@@ -29,7 +29,7 @@ import {
   unregisterEditor,
 } from "./commands";
 import { FormatBar } from "./FormatBar";
-import { editDocument, ensureDocument, useDocumentLines } from "./model";
+import { editDocument, ensureDocument, useDocumentDirty, useDocumentLines } from "./model";
 import { RenderedLine, hasSyntax, parseBlock, rawSegments } from "./render";
 
 /** Below this pane width the format bar collapses its end groups into ⋯.
@@ -79,6 +79,7 @@ interface Selection {
 export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: string }) {
   const note = useNote(noteId).data;
   const docLines = useDocumentLines(noteId);
+  const dirty = useDocumentDirty(noteId);
   const queryLines = useMemo(() => note?.body.split("\n"), [note?.body]);
   const lines = docLines ?? queryLines;
 
@@ -468,9 +469,11 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
       <div className="ed-head">
         {createdLabel(note.createdAt)}
         <div className="slot">
-          {/* header-inline status (r5): dot · chars · updated · where */}
+          {/* header-inline status (r5): dot · chars · updated · where.
+              The dot is the whole save grammar: muted while edits are in
+              flight, olive once the corpus confirmed them. No spinners. */}
           <div className="status-inline">
-            <span className="dot-ok" />
+            <span className={dirty ? "dot-ok dirty" : "dot-ok"} />
             {text.length.toLocaleString()} chars
             <span className="sep" />
             {updatedLabel(note.updatedAt)}

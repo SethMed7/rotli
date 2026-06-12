@@ -14,6 +14,30 @@ const docs = new Map<string, string[]>();
 const subs = new Map<string, Set<() => void>>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
+// ——— the olive-dot grammar: muted while a debounced sync is pending or in
+// flight, olive once the service confirmed the write. NO spinners, ever. ———
+
+const dirtyIds = new Set<string>();
+const dirtySubs = new Set<() => void>();
+
+function setDirty(noteId: string, value: boolean): void {
+  if (dirtyIds.has(noteId) === value) return;
+  if (value) dirtyIds.add(noteId);
+  else dirtyIds.delete(noteId);
+  for (const fn of dirtySubs) fn();
+}
+
+/** True while the note has unsaved edits (pending debounce or sync in flight). */
+export function useDocumentDirty(noteId: string): boolean {
+  const subscribe = useCallback((fn: () => void) => {
+    dirtySubs.add(fn);
+    return () => {
+      dirtySubs.delete(fn);
+    };
+  }, []);
+  return useSyncExternalStore(subscribe, () => dirtyIds.has(noteId));
+}
+
 /** Seed the buffer from the service body. No-op if the note is already open
  * somewhere — the live buffer is the truth, never the (possibly stale) query. */
 export function ensureDocument(noteId: string, body: string): void {
@@ -28,6 +52,7 @@ export function evictDocument(noteId: string): void {
   if (pending !== undefined) clearTimeout(pending);
   timers.delete(noteId);
   docs.delete(noteId);
+  setDirty(noteId, false);
   const set = subs.get(noteId);
   if (set) for (const fn of set) fn();
 }
@@ -48,7 +73,11 @@ function syncNow(noteId: string): void {
   if (!lines) return;
   notesService
     .updateNote(noteId, lines.join("\n"))
-    .then(() => invalidateNotes())
+    .then(() => {
+      // saved — unless newer keystrokes already queued the next sync
+      if (!timers.has(noteId)) setDirty(noteId, false);
+      return invalidateNotes();
+    })
     .catch((err: unknown) => {
       // the note is gone (deleted with a pending sync): drop the orphan buffer.
       // Any other failure keeps the buffer — it stays dirty and the next edit
@@ -60,6 +89,7 @@ function syncNow(noteId: string): void {
 }
 
 function scheduleSync(noteId: string): void {
+  setDirty(noteId, true);
   const pending = timers.get(noteId);
   if (pending !== undefined) clearTimeout(pending);
   timers.set(

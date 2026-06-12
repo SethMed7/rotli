@@ -69,8 +69,92 @@ export async function startWindowDrag(): Promise<void> {
   await getCurrentWindow().startDragging();
 }
 
+// ——— the corpus (phase 2) — typed wrappers over the Rust corpus commands
+//     (src-tauri/src/corpus.rs). Only FsNotesService calls these, and it is
+//     only ever constructed inside the shell; the guard turns a stray browser
+//     call into a loud, clear rejection instead of a silent hang. ———
+
+/** Folder ids ARE relative paths inside the corpus root ("Work/Myela"). */
+export interface CorpusFolder {
+  id: string;
+  name: string;
+  parentId: string | null;
+}
+
+export interface CorpusNoteMeta {
+  id: string;
+  title: string;
+  snippet: string;
+  folderId: string;
+  createdAt: number;
+  updatedAt: number;
+  pinned: boolean;
+}
+
+export interface CorpusListPayload {
+  folders: CorpusFolder[];
+  notes: CorpusNoteMeta[];
+}
+
+export interface CorpusNoteDoc {
+  id: string;
+  folderId: string;
+  /** Frontmatter stripped — exactly what the editor edits. */
+  body: string;
+  createdAt: number;
+  updatedAt: number;
+  pinned: boolean;
+}
+
+/** Tauri command errors arrive as plain strings — normalize to Error so
+ * callers (the editor model's unknown-note eviction) can rely on .message. */
+function corpusInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isTauri()) {
+    return Promise.reject(new Error(`${cmd}: the corpus only exists inside the Tauri shell`));
+  }
+  return invoke<T>(cmd, args).catch((err: unknown) => {
+    throw err instanceof Error ? err : new Error(String(err));
+  });
+}
+
+export function corpusList(): Promise<CorpusListPayload> {
+  return corpusInvoke("corpus_list");
+}
+
+export function corpusRead(id: string): Promise<CorpusNoteDoc> {
+  return corpusInvoke("corpus_read", { id });
+}
+
+export function corpusWrite(id: string, body: string, pinned: boolean): Promise<CorpusNoteMeta> {
+  return corpusInvoke("corpus_write", { id, body, pinned });
+}
+
+export function corpusCreate(folderId: string, body: string): Promise<CorpusNoteMeta> {
+  return corpusInvoke("corpus_create", { folderId, body });
+}
+
+export function corpusDelete(id: string): Promise<void> {
+  return corpusInvoke("corpus_delete", { id });
+}
+
+export function corpusCreateFolder(
+  name: string,
+  parentId: string | null,
+): Promise<CorpusFolder> {
+  return corpusInvoke("corpus_create_folder", { name, parentId });
+}
+
+/** Rust → main window: the corpus changed UNDER the app (a folder dropped in,
+ * a note edited in another editor). Debounced Rust-side; the frontend just
+ * invalidates and refetches — content appears when ready, no spinners. */
+export function onCorpusChanged(cb: () => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen("rotli:corpus-changed", () => cb());
+  return () => void unlisten.then((fn) => fn());
+}
+
 // ——— cross-webview events (the capture card and the main window are separate
-//     webviews; the main window owns the in-memory corpus) ———
+//     webviews; the main window owns the corpus service) ———
 
 export interface CapturePayload {
   /** Correlates the save with its ack — the card clears the draft only then. */

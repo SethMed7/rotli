@@ -19,7 +19,7 @@ import {
   showMainWindow,
 } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
-import { inboxFolder, notesService, ulid } from "../services/notes";
+import { inboxFolderId, notesService, ulid } from "../services/notes";
 
 const MAX_ROWS = 4;
 
@@ -51,7 +51,7 @@ export function CaptureCard() {
     } else {
       // browser review: save through the local service
       setText("");
-      void notesService.createNote(inboxFolder.id, body).then(() => invalidateNotes());
+      void notesService.createNote(inboxFolderId, body).then(() => invalidateNotes());
     }
   };
 

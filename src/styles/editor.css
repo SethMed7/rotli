@@ -31,6 +31,11 @@
   height: 6px;
   border-radius: 50%;
   background: var(--success);
+  transition: background 160ms ease;
+}
+/* the save grammar: muted while edits are in flight, olive when saved */
+.status-inline .dot-ok.dirty {
+  background: var(--border);
 }
 .status-inline .sep {
   width: 3px;

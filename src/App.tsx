@@ -12,10 +12,10 @@ import { Titlebar } from "./components/Titlebar";
 import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
 import { GLASS_BG_SRC } from "./lib/glassBackgrounds";
-import { emitCaptureAck, onCaptureSave, onRebind } from "./lib/tauri";
-import { invalidateNotes } from "./services/hooks";
-import { inboxFolder, notesService } from "./services/notes";
-import { usePanesStore } from "./state/panes";
+import { emitCaptureAck, isTauri, onCaptureSave, onCorpusChanged, onRebind } from "./lib/tauri";
+import { invalidateFolders, invalidateNotes } from "./services/hooks";
+import { inboxFolderId, notesService } from "./services/notes";
+import { activeTabOf, leaves, usePanesStore } from "./state/panes";
 import { applyTheme } from "./state/theme";
 import { useUiStore } from "./state/ui";
 
@@ -48,12 +48,12 @@ function MainShell() {
   }, [focusMode]);
 
   // the capture card lives in another webview; this window owns the corpus —
-  // it saves the capture into Inbox, (on save & open) makes it the active tab,
-  // and acks so the card knows it may clear the draft
+  // it saves the capture into Inbox (a real .md on disk in fs mode), (on
+  // save & open) makes it the active tab, and acks so the card may clear
   useEffect(
     () =>
       onCaptureSave(({ id, body, open }) => {
-        void notesService.createNote(inboxFolder.id, body).then(async (note) => {
+        void notesService.createNote(inboxFolderId, body).then(async (note) => {
           await invalidateNotes();
           if (open) usePanesStore.getState().openNote(note.id);
           emitCaptureAck(id);
@@ -61,6 +61,34 @@ function MainShell() {
       }),
     [],
   );
+
+  // the corpus changed UNDER the app (a folder dropped in, a note edited in
+  // another editor) — refetch everything; content appears when ready
+  useEffect(
+    () =>
+      onCorpusChanged(() => {
+        void invalidateFolders();
+        void invalidateNotes();
+      }),
+    [],
+  );
+
+  // fs mode: the window opens on the freshest note. The in-memory seed decides
+  // this synchronously at module init; the disk corpus answers async — fill
+  // the pristine startup tab once, never replacing anything the user opened.
+  useEffect(() => {
+    if (!isTauri()) return;
+    void notesService.listNotes().then((notes) => {
+      const freshest = notes[0];
+      if (!freshest) return;
+      const { root, openNote } = usePanesStore.getState();
+      const panes = leaves(root);
+      const only = panes[0];
+      const pristine =
+        panes.length === 1 && only && only.tabs.length === 1 && activeTabOf(only).noteId === "";
+      if (pristine) openNote(freshest.id);
+    });
+  }, []);
 
   return (
     <div className="app-window">

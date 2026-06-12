@@ -1,10 +1,14 @@
-// The data seam. All note/folder access goes through this typed interface —
-// today it is in-memory (reload wipes everything; correct for Stage 1), later
-// phases swap the implementation for the markdown corpus without touching UI.
-// Components never call this directly — they consume the TanStack Query hooks
-// in ./hooks.ts.
+// The data seam. All note/folder access goes through this typed interface,
+// and the bottom of this file is the ONE switch point: inside the Tauri shell
+// the markdown corpus on disk is the truth (FsNotesService); in a plain
+// browser (vite dev, design review) the seeded in-memory service remains.
+// Components never call either directly — they consume the TanStack Query
+// hooks in ./hooks.ts.
 
+import { isTauri } from "../lib/tauri";
 import type { Folder, Note, NoteSummary } from "../types";
+import { snippetOf, titleOf } from "./derive";
+import { FsNotesService } from "./fsNotes";
 
 export interface NotesService {
   listFolders(): Promise<Folder[]>;
@@ -32,22 +36,6 @@ export function ulid(now = Date.now()): string {
   let rand = "";
   for (let i = 0; i < 16; i++) rand += B32[Math.floor(Math.random() * 32)] ?? "0";
   return time + rand;
-}
-
-function titleOf(body: string): string {
-  return body.split("\n", 1)[0]?.replace(/^#+\s*/, "").trim() || "Untitled";
-}
-
-/** First lines after the title, markdown punctuation stripped, for list rows. */
-function snippetOf(body: string): string {
-  const lines = body.split("\n");
-  const rest = lines.slice(1).join(" ");
-  return rest
-    .replace(/^#+\s*/g, "")
-    .replace(/[*_`>#]|\[[x ]\]|^- /g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 140);
 }
 
 export class InMemoryNotesService implements NotesService {
@@ -168,6 +156,11 @@ export class InMemoryNotesService implements NotesService {
 }
 
 // ——— the seeded corpus (titles/snippets from the approved gate frames) ———
+// Browser/dev surface ONLY: inside the Tauri shell the demo corpus never even
+// exists in memory — the disk corpus (with its one welcome note) is the truth.
+
+/** ONE switch point — decided once, at startup. */
+const FS_MODE = isTauri();
 
 // Dev-only review affordance: ?empty skips note seeding so the r1 frame E
 // empty state ("Your island is ready") can be looked at. Folders still exist —
@@ -177,37 +170,41 @@ const SEED_EMPTY =
 
 const svc = new InMemoryNotesService();
 
-const DAY = 24 * 60 * 60 * 1000;
-const now = Date.now();
-const todayAt = (h: number, m: number) => {
-  const d = new Date(now);
-  d.setHours(h, m, 0, 0);
-  return Math.min(d.getTime(), now);
-};
-
-export const inboxFolder = svc.seedFolder("Inbox");
-const work = svc.seedFolder("Work");
-const myela = svc.seedFolder("Myela", work.id);
-const oneOnOnes = svc.seedFolder("1-on-1s", work.id);
-const personal = svc.seedFolder("Personal");
-const ideas = svc.seedFolder("Ideas", personal.id);
-
+// fs mode: folder ids ARE relative paths; "Inbox" is born on first run
+let inboxId = "Inbox";
 let firstNoteId = "";
 
-if (!SEED_EMPTY) {
-  svc.seedNote(
-    work.id,
-    `# Pricing decision
+if (!FS_MODE) {
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const todayAt = (h: number, m: number) => {
+    const d = new Date(now);
+    d.setHours(h, m, 0, 0);
+    return Math.min(d.getTime(), now);
+  };
+
+  const inbox = svc.seedFolder("Inbox");
+  inboxId = inbox.id;
+  const work = svc.seedFolder("Work");
+  const myela = svc.seedFolder("Myela", work.id);
+  const oneOnOnes = svc.seedFolder("1-on-1s", work.id);
+  const personal = svc.seedFolder("Personal");
+  const ideas = svc.seedFolder("Ideas", personal.id);
+
+  if (!SEED_EMPTY) {
+    svc.seedNote(
+      work.id,
+      `# Pricing decision
 
 Free local forever. Paid = sync + managed AI. Never gate local features behind the subscription — the corpus is the user's, full stop.
 
 Launch sync at $4, anchor on Obsidian, revisit at 10k users.`,
-    { pinned: true, createdAt: todayAt(8, 5), updatedAt: todayAt(9, 10) },
-  );
+      { pinned: true, createdAt: todayAt(8, 5), updatedAt: todayAt(9, 10) },
+    );
 
-  const notesFirst = svc.seedNote(
-    ideas.id,
-    `# rotli — notes first
+    const notesFirst = svc.seedNote(
+      ideas.id,
+      `# rotli — notes first
 
 Apple Notes feel, **markdown underneath**. Local files, one structure the AI can read. The app is a *visitor* — summon it, write, dismiss it.
 
@@ -220,62 +217,69 @@ Apple Notes feel, **markdown underneath**. Local files, one structure the AI can
 > The folder of files *is* the product. Every view, every backend, every AI is a reader.
 
 Later: breve plugs into the same corpus and the Wiki answers from it. Nothing changes shape.`,
-    { createdAt: todayAt(9, 42), updatedAt: todayAt(9, 42) },
-  );
-  firstNoteId = notesFirst.id;
+      { createdAt: todayAt(9, 42), updatedAt: todayAt(9, 42) },
+    );
+    firstNoteId = notesFirst.id;
 
-  svc.seedNote(
-    myela.id,
-    `# Q3 priorities — Myela
+    svc.seedNote(
+      myela.id,
+      `# Q3 priorities — Myela
 
 Ship the gateway migration, land the issuing portal rebuild, and get the partner reporting story straight before the platform review.`,
-    { createdAt: todayAt(7, 30), updatedAt: todayAt(7, 30) },
-  );
+      { createdAt: todayAt(7, 30), updatedAt: todayAt(7, 30) },
+    );
 
-  svc.seedNote(
-    work.id,
-    `# Q3 platform review — prep
+    svc.seedNote(
+      work.id,
+      `# Q3 platform review — prep
 
 Three things must land before Thursday: the settlement mapping, the gateway export enum, and a clear pricing answer we can defend in front of the partners.
 
 The demo flows from capture → recall: open with the island story, close with the cited answer.
 
 Maria owns the reconciliation walkthrough; I take pricing.`,
-    { createdAt: now - DAY, updatedAt: now - DAY },
-  );
+      { createdAt: now - DAY, updatedAt: now - DAY },
+    );
 
-  svc.seedNote(
-    ideas.id,
-    `# Quokka world — where it lives
+    svc.seedNote(
+      ideas.id,
+      `# Quokka world — where it lives
 
 Onboarding, empty states, about. Never in the editor, never in notifications — the world appears at low-frequency moments only.`,
-    { createdAt: now - DAY, updatedAt: now - DAY },
-  );
+      { createdAt: now - DAY, updatedAt: now - DAY },
+    );
 
-  svc.seedNote(
-    oneOnOnes.id,
-    `# 1-on-1 — Sarah
+    svc.seedNote(
+      oneOnOnes.id,
+      `# 1-on-1 — Sarah
 
 Ship review Friday. She'll own the gateway migration writeup. Follow up on the Lithic question and the Q3 growth path conversation.`,
-    { createdAt: now - 3 * DAY, updatedAt: now - 3 * DAY },
-  );
+      { createdAt: now - 3 * DAY, updatedAt: now - 3 * DAY },
+    );
 
-  svc.seedNote(
-    personal.id,
-    `# Groceries
+    svc.seedNote(
+      personal.id,
+      `# Groceries
 
 Olive oil, sourdough, oat milk, blueberries, the good butter.`,
-    { createdAt: now - 4 * DAY, updatedAt: now - 4 * DAY },
-  );
+      { createdAt: now - 4 * DAY, updatedAt: now - 4 * DAY },
+    );
 
-  svc.seedNote(
-    inboxFolder.id,
-    `# Call the bank about the wire limit before Friday`,
-    { createdAt: now - 2 * DAY, updatedAt: now - 2 * DAY },
-  );
+    svc.seedNote(
+      inbox.id,
+      `# Call the bank about the wire limit before Friday`,
+      { createdAt: now - 2 * DAY, updatedAt: now - 2 * DAY },
+    );
+  }
 }
 
-/** The note the window opens on (gate frame A); "" when the corpus is empty. */
+/** Where captures and ⌘N land when no folder is selected — "Inbox" on disk
+ * (fs mode), the seeded folder's id in the browser. */
+export const inboxFolderId = inboxId;
+
+/** The note the window opens on (gate frame A); "" when nothing is known at
+ * startup — fs mode resolves the freshest note async (App.tsx fills the
+ * pristine first tab once the corpus answers). */
 export const initialNoteId = firstNoteId;
 
-export const notesService: NotesService = svc;
+export const notesService: NotesService = FS_MODE ? new FsNotesService() : svc;

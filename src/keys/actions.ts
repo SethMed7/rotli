@@ -11,7 +11,7 @@ import {
   activeEditor,
 } from "../editor/commands";
 import { invalidateNotes } from "../services/hooks";
-import { inboxFolder, notesService } from "../services/notes";
+import { inboxFolderId, notesService } from "../services/notes";
 import { captureHandle } from "../lib/captureHandle";
 import { hideMainWindow, summon, toggleMainWindow } from "../lib/tauri";
 import { usePanesStore } from "../state/panes";
@@ -24,7 +24,7 @@ async function newNote(): Promise<void> {
   const { selectedFolderId } = useUiStore.getState();
   const folderId =
     selectedFolderId === ALL_NOTES || selectedFolderId === RECENT
-      ? inboxFolder.id
+      ? inboxFolderId
       : selectedFolderId;
   const note = await notesService.createNote(folderId, "");
   await invalidateNotes();
