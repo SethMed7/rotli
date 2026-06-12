@@ -10,8 +10,10 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
+        "label": "main",
         "title": "rotli",
         "width": 980,
         "height": 640,
@@ -20,6 +22,20 @@
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "visible": true
+      },
+      {
+        "label": "capture",
+        "url": "index.html?window=capture",
+        "title": "rotli capture",
+        "width": 560,
+        "height": 170,
+        "resizable": false,
+        "visible": false,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "center": true
       }
     ],
     "security": {
