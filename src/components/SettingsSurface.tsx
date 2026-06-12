@@ -5,10 +5,17 @@
 // the rebind list: click a chord, press the next combo (a quiet inline note if
 // the chord is taken).
 
-import { type KeyboardEvent, useState } from "react";
+import { type KeyboardEvent, useEffect, useState } from "react";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
-import { type KeyAction, allActions, conflictFor, dispatch, rebind } from "../keys/registry";
+import {
+  type KeyAction,
+  allActions,
+  conflictFor,
+  dispatch,
+  rebind,
+  setDispatchSuspended,
+} from "../keys/registry";
 import { GLASS_BG_SRC } from "../lib/glassBackgrounds";
 import { setDockVisible, setHideOnBlur } from "../lib/tauri";
 import {
@@ -58,10 +65,17 @@ const HK_SECTIONS: { prefix: string; label: string }[] = [
 function HotkeysPane() {
   const overrides = useBindingsStore((s) => s.overrides);
   const [recordingId, setRecordingId] = useState<string | null>(null);
-  const [conflict, setConflict] = useState<{ id: string; withTitle: string } | null>(null);
+  const [note, setNote] = useState<{ id: string; text: string } | null>(null);
   const [query, setQuery] = useState("");
 
   const chordOf = (a: KeyAction) => resolveChord(overrides, a.id, a.defaultChord);
+
+  // belt-and-braces under the recorder's stopPropagation: while recording, the
+  // live dispatcher stands down so a half-typed combo can't fire an action
+  useEffect(() => {
+    setDispatchSuspended(recordingId !== null);
+    return () => setDispatchSuspended(false);
+  }, [recordingId]);
 
   // The recording button captures the next keydown itself (it IS the rebind
   // widget — like a text input handling its own typing); stopPropagation keeps
@@ -69,17 +83,29 @@ function HotkeysPane() {
   const onRecordKeyDown = (action: KeyAction) => (event: KeyboardEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    if (event.key === "Escape") {
+      setRecordingId(null); // Esc cancels recording — it is not recordable
+      return;
+    }
     const chord = chordFromEvent(event.nativeEvent);
     if (!chord) return; // modifiers alone — keep listening
+    const key = chord.split("+").pop() ?? "";
+    // bare keys must stay typable everywhere: require a real modifier
+    // (F-keys excepted) before a chord can be a binding
+    if (!(event.ctrlKey || event.altKey || event.metaKey) && !/^F\d{1,2}$/.test(key)) return;
     const taken = conflictFor(action.id, chord);
     if (taken) {
-      setConflict({ id: action.id, withTitle: taken.title });
+      setNote({ id: action.id, text: `taken by “${taken.title}”` });
       setRecordingId(null);
       return;
     }
-    setConflict(null);
+    setNote(null);
     setRecordingId(null);
-    void rebind(action.id, chord);
+    rebind(action.id, chord).catch(() => {
+      // the OS refused the chord (owned by another app) — nothing committed,
+      // the old binding stays everywhere; say so quietly, in place
+      setNote({ id: action.id, text: "the system kept the previous chord" });
+    });
   };
 
   const q = query.trim().toLowerCase();
@@ -107,16 +133,17 @@ function HotkeysPane() {
     return (
       <div className="hkrow" key={action.id}>
         <span className="hklabel">{action.title}</span>
-        {conflict?.id === action.id && (
-          <span className="hkconflict">taken by “{conflict.withTitle}”</span>
-        )}
+        {note?.id === action.id && <span className="hkconflict">{note.text}</span>}
         <button
           type="button"
           className={recording ? "hkchord recording" : "hkchord"}
           aria-label={`Rebind ${action.title}`}
-          onClick={() => {
+          onClick={(event) => {
+            // WebKit does not focus buttons on click — without this the
+            // recorder never hears a key and the row sticks on "press keys…"
+            event.currentTarget.focus();
             setRecordingId(action.id);
-            setConflict(null);
+            setNote(null);
           }}
           onKeyDown={recording ? onRecordKeyDown(action) : undefined}
           onBlur={() => setRecordingId((id) => (id === action.id ? null : id))}

@@ -53,25 +53,33 @@ export function currentChord(actionId: string): string | null {
 }
 
 /** The other action already holding `chord`, if any (for the quiet inline
- * conflict note in Settings → Hotkeys). */
+ * conflict note in Settings → Hotkeys). Each webview runs its own dispatcher,
+ * so chords only collide on the SAME surface — or when either side is
+ * OS-global (a global chord fires everywhere). */
 export function conflictFor(actionId: string, chord: string): KeyAction | null {
+  const target = actions.get(actionId);
+  if (!target) return null;
   const n = normalizeChord(chord);
   for (const action of actions.values()) {
     if (action.id === actionId) continue;
+    if (action.surface !== target.surface && !action.global && !target.global) continue;
     const c = currentChord(action.id);
     if (c && normalizeChord(c) === n) return action;
   }
   return null;
 }
 
-/** Rebind an action. Updates the bindings store, mirrors to the other webview,
- * and round-trips global chords through Rust so the OS registration follows. */
+/** Rebind an action. For global actions the OS registration goes FIRST — only
+ * a successful round-trip commits the override (otherwise the UI would show a
+ * chord the OS never fires; Rust keeps the old chord registered on failure and
+ * the rejection bubbles to the caller for the quiet inline note). `null`
+ * unbinds — including OS-side for global actions. */
 export async function rebind(actionId: string, chord: string | null): Promise<void> {
   const action = actions.get(actionId);
   if (!action) return;
+  if (action.global) await setGlobalShortcut(actionId, chord ? toAccelerator(chord) : null);
   useBindingsStore.getState().setOverride(actionId, chord);
   emitRebind(actionId, chord);
-  if (action.global && chord) await setGlobalShortcut(actionId, toAccelerator(chord));
 }
 
 /** Apply a rebind that arrived from the other webview (no re-emit, no invoke). */
@@ -81,12 +89,38 @@ export function applyRebind(actionId: string, chord: string | null): void {
 
 let detach: (() => void) | null = null;
 
+let suspended = false;
+
+/** While Settings → Hotkeys records a chord the dispatcher stands down, so a
+ * half-recorded combo can never fire a live action under the recorder. */
+export function setDispatchSuspended(on: boolean): void {
+  suspended = on;
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT"
+  );
+}
+
 /** Attach the one dispatcher for this webview's surface. Idempotent. */
 export function attachDispatcher(surface: Surface): () => void {
   if (detach) return detach;
   const onKeyDown = (event: KeyboardEvent) => {
+    if (suspended) return;
     const pressed = chordFromEvent(event);
     if (!pressed) return;
+    // a modifier-less chord must never swallow typing: inside editable targets
+    // only Esc / Enter / F-keys may dispatch bare (the capture card's ⏎ save,
+    // Esc everywhere) — a bare-letter rebind stays typable in text fields
+    if (!(event.ctrlKey || event.altKey || event.metaKey) && isEditableTarget(event.target)) {
+      const key = pressed.split("+").pop() ?? "";
+      if (!/^(Esc|Enter|F\d{1,2})$/.test(key)) return;
+    }
     for (const action of actions.values()) {
       if (action.global || action.surface !== surface) continue;
       const chord = currentChord(action.id);

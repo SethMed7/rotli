@@ -36,9 +36,14 @@ export async function summon(): Promise<void> {
   await invoke("summon");
 }
 
-/** Re-register an OS-wide chord (used when a global action is rebound).
- * actionId ∈ { "capture.summon", "app.toggleWindow" }. */
-export async function setGlobalShortcut(actionId: string, accelerator: string): Promise<void> {
+/** Re-register an OS-wide chord (used when a global action is rebound);
+ * null unregisters it. actionId ∈ { "capture.summon", "app.toggleWindow" }.
+ * Rejects when the OS refuses the chord — the caller must NOT have committed
+ * the rebind yet. */
+export async function setGlobalShortcut(
+  actionId: string,
+  accelerator: string | null,
+): Promise<void> {
   if (!isTauri()) return;
   await invoke("set_summon_shortcut", { actionId, accelerator });
 }
@@ -68,19 +73,35 @@ export async function startWindowDrag(): Promise<void> {
 //     webviews; the main window owns the in-memory corpus) ———
 
 export interface CapturePayload {
+  /** Correlates the save with its ack — the card clears the draft only then. */
+  id: string;
   body: string;
   open: boolean;
 }
 
 /** Capture card → main window: "save this into Inbox" (+ open it if asked). */
-export function emitCaptureSave(body: string, open: boolean): void {
+export function emitCaptureSave(id: string, body: string, open: boolean): void {
   if (!isTauri()) return;
-  void emit("rotli:capture", { body, open } satisfies CapturePayload);
+  void emit("rotli:capture", { id, body, open } satisfies CapturePayload);
 }
 
 export function onCaptureSave(cb: (payload: CapturePayload) => void): () => void {
   if (!isTauri()) return () => {};
   const unlisten = listen<CapturePayload>("rotli:capture", (event) => cb(event.payload));
+  return () => void unlisten.then((fn) => fn());
+}
+
+/** Main window → capture card: the capture landed in the corpus — safe to
+ * clear the draft. Without this round-trip a capture emitted while the main
+ * webview isn't listening would vanish along with the already-cleared draft. */
+export function emitCaptureAck(id: string): void {
+  if (!isTauri()) return;
+  void emit("rotli:capture-ack", id);
+}
+
+export function onCaptureAck(cb: (id: string) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen<string>("rotli:capture-ack", (event) => cb(event.payload));
   return () => void unlisten.then((fn) => fn());
 }
 

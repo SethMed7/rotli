@@ -14,17 +14,19 @@ import {
   emitCaptureSave,
   hideCaptureWindow,
   isTauri,
+  onCaptureAck,
   onCaptureShow,
   showMainWindow,
 } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
-import { inboxFolder, notesService } from "../services/notes";
+import { inboxFolder, notesService, ulid } from "../services/notes";
 
 const MAX_ROWS = 4;
 
 export function CaptureCard() {
   const [text, setText] = useState("");
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const pendingRef = useRef<{ id: string; sent: string } | null>(null);
 
   const dismiss = () => {
     void hideCaptureWindow(); // the draft stays — summoning again resumes it
@@ -36,17 +38,35 @@ export function CaptureCard() {
       dismiss(); // an empty ⏎ is a dismissal, quietly
       return;
     }
-    setText("");
     if (isTauri()) {
-      // the main webview owns the in-memory corpus; it saves + (maybe) opens
-      emitCaptureSave(body, openAfter);
+      // the main webview owns the in-memory corpus; it saves + (maybe) opens.
+      // The draft is NOT cleared here — only the main window's ack clears it,
+      // so a capture emitted while that webview isn't listening (just after
+      // launch, mid-reload) is never lost: re-summoning resumes the draft.
+      const id = ulid();
+      pendingRef.current = { id, sent: text };
+      emitCaptureSave(id, body, openAfter);
       void hideCaptureWindow();
       if (openAfter) void showMainWindow();
     } else {
       // browser review: save through the local service
+      setText("");
       void notesService.createNote(inboxFolder.id, body).then(() => invalidateNotes());
     }
   };
+
+  // the saved capture landed in the corpus — clear the draft (unless the user
+  // re-summoned and kept typing in the meantime)
+  useEffect(
+    () =>
+      onCaptureAck((id) => {
+        const pending = pendingRef.current;
+        if (pending?.id !== id) return;
+        pendingRef.current = null;
+        setText((t) => (t === pending.sent ? "" : t));
+      }),
+    [],
+  );
 
   // the registry's capture.save / capture.saveAndOpen / capture.dismiss route here
   useEffect(() => {
@@ -66,7 +86,6 @@ export function CaptureCard() {
           <img src={rMark} alt="" width={22} height={22} />
           <textarea
             ref={taRef}
-            // biome-ignore lint: the card exists to type into
             autoFocus
             value={text}
             rows={rows}

@@ -12,7 +12,7 @@ import { Titlebar } from "./components/Titlebar";
 import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
 import { GLASS_BG_SRC } from "./lib/glassBackgrounds";
-import { onCaptureSave, onRebind } from "./lib/tauri";
+import { emitCaptureAck, onCaptureSave, onRebind } from "./lib/tauri";
 import { invalidateNotes } from "./services/hooks";
 import { inboxFolder, notesService } from "./services/notes";
 import { usePanesStore } from "./state/panes";
@@ -48,13 +48,15 @@ function MainShell() {
   }, [focusMode]);
 
   // the capture card lives in another webview; this window owns the corpus —
-  // it saves the capture into Inbox and (on save & open) makes it the active tab
+  // it saves the capture into Inbox, (on save & open) makes it the active tab,
+  // and acks so the card knows it may clear the draft
   useEffect(
     () =>
-      onCaptureSave(({ body, open }) => {
+      onCaptureSave(({ id, body, open }) => {
         void notesService.createNote(inboxFolder.id, body).then(async (note) => {
           await invalidateNotes();
           if (open) usePanesStore.getState().openNote(note.id);
+          emitCaptureAck(id);
         });
       }),
     [],
@@ -95,8 +97,12 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     const src =
-      glassBackground === "custom" ? customBackground : (GLASS_BG_SRC as Record<string, string>)[glassBackground];
-    if (!glassMode || glassBackground === "field" || !src) {
+      glassBackground === "custom"
+        ? customBackground
+        : glassBackground === "field"
+          ? null
+          : GLASS_BG_SRC[glassBackground];
+    if (!glassMode || !src) {
       root.dataset.glassBg = "field";
       root.style.removeProperty("--glass-wallpaper");
       return;

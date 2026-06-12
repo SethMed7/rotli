@@ -36,7 +36,7 @@ const BLUR_TOGGLE_GRACE: Duration = Duration::from_millis(300);
 /// from the frontend via the `set_summon_shortcut` command).
 struct GlobalChords {
     /// `capture.summon` — the quick-capture card.
-    capture: Mutex<String>,
+    capture: Mutex<Option<String>>,
     /// `app.toggleWindow` — main-window toggle (the way the app opens).
     main_toggle: Mutex<Option<String>>,
 }
@@ -74,10 +74,22 @@ fn show_capture(app: &AppHandle) {
         return;
     };
     let centered = (|| -> tauri::Result<()> {
+        // ONE coordinate space throughout: cursor_position() is PHYSICAL, so
+        // the monitor is found by its physical rect (monitor_from_point tests
+        // against LOGICAL display bounds — wrong on every Retina screen).
         let cursor = app.cursor_position()?;
-        let Some(monitor) = app.monitor_from_point(cursor.x, cursor.y)? else {
-            return Err(tauri::Error::WindowNotFound);
-        };
+        let monitor = app
+            .available_monitors()?
+            .into_iter()
+            .find(|m| {
+                let pos = m.position();
+                let size = m.size();
+                cursor.x >= pos.x as f64
+                    && cursor.x < (pos.x + size.width as i32) as f64
+                    && cursor.y >= pos.y as f64
+                    && cursor.y < (pos.y + size.height as i32) as f64
+            })
+            .ok_or(tauri::Error::WindowNotFound)?;
         let win = window.outer_size()?;
         let pos = monitor.position();
         let size = monitor.size();
@@ -114,7 +126,15 @@ fn toggle_main(app: &AppHandle, respect_blur_grace: bool) {
         return;
     };
     if window.is_visible().unwrap_or(false) {
-        let _ = window.hide();
+        // visible AND focused → hide. Visible but BEHIND other apps (the
+        // Stay-open setting) → the summon chord brings it forward instead
+        // of hiding a window the user can't even see properly.
+        if window.is_focused().unwrap_or(true) {
+            let _ = window.hide();
+            return;
+        }
+        let _ = window.show();
+        let _ = window.set_focus();
         return;
     }
     if respect_blur_grace {
@@ -182,41 +202,42 @@ fn set_dock_visible(app: AppHandle, visible: bool) {
 }
 
 /// Re-register a global chord (the keys registry calls this when a global
-/// action is rebound). Keeps the old chord if the new one fails to register,
-/// so summon is never lost.
+/// action is rebound); `None` unbinds it OS-side. Keeps the old chord if the
+/// new one fails to register — and returns Err so the frontend does NOT
+/// commit a chord the OS never fires.
 #[tauri::command]
-fn set_summon_shortcut(app: AppHandle, action_id: String, accelerator: String) -> Result<(), String> {
-    accelerator
-        .parse::<Shortcut>()
-        .map_err(|e| format!("invalid accelerator {accelerator:?}: {e}"))?;
+fn set_summon_shortcut(
+    app: AppHandle,
+    action_id: String,
+    accelerator: Option<String>,
+) -> Result<(), String> {
+    if let Some(acc) = accelerator.as_deref() {
+        acc.parse::<Shortcut>()
+            .map_err(|e| format!("invalid accelerator {acc:?}: {e}"))?;
+    }
 
     let shortcuts = app.global_shortcut();
     let chords = app.state::<GlobalChords>();
 
-    match action_id.as_str() {
-        "capture.summon" => {
-            let mut current = chords.capture.lock().unwrap();
-            let _ = shortcuts.unregister(current.as_str());
-            if let Err(e) = shortcuts.register(accelerator.as_str()) {
-                let _ = shortcuts.register(current.as_str());
-                return Err(format!("could not register {accelerator:?}: {e}"));
-            }
-            *current = accelerator;
-        }
-        "app.toggleWindow" => {
-            let mut current = chords.main_toggle.lock().unwrap();
-            if let Some(old) = current.as_deref() {
-                let _ = shortcuts.unregister(old);
-            }
-            if let Err(e) = shortcuts.register(accelerator.as_str()) {
+    let mut current = match action_id.as_str() {
+        "capture.summon" => chords.capture.lock().unwrap(),
+        "app.toggleWindow" => chords.main_toggle.lock().unwrap(),
+        other => return Err(format!("unknown global action: {other}")),
+    };
+    if let Some(old) = current.as_deref() {
+        let _ = shortcuts.unregister(old);
+    }
+    match accelerator {
+        Some(acc) => {
+            if let Err(e) = shortcuts.register(acc.as_str()) {
                 if let Some(old) = current.as_deref() {
                     let _ = shortcuts.register(old);
                 }
-                return Err(format!("could not register {accelerator:?}: {e}"));
+                return Err(format!("could not register {acc:?}: {e}"));
             }
-            *current = Some(accelerator);
+            *current = Some(acc);
         }
-        other => return Err(format!("unknown global action: {other}")),
+        None => *current = None,
     }
     Ok(())
 }
@@ -235,7 +256,7 @@ pub fn run() {
                         stored.parse::<Shortcut>().is_ok_and(|s| s == *shortcut)
                     };
                     let capture = chords.capture.lock().unwrap().clone();
-                    if matches(&capture) {
+                    if capture.as_deref().is_some_and(matches) {
                         do_summon(app);
                         return;
                     }
@@ -247,7 +268,7 @@ pub fn run() {
                 .build(),
         )
         .manage(GlobalChords {
-            capture: Mutex::new(DEFAULT_CAPTURE.to_string()),
+            capture: Mutex::new(Some(DEFAULT_CAPTURE.to_string())),
             main_toggle: Mutex::new(Some(DEFAULT_MAIN_TOGGLE.to_string())),
         })
         .manage(LastBlurHide(Mutex::new(None)))
@@ -268,8 +289,14 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             // ⌥Space opens the app; ⌥C is the one-breath capture (both rebindable).
-            app.global_shortcut().register(DEFAULT_MAIN_TOGGLE)?;
-            app.global_shortcut().register(DEFAULT_CAPTURE)?;
+            // Best-effort: another app owning a chord (launchers love ⌥Space)
+            // must DEGRADE — the app still launches, the chord stays rebindable
+            // in Settings → Hotkeys — never abort startup.
+            for chord in [DEFAULT_MAIN_TOGGLE, DEFAULT_CAPTURE] {
+                if let Err(e) = app.global_shortcut().register(chord) {
+                    eprintln!("rotli: global shortcut {chord} unavailable ({e}) — rebind it in Settings");
+                }
+            }
 
             // Menu-bar tray: the kit r-mark as a TEMPLATE icon (macOS tints it).
             // 44px = 22px logical @2x; tray-icon scales NSImage to the bar height.
@@ -303,10 +330,20 @@ pub fn run() {
         })
         // Click-away hide (the visitor law) — a setting since 2026-06-12:
         // "Stay open" turns it off for the main window. Capture always hides.
+        // And closing NEVER destroys (the summon law: summon shows LIVING
+        // windows): the traffic-light close — or Cmd+W reaching the default
+        // macOS menu's Close Window — hides instead, or summon, tray click and
+        // "Open rotli" would all go dead for the rest of the process.
         .on_window_event(|window, event| {
-            let WindowEvent::Focused(false) = event else {
-                return;
-            };
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    return;
+                }
+                WindowEvent::Focused(false) => {}
+                _ => return,
+            }
             match window.label() {
                 "main" => {
                     let app = window.app_handle();
