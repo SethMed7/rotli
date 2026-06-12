@@ -1,6 +1,7 @@
-// Quick capture — the one-breath card (r1 frame C, CSS transfers): r-mark +
+// Quick capture — the one-breath card (r2 frame C, CSS transfers): r-mark +
 // one field; first line becomes the title; footer = '→ Inbox' chip · ⏎ save ·
-// ⌘⏎ save & open · Esc dismiss. Lives in its own frameless always-on-top
+// Esc dismiss (⌘⏎ save-and-open still works but is demoted to the palette —
+// the r2 dedup call). Lives in its own frameless always-on-top
 // transparent-edged window (?window=capture); renders standalone in a plain
 // browser for review. The keys route through the registry's capture.* actions
 // via the capture handle — the textarea only handles its own typing
@@ -80,9 +81,6 @@ export function CaptureCard() {
           <span className="grow" />
           <span>
             <kbd>⏎</kbd> save
-          </span>
-          <span>
-            <kbd>⌘⏎</kbd> save &amp; open
           </span>
           <span>
             <kbd>Esc</kbd> dismiss

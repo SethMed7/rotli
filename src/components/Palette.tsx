@@ -21,7 +21,7 @@ import { type KeyAction, allActions, dispatch, getAction } from "../keys/registr
 import { useTransientPopover } from "../lib/popover";
 import { useFolders, useNotes } from "../services/hooks";
 import { useMruStore } from "../state/mru";
-import { leaves, useFocusedNoteId, usePanesStore } from "../state/panes";
+import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { Icon } from "./Icon";
@@ -86,7 +86,6 @@ export function Palette({ onClose }: { onClose: () => void }) {
   const focusedPaneId = usePanesStore((s) => s.focusedPaneId);
   const openNote = usePanesStore((s) => s.openNote);
   const activateTab = usePanesStore((s) => s.activateTab);
-  const focusedNoteId = useFocusedNoteId();
   const selectedFolderId = useUiStore((s) => s.selectedFolderId);
 
   const groups = useMemo<Group[]>(() => {
@@ -121,9 +120,26 @@ export function Palette({ onClose }: { onClose: () => void }) {
     });
 
     if (!q) {
+      // Recent includes the open note (gate r3F: the focused note is row 1 —
+      // an empty palette is a dead palette); recents living as tabs in the
+      // focused pane carry their ⌘1…⌘8 jump hint (tab-jump education).
+      const focusedTabs = findLeaf(root, focusedPaneId)?.tabs ?? [];
+      const recentRow = (n: NoteSummary): Row => {
+        const i = focusedTabs.findIndex((t) => t.noteId === n.id);
+        const tab = i >= 0 && i < 8 ? focusedTabs[i] : undefined;
+        if (!tab) return noteRow(n);
+        return {
+          ...noteRow(n),
+          hint: <kbd>{formatChord(`Meta+${i + 1}`)}</kbd>,
+          run: () => {
+            activateTab(focusedPaneId, tab.id);
+            onClose();
+          },
+        };
+      };
       const recents = mruIds
         .map((id) => noteById.get(id))
-        .filter((n): n is NoteSummary => n !== undefined && n.id !== focusedNoteId)
+        .filter((n): n is NoteSummary => n !== undefined)
         .slice(0, 5);
       const newNoteIn =
         selectedFolderId === ALL_NOTES || selectedFolderId === RECENT
@@ -138,7 +154,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
       suggest("panes.splitRight");
       suggest("view.focus");
       return [
-        ...(recents.length > 0 ? [{ name: "Recent", rows: recents.map(noteRow) }] : []),
+        ...(recents.length > 0 ? [{ name: "Recent", rows: recents.map(recentRow) }] : []),
         { name: "Suggested", rows: suggested },
       ];
     }
@@ -187,7 +203,6 @@ export function Palette({ onClose }: { onClose: () => void }) {
     overrides,
     root,
     focusedPaneId,
-    focusedNoteId,
     selectedFolderId,
     openNote,
     activateTab,

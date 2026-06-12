@@ -74,6 +74,11 @@
   background: var(--tint);
   font-weight: 500;
 }
+/* the selected row's icon is the rail's clay punctuation (r1 gate:
+   .frow.sel svg{color:var(--accent-text)} — same clay in dark) */
+.frow.sel svg {
+  color: var(--accent-text);
+}
 /* dark folder selection gains the 3px clay bar — one selection grammar (r2) */
 :root[data-theme="dark"] .frow.sel::before {
   content: "";
