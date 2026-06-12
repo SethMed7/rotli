@@ -41,11 +41,3 @@ export function useCreateFolder() {
     onSuccess: () => invalidateFolders(),
   });
 }
-
-export function useCreateNote() {
-  return useMutation({
-    mutationFn: ({ folderId, body }: { folderId: string; body: string }) =>
-      notesService.createNote(folderId, body),
-    onSuccess: () => invalidateNotes(),
-  });
-}

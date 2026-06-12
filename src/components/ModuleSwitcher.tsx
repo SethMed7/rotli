@@ -4,6 +4,7 @@
 // does nothing (no dead-end dialogs).
 
 import { useEffect, useRef } from "react";
+import { useTransientPopover } from "../lib/popover";
 import { Icon, type RotliIconName } from "./Icon";
 
 interface UpcomingModule {
@@ -24,15 +25,15 @@ const UPCOMING: UpcomingModule[] = [
 export function ModuleSwitcher({ onClose }: { onClose: () => void }) {
   const popRef = useRef<HTMLDivElement>(null);
 
+  // the standard transient plumbing: outside-click closes, and Esc unwinds
+  // through the ui store's transient stack in true topmost-first order —
+  // no ad-hoc listeners. The identity button (the anchor) sits outside popRef;
+  // its own onClick toggles, and the stack close fires first on outside-click.
+  const anchorRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    const onMouseDown = (event: MouseEvent) => {
-      const target = event.target;
-      if (target instanceof Element && target.closest(".identity-wrap")) return;
-      onClose();
-    };
-    document.addEventListener("mousedown", onMouseDown);
-    return () => document.removeEventListener("mousedown", onMouseDown);
-  }, [onClose]);
+    anchorRef.current = popRef.current?.closest(".identity-wrap") ?? null;
+  }, []);
+  useTransientPopover([popRef, anchorRef], true, onClose);
 
   return (
     <div ref={popRef} className="modpop" role="menu" aria-label="Modules">

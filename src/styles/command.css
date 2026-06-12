@@ -722,12 +722,6 @@
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
 }
-.themerow {
-  display: flex;
-  gap: 6px;
-  max-width: 320px;
-}
-
 /* ——— focus mode (r3 frame E): chrome leaves — exits faster than entries ———
    The attribute lives on <html>; everything below restores on its removal
    with the (slower) enter timing declared on the base rules. */

@@ -115,7 +115,9 @@ export function Palette({ onClose }: { onClose: () => void }) {
       hint: kbdHint(a),
       run: () => {
         onClose();
-        dispatch(a.id);
+        // selecting "Search notes & actions" from inside the palette would
+        // close-then-reopen it — closing IS the toggle here
+        if (a.id !== "palette.toggle") dispatch(a.id);
       },
     });
 
@@ -131,8 +133,10 @@ export function Palette({ onClose }: { onClose: () => void }) {
         return {
           ...noteRow(n),
           hint: <kbd>{formatChord(`Meta+${i + 1}`)}</kbd>,
-          run: () => {
-            activateTab(focusedPaneId, tab.id);
+          run: (newTab) => {
+            // ⌘⏎ keeps the footer's promise even on a row that is already a tab
+            if (newTab) openNote(n.id, { newTab: true });
+            else activateTab(focusedPaneId, tab.id);
             onClose();
           },
         };
@@ -175,8 +179,9 @@ export function Palette({ onClose }: { onClose: () => void }) {
             ) : (
               <span className="muted">Open tab</span>
             ),
-          run: () => {
-            activateTab(leaf.id, tab.id);
+          run: (newTab) => {
+            if (newTab) openNote(n.id, { newTab: true });
+            else activateTab(leaf.id, tab.id);
             onClose();
           },
         });
@@ -186,8 +191,10 @@ export function Palette({ onClose }: { onClose: () => void }) {
       .filter((n) => fuzzy(q, n.title) || fuzzy(q, n.snippet))
       .slice(0, 8)
       .map(noteRow);
+    // capture-surface actions live in the other webview — their handle is
+    // null here and dispatching them would silently no-op
     const actionRows = allActions()
-      .filter((a) => fuzzy(q, a.title))
+      .filter((a) => a.surface === "main" && fuzzy(q, a.title))
       .slice(0, 10)
       .map((a) => actionRow(a));
     return [
@@ -240,7 +247,6 @@ export function Palette({ onClose }: { onClose: () => void }) {
         <div className="pal-in">
           <SearchGlyph size={16} />
           <input
-            // biome-ignore lint: the palette exists to type into
             autoFocus
             type="text"
             value={query}

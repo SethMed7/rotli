@@ -93,9 +93,8 @@ export class InMemoryNotesService implements NotesService {
 
   async listNotes(folderId?: string): Promise<NoteSummary[]> {
     const all = [...this.notes.values()];
-    const scoped = folderId
-      ? all.filter((n) => this.descendants(folderId).has(n.folderId))
-      : all;
+    const within = folderId ? this.descendants(folderId) : null; // once, not per note
+    const scoped = within ? all.filter((n) => within.has(n.folderId)) : all;
     return scoped
       .map(({ body: _body, ...summary }) => summary)
       .sort((a, b) =>

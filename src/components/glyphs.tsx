@@ -5,8 +5,8 @@
 import type { ReactNode } from "react";
 
 interface GlyphProps {
-  size?: number;
-  className?: string;
+  size?: number | undefined;
+  className?: string | undefined;
 }
 
 function Glyph({ size = 15, className, children }: GlyphProps & { children: ReactNode }) {

@@ -222,7 +222,11 @@
 }
 
 /* chrome becomes glass: heavy blur + saturation, a specular top edge, a soft
-   hue-colored drop. The editor canvas gets its own (near-solid or paper) layer. */
+   hue-colored drop. The editor canvas gets its own (near-solid or paper) layer.
+   The frosted floor is deliberately HIGH-opacity (audit 2026-06-12): the glass
+   theme's ink is fixed, so the panel itself must guarantee its luminance — a
+   dark wallpaper under glass-light (or a white canvas under glass-dark) must
+   never invert the chrome's contrast. */
 :root[data-theme="glass-light"] .titlebar,
 :root[data-theme="glass-light"] .folders,
 :root[data-theme="glass-light"] .notelist,
@@ -234,7 +238,7 @@
 :root[data-theme="glass-light"] .aapanel,
 :root[data-theme="glass-light"] .palette,
 :root[data-theme="glass-light"] .capture {
-  background: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.58);
   -webkit-backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
   backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
   border-color: rgba(255, 255, 255, 0.55);
@@ -254,7 +258,7 @@
 :root[data-theme="glass-dark"] .aapanel,
 :root[data-theme="glass-dark"] .palette,
 :root[data-theme="glass-dark"] .capture {
-  background: rgba(18, 21, 26, 0.42);
+  background: rgba(18, 21, 26, 0.58);
   -webkit-backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
   backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
   border-color: rgba(255, 255, 255, 0.16);
@@ -271,18 +275,25 @@
   background: transparent;
 }
 /* floating glass pieces sit visibly above the field — incl. the bar's own
-   popovers (heading menu, overflow), which need to stay readable over text */
+   popovers (heading menu, overflow), which need to stay readable over text.
+   These float over ARBITRARY luminance (the format bar / Aa panel can sit on a
+   white paper canvas in glass-dark), so their floor is the heaviest. */
 :root[data-theme="glass-light"] .fmtbar,
 :root[data-theme="glass-light"] .palette,
 :root[data-theme="glass-light"] .capture,
 :root[data-theme="glass-light"] .modpop,
 :root[data-theme="glass-light"] .aapanel,
 :root[data-theme="glass-light"] .fbmenu {
-  background: rgba(255, 255, 255, 0.66);
+  background: rgba(255, 255, 255, 0.78);
   -webkit-backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
   backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
   border-color: rgba(255, 255, 255, 0.6);
 }
+:root[data-theme="glass-dark"] .fmtbar,
+:root[data-theme="glass-dark"] .palette,
+:root[data-theme="glass-dark"] .capture,
+:root[data-theme="glass-dark"] .modpop,
+:root[data-theme="glass-dark"] .aapanel,
 :root[data-theme="glass-dark"] .fbmenu {
   background: rgba(18, 21, 26, 0.78);
   -webkit-backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);

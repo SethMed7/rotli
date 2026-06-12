@@ -37,14 +37,11 @@ export function registerDefaultActions(): void {
     title: "Hide rotli",
     defaultChord: "Esc",
     run: () => {
-      // Esc unwinds one layer at a time (quokka rule): topmost transient →
-      // module switcher → settings → focus mode → the window itself.
+      // Esc unwinds one layer at a time (quokka rule): topmost transient
+      // (popovers incl. the module switcher, in stack order) → settings →
+      // focus mode → the window itself.
       const ui = useUiStore.getState();
       if (ui.closeTopTransient()) return;
-      if (ui.switcherOpen) {
-        ui.setSwitcherOpen(false);
-        return;
-      }
       if (ui.settingsOpen) {
         ui.setSettingsOpen(false);
         return;

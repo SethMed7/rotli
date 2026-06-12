@@ -32,9 +32,10 @@
   --motion-ease: ease-out;
 }
 
-/* dark: same formula, paper overlay (8% / 13%) on the warm cocoa ground */
-:root[data-theme="dark"],
-.rotli-dark {
+/* dark: same formula, paper overlay (8% / 13%) on the warm cocoa ground
+   (theming runs entirely on data-theme — the kit's .rotli-dark class is the
+   kit's own affair and stays in src/brand/) */
+:root[data-theme="dark"] {
   --hov: rgba(241, 231, 218, 0.08);
   --act: rgba(241, 231, 218, 0.13);
 }

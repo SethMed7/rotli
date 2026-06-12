@@ -187,7 +187,15 @@ export const useUiStore = create<UiState>((set, get) => ({
   glassBackground: "field",
   setGlassBackground: (bg) => set({ glassBackground: bg }),
   customBackground: null,
-  setCustomBackground: (url) => set({ customBackground: url }),
+  setCustomBackground: (url) =>
+    set((s) => {
+      // each upload replaces the previous object URL — revoke the outgoing one
+      // or the full decoded image stays pinned in the webview for the session
+      if (s.customBackground && s.customBackground !== url) {
+        URL.revokeObjectURL(s.customBackground);
+      }
+      return { customBackground: url };
+    }),
 
   glassClarity: "frosted",
   setGlassClarity: (clarity) => set({ glassClarity: clarity }),

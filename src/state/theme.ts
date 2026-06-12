@@ -28,12 +28,14 @@ function detachSystemListener(): void {
   onChange = null;
 }
 
+/** Returns the detach so callers (the App effect) get a real cleanup — the
+ * last "system" listener must not survive a root unmount. */
 export function applyTheme(
   setting: ThemeSetting,
   family: ThemeFamily,
   glass: boolean,
   tint: GlassTint,
-): void {
+): () => void {
   detachSystemListener();
   document.documentElement.dataset.glassTint = tint;
   if (setting === "system") {
@@ -41,7 +43,8 @@ export function applyTheme(
     onChange = (event) => setDataTheme(resolve(family, glass, event.matches ? "dark" : "light"));
     setDataTheme(resolve(family, glass, media.matches ? "dark" : "light"));
     media.addEventListener("change", onChange);
-    return;
+  } else {
+    setDataTheme(resolve(family, glass, setting));
   }
-  setDataTheme(resolve(family, glass, setting));
+  return detachSystemListener;
 }
