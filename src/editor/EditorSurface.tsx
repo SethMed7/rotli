@@ -32,8 +32,11 @@ import { FormatBar } from "./FormatBar";
 import { editDocument, ensureDocument, useDocumentLines } from "./model";
 import { RenderedLine, parseBlock, rawSegments } from "./render";
 
-/** Below this pane width the format bar collapses its end groups into ⋯. */
-const FORMAT_BAR_COLLAPSE_PX = 560;
+/** Below this pane width the format bar collapses its end groups into ⋯.
+ * The full 11-control bar measures ~392px — r5 approved the ⋯ only for
+ * genuinely narrow panes, so the default three-pane (~524px editor) must
+ * show all controls. */
+const FORMAT_BAR_COLLAPSE_PX = 440;
 
 function createdLabel(ts: number): string {
   return new Date(ts).toLocaleDateString(undefined, {

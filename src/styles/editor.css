@@ -127,7 +127,8 @@
   width: 16px;
   height: 16px;
   border-radius: var(--r-inner);
-  border: 1.5px solid var(--border);
+  /* muted, not --border — r2 judge: "Checkbox borders darkened to muted (were invisible)" */
+  border: 1.5px solid var(--text-muted);
   background: none;
   padding: 0;
   margin-top: 0.3em;

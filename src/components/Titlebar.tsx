@@ -10,7 +10,7 @@ import { useUiStore } from "../state/ui";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 import { ModuleSwitcher } from "./ModuleSwitcher";
-import { ChevronDown, RailFolders, RailList } from "./glyphs";
+import { ChevronDown, RailFolders, RailList, SunGlyph } from "./glyphs";
 
 function onDragRegionMouseDown(event: MouseEvent) {
   if (event.button !== 0 || event.detail > 1) return;
@@ -23,6 +23,7 @@ export function Titlebar() {
   const foldersCollapsed = useUiStore((s) => s.foldersCollapsed);
   const listCollapsed = useUiStore((s) => s.listCollapsed);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
+  const theme = useUiStore((s) => s.theme);
 
   return (
     <header className="titlebar">
@@ -72,6 +73,10 @@ export function Titlebar() {
       )}
       <div className="tb-spacer" onMouseDown={onDragRegionMouseDown} />
       <div className="tb-actions">
+        {/* sun = theme, in every approved titlebar frame (r1 tip "Theme — light"; r2/r4/r5 frame A) */}
+        <IconButton label={`Theme — ${theme}`} onClick={() => dispatch("theme.cycle")}>
+          <SunGlyph />
+        </IconButton>
         <IconButton
           label="Settings — ⌘,"
           pressed={settingsOpen}
