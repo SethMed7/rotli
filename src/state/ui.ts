@@ -41,6 +41,18 @@ export const GLASS_BACKGROUNDS: { value: Exclude<GlassBackground, "custom">; lab
   { value: "cocoa", label: "Cocoa night" },
 ];
 
+/** Frosted = the classic milky glass; clear = see the background through. */
+export type GlassClarity = "frosted" | "clear";
+
+/** Blur weight on the glass. */
+export type GlassBlur = "soft" | "standard" | "heavy";
+
+export const GLASS_BLURS: { value: GlassBlur; label: string }[] = [
+  { value: "soft", label: "Soft" },
+  { value: "standard", label: "Standard" },
+  { value: "heavy", label: "Heavy" },
+];
+
 /** What the notes canvas is made of while glass is live. */
 export type GlassCanvas = "glass" | "linen" | "white" | "cocoa";
 
@@ -83,6 +95,20 @@ interface UiState {
   /** Object URL of an uploaded image; in-memory, gone on quit (Stage 1). */
   customBackground: string | null;
   setCustomBackground: (url: string | null) => void;
+
+  /** Frosted (default) or clear — clear glass shows the background through. */
+  glassClarity: GlassClarity;
+  setGlassClarity: (clarity: GlassClarity) => void;
+  /** How heavy the blur is. */
+  glassBlur: GlassBlur;
+  setGlassBlur: (blur: GlassBlur) => void;
+
+  /** General: visitor (click-away hides, default) vs resident (stays open). */
+  stayOpen: boolean;
+  setStayOpen: (on: boolean) => void;
+  /** General: show the app in the Dock (default off — menu bar only). */
+  showInDock: boolean;
+  setShowInDock: (on: boolean) => void;
 
   /** The writing canvas inside glass: glass like everything else, or a real
    * paper surface (linen / white / cocoa) — write on paper, the rest stays
@@ -162,6 +188,16 @@ export const useUiStore = create<UiState>((set, get) => ({
   setGlassBackground: (bg) => set({ glassBackground: bg }),
   customBackground: null,
   setCustomBackground: (url) => set({ customBackground: url }),
+
+  glassClarity: "frosted",
+  setGlassClarity: (clarity) => set({ glassClarity: clarity }),
+  glassBlur: "standard",
+  setGlassBlur: (blur) => set({ glassBlur: blur }),
+
+  stayOpen: false,
+  setStayOpen: (on) => set({ stayOpen: on }),
+  showInDock: false,
+  setShowInDock: (on) => set({ showInDock: on }),
 
   glassCanvas: "glass",
   setGlassCanvas: (canvas) => set({ glassCanvas: canvas }),

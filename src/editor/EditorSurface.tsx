@@ -165,6 +165,19 @@ export function EditorSurface({ noteId }: { noteId: string }) {
     });
   };
 
+  /** List continuation (the standard editors' grammar, Seth 2026-06-12):
+   * Enter inside a list item carries the marker onto the new line (numbered
+   * lists count up); Enter on an EMPTY item clears it — the exit ramp. */
+  const splitAtWithPrefix = (index: number, at: number, prefix: string) => {
+    ensure();
+    pendingCaretRef.current = { start: prefix.length, end: prefix.length };
+    setActiveState(index + 1);
+    editDocument(noteId, (ls) => {
+      const l = ls[index] ?? "";
+      return [...ls.slice(0, index), l.slice(0, at), prefix + l.slice(at), ...ls.slice(index + 1)];
+    });
+  };
+
   const joinWithPrevious = (index: number) => {
     if (!lines) return;
     ensure();
@@ -319,6 +332,23 @@ export function EditorSurface({ noteId }: { noteId: string }) {
 
   // ——— active-line keys (text editing only — command chords stay in the registry) ———
 
+  /** Parse a list marker: bullets, numbered, tasks, quotes. Returns the marker
+   * length, the marker for the NEXT line (numbers count up, tasks reset to
+   * unchecked), and whether the item is empty (the exit-the-list signal). */
+  const listPrefixOf = (
+    line: string,
+  ): { prefixLen: number; next: string; empty: boolean } | null => {
+    const m = line.match(/^(\s*(?:- \[[ xX]\] |[-*] |\d+\. |> ))(.*)$/);
+    if (!m) return null;
+    const prefix = m[1] ?? "";
+    const content = m[2] ?? "";
+    const num = prefix.match(/^(\s*)(\d+)\. $/);
+    const next = num
+      ? `${num[1] ?? ""}${Number(num[2]) + 1}. `
+      : prefix.replace(/\[[xX]\]/, "[ ]");
+    return { prefixLen: prefix.length, next, empty: content.trim() === "" };
+  };
+
   const singleVisualRow = (): boolean => {
     const twin = twinRef.current;
     if (!twin) return true;
@@ -337,10 +367,37 @@ export function EditorSurface({ noteId }: { noteId: string }) {
     const lastIndex = lines.length - 1;
 
     switch (event.key) {
-      case "Enter":
+      case "Enter": {
         event.preventDefault();
+        const list = listPrefixOf(line);
+        if (list && collapsed) {
+          if (list.empty) {
+            // Enter on an empty item exits the list (clears the marker)
+            pendingCaretRef.current = { start: 0, end: 0 };
+            setLine(active, "");
+            break;
+          }
+          if (start >= list.prefixLen) {
+            splitAtWithPrefix(active, start, list.next);
+            break;
+          }
+        }
         splitAt(active, start);
         break;
+      }
+      case " ": {
+        // "[ ]" (or "[]") + space at the start of a line becomes a task
+        const before = line.slice(0, start);
+        const box = before.match(/^(\s*)\[ ?\]$/);
+        if (box && collapsed) {
+          event.preventDefault();
+          const indent = box[1] ?? "";
+          const prefix = `${indent}- [ ] `;
+          pendingCaretRef.current = { start: prefix.length, end: prefix.length };
+          setLine(active, prefix + line.slice(start));
+        }
+        break;
+      }
       case "Backspace":
         if (collapsed && start === 0 && active > 0) {
           event.preventDefault();

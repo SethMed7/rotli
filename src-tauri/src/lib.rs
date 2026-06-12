@@ -3,11 +3,12 @@
 // hides on blur or Esc. Summon shows LIVING windows — never recreates them —
 // so they appear in well under 80ms.
 //
-// THE SUMMON LAW (1c): when rotli is hidden, ⌥Space opens the quick-capture
-// card; when the main window is visible, ⌥Space hides the app. ⌘⏎ in the card
-// (save & open) reveals the main window. Tray left-click toggles the MAIN
-// window. Both summon surfaces are separate registry actions, so either chord
-// is rebindable through set_summon_shortcut.
+// THE SUMMON LAW (revised by Seth, 2026-06-12): ⌥Space toggles the MAIN
+// window — "Option+Space is the way we open the app." The quick-capture card
+// has its own chord (default ⌥C). ⌘⏎ in the card (save & open) reveals the
+// main window. Tray left-click toggles the MAIN window. Both chords are
+// rebindable through set_summon_shortcut, and click-away hiding is a setting
+// (set_hide_on_blur) so heavy use can keep the window resident.
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -20,8 +21,10 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-/// Default summon chord — mirrors `capture.summon` in src/keys/actions.ts.
-const DEFAULT_SUMMON: &str = "Alt+Space";
+/// Default chords — mirror `app.toggleWindow` / `capture.summon` in
+/// src/keys/actions.ts.
+const DEFAULT_MAIN_TOGGLE: &str = "Alt+Space";
+const DEFAULT_CAPTURE: &str = "Alt+C";
 
 /// Clicking the tray icon steals focus from the window, so blur fires (and
 /// hides it) *before* the tray click arrives. Within this grace window the
@@ -32,14 +35,18 @@ const BLUR_TOGGLE_GRACE: Duration = Duration::from_millis(300);
 /// The OS-registered accelerators, per global registry action (rebindable
 /// from the frontend via the `set_summon_shortcut` command).
 struct GlobalChords {
-    /// `capture.summon` — the summon law (always bound).
+    /// `capture.summon` — the quick-capture card.
     capture: Mutex<String>,
-    /// `app.toggleWindow` — main-window toggle (unbound until Seth binds it).
+    /// `app.toggleWindow` — main-window toggle (the way the app opens).
     main_toggle: Mutex<Option<String>>,
 }
 
 /// When the main window was last hidden because it lost focus.
 struct LastBlurHide(Mutex<Option<Instant>>);
+
+/// The visitor-vs-resident setting: when false, clicking away no longer hides
+/// the main window (Settings → General → "Stay open"). Capture always hides.
+struct HideOnBlur(Mutex<bool>);
 
 fn show_main(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -93,14 +100,8 @@ fn is_visible(app: &AppHandle, label: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// The summon law: main visible → hide the app; capture visible → dismiss it;
-/// otherwise → the quick-capture card.
+/// The capture chord: toggle the one-breath card.
 fn do_summon(app: &AppHandle) {
-    if is_visible(app, "main") {
-        hide_main(app);
-        hide_capture(app);
-        return;
-    }
     if is_visible(app, "capture") {
         hide_capture(app);
         return;
@@ -154,6 +155,30 @@ fn hide_capture_window(app: AppHandle) {
 #[tauri::command]
 fn summon(app: AppHandle) {
     do_summon(&app);
+}
+
+/// Settings → General → "Stay open": disable click-away hiding for the main
+/// window so rotli can sit on a screen like a resident app.
+#[tauri::command]
+fn set_hide_on_blur(app: AppHandle, hide: bool) {
+    *app.state::<HideOnBlur>().0.lock().unwrap() = hide;
+}
+
+/// Settings → General → "Show in Dock": flips the activation policy between
+/// menu-bar-only (Accessory, the default) and a normal Dock app (Regular).
+#[tauri::command]
+fn set_dock_visible(app: AppHandle, visible: bool) {
+    #[cfg(target_os = "macos")]
+    {
+        let policy = if visible {
+            tauri::ActivationPolicy::Regular
+        } else {
+            tauri::ActivationPolicy::Accessory
+        };
+        let _ = app.set_activation_policy(policy);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, visible);
 }
 
 /// Re-register a global chord (the keys registry calls this when a global
@@ -222,25 +247,29 @@ pub fn run() {
                 .build(),
         )
         .manage(GlobalChords {
-            capture: Mutex::new(DEFAULT_SUMMON.to_string()),
-            main_toggle: Mutex::new(None),
+            capture: Mutex::new(DEFAULT_CAPTURE.to_string()),
+            main_toggle: Mutex::new(Some(DEFAULT_MAIN_TOGGLE.to_string())),
         })
         .manage(LastBlurHide(Mutex::new(None)))
+        .manage(HideOnBlur(Mutex::new(true)))
         .invoke_handler(tauri::generate_handler![
             toggle_main_window,
             hide_main_window,
             show_main_window,
             hide_capture_window,
             summon,
-            set_summon_shortcut
+            set_summon_shortcut,
+            set_hide_on_blur,
+            set_dock_visible
         ])
         .setup(|app| {
             // The visitor law: never in the dock, never in Cmd-Tab.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            // ⌥Space summons from anywhere (the summon law).
-            app.global_shortcut().register(DEFAULT_SUMMON)?;
+            // ⌥Space opens the app; ⌥C is the one-breath capture (both rebindable).
+            app.global_shortcut().register(DEFAULT_MAIN_TOGGLE)?;
+            app.global_shortcut().register(DEFAULT_CAPTURE)?;
 
             // Menu-bar tray: the kit r-mark as a TEMPLATE icon (macOS tints it).
             // 44px = 22px logical @2x; tray-icon scales NSImage to the bar height.
@@ -272,15 +301,20 @@ pub fn run() {
 
             Ok(())
         })
-        // Click-away hide (the visitor law): losing focus dismisses the window.
+        // Click-away hide (the visitor law) — a setting since 2026-06-12:
+        // "Stay open" turns it off for the main window. Capture always hides.
         .on_window_event(|window, event| {
             let WindowEvent::Focused(false) = event else {
                 return;
             };
             match window.label() {
                 "main" => {
+                    let app = window.app_handle();
+                    if !*app.state::<HideOnBlur>().0.lock().unwrap() {
+                        return;
+                    }
                     let _ = window.hide();
-                    let state = window.app_handle().state::<LastBlurHide>();
+                    let state = app.state::<LastBlurHide>();
                     *state.0.lock().unwrap() = Some(Instant::now());
                 }
                 "capture" => {

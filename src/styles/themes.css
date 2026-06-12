@@ -91,6 +91,17 @@
    (the two rotli colors). Glass lives on the CHROME — the editor canvas stays
    near-solid for reading. */
 
+/* blur weight (Settings → Appearance → Blur) */
+:root[data-glass-blur="soft"] {
+  --glass-blur-px: 12px;
+}
+:root[data-glass-blur="standard"] {
+  --glass-blur-px: 26px;
+}
+:root[data-glass-blur="heavy"] {
+  --glass-blur-px: 40px;
+}
+
 :root[data-glass-tint="dusk"] {
   --glass-hue: #5681b5;
   --glass-hue-deep: #3c659a;
@@ -144,7 +155,7 @@
 
 /* the ambient field the glass floats over — soft hue blobs (glass needs color
    variation behind it to read as glass), fixed so panels scroll across it */
-:root[data-theme="glass-light"] body {
+:root[data-theme="glass-light"] body:not([data-surface="capture"]) {
   background:
     radial-gradient(42% 52% at 12% 16%, color-mix(in srgb, var(--glass-hue) 42%, transparent), transparent 70%),
     radial-gradient(38% 46% at 88% 10%, color-mix(in srgb, var(--glass-hue) 26%, transparent), transparent 72%),
@@ -153,7 +164,7 @@
     linear-gradient(160deg, color-mix(in srgb, var(--glass-hue) 10%, #f8f9fa), #fcfcfb);
   background-attachment: fixed;
 }
-:root[data-theme="glass-dark"] body {
+:root[data-theme="glass-dark"] body:not([data-surface="capture"]) {
   background:
     radial-gradient(44% 54% at 14% 16%, color-mix(in srgb, var(--glass-hue) 52%, transparent), transparent 70%),
     radial-gradient(38% 46% at 86% 12%, color-mix(in srgb, var(--glass-hue) 30%, transparent), transparent 72%),
@@ -163,8 +174,8 @@
 }
 
 /* an image background (bundled wallpapers or the user's own) replaces the field */
-:root[data-theme="glass-light"][data-glass-bg="image"] body,
-:root[data-theme="glass-dark"][data-glass-bg="image"] body {
+:root[data-theme="glass-light"][data-glass-bg="image"] body:not([data-surface="capture"]),
+:root[data-theme="glass-dark"][data-glass-bg="image"] body:not([data-surface="capture"]) {
   background: var(--glass-wallpaper) center / cover no-repeat fixed;
 }
 
@@ -199,9 +210,15 @@
   border-radius: var(--r-window);
   overflow: hidden;
 }
+/* the titlebar floats like the panels (it sits above them so its tooltips and
+   popovers never slip underneath) */
 :root[data-theme="glass-light"] .titlebar,
 :root[data-theme="glass-dark"] .titlebar {
-  border-bottom: none;
+  position: relative;
+  z-index: 6;
+  margin: 10px 10px 0;
+  border: 1px solid;
+  border-radius: var(--r-window);
 }
 
 /* chrome becomes glass: heavy blur + saturation, a specular top edge, a soft
@@ -218,8 +235,8 @@
 :root[data-theme="glass-light"] .palette,
 :root[data-theme="glass-light"] .capture {
   background: rgba(255, 255, 255, 0.38);
-  -webkit-backdrop-filter: blur(26px) saturate(1.7);
-  backdrop-filter: blur(26px) saturate(1.7);
+  -webkit-backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
+  backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
   border-color: rgba(255, 255, 255, 0.55);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
@@ -238,42 +255,67 @@
 :root[data-theme="glass-dark"] .palette,
 :root[data-theme="glass-dark"] .capture {
   background: rgba(18, 21, 26, 0.42);
-  -webkit-backdrop-filter: blur(26px) saturate(1.7);
-  backdrop-filter: blur(26px) saturate(1.7);
+  -webkit-backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
+  backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
   border-color: rgba(255, 255, 255, 0.16);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     0 14px 40px rgba(0, 0, 0, 0.45);
 }
-/* panes carry the glass; their inner editor surface goes transparent
-   (the canvas layer on .ed-scroll does the rest) */
+/* panes carry the glass; everything inside them is transparent so glass never
+   stacks on glass (the white-plate bug: pane glass + editor glass = opaque) */
 :root[data-theme="glass-light"] .editor,
-:root[data-theme="glass-dark"] .editor {
+:root[data-theme="glass-dark"] .editor,
+:root[data-theme="glass-light"] .ed-head,
+:root[data-theme="glass-dark"] .ed-head {
   background: transparent;
 }
-/* floating glass pieces sit visibly above the field */
+/* floating glass pieces sit visibly above the field — incl. the bar's own
+   popovers (heading menu, overflow), which need to stay readable over text */
 :root[data-theme="glass-light"] .fmtbar,
 :root[data-theme="glass-light"] .palette,
 :root[data-theme="glass-light"] .capture,
 :root[data-theme="glass-light"] .modpop,
-:root[data-theme="glass-light"] .aapanel {
-  background: rgba(255, 255, 255, 0.46);
+:root[data-theme="glass-light"] .aapanel,
+:root[data-theme="glass-light"] .fbmenu {
+  background: rgba(255, 255, 255, 0.66);
+  -webkit-backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
+  backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+:root[data-theme="glass-dark"] .fbmenu {
+  background: rgba(18, 21, 26, 0.78);
+  -webkit-backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
+  backdrop-filter: blur(var(--glass-blur-px, 26px)) saturate(1.7);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
-/* — the writing canvas in glass (Seth, 2026-06-12): by default the notes area
-   is quiet glass too; data-glass-canvas lets you write ON PAPER while the rest
-   stays glass — the canvas takes a real theme surface and that surface's ink.
-   Toggled from the Aa panel (a styling layer — never written into the file). — */
+/* — CLARITY (Settings → Appearance): clear glass shows the background through — */
+:root[data-glass-clarity="clear"][data-theme="glass-light"] .titlebar,
+:root[data-glass-clarity="clear"][data-theme="glass-light"] .folders,
+:root[data-glass-clarity="clear"][data-theme="glass-light"] .notelist,
+:root[data-glass-clarity="clear"][data-theme="glass-light"] .pane,
+:root[data-glass-clarity="clear"][data-theme="glass-light"] .set-nav,
+:root[data-glass-clarity="clear"][data-theme="glass-light"] .set-main {
+  background: rgba(255, 255, 255, 0.16);
+}
+:root[data-glass-clarity="clear"][data-theme="glass-dark"] .titlebar,
+:root[data-glass-clarity="clear"][data-theme="glass-dark"] .folders,
+:root[data-glass-clarity="clear"][data-theme="glass-dark"] .notelist,
+:root[data-glass-clarity="clear"][data-theme="glass-dark"] .pane,
+:root[data-glass-clarity="clear"][data-theme="glass-dark"] .set-nav,
+:root[data-glass-clarity="clear"][data-theme="glass-dark"] .set-main {
+  background: rgba(18, 21, 26, 0.18);
+}
+
+/* — the writing canvas in glass (Seth, 2026-06-12): by default the canvas IS
+   the pane's glass — same as every other panel, no extra layer (the pane
+   already blurs). data-glass-canvas lets you write ON PAPER instead — the
+   canvas takes a real theme surface and that surface's ink. Toggled from the
+   Aa panel (a styling layer — never written into the file). — */
 :root[data-theme="glass-light"] .ed-scroll,
 :root[data-theme="glass-dark"] .ed-scroll {
-  -webkit-backdrop-filter: blur(26px) saturate(1.6);
-  backdrop-filter: blur(26px) saturate(1.6);
-}
-:root[data-theme="glass-light"] .ed-scroll {
-  background: rgba(255, 255, 255, 0.56);
-}
-:root[data-theme="glass-dark"] .ed-scroll {
-  background: rgba(16, 18, 23, 0.52);
+  background: transparent;
 }
 /* paper canvases — kit-light (linen), mono-light (white), kit-dark (cocoa) inks travel with them */
 :root[data-glass-canvas="linen"][data-theme="glass-light"] .ed-scroll,

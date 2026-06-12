@@ -591,6 +591,52 @@
   font-size: 15px;
   margin: 26px 0 4px;
 }
+.hksearch {
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 18px;
+  padding: 7px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.hksearch::placeholder {
+  color: var(--text-muted);
+}
+.hksection {
+  margin-bottom: 22px;
+}
+.hkhead {
+  font-size: var(--fs-label);
+  font-weight: var(--wght-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.famrow.off {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.glassrows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0;
+}
+.glassrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.glassrow-label {
+  width: 56px;
+  font-size: var(--fs-label);
+  color: var(--text-muted);
+}
 .tintrow {
   display: flex;
   gap: 8px;

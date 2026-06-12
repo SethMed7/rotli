@@ -57,20 +57,21 @@ export function registerDefaultActions(): void {
     },
   });
 
-  // — the two summon surfaces (both global, separately rebindable) —
+  // — the two summon surfaces (both global, separately rebindable).
+  // Seth's law (2026-06-12): ⌥Space opens the APP; capture has its own chord. —
+  registerAction({
+    id: "app.toggleWindow",
+    title: "Open or hide rotli",
+    defaultChord: "Alt+Space",
+    global: true,
+    run: () => void toggleMainWindow(),
+  });
   registerAction({
     id: "capture.summon",
     title: "Quick capture",
-    defaultChord: "Alt+Space",
-    global: true, // the summon law lives in Rust; dispatch() works for review automation
+    defaultChord: "Alt+C",
+    global: true, // lives in Rust; dispatch() works for review automation
     run: () => void summon(),
-  });
-  registerAction({
-    id: "app.toggleWindow",
-    title: "Show or hide the main window",
-    defaultChord: null, // tray left-click does this; bind a chord if wanted
-    global: true,
-    run: () => void toggleMainWindow(),
   });
 
   // — the command layer —

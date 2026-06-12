@@ -10,8 +10,10 @@ import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import { type KeyAction, allActions, conflictFor, dispatch, rebind } from "../keys/registry";
 import { GLASS_BG_SRC } from "../lib/glassBackgrounds";
+import { setDockVisible, setHideOnBlur } from "../lib/tauri";
 import {
   GLASS_BACKGROUNDS,
+  GLASS_BLURS,
   GLASS_TINTS,
   SOLID_THEMES,
   type ThemeFamily,
@@ -27,21 +29,37 @@ import {
   SunGlyph,
 } from "./glyphs";
 
-type SettingsPane = "hotkeys" | "appearance" | "storage" | "plugins";
+type SettingsPane = "general" | "hotkeys" | "appearance" | "storage" | "plugins";
 
 const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = [
+  { id: "general", label: "General", glyph: LaptopGlyph },
   { id: "hotkeys", label: "Hotkeys", glyph: KeyboardGlyph },
   { id: "appearance", label: "Appearance", glyph: SunGlyph },
   { id: "storage", label: "Storage", glyph: DatabaseGlyph },
   { id: "plugins", label: "Plugins", glyph: PlusGlyph },
 ];
 
-// ——— Hotkeys: every registry action, label + chord, click-to-record ———
+// ——— Hotkeys: every registry action, grouped by area + searchable ———
+
+/** Sections derive from the action id prefix ("tabs.new" → Tabs) — no
+ * per-action bookkeeping, new actions land in the right group automatically. */
+const HK_SECTIONS: { prefix: string; label: string }[] = [
+  { prefix: "app", label: "App" },
+  { prefix: "capture", label: "Quick capture" },
+  { prefix: "notes", label: "Notes" },
+  { prefix: "editor", label: "Editor" },
+  { prefix: "tabs", label: "Tabs" },
+  { prefix: "panes", label: "Panes" },
+  { prefix: "chrome", label: "Chrome" },
+  { prefix: "palette", label: "Palette" },
+  { prefix: "theme", label: "Theme" },
+];
 
 function HotkeysPane() {
   const overrides = useBindingsStore((s) => s.overrides);
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ id: string; withTitle: string } | null>(null);
+  const [query, setQuery] = useState("");
 
   const chordOf = (a: KeyAction) => resolveChord(overrides, a.id, a.defaultChord);
 
@@ -64,45 +82,134 @@ function HotkeysPane() {
     void rebind(action.id, chord);
   };
 
+  const q = query.trim().toLowerCase();
+  const matches = (action: KeyAction): boolean => {
+    if (!q) return true;
+    const chord = chordOf(action);
+    return (
+      action.title.toLowerCase().includes(q) ||
+      action.id.toLowerCase().includes(q) ||
+      (chord !== null && formatChord(chord).toLowerCase().includes(q))
+    );
+  };
+  const actions = allActions();
+  const grouped = HK_SECTIONS.map((section) => ({
+    ...section,
+    actions: actions.filter((a) => a.id.startsWith(`${section.prefix}.`) && matches(a)),
+  })).filter((section) => section.actions.length > 0);
+  const ungrouped = actions.filter(
+    (a) => !HK_SECTIONS.some((s) => a.id.startsWith(`${s.prefix}.`)) && matches(a),
+  );
+
+  const row = (action: KeyAction) => {
+    const recording = recordingId === action.id;
+    const chord = chordOf(action);
+    return (
+      <div className="hkrow" key={action.id}>
+        <span className="hklabel">{action.title}</span>
+        {conflict?.id === action.id && (
+          <span className="hkconflict">taken by “{conflict.withTitle}”</span>
+        )}
+        <button
+          type="button"
+          className={recording ? "hkchord recording" : "hkchord"}
+          aria-label={`Rebind ${action.title}`}
+          onClick={() => {
+            setRecordingId(action.id);
+            setConflict(null);
+          }}
+          onKeyDown={recording ? onRecordKeyDown(action) : undefined}
+          onBlur={() => setRecordingId((id) => (id === action.id ? null : id))}
+        >
+          {recording ? (
+            "press keys…"
+          ) : chord ? (
+            <kbd>{formatChord(chord)}</kbd>
+          ) : (
+            <span className="hkunset">—</span>
+          )}
+        </button>
+      </div>
+    );
+  };
+
   return (
     <>
       <h3>Hotkeys</h3>
       <p className="lead">
         Every shortcut in rotli is yours to rebind. Click a chord, press the new keys.
       </p>
-      <div className="hkrows">
-        {allActions().map((action) => {
-          const recording = recordingId === action.id;
-          const chord = chordOf(action);
-          return (
-            <div className="hkrow" key={action.id}>
-              <span className="hklabel">{action.title}</span>
-              {conflict?.id === action.id && (
-                <span className="hkconflict">taken by “{conflict.withTitle}”</span>
-              )}
-              <button
-                type="button"
-                className={recording ? "hkchord recording" : "hkchord"}
-                aria-label={`Rebind ${action.title}`}
-                onClick={() => {
-                  setRecordingId(action.id);
-                  setConflict(null);
-                }}
-                onKeyDown={recording ? onRecordKeyDown(action) : undefined}
-                onBlur={() => setRecordingId((id) => (id === action.id ? null : id))}
-              >
-                {recording ? (
-                  "press keys…"
-                ) : chord ? (
-                  <kbd>{formatChord(chord)}</kbd>
-                ) : (
-                  <span className="hkunset">—</span>
-                )}
-              </button>
-            </div>
-          );
-        })}
-      </div>
+      <input
+        type="search"
+        className="hksearch"
+        placeholder="Search hotkeys…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => e.stopPropagation()}
+      />
+      {grouped.map((section) => (
+        <section key={section.prefix} className="hksection">
+          <div className="hkhead">{section.label}</div>
+          <div className="hkrows">{section.actions.map(row)}</div>
+        </section>
+      ))}
+      {ungrouped.length > 0 && (
+        <section className="hksection">
+          <div className="hkhead">Other</div>
+          <div className="hkrows">{ungrouped.map(row)}</div>
+        </section>
+      )}
+      {grouped.length === 0 && ungrouped.length === 0 && (
+        <p className="setnote">Nothing matches “{query}”.</p>
+      )}
+    </>
+  );
+}
+
+// ——— General: visitor vs resident, dock visibility (Seth, 2026-06-12) ———
+
+function GeneralPane() {
+  const stayOpen = useUiStore((s) => s.stayOpen);
+  const setStayOpen = useUiStore((s) => s.setStayOpen);
+  const showInDock = useUiStore((s) => s.showInDock);
+  const setShowInDock = useUiStore((s) => s.setShowInDock);
+  return (
+    <>
+      <h3>General</h3>
+      <p className="lead">
+        rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when
+        you&rsquo;re living in it.
+      </p>
+      <button
+        type="button"
+        className={stayOpen ? "sysrow on" : "sysrow"}
+        aria-pressed={stayOpen}
+        onClick={() => {
+          const next = !stayOpen;
+          setStayOpen(next);
+          void setHideOnBlur(!next);
+        }}
+      >
+        <span className="sysdot" aria-hidden="true" />
+        Stay open — don&rsquo;t hide when I click away
+      </button>
+      <button
+        type="button"
+        className={showInDock ? "sysrow on" : "sysrow"}
+        aria-pressed={showInDock}
+        onClick={() => {
+          const next = !showInDock;
+          setShowInDock(next);
+          void setDockVisible(next);
+        }}
+      >
+        <span className="sysdot" aria-hidden="true" />
+        Show in the Dock — otherwise rotli lives in the menu bar only
+      </button>
+      <p className="setnote">
+        Either way the menu-bar icon stays, ⌥Space opens the app, and ⌥C is the one-breath
+        capture — all rebindable in Hotkeys.
+      </p>
     </>
   );
 }
@@ -148,21 +255,27 @@ function AppearancePane() {
   const glassBackground = useUiStore((s) => s.glassBackground);
   const setGlassBackground = useUiStore((s) => s.setGlassBackground);
   const setCustomBackground = useUiStore((s) => s.setCustomBackground);
+  const glassClarity = useUiStore((s) => s.glassClarity);
+  const setGlassClarity = useUiStore((s) => s.setGlassClarity);
+  const glassBlur = useUiStore((s) => s.glassBlur);
+  const setGlassBlur = useUiStore((s) => s.setGlassBlur);
   const followingSystem = theme === "system";
   return (
     <>
       <h3>Appearance</h3>
       <p className="lead">Pick a theme. The titlebar sun cycles through these four.</p>
-      <div className="famrow">
+      <div className={glassMode ? "famrow off" : "famrow"}>
         {SOLID_THEMES.map(({ family, mode, label }) => {
-          const selected = themeFamily === family && theme === mode;
+          const selected = !glassMode && themeFamily === family && theme === mode;
           return (
             <button
               type="button"
               key={label}
               className={selected ? "famcard sel" : "famcard"}
               aria-pressed={selected}
+              aria-disabled={glassMode}
               onClick={() => {
+                if (glassMode) return; // glass owns light/dark below
                 setThemeFamily(family);
                 setTheme(mode);
               }}
@@ -193,7 +306,8 @@ function AppearancePane() {
         }
       >
         <span className="sysdot" aria-hidden="true" />
-        Match the system — switch between {FAMILY_PAIR[themeFamily]} with macOS.
+        Match the system — switch between{" "}
+        {glassMode ? "Glass Light and Glass Dark" : FAMILY_PAIR[themeFamily]} with macOS.
       </button>
 
       <h4 className="sethead">Liquid Glass</h4>
@@ -212,6 +326,50 @@ function AppearancePane() {
       </button>
       {glassMode && (
         <>
+          <div className="glassrows">
+            <div className="glassrow">
+              <span className="glassrow-label">Mode</span>
+              {(["light", "dark"] as const).map((m) => (
+                <button
+                  type="button"
+                  key={m}
+                  className={theme === m ? "aaseg sel" : "aaseg"}
+                  aria-pressed={theme === m}
+                  onClick={() => setTheme(m)}
+                >
+                  {m === "light" ? "Glass Light" : "Glass Dark"}
+                </button>
+              ))}
+            </div>
+            <div className="glassrow">
+              <span className="glassrow-label">Clarity</span>
+              {(["frosted", "clear"] as const).map((c) => (
+                <button
+                  type="button"
+                  key={c}
+                  className={glassClarity === c ? "aaseg sel" : "aaseg"}
+                  aria-pressed={glassClarity === c}
+                  onClick={() => setGlassClarity(c)}
+                >
+                  {c === "frosted" ? "Frosted" : "Clear"}
+                </button>
+              ))}
+            </div>
+            <div className="glassrow">
+              <span className="glassrow-label">Blur</span>
+              {GLASS_BLURS.map(({ value, label }) => (
+                <button
+                  type="button"
+                  key={value}
+                  className={glassBlur === value ? "aaseg sel" : "aaseg"}
+                  aria-pressed={glassBlur === value}
+                  onClick={() => setGlassBlur(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="tintrow" role="radiogroup" aria-label="Glass tint">
             {GLASS_TINTS.map(({ value, label }) => (
               <button
@@ -404,6 +562,7 @@ export function SettingsSurface() {
         ))}
       </nav>
       <div className="set-main">
+        {pane === "general" && <GeneralPane />}
         {pane === "hotkeys" && <HotkeysPane />}
         {pane === "appearance" && <AppearancePane />}
         {pane === "storage" && <StoragePane />}

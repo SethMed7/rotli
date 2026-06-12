@@ -43,6 +43,20 @@ export async function setGlobalShortcut(actionId: string, accelerator: string): 
   await invoke("set_summon_shortcut", { actionId, accelerator });
 }
 
+/** Settings → General → "Stay open": when false, clicking away no longer
+ * hides the main window. */
+export async function setHideOnBlur(hide: boolean): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("set_hide_on_blur", { hide });
+}
+
+/** Settings → General → "Show in Dock": Accessory (menu-bar only, default)
+ * vs Regular (normal Dock app). */
+export async function setDockVisible(visible: boolean): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("set_dock_visible", { visible });
+}
+
 /** Manual drag (instead of data-tauri-drag-region) so double-clicking the
  * titlebar never triggers the built-in maximize/zoom. */
 export async function startWindowDrag(): Promise<void> {

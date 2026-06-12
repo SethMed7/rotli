@@ -86,6 +86,12 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.glassCanvas = glassCanvas;
   }, [glassCanvas]);
+  const glassClarity = useUiStore((s) => s.glassClarity);
+  const glassBlur = useUiStore((s) => s.glassBlur);
+  useEffect(() => {
+    document.documentElement.dataset.glassClarity = glassClarity;
+    document.documentElement.dataset.glassBlur = glassBlur;
+  }, [glassClarity, glassBlur]);
   useEffect(() => {
     const root = document.documentElement;
     const src =
