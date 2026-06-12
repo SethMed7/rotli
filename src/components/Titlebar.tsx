@@ -20,8 +20,8 @@ function onDragRegionMouseDown(event: MouseEvent) {
 export function Titlebar() {
   const switcherOpen = useUiStore((s) => s.switcherOpen);
   const setSwitcherOpen = useUiStore((s) => s.setSwitcherOpen);
-  const foldersRailOpen = useUiStore((s) => s.foldersRailOpen);
-  const noteListOpen = useUiStore((s) => s.noteListOpen);
+  const foldersCollapsed = useUiStore((s) => s.foldersCollapsed);
+  const listCollapsed = useUiStore((s) => s.listCollapsed);
 
   return (
     <header className="titlebar">
@@ -43,15 +43,15 @@ export function Titlebar() {
       <div className="railbtns">
         <IconButton
           label="Folders — ⌘0"
-          pressed={foldersRailOpen}
-          onClick={() => dispatch("panes.toggleFolders")}
+          pressed={!foldersCollapsed}
+          onClick={() => dispatch("chrome.toggleFolders")}
         >
           <RailFolders />
         </IconButton>
         <IconButton
           label="Notes list — ⌥⌘L"
-          pressed={noteListOpen}
-          onClick={() => dispatch("panes.toggleList")}
+          pressed={!listCollapsed}
+          onClick={() => dispatch("chrome.toggleList")}
         >
           <RailList />
         </IconButton>

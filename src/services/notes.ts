@@ -1,26 +1,18 @@
 // The data seam. All note/folder access goes through this typed interface —
 // today it is in-memory (reload wipes everything; correct for Stage 1), later
 // phases swap the implementation for the markdown corpus without touching UI.
+// Components never call this directly — they consume the TanStack Query hooks
+// in ./hooks.ts.
 
-export interface Folder {
-  id: string;
-  name: string;
-  parentId: string | null;
-}
-
-export interface NoteSummary {
-  id: string;
-  title: string;
-  folderId: string;
-  updatedAt: number;
-}
-
-export interface Note extends NoteSummary {
-  body: string;
-}
+import type { Folder, Note, NoteSummary } from "../types";
 
 export interface NotesService {
   listFolders(): Promise<Folder[]>;
+  createFolder(name: string, parentId?: string | null): Promise<Folder>;
+  updateFolder(id: string, name: string): Promise<Folder>;
+  deleteFolder(id: string): Promise<void>;
+  /** No folderId = all notes. With a folderId, includes descendant folders
+   * (one mental model: a folder holds everything under it). */
   listNotes(folderId?: string): Promise<NoteSummary[]>;
   getNote(id: string): Promise<Note | null>;
   createNote(folderId: string, body: string): Promise<Note>;
@@ -28,29 +20,87 @@ export interface NotesService {
   deleteNote(id: string): Promise<void>;
 }
 
+/** Ulid-style id: time-sortable prefix + random tail (Crockford base32). */
+const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+export function ulid(now = Date.now()): string {
+  let time = "";
+  let t = now;
+  for (let i = 0; i < 10; i++) {
+    time = (B32[t % 32] ?? "0") + time;
+    t = Math.floor(t / 32);
+  }
+  let rand = "";
+  for (let i = 0; i < 16; i++) rand += B32[Math.floor(Math.random() * 32)] ?? "0";
+  return time + rand;
+}
+
 function titleOf(body: string): string {
   return body.split("\n", 1)[0]?.replace(/^#+\s*/, "").trim() || "Untitled";
+}
+
+/** First lines after the title, markdown punctuation stripped, for list rows. */
+function snippetOf(body: string): string {
+  const lines = body.split("\n");
+  const rest = lines.slice(1).join(" ");
+  return rest
+    .replace(/^#+\s*/g, "")
+    .replace(/[*_`>#]|\[[x ]\]|^- /g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 140);
 }
 
 export class InMemoryNotesService implements NotesService {
   private folders = new Map<string, Folder>();
   private notes = new Map<string, Note>();
-  private nextId = 1;
-
-  private id(prefix: string): string {
-    return `${prefix}-${this.nextId++}`;
-  }
 
   async listFolders(): Promise<Folder[]> {
     return [...this.folders.values()];
   }
 
+  async createFolder(name: string, parentId: string | null = null): Promise<Folder> {
+    const folder: Folder = { id: ulid(), name, parentId };
+    this.folders.set(folder.id, folder);
+    return folder;
+  }
+
+  async updateFolder(id: string, name: string): Promise<Folder> {
+    const existing = this.folders.get(id);
+    if (!existing) throw new Error(`unknown folder: ${id}`);
+    const updated = { ...existing, name };
+    this.folders.set(id, updated);
+    return updated;
+  }
+
+  async deleteFolder(id: string): Promise<void> {
+    this.folders.delete(id);
+  }
+
+  private descendants(folderId: string): Set<string> {
+    const ids = new Set([folderId]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const f of this.folders.values()) {
+        if (f.parentId && ids.has(f.parentId) && !ids.has(f.id)) {
+          ids.add(f.id);
+          grew = true;
+        }
+      }
+    }
+    return ids;
+  }
+
   async listNotes(folderId?: string): Promise<NoteSummary[]> {
     const all = [...this.notes.values()];
-    const inFolder = folderId ? all.filter((n) => n.folderId === folderId) : all;
-    return inFolder
+    const scoped = folderId
+      ? all.filter((n) => this.descendants(folderId).has(n.folderId))
+      : all;
+    return scoped
       .map(({ body: _body, ...summary }) => summary)
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+      .sort((a, b) =>
+        a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : b.updatedAt - a.updatedAt,
+      );
   }
 
   async getNote(id: string): Promise<Note | null> {
@@ -58,11 +108,15 @@ export class InMemoryNotesService implements NotesService {
   }
 
   async createNote(folderId: string, body: string): Promise<Note> {
+    const now = Date.now();
     const note: Note = {
-      id: this.id("note"),
+      id: ulid(now),
       title: titleOf(body),
+      snippet: snippetOf(body),
       folderId,
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
+      pinned: false,
       body,
     };
     this.notes.set(note.id, note);
@@ -72,7 +126,13 @@ export class InMemoryNotesService implements NotesService {
   async updateNote(id: string, body: string): Promise<Note> {
     const existing = this.notes.get(id);
     if (!existing) throw new Error(`unknown note: ${id}`);
-    const updated: Note = { ...existing, body, title: titleOf(body), updatedAt: Date.now() };
+    const updated: Note = {
+      ...existing,
+      body,
+      title: titleOf(body),
+      snippet: snippetOf(body),
+      updatedAt: Date.now(),
+    };
     this.notes.set(id, updated);
     return updated;
   }
@@ -80,6 +140,132 @@ export class InMemoryNotesService implements NotesService {
   async deleteNote(id: string): Promise<void> {
     this.notes.delete(id);
   }
+
+  /** Synchronous seeding (Stage 1 sample corpus — the r1/r2 gate frames). */
+  seedFolder(name: string, parentId: string | null = null): Folder {
+    const folder: Folder = { id: ulid(), name, parentId };
+    this.folders.set(folder.id, folder);
+    return folder;
+  }
+
+  seedNote(
+    folderId: string,
+    body: string,
+    opts: { pinned?: boolean; createdAt: number; updatedAt: number },
+  ): Note {
+    const note: Note = {
+      id: ulid(opts.createdAt),
+      title: titleOf(body),
+      snippet: snippetOf(body),
+      folderId,
+      createdAt: opts.createdAt,
+      updatedAt: opts.updatedAt,
+      pinned: opts.pinned ?? false,
+      body,
+    };
+    this.notes.set(note.id, note);
+    return note;
+  }
 }
 
-export const notesService: NotesService = new InMemoryNotesService();
+// ——— the seeded corpus (titles/snippets from the approved gate frames) ———
+
+const svc = new InMemoryNotesService();
+
+const DAY = 24 * 60 * 60 * 1000;
+const now = Date.now();
+const todayAt = (h: number, m: number) => {
+  const d = new Date(now);
+  d.setHours(h, m, 0, 0);
+  return Math.min(d.getTime(), now);
+};
+
+export const inboxFolder = svc.seedFolder("Inbox");
+const work = svc.seedFolder("Work");
+const myela = svc.seedFolder("Myela", work.id);
+const oneOnOnes = svc.seedFolder("1-on-1s", work.id);
+const personal = svc.seedFolder("Personal");
+const ideas = svc.seedFolder("Ideas", personal.id);
+
+svc.seedNote(
+  work.id,
+  `# Pricing decision
+
+Free local forever. Paid = sync + managed AI. Never gate local features behind the subscription — the corpus is the user's, full stop.
+
+Launch sync at $4, anchor on Obsidian, revisit at 10k users.`,
+  { pinned: true, createdAt: todayAt(8, 5), updatedAt: todayAt(9, 10) },
+);
+
+const notesFirst = svc.seedNote(
+  ideas.id,
+  `# rotli — notes first
+
+Apple Notes feel, **markdown underneath**. Local files, one structure the AI can read. The app is a *visitor* — summon it, write, dismiss it.
+
+### What ships first
+
+- [x] Folders, list, editor — the three panes
+- [ ] Quick capture from anywhere (\`⌥Space\`)
+- [ ] Plain \`.md\` files on disk — the corpus
+
+> The folder of files *is* the product. Every view, every backend, every AI is a reader.
+
+Later: breve plugs into the same corpus and the Wiki answers from it. Nothing changes shape.`,
+  { createdAt: todayAt(9, 42), updatedAt: todayAt(9, 42) },
+);
+
+/** The note the window opens on (gate frame A). */
+export const initialNoteId = notesFirst.id;
+
+svc.seedNote(
+  myela.id,
+  `# Q3 priorities — Myela
+
+Ship the gateway migration, land the issuing portal rebuild, and get the partner reporting story straight before the platform review.`,
+  { createdAt: todayAt(7, 30), updatedAt: todayAt(7, 30) },
+);
+
+svc.seedNote(
+  work.id,
+  `# Q3 platform review — prep
+
+Three things must land before Thursday: the settlement mapping, the gateway export enum, and a clear pricing answer we can defend in front of the partners.
+
+The demo flows from capture → recall: open with the island story, close with the cited answer.
+
+Maria owns the reconciliation walkthrough; I take pricing.`,
+  { createdAt: now - DAY, updatedAt: now - DAY },
+);
+
+svc.seedNote(
+  ideas.id,
+  `# Quokka world — where it lives
+
+Onboarding, empty states, about. Never in the editor, never in notifications — the world appears at low-frequency moments only.`,
+  { createdAt: now - DAY, updatedAt: now - DAY },
+);
+
+svc.seedNote(
+  oneOnOnes.id,
+  `# 1-on-1 — Sarah
+
+Ship review Friday. She'll own the gateway migration writeup. Follow up on the Lithic question and the Q3 growth path conversation.`,
+  { createdAt: now - 3 * DAY, updatedAt: now - 3 * DAY },
+);
+
+svc.seedNote(
+  personal.id,
+  `# Groceries
+
+Olive oil, sourdough, oat milk, blueberries, the good butter.`,
+  { createdAt: now - 4 * DAY, updatedAt: now - 4 * DAY },
+);
+
+svc.seedNote(
+  inboxFolder.id,
+  `# Call the bank about the wire limit before Friday`,
+  { createdAt: now - 2 * DAY, updatedAt: now - 2 * DAY },
+);
+
+export const notesService: NotesService = svc;

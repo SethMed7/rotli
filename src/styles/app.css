@@ -35,6 +35,7 @@
   flex: 1;
   min-height: 0;
   background: var(--surface);
+  display: flex; /* the surface inside fills the window exactly; panes scroll internally */
 }
 
 /* — titlebar (r4/r5 gate values) — */

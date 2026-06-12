@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import "./styles/base.css";
 import "./styles/app.css";
+import "./styles/notes.css";
+import { NotesSurface } from "./components/NotesSurface";
 import { Titlebar } from "./components/Titlebar";
 import { registerDefaultActions } from "./keys/actions";
 import { attachDispatcher, dispatch } from "./keys/registry";
@@ -29,8 +31,9 @@ function MainShell() {
   return (
     <div className="app-window">
       <Titlebar />
-      {/* the work surface — panes arrive in 1a; empty is correct, not missing */}
-      <main className="app-content" />
+      <main className="app-content">
+        <NotesSurface />
+      </main>
     </div>
   );
 }

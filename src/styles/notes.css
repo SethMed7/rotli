@@ -1,0 +1,585 @@
+/* rotli — the notes surface (phase 1a). Class structure + values transfer
+   from the approved gates: r1/r2 frame A (three-pane), r2 frame A2 (tab
+   strip), r3 frame B (collapse + warm edge) + frame G (state grammar vars),
+   r4 frame A (floating status pill). No raw hex — kit tokens + base.css
+   grammar vars only. */
+
+/* — interactive rows render as buttons; strip the UA chrome — */
+.frow,
+.newfolder,
+.nrow,
+.x,
+.tabplus {
+  font: inherit;
+  text-align: left;
+  border: none;
+  background: none;
+  color: inherit;
+  padding: 0;
+}
+
+/* — three-pane chassis — */
+.threepane {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  background: var(--ground);
+  overflow: hidden;
+}
+
+/* — folders rail (gate: 198px) — */
+.folders {
+  flex: 0 0 198px;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  background: var(--ground);
+  min-height: 0;
+  overflow-y: auto;
+}
+.frow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6.5px 10px;
+  border-radius: var(--r-control);
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  position: relative;
+}
+.frow svg {
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+.frow .fname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.frow .count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.frow:hover {
+  background: var(--hov);
+}
+.frow.sel {
+  background: var(--tint);
+  font-weight: 500;
+}
+/* dark folder selection gains the 3px clay bar — one selection grammar (r2) */
+:root[data-theme="dark"] .frow.sel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+.frow.child {
+  padding-left: 30px;
+}
+.fsec {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 14px 10px 5px;
+}
+.folders .grow {
+  flex: 1;
+}
+.newfolder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--r-control);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.newfolder:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+
+/* — note list (gate: 258px, filter on top, no header row) — */
+.notelist {
+  flex: 0 0 258px;
+  min-width: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--ground);
+  min-height: 0;
+}
+.nl-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  flex: 0 0 auto;
+}
+.filter {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface-2);
+  border-radius: var(--r-control);
+  padding: 6px 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.filter svg {
+  flex: 0 0 auto;
+}
+.filter input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  padding: 0;
+}
+.filter input::placeholder {
+  color: var(--text-muted);
+}
+.filter input:focus-visible {
+  outline: none; /* the field itself is the affordance; no ring inside a well */
+}
+.nl-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.nrow {
+  display: block;
+  width: 100%;
+  padding: 10px 14px 11px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+}
+.nrow .nt {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 2.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nrow .ns {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nrow .nd {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.nrow:hover {
+  background: var(--hov);
+}
+.nrow.sel {
+  background: var(--tint);
+}
+.nrow.sel .ns,
+.nrow.sel .nd {
+  color: var(--text);
+}
+.nrow.sel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+.nd .pin {
+  flex: 0 0 auto;
+}
+
+/* — panes — */
+.panes {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+}
+.pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.split {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.split.row {
+  flex-direction: row;
+}
+.split.col {
+  flex-direction: column;
+}
+.split > .cell {
+  flex-basis: 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+.split > .cell > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* divider: 1px border line, 8px hit zone, 2px cocoa@24% while dragging —
+   never clay (r2 law) */
+.divider {
+  flex: 0 0 1px;
+  background: var(--border);
+  position: relative;
+  z-index: 3;
+}
+.split.row > .divider {
+  cursor: col-resize;
+}
+.split.col > .divider {
+  cursor: row-resize;
+}
+.divider::after {
+  content: "";
+  position: absolute;
+}
+.split.row > .divider::after {
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+}
+.split.col > .divider::after {
+  left: 0;
+  right: 0;
+  top: -4px;
+  bottom: -4px;
+}
+.divider.dragging::before {
+  content: "";
+  position: absolute;
+  background: color-mix(in srgb, var(--rotli-cocoa) 24%, transparent);
+  z-index: 1;
+}
+.split.row > .divider.dragging::before {
+  top: 0;
+  bottom: 0;
+  left: -0.5px;
+  width: 2px;
+}
+.split.col > .divider.dragging::before {
+  left: 0;
+  right: 0;
+  top: -0.5px;
+  height: 2px;
+}
+
+/* — tab strip (r2 frame A2; single-tab pane renders none of this) — */
+.tabstrip {
+  display: flex;
+  align-items: flex-end;
+  height: 34px;
+  background: var(--ground);
+  border-bottom: 1px solid var(--border);
+  padding: 0 6px;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+.tabscroll-wrap {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 100%;
+}
+.tabscroll {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabscroll::-webkit-scrollbar {
+  display: none;
+}
+/* linen fade masks at the overflow edges — no dropdown, ever */
+.tabscroll-wrap::before,
+.tabscroll-wrap::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease);
+}
+.tabscroll-wrap::before {
+  left: 0;
+  background: linear-gradient(
+    90deg,
+    var(--ground),
+    color-mix(in srgb, var(--ground), transparent 100%)
+  );
+}
+.tabscroll-wrap::after {
+  right: 0;
+  background: linear-gradient(
+    270deg,
+    var(--ground),
+    color-mix(in srgb, var(--ground), transparent 100%)
+  );
+}
+.tabscroll-wrap[data-fade-left="true"]::before {
+  opacity: 1;
+}
+.tabscroll-wrap[data-fade-right="true"]::after {
+  opacity: 1;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 12px;
+  min-width: 96px; /* the compression floor */
+  max-width: 208px;
+  flex: 0 1 auto;
+  border-radius: var(--r-tab) var(--r-tab) 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  position: relative;
+  cursor: pointer;
+  z-index: 1;
+}
+.tab .tglyph {
+  flex: 0 0 auto;
+}
+.tab span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab:hover {
+  background: var(--surface-2);
+}
+.tab.active {
+  background: var(--surface); /* merges into the editor below */
+  color: var(--text);
+  height: 30px;
+  margin-bottom: -1px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  z-index: 2;
+}
+/* focus = 2px clay top edge on the focused pane's active tab — ONLY when
+   more than one pane exists (single clay element by construction) */
+.panes.multi .pane.focused .tab.active::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 9px;
+  right: 9px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--accent);
+}
+.tab .x {
+  margin-left: auto;
+  width: 15px;
+  height: 15px;
+  border-radius: var(--r-inner);
+  display: none;
+  place-items: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.tab.active .x,
+.tab:hover .x {
+  display: grid;
+}
+.tab .x:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.tab .x svg {
+  stroke-width: 2.2;
+}
+.tabplus {
+  width: 24px;
+  height: 24px;
+  margin: 0 2px 3px;
+  border-radius: var(--r-control);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  position: relative;
+  flex: 0 0 auto;
+}
+.tabplus:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.tabplus:hover .tip {
+  opacity: 1;
+  transition-delay: 300ms;
+}
+
+/* — editor (r2 padding/measure; r4 floating status pill) — */
+.editor {
+  flex: 1;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+.ed-head {
+  padding: 22px 40px 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.ed-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 23px;
+  letter-spacing: -0.01em;
+  padding: 9px 40px 0;
+  flex: 0 0 auto;
+}
+.ed-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.ed-body {
+  padding: 14px 40px 64px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  max-width: 660px;
+}
+.ed-plain {
+  font-family: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  margin: 0;
+}
+.statpill {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 7px 16px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  box-shadow: 0 10px 28px rgba(58, 48, 40, 0.18);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 4;
+}
+.statpill .dot-ok {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.statpill .sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+/* — collapse grammar: warm-edge hover sliver + overlay reveal (r3 frame B) — */
+.warm-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  z-index: 7;
+}
+.edgehint {
+  position: absolute;
+  left: 0;
+  top: 30%;
+  bottom: 30%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+  opacity: 0.5;
+}
+.rail-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  background: var(--ground);
+  border-right: 1px solid var(--border);
+  box-shadow: 0 18px 44px rgba(58, 48, 40, 0.25);
+  animation: rail-in var(--motion-enter) var(--motion-ease);
+  z-index: 8;
+}
+@keyframes rail-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
