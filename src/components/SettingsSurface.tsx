@@ -9,7 +9,14 @@ import { type KeyboardEvent, useState } from "react";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import { type KeyAction, allActions, conflictFor, dispatch, rebind } from "../keys/registry";
-import { GLASS_TINTS, type ThemeFamily, useUiStore } from "../state/ui";
+import { GLASS_BG_SRC } from "../lib/glassBackgrounds";
+import {
+  GLASS_BACKGROUNDS,
+  GLASS_TINTS,
+  SOLID_THEMES,
+  type ThemeFamily,
+  useUiStore,
+} from "../state/ui";
 import {
   CheckGlyph,
   CloudGlyph,
@@ -100,64 +107,26 @@ function HotkeysPane() {
   );
 }
 
-// ——— Appearance: every theme is one visible card (Seth, 2026-06-12 — no
-// family/mode two-step; the quokka never asks "where is the white theme?") ———
+// ——— Appearance: four solid theme cards + Liquid Glass as a MODE on top
+// (Seth, 2026-06-12: "the sun toggles the four themes; glass is a toggle") ———
 
-const THEME_CARDS: {
-  family: ThemeFamily;
-  mode: "light" | "dark";
-  label: string;
-  caption: string;
-  swatch: string;
-}[] = [
-  {
-    family: "warm",
-    mode: "light",
-    label: "Warm Light",
-    caption: "The rotli default — paper under lamplight.",
-    swatch: "var(--swatch-warm-light)",
-  },
-  {
-    family: "warm",
-    mode: "dark",
-    label: "Warm Dark",
-    caption: "Cocoa dark, never clinical.",
-    swatch: "var(--swatch-warm-dark)",
-  },
-  {
-    family: "mono",
-    mode: "light",
-    label: "Paper",
-    caption: "Simple white & black.",
-    swatch: "var(--swatch-paper)",
-  },
-  {
-    family: "mono",
-    mode: "dark",
-    label: "Charcoal",
-    caption: "The SM-suite dark.",
-    swatch: "var(--swatch-charcoal)",
-  },
-  {
-    family: "glass",
-    mode: "light",
-    label: "Glass Light",
-    caption: "Liquid glass over a bright wash.",
-    swatch: "linear-gradient(135deg, var(--swatch-dusk), var(--swatch-paper))",
-  },
-  {
-    family: "glass",
-    mode: "dark",
-    label: "Glass Dark",
-    caption: "Liquid glass after dark.",
-    swatch: "linear-gradient(135deg, var(--swatch-dusk), var(--swatch-charcoal))",
-  },
-];
+const THEME_CAPTIONS: Record<string, string> = {
+  "Warm Light": "The rotli default — paper under lamplight.",
+  "Warm Dark": "Cocoa dark, never clinical.",
+  Paper: "Simple white & black.",
+  Charcoal: "The SM-suite dark.",
+};
+
+const THEME_SWATCH: Record<string, string> = {
+  "Warm Light": "var(--swatch-warm-light)",
+  "Warm Dark": "var(--swatch-warm-dark)",
+  Paper: "var(--swatch-paper)",
+  Charcoal: "var(--swatch-charcoal)",
+};
 
 const FAMILY_PAIR: Record<ThemeFamily, string> = {
   warm: "Warm Light and Warm Dark",
   mono: "Paper and Charcoal",
-  glass: "Glass Light and Glass Dark",
 };
 
 const TINT_SWATCH: Record<string, string> = {
@@ -172,15 +141,20 @@ function AppearancePane() {
   const setTheme = useUiStore((s) => s.setTheme);
   const themeFamily = useUiStore((s) => s.themeFamily);
   const setThemeFamily = useUiStore((s) => s.setThemeFamily);
+  const glassMode = useUiStore((s) => s.glassMode);
+  const setGlassMode = useUiStore((s) => s.setGlassMode);
   const glassTint = useUiStore((s) => s.glassTint);
   const setGlassTint = useUiStore((s) => s.setGlassTint);
+  const glassBackground = useUiStore((s) => s.glassBackground);
+  const setGlassBackground = useUiStore((s) => s.setGlassBackground);
+  const setCustomBackground = useUiStore((s) => s.setCustomBackground);
   const followingSystem = theme === "system";
   return (
     <>
       <h3>Appearance</h3>
-      <p className="lead">Pick a theme. Glass also has a tint of its own.</p>
+      <p className="lead">Pick a theme. The titlebar sun cycles through these four.</p>
       <div className="famrow">
-        {THEME_CARDS.map(({ family, mode, label, caption, swatch }) => {
+        {SOLID_THEMES.map(({ family, mode, label }) => {
           const selected = themeFamily === family && theme === mode;
           return (
             <button
@@ -193,29 +167,17 @@ function AppearancePane() {
                 setTheme(mode);
               }}
             >
-              <span className="famswatch" style={{ background: swatch }} aria-hidden="true" />
+              <span
+                className="famswatch"
+                style={{ background: THEME_SWATCH[label] }}
+                aria-hidden="true"
+              />
               <span className="famlabel">{label}</span>
-              <span className="famcaption">{caption}</span>
+              <span className="famcaption">{THEME_CAPTIONS[label]}</span>
             </button>
           );
         })}
       </div>
-      {themeFamily === "glass" && (
-        <div className="tintrow" role="radiogroup" aria-label="Glass tint">
-          {GLASS_TINTS.map(({ value, label }) => (
-            <button
-              type="button"
-              key={value}
-              className={glassTint === value ? "tintchip sel" : "tintchip"}
-              aria-pressed={glassTint === value}
-              onClick={() => setGlassTint(value)}
-            >
-              <i style={{ background: TINT_SWATCH[value] }} aria-hidden="true" />
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
       <button
         type="button"
         className={followingSystem ? "sysrow on" : "sysrow"}
@@ -233,6 +195,78 @@ function AppearancePane() {
         <span className="sysdot" aria-hidden="true" />
         Match the system — switch between {FAMILY_PAIR[themeFamily]} with macOS.
       </button>
+
+      <h4 className="sethead">Liquid Glass</h4>
+      <p className="lead">
+        A mode over your theme: floating glass panels on a background. While it&rsquo;s on, the
+        titlebar sun becomes the tint dot — click it to cycle hues.
+      </p>
+      <button
+        type="button"
+        className={glassMode ? "sysrow on" : "sysrow"}
+        aria-pressed={glassMode}
+        onClick={() => setGlassMode(!glassMode)}
+      >
+        <span className="sysdot" aria-hidden="true" />
+        Glass mode
+      </button>
+      {glassMode && (
+        <>
+          <div className="tintrow" role="radiogroup" aria-label="Glass tint">
+            {GLASS_TINTS.map(({ value, label }) => (
+              <button
+                type="button"
+                key={value}
+                className={glassTint === value ? "tintchip sel" : "tintchip"}
+                aria-pressed={glassTint === value}
+                onClick={() => setGlassTint(value)}
+              >
+                <i style={{ background: TINT_SWATCH[value] }} aria-hidden="true" />
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="aalabel bglabel">Background</div>
+          <div className="bgrow" role="radiogroup" aria-label="Glass background">
+            {GLASS_BACKGROUNDS.map(({ value, label }) => (
+              <button
+                type="button"
+                key={value}
+                className={glassBackground === value ? "bgchip sel" : "bgchip"}
+                aria-pressed={glassBackground === value}
+                onClick={() => setGlassBackground(value)}
+              >
+                {value === "field" ? (
+                  <span className="bgthumb bgthumb--field" aria-hidden="true" />
+                ) : (
+                  <img className="bgthumb" src={GLASS_BG_SRC[value]} alt="" />
+                )}
+                {label}
+              </button>
+            ))}
+            <label className={glassBackground === "custom" ? "bgchip sel" : "bgchip"}>
+              <span className="bgthumb bgthumb--upload" aria-hidden="true">+</span>
+              Your image
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setCustomBackground(URL.createObjectURL(file));
+                  setGlassBackground("custom");
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+          <p className="setnote">
+            Your own image stays for this session — it lands with the rest of your stuff when
+            files arrive in the next stage.
+          </p>
+        </>
+      )}
     </>
   );
 }

@@ -34,7 +34,7 @@ export function AaPanel({
   const style = useNoteStyle(noteId);
   const setSize = useNoteStyleStore((s) => s.setSize);
   const setMeasure = useNoteStyleStore((s) => s.setMeasure);
-  const themeFamily = useUiStore((s) => s.themeFamily);
+  const glassMode = useUiStore((s) => s.glassMode);
   const glassCanvas = useUiStore((s) => s.glassCanvas);
   const setGlassCanvas = useUiStore((s) => s.setGlassCanvas);
 
@@ -75,7 +75,7 @@ export function AaPanel({
           </button>
         ))}
       </div>
-      {themeFamily === "glass" && (
+      {glassMode && (
         <>
           <div className="aalabel">Canvas</div>
           <div className="aarow">

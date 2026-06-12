@@ -11,6 +11,7 @@ import { SettingsSurface } from "./components/SettingsSurface";
 import { Titlebar } from "./components/Titlebar";
 import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
+import { GLASS_BG_SRC } from "./lib/glassBackgrounds";
 import { onCaptureSave, onRebind } from "./lib/tauri";
 import { invalidateNotes } from "./services/hooks";
 import { inboxFolder, notesService } from "./services/notes";
@@ -71,14 +72,32 @@ function MainShell() {
 export default function App() {
   const theme = useUiStore((s) => s.theme);
   const themeFamily = useUiStore((s) => s.themeFamily);
+  const glassMode = useUiStore((s) => s.glassMode);
   const glassTint = useUiStore((s) => s.glassTint);
   const glassCanvas = useUiStore((s) => s.glassCanvas);
+  const glassBackground = useUiStore((s) => s.glassBackground);
+  const customBackground = useUiStore((s) => s.customBackground);
   const surface = surfaceFromUrl();
 
-  useEffect(() => applyTheme(theme, themeFamily, glassTint), [theme, themeFamily, glassTint]);
+  useEffect(
+    () => applyTheme(theme, themeFamily, glassMode, glassTint),
+    [theme, themeFamily, glassMode, glassTint],
+  );
   useEffect(() => {
     document.documentElement.dataset.glassCanvas = glassCanvas;
   }, [glassCanvas]);
+  useEffect(() => {
+    const root = document.documentElement;
+    const src =
+      glassBackground === "custom" ? customBackground : (GLASS_BG_SRC as Record<string, string>)[glassBackground];
+    if (!glassMode || glassBackground === "field" || !src) {
+      root.dataset.glassBg = "field";
+      root.style.removeProperty("--glass-wallpaper");
+      return;
+    }
+    root.dataset.glassBg = "image";
+    root.style.setProperty("--glass-wallpaper", `url("${src}")`);
+  }, [glassMode, glassBackground, customBackground]);
 
   useEffect(() => {
     document.body.dataset.surface = surface;

@@ -162,11 +162,56 @@
   background-attachment: fixed;
 }
 
+/* an image background (bundled wallpapers or the user's own) replaces the field */
+:root[data-theme="glass-light"][data-glass-bg="image"] body,
+:root[data-theme="glass-dark"][data-glass-bg="image"] body {
+  background: var(--glass-wallpaper) center / cover no-repeat fixed;
+}
+
+/* — FLOATING LAYOUT — glass needs the background visible BETWEEN things to
+   read as glass at all (Seth, 2026-06-12: "everything flow a little bit more").
+   Panels become inset, rounded, separated cards over the field/wallpaper. */
+:root[data-theme="glass-light"] .app-window,
+:root[data-theme="glass-dark"] .app-window,
+:root[data-theme="glass-light"] .app-content,
+:root[data-theme="glass-dark"] .app-content {
+  background: transparent; /* the body's field/wallpaper must show through */
+}
+:root[data-theme="glass-light"] .threepane,
+:root[data-theme="glass-dark"] .threepane,
+:root[data-theme="glass-light"] .settings,
+:root[data-theme="glass-dark"] .settings {
+  gap: 10px;
+  padding: 10px;
+  background: transparent;
+}
+:root[data-theme="glass-light"] .folders,
+:root[data-theme="glass-dark"] .folders,
+:root[data-theme="glass-light"] .notelist,
+:root[data-theme="glass-dark"] .notelist,
+:root[data-theme="glass-light"] .pane,
+:root[data-theme="glass-dark"] .pane,
+:root[data-theme="glass-light"] .set-nav,
+:root[data-theme="glass-dark"] .set-nav,
+:root[data-theme="glass-light"] .set-main,
+:root[data-theme="glass-dark"] .set-main {
+  border: 1px solid;
+  border-radius: var(--r-window);
+  overflow: hidden;
+}
+:root[data-theme="glass-light"] .titlebar,
+:root[data-theme="glass-dark"] .titlebar {
+  border-bottom: none;
+}
+
 /* chrome becomes glass: heavy blur + saturation, a specular top edge, a soft
    hue-colored drop. The editor canvas gets its own (near-solid or paper) layer. */
 :root[data-theme="glass-light"] .titlebar,
 :root[data-theme="glass-light"] .folders,
 :root[data-theme="glass-light"] .notelist,
+:root[data-theme="glass-light"] .pane,
+:root[data-theme="glass-light"] .set-nav,
+:root[data-theme="glass-light"] .set-main,
 :root[data-theme="glass-light"] .fmtbar,
 :root[data-theme="glass-light"] .modpop,
 :root[data-theme="glass-light"] .aapanel,
@@ -184,6 +229,9 @@
 :root[data-theme="glass-dark"] .titlebar,
 :root[data-theme="glass-dark"] .folders,
 :root[data-theme="glass-dark"] .notelist,
+:root[data-theme="glass-dark"] .pane,
+:root[data-theme="glass-dark"] .set-nav,
+:root[data-theme="glass-dark"] .set-main,
 :root[data-theme="glass-dark"] .fmtbar,
 :root[data-theme="glass-dark"] .modpop,
 :root[data-theme="glass-dark"] .aapanel,
@@ -196,6 +244,12 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     0 14px 40px rgba(0, 0, 0, 0.45);
+}
+/* panes carry the glass; their inner editor surface goes transparent
+   (the canvas layer on .ed-scroll does the rest) */
+:root[data-theme="glass-light"] .editor,
+:root[data-theme="glass-dark"] .editor {
+  background: transparent;
 }
 /* floating glass pieces sit visibly above the field */
 :root[data-theme="glass-light"] .fmtbar,

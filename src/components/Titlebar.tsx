@@ -6,7 +6,7 @@
 import type { MouseEvent } from "react";
 import { dispatch } from "../keys/registry";
 import { startWindowDrag } from "../lib/tauri";
-import { GLASS_TINTS, useUiStore } from "../state/ui";
+import { GLASS_TINTS, SOLID_THEMES, useUiStore } from "../state/ui";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 import { ModuleSwitcher } from "./ModuleSwitcher";
@@ -25,8 +25,13 @@ export function Titlebar() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const theme = useUiStore((s) => s.theme);
   const themeFamily = useUiStore((s) => s.themeFamily);
+  const glassMode = useUiStore((s) => s.glassMode);
   const glassTint = useUiStore((s) => s.glassTint);
   const tintLabel = GLASS_TINTS.find((t) => t.value === glassTint)?.label ?? glassTint;
+  const themeLabel =
+    theme === "system"
+      ? "System"
+      : (SOLID_THEMES.find((t) => t.family === themeFamily && t.mode === theme)?.label ?? theme);
 
   return (
     <header className="titlebar">
@@ -77,14 +82,14 @@ export function Titlebar() {
       <div className="tb-spacer" onMouseDown={onDragRegionMouseDown} />
       <div className="tb-actions">
         {/* sun = theme, in every approved titlebar frame (r1 tip "Theme — light";
-            r2/r4/r5 frame A). While liquid glass is live the slot becomes the
-            tint cycler instead (Seth, 2026-06-12) — mode still lives in Settings. */}
-        {themeFamily === "glass" ? (
+            r2/r4/r5 frame A). The sun cycles the four solid themes; while glass
+            mode is on the slot becomes the tint cycler instead (Seth, 2026-06-12). */}
+        {glassMode ? (
           <IconButton label={`Glass — ${tintLabel}`} onClick={() => dispatch("theme.cycleGlassTint")}>
             <span className="tintdot" />
           </IconButton>
         ) : (
-          <IconButton label={`Theme — ${theme}`} onClick={() => dispatch("theme.cycle")}>
+          <IconButton label={`Theme — ${themeLabel}`} onClick={() => dispatch("theme.cycle")}>
             <SunGlyph />
           </IconButton>
         )}

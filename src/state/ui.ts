@@ -6,9 +6,17 @@ export type ThemeSetting = "light" | "dark" | "system";
 
 /** Theme family (Seth, 2026-06-12): "warm" is the kit brand pair (Light/Dark,
  * the default); "mono" is the simple pair — Paper (white & black) and Charcoal
- * (the breve/SM-suite dark); "glass" is liquid glass — translucent chrome over
- * a tinted wash, one hue at a time. The mode setting picks within the family. */
-export type ThemeFamily = "warm" | "mono" | "glass";
+ * (the breve/SM-suite dark). Liquid glass is NOT a theme — it is a MODE layered
+ * over whichever theme is active (glassMode below). */
+export type ThemeFamily = "warm" | "mono";
+
+/** The four solid themes, in the order the titlebar sun cycles them. */
+export const SOLID_THEMES: { family: ThemeFamily; mode: "light" | "dark"; label: string }[] = [
+  { family: "warm", mode: "light", label: "Warm Light" },
+  { family: "warm", mode: "dark", label: "Warm Dark" },
+  { family: "mono", mode: "light", label: "Paper" },
+  { family: "mono", mode: "dark", label: "Charcoal" },
+];
 
 /** The glass hue: Seth's sunset-edge blue · the same band in pink · the two
  * rotli colors. Cycled from the titlebar while glass is live. */
@@ -19,6 +27,18 @@ export const GLASS_TINTS: { value: GlassTint; label: string }[] = [
   { value: "blush", label: "Blush" },
   { value: "clay", label: "Clay" },
   { value: "olive", label: "Olive" },
+];
+
+/** What sits behind the glass: the tinted field, a bundled wallpaper, or the
+ * user's own image (custom — an object URL, in-memory for Stage 1). */
+export type GlassBackground = "field" | "dusk" | "blush" | "linen" | "cocoa" | "custom";
+
+export const GLASS_BACKGROUNDS: { value: Exclude<GlassBackground, "custom">; label: string }[] = [
+  { value: "field", label: "Tint field" },
+  { value: "dusk", label: "Dusk waves" },
+  { value: "blush", label: "Blush waves" },
+  { value: "linen", label: "Linen hills" },
+  { value: "cocoa", label: "Cocoa night" },
 ];
 
 /** What the notes canvas is made of while glass is live. */
@@ -46,10 +66,23 @@ interface UiState {
   themeFamily: ThemeFamily;
   setThemeFamily: (family: ThemeFamily) => void;
 
-  /** Liquid-glass hue; meaningful while themeFamily is "glass". */
+  /** Liquid glass — a mode OVER the active theme, toggled in Settings. While
+   * on, the resolved light/dark of the chosen theme picks glass-light/dark
+   * and the titlebar sun becomes the tint cycler. */
+  glassMode: boolean;
+  setGlassMode: (on: boolean) => void;
+
+  /** Liquid-glass hue; meaningful while glassMode is on. */
   glassTint: GlassTint;
   setGlassTint: (tint: GlassTint) => void;
   cycleGlassTint: () => void;
+
+  /** What sits behind the glass (glassMode only). */
+  glassBackground: GlassBackground;
+  setGlassBackground: (bg: GlassBackground) => void;
+  /** Object URL of an uploaded image; in-memory, gone on quit (Stage 1). */
+  customBackground: string | null;
+  setCustomBackground: (url: string | null) => void;
 
   /** The writing canvas inside glass: glass like everything else, or a real
    * paper surface (linen / white / cocoa) — write on paper, the rest stays
@@ -101,16 +134,34 @@ interface UiState {
 export const useUiStore = create<UiState>((set, get) => ({
   theme: "light",
   setTheme: (theme) => set({ theme }),
+  // the titlebar sun: Warm Light → Warm Dark → Paper → Charcoal (Seth's law);
+  // a "system" setting resolves to its current mode before stepping on
   cycleTheme: () =>
-    set((s) => ({
-      theme: s.theme === "light" ? "dark" : s.theme === "dark" ? "system" : "light",
-    })),
+    set((s) => {
+      const mode =
+        s.theme === "system"
+          ? window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light"
+          : s.theme;
+      const i = SOLID_THEMES.findIndex((t) => t.family === s.themeFamily && t.mode === mode);
+      const next = SOLID_THEMES[(i + 1) % SOLID_THEMES.length];
+      return next ? { themeFamily: next.family, theme: next.mode } : s;
+    }),
 
   themeFamily: "warm",
   setThemeFamily: (family) => set({ themeFamily: family }),
 
+  glassMode: false,
+  setGlassMode: (on) => set({ glassMode: on }),
+
   glassTint: "dusk",
   setGlassTint: (tint) => set({ glassTint: tint }),
+
+  glassBackground: "field",
+  setGlassBackground: (bg) => set({ glassBackground: bg }),
+  customBackground: null,
+  setCustomBackground: (url) => set({ customBackground: url }),
 
   glassCanvas: "glass",
   setGlassCanvas: (canvas) => set({ glassCanvas: canvas }),
