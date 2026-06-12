@@ -476,20 +476,20 @@
   color: var(--text-muted);
 }
 
-/* appearance — family cards (warm / mono) + the explicit three-way mode */
+/* appearance — one card per theme (no family/mode two-step) */
 .famrow {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  max-width: 440px;
+  max-width: 560px;
   margin-bottom: 14px;
 }
 .famcard {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  padding: 12px;
+  padding: 10px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
@@ -505,16 +505,13 @@
   border-color: var(--accent);
   background: var(--tint);
 }
-.famswatches {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 2px;
-}
-.famswatches i {
-  width: 16px;
-  height: 16px;
-  border-radius: var(--r-inner);
+.famswatch {
+  display: block;
+  width: 100%;
+  height: 34px;
+  border-radius: var(--r-control);
   border: 1px solid var(--border);
+  margin-bottom: 4px;
 }
 .famlabel {
   font-weight: var(--wght-label);
@@ -523,6 +520,70 @@
 .famcaption {
   font-size: var(--fs-label);
   color: var(--text-muted);
+}
+.sysrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 4px;
+  padding: 9px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  color: var(--text-muted);
+  font-size: var(--fs-label);
+  cursor: pointer;
+  transition: background var(--motion-exit) var(--motion-ease);
+}
+.sysrow:hover {
+  background: var(--hov);
+}
+.sysrow.on {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--tint);
+}
+.sysdot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--text-muted);
+  flex: none;
+}
+.sysrow.on .sysdot {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.set-back {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  margin-bottom: 10px;
+  background: none;
+  border: none;
+  border-radius: var(--r-control);
+  color: var(--text-muted);
+  font-size: var(--fs-label);
+  font-weight: var(--wght-label);
+  cursor: pointer;
+  transition: background var(--motion-exit) var(--motion-ease);
+}
+.set-back:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.set-back .set-back-label {
+  flex: 1;
+  text-align: left;
+}
+.set-back kbd {
+  font-size: 10px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  padding: 1px 5px;
+  background: var(--surface);
 }
 .tintrow {
   display: flex;

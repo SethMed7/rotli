@@ -12,6 +12,7 @@ import {
   useNoteStyle,
   useNoteStyleStore,
 } from "../state/noteStyle";
+import { GLASS_CANVASES, useUiStore } from "../state/ui";
 
 const MEASURES: { id: Measure; label: string }[] = [
   { id: "narrow", label: "Narrow" },
@@ -33,6 +34,9 @@ export function AaPanel({
   const style = useNoteStyle(noteId);
   const setSize = useNoteStyleStore((s) => s.setSize);
   const setMeasure = useNoteStyleStore((s) => s.setMeasure);
+  const themeFamily = useUiStore((s) => s.themeFamily);
+  const glassCanvas = useUiStore((s) => s.glassCanvas);
+  const setGlassCanvas = useUiStore((s) => s.setGlassCanvas);
 
   return (
     <div className="aapanel" ref={ref} role="dialog" aria-label="Typography">
@@ -71,6 +75,23 @@ export function AaPanel({
           </button>
         ))}
       </div>
+      {themeFamily === "glass" && (
+        <>
+          <div className="aalabel">Canvas</div>
+          <div className="aarow">
+            {GLASS_CANVASES.map((c) => (
+              <button
+                type="button"
+                key={c.value}
+                className={glassCanvas === c.value ? "aaseg sel" : "aaseg"}
+                onClick={() => setGlassCanvas(c.value)}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       <div className="aanote">
         Styling lives with the editor, saved for this note — the note itself never changes. Marks
         (bold, highlight…) are real markdown via the format bar.

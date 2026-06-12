@@ -142,28 +142,28 @@
   --act: rgba(238, 241, 244, 0.13);
 }
 
-/* the tinted wash the glass floats over — fixed so panels scroll across it */
+/* the ambient field the glass floats over — soft hue blobs (glass needs color
+   variation behind it to read as glass), fixed so panels scroll across it */
 :root[data-theme="glass-light"] body {
-  background: linear-gradient(
-    165deg,
-    color-mix(in srgb, var(--glass-hue) 22%, #f8f9fa),
-    color-mix(in srgb, var(--glass-hue) 6%, #fdfdfc) 62%,
-    color-mix(in srgb, var(--glass-hue) 13%, #fbfbfa)
-  );
+  background:
+    radial-gradient(42% 52% at 12% 16%, color-mix(in srgb, var(--glass-hue) 42%, transparent), transparent 70%),
+    radial-gradient(38% 46% at 88% 10%, color-mix(in srgb, var(--glass-hue) 26%, transparent), transparent 72%),
+    radial-gradient(52% 62% at 80% 92%, color-mix(in srgb, var(--glass-hue) 34%, transparent), transparent 70%),
+    radial-gradient(40% 50% at 16% 86%, color-mix(in srgb, var(--glass-hue) 20%, transparent), transparent 74%),
+    linear-gradient(160deg, color-mix(in srgb, var(--glass-hue) 10%, #f8f9fa), #fcfcfb);
   background-attachment: fixed;
 }
 :root[data-theme="glass-dark"] body {
-  background: linear-gradient(
-    165deg,
-    color-mix(in srgb, var(--glass-hue) 30%, #121419),
-    color-mix(in srgb, var(--glass-hue) 10%, #14161a) 62%,
-    color-mix(in srgb, var(--glass-hue) 20%, #121419)
-  );
+  background:
+    radial-gradient(44% 54% at 14% 16%, color-mix(in srgb, var(--glass-hue) 52%, transparent), transparent 70%),
+    radial-gradient(38% 46% at 86% 12%, color-mix(in srgb, var(--glass-hue) 30%, transparent), transparent 72%),
+    radial-gradient(52% 62% at 80% 90%, color-mix(in srgb, var(--glass-hue) 40%, transparent), transparent 70%),
+    linear-gradient(160deg, color-mix(in srgb, var(--glass-hue) 14%, #101217), #121419);
   background-attachment: fixed;
 }
 
-/* chrome becomes glass: blur + saturate + a light top edge. The editor pane is
-   deliberately NOT in this list — text sits on near-solid surface. */
+/* chrome becomes glass: heavy blur + saturation, a specular top edge, a soft
+   hue-colored drop. The editor canvas gets its own (near-solid or paper) layer. */
 :root[data-theme="glass-light"] .titlebar,
 :root[data-theme="glass-light"] .folders,
 :root[data-theme="glass-light"] .notelist,
@@ -171,19 +171,15 @@
 :root[data-theme="glass-light"] .modpop,
 :root[data-theme="glass-light"] .aapanel,
 :root[data-theme="glass-light"] .palette,
-:root[data-theme="glass-light"] .capture,
-:root[data-theme="glass-dark"] .titlebar,
-:root[data-theme="glass-dark"] .folders,
-:root[data-theme="glass-dark"] .notelist,
-:root[data-theme="glass-dark"] .fmtbar,
-:root[data-theme="glass-dark"] .modpop,
-:root[data-theme="glass-dark"] .aapanel,
-:root[data-theme="glass-dark"] .palette,
-:root[data-theme="glass-dark"] .capture {
-  background: var(--surface-2);
-  -webkit-backdrop-filter: blur(18px) saturate(1.5);
-  backdrop-filter: blur(18px) saturate(1.5);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+:root[data-theme="glass-light"] .capture {
+  background: rgba(255, 255, 255, 0.38);
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  backdrop-filter: blur(26px) saturate(1.7);
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.2),
+    0 12px 36px color-mix(in srgb, var(--glass-hue) 22%, transparent);
 }
 :root[data-theme="glass-dark"] .titlebar,
 :root[data-theme="glass-dark"] .folders,
@@ -193,7 +189,101 @@
 :root[data-theme="glass-dark"] .aapanel,
 :root[data-theme="glass-dark"] .palette,
 :root[data-theme="glass-dark"] .capture {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  background: rgba(18, 21, 26, 0.42);
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  backdrop-filter: blur(26px) saturate(1.7);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 14px 40px rgba(0, 0, 0, 0.45);
+}
+/* floating glass pieces sit visibly above the field */
+:root[data-theme="glass-light"] .fmtbar,
+:root[data-theme="glass-light"] .palette,
+:root[data-theme="glass-light"] .capture,
+:root[data-theme="glass-light"] .modpop,
+:root[data-theme="glass-light"] .aapanel {
+  background: rgba(255, 255, 255, 0.46);
+}
+
+/* — the writing canvas in glass (Seth, 2026-06-12): by default the notes area
+   is quiet glass too; data-glass-canvas lets you write ON PAPER while the rest
+   stays glass — the canvas takes a real theme surface and that surface's ink.
+   Toggled from the Aa panel (a styling layer — never written into the file). — */
+:root[data-theme="glass-light"] .ed-scroll,
+:root[data-theme="glass-dark"] .ed-scroll {
+  -webkit-backdrop-filter: blur(26px) saturate(1.6);
+  backdrop-filter: blur(26px) saturate(1.6);
+}
+:root[data-theme="glass-light"] .ed-scroll {
+  background: rgba(255, 255, 255, 0.56);
+}
+:root[data-theme="glass-dark"] .ed-scroll {
+  background: rgba(16, 18, 23, 0.52);
+}
+/* paper canvases — kit-light (linen), mono-light (white), kit-dark (cocoa) inks travel with them */
+:root[data-glass-canvas="linen"][data-theme="glass-light"] .ed-scroll,
+:root[data-glass-canvas="linen"][data-theme="glass-dark"] .ed-scroll {
+  background: #f8f2e9;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: var(--text); /* re-anchor inherited ink inside the canvas scope */
+  --text: #3a3028;
+  --text-muted: #6e6155;
+  --border: #e7dbc9;
+  --surface: #ffffff;
+  --surface-2: #f1e7d8;
+  --tint: #f2d6c2;
+  --accent: #c97e62;
+  --accent-text: #8f4e37;
+  --on-accent: #ffffff;
+  --success: #8d9a76;
+  --hov: rgba(58, 48, 40, 0.07);
+  --act: rgba(58, 48, 40, 0.11);
+  --quote-bar: #f2d6c2;
+  --check-ink: #3a3028;
+}
+:root[data-glass-canvas="white"][data-theme="glass-light"] .ed-scroll,
+:root[data-glass-canvas="white"][data-theme="glass-dark"] .ed-scroll {
+  background: #ffffff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: var(--text);
+  --text: #161616;
+  --text-muted: #6b6b68;
+  --border: #e6e6e3;
+  --surface: #ffffff;
+  --surface-2: #f5f5f4;
+  --tint: #ececea;
+  --accent: #161616;
+  --accent-text: #161616;
+  --on-accent: #ffffff;
+  --success: #6b6b68;
+  --hov: rgba(22, 22, 22, 0.07);
+  --act: rgba(22, 22, 22, 0.11);
+  --quote-bar: rgba(107, 107, 104, 0.55);
+  --check-ink: #ffffff;
+}
+:root[data-glass-canvas="cocoa"][data-theme="glass-light"] .ed-scroll,
+:root[data-glass-canvas="cocoa"][data-theme="glass-dark"] .ed-scroll {
+  background: #2e2620;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: var(--text);
+  --text: #f1e7da;
+  --text-muted: #b7a593;
+  --border: #3d3229;
+  --surface: #2e2620;
+  --surface-2: #392f28;
+  --tint: #3e332b;
+  --accent: #c97e62;
+  --accent-text: #c97e62;
+  --on-accent: #241d18;
+  --success: #8d9a76;
+  --hov: rgba(241, 231, 218, 0.08);
+  --act: rgba(241, 231, 218, 0.13);
+  --quote-bar: #3e332b;
+  --check-ink: #241d18;
 }
 
 /* glass dark shares the dark selection-bar grammar (the bar lands in the hue) */

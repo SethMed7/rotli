@@ -21,6 +21,16 @@ export const GLASS_TINTS: { value: GlassTint; label: string }[] = [
   { value: "olive", label: "Olive" },
 ];
 
+/** What the notes canvas is made of while glass is live. */
+export type GlassCanvas = "glass" | "linen" | "white" | "cocoa";
+
+export const GLASS_CANVASES: { value: GlassCanvas; label: string }[] = [
+  { value: "glass", label: "Glass" },
+  { value: "linen", label: "Linen" },
+  { value: "white", label: "White" },
+  { value: "cocoa", label: "Cocoa" },
+];
+
 /** The folders rail selection: the two smart rows or a real folder id. */
 export const ALL_NOTES = "all";
 export const RECENT = "recent";
@@ -40,6 +50,12 @@ interface UiState {
   glassTint: GlassTint;
   setGlassTint: (tint: GlassTint) => void;
   cycleGlassTint: () => void;
+
+  /** The writing canvas inside glass: glass like everything else, or a real
+   * paper surface (linen / white / cocoa) — write on paper, the rest stays
+   * glass. Toggled from the Aa panel. */
+  glassCanvas: GlassCanvas;
+  setGlassCanvas: (canvas: GlassCanvas) => void;
 
   /** Rails collapse state — remembered per window (in-memory, Stage 1). */
   foldersCollapsed: boolean;
@@ -95,6 +111,9 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   glassTint: "dusk",
   setGlassTint: (tint) => set({ glassTint: tint }),
+
+  glassCanvas: "glass",
+  setGlassCanvas: (canvas) => set({ glassCanvas: canvas }),
   cycleGlassTint: () =>
     set((s) => {
       const i = GLASS_TINTS.findIndex((t) => t.value === s.glassTint);

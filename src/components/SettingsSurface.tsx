@@ -8,8 +8,8 @@
 import { type KeyboardEvent, useState } from "react";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
-import { type KeyAction, allActions, conflictFor, rebind } from "../keys/registry";
-import { GLASS_TINTS, type ThemeFamily, type ThemeSetting, useUiStore } from "../state/ui";
+import { type KeyAction, allActions, conflictFor, dispatch, rebind } from "../keys/registry";
+import { GLASS_TINTS, type ThemeFamily, useUiStore } from "../state/ui";
 import {
   CheckGlyph,
   CloudGlyph,
@@ -100,39 +100,65 @@ function HotkeysPane() {
   );
 }
 
-// ——— Appearance: family (warm / mono) + the explicit three-way mode ———
+// ——— Appearance: every theme is one visible card (Seth, 2026-06-12 — no
+// family/mode two-step; the quokka never asks "where is the white theme?") ———
 
-const THEMES: { value: ThemeSetting; label: string }[] = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-  { value: "system", label: "System" },
-];
-
-const FAMILIES: {
-  value: ThemeFamily;
+const THEME_CARDS: {
+  family: ThemeFamily;
+  mode: "light" | "dark";
   label: string;
   caption: string;
-  swatches: [string, string];
+  swatch: string;
 }[] = [
   {
-    value: "warm",
-    label: "Warm",
-    caption: "Paper under lamplight — the rotli default.",
-    swatches: ["var(--swatch-warm-light)", "var(--swatch-warm-dark)"],
+    family: "warm",
+    mode: "light",
+    label: "Warm Light",
+    caption: "The rotli default — paper under lamplight.",
+    swatch: "var(--swatch-warm-light)",
   },
   {
-    value: "mono",
-    label: "Mono",
-    caption: "Simple white & black. Charcoal after dark.",
-    swatches: ["var(--swatch-paper)", "var(--swatch-charcoal)"],
+    family: "warm",
+    mode: "dark",
+    label: "Warm Dark",
+    caption: "Cocoa dark, never clinical.",
+    swatch: "var(--swatch-warm-dark)",
   },
   {
-    value: "glass",
-    label: "Liquid Glass",
-    caption: "Translucent chrome, one hue at a time.",
-    swatches: ["var(--swatch-dusk)", "var(--swatch-blush)"],
+    family: "mono",
+    mode: "light",
+    label: "Paper",
+    caption: "Simple white & black.",
+    swatch: "var(--swatch-paper)",
+  },
+  {
+    family: "mono",
+    mode: "dark",
+    label: "Charcoal",
+    caption: "The SM-suite dark.",
+    swatch: "var(--swatch-charcoal)",
+  },
+  {
+    family: "glass",
+    mode: "light",
+    label: "Glass Light",
+    caption: "Liquid glass over a bright wash.",
+    swatch: "linear-gradient(135deg, var(--swatch-dusk), var(--swatch-paper))",
+  },
+  {
+    family: "glass",
+    mode: "dark",
+    label: "Glass Dark",
+    caption: "Liquid glass after dark.",
+    swatch: "linear-gradient(135deg, var(--swatch-dusk), var(--swatch-charcoal))",
   },
 ];
+
+const FAMILY_PAIR: Record<ThemeFamily, string> = {
+  warm: "Warm Light and Warm Dark",
+  mono: "Paper and Charcoal",
+  glass: "Glass Light and Glass Dark",
+};
 
 const TINT_SWATCH: Record<string, string> = {
   dusk: "var(--swatch-dusk)",
@@ -148,27 +174,31 @@ function AppearancePane() {
   const setThemeFamily = useUiStore((s) => s.setThemeFamily);
   const glassTint = useUiStore((s) => s.glassTint);
   const setGlassTint = useUiStore((s) => s.setGlassTint);
+  const followingSystem = theme === "system";
   return (
     <>
       <h3>Appearance</h3>
-      <p className="lead">Pick your light. Light, Dark, and System work inside every family.</p>
+      <p className="lead">Pick a theme. Glass also has a tint of its own.</p>
       <div className="famrow">
-        {FAMILIES.map(({ value, label, caption, swatches }) => (
-          <button
-            type="button"
-            key={value}
-            className={themeFamily === value ? "famcard sel" : "famcard"}
-            aria-pressed={themeFamily === value}
-            onClick={() => setThemeFamily(value)}
-          >
-            <span className="famswatches" aria-hidden="true">
-              <i style={{ background: swatches[0] }} />
-              <i style={{ background: swatches[1] }} />
-            </span>
-            <span className="famlabel">{label}</span>
-            <span className="famcaption">{caption}</span>
-          </button>
-        ))}
+        {THEME_CARDS.map(({ family, mode, label, caption, swatch }) => {
+          const selected = themeFamily === family && theme === mode;
+          return (
+            <button
+              type="button"
+              key={label}
+              className={selected ? "famcard sel" : "famcard"}
+              aria-pressed={selected}
+              onClick={() => {
+                setThemeFamily(family);
+                setTheme(mode);
+              }}
+            >
+              <span className="famswatch" style={{ background: swatch }} aria-hidden="true" />
+              <span className="famlabel">{label}</span>
+              <span className="famcaption">{caption}</span>
+            </button>
+          );
+        })}
       </div>
       {themeFamily === "glass" && (
         <div className="tintrow" role="radiogroup" aria-label="Glass tint">
@@ -186,19 +216,23 @@ function AppearancePane() {
           ))}
         </div>
       )}
-      <div className="themerow">
-        {THEMES.map(({ value, label }) => (
-          <button
-            type="button"
-            key={value}
-            className={theme === value ? "aaseg sel" : "aaseg"}
-            aria-pressed={theme === value}
-            onClick={() => setTheme(value)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <button
+        type="button"
+        className={followingSystem ? "sysrow on" : "sysrow"}
+        aria-pressed={followingSystem}
+        onClick={() =>
+          setTheme(
+            followingSystem
+              ? window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light"
+              : "system",
+          )
+        }
+      >
+        <span className="sysdot" aria-hidden="true" />
+        Match the system — switch between {FAMILY_PAIR[themeFamily]} with macOS.
+      </button>
     </>
   );
 }
@@ -309,6 +343,20 @@ export function SettingsSurface() {
   return (
     <div className="settings">
       <nav className="set-nav" aria-label="Settings sections">
+        <button type="button" className="set-back" onClick={() => dispatch("app.settings")}>
+          <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+            <path
+              d="M15 18l-6-6 6-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="set-back-label">Back to notes</span>
+          <kbd>esc</kbd>
+        </button>
         {NAV.map(({ id, label, glyph: G }) => (
           <button
             type="button"
