@@ -24,9 +24,9 @@ import {
   type EditorHandle,
   applyBlockToggle,
   applyHeading,
-  releaseActiveEditor,
-  setActiveEditor,
+  registerEditor,
   toggleInlineMark,
+  unregisterEditor,
 } from "./commands";
 import { FormatBar } from "./FormatBar";
 import { editDocument, ensureDocument, useDocumentLines } from "./model";
@@ -76,7 +76,7 @@ interface Selection {
   end: number;
 }
 
-export function EditorSurface({ noteId }: { noteId: string }) {
+export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: string }) {
   const note = useNote(noteId).data;
   const docLines = useDocumentLines(noteId);
   const queryLines = useMemo(() => note?.body.split("\n"), [note?.body]);
@@ -120,10 +120,12 @@ export function EditorSurface({ noteId }: { noteId: string }) {
     if (note) ensureDocument(note.id, note.body);
   }, [note]);
 
-  // a fresh surface target = fresh edit state (tabs keep only view state)
+  // a fresh surface target = fresh edit state (tabs keep only view state) —
+  // and a fresh scroll: the previous note's position must not bleed over
   useEffect(() => {
     setActiveState(null);
     setAaOpen(false);
+    scrollRef.current?.scrollTo({ top: 0 });
   }, [noteId]);
 
   useEffect(() => {
@@ -206,7 +208,7 @@ export function EditorSurface({ noteId }: { noteId: string }) {
       ls.map((l, i) => {
         if (i !== index) return l;
         if (l.startsWith("- [ ] ")) return `- [x] ${l.slice(6)}`;
-        if (l.startsWith("- [x] ")) return `- [ ] ${l.slice(6)}`;
+        if (l.startsWith("- [x] ") || l.startsWith("- [X] ")) return `- [ ] ${l.slice(6)}`;
         return l;
       }),
     );
@@ -264,9 +266,9 @@ export function EditorSurface({ noteId }: { noteId: string }) {
   );
 
   useEffect(() => {
-    setActiveEditor(handle);
-    return () => releaseActiveEditor(handle);
-  }, [handle]);
+    registerEditor(paneId, handle);
+    return () => unregisterEditor(paneId, handle);
+  }, [paneId, handle]);
 
   // ——— caret application (after activation / programmatic edits) ———
 
@@ -334,18 +336,18 @@ export function EditorSurface({ noteId }: { noteId: string }) {
 
   /** Parse a list marker: bullets, numbered, tasks, quotes. Returns the marker
    * length, the marker for the NEXT line (numbers count up, tasks reset to
-   * unchecked), and whether the item is empty (the exit-the-list signal). */
+   * unchecked), and whether the item is empty (the exit-the-list signal).
+   * The grammar is EXACTLY parseBlock's (column 0, `- ` bullets): continuation
+   * must never produce a line the renderer reads as a plain paragraph. */
   const listPrefixOf = (
     line: string,
   ): { prefixLen: number; next: string; empty: boolean } | null => {
-    const m = line.match(/^(\s*(?:- \[[ xX]\] |[-*] |\d+\. |> ))(.*)$/);
+    const m = line.match(/^((?:- \[[ xX]\] |- |\d+\. |> ))(.*)$/);
     if (!m) return null;
     const prefix = m[1] ?? "";
     const content = m[2] ?? "";
-    const num = prefix.match(/^(\s*)(\d+)\. $/);
-    const next = num
-      ? `${num[1] ?? ""}${Number(num[2]) + 1}. `
-      : prefix.replace(/\[[xX]\]/, "[ ]");
+    const num = prefix.match(/^(\d+)\. $/);
+    const next = num ? `${Number(num[1]) + 1}. ` : prefix.replace(/\[[xX]\]/, "[ ]");
     return { prefixLen: prefix.length, next, empty: content.trim() === "" };
   };
 
@@ -369,8 +371,14 @@ export function EditorSurface({ noteId }: { noteId: string }) {
     switch (event.key) {
       case "Enter": {
         event.preventDefault();
+        if (!collapsed) {
+          // the selection is replaced by the line break (the standard grammar)
+          setLine(active, line.slice(0, start) + line.slice(end));
+          splitAt(active, start);
+          break;
+        }
         const list = listPrefixOf(line);
-        if (list && collapsed) {
+        if (list) {
           if (list.empty) {
             // Enter on an empty item exits the list (clears the marker)
             pendingCaretRef.current = { start: 0, end: 0 };
@@ -386,13 +394,12 @@ export function EditorSurface({ noteId }: { noteId: string }) {
         break;
       }
       case " ": {
-        // "[ ]" (or "[]") + space at the start of a line becomes a task
+        // "[ ]" (or "[]") + space at the start of a line becomes a task —
+        // column 0 only, the renderer's task grammar
         const before = line.slice(0, start);
-        const box = before.match(/^(\s*)\[ ?\]$/);
-        if (box && collapsed) {
+        if (/^\[ ?\]$/.test(before) && collapsed) {
           event.preventDefault();
-          const indent = box[1] ?? "";
-          const prefix = `${indent}- [ ] `;
+          const prefix = "- [ ] ";
           pendingCaretRef.current = { start: prefix.length, end: prefix.length };
           setLine(active, prefix + line.slice(start));
         }
@@ -457,7 +464,7 @@ export function EditorSurface({ noteId }: { noteId: string }) {
     : { fontSize: `${style.size}px`, maxWidth: MEASURE_MAX_WIDTH[style.measure] };
 
   return (
-    <div className="editor" ref={rootRef} onMouseDownCapture={() => setActiveEditor(handle)}>
+    <div className="editor" ref={rootRef}>
       <div className="ed-head">
         {createdLabel(note.createdAt)}
         <div className="slot">
@@ -491,7 +498,6 @@ export function EditorSurface({ noteId }: { noteId: string }) {
                 className={hasSyntax(line) ? "ed-line raw" : "ed-line raw plain"}
                 data-kind={parseBlock(line).kind}
                 ref={rawRowRef}
-                // biome-ignore lint: line index is the identity here
                 key={i}
               >
                 <pre className="raw-twin" ref={twinRef} aria-hidden="true">
@@ -520,7 +526,6 @@ export function EditorSurface({ noteId }: { noteId: string }) {
               <div
                 className={lineClass(i)}
                 data-kind={parseBlock(line).kind}
-                // biome-ignore lint: line index is the identity here
                 key={i}
                 onMouseDown={onRowMouseDown(i)}
               >

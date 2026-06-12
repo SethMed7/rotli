@@ -12,6 +12,7 @@ import { touchMru } from "./mru";
 import { useUiStore } from "./ui";
 
 const MIN_PANE_WIDTH = 320;
+const MIN_PANE_HEIGHT = 160;
 const FOLDERS_RAIL_WIDTH = 198;
 const NOTE_LIST_WIDTH = 258;
 
@@ -104,6 +105,13 @@ function columnCount(node: PaneNode): number {
   return Math.max(...node.children.map(columnCount));
 }
 
+/** How many leaf rows the tree stacks (for the 160px height floor). */
+function rowCount(node: PaneNode): number {
+  if (node.kind === "leaf") return 1;
+  if (node.dir === "col") return node.children.reduce((sum, c) => sum + rowCount(c), 0);
+  return Math.max(...node.children.map(rowCount));
+}
+
 // geometry (unit square) for directional focus
 interface LeafRect {
   id: string;
@@ -189,22 +197,27 @@ const initialLeaf = makeLeaf(makeTab(initialNoteId));
 touchMru(initialNoteId); // the note the window opens on is the freshest "recent"
 
 /** Before a row split: does one more column fit at the 320px floor?
- * Auto-collapse the folders rail first, then the list (the r2 law). */
+ * Auto-collapse the folders rail first, then the list (the r2 law) — but only
+ * commit a collapse the split actually needs AND that makes it fit: a split
+ * that cannot fit must not eat the rails as a side effect of a no-op. */
 function ensureRoomForColumn(root: PaneNode): boolean {
   const columns = columnCount(root) + 1;
-  const railsWidth = () => {
-    const ui = useUiStore.getState(); // always fresh — collapsing changes it
-    return (
-      (ui.foldersCollapsed ? 0 : FOLDERS_RAIL_WIDTH) +
-      (ui.listCollapsed ? 0 : NOTE_LIST_WIDTH)
-    );
-  };
-  const fits = () => window.innerWidth - railsWidth() >= columns * MIN_PANE_WIDTH;
-  if (fits()) return true;
-  useUiStore.getState().setFoldersCollapsed(true);
-  if (fits()) return true;
-  useUiStore.getState().setListCollapsed(true);
-  return fits();
+  const ui = useUiStore.getState();
+  const fitsWith = (foldersCollapsed: boolean, listCollapsed: boolean) =>
+    window.innerWidth -
+      ((foldersCollapsed ? 0 : FOLDERS_RAIL_WIDTH) + (listCollapsed ? 0 : NOTE_LIST_WIDTH)) >=
+    columns * MIN_PANE_WIDTH;
+  if (fitsWith(ui.foldersCollapsed, ui.listCollapsed)) return true;
+  if (fitsWith(true, ui.listCollapsed)) {
+    ui.setFoldersCollapsed(true);
+    return true;
+  }
+  if (fitsWith(true, true)) {
+    ui.setFoldersCollapsed(true);
+    ui.setListCollapsed(true);
+    return true;
+  }
+  return false;
 }
 
 export const usePanesStore = create<PanesState>((set, get) => {
@@ -220,10 +233,22 @@ export const usePanesStore = create<PanesState>((set, get) => {
   const split = (dir: SplitDir) => {
     const { root } = get();
     if (dir === "row" && !ensureRoomForColumn(root)) return;
+    // the height floor mirrors the divider drag's 160px minimum
+    if (dir === "col" && (rowCount(root) + 1) * MIN_PANE_HEIGHT > window.innerHeight) return;
     const leaf = focusedLeaf();
     const dup = makeTab(activeTabOf(leaf).noteId); // duplicate, never empty
     const newLeaf = makeLeaf(dup);
     set({ root: splitLeaf(get().root, leaf.id, dir, newLeaf), focusedPaneId: newLeaf.id });
+  };
+
+  /** When a pane closes, focus its geometric NEIGHBOR — never jump to the
+   * first leaf across the window. */
+  const nextFocusAfterClose = (root: PaneNode, leafId: string): string | null => {
+    for (const dir of ["left", "right", "up", "down"] as const) {
+      const neighbor = neighborIn(root, leafId, dir);
+      if (neighbor) return neighbor;
+    }
+    return null;
   };
 
   return {
@@ -276,14 +301,16 @@ export const usePanesStore = create<PanesState>((set, get) => {
       if (!leaf) return;
       if (leaf.tabs.length <= 1) {
         // last tab: closing it closes the pane (unless it's the only pane)
+        const neighbor = nextFocusAfterClose(get().root, leaf.id);
         const remaining = removeLeaf(get().root, leaf.id);
         if (!remaining) return;
-        const focus = leaves(remaining)[0];
-        if (!focus) return;
+        const fallback = leaves(remaining)[0];
+        if (!fallback) return;
+        const focus = neighbor && findLeaf(remaining, neighbor) ? neighbor : fallback.id;
         set({
           root: remaining,
           focusedPaneId:
-            get().focusedPaneId === leaf.id ? focus.id : get().focusedPaneId,
+            get().focusedPaneId === leaf.id ? focus : get().focusedPaneId,
         });
         return;
       }
@@ -336,11 +363,13 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
     closePane: () => {
       const leaf = focusedLeaf();
+      const neighbor = nextFocusAfterClose(get().root, leaf.id);
       const remaining = removeLeaf(get().root, leaf.id);
       if (!remaining) return; // never close the last pane
-      const focus = leaves(remaining)[0];
-      if (!focus) return;
-      set({ root: remaining, focusedPaneId: focus.id });
+      const fallback = leaves(remaining)[0];
+      if (!fallback) return;
+      const focus = neighbor && findLeaf(remaining, neighbor) ? neighbor : fallback.id;
+      set({ root: remaining, focusedPaneId: focus });
     },
 
     setSplitSizes: (splitId, sizes) => {

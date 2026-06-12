@@ -26,7 +26,7 @@ export interface Block {
   marker?: string;
 }
 
-const TASK_RE = /^- \[([ x])\] /;
+const TASK_RE = /^- \[([ xX])\] /;
 const NUMBERED_RE = /^(\d+)\. /;
 const HEADING_RE = /^(#{1,3}) /;
 
@@ -38,7 +38,7 @@ export function parseBlock(line: string): Block {
     return { kind, prefixLen: h[0].length, text: line.slice(h[0].length) };
   }
   const t = TASK_RE.exec(line);
-  if (t) return { kind: "task", prefixLen: t[0].length, text: line.slice(t[0].length), done: t[1] === "x" };
+  if (t) return { kind: "task", prefixLen: t[0].length, text: line.slice(t[0].length), done: t[1] !== " " };
   if (line.startsWith("- ")) return { kind: "bullet", prefixLen: 2, text: line.slice(2) };
   const n = NUMBERED_RE.exec(line);
   if (n) return { kind: "numbered", prefixLen: n[0].length, text: line.slice(n[0].length), marker: `${n[1]}.` };

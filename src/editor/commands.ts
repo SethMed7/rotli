@@ -3,6 +3,8 @@
 // dispatches to. The marks law (r3, approved): underline = <u>…</u>,
 // highlight = ==…== (always peach); bold/italic/strike native syntax.
 
+import { usePanesStore } from "../state/panes";
+
 export type InlineMark = "bold" | "italic" | "underline" | "strike" | "code" | "highlight" | "link";
 export type BlockToggle = "quote" | "bullet" | "numbered" | "checklist";
 export type HeadingLevel = 1 | 2 | 3;
@@ -13,19 +15,22 @@ export interface EditorHandle {
   toggleBlock(kind: BlockToggle): void;
 }
 
-// The focused editor pane registers itself; registry actions route here.
-let current: EditorHandle | null = null;
+// Every mounted editor surface registers its handle under its pane id; the
+// registry's editor.* actions resolve through the panes store's focusedPaneId,
+// so keyboard pane focus (⌘⌥arrows), palette activation, and pane closing all
+// keep the seam pointed at the right editor — no last-clicked pointer.
+const handles = new Map<string, EditorHandle>();
 
-export function setActiveEditor(handle: EditorHandle): void {
-  current = handle;
+export function registerEditor(paneId: string, handle: EditorHandle): void {
+  handles.set(paneId, handle);
 }
 
-export function releaseActiveEditor(handle: EditorHandle): void {
-  if (current === handle) current = null;
+export function unregisterEditor(paneId: string, handle: EditorHandle): void {
+  if (handles.get(paneId) === handle) handles.delete(paneId);
 }
 
 export function activeEditor(): EditorHandle | null {
-  return current;
+  return handles.get(usePanesStore.getState().focusedPaneId) ?? null;
 }
 
 // ——— inline marks ———
@@ -144,13 +149,13 @@ export function applyHeading(line: string, level: HeadingLevel): PrefixEdit {
 
 // ——— block prefixes ———
 
-const ANY_BLOCK_PREFIX = /^(- \[[ x]\] |- |\d+\. |> )/;
+const ANY_BLOCK_PREFIX = /^(- \[[ xX]\] |- |\d+\. |> )/;
 
 const BLOCK_RULES: Record<BlockToggle, { add: string; test: RegExp }> = {
   quote: { add: "> ", test: /^> / },
-  bullet: { add: "- ", test: /^- (?!\[[ x]\] )/ },
+  bullet: { add: "- ", test: /^- (?!\[[ xX]\] )/ },
   numbered: { add: "1. ", test: /^\d+\. / },
-  checklist: { add: "- [ ] ", test: /^- \[[ x]\] / },
+  checklist: { add: "- [ ] ", test: /^- \[[ xX]\] / },
 };
 
 export function blockToggleActive(line: string, kind: BlockToggle): boolean {

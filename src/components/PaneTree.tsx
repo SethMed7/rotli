@@ -20,7 +20,11 @@ function LeafView({ node }: { node: LeafNode }) {
       onMouseDownCapture={() => focusPane(node.id)}
     >
       {node.tabs.length > 1 && <TabStrip pane={node} />}
-      {tab.surfaceKind === "note" && <EditorSurface noteId={tab.noteId} />}
+      {/* keyed by tab — each tab gets its own surface, so scroll/edit state
+          never bleeds from the previously active tab */}
+      {tab.surfaceKind === "note" && (
+        <EditorSurface key={tab.id} paneId={node.id} noteId={tab.noteId} />
+      )}
     </section>
   );
 }
@@ -41,6 +45,7 @@ function SplitView({ node }: { node: SplitNode }) {
     const startSizes = [...node.sizes];
     const minFrac = Math.min((node.dir === "row" ? 320 : 160) / total, 0.5);
     divider.classList.add("dragging");
+    divider.setPointerCapture(event.pointerId);
 
     const onMove = (ev: globalThis.PointerEvent) => {
       const pos = node.dir === "row" ? ev.clientX : ev.clientY;
@@ -64,9 +69,13 @@ function SplitView({ node }: { node: SplitNode }) {
       divider.classList.remove("dragging");
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    // an interrupted pointer stream (gesture takeover, window hidden mid-drag)
+    // must release the drag too, or the listeners live for the session
+    window.addEventListener("pointercancel", onUp);
   };
 
   const parts: ReactNode[] = [];
