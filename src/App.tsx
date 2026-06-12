@@ -70,9 +70,10 @@ function MainShell() {
 
 export default function App() {
   const theme = useUiStore((s) => s.theme);
+  const themeFamily = useUiStore((s) => s.themeFamily);
   const surface = surfaceFromUrl();
 
-  useEffect(() => applyTheme(theme), [theme]);
+  useEffect(() => applyTheme(theme, themeFamily), [theme, themeFamily]);
 
   useEffect(() => {
     document.body.dataset.surface = surface;

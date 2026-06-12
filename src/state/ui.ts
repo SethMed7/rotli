@@ -4,6 +4,11 @@ import { create } from "zustand";
 
 export type ThemeSetting = "light" | "dark" | "system";
 
+/** Theme family (Seth, 2026-06-12): "warm" is the kit brand pair (Light/Dark,
+ * the default); "mono" is the simple pair — Paper (white & black) and Charcoal
+ * (the breve/SM-suite dark). The mode setting picks within the family. */
+export type ThemeFamily = "warm" | "mono";
+
 /** The folders rail selection: the two smart rows or a real folder id. */
 export const ALL_NOTES = "all";
 export const RECENT = "recent";
@@ -14,6 +19,10 @@ interface UiState {
   theme: ThemeSetting;
   setTheme: (theme: ThemeSetting) => void;
   cycleTheme: () => void;
+
+  /** Which token family the mode resolves into (warm = kit default). */
+  themeFamily: ThemeFamily;
+  setThemeFamily: (family: ThemeFamily) => void;
 
   /** Rails collapse state — remembered per window (in-memory, Stage 1). */
   foldersCollapsed: boolean;
@@ -63,6 +72,9 @@ export const useUiStore = create<UiState>((set, get) => ({
     set((s) => ({
       theme: s.theme === "light" ? "dark" : s.theme === "dark" ? "system" : "light",
     })),
+
+  themeFamily: "warm",
+  setThemeFamily: (family) => set({ themeFamily: family }),
 
   foldersCollapsed: false,
   listCollapsed: false,

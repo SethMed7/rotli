@@ -6,6 +6,7 @@
 
 @import "../brand/tokens/colors.css";
 @import "../brand/tokens/type.css";
+@import "./themes.css"; /* mono family (paper · charcoal) — user choice, warm stays default */
 
 :root {
   /* — state layers (r3 gate values) —

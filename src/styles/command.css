@@ -476,7 +476,54 @@
   color: var(--text-muted);
 }
 
-/* appearance — the explicit three-way theme */
+/* appearance — family cards (warm / mono) + the explicit three-way mode */
+.famrow {
+  display: flex;
+  gap: 10px;
+  max-width: 440px;
+  margin-bottom: 14px;
+}
+.famcard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-exit) var(--motion-ease);
+}
+.famcard:hover {
+  background: var(--hov);
+}
+.famcard.sel {
+  border-color: var(--accent);
+  background: var(--tint);
+}
+.famswatches {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+.famswatches i {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-inner);
+  border: 1px solid var(--border);
+}
+.famlabel {
+  font-weight: var(--wght-label);
+  font-size: var(--fs-body);
+}
+.famcaption {
+  font-size: var(--fs-label);
+  color: var(--text-muted);
+}
 .themerow {
   display: flex;
   gap: 6px;

@@ -1,5 +1,7 @@
 // check-hex — fails if any raw hex color literal appears under src/, excluding
-// src/brand/ (the frozen kit is the only place hex may live). Run: bun run check:hex
+// src/brand/ (the frozen kit) and src/styles/themes.css (the app's additional
+// theme token sets — a token-DEFINITION file, same role as the kit's colors.css;
+// Seth 2026-06-12). Those two are the only places hex may live. Run: bun run check:hex
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, extname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SRC = join(ROOT, "src");
 const SKIP = join(SRC, "brand");
+const SKIP_FILES = new Set([join(SRC, "styles", "themes.css")]);
 const TEXT_EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".css", ".html", ".svg", ".json", ".md"]);
 const HEX = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g;
 
@@ -18,7 +21,7 @@ function walk(dir) {
     if (entry.isDirectory()) {
       if (path === SKIP) continue;
       walk(path);
-    } else if (TEXT_EXTS.has(extname(entry.name))) {
+    } else if (TEXT_EXTS.has(extname(entry.name)) && !SKIP_FILES.has(path)) {
       const lines = readFileSync(path, "utf8").split("\n");
       lines.forEach((line, i) => {
         for (const match of line.matchAll(HEX)) {

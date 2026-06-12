@@ -9,7 +9,7 @@ import { type KeyboardEvent, useState } from "react";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import { type KeyAction, allActions, conflictFor, rebind } from "../keys/registry";
-import { type ThemeSetting, useUiStore } from "../state/ui";
+import { type ThemeFamily, type ThemeSetting, useUiStore } from "../state/ui";
 import {
   CheckGlyph,
   CloudGlyph,
@@ -100,7 +100,7 @@ function HotkeysPane() {
   );
 }
 
-// ——— Appearance: the explicit three-way theme (default Light) ———
+// ——— Appearance: family (warm / mono) + the explicit three-way mode ———
 
 const THEMES: { value: ThemeSetting; label: string }[] = [
   { value: "light", label: "Light" },
@@ -108,15 +108,53 @@ const THEMES: { value: ThemeSetting; label: string }[] = [
   { value: "system", label: "System" },
 ];
 
+const FAMILIES: {
+  value: ThemeFamily;
+  label: string;
+  caption: string;
+  swatches: [string, string];
+}[] = [
+  {
+    value: "warm",
+    label: "Warm",
+    caption: "Paper under lamplight — the rotli default.",
+    swatches: ["var(--swatch-warm-light)", "var(--swatch-warm-dark)"],
+  },
+  {
+    value: "mono",
+    label: "Mono",
+    caption: "Simple white & black. Charcoal after dark.",
+    swatches: ["var(--swatch-paper)", "var(--swatch-charcoal)"],
+  },
+];
+
 function AppearancePane() {
   const theme = useUiStore((s) => s.theme);
   const setTheme = useUiStore((s) => s.setTheme);
+  const themeFamily = useUiStore((s) => s.themeFamily);
+  const setThemeFamily = useUiStore((s) => s.setThemeFamily);
   return (
     <>
       <h3>Appearance</h3>
-      <p className="lead">
-        Pick your light. Every surface is warm — like paper under a lamp, never a cold screen.
-      </p>
+      <p className="lead">Pick your light. Light, Dark, and System work inside either family.</p>
+      <div className="famrow">
+        {FAMILIES.map(({ value, label, caption, swatches }) => (
+          <button
+            type="button"
+            key={value}
+            className={themeFamily === value ? "famcard sel" : "famcard"}
+            aria-pressed={themeFamily === value}
+            onClick={() => setThemeFamily(value)}
+          >
+            <span className="famswatches" aria-hidden="true">
+              <i style={{ background: swatches[0] }} />
+              <i style={{ background: swatches[1] }} />
+            </span>
+            <span className="famlabel">{label}</span>
+            <span className="famcaption">{caption}</span>
+          </button>
+        ))}
+      </div>
       <div className="themerow">
         {THEMES.map(({ value, label }) => (
           <button

@@ -1,0 +1,64 @@
+/* rotli — additional appearance themes (Seth, 2026-06-12).
+   The frozen kit (src/brand/tokens/colors.css) owns the WARM family — Light + Dark,
+   the brand truth and the default. This file adds the MONO family as a user choice
+   (PHILOSOPHY §6: opinions live in defaults, not enforcement):
+
+     paper    — simple white & black; hair-off-white ground so structure survives
+     charcoal — the breve / SM-suite dark (~/smBrain/breve/theme.md): #161616 ground,
+                #1f1e1c cards, warm off-white ink — dark without being overbearing
+
+   This is the ONLY file outside src/brand/ where raw hex may live (it is a token-
+   definition file, same role as the kit's colors.css — check-hex exempts it by name).
+   Components never read these values directly; they consume the same semantic tokens. */
+
+/* picker swatches — available in every theme, for Settings → Appearance */
+:root {
+  --swatch-warm-light: #f8f2e9;
+  --swatch-warm-dark: #241d18;
+  --swatch-paper: #ffffff;
+  --swatch-charcoal: #161616;
+}
+
+/* — MONO · paper (light) — */
+:root[data-theme="paper"] {
+  --ground: #fafaf9;
+  --surface: #ffffff;
+  --surface-2: #f5f5f4;
+  --tint: #ececea;
+  --text: #161616;
+  --text-muted: #6b6b68;
+  --border: #e6e6e3;
+  --accent: #161616;
+  --accent-text: #161616;
+  --on-accent: #ffffff;
+  --success: #6b6b68;
+  --hov: rgba(22, 22, 22, 0.07);
+  --act: rgba(22, 22, 22, 0.11);
+}
+
+/* — MONO · charcoal (dark) — breve theme values, verbatim where possible — */
+:root[data-theme="charcoal"] {
+  --ground: #161616;
+  --surface: #1f1e1c;
+  --surface-2: #2a2825;
+  --tint: #33312d;
+  --text: #e9e7e2;
+  --text-muted: #a8a49c;
+  --border: #2e2c29;
+  --accent: #e9e7e2;
+  --accent-text: #e9e7e2;
+  --on-accent: #161616;
+  --success: #a8a49c;
+  --hov: rgba(233, 231, 226, 0.08);
+  --act: rgba(233, 231, 226, 0.13);
+}
+
+/* In the mono family the kit icons drop their clay/olive accents to ink — the
+   icons-README mono rule, via the app's --icon-* indirection (src/styles/app.css).
+   Brand moments that are imagery (the quokka world) stay warm by design; the
+   placement law keeps them rare. */
+:root[data-theme="paper"],
+:root[data-theme="charcoal"] {
+  --icon-clay: currentColor;
+  --icon-olive: currentColor;
+}

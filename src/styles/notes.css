@@ -79,8 +79,10 @@
 .frow.sel svg {
   color: var(--accent-text);
 }
-/* dark folder selection gains the 3px clay bar — one selection grammar (r2) */
-:root[data-theme="dark"] .frow.sel::before {
+/* dark folder selection gains the 3px clay bar — one selection grammar (r2);
+   charcoal (the mono dark) follows the same dark grammar, in ink */
+:root[data-theme="dark"] .frow.sel::before,
+:root[data-theme="charcoal"] .frow.sel::before {
   content: "";
   position: absolute;
   left: 0;
