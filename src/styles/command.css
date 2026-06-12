@@ -524,6 +524,38 @@
   font-size: var(--fs-label);
   color: var(--text-muted);
 }
+.tintrow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.tintchip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px 6px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  color: var(--text);
+  font-size: var(--fs-label);
+  font-weight: var(--wght-label);
+  cursor: pointer;
+  transition: background var(--motion-exit) var(--motion-ease);
+}
+.tintchip:hover {
+  background: var(--hov);
+}
+.tintchip.sel {
+  border-color: var(--accent);
+  background: var(--tint);
+}
+.tintchip i {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+}
 .themerow {
   display: flex;
   gap: 6px;

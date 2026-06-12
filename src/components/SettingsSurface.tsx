@@ -9,7 +9,7 @@ import { type KeyboardEvent, useState } from "react";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import { type KeyAction, allActions, conflictFor, rebind } from "../keys/registry";
-import { type ThemeFamily, type ThemeSetting, useUiStore } from "../state/ui";
+import { GLASS_TINTS, type ThemeFamily, type ThemeSetting, useUiStore } from "../state/ui";
 import {
   CheckGlyph,
   CloudGlyph,
@@ -126,17 +126,32 @@ const FAMILIES: {
     caption: "Simple white & black. Charcoal after dark.",
     swatches: ["var(--swatch-paper)", "var(--swatch-charcoal)"],
   },
+  {
+    value: "glass",
+    label: "Liquid Glass",
+    caption: "Translucent chrome, one hue at a time.",
+    swatches: ["var(--swatch-dusk)", "var(--swatch-blush)"],
+  },
 ];
+
+const TINT_SWATCH: Record<string, string> = {
+  dusk: "var(--swatch-dusk)",
+  blush: "var(--swatch-blush)",
+  clay: "var(--swatch-clay)",
+  olive: "var(--swatch-olive)",
+};
 
 function AppearancePane() {
   const theme = useUiStore((s) => s.theme);
   const setTheme = useUiStore((s) => s.setTheme);
   const themeFamily = useUiStore((s) => s.themeFamily);
   const setThemeFamily = useUiStore((s) => s.setThemeFamily);
+  const glassTint = useUiStore((s) => s.glassTint);
+  const setGlassTint = useUiStore((s) => s.setGlassTint);
   return (
     <>
       <h3>Appearance</h3>
-      <p className="lead">Pick your light. Light, Dark, and System work inside either family.</p>
+      <p className="lead">Pick your light. Light, Dark, and System work inside every family.</p>
       <div className="famrow">
         {FAMILIES.map(({ value, label, caption, swatches }) => (
           <button
@@ -155,6 +170,22 @@ function AppearancePane() {
           </button>
         ))}
       </div>
+      {themeFamily === "glass" && (
+        <div className="tintrow" role="radiogroup" aria-label="Glass tint">
+          {GLASS_TINTS.map(({ value, label }) => (
+            <button
+              type="button"
+              key={value}
+              className={glassTint === value ? "tintchip sel" : "tintchip"}
+              aria-pressed={glassTint === value}
+              onClick={() => setGlassTint(value)}
+            >
+              <i style={{ background: TINT_SWATCH[value] }} aria-hidden="true" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="themerow">
         {THEMES.map(({ value, label }) => (
           <button

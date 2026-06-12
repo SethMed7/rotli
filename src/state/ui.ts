@@ -6,8 +6,20 @@ export type ThemeSetting = "light" | "dark" | "system";
 
 /** Theme family (Seth, 2026-06-12): "warm" is the kit brand pair (Light/Dark,
  * the default); "mono" is the simple pair — Paper (white & black) and Charcoal
- * (the breve/SM-suite dark). The mode setting picks within the family. */
-export type ThemeFamily = "warm" | "mono";
+ * (the breve/SM-suite dark); "glass" is liquid glass — translucent chrome over
+ * a tinted wash, one hue at a time. The mode setting picks within the family. */
+export type ThemeFamily = "warm" | "mono" | "glass";
+
+/** The glass hue: Seth's sunset-edge blue · the same band in pink · the two
+ * rotli colors. Cycled from the titlebar while glass is live. */
+export type GlassTint = "dusk" | "blush" | "clay" | "olive";
+
+export const GLASS_TINTS: { value: GlassTint; label: string }[] = [
+  { value: "dusk", label: "Dusk" },
+  { value: "blush", label: "Blush" },
+  { value: "clay", label: "Clay" },
+  { value: "olive", label: "Olive" },
+];
 
 /** The folders rail selection: the two smart rows or a real folder id. */
 export const ALL_NOTES = "all";
@@ -23,6 +35,11 @@ interface UiState {
   /** Which token family the mode resolves into (warm = kit default). */
   themeFamily: ThemeFamily;
   setThemeFamily: (family: ThemeFamily) => void;
+
+  /** Liquid-glass hue; meaningful while themeFamily is "glass". */
+  glassTint: GlassTint;
+  setGlassTint: (tint: GlassTint) => void;
+  cycleGlassTint: () => void;
 
   /** Rails collapse state — remembered per window (in-memory, Stage 1). */
   foldersCollapsed: boolean;
@@ -75,6 +92,15 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   themeFamily: "warm",
   setThemeFamily: (family) => set({ themeFamily: family }),
+
+  glassTint: "dusk",
+  setGlassTint: (tint) => set({ glassTint: tint }),
+  cycleGlassTint: () =>
+    set((s) => {
+      const i = GLASS_TINTS.findIndex((t) => t.value === s.glassTint);
+      const next = GLASS_TINTS[(i + 1) % GLASS_TINTS.length];
+      return next ? { glassTint: next.value } : s;
+    }),
 
   foldersCollapsed: false,
   listCollapsed: false,

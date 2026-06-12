@@ -113,7 +113,8 @@
   margin: 0;
 }
 .md-quote {
-  border-left: 3px solid var(--rotli-peach);
+  /* peach in the warm family (gate truth); mono/glass re-point --quote-bar */
+  border-left: 3px solid var(--quote-bar, var(--rotli-peach));
   padding: 2px 0 2px 14px;
   color: var(--text-muted);
   margin: 0;
@@ -144,7 +145,7 @@
 .task .box svg {
   width: 10px;
   height: 10px;
-  stroke: var(--rotli-cocoa); /* cocoa check on olive */
+  stroke: var(--check-ink, var(--rotli-cocoa)); /* cocoa check on olive (warm); mono/glass re-point */
   stroke-width: 2.4;
   fill: none;
   stroke-linecap: round;
@@ -432,7 +433,7 @@
 }
 .aaseg.sel {
   background: var(--tint);
-  border-color: color-mix(in srgb, var(--rotli-clay) 40%, transparent);
+  border-color: color-mix(in srgb, var(--seg-accent, var(--rotli-clay)) 40%, transparent);
   font-weight: 600;
 }
 .stepper {

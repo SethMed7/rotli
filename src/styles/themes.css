@@ -17,6 +17,10 @@
   --swatch-warm-dark: #241d18;
   --swatch-paper: #ffffff;
   --swatch-charcoal: #161616;
+  --swatch-dusk: #5681b5;
+  --swatch-blush: #c386a5;
+  --swatch-clay: var(--rotli-clay);
+  --swatch-olive: var(--rotli-olive);
 }
 
 /* — MONO · paper (light) — */
@@ -53,12 +57,164 @@
   --act: rgba(233, 231, 226, 0.13);
 }
 
-/* In the mono family the kit icons drop their clay/olive accents to ink — the
-   icons-README mono rule, via the app's --icon-* indirection (src/styles/app.css).
-   Brand moments that are imagery (the quokka world) stay warm by design; the
-   placement law keeps them rare. */
+/* In the mono and glass families the kit icons drop their clay/olive accents to
+   ink — the icons-README mono rule, via the app's --icon-* indirection
+   (src/styles/app.css). One hue at a time is the glass discipline. Brand moments
+   that are imagery (the quokka world) stay warm by design; the placement law
+   keeps them rare. */
 :root[data-theme="paper"],
-:root[data-theme="charcoal"] {
+:root[data-theme="charcoal"],
+:root[data-theme="glass-light"],
+:root[data-theme="glass-dark"] {
   --icon-clay: currentColor;
   --icon-olive: currentColor;
+  /* warm-token leaks re-pointed: done-check ink + Aa segment accent */
+  --check-ink: var(--on-accent);
+  --seg-accent: var(--accent);
+}
+
+/* the quote bar: peach is warm-family truth; mono goes neutral, glass goes hue */
+:root[data-theme="paper"],
+:root[data-theme="charcoal"] {
+  --quote-bar: color-mix(in srgb, var(--text-muted) 55%, transparent);
+}
+:root[data-theme="glass-light"],
+:root[data-theme="glass-dark"] {
+  --quote-bar: color-mix(in srgb, var(--glass-hue) 55%, transparent);
+}
+
+/* ————————————————————————————————————————————————————————————————
+   LIQUID GLASS (Seth, 2026-06-12) — translucent chrome over a tinted wash,
+   ONE hue at a time (the tint), neutrals everywhere else. The tint is chosen
+   in Settings → Appearance (and cycled from the titlebar while glass is live):
+   dusk (Seth's sunset-edge blue) · blush (the same band, pink) · clay · olive
+   (the two rotli colors). Glass lives on the CHROME — the editor canvas stays
+   near-solid for reading. */
+
+:root[data-glass-tint="dusk"] {
+  --glass-hue: #5681b5;
+  --glass-hue-deep: #3c659a;
+}
+:root[data-glass-tint="blush"] {
+  --glass-hue: #c386a5;
+  --glass-hue-deep: #a05c80;
+}
+:root[data-glass-tint="clay"] {
+  --glass-hue: var(--rotli-clay);
+  --glass-hue-deep: var(--rotli-clay-text);
+}
+:root[data-glass-tint="olive"] {
+  --glass-hue: var(--rotli-olive);
+  --glass-hue-deep: var(--rotli-olive-text);
+}
+
+/* — GLASS · light — */
+:root[data-theme="glass-light"] {
+  --ground: color-mix(in srgb, var(--glass-hue) 9%, #fbfbfa);
+  --surface: rgba(255, 255, 255, 0.62);
+  --surface-2: rgba(255, 255, 255, 0.45);
+  --tint: color-mix(in srgb, var(--glass-hue) 16%, #ffffff);
+  --text: #1c2026;
+  --text-muted: #5d646e;
+  --border: rgba(28, 32, 38, 0.13);
+  --accent: var(--glass-hue);
+  --accent-text: var(--glass-hue-deep);
+  --on-accent: #ffffff;
+  --success: var(--glass-hue-deep);
+  --hov: rgba(28, 32, 38, 0.06);
+  --act: rgba(28, 32, 38, 0.1);
+}
+
+/* — GLASS · dark — */
+:root[data-theme="glass-dark"] {
+  --ground: color-mix(in srgb, var(--glass-hue) 16%, #14161a);
+  --surface: rgba(20, 23, 28, 0.55);
+  --surface-2: rgba(28, 32, 38, 0.45);
+  --tint: color-mix(in srgb, var(--glass-hue) 26%, #181b20);
+  --text: #eef1f4;
+  --text-muted: #a4abb5;
+  --border: rgba(238, 241, 244, 0.14);
+  --accent: var(--glass-hue);
+  --accent-text: color-mix(in srgb, var(--glass-hue) 78%, #ffffff);
+  --on-accent: #14161a;
+  --success: var(--glass-hue);
+  --hov: rgba(238, 241, 244, 0.08);
+  --act: rgba(238, 241, 244, 0.13);
+}
+
+/* the tinted wash the glass floats over — fixed so panels scroll across it */
+:root[data-theme="glass-light"] body {
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--glass-hue) 22%, #f8f9fa),
+    color-mix(in srgb, var(--glass-hue) 6%, #fdfdfc) 62%,
+    color-mix(in srgb, var(--glass-hue) 13%, #fbfbfa)
+  );
+  background-attachment: fixed;
+}
+:root[data-theme="glass-dark"] body {
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--glass-hue) 30%, #121419),
+    color-mix(in srgb, var(--glass-hue) 10%, #14161a) 62%,
+    color-mix(in srgb, var(--glass-hue) 20%, #121419)
+  );
+  background-attachment: fixed;
+}
+
+/* chrome becomes glass: blur + saturate + a light top edge. The editor pane is
+   deliberately NOT in this list — text sits on near-solid surface. */
+:root[data-theme="glass-light"] .titlebar,
+:root[data-theme="glass-light"] .folders,
+:root[data-theme="glass-light"] .notelist,
+:root[data-theme="glass-light"] .fmtbar,
+:root[data-theme="glass-light"] .modpop,
+:root[data-theme="glass-light"] .aapanel,
+:root[data-theme="glass-light"] .palette,
+:root[data-theme="glass-light"] .capture,
+:root[data-theme="glass-dark"] .titlebar,
+:root[data-theme="glass-dark"] .folders,
+:root[data-theme="glass-dark"] .notelist,
+:root[data-theme="glass-dark"] .fmtbar,
+:root[data-theme="glass-dark"] .modpop,
+:root[data-theme="glass-dark"] .aapanel,
+:root[data-theme="glass-dark"] .palette,
+:root[data-theme="glass-dark"] .capture {
+  background: var(--surface-2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+:root[data-theme="glass-dark"] .titlebar,
+:root[data-theme="glass-dark"] .folders,
+:root[data-theme="glass-dark"] .notelist,
+:root[data-theme="glass-dark"] .fmtbar,
+:root[data-theme="glass-dark"] .modpop,
+:root[data-theme="glass-dark"] .aapanel,
+:root[data-theme="glass-dark"] .palette,
+:root[data-theme="glass-dark"] .capture {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+/* glass dark shares the dark selection-bar grammar (the bar lands in the hue) */
+:root[data-theme="glass-dark"] .frow.sel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+
+/* the titlebar tint-cycle dot (replaces the sun while glass is live) */
+.tintdot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-pill);
+  background: var(--glass-hue, var(--accent));
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }

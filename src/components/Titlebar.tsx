@@ -6,7 +6,7 @@
 import type { MouseEvent } from "react";
 import { dispatch } from "../keys/registry";
 import { startWindowDrag } from "../lib/tauri";
-import { useUiStore } from "../state/ui";
+import { GLASS_TINTS, useUiStore } from "../state/ui";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 import { ModuleSwitcher } from "./ModuleSwitcher";
@@ -24,6 +24,9 @@ export function Titlebar() {
   const listCollapsed = useUiStore((s) => s.listCollapsed);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const theme = useUiStore((s) => s.theme);
+  const themeFamily = useUiStore((s) => s.themeFamily);
+  const glassTint = useUiStore((s) => s.glassTint);
+  const tintLabel = GLASS_TINTS.find((t) => t.value === glassTint)?.label ?? glassTint;
 
   return (
     <header className="titlebar">
@@ -73,10 +76,18 @@ export function Titlebar() {
       )}
       <div className="tb-spacer" onMouseDown={onDragRegionMouseDown} />
       <div className="tb-actions">
-        {/* sun = theme, in every approved titlebar frame (r1 tip "Theme — light"; r2/r4/r5 frame A) */}
-        <IconButton label={`Theme — ${theme}`} onClick={() => dispatch("theme.cycle")}>
-          <SunGlyph />
-        </IconButton>
+        {/* sun = theme, in every approved titlebar frame (r1 tip "Theme — light";
+            r2/r4/r5 frame A). While liquid glass is live the slot becomes the
+            tint cycler instead (Seth, 2026-06-12) — mode still lives in Settings. */}
+        {themeFamily === "glass" ? (
+          <IconButton label={`Glass — ${tintLabel}`} onClick={() => dispatch("theme.cycleGlassTint")}>
+            <span className="tintdot" />
+          </IconButton>
+        ) : (
+          <IconButton label={`Theme — ${theme}`} onClick={() => dispatch("theme.cycle")}>
+            <SunGlyph />
+          </IconButton>
+        )}
         <IconButton
           label="Settings — ⌘,"
           pressed={settingsOpen}
