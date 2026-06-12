@@ -29,7 +29,13 @@ import {
   unregisterEditor,
 } from "./commands";
 import { FormatBar } from "./FormatBar";
-import { editDocument, ensureDocument, useDocumentDirty, useDocumentLines } from "./model";
+import {
+  editDocument,
+  ensureDocument,
+  flushNote,
+  useDocumentDirty,
+  useDocumentLines,
+} from "./model";
 import { RenderedLine, hasSyntax, parseBlock, rawSegments } from "./render";
 
 /** Below this pane width the format bar collapses its end groups into ⋯.
@@ -53,6 +59,17 @@ function updatedLabel(ts: number): string {
   const hrs = Math.round(mins / 60);
   if (hrs < 24) return `${hrs} hr ago`;
   return `${Math.round(hrs / 24)}d ago`;
+}
+
+/** "just now" must not read "just now" an hour later — a quiet half-minute
+ * tick keeps the relative time honest without re-rendering the editor. */
+function UpdatedAt({ ts }: { ts: number }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  return <>{updatedLabel(ts)}</>;
 }
 
 /** Raw-text caret offset for a click point, measured against the twin
@@ -128,6 +145,10 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
     setAaOpen(false);
     scrollRef.current?.scrollTo({ top: 0 });
   }, [noteId]);
+
+  // leaving a note (tab switch, pane close, note switch) flushes its pending
+  // debounced save — keystrokes are never parked in a timer behind your back
+  useEffect(() => () => flushNote(noteId), [noteId]);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -476,7 +497,7 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
             <span className={dirty ? "dot-ok dirty" : "dot-ok"} />
             {text.length.toLocaleString()} chars
             <span className="sep" />
-            {updatedLabel(note.updatedAt)}
+            <UpdatedAt ts={note.updatedAt} />
             <span className="sep" />
             On this Mac
           </div>

@@ -101,6 +101,17 @@ function scheduleSync(noteId: string): void {
   );
 }
 
+/** Flush ONE note's pending debounced sync — the note/tab-switch path.
+ * The timer would still fire 400ms later, but flushing at the switch means
+ * the list row and the disk are already true when the eye lands elsewhere. */
+export function flushNote(noteId: string): void {
+  const pending = timers.get(noteId);
+  if (pending === undefined) return;
+  clearTimeout(pending);
+  timers.delete(noteId);
+  syncNow(noteId);
+}
+
 /** Flush every pending debounced sync immediately — the quit/reload path. The
  * 400ms window must never eat the last keystrokes once the disk-backed service
  * lands (and it costs nothing to be correct now). */
@@ -112,7 +123,14 @@ export function flushSyncs(): void {
   timers.clear();
 }
 
+// Keystrokes are never lost: quit/reload (pagehide), the window hiding under
+// ⌥Space / click-away (visibilitychange → hidden), and plain focus loss (blur)
+// all flush the debounce window immediately.
 window.addEventListener("pagehide", flushSyncs);
+window.addEventListener("blur", flushSyncs);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) flushSyncs();
+});
 
 function subscribeDocument(noteId: string, fn: () => void): () => void {
   let set = subs.get(noteId);

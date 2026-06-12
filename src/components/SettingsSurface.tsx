@@ -5,6 +5,7 @@
 // the rebind list: click a chord, press the next combo (a quiet inline note if
 // the chord is taken).
 
+import { useQuery } from "@tanstack/react-query";
 import { type KeyboardEvent, useEffect, useState } from "react";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
@@ -17,7 +18,7 @@ import {
   setDispatchSuspended,
 } from "../keys/registry";
 import { GLASS_BG_SRC } from "../lib/glassBackgrounds";
-import { setDockVisible, setHideOnBlur } from "../lib/tauri";
+import { corpusOverview, isTauri, setDockVisible, setHideOnBlur } from "../lib/tauri";
 import {
   GLASS_BACKGROUNDS,
   GLASS_BLURS,
@@ -462,9 +463,66 @@ function AppearancePane() {
   );
 }
 
-// ——— Storage: the corpus story (r1 frame F; path = the future default) ———
+// ——— Storage: the corpus story (r1 frame F grammar). Inside the shell the
+//     pane is TRUTHFUL: the real root path and the real tree, straight from a
+//     disk scan (corpus_overview). The browser/dev surface keeps the
+//     illustrative tree — it mirrors the in-memory demo corpus it sits over. ———
+
+const TREE_MAX_ROWS = 12;
+
+/** The corpus as it actually exists, in the gate's tree grammar — folders
+ * bold, files plain, `.rotli/` last; one quiet "… n more" when it outgrows
+ * the card. No mock filenames ever reach this branch. */
+function RealCorpusTree({
+  root,
+  folders,
+  files,
+}: {
+  root: string;
+  folders: string[];
+  files: string[];
+}) {
+  const entries = [
+    ...folders.map((path) => ({ path, folder: true })),
+    ...files.map((path) => ({ path, folder: false })),
+  ].sort((a, b) => a.path.localeCompare(b.path));
+  const shown = entries.slice(0, TREE_MAX_ROWS);
+  const hidden = entries.length - shown.length;
+
+  return (
+    <div className="tree">
+      <i>{root}/</i>
+      <br />
+      {shown.map(({ path, folder }) => {
+        const parts = path.split("/");
+        const name = parts[parts.length - 1] ?? path;
+        const indent = "│   ".repeat(parts.length - 1);
+        return (
+          <span key={path}>
+            {indent}├─ {folder ? <b>{name}/</b> : name}
+            <br />
+          </span>
+        );
+      })}
+      {hidden > 0 && (
+        <>
+          ├─ … {hidden} more
+          <br />
+        </>
+      )}
+      └─ <i>.rotli/&nbsp;&nbsp;(index · settings)</i>
+    </div>
+  );
+}
 
 function StoragePane() {
+  const real = useQuery({
+    queryKey: ["corpus", "overview"],
+    queryFn: corpusOverview,
+    enabled: isTauri(),
+  }).data;
+  const rootPath = real?.root ?? "~/Documents/rotli";
+
   return (
     <>
       <h3>Where your notes live</h3>
@@ -481,7 +539,7 @@ function StoragePane() {
             <LaptopGlyph size={15} />
             This Mac
           </div>
-          <div className="sd">~/Documents/rotli — plain files, works offline, free forever</div>
+          <div className="sd">{rootPath} — plain files, works offline, free forever</div>
         </div>
         <div className="store later">
           <span className="soon">Later</span>
@@ -501,31 +559,35 @@ function StoragePane() {
         </div>
       </div>
       <div className="corpus">
-        <div className="tree">
-          <i>~/Documents/rotli/</i>
-          <br />
-          ├─ <b>Inbox/</b>
-          <br />
-          │&nbsp;&nbsp; └─ call-the-bank.md
-          <br />
-          ├─ <b>Work/</b>
-          <br />
-          │&nbsp;&nbsp; ├─ Myela/
-          <br />
-          │&nbsp;&nbsp; │&nbsp;&nbsp; └─ pricing-decision.md
-          <br />
-          │&nbsp;&nbsp; └─ 1-on-1s/
-          <br />
-          │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; └─ sarah.md
-          <br />
-          ├─ <b>Personal/</b>
-          <br />
-          │&nbsp;&nbsp; └─ Ideas/
-          <br />
-          │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; └─ rotli-notes…md
-          <br />
-          └─ <i>.rotli/&nbsp;&nbsp;(index · settings)</i>
-        </div>
+        {real ? (
+          <RealCorpusTree root={real.root} folders={real.folders} files={real.files} />
+        ) : (
+          <div className="tree">
+            <i>~/Documents/rotli/</i>
+            <br />
+            ├─ <b>Inbox/</b>
+            <br />
+            │&nbsp;&nbsp; └─ call-the-bank.md
+            <br />
+            ├─ <b>Work/</b>
+            <br />
+            │&nbsp;&nbsp; ├─ Myela/
+            <br />
+            │&nbsp;&nbsp; │&nbsp;&nbsp; └─ pricing-decision.md
+            <br />
+            │&nbsp;&nbsp; └─ 1-on-1s/
+            <br />
+            │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; └─ sarah.md
+            <br />
+            ├─ <b>Personal/</b>
+            <br />
+            │&nbsp;&nbsp; └─ Ideas/
+            <br />
+            │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; └─ rotli-notes…md
+            <br />
+            └─ <i>.rotli/&nbsp;&nbsp;(index · settings)</i>
+          </div>
+        )}
         <div className="mdfile">
           <i># Personal/Ideas/rotli-notes-first.md</i>
           <br />

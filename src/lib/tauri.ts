@@ -145,6 +145,18 @@ export function corpusCreateFolder(
   return corpusInvoke("corpus_create_folder", { name, parentId });
 }
 
+/** Settings → Storage truth: the real root (home shortened to `~`), every
+ * folder, every note file — what actually exists on disk, never a mock. */
+export interface CorpusOverview {
+  root: string;
+  folders: string[];
+  files: string[];
+}
+
+export function corpusOverview(): Promise<CorpusOverview> {
+  return corpusInvoke("corpus_overview");
+}
+
 /** The `.rotli/` dot-files — opaque JSON strings the frontend owns. Missing
  * file reads as "{}". `background` carries the custom glass wallpaper. */
 export type SettingsFile = "settings" | "viewstate" | "background";

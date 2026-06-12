@@ -274,6 +274,16 @@ pub struct CorpusList {
     pub notes: Vec<NoteMeta>,
 }
 
+/// What Settings → Storage shows: the REAL corpus, not a mock. Root with the
+/// home dir shortened to `~`, every folder, every note file (relative paths).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CorpusOverview {
+    pub root: String,
+    pub folders: Vec<String>,
+    pub files: Vec<String>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteDoc {
@@ -621,6 +631,23 @@ impl CorpusStore {
         })
     }
 
+    /// The truthful storage pane: scan the disk (reconciling the index on the
+    /// way) and report exactly what exists, with the root pretty-printed.
+    pub fn overview(&mut self) -> Result<CorpusOverview, String> {
+        let list = self.list()?;
+        let folders = list.folders.iter().map(|f| f.id.clone()).collect();
+        let mut files: Vec<String> = self.index.values().cloned().collect();
+        files.sort();
+        let root_str = self.root.display().to_string();
+        let root = match std::env::var("HOME") {
+            Ok(home) if !home.is_empty() && root_str.starts_with(&home) => {
+                format!("~{}", &root_str[home.len()..])
+            }
+            _ => root_str,
+        };
+        Ok(CorpusOverview { root, folders, files })
+    }
+
     /// settings.json / viewstate.json / background.json — opaque JSON strings
     /// the frontend owns (background.json carries the custom glass wallpaper
     /// as a data URL, so the uploaded image survives relaunch).
@@ -889,6 +916,11 @@ pub fn corpus_create_folder(
     parent_id: Option<String>,
 ) -> Result<FolderMeta, String> {
     state.with(|s| s.create_folder(&name, parent_id.as_deref()))
+}
+
+#[tauri::command]
+pub fn corpus_overview(state: tauri::State<'_, CorpusState>) -> Result<CorpusOverview, String> {
+    state.with(|s| s.overview())
 }
 
 #[tauri::command]
@@ -1171,6 +1203,37 @@ mod tests {
         let mut again = CorpusStore::open(_dir.path().join("corpus")).unwrap();
         again.os_trash = false;
         assert_eq!(again.list().unwrap().notes.len(), 1);
+    }
+
+    #[test]
+    fn pin_persists_across_a_reopen() {
+        let (_dir, mut store) = bare();
+        let root = store.root().to_path_buf();
+        let meta = store.create("Inbox", "# Keep me up top\n").unwrap();
+        store.write(&meta.id, "# Keep me up top\n", true).unwrap();
+        drop(store);
+
+        let mut again = CorpusStore::open(root).unwrap();
+        again.os_trash = false;
+        let doc = again.read(&meta.id).unwrap();
+        assert!(doc.pinned, "pin lost across quit/relaunch");
+        assert_eq!(again.list().unwrap().notes[0].id, meta.id, "pinned must sort first");
+    }
+
+    #[test]
+    fn overview_reports_what_actually_exists() {
+        let (_dir, mut store) = fresh();
+        store.create_folder("Work", None).unwrap();
+        store.create("Work", "# Plan\n").unwrap();
+        let ov = store.overview().unwrap();
+        assert!(ov.root.ends_with("corpus"), "root missing: {}", ov.root);
+        assert!(ov.folders.contains(&"Inbox".to_string()));
+        assert!(ov.folders.contains(&"Work".to_string()));
+        assert!(ov.files.iter().any(|f| f.starts_with("Inbox/welcome-to-rotli-")));
+        assert!(ov.files.iter().any(|f| f.starts_with("Work/plan-")));
+        // .rotli never leaks into the picture
+        assert!(ov.folders.iter().all(|f| !f.starts_with('.')));
+        assert!(ov.files.iter().all(|f| !f.starts_with('.')));
     }
 
     #[test]
