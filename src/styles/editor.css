@@ -207,6 +207,15 @@
   padding: 0;
   border: none;
 }
+/* a plain line (no markdown tokens, no mdsyn to reveal) keeps the body voice —
+   r3 frame E puts the caret in a General Sans paragraph; the mono raw voice
+   belongs only to lines that carry syntax. Twin + textarea share the rule so
+   their metrics stay identical. */
+.ed-line.raw.plain .raw-twin,
+.ed-line.raw.plain .raw-input {
+  font-family: var(--font-body);
+  font-size: 1em;
+}
 .raw-twin {
   color: var(--text);
 }

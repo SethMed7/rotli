@@ -195,6 +195,15 @@ export function RenderedLine({
 
 const RAW_TOKEN = /(\*\*|==|~~|`|<\/?u>|\]\([^)]*\)|\[|\*)/g;
 
+/** True when the source line carries markdown syntax to reveal. The mono raw
+ *  voice is reserved for these lines (r1/r4/r5 rawline); a plain paragraph
+ *  keeps the body voice even with the caret inside it (r3 frame E). */
+export function hasSyntax(line: string): boolean {
+  if (parseBlock(line).prefixLen > 0) return true;
+  RAW_TOKEN.lastIndex = 0;
+  return RAW_TOKEN.test(line);
+}
+
 export function rawSegments(line: string): ReactNode[] {
   const out: ReactNode[] = [];
   let key = 0;

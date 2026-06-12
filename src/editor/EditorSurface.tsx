@@ -30,7 +30,7 @@ import {
 } from "./commands";
 import { FormatBar } from "./FormatBar";
 import { editDocument, ensureDocument, useDocumentLines } from "./model";
-import { RenderedLine, parseBlock, rawSegments } from "./render";
+import { RenderedLine, hasSyntax, parseBlock, rawSegments } from "./render";
 
 /** Below this pane width the format bar collapses its end groups into ⋯.
  * The full 11-control bar measures ~392px — r5 approved the ⋯ only for
@@ -431,7 +431,7 @@ export function EditorSurface({ noteId }: { noteId: string }) {
           {lines.map((line, i) =>
             i === active ? (
               <div
-                className="ed-line raw"
+                className={hasSyntax(line) ? "ed-line raw" : "ed-line raw plain"}
                 data-kind={parseBlock(line).kind}
                 ref={rawRowRef}
                 // biome-ignore lint: line index is the identity here
