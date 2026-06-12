@@ -88,11 +88,29 @@ export function EditorSurface({ noteId }: { noteId: string }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const twinRef = useRef<HTMLPreElement>(null);
   const aaChipRef = useRef<HTMLButtonElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rawRowRef = useRef<HTMLDivElement>(null);
   const pendingCaretRef = useRef<Selection | null>(null);
   const clickPointRef = useRef<{ x: number; y: number } | null>(null);
 
   const style = useNoteStyle(noteId);
   const formatBarVisible = useUiStore((s) => s.formatBarVisible);
+  const focusMode = useUiStore((s) => s.focusMode);
+
+  // word count idles back in after typing pauses (r3 frame E judge note)
+  const [typing, setTyping] = useState(false);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markTyping = () => {
+    setTyping(true);
+    if (typingTimer.current !== null) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => setTyping(false), 1000);
+  };
+  useEffect(
+    () => () => {
+      if (typingTimer.current !== null) clearTimeout(typingTimer.current);
+    },
+    [],
+  );
 
   // the buffer exists as soon as the note loads — edits always hit one buffer
   useEffect(() => {
@@ -263,6 +281,39 @@ export function EditorSurface({ noteId }: { noteId: string }) {
     }
   });
 
+  // ——— focus mode (r3 frame E): typewriter scroll + paragraph dimming ———
+
+  const activeLineText = active !== null ? (lines?.[active] ?? null) : null;
+
+  // hold the active line vertically centered while writing (typewriter)
+  useLayoutEffect(() => {
+    if (!focusMode || active === null) return;
+    const scroller = scrollRef.current;
+    const row = rawRowRef.current;
+    if (!scroller || !row) return;
+    const scrollerRect = scroller.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    const top =
+      scroller.scrollTop +
+      (rowRect.top - scrollerRect.top) -
+      (scrollerRect.height / 2 - rowRect.height / 2);
+    scroller.scrollTop = Math.max(0, top);
+  }, [focusMode, active, activeLineText]);
+
+  // the active PARAGRAPH (contiguous non-blank block) stays lit; the rest dims
+  const dimRange = useMemo<readonly [number, number] | null>(() => {
+    if (!focusMode || active === null || !lines) return null;
+    let start = active;
+    let end = active;
+    while (start > 0 && (lines[start - 1] ?? "").trim() !== "") start--;
+    while (end < lines.length - 1 && (lines[end + 1] ?? "").trim() !== "") end++;
+    return [start, end];
+  }, [focusMode, active, lines]);
+
+  // the title line never dims (r3 frame E shows it at full strength)
+  const lineClass = (i: number): string =>
+    dimRange && i > 0 && (i < dimRange[0] || i > dimRange[1]) ? "ed-line dim" : "ed-line";
+
   // ——— active-line keys (text editing only — command chords stay in the registry) ———
 
   const singleVisualRow = (): boolean => {
@@ -338,7 +389,12 @@ export function EditorSurface({ noteId }: { noteId: string }) {
   if (!note || !lines) return <div className="editor" ref={rootRef} />;
 
   const text = lines.join("\n");
-  const activeLine = active !== null ? (lines[active] ?? null) : null;
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  // focus mode locks the column: ~65ch (the gate's 620px) at the gate's 15.5px —
+  // the Aa layer resumes when focus ends
+  const bodyStyle = focusMode
+    ? { fontSize: "15.5px", maxWidth: 620 }
+    : { fontSize: `${style.size}px`, maxWidth: MEASURE_MAX_WIDTH[style.measure] };
 
   return (
     <div className="editor" ref={rootRef} onMouseDownCapture={() => setActiveEditor(handle)}>
@@ -367,16 +423,14 @@ export function EditorSurface({ noteId }: { noteId: string }) {
         </div>
       </div>
       {aaOpen && <AaPanel noteId={noteId} anchorRef={aaChipRef} onClose={() => setAaOpen(false)} />}
-      <div className="ed-scroll">
-        <div
-          className="ed-body"
-          style={{ fontSize: `${style.size}px`, maxWidth: MEASURE_MAX_WIDTH[style.measure] }}
-        >
+      <div className="ed-scroll" ref={scrollRef}>
+        <div className="ed-body" style={bodyStyle}>
           {lines.map((line, i) =>
             i === active ? (
               <div
                 className="ed-line raw"
                 data-kind={parseBlock(line).kind}
+                ref={rawRowRef}
                 // biome-ignore lint: line index is the identity here
                 key={i}
               >
@@ -391,7 +445,10 @@ export function EditorSurface({ noteId }: { noteId: string }) {
                   rows={1}
                   spellCheck={false}
                   aria-label={`Line ${i + 1}`}
-                  onChange={(e) => setLine(i, e.target.value)}
+                  onChange={(e) => {
+                    markTyping();
+                    setLine(i, e.target.value);
+                  }}
                   onKeyDown={onTaKeyDown}
                   onSelect={(e) =>
                     updateSel(e.currentTarget.selectionStart ?? 0, e.currentTarget.selectionEnd ?? 0)
@@ -401,7 +458,7 @@ export function EditorSurface({ noteId }: { noteId: string }) {
               </div>
             ) : (
               <div
-                className="ed-line"
+                className={lineClass(i)}
                 data-kind={parseBlock(line).kind}
                 // biome-ignore lint: line index is the identity here
                 key={i}
@@ -413,9 +470,14 @@ export function EditorSurface({ noteId }: { noteId: string }) {
           )}
         </div>
       </div>
+      {focusMode && (
+        <div className={typing ? "fwc typing" : "fwc"} aria-hidden="true">
+          {wordCount.toLocaleString()} words
+        </div>
+      )}
       {formatBarVisible && (
         <BottomSlot>
-          <FormatBar ctx={{ line: activeLine, selStart: sel.start }} narrow={narrow} />
+          <FormatBar ctx={{ line: activeLineText, selStart: sel.start }} narrow={narrow} />
         </BottomSlot>
       )}
     </div>

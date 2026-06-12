@@ -36,6 +36,18 @@ interface UiState {
   formatBarVisible: boolean;
   setFormatBarVisible: (visible: boolean) => void;
 
+  /** ⌘K — the only overlay that dims (r3 frame F). */
+  paletteOpen: boolean;
+  setPaletteOpen: (open: boolean) => void;
+
+  /** Settings as its own surface in the window (r1 frame F); Esc returns. */
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
+
+  /** ⌥⌘F focus mode (r3 frame E): chrome leaves, one centered column. */
+  focusMode: boolean;
+  setFocusMode: (on: boolean) => void;
+
   /** Open transient close-callbacks, top = last. Esc (app.hide, the one
    * registry dispatcher) closes the topmost transient before the window —
    * the quokka rule, without ad-hoc keydown listeners. */
@@ -67,6 +79,15 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   formatBarVisible: true,
   setFormatBarVisible: (visible) => set({ formatBarVisible: visible }),
+
+  paletteOpen: false,
+  setPaletteOpen: (open) => set({ paletteOpen: open }),
+
+  settingsOpen: false,
+  setSettingsOpen: (open) => set({ settingsOpen: open }),
+
+  focusMode: false,
+  setFocusMode: (on) => set({ focusMode: on }),
 
   transients: [],
   registerTransient: (close) => {

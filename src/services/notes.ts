@@ -170,6 +170,12 @@ export class InMemoryNotesService implements NotesService {
 
 // ——— the seeded corpus (titles/snippets from the approved gate frames) ———
 
+// Dev-only review affordance: ?empty skips note seeding so the r1 frame E
+// empty state ("Your island is ready") can be looked at. Folders still exist —
+// Inbox is the capture target either way.
+const SEED_EMPTY =
+  import.meta.env.DEV && new URLSearchParams(window.location.search).has("empty");
+
 const svc = new InMemoryNotesService();
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -187,19 +193,22 @@ const oneOnOnes = svc.seedFolder("1-on-1s", work.id);
 const personal = svc.seedFolder("Personal");
 const ideas = svc.seedFolder("Ideas", personal.id);
 
-svc.seedNote(
-  work.id,
-  `# Pricing decision
+let firstNoteId = "";
+
+if (!SEED_EMPTY) {
+  svc.seedNote(
+    work.id,
+    `# Pricing decision
 
 Free local forever. Paid = sync + managed AI. Never gate local features behind the subscription — the corpus is the user's, full stop.
 
 Launch sync at $4, anchor on Obsidian, revisit at 10k users.`,
-  { pinned: true, createdAt: todayAt(8, 5), updatedAt: todayAt(9, 10) },
-);
+    { pinned: true, createdAt: todayAt(8, 5), updatedAt: todayAt(9, 10) },
+  );
 
-const notesFirst = svc.seedNote(
-  ideas.id,
-  `# rotli — notes first
+  const notesFirst = svc.seedNote(
+    ideas.id,
+    `# rotli — notes first
 
 Apple Notes feel, **markdown underneath**. Local files, one structure the AI can read. The app is a *visitor* — summon it, write, dismiss it.
 
@@ -212,60 +221,62 @@ Apple Notes feel, **markdown underneath**. Local files, one structure the AI can
 > The folder of files *is* the product. Every view, every backend, every AI is a reader.
 
 Later: breve plugs into the same corpus and the Wiki answers from it. Nothing changes shape.`,
-  { createdAt: todayAt(9, 42), updatedAt: todayAt(9, 42) },
-);
+    { createdAt: todayAt(9, 42), updatedAt: todayAt(9, 42) },
+  );
+  firstNoteId = notesFirst.id;
 
-/** The note the window opens on (gate frame A). */
-export const initialNoteId = notesFirst.id;
-
-svc.seedNote(
-  myela.id,
-  `# Q3 priorities — Myela
+  svc.seedNote(
+    myela.id,
+    `# Q3 priorities — Myela
 
 Ship the gateway migration, land the issuing portal rebuild, and get the partner reporting story straight before the platform review.`,
-  { createdAt: todayAt(7, 30), updatedAt: todayAt(7, 30) },
-);
+    { createdAt: todayAt(7, 30), updatedAt: todayAt(7, 30) },
+  );
 
-svc.seedNote(
-  work.id,
-  `# Q3 platform review — prep
+  svc.seedNote(
+    work.id,
+    `# Q3 platform review — prep
 
 Three things must land before Thursday: the settlement mapping, the gateway export enum, and a clear pricing answer we can defend in front of the partners.
 
 The demo flows from capture → recall: open with the island story, close with the cited answer.
 
 Maria owns the reconciliation walkthrough; I take pricing.`,
-  { createdAt: now - DAY, updatedAt: now - DAY },
-);
+    { createdAt: now - DAY, updatedAt: now - DAY },
+  );
 
-svc.seedNote(
-  ideas.id,
-  `# Quokka world — where it lives
+  svc.seedNote(
+    ideas.id,
+    `# Quokka world — where it lives
 
 Onboarding, empty states, about. Never in the editor, never in notifications — the world appears at low-frequency moments only.`,
-  { createdAt: now - DAY, updatedAt: now - DAY },
-);
+    { createdAt: now - DAY, updatedAt: now - DAY },
+  );
 
-svc.seedNote(
-  oneOnOnes.id,
-  `# 1-on-1 — Sarah
+  svc.seedNote(
+    oneOnOnes.id,
+    `# 1-on-1 — Sarah
 
 Ship review Friday. She'll own the gateway migration writeup. Follow up on the Lithic question and the Q3 growth path conversation.`,
-  { createdAt: now - 3 * DAY, updatedAt: now - 3 * DAY },
-);
+    { createdAt: now - 3 * DAY, updatedAt: now - 3 * DAY },
+  );
 
-svc.seedNote(
-  personal.id,
-  `# Groceries
+  svc.seedNote(
+    personal.id,
+    `# Groceries
 
 Olive oil, sourdough, oat milk, blueberries, the good butter.`,
-  { createdAt: now - 4 * DAY, updatedAt: now - 4 * DAY },
-);
+    { createdAt: now - 4 * DAY, updatedAt: now - 4 * DAY },
+  );
 
-svc.seedNote(
-  inboxFolder.id,
-  `# Call the bank about the wire limit before Friday`,
-  { createdAt: now - 2 * DAY, updatedAt: now - 2 * DAY },
-);
+  svc.seedNote(
+    inboxFolder.id,
+    `# Call the bank about the wire limit before Friday`,
+    { createdAt: now - 2 * DAY, updatedAt: now - 2 * DAY },
+  );
+}
+
+/** The note the window opens on (gate frame A); "" when the corpus is empty. */
+export const initialNoteId = firstNoteId;
 
 export const notesService: NotesService = svc;

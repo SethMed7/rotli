@@ -8,6 +8,7 @@
 import { create } from "zustand";
 import { initialNoteId, ulid } from "../services/notes";
 import type { LeafNode, PaneNode, SplitDir, Tab } from "../types";
+import { touchMru } from "./mru";
 import { useUiStore } from "./ui";
 
 const MIN_PANE_WIDTH = 320;
@@ -185,6 +186,7 @@ interface PanesState {
 }
 
 const initialLeaf = makeLeaf(makeTab(initialNoteId));
+touchMru(initialNoteId); // the note the window opens on is the freshest "recent"
 
 /** Before a row split: does one more column fit at the 320px floor?
  * Auto-collapse the folders rail first, then the list (the r2 law). */
@@ -238,6 +240,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
     },
 
     openNote: (noteId, opts) => {
+      touchMru(noteId);
       const leaf = focusedLeaf();
       set({
         root: updateLeaf(get().root, leaf.id, (l) => {
@@ -298,6 +301,8 @@ export const usePanesStore = create<PanesState>((set, get) => {
     },
 
     activateTab: (paneId, tabId) => {
+      const target = findLeaf(get().root, paneId)?.tabs.find((t) => t.id === tabId);
+      if (target) touchMru(target.noteId);
       set({
         root: updateLeaf(get().root, paneId, (l) =>
           l.tabs.some((t) => t.id === tabId) ? { ...l, activeTabId: tabId } : l,

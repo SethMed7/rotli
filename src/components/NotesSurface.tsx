@@ -4,7 +4,9 @@
 // shift. State is remembered per window (ui store, in-memory).
 
 import { useState } from "react";
+import { useNotes } from "../services/hooks";
 import { useUiStore } from "../state/ui";
+import { EmptyState } from "./EmptyState";
 import { FoldersRail } from "./FoldersRail";
 import { NoteList } from "./NoteList";
 import { PaneTree } from "./PaneTree";
@@ -16,6 +18,10 @@ export function NotesSurface() {
   const listCollapsed = useUiStore((s) => s.listCollapsed);
   const [revealed, setRevealed] = useState(false);
   const anyCollapsed = foldersCollapsed || listCollapsed;
+  const allNotes = useNotes().data;
+
+  // no notes at all → the island empty state (r1 frame E), nothing else
+  if (allNotes && allNotes.length === 0) return <EmptyState />;
 
   // the warm edge sits where the hidden rail would begin
   const edgeLeft = foldersCollapsed ? 0 : FOLDERS_RAIL_WIDTH;

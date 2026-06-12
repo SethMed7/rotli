@@ -1,0 +1,586 @@
+/* rotli — the command layer (phase 1c). Class structure + values transfer
+   from the approved gates: r3 frame F (⌘K v2), r3 frame E (focus mode),
+   r1 frame C (quick capture), r1 frame E (empty state), r1 frame F (settings/
+   storage). No raw hex — kit tokens, base.css grammar vars, and the gates'
+   cocoa-component rgba() shadow values. */
+
+/* ——— ⌘K palette (r3 frame F): 640px, top-anchored 96px, dim + 7px blur ——— */
+.pal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(58, 48, 40, 0.38); /* the gate's dim, = cocoa @ 38% */
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 96px;
+  animation: scrim-in var(--motion-enter) var(--motion-ease);
+}
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+.palette {
+  width: 640px;
+  max-width: calc(100vw - 48px);
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: 0 30px 80px -16px rgba(36, 29, 24, 0.55);
+  overflow: hidden;
+  border: 1px solid rgba(58, 48, 40, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+.pal-in {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  font-size: 15px;
+}
+.pal-in svg {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.pal-in input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  padding: 0;
+}
+.pal-in input::placeholder {
+  color: var(--text-muted);
+}
+.pal-in input:focus-visible {
+  outline: none; /* the palette is the affordance; no ring inside the well */
+}
+.pal-list {
+  max-height: 384px;
+  overflow-y: auto;
+  padding-bottom: 10px;
+}
+.pal-sec {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 12px 18px 4px;
+}
+.prow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 9px 18px;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  color: var(--text);
+  cursor: pointer;
+  border: none;
+  background: none;
+  text-align: left;
+}
+.prow svg {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.prow .plabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prow:hover {
+  background: var(--hov);
+}
+.prow.sel {
+  background: var(--tint);
+}
+.prow .hint {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.prow .hint .muted {
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.pal-empty {
+  padding: 18px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.pal-foot {
+  display: flex;
+  gap: 16px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--ground);
+}
+.pal-foot .end {
+  margin-left: auto;
+}
+.pal-foot kbd {
+  margin-right: 2px;
+}
+
+/* ——— quick capture — the one-breath card (r1 frame C) ——— */
+.capture-stage {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 18px 30px 60px;
+}
+.capture {
+  width: 560px;
+  max-width: 100%;
+  background: var(--surface);
+  border-radius: var(--r-window);
+  box-shadow:
+    0 36px 90px -20px rgba(58, 48, 40, 0.5),
+    0 6px 20px rgba(58, 48, 40, 0.18);
+  border: 1px solid rgba(58, 48, 40, 0.08);
+  overflow: hidden;
+}
+.cap-in {
+  padding: 20px 22px 14px;
+  display: flex;
+  gap: 12px;
+}
+.cap-in img {
+  width: 22px;
+  height: 22px;
+  margin-top: 3px;
+  flex: 0 0 auto;
+}
+.cap-in textarea {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  resize: none;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  padding: 0;
+}
+.cap-in textarea::placeholder {
+  color: var(--text-muted);
+}
+.cap-in textarea:focus-visible {
+  outline: none;
+}
+.cap-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  background: var(--ground);
+}
+.cap-foot .grow {
+  flex: 1;
+}
+.chip {
+  background: var(--surface-2);
+  border-radius: var(--r-pill);
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* ——— empty state — where the quokka lives (r1 frame E) ——— */
+.empty-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: var(--surface);
+}
+.empty-stage img {
+  width: 190px;
+  border-radius: var(--r-window);
+  margin-bottom: 22px;
+}
+.empty-stage .et {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  margin-bottom: 6px;
+}
+.empty-stage .es {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 330px;
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 9px 18px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(201, 126, 98, 0.35);
+}
+.btn svg {
+  color: var(--on-accent);
+}
+.btn:hover {
+  background-image: linear-gradient(var(--hov), var(--hov));
+}
+.ghost {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 14px;
+}
+
+/* ——— settings (r1 frame F window grammar) ——— */
+.settings {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.set-nav {
+  flex: 0 0 178px;
+  border-right: 1px solid var(--border);
+  padding: 14px 8px;
+  background: var(--ground);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.set-main {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  padding: 30px 38px;
+  overflow-y: auto;
+}
+.set-main h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  margin-bottom: 4px;
+}
+.set-main .lead {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  max-width: 540px;
+  margin-bottom: 22px;
+}
+
+/* storage cards — selected = flat + clay border + clay check (r2 call) */
+.store-grid {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 26px;
+}
+.store {
+  width: 168px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 14px 15px;
+  position: relative;
+  background: var(--surface);
+}
+.store.sel {
+  border-color: var(--accent);
+}
+.store.later {
+  /* quiet, non-interactive */
+  color: var(--text-muted);
+}
+.store .sn {
+  font-weight: 600;
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+.store.later .sn {
+  color: var(--text-muted);
+}
+.store .sn svg {
+  flex: 0 0 auto;
+}
+.store .sd {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.store .on {
+  position: absolute;
+  top: 11px;
+  right: 11px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: grid;
+  place-items: center;
+  color: var(--on-accent);
+}
+.store .on svg {
+  stroke-width: 2.6;
+}
+.store .soon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border-radius: var(--r-pill);
+  padding: 2.5px 7px;
+}
+
+/* the corpus story (r1 frame F) */
+.corpus {
+  display: flex;
+  gap: 18px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+.tree {
+  flex: 0 0 282px;
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 13px 15px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11.8px;
+  line-height: 1.85;
+  color: var(--text);
+}
+.tree i {
+  font-style: normal;
+  color: var(--text-muted);
+}
+.tree b {
+  font-weight: 600;
+  color: var(--accent-text);
+}
+.mdfile {
+  flex: 1;
+  min-width: 240px;
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 13px 16px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11.8px;
+  line-height: 1.8;
+  color: var(--text);
+  overflow: hidden;
+}
+.mdfile i {
+  font-style: normal;
+  color: var(--text-muted);
+}
+.setnote {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 16px;
+  line-height: 1.6;
+  max-width: 560px;
+}
+.setnote code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  background: var(--surface-2);
+  border-radius: var(--r-inner);
+  padding: 1.5px 5px;
+}
+
+/* hotkeys — the rebind list */
+.hkrows {
+  max-width: 560px;
+}
+.hkrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.hklabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hkconflict {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+.hkchord {
+  border: none;
+  background: none;
+  padding: 4px 7px;
+  border-radius: var(--r-control);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 72px;
+  text-align: right;
+  flex: 0 0 auto;
+}
+.hkchord:hover {
+  background: var(--hov);
+}
+.hkchord.recording {
+  background: var(--tint);
+  color: var(--text);
+}
+.hkunset {
+  color: var(--text-muted);
+}
+
+/* appearance — the explicit three-way theme */
+.themerow {
+  display: flex;
+  gap: 6px;
+  max-width: 320px;
+}
+
+/* ——— focus mode (r3 frame E): chrome leaves — exits faster than entries ———
+   The attribute lives on <html>; everything below restores on its removal
+   with the (slower) enter timing declared on the base rules. */
+.titlebar,
+.ed-head {
+  transition:
+    opacity var(--motion-enter) var(--motion-ease),
+    margin-top var(--motion-enter) var(--motion-ease);
+}
+.folders,
+.notelist {
+  transition:
+    flex-basis var(--motion-enter) var(--motion-ease),
+    opacity var(--motion-enter) var(--motion-ease);
+}
+.tabstrip {
+  transition:
+    height var(--motion-enter) var(--motion-ease),
+    opacity var(--motion-enter) var(--motion-ease);
+}
+.bottomslot {
+  transition: opacity var(--motion-enter) var(--motion-ease);
+}
+
+[data-focus="true"] .titlebar {
+  opacity: 0;
+  pointer-events: none;
+  margin-top: -50px;
+  transition-duration: var(--motion-exit);
+}
+[data-focus="true"] .folders,
+[data-focus="true"] .notelist {
+  flex-basis: 0;
+  opacity: 0;
+  pointer-events: none;
+  padding-left: 0;
+  padding-right: 0;
+  border-right-width: 0;
+  overflow: hidden;
+  transition-duration: var(--motion-exit);
+}
+[data-focus="true"] .warm-edge {
+  display: none;
+}
+[data-focus="true"] .tabstrip {
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom-width: 0;
+  overflow: hidden;
+  transition-duration: var(--motion-exit);
+}
+[data-focus="true"] .ed-head {
+  opacity: 0;
+  pointer-events: none;
+  margin-top: -40px;
+  transition-duration: var(--motion-exit);
+}
+[data-focus="true"] .bottomslot {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: var(--motion-exit);
+}
+/* splits: only the focused pane's column remains (one centered column) */
+[data-focus="true"] .divider {
+  display: none;
+}
+[data-focus="true"] .split > .cell:not(:has(.pane.focused)) {
+  display: none;
+}
+/* the locked column (the gate's 620px / 15.5px arrive via inline style) */
+[data-focus="true"] .ed-body {
+  margin: 0 auto;
+  padding: 64px 20px 55vh;
+  line-height: 1.75;
+}
+/* paragraph dimming — opacity only, calm */
+.ed-line {
+  transition: opacity 180ms var(--motion-ease);
+}
+[data-focus="true"] .ed-line.dim {
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+/* word count, bottom-right at 60%, gone while typing */
+.fwc {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity var(--motion-enter) var(--motion-ease);
+}
+.fwc.typing {
+  opacity: 0;
+  transition-duration: var(--motion-exit);
+}

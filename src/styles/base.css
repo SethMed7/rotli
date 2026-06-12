@@ -84,33 +84,3 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
-
-/* — scaffold placeholder shells (replaced by later phases) — */
-.shell {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.shell-title {
-  font-family: var(--font-display);
-  font-weight: var(--wght-heading);
-  font-size: var(--fs-subhead);
-  line-height: var(--lh-subhead);
-  letter-spacing: -0.01em;
-}
-
-.shell-hint {
-  font-size: var(--fs-label);
-  line-height: var(--lh-label);
-  color: var(--text-muted);
-}
-
-.shell-capture {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-window);
-}

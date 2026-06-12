@@ -1,26 +1,36 @@
 // The single registry of every hotkey-driven action, and the ONE keydown
-// dispatcher that routes to it (attached once in App.tsx). No ad-hoc keydown
-// listeners anywhere else — text inputs may handle their own typing, but every
-// command chord lives here, and every chord is rebindable. Global chords are
-// registered with the OS in Rust; rebinding them goes through
-// set_summon_shortcut.
+// dispatcher per webview that routes to it (attached once in App.tsx). No
+// ad-hoc keydown listeners anywhere else — text inputs may handle their own
+// typing, but every command chord lives here, and every chord is rebindable
+// (the overrides map lives in the bindings store; defaults live here).
+// Global chords are registered with the OS in Rust; rebinding them round-trips
+// through the set_summon_shortcut invoke.
 
-import { setSummonShortcut } from "../lib/tauri";
+import { emitRebind, setGlobalShortcut } from "../lib/tauri";
+import { resolveChord, useBindingsStore } from "./bindings";
+import { chordFromEvent, normalizeChord, toAccelerator } from "./chords";
+
+/** Which webview an action belongs to — the dispatcher only fires actions for
+ * its own surface (global actions are handled OS-side in Rust and skipped). */
+export type Surface = "main" | "capture";
 
 export interface KeyAction {
   id: string;
   title: string;
-  /** Chord like "Esc", "Alt+Space", "Meta+0", "Alt+Meta+L"; null = unbound. */
-  chord: string | null;
+  /** Default chord like "Esc", "Alt+Space", "Meta+0"; null = unbound. */
+  defaultChord: string | null;
+  surface: Surface;
   /** OS-wide shortcut, registered + handled in Rust — the dispatcher skips it. */
   global?: boolean;
   run: () => void;
 }
 
+type KeyActionInput = Omit<KeyAction, "surface"> & { surface?: Surface };
+
 const actions = new Map<string, KeyAction>();
 
-export function registerAction(action: KeyAction): void {
-  actions.set(action.id, action);
+export function registerAction(action: KeyActionInput): void {
+  actions.set(action.id, { surface: "main", ...action });
 }
 
 export function getAction(id: string): KeyAction | undefined {
@@ -35,52 +45,52 @@ export function dispatch(actionId: string): void {
   actions.get(actionId)?.run();
 }
 
+/** The action's chord right now: override if one exists, else its default. */
+export function currentChord(actionId: string): string | null {
+  const action = actions.get(actionId);
+  if (!action) return null;
+  return resolveChord(useBindingsStore.getState().overrides, actionId, action.defaultChord);
+}
+
+/** The other action already holding `chord`, if any (for the quiet inline
+ * conflict note in Settings → Hotkeys). */
+export function conflictFor(actionId: string, chord: string): KeyAction | null {
+  const n = normalizeChord(chord);
+  for (const action of actions.values()) {
+    if (action.id === actionId) continue;
+    const c = currentChord(action.id);
+    if (c && normalizeChord(c) === n) return action;
+  }
+  return null;
+}
+
+/** Rebind an action. Updates the bindings store, mirrors to the other webview,
+ * and round-trips global chords through Rust so the OS registration follows. */
 export async function rebind(actionId: string, chord: string | null): Promise<void> {
   const action = actions.get(actionId);
   if (!action) return;
-  action.chord = chord;
-  if (action.global && chord) await setSummonShortcut(toAccelerator(chord));
+  useBindingsStore.getState().setOverride(actionId, chord);
+  emitRebind(actionId, chord);
+  if (action.global && chord) await setGlobalShortcut(actionId, toAccelerator(chord));
 }
 
-/** Our chord notation → a Tauri accelerator string. */
-function toAccelerator(chord: string): string {
-  return chord
-    .split("+")
-    .map((part) => (part === "Meta" ? "Command" : part === "Esc" ? "Escape" : part))
-    .join("+");
-}
-
-function keyToCode(key: string): string {
-  if (key === "Esc" || key === "Escape") return "Escape";
-  if (key === "Space") return "Space";
-  if (/^[a-zA-Z]$/.test(key)) return `Key${key.toUpperCase()}`;
-  if (/^[0-9]$/.test(key)) return `Digit${key}`;
-  return key;
-}
-
-function eventMatches(event: KeyboardEvent, chord: string): boolean {
-  const parts = chord.split("+");
-  const key = parts[parts.length - 1];
-  if (!key) return false;
-  const mods = new Set(parts.slice(0, -1).map((m) => m.toLowerCase()));
-  return (
-    event.metaKey === mods.has("meta") &&
-    event.ctrlKey === mods.has("ctrl") &&
-    event.altKey === mods.has("alt") &&
-    event.shiftKey === mods.has("shift") &&
-    event.code === keyToCode(key)
-  );
+/** Apply a rebind that arrived from the other webview (no re-emit, no invoke). */
+export function applyRebind(actionId: string, chord: string | null): void {
+  useBindingsStore.getState().setOverride(actionId, chord);
 }
 
 let detach: (() => void) | null = null;
 
-/** Attach the one dispatcher. Idempotent; returns the detach function. */
-export function attachDispatcher(): () => void {
+/** Attach the one dispatcher for this webview's surface. Idempotent. */
+export function attachDispatcher(surface: Surface): () => void {
   if (detach) return detach;
   const onKeyDown = (event: KeyboardEvent) => {
+    const pressed = chordFromEvent(event);
+    if (!pressed) return;
     for (const action of actions.values()) {
-      if (action.global || !action.chord) continue;
-      if (eventMatches(event, action.chord)) {
+      if (action.global || action.surface !== surface) continue;
+      const chord = currentChord(action.id);
+      if (chord && normalizeChord(chord) === pressed) {
         event.preventDefault();
         action.run();
         return;

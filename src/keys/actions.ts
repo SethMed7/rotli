@@ -1,6 +1,8 @@
-// Every user-invocable action registers here so ⌘K and Settings → Hotkeys
-// (later phases) can list and rebind all of it. One dispatcher, no ad-hoc
-// keydown listeners anywhere else.
+// Every user-invocable action registers here so ⌘K and Settings → Hotkeys can
+// list and rebind all of it. One dispatcher per webview, no ad-hoc keydown
+// listeners anywhere else. Both webviews register the full set — the
+// dispatcher only fires the actions for its own surface, and the Settings
+// list shows everything.
 
 import {
   type BlockToggle,
@@ -10,7 +12,8 @@ import {
 } from "../editor/commands";
 import { invalidateNotes } from "../services/hooks";
 import { inboxFolder, notesService } from "../services/notes";
-import { hideMainWindow, toggleMainWindow } from "../lib/tauri";
+import { captureHandle } from "../lib/captureHandle";
+import { hideMainWindow, summon, toggleMainWindow } from "../lib/tauri";
 import { usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import { registerAction } from "./registry";
@@ -32,31 +35,81 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "app.hide",
     title: "Hide rotli",
-    chord: "Esc",
+    defaultChord: "Esc",
     run: () => {
-      // Esc closes the topmost transient first (quokka rule), then the window.
-      const { switcherOpen, setSwitcherOpen, closeTopTransient } = useUiStore.getState();
-      if (closeTopTransient()) return;
-      if (switcherOpen) {
-        setSwitcherOpen(false);
+      // Esc unwinds one layer at a time (quokka rule): topmost transient →
+      // module switcher → settings → focus mode → the window itself.
+      const ui = useUiStore.getState();
+      if (ui.closeTopTransient()) return;
+      if (ui.switcherOpen) {
+        ui.setSwitcherOpen(false);
+        return;
+      }
+      if (ui.settingsOpen) {
+        ui.setSettingsOpen(false);
+        return;
+      }
+      if (ui.focusMode) {
+        ui.setFocusMode(false);
         return;
       }
       void hideMainWindow();
     },
   });
 
+  // — the two summon surfaces (both global, separately rebindable) —
+  registerAction({
+    id: "capture.summon",
+    title: "Quick capture",
+    defaultChord: "Alt+Space",
+    global: true, // the summon law lives in Rust; dispatch() works for review automation
+    run: () => void summon(),
+  });
   registerAction({
     id: "app.toggleWindow",
-    title: "Summon rotli",
-    chord: "Alt+Space",
-    global: true, // registered + handled in Rust; dispatch() still works for review automation
+    title: "Show or hide the main window",
+    defaultChord: null, // tray left-click does this; bind a chord if wanted
+    global: true,
     run: () => void toggleMainWindow(),
+  });
+
+  // — the command layer —
+  registerAction({
+    id: "palette.toggle",
+    title: "Search notes & actions",
+    defaultChord: "Meta+K",
+    run: () => {
+      const ui = useUiStore.getState();
+      ui.setPaletteOpen(!ui.paletteOpen);
+    },
+  });
+  registerAction({
+    id: "view.focus",
+    title: "Focus mode",
+    defaultChord: "Alt+Meta+F",
+    run: () => {
+      const ui = useUiStore.getState();
+      ui.setSettingsOpen(false);
+      ui.setSwitcherOpen(false);
+      ui.setFocusMode(!ui.focusMode);
+    },
+  });
+  registerAction({
+    id: "app.settings",
+    title: "Settings",
+    defaultChord: "Meta+Comma",
+    run: () => {
+      const ui = useUiStore.getState();
+      ui.setFocusMode(false);
+      ui.setSwitcherOpen(false);
+      ui.setSettingsOpen(!ui.settingsOpen);
+    },
   });
 
   registerAction({
     id: "theme.cycle",
     title: "Cycle theme",
-    chord: null,
+    defaultChord: null,
     run: () => useUiStore.getState().cycleTheme(),
   });
 
@@ -64,7 +117,7 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "notes.new",
     title: "New note",
-    chord: "Meta+N",
+    defaultChord: "Meta+N",
     run: () => void newNote(),
   });
 
@@ -72,33 +125,33 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "tabs.new",
     title: "New tab",
-    chord: "Meta+T",
+    defaultChord: "Meta+T",
     run: () => usePanesStore.getState().newTab(),
   });
   registerAction({
     id: "tabs.close",
     title: "Close tab",
-    chord: "Meta+W",
+    defaultChord: "Meta+W",
     run: () => usePanesStore.getState().closeTab(),
   });
   registerAction({
     id: "tabs.cycle",
     title: "Next tab",
-    chord: "Ctrl+Tab",
+    defaultChord: "Ctrl+Tab",
     run: () => usePanesStore.getState().cycleTab(),
   });
   for (let n = 1; n <= 8; n++) {
     registerAction({
       id: `tabs.jump${n}`,
       title: `Go to tab ${n}`,
-      chord: `Meta+${n}`,
+      defaultChord: `Meta+${n}`,
       run: () => usePanesStore.getState().jumpTab(n - 1),
     });
   }
   registerAction({
     id: "tabs.last",
     title: "Go to last tab",
-    chord: "Meta+9",
+    defaultChord: "Meta+9",
     run: () => usePanesStore.getState().lastTab(),
   });
 
@@ -106,43 +159,43 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "panes.splitRight",
     title: "Split right",
-    chord: "Meta+D",
+    defaultChord: "Meta+D",
     run: () => usePanesStore.getState().splitRight(),
   });
   registerAction({
     id: "panes.splitDown",
     title: "Split down",
-    chord: "Meta+Shift+D",
+    defaultChord: "Meta+Shift+D",
     run: () => usePanesStore.getState().splitDown(),
   });
   registerAction({
     id: "panes.focusLeft",
     title: "Focus pane left",
-    chord: "Meta+Alt+ArrowLeft",
+    defaultChord: "Meta+Alt+ArrowLeft",
     run: () => usePanesStore.getState().focusDir("left"),
   });
   registerAction({
     id: "panes.focusRight",
     title: "Focus pane right",
-    chord: "Meta+Alt+ArrowRight",
+    defaultChord: "Meta+Alt+ArrowRight",
     run: () => usePanesStore.getState().focusDir("right"),
   });
   registerAction({
     id: "panes.focusUp",
     title: "Focus pane up",
-    chord: "Meta+Alt+ArrowUp",
+    defaultChord: "Meta+Alt+ArrowUp",
     run: () => usePanesStore.getState().focusDir("up"),
   });
   registerAction({
     id: "panes.focusDown",
     title: "Focus pane down",
-    chord: "Meta+Alt+ArrowDown",
+    defaultChord: "Meta+Alt+ArrowDown",
     run: () => usePanesStore.getState().focusDir("down"),
   });
   registerAction({
     id: "panes.close",
     title: "Close pane",
-    chord: "Meta+Alt+W",
+    defaultChord: "Meta+Alt+W",
     run: () => usePanesStore.getState().closePane(),
   });
 
@@ -150,13 +203,13 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "chrome.toggleFolders",
     title: "Toggle folders rail",
-    chord: "Meta+0",
+    defaultChord: "Meta+0",
     run: () => useUiStore.getState().toggleFolders(),
   });
   registerAction({
     id: "chrome.toggleList",
     title: "Toggle note list",
-    chord: "Alt+Meta+L",
+    defaultChord: "Alt+Meta+L",
     run: () => useUiStore.getState().toggleList(),
   });
 
@@ -171,14 +224,14 @@ export function registerDefaultActions(): void {
     ["editor.highlight", "Highlight", "highlight", "Meta+Shift+H"],
     ["editor.link", "Link", "link", null],
   ];
-  for (const [id, title, mark, chord] of marks) {
-    registerAction({ id, title, chord, run: () => activeEditor()?.toggleMark(mark) });
+  for (const [id, title, mark, defaultChord] of marks) {
+    registerAction({ id, title, defaultChord, run: () => activeEditor()?.toggleMark(mark) });
   }
   for (const level of [1, 2, 3] as HeadingLevel[]) {
     registerAction({
       id: `editor.heading${level}`,
       title: `Heading ${level}`,
-      chord: null,
+      defaultChord: null,
       run: () => activeEditor()?.setHeading(level),
     });
   }
@@ -189,13 +242,42 @@ export function registerDefaultActions(): void {
     ["editor.checklist", "Checklist", "checklist"],
   ];
   for (const [id, title, kind] of blocks) {
-    registerAction({ id, title, chord: null, run: () => activeEditor()?.toggleBlock(kind) });
+    registerAction({
+      id,
+      title,
+      defaultChord: null,
+      run: () => activeEditor()?.toggleBlock(kind),
+    });
   }
 
   registerAction({
     id: "modules.notes",
     title: "Go to Notes",
-    chord: "Ctrl+1",
+    defaultChord: "Ctrl+1",
     run: () => useUiStore.getState().setSwitcherOpen(false), // already the current module
+  });
+
+  // — the capture card's own keys (surface: capture — its webview's dispatcher
+  //   routes these; the textarea never grows ad-hoc listeners) —
+  registerAction({
+    id: "capture.save",
+    title: "Capture — save",
+    defaultChord: "Enter",
+    surface: "capture",
+    run: () => captureHandle()?.save(false),
+  });
+  registerAction({
+    id: "capture.saveAndOpen",
+    title: "Capture — save & open",
+    defaultChord: "Meta+Enter",
+    surface: "capture",
+    run: () => captureHandle()?.save(true),
+  });
+  registerAction({
+    id: "capture.dismiss",
+    title: "Capture — dismiss",
+    defaultChord: "Esc",
+    surface: "capture",
+    run: () => captureHandle()?.dismiss(),
   });
 }

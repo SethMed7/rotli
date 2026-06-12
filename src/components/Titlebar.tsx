@@ -22,43 +22,61 @@ export function Titlebar() {
   const setSwitcherOpen = useUiStore((s) => s.setSwitcherOpen);
   const foldersCollapsed = useUiStore((s) => s.foldersCollapsed);
   const listCollapsed = useUiStore((s) => s.listCollapsed);
+  const settingsOpen = useUiStore((s) => s.settingsOpen);
 
   return (
     <header className="titlebar">
       <div className="tb-inset" onMouseDown={onDragRegionMouseDown} />
-      <div className="identity-wrap">
-        <button
-          type="button"
-          className={switcherOpen ? "identity open" : "identity"}
-          aria-haspopup="menu"
-          aria-expanded={switcherOpen}
-          onClick={() => setSwitcherOpen(!switcherOpen)}
-        >
-          <Icon name="rotli-notes" size={14} />
-          Notes
-          <ChevronDown className="chev" />
-        </button>
-        {switcherOpen && <ModuleSwitcher onClose={() => setSwitcherOpen(false)} />}
-      </div>
-      <div className="railbtns">
-        <IconButton
-          label="Folders — ⌘0"
-          pressed={!foldersCollapsed}
-          onClick={() => dispatch("chrome.toggleFolders")}
-        >
-          <RailFolders />
-        </IconButton>
-        <IconButton
-          label="Notes list — ⌥⌘L"
-          pressed={!listCollapsed}
-          onClick={() => dispatch("chrome.toggleList")}
-        >
-          <RailList />
-        </IconButton>
-      </div>
+      {settingsOpen ? (
+        // settings surface (r1 frame F): the identity reads Settings; the rail
+        // toggles step aside — clicking the identity walks back to notes
+        <div className="identity-wrap">
+          <button type="button" className="identity" onClick={() => dispatch("app.settings")}>
+            <Icon name="rotli-settings" size={14} />
+            Settings
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="identity-wrap">
+            <button
+              type="button"
+              className={switcherOpen ? "identity open" : "identity"}
+              aria-haspopup="menu"
+              aria-expanded={switcherOpen}
+              onClick={() => setSwitcherOpen(!switcherOpen)}
+            >
+              <Icon name="rotli-notes" size={14} />
+              Notes
+              <ChevronDown className="chev" />
+            </button>
+            {switcherOpen && <ModuleSwitcher onClose={() => setSwitcherOpen(false)} />}
+          </div>
+          <div className="railbtns">
+            <IconButton
+              label="Folders — ⌘0"
+              pressed={!foldersCollapsed}
+              onClick={() => dispatch("chrome.toggleFolders")}
+            >
+              <RailFolders />
+            </IconButton>
+            <IconButton
+              label="Notes list — ⌥⌘L"
+              pressed={!listCollapsed}
+              onClick={() => dispatch("chrome.toggleList")}
+            >
+              <RailList />
+            </IconButton>
+          </div>
+        </>
+      )}
       <div className="tb-spacer" onMouseDown={onDragRegionMouseDown} />
       <div className="tb-actions">
-        <IconButton label="Settings">
+        <IconButton
+          label="Settings — ⌘,"
+          pressed={settingsOpen}
+          onClick={() => dispatch("app.settings")}
+        >
           <Icon name="rotli-settings" />
         </IconButton>
       </div>
