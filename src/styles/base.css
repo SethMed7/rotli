@@ -1,0 +1,115 @@
+/* rotli — app-level CSS base.
+   Layer 1: the frozen kit tokens (src/brand/ — never edited here).
+   Layer 2: the shape & state grammar from the approved r3 gate, frame G
+   (engine/RUNS/rotli/2026-06-11-ui-notes-mockups-r3/gate.html) — one law, everywhere.
+   Components never invent states; they consume these. No raw hex outside src/brand/. */
+
+@import "../brand/tokens/colors.css";
+@import "../brand/tokens/type.css";
+
+:root {
+  /* — state layers (r3 gate values) —
+     hover = 7% ink overlay · active/selected-press = 11% ink, on the element's own shape.
+     Never a new color, never a shape change. */
+  --hov: rgba(58, 48, 40, 0.07);
+  --act: rgba(58, 48, 40, 0.11);
+
+  /* — radius scale, one family (r3 gate) —
+     4 inner elements · 8 controls/rows · 10 tabs/bubbles · 12 cards/panels ·
+     14 windows · 999 pills/chips. Nested radius = outer − padding. */
+  --r-inner: 4px;
+  --r-control: 8px;
+  --r-tab: 10px;
+  --r-card: 12px;
+  --r-window: 14px;
+  --r-pill: 999px;
+
+  /* — motion (r3 gate law) — 120–180ms ease-out, exit faster than enter.
+     Frequent actions animate opacity/transform only, or not at all. */
+  --motion-enter: 160ms;
+  --motion-exit: 120ms;
+  --motion-ease: ease-out;
+}
+
+/* dark: same formula, paper overlay (8% / 13%) on the warm cocoa ground */
+:root[data-theme="dark"],
+.rotli-dark {
+  --hov: rgba(241, 231, 218, 0.08);
+  --act: rgba(241, 231, 218, 0.13);
+}
+
+/* — base — */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  font-weight: var(--wght-body);
+  line-height: var(--lh-body);
+  color: var(--text);
+  background: var(--ground);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* selection is always the peach tint — never clay, never a new color */
+::selection {
+  background: var(--tint);
+}
+
+/* focus-visible is always a 2px clay ring, 2px offset, keyboard-only */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* — scaffold placeholder shells (replaced by later phases) — */
+.shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.shell-title {
+  font-family: var(--font-display);
+  font-weight: var(--wght-heading);
+  font-size: var(--fs-subhead);
+  line-height: var(--lh-subhead);
+  letter-spacing: -0.01em;
+}
+
+.shell-hint {
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  color: var(--text-muted);
+}
+
+.shell-capture {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-window);
+}

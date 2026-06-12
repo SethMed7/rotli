@@ -1,0 +1,43 @@
+/* rotli — type tokens. From the Seth-approved brand board (2026-06-06).
+   Display + headings + wordmark: Satoshi. UI + body: General Sans. Fallback: Inter / system.
+   Both faces are Fontshare (ITF) — free for personal AND commercial use, self-hosted. NOT OFL and NOT in
+   smLab's Fontsource catalog — a deliberate, Seth-approved deviation for rotli (record in LICENSES.md at
+   freeze). Drop the font files into ../fonts/ (Fontshare download). The wordmark also ships as outlined
+   SVG paths, so the font is only needed for live UI text. */
+@font-face{
+  font-family:"Satoshi";
+  src:url("../fonts/Satoshi-Variable.woff2") format("woff2");
+  font-weight:300 900; font-style:normal; font-display:swap;
+}
+@font-face{
+  font-family:"General Sans";
+  src:url("../fonts/GeneralSans-Variable.woff2") format("woff2");
+  font-weight:300 700; font-style:normal; font-display:swap;
+}
+
+:root{
+  --font-display:"Satoshi", "Inter", system-ui, sans-serif;        /* headings + wordmark */
+  --font-body:"General Sans", "Satoshi", "Inter", system-ui, sans-serif; /* UI + body */
+
+  /* scale — exactly as specified on the board (size / line-height) */
+  --fs-heading:2rem;      /* 32 / 40  · Satoshi Bold 700 */
+  --lh-heading:2.5rem;
+  --fs-subhead:1.25rem;   /* 20 / 28  · Satoshi Medium 500 */
+  --lh-subhead:1.75rem;
+  --fs-body:0.875rem;     /* 14 / 22  · General Sans Regular 400 */
+  --lh-body:1.375rem;
+  --fs-label:0.75rem;     /* 12 / 16  · Medium 500 — UI labels, chips, nav */
+  --lh-label:1rem;
+
+  --wght-heading:700;     /* Satoshi Bold */
+  --wght-subhead:500;     /* Satoshi Medium */
+  --wght-body:400;        /* General Sans Regular */
+  --wght-label:500;       /* Medium */
+}
+
+/* helpers */
+.rotli-heading{ font-family:var(--font-display); font-weight:var(--wght-heading); font-size:var(--fs-heading); line-height:var(--lh-heading); letter-spacing:-.01em; }
+.rotli-subhead{ font-family:var(--font-display); font-weight:var(--wght-subhead); font-size:var(--fs-subhead); line-height:var(--lh-subhead); }
+.rotli-body{ font-family:var(--font-body); font-weight:var(--wght-body); font-size:var(--fs-body); line-height:var(--lh-body); }
+.rotli-label{ font-family:var(--font-body); font-weight:var(--wght-label); font-size:var(--fs-label); line-height:var(--lh-label); }
+.rotli-wordmark{ font-family:var(--font-display); font-weight:700; letter-spacing:-.01em; text-transform:lowercase; }

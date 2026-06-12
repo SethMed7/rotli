@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <!-- rotli icon set v2 — FROZEN 2026-06-11 (run: engine/RUNS/rotli/2026-06-11-icons-recut, Seth-approved).
+       11 symbols re-cut to module truth: 6 modules (notes chat voice memory inbox board) + 5 supports
+       (capture tags search sync settings). 24-grid · 1.8 stroke · outline · currentColor · ≤1 clay accent
+       (sync keeps its approved clay+olive pair — it IS the semantic). On dark grounds lift olive to
+       var(--rotli-olive-bright) #A9B78F (see tokens/colors.css). Mono contexts: force accents to currentColor. -->
+  <symbol id="rotli-notes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h6" stroke="#C97E62"/><path d="M8 12h8"/><path d="M8 16h5"/>
+  </symbol>
+  <symbol id="rotli-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 11.8a8.3 8.3 0 0 1-8.9 8.3 8.5 8.5 0 0 1-3.5-.8L3.2 21l1.9-5.4A8.3 8.3 0 1 1 21 11.8Z"/>
+    <path d="M8.6 11.8h6.8" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="rotli-voice" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="2.5" width="6" height="11.5" rx="3"/>
+    <path d="M5 10.5v1.5a7 7 0 0 0 14 0v-1.5"/><path d="M12 19v2.5"/>
+    <circle cx="12" cy="8" r="1.2" fill="#C97E62" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="rotli-memory" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 4.5a4 4 0 0 0-3.9 3 3.5 3.5 0 0 0-2.4 4.4A3.3 3.3 0 0 0 6.3 17c.4 1.5 1.8 2.5 3.3 2.3a3.1 3.1 0 0 0 2.4-1.3 3.1 3.1 0 0 0 2.4 1.3c1.5.2 2.9-.8 3.3-2.3a3.3 3.3 0 0 0 .6-5.1A3.5 3.5 0 0 0 15.9 7.5a4 4 0 0 0-3.9-3Z"/>
+    <path d="M12 4.5V18" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="rotli-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 12.5h-5.5l-2 3h-5l-2-3H2"/>
+    <path d="M5.5 5.6 2 12.5V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.5l-3.5-6.9A2 2 0 0 0 16.7 4.5H7.3a2 2 0 0 0-1.8 1.1Z"/>
+    <circle cx="18.5" cy="8" r="1.3" fill="#C97E62" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="rotli-board" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3.5" y="3.5" width="7" height="9.5" rx="1.8"/><rect x="14" y="3.5" width="6.5" height="5.5" rx="1.8"/>
+    <rect x="14" y="12.5" width="6.5" height="8" rx="1.8" fill="#C97E62" stroke="#C97E62"/><rect x="3.5" y="16.5" width="7" height="4" rx="1.8"/>
+  </symbol>
+  <symbol id="rotli-capture" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/>
+    <path d="M12 8.5v7M8.5 12h7" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="rotli-tags" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4Z"/>
+    <circle cx="7.5" cy="7.5" r="1.5" fill="#C97E62" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="rotli-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/>
+  </symbol>
+  <symbol id="rotli-sync" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4.5 9.5a7.5 7.5 0 0 1 12.8-3.4" stroke="#C97E62"/><path d="M17.5 2.5v3.8h-3.8" stroke="#C97E62"/>
+    <path d="M19.5 14.5a7.5 7.5 0 0 1-12.8 3.4" stroke="#8D9A76"/><path d="M6.5 21.5v-3.8h3.8" stroke="#8D9A76"/>
+  </symbol>
+  <symbol id="rotli-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 6.5h7.6M18.4 6.5H20"/><circle cx="15.1" cy="6.5" r="2.1"/>
+    <path d="M4 12h1.7M12.4 12H20"/><circle cx="9.1" cy="12" r="2.1" stroke="#C97E62"/>
+    <path d="M4 17.5h5.7M16.4 17.5H20"/><circle cx="13.1" cy="17.5" r="2.1"/>
+  </symbol>
+</svg>

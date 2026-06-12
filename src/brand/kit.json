@@ -1,0 +1,41 @@
+{
+  "kit": "rotli",
+  "version": "1.0.0",
+  "status": "FROZEN",
+  "builtAt": "2026-06-08",
+  "frozenAt": "2026-06-11",
+  "approvedBy": "Seth Medina",
+  "brand": "rotli (lowercase, always)",
+  "engine": "smLab/brand/engine",
+  "sourceRuns": [
+    "engine/RUNS/rotli/2026-06-08-wordmark",
+    "engine/RUNS/rotli/2026-06-10-board-intake",
+    "engine/RUNS/rotli/2026-06-11-imagery",
+    "engine/RUNS/rotli/2026-06-11-icons-recut"
+  ],
+  "freezeGate": "Marks approved (gate r3, board intake 06-10). World soft-approved 06-11. Icons re-cut to module truth and approved 06-11 (Tags revised to tilted tag; Settings segmented; olive-bright token added). Seth: freeze confirmed 2026-06-11 — Stage 2 (the app, own fresh repo) opens.",
+  "identity": "Warm, quiet, instant. The quokka and its island. One brain (plain .md corpus), six fronts: Notes · Chat · Voice · the Memory · Inbox · Board.",
+  "contents": {
+    "brand": "brand.json",
+    "tokens": ["tokens/colors.css", "tokens/colors.json", "tokens/type.css"],
+    "logo": [
+      "logo/wordmark.svg", "logo/wordmark.mono.svg", "logo/wordmark.mono-white.svg",
+      "logo/r-mark.svg", "logo/r-mark.mono.svg", "logo/r-mark.mono-white.svg"
+    ],
+    "tiles": [
+      "tiles/tile-linen.svg", "tiles/tile-cocoa.svg", "tiles/tile-clay.svg",
+      "tiles/favicon.svg", "tiles/app-icon-512.svg", "tiles/social-avatar-1024.svg"
+    ],
+    "icons": "icons/rotli-icons.sprite.svg (v2, 11 symbols) + icons/src/ (11 sources) + icons/README.md (context rules)",
+    "fonts": [
+      "fonts/Satoshi-Variable.woff2 (+ Regular/Medium/Bold)",
+      "fonts/GeneralSans-Variable.woff2 (+ Regular/Medium/Semibold)",
+      "fonts/Baloo2-600.ttf (wordmark provenance only — marks ship outlined)"
+    ],
+    "board": "board.html",
+    "licenses": "LICENSES.md",
+    "worldImagery": "NOT in-kit — illustrated world (quokka, island, nooks) lives in engine/RUNS/rotli/2026-06-11-imagery/ and smStorage; product uses it only at onboarding/empty/about per the placement law"
+  },
+  "designLaws": "The seven approved UI gates (engine/RUNS/rotli/2026-06-11-ui-notes-mockups{,-r2..-r7}) + the company book (engine/RUNS/rotli/2026-06-11-company-book/book.html) are the visual spec; the shape & state grammar (r3) and quiet-AI clause govern all product UI.",
+  "rules": "Frozen kit = DATA only, no engine dependency. To change: re-enter Stage 1, bump version, re-pull. The app vendors this whole folder into src/brand/ and consumes tokens.css + SVGs — never reaching back into the engine. No raw hex in product code."
+}

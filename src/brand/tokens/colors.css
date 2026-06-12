@@ -1,0 +1,57 @@
+/* rotli — color tokens. Single source of truth for every surface; never raw hex in product code.
+   From the Seth-approved brand board (2026-06-06). Tiered: BRAND CORE (cocoa + clay) ·
+   SUPPORTING (olive + peach) · SEMANTIC SURFACES (light + dark). Warm, never clinical. */
+:root{
+  /* — brand core (the five board colors) — */
+  --rotli-cocoa:#3A3028;   /* primary text / ink · wordmark · dark ground base */
+  --rotli-clay:#C97E62;    /* the one signature accent — active, progress, key moments */
+  --rotli-peach:#F2D6C2;   /* warm tint — selected rows, highlights, accent backgrounds */
+  --rotli-linen:#F8F2E9;   /* lightest warm surface / light ground (never pure white) */
+  --rotli-olive:#8D9A76;   /* secondary / success accent — checkmarks, sync, "all caught up" */
+
+  /* — supporting (derived for AA text where the core colors are mid-tone) — */
+  --rotli-clay-text:#8F4E37;   /* clay too light for AA small text on linen — use this for accent text/links */
+  --rotli-olive-text:#5F6B49;  /* olive too light for AA small text on linen — use this for olive text */
+  --rotli-olive-bright:#A9B78F; /* olive lifted for thin strokes/icons on DARK grounds — #8D9A76 clears AA
+                                   for text on cocoa but reads muddy at 1.8px (Seth, 2026-06-11, icon gate) */
+
+  /* — semantic: LIGHT surfaces (default) — */
+  --ground:#F8F2E9;        /* Linen */
+  --surface:#FFFFFF;
+  --surface-2:#F1E7D8;
+  --tint:#F2D6C2;          /* Peach — selected/highlight backgrounds */
+  --text:#3A3028;          /* Cocoa */
+  --text-muted:#6E6155;
+  --border:#E7DBC9;
+  --accent:#C97E62;        /* Clay — fills, progress, active (AA-large/UI) */
+  --accent-text:#8F4E37;   /* accent text/links at small sizes (AA) */
+  --on-accent:#FFFFFF;     /* text on a clay fill — AA-large/UI only (3.16); for small text prefer cocoa */
+  --success:#8D9A76;       /* Olive — UI/icons; for small text use --rotli-olive-text */
+}
+
+/* — semantic: DARK surfaces — warm cocoa ground, never clinical grey. Clay clears AA on it. — */
+:root[data-theme="dark"],
+.rotli-dark{
+  --ground:#241D18;
+  --surface:#2E2620;
+  --surface-2:#392F28;
+  --tint:#3E332B;          /* warm tint band on dark */
+  --text:#F1E7DA;
+  --text-muted:#B7A593;
+  --border:#3D3229;
+  --accent:#C97E62;        /* Clay — AA (5.26) on the cocoa ground for small text */
+  --accent-text:#C97E62;
+  --on-accent:#241D18;
+  --success:#8D9A76;       /* AA (5.55) on the cocoa ground */
+}
+
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#241D18; --surface:#2E2620; --surface-2:#392F28; --tint:#3E332B;
+    --text:#F1E7DA; --text-muted:#B7A593; --border:#3D3229;
+    --accent:#C97E62; --accent-text:#C97E62; --on-accent:#241D18; --success:#8D9A76;
+  }
+}
+
+/* Night Paper (future): amber-brown, near-zero blue. Derive from this palette when built —
+   the old copper/cream amber set is retired. Every value must be warm. */
