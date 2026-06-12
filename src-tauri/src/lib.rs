@@ -10,6 +10,8 @@
 // rebindable through set_summon_shortcut, and click-away hiding is a setting
 // (set_hide_on_blur) so heavy use can keep the window resident.
 
+mod corpus;
+
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -281,12 +283,44 @@ pub fn run() {
             summon,
             set_summon_shortcut,
             set_hide_on_blur,
-            set_dock_visible
+            set_dock_visible,
+            corpus::corpus_list,
+            corpus::corpus_read,
+            corpus::corpus_write,
+            corpus::corpus_create,
+            corpus::corpus_delete,
+            corpus::corpus_create_folder,
+            corpus::corpus_settings_read,
+            corpus::corpus_settings_write
         ])
         .setup(|app| {
             // The visitor law: never in the dock, never in Cmd-Tab.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            // Phase 2 — the corpus. Open (first run: create root + Inbox +
+            // welcome note + .rotli/), then watch it for EXTERNAL changes; the
+            // frontend invalidates on "rotli:corpus-changed". A disk error
+            // must not kill the shell: commands degrade to clean errors.
+            let opened = corpus::CorpusStore::open(corpus::default_corpus_root(app.handle()));
+            let store = match opened {
+                Ok(store) => {
+                    let suppress = store.suppress_set();
+                    let watch_root = store.root().to_path_buf();
+                    let handle = app.handle().clone();
+                    if let Err(e) = corpus::spawn_watcher(watch_root, suppress, move || {
+                        let _ = handle.emit_to("main", "rotli:corpus-changed", ());
+                    }) {
+                        eprintln!("rotli: corpus watcher unavailable ({e}) — external edits won't auto-refresh");
+                    }
+                    Some(store)
+                }
+                Err(e) => {
+                    eprintln!("rotli: corpus unavailable ({e}) — file commands disabled");
+                    None
+                }
+            };
+            app.manage(corpus::CorpusState(Mutex::new(store)));
 
             // ⌥Space opens the app; ⌥C is the one-breath capture (both rebindable).
             // Best-effort: another app owning a chord (launchers love ⌥Space)

@@ -23,3 +23,9 @@ tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-ap
 tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Phase 2 — the corpus (plain .md files become real)
+notify = "8"                                                     # fs watcher (external edits → UI refresh)
+ulid = "1"                                                       # note identity (time-sortable, matches the TS ulid)
+time = { version = "0.3", features = ["formatting", "parsing"] } # frontmatter created/updated (RFC 3339)
+tempfile = "3"                                                   # atomic writes: tmp in the same dir + rename
+trash = "5"                                                      # delete = OS trash, never a hard rm
