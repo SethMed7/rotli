@@ -4,9 +4,9 @@
 // clay). Splits/focus/tabs all live in the panes store.
 
 import { type PointerEvent as ReactPointerEvent, type ReactNode, useRef } from "react";
+import { EditorSurface } from "../editor/EditorSurface";
 import { activeTabOf, leaves, usePanesStore } from "../state/panes";
 import type { LeafNode, PaneNode, SplitNode } from "../types";
-import { EditorSurface } from "./EditorSurface";
 import { TabStrip } from "./TabStrip";
 
 function LeafView({ node }: { node: LeafNode }) {

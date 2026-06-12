@@ -1,0 +1,467 @@
+/* rotli — the hybrid markdown editor (phase 1b). Class structure + values
+   transfer from the approved gates: r1 frame A (rendered note: headings,
+   tasks, quote), r4/r5 frame A (raw active line, mdsyn clay-deep, format bar,
+   header-inline status), r3 frame C (Aa panel). No raw hex — kit tokens +
+   base.css grammar vars only. Radii snap to the r3 frame G scale. */
+
+/* — header-inline status + Aa chip (r5) — */
+.ed-head {
+  white-space: nowrap; /* narrow panes truncate the status, never wrap the head */
+}
+.ed-head .slot {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+.status-inline {
+  overflow: hidden;
+}
+.status-inline {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.status-inline .dot-ok {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.status-inline .sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.aachip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: none;
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.aachip:hover {
+  background-image: linear-gradient(var(--hov), var(--hov));
+}
+.aachip.on {
+  background: var(--tint);
+}
+
+/* — the note body: every source line is a row — */
+.ed-body {
+  padding: 9px 40px 90px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  max-width: 660px;
+  cursor: text;
+}
+.ed-line {
+  position: relative;
+}
+/* spacing grammar: blank source lines carry the paragraph gap (the gate's
+   12px); blocks add only their own offsets */
+.ed-line[data-kind="blank"] {
+  min-height: 12px;
+}
+.ed-line[data-kind="h1"] {
+  margin: 0 0 2px;
+}
+.ed-line[data-kind="h2"],
+.ed-line[data-kind="h3"] {
+  margin: 8px 0;
+}
+.ed-line[data-kind="task"],
+.ed-line[data-kind="bullet"],
+.ed-line[data-kind="numbered"] {
+  margin: 0 0 7px;
+}
+
+/* — rendered blocks (r1 frame A) — */
+.md-h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.586em; /* 23px at the 14.5 base — scales with the Aa size */
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.md-h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.31em; /* 19px at base */
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+.md-h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.172em; /* the gate's 17px at base */
+  line-height: 1.45;
+}
+.md-p {
+  margin: 0;
+}
+.md-quote {
+  border-left: 3px solid var(--rotli-peach);
+  padding: 2px 0 2px 14px;
+  color: var(--text-muted);
+  margin: 0;
+}
+.task {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+.task .box {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-inner);
+  border: 1.5px solid var(--border);
+  background: none;
+  padding: 0;
+  margin-top: 0.3em;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.task.done .box {
+  background: var(--success);
+  border-color: var(--success);
+}
+.task .box svg {
+  width: 10px;
+  height: 10px;
+  stroke: var(--rotli-cocoa); /* cocoa check on olive */
+  stroke-width: 2.4;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.task.done .task-text {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+}
+.md-li {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+.md-li .li-marker {
+  flex: 0 0 auto;
+  min-width: 16px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.md-li .li-marker.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* — inline marks — */
+.md-code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.862em; /* the gate's 12.5px at base */
+  background: var(--surface-2);
+  border-radius: var(--r-inner);
+  padding: 1.5px 5px;
+}
+.md-hl {
+  background: var(--tint); /* highlight is ALWAYS the peach tint */
+  color: inherit;
+  border-radius: var(--r-inner);
+  padding: 1px 2px;
+}
+.md-link {
+  color: var(--accent-text);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/* — the raw active line: transparent textarea over the tinted twin.
+     Metrics on both MUST stay identical or the caret drifts. — */
+.ed-line.raw {
+  cursor: text;
+}
+.raw-twin,
+.raw-input {
+  font-family: ui-monospace, Menlo, monospace; /* the gate's raw-line voice */
+  font-size: 0.966em; /* 14px at the 14.5 base */
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.raw-twin {
+  color: var(--text);
+}
+.raw-twin .mdsyn {
+  color: var(--accent-text); /* clay-deep syntax characters (r4) */
+  opacity: 0.75;
+}
+.raw-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  resize: none;
+  overflow: hidden;
+  background: none;
+  color: transparent;
+  caret-color: var(--text);
+}
+.raw-input:focus-visible {
+  outline: none; /* the tinted line is the affordance; no ring inside text */
+}
+/* selection must stay translucent — the visible glyphs live on the twin */
+.raw-input::selection {
+  background: color-mix(in srgb, var(--tint) 55%, transparent);
+}
+
+/* — the bottom-center resident slot + the format bar (r5) — */
+.bottomslot {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: calc(100% - 24px);
+}
+.fmtbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 5px 7px;
+  box-shadow: 0 12px 32px rgba(58, 48, 40, 0.2);
+  white-space: nowrap;
+}
+.fbwrap {
+  position: relative;
+  display: flex;
+}
+.fb {
+  min-width: 30px;
+  height: 30px;
+  border: none;
+  background: none;
+  border-radius: var(--r-control);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 0 5px;
+  position: relative;
+}
+.fb:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.fb.on {
+  background: var(--tint);
+  color: var(--text);
+}
+.fb u {
+  text-decoration-thickness: 1.5px;
+}
+.fb .hchev {
+  margin-left: 2px;
+  opacity: 0.55;
+}
+.fdiv {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 5px;
+  flex: 0 0 auto;
+}
+/* hover labels flip above the bar (it lives at the bottom) */
+.fb .tip {
+  top: auto;
+  bottom: 38px;
+}
+.fb .tip::after {
+  top: auto;
+  bottom: -4px;
+}
+
+/* — bar popovers: heading-level menu + the ⋯ overflow — */
+.fbmenu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: 0 16px 44px rgba(58, 48, 40, 0.26);
+  padding: 5px;
+  z-index: 7;
+  animation: pop-in var(--motion-enter) var(--motion-ease);
+}
+.fbmenu.more {
+  left: auto;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.fbrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  border-radius: var(--r-control);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+}
+.fbrow:hover {
+  background: var(--hov);
+}
+.fbrow.sel {
+  background: var(--tint);
+  font-weight: 500;
+}
+.fbrow .hsample {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.fbrow .hsample.h1 {
+  font-size: 15px;
+}
+.fbrow .hsample.h2 {
+  font-size: 13.5px;
+}
+.fbrow .hsample.h3 {
+  font-size: 12.5px;
+}
+.fbrow .hmark {
+  margin-left: auto;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--accent-text);
+  opacity: 0.75;
+}
+
+/* — the Aa panel (r3 frame C: typography only) — */
+.aapanel {
+  position: absolute;
+  top: 50px;
+  right: 34px;
+  width: 248px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: 0 18px 44px rgba(58, 48, 40, 0.25);
+  padding: 14px;
+  font-size: 12px;
+  z-index: 8;
+  animation: pop-in var(--motion-enter) var(--motion-ease);
+}
+.aalabel {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+}
+.aarow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.aaseg {
+  flex: 1;
+  text-align: center;
+  padding: 7px 4px;
+  border: 1px solid var(--border);
+  background: none;
+  border-radius: var(--r-control);
+  cursor: pointer;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 12px;
+}
+.aaseg:hover {
+  background: var(--hov);
+}
+.aaseg.sel {
+  background: var(--tint);
+  border-color: color-mix(in srgb, var(--rotli-clay) 40%, transparent);
+  font-weight: 600;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  overflow: hidden;
+  flex: 1;
+}
+.stepper button {
+  flex: 1;
+  text-align: center;
+  padding: 7px 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+}
+.stepper button:hover:not(:disabled) {
+  background: var(--hov);
+}
+.stepper button:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+.stepper .val {
+  flex: 1.4;
+  text-align: center;
+  padding: 7px 0;
+  font-weight: 600;
+  background: var(--surface-2);
+}
+.aanote {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 9px;
+}

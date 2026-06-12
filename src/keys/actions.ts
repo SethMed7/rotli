@@ -2,6 +2,12 @@
 // (later phases) can list and rebind all of it. One dispatcher, no ad-hoc
 // keydown listeners anywhere else.
 
+import {
+  type BlockToggle,
+  type HeadingLevel,
+  type InlineMark,
+  activeEditor,
+} from "../editor/commands";
 import { invalidateNotes } from "../services/hooks";
 import { inboxFolder, notesService } from "../services/notes";
 import { hideMainWindow, toggleMainWindow } from "../lib/tauri";
@@ -29,7 +35,8 @@ export function registerDefaultActions(): void {
     chord: "Esc",
     run: () => {
       // Esc closes the topmost transient first (quokka rule), then the window.
-      const { switcherOpen, setSwitcherOpen } = useUiStore.getState();
+      const { switcherOpen, setSwitcherOpen, closeTopTransient } = useUiStore.getState();
+      if (closeTopTransient()) return;
       if (switcherOpen) {
         setSwitcherOpen(false);
         return;
@@ -152,6 +159,38 @@ export function registerDefaultActions(): void {
     chord: "Alt+Meta+L",
     run: () => useUiStore.getState().toggleList(),
   });
+
+  // — editor formatting (the r5 format bar's 11 controls + highlight; chords
+  //   from the r3 gate footer, the rest unbound-but-rebindable) —
+  const marks: [string, string, InlineMark, string | null][] = [
+    ["editor.bold", "Bold", "bold", "Meta+B"],
+    ["editor.italic", "Italic", "italic", "Meta+I"],
+    ["editor.underline", "Underline", "underline", "Meta+U"],
+    ["editor.strike", "Strikethrough", "strike", null],
+    ["editor.code", "Inline code", "code", null],
+    ["editor.highlight", "Highlight", "highlight", "Meta+Shift+H"],
+    ["editor.link", "Link", "link", null],
+  ];
+  for (const [id, title, mark, chord] of marks) {
+    registerAction({ id, title, chord, run: () => activeEditor()?.toggleMark(mark) });
+  }
+  for (const level of [1, 2, 3] as HeadingLevel[]) {
+    registerAction({
+      id: `editor.heading${level}`,
+      title: `Heading ${level}`,
+      chord: null,
+      run: () => activeEditor()?.setHeading(level),
+    });
+  }
+  const blocks: [string, string, BlockToggle][] = [
+    ["editor.quote", "Quote", "quote"],
+    ["editor.bulletList", "Bulleted list", "bullet"],
+    ["editor.numberedList", "Numbered list", "numbered"],
+    ["editor.checklist", "Checklist", "checklist"],
+  ];
+  for (const [id, title, kind] of blocks) {
+    registerAction({ id, title, chord: null, run: () => activeEditor()?.toggleBlock(kind) });
+  }
 
   registerAction({
     id: "modules.notes",

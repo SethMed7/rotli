@@ -471,7 +471,9 @@
   transition-delay: 300ms;
 }
 
-/* — editor (r2 padding/measure; r4 floating status pill) — */
+/* — editor chassis (r2 padding; the body/marks/raw-line/format-bar styles
+     live in editor.css, phase 1b; the r4 statpill was superseded by the r5
+     header-inline status) — */
 .editor {
   flex: 1;
   background: var(--surface);
@@ -490,61 +492,10 @@
   gap: 10px;
   flex: 0 0 auto;
 }
-.ed-title {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 23px;
-  letter-spacing: -0.01em;
-  padding: 9px 40px 0;
-  flex: 0 0 auto;
-}
 .ed-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-}
-.ed-body {
-  padding: 14px 40px 64px;
-  font-size: 14.5px;
-  line-height: 1.65;
-  max-width: 660px;
-}
-.ed-plain {
-  font-family: inherit;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-  margin: 0;
-}
-.statpill {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  background: var(--ground);
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  padding: 7px 16px;
-  font-size: 11.5px;
-  color: var(--text-muted);
-  box-shadow: 0 10px 28px rgba(58, 48, 40, 0.18);
-  white-space: nowrap;
-  pointer-events: none;
-  z-index: 4;
-}
-.statpill .dot-ok {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--success);
-}
-.statpill .sep {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--border);
 }
 
 /* — collapse grammar: warm-edge hover sliver + overlay reveal (r3 frame B) — */

@@ -30,9 +30,21 @@ interface UiState {
   /** The identity module-switcher popover (r5, approved). */
   switcherOpen: boolean;
   setSwitcherOpen: (open: boolean) => void;
+
+  /** The bottom-center resident slot's visibility — 1c's focus mode hides
+   * the format bar through this flag. */
+  formatBarVisible: boolean;
+  setFormatBarVisible: (visible: boolean) => void;
+
+  /** Open transient close-callbacks, top = last. Esc (app.hide, the one
+   * registry dispatcher) closes the topmost transient before the window —
+   * the quokka rule, without ad-hoc keydown listeners. */
+  transients: (() => void)[];
+  registerTransient: (close: () => void) => () => void;
+  closeTopTransient: () => boolean;
 }
 
-export const useUiStore = create<UiState>((set) => ({
+export const useUiStore = create<UiState>((set, get) => ({
   theme: "light",
   setTheme: (theme) => set({ theme }),
   cycleTheme: () =>
@@ -52,4 +64,19 @@ export const useUiStore = create<UiState>((set) => ({
 
   switcherOpen: false,
   setSwitcherOpen: (open) => set({ switcherOpen: open }),
+
+  formatBarVisible: true,
+  setFormatBarVisible: (visible) => set({ formatBarVisible: visible }),
+
+  transients: [],
+  registerTransient: (close) => {
+    set((s) => ({ transients: [...s.transients, close] }));
+    return () => set((s) => ({ transients: s.transients.filter((t) => t !== close) }));
+  },
+  closeTopTransient: () => {
+    const top = get().transients[get().transients.length - 1];
+    if (!top) return false;
+    top();
+    return true;
+  },
 }));

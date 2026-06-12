@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import "./styles/base.css";
 import "./styles/app.css";
 import "./styles/notes.css";
+import "./styles/editor.css";
 import { NotesSurface } from "./components/NotesSurface";
 import { Titlebar } from "./components/Titlebar";
 import { registerDefaultActions } from "./keys/actions";
