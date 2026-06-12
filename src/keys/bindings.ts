@@ -1,7 +1,7 @@
 // The rebind layer — a Zustand map of chord OVERRIDES keyed by action id
 // (UI state only; defaults live on the actions themselves in the registry).
-// An entry present with null = explicitly unbound. In-memory for Stage 1;
-// Phase 2 persists it to .rotli/.
+// An entry present with null = explicitly unbound. Persisted to
+// .rotli/settings.json in the shell (src/state/persist.ts).
 
 import { create } from "zustand";
 

@@ -30,7 +30,8 @@ export const GLASS_TINTS: { value: GlassTint; label: string }[] = [
 ];
 
 /** What sits behind the glass: the tinted field, a bundled wallpaper, or the
- * user's own image (custom — an object URL, in-memory for Stage 1). */
+ * user's own image (custom — a data URL, persisted to .rotli/background.json
+ * in the shell). */
 export type GlassBackground = "field" | "dusk" | "blush" | "linen" | "cocoa" | "custom";
 
 export const GLASS_BACKGROUNDS: { value: Exclude<GlassBackground, "custom">; label: string }[] = [
@@ -92,7 +93,7 @@ interface UiState {
   /** What sits behind the glass (glassMode only). */
   glassBackground: GlassBackground;
   setGlassBackground: (bg: GlassBackground) => void;
-  /** Object URL of an uploaded image; in-memory, gone on quit (Stage 1). */
+  /** The uploaded image as a data URL — persist.ts keeps it across launches. */
   customBackground: string | null;
   setCustomBackground: (url: string | null) => void;
 
@@ -116,7 +117,7 @@ interface UiState {
   glassCanvas: GlassCanvas;
   setGlassCanvas: (canvas: GlassCanvas) => void;
 
-  /** Rails collapse state — remembered per window (in-memory, Stage 1). */
+  /** Rails collapse state — remembered per window, persisted in the shell. */
   foldersCollapsed: boolean;
   listCollapsed: boolean;
   toggleFolders: () => void;
@@ -189,9 +190,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   customBackground: null,
   setCustomBackground: (url) =>
     set((s) => {
-      // each upload replaces the previous object URL — revoke the outgoing one
-      // or the full decoded image stays pinned in the webview for the session
-      if (s.customBackground && s.customBackground !== url) {
+      // uploads are data URLs now (persistable); revoke only a legacy blob —
+      // a leaked object URL would pin the decoded image for the session
+      if (s.customBackground?.startsWith("blob:") && s.customBackground !== url) {
         URL.revokeObjectURL(s.customBackground);
       }
       return { customBackground: url };

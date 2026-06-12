@@ -1,6 +1,6 @@
 // The Aa styling layer (r3 frame C, typography only — heading levels live on
-// the format bar per r5). Per-note, in-memory map, NEVER written into the
-// document; Phase 2 persists it to .rotli/, the .md file never changes.
+// the format bar per r5). Per-note map, NEVER written into the document —
+// persisted to .rotli/settings.json in the shell, the .md file never changes.
 
 import { create } from "zustand";
 

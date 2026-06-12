@@ -70,9 +70,10 @@ export async function startWindowDrag(): Promise<void> {
 }
 
 // ——— the corpus (phase 2) — typed wrappers over the Rust corpus commands
-//     (src-tauri/src/corpus.rs). Only FsNotesService calls these, and it is
-//     only ever constructed inside the shell; the guard turns a stray browser
-//     call into a loud, clear rejection instead of a silent hang. ———
+//     (src-tauri/src/corpus.rs). Only FsNotesService and the persistence
+//     layer (src/state/persist.ts) call these, and both exist only inside the
+//     shell; the guard turns a stray browser call into a loud, clear
+//     rejection instead of a silent hang. ———
 
 /** Folder ids ARE relative paths inside the corpus root ("Work/Myela"). */
 export interface CorpusFolder {
@@ -142,6 +143,18 @@ export function corpusCreateFolder(
   parentId: string | null,
 ): Promise<CorpusFolder> {
   return corpusInvoke("corpus_create_folder", { name, parentId });
+}
+
+/** The `.rotli/` dot-files — opaque JSON strings the frontend owns. Missing
+ * file reads as "{}". `background` carries the custom glass wallpaper. */
+export type SettingsFile = "settings" | "viewstate" | "background";
+
+export function corpusSettingsRead(file: SettingsFile): Promise<string> {
+  return corpusInvoke("corpus_settings_read", { file });
+}
+
+export function corpusSettingsWrite(file: SettingsFile, contents: string): Promise<void> {
+  return corpusInvoke("corpus_settings_write", { file, contents });
 }
 
 /** Rust → main window: the corpus changed UNDER the app (a folder dropped in,

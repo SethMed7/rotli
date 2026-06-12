@@ -439,16 +439,22 @@ function AppearancePane() {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  setCustomBackground(URL.createObjectURL(file));
-                  setGlassBackground("custom");
+                  // data URL (not an object URL) so the persistence layer can
+                  // write the image itself into .rotli/background.json
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    if (typeof reader.result !== "string") return;
+                    setCustomBackground(reader.result);
+                    setGlassBackground("custom");
+                  };
+                  reader.readAsDataURL(file);
                   e.target.value = "";
                 }}
               />
             </label>
           </div>
           <p className="setnote">
-            Your own image stays for this session — it lands with the rest of your stuff when
-            files arrive in the next stage.
+            Your own image stays with your settings — quit and relaunch, it&rsquo;s still here.
           </p>
         </>
       )}

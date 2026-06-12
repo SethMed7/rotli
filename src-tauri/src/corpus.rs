@@ -621,7 +621,9 @@ impl CorpusStore {
         })
     }
 
-    /// settings.json / viewstate.json — opaque JSON strings the frontend owns.
+    /// settings.json / viewstate.json / background.json — opaque JSON strings
+    /// the frontend owns (background.json carries the custom glass wallpaper
+    /// as a data URL, so the uploaded image survives relaunch).
     pub fn dot_read(&self, which: &str) -> Result<String, String> {
         let path = self.root.join(DOT_DIR).join(dot_file(which)?);
         match fs::read_to_string(&path) {
@@ -660,6 +662,7 @@ fn dot_file(which: &str) -> Result<&'static str, String> {
     match which {
         "settings" => Ok("settings.json"),
         "viewstate" => Ok("viewstate.json"),
+        "background" => Ok("background.json"),
         other => Err(format!("unknown settings file: {other}")),
     }
 }
@@ -1178,6 +1181,8 @@ mod tests {
         assert_eq!(store.dot_read("settings").unwrap(), r#"{"theme":"dark"}"#);
         store.dot_write("viewstate", r#"{"pane":"left"}"#).unwrap();
         assert_eq!(store.dot_read("viewstate").unwrap(), r#"{"pane":"left"}"#);
+        store.dot_write("background", r#"{"v":1}"#).unwrap();
+        assert_eq!(store.dot_read("background").unwrap(), r#"{"v":1}"#);
         assert!(store.dot_read("passwords").is_err(), "surface stays tight");
     }
 
