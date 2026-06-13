@@ -1,9 +1,16 @@
 // The pane tree (UI state only — the Zustand law). Implements the r2 pane/tab
-// law: every pane owns tabs; a single-tab pane renders zero chrome; splits
-// DUPLICATE the active tab (never an empty pane); the note list mirrors the
-// focused pane's active tab; plain click replaces, only explicit gestures
-// (⌘T / ⌘-click) create tabs. 320px min pane width — when a split would break
-// the floor, the folders rail auto-collapses first, then the list.
+// law: every pane owns tabs; splits DUPLICATE the active tab (never an empty
+// pane); the note list mirrors the focused pane's active tab; plain click
+// replaces, only explicit gestures (⌘T / ⌘-click) create tabs. 320px min pane
+// width — when a split would break the floor, the folders rail auto-collapses
+// first, then the list.
+//
+// Tab discoverability law (Seth, 2026-06-13): EVERY pane shows its tab strip —
+// the old "single-tab pane renders zero chrome" Apple-Notes default is gone,
+// so every tab is visible and closeable. Drag-and-drop joins it: tabs reorder
+// within a strip (moveTab same-pane), move to another strip (moveTab
+// cross-pane), or pull onto a pane edge to carve a new split (detachTab). All
+// three ride the same pure/total tree helpers — never mutate inputs.
 
 import { create } from "zustand";
 import { initialNoteId, ulid } from "../services/notes";
@@ -13,8 +20,9 @@ import { useUiStore } from "./ui";
 
 const MIN_PANE_WIDTH = 320;
 const MIN_PANE_HEIGHT = 160;
-const FOLDERS_RAIL_WIDTH = 198;
-const NOTE_LIST_WIDTH = 258;
+/** Fallback width when the ui store hasn't seeded one yet — matches ui.ts's
+ * sidebarWidth init (Seth, 2026-06-13: one sidebar, not two rails). */
+const SIDEBAR_WIDTH = 240;
 
 function makeTab(noteId: string): Tab {
   return { id: ulid(), surfaceKind: "note", noteId, viewState: { cursor: 0, scroll: 0 } };
@@ -53,11 +61,21 @@ function updateLeaf(node: PaneNode, id: string, fn: (leaf: LeafNode) => LeafNode
 }
 
 /** Replace the leaf with a split (or insert a sibling if the parent already
- * splits in the same direction — keeps the tree flat). */
-function splitLeaf(node: PaneNode, leafId: string, dir: SplitDir, newLeaf: LeafNode): PaneNode {
+ * splits in the same direction — keeps the tree flat). `before` puts the new
+ * leaf on the leading side of the target (left for "row", top for "col");
+ * the keyboard split path leaves it false (Seth, 2026-06-13: detach drops
+ * onto either edge). */
+function splitLeaf(
+  node: PaneNode,
+  leafId: string,
+  dir: SplitDir,
+  newLeaf: LeafNode,
+  before = false,
+): PaneNode {
   if (node.kind === "leaf") {
     if (node.id !== leafId) return node;
-    return { kind: "split", id: ulid(), dir, children: [node, newLeaf], sizes: [0.5, 0.5] };
+    const children = before ? [newLeaf, node] : [node, newLeaf];
+    return { kind: "split", id: ulid(), dir, children, sizes: [0.5, 0.5] };
   }
   const index = node.children.findIndex(
     (c) => c.kind === "leaf" && c.id === leafId,
@@ -67,10 +85,13 @@ function splitLeaf(node: PaneNode, leafId: string, dir: SplitDir, newLeaf: LeafN
     const sizes = [...node.sizes];
     const half = (sizes[index] ?? 1 / children.length) / 2;
     sizes.splice(index, 1, half, half);
-    children.splice(index + 1, 0, newLeaf);
+    children.splice(before ? index : index + 1, 0, newLeaf);
     return { ...node, children, sizes };
   }
-  return { ...node, children: node.children.map((c) => splitLeaf(c, leafId, dir, newLeaf)) };
+  return {
+    ...node,
+    children: node.children.map((c) => splitLeaf(c, leafId, dir, newLeaf, before)),
+  };
 }
 
 /** Remove a leaf; collapse single-child splits. Returns null if it was the root. */
@@ -172,9 +193,21 @@ function neighborIn(root: PaneNode, fromId: string, dir: FocusDir): string | nul
 
 // ——— the store ———
 
+/** The tab currently under an HTML5 drag — set on dragstart, cleared on
+ * dragend/drop. Panes read it to arm their split-detach dropzones (Seth,
+ * 2026-06-13). */
+export interface DraggingTab {
+  paneId: string;
+  tabId: string;
+}
+
+/** Where a detached tab lands relative to its target leaf. */
+export type DetachDir = "left" | "right" | "up" | "down";
+
 interface PanesState {
   root: PaneNode;
   focusedPaneId: string;
+  draggingTab: DraggingTab | null;
   focusPane: (paneId: string) => void;
   focusDir: (dir: FocusDir) => void;
   /** Plain list click: REPLACE the focused pane's active tab's note.
@@ -191,30 +224,32 @@ interface PanesState {
   splitDown: () => void;
   closePane: () => void;
   setSplitSizes: (splitId: string, sizes: number[]) => void;
+  setDraggingTab: (v: DraggingTab | null) => void;
+  /** Reorder within a strip (from === to) or move a tab to another strip,
+   * landing at `toIndex`. */
+  moveTab: (fromPaneId: string, tabId: string, toPaneId: string, toIndex: number) => void;
+  /** Pull a tab into a NEW leaf split off the target's `dir` edge; falls back
+   * to moveTab(...end) when the floor won't fit. */
+  detachTab: (fromPaneId: string, tabId: string, targetLeafId: string, dir: DetachDir) => void;
 }
 
 const initialLeaf = makeLeaf(makeTab(initialNoteId));
 touchMru(initialNoteId); // the note the window opens on is the freshest "recent"
 
 /** Before a row split: does one more column fit at the 320px floor?
- * Auto-collapse the folders rail first, then the list (the r2 law) — but only
- * commit a collapse the split actually needs AND that makes it fit: a split
- * that cannot fit must not eat the rails as a side effect of a no-op. */
+ * Auto-collapse the ONE sidebar if that's what it takes (Seth, 2026-06-13: the
+ * two-rail cascade collapses to a single case) — but only commit the collapse
+ * when the split actually fits afterward: a split that cannot fit must not eat
+ * the sidebar as a side effect of a no-op. */
 function ensureRoomForColumn(root: PaneNode): boolean {
   const columns = columnCount(root) + 1;
   const ui = useUiStore.getState();
-  const fitsWith = (foldersCollapsed: boolean, listCollapsed: boolean) =>
-    window.innerWidth -
-      ((foldersCollapsed ? 0 : FOLDERS_RAIL_WIDTH) + (listCollapsed ? 0 : NOTE_LIST_WIDTH)) >=
-    columns * MIN_PANE_WIDTH;
-  if (fitsWith(ui.foldersCollapsed, ui.listCollapsed)) return true;
-  if (fitsWith(true, ui.listCollapsed)) {
-    ui.setFoldersCollapsed(true);
-    return true;
-  }
-  if (fitsWith(true, true)) {
-    ui.setFoldersCollapsed(true);
-    ui.setListCollapsed(true);
+  const sidebarWidth = ui.sidebarWidth || SIDEBAR_WIDTH;
+  const fitsWith = (sidebarCollapsed: boolean) =>
+    window.innerWidth - (sidebarCollapsed ? 0 : sidebarWidth) >= columns * MIN_PANE_WIDTH;
+  if (fitsWith(ui.sidebarCollapsed)) return true;
+  if (fitsWith(true)) {
+    ui.setSidebarCollapsed(true);
     return true;
   }
   return false;
@@ -254,6 +289,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
   return {
     root: initialLeaf,
     focusedPaneId: initialLeaf.id,
+    draggingTab: null,
 
     focusPane: (paneId) => {
       if (findLeaf(get().root, paneId)) set({ focusedPaneId: paneId });
@@ -374,6 +410,105 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
     setSplitSizes: (splitId, sizes) => {
       set({ root: setSplitSizes(get().root, splitId, sizes) });
+    },
+
+    setDraggingTab: (v) => set({ draggingTab: v }),
+
+    moveTab: (fromPaneId, tabId, toPaneId, toIndex) => {
+      const root = get().root;
+      const from = findLeaf(root, fromPaneId);
+      const tab = from?.tabs.find((t) => t.id === tabId);
+      if (!from || !tab) return;
+      touchMru(tab.noteId);
+
+      if (fromPaneId === toPaneId) {
+        // reorder in place: remove, then splice back at the clamped index;
+        // activeTabId is identity-stable so it rides along untouched
+        set({
+          root: updateLeaf(root, fromPaneId, (l) => {
+            const without = l.tabs.filter((t) => t.id !== tabId);
+            const at = Math.max(0, Math.min(toIndex, without.length));
+            const tabs = [...without.slice(0, at), tab, ...without.slice(at)];
+            return { ...l, tabs };
+          }),
+        });
+        return;
+      }
+
+      // cross-pane: insert a copy into the target (active there), drop from the
+      // source, collapse the source if it emptied — all in one tree walk
+      let next = updateLeaf(root, toPaneId, (l) => {
+        const at = Math.max(0, Math.min(toIndex, l.tabs.length));
+        const tabs = [...l.tabs.slice(0, at), tab, ...l.tabs.slice(at)];
+        return { ...l, tabs, activeTabId: tab.id };
+      });
+      const sourceEmpties = from.tabs.length <= 1;
+      if (sourceEmpties) {
+        const collapsed = removeLeaf(next, fromPaneId);
+        if (collapsed) next = collapsed;
+      } else {
+        next = updateLeaf(next, fromPaneId, (l) => {
+          const tabs = l.tabs.filter((t) => t.id !== tabId);
+          const index = l.tabs.findIndex((t) => t.id === tabId);
+          const activeTabId =
+            l.activeTabId === tabId
+              ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? l.activeTabId)
+              : l.activeTabId;
+          return { ...l, tabs, activeTabId };
+        });
+      }
+      set({ root: next, focusedPaneId: toPaneId });
+    },
+
+    detachTab: (fromPaneId, tabId, targetLeafId, dir) => {
+      const root = get().root;
+      const from = findLeaf(root, fromPaneId);
+      const tab = from?.tabs.find((t) => t.id === tabId);
+      if (!from || !tab) return;
+      // pulling a lone tab out of its own pane onto its own edge is a no-op
+      if (fromPaneId === targetLeafId && from.tabs.length <= 1) return;
+
+      const splitDir: SplitDir = dir === "left" || dir === "right" ? "row" : "col";
+      const before = dir === "left" || dir === "up";
+
+      // floor check on the CURRENT tree (one more column / row must fit); if it
+      // can't, fall back to moving the tab to the target strip's end
+      const fits =
+        splitDir === "row"
+          ? ensureRoomForColumn(root)
+          : (rowCount(root) + 1) * MIN_PANE_HEIGHT <= window.innerHeight;
+      if (!fits) {
+        const target = findLeaf(root, targetLeafId);
+        get().moveTab(fromPaneId, tabId, targetLeafId, target?.tabs.length ?? 0);
+        return;
+      }
+
+      // T2: remove the tab from its source first (collapse if it emptied), so
+      // the subsequent split targets a tree the tab no longer lives in
+      let t2: PaneNode | null;
+      if (from.tabs.length <= 1) {
+        t2 = removeLeaf(root, fromPaneId);
+      } else {
+        t2 = updateLeaf(root, fromPaneId, (l) => {
+          const tabs = l.tabs.filter((t) => t.id !== tabId);
+          const index = l.tabs.findIndex((t) => t.id === tabId);
+          const activeTabId =
+            l.activeTabId === tabId
+              ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? l.activeTabId)
+              : l.activeTabId;
+          return { ...l, tabs, activeTabId };
+        });
+      }
+      // the source was the whole tree and it emptied — nothing left to split
+      if (!t2) return;
+
+      // a fresh single-tab leaf carrying the dragged tab, split off the edge
+      const newLeaf: LeafNode = { kind: "leaf", id: ulid(), tabs: [tab], activeTabId: tab.id };
+      touchMru(tab.noteId);
+      set({
+        root: splitLeaf(t2, targetLeafId, splitDir, newLeaf, before),
+        focusedPaneId: newLeaf.id,
+      });
     },
   };
 });

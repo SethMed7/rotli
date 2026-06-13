@@ -9,10 +9,12 @@ import {
   corpusCreateFolder,
   corpusDelete,
   corpusList,
+  corpusMove,
   corpusRead,
   corpusWrite,
 } from "../lib/tauri";
 import type { Folder, Note, NoteSummary } from "../types";
+import { DEST, isHidden } from "./destinations";
 import { snippetOf, titleOf } from "./derive";
 import type { NotesService } from "./notes";
 
@@ -43,10 +45,21 @@ export class FsNotesService implements NotesService {
 
   async listNotes(folderId?: string): Promise<NoteSummary[]> {
     const { notes } = await corpusList();
-    if (!folderId) return notes;
-    // one mental model: a folder holds everything under it — ids are paths
+    // All Notes (no folderId): everything EXCEPT the hidden roots.
+    if (!folderId) return notes.filter((n) => !isHidden(n.folderId));
+    // Asking for a hidden root (Archive/Trash) is the ONLY way to see it:
+    // scope to that root's subtree and nothing leaks elsewhere.
+    if (isHidden(folderId)) {
+      return notes.filter(
+        (n) => n.folderId === folderId || n.folderId.startsWith(`${folderId}/`),
+      );
+    }
+    // Any normal folder: everything under it, minus hidden (defensive — a note
+    // can't sit under both, but the exclusion is the single source of truth).
     return notes.filter(
-      (n) => n.folderId === folderId || n.folderId.startsWith(`${folderId}/`),
+      (n) =>
+        !isHidden(n.folderId) &&
+        (n.folderId === folderId || n.folderId.startsWith(`${folderId}/`)),
     );
   }
 
@@ -91,5 +104,42 @@ export class FsNotesService implements NotesService {
 
   async deleteNote(id: string): Promise<void> {
     await corpusDelete(id);
+  }
+
+  // ——— lifecycle: Rust's corpus_move keeps the id/index and bakes the origin
+  // rule on disk; we read the body back so callers get a full Note (the move
+  // meta carries no body), exactly like getNote derives (Seth, 2026-06-13). ———
+
+  async moveNote(id: string, targetFolder: string): Promise<Note> {
+    const meta = await corpusMove(id, targetFolder);
+    const { body } = await corpusRead(id);
+    return {
+      id: meta.id,
+      title: titleOf(body),
+      snippet: snippetOf(body),
+      folderId: meta.folderId,
+      createdAt: meta.createdAt,
+      updatedAt: meta.updatedAt,
+      pinned: meta.pinned,
+      body,
+    };
+  }
+
+  async archiveNote(id: string): Promise<Note> {
+    return this.moveNote(id, DEST.archive);
+  }
+
+  async trashNote(id: string): Promise<Note> {
+    return this.moveNote(id, DEST.trash);
+  }
+
+  async restoreNote(id: string): Promise<Note> {
+    // Send it back to its recorded origin; fall back to Inbox if the breadcrumb
+    // is missing or its folder no longer exists on disk.
+    const { origin } = await corpusRead(id);
+    const { folders } = await corpusList();
+    const target =
+      origin && folders.some((f) => f.id === origin) ? origin : DEST.inbox;
+    return this.moveNote(id, target);
   }
 }

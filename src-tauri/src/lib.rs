@@ -289,6 +289,8 @@ pub fn run() {
             corpus::corpus_write,
             corpus::corpus_create,
             corpus::corpus_delete,
+            corpus::corpus_move,
+            corpus::corpus_purge,
             corpus::corpus_create_folder,
             corpus::corpus_overview,
             corpus::corpus_settings_read,

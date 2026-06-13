@@ -94,6 +94,12 @@ pub struct Frontmatter {
     pub created: Option<String>,
     pub updated: Option<String>,
     pub pinned: Option<bool>,
+    /// Where a note CAME FROM before it landed in a hidden root (Archive/Trash).
+    /// `Some(folder)` = restore here; `Some("")` = restore to corpus root (a
+    /// deliberate, distinct value from absent — `None` means "never moved into
+    /// a hidden root, no origin to honor"). Emitted only when `Some(_)`, so
+    /// normal notes stay byte-identical. (Seth, 2026-06-13)
+    pub origin: Option<String>,
     pub foreign: Vec<String>,
 }
 
@@ -131,6 +137,8 @@ fn parse_fields(head: &str) -> Frontmatter {
                 "created" if fm.created.is_none() => fm.created = Some(value.to_string()),
                 "updated" if fm.updated.is_none() => fm.updated = Some(value.to_string()),
                 "pinned" if fm.pinned.is_none() => fm.pinned = Some(value == "true"),
+                // empty value (`origin:`) stays Some("") — distinct from absent
+                "origin" if fm.origin.is_none() => fm.origin = Some(value.to_string()),
                 _ => return None,
             }
             Some(())
@@ -151,6 +159,11 @@ pub fn compose_document(fm: &Frontmatter, raw_body: &str) -> String {
     out.push_str(&format!("created: {}\n", fm.created.as_deref().unwrap_or("")));
     out.push_str(&format!("updated: {}\n", fm.updated.as_deref().unwrap_or("")));
     out.push_str(&format!("pinned: {}\n", fm.pinned.unwrap_or(false)));
+    // origin emitted ONLY when Some(_) — right after pinned, before foreign —
+    // so notes that never entered a hidden root stay byte-identical.
+    if let Some(origin) = &fm.origin {
+        out.push_str(&format!("origin: {origin}\n"));
+    }
     for line in &fm.foreign {
         out.push_str(line);
         out.push('\n');
@@ -258,6 +271,9 @@ pub struct NoteMeta {
     pub created_at: i64,
     pub updated_at: i64,
     pub pinned: bool,
+    /// Where this note belongs once restored out of a hidden root. Carried only
+    /// by notes physically under Archive/Trash; `None` everywhere else.
+    pub origin: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -294,6 +310,9 @@ pub struct NoteDoc {
     pub created_at: i64,
     pub updated_at: i64,
     pub pinned: bool,
+    /// See `NoteMeta::origin`. `corpus_read` returns it so the UI can offer
+    /// "restore to <origin>".
+    pub origin: Option<String>,
 }
 
 // ─── suppress set (our own writes must not echo back as "external") ─────────
@@ -385,6 +404,9 @@ impl CorpusStore {
             os_trash: true,
         };
         store.load_index();
+        // Scaffold the five reserved sidebar destinations every open (idempotent),
+        // so existing corpora gain them too. (Seth, 2026-06-13)
+        store.ensure_reserved_folders()?;
         if fresh {
             store.first_run()?;
         }
@@ -405,6 +427,21 @@ impl CorpusStore {
         fs::create_dir_all(self.root.join("Inbox"))
             .map_err(|e| format!("create Inbox: {e}"))?;
         self.create("Inbox", WELCOME_BODY)?;
+        Ok(())
+    }
+
+    /// The five reserved top-level destinations the sidebar always offers —
+    /// Inbox, Brain, Storage, Archive, Trash — scaffolded on disk so they exist
+    /// even on a corpus that predates them. Called unconditionally from `open`;
+    /// `create_dir_all` is a no-op when a dir is already there, so this is fully
+    /// idempotent. Empty reserved dirs surface as zero-note folders via `walk`;
+    /// the TS layer decides which double as fixed destinations vs. plain folders.
+    /// (Seth, 2026-06-13)
+    fn ensure_reserved_folders(&self) -> Result<(), String> {
+        for name in ["Inbox", "Brain", "Storage", "Archive", "Trash"] {
+            fs::create_dir_all(self.root.join(name))
+                .map_err(|e| format!("create reserved folder {name}: {e}"))?;
+        }
         Ok(())
     }
 
@@ -480,9 +517,11 @@ impl CorpusStore {
         };
         let (file_created, file_updated) = file_stamps(&abs);
         let fm = fm.unwrap_or_default();
+        let folder = folder_of(&rel);
         Ok(NoteDoc {
             id: id.to_string(),
-            folder_id: folder_of(&rel),
+            origin: if is_hidden_root(&folder) { fm.origin.clone() } else { None },
+            folder_id: folder,
             body: body.to_string(),
             created_at: fm.created.as_deref().and_then(stamp_to_ms).unwrap_or(file_created),
             updated_at: fm.updated.as_deref().and_then(stamp_to_ms).unwrap_or(file_updated),
@@ -512,6 +551,8 @@ impl CorpusStore {
             created: Some(created.clone()),
             updated: Some(updated.clone()),
             pinned: Some(pinned),
+            // an edit never changes WHERE a note belongs — carry origin through.
+            origin: old_fm.origin,
             foreign: old_fm.foreign,
         };
         let text = compose_document(&fm, &format!("\n{body}"));
@@ -543,10 +584,106 @@ impl CorpusStore {
             id: id.to_string(),
             title,
             snippet: snippet_of(body),
-            folder_id: folder,
+            folder_id: folder.clone(),
             created_at: stamp_to_ms(&created).unwrap_or_else(now_ms),
             updated_at: stamp_to_ms(&updated).unwrap_or_else(now_ms),
             pinned,
+            origin: if is_hidden_root(&folder) { fm.origin } else { None },
+        })
+    }
+
+    /// Move a note to `target_folder`, PRESERVING its id (and created stamp,
+    /// and order — `updated` is NOT bumped). The origin rule is baked in here so
+    /// the never-delete lifecycle is one place:
+    ///   • into a hidden root from a visible folder → stamp origin = the folder
+    ///     it came from (so Restore knows where home is);
+    ///   • out of a hidden root (target visible) when an origin exists → clear
+    ///     it (it's home now);
+    ///   • otherwise keep whatever origin was there (hidden→hidden, or a plain
+    ///     visible→visible move that never had one).
+    /// `target_folder == ""` means the corpus root (no validation, no dir).
+    /// Filenames collide safely (free_filename); the id is the through-line.
+    pub fn move_note(&mut self, id: &str, target_folder: &str) -> Result<NoteMeta, String> {
+        let rel = self.path_of(id)?;
+        let abs = self.abs(&rel);
+        let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        let (fm, raw) = parse_document(&text);
+        let body = match &fm {
+            Some(_) => editor_body(raw),
+            None => raw,
+        }
+        .to_string();
+        let old_fm = fm.unwrap_or_default();
+        let current_folder = folder_of(&rel);
+
+        // ── the origin rule ──
+        let into_hidden = is_hidden_root(target_folder);
+        let from_hidden = is_hidden_root(&current_folder);
+        let origin = if into_hidden && !from_hidden {
+            // entering a sink: remember where it lived (root == "")
+            Some(current_folder.clone())
+        } else if !into_hidden && old_fm.origin.is_some() {
+            // restored / moved out of a sink: home now, drop the breadcrumb
+            None
+        } else {
+            old_fm.origin.clone()
+        };
+
+        // validate + create the destination (root is "" → neither)
+        if !target_folder.is_empty() {
+            validate_rel(target_folder)?;
+            fs::create_dir_all(self.abs(target_folder))
+                .map_err(|e| format!("create folder {target_folder}: {e}"))?;
+        }
+
+        // stable identity, fresh-but-collision-safe filename in the new folder
+        let title = title_of(&body);
+        let desired = filename_for(&title, id);
+        let target_rel = self.free_filename(target_folder, &desired, None);
+        let target_abs = self.abs(&target_rel);
+
+        // preserve id + created; DO NOT bump updated (order stays put)
+        let (file_created, file_updated) = file_stamps(&abs);
+        let created = old_fm
+            .created
+            .clone()
+            .filter(|s| stamp_to_ms(s).is_some())
+            .unwrap_or_else(|| ms_to_stamp(file_created));
+        let updated = old_fm
+            .updated
+            .clone()
+            .filter(|s| stamp_to_ms(s).is_some())
+            .unwrap_or_else(|| ms_to_stamp(file_updated));
+        let pinned = old_fm.pinned.unwrap_or(false);
+        let fm = Frontmatter {
+            id: Some(id.to_string()),
+            created: Some(created.clone()),
+            updated: Some(updated.clone()),
+            pinned: Some(pinned),
+            origin: origin.clone(),
+            foreign: old_fm.foreign,
+        };
+        let out = compose_document(&fm, &format!("\n{body}"));
+
+        // both paths are OUR writes — neither should echo back as external
+        self.suppress.mark(&abs);
+        self.suppress.mark(&target_abs);
+        atomic_write(&target_abs, &out)?;
+        if target_abs != abs {
+            let _ = fs::remove_file(&abs);
+        }
+        self.index.insert(id.to_string(), target_rel);
+        self.persist_index();
+
+        Ok(NoteMeta {
+            id: id.to_string(),
+            title,
+            snippet: snippet_of(&body),
+            folder_id: target_folder.to_string(),
+            created_at: stamp_to_ms(&created).unwrap_or(file_created),
+            updated_at: stamp_to_ms(&updated).unwrap_or(file_updated),
+            pinned,
+            origin,
         })
     }
 
@@ -565,6 +702,7 @@ impl CorpusStore {
             created: Some(now.clone()),
             updated: Some(now.clone()),
             pinned: Some(false),
+            origin: None,
             foreign: Vec::new(),
         };
         let abs = self.abs(&rel);
@@ -581,12 +719,24 @@ impl CorpusStore {
             created_at: ms,
             updated_at: ms,
             pinned: false,
+            origin: None,
         })
     }
 
-    /// Never a hard delete: OS trash first, `.rotli/trash/` as the fallback
-    /// (and as the test path — tests must not touch the user's real Trash).
+    /// Delete is now SOFT and reversible: the note slides into the reserved
+    /// `Trash` folder (still a real `.md` in the corpus, still openable in any
+    /// editor), stamped with where it came from so it can be restored. It NEVER
+    /// leaves the corpus — emptying the trash (the hard delete) is `purge`.
+    /// (Seth, 2026-06-13)
     pub fn delete(&mut self, id: &str) -> Result<(), String> {
+        self.move_note(id, "Trash").map(|_| ())
+    }
+
+    /// The ONLY hard delete — a future "Empty Trash". The note actually leaves
+    /// the corpus: OS trash first, `.rotli/trash/` as the fallback (and as the
+    /// test path — tests must not touch the user's real Trash). No TS wrapper
+    /// yet; wired into the invoke_handler so the UI can call it later.
+    pub fn purge(&mut self, id: &str) -> Result<(), String> {
         let rel = self.path_of(id)?;
         let abs = self.abs(&rel);
         self.suppress.mark(&abs);
@@ -701,6 +851,16 @@ fn folder_of(rel: &str) -> String {
     }
 }
 
+/// The two never-delete sinks: a folder is a hidden root when it IS Archive or
+/// Trash, or lives anywhere beneath one. Moving INTO one stamps an origin;
+/// moving back OUT clears it. (Seth, 2026-06-13)
+fn is_hidden_root(folder: &str) -> bool {
+    folder == "Archive"
+        || folder == "Trash"
+        || folder.starts_with("Archive/")
+        || folder.starts_with("Trash/")
+}
+
 /// Folder ids come from the frontend — keep them inside the corpus root.
 fn validate_rel(rel: &str) -> Result<(), String> {
     if rel.starts_with('/') {
@@ -772,6 +932,9 @@ fn walk(
                 .unwrap_or_else(|| Ulid::new().to_string());
             new_index.insert(id.clone(), rel.clone());
             let (file_created, file_updated) = file_stamps(&abs);
+            // only notes physically under a hidden root (Archive/Trash) carry
+            // an origin out to the wire; everything else is None.
+            let origin = if is_hidden_root(prefix) { fm.origin.clone() } else { None };
             notes.push(NoteMeta {
                 id,
                 title: title_of(body),
@@ -780,6 +943,7 @@ fn walk(
                 created_at: fm.created.as_deref().and_then(stamp_to_ms).unwrap_or(file_created),
                 updated_at: fm.updated.as_deref().and_then(stamp_to_ms).unwrap_or(file_updated),
                 pinned: fm.pinned.unwrap_or(false),
+                origin,
             });
         }
     }
@@ -909,6 +1073,25 @@ pub fn corpus_delete(state: tauri::State<'_, CorpusState>, id: String) -> Result
     state.with(|s| s.delete(&id))
 }
 
+/// Move a note to another folder, preserving its id (Tauri maps the JS
+/// `targetFolder` arg to `target_folder`). The origin rule for the hidden
+/// Archive/Trash roots is baked into `move_note`.
+#[tauri::command]
+pub fn corpus_move(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    target_folder: String,
+) -> Result<NoteMeta, String> {
+    state.with(|s| s.move_note(&id, &target_folder))
+}
+
+/// The hard delete (a future "Empty Trash") — no TS wrapper yet, but registered
+/// so the UI can reach it later.
+#[tauri::command]
+pub fn corpus_purge(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
+    state.with(|s| s.purge(&id))
+}
+
 #[tauri::command]
 pub fn corpus_create_folder(
     state: tauri::State<'_, CorpusState>,
@@ -980,7 +1163,43 @@ mod tests {
         assert_eq!(fm.pinned, Some(true));
         assert!(fm.foreign.is_empty());
         assert_eq!(body, "\n# A note\n\nBody stays byte-exact.\n");
+        // origin ABSENT in this document → None → not emitted → byte-identical
+        assert_eq!(fm.origin, None);
         assert_eq!(compose_document(&fm, body), text);
+    }
+
+    #[test]
+    fn origin_emitted_only_when_some_and_after_pinned() {
+        // present → parsed AND emitted right after the pinned line, before foreign
+        let with = "---\nid: AAAA\ncreated: 2026-06-12T10:00:00Z\nupdated: 2026-06-12T11:00:00Z\npinned: false\norigin: Brain\ntags: [a]\n---\n\n# Filed\n";
+        let (fm, body) = parse_document(with);
+        let fm = fm.unwrap();
+        assert_eq!(fm.origin.as_deref(), Some("Brain"));
+        assert_eq!(fm.foreign, vec!["tags: [a]"]);
+        let out = compose_document(&fm, body);
+        assert_eq!(out, with, "origin must round-trip byte-exact after pinned");
+        // emitted line sits immediately after pinned and before the foreign key
+        let pinned_at = out.find("pinned: false\n").unwrap();
+        let origin_at = out.find("origin: Brain\n").unwrap();
+        let tags_at = out.find("tags: [a]").unwrap();
+        assert!(pinned_at < origin_at && origin_at < tags_at);
+
+        // empty value (`origin:`) is DISTINCT from absent — kept as Some("")
+        // (means "restore to corpus root"), still emitted
+        let root_origin = "---\nid: B\ncreated: 2026-06-12T10:00:00Z\nupdated: 2026-06-12T10:00:00Z\npinned: false\norigin: \n---\n\n# At root once\n";
+        let (fm, body) = parse_document(root_origin);
+        let fm = fm.unwrap();
+        assert_eq!(fm.origin.as_deref(), Some(""));
+        assert_eq!(compose_document(&fm, body), root_origin);
+
+        // None → never emitted (no stray `origin:` line)
+        let absent = "---\nid: C\ncreated: 2026-06-12T10:00:00Z\nupdated: 2026-06-12T10:00:00Z\npinned: true\n---\n\n# Plain\n";
+        let (fm, body) = parse_document(absent);
+        let fm = fm.unwrap();
+        assert_eq!(fm.origin, None);
+        let out = compose_document(&fm, body);
+        assert!(!out.contains("origin:"), "absent origin must not be emitted:\n{out}");
+        assert_eq!(out, absent);
     }
 
     #[test]
@@ -1169,10 +1388,73 @@ mod tests {
         let list = store.list().unwrap();
         assert_eq!(list.notes[0].id, meta.id);
 
+        // delete is now SOFT: the note is NOT gone — it slid into Trash/,
+        // still a real file, still readable by the same id, carrying its origin.
         store.delete(&meta.id).unwrap();
-        assert!(store.read(&meta.id).is_err());
+        let doc = store.read(&meta.id).unwrap();
+        assert!(doc.folder_id.starts_with("Trash"), "soft-deleted note must live under Trash, got {}", doc.folder_id);
+        assert_eq!(doc.origin.as_deref(), Some("Inbox"), "origin must remember where it came from");
+        assert!(doc.body.contains("the good butter"), "body survives the move");
+        // still surfaced by the raw walk — but under Trash, so the TS "normal"
+        // view (isHidden) filters it out. The corpus never loses it.
+        let list = store.list().unwrap();
+        let still = list.notes.iter().find(|n| n.id == meta.id).unwrap();
+        assert!(still.folder_id.starts_with("Trash"), "still in the corpus, just under Trash");
+        // the file truly lives on disk under Trash/ (never the OS trash / .rotli)
+        let rel = store.index.get(&meta.id).unwrap();
+        assert!(rel.starts_with("Trash/"), "physical path under Trash: {rel}");
+        assert!(store.root().join(rel).is_file());
+    }
+
+    // ── the never-delete lifecycle: move · archive · restore ──
+
+    #[test]
+    fn move_into_archive_stamps_origin_then_restore_clears_it() {
+        let (_dir, mut store) = bare();
+        let meta = store.create("Brain", "# A thought\n\nKeep this.\n").unwrap();
+        let id = meta.id.clone();
+        // fresh out of Brain there is no origin
+        assert_eq!(store.read(&id).unwrap().origin, None);
+
+        // into Archive (a hidden root) from Brain → origin = Brain, id preserved
+        let archived = store.move_note(&id, "Archive").unwrap();
+        assert_eq!(archived.id, id, "id must survive the move");
+        assert_eq!(archived.folder_id, "Archive");
+        assert_eq!(archived.origin.as_deref(), Some("Brain"));
+        let doc = store.read(&id).unwrap();
+        assert_eq!(doc.folder_id, "Archive");
+        assert_eq!(doc.origin.as_deref(), Some("Brain"));
+        assert!(doc.body.contains("Keep this."));
+        // the breadcrumb is on disk
+        let rel = store.index.get(&id).unwrap();
+        assert!(rel.starts_with("Archive/"));
+        let on_disk = fs::read_to_string(store.root().join(rel)).unwrap();
+        assert!(on_disk.contains("origin: Brain"), "origin not persisted:\n{on_disk}");
+
+        // move back to its origin → origin cleared, lands in Brain
+        let restored = store.move_note(&id, "Brain").unwrap();
+        assert_eq!(restored.folder_id, "Brain");
+        assert_eq!(restored.origin, None, "restore must clear the breadcrumb");
+        let doc = store.read(&id).unwrap();
+        assert_eq!(doc.folder_id, "Brain");
+        assert_eq!(doc.origin, None);
+        let rel = store.index.get(&id).unwrap();
+        assert!(rel.starts_with("Brain/"));
+        let on_disk = fs::read_to_string(store.root().join(rel)).unwrap();
+        assert!(!on_disk.contains("origin:"), "origin should be gone after restore:\n{on_disk}");
+    }
+
+    #[test]
+    fn purge_is_the_only_hard_delete() {
+        let (_dir, mut store) = bare();
+        let meta = store.create("Inbox", "# Throwaway\n").unwrap();
+        // soft-delete first (into Trash), then purge it for real
+        store.delete(&meta.id).unwrap();
+        assert!(store.read(&meta.id).is_ok(), "still in the corpus after soft delete");
+        store.purge(&meta.id).unwrap();
+        assert!(store.read(&meta.id).is_err(), "purge removes it from the corpus");
         assert!(store.list().unwrap().notes.iter().all(|n| n.id != meta.id));
-        // never hard-deleted: it landed in .rotli/trash/
+        // never a TRUE hard delete in tests: it landed in .rotli/trash/
         let trashed: Vec<_> = fs::read_dir(store.root().join(DOT_DIR).join("trash"))
             .unwrap()
             .filter_map(|e| e.ok())

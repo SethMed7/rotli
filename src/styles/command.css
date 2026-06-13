@@ -137,6 +137,53 @@
   margin-right: 2px;
 }
 
+/* ——— WhichKey — "hold ⌘ to peek" shortcut map (Seth, 2026-06-13) ———
+   A LIGHT, non-modal floating panel: it does NOT dim or blur the window (that
+   is the palette's job alone). Centered, pointer-events:none so it can never
+   steal a click, and z-index 18 — below the palette (20) so a chord that opens
+   ⌘K is never veiled. The fade-in is neutralized under reduced-motion by the
+   base.css rule. No raw hex — kit tokens + the palette's cocoa shadow value. */
+.whichkey {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: wk-in var(--motion-enter) var(--motion-ease);
+}
+@keyframes wk-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+.wk-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  max-width: calc(100vw - 64px);
+  max-height: calc(100vh - 96px);
+  overflow: hidden;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid rgba(58, 48, 40, 0.1);
+  border-radius: var(--r-card);
+  box-shadow: 0 30px 80px -16px rgba(36, 29, 24, 0.55);
+}
+.wk-area {
+  min-width: 0;
+}
+/* the area's chord rows reuse .prow/.hint/kbd from the palette, but here they
+   are read-only — flatten the row's interactive padding so the card stays tight */
+.wk-area .prow {
+  padding: 5px 8px;
+  cursor: default;
+}
+.wk-area .pal-sec {
+  padding: 6px 8px 2px;
+}
+
 /* ——— quick capture — the one-breath card (r1 frame C) ——— */
 .capture-stage {
   height: 100vh;

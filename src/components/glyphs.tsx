@@ -36,6 +36,16 @@ export function ChevronDown({ size = 10, className }: GlyphProps) {
   );
 }
 
+/** Sidebar row disclosure caret — points right when collapsed, the .open class
+ * rotates it down (Seth, 2026-06-13: one chevron for every expandable row). */
+export function ChevronRight({ size = 10, className }: GlyphProps) {
+  return (
+    <Glyph size={size} className={className}>
+      <path d="m9 6 6 6-6 6" />
+    </Glyph>
+  );
+}
+
 /** Folders-rail toggle (r4 gate). */
 export function RailFolders(props: GlyphProps) {
   return (
@@ -141,6 +151,72 @@ export function SplitGlyph(props: GlyphProps) {
   );
 }
 
+/** Titlebar "split right" — rounded rect, VERTICAL center divider = two
+ *  columns. Standalone (not the shared Glyph) so it matches the existing
+ *  inline split svg exactly: 15px, strokeWidth 1.8 (Seth, 2026-06-13). */
+export function SplitRightGlyph({ size = 15, className }: GlyphProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      aria-hidden="true"
+    >
+      <rect
+        x="3.2"
+        y="4.2"
+        width="17.6"
+        height="15.6"
+        rx="2.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path d="M12 4.2v15.6" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+/** Titlebar "split down" — rounded rect, HORIZONTAL center divider = two
+ *  rows. Same standalone shape as SplitRightGlyph (Seth, 2026-06-13). */
+export function SplitDownGlyph({ size = 15, className }: GlyphProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      aria-hidden="true"
+    >
+      <rect
+        x="3.2"
+        y="4.2"
+        width="17.6"
+        height="15.6"
+        rx="2.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path d="M3.2 12h17.6" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+/** Unified sidebar toggle (Seth, 2026-06-13) — rounded rect with a filled
+ *  left column, reading as "side panels". Lives inline left of the note-list
+ *  filter; the one control that hides/shows both rails with memory. */
+export function SidebarGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16" />
+      <path d="M5.5 8.5h1M5.5 12h1" />
+    </Glyph>
+  );
+}
+
 /** Focus-mode corners (r3 frame F). */
 export function FocusGlyph(props: GlyphProps) {
   return (
@@ -206,6 +282,59 @@ export function CheckGlyph(props: GlyphProps) {
   return (
     <Glyph {...props}>
       <path d="m4 12.5 5 5L20 6.5" />
+    </Glyph>
+  );
+}
+
+/* — destination row icons (Seth, 2026-06-13): the five reserved roots in the
+   unified sidebar — Inbox (tray), Brain (head), Storage (database, reused),
+   Archive (box), Trash (bin). currentColor only, no hex. — */
+
+/** Inbox destination — a tray with the incoming notch. */
+export function InboxGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M4 13h4l1.5 2.5h5L16 13h4" />
+      <path d="M5.5 5.5 4 13v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4l-1.5-7.5A2 2 0 0 0 16.6 4H7.4a2 2 0 0 0-1.9 1.5Z" />
+    </Glyph>
+  );
+}
+
+/** Brain destination — a profile head with the brain fold. */
+export function BrainGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M9.5 4.5a3 3 0 0 0-3 3 3 3 0 0 0-1.5 5.4V17a2.5 2.5 0 0 0 2.5 2.5h.5" />
+      <path d="M14.5 4.5a3 3 0 0 1 3 3 3 3 0 0 1 1.5 5.4V17a2.5 2.5 0 0 1-2.5 2.5H16" />
+      <path d="M12 4.8v15M9.5 9.5h2.5M12 13.5h3" />
+    </Glyph>
+  );
+}
+
+/** Storage destination — reuses the database barrel (matches Settings). */
+export function StorageGlyph(props: GlyphProps) {
+  return <DatabaseGlyph {...props} />;
+}
+
+/** Archive destination — a lidded box with a pull slot. */
+export function ArchiveGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="3" y="4" width="18" height="5" rx="1.5" />
+      <path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9" />
+      <path d="M10 13h4" />
+    </Glyph>
+  );
+}
+
+/** Trash destination — a bin with lid + two staves. */
+export function TrashGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M4 7h16" />
+      <path d="M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2" />
+      <path d="M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7" />
+      <path d="M10 11v6M14 11v6" />
     </Glyph>
   );
 }

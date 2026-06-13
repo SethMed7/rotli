@@ -1,7 +1,13 @@
-// The titlebar law (r4/r5 gates): identity + rail toggles LEFT · empty
-// draggable CENTER · actions RIGHT. Native traffic lights stay (the inset
-// reserves their space). Dragging is manual startDragging so double-click
-// never triggers the built-in zoom.
+// The titlebar law (r4/r5 gates): identity LEFT · empty draggable CENTER ·
+// actions RIGHT. Native traffic lights stay (the inset reserves their space).
+// Dragging is manual startDragging so double-click never triggers the built-in
+// zoom.
+//
+// Rail-toggle law (Seth, 2026-06-13): the two titlebar rail icons (Folders ⌘0,
+// Notes list ⌥⌘L) are GONE. One unified, memory-based sidebar toggle now lives
+// INLINE left of the note-list filter (and on the warm-edge restore strip when
+// both rails are collapsed). The ⌘0 / ⌥⌘L chords stay rebindable in Hotkeys —
+// they just no longer have a home in the bar.
 
 import type { MouseEvent } from "react";
 import { dispatch } from "../keys/registry";
@@ -10,7 +16,7 @@ import { GLASS_TINTS, SOLID_THEMES, useUiStore } from "../state/ui";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 import { ModuleSwitcher } from "./ModuleSwitcher";
-import { ChevronDown, RailFolders, RailList, SunGlyph } from "./glyphs";
+import { ChevronDown, SplitDownGlyph, SplitRightGlyph, SunGlyph } from "./glyphs";
 
 function onDragRegionMouseDown(event: MouseEvent) {
   if (event.button !== 0 || event.detail > 1) return;
@@ -20,8 +26,6 @@ function onDragRegionMouseDown(event: MouseEvent) {
 export function Titlebar() {
   const switcherOpen = useUiStore((s) => s.switcherOpen);
   const setSwitcherOpen = useUiStore((s) => s.setSwitcherOpen);
-  const foldersCollapsed = useUiStore((s) => s.foldersCollapsed);
-  const listCollapsed = useUiStore((s) => s.listCollapsed);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const theme = useUiStore((s) => s.theme);
   const themeFamily = useUiStore((s) => s.themeFamily);
@@ -61,22 +65,6 @@ export function Titlebar() {
             </button>
             {switcherOpen && <ModuleSwitcher onClose={() => setSwitcherOpen(false)} />}
           </div>
-          <div className="railbtns">
-            <IconButton
-              label="Folders — ⌘0"
-              pressed={!foldersCollapsed}
-              onClick={() => dispatch("chrome.toggleFolders")}
-            >
-              <RailFolders />
-            </IconButton>
-            <IconButton
-              label="Notes list — ⌥⌘L"
-              pressed={!listCollapsed}
-              onClick={() => dispatch("chrome.toggleList")}
-            >
-              <RailList />
-            </IconButton>
-          </div>
         </>
       )}
       <div className="tb-spacer" onMouseDown={onDragRegionMouseDown} />
@@ -95,20 +83,13 @@ export function Titlebar() {
                 />
               </svg>
             </IconButton>
-            <IconButton label="Split — ⌘D (down: ⌘⇧D)" onClick={() => dispatch("panes.splitRight")}>
-              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-                <rect
-                  x="3.2"
-                  y="4.2"
-                  width="17.6"
-                  height="15.6"
-                  rx="2.6"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                />
-                <path d="M12 4.2v15.6" stroke="currentColor" strokeWidth="1.8" />
-              </svg>
+            {/* two distinct split buttons (Seth, 2026-06-13): right = vertical
+                divider (columns), down = horizontal divider (rows) */}
+            <IconButton label="Split right — ⌘D" onClick={() => dispatch("panes.splitRight")}>
+              <SplitRightGlyph />
+            </IconButton>
+            <IconButton label="Split down — ⌘⇧D" onClick={() => dispatch("panes.splitDown")}>
+              <SplitDownGlyph />
             </IconButton>
             <span className="tb-sep" aria-hidden="true" />
           </>

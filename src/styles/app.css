@@ -50,9 +50,13 @@
   user-select: none;
   -webkit-user-select: none;
 }
-/* native traffic lights live here (frameless overlay titlebar) */
+/* native traffic lights live here (frameless overlay titlebar).
+   Width math (Seth, 2026-06-13): the 3-button macOS cluster starts at conf
+   x:18 and spans ~52px, so its right edge sits ~70px from the window's left.
+   The .titlebar already pads 14px on the left, so the inset must reserve
+   70 − 14 = 56px to let the "Notes" identity clear the lights with a gap. */
 .tb-inset {
-  width: 52px;
+  width: 56px;
   height: 28px;
   flex: 0 0 auto;
 }
@@ -83,13 +87,6 @@
 .identity .chev {
   opacity: 0.6;
   transition: opacity 120ms var(--motion-ease);
-}
-.railbtns {
-  display: flex;
-  gap: 3px;
-  align-items: center;
-  padding-left: 11px;
-  border-left: 1px solid var(--border);
 }
 /* hairline between the pane/tab buttons and the theme/settings cluster */
 .tb-sep {

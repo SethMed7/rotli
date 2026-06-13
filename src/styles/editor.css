@@ -71,6 +71,11 @@
   line-height: 1.65;
   max-width: 660px;
   cursor: text;
+  /* native click-drag must be able to select across the rendered (static)
+     lines — nothing global blocks it, but pin it here so a future grammar
+     can't silently break multi-line selection (Seth 2026-06-13) */
+  -webkit-user-select: text;
+  user-select: text;
 }
 .ed-line {
   position: relative;
@@ -244,9 +249,12 @@
 .raw-input:focus-visible {
   outline: none; /* the tinted line is the affordance; no ring inside text */
 }
-/* selection must stay translucent — the visible glyphs live on the twin */
+/* In-line selection must READ as selected even though the textarea's own text
+   is transparent (the visible glyphs live on the twin underneath). A near-full
+   peach tint makes the highlight band clearly visible over the twin's glyphs;
+   the textarea text stays transparent so the caret never doubles (Seth 2026-06-13). */
 .raw-input::selection {
-  background: color-mix(in srgb, var(--tint) 55%, transparent);
+  background: color-mix(in srgb, var(--tint) 90%, transparent);
 }
 
 /* — the bottom-center resident slot + the format bar (r5) — */
@@ -391,6 +399,67 @@
   font-size: 10.5px;
   color: var(--accent-text);
   opacity: 0.75;
+}
+
+/* — the "/" slash menu (Seth 2026-06-13): a block-insert popover anchored
+     UNDER the active row (rawRowRef is position:relative). Mirrors the format
+     bar's .fbmenu/.fbrow voice — same surface, border, radius, pop-in — but
+     opens downward. Reduced-motion is handled globally by base.css. */
+.slashmenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 184px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: 0 16px 44px rgba(58, 48, 40, 0.26);
+  padding: 5px;
+  z-index: 7;
+  animation: pop-in var(--motion-enter) var(--motion-ease);
+}
+.slashrow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  border-radius: var(--r-control);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+}
+.slashrow:hover {
+  background: var(--hov);
+}
+.slashrow.sel {
+  background: var(--tint);
+  font-weight: 500;
+}
+.slashrow .slashglyph {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+.slashrow.sel .slashglyph {
+  color: var(--text);
+}
+.slashrow .slashglyph-h {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: -0.02em;
+}
+.slashrow .slashlabel {
+  flex: 1 1 auto;
 }
 
 /* — the Aa panel (r3 frame C: typography only) — */

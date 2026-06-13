@@ -1,30 +1,100 @@
-// The pane tree. A leaf with ONE tab renders zero tab chrome — the simple
-// Apple-Notes default is this system at rest (r2 law). Dividers: 1px border
-// line, 8px hit zone, 2px cocoa-at-24% while dragging (token-derived, never
-// clay). Splits/focus/tabs all live in the panes store.
+// The pane tree. EVERY leaf renders its tab strip now (Seth, 2026-06-13) — the
+// old "single-tab pane renders zero chrome / Apple-Notes default" law is gone;
+// a visible strip everywhere buys discoverability + a close x on every tab.
+// Dividers: 1px border line, 8px hit zone, 2px cocoa-at-24% while dragging
+// (token-derived, never clay). While a tab is mid-drag, each pane body wears a
+// 5-region split-detach overlay: drop on the center to move the tab here, on
+// an edge band to carve a split. Splits/focus/tabs/drag all live in the store.
 
-import { type PointerEvent as ReactPointerEvent, type ReactNode, useRef } from "react";
+import {
+  type DragEvent as ReactDragEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  useRef,
+  useState,
+} from "react";
 import { EditorSurface } from "../editor/EditorSurface";
-import { activeTabOf, leaves, usePanesStore } from "../state/panes";
+import { activeTabOf, type DetachDir, leaves, usePanesStore } from "../state/panes";
 import type { LeafNode, PaneNode, SplitNode } from "../types";
 import { TabStrip } from "./TabStrip";
+
+// the 5 dropzones over a pane body: 4 edge bands carve a split, center moves
+type Zone = DetachDir | "center";
+const EDGE_BAND = 0.22; // each edge band is ~22% of the pane's width/height
+
+function zoneAt(rect: DOMRect, clientX: number, clientY: number): Zone {
+  const fx = (clientX - rect.left) / Math.max(rect.width, 1);
+  const fy = (clientY - rect.top) / Math.max(rect.height, 1);
+  if (fx < EDGE_BAND && fx <= fy && fx <= 1 - fy) return "left";
+  if (fx > 1 - EDGE_BAND && 1 - fx <= fy && 1 - fx <= 1 - fy) return "right";
+  if (fy < EDGE_BAND) return "up";
+  if (fy > 1 - EDGE_BAND) return "down";
+  return "center";
+}
 
 function LeafView({ node }: { node: LeafNode }) {
   const focusedPaneId = usePanesStore((s) => s.focusedPaneId);
   const focusPane = usePanesStore((s) => s.focusPane);
+  const draggingTab = usePanesStore((s) => s.draggingTab);
+  const moveTab = usePanesStore((s) => s.moveTab);
+  const detachTab = usePanesStore((s) => s.detachTab);
+  const setDraggingTab = usePanesStore((s) => s.setDraggingTab);
   const tab = activeTabOf(node);
+
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [zone, setZone] = useState<Zone | null>(null);
+
+  const onZoneOver = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!draggingTab) return;
+    event.preventDefault();
+    const el = bodyRef.current;
+    if (!el) return;
+    setZone(zoneAt(el.getBoundingClientRect(), event.clientX, event.clientY));
+  };
+  const onZoneDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    const drag = draggingTab;
+    setZone(null);
+    setDraggingTab(null);
+    if (!drag) return;
+    event.preventDefault();
+    const el = bodyRef.current;
+    const where = el ? zoneAt(el.getBoundingClientRect(), event.clientX, event.clientY) : "center";
+    if (where === "center") {
+      // move to the end of this strip
+      const target = leaves(usePanesStore.getState().root).find((l) => l.id === node.id);
+      moveTab(drag.paneId, drag.tabId, node.id, target?.tabs.length ?? 0);
+    } else {
+      detachTab(drag.paneId, drag.tabId, node.id, where);
+    }
+  };
 
   return (
     <section
       className={node.id === focusedPaneId ? "pane focused" : "pane"}
       onMouseDownCapture={() => focusPane(node.id)}
     >
-      {node.tabs.length > 1 && <TabStrip pane={node} />}
+      <TabStrip pane={node} />
       {/* keyed by tab — each tab gets its own surface, so scroll/edit state
           never bleeds from the previously active tab */}
-      {tab.surfaceKind === "note" && (
-        <EditorSurface key={tab.id} paneId={node.id} noteId={tab.noteId} />
-      )}
+      <div className="pane-body" ref={bodyRef}>
+        {tab.surfaceKind === "note" && (
+          <EditorSurface key={tab.id} paneId={node.id} noteId={tab.noteId} />
+        )}
+        {/* split-detach overlay — pointer-active ONLY mid-drag, so it never
+            blocks normal editing (Seth, 2026-06-13) */}
+        {draggingTab && (
+          <div
+            className="pane-dropzones"
+            onDragOver={onZoneOver}
+            onDrop={onZoneDrop}
+            onDragLeave={() => setZone(null)}
+          >
+            {(["left", "right", "up", "down", "center"] as const).map((z) => (
+              <div key={z} className={zone === z ? `dz ${z} over` : `dz ${z}`} />
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }

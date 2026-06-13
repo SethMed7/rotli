@@ -5,6 +5,19 @@
 // <pre> twin — transparent text over the styled twin, so the caret never
 // drifts. One shared document buffer per noteId across panes (model.ts);
 // typing is local + synchronous, the service sync is debounced.
+//
+// SELECTION — click vs drag on the rendered lines (Seth 2026-06-13). A
+// mousedown on a static (non-active) line does NOT activate immediately:
+// we record the point + index and watch window mousemove. A plain CLICK
+// (pointer never travels past ~4px) activates the line and drops the caret
+// at the click point — the old behavior. A DRAG lets the browser run NATIVE
+// selection across the static rendered lines; if a line was active we set
+// active=null FIRST so its textarea becomes static and the selection can flow
+// across that row too. Native selection can't cross the textarea<->div seam,
+// so the active line drops out the instant a multi-line drag begins. Copying
+// a multi-line selection yields the rendered VISIBLE text (markdown syntax is
+// stripped) — acceptable for Stage 1; in-line copy on the active line is
+// verbatim raw text.
 
 import {
   type KeyboardEvent,
@@ -36,6 +49,7 @@ import {
   useDocumentDirty,
   useDocumentLines,
 } from "./model";
+import { type SlashItem, SlashMenu, filterSlashItems } from "./SlashMenu";
 import { RenderedLine, hasSyntax, parseBlock, rawSegments } from "./render";
 
 /** Below this pane width the format bar collapses its end groups into ⋯.
@@ -105,6 +119,20 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
   const [aaOpen, setAaOpen] = useState(false);
   const [narrow, setNarrow] = useState(false);
 
+  // — the "/" slash menu (Seth 2026-06-13): a LOCAL editor affordance, never a
+  //   global key surface. Opens when the active line is exactly "/" + word chars
+  //   (so "/" must lead the line — mid-text "/" has text before it and can't
+  //   match). onTaKeyDown intercepts ↑/↓/Enter/Esc while open; everything else
+  //   (typing, Backspace emptying the "/") closes it through the onChange test. —
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashQuery, setSlashQuery] = useState("");
+  const [slashIndex, setSlashIndex] = useState(0);
+  const closeSlash = () => {
+    setSlashOpen(false);
+    setSlashQuery("");
+    setSlashIndex(0);
+  };
+
   const rootRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const twinRef = useRef<HTMLPreElement>(null);
@@ -143,6 +171,7 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
   useEffect(() => {
     setActiveState(null);
     setAaOpen(false);
+    closeSlash();
     scrollRef.current?.scrollTo({ top: 0 });
   }, [noteId]);
 
@@ -234,6 +263,31 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
         return l;
       }),
     );
+  };
+
+  /** Pick a slash item: clear the "/query" the user typed FIRST (so the block
+   * mutator sees an empty line — toggleBlock("bullet") on "" → "- " etc.), set
+   * the caret to the new prefix end, then run the item. setLine + setHeading/
+   * toggleBlock/toggleMark all flow through the same buffer, so the command
+   * reads the cleared line. pendingCaretRef is overwritten by the mutator's own
+   * caret (which is correct — it lands after the inserted prefix). */
+  // Apply a slash item to the active line. We compute the result DIRECTLY from an
+  // empty line via the canonical block functions — NOT through activeEditor(),
+  // whose handle reads stateRef (still the stale "/query" this same tick) and
+  // would compose "- /bul" instead of "- ". (Seth 2026-06-13)
+  const applySlash = (item: SlashItem) => {
+    if (active === null) return;
+    const op = item.op;
+    if (op.kind === "code") {
+      // inline code on the now-empty line: "``" with the caret between the ticks
+      pendingCaretRef.current = { start: 1, end: 1 };
+      setLine(active, "``");
+    } else {
+      const r = op.kind === "heading" ? applyHeading("", op.level) : applyBlockToggle("", op.block);
+      pendingCaretRef.current = { start: r.line.length, end: r.line.length };
+      setLine(active, r.line);
+    }
+    closeSlash();
   };
 
   // ——— registry seam: the focused editor handles editor.* actions ———
@@ -382,6 +436,41 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
 
   const onTaKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (active === null || !lines) return;
+
+    // — slash menu owns ↑/↓/Enter/Esc while open (Seth 2026-06-13). Each branch
+    //   preventDefaults + returns so the normal line-edit grammar is skipped.
+    //   Esc also stops propagation so the editor's allowed-bare-Esc does NOT
+    //   also reach the registry and hide the window. —
+    if (slashOpen && !event.metaKey && !event.ctrlKey) {
+      const matches = filterSlashItems(slashQuery);
+      switch (event.key) {
+        case "ArrowDown":
+          event.preventDefault();
+          if (matches.length > 0) setSlashIndex((i) => (i + 1) % matches.length);
+          return;
+        case "ArrowUp":
+          event.preventDefault();
+          if (matches.length > 0) setSlashIndex((i) => (i - 1 + matches.length) % matches.length);
+          return;
+        case "Enter": {
+          event.preventDefault();
+          const item = matches[slashIndex] ?? matches[0];
+          if (item) applySlash(item);
+          return;
+        }
+        case "Escape":
+          event.preventDefault();
+          event.stopPropagation();
+          // the registry Esc (app.hide) is a SEPARATE native window listener;
+          // a synthetic stopPropagation won't reach it, so stop the native event
+          // too — closing the menu must not also unwind the transient stack /
+          // hide the window (Seth 2026-06-13).
+          event.nativeEvent.stopImmediatePropagation();
+          closeSlash();
+          return;
+      }
+    }
+
     if (event.metaKey || event.ctrlKey) return; // chords belong to the dispatcher
     const ta = event.currentTarget;
     const line = lines[active] ?? "";
@@ -466,13 +555,40 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
     }
   };
 
+  /** Click vs drag on a static rendered line (Seth 2026-06-13). We do NOT
+   * preventDefault on mousedown — that would kill the browser's native
+   * selection before a drag could start. Instead we record the point and watch
+   * window mousemove: travel past DRAG_THRESHOLD_PX = a DRAG (leave it to the
+   * browser; drop the active line first so selection can flow across that row),
+   * no travel by mouseup = a CLICK (activate the line, caret at the point). */
+  const DRAG_THRESHOLD_PX = 4;
   const onRowMouseDown = (index: number) => (event: MouseEvent) => {
     if (event.button !== 0) return;
-    // keep focus continuity — the layout effect focuses the new textarea
-    event.preventDefault();
-    pendingCaretRef.current = null;
-    clickPointRef.current = { x: event.clientX, y: event.clientY };
-    setActiveState(index);
+    const downX = event.clientX;
+    const downY = event.clientY;
+    let dragged = false;
+
+    const onMove = (e: globalThis.MouseEvent) => {
+      if (dragged) return;
+      if (Math.abs(e.clientX - downX) > DRAG_THRESHOLD_PX || Math.abs(e.clientY - downY) > DRAG_THRESHOLD_PX) {
+        dragged = true;
+        // a textarea can't be the selection anchor for the static lines — let
+        // the active line fall back to a rendered div so the drag spans it too
+        setActiveState(null);
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      if (dragged) return; // the browser owns the native selection on a drag
+      // a plain click — activate the line and drop the caret at the click point
+      // (the layout effect focuses the new textarea + hit-tests the twin)
+      pendingCaretRef.current = null;
+      clickPointRef.current = { x: downX, y: downY };
+      setActiveState(index);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   };
 
   if (!note || !lines) return <div className="editor" ref={rootRef} />;
@@ -537,7 +653,21 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
                   aria-label={`Line ${i + 1}`}
                   onChange={(e) => {
                     markTyping();
-                    setLine(i, e.target.value);
+                    const v = e.target.value;
+                    setLine(i, v);
+                    // open on a leading "/" + word chars only — mid-text "/" has
+                    // text before it and never matches. Backspace that empties
+                    // the "/" fails the test → closes the menu here (no special
+                    // case in onTaKeyDown). slashIndex resets so a new query
+                    // always starts at the top item.
+                    const m = /^\/(\w*)$/.exec(v);
+                    if (m) {
+                      setSlashOpen(true);
+                      setSlashQuery(m[1] ?? "");
+                      setSlashIndex(0);
+                    } else if (slashOpen) {
+                      closeSlash();
+                    }
                   }}
                   onKeyDown={onTaKeyDown}
                   onSelect={(e) =>
@@ -545,6 +675,15 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
                   }
                   onBlur={() => setActiveState((a) => (a === i ? null : a))}
                 />
+                {slashOpen && (
+                  <SlashMenu
+                    query={slashQuery}
+                    selectedIndex={slashIndex}
+                    onHover={setSlashIndex}
+                    onPick={applySlash}
+                    anchorRef={rawRowRef}
+                  />
+                )}
               </div>
             ) : (
               <div

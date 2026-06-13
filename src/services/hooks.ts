@@ -41,3 +41,48 @@ export function useCreateFolder() {
     onSuccess: () => invalidateFolders(),
   });
 }
+
+// ——— lifecycle (Phase 2c): a note's home changes (move/archive/trash/restore).
+// All four invalidate notes AND folders — restore can resurrect a folder, and
+// archive/trash shift the hidden-root counts (Seth, 2026-06-13).
+
+export function useMoveNote() {
+  return useMutation({
+    mutationFn: ({ id, targetFolder }: { id: string; targetFolder: string }) =>
+      notesService.moveNote(id, targetFolder),
+    onSuccess: async () => {
+      await invalidateNotes();
+      await invalidateFolders();
+    },
+  });
+}
+
+export function useArchiveNote() {
+  return useMutation({
+    mutationFn: (id: string) => notesService.archiveNote(id),
+    onSuccess: async () => {
+      await invalidateNotes();
+      await invalidateFolders();
+    },
+  });
+}
+
+export function useTrashNote() {
+  return useMutation({
+    mutationFn: (id: string) => notesService.trashNote(id),
+    onSuccess: async () => {
+      await invalidateNotes();
+      await invalidateFolders();
+    },
+  });
+}
+
+export function useRestoreNote() {
+  return useMutation({
+    mutationFn: (id: string) => notesService.restoreNote(id),
+    onSuccess: async () => {
+      await invalidateNotes();
+      await invalidateFolders();
+    },
+  });
+}

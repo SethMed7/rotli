@@ -43,8 +43,7 @@ import { findLeaf, leaves, usePanesStore } from "./panes";
 import { applyTheme } from "./theme";
 import {
   ALL_NOTES,
-  clampFoldersWidth,
-  clampListWidth,
+  clampSidebarWidth,
   GLASS_BACKGROUNDS,
   GLASS_BLURS,
   GLASS_CANVASES,
@@ -55,6 +54,7 @@ import {
   type GlassClarity,
   type GlassTint,
   RECENT,
+  RESERVED_DESTS,
   type ThemeFamily,
   type ThemeSetting,
   useUiStore,
@@ -109,10 +109,12 @@ interface PersistedSettings {
   glassCanvas: GlassCanvas;
   stayOpen: boolean;
   showInDock: boolean;
-  foldersCollapsed: boolean;
-  listCollapsed: boolean;
-  foldersWidth: number;
-  listWidth: number;
+  /** The ONE sidebar's collapse state + width, and which dests are expanded —
+   * the two-rail keys (foldersCollapsed/listCollapsed/lastOpenRails/
+   * foldersWidth/listWidth) are retired (Seth, 2026-06-13). */
+  sidebarCollapsed: boolean;
+  sidebarWidth: number;
+  expandedDests: Record<string, boolean>;
   /** Hotkey overrides keyed by action id; null = explicitly unbound. */
   bindings: Record<string, string | null>;
   /** The per-note Aa layer — NEVER written into the .md files. */
@@ -139,6 +141,17 @@ function parseSettings(raw: string): PersistedSettings {
         : DEFAULT_NOTE_STYLE.size;
     noteStyles[id] = { size, measure: asEnum(s.measure, MEASURES, DEFAULT_NOTE_STYLE.measure) };
   }
+  // expandedDests — keep only boolean entries; missing → seed Inbox + Brain so
+  // an old config (which lacked this key) opens with the default tree
+  const rawDests = record(data.expandedDests);
+  const expandedDests: Record<string, boolean> = {};
+  for (const [id, open] of Object.entries(rawDests)) {
+    if (typeof open === "boolean") expandedDests[id] = open;
+  }
+  if (Object.keys(expandedDests).length === 0) {
+    expandedDests.Inbox = true;
+    expandedDests.Brain = true;
+  }
   return {
     v: 1,
     theme: asEnum(data.theme, THEME_SETTINGS, "light"),
@@ -151,10 +164,10 @@ function parseSettings(raw: string): PersistedSettings {
     glassCanvas: asEnum(data.glassCanvas, CANVASES, "glass"),
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
-    foldersCollapsed: asBool(data.foldersCollapsed, false),
-    listCollapsed: asBool(data.listCollapsed, false),
-    foldersWidth: clampFoldersWidth(typeof data.foldersWidth === "number" ? data.foldersWidth : 198),
-    listWidth: clampListWidth(typeof data.listWidth === "number" ? data.listWidth : 258),
+    // missing keys default — old configs predate the single sidebar, never crash
+    sidebarCollapsed: asBool(data.sidebarCollapsed, false),
+    sidebarWidth: clampSidebarWidth(typeof data.sidebarWidth === "number" ? data.sidebarWidth : 240),
+    expandedDests,
     bindings,
     noteStyles,
   };
@@ -172,10 +185,9 @@ function applySettings(s: PersistedSettings): void {
     glassCanvas: s.glassCanvas,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
-    foldersCollapsed: s.foldersCollapsed,
-    listCollapsed: s.listCollapsed,
-    foldersWidth: s.foldersWidth,
-    listWidth: s.listWidth,
+    sidebarCollapsed: s.sidebarCollapsed,
+    sidebarWidth: s.sidebarWidth,
+    expandedDests: s.expandedDests,
   });
   useBindingsStore.setState({ overrides: s.bindings });
   useNoteStyleStore.setState({ styles: s.noteStyles });
@@ -308,7 +320,16 @@ async function hydrateViewstate(): Promise<void> {
     if (focusedPaneId) usePanesStore.setState({ root, focusedPaneId });
   }
 
-  const folderIds = new Set<string>([ALL_NOTES, RECENT, ...folders.map((f) => f.id)]);
+  // reserved dest ids (Inbox/Brain/Storage/Archive/Trash) join the smart rows +
+  // real folders in the valid set, so a fresh corpus that selected a
+  // destination before its first list resolved isn't reset to All Notes
+  // (Seth, 2026-06-13).
+  const folderIds = new Set<string>([
+    ALL_NOTES,
+    RECENT,
+    ...RESERVED_DESTS,
+    ...folders.map((f) => f.id),
+  ]);
   if (typeof data.selectedFolderId === "string" && folderIds.has(data.selectedFolderId)) {
     useUiStore.setState({ selectedFolderId: data.selectedFolderId });
   }
@@ -381,10 +402,9 @@ function settingsSnapshot(): string {
     glassCanvas: ui.glassCanvas,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
-    foldersCollapsed: ui.foldersCollapsed,
-    listCollapsed: ui.listCollapsed,
-    foldersWidth: ui.foldersWidth,
-    listWidth: ui.listWidth,
+    sidebarCollapsed: ui.sidebarCollapsed,
+    sidebarWidth: ui.sidebarWidth,
+    expandedDests: ui.expandedDests,
     bindings: useBindingsStore.getState().overrides,
     noteStyles: useNoteStyleStore.getState().styles,
   };

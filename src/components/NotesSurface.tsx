@@ -1,18 +1,21 @@
-// The Notes three-pane surface: folders rail · note list · pane tree.
-// Collapse grammar (r3 frame B): a hidden rail leaves a warm-edge hover
-// sliver; hovering it reveals the hidden rail(s) as an overlay — no layout
-// shift. Rails are drag-resizable on their right edge (Seth, 2026-06-12);
-// widths persist via .rotli/settings.json.
+// The Notes surface: ONE sidebar · the pane tree (Seth, 2026-06-13). The
+// two-rail era (folders + note list) is gone — a single unified compact-tree
+// sidebar replaces both. Collapse grammar (r3 frame B) survives intact: a
+// hidden sidebar leaves a warm-edge hover sliver that reveals it as an overlay
+// (no layout shift) and is ALSO a clickable restore strip running the unified
+// sidebar toggle. The sidebar is drag-resizable on its right edge; its width
+// persists via .rotli/settings.json.
 
 import { type CSSProperties, type PointerEvent, useState } from "react";
 import { useNotes } from "../services/hooks";
 import { useUiStore } from "../state/ui";
 import { EmptyState } from "./EmptyState";
-import { FoldersRail } from "./FoldersRail";
-import { NoteList } from "./NoteList";
+import { Sidebar } from "./Sidebar";
 import { PaneTree } from "./PaneTree";
+import { dispatch } from "../keys/registry";
+import { SidebarGlyph } from "./glyphs";
 
-/** Drag grip on a rail's right edge — same pointer grammar as the pane
+/** Drag grip on the sidebar's right edge — same pointer grammar as the pane
  * dividers (8px hit zone, cocoa-tinted line while dragging, never clay). */
 function RailGrip({ width, onResize }: { width: number; onResize: (px: number) => void }) {
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -45,54 +48,50 @@ function RailGrip({ width, onResize }: { width: number; onResize: (px: number) =
 }
 
 export function NotesSurface() {
-  const foldersCollapsed = useUiStore((s) => s.foldersCollapsed);
-  const listCollapsed = useUiStore((s) => s.listCollapsed);
-  const foldersWidth = useUiStore((s) => s.foldersWidth);
-  const setFoldersWidth = useUiStore((s) => s.setFoldersWidth);
-  const listWidth = useUiStore((s) => s.listWidth);
-  const setListWidth = useUiStore((s) => s.setListWidth);
+  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
+  const sidebarWidth = useUiStore((s) => s.sidebarWidth);
+  const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
   const [revealed, setRevealed] = useState(false);
-  const anyCollapsed = foldersCollapsed || listCollapsed;
   const allNotes = useNotes().data;
 
   // no notes at all → the island empty state (r1 frame E), nothing else
   if (allNotes && allNotes.length === 0) return <EmptyState />;
 
-  // the warm edge sits where the hidden rail would begin
-  const edgeLeft = foldersCollapsed ? 0 : foldersWidth;
-  const railVars = {
-    "--folders-w": `${foldersWidth}px`,
-    "--list-w": `${listWidth}px`,
-  } as CSSProperties;
+  const railVars = { "--sidebar-w": `${sidebarWidth}px` } as CSSProperties;
 
   return (
     <div className="threepane" style={railVars}>
-      {!foldersCollapsed && (
+      {!sidebarCollapsed && (
         <div className="rail-wrap">
-          <FoldersRail />
-          <RailGrip width={foldersWidth} onResize={setFoldersWidth} />
-        </div>
-      )}
-      {!listCollapsed && (
-        <div className="rail-wrap">
-          <NoteList />
-          <RailGrip width={listWidth} onResize={setListWidth} />
+          <Sidebar />
+          <RailGrip width={sidebarWidth} onResize={setSidebarWidth} />
         </div>
       )}
       <PaneTree />
-      {anyCollapsed && (
-        // hover-reveal zone (pointer affordance, not a command — no registry)
+      {sidebarCollapsed && (
+        // hover reveals the hidden sidebar; click restores it
         <div
           className="warm-edge"
-          style={{ left: edgeLeft }}
+          style={{ left: 0 }}
           onMouseEnter={() => setRevealed(true)}
           onMouseLeave={() => setRevealed(false)}
         >
-          <span className="edgehint" aria-hidden="true" />
+          {/* the strip itself is the restore button (a sibling of the overlay,
+              so overlay clicks never bubble into restore) */}
+          <button
+            type="button"
+            className="edge-restore"
+            aria-label="Show sidebar"
+            onClick={() => dispatch("chrome.toggleSidebars")}
+          >
+            <span className="edgehint" aria-hidden="true" />
+            <span className="edge-glyph" aria-hidden="true">
+              <SidebarGlyph size={14} />
+            </span>
+          </button>
           {revealed && (
             <div className="rail-overlay">
-              {foldersCollapsed && <FoldersRail />}
-              {listCollapsed && <NoteList />}
+              <Sidebar />
             </div>
           )}
         </div>

@@ -90,6 +90,10 @@ export interface CorpusNoteMeta {
   createdAt: number;
   updatedAt: number;
   pinned: boolean;
+  /** Where a note came from before it was moved into Archive/Trash — Rust
+   * bakes the rule (set on entering a hidden root, cleared on leaving). Null
+   * for a note that lives in a normal folder (Seth, 2026-06-13). */
+  origin?: string | null;
 }
 
 export interface CorpusListPayload {
@@ -105,6 +109,9 @@ export interface CorpusNoteDoc {
   createdAt: number;
   updatedAt: number;
   pinned: boolean;
+  /** The restore breadcrumb (see CorpusNoteMeta.origin); corpus_read returns
+   * it so restore can send a note back where it came from (Seth, 2026-06-13). */
+  origin?: string | null;
 }
 
 /** Tauri command errors arrive as plain strings — normalize to Error so
@@ -136,6 +143,14 @@ export function corpusCreate(folderId: string, body: string): Promise<CorpusNote
 
 export function corpusDelete(id: string): Promise<void> {
   return corpusInvoke("corpus_delete", { id });
+}
+
+/** Move a note into target_folder, PRESERVING its id + index; Rust creates the
+ * folder if needed and bakes the origin rule (record where it came from on the
+ * way into Archive/Trash, clear it on the way out). Tauri maps JS targetFolder
+ * ↔ the Rust target_folder arg (Seth, 2026-06-13). */
+export function corpusMove(id: string, targetFolder: string): Promise<CorpusNoteMeta> {
+  return corpusInvoke("corpus_move", { id, targetFolder });
 }
 
 export function corpusCreateFolder(

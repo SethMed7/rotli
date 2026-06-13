@@ -14,9 +14,20 @@ import { invalidateNotes } from "../services/hooks";
 import { inboxFolderId, notesService } from "../services/notes";
 import { captureHandle } from "../lib/captureHandle";
 import { hideMainWindow, summon, toggleMainWindow } from "../lib/tauri";
-import { usePanesStore } from "../state/panes";
+import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import { registerAction } from "./registry";
+
+/** The focused pane's active tab noteId, read imperatively for action runs
+ * (the hook form useFocusedNoteId is for components). null when the pane has no
+ * resolvable tab (Seth, 2026-06-13: the lifecycle chords target this note). */
+function focusedNoteIdNow(): string | null {
+  const { root, focusedPaneId } = usePanesStore.getState();
+  const leaf = findLeaf(root, focusedPaneId) ?? leaves(root)[0];
+  if (!leaf) return null;
+  const tab = leaf.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf.tabs[0];
+  return tab?.noteId ?? null;
+}
 
 /** ⌘N: create in the selected folder (Inbox when a smart row is selected),
  * then open it replacing the focused pane's active tab. */
@@ -126,6 +137,39 @@ export function registerDefaultActions(): void {
     run: () => void newNote(),
   });
 
+  // — note lifecycle (Seth, 2026-06-13): archive / trash / restore the FOCUSED
+  //   note (the focused pane's active tab). All three reach ⌘K automatically and
+  //   are rebindable. Trash is deliberately UNBOUND by default: ⌘⌫ would hijack
+  //   the editor's delete-to-line-start AND get preventDefault-ed, so it ships
+  //   chord-less but still palette-reachable. —
+  registerAction({
+    id: "notes.archive",
+    title: "Archive note",
+    defaultChord: "Meta+Shift+A",
+    run: () => {
+      const id = focusedNoteIdNow();
+      if (id) void notesService.archiveNote(id).then(invalidateNotes);
+    },
+  });
+  registerAction({
+    id: "notes.trash",
+    title: "Move note to Trash",
+    defaultChord: null,
+    run: () => {
+      const id = focusedNoteIdNow();
+      if (id) void notesService.trashNote(id).then(invalidateNotes);
+    },
+  });
+  registerAction({
+    id: "notes.restore",
+    title: "Restore note",
+    defaultChord: null,
+    run: () => {
+      const id = focusedNoteIdNow();
+      if (id) void notesService.restoreNote(id).then(invalidateNotes);
+    },
+  });
+
   // — tabs (created only by explicit gestures; plain click replaces) —
   registerAction({
     id: "tabs.new",
@@ -205,17 +249,22 @@ export function registerDefaultActions(): void {
   });
 
   // — chrome —
+  // ⌘0 keeps its muscle memory, now driving the ONE sidebar (Seth, 2026-06-13:
+  // folders + note-list collapsed into a single navigator; the separate
+  // chrome.toggleList ⌥⌘L is retired).
   registerAction({
     id: "chrome.toggleFolders",
-    title: "Toggle folders rail",
+    title: "Toggle sidebar",
     defaultChord: "Meta+0",
-    run: () => useUiStore.getState().toggleFolders(),
+    run: () => useUiStore.getState().toggleSidebar(),
   });
+  // the unified sidebar toggle (Seth, 2026-06-13): hides/shows the sidebar —
+  // the inline button + the warm-edge restore strip
   registerAction({
-    id: "chrome.toggleList",
-    title: "Toggle note list",
-    defaultChord: "Alt+Meta+L",
-    run: () => useUiStore.getState().toggleList(),
+    id: "chrome.toggleSidebars",
+    title: "Show or hide sidebar",
+    defaultChord: null,
+    run: () => useUiStore.getState().toggleSidebar(),
   });
 
   // — editor formatting (the r5 format bar's 11 controls + highlight; chords

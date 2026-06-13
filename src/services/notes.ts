@@ -7,6 +7,7 @@
 
 import { isTauri } from "../lib/tauri";
 import type { Folder, Note, NoteSummary } from "../types";
+import { DEST, isHidden } from "./destinations";
 import { snippetOf, titleOf } from "./derive";
 import { FsNotesService } from "./fsNotes";
 
@@ -22,6 +23,13 @@ export interface NotesService {
   createNote(folderId: string, body: string): Promise<Note>;
   updateNote(id: string, body: string): Promise<Note>;
   deleteNote(id: string): Promise<void>;
+  // ——— lifecycle (Phase 2c): the note keeps its id/index, only its home moves.
+  // archive/trash/restore are move with the origin rule applied; restore reads
+  // the recorded origin and falls back to Inbox if it's gone (Seth, 2026-06-13).
+  moveNote(id: string, targetFolder: string): Promise<Note>;
+  archiveNote(id: string): Promise<Note>;
+  trashNote(id: string): Promise<Note>;
+  restoreNote(id: string): Promise<Note>;
 }
 
 /** Ulid-style id: time-sortable prefix + random tail (Crockford base32). */
@@ -41,6 +49,10 @@ export function ulid(now = Date.now()): string {
 export class InMemoryNotesService implements NotesService {
   private folders = new Map<string, Folder>();
   private notes = new Map<string, Note>();
+  /** Where an archived/trashed note came from, so Phase 2 restore is
+   * reviewable in the browser surface — fs mode carries this on disk instead.
+   * Side Map keeps Note's shape identical to the FS service (Seth, 2026-06-13). */
+  readonly origins = new Map<string, string>();
 
   async listFolders(): Promise<Folder[]> {
     return [...this.folders.values()];
@@ -81,8 +93,15 @@ export class InMemoryNotesService implements NotesService {
 
   async listNotes(folderId?: string): Promise<NoteSummary[]> {
     const all = [...this.notes.values()];
+    // Same three-case rule as FsNotesService (destinations.ts is the truth):
+    // All Notes hides the hidden roots; a hidden root shows only its subtree;
+    // any normal folder shows its subtree minus hidden (defensive).
     const within = folderId ? this.descendants(folderId) : null; // once, not per note
-    const scoped = within ? all.filter((n) => within.has(n.folderId)) : all;
+    let scoped: Note[];
+    if (!within) scoped = all.filter((n) => !isHidden(n.folderId));
+    else if (folderId && isHidden(folderId))
+      scoped = all.filter((n) => within.has(n.folderId));
+    else scoped = all.filter((n) => within.has(n.folderId) && !isHidden(n.folderId));
     return scoped
       .map(({ body: _body, ...summary }) => summary)
       .sort((a, b) =>
@@ -128,6 +147,41 @@ export class InMemoryNotesService implements NotesService {
     this.notes.delete(id);
   }
 
+  // ——— lifecycle: move keeps the note's id; only its folderId changes. The
+  // origin Map mirrors fs mode's on-disk breadcrumb so restore is reviewable in
+  // the browser surface, while the Note's shape stays identical to fs mode —
+  // origin is NEVER a field on Note (Seth, 2026-06-13). ———
+
+  async moveNote(id: string, targetFolder: string): Promise<Note> {
+    const existing = this.notes.get(id);
+    if (!existing) throw new Error(`unknown note: ${id}`);
+    const from = existing.folderId;
+    // The SAME origin rule Rust bakes in: entering a hidden root from a normal
+    // folder records where it came from; leaving (target not hidden) when an
+    // origin exists clears it; otherwise the breadcrumb is left untouched.
+    if (isHidden(targetFolder) && !isHidden(from)) this.origins.set(id, from);
+    else if (!isHidden(targetFolder) && this.origins.has(id)) this.origins.delete(id);
+    const updated: Note = { ...existing, folderId: targetFolder };
+    this.notes.set(id, updated);
+    return updated;
+  }
+
+  async archiveNote(id: string): Promise<Note> {
+    return this.moveNote(id, DEST.archive);
+  }
+
+  async trashNote(id: string): Promise<Note> {
+    return this.moveNote(id, DEST.trash);
+  }
+
+  async restoreNote(id: string): Promise<Note> {
+    // Send it back where it came from; fall back to Inbox if the breadcrumb is
+    // missing or its folder no longer exists.
+    const origin = this.origins.get(id);
+    const target = origin && this.folders.has(origin) ? origin : DEST.inbox;
+    return this.moveNote(id, target);
+  }
+
   /** Synchronous seeding (Stage 1 sample corpus — the r1/r2 gate frames). */
   seedFolder(name: string, parentId: string | null = null): Folder {
     const folder: Folder = { id: ulid(), name, parentId };
@@ -135,10 +189,20 @@ export class InMemoryNotesService implements NotesService {
     return folder;
   }
 
+  /** A reserved/destination folder whose id IS its name (or its path under a
+   * reserved root, e.g. "Brain/Work") — matching fs mode where folderId === the
+   * relative path. This is what makes DEST.brain === folder.id true in BOTH
+   * modes; the freshest-note and destination lookups depend on it. */
+  seedReserved(id: string, name: string, parentId: string | null = null): Folder {
+    const folder: Folder = { id, name, parentId };
+    this.folders.set(folder.id, folder);
+    return folder;
+  }
+
   seedNote(
     folderId: string,
     body: string,
-    opts: { pinned?: boolean; createdAt: number; updatedAt: number },
+    opts: { pinned?: boolean; createdAt: number; updatedAt: number; origin?: string },
   ): Note {
     const note: Note = {
       id: ulid(opts.createdAt),
@@ -151,6 +215,7 @@ export class InMemoryNotesService implements NotesService {
       body,
     };
     this.notes.set(note.id, note);
+    if (opts.origin) this.origins.set(note.id, opts.origin);
     return note;
   }
 }
@@ -183,27 +248,24 @@ if (!FS_MODE) {
     return Math.min(d.getTime(), now);
   };
 
-  const inbox = svc.seedFolder("Inbox");
+  // Reserved roots: id === name (mirrors fs mode where folderId is the path),
+  // so DEST.brain === folder.id holds in the browser too.
+  const inbox = svc.seedReserved(DEST.inbox, DEST.inbox);
   inboxId = inbox.id;
-  const work = svc.seedFolder("Work");
-  const myela = svc.seedFolder("Myela", work.id);
-  const oneOnOnes = svc.seedFolder("1-on-1s", work.id);
-  const personal = svc.seedFolder("Personal");
-  const ideas = svc.seedFolder("Ideas", personal.id);
+  svc.seedReserved(DEST.brain, DEST.brain);
+  svc.seedReserved(DEST.storage, DEST.storage);
+  svc.seedReserved(DEST.archive, DEST.archive);
+  svc.seedReserved(DEST.trash, DEST.trash);
+
+  // A couple of user folders nested under Brain — path-style ids ("Brain/Work")
+  // so the tree renders and descendant scoping behaves exactly like fs mode.
+  const brainWork = svc.seedReserved(`${DEST.brain}/Work`, "Work", DEST.brain);
+  const brainMyela = svc.seedReserved(`${DEST.brain}/Myela`, "Myela", DEST.brain);
 
   if (!SEED_EMPTY) {
-    svc.seedNote(
-      work.id,
-      `# Pricing decision
-
-Free local forever. Paid = sync + managed AI. Never gate local features behind the subscription — the corpus is the user's, full stop.
-
-Launch sync at $4, anchor on Obsidian, revisit at 10k users.`,
-      { pinned: true, createdAt: todayAt(8, 5), updatedAt: todayAt(9, 10) },
-    );
-
-    const notesFirst = svc.seedNote(
-      ideas.id,
+    // —— Inbox: the welcome note + a quick capture ——
+    const welcome = svc.seedNote(
+      inbox.id,
       `# rotli — notes first
 
 Apple Notes feel, **markdown underneath**. Local files, one structure the AI can read. The app is a *visitor* — summon it, write, dismiss it.
@@ -219,18 +281,27 @@ Apple Notes feel, **markdown underneath**. Local files, one structure the AI can
 Later: breve plugs into the same corpus and the Wiki answers from it. Nothing changes shape.`,
       { createdAt: todayAt(9, 42), updatedAt: todayAt(9, 42) },
     );
-    firstNoteId = notesFirst.id;
+    firstNoteId = welcome.id;
 
     svc.seedNote(
-      myela.id,
-      `# Q3 priorities — Myela
+      inbox.id,
+      `# Call the bank about the wire limit before Friday`,
+      { createdAt: now - 2 * DAY, updatedAt: now - 2 * DAY },
+    );
 
-Ship the gateway migration, land the issuing portal rebuild, and get the partner reporting story straight before the platform review.`,
-      { createdAt: todayAt(7, 30), updatedAt: todayAt(7, 30) },
+    // —— Brain: a pinned decision + nested Work/Myela notes ——
+    svc.seedNote(
+      DEST.brain,
+      `# Pricing decision
+
+Free local forever. Paid = sync + managed AI. Never gate local features behind the subscription — the corpus is the user's, full stop.
+
+Launch sync at $4, anchor on Obsidian, revisit at 10k users.`,
+      { pinned: true, createdAt: todayAt(8, 5), updatedAt: todayAt(9, 10) },
     );
 
     svc.seedNote(
-      work.id,
+      brainWork.id,
       `# Q3 platform review — prep
 
 Three things must land before Thursday: the settlement mapping, the gateway export enum, and a clear pricing answer we can defend in front of the partners.
@@ -242,7 +313,16 @@ Maria owns the reconciliation walkthrough; I take pricing.`,
     );
 
     svc.seedNote(
-      ideas.id,
+      brainMyela.id,
+      `# Q3 priorities — Myela
+
+Ship the gateway migration, land the issuing portal rebuild, and get the partner reporting story straight before the platform review.`,
+      { createdAt: todayAt(7, 30), updatedAt: todayAt(7, 30) },
+    );
+
+    // —— Storage: long-lived reference, lighter than Brain ——
+    svc.seedNote(
+      DEST.storage,
       `# Quokka world — where it lives
 
 Onboarding, empty states, about. Never in the editor, never in notifications — the world appears at low-frequency moments only.`,
@@ -250,25 +330,37 @@ Onboarding, empty states, about. Never in the editor, never in notifications —
     );
 
     svc.seedNote(
-      oneOnOnes.id,
-      `# 1-on-1 — Sarah
-
-Ship review Friday. She'll own the gateway migration writeup. Follow up on the Lithic question and the Q3 growth path conversation.`,
-      { createdAt: now - 3 * DAY, updatedAt: now - 3 * DAY },
-    );
-
-    svc.seedNote(
-      personal.id,
+      DEST.storage,
       `# Groceries
 
 Olive oil, sourdough, oat milk, blueberries, the good butter.`,
       { createdAt: now - 4 * DAY, updatedAt: now - 4 * DAY },
     );
 
+    // —— ONE Archive note + ONE Trash note (origin = where restore returns it).
+    // These are hidden from All Notes; only their own view shows them. ——
     svc.seedNote(
-      inbox.id,
-      `# Call the bank about the wire limit before Friday`,
-      { createdAt: now - 2 * DAY, updatedAt: now - 2 * DAY },
+      DEST.archive,
+      `# 1-on-1 — Sarah
+
+Ship review Friday. She'll own the gateway migration writeup. Follow up on the Lithic question and the Q3 growth path conversation.`,
+      {
+        createdAt: now - 30 * DAY,
+        updatedAt: now - 7 * DAY,
+        origin: `${DEST.brain}/Work`,
+      },
+    );
+
+    svc.seedNote(
+      DEST.trash,
+      `# Old draft — pricing tiers v0
+
+Scrap this. The three-tier idea died; we went free-local + one paid sync line. Kept only so Phase 2 restore has something to put back.`,
+      {
+        createdAt: now - 14 * DAY,
+        updatedAt: now - 5 * DAY,
+        origin: DEST.brain,
+      },
     );
   }
 }

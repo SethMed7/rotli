@@ -68,11 +68,15 @@ export const GLASS_CANVASES: { value: GlassCanvas; label: string }[] = [
 export const ALL_NOTES = "all";
 export const RECENT = "recent";
 
-/** Rail width clamps — small enough to tuck away, never wide enough to eat the editor. */
-export const clampFoldersWidth = (px: number): number =>
-  Math.min(340, Math.max(140, Math.round(px)));
-export const clampListWidth = (px: number): number =>
+/** Sidebar width clamp — small enough to tuck away, never wide enough to eat
+ * the editor (one rail now, not two — Seth, 2026-06-13). */
+export const clampSidebarWidth = (px: number): number =>
   Math.min(460, Math.max(190, Math.round(px)));
+
+/** The reserved destination ids the sidebar seeds open (Inbox + Brain) and the
+ * persistence layer trusts as a valid folder selection before the first list
+ * resolves (Seth, 2026-06-13). */
+export const RESERVED_DESTS = ["Inbox", "Brain", "Storage", "Archive", "Trash"] as const;
 
 interface UiState {
   /** Explicit three-way setting. "system" mirrors the OS only while selected;
@@ -123,19 +127,21 @@ interface UiState {
   glassCanvas: GlassCanvas;
   setGlassCanvas: (canvas: GlassCanvas) => void;
 
-  /** Rails collapse state — remembered per window, persisted in the shell. */
-  /** Rail widths (px) — drag the grip on a rail's right edge (Seth, 2026-06-12). */
-  foldersWidth: number;
-  setFoldersWidth: (px: number) => void;
-  listWidth: number;
-  setListWidth: (px: number) => void;
+  /** The ONE sidebar — collapse state (remembered per window, persisted in the
+   * shell) and width (px; drag the grip on its right edge). The two-rail era is
+   * gone: folders + note-list collapse into a single navigator (Seth,
+   * 2026-06-13). */
+  sidebarCollapsed: boolean;
+  toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  sidebarWidth: number;
+  setSidebarWidth: (px: number) => void;
 
-  foldersCollapsed: boolean;
-  listCollapsed: boolean;
-  toggleFolders: () => void;
-  toggleList: () => void;
-  setFoldersCollapsed: (collapsed: boolean) => void;
-  setListCollapsed: (collapsed: boolean) => void;
+  /** Which destinations in the sidebar tree are expanded, keyed by dest id —
+   * Inbox + Brain open by default (Seth, 2026-06-13). */
+  expandedDests: Record<string, boolean>;
+  toggleDestExpanded: (id: string) => void;
+  setDestExpanded: (id: string, open: boolean) => void;
 
   /** Folders-rail selection (window-level). */
   selectedFolderId: string;
@@ -229,17 +235,17 @@ export const useUiStore = create<UiState>((set, get) => ({
       return next ? { glassTint: next.value } : s;
     }),
 
-  foldersWidth: 198,
-  setFoldersWidth: (px) => set({ foldersWidth: clampFoldersWidth(px) }),
-  listWidth: 258,
-  setListWidth: (px) => set({ listWidth: clampListWidth(px) }),
+  sidebarCollapsed: false,
+  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+  sidebarWidth: 240,
+  setSidebarWidth: (px) => set({ sidebarWidth: clampSidebarWidth(px) }),
 
-  foldersCollapsed: false,
-  listCollapsed: false,
-  toggleFolders: () => set((s) => ({ foldersCollapsed: !s.foldersCollapsed })),
-  toggleList: () => set((s) => ({ listCollapsed: !s.listCollapsed })),
-  setFoldersCollapsed: (collapsed) => set({ foldersCollapsed: collapsed }),
-  setListCollapsed: (collapsed) => set({ listCollapsed: collapsed }),
+  expandedDests: { Inbox: true, Brain: true },
+  toggleDestExpanded: (id) =>
+    set((s) => ({ expandedDests: { ...s.expandedDests, [id]: !s.expandedDests[id] } })),
+  setDestExpanded: (id, open) =>
+    set((s) => ({ expandedDests: { ...s.expandedDests, [id]: open } })),
 
   selectedFolderId: ALL_NOTES,
   setSelectedFolderId: (id) => set({ selectedFolderId: id }),

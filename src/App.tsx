@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import "./styles/base.css";
 import "./styles/app.css";
 import "./styles/notes.css";
@@ -9,8 +9,10 @@ import { NotesSurface } from "./components/NotesSurface";
 import { Palette } from "./components/Palette";
 import { SettingsSurface } from "./components/SettingsSurface";
 import { Titlebar } from "./components/Titlebar";
+import { WhichKey } from "./components/WhichKey";
 import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
+import { useHeldModifier } from "./keys/useHeldModifier";
 import { GLASS_BG_SRC } from "./lib/glassBackgrounds";
 import { emitCaptureAck, isTauri, onCaptureSave, onCorpusChanged, onRebind } from "./lib/tauri";
 import { invalidateFolders, invalidateNotes } from "./services/hooks";
@@ -40,6 +42,18 @@ function MainShell() {
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const focusMode = useUiStore((s) => s.focusMode);
+
+  // hold ⌘ ~0.5s on the main surface → the non-modal shortcut map. Gated off
+  // while the palette or settings own the keyboard, so it never doubles up; the
+  // hook releases the moment a real chord fires (Seth, 2026-06-13).
+  const [whichKey, setWhichKey] = useState(false);
+  useHeldModifier({
+    modifier: "Meta",
+    delayMs: 500,
+    enabled: !paletteOpen && !settingsOpen,
+    onHold: () => setWhichKey(true),
+    onRelease: () => setWhichKey(false),
+  });
 
   // focus mode is window-wide: chrome everywhere reacts to one attribute
   useEffect(() => {
@@ -95,6 +109,7 @@ function MainShell() {
       <Titlebar />
       <main className="app-content">{settingsOpen ? <SettingsSurface /> : <NotesSurface />}</main>
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
+      {whichKey && <WhichKey onClose={() => setWhichKey(false)} />}
     </div>
   );
 }
