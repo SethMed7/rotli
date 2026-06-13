@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>rotli — Stage 1 Testing Map</title>
+<style>
+  @font-face { font-family:"General Sans"; src:url("../src/brand/fonts/GeneralSans-Variable.woff2") format("woff2"); font-weight:200 700; font-display:swap; }
+  @font-face { font-family:"Satoshi"; src:url("../src/brand/fonts/Satoshi-Variable.woff2") format("woff2"); font-weight:300 900; font-display:swap; }
+  :root{
+    --ground:#F8F2E9; --surface:#FFFFFF; --surface-2:#F1E7D8; --tint:#F2D6C2;
+    --text:#3A3028; --muted:#6E6155; --border:#E7DBC9; --accent:#C97E62; --accent-text:#8F4E37; --success:#8D9A76; --olive-text:#5F6B49; --clay-text:#8F4E37;
+    --display:"Satoshi","General Sans",ui-sans-serif,-apple-system,system-ui,sans-serif;
+    --body:"General Sans",ui-sans-serif,-apple-system,system-ui,sans-serif;
+    --r-card:14px; --r-pill:999px; --shadow:0 18px 50px -22px rgba(58,48,40,.45);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --ground:#241D18; --surface:#2E2620; --surface-2:#392F28; --tint:#3E332B; --text:#F1E7DA; --muted:#B7A593; --border:#3D3229; --accent:#C97E62; --accent-text:#C97E62; --olive-text:#A7B58C; --clay-text:#D79A80; --shadow:0 18px 50px -22px rgba(0,0,0,.6);}
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--body);color:var(--text);background:var(--ground);line-height:1.55;-webkit-font-smoothing:antialiased;font-size:15.5px;padding:0 22px 110px;}
+  .wrap{max-width:900px;margin:0 auto;}
+  header{padding:54px 0 8px;text-align:center;}
+  .wordmark{height:40px;onerror:none;}
+  h1{font-family:var(--display);font-weight:700;font-size:26px;margin-top:16px;letter-spacing:-.01em;}
+  .sub{color:var(--muted);margin-top:8px;font-size:14.5px;}
+  .gate{margin-top:14px;display:inline-block;font-size:13px;font-weight:600;color:var(--clay-text);background:color-mix(in srgb,var(--clay) 16%,transparent);border:1px solid color-mix(in srgb,var(--clay) 35%,transparent);border-radius:var(--r-pill);padding:6px 15px;}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:18px;color:var(--muted);font-size:12.5px;}
+  .legend b{color:var(--text);}
+
+  /* sticky progress */
+  .progress{position:sticky;top:0;z-index:9;background:color-mix(in srgb,var(--ground) 88%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:12px 0;margin:26px 0 8px;}
+  .pbar{height:9px;border-radius:var(--r-pill);background:var(--surface-2);overflow:hidden;}
+  .pfill{height:100%;width:0;background:var(--success);transition:width .25s ease;border-radius:var(--r-pill);}
+  .pmeta{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);margin-bottom:8px;}
+  .pmeta b{color:var(--text);font-weight:650;}
+  .resetbtn{font:inherit;font-size:12px;color:var(--muted);background:none;border:1px solid var(--border);border-radius:var(--r-pill);padding:3px 11px;cursor:pointer;}
+  .resetbtn:hover{background:var(--surface-2);color:var(--text);}
+
+  section{margin-top:30px;}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:12px;}
+  .sec-head h2{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:-.01em;}
+  .sec-head .n{font-size:12.5px;color:var(--muted);}
+  .crit .sec-head h2{color:var(--clay-text);}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:6px 4px;}
+  .crit .card{border-color:color-mix(in srgb,var(--clay) 40%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--clay) 18%,transparent);}
+
+  .row{display:flex;gap:12px;align-items:flex-start;padding:11px 14px;border-bottom:1px solid var(--border);}
+  .row:last-child{border-bottom:none;}
+  .row .box{flex:0 0 auto;margin-top:1px;}
+  .row label{font-size:14px;cursor:pointer;flex:1;}
+  .row .hint{display:block;color:var(--muted);font-size:12.5px;margin-top:3px;line-height:1.5;}
+  .row code{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:5px;color:var(--text);}
+  input[type=checkbox]{width:18px;height:18px;accent-color:var(--success);cursor:pointer;}
+  .row.done label{color:var(--muted);}
+  .row.done label .t{text-decoration:line-through;text-decoration-color:color-mix(in srgb,currentColor 45%,transparent);}
+
+  .badge{flex:0 0 auto;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:var(--r-pill);margin-top:1px;}
+  .b-auto{background:color-mix(in srgb,var(--success) 20%,transparent);color:var(--olive-text);}
+  .b-you{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent-text);}
+  .b-watch{background:color-mix(in srgb,var(--clay) 18%,transparent);color:var(--clay-text);}
+  .auto-row{opacity:.92;}
+  .auto-row .checkmark{flex:0 0 auto;color:var(--success);font-weight:800;font-size:16px;margin-top:-1px;width:18px;text-align:center;}
+
+  .notes{margin-top:34px;}
+  .notes textarea{width:100%;min-height:120px;font:inherit;font-size:14px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:14px;resize:vertical;}
+  footer{margin-top:40px;text-align:center;color:var(--muted);font-size:12.5px;border-top:1px solid var(--border);padding-top:22px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img class="wordmark" src="../src/brand/logo/wordmark.svg" alt="rotli" onerror="this.style.display='none'"/>
+    <h1>Stage 1 — Testing Map</h1>
+    <p class="sub">Run the real app: <code>bun run tauri dev</code>. Work top-down. We don't move to the next stage until this passes.</p>
+    <div class="gate">🚦 Gate: all <b>👤 You</b> + <b>⚠️ Decide</b> rows must pass before Stage 2</div>
+    <div class="legend">
+      <span>✅ <b>Auto</b> — I verified this (browser + Rust tests)</span>
+      <span>🟠 <b>You</b> — needs the real Tauri window</span>
+      <span>🟡 <b>Decide</b> — a judgment call</span>
+    </div>
+  </header>
+
+  <div class="progress">
+    <div class="pmeta"><span>Your checklist: <b><span id="done">0</span> / <span id="total">0</span></b> &nbsp;·&nbsp; <span id="pct">0%</span></div><button class="resetbtn" onclick="resetAll()">reset</button></div>
+    <div class="pbar"><div class="pfill" id="pfill"></div></div>
+  </div>
+
+  <!-- 1. First launch & corpus -->
+  <section class="crit">
+    <div class="sec-head"><h2>1 · First launch &amp; the corpus on disk</h2><span class="n">the foundation</span></div>
+    <div class="card" data-card>
+      <div class="auto-row row"><span class="checkmark">✓</span><span class="badge b-auto">auto</span><label><span class="t">Reserved folders exist on disk</span><span class="hint">Confirmed: <code>~/Documents/rotli/</code> has Inbox · Brain · Storage · Archive · Trash + <code>.rotli/</code> index. Welcome note frontmatter is clean (id·created·updated·pinned, no stray origin).</span></label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="boot"></span><span class="badge b-you">you</span><label><span class="t">App boots clean</span> — <code>bun run tauri dev</code> builds &amp; launches with no Rust panic; the menu-bar icon appears.<span class="hint">Watch the terminal for any error on startup (corpus open, watcher, tray, global shortcuts).</span></label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="summon"></span><span class="badge b-you">you</span><label><span class="t">Summon &amp; dismiss</span> — <code>⌥Space</code> opens the window instantly; press it again (or click away) and it's gone; no Dock icon, no ⌘Tab entry.</label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="plainfiles"></span><span class="badge b-you">you</span><label><span class="t">Notes are plain files</span> — open a note's <code>.md</code> in Finder / another editor; it's readable markdown with a 4-line frontmatter. Edit it there, save, and rotli refreshes it (the fs watcher).</label></div>
+    </div>
+  </section>
+
+  <!-- 2. Capture -->
+  <section>
+    <div class="sec-head"><h2>2 · Quick capture</h2><span class="n">the ⌥C breath</span></div>
+    <div class="card">
+      <div class="row"><span class="box"><input type="checkbox" data-id="cap-basic"></span><span class="badge b-you">you</span><label><span class="t">Capture lands in Inbox</span> — from ANOTHER app, press <code>⌥C</code>, type a thought, <code>⏎</code>. The card clears; the thought is a new <code>.md</code> in <code>Inbox/</code>.</label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="cap-open"></span><span class="badge b-you">you</span><label><span class="t">Save &amp; open</span> — <code>⌘⏎</code> in the card reveals the main window focused on the new note; <code>Esc</code> dismisses without saving.</label></div>
+    </div>
+  </section>
+
+  <!-- 3. Editing -->
+  <section>
+    <div class="sec-head"><h2>3 · Editing &amp; autosave</h2></div>
+    <div class="card">
+      <div class="auto-row row"><span class="checkmark">✓</span><span class="badge b-auto">auto</span><label><span class="t">Markdown renders</span><span class="hint">Verified: H1, <b>bold</b>, <i>italic</i>, <code>code</code>, highlight, bullets, numbered, tasks, quote all render; the line under the caret shows raw syntax; title flows to the tab + sidebar; olive autosave dot.</span></label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="edit-persist"></span><span class="badge b-you">you</span><label><span class="t">Edits persist to disk</span> — type in a note, wait a beat (olive dot), quit rotli, relaunch → the text is there. Then confirm the same text is in the <code>.md</code> on disk.</label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="edit-select"></span><span class="badge b-you">you</span><label><span class="t">Text selection</span> — click-drag across several lines selects them; copy/paste works; click places the caret.</label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="edit-tasks"></span><span class="badge b-you">you</span><label><span class="t">Live grammar</span> — <code>- </code> + Enter continues a list; <code>[] </code> makes a checkbox you can tick; the <code>Aa</code> panel changes the note's type size.</label></div>
+    </div>
+  </section>
+
+  <!-- 4. Sidebar -->
+  <section>
+    <div class="sec-head"><h2>4 · The unified sidebar</h2></div>
+    <div class="card">
+      <div class="auto-row row"><span class="checkmark">✓</span><span class="badge b-auto">auto</span><label><span class="t">Tree, counts, selection</span><span class="hint">Verified: destinations expand/collapse inline, nested folders, counts exclude Archive/Trash (All notes = visible only), plain-click opens / ⌘-click new tab, selection mirrors the focused pane, one toggle + warm-edge restore.</span></label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="side-feel"></span><span class="badge b-you">you</span><label><span class="t">Feels right in the real window</span> — expand each destination; the compact rows read cleanly; <code>⌘0</code> and the inline toggle and the left-edge strip all hide/show the sidebar; widths persist on relaunch.</label></div>
+    </div>
+  </section>
+
+  <!-- 5. Lifecycle CRITICAL -->
+  <section class="crit">
+    <div class="sec-head"><h2>5 · Never-delete lifecycle</h2><span class="n">🚦 the most important live test</span></div>
+    <div class="card">
+      <div class="row"><span class="box"><input type="checkbox" data-id="life-archive"></span><span class="badge b-you">you</span><label><span class="t">Archive moves the file</span> — archive a note (hover → archive icon, or <code>⌘⇧A</code>). It leaves its list, appears under Archive, and the <code>.md</code> physically moves to <code>~/Documents/rotli/Archive/</code> with an <code>origin:</code> line in its frontmatter.</label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="life-trash"></span><span class="badge b-you">you</span><label><span class="t">Trash moves the file</span> — trash a note (hover → trash icon, or drag it onto the Trash row). The file moves to <code>~/Documents/rotli/Trash/</code> — and <b>NOT</b> to the macOS Trash (check the macOS Trash is empty of it).</label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="life-restore"></span><span class="badge b-you">you</span><label><span class="t">Restore returns it</span> — from Archive/Trash, hover → restore. The note returns to its original folder and the <code>origin:</code> line is gone. (Delete the origin folder first, then restore → it should fall back to Inbox.)</label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="life-drag"></span><span class="badge b-you">you</span><label><span class="t">Drag between destinations</span> — drag a note from Brain onto Storage (and a folder) → the file moves on disk, id preserved, opens fine.</label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="life-nodelete"></span><span class="badge b-you">you</span><label><span class="t">Nothing is ever destroyed</span> — confirm there is NO "delete forever / empty trash" anywhere in the app; the only way to truly remove a note is Finder.</label></div>
+    </div>
+  </section>
+
+  <!-- 6. Panes & tabs -->
+  <section>
+    <div class="sec-head"><h2>6 · Panes &amp; tabs</h2></div>
+    <div class="card">
+      <div class="auto-row row"><span class="checkmark">✓</span><span class="badge b-auto">auto</span><label><span class="t">Splits, tabs, drag</span><span class="hint">Verified: Split right <code>⌘D</code> / down <code>⌘⇧D</code> (two labeled buttons), <code>⌘T</code> new tab, ⌘-click new tab, close ×, a tab strip in every pane, 3-pane split.</span></label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="pane-drag"></span><span class="badge b-you">you</span><label><span class="t">Tab drag &amp; pane resize</span> — drag a tab to reorder, drag it to another pane's strip, and pull a tab onto a pane edge to spawn a split; drag dividers &amp; the sidebar rail to resize. Layout persists on relaunch.</label></div>
+    </div>
+  </section>
+
+  <!-- 7. Discoverability -->
+  <section>
+    <div class="sec-head"><h2>7 · Keyboard &amp; discoverability</h2></div>
+    <div class="card">
+      <div class="auto-row row"><span class="checkmark">✓</span><span class="badge b-auto">auto</span><label><span class="t">Hold-⌘ map · j/k nav · slash · ⌘K</span><span class="hint">Verified: holding ⌘ shows the shortcut map; the slash menu inserts blocks; sidebar j/k moves, Enter opens, <code>/</code> filters, <code>m</code> menu; ⌘K palette lists notes + every action.</span></label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="disc-feel"></span><span class="badge b-you">you</span><label><span class="t">Timing feels good</span> — hold ⌘ ~0.5s for the map; release dismisses it; pressing a real chord (e.g. ⌘N) runs it and the map vanishes — never appears mid-chord.</label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="disc-rebind"></span><span class="badge b-you">you</span><label><span class="t">Rebinding</span> — Settings → Hotkeys → click a chord, press new keys; it works and survives relaunch. Esc during recording cancels.</label></div>
+    </div>
+  </section>
+
+  <!-- 8. Appearances -->
+  <section>
+    <div class="sec-head"><h2>8 · Appearances</h2></div>
+    <div class="card">
+      <div class="auto-row row"><span class="checkmark">✓</span><span class="badge b-auto">auto</span><label><span class="t">Themes · focus · glass (browser)</span><span class="hint">Verified in-browser: the four themes cycle; focus mode <code>⌥⌘F</code> collapses the sidebar to one column; glass mode frosts the sidebar like the editor.</span></label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="look-glass"></span><span class="badge b-you">you</span><label><span class="t">Glass in the real window</span> — Settings → Appearance → Liquid Glass; try hues, frosted/clear, a wallpaper, the paper canvas. The whole chrome (titlebar + sidebar + editor) reads as one glass system.</label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="look-lights"></span><span class="badge b-you">you</span><label><span class="t">Traffic lights align</span> — the native ●●● sit cleanly with the titlebar content (browser has no native lights, so this is real-window only). Confirm "Notes" doesn't crowd the green light.</label></div>
+    </div>
+  </section>
+
+  <!-- 9. Persistence -->
+  <section>
+    <div class="sec-head"><h2>9 · Persistence (relaunch)</h2></div>
+    <div class="card">
+      <div class="row"><span class="box"><input type="checkbox" data-id="persist"></span><span class="badge b-you">you</span><label><span class="t">Everything is remembered</span> — set a theme, widen the sidebar, expand some destinations, select Brain, open two tabs &amp; a split; quit and relaunch → all restored. Then delete <code>.rotli/</code> and relaunch → it rebuilds and loses nothing but the rebuild.</label></div>
+    </div>
+  </section>
+
+  <!-- 10. Decisions -->
+  <section>
+    <div class="sec-head"><h2>10 · Decisions to make</h2><span class="n">design calls before Stage 2</span></div>
+    <div class="card">
+      <div class="row"><span class="box"><input type="checkbox" data-id="dec-archive"></span><span class="badge b-watch">decide</span><label><span class="t">⌘⇧A while editing archives the open note</span> — by design it archives the focused note even mid-typing (reversible, tab stays valid). Keep it, or guard it to only fire when you're NOT in the editor? <span class="hint">Tell me your call and I'll wire it.</span></label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="dec-empty"></span><span class="badge b-watch">decide</span><label><span class="t">Empty-state edge</span> — if a corpus has <i>only</i> archived/trashed notes (zero visible), the island empty-state shows. Acceptable, or should it still show the sidebar? <span class="hint">Unlikely in practice (Inbox welcome note prevents it).</span></label></div>
+      <div class="row"><span class="box"><input type="checkbox" data-id="dec-slashcode"></span><span class="badge b-watch">decide</span><label><span class="t">Slash "Code" = inline backticks</span> — there's no fenced code-block primitive yet, so <code>/code</code> inserts inline <code>``</code>. Fine for now, or is a fenced block a Stage-2 priority?</label></div>
+    </div>
+  </section>
+
+  <section class="notes">
+    <div class="sec-head"><h2>📝 Found something? Jot it here</h2></div>
+    <textarea id="notes" placeholder="Bugs, rough edges, ideas — anything you hit while testing. (Saved in this browser; paste it back to me when you're done.)"></textarea>
+  </section>
+
+  <footer>rotli · Stage 1 testing map · 2026-06-13 · progress saved locally in this browser</footer>
+</div>
+
+<script>
+  const KEY = "rotli-testmap-v1";
+  const boxes = Array.from(document.querySelectorAll('input[type=checkbox][data-id]'));
+  const notes = document.getElementById('notes');
+  const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
+  function paint(){
+    let done = 0;
+    boxes.forEach(b => { if(b.checked) done++; b.closest('.row').classList.toggle('done', b.checked); });
+    document.getElementById('done').textContent = done;
+    document.getElementById('total').textContent = boxes.length;
+    const pct = boxes.length ? Math.round(done/boxes.length*100) : 0;
+    document.getElementById('pct').textContent = pct + '%';
+    document.getElementById('pfill').style.width = pct + '%';
+  }
+  function save(){
+    const s = {notes: notes.value};
+    boxes.forEach(b => s[b.dataset.id] = b.checked);
+    localStorage.setItem(KEY, JSON.stringify(s));
+  }
+  boxes.forEach(b => { b.checked = !!saved[b.dataset.id]; b.addEventListener('change', () => { paint(); save(); }); });
+  notes.value = saved.notes || "";
+  notes.addEventListener('input', save);
+  window.resetAll = () => { if(confirm('Clear all checks and notes?')){ localStorage.removeItem(KEY); boxes.forEach(b=>b.checked=false); notes.value=""; paint(); } };
+  paint();
+</script>
+</body>
+</html>
