@@ -778,8 +778,7 @@
     opacity var(--motion-enter) var(--motion-ease),
     margin-top var(--motion-enter) var(--motion-ease);
 }
-.folders,
-.notelist {
+.rail-wrap {
   transition:
     flex-basis var(--motion-enter) var(--motion-ease),
     opacity var(--motion-enter) var(--motion-ease);
@@ -799,14 +798,12 @@
   margin-top: -50px;
   transition-duration: var(--motion-exit);
 }
-[data-focus="true"] .folders,
-[data-focus="true"] .notelist {
+/* focus mode collapses the whole sidebar rail (was .folders/.notelist before
+   the 2026-06-13 single-sidebar consolidation) */
+[data-focus="true"] .rail-wrap {
   flex-basis: 0;
   opacity: 0;
   pointer-events: none;
-  padding-left: 0;
-  padding-right: 0;
-  border-right-width: 0;
   overflow: hidden;
   transition-duration: var(--motion-exit);
 }

@@ -196,10 +196,8 @@
   padding: 10px;
   background: transparent;
 }
-:root[data-theme="glass-light"] .folders,
-:root[data-theme="glass-dark"] .folders,
-:root[data-theme="glass-light"] .notelist,
-:root[data-theme="glass-dark"] .notelist,
+:root[data-theme="glass-light"] .sidebar,
+:root[data-theme="glass-dark"] .sidebar,
 :root[data-theme="glass-light"] .pane,
 :root[data-theme="glass-dark"] .pane,
 :root[data-theme="glass-light"] .set-nav,
@@ -231,8 +229,7 @@
    dark wallpaper under glass-light (or a white canvas under glass-dark) must
    never invert the chrome's contrast. */
 :root[data-theme="glass-light"] .titlebar,
-:root[data-theme="glass-light"] .folders,
-:root[data-theme="glass-light"] .notelist,
+:root[data-theme="glass-light"] .sidebar,
 :root[data-theme="glass-light"] .pane,
 :root[data-theme="glass-light"] .set-nav,
 :root[data-theme="glass-light"] .set-main,
@@ -251,8 +248,7 @@
     0 12px 36px color-mix(in srgb, var(--glass-hue) 22%, transparent);
 }
 :root[data-theme="glass-dark"] .titlebar,
-:root[data-theme="glass-dark"] .folders,
-:root[data-theme="glass-dark"] .notelist,
+:root[data-theme="glass-dark"] .sidebar,
 :root[data-theme="glass-dark"] .pane,
 :root[data-theme="glass-dark"] .set-nav,
 :root[data-theme="glass-dark"] .set-main,
@@ -306,16 +302,14 @@
 
 /* — CLARITY (Settings → Appearance): clear glass shows the background through — */
 :root[data-glass-clarity="clear"][data-theme="glass-light"] .titlebar,
-:root[data-glass-clarity="clear"][data-theme="glass-light"] .folders,
-:root[data-glass-clarity="clear"][data-theme="glass-light"] .notelist,
+:root[data-glass-clarity="clear"][data-theme="glass-light"] .sidebar,
 :root[data-glass-clarity="clear"][data-theme="glass-light"] .pane,
 :root[data-glass-clarity="clear"][data-theme="glass-light"] .set-nav,
 :root[data-glass-clarity="clear"][data-theme="glass-light"] .set-main {
   background: rgba(255, 255, 255, 0.16);
 }
 :root[data-glass-clarity="clear"][data-theme="glass-dark"] .titlebar,
-:root[data-glass-clarity="clear"][data-theme="glass-dark"] .folders,
-:root[data-glass-clarity="clear"][data-theme="glass-dark"] .notelist,
+:root[data-glass-clarity="clear"][data-theme="glass-dark"] .sidebar,
 :root[data-glass-clarity="clear"][data-theme="glass-dark"] .pane,
 :root[data-glass-clarity="clear"][data-theme="glass-dark"] .set-nav,
 :root[data-glass-clarity="clear"][data-theme="glass-dark"] .set-main {
