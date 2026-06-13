@@ -43,6 +43,8 @@ import { findLeaf, leaves, usePanesStore } from "./panes";
 import { applyTheme } from "./theme";
 import {
   ALL_NOTES,
+  clampFoldersWidth,
+  clampListWidth,
   GLASS_BACKGROUNDS,
   GLASS_BLURS,
   GLASS_CANVASES,
@@ -109,6 +111,8 @@ interface PersistedSettings {
   showInDock: boolean;
   foldersCollapsed: boolean;
   listCollapsed: boolean;
+  foldersWidth: number;
+  listWidth: number;
   /** Hotkey overrides keyed by action id; null = explicitly unbound. */
   bindings: Record<string, string | null>;
   /** The per-note Aa layer — NEVER written into the .md files. */
@@ -149,6 +153,8 @@ function parseSettings(raw: string): PersistedSettings {
     showInDock: asBool(data.showInDock, false),
     foldersCollapsed: asBool(data.foldersCollapsed, false),
     listCollapsed: asBool(data.listCollapsed, false),
+    foldersWidth: clampFoldersWidth(typeof data.foldersWidth === "number" ? data.foldersWidth : 198),
+    listWidth: clampListWidth(typeof data.listWidth === "number" ? data.listWidth : 258),
     bindings,
     noteStyles,
   };
@@ -168,6 +174,8 @@ function applySettings(s: PersistedSettings): void {
     showInDock: s.showInDock,
     foldersCollapsed: s.foldersCollapsed,
     listCollapsed: s.listCollapsed,
+    foldersWidth: s.foldersWidth,
+    listWidth: s.listWidth,
   });
   useBindingsStore.setState({ overrides: s.bindings });
   useNoteStyleStore.setState({ styles: s.noteStyles });
@@ -375,6 +383,8 @@ function settingsSnapshot(): string {
     showInDock: ui.showInDock,
     foldersCollapsed: ui.foldersCollapsed,
     listCollapsed: ui.listCollapsed,
+    foldersWidth: ui.foldersWidth,
+    listWidth: ui.listWidth,
     bindings: useBindingsStore.getState().overrides,
     noteStyles: useNoteStyleStore.getState().styles,
   };

@@ -68,6 +68,12 @@ export const GLASS_CANVASES: { value: GlassCanvas; label: string }[] = [
 export const ALL_NOTES = "all";
 export const RECENT = "recent";
 
+/** Rail width clamps — small enough to tuck away, never wide enough to eat the editor. */
+export const clampFoldersWidth = (px: number): number =>
+  Math.min(340, Math.max(140, Math.round(px)));
+export const clampListWidth = (px: number): number =>
+  Math.min(460, Math.max(190, Math.round(px)));
+
 interface UiState {
   /** Explicit three-way setting. "system" mirrors the OS only while selected;
    * the default is "light" so demos are deterministic. */
@@ -118,6 +124,12 @@ interface UiState {
   setGlassCanvas: (canvas: GlassCanvas) => void;
 
   /** Rails collapse state — remembered per window, persisted in the shell. */
+  /** Rail widths (px) — drag the grip on a rail's right edge (Seth, 2026-06-12). */
+  foldersWidth: number;
+  setFoldersWidth: (px: number) => void;
+  listWidth: number;
+  setListWidth: (px: number) => void;
+
   foldersCollapsed: boolean;
   listCollapsed: boolean;
   toggleFolders: () => void;
@@ -216,6 +228,11 @@ export const useUiStore = create<UiState>((set, get) => ({
       const next = GLASS_TINTS[(i + 1) % GLASS_TINTS.length];
       return next ? { glassTint: next.value } : s;
     }),
+
+  foldersWidth: 198,
+  setFoldersWidth: (px) => set({ foldersWidth: clampFoldersWidth(px) }),
+  listWidth: 258,
+  setListWidth: (px) => set({ listWidth: clampListWidth(px) }),
 
   foldersCollapsed: false,
   listCollapsed: false,

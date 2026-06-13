@@ -29,6 +29,44 @@
   overflow: hidden;
 }
 
+/* — rail wraps: a rail + its resize grip; width rides the --folders-w /
+   --list-w vars (drag-resizable, persisted — Seth 2026-06-12) — */
+.rail-wrap {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.rail-wrap:has(> .folders) {
+  flex-basis: var(--folders-w, 198px);
+}
+.rail-wrap:has(> .notelist) {
+  flex-basis: var(--list-w, 258px);
+}
+.rail-wrap > .folders,
+.rail-wrap > .notelist {
+  flex: 1 1 auto;
+}
+.railgrip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -4px;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 4;
+}
+.railgrip.dragging::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: color-mix(in srgb, var(--rotli-cocoa) 24%, transparent);
+}
+
 /* — folders rail (gate: 198px) — */
 .folders {
   flex: 0 0 198px;

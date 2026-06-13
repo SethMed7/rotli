@@ -43,7 +43,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 11px 14px 10px;
+  height: 52px; /* fixed so the native traffic lights (conf: x18/y20) center */
+  padding: 0 14px;
   border-bottom: 1px solid var(--border);
   background: var(--ground);
   user-select: none;
@@ -89,6 +90,14 @@
   align-items: center;
   padding-left: 11px;
   border-left: 1px solid var(--border);
+}
+/* hairline between the pane/tab buttons and the theme/settings cluster */
+.tb-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 5px;
+  flex: 0 0 auto;
 }
 .tb-spacer {
   flex: 1;

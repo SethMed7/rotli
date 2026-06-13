@@ -81,6 +81,38 @@ export function Titlebar() {
       )}
       <div className="tb-spacer" onMouseDown={onDragRegionMouseDown} />
       <div className="tb-actions">
+        {/* panes & tabs, visible (Seth 2026-06-12: keyboard-only is not discoverable) */}
+        {!settingsOpen && (
+          <>
+            <IconButton label="New tab — ⌘T" onClick={() => dispatch("tabs.new")}>
+              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                <path
+                  d="M12 5v14M5 12h14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </IconButton>
+            <IconButton label="Split — ⌘D (down: ⌘⇧D)" onClick={() => dispatch("panes.splitRight")}>
+              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                <rect
+                  x="3.2"
+                  y="4.2"
+                  width="17.6"
+                  height="15.6"
+                  rx="2.6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+                <path d="M12 4.2v15.6" stroke="currentColor" strokeWidth="1.8" />
+              </svg>
+            </IconButton>
+            <span className="tb-sep" aria-hidden="true" />
+          </>
+        )}
         {/* sun = theme, in every approved titlebar frame (r1 tip "Theme — light";
             r2/r4/r5 frame A). The sun cycles the four solid themes; while glass
             mode is on the slot becomes the tint cycler instead (Seth, 2026-06-12). */}

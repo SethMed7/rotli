@@ -210,15 +210,18 @@
   border-radius: var(--r-window);
   overflow: hidden;
 }
-/* the titlebar floats like the panels (it sits above them so its tooltips and
-   popovers never slip underneath) */
+/* the titlebar in glass: anchored to the window top (so the native traffic
+   lights stay vertically centered with its content — one conf position fits
+   every mode), side-inset like the panels, rounded below; above the panels so
+   tooltips and popovers never slip underneath */
 :root[data-theme="glass-light"] .titlebar,
 :root[data-theme="glass-dark"] .titlebar {
   position: relative;
   z-index: 6;
-  margin: 10px 10px 0;
+  margin: 0 10px;
   border: 1px solid;
-  border-radius: var(--r-window);
+  border-top: none;
+  border-radius: 0 0 var(--r-window) var(--r-window);
 }
 
 /* chrome becomes glass: heavy blur + saturation, a specular top edge, a soft
