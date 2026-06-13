@@ -249,21 +249,14 @@ export function registerDefaultActions(): void {
   });
 
   // — chrome —
-  // ⌘0 keeps its muscle memory, now driving the ONE sidebar (Seth, 2026-06-13:
-  // folders + note-list collapsed into a single navigator; the separate
-  // chrome.toggleList ⌥⌘L is retired).
-  registerAction({
-    id: "chrome.toggleFolders",
-    title: "Toggle sidebar",
-    defaultChord: "Meta+0",
-    run: () => useUiStore.getState().toggleSidebar(),
-  });
-  // the unified sidebar toggle (Seth, 2026-06-13): hides/shows the sidebar —
-  // the inline button + the warm-edge restore strip
+  // ONE sidebar toggle (Seth, 2026-06-13: folders + note-list collapsed into a
+  // single navigator; chrome.toggleList ⌥⌘L retired). ⌘0 keeps its muscle
+  // memory; the inline .sidebtn and the warm-edge restore strip dispatch this
+  // same action — one row in Settings, not two.
   registerAction({
     id: "chrome.toggleSidebars",
-    title: "Show or hide sidebar",
-    defaultChord: null,
+    title: "Toggle sidebar",
+    defaultChord: "Meta+0",
     run: () => useUiStore.getState().toggleSidebar(),
   });
 

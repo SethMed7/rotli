@@ -8,6 +8,7 @@
 
 import { type CSSProperties, type PointerEvent, useState } from "react";
 import { useNotes } from "../services/hooks";
+import { DEST } from "../services/destinations";
 import { useUiStore } from "../state/ui";
 import { EmptyState } from "./EmptyState";
 import { Sidebar } from "./Sidebar";
@@ -53,9 +54,23 @@ export function NotesSurface() {
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
   const [revealed, setRevealed] = useState(false);
   const allNotes = useNotes().data;
+  const archived = useNotes(DEST.archive).data;
+  const trashed = useNotes(DEST.trash).data;
 
-  // no notes at all → the island empty state (r1 frame E), nothing else
-  if (allNotes && allNotes.length === 0) return <EmptyState />;
+  // the island empty state (r1 frame E) shows ONLY when the corpus is TRULY
+  // empty. If anything sits in Archive/Trash, keep the sidebar so those notes
+  // stay reachable and restorable — never strand them behind the empty state
+  // (Seth, 2026-06-13).
+  if (
+    allNotes &&
+    archived &&
+    trashed &&
+    allNotes.length === 0 &&
+    archived.length === 0 &&
+    trashed.length === 0
+  ) {
+    return <EmptyState />;
+  }
 
   const railVars = { "--sidebar-w": `${sidebarWidth}px` } as CSSProperties;
 

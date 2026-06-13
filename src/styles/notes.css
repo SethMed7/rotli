@@ -837,6 +837,11 @@
   animation: rail-in var(--motion-enter) var(--motion-ease);
   z-index: 8;
 }
+/* the reveal overlay honors the persisted width, not the 240px .sidebar
+   fallback (the overlay sidebar is not inside a .rail-wrap) (Seth, 2026-06-13) */
+.rail-overlay > .sidebar {
+  flex: 0 0 var(--sidebar-w, 240px);
+}
 @keyframes rail-in {
   from {
     opacity: 0;

@@ -79,6 +79,7 @@
       <span>🟠 <b>You</b> — needs the real Tauri window</span>
       <span>🟡 <b>Decide</b> — a judgment call</span>
     </div>
+    <div style="margin-top:15px;font-size:13px;color:var(--olive-text);background:color-mix(in srgb,var(--success) 13%,transparent);border:1px solid color-mix(in srgb,var(--success) 32%,transparent);border-radius:14px;padding:9px 16px;display:inline-block;max-width:660px;line-height:1.55;text-align:left;">✦ <b>Fixed in my pre-test review</b>, so you won't hit them: focus-mode &amp; glass-mode sidebar · empty-state no longer strands you when only Archive/Trash hold notes · collapsed-reveal honors your saved width · one "Toggle sidebar" row in Settings (was two).</div>
   </header>
 
   <div class="progress">
@@ -180,7 +181,6 @@
     <div class="sec-head"><h2>10 · Decisions to make</h2><span class="n">design calls before Stage 2</span></div>
     <div class="card">
       <div class="row"><span class="box"><input type="checkbox" data-id="dec-archive"></span><span class="badge b-watch">decide</span><label><span class="t">⌘⇧A while editing archives the open note</span> — by design it archives the focused note even mid-typing (reversible, tab stays valid). Keep it, or guard it to only fire when you're NOT in the editor? <span class="hint">Tell me your call and I'll wire it.</span></label></div>
-      <div class="row"><span class="box"><input type="checkbox" data-id="dec-empty"></span><span class="badge b-watch">decide</span><label><span class="t">Empty-state edge</span> — if a corpus has <i>only</i> archived/trashed notes (zero visible), the island empty-state shows. Acceptable, or should it still show the sidebar? <span class="hint">Unlikely in practice (Inbox welcome note prevents it).</span></label></div>
       <div class="row"><span class="box"><input type="checkbox" data-id="dec-slashcode"></span><span class="badge b-watch">decide</span><label><span class="t">Slash "Code" = inline backticks</span> — there's no fenced code-block primitive yet, so <code>/code</code> inserts inline <code>``</code>. Fine for now, or is a fenced block a Stage-2 priority?</label></div>
     </div>
   </section>
