@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>rotli — Roadmap</title>
+<style>
+  @font-face { font-family:"General Sans"; src:url("../src/brand/fonts/GeneralSans-Variable.woff2") format("woff2"); font-weight:200 700; font-display:swap; }
+  @font-face { font-family:"Satoshi"; src:url("../src/brand/fonts/Satoshi-Variable.woff2") format("woff2"); font-weight:300 900; font-display:swap; }
+
+  :root{
+    --cocoa:#3A3028; --clay:#C97E62; --peach:#F2D6C2; --linen:#F8F2E9; --olive:#8D9A76;
+    --clay-text:#8F4E37; --olive-text:#5F6B49;
+    --ground:#F8F2E9; --surface:#FFFFFF; --surface-2:#F1E7D8; --tint:#F2D6C2;
+    --text:#3A3028; --muted:#6E6155; --border:#E7DBC9; --accent:#C97E62; --accent-text:#8F4E37; --success:#8D9A76;
+    --display:"Satoshi","General Sans",ui-sans-serif,-apple-system,system-ui,sans-serif;
+    --body:"General Sans",ui-sans-serif,-apple-system,system-ui,sans-serif;
+    --r-card:14px; --r-pill:999px; --r-inner:8px;
+    --shadow:0 18px 50px -22px rgba(58,48,40,.45);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ground:#241D18; --surface:#2E2620; --surface-2:#392F28; --tint:#3E332B;
+      --text:#F1E7DA; --muted:#B7A593; --border:#3D3229; --accent:#C97E62; --accent-text:#C97E62;
+      --clay-text:#D79A80; --olive-text:#A7B58C;
+      --shadow:0 18px 50px -22px rgba(0,0,0,.6);
+    }
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:var(--body); color:var(--text); background:var(--ground);
+    line-height:1.6; -webkit-font-smoothing:antialiased; font-size:16px;
+    padding:0 24px 96px;
+  }
+  .wrap{max-width:1080px; margin:0 auto;}
+
+  /* — header — */
+  header{padding:64px 0 28px; text-align:center;}
+  .wordmark{height:46px; width:auto;}
+  .tagline{color:var(--muted); margin-top:14px; font-size:15px;}
+  .tagline b{color:var(--text); font-weight:600;}
+  .meta{margin-top:22px; display:inline-flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center;}
+  .chip{
+    font-size:12.5px; font-weight:600; letter-spacing:.02em;
+    background:var(--surface-2); color:var(--muted); border:1px solid var(--border);
+    border-radius:var(--r-pill); padding:5px 13px;
+  }
+  .chip.live{color:var(--olive-text);} .chip.live::before{content:"●"; color:var(--success); margin-right:6px;}
+
+  .hero{
+    margin:30px auto 8px; display:block; max-width:780px; width:100%;
+    border-radius:var(--r-card); border:1px solid var(--border); box-shadow:var(--shadow);
+  }
+
+  /* — section — */
+  section{margin-top:54px;}
+  .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:20px; flex-wrap:wrap;}
+  .sec-head h2{font-family:var(--display); font-weight:700; font-size:23px; letter-spacing:-.01em;}
+  .sec-head .lead{color:var(--muted); font-size:14px;}
+  .rule{height:1px; background:var(--border); flex:1; min-width:40px; align-self:center;}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:14px;}
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r-card);
+    padding:18px 18px 16px; position:relative; overflow:hidden;
+  }
+  .card::before{content:""; position:absolute; left:0; top:14px; bottom:14px; width:3px; border-radius:0 3px 3px 0; background:var(--bar,var(--border));}
+  .card.done{--bar:var(--success);}
+  .card.now{--bar:var(--clay);}
+  .card.next{--bar:var(--accent);}
+  .card.horizon{--bar:color-mix(in srgb,var(--muted) 50%,transparent);}
+  .card h3{font-size:14.5px; font-weight:650; display:flex; align-items:center; gap:9px; margin-bottom:9px; padding-left:8px;}
+  .card h3 .ic{font-size:15px; line-height:1; filter:grayscale(.1);}
+  .card ul{list-style:none; padding-left:8px; display:flex; flex-direction:column; gap:7px;}
+  .card li{font-size:13.5px; color:var(--muted); padding-left:18px; position:relative; line-height:1.5;}
+  .card li::before{position:absolute; left:0; top:0; font-size:12px;}
+  .card.done li::before{content:"✓"; color:var(--success); font-weight:700;}
+  .card.now li::before{content:"◆"; color:var(--clay); font-size:10px; top:2px;}
+  .card.next li::before{content:"→"; color:var(--accent); font-weight:700;}
+  .card.horizon li::before{content:"○"; color:var(--muted); font-size:10px; top:2px;}
+  .card li b{color:var(--text); font-weight:600;}
+  .card li code{font-family:ui-monospace,Menlo,monospace; font-size:12px; background:var(--surface-2); padding:1px 5px; border-radius:5px; color:var(--text);}
+  .tag{display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 7px; border-radius:var(--r-pill); margin-left:4px; vertical-align:1px;}
+  .tag.warn{background:color-mix(in srgb,var(--clay) 18%,transparent); color:var(--clay-text);}
+  .tag.v1{background:color-mix(in srgb,var(--success) 20%,transparent); color:var(--olive-text);}
+
+  /* legend */
+  .legend{display:flex; gap:18px; flex-wrap:wrap; justify-content:center; margin-top:18px; color:var(--muted); font-size:12.5px;}
+  .legend span{display:inline-flex; align-items:center; gap:7px;}
+  .dot{width:9px; height:9px; border-radius:50%;}
+  .dot.done{background:var(--success);} .dot.now{background:var(--clay);} .dot.next{background:var(--accent);} .dot.horizon{background:color-mix(in srgb,var(--muted) 50%,transparent);}
+
+  footer{margin-top:64px; text-align:center; color:var(--muted); font-size:13px; border-top:1px solid var(--border); padding-top:28px;}
+  footer img{height:24px; opacity:.9; margin-bottom:8px; display:inline-block;}
+  footer em{display:block; margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <img class="wordmark" src="../src/brand/logo/wordmark.svg" alt="rotli" onerror="this.style.display='none'"/>
+    <p class="tagline"><b>A warm, local-first notes app that lives in your Mac's menu bar.</b><br>One brain, six fronts — where we are, and what's next.</p>
+    <div class="meta">
+      <span class="chip">Stage 1 · graduated 2026-06-12</span>
+      <span class="chip live">Updated 2026-06-13</span>
+      <span class="chip">Tauri v2 · React 18 · Bun</span>
+    </div>
+    <div class="legend">
+      <span><i class="dot done"></i> Shipped &amp; verified</span>
+      <span><i class="dot now"></i> Now — verify &amp; polish</span>
+      <span><i class="dot next"></i> Next — to build</span>
+      <span><i class="dot horizon"></i> Horizon</span>
+    </div>
+    <img class="hero" src="media/rotli-warm-light.png" alt="rotli — Warm Light" onerror="this.style.display='none'"/>
+  </header>
+
+  <!-- ───────────────── SHIPPED ───────────────── -->
+  <section>
+    <div class="sec-head"><h2>Shipped</h2><span class="lead">the foundation + today's redesign — all verified (tsc · hex · vite build · cargo&nbsp;test 21/21 · Playwright)</span><span class="rule"></span></div>
+    <div class="grid">
+
+      <div class="card done">
+        <h3><span class="ic">🪟</span> The shell</h3>
+        <ul>
+          <li>Menu-bar <b>visitor</b> — no dock icon, no ⌘Tab</li>
+          <li><code>⌥Space</code> summons · dismiss and it's gone</li>
+          <li><code>⌥C</code> quick capture from anywhere → Inbox</li>
+          <li>Stay-open &amp; show-in-Dock settings; tray toggle</li>
+        </ul>
+      </div>
+
+      <div class="card done">
+        <h3><span class="ic">🗂️</span> The corpus</h3>
+        <ul>
+          <li>Every note a plain <code>.md</code> in <code>~/Documents/rotli</code></li>
+          <li>4–5 line frontmatter · atomic writes · fs watcher</li>
+          <li><code>.rotli/</code> index + settings + viewstate — fully rebuildable</li>
+          <li>Persistence: theme, panes, widths, selection all remembered</li>
+        </ul>
+      </div>
+
+      <div class="card done">
+        <h3><span class="ic">✍️</span> Hybrid editor</h3>
+        <ul>
+          <li>Raw active line, everything else renders</li>
+          <li>Lists · tasks · quotes · <b>bold/italic/underline/strike/code/highlight/link</b></li>
+          <li>Floating format bar · <code>Aa</code> typography (never written to files)</li>
+          <li>Multi-line text selection across rendered lines</li>
+        </ul>
+      </div>
+
+      <div class="card done">
+        <h3><span class="ic">🔲</span> Panes &amp; tabs</h3>
+        <ul>
+          <li>Two labeled split buttons — <b>right</b> (<code>⌘D</code>) · <b>down</b> (<code>⌘⇧D</code>)</li>
+          <li>A tab strip in <b>every</b> pane, close ×, drag to reorder</li>
+          <li>Drag tabs across panes · pull to a pane edge to split</li>
+          <li>Drag-resizable dividers &amp; rails, all remembered</li>
+        </ul>
+      </div>
+
+      <div class="card done">
+        <h3><span class="ic">🎨</span> Six appearances</h3>
+        <ul>
+          <li>Warm Light · Warm Dark · Paper · Charcoal</li>
+          <li><b>Liquid Glass</b> — 4 hues, frosted/clear, paper canvas</li>
+          <li>Sidebar now frosts with the glass (fixed today)</li>
+          <li>Focus mode <code>⌥⌘F</code> — one centered column (fixed today)</li>
+        </ul>
+      </div>
+
+      <div class="card done">
+        <h3><span class="ic">🧭</span> Unified sidebar <span class="tag v1">new</span></h3>
+        <ul>
+          <li>One clean compact tree (replaced two panels), one toggle</li>
+          <li>Destinations: <b>Inbox · Brain · Storage · Archive · Trash</b></li>
+          <li>Expand inline to title+date rows · nested folders · live counts</li>
+          <li>Counts &amp; views exclude Archive/Trash</li>
+        </ul>
+      </div>
+
+      <div class="card done">
+        <h3><span class="ic">♻️</span> Never-delete lifecycle <span class="tag v1">new</span></h3>
+        <ul>
+          <li><b>rotli never removes a file from disk</b> — Finder is the only hard delete</li>
+          <li>Archive / Trash / Restore = recoverable <i>moves</i> (id preserved)</li>
+          <li>Hover buttons · drag-onto-destination · <code>⌘⇧A</code> archive</li>
+          <li><code>origin</code> frontmatter restores a note to where it came from</li>
+        </ul>
+      </div>
+
+      <div class="card done">
+        <h3><span class="ic">⌨️</span> Discoverability <span class="tag v1">new</span></h3>
+        <ul>
+          <li><b>Hold ⌘</b> → a grouped map of every shortcut</li>
+          <li>Focused-list <b>j/k</b> nav (Enter open · <code>/</code> filter · <code>m</code> menu)</li>
+          <li>Editor <b>slash menu</b> — <code>/</code> inserts headings/lists/quote/code</li>
+          <li><code>⌘K</code> palette: notes + every action · every hotkey rebindable</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ───────────────── NOW ───────────────── -->
+  <section>
+    <div class="sec-head"><h2>Now — verify &amp; polish</h2><span class="lead">surfaced by the post-redesign readiness audit, before full hands-on testing</span><span class="rule"></span></div>
+    <div class="grid">
+
+      <div class="card now">
+        <h3><span class="ic">🧪</span> Live on-disk test <span class="tag warn">do first</span></h3>
+        <ul>
+          <li>Run <code>bun run tauri dev</code> and exercise move/archive/trash/<b>restore</b> on a real corpus</li>
+          <li>Confirm files physically move under <code>Archive/</code>·<code>Trash/</code> with an <code>origin:</code> line, and restore returns them</li>
+          <li>The TS→IPC→Rust seam is the one path verified only in-memory + by <code>cargo&nbsp;test</code></li>
+        </ul>
+      </div>
+
+      <div class="card now">
+        <h3><span class="ic">⚖️</span> Decisions &amp; edges</h3>
+        <ul>
+          <li><b><code>⌘⇧A</code> archives the note you're editing</b> — intended, or guard to non-editing focus?</li>
+          <li>EmptyState shows if <i>only</i> Archive/Trash hold notes (Inbox welcome note normally prevents this)</li>
+          <li>Capture → Inbox under the shell (separate webview) — confirm live</li>
+        </ul>
+      </div>
+
+      <div class="card now">
+        <h3><span class="ic">🧹</span> Cosmetic cleanup</h3>
+        <ul>
+          <li>Collapsed-reveal overlay uses a 240px fallback, not the saved width</li>
+          <li>Two near-identical "toggle sidebar" actions in Settings → Hotkeys</li>
+          <li>Orphaned <code>.folders</code>/<code>.notelist</code> CSS comments to sweep</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ───────────────── NEXT ───────────────── -->
+  <section>
+    <div class="sec-head"><h2>Next — to build</h2><span class="lead">the near roadmap</span><span class="rule"></span></div>
+    <div class="grid">
+
+      <div class="card next">
+        <h3><span class="ic">🧠</span> smBrain wiring <span class="tag warn">planned</span></h3>
+        <ul>
+          <li>Point <b>Brain → <code>~/smBrain</code></b> (you're building smBrain now — untouched)</li>
+          <li><code>CorpusRoot{id,label,abs_path}</code> multi-root; ids become <code>root:path</code></li>
+          <li>Per-destination directory picker — "point Storage into Brain, or separate"</li>
+          <li>Today's reserved-folder model upgrades cleanly into it</li>
+        </ul>
+      </div>
+
+      <div class="card next">
+        <h3><span class="ic">🏷️</span> Tags</h3>
+        <ul>
+          <li>A <code>#hashtag</code> model (parse + index across the corpus)</li>
+          <li>A <b>Tags</b> lens in the sidebar (the reference's "TAGS")</li>
+          <li>Multi-select union filtering · hierarchical tags</li>
+        </ul>
+      </div>
+
+      <div class="card next">
+        <h3><span class="ic">📁</span> Corpus actions</h3>
+        <ul>
+          <li>Folder <b>rename / delete</b> (currently deferred — service throws)</li>
+          <li><b>Empty Trash</b> — the only hard delete (<code>corpus_purge</code> built, unwired)</li>
+          <li>Right-click context menus (the keyboard <code>m</code> menu exists today)</li>
+        </ul>
+      </div>
+
+      <div class="card next">
+        <h3><span class="ic">🔎</span> The index → real search</h3>
+        <ul>
+          <li>SQLite <b>FTS5</b> — <code>⌘K</code> becomes true full-text search</li>
+          <li>Fenced <b>code blocks</b> (slash "Code" is inline backticks today)</li>
+        </ul>
+      </div>
+
+      <div class="card next">
+        <h3><span class="ic">🎙️</span> Dictation → v1 <span class="tag v1">v1</span></h3>
+        <ul>
+          <li>Bundled local STT (Parakeet), cleanup by default</li>
+          <li>Speak it; the corpus stays plain markdown</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ───────────────── HORIZON ───────────────── -->
+  <section>
+    <div class="sec-head"><h2>Horizon — the six fronts</h2><span class="lead">one brain, six fronts — Notes is live; the rest read the same corpus</span><span class="rule"></span></div>
+    <div class="grid">
+      <div class="card horizon">
+        <h3><span class="ic">🌅</span> The modules</h3>
+        <ul>
+          <li><b>Chat</b> — talk with your corpus</li>
+          <li><b>Voice</b> — speak it</li>
+          <li><b>Memory</b> — recall across everything</li>
+          <li><b>Inbox</b> &amp; <b>Board</b> — feed it &amp; arrange it</li>
+        </ul>
+      </div>
+      <div class="card horizon">
+        <h3><span class="ic">🧩</span> The principle</h3>
+        <ul>
+          <li>The folder of files <i>is</i> the product — every front is a reader</li>
+          <li>Nothing phones home · no account · offline is the default</li>
+          <li>Warm, quiet, instant · free local forever</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <img src="../src/brand/logo/r-mark.svg" alt="r" onerror="this.style.display='none'"/>
+    <div>rotli roadmap · generated 2026-06-13</div>
+    <em>Warm, quiet, instant. Free local forever.</em>
+  </footer>
+
+</div>
+</body>
+</html>
