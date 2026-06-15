@@ -178,12 +178,14 @@
   left: 12px;
   margin-left: 0;
 }
-.tb-trail .tip {
+.tb-trail .tip,
+.nl-top .icobtn .tip {
   left: auto;
   right: 0;
   transform: none;
 }
-.tb-trail .tip::after {
+.tb-trail .tip::after,
+.nl-top .icobtn .tip::after {
   left: auto;
   right: 12px;
   margin-left: 0;
