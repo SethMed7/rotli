@@ -47,6 +47,71 @@ pub fn default_corpus_root(app: &tauri::AppHandle) -> PathBuf {
         })
 }
 
+/// Where the chosen corpus root is remembered — OUTSIDE the corpus (it can
+/// move): the app config dir. Missing/empty → fall back to the default root.
+fn root_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
+    use tauri::Manager;
+    app.path()
+        .app_config_dir()
+        .ok()
+        .map(|d| d.join("corpus-root.txt"))
+}
+
+pub fn read_saved_root(app: &tauri::AppHandle) -> Option<PathBuf> {
+    let raw = fs::read_to_string(root_config_file(app)?).ok()?;
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(trimmed))
+    }
+}
+
+pub fn write_saved_root(app: &tauri::AppHandle, root: &Path) -> std::io::Result<()> {
+    let file = root_config_file(app)
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no app config dir"))?;
+    if let Some(parent) = file.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(file, root.to_string_lossy().as_bytes())
+}
+
+/// The corpus root in effect: the saved choice if it still exists, else the
+/// default `~/Documents/rotli`.
+pub fn resolve_root(app: &tauri::AppHandle) -> PathBuf {
+    read_saved_root(app)
+        .filter(|p| p.exists())
+        .unwrap_or_else(|| default_corpus_root(app))
+}
+
+/// Move the whole corpus into `new_root` (top-level entries, including
+/// `.rotli/`); the caller then persists the new root and relaunches. We refuse
+/// a non-empty target and a target inside the current root, so notes are never
+/// merged into — or nested under — someone else's files.
+pub fn relocate(old_root: &Path, new_root: &Path) -> Result<(), String> {
+    if old_root == new_root {
+        return Ok(());
+    }
+    if new_root.starts_with(old_root) {
+        return Err("Choose a folder that isn't inside the current notes folder.".into());
+    }
+    if new_root.exists() {
+        let mut entries = fs::read_dir(new_root).map_err(|e| e.to_string())?;
+        if entries.next().is_some() {
+            return Err("Pick an empty folder — rotli won't merge into existing files.".into());
+        }
+    } else {
+        fs::create_dir_all(new_root).map_err(|e| e.to_string())?;
+    }
+    for entry in fs::read_dir(old_root).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let to = new_root.join(entry.file_name());
+        fs::rename(entry.path(), &to)
+            .map_err(|e| format!("couldn't move {}: {e}", entry.file_name().to_string_lossy()))?;
+    }
+    Ok(())
+}
+
 // ─── time ────────────────────────────────────────────────────────────────────
 
 fn now_stamp() -> String {

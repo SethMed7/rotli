@@ -29,6 +29,24 @@ export async function hideCaptureWindow(): Promise<void> {
   await invoke("hide_capture_window");
 }
 
+/** The Quick Note window (Raycast-style floating note): summoned by its own
+ * global chord (default ⌥Q), hides on blur. toggle = show if hidden / behind,
+ * hide if focused. */
+export async function toggleQuickWindow(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("toggle_quick_window");
+}
+
+export async function showQuickWindow(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("show_quick_window");
+}
+
+export async function hideQuickWindow(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("hide_quick_window");
+}
+
 /** The summon law, applied from Rust: main visible → hide the app;
  * otherwise → the quick-capture card. */
 export async function summon(): Promise<void> {
@@ -172,6 +190,21 @@ export function corpusOverview(): Promise<CorpusOverview> {
   return corpusInvoke("corpus_overview");
 }
 
+/** Reveal the corpus folder in Finder. */
+export async function revealCorpus(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_reveal");
+}
+
+/** Open a native folder picker; if a (empty) destination is chosen, move the
+ * whole corpus there, persist it as the new root, and relaunch into it.
+ * Resolves false when the picker is cancelled; rejects with a clear message
+ * when the target isn't usable. */
+export async function relocateCorpus(): Promise<boolean> {
+  if (!isTauri()) return false;
+  return invoke<boolean>("corpus_relocate");
+}
+
 /** The `.rotli/` dot-files — opaque JSON strings the frontend owns. Missing
  * file reads as "{}". `background` carries the custom glass wallpaper. */
 export type SettingsFile = "settings" | "viewstate" | "background";
@@ -233,6 +266,37 @@ export function onCaptureAck(cb: (id: string) => void): () => void {
 export function onCaptureShow(cb: () => void): () => void {
   if (!isTauri()) return () => {};
   const unlisten = listen("rotli:capture-show", () => cb());
+  return () => void unlisten.then((fn) => fn());
+}
+
+/** Rust → quick webview: the card was just summoned (refocus the editor). */
+export function onQuickShow(cb: () => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen("rotli:quick-show", () => cb());
+  return () => void unlisten.then((fn) => fn());
+}
+
+export interface QuickStatePayload {
+  /** The capped set of quick-access note ids, in switcher order. */
+  ids: string[];
+  /** The note the window reopens on (remembers where you were). */
+  activeId: string | null;
+  /** Folder new quick notes are created in. */
+  folder: string;
+}
+
+/** Keep the quick-access set in step across the main + quick webviews — the
+ * same one-keymap-two-webviews pattern as rebinds. Only the MAIN window
+ * persists it (the single settings writer); the quick window emits its changes
+ * so main can record them. */
+export function emitQuickSet(state: QuickStatePayload): void {
+  if (!isTauri()) return;
+  void emit("rotli:quick-set", state);
+}
+
+export function onQuickSet(cb: (state: QuickStatePayload) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen<QuickStatePayload>("rotli:quick-set", (event) => cb(event.payload));
   return () => void unlisten.then((fn) => fn());
 }
 

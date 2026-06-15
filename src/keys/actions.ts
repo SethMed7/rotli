@@ -13,8 +13,16 @@ import {
 import { invalidateNotes } from "../services/hooks";
 import { inboxFolderId, notesService } from "../services/notes";
 import { captureHandle } from "../lib/captureHandle";
-import { hideMainWindow, summon, toggleMainWindow } from "../lib/tauri";
+import { quickHandle } from "../lib/quickHandle";
+import {
+  hideMainWindow,
+  hideQuickWindow,
+  summon,
+  toggleMainWindow,
+  toggleQuickWindow,
+} from "../lib/tauri";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
+import { cycleQuick, removeQuickNote } from "../state/quick";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import { registerAction } from "./registry";
 
@@ -80,6 +88,13 @@ export function registerDefaultActions(): void {
     defaultChord: "Alt+C",
     global: true, // lives in Rust; dispatch() works for review automation
     run: () => void summon(),
+  });
+  registerAction({
+    id: "quick.summon",
+    title: "Quick note",
+    defaultChord: "Alt+Q",
+    global: true, // the floating Quick Note window; toggle lives in Rust
+    run: () => void toggleQuickWindow(),
   });
 
   // — the command layer —
@@ -272,13 +287,16 @@ export function registerDefaultActions(): void {
     ["editor.link", "Link", "link", null],
   ];
   for (const [id, title, mark, defaultChord] of marks) {
-    registerAction({ id, title, defaultChord, run: () => activeEditor()?.toggleMark(mark) });
+    // shared: the format chords act on activeEditor(), which resolves per
+    // webview — so they belong to the main AND the Quick Note window
+    registerAction({ id, title, defaultChord, shared: true, run: () => activeEditor()?.toggleMark(mark) });
   }
   for (const level of [1, 2, 3] as HeadingLevel[]) {
     registerAction({
       id: `editor.heading${level}`,
       title: `Heading ${level}`,
       defaultChord: null,
+      shared: true,
       run: () => activeEditor()?.setHeading(level),
     });
   }
@@ -293,6 +311,7 @@ export function registerDefaultActions(): void {
       id,
       title,
       defaultChord: null,
+      shared: true,
       run: () => activeEditor()?.toggleBlock(kind),
     });
   }
@@ -326,5 +345,58 @@ export function registerDefaultActions(): void {
     defaultChord: "Esc",
     surface: "capture",
     run: () => captureHandle()?.dismiss(),
+  });
+
+  // — the Quick Note window's own keys (surface: quick). new/search reach the
+  //   mounted component through quickHandle; cycle/remove act on the set store;
+  //   dismiss unwinds a transient (the search overlay) before hiding the window. —
+  registerAction({
+    id: "quick.new",
+    title: "Quick note — new",
+    defaultChord: "Meta+N",
+    surface: "quick",
+    run: () => quickHandle()?.newNote(),
+  });
+  registerAction({
+    id: "quick.search",
+    title: "Quick note — search & swap",
+    defaultChord: "Meta+K",
+    surface: "quick",
+    run: () => quickHandle()?.openSearch(),
+  });
+  registerAction({
+    id: "quick.next",
+    title: "Quick note — next",
+    defaultChord: "Meta+BracketRight",
+    surface: "quick",
+    run: () => cycleQuick(1),
+  });
+  registerAction({
+    id: "quick.prev",
+    title: "Quick note — previous",
+    defaultChord: "Meta+BracketLeft",
+    surface: "quick",
+    run: () => cycleQuick(-1),
+  });
+  registerAction({
+    id: "quick.remove",
+    title: "Quick note — remove from set",
+    defaultChord: null,
+    surface: "quick",
+    run: () => {
+      const id = useUiStore.getState().quickActiveId;
+      if (id) removeQuickNote(id);
+    },
+  });
+  registerAction({
+    id: "quick.dismiss",
+    title: "Quick note — dismiss",
+    defaultChord: "Esc",
+    surface: "quick",
+    run: () => {
+      // unwind a transient (the search overlay / a popover) before the window
+      if (useUiStore.getState().closeTopTransient()) return;
+      void hideQuickWindow();
+    },
   });
 }

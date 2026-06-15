@@ -21,6 +21,7 @@ tauri-build = { version = "2", features = [] }
 # macos-private-api: groundwork for the transparent always-on-top capture card (1c).
 tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-dialog = "2"                                        # native folder picker (move the corpus)
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Phase 2 — the corpus (plain .md files become real)

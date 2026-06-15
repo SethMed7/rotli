@@ -82,8 +82,22 @@ const KEY_LABELS: Record<string, string> = {
   Comma: ",",
   Period: ".",
   Slash: "/",
+  Backslash: "\\",
+  BracketLeft: "[",
+  BracketRight: "]",
+  Backquote: "`",
+  Minus: "−",
+  Equal: "=",
+  Semicolon: ";",
+  Quote: "'",
   Backspace: "⌫",
   Delete: "⌦",
+  Home: "↖",
+  End: "↘",
+  PageUp: "⇞",
+  PageDown: "⇟",
+  Tab: "⇥",
+  Space: "Space",
 };
 
 /** "Alt+Meta+F" → "⌥⌘F" (mac symbols, the gates' hint voice). */

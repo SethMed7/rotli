@@ -18,13 +18,22 @@ import {
   setDispatchSuspended,
 } from "../keys/registry";
 import { GLASS_BG_SRC } from "../lib/glassBackgrounds";
-import { corpusOverview, isTauri, setDockVisible, setHideOnBlur } from "../lib/tauri";
+import {
+  corpusOverview,
+  isTauri,
+  relocateCorpus,
+  revealCorpus,
+  setDockVisible,
+  setHideOnBlur,
+} from "../lib/tauri";
+import { useFolders } from "../services/hooks";
+import { isHidden } from "../services/destinations";
+import { setQuickFolderSynced } from "../state/quick";
 import {
   GLASS_BACKGROUNDS,
   GLASS_BLURS,
   GLASS_TINTS,
   SOLID_THEMES,
-  type ThemeFamily,
   useUiStore,
 } from "../state/ui";
 import {
@@ -47,6 +56,69 @@ const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = 
   { id: "plugins", label: "Plugins", glyph: PlusGlyph },
 ];
 
+// ——— shared settings controls (Seth, 2026-06-15) ———
+
+/** A real on/off switch — label + description on the left, a sliding track on
+ * the right. Replaces the old ambiguous dot-in-a-box "sysrow". */
+function Toggle({
+  on,
+  onChange,
+  title,
+  desc,
+}: {
+  on: boolean;
+  onChange: () => void;
+  title: string;
+  desc?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      className={on ? "swrow on" : "swrow"}
+      onClick={onChange}
+    >
+      <span className="swtext">
+        <span className="swt">{title}</span>
+        {desc && <span className="swd">{desc}</span>}
+      </span>
+      <span className="sw" aria-hidden="true">
+        <span className="swknob" />
+      </span>
+    </button>
+  );
+}
+
+/** A small segmented picker (reuses the .aaseg pills). */
+function Seg<T extends string>({
+  value,
+  options,
+  onPick,
+}: {
+  value: T;
+  options: [T, string][];
+  onPick: (v: T) => void;
+}) {
+  return (
+    <div className="segrow">
+      {options.map(([v, label]) => (
+        <button
+          type="button"
+          key={v}
+          className={value === v ? "aaseg sel" : "aaseg"}
+          aria-pressed={value === v}
+          onClick={() => onPick(v)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const prefersDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+
 // ——— Hotkeys: every registry action, grouped by area + searchable ———
 
 /** Sections derive from the action id prefix ("tabs.new" → Tabs) — no
@@ -54,6 +126,7 @@ const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = 
 const HK_SECTIONS: { prefix: string; label: string }[] = [
   { prefix: "app", label: "App" },
   { prefix: "capture", label: "Quick capture" },
+  { prefix: "quick", label: "Quick note" },
   { prefix: "notes", label: "Notes" },
   { prefix: "editor", label: "Editor" },
   { prefix: "tabs", label: "Tabs" },
@@ -201,6 +274,9 @@ function GeneralPane() {
   const setStayOpen = useUiStore((s) => s.setStayOpen);
   const showInDock = useUiStore((s) => s.showInDock);
   const setShowInDock = useUiStore((s) => s.setShowInDock);
+  const quickFolder = useUiStore((s) => s.quickFolder);
+  const folderOpts = (useFolders().data ?? []).filter((f) => !isHidden(f.id));
+  const hasCurrent = folderOpts.some((f) => f.id === quickFolder);
   return (
     <>
       <h3>General</h3>
@@ -208,36 +284,54 @@ function GeneralPane() {
         rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when
         you&rsquo;re living in it.
       </p>
-      <button
-        type="button"
-        className={stayOpen ? "sysrow on" : "sysrow"}
-        aria-pressed={stayOpen}
-        onClick={() => {
-          const next = !stayOpen;
-          setStayOpen(next);
-          void setHideOnBlur(!next);
-        }}
-      >
-        <span className="sysdot" aria-hidden="true" />
-        Stay open — don&rsquo;t hide when I click away
-      </button>
-      <button
-        type="button"
-        className={showInDock ? "sysrow on" : "sysrow"}
-        aria-pressed={showInDock}
-        onClick={() => {
-          const next = !showInDock;
-          setShowInDock(next);
-          void setDockVisible(next);
-        }}
-      >
-        <span className="sysdot" aria-hidden="true" />
-        Show in the Dock — otherwise rotli lives in the menu bar only
-      </button>
+      <div className="swgroup">
+        <Toggle
+          on={stayOpen}
+          title="Stay open"
+          desc="Don’t hide when I click away."
+          onChange={() => {
+            const next = !stayOpen;
+            setStayOpen(next);
+            void setHideOnBlur(!next);
+          }}
+        />
+        <Toggle
+          on={showInDock}
+          title="Show in the Dock"
+          desc="Otherwise rotli lives in the menu bar only."
+          onChange={() => {
+            const next = !showInDock;
+            setShowInDock(next);
+            void setDockVisible(next);
+          }}
+        />
+      </div>
       <p className="setnote">
         Either way the menu-bar icon stays, ⌥Space opens the app, and ⌥C is the one-breath
         capture — all rebindable in Hotkeys.
       </p>
+
+      <h4 className="sethead">Quick note</h4>
+      <p className="lead">
+        A floating note you summon with ⌥Q — pin up to five notes in it, cycle them with ‹ ›, and
+        ⌘K searches every note to swap one in. It always reopens where you left off and closes when
+        you click away.
+      </p>
+      <label className="setselect-row">
+        <span>New quick notes go to</span>
+        <select
+          className="setselect"
+          value={quickFolder}
+          onChange={(e) => setQuickFolderSynced(e.target.value)}
+        >
+          {!hasCurrent && <option value={quickFolder}>{quickFolder}</option>}
+          {folderOpts.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </select>
+      </label>
     </>
   );
 }
@@ -259,11 +353,6 @@ const THEME_SWATCH: Record<string, string> = {
   Charcoal: "var(--swatch-charcoal)",
 };
 
-const FAMILY_PAIR: Record<ThemeFamily, string> = {
-  warm: "Warm Light and Warm Dark",
-  mono: "Paper and Charcoal",
-};
-
 const TINT_SWATCH: Record<string, string> = {
   dusk: "var(--swatch-dusk)",
   blush: "var(--swatch-blush)",
@@ -276,6 +365,10 @@ function AppearancePane() {
   const setTheme = useUiStore((s) => s.setTheme);
   const themeFamily = useUiStore((s) => s.themeFamily);
   const setThemeFamily = useUiStore((s) => s.setThemeFamily);
+  const matchLightFamily = useUiStore((s) => s.matchLightFamily);
+  const setMatchLightFamily = useUiStore((s) => s.setMatchLightFamily);
+  const matchDarkFamily = useUiStore((s) => s.matchDarkFamily);
+  const setMatchDarkFamily = useUiStore((s) => s.setMatchDarkFamily);
   const glassMode = useUiStore((s) => s.glassMode);
   const setGlassMode = useUiStore((s) => s.setGlassMode);
   const glassTint = useUiStore((s) => s.glassTint);
@@ -319,40 +412,49 @@ function AppearancePane() {
           );
         })}
       </div>
-      <button
-        type="button"
-        className={followingSystem ? "sysrow on" : "sysrow"}
-        aria-pressed={followingSystem}
-        onClick={() =>
-          setTheme(
-            followingSystem
-              ? window.matchMedia("(prefers-color-scheme: dark)").matches
-                ? "dark"
-                : "light"
-              : "system",
-          )
-        }
-      >
-        <span className="sysdot" aria-hidden="true" />
-        Match the system — switch between{" "}
-        {glassMode ? "Glass Light and Glass Dark" : FAMILY_PAIR[themeFamily]} with macOS.
-      </button>
+      <Toggle
+        on={followingSystem}
+        title="Match the system"
+        desc="Follow macOS light / dark automatically."
+        onChange={() => setTheme(followingSystem ? (prefersDark() ? "dark" : "light") : "system")}
+      />
+      {followingSystem &&
+        (glassMode ? (
+          <p className="setnote">macOS picks Glass Light or Glass Dark while glass mode is on.</p>
+        ) : (
+          <div className="matchpick">
+            <div className="mprow">
+              <span className="mplabel">When light</span>
+              <Seg
+                value={matchLightFamily}
+                options={[
+                  ["warm", "Warm Light"],
+                  ["mono", "Paper"],
+                ]}
+                onPick={setMatchLightFamily}
+              />
+            </div>
+            <div className="mprow">
+              <span className="mplabel">When dark</span>
+              <Seg
+                value={matchDarkFamily}
+                options={[
+                  ["warm", "Warm Dark"],
+                  ["mono", "Charcoal"],
+                ]}
+                onPick={setMatchDarkFamily}
+              />
+            </div>
+          </div>
+        ))}
 
       <h4 className="sethead">Liquid Glass</h4>
       <p className="lead">
         A mode over your theme: floating glass panels on a background. While it&rsquo;s on, the
         titlebar sun becomes the tint dot — click it to cycle hues.
       </p>
-      <button
-        type="button"
-        className={glassMode ? "sysrow on" : "sysrow"}
-        aria-pressed={glassMode}
-        onClick={() => setGlassMode(!glassMode)}
-      >
-        <span className="sysdot" aria-hidden="true" />
-        Glass mode
-      </button>
-      {glassMode && (
+      <Toggle on={glassMode} title="Glass mode" onChange={() => setGlassMode(!glassMode)} />
+      <div className={glassMode ? "glassopts" : "glassopts off"} aria-hidden={!glassMode}>
         <>
           <div className="glassrows">
             <div className="glassrow">
@@ -458,70 +560,36 @@ function AppearancePane() {
             Your own image stays with your settings — quit and relaunch, it&rsquo;s still here.
           </p>
         </>
-      )}
+      </div>
     </>
   );
 }
 
-// ——— Storage: the corpus story (r1 frame F grammar). Inside the shell the
-//     pane is TRUTHFUL: the real root path and the real tree, straight from a
-//     disk scan (corpus_overview). The browser/dev surface keeps the
-//     illustrative tree — it mirrors the in-memory demo corpus it sits over. ———
-
-const TREE_MAX_ROWS = 12;
-
-/** The corpus as it actually exists, in the gate's tree grammar — folders
- * bold, files plain, `.rotli/` last; one quiet "… n more" when it outgrows
- * the card. No mock filenames ever reach this branch. */
-function RealCorpusTree({
-  root,
-  folders,
-  files,
-}: {
-  root: string;
-  folders: string[];
-  files: string[];
-}) {
-  const entries = [
-    ...folders.map((path) => ({ path, folder: true })),
-    ...files.map((path) => ({ path, folder: false })),
-  ].sort((a, b) => a.path.localeCompare(b.path));
-  const shown = entries.slice(0, TREE_MAX_ROWS);
-  const hidden = entries.length - shown.length;
-
-  return (
-    <div className="tree">
-      <i>{root}/</i>
-      <br />
-      {shown.map(({ path, folder }) => {
-        const parts = path.split("/");
-        const name = parts[parts.length - 1] ?? path;
-        const indent = "│   ".repeat(parts.length - 1);
-        return (
-          <span key={path}>
-            {indent}├─ {folder ? <b>{name}/</b> : name}
-            <br />
-          </span>
-        );
-      })}
-      {hidden > 0 && (
-        <>
-          ├─ … {hidden} more
-          <br />
-        </>
-      )}
-      └─ <i>.rotli/&nbsp;&nbsp;(index · settings)</i>
-    </div>
-  );
-}
+// ——— Storage: where the corpus lives + how to move it. The structure dump
+//     (file tree + a sample .md) is gone — the sidebar already IS the tree
+//     (Seth, 2026-06-15). What's left is the path, the storage options, and a
+//     way to relocate the whole folder. ———
 
 function StoragePane() {
   const real = useQuery({
     queryKey: ["corpus", "overview"],
     queryFn: corpusOverview,
     enabled: isTauri(),
-  }).data;
-  const rootPath = real?.root ?? "~/Documents/rotli";
+  });
+  const rootPath = real.data?.root ?? "~/Documents/rotli";
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const change = () => {
+    setErr(null);
+    setBusy(true);
+    relocateCorpus()
+      .then((moved) => {
+        if (moved) void real.refetch();
+      })
+      .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false));
+  };
 
   return (
     <>
@@ -539,7 +607,7 @@ function StoragePane() {
             <LaptopGlyph size={15} />
             This Mac
           </div>
-          <div className="sd">{rootPath} — plain files, works offline, free forever</div>
+          <div className="sd">Plain files, works offline, free forever.</div>
         </div>
         <div className="store later">
           <span className="soon">Later</span>
@@ -558,56 +626,23 @@ function StoragePane() {
           <div className="sd">iCloud · Google · OneDrive · Proton · WebDAV/NAS</div>
         </div>
       </div>
-      <div className="corpus">
-        {real ? (
-          <RealCorpusTree root={real.root} folders={real.folders} files={real.files} />
-        ) : (
-          <div className="tree">
-            <i>~/Documents/rotli/</i>
-            <br />
-            ├─ <b>Inbox/</b>
-            <br />
-            │&nbsp;&nbsp; └─ call-the-bank.md
-            <br />
-            ├─ <b>Work/</b>
-            <br />
-            │&nbsp;&nbsp; ├─ Myela/
-            <br />
-            │&nbsp;&nbsp; │&nbsp;&nbsp; └─ pricing-decision.md
-            <br />
-            │&nbsp;&nbsp; └─ 1-on-1s/
-            <br />
-            │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; └─ sarah.md
-            <br />
-            ├─ <b>Personal/</b>
-            <br />
-            │&nbsp;&nbsp; └─ Ideas/
-            <br />
-            │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; └─ rotli-notes…md
-            <br />
-            └─ <i>.rotli/&nbsp;&nbsp;(index · settings)</i>
-          </div>
-        )}
-        <div className="mdfile">
-          <i># Personal/Ideas/rotli-notes-first.md</i>
-          <br />
-          ---
-          <br />
-          created: 2026-06-11T09:42
-          <br />
-          updated: 2026-06-11T10:05
-          <br />
-          pinned: false
-          <br />
-          ---
-          <br />
-          Apple Notes feel, **markdown underneath**.
-          <br />
-          Local files, one structure the AI can read…
+      <div className="locrow">
+        <div className="loctext">
+          <span className="loclabel">Notes folder</span>
+          <code className="locpath">{rootPath}</code>
+        </div>
+        <div className="locact">
+          <button type="button" className="ghostbtn" onClick={() => void revealCorpus()}>
+            Reveal in Finder
+          </button>
+          <button type="button" className="ghostbtn" onClick={change} disabled={busy}>
+            {busy ? "Moving…" : "Move folder…"}
+          </button>
         </div>
       </div>
+      {err && <p className="setnote err">Couldn’t move the folder: {err}</p>}
       <p className="setnote">
-        Folders in the sidebar <strong>are</strong> folders on disk — one mental model. The hidden{" "}
+        Move takes every note with it and points rotli at the new home. The hidden{" "}
         <code>.rotli/</code> holds the search index and settings; deleting it loses nothing but a
         rebuild.
       </p>
@@ -619,7 +654,21 @@ function PluginsPane() {
   return (
     <>
       <h3>Plugins</h3>
-      <p className="lead">Plugins arrive later — breve will live here.</p>
+      <p className="lead">
+        Plugins extend rotli over the same corpus. The first one is on the way.
+      </p>
+      <div className="pluglist">
+        <div className="plugrow" aria-disabled="true">
+          <span className="plugmark" aria-hidden="true">
+            b
+          </span>
+          <span className="plugtext">
+            <span className="plugname">breve</span>
+            <span className="plugdesc">Your morning brief, drawn from your notes.</span>
+          </span>
+          <span className="plugsoon">Soon</span>
+        </div>
+      </div>
     </>
   );
 }
@@ -642,7 +691,6 @@ export function SettingsSurface() {
             />
           </svg>
           <span className="set-back-label">Back to notes</span>
-          <kbd>esc</kbd>
         </button>
         {NAV.map(({ id, label, glyph: G }) => (
           <button
@@ -657,11 +705,13 @@ export function SettingsSurface() {
         ))}
       </nav>
       <div className="set-main">
-        {pane === "general" && <GeneralPane />}
-        {pane === "hotkeys" && <HotkeysPane />}
-        {pane === "appearance" && <AppearancePane />}
-        {pane === "storage" && <StoragePane />}
-        {pane === "plugins" && <PluginsPane />}
+        <div className="set-body">
+          {pane === "general" && <GeneralPane />}
+          {pane === "hotkeys" && <HotkeysPane />}
+          {pane === "appearance" && <AppearancePane />}
+          {pane === "storage" && <StoragePane />}
+          {pane === "plugins" && <PluginsPane />}
+        </div>
       </div>
     </div>
   );

@@ -4,9 +4,11 @@ import "./styles/app.css";
 import "./styles/notes.css";
 import "./styles/editor.css";
 import "./styles/command.css";
+import "./styles/quick.css";
 import { CaptureCard } from "./components/CaptureCard";
 import { NotesSurface } from "./components/NotesSurface";
 import { Palette } from "./components/Palette";
+import { QuickNote } from "./components/QuickNote";
 import { SettingsSurface } from "./components/SettingsSurface";
 import { Titlebar } from "./components/Titlebar";
 import { WhichKey } from "./components/WhichKey";
@@ -14,10 +16,18 @@ import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
 import { useHeldModifier } from "./keys/useHeldModifier";
 import { GLASS_BG_SRC } from "./lib/glassBackgrounds";
-import { emitCaptureAck, isTauri, onCaptureSave, onCorpusChanged, onRebind } from "./lib/tauri";
+import {
+  emitCaptureAck,
+  isTauri,
+  onCaptureSave,
+  onCorpusChanged,
+  onQuickSet,
+  onRebind,
+} from "./lib/tauri";
 import { invalidateFolders, invalidateNotes } from "./services/hooks";
 import { inboxFolderId, notesService } from "./services/notes";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
+import { applyQuickState } from "./state/quick";
 import { applyTheme } from "./state/theme";
 import { useUiStore } from "./state/ui";
 
@@ -31,10 +41,13 @@ if (import.meta.env.DEV) {
 }
 
 /** Which surface this webview shows. Default = the main window;
- *  `?window=capture` = the quick-capture card. */
+ *  `?window=capture` = the quick-capture card; `?window=quick` = the floating
+ *  Quick Note window. */
 function surfaceFromUrl(): Surface {
   const param = new URLSearchParams(window.location.search).get("window");
-  return param === "capture" ? "capture" : "main";
+  if (param === "capture") return "capture";
+  if (param === "quick") return "quick";
+  return "main";
 }
 
 function MainShell() {
@@ -117,6 +130,8 @@ function MainShell() {
 export default function App() {
   const theme = useUiStore((s) => s.theme);
   const themeFamily = useUiStore((s) => s.themeFamily);
+  const matchLightFamily = useUiStore((s) => s.matchLightFamily);
+  const matchDarkFamily = useUiStore((s) => s.matchDarkFamily);
   const glassMode = useUiStore((s) => s.glassMode);
   const glassTint = useUiStore((s) => s.glassTint);
   const glassCanvas = useUiStore((s) => s.glassCanvas);
@@ -125,8 +140,12 @@ export default function App() {
   const surface = surfaceFromUrl();
 
   useEffect(
-    () => applyTheme(theme, themeFamily, glassMode, glassTint),
-    [theme, themeFamily, glassMode, glassTint],
+    () =>
+      applyTheme(theme, themeFamily, glassMode, glassTint, {
+        light: matchLightFamily,
+        dark: matchDarkFamily,
+      }),
+    [theme, themeFamily, glassMode, glassTint, matchLightFamily, matchDarkFamily],
   );
   useEffect(() => {
     document.documentElement.dataset.glassCanvas = glassCanvas;
@@ -164,5 +183,11 @@ export default function App() {
   // rebinds made in the other webview land here too (one keymap, two webviews)
   useEffect(() => onRebind(({ actionId, chord }) => applyRebind(actionId, chord)), []);
 
-  return surface === "capture" ? <CaptureCard /> : <MainShell />;
+  // the quick-access set is kept in step across webviews (the same pattern) —
+  // the quick window emits its edits, the main window records + persists them
+  useEffect(() => onQuickSet(applyQuickState), []);
+
+  if (surface === "capture") return <CaptureCard />;
+  if (surface === "quick") return <QuickNote />;
+  return <MainShell />;
 }

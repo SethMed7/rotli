@@ -7,20 +7,15 @@
 // `.panes.multi`). Overflow compresses to the 96px floor, then horizontally
 // scrolls behind linen fade masks — no dropdown.
 //
-// Tabs are HTML5-draggable: drag within a strip to reorder, onto another
-// strip to move, or onto a pane edge to split (the edge case lives in the
-// PaneTree body overlay). The strip itself is a drop target — pointer x vs
-// tab midpoints picks the insertion index and a 2px accent line previews it.
-// The lone-tab-in-lone-pane hides its × (closing it is a no-op anyway).
+// Tabs drag with POINTER events (Seth, 2026-06-15: HTML5 drag is dead in the
+// macOS WKWebView shell): drag within a strip to reorder, onto another strip to
+// move, or onto a pane edge to split. The gesture + hit-testing live in
+// lib/tabDrag; the strip just starts it on pointerdown and reads the store's
+// dropPreview to paint the 2px insertion line. The lone-tab-in-lone-pane hides
+// its × (closing it is a no-op anyway).
 
-import {
-  type DragEvent as ReactDragEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTabDrag } from "../lib/tabDrag";
 import { useNotes } from "../services/hooks";
 import { leaves, usePanesStore } from "../state/panes";
 import type { LeafNode, Tab } from "../types";
@@ -37,9 +32,13 @@ function tabLabel(tab: Tab, titles: Map<string, string>): string {
 export function TabStrip({ pane }: { pane: LeafNode }) {
   const activateTab = usePanesStore((s) => s.activateTab);
   const closeTabById = usePanesStore((s) => s.closeTabById);
-  const moveTab = usePanesStore((s) => s.moveTab);
   const draggingTab = usePanesStore((s) => s.draggingTab);
-  const setDraggingTab = usePanesStore((s) => s.setDraggingTab);
+  // the insertion index previewed for THIS strip (2px line), or null
+  const dropAt = usePanesStore((s) =>
+    s.dropPreview?.kind === "strip" && s.dropPreview.paneId === pane.id
+      ? s.dropPreview.index
+      : null,
+  );
   // the only tab of the only pane: closing it is a no-op, so hide its × — the
   // strip stays for the new always-visible law (Seth, 2026-06-13)
   const loneInLonePane = usePanesStore(
@@ -50,9 +49,6 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
     () => new Map(allNotes.map((n) => [n.id, n.title])),
     [allNotes],
   );
-
-  // insertion index previewed by the 2px accent line; null = no drop preview
-  const [dropAt, setDropAt] = useState<number | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fade, setFade] = useState({ left: false, right: false });
@@ -89,35 +85,6 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
     store.newTab();
   };
 
-  // pointer x vs each tab's midpoint -> the index the drop would land at
-  const insertionIndex = (clientX: number): number => {
-    const el = scrollRef.current;
-    if (!el) return pane.tabs.length;
-    const tabs = Array.from(el.querySelectorAll<HTMLElement>('[role="tab"]'));
-    for (let i = 0; i < tabs.length; i++) {
-      const r = tabs[i]?.getBoundingClientRect();
-      if (r && clientX < r.left + r.width / 2) return i;
-    }
-    return tabs.length;
-  };
-
-  const onStripDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
-    if (!draggingTab) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    setDropAt(insertionIndex(event.clientX));
-  };
-
-  const onStripDrop = (event: ReactDragEvent<HTMLDivElement>) => {
-    const drag = draggingTab;
-    const at = dropAt ?? insertionIndex(event.clientX);
-    setDropAt(null);
-    setDraggingTab(null);
-    if (!drag) return;
-    event.preventDefault();
-    moveTab(drag.paneId, drag.tabId, pane.id, at);
-  };
-
   return (
     <div className="tabstrip" role="tablist">
       <div
@@ -125,14 +92,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
         data-fade-left={fade.left}
         data-fade-right={fade.right}
       >
-        <div
-          className="tabscroll"
-          ref={scrollRef}
-          onScroll={updateFade}
-          onDragOver={onStripDragOver}
-          onDrop={onStripDrop}
-          onDragLeave={() => setDropAt(null)}
-        >
+        <div className="tabscroll" data-tabscroll data-pane-id={pane.id} ref={scrollRef} onScroll={updateFade}>
           {pane.tabs.map((tab, i) => {
             const dragging =
               draggingTab?.paneId === pane.id && draggingTab.tabId === tab.id;
@@ -141,21 +101,16 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                 {dropAt === i && <span className="tab-ins" aria-hidden="true" />}
                 <div
                   role="tab"
-                  draggable
+                  data-tab-id={tab.id}
+                  data-tab-index={i}
                   aria-selected={tab.id === pane.activeTabId}
                   className={`${tab.id === pane.activeTabId ? "tab active" : "tab"}${
                     dragging ? " dragging" : ""
                   }`}
                   onClick={() => activateTab(pane.id, tab.id)}
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData("text/x-rotli-tab", tab.id);
-                    setDraggingTab({ paneId: pane.id, tabId: tab.id });
-                  }}
-                  onDragEnd={() => {
-                    setDraggingTab(null);
-                    setDropAt(null);
-                  }}
+                  onPointerDown={(event) =>
+                    startTabDrag(event, pane.id, tab.id, tabLabel(tab, titles))
+                  }
                 >
                   <FileGlyph size={13} className="tglyph" />
                   <span>{tabLabel(tab, titles)}</span>
@@ -164,6 +119,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                       type="button"
                       className="x"
                       aria-label="Close tab — ⌘W"
+                      onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => {
                         event.stopPropagation();
                         closeTabById(pane.id, tab.id);

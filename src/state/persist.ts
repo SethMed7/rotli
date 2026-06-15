@@ -28,9 +28,10 @@ import {
   setGlobalShortcut,
   setHideOnBlur,
 } from "../lib/tauri";
-import { notesService } from "../services/notes";
+import { inboxFolderId, notesService } from "../services/notes";
 import type { PaneNode, Tab } from "../types";
 import { useMruStore } from "./mru";
+import { QUICK_MAX } from "./quick";
 import {
   DEFAULT_NOTE_STYLE,
   MAX_TEXT_SIZE,
@@ -63,10 +64,12 @@ import {
 const SAVE_DEBOUNCE_MS = 500;
 const MRU_CAP = 24;
 
-/** Which webview this is — only the main window hydrates viewstate, applies
- * shell side-effects, and WRITES (one writer; the capture card only reads). */
-function isCaptureSurface(): boolean {
-  return new URLSearchParams(window.location.search).get("window") === "capture";
+/** Which webview this is — only the MAIN window hydrates viewstate, applies
+ * shell side-effects (window/dock/global chords), and WRITES the dot-files (one
+ * writer). The capture + quick windows only read settings (theme + the quick
+ * set), so they never race the writer or double-register OS chords. */
+function isMainSurface(): boolean {
+  return (new URLSearchParams(window.location.search).get("window") ?? "main") === "main";
 }
 
 // ─── defensive parsing helpers ───────────────────────────────────────────────
@@ -101,6 +104,8 @@ interface PersistedSettings {
   v: 1;
   theme: ThemeSetting;
   themeFamily: ThemeFamily;
+  matchLightFamily: ThemeFamily;
+  matchDarkFamily: ThemeFamily;
   glassMode: boolean;
   glassTint: GlassTint;
   glassBackground: GlassBackground;
@@ -109,6 +114,11 @@ interface PersistedSettings {
   glassCanvas: GlassCanvas;
   stayOpen: boolean;
   showInDock: boolean;
+  /** The Quick Note window's capped set, remembered note, and new-note folder
+   * (Seth, 2026-06-15). */
+  quickNoteIds: string[];
+  quickActiveId: string | null;
+  quickFolder: string;
   /** The ONE sidebar's collapse state + width, and which dests are expanded —
    * the two-rail keys (foldersCollapsed/listCollapsed/lastOpenRails/
    * foldersWidth/listWidth) are retired (Seth, 2026-06-13). */
@@ -152,10 +162,23 @@ function parseSettings(raw: string): PersistedSettings {
     expandedDests.Inbox = true;
     expandedDests.Brain = true;
   }
+  // the quick set: keep only string ids, cap at QUICK_MAX; the active note must
+  // be one of them; the folder falls back to Inbox
+  const quickNoteIds = Array.isArray(data.quickNoteIds)
+    ? data.quickNoteIds.filter((x): x is string => typeof x === "string").slice(0, QUICK_MAX)
+    : [];
+  const quickActiveId =
+    typeof data.quickActiveId === "string" && quickNoteIds.includes(data.quickActiveId)
+      ? data.quickActiveId
+      : (quickNoteIds[0] ?? null);
+  const quickFolder =
+    typeof data.quickFolder === "string" && data.quickFolder ? data.quickFolder : inboxFolderId;
   return {
     v: 1,
     theme: asEnum(data.theme, THEME_SETTINGS, "light"),
     themeFamily: asEnum(data.themeFamily, THEME_FAMILIES, "warm"),
+    matchLightFamily: asEnum(data.matchLightFamily, THEME_FAMILIES, "warm"),
+    matchDarkFamily: asEnum(data.matchDarkFamily, THEME_FAMILIES, "warm"),
     glassMode: asBool(data.glassMode, false),
     glassTint: asEnum(data.glassTint, TINTS, "dusk"),
     glassBackground: asEnum(data.glassBackground, BACKGROUNDS, "field"),
@@ -164,6 +187,9 @@ function parseSettings(raw: string): PersistedSettings {
     glassCanvas: asEnum(data.glassCanvas, CANVASES, "glass"),
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
+    quickNoteIds,
+    quickActiveId,
+    quickFolder,
     // missing keys default — old configs predate the single sidebar, never crash
     sidebarCollapsed: asBool(data.sidebarCollapsed, false),
     sidebarWidth: clampSidebarWidth(typeof data.sidebarWidth === "number" ? data.sidebarWidth : 240),
@@ -177,6 +203,8 @@ function applySettings(s: PersistedSettings): void {
   useUiStore.setState({
     theme: s.theme,
     themeFamily: s.themeFamily,
+    matchLightFamily: s.matchLightFamily,
+    matchDarkFamily: s.matchDarkFamily,
     glassMode: s.glassMode,
     glassTint: s.glassTint,
     glassBackground: s.glassBackground,
@@ -185,6 +213,9 @@ function applySettings(s: PersistedSettings): void {
     glassCanvas: s.glassCanvas,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
+    quickNoteIds: s.quickNoteIds,
+    quickActiveId: s.quickActiveId,
+    quickFolder: s.quickFolder,
     sidebarCollapsed: s.sidebarCollapsed,
     sidebarWidth: s.sidebarWidth,
     expandedDests: s.expandedDests,
@@ -349,7 +380,10 @@ async function hydrateViewstate(): Promise<void> {
  * index.html light pin for a frame. App re-applies identically on mount. */
 function prePaint(): void {
   const s = useUiStore.getState();
-  applyTheme(s.theme, s.themeFamily, s.glassMode, s.glassTint);
+  applyTheme(s.theme, s.themeFamily, s.glassMode, s.glassTint, {
+    light: s.matchLightFamily,
+    dark: s.matchDarkFamily,
+  });
   const root = document.documentElement;
   root.dataset.glassCanvas = s.glassCanvas;
   root.dataset.glassClarity = s.glassClarity;
@@ -376,7 +410,7 @@ export async function hydratePersistedState(): Promise<void> {
     const settings = parseSettings(await corpusSettingsRead("settings"));
     applySettings(settings);
     if (settings.glassBackground === "custom") await loadCustomBackground();
-    if (!isCaptureSurface()) {
+    if (isMainSurface()) {
       await hydrateViewstate();
       applyShellSideEffects(settings);
     }
@@ -394,6 +428,8 @@ function settingsSnapshot(): string {
     v: 1,
     theme: ui.theme,
     themeFamily: ui.themeFamily,
+    matchLightFamily: ui.matchLightFamily,
+    matchDarkFamily: ui.matchDarkFamily,
     glassMode: ui.glassMode,
     glassTint: ui.glassTint,
     glassBackground: ui.glassBackground,
@@ -402,6 +438,9 @@ function settingsSnapshot(): string {
     glassCanvas: ui.glassCanvas,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
+    quickNoteIds: ui.quickNoteIds,
+    quickActiveId: ui.quickActiveId,
+    quickFolder: ui.quickFolder,
     sidebarCollapsed: ui.sidebarCollapsed,
     sidebarWidth: ui.sidebarWidth,
     expandedDests: ui.expandedDests,
@@ -428,7 +467,7 @@ function viewstateSnapshot(): string {
  * window hides (visibilitychange) or unloads (pagehide). Call once, after
  * hydration, in the main window — no-op anywhere else. */
 export function attachPersistence(): () => void {
-  if (!isTauri() || isCaptureSurface()) return () => {};
+  if (!isTauri() || !isMainSurface()) return () => {};
 
   // seed from the just-hydrated state so hydration itself never writes back
   let lastSettings = settingsSnapshot();

@@ -204,10 +204,24 @@ export interface DraggingTab {
 /** Where a detached tab lands relative to its target leaf. */
 export type DetachDir = "left" | "right" | "up" | "down";
 
+/** A pane body's 5 drop regions: 4 edges carve a split, center moves here. */
+export type DropZone = DetachDir | "center";
+
+/** What the in-flight pointer drag would do if dropped now — drives the strip
+ * insertion line and the pane-body zone highlight (Seth, 2026-06-15: the tab
+ * drag is pointer-based, not HTML5, so it fires in the macOS WKWebView shell). */
+export type DropPreview =
+  | { kind: "strip"; paneId: string; index: number }
+  | { kind: "zone"; leafId: string; zone: DropZone }
+  | null;
+
 interface PanesState {
   root: PaneNode;
   focusedPaneId: string;
   draggingTab: DraggingTab | null;
+  /** Live drop target during a pointer drag (null when idle). */
+  dropPreview: DropPreview;
+  setDropPreview: (preview: DropPreview) => void;
   focusPane: (paneId: string) => void;
   focusDir: (dir: FocusDir) => void;
   /** Plain list click: REPLACE the focused pane's active tab's note.
@@ -290,6 +304,8 @@ export const usePanesStore = create<PanesState>((set, get) => {
     root: initialLeaf,
     focusedPaneId: initialLeaf.id,
     draggingTab: null,
+    dropPreview: null,
+    setDropPreview: (preview) => set({ dropPreview: preview }),
 
     focusPane: (paneId) => {
       if (findLeaf(get().root, paneId)) set({ focusedPaneId: paneId });

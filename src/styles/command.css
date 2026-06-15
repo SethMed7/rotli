@@ -638,6 +638,262 @@
   font-size: 15px;
   margin: 26px 0 4px;
 }
+.setselect-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: var(--fs-label);
+  color: var(--text-muted);
+}
+.setselect {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.setselect:hover {
+  background: var(--hov);
+}
+
+/* ——— settings layout: cap + center the content so a wide window doesn't
+   strand everything on the left (Seth, 2026-06-15) ——— */
+.set-body {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ——— real on/off switches (replaces the ambiguous dot-button) ——— */
+.swgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  max-width: 560px;
+}
+.swrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background var(--motion-exit) var(--motion-ease),
+    border-color var(--motion-exit) var(--motion-ease);
+}
+.swrow:hover {
+  background: var(--hov);
+}
+.swtext {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.swt {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.swd {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sw {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  position: relative;
+  transition: background var(--motion-exit) var(--motion-ease);
+}
+.swknob {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition:
+    left var(--motion-exit) var(--motion-ease),
+    background var(--motion-exit) var(--motion-ease);
+}
+.swrow.on {
+  border-color: var(--accent);
+}
+.swrow.on .sw {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.swrow.on .swknob {
+  left: 19px;
+  background: var(--on-accent);
+}
+
+/* ——— system-match theme pickers + segmented rows ——— */
+.matchpick {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 4px;
+  max-width: 560px;
+}
+.mprow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.mplabel {
+  width: 86px;
+  flex: 0 0 auto;
+  font-size: var(--fs-label);
+  color: var(--text-muted);
+}
+.segrow {
+  display: flex;
+  gap: 6px;
+}
+
+/* ——— glass options: always shown, dimmed + inert when glass mode is off ——— */
+.glassopts {
+  transition: opacity var(--motion-exit) var(--motion-ease);
+}
+.glassopts.off {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ——— storage: the notes-folder location row + ghost buttons ——— */
+.locrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0 8px;
+  padding: 12px 14px;
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  max-width: 640px;
+}
+.loctext {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.loclabel {
+  font-size: var(--fs-label);
+  color: var(--text-muted);
+}
+.locpath {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.locact {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.ghostbtn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: var(--r-control);
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--motion-exit) var(--motion-ease);
+}
+.ghostbtn:hover:not(:disabled) {
+  background: var(--hov);
+}
+.ghostbtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.setnote.err {
+  color: var(--accent-text);
+}
+
+/* ——— plugins: a real (disabled) "Soon" row, not a bare sentence ——— */
+.pluglist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 560px;
+}
+.plugrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  opacity: 0.75;
+}
+.plugmark {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+}
+.plugtext {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.plugname {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.plugdesc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.plugsoon {
+  flex: 0 0 auto;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border-radius: var(--r-pill);
+  padding: 2.5px 8px;
+}
 .hksearch {
   width: 100%;
   max-width: 360px;

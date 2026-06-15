@@ -11,8 +11,9 @@ import { resolveChord, useBindingsStore } from "./bindings";
 import { chordFromEvent, normalizeChord, toAccelerator } from "./chords";
 
 /** Which webview an action belongs to — the dispatcher only fires actions for
- * its own surface (global actions are handled OS-side in Rust and skipped). */
-export type Surface = "main" | "capture";
+ * its own surface (global actions are handled OS-side in Rust and skipped).
+ * "quick" is the floating Quick Note window. */
+export type Surface = "main" | "capture" | "quick";
 
 export interface KeyAction {
   id: string;
@@ -22,6 +23,11 @@ export interface KeyAction {
   surface: Surface;
   /** OS-wide shortcut, registered + handled in Rust — the dispatcher skips it. */
   global?: boolean;
+  /** Fires on EVERY surface's dispatcher — for actions tied to a per-webview
+   * seam that exists wherever it's mounted (the editor.* format commands resolve
+   * through activeEditor(), so they belong to the main AND quick windows). Like
+   * global, a shared chord conflicts across surfaces. */
+  shared?: boolean;
   run: () => void;
 }
 
@@ -62,7 +68,10 @@ export function conflictFor(actionId: string, chord: string): KeyAction | null {
   const n = normalizeChord(chord);
   for (const action of actions.values()) {
     if (action.id === actionId) continue;
-    if (action.surface !== target.surface && !action.global && !target.global) continue;
+    // a shared or global chord fires everywhere, so it collides with any
+    // surface; otherwise only same-surface chords can collide
+    const spansAll = action.global || target.global || action.shared || target.shared;
+    if (action.surface !== target.surface && !spansAll) continue;
     const c = currentChord(action.id);
     if (c && normalizeChord(c) === n) return action;
   }
@@ -122,7 +131,8 @@ export function attachDispatcher(surface: Surface): () => void {
       if (!/^(Esc|Enter|F\d{1,2})$/.test(key)) return;
     }
     for (const action of actions.values()) {
-      if (action.global || action.surface !== surface) continue;
+      if (action.global) continue; // OS-side, handled in Rust
+      if (!action.shared && action.surface !== surface) continue;
       const chord = currentChord(action.id);
       if (chord && normalizeChord(chord) === pressed) {
         event.preventDefault();

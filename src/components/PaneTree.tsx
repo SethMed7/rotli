@@ -6,67 +6,21 @@
 // 5-region split-detach overlay: drop on the center to move the tab here, on
 // an edge band to carve a split. Splits/focus/tabs/drag all live in the store.
 
-import {
-  type DragEvent as ReactDragEvent,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-  useRef,
-  useState,
-} from "react";
+import { type PointerEvent as ReactPointerEvent, type ReactNode, useRef } from "react";
 import { EditorSurface } from "../editor/EditorSurface";
-import { activeTabOf, type DetachDir, leaves, usePanesStore } from "../state/panes";
+import { activeTabOf, leaves, usePanesStore } from "../state/panes";
 import type { LeafNode, PaneNode, SplitNode } from "../types";
 import { TabStrip } from "./TabStrip";
-
-// the 5 dropzones over a pane body: 4 edge bands carve a split, center moves
-type Zone = DetachDir | "center";
-const EDGE_BAND = 0.22; // each edge band is ~22% of the pane's width/height
-
-function zoneAt(rect: DOMRect, clientX: number, clientY: number): Zone {
-  const fx = (clientX - rect.left) / Math.max(rect.width, 1);
-  const fy = (clientY - rect.top) / Math.max(rect.height, 1);
-  if (fx < EDGE_BAND && fx <= fy && fx <= 1 - fy) return "left";
-  if (fx > 1 - EDGE_BAND && 1 - fx <= fy && 1 - fx <= 1 - fy) return "right";
-  if (fy < EDGE_BAND) return "up";
-  if (fy > 1 - EDGE_BAND) return "down";
-  return "center";
-}
 
 function LeafView({ node }: { node: LeafNode }) {
   const focusedPaneId = usePanesStore((s) => s.focusedPaneId);
   const focusPane = usePanesStore((s) => s.focusPane);
   const draggingTab = usePanesStore((s) => s.draggingTab);
-  const moveTab = usePanesStore((s) => s.moveTab);
-  const detachTab = usePanesStore((s) => s.detachTab);
-  const setDraggingTab = usePanesStore((s) => s.setDraggingTab);
+  // the highlighted zone for THIS pane (driven by lib/tabDrag's hit-testing)
+  const zone = usePanesStore((s) =>
+    s.dropPreview?.kind === "zone" && s.dropPreview.leafId === node.id ? s.dropPreview.zone : null,
+  );
   const tab = activeTabOf(node);
-
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const [zone, setZone] = useState<Zone | null>(null);
-
-  const onZoneOver = (event: ReactDragEvent<HTMLDivElement>) => {
-    if (!draggingTab) return;
-    event.preventDefault();
-    const el = bodyRef.current;
-    if (!el) return;
-    setZone(zoneAt(el.getBoundingClientRect(), event.clientX, event.clientY));
-  };
-  const onZoneDrop = (event: ReactDragEvent<HTMLDivElement>) => {
-    const drag = draggingTab;
-    setZone(null);
-    setDraggingTab(null);
-    if (!drag) return;
-    event.preventDefault();
-    const el = bodyRef.current;
-    const where = el ? zoneAt(el.getBoundingClientRect(), event.clientX, event.clientY) : "center";
-    if (where === "center") {
-      // move to the end of this strip
-      const target = leaves(usePanesStore.getState().root).find((l) => l.id === node.id);
-      moveTab(drag.paneId, drag.tabId, node.id, target?.tabs.length ?? 0);
-    } else {
-      detachTab(drag.paneId, drag.tabId, node.id, where);
-    }
-  };
 
   return (
     <section
@@ -75,20 +29,16 @@ function LeafView({ node }: { node: LeafNode }) {
     >
       <TabStrip pane={node} />
       {/* keyed by tab — each tab gets its own surface, so scroll/edit state
-          never bleeds from the previously active tab */}
-      <div className="pane-body" ref={bodyRef}>
+          never bleeds from the previously active tab. data-pane-body lets the
+          pointer-drag controller (lib/tabDrag) find this leaf via elementFromPoint. */}
+      <div className="pane-body" data-pane-body data-leaf-id={node.id}>
         {tab.surfaceKind === "note" && (
           <EditorSurface key={tab.id} paneId={node.id} noteId={tab.noteId} />
         )}
-        {/* split-detach overlay — pointer-active ONLY mid-drag, so it never
-            blocks normal editing (Seth, 2026-06-13) */}
+        {/* split-detach preview — mounted only mid-drag, pointer-events:none
+            (the controller hit-tests the pane body, not this overlay) */}
         {draggingTab && (
-          <div
-            className="pane-dropzones"
-            onDragOver={onZoneOver}
-            onDrop={onZoneDrop}
-            onDragLeave={() => setZone(null)}
-          >
+          <div className="pane-dropzones">
             {(["left", "right", "up", "down", "center"] as const).map((z) => (
               <div key={z} className={zone === z ? `dz ${z} over` : `dz ${z}`} />
             ))}

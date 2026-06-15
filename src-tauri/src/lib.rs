@@ -23,10 +23,11 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-/// Default chords — mirror `app.toggleWindow` / `capture.summon` in
-/// src/keys/actions.ts.
+/// Default chords — mirror `app.toggleWindow` / `capture.summon` /
+/// `quick.summon` in src/keys/actions.ts.
 const DEFAULT_MAIN_TOGGLE: &str = "Alt+Space";
 const DEFAULT_CAPTURE: &str = "Alt+C";
+const DEFAULT_QUICK: &str = "Alt+Q";
 
 /// Clicking the tray icon steals focus from the window, so blur fires (and
 /// hides it) *before* the tray click arrives. Within this grace window the
@@ -41,6 +42,8 @@ struct GlobalChords {
     capture: Mutex<Option<String>>,
     /// `app.toggleWindow` — main-window toggle (the way the app opens).
     main_toggle: Mutex<Option<String>>,
+    /// `quick.summon` — the floating Quick Note window.
+    quick: Mutex<Option<String>>,
 }
 
 /// When the main window was last hidden because it lost focus.
@@ -69,13 +72,10 @@ fn hide_capture(app: &AppHandle) {
     }
 }
 
-/// Show the capture card centered on the ACTIVE display (the one holding the
-/// cursor), then tell its webview to refocus the field.
-fn show_capture(app: &AppHandle) {
-    let Some(window) = app.get_webview_window("capture") else {
-        return;
-    };
-    let centered = (|| -> tauri::Result<()> {
+/// Center a window on the ACTIVE display (the one holding the cursor), falling
+/// back to the primary-display center.
+fn center_on_cursor_display(app: &AppHandle, window: &tauri::WebviewWindow) {
+    let placed = (|| -> tauri::Result<()> {
         // ONE coordinate space throughout: cursor_position() is PHYSICAL, so
         // the monitor is found by its physical rect (monitor_from_point tests
         // against LOGICAL display bounds — wrong on every Retina screen).
@@ -100,12 +100,55 @@ fn show_capture(app: &AppHandle) {
         window.set_position(PhysicalPosition::new(x, y))?;
         Ok(())
     })();
-    if centered.is_err() {
+    if placed.is_err() {
         let _ = window.center();
     }
+}
+
+/// Show the capture card centered on the active display, then tell its webview
+/// to refocus the field.
+fn show_capture(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("capture") else {
+        return;
+    };
+    center_on_cursor_display(app, &window);
     let _ = window.show();
     let _ = window.set_focus();
     let _ = app.emit_to("capture", "rotli:capture-show", ());
+}
+
+fn show_quick(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("quick") else {
+        return;
+    };
+    center_on_cursor_display(app, &window);
+    let _ = window.show();
+    let _ = window.set_focus();
+    let _ = app.emit_to("quick", "rotli:quick-show", ());
+}
+
+fn hide_quick(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("quick") {
+        let _ = window.hide();
+    }
+}
+
+/// The quick chord toggles the floating note: visible + focused → hide; visible
+/// but behind → bring it forward; hidden → show on the active display.
+fn toggle_quick(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("quick") else {
+        return;
+    };
+    if window.is_visible().unwrap_or(false) {
+        if window.is_focused().unwrap_or(true) {
+            let _ = window.hide();
+        } else {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+        return;
+    }
+    show_quick(app);
 }
 
 fn is_visible(app: &AppHandle, label: &str) -> bool {
@@ -175,6 +218,56 @@ fn hide_capture_window(app: AppHandle) {
 }
 
 #[tauri::command]
+fn toggle_quick_window(app: AppHandle) {
+    toggle_quick(&app);
+}
+
+#[tauri::command]
+fn hide_quick_window(app: AppHandle) {
+    hide_quick(&app);
+}
+
+#[tauri::command]
+fn show_quick_window(app: AppHandle) {
+    show_quick(&app);
+}
+
+/// Settings → Storage → "Reveal in Finder": open the corpus folder.
+#[tauri::command]
+fn corpus_reveal(app: AppHandle) {
+    let root = corpus::resolve_root(&app);
+    #[cfg(target_os = "macos")]
+    let _ = std::process::Command::new("open").arg(&root).spawn();
+    #[cfg(not(target_os = "macos"))]
+    let _ = root;
+}
+
+/// Settings → Storage → "Move folder…": pick an empty destination, move the
+/// whole corpus there, remember it as the new root, and relaunch into it (a
+/// clean re-open beats live-swapping the open store + watcher). Returns false
+/// when the picker is cancelled; Err carries a human message for the UI.
+#[tauri::command]
+fn corpus_relocate(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let old_root = corpus::resolve_root(&app);
+    let Some(picked) = app
+        .dialog()
+        .file()
+        .set_title("Choose an empty folder for your notes")
+        .blocking_pick_folder()
+    else {
+        return Ok(false);
+    };
+    let new_root = picked.into_path().map_err(|e| e.to_string())?;
+    if new_root == old_root {
+        return Ok(false);
+    }
+    corpus::relocate(&old_root, &new_root)?;
+    corpus::write_saved_root(&app, &new_root).map_err(|e| e.to_string())?;
+    app.restart();
+}
+
+#[tauri::command]
 fn summon(app: AppHandle) {
     do_summon(&app);
 }
@@ -224,6 +317,7 @@ fn set_summon_shortcut(
     let mut current = match action_id.as_str() {
         "capture.summon" => chords.capture.lock().unwrap(),
         "app.toggleWindow" => chords.main_toggle.lock().unwrap(),
+        "quick.summon" => chords.quick.lock().unwrap(),
         other => return Err(format!("unknown global action: {other}")),
     };
     if let Some(old) = current.as_deref() {
@@ -247,6 +341,7 @@ fn set_summon_shortcut(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -265,6 +360,11 @@ pub fn run() {
                     let main_toggle = chords.main_toggle.lock().unwrap().clone();
                     if main_toggle.as_deref().is_some_and(matches) {
                         toggle_main(app, false);
+                        return;
+                    }
+                    let quick = chords.quick.lock().unwrap().clone();
+                    if quick.as_deref().is_some_and(matches) {
+                        toggle_quick(app);
                     }
                 })
                 .build(),
@@ -272,6 +372,7 @@ pub fn run() {
         .manage(GlobalChords {
             capture: Mutex::new(Some(DEFAULT_CAPTURE.to_string())),
             main_toggle: Mutex::new(Some(DEFAULT_MAIN_TOGGLE.to_string())),
+            quick: Mutex::new(Some(DEFAULT_QUICK.to_string())),
         })
         .manage(LastBlurHide(Mutex::new(None)))
         .manage(HideOnBlur(Mutex::new(true)))
@@ -280,6 +381,11 @@ pub fn run() {
             hide_main_window,
             show_main_window,
             hide_capture_window,
+            toggle_quick_window,
+            hide_quick_window,
+            show_quick_window,
+            corpus_reveal,
+            corpus_relocate,
             summon,
             set_summon_shortcut,
             set_hide_on_blur,
@@ -305,7 +411,7 @@ pub fn run() {
             // welcome note + .rotli/), then watch it for EXTERNAL changes; the
             // frontend invalidates on "rotli:corpus-changed". A disk error
             // must not kill the shell: commands degrade to clean errors.
-            let opened = corpus::CorpusStore::open(corpus::default_corpus_root(app.handle()));
+            let opened = corpus::CorpusStore::open(corpus::resolve_root(app.handle()));
             let store = match opened {
                 Ok(store) => {
                     let suppress = store.suppress_set();
@@ -329,7 +435,7 @@ pub fn run() {
             // Best-effort: another app owning a chord (launchers love ⌥Space)
             // must DEGRADE — the app still launches, the chord stays rebindable
             // in Settings → Hotkeys — never abort startup.
-            for chord in [DEFAULT_MAIN_TOGGLE, DEFAULT_CAPTURE] {
+            for chord in [DEFAULT_MAIN_TOGGLE, DEFAULT_CAPTURE, DEFAULT_QUICK] {
                 if let Err(e) = app.global_shortcut().register(chord) {
                     eprintln!("rotli: global shortcut {chord} unavailable ({e}) — rebind it in Settings");
                 }
@@ -392,6 +498,11 @@ pub fn run() {
                     *state.0.lock().unwrap() = Some(Instant::now());
                 }
                 "capture" => {
+                    let _ = window.hide();
+                }
+                // the floating Quick Note is a visitor by nature — always hide on
+                // click-away (the close-on-blur Seth wanted for quick access)
+                "quick" => {
                     let _ = window.hide();
                 }
                 _ => {}

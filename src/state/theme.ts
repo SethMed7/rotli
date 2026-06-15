@@ -28,6 +28,13 @@ function detachSystemListener(): void {
   onChange = null;
 }
 
+/** When following the system, each OS appearance can map to a theme in EITHER
+ * family (Seth, 2026-06-15) — light → matchLightFamily, dark → matchDarkFamily. */
+export interface MatchFamilies {
+  light: ThemeFamily;
+  dark: ThemeFamily;
+}
+
 /** Returns the detach so callers (the App effect) get a real cleanup — the
  * last "system" listener must not survive a root unmount. */
 export function applyTheme(
@@ -35,13 +42,15 @@ export function applyTheme(
   family: ThemeFamily,
   glass: boolean,
   tint: GlassTint,
+  match: MatchFamilies = { light: family, dark: family },
 ): () => void {
   detachSystemListener();
   document.documentElement.dataset.glassTint = tint;
   if (setting === "system") {
+    const forOs = (dark: boolean) => resolve(dark ? match.dark : match.light, glass, dark ? "dark" : "light");
     media = window.matchMedia("(prefers-color-scheme: dark)");
-    onChange = (event) => setDataTheme(resolve(family, glass, event.matches ? "dark" : "light"));
-    setDataTheme(resolve(family, glass, media.matches ? "dark" : "light"));
+    onChange = (event) => setDataTheme(forOs(event.matches));
+    setDataTheme(forOs(media.matches));
     media.addEventListener("change", onChange);
   } else {
     setDataTheme(resolve(family, glass, setting));

@@ -1,5 +1,6 @@
 // UI state only (the Zustand law). Data lives behind src/services/.
 
+import { inboxFolderId } from "../services/notes";
 import { create } from "zustand";
 
 export type ThemeSetting = "light" | "dark" | "system";
@@ -89,6 +90,15 @@ interface UiState {
   themeFamily: ThemeFamily;
   setThemeFamily: (family: ThemeFamily) => void;
 
+  /** When "Match the system" is on, which theme each OS appearance maps to —
+   * decoupled from the active family so you can pair, say, Paper (light) with
+   * Warm Dark (dark). A theme is (family, mode); these store the family, the
+   * mode is fixed by the OS (Seth, 2026-06-15). */
+  matchLightFamily: ThemeFamily;
+  setMatchLightFamily: (family: ThemeFamily) => void;
+  matchDarkFamily: ThemeFamily;
+  setMatchDarkFamily: (family: ThemeFamily) => void;
+
   /** Liquid glass — a mode OVER the active theme, toggled in Settings. While
    * on, the resolved light/dark of the chosen theme picks glass-light/dark
    * and the titlebar sun becomes the tint cycler. */
@@ -120,6 +130,18 @@ interface UiState {
   /** General: show the app in the Dock (default off — menu bar only). */
   showInDock: boolean;
   setShowInDock: (on: boolean) => void;
+
+  /** The Quick Note window's capped set (Seth, 2026-06-15): up to QUICK_MAX
+   * note ids, in switcher order. The mutations + cross-webview sync live in
+   * state/quick.ts; these are the raw fields the persistence layer reads. */
+  quickNoteIds: string[];
+  setQuickNoteIds: (ids: string[]) => void;
+  /** Which quick note the window reopens on — "remember where I am". */
+  quickActiveId: string | null;
+  setQuickActiveId: (id: string | null) => void;
+  /** Folder new quick notes (the "+") are created in. */
+  quickFolder: string;
+  setQuickFolder: (folder: string) => void;
 
   /** The writing canvas inside glass: glass like everything else, or a real
    * paper surface (linen / white / cocoa) — write on paper, the rest stays
@@ -197,6 +219,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   themeFamily: "warm",
   setThemeFamily: (family) => set({ themeFamily: family }),
 
+  matchLightFamily: "warm",
+  setMatchLightFamily: (family) => set({ matchLightFamily: family }),
+  matchDarkFamily: "warm",
+  setMatchDarkFamily: (family) => set({ matchDarkFamily: family }),
+
   glassMode: false,
   setGlassMode: (on) => set({ glassMode: on }),
 
@@ -225,6 +252,14 @@ export const useUiStore = create<UiState>((set, get) => ({
   setStayOpen: (on) => set({ stayOpen: on }),
   showInDock: false,
   setShowInDock: (on) => set({ showInDock: on }),
+
+  quickNoteIds: [],
+  setQuickNoteIds: (ids) => set({ quickNoteIds: ids }),
+  quickActiveId: null,
+  setQuickActiveId: (id) => set({ quickActiveId: id }),
+  // "Inbox" on disk (fs mode); the seeded Inbox id in the browser
+  quickFolder: inboxFolderId,
+  setQuickFolder: (folder) => set({ quickFolder: folder }),
 
   glassCanvas: "glass",
   setGlassCanvas: (canvas) => set({ glassCanvas: canvas }),
