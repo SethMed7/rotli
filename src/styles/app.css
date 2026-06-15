@@ -43,20 +43,22 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 52px; /* fixed so the native traffic lights (conf: x18/y20) center */
+  /* 52px so the OS traffic lights (conf x19/y18) center on the content row
+     (measured centerY ≈ 26) — y is tuned for macOS Tahoe's LARGER window
+     controls; on older macOS the smaller buttons sit a hair high (acceptable). */
+  height: 52px;
   padding: 0 14px;
   border-bottom: 1px solid var(--border);
   background: var(--ground);
   user-select: none;
   -webkit-user-select: none;
 }
-/* native traffic lights live here (frameless overlay titlebar).
-   Width math (Seth, 2026-06-13): the 3-button macOS cluster starts at conf
-   x:18 and spans ~52px, so its right edge sits ~70px from the window's left.
-   The .titlebar already pads 14px on the left, so the inset must reserve
-   70 − 14 = 56px to let the "Notes" identity clear the lights with a gap. */
+/* native traffic lights live here (frameless overlay titlebar). Tahoe's buttons
+   are bigger, so the cluster from conf x:19 reaches ~80px; reserve to ~84px
+   (14px pad + this 60px + the 10px flex gap) so the "Notes" identity always
+   clears them (Seth, 2026-06-15). */
 .tb-inset {
-  width: 56px;
+  width: 60px;
   height: 28px;
   flex: 0 0 auto;
 }
