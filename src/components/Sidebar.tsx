@@ -121,12 +121,15 @@ interface RowActions {
 function CompactNoteRow({
   note,
   selected,
+  padLeft,
   onOpen,
   actions,
   rowProps,
 }: {
   note: NoteSummary;
   selected: boolean;
+  /** Depth-scaled left inset so a note sits under its folder (Seth, 2026-06-15). */
+  padLeft: number;
   onOpen: (newTab: boolean) => void;
   actions: RowActions;
   /** Roving-list props (Seth, 2026-06-13): tabIndex/role/aria-selected + the
@@ -144,11 +147,13 @@ function CompactNoteRow({
     <button
       type="button"
       className={selected ? "snrow sel" : "snrow"}
+      style={{ paddingLeft: padLeft }}
       onClick={onClick}
       draggable
       onDragStart={onDragStart}
       {...rowProps}
     >
+      <FileGlyph size={14} className="snicon" />
       <span className="snt">{note.title || "Empty note"}</span>
       <span className="snd">{dayLabel(note.updatedAt)}</span>
       <span className="snact">
@@ -317,10 +322,13 @@ export function Sidebar() {
   // —— compact rows for one folder id (own notes only), filtered + sorted ——
   // `rp` is the roving rowProps factory (passed in so this helper can run before
   // useRovingList is even declared — React calls it during render either way).
+  // `level` is the row's tree depth (dest-direct notes = 1); ~16px per level so
+  // a note's icon lands under its folder's icon (Seth, 2026-06-15).
   const compactRows = (
     notes: NoteSummary[],
     folderId: string,
     rp: ReturnType<typeof useRovingList>["rowProps"],
+    level: number,
   ): ReactNode =>
     notes
       .filter((n) => n.folderId === folderId && matches(n))
@@ -329,6 +337,7 @@ export function Sidebar() {
           key={note.id}
           note={note}
           selected={note.id === focusedNoteId}
+          padLeft={28 + level * 16}
           onOpen={openRow(note.id)}
           actions={rowActions}
           rowProps={rp({ id: note.id, kind: "note" })}
@@ -352,7 +361,7 @@ export function Sidebar() {
             className={`frow child${selected ? " sel" : ""}${
               dropTarget === folder.id ? " drop-over" : ""
             }`}
-            style={{ paddingLeft: 18 + depth * 14 }}
+            style={{ paddingLeft: 10 + (depth + 1) * 16 }}
             onClick={() => {
               toggleDestExpanded(folder.id);
               setSelectedFolderId(folder.id);
@@ -369,7 +378,7 @@ export function Sidebar() {
           </button>
           {open && (
             <>
-              {compactRows(destNotes, folder.id, rp)}
+              {compactRows(destNotes, folder.id, rp, depth + 2)}
               {renderFolderTree(folder.id, destNotes, depth + 1, rp)}
             </>
           )}
@@ -560,7 +569,7 @@ export function Sidebar() {
               </button>
               {open && (
                 <>
-                  {compactRows(destNotes, id, rowProps)}
+                  {compactRows(destNotes, id, rowProps, 1)}
                   {renderFolderTree(id, destNotes, 0, rowProps)}
                 </>
               )}

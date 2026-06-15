@@ -151,10 +151,20 @@
   border-radius: 0 2px 2px 0;
   background: var(--accent);
 }
-/* nested user folders indent via inline padding-left (depth-scaled in JSX);
-   the .child class keeps the base inset for depth 0 */
+/* THE one-active-state law (Seth, 2026-06-15): in the sidebar tree only the OPEN
+   note carries the pill. A selected destination/folder is just bold text + an
+   accent icon — no fill, no bar — so nothing competes with the active note.
+   (Scoped to .sb-rows; the Settings nav keeps the base .frow.sel highlight.) */
+.sb-rows .frow.sel {
+  background: none;
+}
+.sb-rows .frow.sel::before {
+  display: none;
+}
+/* nested rows indent via inline padding-left (depth-scaled in JSX, ~16px/level);
+   the .child class keeps a fallback inset for depth 0 */
 .frow.child {
-  padding-left: 18px;
+  padding-left: 26px;
 }
 /* the active drop target while a note is dragged onto a destination/folder row
    (Seth, 2026-06-13): a 1.5px inset clay ring — the same accent the pane-detach
@@ -182,6 +192,13 @@
   border-radius: var(--r-control);
   cursor: pointer;
   position: relative;
+}
+/* leading file glyph (Seth, 2026-06-15: every row has an icon now, like the
+   reference — and it gives the note's icon a fixed column to align under its
+   folder's icon). */
+.snrow .snicon {
+  flex: 0 0 auto;
+  color: var(--text-muted);
 }
 .snrow .snt {
   flex: 1;
@@ -235,21 +252,21 @@
 .snrow:hover {
   background: var(--hov);
 }
-.snrow.sel {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-}
-.snrow.sel .snd {
-  color: var(--text);
-}
-.snrow.sel::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 2px;
-  border-radius: 0 2px 2px 0;
+/* the open note — the ONE active state: a clean solid accent pill (Seth,
+   2026-06-15, matching the reference). Title, date, and glyph all flip to the
+   on-accent ink for contrast; no separate bar. */
+.snrow.sel,
+.snrow.sel:hover {
   background: var(--accent);
+}
+.snrow.sel .snt,
+.snrow.sel .snd,
+.snrow.sel svg,
+.snrow.sel .snactbtn {
+  color: var(--on-accent);
+}
+.snrow.sel .snactbtn:hover {
+  background: color-mix(in srgb, var(--on-accent) 20%, transparent);
 }
 
 /* — focused-list j/k navigation (Seth, 2026-06-13): the roving keyboard cursor
@@ -347,10 +364,19 @@
   align-items: center;
   gap: 7px;
   background: var(--surface-2);
+  border: 1px solid transparent;
   border-radius: var(--r-control);
-  padding: 6px 10px;
+  padding: 7px 10px;
   font-size: 12.5px;
   color: var(--text-muted);
+  transition:
+    background var(--motion-exit) var(--motion-ease),
+    border-color var(--motion-exit) var(--motion-ease);
+}
+/* a calm focus state so the search well reads like a real field, not a chip */
+.filter:focus-within {
+  background: var(--surface);
+  border-color: var(--accent);
 }
 .filter svg {
   flex: 0 0 auto;
