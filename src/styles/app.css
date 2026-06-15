@@ -56,11 +56,11 @@
   -webkit-user-select: none;
 }
 /* native traffic lights live here (frameless overlay titlebar). Tahoe's buttons
-   are bigger, so the cluster from conf x:19 reaches ~80px; reserve to ~84px
-   (14px pad + this 60px + the 10px flex gap) so the "Notes" identity always
-   clears them (Seth, 2026-06-15). */
+   are bigger AND the sidebar toggle now follows the inset, so reserve generously
+   (14px pad + this 74px + the 10px gap → toggle starts ~98px) so the toggle reads
+   as app chrome, clearly separate from the window controls (Seth, 2026-06-15). */
 .tb-inset {
-  width: 60px;
+  width: 74px;
   height: 28px;
   flex: 0 0 auto;
 }
