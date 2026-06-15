@@ -16,7 +16,11 @@ import { GLASS_TINTS, SOLID_THEMES, useUiStore } from "../state/ui";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 import { ModuleSwitcher } from "./ModuleSwitcher";
-import { ChevronDown, SplitDownGlyph, SplitRightGlyph, SunGlyph } from "./glyphs";
+import { ChevronDown, PlusGlyph, SplitDownGlyph, SplitRightGlyph, SunGlyph } from "./glyphs";
+
+/** One size for every titlebar icon so the bar reads as one cohesive row
+ * (Seth, 2026-06-15). */
+const TB_ICON = 16;
 
 function onDragRegionMouseDown(event: MouseEvent) {
   if (event.button !== 0 || event.detail > 1) return;
@@ -45,7 +49,7 @@ export function Titlebar() {
         // toggles step aside — clicking the identity walks back to notes
         <div className="identity-wrap">
           <button type="button" className="identity" onClick={() => dispatch("app.settings")}>
-            <Icon name="rotli-settings" size={14} />
+            <Icon name="rotli-settings" size={TB_ICON} />
             Settings
           </button>
         </div>
@@ -59,7 +63,7 @@ export function Titlebar() {
               aria-expanded={switcherOpen}
               onClick={() => setSwitcherOpen(!switcherOpen)}
             >
-              <Icon name="rotli-notes" size={14} />
+              <Icon name="rotli-notes" size={TB_ICON} />
               Notes
               <ChevronDown className="chev" />
             </button>
@@ -73,23 +77,15 @@ export function Titlebar() {
         {!settingsOpen && (
           <>
             <IconButton label="New tab — ⌘T" onClick={() => dispatch("tabs.new")}>
-              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-                <path
-                  d="M12 5v14M5 12h14"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <PlusGlyph size={TB_ICON} />
             </IconButton>
             {/* two distinct split buttons (Seth, 2026-06-13): right = vertical
                 divider (columns), down = horizontal divider (rows) */}
             <IconButton label="Split right — ⌘D" onClick={() => dispatch("panes.splitRight")}>
-              <SplitRightGlyph />
+              <SplitRightGlyph size={TB_ICON} />
             </IconButton>
             <IconButton label="Split down — ⌘⇧D" onClick={() => dispatch("panes.splitDown")}>
-              <SplitDownGlyph />
+              <SplitDownGlyph size={TB_ICON} />
             </IconButton>
             <span className="tb-sep" aria-hidden="true" />
           </>
@@ -103,7 +99,7 @@ export function Titlebar() {
           </IconButton>
         ) : (
           <IconButton label={`Theme — ${themeLabel}`} onClick={() => dispatch("theme.cycle")}>
-            <SunGlyph />
+            <SunGlyph size={TB_ICON} />
           </IconButton>
         )}
         <IconButton
@@ -111,7 +107,7 @@ export function Titlebar() {
           pressed={settingsOpen}
           onClick={() => dispatch("app.settings")}
         >
-          <Icon name="rotli-settings" />
+          <Icon name="rotli-settings" size={TB_ICON} />
         </IconButton>
       </div>
     </header>

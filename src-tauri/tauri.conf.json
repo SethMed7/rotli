@@ -21,7 +21,7 @@
         "minHeight": 480,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "trafficLightPosition": { "x": 19, "y": 18 },
+        "trafficLightPosition": { "x": 19, "y": 21 },
         "visible": true
       },
       {
@@ -48,7 +48,7 @@
         "minHeight": 380,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "trafficLightPosition": { "x": 14, "y": 15 },
+        "trafficLightPosition": { "x": 14, "y": 21 },
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "visible": false,

@@ -152,54 +152,47 @@ export function SplitGlyph(props: GlyphProps) {
 }
 
 /** Titlebar "split right" — rounded rect, VERTICAL center divider = two
- *  columns. Standalone (not the shared Glyph) so it matches the existing
- *  inline split svg exactly: 15px, strokeWidth 1.8 (Seth, 2026-06-13). */
-export function SplitRightGlyph({ size = 15, className }: GlyphProps) {
+ *  columns. Standalone (not the shared Glyph) but matched to the line-glyph
+ *  grammar: strokeWidth 1.7, round joins (Seth, 2026-06-15: one weight across
+ *  the titlebar). */
+export function SplitRightGlyph({ size = 16, className }: GlyphProps) {
   return (
     <svg
       className={className}
       viewBox="0 0 24 24"
       width={size}
       height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
     >
-      <rect
-        x="3.2"
-        y="4.2"
-        width="17.6"
-        height="15.6"
-        rx="2.6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
-      <path d="M12 4.2v15.6" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="3.2" y="4.2" width="17.6" height="15.6" rx="2.6" />
+      <path d="M12 4.2v15.6" />
     </svg>
   );
 }
 
 /** Titlebar "split down" — rounded rect, HORIZONTAL center divider = two
- *  rows. Same standalone shape as SplitRightGlyph (Seth, 2026-06-13). */
-export function SplitDownGlyph({ size = 15, className }: GlyphProps) {
+ *  rows. Same standalone shape as SplitRightGlyph (Seth, 2026-06-15). */
+export function SplitDownGlyph({ size = 16, className }: GlyphProps) {
   return (
     <svg
       className={className}
       viewBox="0 0 24 24"
       width={size}
       height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
     >
-      <rect
-        x="3.2"
-        y="4.2"
-        width="17.6"
-        height="15.6"
-        rx="2.6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
-      <path d="M3.2 12h17.6" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="3.2" y="4.2" width="17.6" height="15.6" rx="2.6" />
+      <path d="M3.2 12h17.6" />
     </svg>
   );
 }
