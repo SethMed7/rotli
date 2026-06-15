@@ -139,8 +139,12 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
   const aaChipRef = useRef<HTMLButtonElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const rawRowRef = useRef<HTMLDivElement>(null);
+  const edBodyRef = useRef<HTMLDivElement>(null);
   const pendingCaretRef = useRef<Selection | null>(null);
   const clickPointRef = useRef<{ x: number; y: number } | null>(null);
+  // ⌘A defers one frame: deactivate the line first (so the textarea isn't the
+  // selection island), then select the whole rendered body (Seth, 2026-06-15).
+  const pendingSelectAllRef = useRef(false);
 
   const style = useNoteStyle(noteId);
   const formatBarVisible = useUiStore((s) => s.formatBarVisible);
@@ -178,6 +182,21 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
   // leaving a note (tab switch, pane close, note switch) flushes its pending
   // debounced save — keystrokes are never parked in a timer behind your back
   useEffect(() => () => flushNote(noteId), [noteId]);
+
+  // ⌘A select-all: the ⌘A branch in onTaKeyDown drops the active line, then this
+  // selects the whole rendered body (the drag-select model — copy yields the
+  // visible text). Runs every render but no-ops unless the flag is armed.
+  useEffect(() => {
+    if (!pendingSelectAllRef.current) return;
+    pendingSelectAllRef.current = false;
+    const el = edBodyRef.current;
+    const selection = window.getSelection();
+    if (!el || !selection) return;
+    selection.removeAllRanges();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    selection.addRange(range);
+  });
 
   useEffect(() => {
     const el = rootRef.current;
@@ -471,7 +490,15 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
       }
     }
 
-    if (event.metaKey || event.ctrlKey) return; // chords belong to the dispatcher
+    // ⌘A / ⌃A: select the WHOLE note (not just this line). Drop the active line
+    // so the body is one selectable block, then the effect selects it.
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
+      event.preventDefault();
+      setActiveState(null);
+      pendingSelectAllRef.current = true;
+      return;
+    }
+    if (event.metaKey || event.ctrlKey) return; // other chords belong to the dispatcher
     const ta = event.currentTarget;
     const line = lines[active] ?? "";
     const start = ta.selectionStart ?? 0;
@@ -631,7 +658,7 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
       </div>
       {aaOpen && <AaPanel noteId={noteId} anchorRef={aaChipRef} onClose={() => setAaOpen(false)} />}
       <div className="ed-scroll" ref={scrollRef}>
-        <div className="ed-body" style={bodyStyle}>
+        <div className="ed-body" style={bodyStyle} ref={edBodyRef}>
           {lines.map((line, i) =>
             i === active ? (
               <div

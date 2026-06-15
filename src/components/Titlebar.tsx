@@ -16,7 +16,14 @@ import { GLASS_TINTS, SOLID_THEMES, useUiStore } from "../state/ui";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 import { ModuleSwitcher } from "./ModuleSwitcher";
-import { ChevronDown, PlusGlyph, SplitDownGlyph, SplitRightGlyph, SunGlyph } from "./glyphs";
+import {
+  ChevronDown,
+  PlusGlyph,
+  SidebarGlyph,
+  SplitDownGlyph,
+  SplitRightGlyph,
+  SunGlyph,
+} from "./glyphs";
 
 /** One size for every titlebar icon so the bar reads as one cohesive row
  * (Seth, 2026-06-15). */
@@ -31,6 +38,7 @@ export function Titlebar() {
   const switcherOpen = useUiStore((s) => s.switcherOpen);
   const setSwitcherOpen = useUiStore((s) => s.setSwitcherOpen);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
+  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const theme = useUiStore((s) => s.theme);
   const themeFamily = useUiStore((s) => s.themeFamily);
   const glassMode = useUiStore((s) => s.glassMode);
@@ -44,6 +52,18 @@ export function Titlebar() {
   return (
     <header className="titlebar">
       <div className="tb-inset" onMouseDown={onDragRegionMouseDown} />
+      {/* always-visible sidebar toggle (Seth, 2026-06-15): the clear way to
+          reopen a collapsed left menu — replaces the subtle warm-edge strip.
+          .tb-lead left-aligns its tooltip so the label never clips off-window. */}
+      {!settingsOpen && (
+        <IconButton
+          className="tb-lead"
+          label={sidebarCollapsed ? "Show sidebar — ⌘0" : "Hide sidebar — ⌘0"}
+          onClick={() => dispatch("chrome.toggleSidebars")}
+        >
+          <SidebarGlyph size={TB_ICON} />
+        </IconButton>
+      )}
       {settingsOpen ? (
         // settings surface (r1 frame F): the identity reads Settings; the rail
         // toggles step aside — clicking the identity walks back to notes
@@ -103,6 +123,7 @@ export function Titlebar() {
           </IconButton>
         )}
         <IconButton
+          className="tb-trail"
           label="Settings — ⌘,"
           pressed={settingsOpen}
           onClick={() => dispatch("app.settings")}

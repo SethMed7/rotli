@@ -43,7 +43,6 @@ import {
   InboxGlyph,
   PencilGlyph,
   SearchGlyph,
-  SidebarGlyph,
   StorageGlyph,
   TrashGlyph,
 } from "./glyphs";
@@ -233,7 +232,6 @@ export function Sidebar() {
   const expandedDests = useUiStore((s) => s.expandedDests);
   const toggleDestExpanded = useUiStore((s) => s.toggleDestExpanded);
   const setDestExpanded = useUiStore((s) => s.setDestExpanded);
-  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const focusedNoteId = useFocusedNoteId();
   const openNote = usePanesStore((s) => s.openNote);
   const [filter, setFilter] = useState("");
@@ -474,20 +472,9 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar" aria-label="Notes">
+      {/* the sidebar toggle now lives in the titlebar (always visible, the clear
+          reopen) — the search row is just the filter + new-note (Seth, 2026-06-15) */}
       <div className="nl-top">
-        {/* the unified sidebar toggle (Seth, 2026-06-13): hides/shows the one
-            sidebar with memory — lives left of the filter, not in the titlebar */}
-        <button
-          type="button"
-          className="sidebtn"
-          aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
-          onClick={() => dispatch("chrome.toggleSidebars")}
-        >
-          <SidebarGlyph size={15} />
-          <span className="tip" aria-hidden="true">
-            {sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
-          </span>
-        </button>
         <div className="filter">
           <SearchGlyph size={13} />
           <input

@@ -6,15 +6,13 @@
 // sidebar toggle. The sidebar is drag-resizable on its right edge; its width
 // persists via .rotli/settings.json.
 
-import { type CSSProperties, type PointerEvent, useState } from "react";
+import type { CSSProperties, PointerEvent } from "react";
 import { useNotes } from "../services/hooks";
 import { DEST } from "../services/destinations";
 import { useUiStore } from "../state/ui";
 import { EmptyState } from "./EmptyState";
 import { Sidebar } from "./Sidebar";
 import { PaneTree } from "./PaneTree";
-import { dispatch } from "../keys/registry";
-import { SidebarGlyph } from "./glyphs";
 
 /** Drag grip on the sidebar's right edge — same pointer grammar as the pane
  * dividers (8px hit zone, cocoa-tinted line while dragging, never clay). */
@@ -52,7 +50,6 @@ export function NotesSurface() {
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
-  const [revealed, setRevealed] = useState(false);
   const allNotes = useNotes().data;
   const archived = useNotes(DEST.archive).data;
   const trashed = useNotes(DEST.trash).data;
@@ -83,34 +80,9 @@ export function NotesSurface() {
         </div>
       )}
       <PaneTree />
-      {sidebarCollapsed && (
-        // hover reveals the hidden sidebar; click restores it
-        <div
-          className="warm-edge"
-          style={{ left: 0 }}
-          onMouseEnter={() => setRevealed(true)}
-          onMouseLeave={() => setRevealed(false)}
-        >
-          {/* the strip itself is the restore button (a sibling of the overlay,
-              so overlay clicks never bubble into restore) */}
-          <button
-            type="button"
-            className="edge-restore"
-            aria-label="Show sidebar"
-            onClick={() => dispatch("chrome.toggleSidebars")}
-          >
-            <span className="edgehint" aria-hidden="true" />
-            <span className="edge-glyph" aria-hidden="true">
-              <SidebarGlyph size={14} />
-            </span>
-          </button>
-          {revealed && (
-            <div className="rail-overlay">
-              <Sidebar />
-            </div>
-          )}
-        </div>
-      )}
+      {/* collapsed → no warm-edge sliver (Seth, 2026-06-15: it was an unclear,
+          disliked line). The titlebar's always-visible sidebar toggle is the
+          clear reopen now. */}
     </div>
   );
 }

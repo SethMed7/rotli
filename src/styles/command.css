@@ -138,11 +138,10 @@
 }
 
 /* ——— WhichKey — "hold ⌘ to peek" shortcut map (Seth, 2026-06-13) ———
-   A LIGHT, non-modal floating panel: it does NOT dim or blur the window (that
-   is the palette's job alone). Centered, pointer-events:none so it can never
-   steal a click, and z-index 18 — below the palette (20) so a chord that opens
-   ⌘K is never veiled. The fade-in is neutralized under reduced-motion by the
-   base.css rule. No raw hex — kit tokens + the palette's cocoa shadow value. */
+   Centered, pointer-events:none so it can never steal a click, z-index 18 —
+   below the palette (20). Dims + blurs behind the panel (Seth, 2026-06-15: the
+   panel-over-live-app was hard to read) — the same scrim values as ⌘K. No raw
+   hex — kit tokens + the palette's cocoa values. */
 .whichkey {
   position: fixed;
   inset: 0;
@@ -151,6 +150,18 @@
   place-items: center;
   pointer-events: none;
   animation: wk-in var(--motion-enter) var(--motion-ease);
+}
+/* the readability scrim — dim + blur the live app behind the panel */
+.whichkey::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(58, 48, 40, 0.4); /* cocoa @ 40%, a touch heavier than ⌘K */
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+.wk-panel {
+  position: relative; /* sit above the scrim */
 }
 @keyframes wk-in {
   from {

@@ -167,6 +167,28 @@
   transition-delay: 300ms;
 }
 
+/* edge-safe tooltips (Seth, 2026-06-15): a button hugging the window's LEFT edge
+   shows its label to the right; one at the RIGHT edge shows it to the left — so a
+   centered tooltip never spills past the window and clips ("ide sidebar"). */
+.tb-lead .tip {
+  left: 0;
+  transform: none;
+}
+.tb-lead .tip::after {
+  left: 12px;
+  margin-left: 0;
+}
+.tb-trail .tip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.tb-trail .tip::after {
+  left: auto;
+  right: 12px;
+  margin-left: 0;
+}
+
 /* — module switcher popover (r5 approved; r7 final) — */
 .modpop {
   position: absolute;
