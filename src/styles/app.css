@@ -43,10 +43,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  /* 42px — compact top (Seth, 2026-06-15: 52px read as too tall). The OS traffic
-     lights are centered on this bar via conf trafficLightPosition y ≈ height/2
-     (on this Tahoe build the y value reads like the button CENTER, not its top).
-     If they ever drift: raise conf y to lower the lights, lower it to raise them. */
+  /* 42px — compact top (Seth, 2026-06-15: 52px read as too tall). Content is
+     centered here (centerY ≈ 21); the OS traffic lights render a few px HIGH on
+     this Tahoe build, so conf trafficLightPosition y is tuned ABOVE height/2
+     (y:24) to drop them onto the content line. Raise conf y to lower the lights,
+     lower it to raise them. */
   height: 42px;
   padding: 0 14px;
   border-bottom: 1px solid var(--border);
