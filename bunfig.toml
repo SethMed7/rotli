@@ -1,0 +1,5 @@
+# Bun test runner config. The preload installs minimal browser globals before
+# any test module loads (see test-setup.ts), so frontend modules that read
+# `window`/`document` at import time pick their non-Tauri (in-memory) branch.
+[test]
+preload = ["./test-setup.ts"]

@@ -134,12 +134,20 @@ export class FsNotesService implements NotesService {
   }
 
   async restoreNote(id: string): Promise<Note> {
-    // Send it back to its recorded origin; fall back to Inbox if the breadcrumb
-    // is missing or its folder no longer exists on disk.
+    // Send it back where it came from. The origin breadcrumb is THREE-valued
+    // (corpus.rs:162-167): absent (null) → never had a home, go to Inbox;
+    // "" → the corpus ROOT (a distinct, deliberate value, NOT a miss);
+    // a folder id → there if it still exists on disk, else Inbox. The empty
+    // string is falsy AND the root is never present in the folder list, so it
+    // MUST be matched explicitly — otherwise a root note silently lands in Inbox.
     const { origin } = await corpusRead(id);
     const { folders } = await corpusList();
     const target =
-      origin && folders.some((f) => f.id === origin) ? origin : DEST.inbox;
+      origin == null
+        ? DEST.inbox
+        : origin === "" || folders.some((f) => f.id === origin)
+          ? origin
+          : DEST.inbox;
     return this.moveNote(id, target);
   }
 }

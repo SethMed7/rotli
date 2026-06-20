@@ -114,6 +114,8 @@ interface PersistedSettings {
   glassCanvas: GlassCanvas;
   stayOpen: boolean;
   showInDock: boolean;
+  /** First-run onboarding gate — false until the flow is finished/skipped. */
+  onboarded: boolean;
   /** The Quick Note window's capped set, remembered note, and new-note folder
    * (Seth, 2026-06-15). */
   quickNoteIds: string[];
@@ -167,8 +169,10 @@ function parseSettings(raw: string): PersistedSettings {
   const quickNoteIds = Array.isArray(data.quickNoteIds)
     ? data.quickNoteIds.filter((x): x is string => typeof x === "string").slice(0, QUICK_MAX)
     : [];
+  // the open note is decoupled from the pinned set — keep it even if unpinned;
+  // fall back to the first favorite, else nothing.
   const quickActiveId =
-    typeof data.quickActiveId === "string" && quickNoteIds.includes(data.quickActiveId)
+    typeof data.quickActiveId === "string" && data.quickActiveId
       ? data.quickActiveId
       : (quickNoteIds[0] ?? null);
   const quickFolder =
@@ -187,6 +191,11 @@ function parseSettings(raw: string): PersistedSettings {
     glassCanvas: asEnum(data.glassCanvas, CANVASES, "glass"),
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
+    // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
+    // not this one — treat that as already-onboarded so we don't re-run first-run
+    // onboarding on existing users (same migration shape as expandedDests above)
+    onboarded:
+      typeof data.onboarded === "boolean" ? data.onboarded : Object.keys(data).length > 0,
     quickNoteIds,
     quickActiveId,
     quickFolder,
@@ -213,6 +222,7 @@ function applySettings(s: PersistedSettings): void {
     glassCanvas: s.glassCanvas,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
+    onboarded: s.onboarded,
     quickNoteIds: s.quickNoteIds,
     quickActiveId: s.quickActiveId,
     quickFolder: s.quickFolder,
@@ -245,7 +255,10 @@ async function loadCustomBackground(): Promise<void> {
  * overrides re-register here). A chord the OS now refuses (claimed by another
  * app since last run) falls back to the action's default, never half-applied. */
 function applyShellSideEffects(s: PersistedSettings): void {
-  if (s.stayOpen) void setHideOnBlur(false);
+  // During onboarding the window must NOT hide on blur (the Rust default is
+  // true) — assert it BEFORE first paint so the flow can't vanish in the gap
+  // before App's reactive effect runs. App.tsx re-applies on finish.
+  if (s.stayOpen || !s.onboarded) void setHideOnBlur(false);
   if (s.showInDock) void setDockVisible(true);
   for (const action of allActions()) {
     if (!action.global || !(action.id in s.bindings)) continue;
@@ -438,6 +451,7 @@ function settingsSnapshot(): string {
     glassCanvas: ui.glassCanvas,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
+    onboarded: ui.onboarded,
     quickNoteIds: ui.quickNoteIds,
     quickActiveId: ui.quickActiveId,
     quickFolder: ui.quickFolder,

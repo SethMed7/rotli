@@ -29,6 +29,14 @@ export async function hideCaptureWindow(): Promise<void> {
   await invoke("hide_capture_window");
 }
 
+/** Finish a capture (Enter-save / Esc-dismiss): hide the card AND return focus
+ * to where you were — rotli's main window if you were in it, otherwise the app
+ * you came from. So capturing from another app never surfaces rotli (#5). */
+export async function finishCapture(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("finish_capture_window");
+}
+
 /** The Quick Note window (Raycast-style floating note): summoned by its own
  * global chord (default ⌥Q), hides on blur. toggle = show if hidden / behind,
  * hide if focused. */
@@ -297,6 +305,38 @@ export function emitQuickSet(state: QuickStatePayload): void {
 export function onQuickSet(cb: (state: QuickStatePayload) => void): () => void {
   if (!isTauri()) return () => {};
   const unlisten = listen<QuickStatePayload>("rotli:quick-set", (event) => cb(event.payload));
+  return () => void unlisten.then((fn) => fn());
+}
+
+/** Theme + glass settings, broadcast from the MAIN window so the quick + capture
+ * webviews follow the chosen theme live (they each apply their own theme from
+ * their store; without this they'd only pick it up from settings.json at launch
+ * and go stale when you change it). Loose string types avoid a ui<->tauri import
+ * cycle; the receiver casts back to the ui store's unions. */
+export interface ThemePayload {
+  theme: "light" | "dark" | "system";
+  themeFamily: "warm" | "mono";
+  matchLightFamily: "warm" | "mono";
+  matchDarkFamily: "warm" | "mono";
+  glassMode: boolean;
+  glassTint: string;
+  glassBackground: string;
+  glassClarity: string;
+  glassBlur: string;
+  glassCanvas: string;
+  /** The custom glass wallpaper data-URL (or null) — must ride along so a
+   * window picks up a wallpaper uploaded/changed AFTER it launched. */
+  customBackground: string | null;
+}
+
+export function emitThemeSet(payload: ThemePayload): void {
+  if (!isTauri()) return;
+  void emit("rotli:theme-set", payload);
+}
+
+export function onThemeSet(cb: (payload: ThemePayload) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen<ThemePayload>("rotli:theme-set", (event) => cb(event.payload));
   return () => void unlisten.then((fn) => fn());
 }
 

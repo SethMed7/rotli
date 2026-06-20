@@ -19,11 +19,14 @@ export type BlockKind =
 
 export interface Block {
   kind: BlockKind;
-  /** Source chars before the visible text (the markdown prefix). */
+  /** Source chars before the visible text (the markdown prefix, incl. any
+   * leading indent for a nested list). */
   prefixLen: number;
   text: string;
   done?: boolean;
   marker?: string;
+  /** Leading-space count for a nested list item (0 = top level). 2 spaces/level. */
+  indent?: number;
 }
 
 const TASK_RE = /^- \[([ xX])\] /;
@@ -32,17 +35,23 @@ const HEADING_RE = /^(#{1,3}) /;
 
 export function parseBlock(line: string): Block {
   if (line.trim() === "") return { kind: "blank", prefixLen: 0, text: "" };
+  // headings are never indented (markdown nests lists, not headings)
   const h = HEADING_RE.exec(line);
   if (h?.[1]) {
     const kind = (`h${h[1].length}`) as "h1" | "h2" | "h3";
     return { kind, prefixLen: h[0].length, text: line.slice(h[0].length) };
   }
-  const t = TASK_RE.exec(line);
-  if (t) return { kind: "task", prefixLen: t[0].length, text: line.slice(t[0].length), done: t[1] !== " " };
-  if (line.startsWith("- ")) return { kind: "bullet", prefixLen: 2, text: line.slice(2) };
-  const n = NUMBERED_RE.exec(line);
-  if (n) return { kind: "numbered", prefixLen: n[0].length, text: line.slice(n[0].length), marker: `${n[1]}.` };
-  if (line.startsWith("> ")) return { kind: "quote", prefixLen: 2, text: line.slice(2) };
+  // list kinds may carry a leading indent → nesting depth (2 spaces per level)
+  const indent = /^( +)/.exec(line)?.[1]?.length ?? 0;
+  const body = indent > 0 ? line.slice(indent) : line;
+  const t = TASK_RE.exec(body);
+  if (t) return { kind: "task", prefixLen: indent + t[0].length, text: body.slice(t[0].length), done: t[1] !== " ", indent };
+  if (body.startsWith("- ")) return { kind: "bullet", prefixLen: indent + 2, text: body.slice(2), indent };
+  const n = NUMBERED_RE.exec(body);
+  if (n) return { kind: "numbered", prefixLen: indent + n[0].length, text: body.slice(n[0].length), marker: `${n[1]}.`, indent };
+  // quotes de-indent like the other list kinds so a Tab-nested quote ("  > x")
+  // stays a quote (and nests) instead of falling through to a literal paragraph
+  if (body.startsWith("> ")) return { kind: "quote", prefixLen: indent + 2, text: body.slice(2), indent };
   return { kind: "para", prefixLen: 0, text: line };
 }
 
@@ -142,6 +151,9 @@ export function RenderedLine({
   onToggleTask?: (() => void) | undefined;
 }): ReactNode {
   const block = parseBlock(line);
+  // nested-list depth → a left inset (2 source spaces per level)
+  const depth = Math.floor((block.indent ?? 0) / 2);
+  const nest = depth > 0 ? { marginLeft: depth * 22 } : undefined;
   switch (block.kind) {
     case "h1":
       return <h1 className="md-h1">{renderInline(block.text)}</h1>;
@@ -151,7 +163,7 @@ export function RenderedLine({
       return <h3 className="md-h3">{renderInline(block.text)}</h3>;
     case "task":
       return (
-        <div className={block.done ? "task done" : "task"}>
+        <div className={block.done ? "task done" : "task"} style={nest}>
           <button
             type="button"
             className="box"
@@ -166,24 +178,31 @@ export function RenderedLine({
           <span className="task-text">{renderInline(block.text)}</span>
         </div>
       );
-    case "bullet":
+    case "bullet": {
+      // bullets cycle glyph by depth so nested levels read distinctly
+      const glyph = depth % 3 === 1 ? "◦" : depth % 3 === 2 ? "▪" : "•";
       return (
-        <div className="md-li">
+        <div className="md-li" style={nest}>
           <span className="li-marker" aria-hidden="true">
-            •
+            {glyph}
           </span>
           <span>{renderInline(block.text)}</span>
         </div>
       );
+    }
     case "numbered":
       return (
-        <div className="md-li">
+        <div className="md-li" style={nest}>
           <span className="li-marker num">{block.marker}</span>
           <span>{renderInline(block.text)}</span>
         </div>
       );
     case "quote":
-      return <blockquote className="md-quote">{renderInline(block.text)}</blockquote>;
+      return (
+        <blockquote className="md-quote" style={nest}>
+          {renderInline(block.text)}
+        </blockquote>
+      );
     case "blank":
       return <div className="md-blank" />;
     case "para":

@@ -121,6 +121,7 @@ export function attachDispatcher(surface: Surface): () => void {
   if (detach) return detach;
   const onKeyDown = (event: KeyboardEvent) => {
     if (suspended) return;
+    if (event.repeat) return; // auto-repeat is not a fresh press — never re-fire a command
     const pressed = chordFromEvent(event);
     if (!pressed) return;
     // a modifier-less chord must never swallow typing: inside editable targets

@@ -28,6 +28,7 @@ import {
 } from "../lib/tauri";
 import { useFolders } from "../services/hooks";
 import { isHidden } from "../services/destinations";
+import { resetAndReonboard } from "../state/onboarding";
 import { setQuickFolderSynced } from "../state/quick";
 import {
   GLASS_BACKGROUNDS,
@@ -274,6 +275,8 @@ function GeneralPane() {
   const setStayOpen = useUiStore((s) => s.setStayOpen);
   const showInDock = useUiStore((s) => s.showInDock);
   const setShowInDock = useUiStore((s) => s.setShowInDock);
+  const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
+  const [confirmReset, setConfirmReset] = useState(false);
   const quickFolder = useUiStore((s) => s.quickFolder);
   const folderOpts = (useFolders().data ?? []).filter((f) => !isHidden(f.id));
   const hasCurrent = folderOpts.some((f) => f.id === quickFolder);
@@ -332,6 +335,26 @@ function GeneralPane() {
           ))}
         </select>
       </label>
+
+      <h4 className="sethead">Start fresh</h4>
+      <p className="lead">
+        Reset your hotkeys, window behavior, and theme back to the defaults and run first-time
+        setup again. Your notes are never touched.
+      </p>
+      <button
+        type="button"
+        className={confirmReset ? "ghostbtn danger" : "ghostbtn"}
+        onClick={() => {
+          if (!confirmReset) {
+            setConfirmReset(true);
+            return;
+          }
+          void resetAndReonboard().then(() => setSettingsOpen(false));
+        }}
+        onBlur={() => setConfirmReset(false)}
+      >
+        {confirmReset ? "Click again to reset & re-onboard" : "Reset & re-onboard…"}
+      </button>
     </>
   );
 }

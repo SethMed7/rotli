@@ -7,7 +7,7 @@
 
 import { isTauri } from "../lib/tauri";
 import type { Folder, Note, NoteSummary } from "../types";
-import { DEST, isHidden } from "./destinations";
+import { DEST, isHidden, isSink } from "./destinations";
 import { snippetOf, titleOf } from "./derive";
 import { FsNotesService } from "./fsNotes";
 
@@ -105,7 +105,11 @@ export class InMemoryNotesService implements NotesService {
     return scoped
       .map(({ body: _body, ...summary }) => summary)
       .sort((a, b) =>
-        a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : b.updatedAt - a.updatedAt,
+        a.pinned !== b.pinned
+          ? a.pinned
+            ? -1
+            : 1
+          : b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
       );
   }
 
@@ -156,11 +160,12 @@ export class InMemoryNotesService implements NotesService {
     const existing = this.notes.get(id);
     if (!existing) throw new Error(`unknown note: ${id}`);
     const from = existing.folderId;
-    // The SAME origin rule Rust bakes in: entering a hidden root from a normal
-    // folder records where it came from; leaving (target not hidden) when an
-    // origin exists clears it; otherwise the breadcrumb is left untouched.
-    if (isHidden(targetFolder) && !isHidden(from)) this.origins.set(id, from);
-    else if (!isHidden(targetFolder) && this.origins.has(id)) this.origins.delete(id);
+    // The SAME origin rule Rust bakes in (isSink mirrors Rust is_hidden_root —
+    // Archive/Trash only, NOT Board): entering a sink from a non-sink folder
+    // records where it came from; leaving a sink when an origin exists clears
+    // it; otherwise the breadcrumb is left untouched.
+    if (isSink(targetFolder) && !isSink(from)) this.origins.set(id, from);
+    else if (!isSink(targetFolder) && this.origins.has(id)) this.origins.delete(id);
     const updated: Note = { ...existing, folderId: targetFolder };
     this.notes.set(id, updated);
     return updated;
@@ -175,10 +180,17 @@ export class InMemoryNotesService implements NotesService {
   }
 
   async restoreNote(id: string): Promise<Note> {
-    // Send it back where it came from; fall back to Inbox if the breadcrumb is
-    // missing or its folder no longer exists.
+    // Mirror fs mode's three-valued origin (corpus.rs:162-167): no breadcrumb →
+    // Inbox; "" → the corpus ROOT (a distinct value, NOT a miss); a folder id →
+    // there if it still exists, else Inbox. "" is falsy and no folder has id "",
+    // so the root case must be matched explicitly.
     const origin = this.origins.get(id);
-    const target = origin && this.folders.has(origin) ? origin : DEST.inbox;
+    const target =
+      origin === undefined
+        ? DEST.inbox
+        : origin === "" || this.folders.has(origin)
+          ? origin
+          : DEST.inbox;
     return this.moveNote(id, target);
   }
 
@@ -202,10 +214,10 @@ export class InMemoryNotesService implements NotesService {
   seedNote(
     folderId: string,
     body: string,
-    opts: { pinned?: boolean; createdAt: number; updatedAt: number; origin?: string },
+    opts: { id?: string; pinned?: boolean; createdAt: number; updatedAt: number; origin?: string },
   ): Note {
     const note: Note = {
-      id: ulid(opts.createdAt),
+      id: opts.id ?? ulid(opts.createdAt),
       title: titleOf(body),
       snippet: snippetOf(body),
       folderId,
@@ -254,6 +266,7 @@ if (!FS_MODE) {
   inboxId = inbox.id;
   svc.seedReserved(DEST.brain, DEST.brain);
   svc.seedReserved(DEST.storage, DEST.storage);
+  svc.seedReserved(DEST.board, DEST.board);
   svc.seedReserved(DEST.archive, DEST.archive);
   svc.seedReserved(DEST.trash, DEST.trash);
 
@@ -362,6 +375,21 @@ Scrap this. The three-tier idea died; we went free-local + one paid sync line. K
         origin: DEST.brain,
       },
     );
+
+    // —— Board: loose quick-captures, the staging area. Cards, not notes — you
+    // multi-select and merge them into one joint note (Seth, 2026-06-19). ——
+    svc.seedNote(DEST.board, "Ask Maria about the settlement mapping deadline", {
+      createdAt: now - 40 * 60 * 1000,
+      updatedAt: now - 40 * 60 * 1000,
+    });
+    svc.seedNote(DEST.board, "Idea: warm empty-state for the Board — the quokka again?", {
+      createdAt: now - 25 * 60 * 1000,
+      updatedAt: now - 25 * 60 * 1000,
+    });
+    svc.seedNote(DEST.board, "Gateway export enum — confirm the Lithic mapping before Thursday", {
+      createdAt: now - 8 * 60 * 1000,
+      updatedAt: now - 8 * 60 * 1000,
+    });
   }
 }
 

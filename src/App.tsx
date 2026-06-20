@@ -5,8 +5,12 @@ import "./styles/notes.css";
 import "./styles/editor.css";
 import "./styles/command.css";
 import "./styles/quick.css";
+import "./styles/onboarding.css";
+import "./styles/board.css";
+import { BoardSurface } from "./components/BoardSurface";
 import { CaptureCard } from "./components/CaptureCard";
 import { NotesSurface } from "./components/NotesSurface";
+import { Onboarding } from "./components/Onboarding";
 import { Palette } from "./components/Palette";
 import { QuickNote } from "./components/QuickNote";
 import { SettingsSurface } from "./components/SettingsSurface";
@@ -18,18 +22,30 @@ import { useHeldModifier } from "./keys/useHeldModifier";
 import { GLASS_BG_SRC } from "./lib/glassBackgrounds";
 import {
   emitCaptureAck,
+  emitThemeSet,
   isTauri,
   onCaptureSave,
   onCorpusChanged,
   onQuickSet,
   onRebind,
+  onThemeSet,
+  setDockVisible,
+  setHideOnBlur,
 } from "./lib/tauri";
+import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateNotes } from "./services/hooks";
-import { inboxFolderId, notesService } from "./services/notes";
+import { notesService } from "./services/notes";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
 import { applyQuickState } from "./state/quick";
 import { applyTheme } from "./state/theme";
-import { useUiStore } from "./state/ui";
+import {
+  type GlassBackground,
+  type GlassBlur,
+  type GlassCanvas,
+  type GlassClarity,
+  type GlassTint,
+  useUiStore,
+} from "./state/ui";
 
 registerDefaultActions();
 
@@ -52,9 +68,14 @@ function surfaceFromUrl(): Surface {
 
 function MainShell() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
+  const boardOpen = useUiStore((s) => s.boardOpen);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const focusMode = useUiStore((s) => s.focusMode);
+  const onboarded = useUiStore((s) => s.onboarded);
+  const setOnboarded = useUiStore((s) => s.setOnboarded);
+  // first run (the real app only — the browser/dev demo never onboards)
+  const showOnboarding = isTauri() && !onboarded;
 
   // hold ⌘ ~0.5s on the main surface → the non-modal shortcut map. Gated off
   // while the palette or settings own the keyboard, so it never doubles up; the
@@ -63,7 +84,7 @@ function MainShell() {
   useHeldModifier({
     modifier: "Meta",
     delayMs: 500,
-    enabled: !paletteOpen && !settingsOpen,
+    enabled: !paletteOpen && !settingsOpen && !showOnboarding,
     onHold: () => setWhichKey(true),
     onRelease: () => setWhichKey(false),
   });
@@ -74,15 +95,16 @@ function MainShell() {
     else delete document.documentElement.dataset.focus;
   }, [focusMode]);
 
-  // the capture card lives in another webview; this window owns the corpus —
-  // it saves the capture into Inbox (a real .md on disk in fs mode), (on
-  // save & open) makes it the active tab, and acks so the card may clear
+  // the capture card lives in another webview; this window owns the corpus — it
+  // drops the capture onto the BOARD as a card (a real .md in Board/, NOT a note
+  // in your list), then acks so the card may clear. Plain Enter never surfaces
+  // the app (open=false); ⌘Enter (open=true) opens the Board so you can see it.
   useEffect(
     () =>
       onCaptureSave(({ id, body, open }) => {
-        void notesService.createNote(inboxFolderId, body).then(async (note) => {
+        void notesService.createNote(DEST.board, body).then(async () => {
           await invalidateNotes();
-          if (open) usePanesStore.getState().openNote(note.id);
+          if (open) useUiStore.getState().setBoardOpen(true);
           emitCaptureAck(id);
         });
       }),
@@ -117,10 +139,36 @@ function MainShell() {
     });
   }, []);
 
+  // While onboarding, the window must NOT vanish on blur (it normally hides) —
+  // the flow would disappear the moment focus slips. The real behavior is
+  // (re)applied on finish from the user's chosen Stay-open value.
+  useEffect(() => {
+    if (showOnboarding) void setHideOnBlur(false);
+  }, [showOnboarding]);
+
+  if (showOnboarding) {
+    return (
+      <div className="app-window">
+        <Onboarding
+          onDone={() => {
+            setOnboarded(true);
+            // apply the deferred window choices now (changing them live during
+            // onboarding can kill the frameless window — #1)
+            const ui = useUiStore.getState();
+            void setHideOnBlur(!ui.stayOpen);
+            void setDockVisible(ui.showInDock);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="app-window">
       <Titlebar />
-      <main className="app-content">{settingsOpen ? <SettingsSurface /> : <NotesSurface />}</main>
+      <main className="app-content">
+        {boardOpen ? <BoardSurface /> : settingsOpen ? <SettingsSurface /> : <NotesSurface />}
+      </main>
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
       {whichKey && <WhichKey onClose={() => setWhichKey(false)} />}
     </div>
@@ -156,6 +204,58 @@ export default function App() {
     document.documentElement.dataset.glassClarity = glassClarity;
     document.documentElement.dataset.glassBlur = glassBlur;
   }, [glassClarity, glassBlur]);
+
+  // theme is broadcast from the MAIN window so the quick + capture webviews
+  // follow it LIVE (each applies its own theme; without this they only read it
+  // from settings.json at launch and go stale — issue #4). Main is the source
+  // and never listens; the others listen and never emit, so there's no echo.
+  useEffect(() => {
+    if (surface !== "main") return;
+    emitThemeSet({
+      theme,
+      themeFamily,
+      matchLightFamily,
+      matchDarkFamily,
+      glassMode,
+      glassTint,
+      glassBackground,
+      glassClarity,
+      glassBlur,
+      glassCanvas,
+      customBackground,
+    });
+  }, [
+    surface,
+    theme,
+    themeFamily,
+    matchLightFamily,
+    matchDarkFamily,
+    glassMode,
+    glassTint,
+    glassBackground,
+    glassClarity,
+    glassBlur,
+    glassCanvas,
+    customBackground,
+  ]);
+  useEffect(() => {
+    if (surface === "main") return;
+    return onThemeSet((p) =>
+      useUiStore.setState({
+        theme: p.theme,
+        themeFamily: p.themeFamily,
+        matchLightFamily: p.matchLightFamily,
+        matchDarkFamily: p.matchDarkFamily,
+        glassMode: p.glassMode,
+        glassTint: p.glassTint as GlassTint,
+        glassBackground: p.glassBackground as GlassBackground,
+        glassClarity: p.glassClarity as GlassClarity,
+        glassBlur: p.glassBlur as GlassBlur,
+        glassCanvas: p.glassCanvas as GlassCanvas,
+        customBackground: p.customBackground,
+      }),
+    );
+  }, [surface]);
   useEffect(() => {
     const root = document.documentElement;
     const src =

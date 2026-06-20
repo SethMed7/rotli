@@ -65,6 +65,10 @@ export function registerDefaultActions(): void {
         ui.setSettingsOpen(false);
         return;
       }
+      if (ui.boardOpen) {
+        ui.setBoardOpen(false);
+        return;
+      }
       if (ui.focusMode) {
         ui.setFocusMode(false);
         return;
@@ -126,7 +130,23 @@ export function registerDefaultActions(): void {
       const ui = useUiStore.getState();
       ui.setFocusMode(false);
       ui.setSwitcherOpen(false);
+      ui.setBoardOpen(false);
       ui.setSettingsOpen(!ui.settingsOpen);
+    },
+  });
+
+  // The Board — quick captures collected as cards (Seth, 2026-06-19). Its own
+  // surface, like Settings; ⌘K-reachable + rebindable, opened from the sidebar.
+  registerAction({
+    id: "board.open",
+    title: "Board — captures",
+    defaultChord: null,
+    run: () => {
+      const ui = useUiStore.getState();
+      ui.setFocusMode(false);
+      ui.setSwitcherOpen(false);
+      ui.setSettingsOpen(false);
+      ui.setBoardOpen(!ui.boardOpen);
     },
   });
 
@@ -359,8 +379,8 @@ export function registerDefaultActions(): void {
   });
   registerAction({
     id: "quick.search",
-    title: "Quick note — search & swap",
-    defaultChord: "Meta+K",
+    title: "Quick note — switch / pin notes",
+    defaultChord: "Meta+P",
     surface: "quick",
     run: () => quickHandle()?.openSearch(),
   });

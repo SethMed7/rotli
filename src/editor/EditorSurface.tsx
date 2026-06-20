@@ -107,7 +107,17 @@ interface Selection {
   end: number;
 }
 
-export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: string }) {
+export function EditorSurface({
+  noteId,
+  paneId,
+  autoFocus = false,
+}: {
+  noteId: string;
+  paneId: string;
+  /** Quick Note: land an active typing caret on open (the main editor stays
+   * click-to-edit). */
+  autoFocus?: boolean;
+}) {
   const note = useNote(noteId).data;
   const docLines = useDocumentLines(noteId);
   const dirty = useDocumentDirty(noteId);
@@ -178,6 +188,21 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
     closeSlash();
     scrollRef.current?.scrollTo({ top: 0 });
   }, [noteId]);
+
+  // autoFocus (Quick Note, #7): the moment the note loads, drop an active typing
+  // caret at the END of the content — opening the window lands you straight in
+  // writing where you left off. Fires once per mount; the quick window remounts
+  // on each show (a key nonce) so re-opens refocus. Placed AFTER the reset above
+  // so it wins on mount.
+  const didAutoFocusRef = useRef(false);
+  useEffect(() => {
+    if (!autoFocus || didAutoFocusRef.current || !lines) return;
+    didAutoFocusRef.current = true;
+    const last = Math.max(0, lines.length - 1);
+    const end = (lines[last] ?? "").length;
+    pendingCaretRef.current = { start: end, end };
+    setActiveState(last);
+  }, [autoFocus, lines]);
 
   // leaving a note (tab switch, pane close, note switch) flushes its pending
   // debounced save — keystrokes are never parked in a timer behind your back
@@ -437,13 +462,15 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
   const listPrefixOf = (
     line: string,
   ): { prefixLen: number; next: string; empty: boolean } | null => {
-    const m = line.match(/^((?:- \[[ xX]\] |- |\d+\. |> ))(.*)$/);
+    // capture any leading indent so a nested item continues at the SAME depth
+    const m = line.match(/^( *)((?:- \[[ xX]\] |- |\d+\. |> ))(.*)$/);
     if (!m) return null;
-    const prefix = m[1] ?? "";
-    const content = m[2] ?? "";
+    const indent = m[1] ?? "";
+    const prefix = m[2] ?? "";
+    const content = m[3] ?? "";
     const num = prefix.match(/^(\d+)\. $/);
-    const next = num ? `${Number(num[1]) + 1}. ` : prefix.replace(/\[[xX]\]/, "[ ]");
-    return { prefixLen: prefix.length, next, empty: content.trim() === "" };
+    const marker = num ? `${Number(num[1]) + 1}. ` : prefix.replace(/\[[xX]\]/, "[ ]");
+    return { prefixLen: indent.length + prefix.length, next: indent + marker, empty: content.trim() === "" };
   };
 
   const singleVisualRow = (): boolean => {
@@ -529,6 +556,26 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
           }
         }
         splitAt(active, start);
+        break;
+      }
+      case "Tab": {
+        // Tab works in your typing — indent (nest a list) instead of moving
+        // focus to the format bar. Shift+Tab outdents. 2 spaces per level.
+        if (event.shiftKey) {
+          const removed = line.startsWith("  ") ? 2 : line.startsWith(" ") ? 1 : 0;
+          // nothing to outdent → let Shift+Tab move focus natively (no trap)
+          if (removed === 0) break;
+          event.preventDefault();
+          pendingCaretRef.current = {
+            start: Math.max(0, start - removed),
+            end: Math.max(0, end - removed),
+          };
+          setLine(active, line.slice(removed));
+        } else {
+          event.preventDefault();
+          pendingCaretRef.current = { start: start + 2, end: end + 2 };
+          setLine(active, `  ${line}`);
+        }
         break;
       }
       case " ": {
@@ -618,6 +665,23 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
     window.addEventListener("mouseup", onUp);
   };
 
+  /** autoFocus (#7): a click in the empty area BELOW the lines (not on a line)
+   * lands the caret at the end of the content — "click anywhere to type". Gated
+   * to autoFocus so the main editor's click/drag-select grammar is untouched. */
+  const onBodyMouseDown = (event: MouseEvent) => {
+    if (!autoFocus || event.button !== 0) return;
+    if ((event.target as HTMLElement).closest(".ed-line")) return; // a line owns its click
+    if (!lines || lines.length === 0) return;
+    // CRITICAL: stop the native mousedown from moving focus to <body> — without
+    // this it blurs the textarea we focus below, so clicking the empty area did
+    // nothing and you couldn't type (#4).
+    event.preventDefault();
+    const last = lines.length - 1;
+    const end = (lines[last] ?? "").length;
+    pendingCaretRef.current = { start: end, end };
+    setActiveState(last);
+  };
+
   if (!note || !lines) return <div className="editor" ref={rootRef} />;
 
   const text = lines.join("\n");
@@ -657,7 +721,7 @@ export function EditorSurface({ noteId, paneId }: { noteId: string; paneId: stri
         </div>
       </div>
       {aaOpen && <AaPanel noteId={noteId} anchorRef={aaChipRef} onClose={() => setAaOpen(false)} />}
-      <div className="ed-scroll" ref={scrollRef}>
+      <div className="ed-scroll" ref={scrollRef} onMouseDown={onBodyMouseDown}>
         <div className="ed-body" style={bodyStyle} ref={edBodyRef}>
           {lines.map((line, i) =>
             i === active ? (

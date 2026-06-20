@@ -77,6 +77,29 @@ function RestoreGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
+/** Board glyph — a 2×2 grid of cards (the capture board). Inline like
+ * RestoreGlyph; same stroke/viewBox grammar so it reads as one family. */
+function BoardGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </svg>
+  );
+}
+
 /** Day label for a compact row's trailing date (lifted from NoteList). */
 function dayLabel(ts: number): string {
   const date = new Date(ts);
@@ -212,6 +235,7 @@ export function Sidebar() {
   const storageNotes = useNotes(DEST.storage).data ?? [];
   const archiveNotes = useNotes(DEST.archive).data ?? [];
   const trashNotes = useNotes(DEST.trash).data ?? [];
+  const boardNotes = useNotes(DEST.board).data ?? [];
 
   // a flat id → note lookup across every loaded list (incl. hidden Archive/
   // Trash) — the drop handler's same-folder no-op check trusts this (Seth,
@@ -499,6 +523,15 @@ export function Sidebar() {
           </span>
         </button>
       </div>
+
+      {/* the Board — quick captures collected as cards; opens its own surface
+          (Seth, 2026-06-19). Outside the roving listbox: it's an action, not a
+          folder selection. */}
+      <button type="button" className="frow sb-board" onClick={() => dispatch("board.open")}>
+        <BoardGlyph size={14.5} />
+        <span className="fname">Board</span>
+        <span className="count">{boardNotes.length}</span>
+      </button>
 
       {/* the scrolling tree is the roving listbox: Tab enters at the one
           tabIndex=0 row, then j/k walk it (Seth, 2026-06-13). The keyboard

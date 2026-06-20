@@ -1,0 +1,323 @@
+/* rotli — first-run onboarding (Seth, 2026-06-19). A calm centered wizard over
+   the app ground. Reuses .famrow/.famcard (theme cards) and .hkchord (the chord
+   recorder) from app.css/command.css; everything else is kit tokens only. */
+
+.onb {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ground);
+  overflow: hidden;
+  padding: 56px 28px 28px;
+}
+
+/* a draggable strip across the top so the frameless window still moves; sits
+   behind the card and clear of the native traffic lights (top-left) */
+.onb-drag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
+}
+
+.onb-card {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.onb-step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 320px;
+}
+.onb-welcome {
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+}
+.onb-mark {
+  margin-bottom: 4px;
+}
+.onb-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 25px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.onb-sub {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  max-width: 460px;
+}
+.onb-welcome .onb-sub {
+  margin: 0 auto;
+}
+.onb-sub b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* — hotkey rows — */
+.onb-hks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.onb-hk {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+.onb-hk-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.onb-hk-label {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.onb-hk-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.onb-hk-note {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--accent-text, var(--accent));
+}
+
+/* — two-up choice cards (Dock + Behavior) — */
+.onb-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 4px;
+}
+.onb-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-exit) var(--motion-ease),
+    background var(--motion-exit) var(--motion-ease);
+}
+.onb-choice:hover {
+  background: var(--hov);
+}
+.onb-choice.sel {
+  border-color: var(--accent);
+  background: var(--tint);
+}
+.onb-choice-title {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
+}
+.onb-choice-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* — footer: progress dots + actions — */
+.onb-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+.onb-dots {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.onb-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--border);
+  transition: all var(--motion-exit) var(--motion-ease);
+}
+.onb-dot.on {
+  width: 20px;
+  background: var(--accent);
+}
+.onb-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.onb-skip {
+  border: none;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 8px 6px;
+}
+.onb-skip:hover {
+  color: var(--text);
+}
+.onb-btn {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  padding: 9px 20px;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+}
+.onb-btn:hover {
+  filter: brightness(1.04);
+}
+.onb-btn.ghost {
+  background: none;
+  border-color: var(--border);
+  color: var(--text);
+}
+.onb-btn.ghost:hover {
+  background: var(--hov);
+  filter: none;
+}
+
+/* footer buttons share ONE baseline: every control is the same height, centered,
+   no stray margins, so Back/Continue/Skip line up exactly. */
+.onb-actions {
+  align-items: center;
+}
+.onb-actions .onb-btn,
+.onb-actions .onb-skip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  line-height: 1;
+  margin: 0;
+}
+
+/* #3 — Liquid Glass option under the theme cards */
+.famrow.dim .famcard {
+  opacity: 0.5;
+}
+.onb-glass {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+.onb-glass-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+}
+.onb-glass-toggle.on {
+  border-color: var(--accent);
+  background: var(--tint);
+}
+.onb-glass-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.onb-glass-title {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
+}
+.onb-glass-desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.onb-tints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.onb-tint {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--text);
+  cursor: pointer;
+}
+.onb-tint.sel {
+  border-color: var(--accent);
+  background: var(--tint);
+}
+.onb-tint i {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-pill);
+  display: inline-block;
+}
+.onb-glass-modes {
+  display: flex;
+  gap: 8px;
+}
+.onb-glass-mode {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.onb-glass-mode.sel {
+  border-color: var(--accent);
+  background: var(--tint);
+}

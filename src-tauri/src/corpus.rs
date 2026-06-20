@@ -469,7 +469,7 @@ impl CorpusStore {
             os_trash: true,
         };
         store.load_index();
-        // Scaffold the five reserved sidebar destinations every open (idempotent),
+        // Scaffold the six reserved sidebar destinations every open (idempotent),
         // so existing corpora gain them too. (Seth, 2026-06-13)
         store.ensure_reserved_folders()?;
         if fresh {
@@ -495,15 +495,15 @@ impl CorpusStore {
         Ok(())
     }
 
-    /// The five reserved top-level destinations the sidebar always offers —
-    /// Inbox, Brain, Storage, Archive, Trash — scaffolded on disk so they exist
+    /// The six reserved top-level destinations the sidebar always offers —
+    /// Inbox, Brain, Storage, Board, Archive, Trash — scaffolded on disk so they exist
     /// even on a corpus that predates them. Called unconditionally from `open`;
     /// `create_dir_all` is a no-op when a dir is already there, so this is fully
     /// idempotent. Empty reserved dirs surface as zero-note folders via `walk`;
     /// the TS layer decides which double as fixed destinations vs. plain folders.
     /// (Seth, 2026-06-13)
     fn ensure_reserved_folders(&self) -> Result<(), String> {
-        for name in ["Inbox", "Brain", "Storage", "Archive", "Trash"] {
+        for name in ["Inbox", "Brain", "Storage", "Board", "Archive", "Trash"] {
             fs::create_dir_all(self.root.join(name))
                 .map_err(|e| format!("create reserved folder {name}: {e}"))?;
         }

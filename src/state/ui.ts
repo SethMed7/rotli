@@ -77,7 +77,7 @@ export const clampSidebarWidth = (px: number): number =>
 /** The reserved destination ids the sidebar seeds open (Inbox + Brain) and the
  * persistence layer trusts as a valid folder selection before the first list
  * resolves (Seth, 2026-06-13). */
-export const RESERVED_DESTS = ["Inbox", "Brain", "Storage", "Archive", "Trash"] as const;
+export const RESERVED_DESTS = ["Inbox", "Brain", "Storage", "Board", "Archive", "Trash"] as const;
 
 interface UiState {
   /** Explicit three-way setting. "system" mirrors the OS only while selected;
@@ -130,6 +130,12 @@ interface UiState {
   /** General: show the app in the Dock (default off — menu bar only). */
   showInDock: boolean;
   setShowInDock: (on: boolean) => void;
+
+  /** First-run gate: false until the user finishes (or skips) onboarding, or
+   * after a manual "Reset & re-onboard". Persisted in settings.json; the
+   * onboarding surface shows whenever this is false (Tauri only). */
+  onboarded: boolean;
+  setOnboarded: (done: boolean) => void;
 
   /** The Quick Note window's capped set (Seth, 2026-06-15): up to QUICK_MAX
    * note ids, in switcher order. The mutations + cross-webview sync live in
@@ -185,6 +191,11 @@ interface UiState {
   /** Settings as its own surface in the window (r1 frame F); Esc returns. */
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
+
+  /** The Board — quick captures collected as cards — as its own surface (like
+   * Settings). Esc / "Back to notes" returns. Not persisted (a transient view). */
+  boardOpen: boolean;
+  setBoardOpen: (open: boolean) => void;
 
   /** ⌥⌘F focus mode (r3 frame E): chrome leaves, one centered column. */
   focusMode: boolean;
@@ -253,6 +264,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   showInDock: false,
   setShowInDock: (on) => set({ showInDock: on }),
 
+  onboarded: false,
+  setOnboarded: (done) => set({ onboarded: done }),
+
   quickNoteIds: [],
   setQuickNoteIds: (ids) => set({ quickNoteIds: ids }),
   quickActiveId: null,
@@ -296,6 +310,9 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   settingsOpen: false,
   setSettingsOpen: (open) => set({ settingsOpen: open }),
+
+  boardOpen: false,
+  setBoardOpen: (open) => set({ boardOpen: open }),
 
   focusMode: false,
   setFocusMode: (on) => set({ focusMode: on }),

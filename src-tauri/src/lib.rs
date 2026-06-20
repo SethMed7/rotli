@@ -53,6 +53,12 @@ struct LastBlurHide(Mutex<Option<Instant>>);
 /// the main window (Settings → General → "Stay open"). Capture always hides.
 struct HideOnBlur(Mutex<bool>);
 
+/// Whether the MAIN window was visible when the capture card was last summoned.
+/// Finishing a capture uses it to return focus correctly: back to rotli's main
+/// window if you were already in the app, or to the app you came from otherwise
+/// — so a quick capture from another app never "opens" rotli (Seth, 2026-06-19).
+struct CaptureReturn(Mutex<bool>);
+
 fn show_main(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -111,10 +117,31 @@ fn show_capture(app: &AppHandle) {
     let Some(window) = app.get_webview_window("capture") else {
         return;
     };
+    // remember whether main was up — finish_capture returns focus accordingly
+    let main_visible = app
+        .get_webview_window("main")
+        .map(|w| w.is_visible().unwrap_or(false))
+        .unwrap_or(false);
+    *app.state::<CaptureReturn>().0.lock().unwrap() = main_visible;
     center_on_cursor_display(app, &window);
     let _ = window.show();
     let _ = window.set_focus();
     let _ = app.emit_to("capture", "rotli:capture-show", ());
+}
+
+/// Finish a capture (Enter-save or Esc-dismiss): hide the card, then return focus
+/// where it belongs — back to the main window if you were already in rotli, or to
+/// the app you came from (NSApp hide) otherwise, so capturing from another app
+/// never surfaces rotli (#5). The card is always hidden either way.
+fn finish_capture(app: &AppHandle) {
+    hide_capture(app);
+    let was_in_rotli = *app.state::<CaptureReturn>().0.lock().unwrap();
+    if was_in_rotli {
+        show_main(app);
+    } else {
+        #[cfg(target_os = "macos")]
+        let _ = app.hide();
+    }
 }
 
 fn show_quick(app: &AppHandle) {
@@ -215,6 +242,11 @@ fn show_main_window(app: AppHandle) {
 #[tauri::command]
 fn hide_capture_window(app: AppHandle) {
     hide_capture(&app);
+}
+
+#[tauri::command]
+fn finish_capture_window(app: AppHandle) {
+    finish_capture(&app);
 }
 
 #[tauri::command]
@@ -376,11 +408,13 @@ pub fn run() {
         })
         .manage(LastBlurHide(Mutex::new(None)))
         .manage(HideOnBlur(Mutex::new(true)))
+        .manage(CaptureReturn(Mutex::new(false)))
         .invoke_handler(tauri::generate_handler![
             toggle_main_window,
             hide_main_window,
             show_main_window,
             hide_capture_window,
+            finish_capture_window,
             toggle_quick_window,
             hide_quick_window,
             show_quick_window,
@@ -508,6 +542,21 @@ pub fn run() {
                 _ => {}
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // Clicking the Dock icon (when "Show in Dock" is on) of a running app
+            // with no visible window must reopen it — macOS sends Reopen, and
+            // without handling it the Dock icon does nothing (Seth, 2026-06-19).
+            // RunEvent::Reopen is a macOS-only variant, so cfg-gate it the same
+            // way the rest of this file gates every other macOS API.
+            #[cfg(target_os = "macos")]
+            {
+                if let tauri::RunEvent::Reopen { .. } = event {
+                    show_main(app);
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        });
 }

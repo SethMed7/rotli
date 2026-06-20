@@ -69,13 +69,27 @@ export function setQuickActive(id: string): void {
   commit({ activeId: id });
 }
 
+/** Pin/unpin a note to the quick-access favorites — does NOT change which note
+ * is open (the picker decouples "open" from "pinned"). Capped at QUICK_MAX;
+ * pinning when full is ignored. */
+export function togglePinQuick(id: string): void {
+  const { quickNoteIds: ids } = useUiStore.getState();
+  if (ids.includes(id)) commit({ ids: ids.filter((x) => x !== id) });
+  else if (ids.length < QUICK_MAX) commit({ ids: [...ids, id] });
+}
+
 /** Step the active note through the set, wrapping. dir = +1 next / -1 prev. */
 export function cycleQuick(dir: 1 | -1): void {
   const { quickNoteIds: ids, quickActiveId: active } = useUiStore.getState();
   if (ids.length === 0) return;
   const i = active ? ids.indexOf(active) : -1;
-  const base = i >= 0 ? i : 0;
-  commit({ activeId: ids[(base + dir + ids.length) % ids.length] ?? null });
+  if (i < 0) {
+    // the open note isn't a favorite (the picker decoupled open from pinned) —
+    // step onto the first/last favorite, not over ids[0].
+    commit({ activeId: (dir === 1 ? ids[0] : ids[ids.length - 1]) ?? null });
+    return;
+  }
+  commit({ activeId: ids[(i + dir + ids.length) % ids.length] ?? null });
 }
 
 export function setQuickFolderSynced(folder: string): void {
@@ -87,7 +101,9 @@ export function setQuickFolderSynced(folder: string): void {
 export function pruneQuick(alive: Set<string>): void {
   const { quickNoteIds: ids, quickActiveId: active } = useUiStore.getState();
   const kept = ids.filter((id) => alive.has(id));
-  const activeId = active && kept.includes(active) ? active : (kept[0] ?? null);
+  // keep the OPEN note if it still exists — it need not be pinned (the picker
+  // opens any note); only fall back when the active note is truly gone.
+  const activeId = active && alive.has(active) ? active : (kept[0] ?? null);
   if (kept.length === ids.length && activeId === active) return;
   commit({ ids: kept, activeId });
 }

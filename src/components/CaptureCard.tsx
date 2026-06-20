@@ -12,14 +12,16 @@ import rMark from "../brand/logo/r-mark.svg";
 import { setCaptureHandle } from "../lib/captureHandle";
 import {
   emitCaptureSave,
+  finishCapture,
   hideCaptureWindow,
   isTauri,
   onCaptureAck,
   onCaptureShow,
   showMainWindow,
 } from "../lib/tauri";
+import { DEST } from "../services/destinations";
 import { invalidateNotes } from "../services/hooks";
-import { inboxFolderId, notesService, ulid } from "../services/notes";
+import { notesService, ulid } from "../services/notes";
 
 const MAX_ROWS = 4;
 
@@ -29,7 +31,8 @@ export function CaptureCard() {
   const pendingRef = useRef<{ id: string; sent: string } | null>(null);
 
   const dismiss = () => {
-    void hideCaptureWindow(); // the draft stays — summoning again resumes it
+    // hide the card + return focus where you were; the draft stays (re-summon resumes it)
+    void finishCapture();
   };
 
   const save = (openAfter: boolean) => {
@@ -46,12 +49,18 @@ export function CaptureCard() {
       const id = ulid();
       pendingRef.current = { id, sent: text };
       emitCaptureSave(id, body, openAfter);
-      void hideCaptureWindow();
-      if (openAfter) void showMainWindow();
+      if (openAfter) {
+        // ⌘⏎ — jump to the Board to see the card (the main window opens it)
+        void hideCaptureWindow();
+        void showMainWindow();
+      } else {
+        // ⏎ — drop the card and return to where you were; never surface the app
+        void finishCapture();
+      }
     } else {
-      // browser review: save through the local service
+      // browser review: save through the local service (onto the Board)
       setText("");
-      void notesService.createNote(inboxFolderId, body).then(() => invalidateNotes());
+      void notesService.createNote(DEST.board, body).then(() => invalidateNotes());
     }
   };
 
@@ -96,7 +105,7 @@ export function CaptureCard() {
           />
         </div>
         <div className="cap-foot">
-          <span className="chip">→ Inbox</span>
+          <span className="chip">→ Board</span>
           <span className="grow" />
           <span>
             <kbd>⏎</kbd> save

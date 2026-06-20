@@ -1,11 +1,11 @@
-// Quick Note — the floating, Raycast-style note window (Seth, 2026-06-15).
-// A third webview (?window=quick), summoned by its own global chord (⌥Q),
-// hidden on blur. It reuses the EXACT main editor + format bar, but over a tiny
-// curated set: up to QUICK_MAX notes you cycle with ‹ ›, a "+" that makes a new
-// one in the quick folder, and ⌘K search to swap any note into the set. The set
-// + the remembered note live in the ui store (state/quick.ts), synced to the
-// main window which persists them. Renders standalone in a plain browser
-// (localhost:1420/?window=quick) for review, like the capture card.
+// Quick Note — the floating, Raycast-style note window (Seth, 2026-06-15; the
+// ⌘P picker, 2026-06-19). A third webview (?window=quick), summoned by ⌥Q,
+// hidden on blur. It reuses the EXACT main editor + format bar over ONE open
+// note. The note you're in is decoupled from your pinned favorites: ⌘P (or the
+// header) opens a picker over ALL notes — click one to open it, star one to pin
+// it to quick access. ⌘]/⌘[ cycle the pinned favorites. The set + the open note
+// live in the ui store (state/quick.ts), synced to the main window which
+// persists them. Renders standalone in a plain browser for review.
 
 import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { EditorSurface } from "../editor/EditorSurface";
@@ -15,7 +15,7 @@ import { onQuickShow, startWindowDrag } from "../lib/tauri";
 import { invalidateNotes, useNotes } from "../services/hooks";
 import { notesService } from "../services/notes";
 import { usePanesStore } from "../state/panes";
-import { QUICK_MAX, addQuickNote, cycleQuick, pruneQuick, removeQuickNote } from "../state/quick";
+import { pruneQuick, setQuickActive, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { IconButton } from "./IconButton";
@@ -26,8 +26,7 @@ import { FileGlyph, PlusGlyph, SearchGlyph } from "./glyphs";
  * under it — that keeps ⌘B / headings / lists working here. */
 const QUICK_PANE_ID = "quick";
 
-/** Manual drag (never data-tauri-drag-region) so double-click can't zoom — the
- * same rule the main Titlebar follows. */
+/** Manual drag (never data-tauri-drag-region) so double-click can't zoom. */
 function onDragRegionMouseDown(event: MouseEvent) {
   if (event.button !== 0 || event.detail > 1) return;
   void startWindowDrag();
@@ -45,48 +44,55 @@ function fuzzy(query: string, text: string): boolean {
   return q.length === 0;
 }
 
-function Chevron({ dir }: { dir: "left" | "right" }) {
+function StarGlyph({ filled }: { filled: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
       width="15"
       height="15"
-      fill="none"
+      fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="1.6"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d={dir === "left" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
+      <path d="M12 3.5l2.6 5.27 5.82.85-4.21 4.1.99 5.79L12 16.77 6.79 19.5l.99-5.79-4.21-4.1 5.82-.85z" />
     </svg>
   );
 }
 
-/** Search every note and pick one INTO the set (add when there's room, else
- * swap the chosen note into the active slot — see addQuickNote). */
-function QuickSearch({
+/** The picker (⌘P): search ALL notes; click a row to OPEN it, click the star to
+ * pin/unpin it to quick access. Favorites float to the top. */
+function NotePicker({
   notes,
-  inSet,
-  onPick,
+  pinned,
+  activeId,
+  onOpen,
+  onTogglePin,
   onClose,
 }: {
   notes: NoteSummary[];
-  inSet: Set<string>;
-  onPick: (id: string) => void;
+  pinned: Set<string>;
+  activeId: string | null;
+  onOpen: (id: string) => void;
+  onTogglePin: (id: string) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
-  // register in the transient stack so quick.dismiss (Esc) closes the overlay
-  // before the window, and an outside click closes it
+  // Esc (quick.dismiss) + outside-click close the picker before the window
   useTransientPopover([panelRef], true, onClose);
 
   const results = useMemo(() => {
     const q = query.trim();
-    return notes.filter((n) => fuzzy(q, n.title) || fuzzy(q, n.snippet)).slice(0, 30);
-  }, [notes, query]);
+    const matched = notes.filter((n) => fuzzy(q, n.title) || fuzzy(q, n.snippet));
+    // pinned favorites first, then the rest — both filtered by the query
+    const fav = matched.filter((n) => pinned.has(n.id));
+    const rest = matched.filter((n) => !pinned.has(n.id));
+    return [...fav, ...rest].slice(0, 60);
+  }, [notes, query, pinned]);
   const sel = Math.min(index, Math.max(0, results.length - 1));
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -99,21 +105,21 @@ function QuickSearch({
     } else if (event.key === "Enter") {
       event.preventDefault();
       const note = results[sel];
-      if (note) onPick(note.id);
+      if (note) onOpen(note.id);
     }
-    // Esc falls through to the quick.dismiss action (the transient stack)
+    // Esc falls through to quick.dismiss (the transient stack)
   };
 
   return (
-    <div className="qsearch" ref={panelRef} role="dialog" aria-label="Search notes to pin">
+    <div className="qsearch" ref={panelRef} role="dialog" aria-label="Switch or pin a note">
       <div className="qsearch-in">
         <SearchGlyph size={15} />
         <input
           autoFocus
           type="text"
           value={query}
-          placeholder="Search notes to pin here…"
-          aria-label="Search notes to pin"
+          placeholder="Open any note · ★ pins it to quick access"
+          aria-label="Switch to a note"
           onChange={(e) => {
             setQuery(e.target.value);
             setIndex(0);
@@ -122,19 +128,27 @@ function QuickSearch({
         />
       </div>
       <div className="qsearch-list">
-        {results.map((n, i) => (
-          <button
-            type="button"
-            key={n.id}
-            className={i === sel ? "qsrow sel" : "qsrow"}
-            onMouseEnter={() => setIndex(i)}
-            onClick={() => onPick(n.id)}
-          >
-            <FileGlyph size={14} />
-            <span className="qslabel">{n.title || "Untitled"}</span>
-            {inSet.has(n.id) && <span className="qstag">in set</span>}
-          </button>
-        ))}
+        {results.map((n, i) => {
+          const isPinned = pinned.has(n.id);
+          return (
+            <div key={n.id} className={i === sel ? "qsrow sel" : "qsrow"} onMouseEnter={() => setIndex(i)}>
+              <button type="button" className="qsopen" onClick={() => onOpen(n.id)}>
+                <FileGlyph size={14} />
+                <span className="qslabel">{n.title || "Untitled"}</span>
+                {n.id === activeId && <span className="qstag">open</span>}
+              </button>
+              <button
+                type="button"
+                className={isPinned ? "qspin on" : "qspin"}
+                aria-label={isPinned ? "Unpin from quick access" : "Pin to quick access"}
+                aria-pressed={isPinned}
+                onClick={() => onTogglePin(n.id)}
+              >
+                <StarGlyph filled={isPinned} />
+              </button>
+            </div>
+          );
+        })}
         {results.length === 0 && <div className="qsempty">No notes match.</div>}
       </div>
     </div>
@@ -147,50 +161,114 @@ export function QuickNote() {
   const notesQuery = useNotes();
   const notes = useMemo(() => notesQuery.data ?? [], [notesQuery.data]);
   const byId = useMemo(() => new Map(notes.map((n) => [n.id, n])), [notes]);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // bumped each summon — keys the editor so it REMOUNTS on every show, re-running
+  // autoFocus so re-opens always land a typing caret (#7)
+  const [showNonce, setShowNonce] = useState(0);
+  // in-flight guard so a burst of summons can't spawn duplicate blank notes (QN-1)
+  const creatingRef = useRef(false);
 
   // point activeEditor() at the one editor this webview mounts
   useEffect(() => {
     usePanesStore.setState({ focusedPaneId: QUICK_PANE_ID });
   }, []);
 
-  // self-heal: drop ids whose notes were deleted, once the corpus list resolves
+  // self-heal: prune pinned ids whose notes are truly GONE (archive/trash is an
+  // id-preserving move, not a delete — confirm via getNote before dropping). The
+  // OPEN note is kept by pruneQuick whenever it still exists, pinned or not.
   useEffect(() => {
-    if (notesQuery.isSuccess) pruneQuick(new Set(notes.map((n) => n.id)));
-  }, [notesQuery.isSuccess, notes]);
+    if (!notesQuery.isSuccess) return;
+    const visible = new Set(notes.map((n) => n.id));
+    // ids absent from the visible list MIGHT be gone — but archive/trash is an
+    // id-preserving move, so confirm via getNote before dropping. The OPEN note
+    // is checked the same way even when every pinned favorite is still visible
+    // (it can be archived/trashed on its own — the half-fix missed this path).
+    const toConfirm = ids.filter((id) => !visible.has(id));
+    if (activeId && !visible.has(activeId) && !toConfirm.includes(activeId)) {
+      toConfirm.push(activeId);
+    }
+    if (toConfirm.length === 0) {
+      pruneQuick(visible);
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(toConfirm.map((id) => notesService.getNote(id).then((n) => (n ? id : null))))
+      .then((found) => {
+        if (cancelled) return;
+        const alive = new Set(visible);
+        for (const id of found) if (id) alive.add(id);
+        pruneQuick(alive);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [notesQuery.isSuccess, notes, ids, activeId]);
 
   const newNote = () => {
     const folder = useUiStore.getState().quickFolder;
-    void notesService.createNote(folder, "").then(async (note) => {
-      await invalidateNotes();
-      addQuickNote(note.id);
-      setSearchOpen(false);
-    });
+    creatingRef.current = true;
+    void notesService
+      .createNote(folder, "")
+      .then(async (note) => {
+        await invalidateNotes();
+        setQuickActive(note.id); // open it (not pinned — pin deliberately via ★)
+        setPickerOpen(false);
+      })
+      .finally(() => {
+        creatingRef.current = false;
+      });
   };
-  const openSearch = () => setSearchOpen(true);
+  const openPicker = () => setPickerOpen(true);
 
-  // route the quick.new / quick.search chords to this live component (no deps —
-  // re-register each render so the closures stay fresh, like the capture card)
+  // route the quick.new / quick.search(picker) chords to this live component
   useEffect(() => {
-    setQuickHandle({ newNote, openSearch });
+    setQuickHandle({ newNote, openSearch: openPicker });
     return () => setQuickHandle(null);
   });
 
-  // re-summoned: a fresh card never opens mid-search
-  useEffect(() => onQuickShow(() => setSearchOpen(false)), []);
+  // re-summoned: close the picker, remount the editor (refocus), and if NO note
+  // is open drop straight into a fresh one so there's always a typing area (#7).
+  // subscribe once — the handler reads everything imperatively (getState, stable
+  // refs/setters), so a per-render re-subscribe would only churn the async
+  // listen/unlisten pair with no benefit.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: stable handler, subscribe once
+  useEffect(
+    () =>
+      onQuickShow(() => {
+        setPickerOpen(false);
+        setShowNonce((n) => n + 1);
+        if (!creatingRef.current && !useUiStore.getState().quickActiveId) newNote();
+      }),
+    [],
+  );
 
-  const pos = activeId ? ids.indexOf(activeId) : -1;
   const activeTitle = (activeId && byId.get(activeId)?.title) || "Untitled";
 
   return (
     <div className="quick-window">
       <header className="quick-head">
         <div className="quick-inset" onMouseDown={onDragRegionMouseDown} />
-        <span className="quick-title" onMouseDown={onDragRegionMouseDown}>
-          Quick note
-        </span>
+        {activeId ? (
+          <button
+            type="button"
+            className="quick-pick"
+            aria-haspopup="dialog"
+            title="Switch or pin a note — ⌘P"
+            onClick={openPicker}
+          >
+            <span className="quick-pick-name">{activeTitle}</span>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+        ) : (
+          <span className="quick-title" onMouseDown={onDragRegionMouseDown}>
+            Quick note
+          </span>
+        )}
         <div className="quick-actions">
-          <IconButton label="Search & swap — ⌘K" onClick={openSearch}>
+          <IconButton label="Switch or pin a note — ⌘P" onClick={openPicker}>
             <SearchGlyph size={15} />
           </IconButton>
           <IconButton label="New quick note — ⌘N" onClick={newNote}>
@@ -199,72 +277,36 @@ export function QuickNote() {
         </div>
       </header>
 
-      {ids.length > 0 && activeId ? (
-        <>
-          <div className="quick-switch">
-            <button
-              type="button"
-              className="qsw-arrow"
-              aria-label="Previous quick note"
-              disabled={ids.length < 2}
-              onClick={() => cycleQuick(-1)}
-            >
-              <Chevron dir="left" />
-            </button>
-            <span className="qsw-name" title={activeTitle}>
-              {activeTitle}
-            </span>
-            <span className="qsw-count">
-              {pos >= 0 ? pos + 1 : 1}/{ids.length}
-            </span>
-            <button
-              type="button"
-              className="qsw-arrow"
-              aria-label="Next quick note"
-              disabled={ids.length < 2}
-              onClick={() => cycleQuick(1)}
-            >
-              <Chevron dir="right" />
-            </button>
-            <span className="qsw-grow" />
-            <button
-              type="button"
-              className="qsw-x"
-              aria-label="Remove from quick set"
-              onClick={() => removeQuickNote(activeId)}
-            >
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
-          </div>
-          {/* key forces a clean remount per note — fresh caret/scroll on switch */}
-          <EditorSurface key={activeId} noteId={activeId} paneId={QUICK_PANE_ID} />
-        </>
+      {activeId ? (
+        // key forces a clean remount per note AND per show (the nonce) — fresh
+        // caret/scroll on switch, autoFocus re-lands the caret on every re-open
+        <EditorSurface key={`${activeId}:${showNonce}`} noteId={activeId} paneId={QUICK_PANE_ID} autoFocus />
       ) : (
         <div className="quick-empty">
-          <p className="qe-title">No quick notes yet</p>
-          <p className="qe-sub">Pin up to {QUICK_MAX} notes here for instant access.</p>
+          <p className="qe-title">No note open</p>
+          <p className="qe-sub">Start a fresh note, or open any of your notes with ⌘P.</p>
           <div className="qe-actions">
             <button type="button" className="btn" onClick={newNote}>
               <PlusGlyph size={14} /> New note
             </button>
-            <button type="button" className="qe-ghost" onClick={openSearch}>
-              Search existing…
+            <button type="button" className="qe-ghost" onClick={openPicker}>
+              Open a note…
             </button>
           </div>
         </div>
       )}
 
-      {searchOpen && (
-        <QuickSearch
+      {pickerOpen && (
+        <NotePicker
           notes={notes}
-          inSet={new Set(ids)}
-          onPick={(id) => {
-            addQuickNote(id);
-            setSearchOpen(false);
+          pinned={new Set(ids)}
+          activeId={activeId}
+          onOpen={(id) => {
+            setQuickActive(id);
+            setPickerOpen(false);
           }}
-          onClose={() => setSearchOpen(false)}
+          onTogglePin={togglePinQuick}
+          onClose={() => setPickerOpen(false)}
         />
       )}
     </div>
