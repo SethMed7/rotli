@@ -549,16 +549,17 @@
 }
 .rotli-cm-host .cm-line.rotli-li,
 .rotli-cm-host .cm-line.rotli-task {
-  /* breathing room between list items so bullets read as a list, not a wall —
-     ~6px gap, matching the rendered view's old rhythm + the heading padding */
-  padding-block: 3px;
+  /* a little breathing room between list items — not a loose wall */
+  padding-block: 2px;
 }
 
-/* list/task markers (widgets) — fill the line's 1.6em hanging indent so the
-   first line's text and every wrapped line align to the same left edge */
+/* list/task markers (widgets) — fill the line's hanging indent so the first line's
+   text and every wrapped line align to the same left edge; the glyph is centered so
+   it sits close to the text instead of adrift at the far left */
 .rotli-marker {
   display: inline-block;
-  width: 1.6em;
+  width: 1.3em;
+  text-align: center;
   color: var(--text-muted);
 }
 .rotli-marker.num {

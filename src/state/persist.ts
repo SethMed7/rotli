@@ -116,6 +116,8 @@ interface PersistedSettings {
   showInDock: boolean;
   /** Editor spell-check (red squiggles); on by default. */
   spellcheck: boolean;
+  /** Editor view: raw markdown vs beautified (WYSIWYG); beautified by default. */
+  rawEditor: boolean;
   /** Route ⌥C quick captures to the active memex's inbox.md; off by default. */
   captureToBrainInbox: boolean;
   /** First-run onboarding gate — false until the flow is finished/skipped. */
@@ -196,6 +198,7 @@ function parseSettings(raw: string): PersistedSettings {
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
     spellcheck: asBool(data.spellcheck, true),
+    rawEditor: asBool(data.rawEditor, false),
     captureToBrainInbox: asBool(data.captureToBrainInbox, false),
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
     // not this one — treat that as already-onboarded so we don't re-run first-run
@@ -229,6 +232,7 @@ function applySettings(s: PersistedSettings): void {
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
     spellcheck: s.spellcheck,
+    rawEditor: s.rawEditor,
     captureToBrainInbox: s.captureToBrainInbox,
     onboarded: s.onboarded,
     quickNoteIds: s.quickNoteIds,
@@ -460,6 +464,7 @@ function settingsSnapshot(): string {
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
     spellcheck: ui.spellcheck,
+    rawEditor: ui.rawEditor,
     captureToBrainInbox: ui.captureToBrainInbox,
     onboarded: ui.onboarded,
     quickNoteIds: ui.quickNoteIds,

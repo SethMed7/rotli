@@ -27,6 +27,7 @@ import {
 } from "./commands";
 import { focusDim } from "./focusMode";
 import { livePreview } from "./livePreview";
+import { stripMarkdown } from "./stripMarkdown";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import { type SlashItem, SlashMenu, filterSlashItems } from "./SlashMenu";
 
@@ -69,8 +70,14 @@ export function CmEditor({
   const spellcheckRef = useRef(spellcheck);
   spellcheckRef.current = spellcheck;
 
+  // beautified (live WYSIWYG) vs raw markdown source — a view toggle (Aa panel).
+  const rawEditor = useUiStore((s) => s.rawEditor);
+  const rawEditorRef = useRef(rawEditor);
+  rawEditorRef.current = rawEditor;
+
   const spellComp = useRef(new Compartment()).current;
   const focusComp = useRef(new Compartment()).current;
+  const viewModeComp = useRef(new Compartment()).current;
 
   const [slash, setSlash] = useState<SlashState>({ open: false, query: "", index: 0, left: 0, top: 0 });
   // the slash key-handler reads live state through this ref (the CM dom handler
@@ -201,6 +208,24 @@ export function CmEditor({
       });
     };
 
+    // beautified copy: strip markdown markers from the selection so a copy reads
+    // like what you see (no ** around a bold word). Raw mode copies verbatim.
+    const copyStripped = (event: ClipboardEvent, v: EditorView, isCut: boolean): boolean => {
+      if (rawEditorRef.current) return false;
+      const r = v.state.selection.main;
+      if (r.empty) return false;
+      event.clipboardData?.setData("text/plain", stripMarkdown(v.state.sliceDoc(r.from, r.to)));
+      event.preventDefault();
+      if (isCut) {
+        v.dispatch({
+          changes: { from: r.from, to: r.to },
+          selection: EditorSelection.cursor(r.from),
+          userEvent: "delete.cut",
+        });
+      }
+      return true;
+    };
+
     const state = EditorState.create({
       doc: startText,
       extensions: [
@@ -216,7 +241,11 @@ export function CmEditor({
         Prec.high(keymap.of(rotliKeymap)),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
-        livePreview,
+        viewModeComp.of(rawEditorRef.current ? [] : livePreview),
+        EditorView.domEventHandlers({
+          copy: (e, v) => copyStripped(e, v, false),
+          cut: (e, v) => copyStripped(e, v, true),
+        }),
         spellComp.of(EditorView.contentAttributes.of({ spellcheck: String(spellcheckRef.current) })),
         focusComp.of(focusModeRef.current ? focusDim : []),
         placeholder("Write…"),
@@ -282,6 +311,12 @@ export function CmEditor({
     focusModeRef.current = focusMode;
     viewRef.current?.dispatch({ effects: focusComp.reconfigure(focusMode ? focusDim : []) });
   }, [focusMode, focusComp]);
+
+  // beautified ⇄ raw markdown: swap the live-preview decorations on/off
+  useEffect(() => {
+    rawEditorRef.current = rawEditor;
+    viewRef.current?.dispatch({ effects: viewModeComp.reconfigure(rawEditor ? [] : livePreview) });
+  }, [rawEditor, viewModeComp]);
 
   // keep the slash key-handler bound to the current query + index
   useEffect(() => {

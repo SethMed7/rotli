@@ -37,6 +37,8 @@ export function AaPanel({
   const glassMode = useUiStore((s) => s.glassMode);
   const glassCanvas = useUiStore((s) => s.glassCanvas);
   const setGlassCanvas = useUiStore((s) => s.setGlassCanvas);
+  const rawEditor = useUiStore((s) => s.rawEditor);
+  const setRawEditor = useUiStore((s) => s.setRawEditor);
 
   return (
     <div className="aapanel" ref={ref} role="dialog" aria-label="Typography">
@@ -74,6 +76,23 @@ export function AaPanel({
             {m.label}
           </button>
         ))}
+      </div>
+      <div className="aalabel">View</div>
+      <div className="aarow">
+        <button
+          type="button"
+          className={!rawEditor ? "aaseg sel" : "aaseg"}
+          onClick={() => setRawEditor(false)}
+        >
+          Beautified
+        </button>
+        <button
+          type="button"
+          className={rawEditor ? "aaseg sel" : "aaseg"}
+          onClick={() => setRawEditor(true)}
+        >
+          Raw markdown
+        </button>
       </div>
       {glassMode && (
         <>

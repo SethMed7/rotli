@@ -195,7 +195,7 @@ function scanInline(
   }
 }
 
-const HANG_EM = 1.6;
+const HANG_EM = 1.3;
 
 function listStyle(depth: number, extra = 0): string {
   const hang = HANG_EM + extra;

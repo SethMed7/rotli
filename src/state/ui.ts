@@ -189,6 +189,11 @@ interface UiState {
   spellcheck: boolean;
   setSpellcheck: (on: boolean) => void;
 
+  /** Editor view: false = beautified (live WYSIWYG), true = raw markdown source.
+   * A per-eye preference — the .md is identical either way. Persisted. */
+  rawEditor: boolean;
+  setRawEditor: (on: boolean) => void;
+
   /** Quick captures (⌥C) route to the active memex's inbox.md instead of the
    * Board. Off by default (the Board is the safe fallback). Persisted. */
   captureToBrainInbox: boolean;
@@ -336,6 +341,9 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   spellcheck: true,
   setSpellcheck: (on) => set({ spellcheck: on }),
+
+  rawEditor: false,
+  setRawEditor: (on) => set({ rawEditor: on }),
 
   captureToBrainInbox: false,
   setCaptureToBrainInbox: (on) => set({ captureToBrainInbox: on }),

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-06-24
+
+### Added
+- Copy as you see it: copying from the beautified editor strips markdown syntax —
+  no `**` around bold, links become their text, list/heading prefixes dropped.
+- A **Beautified ⇄ Raw markdown** view toggle in the Aa panel — read your notes as
+  live WYSIWYG or as the plain markdown source (the file is identical either way).
+
+### Changed
+- Tidier bullet / numbered lists: a tighter hanging indent and a centered marker,
+  so the glyph sits next to its text instead of adrift at the far left.
+
 ## [0.2.1] - 2026-06-24
 
 ### Added
