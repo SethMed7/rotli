@@ -95,6 +95,61 @@ export async function startWindowDrag(): Promise<void> {
   await getCurrentWindow().startDragging();
 }
 
+// ——— in-app updates (Part 2 — the signed updater feed) — guarded so the
+//     browser/dev demo never imports the plugins; outside Tauri every call is a
+//     safe no-op ("nothing available, nothing to install"). The Rust side
+//     registers tauri-plugin-updater + tauri-plugin-process and the capability
+//     grants updater:default + process:allow-restart. CARL rule 2: nothing here
+//     pings on its own — the UI (Settings + a quiet App.tsx mount check) drives it.
+
+export interface UpdateStatus {
+  available: boolean;
+  version?: string;
+  notes?: string;
+}
+
+/** Ask the feed once whether a newer signed build exists. Resolves
+ * { available:false } outside Tauri, or when the feed says we're current. */
+export async function checkForUpdate(): Promise<UpdateStatus> {
+  if (!isTauri()) return { available: false };
+  const { check } = await import("@tauri-apps/plugin-updater");
+  const update = await check();
+  if (!update) return { available: false };
+  // exactOptionalPropertyTypes: only set the optional keys when present —
+  // never assign explicit undefined.
+  const status: UpdateStatus = { available: true };
+  if (update.version) status.version = update.version;
+  if (update.body) status.notes = update.body;
+  return status;
+}
+
+/** Download + install the pending update (re-checks so we hold a fresh handle),
+ * reporting 0–100% progress, then relaunch into the new build. No-op outside
+ * Tauri or when nothing is available. */
+export async function downloadAndInstallUpdate(
+  onProgress?: (pct: number) => void,
+): Promise<void> {
+  if (!isTauri()) return;
+  const { check } = await import("@tauri-apps/plugin-updater");
+  const update = await check();
+  if (!update) return;
+  let downloaded = 0;
+  let total = 0;
+  await update.downloadAndInstall((event) => {
+    if (event.event === "Started") {
+      total = event.data.contentLength ?? 0;
+      onProgress?.(0);
+    } else if (event.event === "Progress") {
+      downloaded += event.data.chunkLength;
+      onProgress?.(total > 0 ? Math.min(100, Math.round((downloaded / total) * 100)) : 0);
+    } else if (event.event === "Finished") {
+      onProgress?.(100);
+    }
+  });
+  const { relaunch } = await import("@tauri-apps/plugin-process");
+  await relaunch();
+}
+
 // ——— the corpus (phase 2) — typed wrappers over the Rust corpus commands
 //     (src-tauri/src/corpus.rs). Only FsNotesService and the persistence
 //     layer (src/state/persist.ts) call these, and both exist only inside the
@@ -213,6 +268,23 @@ export async function relocateCorpus(): Promise<boolean> {
   return invoke<boolean>("corpus_relocate");
 }
 
+/** Point rotli's Notes tree at a memex instance (Increment 3): validates the
+ * path is a real memex, remembers it as the corpus-memex pointer, and relaunches
+ * into it. The legacy ~/Documents/rotli corpus is left untouched — this is a
+ * reversible pointer swap. Rejects with a clear message if the folder isn't a
+ * memex. The app restarts on success, so this never resolves in practice. */
+export async function corpusUseMemex(path: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_use_memex", { path });
+}
+
+/** Forget the memex pointer and relaunch into the legacy ~/Documents/rotli
+ * corpus. The reversible counterpart to corpusUseMemex. */
+export async function corpusUseLegacy(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_use_legacy");
+}
+
 /** The `.rotli/` dot-files — opaque JSON strings the frontend owns. Missing
  * file reads as "{}". `background` carries the custom glass wallpaper. */
 export type SettingsFile = "settings" | "viewstate" | "background";
@@ -232,6 +304,130 @@ export function onCorpusChanged(cb: () => void): () => void {
   if (!isTauri()) return () => {};
   const unlisten = listen("rotli:corpus-changed", () => cb());
   return () => void unlisten.then((fn) => fn());
+}
+
+// ——— the memex seam (Stage 1) — typed wrappers over the Rust memex commands
+//     (src-tauri/src/memex.rs). rotli connects to / initiates a memex instance
+//     (the shared self/wiki/history/chats/inbox.md spine; for Seth, ~/smBrain)
+//     and OWNS chats/ + inbox.md, nothing else. Mirror-not-import: the byte-shape
+//     of what we write lives in src/memex/contract.ts; these only move bytes. ———
+
+/** A folder probed for a memex signature (the memex.json `mx_` marker). */
+export interface DetectedMemex {
+  root: string;
+  label: string;
+  /** "memex" (real, mx_ memex.json) · "plain" (a dir, no valid memex.json) ·
+   * "fresh" (empty/absent — safe to init). */
+  kind: "memex" | "plain" | "fresh";
+  memexId: string | null;
+  contract: string | null;
+  hasUsersJson: boolean;
+  /** Raw users.json contents (TS parses access mode with the mirror codec). */
+  usersJson: string | null;
+}
+
+export type MemexPerms = "chats+inbox" | "read-only";
+
+/** A registered memex instance (the machine-level registry lives outside any
+ * corpus, in the app config dir). */
+export interface MemexInstanceEntry {
+  id: string;
+  label: string;
+  absPath: string;
+  role: string;
+  memexId: string | null;
+  mode: string | null;
+  perms: MemexPerms;
+}
+
+export interface MemexRegistry {
+  version: number;
+  activeId: string | null;
+  instances: MemexInstanceEntry[];
+}
+
+export interface MemexContractRaw {
+  memexJson: string;
+  usersJson: string;
+  identitiesJson: string;
+}
+
+export interface MemexChatSummary {
+  slug: string;
+  title: string;
+  source: string;
+  attachedTo: string;
+  path: string;
+}
+
+/** One entry in the READ-ONLY Memory browser — a subdir or a .md file. */
+export interface MemexDirEntry {
+  name: string;
+  rel: string;
+  isDir: boolean;
+}
+
+export interface MemexValidateReport {
+  ok: boolean;
+  skipped: boolean;
+  stdout: string;
+  errors: number;
+  warnings: number;
+}
+
+function memexInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isTauri()) {
+    return Promise.reject(new Error(`${cmd}: the memex bridge only exists inside the Tauri shell`));
+  }
+  return invoke<T>(cmd, args).catch((err: unknown) => {
+    throw err instanceof Error ? err : new Error(String(err));
+  });
+}
+
+export function memexDetect(): Promise<DetectedMemex[]> {
+  return memexInvoke("memex_detect");
+}
+export function memexInspect(path: string): Promise<DetectedMemex> {
+  return memexInvoke("memex_inspect", { path });
+}
+export function memexReadContract(root: string): Promise<MemexContractRaw> {
+  return memexInvoke("memex_read_contract", { root });
+}
+export function memexRead(root: string, rel: string): Promise<string> {
+  return memexInvoke("memex_read", { root, rel });
+}
+export function memexListChats(root: string): Promise<MemexChatSummary[]> {
+  return memexInvoke("memex_list_chats", { root });
+}
+export function memexListDir(root: string, rel: string): Promise<MemexDirEntry[]> {
+  return memexInvoke("memex_list_dir", { root, rel });
+}
+export function memexInit(path: string, label: string): Promise<MemexInstanceEntry> {
+  return memexInvoke("memex_init", { path, label });
+}
+export function memexConnect(path: string, label: string): Promise<MemexInstanceEntry> {
+  return memexInvoke("memex_connect", { path, label });
+}
+export function memexWriteChat(root: string, slug: string, contents: string): Promise<string> {
+  return memexInvoke("memex_write_chat", { root, slug, contents });
+}
+export function memexAppendInbox(root: string, line: string): Promise<void> {
+  return memexInvoke("memex_append_inbox", { root, line });
+}
+export function memexValidate(root: string): Promise<MemexValidateReport> {
+  return memexInvoke("memex_validate", { root });
+}
+export function memexListInstances(): Promise<MemexRegistry> {
+  return memexInvoke("memex_list_instances");
+}
+export function memexSetActive(id: string): Promise<void> {
+  return memexInvoke("memex_set_active", { id });
+}
+export function memexSetPerms(id: string, perms: MemexPerms): Promise<void> {
+  return memexInvoke("memex_set_perms", { id, perms });
+}
+export function memexPickFolder(): Promise<string | null> {
+  return memexInvoke("memex_pick_folder");
 }
 
 // ——— cross-webview events (the capture card and the main window are separate

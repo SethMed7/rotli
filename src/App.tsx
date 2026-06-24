@@ -7,8 +7,11 @@ import "./styles/command.css";
 import "./styles/quick.css";
 import "./styles/onboarding.css";
 import "./styles/board.css";
+import "./styles/memex.css";
 import { BoardSurface } from "./components/BoardSurface";
 import { CaptureCard } from "./components/CaptureCard";
+import { ChatSurface } from "./components/ChatSurface";
+import { MemorySurface } from "./components/MemorySurface";
 import { NotesSurface } from "./components/NotesSurface";
 import { Onboarding } from "./components/Onboarding";
 import { Palette } from "./components/Palette";
@@ -21,6 +24,7 @@ import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/re
 import { useHeldModifier } from "./keys/useHeldModifier";
 import { GLASS_BG_SRC } from "./lib/glassBackgrounds";
 import {
+  checkForUpdate,
   emitCaptureAck,
   emitThemeSet,
   isTauri,
@@ -32,6 +36,15 @@ import {
   setDockVisible,
   setHideOnBlur,
 } from "./lib/tauri";
+import { activeInstance, isWritable } from "./memex/config";
+import {
+  captureToInbox,
+  connect as memexConnect,
+  init as memexInit,
+  loadConfig as memexLoadConfig,
+} from "./memex/service";
+import { invalidateMemex } from "./memex/useMemex";
+import { useMemexStore } from "./state/memex";
 import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateNotes } from "./services/hooks";
 import { notesService } from "./services/notes";
@@ -69,6 +82,8 @@ function surfaceFromUrl(): Surface {
 function MainShell() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const boardOpen = useUiStore((s) => s.boardOpen);
+  const chatOpen = useUiStore((s) => s.chatOpen);
+  const memoryOpen = useUiStore((s) => s.memoryOpen);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const focusMode = useUiStore((s) => s.focusMode);
@@ -99,14 +114,52 @@ function MainShell() {
   // drops the capture onto the BOARD as a card (a real .md in Board/, NOT a note
   // in your list), then acks so the card may clear. Plain Enter never surfaces
   // the app (open=false); ⌘Enter (open=true) opens the Board so you can see it.
+  //
+  // Settings → Memory → "Send quick captures to the brain inbox" reroutes ⌥C to
+  // the active writable memex's inbox.md instead (no Board card). The brain path
+  // resolves the active instance imperatively each time (it's not in a store yet
+  // here), and falls back to the Board on ANY failure — a capture must never be
+  // lost. The card clears ONLY when we ack, so we ack ONLY on a confirmed save —
+  // on total failure the draft stays put for the next summon.
   useEffect(
     () =>
       onCaptureSave(({ id, body, open }) => {
-        void notesService.createNote(DEST.board, body).then(async () => {
+        const toBoard = async () => {
+          await notesService.createNote(DEST.board, body);
           await invalidateNotes();
           if (open) useUiStore.getState().setBoardOpen(true);
-          emitCaptureAck(id);
-        });
+        };
+        void (async () => {
+          let saved = false;
+          try {
+            if (useUiStore.getState().captureToBrainInbox) {
+              const cfg = await memexLoadConfig();
+              const inst = activeInstance(cfg);
+              if (inst && isWritable(inst)) {
+                // routed to inbox — there's no board note to open, so ⌘Enter
+                // just lands the capture; nothing to surface
+                await captureToInbox(inst, body);
+              } else {
+                await toBoard();
+              }
+            } else {
+              await toBoard();
+            }
+            saved = true;
+          } catch {
+            // any failure (inbox write refused, memex gone) → never drop the
+            // capture; try the Board as a fallback
+            try {
+              await toBoard();
+              saved = true;
+            } catch {
+              /* total failure — leave the draft UN-acked so the next summon resumes it */
+            }
+          }
+          // ack ONLY on a confirmed save: the ack clears the card's draft, so on
+          // total failure we must NOT ack (a capture must never be lost)
+          if (saved) emitCaptureAck(id);
+        })();
       }),
     [],
   );
@@ -139,6 +192,22 @@ function MainShell() {
     });
   }, []);
 
+  // Updates (Part 2): one quiet on-mount check, main surface only, never
+  // blocking. CARL rule 2 — NO auto-download, NO modal, NO recurring ping: we
+  // ask the signed feed exactly once and, if a newer build is offered, just set
+  // a transient ui flag so Settings → General can surface "Update available".
+  // Any failure (offline, feed down) is swallowed — the app never nags.
+  useEffect(() => {
+    if (!isTauri()) return;
+    void checkForUpdate()
+      .then((status) => {
+        if (!status.available) return;
+        useUiStore.getState().setUpdateAvailable(true);
+        useUiStore.getState().setUpdateVersion(status.version ?? null);
+      })
+      .catch(() => {});
+  }, []);
+
   // While onboarding, the window must NOT vanish on blur (it normally hides) —
   // the flow would disappear the moment focus slips. The real behavior is
   // (re)applied on finish from the user's chosen Stay-open value.
@@ -157,6 +226,16 @@ function MainShell() {
             const ui = useUiStore.getState();
             void setHideOnBlur(!ui.stayOpen);
             void setDockVisible(ui.showInDock);
+            // commit the deferred memex choice recorded in the "Memory" step
+            const choice = useMemexStore.getState().pendingChoice;
+            if (choice?.path) {
+              const label = choice.label ?? "memex";
+              const run = choice.kind === "separate" ? memexInit : memexConnect;
+              void run(choice.path, label)
+                .then(() => invalidateMemex())
+                .catch(() => {});
+            }
+            useMemexStore.getState().setPendingChoice(null);
           }}
         />
       </div>
@@ -167,7 +246,17 @@ function MainShell() {
     <div className="app-window">
       <Titlebar />
       <main className="app-content">
-        {boardOpen ? <BoardSurface /> : settingsOpen ? <SettingsSurface /> : <NotesSurface />}
+        {boardOpen ? (
+          <BoardSurface />
+        ) : settingsOpen ? (
+          <SettingsSurface />
+        ) : chatOpen ? (
+          <ChatSurface />
+        ) : memoryOpen ? (
+          <MemorySurface />
+        ) : (
+          <NotesSurface />
+        )}
       </main>
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
       {whichKey && <WhichKey onClose={() => setWhichKey(false)} />}

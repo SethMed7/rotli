@@ -12,7 +12,7 @@
 // two surfaces can evolve independently. Glyphs are reused from FormatBar's
 // vocabulary — same SVG voice, same 15px size.
 
-import type { ReactNode, RefObject } from "react";
+import type { ReactNode } from "react";
 import type { BlockToggle } from "./commands";
 
 // — glyphs (mirrors FormatBar's Gl voice: 24-box, 1.7 stroke, currentColor) —
@@ -109,19 +109,14 @@ export function SlashMenu({
   selectedIndex,
   onHover,
   onPick,
-  anchorRef,
 }: {
   query: string;
   selectedIndex: number;
   onHover(index: number): void;
   onPick(item: SlashItem): void;
-  anchorRef: RefObject<HTMLDivElement | null>;
 }) {
   const items = filterSlashItems(query);
   if (items.length === 0) return null;
-  // anchorRef is the active row; the menu positions itself under it (the row is
-  // position:relative). We read it only to confirm the surface exists.
-  if (!anchorRef.current) return null;
 
   return (
     <div className="slashmenu" role="menu" aria-label="Insert block">

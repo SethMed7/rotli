@@ -11,6 +11,7 @@
 // (set_hide_on_blur) so heavy use can keep the window resident.
 
 mod corpus;
+mod memex;
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -58,6 +59,12 @@ struct HideOnBlur(Mutex<bool>);
 /// window if you were already in the app, or to the app you came from otherwise
 /// — so a quick capture from another app never "opens" rotli (Seth, 2026-06-19).
 struct CaptureReturn(Mutex<bool>);
+
+/// Whether the Quick Note window has been positioned this session. We center it
+/// on the FIRST summon (on the active display); after that we leave it where the
+/// user dragged it — re-centering on every summon meant it felt "stuck in the
+/// middle, can't move it" (Seth, 2026-06-22).
+struct QuickPlaced(Mutex<bool>);
 
 fn show_main(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -148,7 +155,16 @@ fn show_quick(app: &AppHandle) {
     let Some(window) = app.get_webview_window("quick") else {
         return;
     };
-    center_on_cursor_display(app, &window);
+    // center only the first time this session — afterwards keep the user's
+    // dragged position (the window keeps it across hide/show on its own)
+    {
+        let placed = app.state::<QuickPlaced>();
+        let mut done = placed.0.lock().unwrap();
+        if !*done {
+            center_on_cursor_display(app, &window);
+            *done = true;
+        }
+    }
     let _ = window.show();
     let _ = window.set_focus();
     let _ = app.emit_to("quick", "rotli:quick-show", ());
@@ -281,6 +297,18 @@ fn corpus_reveal(app: AppHandle) {
 #[tauri::command]
 fn corpus_relocate(app: AppHandle) -> Result<bool, String> {
     use tauri_plugin_dialog::DialogExt;
+    // "Move folder…" moves your LEGACY notes folder. If rotli is currently
+    // browsing a memex (the corpus IS someone's smBrain), refuse — relocating
+    // would physically scatter the brain out of its home. Switch back first.
+    if corpus::read_saved_memex_root(&app)
+        .filter(|p| corpus::is_memex_root(p))
+        .is_some()
+    {
+        return Err(
+            "rotli is browsing a memex right now — in Settings → Memory choose \"Use ~/Documents/rotli\" before moving your notes folder."
+                .into(),
+        );
+    }
     let old_root = corpus::resolve_root(&app);
     let Some(picked) = app
         .dialog()
@@ -296,6 +324,31 @@ fn corpus_relocate(app: AppHandle) -> Result<bool, String> {
     }
     corpus::relocate(&old_root, &new_root)?;
     corpus::write_saved_root(&app, &new_root).map_err(|e| e.to_string())?;
+    app.restart();
+}
+
+/// Settings → Memory → "Browse in Notes": point rotli's Notes tree at a memex
+/// instance (Increment 3). Validates that `path` really is a memex (a valid
+/// `mx_` memex.json), remembers it as the corpus-memex pointer, and relaunches
+/// into it — a clean re-open beats live-swapping the store + watcher (mirrors
+/// corpus_relocate's restart). The legacy `~/Documents/rotli` corpus is left
+/// untouched on disk; this is a reversible pointer swap, not a move.
+#[tauri::command]
+fn corpus_use_memex(app: AppHandle, path: String) -> Result<(), String> {
+    let root = std::path::PathBuf::from(&path);
+    if !corpus::is_memex_root(&root) {
+        return Err("That folder isn't a memex (no valid memex.json with an mx_ id).".into());
+    }
+    corpus::write_saved_memex_root(&app, &root).map_err(|e| e.to_string())?;
+    app.restart();
+}
+
+/// Settings → Memory → "Use ~/Documents/rotli instead": forget the memex
+/// pointer and relaunch into the legacy corpus. Reversible counterpart to
+/// corpus_use_memex; the memex itself is never modified.
+#[tauri::command]
+fn corpus_use_legacy(app: AppHandle) -> Result<(), String> {
+    corpus::clear_saved_memex_root(&app).map_err(|e| e.to_string())?;
     app.restart();
 }
 
@@ -374,6 +427,8 @@ fn set_summon_shortcut(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -409,6 +464,7 @@ pub fn run() {
         .manage(LastBlurHide(Mutex::new(None)))
         .manage(HideOnBlur(Mutex::new(true)))
         .manage(CaptureReturn(Mutex::new(false)))
+        .manage(QuickPlaced(Mutex::new(false)))
         .invoke_handler(tauri::generate_handler![
             toggle_main_window,
             hide_main_window,
@@ -420,6 +476,8 @@ pub fn run() {
             show_quick_window,
             corpus_reveal,
             corpus_relocate,
+            corpus_use_memex,
+            corpus_use_legacy,
             summon,
             set_summon_shortcut,
             set_hide_on_blur,
@@ -434,7 +492,22 @@ pub fn run() {
             corpus::corpus_create_folder,
             corpus::corpus_overview,
             corpus::corpus_settings_read,
-            corpus::corpus_settings_write
+            corpus::corpus_settings_write,
+            memex::memex_detect,
+            memex::memex_inspect,
+            memex::memex_read_contract,
+            memex::memex_read,
+            memex::memex_list_chats,
+            memex::memex_list_dir,
+            memex::memex_init,
+            memex::memex_connect,
+            memex::memex_write_chat,
+            memex::memex_append_inbox,
+            memex::memex_validate,
+            memex::memex_list_instances,
+            memex::memex_set_active,
+            memex::memex_set_perms,
+            memex::memex_pick_folder
         ])
         .setup(|app| {
             // The visitor law: never in the dock, never in Cmd-Tab.
@@ -552,8 +625,16 @@ pub fn run() {
             // way the rest of this file gates every other macOS API.
             #[cfg(target_os = "macos")]
             {
-                if let tauri::RunEvent::Reopen { .. } = event {
-                    show_main(app);
+                // Only a Dock click with NOTHING visible reopens the main window.
+                // Without the has_visible_windows guard, summoning the Quick Note
+                // (⌥Q) — which activates the app — can fire a spurious Reopen while
+                // Quick is up and wrongly surface the whole main window (Seth,
+                // 2026-06-22). When any window (quick/capture/main) is visible, the
+                // Dock click is a no-op here.
+                if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
+                    if !has_visible_windows {
+                        show_main(app);
+                    }
                 }
             }
             #[cfg(not(target_os = "macos"))]

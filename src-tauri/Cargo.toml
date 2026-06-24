@@ -1,6 +1,6 @@
 [package]
 name = "rotli"
-version = "0.1.0"
+version = "0.2.0"
 description = "rotli — warm, local-first, hotkey-driven notes for the Mac menu bar"
 authors = ["Seth Medina"]
 edition = "2021"
@@ -22,6 +22,8 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-dialog = "2"                                        # native folder picker (move the corpus)
+tauri-plugin-updater = "2"                                       # in-app updates (signed feed → download + relaunch)
+tauri-plugin-process = "2"                                       # relaunch() after an update installs
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Phase 2 — the corpus (plain .md files become real)
@@ -29,4 +31,5 @@ notify = "8"                                                     # fs watcher (e
 ulid = "1"                                                       # note identity (time-sortable, matches the TS ulid)
 time = { version = "0.3", features = ["formatting", "parsing"] } # frontmatter created/updated (RFC 3339)
 tempfile = "3"                                                   # atomic writes: tmp in the same dir + rename
-trash = "5"                                                      # delete = OS trash, never a hard rm
+trash = "5"                                                     # delete = OS trash, never a hard rm
+uuid = { version = "1", features = ["v4"] }                     # mx_<uuid> ids for a rotli-initiated memex

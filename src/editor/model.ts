@@ -150,3 +150,24 @@ export function useDocumentLines(noteId: string): string[] | undefined {
   const subscribe = useCallback((fn: () => void) => subscribeDocument(noteId, fn), [noteId]);
   return useSyncExternalStore(subscribe, () => docs.get(noteId));
 }
+
+/** The whole buffer as one string — the CodeMirror editing surface's source of
+ * truth (the editor edits this text directly, the .md never round-trips a rich
+ * model). undefined until the buffer exists. */
+export function getDocumentText(noteId: string): string | undefined {
+  const lines = docs.get(noteId);
+  return lines ? lines.join("\n") : undefined;
+}
+
+/** Replace the whole buffer from the editor (CM → model): notify every pane
+ * synchronously, sync to the service on the debounce — the exact path the
+ * line-level edits take, so the dirty dot + flush-on-blur are unchanged. */
+export function setDocumentText(noteId: string, text: string): void {
+  editDocument(noteId, () => text.split("\n"));
+}
+
+/** Subscribe to buffer changes for one note (the CM editor mirrors external
+ * edits — another pane on the same note — back into its view). */
+export function onDocumentChange(noteId: string, fn: () => void): () => void {
+  return subscribeDocument(noteId, fn);
+}

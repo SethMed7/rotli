@@ -462,6 +462,180 @@
   flex: 1 1 auto;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   The CodeMirror WYSIWYG surface (Phase 1d). CM edits the markdown text
+   directly; livePreview.ts hides the syntax + styles the content, so this is
+   just the brand voice (kit tokens only). The scroller carries .ed-scroll too
+   (added in CmEditor) so the glass paper-canvas theming applies unchanged.
+   ───────────────────────────────────────────────────────────────────────── */
+.rotli-cm-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.rotli-cm-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.rotli-cm-host .cm-editor {
+  flex: 1;
+  min-height: 0;
+  background: transparent;
+  height: 100%;
+}
+.rotli-cm-host .cm-editor.cm-focused {
+  outline: none;
+}
+.rotli-cm-host .cm-scroller {
+  overflow-y: auto;
+  font-family: var(--font-body);
+  line-height: 1.65;
+}
+.rotli-cm-host .cm-content {
+  font-family: var(--font-body);
+  font-size: inherit; /* the Aa size rides on .rotli-cm-wrap */
+  color: var(--text);
+  caret-color: var(--text);
+  max-width: var(--cm-measure, 660px);
+  padding: 9px 40px 90px;
+}
+.rotli-cm-host .cm-line {
+  padding: 0;
+}
+.rotli-cm-host .cm-content ::selection {
+  background: color-mix(in srgb, var(--tint) 85%, transparent);
+}
+.rotli-cm-host .cm-placeholder {
+  color: var(--text-muted);
+}
+
+/* revealed syntax markers (caret touching the span) — clay-deep, dimmed (r4) */
+.rotli-syntax {
+  color: var(--accent-text);
+  opacity: 0.55;
+}
+
+/* — block voices (mirror r1 frame A: same families + sizes as the old md-*) — */
+.rotli-cm-host .cm-line.rotli-h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.586em;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  padding: 10px 0 2px;
+}
+.rotli-cm-host .cm-line.rotli-h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.31em;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  padding: 8px 0 2px;
+}
+.rotli-cm-host .cm-line.rotli-h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.172em;
+  line-height: 1.45;
+  padding: 6px 0 2px;
+}
+.rotli-cm-host .cm-line.rotli-quote {
+  border-left: 3px solid var(--quote-bar, var(--rotli-peach));
+  padding-left: 14px;
+  color: var(--text-muted);
+}
+.rotli-cm-host .cm-line.rotli-li,
+.rotli-cm-host .cm-line.rotli-task {
+  /* breathing room between list items so bullets read as a list, not a wall —
+     ~6px gap, matching the rendered view's old rhythm + the heading padding */
+  padding-block: 3px;
+}
+
+/* list/task markers (widgets) — fill the line's 1.6em hanging indent so the
+   first line's text and every wrapped line align to the same left edge */
+.rotli-marker {
+  display: inline-block;
+  width: 1.6em;
+  color: var(--text-muted);
+}
+.rotli-marker.num {
+  font-variant-numeric: tabular-nums;
+}
+.rotli-check {
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: 0.5em;
+  border-radius: var(--r-inner);
+  border: 1.5px solid var(--text-muted);
+  background: none;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  vertical-align: -0.15em;
+  line-height: 1;
+}
+.rotli-check.done {
+  background: var(--success);
+  border-color: var(--success);
+}
+.rotli-check.done::after {
+  content: "✓";
+  font-size: 11px;
+  color: var(--check-ink, var(--rotli-cocoa));
+}
+.rotli-done {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+}
+
+/* — inline marks (mirror editor.css's md-* inline voices) — */
+.rotli-strong {
+  font-weight: 700;
+}
+.rotli-em {
+  font-style: italic;
+}
+.rotli-strike {
+  text-decoration: line-through;
+}
+.rotli-u {
+  text-decoration: underline;
+}
+.rotli-code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--surface-2);
+  border-radius: var(--r-inner);
+  padding: 1.5px 5px;
+}
+.rotli-hl {
+  background: var(--tint);
+  border-radius: var(--r-inner);
+  padding: 1px 2px;
+}
+.rotli-link {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* focus mode — the non-active paragraphs dim (r3 frame E) */
+.rotli-cm-host .cm-line.rotli-dim {
+  opacity: 0.5;
+  transition: opacity 180ms var(--motion-ease);
+}
+
+/* the "/" slash menu rides at the caret (CmEditor positions this anchor) */
+.rotli-slash-anchor {
+  position: absolute;
+  z-index: 30;
+}
+
 /* — the Aa panel (r3 frame C: typography only) — */
 .aapanel {
   position: absolute;

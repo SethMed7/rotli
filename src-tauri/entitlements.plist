@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  rotli — hardened-runtime entitlements (the notarization hook).
+
+  rotli is a plain WKWebView Tauri shell: no JIT, no audio/camera/network
+  entitlements to declare. An empty <dict/> keeps the hardened runtime strict
+  (required for Apple notarization) while granting nothing extra. If a future
+  capability needs an entitlement (e.g. a JIT engine), add the key here — this
+  file is referenced from tauri.conf.json's bundle.macOS.entitlements, so the
+  signing + notarization path in scripts/release.sh picks it up automatically.
+-->
+<plist version="1.0">
+<dict/>
+</plist>

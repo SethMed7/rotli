@@ -184,6 +184,16 @@ interface UiState {
   formatBarVisible: boolean;
   setFormatBarVisible: (visible: boolean) => void;
 
+  /** Spell-check: red squiggles under misspellings in the editor. On by
+   * default (Seth, 2026-06-22); a Settings → Editor switch. Persisted. */
+  spellcheck: boolean;
+  setSpellcheck: (on: boolean) => void;
+
+  /** Quick captures (⌥C) route to the active memex's inbox.md instead of the
+   * Board. Off by default (the Board is the safe fallback). Persisted. */
+  captureToBrainInbox: boolean;
+  setCaptureToBrainInbox: (on: boolean) => void;
+
   /** ⌘K — the only overlay that dims (r3 frame F). */
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
@@ -196,6 +206,25 @@ interface UiState {
    * Settings). Esc / "Back to notes" returns. Not persisted (a transient view). */
   boardOpen: boolean;
   setBoardOpen: (open: boolean) => void;
+
+  /** The Chat front — named conversations over the connected memex (chats/) — as
+   * its own surface (like Board). "Everything has a chat." Not persisted. */
+  chatOpen: boolean;
+  setChatOpen: (open: boolean) => void;
+
+  /** A newer signed build is on the feed — set once by App.tsx's quiet on-mount
+   * check (CARL rule 2: no auto-download, no modal). Just lets Settings → General
+   * surface "Update available". Transient, not persisted (mirrors chatOpen). */
+  updateAvailable: boolean;
+  setUpdateAvailable: (on: boolean) => void;
+  /** The version the feed offers, when known (e.g. "0.2.0"). */
+  updateVersion: string | null;
+  setUpdateVersion: (version: string | null) => void;
+
+  /** The Memory browser — a READ-ONLY tour of the active memex's spine (wiki ·
+   * self · chats · MAP · inbox) — as its own surface (like Chat). Not persisted. */
+  memoryOpen: boolean;
+  setMemoryOpen: (open: boolean) => void;
 
   /** ⌥⌘F focus mode (r3 frame E): chrome leaves, one centered column. */
   focusMode: boolean;
@@ -305,6 +334,12 @@ export const useUiStore = create<UiState>((set, get) => ({
   formatBarVisible: true,
   setFormatBarVisible: (visible) => set({ formatBarVisible: visible }),
 
+  spellcheck: true,
+  setSpellcheck: (on) => set({ spellcheck: on }),
+
+  captureToBrainInbox: false,
+  setCaptureToBrainInbox: (on) => set({ captureToBrainInbox: on }),
+
   paletteOpen: false,
   setPaletteOpen: (open) => set({ paletteOpen: open }),
 
@@ -313,6 +348,17 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   boardOpen: false,
   setBoardOpen: (open) => set({ boardOpen: open }),
+
+  chatOpen: false,
+  setChatOpen: (open) => set({ chatOpen: open }),
+
+  updateAvailable: false,
+  setUpdateAvailable: (on) => set({ updateAvailable: on }),
+  updateVersion: null,
+  setUpdateVersion: (version) => set({ updateVersion: version }),
+
+  memoryOpen: false,
+  setMemoryOpen: (open) => set({ memoryOpen: open }),
 
   focusMode: false,
   setFocusMode: (on) => set({ focusMode: on }),

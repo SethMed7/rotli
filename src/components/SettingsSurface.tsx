@@ -19,7 +19,11 @@ import {
 } from "../keys/registry";
 import { GLASS_BG_SRC } from "../lib/glassBackgrounds";
 import {
+  checkForUpdate,
   corpusOverview,
+  corpusUseLegacy,
+  corpusUseMemex,
+  downloadAndInstallUpdate,
   isTauri,
   relocateCorpus,
   revealCorpus,
@@ -38,6 +42,7 @@ import {
   useUiStore,
 } from "../state/ui";
 import {
+  BrainGlyph,
   CheckGlyph,
   CloudGlyph,
   DatabaseGlyph,
@@ -46,14 +51,26 @@ import {
   PlusGlyph,
   SunGlyph,
 } from "./glyphs";
+import { pickFolder } from "../memex/service";
+import {
+  useConnectMemex,
+  useDetectMemex,
+  useInitMemex,
+  useMemexConfig,
+  useRunValidate,
+  useSetActiveMemex,
+  useSetMemexPerms,
+} from "../memex/useMemex";
+import { useMemexStore } from "../state/memex";
 
-type SettingsPane = "general" | "hotkeys" | "appearance" | "storage" | "plugins";
+type SettingsPane = "general" | "hotkeys" | "appearance" | "storage" | "memex" | "plugins";
 
 const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = [
   { id: "general", label: "General", glyph: LaptopGlyph },
   { id: "hotkeys", label: "Hotkeys", glyph: KeyboardGlyph },
   { id: "appearance", label: "Appearance", glyph: SunGlyph },
   { id: "storage", label: "Storage", glyph: DatabaseGlyph },
+  { id: "memex", label: "Memory", glyph: BrainGlyph },
   { id: "plugins", label: "Plugins", glyph: PlusGlyph },
 ];
 
@@ -270,11 +287,116 @@ function HotkeysPane() {
 
 // ——— General: visitor vs resident, dock visibility (Seth, 2026-06-12) ———
 
+// ——— Updates: the current version + a manual check, plus the one-click
+// "Install & relaunch" when the signed feed offers a newer build. The on-mount
+// App.tsx check primes updateAvailable/updateVersion; this lets you also check
+// on demand and pull the update down (CARL rule 2: nothing auto-downloads). ———
+
+type CheckState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "current" }
+  | { kind: "available"; version: string | null }
+  | { kind: "installing"; pct: number }
+  | { kind: "error"; message: string };
+
+function UpdatesSection() {
+  const updateAvailable = useUiStore((s) => s.updateAvailable);
+  const updateVersion = useUiStore((s) => s.updateVersion);
+  const setUpdateAvailable = useUiStore((s) => s.setUpdateAvailable);
+  const setUpdateVersion = useUiStore((s) => s.setUpdateVersion);
+  const [version, setVersion] = useState("0.1.0");
+  // seed from the on-mount check so re-opening Settings keeps the badge
+  const [state, setState] = useState<CheckState>(
+    updateAvailable ? { kind: "available", version: updateVersion } : { kind: "idle" },
+  );
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    let alive = true;
+    void import("@tauri-apps/api/app")
+      .then(({ getVersion }) => getVersion())
+      .then((v) => {
+        if (alive) setVersion(v);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const check = () => {
+    setState({ kind: "checking" });
+    void checkForUpdate()
+      .then((status) => {
+        if (status.available) {
+          const v = status.version ?? null;
+          setUpdateAvailable(true);
+          setUpdateVersion(v);
+          setState({ kind: "available", version: v });
+        } else {
+          setUpdateAvailable(false);
+          setUpdateVersion(null);
+          setState({ kind: "current" });
+        }
+      })
+      .catch((err: unknown) => {
+        setState({ kind: "error", message: err instanceof Error ? err.message : String(err) });
+      });
+  };
+
+  const install = () => {
+    setState({ kind: "installing", pct: 0 });
+    // resolves only if the relaunch doesn't happen (it normally does) — on any
+    // error surface it; the app stays on the current build
+    void downloadAndInstallUpdate((pct) => setState({ kind: "installing", pct })).catch(
+      (err: unknown) => {
+        setState({ kind: "error", message: err instanceof Error ? err.message : String(err) });
+      },
+    );
+  };
+
+  const installing = state.kind === "installing";
+
+  return (
+    <>
+      <h4 className="sethead">Updates</h4>
+      <div className="setselect-row">
+        <span>
+          rotli {version}
+          {state.kind === "current" && " — up to date"}
+          {state.kind === "available" &&
+            ` — update available${state.version ? ` (v${state.version})` : ""}`}
+        </span>
+        {state.kind === "available" || installing ? (
+          <button type="button" className="ghostbtn" onClick={install} disabled={installing}>
+            {installing ? `Updating… ${state.pct}%` : "Install & relaunch"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="ghostbtn"
+            onClick={check}
+            disabled={state.kind === "checking"}
+          >
+            {state.kind === "checking" ? "Checking…" : "Check for updates"}
+          </button>
+        )}
+      </div>
+      {state.kind === "error" && (
+        <p className="setnote err">Couldn’t check for updates: {state.message}</p>
+      )}
+    </>
+  );
+}
+
 function GeneralPane() {
   const stayOpen = useUiStore((s) => s.stayOpen);
   const setStayOpen = useUiStore((s) => s.setStayOpen);
   const showInDock = useUiStore((s) => s.showInDock);
   const setShowInDock = useUiStore((s) => s.setShowInDock);
+  const spellcheck = useUiStore((s) => s.spellcheck);
+  const setSpellcheck = useUiStore((s) => s.setSpellcheck);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const [confirmReset, setConfirmReset] = useState(false);
   const quickFolder = useUiStore((s) => s.quickFolder);
@@ -335,6 +457,19 @@ function GeneralPane() {
           ))}
         </select>
       </label>
+
+      <h4 className="sethead">Writing</h4>
+      <p className="lead">How the editor behaves while you type.</p>
+      <div className="swgroup">
+        <Toggle
+          on={spellcheck}
+          title="Check spelling"
+          desc="Underline misspelled words in red as you write."
+          onChange={() => setSpellcheck(!spellcheck)}
+        />
+      </div>
+
+      <UpdatesSection />
 
       <h4 className="sethead">Start fresh</h4>
       <p className="lead">
@@ -673,6 +808,218 @@ function StoragePane() {
   );
 }
 
+// ——— Memory: the memex seam. Connect to (or initiate) a memex — the shared
+//     self/wiki/history/chats/inbox spine (for Seth, ~/smBrain) — keep multiple
+//     separate non-blending instances, set per-instance write access, and run the
+//     brain's own validate.ts. rotli OWNS chats/ + inbox; the rest is read-only. ———
+
+/** Whether `instRoot` (an absolute memex path) is what the Notes tree is
+ * currently browsing. `overviewRoot` is the live corpus root with `$HOME`
+ * shortened to `~` (corpus_overview), so we compare on the shared tail after the
+ * home prefix — robust without needing `$HOME` in the browser. */
+function isCurrentCorpus(instRoot: string, overviewRoot: string | undefined): boolean {
+  if (!overviewRoot) return false;
+  const tail = overviewRoot.startsWith("~/") ? overviewRoot.slice(1) : overviewRoot;
+  return instRoot === overviewRoot || instRoot.endsWith(tail);
+}
+
+function MemexPane() {
+  const cfg = useMemexConfig();
+  const overview = useQuery({
+    queryKey: ["corpus", "overview", "memex-pane"],
+    queryFn: () => corpusOverview(),
+    enabled: isTauri(),
+  });
+  const detect = useDetectMemex(isTauri());
+  const connectMut = useConnectMemex();
+  const initMut = useInitMemex();
+  const setActiveMut = useSetActiveMemex();
+  const permsMut = useSetMemexPerms();
+  const validateMut = useRunValidate();
+  const lastValidate = useMemexStore((s) => s.lastValidate);
+  const setLastValidate = useMemexStore((s) => s.setLastValidate);
+  const captureToBrainInbox = useUiStore((s) => s.captureToBrainInbox);
+  const setCaptureToBrainInbox = useUiStore((s) => s.setCaptureToBrainInbox);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const instances = cfg.data?.instances ?? [];
+  const activeId = cfg.data?.activeId ?? null;
+  const registered = new Set(instances.map((i) => i.root));
+  const candidates = (detect.data ?? []).filter((d) => !registered.has(d.root));
+  const labelOf = (path: string) => path.split("/").filter(Boolean).pop() || "memex";
+
+  const run = (fn: () => Promise<unknown>) => {
+    setErr(null);
+    setBusy(true);
+    fn()
+      .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false));
+  };
+  const connectExisting = () =>
+    run(async () => {
+      const path = await pickFolder();
+      if (path) await connectMut.mutateAsync({ path, label: labelOf(path) });
+    });
+  const newSeparate = () =>
+    run(async () => {
+      const path = await pickFolder();
+      if (path) await initMut.mutateAsync({ path, label: labelOf(path) });
+    });
+
+  if (!isTauri()) {
+    return (
+      <>
+        <h3>Memory</h3>
+        <p className="lead">
+          Your memex lives on disk — this connects in the app, not the browser preview.
+        </p>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <h3>Memory</h3>
+      <p className="lead">
+        rotli <b>mirrors</b> a memex — it never imports it. It reads your whole brain (self · wiki ·
+        history · chats · inbox · map) and writes only <b>chats</b> and <b>inbox</b>. Your{" "}
+        <b>history</b> and <b>self</b> are never touched; <b>wiki</b> is read-only for now.
+      </p>
+
+      {candidates.length > 0 && (
+        <>
+          <h4 className="sethead">Found on this Mac</h4>
+          {candidates.map((d) => (
+            <div className="memex-card" key={d.root}>
+              <div className="mc-body">
+                <div className="mc-title">{d.label}</div>
+                <div className="mc-path">{d.root}</div>
+                <div className="mc-meta">
+                  contract {d.contract ?? "?"} · {d.memexId?.slice(0, 12) ?? "no id"}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="ghostbtn"
+                disabled={busy}
+                onClick={() => run(() => connectMut.mutateAsync({ path: d.root, label: d.label }))}
+              >
+                Merge
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+
+      <h4 className="sethead">Connected</h4>
+      {instances.length === 0 && <p className="setnote">No memex connected yet.</p>}
+      {instances.map((inst) => {
+        const isActive = inst.id === activeId;
+        const isBrowsing = isCurrentCorpus(inst.root, overview.data?.root);
+        return (
+          <div key={inst.id} className={isActive ? "memex-card sel" : "memex-card"}>
+            <div className="mc-body">
+              <div className="mc-title">
+                {inst.label}
+                <span className={inst.perms === "chats+inbox" ? "memex-badge write" : "memex-badge"}>
+                  {inst.perms === "chats+inbox" ? "chats + inbox" : "read-only"}
+                </span>
+                {inst.mode && <span className="memex-badge">{inst.mode}</span>}
+              </div>
+              <div className="mc-path">{inst.root}</div>
+              <div className="mc-meta">
+                {inst.memexId?.slice(0, 14) ?? "—"} · {inst.role}
+              </div>
+              <Seg
+                value={inst.perms}
+                options={[
+                  ["chats+inbox", "Chats + inbox"],
+                  ["read-only", "Read-only"],
+                ]}
+                onPick={(p) => run(() => permsMut.mutateAsync({ id: inst.id, perms: p }))}
+              />
+              <div className="memex-actions">
+                {!isActive && (
+                  <button
+                    type="button"
+                    className="ghostbtn"
+                    disabled={busy}
+                    onClick={() => run(() => setActiveMut.mutateAsync(inst.id))}
+                  >
+                    Make active
+                  </button>
+                )}
+                {/* Browse this memex in the Notes tree — relaunches into it.
+                    The brain's memory stays read-only; only chats are writable. */}
+                {isBrowsing ? (
+                  <button
+                    type="button"
+                    className="ghostbtn"
+                    disabled={busy}
+                    onClick={() => run(() => corpusUseLegacy())}
+                  >
+                    Use ~/Documents/rotli instead
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="ghostbtn"
+                    disabled={busy}
+                    onClick={() => run(() => corpusUseMemex(inst.root))}
+                  >
+                    Browse in Notes
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="ghostbtn"
+                  disabled={busy}
+                  onClick={() => run(() => validateMut.mutateAsync(inst).then(setLastValidate))}
+                >
+                  Check the brain
+                </button>
+              </div>
+              {lastValidate && isActive && (
+                <div className="memex-validate">
+                  {lastValidate.skipped
+                    ? lastValidate.stdout
+                    : `${lastValidate.ok ? "✓ invariants pass" : "✗ errors"} — ${lastValidate.errors} error(s), ${lastValidate.warnings} warning(s)`}
+                </div>
+              )}
+            </div>
+            {isActive && (
+              <span className="mc-active">
+                <CheckGlyph size={12} />
+              </span>
+            )}
+          </div>
+        );
+      })}
+
+      <div className="memex-actions">
+        <button type="button" className="ghostbtn" disabled={busy} onClick={connectExisting}>
+          Connect to existing…
+        </button>
+        <button type="button" className="ghostbtn" disabled={busy} onClick={newSeparate}>
+          New separate brain…
+        </button>
+      </div>
+      {err && <p className="setnote err">{err}</p>}
+
+      <h4 className="sethead">Quick capture</h4>
+      <div className="swgroup">
+        <Toggle
+          on={captureToBrainInbox}
+          title="Send quick captures to the brain inbox"
+          desc="⌥C captures append to your active memex's inbox.md instead of the Board."
+          onChange={() => setCaptureToBrainInbox(!captureToBrainInbox)}
+        />
+      </div>
+    </>
+  );
+}
+
 function PluginsPane() {
   return (
     <>
@@ -733,6 +1080,7 @@ export function SettingsSurface() {
           {pane === "hotkeys" && <HotkeysPane />}
           {pane === "appearance" && <AppearancePane />}
           {pane === "storage" && <StoragePane />}
+          {pane === "memex" && <MemexPane />}
           {pane === "plugins" && <PluginsPane />}
         </div>
       </div>

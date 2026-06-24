@@ -11,6 +11,8 @@ import rMark from "../brand/logo/r-mark.svg";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import { conflictFor, getAction, rebind, setDispatchSuspended } from "../keys/registry";
+import { useDetectMemex } from "../memex/useMemex";
+import { useMemexStore } from "../state/memex";
 import { GLASS_TINTS, SOLID_THEMES, type GlassTint, type ThemeFamily, useUiStore } from "../state/ui";
 
 /** Tint swatch tokens (mirrors Settings → Appearance). */
@@ -21,7 +23,7 @@ const TINT_SWATCH: Record<string, string> = {
   olive: "var(--swatch-olive)",
 };
 
-const STEPS = ["welcome", "hotkeys", "dock", "behavior", "appearance", "done"] as const;
+const STEPS = ["welcome", "hotkeys", "dock", "behavior", "appearance", "memory", "done"] as const;
 type Step = (typeof STEPS)[number];
 
 const GLOBAL_HOTKEYS: { id: string; label: string; hint: string }[] = [
@@ -145,6 +147,63 @@ function Choice<T extends string>({
           <span className="onb-choice-desc">{o.desc}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+/** The "Memory" step — detect an existing memex (Seth's ~/smBrain auto-appears)
+ * and offer to Merge into it, or keep notes-only for now. The choice is RECORDED
+ * into the memex store; App.tsx commits it (connect) on finish, the same deferred
+ * pattern as dock/behavior. Creating a fresh separate brain lives in Settings →
+ * Memory (it needs a folder picker — kept out of the onboarding flow). */
+function MemexStep() {
+  const detect = useDetectMemex(true);
+  const setPendingChoice = useMemexStore((s) => s.setPendingChoice);
+  const pending = useMemexStore((s) => s.pendingChoice);
+  const found = detect.data ?? [];
+  const isMerge = (root: string) => pending?.kind === "merge" && pending.path === root;
+  const isLater = pending?.kind === "later";
+
+  return (
+    <div className="onb-step">
+      <h1 className="onb-title">Your second brain</h1>
+      <p className="onb-sub">
+        rotli can sit on top of a <b>memex</b> — your local knowledge spine. It reads your whole
+        brain and writes your chats and quick captures into it, never your history or self.
+      </p>
+      {detect.isLoading ? (
+        <p className="onb-sub">Looking for an existing brain…</p>
+      ) : (
+        <div className="onb-choices">
+          {found.map((d) => (
+            <button
+              key={d.root}
+              type="button"
+              className={isMerge(d.root) ? "onb-choice sel" : "onb-choice"}
+              aria-pressed={isMerge(d.root)}
+              onClick={() => setPendingChoice({ kind: "merge", path: d.root, label: d.label })}
+            >
+              <span className="onb-choice-title">Merge into {d.label}</span>
+              <span className="onb-choice-desc">
+                {d.root} · contract {d.contract ?? "?"}
+              </span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className={isLater ? "onb-choice sel" : "onb-choice"}
+            aria-pressed={isLater}
+            onClick={() => setPendingChoice({ kind: "later" })}
+          >
+            <span className="onb-choice-title">{found.length ? "Not now" : "Set it up later"}</span>
+            <span className="onb-choice-desc">
+              {found.length
+                ? "Keep notes only — connect or start a brain anytime in Settings → Memory."
+                : "No brain found here. Create or connect one anytime in Settings → Memory."}
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -342,6 +401,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             </div>
           </div>
         )}
+
+        {step === "memory" && <MemexStep />}
 
         {step === "done" && (
           <div className="onb-step onb-welcome">

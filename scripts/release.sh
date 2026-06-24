@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# release.sh — cut a signed + notarized rotli release.
+#
+# Mirrors voz's flow, adapted to Tauri + a headless hdiutil DMG (Tauri's own DMG
+# bundler shells Finder/AppleScript and fails outside a GUI session). Steps:
+#   gate → build the Developer-ID-signed .app + updater artifacts → notarize +
+#   staple the .app → build the DMG (hdiutil) → sign + notarize + staple the DMG
+#   → assemble latest.json → Gatekeeper check → [--publish] gh release.
+#
+# One-time prerequisites (already set up):
+#   • a "Developer ID Application" cert in the login Keychain
+#   • a notarytool keychain profile  (xcrun notarytool store-credentials rotli-notary …)
+#   • the updater signing key at ~/.rotli-updater.key  (tauri signer generate)
+# No secret ever lives in the repo — identity + creds come from the Keychain, the
+# updater key from a path OUTSIDE the repo.
+#
+# Usage:
+#   bash scripts/release.sh            # build + sign + notarize + validate (NO publish)
+#   bash scripts/release.sh --publish  # the above, then gh release to rotli-releases + tag
+set -euo pipefail
+
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # repo root
+
+# ── knobs (env-overridable; safe defaults) ───────────────────────────────────
+DEVID="${APPLE_SIGNING_IDENTITY:-Developer ID Application: Seth Medina (TEAMID0000)}"
+NOTARY_PROFILE="${ROTLI_NOTARY_PROFILE:-rotli-notary}"
+RELEASES_REPO="${ROTLI_RELEASES_REPO:-SethMed7/rotli-releases}"
+UPDATER_KEY="${ROTLI_UPDATER_KEY:-$HOME/.rotli-updater.key}"
+ENTITLEMENTS="src-tauri/entitlements.plist"
+PUBLISH=0
+[ "${1:-}" = "--publish" ] && PUBLISH=1
+
+VER="$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("src-tauri/tauri.conf.json","utf8")).version)')"
+APP="src-tauri/target/release/bundle/macos/rotli.app"
+TARGZ="$APP.tar.gz"
+SIG="$APP.tar.gz.sig"
+DIST="dist"
+DMG="$DIST/rotli_${VER}_aarch64.dmg"
+DL_URL="https://github.com/${RELEASES_REPO}/releases/download/v${VER}/rotli.app.tar.gz"
+
+echo "▸ rotli $VER  (publish=$PUBLISH · identity: $DEVID · notary: $NOTARY_PROFILE)"
+[ -f "$UPDATER_KEY" ] || { echo "✗ updater key not found at $UPDATER_KEY"; exit 1; }
+mkdir -p "$DIST"
+
+# ── 0. gate ──────────────────────────────────────────────────────────────────
+echo "▸ check"
+bun run check
+
+# ── 1. build the signed .app + updater artifacts (.tar.gz + .sig) ────────────
+echo "▸ build (Developer-ID signed, updater artifacts on)"
+bash scripts/predmg-clean.sh
+export APPLE_SIGNING_IDENTITY="$DEVID"
+export TAURI_SIGNING_PRIVATE_KEY="$(cat "$UPDATER_KEY")"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${ROTLI_UPDATER_KEY_PASSWORD:-}"
+CI=true bun run tauri build --bundles app \
+  --config '{"bundle":{"createUpdaterArtifacts":true}}'
+
+[ -d "$APP" ] || { echo "✗ no .app at $APP"; exit 1; }
+# Tauri signs the .app with the hardened runtime (signingIdentity + entitlements).
+# We don't pre-check the flag — notarytool below is the real gate: Apple REJECTS a
+# non-hardened app, so an Accepted result IS the hardened-runtime proof.
+codesign --verify --strict --verbose=2 "$APP"
+
+# ── 2. notarize + staple the .app ────────────────────────────────────────────
+echo "▸ notarize the .app (notarytool --wait; a few minutes)"
+ZIP="$DIST/rotli-app.zip"
+ditto -c -k --keepParent "$APP" "$ZIP"
+xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+xcrun stapler staple "$APP"
+rm -f "$ZIP"
+
+# the updater feed must ship the FINAL stapled app (so an auto-updated install
+# passes Gatekeeper even offline). Tauri made an initial .tar.gz during the build
+# (pre-staple) — regenerate it from the stapled .app and re-sign with the updater key.
+echo "▸ updater artifact (from the stapled .app)"
+rm -f "$TARGZ" "$SIG"
+( cd "$(dirname "$APP")" && tar czf rotli.app.tar.gz rotli.app )
+# TAURI_SIGNING_PRIVATE_KEY (+ _PASSWORD) are already exported above for the build,
+# and `tauri signer sign` reads the key from them — so pass NEITHER -f nor -k here
+# (clap errors if --private-key-path and the env's --private-key are both set).
+bun run tauri signer sign "$TARGZ"
+cp "$TARGZ" "$DIST/rotli.app.tar.gz"
+cp "$SIG" "$DIST/rotli.app.tar.gz.sig"
+
+# ── 3. build the DMG with hdiutil (headless), around the stapled .app ─────────
+echo "▸ dmg (hdiutil, headless)"
+STAGE="$(mktemp -d)"
+cp -R "$APP" "$STAGE/rotli.app"
+ln -s /Applications "$STAGE/Applications"
+rm -f "$DMG"
+hdiutil create -volname "rotli $VER" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+rm -rf "$STAGE"
+
+# ── 4. sign + notarize + staple the DMG ──────────────────────────────────────
+echo "▸ sign + notarize the dmg"
+codesign --force --timestamp -s "$DEVID" "$DMG"
+xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+xcrun stapler staple "$DMG"
+
+# ── 5. the updater feed manifest ─────────────────────────────────────────────
+echo "▸ latest.json"
+NOTES="$(awk "/^## \[$VER\]/{f=1;next} /^## \[/{f=0} f" CHANGELOG.md | sed '/^[[:space:]]*$/d')"
+[ -n "$NOTES" ] || NOTES="rotli $VER"
+bun scripts/make-latest-json.mjs \
+  --version "$VER" \
+  --sig "$DIST/rotli.app.tar.gz.sig" \
+  --url "$DL_URL" \
+  --notes "$NOTES" \
+  > "$DIST/latest.json"
+
+# ── 6. Gatekeeper proof ──────────────────────────────────────────────────────
+echo "▸ gatekeeper check"
+xcrun stapler validate "$DMG"
+spctl -a -vvv -t install "$DMG" 2>&1 || true   # informational; stapler validate is the gate
+
+echo "✓ built + notarized:"
+ls -lh "$DMG" "$DIST/rotli.app.tar.gz" "$DIST/latest.json"
+
+# ── 7. publish (opt-in) ──────────────────────────────────────────────────────
+if [ "$PUBLISH" -eq 1 ]; then
+  echo "▸ publish → $RELEASES_REPO (tag v$VER)"
+  gh release create "v$VER" \
+    "$DMG" "$DIST/rotli.app.tar.gz" "$DIST/rotli.app.tar.gz.sig" "$DIST/latest.json" \
+    --repo "$RELEASES_REPO" \
+    --title "rotli $VER" \
+    --notes "$NOTES"
+  # tag the SOURCE repo too — ONLY when the tree is clean, so the tag points at
+  # the exact code released (this session's work may still be uncommitted).
+  if git diff --quiet && git diff --cached --quiet; then
+    git tag "v$VER" 2>/dev/null && git push origin "v$VER" 2>/dev/null || true
+  else
+    echo "ℹ source tree dirty — skipping the v$VER source-repo tag (commit first to tag the exact code)."
+  fi
+  echo "✓ published rotli $VER"
+else
+  echo "ℹ not published. Re-run with --publish once $RELEASES_REPO exists to ship."
+fi

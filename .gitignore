@@ -5,3 +5,17 @@ _review
 *.log
 .DS_Store
 scripts/.icon
+
+# secret hygiene (voz-style) — signing/notarization material never gets committed.
+# The updater private key lives OUTSIDE the repo (~/.rotli-updater.key); *.key
+# below is belt-and-suspenders so a stray copy can't be staged.
+*.p12
+*.p8
+*.cer
+*.key
+.env
+.env.*
+secrets.*
+
+# CARL ephemeral session state (runtime; the hook recreates it) — carl.json IS tracked
+.carl/sessions/

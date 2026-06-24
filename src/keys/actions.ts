@@ -58,7 +58,7 @@ export function registerDefaultActions(): void {
     run: () => {
       // Esc unwinds one layer at a time (quokka rule): topmost transient
       // (popovers incl. the module switcher, in stack order) → settings →
-      // focus mode → the window itself.
+      // board → chat → memory → focus mode → the window itself.
       const ui = useUiStore.getState();
       if (ui.closeTopTransient()) return;
       if (ui.settingsOpen) {
@@ -67,6 +67,14 @@ export function registerDefaultActions(): void {
       }
       if (ui.boardOpen) {
         ui.setBoardOpen(false);
+        return;
+      }
+      if (ui.chatOpen) {
+        ui.setChatOpen(false);
+        return;
+      }
+      if (ui.memoryOpen) {
+        ui.setMemoryOpen(false);
         return;
       }
       if (ui.focusMode) {

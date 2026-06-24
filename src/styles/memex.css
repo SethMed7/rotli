@@ -1,0 +1,389 @@
+/* The Chat front (Stage 1) + a few Memory-pane bits. Kit tokens only — no raw
+   hex (check:hex enforces this outside src/brand). Mirrors the warm settings
+   voice: same borders, radii, muted text, tint selection. */
+
+.chat-surface {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.chat-head h2 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+.chat-head .chat-inst {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.chat-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 4px 8px 4px 0;
+  border-radius: var(--r-control);
+}
+.chat-back:hover {
+  color: var(--text);
+}
+
+.chat-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  padding: 24px;
+}
+.chat-cta,
+.chat-newhint .chat-sub code {
+  font-size: 13px;
+}
+.chat-cta {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: var(--r-control);
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.chat-cta:hover {
+  background-image: linear-gradient(var(--hov), var(--hov));
+}
+
+.chat-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.chat-list {
+  width: 232px;
+  flex: 0 0 auto;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.chat-new,
+.chat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+.chat-new {
+  color: var(--accent-text);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.chat-new:hover,
+.chat-item:hover {
+  background: var(--hov);
+}
+.chat-new.sel,
+.chat-item.sel {
+  background: var(--tint);
+}
+.chat-item-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-item-attach {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-list-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  margin: 0;
+}
+
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.chat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+.chat-pre {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0;
+}
+.chat-newhint {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.chat-newhint .chat-sub {
+  font-size: 12.5px;
+  margin-top: 4px;
+}
+.chat-newhint code,
+.chat-readonly code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.86em;
+  background: var(--surface-2);
+  border-radius: var(--r-inner);
+  padding: 1px 5px;
+}
+
+.chat-composer {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chat-send-row {
+  display: flex;
+  gap: 8px;
+}
+.chat-input {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 9px 11px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+}
+.chat-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+}
+.chat-send {
+  flex: 0 0 auto;
+  border: none;
+  background: var(--tint);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 0 16px;
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+.chat-send:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.7;
+}
+.chat-err {
+  font-size: 12px;
+  color: var(--danger, var(--accent-text));
+  margin: 0;
+}
+.chat-readonly {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* ── Memory browser (read-only spine; reuses chat-surface/list/main) ── */
+.mem-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1px;
+  padding: 2px 4px 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.mem-crumb-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.mem-crumb {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 5px;
+  border-radius: var(--r-inner);
+  cursor: pointer;
+}
+.mem-crumb:hover {
+  color: var(--text);
+  background: var(--hov);
+}
+.mem-crumb.sel {
+  color: var(--text);
+  font-weight: 600;
+}
+.mem-sep {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+.mem-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+.mem-row:hover {
+  background: var(--hov);
+}
+.mem-file.sel {
+  background: var(--tint);
+}
+.mem-glyph {
+  flex: 0 0 auto;
+  width: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.mem-dir .mem-name {
+  font-weight: 600;
+}
+.mem-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Settings → Memory pane extras (the rest reuses the settings voice) ── */
+.memex-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: var(--surface);
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+}
+.memex-card:hover {
+  background-image: linear-gradient(var(--hov), var(--hov));
+}
+.memex-card.sel {
+  border-color: color-mix(in srgb, var(--accent-text) 40%, var(--border));
+  background: var(--tint);
+}
+.memex-card .mc-body {
+  flex: 1;
+  min-width: 0;
+}
+.memex-card .mc-title {
+  font-weight: 600;
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.memex-card .mc-path {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.memex-card .mc-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.memex-card .mc-active {
+  flex: 0 0 auto;
+  color: var(--success);
+}
+.memex-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.memex-badge.write {
+  background: var(--tint);
+  color: var(--text);
+}
+.memex-validate {
+  margin-top: 6px;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 8px 10px;
+  max-height: 160px;
+  overflow: auto;
+}
+.memex-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}

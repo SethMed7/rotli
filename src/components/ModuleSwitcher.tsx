@@ -5,6 +5,7 @@
 
 import { useEffect, useRef } from "react";
 import { useTransientPopover } from "../lib/popover";
+import { useUiStore } from "../state/ui";
 import { Icon, type RotliIconName } from "./Icon";
 
 interface UpcomingModule {
@@ -15,15 +16,24 @@ interface UpcomingModule {
 }
 
 const UPCOMING: UpcomingModule[] = [
-  { name: "Chat", icon: "rotli-chat", pill: "Next", next: true },
   { name: "Voice", icon: "rotli-voice", pill: "Next", next: true },
-  { name: "Memory", icon: "rotli-memory", pill: "then", next: false },
   { name: "Inbox", icon: "rotli-inbox", pill: "later", next: false },
   { name: "Board", icon: "rotli-board", pill: "later", next: false },
 ];
 
 export function ModuleSwitcher({ onClose }: { onClose: () => void }) {
   const popRef = useRef<HTMLDivElement>(null);
+  // switch the main surface: clear every sibling flag, then set the target, so a
+  // switch from Board / Settings / Chat / Memory always lands (App renders the
+  // surfaces by priority — a stale sibling flag would otherwise win silently).
+  const go = (target: "notes" | "chat" | "memory") => {
+    const ui = useUiStore.getState();
+    ui.setBoardOpen(false);
+    ui.setSettingsOpen(false);
+    ui.setChatOpen(target === "chat");
+    ui.setMemoryOpen(target === "memory");
+    onClose();
+  };
 
   // the standard transient plumbing: outside-click closes, and Esc unwinds
   // through the ui store's transient stack in true topmost-first order —
@@ -37,12 +47,22 @@ export function ModuleSwitcher({ onClose }: { onClose: () => void }) {
 
   return (
     <div ref={popRef} className="modpop" role="menu" aria-label="Modules">
-      <div className="mrow sel" role="menuitem" onClick={onClose}>
+      <div className="mrow sel" role="menuitem" onClick={() => go("notes")}>
         <Icon name="rotli-notes" size={14.5} />
         Notes
         <span className="hk">
           <kbd>⌃1</kbd>
         </span>
+      </div>
+      <div className="mrow" role="menuitem" onClick={() => go("chat")}>
+        <Icon name="rotli-chat" size={14.5} />
+        Chat
+        <span className="soonpill next">New</span>
+      </div>
+      <div className="mrow" role="menuitem" onClick={() => go("memory")}>
+        <Icon name="rotli-memory" size={14.5} />
+        Memory
+        <span className="soonpill next">New</span>
       </div>
       {UPCOMING.map((mod) => (
         <div key={mod.name} className="mrow soon" role="menuitem" aria-disabled="true">

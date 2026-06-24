@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "last_modified": "2026-06-22T00:00:00.000Z",
+  "config": {
+    "devmode": false,
+    "post_compact_gate": true,
+    "global_exclude": []
+  },
+  "domains": {
+    "ROTLI": {
+      "state": "active",
+      "always_on": true,
+      "recall": [
+        "rotli",
+        "note",
+        "editor",
+        "menu bar",
+        "tauri",
+        "chat",
+        "sync"
+      ],
+      "exclude": [],
+      "rules": [
+        { "id": 0, "text": "rotli is a warm, local-first Mac menu-bar notes app — 'one brain, six fronts' (Notes · Chat · Voice · Memory · Inbox · Board). Stack: Tauri (Rust shell in src-tauri/) + React + Vite + TypeScript, Bun runtime (one bun.lock, bunfig.toml).", "added": "2026-06-22", "last_reviewed": null, "source": "manual" },
+        { "id": 1, "text": "The user's notes are PLAIN MARKDOWN files they own, in ~/Documents/rotli/ (folders on disk = folders in the sidebar). The app's own state lives in a sibling `.rotli/` (settings · view state · index) — deletable with no data loss. The files are the source of truth; never lock notes into a proprietary store.", "added": "2026-06-22", "last_reviewed": null, "source": "manual" },
+        { "id": 2, "text": "Low-pulse by design: no dock icon, no ⌘Tab entry, no badges/pings; summon with ⌥Space, dismiss and it's gone. Formatting/typography (Aa) is a RENDER layer — never written into the user's markdown files.", "added": "2026-06-22", "last_reviewed": null, "source": "manual" },
+        { "id": 3, "text": "Stack discipline: Bun (one lockfile), TypeScript strict, React + Vite frontend, Tauri (Rust) shell. Dev: `bun run dev` (web) / `bun run tauri dev` (app). Run `bun run check` (and `bun run check:hex` for brand colors) before calling work done.", "added": "2026-06-22", "last_reviewed": null, "source": "manual" },
+        { "id": 4, "text": "rotli can READ smBrain as an optional .md corpus and write back via the memex conversation contract — it OWNS chats/ (named, attachable conversations), never history/ (that's Breve's). Resolve memex roots via the contract; mirror-not-import the boundary, exactly like Breve does. See smBrain wiki/projects/rotli/smbrain-integration.", "added": "2026-06-22", "last_reviewed": null, "source": "manual" },
+        { "id": 5, "text": "'Everything has a chat' — any object can carry a chat (chats/<slug>.md, attachedTo: [[note]]). The Convex + CRDT multi-device sync is a DESIGN (smBrain wiki/projects/rotli/sync-design), NOT yet wired — today's build is local-first, single-device (Stage 1, Phases 0–1c).", "added": "2026-06-22", "last_reviewed": null, "source": "manual" },
+        { "id": 6, "text": "Docs live in docs/; the brand kit + brand home live in smLab (apps/rotli + brand/kits/rotli). Change code that a doc describes → update the doc (+ a CHANGELOG entry) in the same commit — see the global DOCS domain.", "added": "2026-06-22", "last_reviewed": null, "source": "manual" }
+      ],
+      "decisions": [
+        { "id": "rotli-001", "decision": "Notes are plain markdown files the user owns in ~/Documents/rotli/; the app keeps only derived state in a sibling .rotli/ (deletable without data loss).", "rationale": "Local-first, no lock-in: files openable in any editor, backable-up, forever. The app is 'a warm window onto them,' not their owner.", "date": "2026-06-22", "source": "manual", "recall": ["local-first", "markdown", "ownership", "files"], "status": "active" }
+      ]
+    }
+  },
+  "staging": []
+}

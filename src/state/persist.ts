@@ -114,6 +114,10 @@ interface PersistedSettings {
   glassCanvas: GlassCanvas;
   stayOpen: boolean;
   showInDock: boolean;
+  /** Editor spell-check (red squiggles); on by default. */
+  spellcheck: boolean;
+  /** Route ⌥C quick captures to the active memex's inbox.md; off by default. */
+  captureToBrainInbox: boolean;
   /** First-run onboarding gate — false until the flow is finished/skipped. */
   onboarded: boolean;
   /** The Quick Note window's capped set, remembered note, and new-note folder
@@ -191,6 +195,8 @@ function parseSettings(raw: string): PersistedSettings {
     glassCanvas: asEnum(data.glassCanvas, CANVASES, "glass"),
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
+    spellcheck: asBool(data.spellcheck, true),
+    captureToBrainInbox: asBool(data.captureToBrainInbox, false),
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
     // not this one — treat that as already-onboarded so we don't re-run first-run
     // onboarding on existing users (same migration shape as expandedDests above)
@@ -222,6 +228,8 @@ function applySettings(s: PersistedSettings): void {
     glassCanvas: s.glassCanvas,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
+    spellcheck: s.spellcheck,
+    captureToBrainInbox: s.captureToBrainInbox,
     onboarded: s.onboarded,
     quickNoteIds: s.quickNoteIds,
     quickActiveId: s.quickActiveId,
@@ -451,6 +459,8 @@ function settingsSnapshot(): string {
     glassCanvas: ui.glassCanvas,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
+    spellcheck: ui.spellcheck,
+    captureToBrainInbox: ui.captureToBrainInbox,
     onboarded: ui.onboarded,
     quickNoteIds: ui.quickNoteIds,
     quickActiveId: ui.quickActiveId,

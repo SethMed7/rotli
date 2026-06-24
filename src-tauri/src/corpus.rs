@@ -76,9 +76,64 @@ pub fn write_saved_root(app: &tauri::AppHandle, root: &Path) -> std::io::Result<
     fs::write(file, root.to_string_lossy().as_bytes())
 }
 
-/// The corpus root in effect: the saved choice if it still exists, else the
-/// default `~/Documents/rotli`.
+/// Where the chosen MEMEX corpus root is remembered — beside `corpus-root.txt`
+/// in the app config dir (Increment 3: the Notes tree can BROWSE a memex
+/// instance). Set ⇒ rotli's corpus IS that memex (Layout::Memex); cleared ⇒
+/// today's `~/Documents/rotli` legacy chain (Layout::LegacyRotli). Kept distinct
+/// from `corpus-root.txt` so relocating the legacy corpus and pointing at a
+/// memex are independent, reversible choices.
+fn memex_root_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
+    use tauri::Manager;
+    app.path()
+        .app_config_dir()
+        .ok()
+        .map(|d| d.join("corpus-memex-root.txt"))
+}
+
+pub fn read_saved_memex_root(app: &tauri::AppHandle) -> Option<PathBuf> {
+    let raw = fs::read_to_string(memex_root_config_file(app)?).ok()?;
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(trimmed))
+    }
+}
+
+pub fn write_saved_memex_root(app: &tauri::AppHandle, root: &Path) -> std::io::Result<()> {
+    let file = memex_root_config_file(app)
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no app config dir"))?;
+    if let Some(parent) = file.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(file, root.to_string_lossy().as_bytes())
+}
+
+/// Forget the memex corpus pointer — rotli falls back to the legacy
+/// `~/Documents/rotli` chain. Missing file is a no-op (already legacy).
+pub fn clear_saved_memex_root(app: &tauri::AppHandle) -> std::io::Result<()> {
+    let Some(file) = memex_root_config_file(app) else {
+        return Ok(());
+    };
+    match fs::remove_file(&file) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
+/// The corpus root in effect. Increment 3: when a memex corpus is chosen AND it
+/// still exists on disk, the Notes tree browses THAT memex; otherwise today's
+/// chain — the saved legacy choice if it still exists, else `~/Documents/rotli`.
 pub fn resolve_root(app: &tauri::AppHandle) -> PathBuf {
+    // The pointer is honored only while it STILL points at a real memex. If the
+    // folder lost its memex.json (a git checkout/rename of smBrain), the pointer
+    // is ignored and we fall through to the LEGACY chain (~/Documents/rotli) —
+    // never open_legacy on the brain, which would scaffold reserved folders +
+    // surface self/history as editable notes.
+    if let Some(memex) = read_saved_memex_root(app).filter(|p| is_memex_root(p)) {
+        return memex;
+    }
     read_saved_root(app)
         .filter(|p| p.exists())
         .unwrap_or_else(|| default_corpus_root(app))
@@ -438,6 +493,79 @@ struct IndexFile {
 
 const WELCOME_BODY: &str = "# Welcome to rotli\n\nThis folder is your corpus — every note is a plain markdown file, right here\non your Mac. Open them in any editor, back them up however you like, keep them\nforever. rotli is just a warm window onto them.\n\nTwo keys to remember:\n\n- **⌥Space** opens rotli from anywhere.\n- **⌥C** catches a thought without breaking stride — it lands here in **Inbox**,\n  ready when you are.\n\nDrop a folder of `.md` files next to this one and it appears in the sidebar.\nThe hidden `.rotli` folder is only an index — delete it any time and rotli\nquietly rebuilds it.\n\nMake yourself at home.\n";
 
+// ─── layout + scope (Increment 3: the corpus can BE a memex instance) ─────────
+
+/// How the corpus root is shaped — decided once at `open()` by probing
+/// `root/memex.json` for a valid `mx_` id.
+///   • `LegacyRotli` — today's `~/Documents/rotli`: reserved folders, first-run,
+///     everything writable. BYTE-IDENTICAL to before Increment 3.
+///   • `Memex` — the root IS someone's memex spine (for Seth, `~/smBrain`). Only
+///     `chats/` is writable + surfaced read-write; `wiki/` is read-only; `self/`,
+///     `history/`, `MAP.md`, `inbox.md` and every control file stay HIDDEN. No
+///     reserved folders are scaffolded, no first-run seeding ever runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Layout {
+    Memex,
+    LegacyRotli,
+}
+
+/// Whether `root/memex.json` marks this dir as a real memex (valid `mx_` id).
+/// Pure (no app handle) so `open()` and the unit tests can both call it. The
+/// detection IDEA mirrors `memex::detect_one`; this is a tiny local probe so
+/// corpus.rs never depends on the memex module's wire types.
+pub fn is_memex_root(root: &Path) -> bool {
+    let text = match fs::read_to_string(root.join("memex.json")) {
+        Ok(t) => t,
+        Err(_) => return false,
+    };
+    serde_json::from_str::<serde_json::Value>(&text)
+        .ok()
+        .and_then(|v| v.get("id").and_then(|x| x.as_str()).map(str::to_string))
+        .map(|id| id.starts_with("mx_"))
+        .unwrap_or(false)
+}
+
+/// What a relative path is to rotli, given the layout. The Notes tree (walk/list)
+/// uses it to decide inclusion + read/write flags; the write gate uses it to
+/// refuse forbidden paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Surface {
+    /// A normal, editable note (LegacyRotli: everything; Memex: `chats/**.md`).
+    NoteRW,
+    /// Surfaced but read-only this increment (Memex: `wiki/**.md`).
+    NoteRO,
+    /// Never surfaced, never written (Memex: self/history/MAP/inbox + control).
+    Hidden,
+}
+
+/// The scope predicate. `rel` is a path relative to the corpus root, using `/`
+/// separators ("" = the root itself).
+///
+/// LegacyRotli surfaces everything read-write (today's behavior). Memex surfaces
+/// ONLY `wiki/` (read-only) + `chats/` (read-write) and hides the brain's memory
+/// (self/history/MAP/inbox) and every smBrain control file. Top-level smBrain
+/// docs (STRUCTURE.md, CONFIG.md, …) are `.md`, so this rule — not the dot-filter
+/// — is what keeps them out of the Notes tree.
+fn surfaced(layout: Layout, rel: &str) -> Surface {
+    if layout == Layout::LegacyRotli {
+        return Surface::NoteRW;
+    }
+    let rel = rel.trim_start_matches('/');
+    // chats/ — rotli's owned, writable surface (the dir itself + everything under)
+    if rel == "chats" || rel.starts_with("chats/") {
+        return Surface::NoteRW;
+    }
+    // wiki/ — browsable folders, read-only this increment
+    if rel == "wiki" || rel.starts_with("wiki/") {
+        return Surface::NoteRO;
+    }
+    // everything else inside a memex is hidden from the Notes tree and unwritable:
+    // self/ history/ archive/ trash/, MAP.md, inbox.md, and all control files
+    // (memex.json, users.json, *.local.json, *.json at root, clients/, scripts/,
+    // STRUCTURE/CONFIG/README/CHANGELOG/ASSETS .md, …).
+    Surface::Hidden
+}
+
 pub struct CorpusStore {
     /// Canonicalized — so watcher event paths (FSEvents resolves symlinks,
     /// e.g. /var → /private/var) compare equal to ours.
@@ -449,11 +577,29 @@ pub struct CorpusStore {
     /// OS trash in production; tests flip this to use `.rotli/trash/` so they
     /// never touch the user's real Trash. Either way: never a hard delete.
     os_trash: bool,
+    /// How this root is shaped (Increment 3). LegacyRotli = today's behavior in
+    /// every respect; Memex gates folders/ownership/scope. Decided at `open()`.
+    layout: Layout,
 }
 
 impl CorpusStore {
-    /// Open (or first-run-initialize) a corpus at `root`.
+    /// Open (or first-run-initialize) a corpus at `root`. The dispatcher: probe
+    /// `root/memex.json` once — a valid `mx_` id routes to the memex path (browse
+    /// the spine, never scaffold), anything else to the legacy path (today,
+    /// byte-identical).
     pub fn open(root: PathBuf) -> Result<Self, String> {
+        // Probe BEFORE create_dir_all so an absent dir reads as "not a memex"
+        // (→ legacy first-run), never as a memex over an empty folder.
+        if is_memex_root(&root) {
+            Self::open_memex(root)
+        } else {
+            Self::open_legacy(root)
+        }
+    }
+
+    /// Today's behavior, unchanged: reserved folders + first-run seeding, every
+    /// path writable. Layout::LegacyRotli.
+    fn open_legacy(root: PathBuf) -> Result<Self, String> {
         let fresh = !root.exists()
             || fs::read_dir(&root).map(|mut d| d.next().is_none()).unwrap_or(false);
         fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
@@ -467,6 +613,7 @@ impl CorpusStore {
             index: HashMap::new(),
             suppress: SuppressSet::default(),
             os_trash: true,
+            layout: Layout::LegacyRotli,
         };
         store.load_index();
         // Scaffold the six reserved sidebar destinations every open (idempotent),
@@ -475,6 +622,29 @@ impl CorpusStore {
         if fresh {
             store.first_run()?;
         }
+        Ok(store)
+    }
+
+    /// The memex path (Increment 3): the root IS a memex spine. Create only the
+    /// dot-prefixed `.rotli/` sidecar (walk + smBrain's validate.ts both skip
+    /// dot-entries, so it never pollutes the brain) and load the index — but
+    /// SKIP `ensure_reserved_folders` and SKIP `first_run`: rotli must never
+    /// scaffold its Inbox/Brain/Storage/… inside someone's smBrain. Layout::Memex
+    /// then keeps every write off self/history/wiki/MAP/inbox + control files.
+    fn open_memex(root: PathBuf) -> Result<Self, String> {
+        let root = fs::canonicalize(&root)
+            .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
+        fs::create_dir_all(root.join(DOT_DIR))
+            .map_err(|e| format!("create {}: {e}", root.join(DOT_DIR).display()))?;
+
+        let mut store = Self {
+            root,
+            index: HashMap::new(),
+            suppress: SuppressSet::default(),
+            os_trash: true,
+            layout: Layout::Memex,
+        };
+        store.load_index();
         Ok(store)
     }
 
@@ -530,6 +700,24 @@ impl CorpusStore {
         self.root.join(rel)
     }
 
+    /// The ownership choke point (Increment 3). Called at the TOP of every
+    /// mutating method, before any disk touch. LegacyRotli → Ok for everything
+    /// (today). Memex → Ok ONLY for `chats/**` (and creating the `chats/` dir);
+    /// every other path returns a user-facing Err that the TS layer renders.
+    /// `rel == ""` is the corpus root — writable only in LegacyRotli.
+    fn writable(&self, rel: &str) -> Result<(), String> {
+        if self.layout == Layout::LegacyRotli {
+            return Ok(());
+        }
+        match surfaced(self.layout, rel) {
+            Surface::NoteRW => Ok(()),
+            _ => Err(format!(
+                "smBrain's memory is read-only here — rotli only writes chats (refused: {})",
+                if rel.is_empty() { "<root>" } else { rel }
+            )),
+        }
+    }
+
     /// Scan the disk (the truth), reconciling the id↔path index as we go:
     /// frontmatter ids win, then the previous index (keeps frontmatter-less
     /// files stable across runs), then a freshly minted ulid.
@@ -540,7 +728,7 @@ impl CorpusStore {
             self.index.iter().map(|(id, p)| (p.clone(), id.clone())).collect();
         let mut new_index: HashMap<String, String> = HashMap::new();
 
-        walk(&self.root, "", &reverse, &mut new_index, &mut folders, &mut notes)?;
+        walk(self.layout, &self.root, "", &reverse, &mut new_index, &mut folders, &mut notes)?;
 
         if new_index != self.index {
             self.index = new_index;
@@ -599,6 +787,7 @@ impl CorpusStore {
     /// when the title moved.
     pub fn write(&mut self, id: &str, body: &str, pinned: bool) -> Result<NoteMeta, String> {
         let rel = self.path_of(id)?;
+        self.writable(&rel)?;
         let abs = self.abs(&rel);
 
         let existing = fs::read_to_string(&abs).unwrap_or_default();
@@ -670,6 +859,11 @@ impl CorpusStore {
     /// Filenames collide safely (free_filename); the id is the through-line.
     pub fn move_note(&mut self, id: &str, target_folder: &str) -> Result<NoteMeta, String> {
         let rel = self.path_of(id)?;
+        // BOTH ends must be writable: the note's current file (a self/ note may
+        // not leave) AND its destination folder (only chats/ accepts notes in a
+        // memex). LegacyRotli waves both through.
+        self.writable(&rel)?;
+        self.writable(target_folder)?;
         let abs = self.abs(&rel);
         let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         let (fm, raw) = parse_document(&text);
@@ -753,6 +947,7 @@ impl CorpusStore {
     }
 
     pub fn create(&mut self, folder_id: &str, body: &str) -> Result<NoteMeta, String> {
+        self.writable(folder_id)?;
         if !folder_id.is_empty() {
             validate_rel(folder_id)?;
             fs::create_dir_all(self.abs(folder_id))
@@ -794,6 +989,12 @@ impl CorpusStore {
     /// leaves the corpus — emptying the trash (the hard delete) is `purge`.
     /// (Seth, 2026-06-13)
     pub fn delete(&mut self, id: &str) -> Result<(), String> {
+        // Soft-delete slides the note into the reserved `Trash` folder. In a
+        // memex there is no writable `Trash`, so move_note's target gate refuses
+        // it — gate here too so the error is explicit (chats aren't deleted into
+        // the brain's sinks this increment).
+        let rel = self.path_of(id)?;
+        self.writable(&rel)?;
         self.move_note(id, "Trash").map(|_| ())
     }
 
@@ -803,6 +1004,7 @@ impl CorpusStore {
     /// yet; wired into the invoke_handler so the UI can call it later.
     pub fn purge(&mut self, id: &str) -> Result<(), String> {
         let rel = self.path_of(id)?;
+        self.writable(&rel)?;
         let abs = self.abs(&rel);
         self.suppress.mark(&abs);
         let trashed = self.os_trash && trash::delete(&abs).is_ok();
@@ -836,6 +1038,8 @@ impl CorpusStore {
             Some(p) => format!("{p}/{name}"),
             None => name.to_string(),
         };
+        // Only writable subtrees accept new folders (Memex: under chats/ only).
+        self.writable(&rel)?;
         let abs = self.abs(&rel);
         self.suppress.mark(&abs);
         fs::create_dir_all(&abs).map_err(|e| format!("create folder {rel}: {e}"))?;
@@ -947,6 +1151,7 @@ fn validate_component(name: &str) -> Result<(), String> {
 /// Recursive scan. Skips dot-entries everywhere (`.rotli`, `.DS_Store`, temp
 /// files). Unreadable / non-UTF-8 files are skipped, never fatal.
 fn walk(
+    layout: Layout,
     root: &Path,
     prefix: &str,
     reverse: &HashMap<String, String>,
@@ -971,13 +1176,20 @@ fn walk(
             Ok(k) => k,
             Err(_) => continue,
         };
+        // The scope gate (Increment 3): in Memex layout only wiki/ + chats/ are
+        // surfaced; self/history/MAP/inbox + every control file are Hidden, so
+        // the brain's memory and smBrain's root docs never appear as notes. A
+        // Hidden DIRECTORY is not descended into. LegacyRotli surfaces all.
+        if surfaced(layout, &rel) == Surface::Hidden {
+            continue;
+        }
         if kind.is_dir() {
             folders.push(FolderMeta {
                 id: rel.clone(),
                 name,
                 parent_id: if prefix.is_empty() { None } else { Some(prefix.to_string()) },
             });
-            walk(root, &rel, reverse, new_index, folders, notes)?;
+            walk(layout, root, &rel, reverse, new_index, folders, notes)?;
         } else if kind.is_file() && name.ends_with(".md") {
             let abs = entry.path();
             let Ok(text) = fs::read_to_string(&abs) else { continue };
@@ -1635,6 +1847,131 @@ mod tests {
         let ours = PathBuf::from("/corpus/Work/ours.md");
         s.mark(&ours);
         assert!(!path_relevant(&root, &s, &ours), "our own write must not echo");
+    }
+
+    // ── Increment 3: the corpus can BE a memex instance ──
+
+    /// Write a minimal-but-valid memex.json (a real `mx_` id) at `root`, plus the
+    /// spine dirs + control files the scope tests probe.
+    fn seed_memex(root: &Path) {
+        fs::create_dir_all(root).unwrap();
+        fs::write(
+            root.join("memex.json"),
+            "{\"id\":\"mx_test123\",\"contract\":\"3.4\",\"apps\":{}}",
+        )
+        .unwrap();
+        for d in ["self", "wiki", "history", "chats", "archive", "trash"] {
+            fs::create_dir_all(root.join(d)).unwrap();
+        }
+        fs::write(root.join("inbox.md"), "# Inbox\n").unwrap();
+        fs::write(root.join("MAP.md"), "# MAP\n").unwrap();
+        fs::write(root.join("STRUCTURE.md"), "# Structure\n").unwrap();
+        fs::write(root.join("self/identity.md"), "# Me\n").unwrap();
+        fs::write(root.join("wiki/note.md"), "# A wiki note\n").unwrap();
+        fs::write(root.join("chats/welcome.md"), "# Welcome chat\n").unwrap();
+    }
+
+    #[test]
+    fn surfaced_scopes_a_memex_to_wiki_and_chats() {
+        let m = Layout::Memex;
+        // hidden: the brain's memory + every control/root doc
+        assert_eq!(surfaced(m, "STRUCTURE.md"), Surface::Hidden);
+        assert_eq!(surfaced(m, "memex.json"), Surface::Hidden);
+        assert_eq!(surfaced(m, "self/x.md"), Surface::Hidden);
+        assert_eq!(surfaced(m, "inbox.md"), Surface::Hidden);
+        assert_eq!(surfaced(m, "MAP.md"), Surface::Hidden);
+        assert_eq!(surfaced(m, "history/2026/x.md"), Surface::Hidden);
+        // surfaced: chats writable, wiki read-only
+        assert_eq!(surfaced(m, "chats/x.md"), Surface::NoteRW);
+        assert_eq!(surfaced(m, "chats"), Surface::NoteRW);
+        assert_eq!(surfaced(m, "wiki/x.md"), Surface::NoteRO);
+        assert_eq!(surfaced(m, "wiki"), Surface::NoteRO);
+        // LegacyRotli surfaces everything read-write (today)
+        assert_eq!(surfaced(Layout::LegacyRotli, "STRUCTURE.md"), Surface::NoteRW);
+        assert_eq!(surfaced(Layout::LegacyRotli, "self/x.md"), Surface::NoteRW);
+    }
+
+    #[test]
+    fn writable_gate_refuses_the_brain_allows_chats() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        let mut store = CorpusStore::open(root).unwrap();
+        store.os_trash = false;
+        assert_eq!(store.layout, Layout::Memex);
+
+        // forbidden: self/history/MAP/wiki/inbox + control files + the root
+        assert!(store.writable("self/identity.md").is_err());
+        assert!(store.writable("history/x.md").is_err());
+        assert!(store.writable("MAP.md").is_err());
+        assert!(store.writable("wiki/note.md").is_err());
+        assert!(store.writable("inbox.md").is_err());
+        assert!(store.writable("memex.json").is_err());
+        assert!(store.writable("").is_err());
+        // allowed: chats and anything under it
+        assert!(store.writable("chats").is_ok());
+        assert!(store.writable("chats/new.md").is_ok());
+    }
+
+    #[test]
+    fn memex_open_skips_reserved_folders_and_first_run() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+        assert_eq!(store.layout, Layout::Memex);
+
+        // NO rotli reserved folders scaffolded inside someone's smBrain. (We omit
+        // Archive/Trash: the memex's own lowercase archive//trash/ sinks already
+        // exist and macOS's case-insensitive FS would match them — the scope test
+        // below proves they don't SURFACE, which is the real guarantee.)
+        for name in ["Inbox", "Brain", "Storage", "Board"] {
+            assert!(
+                !store.root().join(name).exists(),
+                "memex open must not scaffold the reserved folder {name}"
+            );
+        }
+        // and no welcome note seeded into the brain
+        let list = store.list().unwrap();
+        assert!(
+            list.notes.iter().all(|n| n.title != "Welcome to rotli"),
+            "first-run welcome note leaked into the memex"
+        );
+
+        // the Notes tree shows ONLY wiki/ + chats/ — never self/history/STRUCTURE
+        let folder_ids: Vec<&str> = list.folders.iter().map(|f| f.id.as_str()).collect();
+        assert!(folder_ids.contains(&"wiki"), "wiki/ should surface as a folder");
+        assert!(folder_ids.contains(&"chats"), "chats/ should surface as a folder");
+        assert!(!folder_ids.iter().any(|f| f.starts_with("self")), "self/ must stay hidden");
+        assert!(!folder_ids.iter().any(|f| f.starts_with("history")), "history/ must stay hidden");
+        assert!(!folder_ids.iter().any(|f| f.starts_with("archive")), "archive/ must stay hidden");
+        // STRUCTURE.md / inbox.md / MAP.md (root .md docs) never appear as notes
+        let folders_of: Vec<&str> = list.notes.iter().map(|n| n.folder_id.as_str()).collect();
+        assert!(
+            list.notes.iter().all(|n| n.title != "Structure" && n.title != "MAP" && n.title != "Inbox"),
+            "a root smBrain doc surfaced as an editable note"
+        );
+        // every surfaced note lives under wiki/ or chats/, nothing else
+        assert!(
+            folders_of.iter().all(|f| *f == "wiki" || *f == "chats"),
+            "a note outside wiki/+chats/ surfaced: {folders_of:?}"
+        );
+    }
+
+    #[test]
+    fn legacy_open_still_scaffolds_reserved_folders() {
+        // a plain (non-memex) dir keeps today's behavior exactly
+        let dir = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(dir.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        assert_eq!(store.layout, Layout::LegacyRotli);
+        for name in ["Inbox", "Brain", "Storage", "Board", "Archive", "Trash"] {
+            assert!(
+                store.root().join(name).is_dir(),
+                "legacy open must still scaffold the reserved folder {name}"
+            );
+        }
     }
 
     #[test]
