@@ -193,19 +193,37 @@ function MainShell() {
   }, []);
 
   // Updates (Part 2): one quiet on-mount check, main surface only, never
-  // blocking. CARL rule 2 — NO auto-download, NO modal, NO recurring ping: we
-  // ask the signed feed exactly once and, if a newer build is offered, just set
-  // a transient ui flag so Settings → General can surface "Update available".
-  // Any failure (offline, feed down) is swallowed — the app never nags.
+  // blocking. CARL rule 2 — NO auto-download, NO modal, NO nag: a SILENT check of
+  // the signed feed that, if a newer build is offered, just sets a transient ui
+  // flag → the quiet dot on the titlebar Settings button (the titlebar reads it).
+  // We check on launch, again whenever the app is summoned (it may have been
+  // hidden for days), and on a slow 3-hour timer — throttled so a flurry of
+  // show/hide can't hammer it. Any failure (offline, feed down) is swallowed.
   useEffect(() => {
     if (!isTauri()) return;
-    void checkForUpdate()
-      .then((status) => {
-        if (!status.available) return;
-        useUiStore.getState().setUpdateAvailable(true);
-        useUiStore.getState().setUpdateVersion(status.version ?? null);
-      })
-      .catch(() => {});
+    let last = 0;
+    const runCheck = () => {
+      const now = Date.now();
+      if (now - last < 600_000) return; // at most once / 10 min
+      last = now;
+      void checkForUpdate()
+        .then((status) => {
+          if (!status.available) return;
+          useUiStore.getState().setUpdateAvailable(true);
+          useUiStore.getState().setUpdateVersion(status.version ?? null);
+        })
+        .catch(() => {});
+    };
+    runCheck();
+    const onVisible = () => {
+      if (!document.hidden) runCheck();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(runCheck, 3 * 60 * 60 * 1000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
   }, []);
 
   // While onboarding, the window must NOT vanish on blur (it normally hides) —

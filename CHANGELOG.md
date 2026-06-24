@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-24
+
+### Added
+- A quiet "update available" dot on the titlebar Settings button, so a new
+  release tells you it's here without a badge or a ping. The check now also
+  re-runs when you summon the app and on a slow timer (still silent — no
+  auto-download, no modal).
+
+### Fixed
+- Auto-update could fail to unpack (`failed to unpack ._rotli.app`): the updater
+  archive is now built with `COPYFILE_DISABLE=1` so macOS doesn't add AppleDouble
+  sidecar files the unpacker rejects.
+
 ## [0.2.0] - 2026-06-24
 
 First public release — a warm, local-first menu-bar notes app, now with a memex

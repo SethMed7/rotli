@@ -74,7 +74,9 @@ rm -f "$ZIP"
 # (pre-staple) — regenerate it from the stapled .app and re-sign with the updater key.
 echo "▸ updater artifact (from the stapled .app)"
 rm -f "$TARGZ" "$SIG"
-( cd "$(dirname "$APP")" && tar czf rotli.app.tar.gz rotli.app )
+# COPYFILE_DISABLE=1: macOS tar otherwise adds AppleDouble `._rotli.app` sidecar
+# entries (xattrs/resource forks) that the Tauri updater fails to unpack.
+( cd "$(dirname "$APP")" && COPYFILE_DISABLE=1 tar czf rotli.app.tar.gz rotli.app )
 # TAURI_SIGNING_PRIVATE_KEY (+ _PASSWORD) are already exported above for the build,
 # and `tauri signer sign` reads the key from them — so pass NEITHER -f nor -k here
 # (clap errors if --private-key-path and the env's --private-key are both set).

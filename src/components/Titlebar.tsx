@@ -38,6 +38,7 @@ export function Titlebar() {
   const switcherOpen = useUiStore((s) => s.switcherOpen);
   const setSwitcherOpen = useUiStore((s) => s.setSwitcherOpen);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
+  const updateAvailable = useUiStore((s) => s.updateAvailable);
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const theme = useUiStore((s) => s.theme);
   const themeFamily = useUiStore((s) => s.themeFamily);
@@ -124,11 +125,12 @@ export function Titlebar() {
         )}
         <IconButton
           className="tb-trail"
-          label="Settings — ⌘,"
+          label={updateAvailable ? "Update available — open Settings · ⌘," : "Settings — ⌘,"}
           pressed={settingsOpen}
           onClick={() => dispatch("app.settings")}
         >
           <Icon name="rotli-settings" size={TB_ICON} />
+          {updateAvailable && <span className="tb-update-dot" aria-hidden="true" />}
         </IconButton>
       </div>
     </header>

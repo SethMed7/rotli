@@ -387,3 +387,18 @@
   flex-wrap: wrap;
   margin: 10px 0;
 }
+
+/* a quiet "update available" dot on the titlebar Settings button — low-pulse: a
+   warm clay dot, never a red badge. .icobtn is already position:relative (its
+   hover .tip), so the dot anchors to the button corner. */
+.icobtn .tb-update-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-text);
+  box-shadow: 0 0 0 2px var(--surface);
+  pointer-events: none;
+}
