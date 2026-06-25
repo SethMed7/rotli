@@ -21,7 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file with the v3.5 frontmatter preserved (`owner`/`area`/`summary`/`tags`/`links`/`shelf`/
   `reach` ride through untouched) and `updated:` bumped to a `YYYY-MM-DD` date (memex notes
   stay date-shaped; local notes keep rotli's timestamp). Memex date stamps are now honored
-  for sort order too. The default note destination doesn't change yet — that flip lands next.
+  for sort order too.
+- **New notes default into your memex** (memex integration, Phase 2 — creation flip) — when a
+  writable memex is connected, ⌘N and **＋ New note** create the note INTO the memex's
+  `wiki/_inbox/` staging (v3.5 contract) instead of the local Inbox, and open it. An explicit
+  LOCAL folder selection is always respected (never diverted); a selected shelf folder seeds
+  the new note's shelf. (Quick Note still captures locally — a follow-up.) The sidebar still
+  shows these under the memex's shelves nested in the Vault row; **promoting** those shelves
+  to the primary top-level view (local demoted to a collapsed section) is the remaining visual
+  step.
 - **Write notes into your memex** (memex integration, Phase 1) — Memory now has a
   **＋ Note** button (when the connected memex is writable for rotli). It writes a
   brand-new note into the memex's `wiki/_inbox/` **staging** area following the v3.5

@@ -10,9 +10,10 @@ import {
   type InlineMark,
   activeEditor,
 } from "../editor/commands";
-import { isVault } from "../services/destinations";
+import { createRoutedNote } from "../services/createNote";
 import { invalidateNotes } from "../services/hooks";
 import { inboxFolderId, notesService } from "../services/notes";
+import { invalidateMemex } from "../memex/useMemex";
 import { captureHandle } from "../lib/captureHandle";
 import { quickHandle } from "../lib/quickHandle";
 import {
@@ -38,23 +39,22 @@ function focusedNoteIdNow(): string | null {
   return tab && tab.surfaceKind === "note" ? tab.noteId : null;
 }
 
-/** ⌘N: create in the selected folder (Inbox when a smart row is selected),
- * then open it replacing the focused pane's active tab. */
+/** ⌘N / "+ New note": create where the memex-is-the-home model dictates — INTO the
+ * connected memex's wiki/_inbox staging (v3.5) when a writable memex is active and no
+ * explicit LOCAL folder is selected, else the local Inbox — then open it. A selected
+ * shelf folder seeds the note's shelf; an explicit local folder is always respected. */
 async function newNote(): Promise<void> {
   const { selectedFolderId } = useUiStore.getState();
-  // ⌘N / "+ new note" default to the LOCAL Inbox. A smart row (All notes /
-  // Recent) has no folder, and the external Vault is read-mostly — rotli never
-  // creates a note inside the Vault (never into a memex's chats/, even though
-  // the write gate would allow it). Both redirect to the local Inbox.
-  const folderId =
-    selectedFolderId === ALL_NOTES ||
-    selectedFolderId === RECENT ||
-    isVault(selectedFolderId)
-      ? inboxFolderId
-      : selectedFolderId;
-  const note = await notesService.createNote(folderId, "");
+  const isSmart = selectedFolderId === ALL_NOTES || selectedFolderId === RECENT;
+  const id = await createRoutedNote({
+    selectedFolderId,
+    isSmart,
+    localFallback: inboxFolderId,
+    body: "",
+  });
   await invalidateNotes();
-  usePanesStore.getState().openNote(note.id);
+  await invalidateMemex(); // the memex-derived listing refreshes too
+  usePanesStore.getState().openNote(id);
 }
 
 export function registerDefaultActions(): void {
