@@ -244,9 +244,17 @@
   color: var(--text-muted);
 }
 
+/* draggable spacers flanking the title button — keep the header grabbable so the
+   window stays easy to move (the button no longer eats the whole bar) */
+.quick-drag {
+  flex: 1;
+  align-self: stretch;
+  min-width: 12px;
+}
+
 /* — the header "open note" button (opens the ⌘P picker) — */
 .quick-pick {
-  flex: 1;
+  flex: 0 1 auto; /* content-width + centered, not the full header (drag room) */
   min-width: 0;
   display: inline-flex;
   align-items: center;

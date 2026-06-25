@@ -3,11 +3,49 @@
    .app-content area below the titlebar, like the Settings surface. */
 
 .board {
+  flex: 1; /* a content-area view now — sits beside the sidebar, fills the rest */
+  min-width: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--ground);
   overflow: hidden;
+}
+
+/* — All-notes view: the board grammar + a header search (Seth, 2026-06-24) — */
+.cv-search {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 320px;
+  flex: 1;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+}
+.cv-search svg {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.cv-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text);
+  padding: 0;
+}
+.cv-search input::placeholder {
+  color: var(--text-muted);
+}
+.cv-search input:focus-visible {
+  outline: none;
 }
 
 /* the sidebar's Board entry (a frow that opens the board surface) */

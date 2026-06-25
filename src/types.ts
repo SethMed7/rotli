@@ -19,6 +19,9 @@ export interface NoteSummary {
   createdAt: number;
   updatedAt: number;
   pinned: boolean;
+  /** "note" (a .md file) or "board" (a .excalidraw canvas, id === its corpus
+   * path). Optional/defaulted for back-compat with the in-memory seed. */
+  kind?: "note" | "board";
 }
 
 export interface Note extends NoteSummary {
@@ -40,7 +43,17 @@ export interface NoteTab {
   viewState: TabViewState;
 }
 
-export type Tab = NoteTab;
+/** An Excalidraw canvas tab. boardId IS the board's corpus-relative path
+ * (e.g. "Inbox/excalidraw/ideas.excalidraw") — boards live as real .excalidraw
+ * files next to .md notes; the file is the source of truth. */
+export interface CanvasTab {
+  id: string;
+  surfaceKind: "canvas";
+  boardId: string;
+  viewState: TabViewState;
+}
+
+export type Tab = NoteTab | CanvasTab;
 
 export type SplitDir = "row" | "col";
 

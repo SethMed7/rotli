@@ -380,6 +380,19 @@ fn filename_for(title: &str, id: &str) -> String {
 
 // ─── wire types (camelCase to match src/types.ts) ────────────────────────────
 
+/// What kind of corpus item this is. Serialized lowercase so the TS side reads
+/// `"note"` | `"board"`; `Default` is `Note` so the field is back-compat (a
+/// missing `kind` on the wire deserializes — and old TS reads — as a note).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum NoteKind {
+    #[default]
+    Note,
+    /// An Excalidraw board: a raw `*.excalidraw` scene file, NO frontmatter,
+    /// id == its relative path (NOT a ulid, NOT in the `.rotli` index).
+    Board,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteMeta {
@@ -394,6 +407,9 @@ pub struct NoteMeta {
     /// Where this note belongs once restored out of a hidden root. Carried only
     /// by notes physically under Archive/Trash; `None` everywhere else.
     pub origin: Option<String>,
+    /// "note" (a `.md`) or "board" (a `.excalidraw`). Serde-defaults to note.
+    #[serde(default)]
+    pub kind: NoteKind,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -434,6 +450,23 @@ pub struct NoteDoc {
     /// "restore to <origin>".
     pub origin: Option<String>,
 }
+
+/// What `corpus_read_board` returns: the raw Excalidraw scene JSON for a board.
+/// Boards have NO frontmatter and their id IS their relative path.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CorpusBoardDoc {
+    pub id: String,
+    pub folder_id: String,
+    /// The raw `.excalidraw` JSON string — the file verbatim.
+    pub body: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+/// A minimal, valid empty Excalidraw scene. New boards start here; it opens
+/// blank in excalidraw.com.
+const EMPTY_EXCALIDRAW: &str = "{\"type\":\"excalidraw\",\"version\":2,\"source\":\"rotli\",\"elements\":[],\"appState\":{},\"files\":{}}";
 
 // ─── suppress set (our own writes must not echo back as "external") ─────────
 
@@ -843,6 +876,7 @@ impl CorpusStore {
             updated_at: stamp_to_ms(&updated).unwrap_or_else(now_ms),
             pinned,
             origin: if is_hidden_root(&folder) { fm.origin } else { None },
+            kind: NoteKind::Note,
         })
     }
 
@@ -943,6 +977,7 @@ impl CorpusStore {
             updated_at: stamp_to_ms(&updated).unwrap_or(file_updated),
             pinned,
             origin,
+            kind: NoteKind::Note,
         })
     }
 
@@ -980,7 +1015,120 @@ impl CorpusStore {
             updated_at: ms,
             pinned: false,
             origin: None,
+            kind: NoteKind::Note,
         })
+    }
+
+    // ─── boards (Excalidraw) ────────────────────────────────────────────────
+    // Boards are a parallel surface: raw `*.excalidraw` JSON files, NO
+    // frontmatter, id == the relative path, and they bypass the `.rotli` ulid
+    // index entirely. The same writable() gate + validate_rel keep them inside
+    // the corpus root and out of read-only memex surfaces.
+
+    /// Read a board's raw Excalidraw scene JSON. `id` IS the relative path.
+    pub fn read_board(&mut self, id: &str) -> Result<CorpusBoardDoc, String> {
+        validate_rel(id)?;
+        if !id.ends_with(".excalidraw") {
+            return Err(format!("not a board: {id}"));
+        }
+        // reads honor the same memex scope as writes: never return a board that
+        // lives under a hidden root (self/history/MAP/inbox) the listing walk
+        // would never surface — this is the only corpus read that could leak one.
+        if surfaced(self.layout, id) == Surface::Hidden {
+            return Err(format!("not available here: {id}"));
+        }
+        let abs = self.abs(id);
+        if !abs.is_file() {
+            return Err(format!("board not found: {id}"));
+        }
+        let body = fs::read_to_string(&abs).map_err(|e| format!("read {id}: {e}"))?;
+        let (created_at, updated_at) = file_stamps(&abs);
+        Ok(CorpusBoardDoc {
+            id: id.to_string(),
+            folder_id: folder_of(id),
+            body,
+            created_at,
+            updated_at,
+        })
+    }
+
+    /// Save a board's raw scene JSON verbatim (no frontmatter, no index touch).
+    pub fn write_board(&mut self, id: &str, body: &str) -> Result<NoteMeta, String> {
+        validate_rel(id)?;
+        if !id.ends_with(".excalidraw") {
+            return Err(format!("not a board: {id}"));
+        }
+        self.writable(id)?;
+        // re-create the parent dir if it vanished under us (e.g. the folder was
+        // deleted in Finder while a board tab stayed open) — atomic_write needs
+        // the dir to exist, and a debounced save must not silently drop edits.
+        let folder = folder_of(id);
+        if !folder.is_empty() {
+            fs::create_dir_all(self.abs(&folder))
+                .map_err(|e| format!("create folder {folder}: {e}"))?;
+        }
+        let abs = self.abs(id);
+        self.suppress.mark(&abs);
+        atomic_write(&abs, body)?;
+        let (created_at, updated_at) = file_stamps(&abs);
+        Ok(NoteMeta {
+            id: id.to_string(),
+            title: board_title(id),
+            snippet: String::new(),
+            folder_id: folder_of(id),
+            created_at,
+            updated_at,
+            pinned: false,
+            origin: None,
+            kind: NoteKind::Board,
+        })
+    }
+
+    /// Create a new board in `folder_id`. `body` defaults to an empty scene.
+    /// Filename is a free `untitled.excalidraw` (collision-safe). id == relpath.
+    pub fn create_board(&mut self, folder_id: &str, body: Option<&str>) -> Result<NoteMeta, String> {
+        self.writable(folder_id)?;
+        if !folder_id.is_empty() {
+            validate_rel(folder_id)?;
+            fs::create_dir_all(self.abs(folder_id))
+                .map_err(|e| format!("create folder {folder_id}: {e}"))?;
+        }
+        let rel = self.free_board_filename(folder_id, "untitled.excalidraw");
+        let abs = self.abs(&rel);
+        self.suppress.mark(&abs);
+        atomic_write(&abs, body.unwrap_or(EMPTY_EXCALIDRAW))?;
+        let (created_at, updated_at) = file_stamps(&abs);
+        Ok(NoteMeta {
+            id: rel.clone(),
+            title: board_title(&rel),
+            snippet: String::new(),
+            folder_id: folder_id.to_string(),
+            created_at,
+            updated_at,
+            pinned: false,
+            origin: None,
+            kind: NoteKind::Board,
+        })
+    }
+
+    /// First free `.excalidraw` filename in a folder (boards have no id suffix,
+    /// so this is the real collision guard). Mirrors `free_filename` for `.md`.
+    fn free_board_filename(&self, folder: &str, desired: &str) -> String {
+        let join = |name: &str| {
+            if folder.is_empty() {
+                name.to_string()
+            } else {
+                format!("{folder}/{name}")
+            }
+        };
+        let mut rel = join(desired);
+        let mut n = 2;
+        while self.abs(&rel).exists() {
+            let stem = desired.trim_end_matches(".excalidraw");
+            rel = join(&format!("{stem}-{n}.excalidraw"));
+            n += 1;
+        }
+        rel
     }
 
     /// Delete is now SOFT and reversible: the note slides into the reserved
@@ -1221,10 +1369,36 @@ fn walk(
                 updated_at: fm.updated.as_deref().and_then(stamp_to_ms).unwrap_or(file_updated),
                 pinned: fm.pinned.unwrap_or(false),
                 origin,
+                kind: NoteKind::Note,
+            });
+        } else if kind.is_file() && name.ends_with(".excalidraw") {
+            // Boards: a parallel, frontmatter-free, path-as-id surface. NO
+            // frontmatter parse, NO `.rotli` ulid index (id IS the relpath),
+            // title = the file stem. They live next to `.md` notes in the tree.
+            let abs = entry.path();
+            let (file_created, file_updated) = file_stamps(&abs);
+            notes.push(NoteMeta {
+                id: rel.clone(),
+                title: board_title(&rel),
+                snippet: String::new(),
+                folder_id: prefix.to_string(),
+                created_at: file_created,
+                updated_at: file_updated,
+                pinned: false,
+                origin: None,
+                kind: NoteKind::Board,
             });
         }
     }
     Ok(())
+}
+
+/// A board's display title = its filename without the `.excalidraw` extension.
+fn board_title(rel: &str) -> String {
+    Path::new(rel)
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| rel.to_string())
 }
 
 fn ms_to_stamp(ms: i64) -> String {
@@ -1295,9 +1469,10 @@ pub fn path_relevant(root: &Path, suppress: &SuppressSet, path: &Path) -> bool {
             return false; // .rotli/, .DS_Store, .rotli-write-* temp files
         }
     }
-    // directories (a dropped folder) and .md files matter; foreign files don't
+    // directories (a dropped folder), .md notes and .excalidraw boards matter;
+    // foreign files don't
     match path.extension() {
-        Some(ext) => ext == "md" || path.is_dir(),
+        Some(ext) => ext == "md" || ext == "excalidraw" || path.is_dir(),
         None => true,
     }
 }
@@ -1376,6 +1551,34 @@ pub fn corpus_create_folder(
     parent_id: Option<String>,
 ) -> Result<FolderMeta, String> {
     state.with(|s| s.create_folder(&name, parent_id.as_deref()))
+}
+
+#[tauri::command]
+pub fn corpus_read_board(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+) -> Result<CorpusBoardDoc, String> {
+    state.with(|s| s.read_board(&id))
+}
+
+#[tauri::command]
+pub fn corpus_write_board(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    body: String,
+) -> Result<NoteMeta, String> {
+    state.with(|s| s.write_board(&id, &body))
+}
+
+/// Create a board in `folderId` (Tauri maps the JS `folderId` arg to
+/// `folder_id`). `body` is optional — `None` seeds an empty Excalidraw scene.
+#[tauri::command]
+pub fn corpus_create_board(
+    state: tauri::State<'_, CorpusState>,
+    folder_id: String,
+    body: Option<String>,
+) -> Result<NoteMeta, String> {
+    state.with(|s| s.create_board(&folder_id, body.as_deref()))
 }
 
 #[tauri::command]
@@ -1683,6 +1886,75 @@ mod tests {
         assert!(store.root().join(rel).is_file());
     }
 
+    // ── boards (Excalidraw): a parallel, path-as-id, frontmatter-free surface ──
+
+    #[test]
+    fn board_create_list_read_write_cycle() {
+        let (_dir, mut store) = bare();
+
+        // create defaults to an empty scene, lands in the requested folder,
+        // id == its relative path, kind == Board.
+        let meta = store.create_board("Inbox/excalidraw", None).unwrap();
+        assert_eq!(meta.kind, NoteKind::Board);
+        assert_eq!(meta.id, "Inbox/excalidraw/untitled.excalidraw");
+        assert_eq!(meta.folder_id, "Inbox/excalidraw");
+        assert_eq!(meta.title, "untitled");
+        assert!(meta.snippet.is_empty());
+
+        // it surfaces in the listing as a board with the same path-id
+        let list = store.list().unwrap();
+        let board = list.notes.iter().find(|n| n.id == meta.id).unwrap();
+        assert_eq!(board.kind, NoteKind::Board);
+        assert_eq!(board.folder_id, "Inbox/excalidraw");
+        // boards are NOT in the .rotli ulid index (path IS the id)
+        assert!(!store.index.contains_key(&meta.id), "boards must bypass the ulid index");
+
+        // read returns the raw JSON body (the empty-scene default)
+        let doc = store.read_board(&meta.id).unwrap();
+        assert_eq!(doc.id, meta.id);
+        assert_eq!(doc.folder_id, "Inbox/excalidraw");
+        assert!(doc.body.contains("\"type\":\"excalidraw\""), "default scene JSON: {}", doc.body);
+
+        // write round-trips the raw scene verbatim (no frontmatter added)
+        let scene = "{\"type\":\"excalidraw\",\"version\":2,\"source\":\"rotli\",\"elements\":[{\"id\":\"a\"}],\"appState\":{},\"files\":{}}";
+        let w = store.write_board(&meta.id, scene).unwrap();
+        assert_eq!(w.kind, NoteKind::Board);
+        let on_disk = fs::read_to_string(store.root().join(&meta.id)).unwrap();
+        assert_eq!(on_disk, scene, "board JSON must persist byte-exact, no frontmatter");
+        let doc = store.read_board(&meta.id).unwrap();
+        assert!(doc.body.contains("\"id\":\"a\""), "round-tripped element survives");
+
+        // a second board in the same folder gets a collision-safe name
+        let meta2 = store.create_board("Inbox/excalidraw", None).unwrap();
+        assert_eq!(meta2.id, "Inbox/excalidraw/untitled-2.excalidraw");
+    }
+
+    #[test]
+    fn dropped_board_surfaces_with_board_kind() {
+        let (_dir, mut store) = bare();
+        // a `.excalidraw` file dropped straight into the corpus (no app help)
+        fs::create_dir_all(store.root().join("Notes")).unwrap();
+        fs::write(
+            store.root().join("Notes/sketch.excalidraw"),
+            "{\"type\":\"excalidraw\",\"elements\":[]}",
+        )
+        .unwrap();
+        let list = store.list().unwrap();
+        let board = list.notes.iter().find(|n| n.id == "Notes/sketch.excalidraw").unwrap();
+        assert_eq!(board.kind, NoteKind::Board);
+        assert_eq!(board.title, "sketch");
+        assert_eq!(board.folder_id, "Notes");
+        assert!(!store.index.contains_key("Notes/sketch.excalidraw"));
+    }
+
+    #[test]
+    fn read_board_rejects_non_board_and_escape() {
+        let (_dir, mut store) = bare();
+        assert!(store.read_board("Inbox/note.md").is_err(), "must reject non-.excalidraw");
+        assert!(store.read_board("../escape.excalidraw").is_err(), "must reject path escape");
+        assert!(store.read_board("Nope/missing.excalidraw").is_err(), "missing file errors");
+    }
+
     // ── the never-delete lifecycle: move · archive · restore ──
 
     #[test]
@@ -1838,6 +2110,7 @@ mod tests {
         let root = PathBuf::from("/corpus");
         let s = SuppressSet::default();
         assert!(path_relevant(&root, &s, Path::new("/corpus/Work/note.md")));
+        assert!(path_relevant(&root, &s, Path::new("/corpus/Inbox/excalidraw/ideas.excalidraw"))); // a board
         assert!(path_relevant(&root, &s, Path::new("/corpus/Dropped"))); // a folder
         assert!(!path_relevant(&root, &s, Path::new("/corpus/.rotli/index.json")));
         assert!(!path_relevant(&root, &s, Path::new("/corpus/.rotli-write-abc")));
@@ -1911,6 +2184,30 @@ mod tests {
         // allowed: chats and anything under it
         assert!(store.writable("chats").is_ok());
         assert!(store.writable("chats/new.md").is_ok());
+    }
+
+    #[test]
+    fn board_gating_in_a_memex_matches_notes() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+        assert_eq!(store.layout, Layout::Memex);
+
+        // create/write are refused outside the writable chats/ surface…
+        assert!(store.create_board("self", None).is_err());
+        assert!(store.write_board("self/x.excalidraw", "{}").is_err());
+        // …and allowed inside chats/ (rotli's owned surface)
+        let meta = store.create_board("chats", None).unwrap();
+        assert_eq!(meta.kind, NoteKind::Board);
+        assert!(store.read_board(&meta.id).unwrap().body.contains("excalidraw"));
+
+        // read is gated too: a board that physically sits under a hidden root
+        // (self/) must NOT be readable, even though its path is well-formed.
+        fs::create_dir_all(root.join("self")).unwrap();
+        fs::write(root.join("self/secret.excalidraw"), EMPTY_EXCALIDRAW).unwrap();
+        assert!(store.read_board("self/secret.excalidraw").is_err());
     }
 
     #[test]

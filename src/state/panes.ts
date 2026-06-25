@@ -28,6 +28,21 @@ function makeTab(noteId: string): Tab {
   return { id: ulid(), surfaceKind: "note", noteId, viewState: { cursor: 0, scroll: 0 } };
 }
 
+function makeCanvasTab(boardId: string): Tab {
+  return { id: ulid(), surfaceKind: "canvas", boardId, viewState: { cursor: 0, scroll: 0 } };
+}
+
+/** The noteId of a tab, or null for a canvas tab — the one place every
+ * `.noteId` read funnels through so a CanvasTab never crashes NoteTab code. */
+function tabNoteId(tab: Tab): string | null {
+  return tab.surfaceKind === "note" ? tab.noteId : null;
+}
+
+/** Duplicate a tab (its surface target), fresh identity — for splits / ⌘T. */
+function duplicateTab(tab: Tab): Tab {
+  return tab.surfaceKind === "canvas" ? makeCanvasTab(tab.boardId) : makeTab(tab.noteId);
+}
+
 function makeLeaf(tab: Tab): LeafNode {
   return { kind: "leaf", id: ulid(), tabs: [tab], activeTabId: tab.id };
 }
@@ -227,6 +242,9 @@ interface PanesState {
   /** Plain list click: REPLACE the focused pane's active tab's note.
    * `newTab` (⌘-click / ⌘T path) opens a new tab instead. */
   openNote: (noteId: string, opts?: { newTab?: boolean }) => void;
+  /** Open a board (Excalidraw canvas) — mirrors openNote: replace the focused
+   * pane's active tab, or `newTab` opens a fresh canvas tab. */
+  openCanvas: (boardId: string, opts?: { newTab?: boolean }) => void;
   newTab: () => void;
   closeTab: () => void;
   closeTabById: (paneId: string, tabId: string) => void;
@@ -285,7 +303,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
     // the height floor mirrors the divider drag's 160px minimum
     if (dir === "col" && (rowCount(root) + 1) * MIN_PANE_HEIGHT > window.innerHeight) return;
     const leaf = focusedLeaf();
-    const dup = makeTab(activeTabOf(leaf).noteId); // duplicate, never empty
+    const dup = duplicateTab(activeTabOf(leaf)); // duplicate, never empty
     const newLeaf = makeLeaf(dup);
     set({ root: splitLeaf(get().root, leaf.id, dir, newLeaf), focusedPaneId: newLeaf.id });
   };
@@ -318,6 +336,9 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
     openNote: (noteId, opts) => {
       touchMru(noteId);
+      // opening a note always returns the content area to the panes — so a
+      // click in the Board / All-notes grid (or the sidebar) leaves that view
+      useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
       set({
         root: updateLeaf(get().root, leaf.id, (l) => {
@@ -338,9 +359,40 @@ export const usePanesStore = create<PanesState>((set, get) => {
       });
     },
 
+    openCanvas: (boardId, opts) => {
+      // boards aren't notes — no touchMru. Like openNote, surface the panes.
+      useUiStore.getState().setContentView("panes");
+      const leaf = focusedLeaf();
+      set({
+        root: updateLeaf(get().root, leaf.id, (l) => {
+          if (opts?.newTab) {
+            const tab = makeCanvasTab(boardId);
+            return { ...l, tabs: [...l.tabs, tab], activeTabId: tab.id };
+          }
+          // replace: keep the tab id, swap the WHOLE tab to a canvas tab (never
+          // spread a NoteTab's fields onto it)
+          return {
+            ...l,
+            tabs: l.tabs.map((t) =>
+              t.id === l.activeTabId
+                ? {
+                    id: l.activeTabId,
+                    surfaceKind: "canvas",
+                    boardId,
+                    viewState: { cursor: 0, scroll: 0 },
+                  }
+                : t,
+            ),
+          };
+        }),
+      });
+    },
+
     newTab: () => {
       const leaf = focusedLeaf();
-      get().openNote(activeTabOf(leaf).noteId, { newTab: true });
+      const active = activeTabOf(leaf);
+      if (active.surfaceKind === "canvas") get().openCanvas(active.boardId, { newTab: true });
+      else get().openNote(active.noteId, { newTab: true });
     },
 
     closeTab: () => {
@@ -381,7 +433,10 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
     activateTab: (paneId, tabId) => {
       const target = findLeaf(get().root, paneId)?.tabs.find((t) => t.id === tabId);
-      if (target) touchMru(target.noteId);
+      if (target) {
+        const noteId = tabNoteId(target);
+        if (noteId) touchMru(noteId);
+      }
       set({
         root: updateLeaf(get().root, paneId, (l) =>
           l.tabs.some((t) => t.id === tabId) ? { ...l, activeTabId: tabId } : l,
@@ -435,7 +490,8 @@ export const usePanesStore = create<PanesState>((set, get) => {
       const from = findLeaf(root, fromPaneId);
       const tab = from?.tabs.find((t) => t.id === tabId);
       if (!from || !tab) return;
-      touchMru(tab.noteId);
+      const movedNoteId = tabNoteId(tab);
+      if (movedNoteId) touchMru(movedNoteId);
 
       if (fromPaneId === toPaneId) {
         // reorder in place: remove, then splice back at the clamped index;
@@ -520,7 +576,8 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
       // a fresh single-tab leaf carrying the dragged tab, split off the edge
       const newLeaf: LeafNode = { kind: "leaf", id: ulid(), tabs: [tab], activeTabId: tab.id };
-      touchMru(tab.noteId);
+      const detachedNoteId = tabNoteId(tab);
+      if (detachedNoteId) touchMru(detachedNoteId);
       set({
         root: splitLeaf(t2, targetLeafId, splitDir, newLeaf, before),
         focusedPaneId: newLeaf.id,
@@ -535,6 +592,18 @@ export function useFocusedNoteId(): string | null {
     const leaf = findLeaf(s.root, s.focusedPaneId) ?? leaves(s.root)[0];
     if (!leaf) return null;
     const tab = leaf.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf.tabs[0];
-    return tab?.noteId ?? null;
+    return tab && tab.surfaceKind === "note" ? tab.noteId : null;
+  });
+}
+
+/** The canvas companion: the focused pane's active board id, or null when the
+ * active tab is a note. The Sidebar's board rows light up against this so a
+ * board reads "open" the same way a note does (the .sel pill is canvas-aware). */
+export function useFocusedBoardId(): string | null {
+  return usePanesStore((s) => {
+    const leaf = findLeaf(s.root, s.focusedPaneId) ?? leaves(s.root)[0];
+    if (!leaf) return null;
+    const tab = leaf.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf.tabs[0];
+    return tab && tab.surfaceKind === "canvas" ? tab.boardId : null;
   });
 }

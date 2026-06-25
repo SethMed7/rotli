@@ -250,18 +250,25 @@ export function QuickNote() {
       <header className="quick-head">
         <div className="quick-inset" onMouseDown={onDragRegionMouseDown} />
         {activeId ? (
-          <button
-            type="button"
-            className="quick-pick"
-            aria-haspopup="dialog"
-            title="Switch or pin a note — ⌘P"
-            onClick={openPicker}
-          >
-            <span className="quick-pick-name">{activeTitle}</span>
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
+          // the title button is content-width and centered, with draggable
+          // spacers on either side — so the header stays easy to grab and move
+          // the window, instead of being one big click target (Seth, 2026-06-24)
+          <>
+            <div className="quick-drag" onMouseDown={onDragRegionMouseDown} aria-hidden="true" />
+            <button
+              type="button"
+              className="quick-pick"
+              aria-haspopup="dialog"
+              title="Switch or pin a note — ⌘P"
+              onClick={openPicker}
+            >
+              <span className="quick-pick-name">{activeTitle}</span>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            <div className="quick-drag" onMouseDown={onDragRegionMouseDown} aria-hidden="true" />
+          </>
         ) : (
           <span className="quick-title" onMouseDown={onDragRegionMouseDown}>
             Quick note

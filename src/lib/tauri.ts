@@ -175,6 +175,20 @@ export interface CorpusNoteMeta {
    * bakes the rule (set on entering a hidden root, cleared on leaving). Null
    * for a note that lives in a normal folder (Seth, 2026-06-13). */
   origin?: string | null;
+  /** "note" (a .md file) or "board" (a .excalidraw canvas). Rust serde-defaults
+   * to "note" for back-compat, so it's optional on the wire. */
+  kind?: "note" | "board";
+}
+
+/** What corpus_read_board returns — the raw .excalidraw JSON plus file meta.
+ * No pinned/origin (boards carry no frontmatter and never enter the index). */
+export interface CorpusBoardDoc {
+  id: string;
+  folderId: string;
+  /** The raw .excalidraw JSON string, verbatim. */
+  body: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface CorpusListPayload {
@@ -239,6 +253,30 @@ export function corpusCreateFolder(
   parentId: string | null,
 ): Promise<CorpusFolder> {
   return corpusInvoke("corpus_create_folder", { name, parentId });
+}
+
+// ——— boards (Excalidraw): real *.excalidraw files in the corpus, next to the
+//     .md notes. A board id IS its corpus-relative path; boards carry no
+//     frontmatter and never join the ulid index. ———
+
+/** Read a board's raw .excalidraw JSON. Rejects if the id isn't .excalidraw,
+ * escapes the root, or the file is missing. */
+export function corpusReadBoard(id: string): Promise<CorpusBoardDoc> {
+  return corpusInvoke("corpus_read_board", { id });
+}
+
+/** Write a board's raw .excalidraw JSON verbatim (passes the memex writable
+ * gate). Returns the board's meta (kind === "board"). */
+export function corpusWriteBoard(id: string, body: string): Promise<CorpusNoteMeta> {
+  return corpusInvoke("corpus_write_board", { id, body });
+}
+
+/** Create a new board in folderId (filename auto-picked, collision-safe).
+ * Omit body for an empty Excalidraw scene. The returned meta.id IS the new
+ * board's corpus-relative path. */
+export function corpusCreateBoard(folderId: string, body?: string): Promise<CorpusNoteMeta> {
+  // exactOptionalPropertyTypes: only pass body when present.
+  return corpusInvoke("corpus_create_board", body === undefined ? { folderId } : { folderId, body });
 }
 
 /** Settings → Storage truth: the real root (home shortened to `~`), every

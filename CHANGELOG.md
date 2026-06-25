@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Excalidraw boards** — a board is a real `.excalidraw` file living in your
+  corpus folders next to your `.md` notes (a file you own, openable in
+  excalidraw.com). Boards open in a pane like a note, save to disk as you draw,
+  and show in the sidebar with their own glyph. Excalidraw is code-split, so it
+  loads only when you open a board.
+- **A `+` menu in the sidebar** (replaces the pencil) — New note · New Excalidraw
+  board · New folder.
+- **Nested folders** — create a folder inside any folder (e.g. an `excalidraw`
+  folder inside Inbox) from the `+` menu. The inline name commits on Enter or
+  when you click away (Esc cancels).
+
+### Changed
+- **Board** and **All notes** now open as grids in the content area to the right
+  of the sidebar — the sidebar no longer disappears, and there's no empty pane.
+  Board stays a home for quick captures; All notes adds a search box and shows
+  every note (and board) as cards. Clicking a card returns to the editor/canvas.
+
+### Fixed
+- The editor now keeps the caret above the floating format bar while you type —
+  the last line pushes up instead of sliding behind the bar.
+- The Quick Note hotkey (⌥Q) now controls **only** the Quick Note: closing it
+  returns you to where you came from and never surfaces the main window.
+- The Quick Note header is draggable again — the title is a centered button with
+  draggable space on either side, so the window is easy to move.
+
 ## [0.2.2] - 2026-06-24
 
 ### Added

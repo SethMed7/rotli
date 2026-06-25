@@ -127,7 +127,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
       // focused pane carry their ⌘1…⌘8 jump hint (tab-jump education).
       const focusedTabs = findLeaf(root, focusedPaneId)?.tabs ?? [];
       const recentRow = (n: NoteSummary): Row => {
-        const i = focusedTabs.findIndex((t) => t.noteId === n.id);
+        const i = focusedTabs.findIndex((t) => t.surfaceKind === "note" && t.noteId === n.id);
         const tab = i >= 0 && i < 8 ? focusedTabs[i] : undefined;
         if (!tab) return noteRow(n);
         return {
@@ -167,6 +167,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
     const tabRows: Row[] = [];
     for (const leaf of leaves(root)) {
       leaf.tabs.forEach((tab, i) => {
+        if (tab.surfaceKind !== "note") return;
         const n = noteById.get(tab.noteId);
         if (!n || !fuzzy(q, n.title)) return;
         tabRows.push({

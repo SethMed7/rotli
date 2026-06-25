@@ -357,6 +357,47 @@
   opacity: 1;
   transition-delay: 300ms;
 }
+/* the "+" create-menu wrapper (Seth, 2026-06-24): holds the icon button + its
+   anchor ref so the transient popover toggles cleanly. The .rowmenu it opens is
+   position:fixed (JS sets top/left from this box), so it escapes the sidebar. */
+.sb-plus {
+  flex: 0 0 auto;
+  position: relative;
+}
+
+/* the inline nested new-folder input row (Seth, 2026-06-24): a folder glyph +
+   a bare text field that reads like the filter well's input — same .snrow
+   metrics so it sits in the tree where the new folder will land. */
+.sb-newfolder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  padding-right: 10px;
+}
+.sb-newfolder svg {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.sb-newfolder input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  padding: 0;
+}
+.sb-newfolder input::placeholder {
+  color: var(--text-muted);
+}
+.sb-newfolder input:focus-visible {
+  outline: none;
+}
+
 .filter {
   flex: 1;
   min-width: 0;

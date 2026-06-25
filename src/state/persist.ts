@@ -293,19 +293,21 @@ interface PersistedViewstate {
 
 function validTab(v: unknown, alive: Set<string>): Tab | null {
   const o = record(v);
-  if (o.surfaceKind !== "note") return null;
   if (typeof o.id !== "string" || !o.id) return null;
-  if (typeof o.noteId !== "string" || !alive.has(o.noteId)) return null;
   const vs = record(o.viewState);
-  return {
-    id: o.id,
-    surfaceKind: "note",
-    noteId: o.noteId,
-    viewState: {
-      cursor: typeof vs.cursor === "number" ? vs.cursor : 0,
-      scroll: typeof vs.scroll === "number" ? vs.scroll : 0,
-    },
+  const viewState = {
+    cursor: typeof vs.cursor === "number" ? vs.cursor : 0,
+    scroll: typeof vs.scroll === "number" ? vs.scroll : 0,
   };
+  // canvas: boards have no alive-set (ids are paths, no ulid index), so accept
+  // any non-empty boardId — the surface handles a since-deleted board itself.
+  if (o.surfaceKind === "canvas") {
+    if (typeof o.boardId !== "string" || !o.boardId) return null;
+    return { id: o.id, surfaceKind: "canvas", boardId: o.boardId, viewState };
+  }
+  if (o.surfaceKind !== "note") return null;
+  if (typeof o.noteId !== "string" || !alive.has(o.noteId)) return null;
+  return { id: o.id, surfaceKind: "note", noteId: o.noteId, viewState };
 }
 
 /** Validate + prune in one pass: structure must hold AND every tab's note must

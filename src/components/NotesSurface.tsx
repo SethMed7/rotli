@@ -10,6 +10,8 @@ import type { CSSProperties, PointerEvent } from "react";
 import { useNotes } from "../services/hooks";
 import { DEST } from "../services/destinations";
 import { useUiStore } from "../state/ui";
+import { AllNotesSurface } from "./AllNotesSurface";
+import { BoardSurface } from "./BoardSurface";
 import { EmptyState } from "./EmptyState";
 import { Sidebar } from "./Sidebar";
 import { PaneTree } from "./PaneTree";
@@ -50,6 +52,7 @@ export function NotesSurface() {
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
+  const contentView = useUiStore((s) => s.contentView);
   const allNotes = useNotes().data;
   const archived = useNotes(DEST.archive).data;
   const trashed = useNotes(DEST.trash).data;
@@ -79,7 +82,15 @@ export function NotesSurface() {
           <RailGrip width={sidebarWidth} onResize={setSidebarWidth} />
         </div>
       )}
-      <PaneTree />
+      {/* the content area: the note panes, or a grid view (Board / All notes)
+          that renders HERE so the sidebar never moves (Seth, 2026-06-24) */}
+      {contentView === "board" ? (
+        <BoardSurface />
+      ) : contentView === "allNotes" ? (
+        <AllNotesSurface />
+      ) : (
+        <PaneTree />
+      )}
       {/* collapsed → no warm-edge sliver (Seth, 2026-06-15: it was an unclear,
           disliked line). The titlebar's always-visible sidebar toggle is the
           clear reopen now. */}

@@ -39,6 +39,13 @@ interface SlashState {
   top: number;
 }
 
+/** The floating format bar (bottom-center, ~42px tall, sitting 16px up) covers
+ * the scroller's bottom strip. CM keeps the caret at least this many px above
+ * the scroller's bottom edge when scrolling it into view, so typing on the last
+ * line pushes the text UP instead of sliding behind the bar (Seth, 2026-06-24).
+ * Matches the content's 90px bottom padding reserve. */
+const FORMAT_BAR_SCROLL_MARGIN = 88;
+
 export function CmEditor({
   noteId,
   paneId,
@@ -69,6 +76,13 @@ export function CmEditor({
   const spellcheck = useUiStore((s) => s.spellcheck);
   const spellcheckRef = useRef(spellcheck);
   spellcheckRef.current = spellcheck;
+
+  // the format bar overlaps the bottom of the scroller — keep the scroll margin
+  // in step with whether it's showing (a Settings toggle). Read via a ref so the
+  // facet picks up the live value without rebuilding the view.
+  const formatBarVisible = useUiStore((s) => s.formatBarVisible);
+  const formatBarRef = useRef(formatBarVisible);
+  formatBarRef.current = formatBarVisible;
 
   // beautified (live WYSIWYG) vs raw markdown source — a view toggle (Aa panel).
   const rawEditor = useUiStore((s) => s.rawEditor);
@@ -241,6 +255,12 @@ export function CmEditor({
         Prec.high(keymap.of(rotliKeymap)),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
+        // never let the caret slide behind the floating format bar: CM treats
+        // the bottom strip as invisible when scrolling the caret into view, so
+        // typing the last line pushes the text up instead (Seth, 2026-06-24)
+        EditorView.scrollMargins.of(() =>
+          formatBarRef.current ? { bottom: FORMAT_BAR_SCROLL_MARGIN } : null,
+        ),
         viewModeComp.of(rawEditorRef.current ? [] : livePreview),
         EditorView.domEventHandlers({
           copy: (e, v) => copyStripped(e, v, false),

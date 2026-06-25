@@ -1,5 +1,6 @@
 node_modules
 dist
+public/fonts
 src-tauri/target
 _review
 *.log

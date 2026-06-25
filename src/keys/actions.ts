@@ -34,7 +34,7 @@ function focusedNoteIdNow(): string | null {
   const leaf = findLeaf(root, focusedPaneId) ?? leaves(root)[0];
   if (!leaf) return null;
   const tab = leaf.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf.tabs[0];
-  return tab?.noteId ?? null;
+  return tab && tab.surfaceKind === "note" ? tab.noteId : null;
 }
 
 /** ⌘N: create in the selected folder (Inbox when a smart row is selected),
@@ -65,8 +65,8 @@ export function registerDefaultActions(): void {
         ui.setSettingsOpen(false);
         return;
       }
-      if (ui.boardOpen) {
-        ui.setBoardOpen(false);
+      if (ui.contentView !== "panes") {
+        ui.setContentView("panes");
         return;
       }
       if (ui.chatOpen) {
@@ -138,13 +138,14 @@ export function registerDefaultActions(): void {
       const ui = useUiStore.getState();
       ui.setFocusMode(false);
       ui.setSwitcherOpen(false);
-      ui.setBoardOpen(false);
+      ui.setContentView("panes");
       ui.setSettingsOpen(!ui.settingsOpen);
     },
   });
 
-  // The Board — quick captures collected as cards (Seth, 2026-06-19). Its own
-  // surface, like Settings; ⌘K-reachable + rebindable, opened from the sidebar.
+  // The Board — quick captures collected as cards (Seth, 2026-06-19). A view in
+  // the content area now (the sidebar stays); ⌘K-reachable + rebindable, opened
+  // from the sidebar. Toggles between the board grid and the note panes.
   registerAction({
     id: "board.open",
     title: "Board — captures",
@@ -154,7 +155,7 @@ export function registerDefaultActions(): void {
       ui.setFocusMode(false);
       ui.setSwitcherOpen(false);
       ui.setSettingsOpen(false);
-      ui.setBoardOpen(!ui.boardOpen);
+      ui.setContentView(ui.contentView === "board" ? "panes" : "board");
     },
   });
 

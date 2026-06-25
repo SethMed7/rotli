@@ -28,7 +28,7 @@ export function ModuleSwitcher({ onClose }: { onClose: () => void }) {
   // surfaces by priority — a stale sibling flag would otherwise win silently).
   const go = (target: "notes" | "chat" | "memory") => {
     const ui = useUiStore.getState();
-    ui.setBoardOpen(false);
+    ui.setContentView("panes");
     ui.setSettingsOpen(false);
     ui.setChatOpen(target === "chat");
     ui.setMemoryOpen(target === "memory");

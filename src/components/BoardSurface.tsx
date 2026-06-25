@@ -3,11 +3,11 @@
 // All Notes until merged). Click cards to multi-select, then MERGE the selected
 // ones into a single joint note (in Inbox) — the originals are archived
 // (recoverable, never hard-deleted), per the never-delete lifecycle. Double-click
-// a card to open it on its own. Its own surface, like Settings; the registry's
-// app.hide (Esc) closes it back to notes via the boardOpen flag.
+// a card to open it on its own. A view in the content area now (the sidebar
+// stays); the registry's app.hide (Esc) closes it back to the panes via the
+// contentView model (setContentView("panes")).
 
 import { useState } from "react";
-import { dispatch } from "../keys/registry";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
 import { notesService } from "../services/notes";
@@ -32,8 +32,9 @@ function dayLabel(ts: number): string {
 
 export function BoardSurface() {
   const captures = useNotes(DEST.board).data ?? [];
-  const setBoardOpen = useUiStore((s) => s.setBoardOpen);
+  const setContentView = useUiStore((s) => s.setContentView);
   const openNote = usePanesStore((s) => s.openNote);
+  const openCanvas = usePanesStore((s) => s.openCanvas);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
@@ -48,12 +49,12 @@ export function BoardSurface() {
       return next;
     });
 
-  const openOne = (id: string) => {
-    setBoardOpen(false);
-    openNote(id);
-  };
+  // open a card by kind — a stray board in the Board root opens its canvas, not
+  // a dead note tab. open* returns the content area to the panes on its own.
+  const openOne = (c: { id: string; kind?: "note" | "board" }) =>
+    c.kind === "board" ? openCanvas(c.id) : openNote(c.id);
 
-  const back = () => dispatch("board.open"); // toggles boardOpen off
+  const back = () => setContentView("panes");
 
   /** Merge the selected cards into ONE note in Inbox (bodies joined oldest-first
    * with a blank line), then archive the originals — they're consumed, not lost. */
@@ -73,8 +74,7 @@ export function BoardSurface() {
       for (const c of ordered) await notesService.archiveNote(c.id);
       await invalidateNotes();
       setSelected(new Set());
-      setBoardOpen(false);
-      openNote(note.id);
+      openNote(note.id); // returns the content area to the panes
     } finally {
       setBusy(false);
     }
@@ -133,7 +133,7 @@ export function BoardSurface() {
                   className={sel ? "board-card sel" : "board-card"}
                   aria-pressed={sel}
                   onClick={() => toggle(c.id)}
-                  onDoubleClick={() => openOne(c.id)}
+                  onDoubleClick={() => openOne(c)}
                   title="Click to select · double-click to open"
                 >
                   <span className="bc-check" aria-hidden="true">

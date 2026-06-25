@@ -37,7 +37,8 @@ export async function invalidateFolders(): Promise<void> {
 
 export function useCreateFolder() {
   return useMutation({
-    mutationFn: (name: string) => notesService.createFolder(name),
+    mutationFn: ({ name, parentId }: { name: string; parentId?: string | null }) =>
+      notesService.createFolder(name, parentId),
     onSuccess: () => invalidateFolders(),
   });
 }

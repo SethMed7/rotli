@@ -19,13 +19,21 @@ import { startTabDrag } from "../lib/tabDrag";
 import { useNotes } from "../services/hooks";
 import { leaves, usePanesStore } from "../state/panes";
 import type { LeafNode, Tab } from "../types";
-import { FileGlyph, PlusGlyph, XGlyph } from "./glyphs";
+import { BoardGlyph, FileGlyph, PlusGlyph, XGlyph } from "./glyphs";
+
+/** A board's display label = its filename minus the .excalidraw extension. */
+function boardLabel(boardId: string): string {
+  const base = boardId.split("/").pop() ?? boardId;
+  return base.replace(/\.excalidraw$/i, "") || "Board";
+}
 
 function tabLabel(tab: Tab, titles: Map<string, string>): string {
   // surfaceKind dispatch — grows with the union ('chat' …)
   switch (tab.surfaceKind) {
     case "note":
       return titles.get(tab.noteId) ?? "Untitled";
+    case "canvas":
+      return boardLabel(tab.boardId);
   }
 }
 
@@ -112,7 +120,11 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                     startTabDrag(event, pane.id, tab.id, tabLabel(tab, titles))
                   }
                 >
-                  <FileGlyph size={13} className="tglyph" />
+                  {tab.surfaceKind === "canvas" ? (
+                    <BoardGlyph size={13} className="tglyph" />
+                  ) : (
+                    <FileGlyph size={13} className="tglyph" />
+                  )}
                   <span>{tabLabel(tab, titles)}</span>
                   {!loneInLonePane && (
                     <button

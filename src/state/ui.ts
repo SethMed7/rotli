@@ -69,6 +69,11 @@ export const GLASS_CANVASES: { value: GlassCanvas; label: string }[] = [
 export const ALL_NOTES = "all";
 export const RECENT = "recent";
 
+/** What the content area (right of the sidebar) renders: the note panes, the
+ * Board grid, or the searchable All-notes grid. Board/All-notes are views in
+ * the pane area — the sidebar never moves for them (Seth, 2026-06-24). */
+export type ContentView = "panes" | "board" | "allNotes";
+
 /** Sidebar width clamp — small enough to tuck away, never wide enough to eat
  * the editor (one rail now, not two — Seth, 2026-06-13). */
 export const clampSidebarWidth = (px: number): number =>
@@ -207,10 +212,12 @@ interface UiState {
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
 
-  /** The Board — quick captures collected as cards — as its own surface (like
-   * Settings). Esc / "Back to notes" returns. Not persisted (a transient view). */
-  boardOpen: boolean;
-  setBoardOpen: (open: boolean) => void;
+  /** What the content area (right of the sidebar) shows: the note panes, the
+   * Board grid (quick captures), or the All-notes grid. The sidebar stays put —
+   * Board/All-notes are VIEWS in the pane area, not full-surface takeovers
+   * (Seth, 2026-06-24). Esc returns to "panes". Not persisted (transient). */
+  contentView: ContentView;
+  setContentView: (view: ContentView) => void;
 
   /** The Chat front — named conversations over the connected memex (chats/) — as
    * its own surface (like Board). "Everything has a chat." Not persisted. */
@@ -354,8 +361,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   settingsOpen: false,
   setSettingsOpen: (open) => set({ settingsOpen: open }),
 
-  boardOpen: false,
-  setBoardOpen: (open) => set({ boardOpen: open }),
+  contentView: "panes",
+  setContentView: (view) => set({ contentView: view }),
 
   chatOpen: false,
   setChatOpen: (open) => set({ chatOpen: open }),

@@ -1,0 +1,47 @@
+/* The Excalidraw canvas surface (CanvasSurface.tsx). Kit tokens + base.css
+   grammar vars only — NO raw hex. The Excalidraw root needs an explicit
+   non-zero height or it renders 0px tall, so the wrapper fills the pane body. */
+
+.canvas-surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  background: var(--ground);
+}
+
+/* Excalidraw mounts into its own .excalidraw root — make it fill the wrapper. */
+.canvas-surface .excalidraw {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* The browser (no-shell) + loading/error placeholders — quiet, centered, warm. */
+.canvas-placeholder {
+  align-items: center;
+  justify-content: center;
+}
+
+.canvas-placeholder-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.canvas-placeholder-card strong {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+}

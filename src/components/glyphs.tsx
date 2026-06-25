@@ -85,6 +85,17 @@ export function FileGlyph(props: GlyphProps) {
   );
 }
 
+/** Excalidraw board — a canvas frame with a sketch stroke (distinct from the
+ * note FileGlyph so boards read as canvases in the tree + tab strip). */
+export function BoardGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M7 15c2-4 4-4 5-2s3 1 5-3" />
+    </Glyph>
+  );
+}
+
 /** "Recent" row (r1/r2 gates). */
 export function ClockGlyph(props: GlyphProps) {
   return (

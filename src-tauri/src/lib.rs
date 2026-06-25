@@ -66,6 +66,13 @@ struct CaptureReturn(Mutex<bool>);
 /// middle, can't move it" (Seth, 2026-06-22).
 struct QuickPlaced(Mutex<bool>);
 
+/// Where closing the Quick Note returns focus: true = back to the main window
+/// (you were working in it), false = out of rotli entirely (you came from
+/// another app, or main was tucked away). Captured at summon time so the ⌥Q
+/// chord controls ONLY the quick note — closing it never surfaces the main app
+/// (Seth, 2026-06-24). Mirrors CaptureReturn.
+struct QuickReturn(Mutex<bool>);
+
 fn show_main(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -151,10 +158,40 @@ fn finish_capture(app: &AppHandle) {
     }
 }
 
+/// Record where closing the Quick Note should return focus, BEFORE the quick
+/// window steals it: back to the main window only if you were actively in it,
+/// otherwise out of rotli. Mirrors how `show_capture` snapshots CaptureReturn.
+fn remember_quick_return(app: &AppHandle) {
+    let in_main = app
+        .get_webview_window("main")
+        .map(|w| w.is_visible().unwrap_or(false) && w.is_focused().unwrap_or(false))
+        .unwrap_or(false);
+    *app.state::<QuickReturn>().0.lock().unwrap() = in_main;
+}
+
+/// Close the Quick Note via its own chord / Esc and return focus where it
+/// belongs: back to the main window only if you were working in it, otherwise
+/// step out of rotli (NSApp hide) so the ⌥Q chord never surfaces the main app.
+/// The blur-hide path (clicking elsewhere) stays a plain `hide_quick` — focus is
+/// already moving to whatever you clicked. Mirrors `finish_capture` (#5).
+fn hide_quick_return(app: &AppHandle) {
+    hide_quick(app);
+    let return_to_main = *app.state::<QuickReturn>().0.lock().unwrap();
+    if return_to_main {
+        show_main(app);
+    } else {
+        #[cfg(target_os = "macos")]
+        let _ = app.hide();
+    }
+}
+
 fn show_quick(app: &AppHandle) {
     let Some(window) = app.get_webview_window("quick") else {
         return;
     };
+    // snapshot the return target before we steal focus (so a later ⌥Q-close
+    // knows whether you were in main or came from somewhere else)
+    remember_quick_return(app);
     // center only the first time this session — afterwards keep the user's
     // dragged position (the window keeps it across hide/show on its own)
     {
@@ -184,8 +221,13 @@ fn toggle_quick(app: &AppHandle) {
     };
     if window.is_visible().unwrap_or(false) {
         if window.is_focused().unwrap_or(true) {
-            let _ = window.hide();
+            // the ⌥Q chord controls ONLY the quick note — closing it returns
+            // focus to where you came from, never surfaces the main window
+            hide_quick_return(app);
         } else {
+            // visible but behind: bring it forward, and refresh the return
+            // target (you may have moved to another app since the last summon)
+            remember_quick_return(app);
             let _ = window.show();
             let _ = window.set_focus();
         }
@@ -272,7 +314,9 @@ fn toggle_quick_window(app: AppHandle) {
 
 #[tauri::command]
 fn hide_quick_window(app: AppHandle) {
-    hide_quick(&app);
+    // Esc-dismiss from the quick webview — same intent as the ⌥Q chord close,
+    // so return focus the same way (never surface main).
+    hide_quick_return(&app);
 }
 
 #[tauri::command]
@@ -465,6 +509,7 @@ pub fn run() {
         .manage(HideOnBlur(Mutex::new(true)))
         .manage(CaptureReturn(Mutex::new(false)))
         .manage(QuickPlaced(Mutex::new(false)))
+        .manage(QuickReturn(Mutex::new(false)))
         .invoke_handler(tauri::generate_handler![
             toggle_main_window,
             hide_main_window,
@@ -490,6 +535,9 @@ pub fn run() {
             corpus::corpus_move,
             corpus::corpus_purge,
             corpus::corpus_create_folder,
+            corpus::corpus_read_board,
+            corpus::corpus_write_board,
+            corpus::corpus_create_board,
             corpus::corpus_overview,
             corpus::corpus_settings_read,
             corpus::corpus_settings_write,

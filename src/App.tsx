@@ -8,7 +8,8 @@ import "./styles/quick.css";
 import "./styles/onboarding.css";
 import "./styles/board.css";
 import "./styles/memex.css";
-import { BoardSurface } from "./components/BoardSurface";
+import "@excalidraw/excalidraw/index.css";
+import "./styles/canvas.css";
 import { CaptureCard } from "./components/CaptureCard";
 import { ChatSurface } from "./components/ChatSurface";
 import { MemorySurface } from "./components/MemorySurface";
@@ -81,7 +82,6 @@ function surfaceFromUrl(): Surface {
 
 function MainShell() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
-  const boardOpen = useUiStore((s) => s.boardOpen);
   const chatOpen = useUiStore((s) => s.chatOpen);
   const memoryOpen = useUiStore((s) => s.memoryOpen);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
@@ -127,7 +127,7 @@ function MainShell() {
         const toBoard = async () => {
           await notesService.createNote(DEST.board, body);
           await invalidateNotes();
-          if (open) useUiStore.getState().setBoardOpen(true);
+          if (open) useUiStore.getState().setContentView("board");
         };
         void (async () => {
           let saved = false;
@@ -186,8 +186,12 @@ function MainShell() {
       const { root, openNote } = usePanesStore.getState();
       const panes = leaves(root);
       const only = panes[0];
+      const onlyTab = only && only.tabs.length === 1 ? activeTabOf(only) : null;
       const pristine =
-        panes.length === 1 && only && only.tabs.length === 1 && activeTabOf(only).noteId === "";
+        panes.length === 1 &&
+        !!onlyTab &&
+        onlyTab.surfaceKind === "note" &&
+        onlyTab.noteId === "";
       if (pristine) openNote(freshest.id);
     });
   }, []);
@@ -264,9 +268,10 @@ function MainShell() {
     <div className="app-window">
       <Titlebar />
       <main className="app-content">
-        {boardOpen ? (
-          <BoardSurface />
-        ) : settingsOpen ? (
+        {/* Settings / Chat / Memory are still full-surface fronts. The Board and
+            All-notes grids are NOT — they render inside NotesSurface's content
+            area so the sidebar stays put (Seth, 2026-06-24). */}
+        {settingsOpen ? (
           <SettingsSurface />
         ) : chatOpen ? (
           <ChatSurface />
