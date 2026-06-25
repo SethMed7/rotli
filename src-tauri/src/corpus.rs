@@ -15,7 +15,7 @@
 //! watcher (debounced) tells the frontend when the corpus changes under it,
 //! ignoring `.rotli/` and our own in-flight writes.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -483,6 +483,67 @@ fn editor_body(raw: &str) -> &str {
     raw.strip_prefix("\r\n")
         .or_else(|| raw.strip_prefix('\n'))
         .unwrap_or(raw)
+}
+
+// ─── shelf-projection (v3.5) ─────────────────────────────────────────────────
+// The disk is the AI's strict structure; the user's VIEW groups notes by their
+// `shelf:` (the folder the human put it in), never by the disk path — so a note
+// that physically lives in wiki/ (or wiki/_inbox staging) appears under "Inbox" or
+// "Myela/Payments" and the user never feels it lives in wiki/. We read the shelf
+// from the PRESERVED foreign frontmatter lines (parse_fields/compose_document stay
+// untouched, so the byte-exact round-trip + every frontmatter test is unaffected).
+
+/// The user's shelf(s) from a note's frontmatter — `shelf: [a, b]` (or a bare
+/// `shelf: a`). Empty/absent ⇒ `[]`. Read-only; the disk file is never rewritten.
+fn shelf_of(fm: &Frontmatter) -> Vec<String> {
+    for line in &fm.foreign {
+        if let Some(rest) = line.trim_start().strip_prefix("shelf:") {
+            let v = rest.trim();
+            let inner = v
+                .strip_prefix('[')
+                .and_then(|s| s.strip_suffix(']'))
+                .unwrap_or(v);
+            return inner
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+        }
+    }
+    Vec::new()
+}
+
+/// The folder a note is PROJECTED into. In a Memex, a `wiki/` note appears under
+/// its PRIMARY shelf (the user's view) when one is set; otherwise it falls back to
+/// its disk folder (a curated note with no shelf yet stays where it lives on disk).
+/// Everything outside a memex's wiki/, and the whole local corpus, is unaffected.
+fn project_folder(layout: Layout, disk_folder: &str, fm: &Frontmatter) -> String {
+    if layout == Layout::Memex && (disk_folder == "wiki" || disk_folder.starts_with("wiki/")) {
+        if let Some(primary) = shelf_of(fm).into_iter().next() {
+            return primary;
+        }
+    }
+    disk_folder.to_string()
+}
+
+/// Synthesize a `FolderMeta` (and every ancestor) for any note `folder_id` that has
+/// no backing folder — i.e. a shelf path projected from frontmatter (the dir it
+/// physically lives in is wiki/, not the shelf). Idempotent + dedup'd via `known`.
+/// A no-op for the local corpus, where every note's folder_id is a walked directory.
+fn ensure_backing_folders(folders: &mut Vec<FolderMeta>, notes: &[NoteMeta]) {
+    let mut known: HashSet<String> = folders.iter().map(|f| f.id.clone()).collect();
+    for n in notes {
+        let mut path = n.folder_id.clone();
+        while !path.is_empty() && !known.contains(&path) {
+            let (parent, name): (Option<String>, String) = match path.rsplit_once('/') {
+                Some((p, nm)) => (Some(p.to_string()), nm.to_string()),
+                None => (None, path.clone()),
+            };
+            folders.push(FolderMeta { id: path.clone(), name, parent_id: parent.clone() });
+            known.insert(path.clone());
+            path = parent.unwrap_or_default();
+        }
+    }
 }
 
 // ─── title · snippet · slug · filename ───────────────────────────────────────
@@ -958,6 +1019,9 @@ impl CorpusStore {
             self.index = new_index;
             self.persist_index();
         }
+        // shelf-projection (v3.5): notes re-homed onto a shelf path need that shelf
+        // folder (+ ancestors) to exist in the tree. A no-op for the local corpus.
+        ensure_backing_folders(&mut folders, &notes);
         folders.sort_by(|a, b| a.id.cmp(&b.id));
         notes.sort_by(|a, b| {
             b.pinned
@@ -994,10 +1058,13 @@ impl CorpusStore {
         };
         let (file_created, file_updated) = file_stamps(&abs);
         let fm = fm.unwrap_or_default();
-        let folder = folder_of(&rel);
+        let disk_folder = folder_of(&rel);
+        // origin is a DISK-location fact (Archive/Trash); the wire folder_id is the
+        // shelf-projected view — they can differ for a memex wiki note.
+        let folder = project_folder(self.layout, &disk_folder, &fm);
         Ok(NoteDoc {
             id: id.to_string(),
-            origin: if is_hidden_root(&folder) { fm.origin.clone() } else { None },
+            origin: if is_hidden_root(&disk_folder) { fm.origin.clone() } else { None },
             folder_id: folder,
             body: body.to_string(),
             created_at: fm.created.as_deref().and_then(stamp_to_ms).unwrap_or(file_created),
@@ -1532,11 +1599,17 @@ fn walk(
             continue;
         }
         if kind.is_dir() {
-            folders.push(FolderMeta {
-                id: rel.clone(),
-                name,
-                parent_id: if prefix.is_empty() { None } else { Some(prefix.to_string()) },
-            });
+            // Memex: the wiki/_inbox staging dir is plumbing, not a folder — its
+            // notes are re-homed by their shelf (below), so don't surface it as a
+            // browsable folder; still recurse to collect those notes.
+            let staging = layout == Layout::Memex && rel == "wiki/_inbox";
+            if !staging {
+                folders.push(FolderMeta {
+                    id: rel.clone(),
+                    name,
+                    parent_id: if prefix.is_empty() { None } else { Some(prefix.to_string()) },
+                });
+            }
             walk(layout, root, &rel, reverse, new_index, folders, notes)?;
         } else if kind.is_file() && name.ends_with(".md") {
             let abs = entry.path();
@@ -1547,6 +1620,9 @@ fn walk(
                 None => raw,
             };
             let fm = fm.unwrap_or_default();
+            // shelf-projection (v3.5): a wiki note appears under its shelf (the
+            // user's folder), not its disk path. Computed BEFORE fm.id is moved.
+            let folder_id = project_folder(layout, prefix, &fm);
             // identity: frontmatter id → previous index (path-stable for
             // frontmatter-less files) → fresh mint. Duplicate ids (a copied
             // file) never collapse two notes into one.
@@ -1564,7 +1640,7 @@ fn walk(
                 id,
                 title: title_of(body),
                 snippet: snippet_of(body),
-                folder_id: prefix.to_string(),
+                folder_id,
                 created_at: fm.created.as_deref().and_then(stamp_to_ms).unwrap_or(file_created),
                 updated_at: fm.updated.as_deref().and_then(stamp_to_ms).unwrap_or(file_updated),
                 pinned: fm.pinned.unwrap_or(false),
@@ -2494,6 +2570,63 @@ mod tests {
         fs::write(root.join("self/identity.md"), "# Me\n").unwrap();
         fs::write(root.join("wiki/note.md"), "# A wiki note\n").unwrap();
         fs::write(root.join("chats/welcome.md"), "# Welcome chat\n").unwrap();
+    }
+
+    #[test]
+    fn shelf_of_parses_the_v35_field() {
+        let fm = |line: &str| Frontmatter { foreign: vec![line.to_string()], ..Default::default() };
+        assert_eq!(shelf_of(&fm("shelf: [Inbox]")), vec!["Inbox"]);
+        assert_eq!(shelf_of(&fm("shelf: [Myela/Payments, Work]")), vec!["Myela/Payments", "Work"]);
+        assert_eq!(shelf_of(&fm("shelf: Inbox")), vec!["Inbox"]); // bare (no brackets)
+        assert_eq!(shelf_of(&fm("shelf: []")), Vec::<String>::new());
+        assert_eq!(shelf_of(&Frontmatter::default()), Vec::<String>::new()); // absent
+    }
+
+    #[test]
+    fn shelf_projection_re_homes_wiki_notes_and_synthesizes_folders() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root); // also writes a shelf-less wiki/note.md
+        // a rotli staging note (v3.5): lives in wiki/_inbox, shelf = Inbox
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        fs::write(
+            root.join("wiki/_inbox/pricing-aa11bb.md"),
+            "---\nid: 01ABC\nowner: rotli\ncreated: 2026-06-25\nupdated: 2026-06-25\nshelf: [Inbox]\nreach: [seth]\n---\n# Pricing\n\nbody\n",
+        )
+        .unwrap();
+        // a note filed to a nested shelf (the LLM's eventual home)
+        fs::write(
+            root.join("wiki/_inbox/q3-cc22dd.md"),
+            "---\nid: 01DEF\nshelf: [Myela/Payments]\nreach: [seth]\n---\n# Q3\n\nbody\n",
+        )
+        .unwrap();
+
+        let mut store = CorpusStore::open(root).unwrap();
+        store.os_trash = false;
+        assert_eq!(store.layout, Layout::Memex);
+        let list = store.list().unwrap();
+
+        let folder_of_note = |id: &str| {
+            list.notes.iter().find(|n| n.title == id).map(|n| n.folder_id.clone()).unwrap()
+        };
+        // staging notes are PROJECTED onto their shelf, not wiki/_inbox
+        assert_eq!(folder_of_note("Pricing"), "Inbox");
+        assert_eq!(folder_of_note("Q3"), "Myela/Payments");
+        // the shelf-less curated note falls back to its disk folder
+        assert_eq!(folder_of_note("A wiki note"), "wiki");
+
+        let has = |id: &str| list.folders.iter().any(|f| f.id == id);
+        // the shelf folders (+ the nested ancestor) were synthesized
+        assert!(has("Inbox"));
+        assert!(has("Myela"), "the nested shelf's ancestor must exist");
+        assert!(has("Myela/Payments"));
+        let parent_of = |id: &str| list.folders.iter().find(|f| f.id == id).unwrap().parent_id.clone();
+        assert_eq!(parent_of("Myela/Payments"), Some("Myela".to_string()));
+        assert_eq!(parent_of("Myela"), None);
+        // the wiki/_inbox staging dir is NOT surfaced as a browsable folder
+        assert!(!has("wiki/_inbox"));
+        // the real wiki folder still exists (curated notes live there)
+        assert!(has("wiki"));
     }
 
     #[test]

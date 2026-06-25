@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Notes show by your folders, not the brain's filing** (memex integration, Phase 2 —
+  shelf-projection, read side) — a note in a connected memex now appears in the sidebar
+  under its `shelf:` (the folder *you* put it in), never its disk path. So a note rotli
+  staged into `wiki/_inbox/` with `shelf: [Inbox]` shows under **Inbox**; one filed to
+  `Myela/Payments` shows there — and you never feel it physically lives in `wiki/`. The
+  `wiki/_inbox/` staging dir is hidden from the tree (it's plumbing); curated notes that
+  don't carry a shelf yet keep showing under their wiki area until one is set. Frontmatter
+  stays hidden (it always was). The default note destination doesn't change yet — that
+  flip lands next.
 - **Write notes into your memex** (memex integration, Phase 1) — Memory now has a
   **＋ Note** button (when the connected memex is writable for rotli). It writes a
   brand-new note into the memex's `wiki/_inbox/` **staging** area following the v3.5
