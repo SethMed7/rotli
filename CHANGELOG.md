@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-25
+
+The memex release — rotli now reads, writes, edits, and creates notes inside a connected
+memex (your `~/smBrain`) per the v3.5 note contract, plus the Vault, Excalidraw boards,
+nested folders, and inline diagrams/math from the increments since 0.2.2.
+
 ### Added
 - **Notes show by your folders, not the brain's filing** (memex integration, Phase 2 —
   shelf-projection, read side) — a note in a connected memex now appears in the sidebar
