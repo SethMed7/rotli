@@ -11,11 +11,14 @@ import {
   composeInboxLine,
   composeMessageLines,
   composeNewChat,
+  composeNote,
   contractInRange,
   ensureChatBacklink,
   isMemexId,
+  noteStem,
   parseAccessMode,
   parseMemexInfo,
+  parsePrimaryUser,
   slugify,
 } from "./contract";
 
@@ -168,13 +171,14 @@ describe("parseMemexInfo + isMemexId", () => {
 });
 
 describe("contractInRange", () => {
-  test("rotli's band is exactly its shipped version by default", () => {
-    expect(contractInRange("3.4")).toBe(true);
-    expect(contractInRange("3.5")).toBe(false);
-    expect(contractInRange("3.3")).toBe(false);
+  test("rotli's default band is [3.4, 3.5] — both the live brain and a bumped card pass", () => {
+    expect(contractInRange("3.4")).toBe(true); // smBrain's memex.json today
+    expect(contractInRange("3.5")).toBe(true); // a card bumped to the engine version
+    expect(contractInRange("3.3")).toBe(false); // older than rotli supports
+    expect(contractInRange("3.6")).toBe(false); // newer than rotli was built for
   });
   test("can widen the band", () => {
-    expect(contractInRange("3.5", "3.4", "3.6")).toBe(true);
+    expect(contractInRange("3.6", "3.4", "3.6")).toBe(true);
   });
 });
 
@@ -183,13 +187,85 @@ describe("canWrite (mirror of the Rust write-guard)", () => {
     expect(canWrite("chats/foo.md", "chats+inbox")).toBe(true);
     expect(canWrite("inbox.md", "chats+inbox")).toBe(true);
   });
-  test("wiki/self/history/MAP are never writable in stage 1", () => {
-    expect(canWrite("wiki/x.md", "chats+inbox")).toBe(false);
+  test("wiki/_inbox staging is writable (v3.5); the rest of wiki + self/history/MAP are not", () => {
+    expect(canWrite("wiki/_inbox/pricing-decision-01jtes.md", "chats+inbox")).toBe(true);
+    expect(canWrite("wiki/_inbox", "chats+inbox")).toBe(true);
+    expect(canWrite("wiki/x.md", "chats+inbox")).toBe(false); // curated wiki — read-only
+    expect(canWrite("wiki/projects/x.md", "chats+inbox")).toBe(false);
     expect(canWrite("self/x.md", "chats+inbox")).toBe(false);
     expect(canWrite("history/2026/x.md", "chats+inbox")).toBe(false);
     expect(canWrite("MAP.md", "chats+inbox")).toBe(false);
   });
+  test("no traversal out of the staging dir", () => {
+    expect(canWrite("wiki/_inbox/../note.md", "chats+inbox")).toBe(false);
+  });
   test("read-only perms forbid everything", () => {
     expect(canWrite("chats/foo.md", "read-only")).toBe(false);
+    expect(canWrite("wiki/_inbox/x.md", "read-only")).toBe(false);
+  });
+});
+
+describe("composeNote (v3.5 note contract — byte-exact)", () => {
+  const ID = "01JTESTAAAAAAAAAAAAAAAAAAAA";
+  test("frontmatter anchors set, AI metadata blank, body appended with a trailing newline", () => {
+    const out = composeNote(
+      { id: ID, title: "Pricing decision", shelf: ["Inbox"], reach: ["seth"] },
+      "# Pricing decision\n\nFree local forever.", // no trailing newline → composeNote adds one
+      DATE,
+    );
+    expect(out).toBe(
+      "---\n" +
+        `id: ${ID}\n` +
+        "owner: rotli\n" +
+        "created: 2026-06-24\n" +
+        "updated: 2026-06-24\n" +
+        "area:\n" +
+        "summary:\n" +
+        "tags: []\n" +
+        "links:\n" +
+        "shelf: [Inbox]\n" +
+        "reach: [seth]\n" +
+        "---\n" +
+        "# Pricing decision\n" +
+        "\n" +
+        "Free local forever.\n",
+    );
+  });
+  test("multi-shelf, empty reach (owner-only), and a set area", () => {
+    const out = composeNote(
+      { id: ID, title: "x", shelf: ["Myela/Payments", "Work"], reach: [], area: "projects/myela" },
+      "# x\n",
+      DATE,
+    );
+    expect(out).toContain("shelf: [Myela/Payments, Work]\n");
+    expect(out).toContain("reach: []\n");
+    expect(out).toContain("area: projects/myela\n");
+  });
+});
+
+describe("noteStem (home() staging filename)", () => {
+  test("slug + the LAST-6-of-id (random tail), lowercased", () => {
+    expect(noteStem("Pricing decision", "01JTESTAAAQRSTV")).toBe("pricing-decision-aqrstv");
+  });
+  test("empty/symbol-only title falls back to 'note' (never a leading dash)", () => {
+    expect(noteStem("", "01JABCDXYZ012")).toBe("note-xyz012");
+    expect(noteStem("!!!", "01JABCDXYZ012")).toBe("note-xyz012");
+  });
+  test("same title, different ids ⇒ distinct stems (no overwrite) even ms apart", () => {
+    // two ULIDs sharing the time prefix but differing in the random tail
+    const a = "01JTESTAAAA" + "AAAAAA";
+    const b = "01JTESTAAAA" + "BBBBBB";
+    expect(noteStem("Pricing decision", a)).not.toBe(noteStem("Pricing decision", b));
+  });
+});
+
+describe("parsePrimaryUser (reach default)", () => {
+  test("returns users.json primary", () => {
+    expect(parsePrimaryUser(JSON.stringify({ primary: "seth", users: [] }))).toBe("seth");
+  });
+  test("single-tenant / unreadable ⇒ null", () => {
+    expect(parsePrimaryUser("{}")).toBeNull();
+    expect(parsePrimaryUser("nope")).toBeNull();
+    expect(parsePrimaryUser(JSON.stringify({ primary: "" }))).toBeNull();
   });
 });

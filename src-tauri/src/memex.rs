@@ -9,11 +9,12 @@
 //! the bytes down atomically + under an advisory lock (Breve's daemon writes the
 //! same tree concurrently).
 //!
-//! OWNERSHIP: rotli writes ONLY `chats/` (+ appends `inbox.md`). `self/`, `history/`,
-//! `wiki/`, `MAP.md` and every control file are NEVER written — `assert_writable`
-//! refuses, regardless of what the frontend sends (the hard guard behind the TS
-//! `canWrite` gate). The active-instance registry lives OUTSIDE any corpus, in the
-//! app config dir, so a connected brain is never littered with rotli wiring.
+//! OWNERSHIP: rotli writes ONLY `chats/`, the `wiki/_inbox/` note staging (v3.5), and
+//! appends `inbox.md`. `self/`, `history/`, `MAP.md`, the CURATED rest of `wiki/`, and
+//! every control file are NEVER written — `assert_writable` refuses, regardless of what
+//! the frontend sends (the hard guard behind the TS `canWrite` gate). The active-instance
+//! registry lives OUTSIDE any corpus, in the app config dir, so a connected brain is
+//! never littered with rotli wiring.
 
 use std::collections::HashSet;
 use std::fs;
@@ -29,8 +30,11 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 /// The memex contract version rotli is built against (mirrors smBrain's
-/// `CONTRACT_VERSION` and `src/memex/contract.ts`).
-const CONTRACT_VERSION: &str = "3.4";
+/// `CONTRACT_VERSION` and `src/memex/contract.ts`). rotli writes the v3.5 note
+/// contract but still WRITES to a v3.4 brain (the chat/inbox shape is unchanged),
+/// so the supported band is `[MIN_CONTRACT, CONTRACT_VERSION]`.
+const CONTRACT_VERSION: &str = "3.5";
+const MIN_CONTRACT: &str = "3.4";
 /// The inbox sentinel new captures are inserted after (matches smBrain's inbox.md).
 const INBOX_MARK: &str = "<!-- entries below this line -->";
 
@@ -99,14 +103,20 @@ fn with_file_lock<T>(target: &Path, f: impl FnOnce() -> Result<T, String>) -> Re
     result
 }
 
-// ─── the write guard (rotli owns chats/ + inbox.md, nothing else) ──────────────
+// ─── the write guard (rotli owns chats/ + inbox.md + wiki/_inbox/, nothing else) ─
 
 fn is_writable(rel: &str) -> bool {
     let p = rel.trim_start_matches('/');
     if p.contains("..") {
         return false;
     }
-    p == "inbox.md" || p == "chats" || p.starts_with("chats/")
+    p == "inbox.md"
+        || p == "chats"
+        || p.starts_with("chats/")
+        // the note staging area (v3.5) — the ONLY writable part of wiki/; the
+        // curated rest (wiki/note.md, wiki/projects/…) stays read-only.
+        || p == "wiki/_inbox"
+        || p.starts_with("wiki/_inbox/")
 }
 
 fn assert_writable(rel: &str) -> Result<(), String> {
@@ -114,7 +124,7 @@ fn assert_writable(rel: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "rotli only writes chats and inbox here — smBrain's memory is read-only (refused: {rel})"
+            "rotli only writes chats, inbox, and wiki/_inbox staging here — the rest of smBrain's memory is read-only (refused: {rel})"
         ))
     }
 }
@@ -211,8 +221,12 @@ fn detect_one(root: &Path) -> DetectedMemex {
     }
 }
 
+/// Whether a brain's contract is within rotli's supported band [MIN_CONTRACT,
+/// CONTRACT_VERSION]. In-band ⇒ rotli may write (chats/inbox/wiki/_inbox); out of
+/// band ⇒ the brain opens read-only (never write a contract rotli wasn't built for).
+/// Mirrors the TS `contractInRange` default band.
 fn contract_ok(contract: Option<&str>) -> bool {
-    contract == Some(CONTRACT_VERSION)
+    matches!(contract, Some(c) if c == MIN_CONTRACT || c == CONTRACT_VERSION)
 }
 
 // ─── the instance registry (machine-level, outside any corpus) ─────────────────
@@ -667,6 +681,25 @@ pub fn memex_write_chat(root: String, slug: String, contents: String) -> Result<
     Ok(path.to_string_lossy().to_string())
 }
 
+/// Write a brand-new note (full v3.5 bytes composed by TS) into the `wiki/_inbox/`
+/// staging area as `<stem>.md`. The stem is `<slug>-<id6>` from the TS `noteStem`;
+/// `safe_slug` re-validates it on the wire (lowercase-alnum-dash, no separators, no
+/// `..`) so the frontend can never escape the staging dir. Atomic + under the lock,
+/// exactly like a chat write. A later phase's local LLM classifies + `git mv`s the
+/// note out to `wiki/<area>/`; rotli only ever writes the staging copy.
+#[tauri::command]
+pub fn memex_write_note(root: String, stem: String, contents: String) -> Result<String, String> {
+    let root = PathBuf::from(root);
+    let safe = safe_slug(&stem)?;
+    let rel = format!("wiki/_inbox/{safe}.md");
+    assert_writable(&rel)?;
+    let dir = root.join("wiki").join("_inbox");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{safe}.md"));
+    with_file_lock(&path, || atomic_write(&path, &contents))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 /// Append a capture line to `inbox.md` (after the sentinel), under the lock.
 #[tauri::command]
 pub fn memex_append_inbox(root: String, line: String) -> Result<(), String> {
@@ -793,16 +826,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn write_guard_allows_only_chats_and_inbox() {
+    fn write_guard_allows_only_chats_inbox_and_wiki_inbox() {
         assert!(is_writable("chats/foo.md"));
         assert!(is_writable("chats"));
         assert!(is_writable("inbox.md"));
+        // wiki/_inbox staging (v3.5) is writable; the curated rest of wiki/ is not.
+        assert!(is_writable("wiki/_inbox"));
+        assert!(is_writable("wiki/_inbox/pricing-decision-01jtes.md"));
+        assert!(!is_writable("wiki/note.md"));
+        assert!(!is_writable("wiki/projects/x.md"));
         assert!(!is_writable("self/identity.md"));
         assert!(!is_writable("history/2026/x.md"));
-        assert!(!is_writable("wiki/note.md"));
         assert!(!is_writable("MAP.md"));
         assert!(!is_writable("memex.json"));
         assert!(!is_writable("chats/../self/x.md"));
+        assert!(!is_writable("wiki/_inbox/../note.md"));
+    }
+
+    #[test]
+    fn contract_ok_accepts_the_band_only() {
+        assert!(contract_ok(Some("3.4"))); // smBrain's memex.json today
+        assert!(contract_ok(Some("3.5"))); // a bumped card / a rotli-init'd brain
+        assert!(!contract_ok(Some("3.3")));
+        assert!(!contract_ok(Some("3.6")));
+        assert!(!contract_ok(None));
+    }
+
+    #[test]
+    fn write_note_lands_in_wiki_inbox_and_refuses_bad_stems() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_string_lossy().to_string();
+        let stem = "pricing-decision-01jtes";
+        let body = "---\nid: 01JTEST\n---\n# Pricing decision\n";
+        let path = memex_write_note(root.clone(), stem.into(), body.into()).unwrap();
+        assert!(path.ends_with("wiki/_inbox/pricing-decision-01jtes.md"));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), body);
+        // a stem with a path separator / traversal / caps is rejected by safe_slug
+        assert!(memex_write_note(root.clone(), "../escape".into(), "x".into()).is_err());
+        assert!(memex_write_note(root.clone(), "a/b".into(), "x".into()).is_err());
+        assert!(memex_write_note(root, "Caps".into(), "x".into()).is_err());
     }
 
     #[test]

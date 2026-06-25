@@ -85,6 +85,17 @@ export function useWriteChat() {
   });
 }
 
+export function useWriteNote() {
+  return useMutation({
+    mutationFn: (input: { instance: MemexInstance; body: string; shelf?: string[]; reach?: string[] }) =>
+      svc.writeNote(input),
+    onSuccess: (_res, vars) => {
+      // refresh the read-only spine browser so the new staging note shows up.
+      queryClient.invalidateQueries({ queryKey: ["memex", "dir", vars.instance.id] });
+    },
+  });
+}
+
 export function useRunValidate() {
   return useMutation({
     mutationFn: (instance: MemexInstance) => svc.runValidate(instance),

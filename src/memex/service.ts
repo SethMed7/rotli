@@ -24,21 +24,29 @@ import {
   memexSetPerms,
   memexValidate,
   memexWriteChat,
+  memexWriteNote,
 } from "../lib/tauri";
 import {
   type ChatMsg,
+  type NoteMeta,
   ROTLI_SOURCE,
+  SPINE,
   appendMessages,
   canWrite,
   chatSlug,
   composeInboxLine,
   composeNewChat,
+  composeNote,
   contractInRange,
+  noteStem,
   parseAccessMode,
   parseMemexInfo,
+  parsePrimaryUser,
   today,
+  ulid,
 } from "./contract";
 import { type MemexConfig, type MemexInstance, type Perms, fromRegistry } from "./config";
+import { titleOf } from "../services/derive";
 
 export type { DetectedMemex } from "../lib/tauri";
 
@@ -140,6 +148,48 @@ export async function captureToInbox(
     throw new Error("This memex is read-only for rotli.");
   }
   await memexAppendInbox(instance.root, composeInboxLine(text, tag));
+}
+
+// ── notes (rotli's owned wiki/_inbox staging — the v3.5 write model) ───────────
+
+export interface WriteNoteInput {
+  instance: MemexInstance;
+  /** The note body (markdown; its first heading is the title). */
+  body: string;
+  /** The user's folder(s) for the projected view; default ["Inbox"]. */
+  shelf?: string[];
+  /** Who may access it; default: the brain's primary user (owner-only). */
+  reach?: string[];
+}
+
+/** Write a brand-new note into the active memex's `wiki/_inbox/` staging per the v3.5
+ *  contract. AI metadata (area/summary/tags/links) is left blank — a later phase's
+ *  local LLM classifies + files it to `wiki/<area>/`. The `id` is set once and never
+ *  changes. Returns the new note's id, staging stem, and absolute path. */
+export async function writeNote(
+  input: WriteNoteInput,
+): Promise<{ id: string; stem: string; path: string }> {
+  const { instance } = input;
+  const id = ulid();
+  const title = titleOf(input.body);
+  const stem = noteStem(title, id);
+  const rel = `${SPINE.wikiInbox}/${stem}.md`;
+  // TS gate first (the Rust assert_writable is the second layer).
+  if (!canWrite(rel, instance.perms)) {
+    throw new Error("This memex is read-only for rotli — connect it with write access first.");
+  }
+  // reach default = the owning user (the brain's primary). Single-tenant / unreadable
+  // ⇒ owner-only ([]); never invent a user. (Phase 3 adds the active-user picker.)
+  let reach = input.reach;
+  if (!reach) {
+    const { usersJson } = await memexReadContract(instance.root);
+    const primary = parsePrimaryUser(usersJson);
+    reach = primary ? [primary] : [];
+  }
+  const meta: NoteMeta = { id, title, shelf: input.shelf ?? ["Inbox"], reach };
+  const contents = composeNote(meta, input.body, today());
+  const path = await memexWriteNote(instance.root, stem, contents);
+  return { id, stem, path };
 }
 
 // ── read-only spine (Memory) ──────────────────────────────────────────────────

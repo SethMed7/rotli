@@ -460,6 +460,11 @@ export function memexConnect(path: string, label: string): Promise<MemexInstance
 export function memexWriteChat(root: string, slug: string, contents: string): Promise<string> {
   return memexInvoke("memex_write_chat", { root, slug, contents });
 }
+/** Write a v3.5 note (full bytes composed by the contract codec) into wiki/_inbox/
+ *  staging as `<stem>.md`. Returns the absolute path. */
+export function memexWriteNote(root: string, stem: string, contents: string): Promise<string> {
+  return memexInvoke("memex_write_note", { root, stem, contents });
+}
 export function memexAppendInbox(root: string, line: string): Promise<void> {
   return memexInvoke("memex_append_inbox", { root, line });
 }

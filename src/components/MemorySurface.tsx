@@ -8,9 +8,9 @@
 // the module switcher; closes back to Notes via the memoryOpen surface flag.
 
 import { useEffect, useState } from "react";
-import { activeInstance } from "../memex/config";
+import { activeInstance, isWritable } from "../memex/config";
 import { readSpine } from "../memex/service";
-import { useMemexConfig, useSpineDir } from "../memex/useMemex";
+import { useMemexConfig, useSpineDir, useWriteNote } from "../memex/useMemex";
 import { isTauri } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
 
@@ -35,6 +35,14 @@ export function MemorySurface() {
   const [dir, setDir] = useState("");
   const [file, setFile] = useState<string | null>(null);
   const [body, setBody] = useState("");
+
+  // Phase 1 "Stage it": an explicit composer that writes a new note into the
+  // active memex's wiki/_inbox/ staging per the v3.5 contract. Only when the brain
+  // is writable for rotli; the rest of Memory stays strictly read-only.
+  const [composing, setComposing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const writeNote = useWriteNote();
+  const canCompose = !!active && isWritable(active);
 
   const listing = useSpineDir(active, dir);
   // at the root we show the curated spine; inside a folder we show what's there
@@ -72,6 +80,25 @@ export function MemorySurface() {
     setFile(null);
   };
 
+  const startCompose = () => {
+    setFile(null);
+    setComposing(true);
+  };
+  const saveNote = () => {
+    if (!active || !draft.trim() || writeNote.isPending) return;
+    writeNote.mutate(
+      { instance: active, body: draft },
+      {
+        onSuccess: ({ stem }) => {
+          setComposing(false);
+          setDraft("");
+          setDir("wiki/_inbox"); // jump to staging so the new note is visible…
+          setFile(`wiki/_inbox/${stem}.md`); // …and read the note that just landed
+        },
+      },
+    );
+  };
+
   return (
     <div className="chat-surface">
       <header className="chat-head">
@@ -83,6 +110,11 @@ export function MemorySurface() {
         </button>
         <h2>Memory</h2>
         {active && <span className="chat-inst">· {active.label}</span>}
+        {canCompose && !composing && (
+          <button type="button" className="mem-newnote" onClick={startCompose} title="Write a note into this memex (wiki/_inbox staging)">
+            ＋ Note
+          </button>
+        )}
       </header>
 
       {!isTauri() ? (
@@ -151,7 +183,53 @@ export function MemorySurface() {
 
           <main className="chat-main">
             <div className="chat-scroll">
-              {file ? (
+              {composing ? (
+                <div className="mem-compose">
+                  <p className="mem-compose-hint">
+                    New note → <b>{active.label}</b> <code>wiki/_inbox</code>. The first line is the
+                    title; rotli files it for you later.
+                  </p>
+                  <textarea
+                    className="mem-compose-area"
+                    autoFocus
+                    placeholder={"# A title\n\nThen your note…"}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        saveNote();
+                      } else if (e.key === "Escape") {
+                        setComposing(false);
+                        setDraft("");
+                      }
+                    }}
+                  />
+                  {writeNote.isError && (
+                    <p className="mem-compose-err">{String((writeNote.error as Error)?.message ?? writeNote.error)}</p>
+                  )}
+                  <div className="mem-compose-actions">
+                    <button
+                      type="button"
+                      className="mem-compose-cancel"
+                      onClick={() => {
+                        setComposing(false);
+                        setDraft("");
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="mem-compose-save"
+                      disabled={!draft.trim() || writeNote.isPending}
+                      onClick={saveNote}
+                    >
+                      {writeNote.isPending ? "Saving…" : "Save to memex"}
+                    </button>
+                  </div>
+                </div>
+              ) : file ? (
                 <pre className="chat-pre">{body}</pre>
               ) : (
                 <div className="chat-newhint">
@@ -165,7 +243,11 @@ export function MemorySurface() {
                 </div>
               )}
             </div>
-            <div className="chat-readonly">Read-only — rotli never edits your memory here.</div>
+            <div className="chat-readonly">
+              {canCompose
+                ? "Read-only browsing — only ＋ Note writes, into wiki/_inbox staging."
+                : "Read-only — rotli never edits your memory here."}
+            </div>
           </main>
         </div>
       )}

@@ -19,7 +19,13 @@
 // CONTRACT_VERSION or changes the chat/inbox shape. All functions here are PURE
 // (no I/O, no React) so they unit-test in a plain browser.
 
-export const CONTRACT_VERSION = "3.4";
+// rotli is built against the v3.5 note contract (it writes the per-note frontmatter
+// + the wiki/_inbox staging path). It still WRITES to a v3.4 brain (the chat/inbox
+// shape didn't change; a 3.4 brain just warns on the new note fields, never errors),
+// so the supported band is [MIN_CONTRACT, CONTRACT_VERSION] — a brain whose memex.json
+// still reads "3.4" stays writable. Out of the band ⇒ the brain opens read-only.
+export const CONTRACT_VERSION = "3.5";
+export const MIN_CONTRACT = "3.4";
 
 /** Sources allowed on the chats surface (conversations.ts SURFACES.chats.sources).
  *  rotli always writes as "rotli". */
@@ -76,7 +82,7 @@ const verNum = (v: string): number =>
  *  contract it wasn't built for). Defaults to the exact version rotli ships. */
 export function contractInRange(
   contract: string,
-  min: string = CONTRACT_VERSION,
+  min: string = MIN_CONTRACT,
   max: string = CONTRACT_VERSION,
 ): boolean {
   const v = verNum(contract);
@@ -191,10 +197,100 @@ export function composeInboxLine(text: string, tag?: string): string {
   return `- ${tag ? tag + ": " : ""}${text}\n`;
 }
 
+// ── the note surface (v3.5 note contract — wiki/_inbox staging) ───────────────
+// A rotli note is a plain-markdown body the user owns, wrapped in the v3.5 frontmatter
+// the memex defines (STRUCTURE.md §v3.5). rotli writes it INSTANTLY to wiki/_inbox/
+// staging — the AI metadata (area/summary/tags/links) is left blank until a local LLM
+// classifies + files the note to wiki/<area>/ in a LATER phase. The stable anchors
+// (id/owner/created/updated) and the user metadata (shelf/reach) are set now so links,
+// the user's view, and the access catalog survive any (re)filing. The `id` NEVER
+// changes. No `title:` field — the title lives in the body's first heading (titleOf),
+// exactly like a curated wiki note.
+
+/** Ulid-style id (Crockford base32: time-sortable prefix + random tail). Mirrors
+ *  services/notes.ts `ulid` — kept local so the memex codec stays self-contained
+ *  (the boundary law: this file never imports the rest of the app). */
+const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+export function ulid(now: number = Date.now()): string {
+  let time = "";
+  let t = now;
+  for (let i = 0; i < 10; i++) {
+    time = (B32[t % 32] ?? "0") + time;
+    t = Math.floor(t / 32);
+  }
+  let rand = "";
+  for (let i = 0; i < 16; i++) rand += B32[Math.floor(Math.random() * 32)] ?? "0";
+  return time + rand;
+}
+
+export interface NoteMeta {
+  /** ULID — set once, NEVER changes (filing/moving keeps it). */
+  id: string;
+  /** Title for the slug only (the body carries its own heading). */
+  title: string;
+  /** The user's folder(s) — drives the projected view, never the disk path. */
+  shelf: string[];
+  /** Who may access this note (default: the owning user). */
+  reach: string[];
+  /** Classification area — BLANK in Phase 1 (a later LLM phase fills + files it). */
+  area?: string;
+  /** Provenance; rotli always writes "rotli". */
+  owner?: string;
+}
+
+/** `<slug>-<id6>` — the staging filename stem (home() = wiki/_inbox/<stem>.md).
+ *  id6 = the LAST 6 of the ULID (its RANDOM tail), lowercased so it survives the
+ *  Rust safe_slug (lowercase-alnum-dash). The random tail — NOT the time prefix
+ *  (first 10 chars, which two notes minutes apart share) — is what disambiguates,
+ *  so the same title written twice never collides and overwrites. Empty title ⇒
+ *  "note" so the stem never starts with "-". */
+export function noteStem(title: string, id: string): string {
+  const base = slugify(title) || "note";
+  return `${base}-${id.slice(-6).toLowerCase()}`;
+}
+
+/** Compose the full bytes of a brand-NEW staging note: the v3.5 frontmatter + the
+ *  user's body (the body already includes its own `# Title`). AI metadata is blank. */
+export function composeNote(meta: NoteMeta, body: string, date: string): string {
+  // `key:` (no trailing space) for an empty value, `key: value` otherwise.
+  const line = (k: string, v: string) => (v ? `${k}: ${v}` : `${k}:`);
+  const head = [
+    "---",
+    line("id", meta.id),
+    line("owner", meta.owner ?? ROTLI_SOURCE),
+    line("created", date),
+    line("updated", date),
+    line("area", meta.area ?? ""), // blank until the LLM organizer runs
+    "summary:", //  ”
+    "tags: []", //  ”
+    "links:", //  ”
+    line("shelf", `[${meta.shelf.join(", ")}]`),
+    line("reach", `[${meta.reach.join(", ")}]`),
+    "---",
+    "",
+  ].join("\n");
+  const out = head + body.replace(/^\n+/, "");
+  return out.endsWith("\n") ? out : out + "\n";
+}
+
+/** The primary partition from a brain's users.json (mounts.ts `primary`), used as
+ *  the default `reach` ("the owning user"). null when single-tenant / unreadable —
+ *  the caller then writes `reach: []` (owner-only by the contract's default). */
+export function parsePrimaryUser(usersJson: string): string | null {
+  try {
+    const r = JSON.parse(usersJson);
+    return typeof r?.primary === "string" && r.primary ? r.primary : null;
+  } catch {
+    return null;
+  }
+}
+
 // ── the spine + the write-permission gate (mirror of the Rust write-guard) ───
 export const SPINE = {
   self: "self",
   wiki: "wiki",
+  /** The note staging area (v3.5) — the ONLY part of wiki/ rotli writes. */
+  wikiInbox: "wiki/_inbox",
   history: "history",
   chats: "chats",
   inbox: "inbox.md",
@@ -204,12 +300,15 @@ export const SPINE = {
 } as const;
 
 /** Whether rotli may WRITE this spine-relative path under the given perms. The
- *  belt to the Rust path-guard's braces: self/history/MAP are NEVER writable;
- *  wiki is read-only in Stage 1; only chats/** and inbox.md are writable. */
+ *  belt to the Rust path-guard's braces: self/history/MAP are NEVER writable; the
+ *  REST of wiki/ (curated notes) is read-only — only its wiki/_inbox/ staging is
+ *  writable (v3.5), alongside chats/** and inbox.md. */
 export function canWrite(relPath: string, perms: Perms): boolean {
   if (perms === "read-only") return false;
   const p = relPath.replace(/^\/+/, "");
+  if (p.includes("..")) return false;
   if (p === SPINE.inbox) return true;
   if (p === SPINE.chats || p.startsWith(`${SPINE.chats}/`)) return true;
+  if (p === SPINE.wikiInbox || p.startsWith(`${SPINE.wikiInbox}/`)) return true;
   return false;
 }

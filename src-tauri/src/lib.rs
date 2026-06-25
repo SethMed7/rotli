@@ -600,6 +600,7 @@ pub fn run() {
             memex::memex_init,
             memex::memex_connect,
             memex::memex_write_chat,
+            memex::memex_write_note,
             memex::memex_append_inbox,
             memex::memex_validate,
             memex::memex_list_instances,
