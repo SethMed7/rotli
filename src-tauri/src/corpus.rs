@@ -366,9 +366,32 @@ fn now_ms() -> i64 {
 }
 
 fn stamp_to_ms(stamp: &str) -> Option<i64> {
-    OffsetDateTime::parse(stamp, &Rfc3339)
-        .ok()
-        .map(|t| (t.unix_timestamp_nanos() / 1_000_000) as i64)
+    // rotli's local notes stamp RFC3339; a memex note (v3.5) stamps a plain
+    // YYYY-MM-DD date — parse both so a projected note's frontmatter dates are
+    // honored (sort order + created/updated) instead of silently falling back to
+    // the file mtime, which a git clone/copy would have reset.
+    if let Ok(t) = OffsetDateTime::parse(stamp, &Rfc3339) {
+        return Some((t.unix_timestamp_nanos() / 1_000_000) as i64);
+    }
+    let s = stamp.trim();
+    if s.len() == 10 && s.as_bytes()[4] == b'-' && s.as_bytes()[7] == b'-' {
+        let y: i32 = s[0..4].parse().ok()?;
+        let mo: u8 = s[5..7].parse().ok()?;
+        let d: u8 = s[8..10].parse().ok()?;
+        let month = time::Month::try_from(mo).ok()?;
+        let date = time::Date::from_calendar_date(y, month, d).ok()?;
+        let dt = date.with_hms(0, 0, 0).ok()?.assume_utc();
+        return Some((dt.unix_timestamp_nanos() / 1_000_000) as i64);
+    }
+    None
+}
+
+/// A plain YYYY-MM-DD date stamp (UTC) — the memex note convention (v3.5). Local
+/// notes keep the RFC3339 `now_stamp`; a memex edit bumps `updated` with this so the
+/// note stays date-shaped like everything smBrain writes.
+fn today_stamp() -> String {
+    let now = OffsetDateTime::now_utc().date();
+    format!("{:04}-{:02}-{:02}", now.year(), u8::from(now.month()), now.day())
 }
 
 /// (created_ms, updated_ms) from file metadata — the fallback for notes that
@@ -833,7 +856,12 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
     if rel == "chats" || rel.starts_with("chats/") {
         return Surface::NoteRW;
     }
-    // wiki/ — browsable folders, read-only this increment
+    // wiki/_inbox — rotli's note STAGING (v3.5): writable, so a projected note can
+    // be edited in place. Must precede the wiki/ rule below (which is read-only).
+    if rel == "wiki/_inbox" || rel.starts_with("wiki/_inbox/") {
+        return Surface::NoteRW;
+    }
+    // wiki/ — browsable folders; the curated rest is read-only (only _inbox writes)
     if rel == "wiki" || rel.starts_with("wiki/") {
         return Surface::NoteRO;
     }
@@ -1089,7 +1117,9 @@ impl CorpusStore {
             .created
             .filter(|s| stamp_to_ms(s).is_some())
             .unwrap_or_else(|| ms_to_stamp(file_created));
-        let updated = now_stamp();
+        // a memex note stays date-shaped (v3.5: updated: YYYY-MM-DD); local notes
+        // keep rotli's RFC3339 stamp.
+        let updated = if self.layout == Layout::Memex { today_stamp() } else { now_stamp() };
 
         let fm = Frontmatter {
             id: Some(id.to_string()),
@@ -1103,7 +1133,11 @@ impl CorpusStore {
         let text = compose_document(&fm, &format!("\n{body}"));
 
         let title = title_of(body);
-        let folder = folder_of(&rel);
+        // disk_folder routes the file (rename/free_filename/origin); the wire
+        // folder_id is the shelf-PROJECTED view, so the optimistic UI update after a
+        // save lands the note under its shelf, not wiki/_inbox.
+        let disk_folder = folder_of(&rel);
+        let folder = project_folder(self.layout, &disk_folder, &fm);
         let current_name = Path::new(&rel)
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
@@ -1112,7 +1146,7 @@ impl CorpusStore {
         let target_rel = if current_name == desired {
             rel.clone()
         } else {
-            self.free_filename(&folder, &desired, Some(&rel))
+            self.free_filename(&disk_folder, &desired, Some(&rel))
         };
         let target_abs = self.abs(&target_rel);
 
@@ -1129,11 +1163,11 @@ impl CorpusStore {
             id: id.to_string(),
             title,
             snippet: snippet_of(body),
-            folder_id: folder.clone(),
+            folder_id: folder,
             created_at: stamp_to_ms(&created).unwrap_or_else(now_ms),
             updated_at: stamp_to_ms(&updated).unwrap_or_else(now_ms),
             pinned,
-            origin: if is_hidden_root(&folder) { fm.origin } else { None },
+            origin: if is_hidden_root(&disk_folder) { fm.origin } else { None },
             kind: NoteKind::Note,
         })
     }
@@ -2570,6 +2604,67 @@ mod tests {
         fs::write(root.join("self/identity.md"), "# Me\n").unwrap();
         fs::write(root.join("wiki/note.md"), "# A wiki note\n").unwrap();
         fs::write(root.join("chats/welcome.md"), "# Welcome chat\n").unwrap();
+    }
+
+    #[test]
+    fn stamp_to_ms_parses_both_rfc3339_and_date() {
+        assert!(stamp_to_ms("2026-06-25T12:00:00Z").is_some());
+        // a bare v3.5 date parses to that day at 00:00 UTC
+        let a = stamp_to_ms("2026-06-25").unwrap();
+        let b = stamp_to_ms("2026-06-25T00:00:00Z").unwrap();
+        assert_eq!(a, b);
+        assert!(stamp_to_ms("not-a-date").is_none());
+        assert!(stamp_to_ms("2026/06/25").is_none()); // wrong separators
+    }
+
+    #[test]
+    fn editing_a_memex_note_preserves_the_v35_frontmatter_and_bumps_updated() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        let rel = "wiki/_inbox/pricing-aa11bb.md";
+        fs::write(
+            root.join(rel),
+            "---\nid: 01ABC\nowner: rotli\ncreated: 2026-06-20\nupdated: 2026-06-20\narea:\nsummary:\ntags: []\nlinks:\nshelf: [Inbox]\nreach: [seth]\n---\n# Pricing\n\noriginal body\n",
+        )
+        .unwrap();
+
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+        // the note is reachable by its frontmatter id (indexed via list)
+        let _ = store.list().unwrap();
+        let meta = store.write("01ABC", "# Pricing\n\nedited body", false).unwrap();
+        // the wire still projects it onto its shelf, not wiki/_inbox
+        assert_eq!(meta.folder_id, "Inbox");
+
+        // the corpus tracks the title in the filename via filename_for = slug-<id6>,
+        // the SAME scheme as the v3.5 noteStem — so the file stays in wiki/_inbox with
+        // a slug-id6 name (here the id "01ABC" is short, last-6 ⇒ "01abc"). The old
+        // name is gone (a rename, never a copy).
+        let inbox = root.join("wiki/_inbox");
+        let files: Vec<String> = fs::read_dir(&inbox)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".md"))
+            .collect();
+        assert_eq!(files, vec!["pricing-01abc.md"], "expected one slug-id6 file, got {files:?}");
+        let on_disk = fs::read_to_string(inbox.join("pricing-01abc.md")).unwrap();
+        let _ = rel; // the original path is gone after the title-tracking rename
+        // the v3.5 user + AI metadata rode through untouched (foreign preservation)
+        assert!(on_disk.contains("owner: rotli"), "owner lost:\n{on_disk}");
+        assert!(on_disk.contains("shelf: [Inbox]"), "shelf lost:\n{on_disk}");
+        assert!(on_disk.contains("reach: [seth]"), "reach lost:\n{on_disk}");
+        assert!(on_disk.contains("summary:"), "summary lost:\n{on_disk}");
+        // created preserved as the original DATE; updated bumped to a DATE (not RFC3339)
+        assert!(on_disk.contains("created: 2026-06-20"), "created changed:\n{on_disk}");
+        assert!(!on_disk.contains("updated: 2026-06-20"), "updated not bumped:\n{on_disk}");
+        let updated_line = on_disk.lines().find(|l| l.starts_with("updated:")).unwrap();
+        assert!(!updated_line.contains('T'), "updated should be a date, not RFC3339: {updated_line}");
+        // the body changed
+        assert!(on_disk.contains("edited body"));
+        assert!(!on_disk.contains("original body"));
     }
 
     #[test]
