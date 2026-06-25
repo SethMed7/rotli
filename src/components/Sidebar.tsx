@@ -1,9 +1,10 @@
 // The unified compact-tree sidebar (Seth, 2026-06-13): ONE scrollable column
 // that REPLACES the old FoldersRail + NoteList two-rail era. Smart rows (All
-// notes · Recent) sit on top; the five reserved destinations (Inbox · Brain ·
+// notes · Recent) sit on top; the five reserved destinations (Inbox · Vault ·
 // Storage · Archive · Trash) follow, each EXPANDABLE inline to reveal its notes
-// as compact rows. User folders nest under Brain/Storage (path-style ids like
-// "Brain/Work"), each independently expandable and indented by depth.
+// as compact rows. User folders nest under Storage (path-style ids like
+// "Storage/Work"); Vault is the EXTERNAL memex root ("vault:wiki" etc., Track 2),
+// browsed read-only. Each row is independently expandable and indented by depth.
 //
 // Selection grammar is unchanged: clicking a destination row both toggles its
 // expansion AND selects it (the ⌘N target via selectedFolderId); a note row is
@@ -33,7 +34,13 @@ import {
 } from "../services/hooks";
 import { notesService } from "../services/notes";
 import { corpusCreateBoard } from "../lib/tauri";
-import { DEST, type Destination, isHidden } from "../services/destinations";
+import {
+  DEST,
+  type Destination,
+  isHidden,
+  isRootMarker,
+  isVault,
+} from "../services/destinations";
 import { useFocusedBoardId, useFocusedNoteId, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import type { Folder, NoteSummary } from "../types";
@@ -42,7 +49,6 @@ import { useTransientPopover } from "../lib/popover";
 import {
   ArchiveGlyph,
   BoardGlyph as CanvasItemGlyph,
-  BrainGlyph,
   ChevronRight,
   ClockGlyph,
   FileGlyph,
@@ -52,6 +58,7 @@ import {
   SearchGlyph,
   StorageGlyph,
   TrashGlyph,
+  VaultGlyph,
 } from "./glyphs";
 import { type RovingRow, useRovingList } from "./sidebar/useRovingList";
 import { RowMenu } from "./sidebar/RowMenu";
@@ -145,7 +152,7 @@ function dayLabel(ts: number): string {
 /** The five reserved destinations, in sidebar order, each with its glyph. */
 const DEST_ROWS: { id: Destination; label: string; Glyph: typeof InboxGlyph }[] = [
   { id: DEST.inbox, label: "Inbox", Glyph: InboxGlyph },
-  { id: DEST.brain, label: "Brain", Glyph: BrainGlyph },
+  { id: DEST.vault, label: "Vault", Glyph: VaultGlyph },
   { id: DEST.storage, label: "Storage", Glyph: StorageGlyph },
   { id: DEST.archive, label: "Archive", Glyph: ArchiveGlyph },
   { id: DEST.trash, label: "Trash", Glyph: TrashGlyph },
@@ -292,7 +299,7 @@ export function Sidebar() {
   // the five reserved queries — all served from the one cached corpus_list, so
   // five hooks here are five cache reads, not five fetches
   const inboxNotes = useNotes(DEST.inbox).data ?? [];
-  const brainNotes = useNotes(DEST.brain).data ?? [];
+  const vaultNotes = useNotes(DEST.vault).data ?? [];
   const storageNotes = useNotes(DEST.storage).data ?? [];
   const archiveNotes = useNotes(DEST.archive).data ?? [];
   const trashNotes = useNotes(DEST.trash).data ?? [];
@@ -305,7 +312,7 @@ export function Sidebar() {
   for (const n of [
     ...allNotes,
     ...inboxNotes,
-    ...brainNotes,
+    ...vaultNotes,
     ...storageNotes,
     ...archiveNotes,
     ...trashNotes,
@@ -417,7 +424,7 @@ export function Sidebar() {
   // nested user folders; the nested rows slice their own out of this list)
   const notesByDest: Record<string, NoteSummary[]> = {
     [DEST.inbox]: inboxNotes,
-    [DEST.brain]: brainNotes,
+    [DEST.vault]: vaultNotes,
     [DEST.storage]: storageNotes,
     [DEST.archive]: archiveNotes,
     [DEST.trash]: trashNotes,
@@ -425,7 +432,22 @@ export function Sidebar() {
 
   // count for a user folder = own notes + every descendant folder's notes,
   // sliced from the destination subtree it belongs to (mirrors FoldersRail)
-  const childrenOf = (parentId: string) => folders.filter((f) => f.parentId === parentId);
+  // A folder's children are those whose parentId points at it. The external
+  // Vault ROOT MARKER ("vault:") is special: its top-level surfaced folders
+  // (vault:wiki, vault:chats) carry parentId === null (Rust aggregates them with
+  // no parent), so the marker adopts every folder prefixed with it that has no
+  // parent and no nested slash in its rel path.
+  const childrenOf = (parentId: string) => {
+    if (isRootMarker(parentId)) {
+      return folders.filter(
+        (f) =>
+          f.parentId == null &&
+          f.id.startsWith(parentId) &&
+          !f.id.slice(parentId.length).includes("/"),
+      );
+    }
+    return folders.filter((f) => f.parentId === parentId);
+  };
   const countFor = (folder: Folder, destNotes: NoteSummary[]): number => {
     const own = destNotes.filter((n) => n.folderId === folder.id).length;
     return own + childrenOf(folder.id).reduce((sum, c) => sum + countFor(c, destNotes), 0);
@@ -451,7 +473,7 @@ export function Sidebar() {
   for (const n of [
     ...allNotes,
     ...inboxNotes,
-    ...brainNotes,
+    ...vaultNotes,
     ...storageNotes,
     ...archiveNotes,
     ...trashNotes,
@@ -525,7 +547,7 @@ export function Sidebar() {
               setSelectedFolderId(folder.id);
               setContentView("panes");
             }}
-            {...dropProps(folder.id)}
+            {...(!isVault(folder.id) ? dropProps(folder.id) : {})}
             {...rp({ id: folder.id, kind: "folder" })}
           >
             <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
@@ -533,13 +555,13 @@ export function Sidebar() {
             </span>
             <FolderGlyph size={14} />
             <span className="fname">{folder.name}</span>
-            {sectionAddBtn(folder.id)}
+            {!isVault(folder.id) && sectionAddBtn(folder.id)}
             <span className="count">{countFor(folder, destNotes)}</span>
           </button>
           {open && (
             <>
               {compactRows(destNotes, folder.id, rp, depth + 2)}
-              {newFolderRow(folder.id, 28 + (depth + 2) * 16)}
+              {!isVault(folder.id) && newFolderRow(folder.id, 28 + (depth + 2) * 16)}
               {renderFolderTree(folder.id, destNotes, depth + 1, rp)}
             </>
           )}
@@ -650,13 +672,15 @@ export function Sidebar() {
   };
 
   // the create target: the selected folder, falling back to Inbox when a smart
-  // row (All notes / Recent) OR a hidden root (Archive / Trash / Board) is
-  // selected — so freshly created content never starts life inside a sink or
-  // the capture board (mirrors newNote() in actions, plus the lifecycle guard).
+  // row (All notes / Recent), a hidden root (Archive / Trash / Board), OR the
+  // external read-mostly Vault is selected — so freshly created content never
+  // starts life inside a sink, the capture board, or the Vault (mirrors
+  // newNote() in actions, plus the lifecycle + read-only-vault guards).
   const resolvedParent = (): string =>
     selectedFolderId === ALL_NOTES ||
     selectedFolderId === RECENT ||
-    isHidden(selectedFolderId)
+    isHidden(selectedFolderId) ||
+    isVault(selectedFolderId)
       ? DEST.inbox
       : selectedFolderId;
 
@@ -924,7 +948,7 @@ export function Sidebar() {
                   setSelectedFolderId(id);
                   setContentView("panes");
                 }}
-                {...dropProps(id)}
+                {...(!isVault(id) ? dropProps(id) : {})}
                 {...rowProps({ id, kind: "folder" })}
               >
                 <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
@@ -932,13 +956,14 @@ export function Sidebar() {
                 </span>
                 <Glyph size={14.5} />
                 <span className="fname">{label}</span>
-                {!isHidden(id) && sectionAddBtn(id)}
+                {/* the external Vault is read-mostly — no "+ new note/folder" */}
+                {!isHidden(id) && !isVault(id) && sectionAddBtn(id)}
                 <span className="count">{destNotes.length}</span>
               </button>
               {open && (
                 <>
                   {compactRows(destNotes, id, rowProps, 1)}
-                  {newFolderRow(id, 44)}
+                  {!isVault(id) && newFolderRow(id, 44)}
                   {renderFolderTree(id, destNotes, 0, rowProps)}
                 </>
               )}

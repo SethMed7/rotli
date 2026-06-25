@@ -12,8 +12,9 @@ import { EditorSurface } from "../editor/EditorSurface";
 import { useTransientPopover } from "../lib/popover";
 import { setQuickHandle } from "../lib/quickHandle";
 import { onQuickShow, startWindowDrag } from "../lib/tauri";
+import { isVault } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
-import { notesService } from "../services/notes";
+import { inboxFolderId, notesService } from "../services/notes";
 import { usePanesStore } from "../state/panes";
 import { pruneQuick, setQuickActive, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
@@ -206,7 +207,11 @@ export function QuickNote() {
   }, [notesQuery.isSuccess, notes, ids, activeId]);
 
   const newNote = () => {
-    const folder = useUiStore.getState().quickFolder;
+    // Quick notes default to the LOCAL Inbox. The external Vault is read-mostly —
+    // rotli never creates a note inside it (never into a memex's chats/), so a
+    // stored quickFolder that points at the Vault redirects to the local Inbox.
+    const stored = useUiStore.getState().quickFolder;
+    const folder = isVault(stored) ? inboxFolderId : stored;
     creatingRef.current = true;
     void notesService
       .createNote(folder, "")

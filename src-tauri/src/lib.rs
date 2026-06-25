@@ -396,6 +396,55 @@ fn corpus_use_legacy(app: AppHandle) -> Result<(), String> {
     app.restart();
 }
 
+/// Settings → Storage → "Connect a folder…": REGISTER a picked directory as a
+/// root's abs_path in `corpus-roots.json` (Track 2). This is a REGISTER, never a
+/// move/relocate — the directory's contents are never touched. For the reserved
+/// "vault" dest the dir MUST be a valid memex (we never bind the vault to a
+/// non-memex automatically OR via the picker); other dests accept any dir.
+/// Relaunches so the new root opens (mirrors corpus_relocate/corpus_use_memex).
+/// Returns false when the picker is cancelled.
+#[tauri::command]
+fn corpus_set_root(app: AppHandle, dest_id: String, path: Option<String>) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    // only the Vault is a connectable external root this iteration — refuse any
+    // other dest_id so a future/stray caller can't register an arbitrary writable
+    // root that bypasses the memex gate (the picker only ever passes "vault").
+    if dest_id != corpus::VAULT_ROOT_ID {
+        return Err(format!("not a connectable destination: {dest_id}"));
+    }
+    // resolve the absolute dir: an explicit path (tests / programmatic) or the
+    // native folder picker (the user's frontend control).
+    let abs = match path {
+        Some(p) => std::path::PathBuf::from(p),
+        None => {
+            let Some(picked) = app
+                .dialog()
+                .file()
+                .set_title("Choose a folder to connect")
+                .blocking_pick_folder()
+            else {
+                return Ok(false);
+            };
+            picked.into_path().map_err(|e| e.to_string())?
+        }
+    };
+    if dest_id == corpus::VAULT_ROOT_ID && !corpus::is_memex_root(&abs) {
+        return Err("The Vault must point at a memex (a folder with a valid memex.json).".into());
+    }
+    let label = if dest_id == corpus::VAULT_ROOT_ID {
+        "Vault".to_string()
+    } else {
+        abs.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(&dest_id)
+            .to_string()
+    };
+    let mut reg = corpus::read_root_registry(&app);
+    reg.upsert(corpus::CorpusRoot { id: dest_id, label, abs_path: abs });
+    corpus::write_root_registry(&app, &reg)?;
+    app.restart();
+}
+
 #[tauri::command]
 fn summon(app: AppHandle) {
     do_summon(&app);
@@ -523,6 +572,7 @@ pub fn run() {
             corpus_relocate,
             corpus_use_memex,
             corpus_use_legacy,
+            corpus_set_root,
             summon,
             set_summon_shortcut,
             set_hide_on_blur,
@@ -562,29 +612,41 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            // Phase 2 — the corpus. Open (first run: create root + Inbox +
-            // welcome note + .rotli/), then watch it for EXTERNAL changes; the
-            // frontend invalidates on "rotli:corpus-changed". A disk error
-            // must not kill the shell: commands degrade to clean errors.
-            let opened = corpus::CorpusStore::open(corpus::resolve_root(app.handle()));
-            let store = match opened {
-                Ok(store) => {
-                    let suppress = store.suppress_set();
-                    let watch_root = store.root().to_path_buf();
-                    let handle = app.handle().clone();
-                    if let Err(e) = corpus::spawn_watcher(watch_root, suppress, move || {
-                        let _ = handle.emit_to("main", "rotli:corpus-changed", ());
-                    }) {
-                        eprintln!("rotli: corpus watcher unavailable ({e}) — external edits won't auto-refresh");
+            // Phase 2 / Track 2 — the corpus, now MULTI-ROOT. Build the root
+            // registry (the DEFAULT root is always registered, pointing at
+            // today's resolve_root), auto-bind the "vault" root to ~/smBrain ONLY
+            // when it is a valid memex, open a CorpusStore per registered root,
+            // and watch EACH for EXTERNAL changes (one watcher per root). The
+            // frontend invalidates on "rotli:corpus-changed". A disk error on any
+            // single root must not kill the shell: that root is skipped and its
+            // commands degrade to clean errors; the others still work.
+            let mut registry = corpus::CorpusRegistry::new(corpus::DEFAULT_ROOT_ID.to_string());
+            let roots = corpus::startup_roots(app.handle());
+            for root in roots {
+                match corpus::CorpusStore::open(root.abs_path.clone()) {
+                    Ok(store) => {
+                        let suppress = store.suppress_set();
+                        let watch_root = store.root().to_path_buf();
+                        let handle = app.handle().clone();
+                        if let Err(e) = corpus::spawn_watcher(watch_root, suppress, move || {
+                            let _ = handle.emit_to("main", "rotli:corpus-changed", ());
+                        }) {
+                            eprintln!(
+                                "rotli: corpus watcher unavailable for root {} ({e}) — external edits won't auto-refresh",
+                                root.id
+                            );
+                        }
+                        registry.insert(root.id, store);
                     }
-                    Some(store)
+                    Err(e) => {
+                        eprintln!(
+                            "rotli: corpus root {} unavailable ({e}) — its file commands disabled",
+                            root.id
+                        );
+                    }
                 }
-                Err(e) => {
-                    eprintln!("rotli: corpus unavailable ({e}) — file commands disabled");
-                    None
-                }
-            };
-            app.manage(corpus::CorpusState(Mutex::new(store)));
+            }
+            app.manage(corpus::CorpusState(Mutex::new(registry)));
 
             // ⌥Space opens the app; ⌥C is the one-breath capture (both rebindable).
             // Best-effort: another app owning a chord (launchers love ⌥Space)

@@ -85,6 +85,17 @@ export function FileGlyph(props: GlyphProps) {
   );
 }
 
+/** Vault — a book (the external knowledge base the Vault row browses). Reads as a
+ * "knowledge collection," not a brain, matching the renamed destination. */
+export function VaultGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z" />
+      <path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3" />
+    </Glyph>
+  );
+}
+
 /** Excalidraw board — a canvas frame with a sketch stroke (distinct from the
  * note FileGlyph so boards read as canvases in the tree + tab strip). */
 export function BoardGlyph(props: GlyphProps) {

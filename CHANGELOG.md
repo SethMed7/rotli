@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **The Vault** (multi-root corpus) — the old "Brain" destination is now **Vault**
+  and points at an external memex (your `~/smBrain`), browsed in place in the
+  sidebar (its `wiki/` + `chats/`, read-only) alongside your local notes. Connect
+  one in Settings → Storage → "Connect a folder…". rotli never writes your notes
+  into it — `chats/` is only the chat area, and new notes always land in your
+  local Inbox. Folder ids gained a `root:path` scheme (local ids stay bare, so
+  nothing migrates); each root gets its own file-watcher.
 - **Diagrams & math in your notes** — fenced ` ```math ` (KaTeX), ` ```mermaid `,
   and ` ```jsxgraph ` (interactive plots — sine waves, unit circles, draggable
   points) now render inline in the editor. They follow your theme, show an

@@ -306,6 +306,17 @@ export async function relocateCorpus(): Promise<boolean> {
   return invoke<boolean>("corpus_relocate");
 }
 
+/** Connect a destination root to an external folder (Track 2 multi-root): opens
+ * a native folder picker (no path) — or takes an explicit path (programmatic) —
+ * and REGISTERS the chosen dir as that destination's root in corpus-roots.json.
+ * It REGISTERS, never moves/relocates. For the "vault" dest the folder MUST be a
+ * valid memex (else it rejects). The app restarts on success, so it never
+ * resolves in practice; resolves false only when the picker is cancelled. */
+export async function corpusSetRoot(destId: string, path?: string): Promise<boolean> {
+  if (!isTauri()) return false;
+  return invoke<boolean>("corpus_set_root", { destId, path: path ?? null });
+}
+
 /** Point rotli's Notes tree at a memex instance (Increment 3): validates the
  * path is a real memex, remembers it as the corpus-memex pointer, and relaunches
  * into it. The legacy ~/Documents/rotli corpus is left untouched — this is a

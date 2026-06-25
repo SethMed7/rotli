@@ -8,17 +8,19 @@ import { describe, expect, it } from "bun:test";
 import { DEST } from "./destinations";
 import { InMemoryNotesService, ulid } from "./notes";
 
-// A fresh service seeded with the five reserved roots + two nested Brain
-// folders, mirroring how the browser surface is built (ids ARE paths).
+// A fresh service seeded with the local reserved roots + two nested Storage
+// folders, mirroring how the browser surface is built (ids ARE paths). Storage
+// stands in for any everyday local destination (it replaced the old Brain row
+// after the Brain→Vault rename — the external Vault is browse-only, so it's a
+// poor stand-in for a writable everyday folder).
 function freshService(): InMemoryNotesService {
   const svc = new InMemoryNotesService();
   svc.seedReserved(DEST.inbox, DEST.inbox);
-  svc.seedReserved(DEST.brain, DEST.brain);
   svc.seedReserved(DEST.storage, DEST.storage);
   svc.seedReserved(DEST.archive, DEST.archive);
   svc.seedReserved(DEST.trash, DEST.trash);
-  svc.seedReserved(`${DEST.brain}/Work`, "Work", DEST.brain);
-  svc.seedReserved(`${DEST.brain}/Myela`, "Myela", DEST.brain);
+  svc.seedReserved(`${DEST.storage}/Work`, "Work", DEST.storage);
+  svc.seedReserved(`${DEST.storage}/Myela`, "Myela", DEST.storage);
   return svc;
 }
 
@@ -82,7 +84,7 @@ describe("listNotes — three-case descendant scoping", () => {
   it("All Notes (no folderId) excludes the hidden roots", async () => {
     const svc = freshService();
     await svc.createNote(DEST.inbox, "# visible inbox");
-    await svc.createNote(`${DEST.brain}/Work`, "# visible nested");
+    await svc.createNote(`${DEST.storage}/Work`, "# visible nested");
     await svc.createNote(DEST.archive, "# archived");
     await svc.createNote(DEST.trash, "# trashed");
 
@@ -93,12 +95,12 @@ describe("listNotes — three-case descendant scoping", () => {
 
   it("a normal folder includes its descendants (a folder holds everything under it)", async () => {
     const svc = freshService();
-    await svc.createNote(DEST.brain, "# top brain");
-    await svc.createNote(`${DEST.brain}/Work`, "# under work");
-    await svc.createNote(`${DEST.brain}/Myela`, "# under myela");
+    await svc.createNote(DEST.storage, "# top brain");
+    await svc.createNote(`${DEST.storage}/Work`, "# under work");
+    await svc.createNote(`${DEST.storage}/Myela`, "# under myela");
     await svc.createNote(DEST.inbox, "# elsewhere");
 
-    const inBrain = await svc.listNotes(DEST.brain);
+    const inBrain = await svc.listNotes(DEST.storage);
     const titles = inBrain.map((n) => n.title).sort();
     expect(titles).toEqual(["top brain", "under myela", "under work"]);
   });
@@ -163,31 +165,31 @@ describe("listNotes — pinned → updatedAt → id sort (SP-2/TSP-4 tiebreak)",
 describe("moveNote + the origin breadcrumb rule", () => {
   it("entering a hidden root from a normal folder records the origin", async () => {
     const svc = freshService();
-    const note = await svc.createNote(`${DEST.brain}/Work`, "# a thought");
+    const note = await svc.createNote(`${DEST.storage}/Work`, "# a thought");
     expect(svc.origins.has(note.id)).toBe(false);
 
     const archived = await svc.archiveNote(note.id);
     expect(archived.folderId).toBe(DEST.archive);
     expect(archived.id).toBe(note.id); // id preserved through the move
-    expect(svc.origins.get(note.id)).toBe(`${DEST.brain}/Work`);
+    expect(svc.origins.get(note.id)).toBe(`${DEST.storage}/Work`);
   });
 
   it("restore reads the breadcrumb, lands the note home, and CLEARS the origin", async () => {
     const svc = freshService();
-    const note = await svc.createNote(DEST.brain, "# keep this");
+    const note = await svc.createNote(DEST.storage, "# keep this");
     await svc.archiveNote(note.id);
-    expect(svc.origins.get(note.id)).toBe(DEST.brain);
+    expect(svc.origins.get(note.id)).toBe(DEST.storage);
 
     const restored = await svc.restoreNote(note.id);
-    expect(restored.folderId).toBe(DEST.brain);
+    expect(restored.folderId).toBe(DEST.storage);
     expect(svc.origins.has(note.id)).toBe(false); // breadcrumb dropped — it's home now
   });
 
   it("restore falls back to Inbox when the origin folder is gone", async () => {
     const svc = freshService();
-    const note = await svc.createNote(`${DEST.brain}/Work`, "# orphan");
+    const note = await svc.createNote(`${DEST.storage}/Work`, "# orphan");
     await svc.trashNote(note.id);
-    await svc.deleteFolder(`${DEST.brain}/Work`); // its home disappears
+    await svc.deleteFolder(`${DEST.storage}/Work`); // its home disappears
     const restored = await svc.restoreNote(note.id);
     expect(restored.folderId).toBe(DEST.inbox);
   });
@@ -228,18 +230,18 @@ describe("moveNote + the origin breadcrumb rule", () => {
   it("a plain visible→visible move never stamps an origin", async () => {
     const svc = freshService();
     const note = await svc.createNote(DEST.inbox, "# moving around");
-    await svc.moveNote(note.id, DEST.brain);
+    await svc.moveNote(note.id, DEST.storage);
     expect(svc.origins.has(note.id)).toBe(false);
-    expect((await svc.getNote(note.id))?.folderId).toBe(DEST.brain);
+    expect((await svc.getNote(note.id))?.folderId).toBe(DEST.storage);
   });
 
   it("hidden→hidden keeps the existing breadcrumb untouched", async () => {
     const svc = freshService();
-    const note = await svc.createNote(DEST.brain, "# from brain");
+    const note = await svc.createNote(DEST.storage, "# from brain");
     await svc.trashNote(note.id); // origin = Brain
-    expect(svc.origins.get(note.id)).toBe(DEST.brain);
+    expect(svc.origins.get(note.id)).toBe(DEST.storage);
     await svc.moveNote(note.id, DEST.archive); // hidden → hidden
-    expect(svc.origins.get(note.id)).toBe(DEST.brain); // unchanged
+    expect(svc.origins.get(note.id)).toBe(DEST.storage); // unchanged
   });
 
   it("archiveNote/trashNote land in their reserved roots", async () => {
@@ -252,6 +254,52 @@ describe("moveNote + the origin breadcrumb rule", () => {
 
   it("throws on moving an unknown note", async () => {
     const svc = freshService();
-    expect(svc.moveNote("ghost", DEST.brain)).rejects.toThrow("unknown note: ghost");
+    expect(svc.moveNote("ghost", DEST.storage)).rejects.toThrow("unknown note: ghost");
+  });
+});
+
+describe("the external Vault root (Track 2) — browse-only, prefix-scoped", () => {
+  // mirror fs mode: the Vault root's surfaced folders carry the "vault:" prefix
+  // and parentId === null (Rust aggregates its top-level folders with no parent).
+  function withVault(): InMemoryNotesService {
+    const svc = freshService();
+    svc.seedReserved("vault:wiki", "wiki", null);
+    svc.seedReserved("vault:chats", "chats", null);
+    svc.seedReserved("vault:wiki/projects", "projects", "vault:wiki");
+    return svc;
+  }
+
+  // vault notes are SEEDED (read-only, like reading them off ~/smBrain on disk) —
+  // createNote REFUSES the vault (the write ceiling), so populate them directly.
+  const TS = 1_700_000_000_000;
+  const seedVault = (svc: InMemoryNotesService, folderId: string, body: string) =>
+    svc.seedNote(folderId, body, { createdAt: TS, updatedAt: TS });
+
+  it("the ROOT MARKER 'vault:' scopes to everything under the external root", async () => {
+    const svc = withVault();
+    seedVault(svc, "vault:wiki", "# a wiki note");
+    seedVault(svc, "vault:wiki/projects", "# a project note");
+    seedVault(svc, "vault:chats", "# a chat note");
+    await svc.createNote(DEST.inbox, "# a local note");
+
+    const inVault = await svc.listNotes(DEST.vault);
+    const titles = inVault.map((n) => n.title).sort();
+    expect(titles).toEqual(["a chat note", "a project note", "a wiki note"]);
+  });
+
+  it("All Notes EXCLUDES the Vault — it's browsed only via its own row", async () => {
+    const svc = withVault();
+    await svc.createNote(DEST.inbox, "# local visible");
+    seedVault(svc, "vault:wiki", "# vault hidden from all-notes");
+
+    const titles = (await svc.listNotes()).map((n) => n.title).sort();
+    expect(titles).toEqual(["local visible"]);
+  });
+
+  it("refuses to create or move a note into the Vault (the write ceiling)", async () => {
+    const svc = withVault();
+    expect(svc.createNote("vault:wiki", "# nope")).rejects.toThrow();
+    const local = await svc.createNote(DEST.inbox, "# local");
+    expect(svc.moveNote(local.id, "vault:wiki")).rejects.toThrow();
   });
 });

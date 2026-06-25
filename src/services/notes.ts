@@ -7,7 +7,7 @@
 
 import { isTauri } from "../lib/tauri";
 import type { Folder, Note, NoteSummary } from "../types";
-import { DEST, isHidden, isSink } from "./destinations";
+import { DEST, isHidden, isRootMarker, isSink, isVault } from "./destinations";
 import { snippetOf, titleOf } from "./derive";
 import { FsNotesService } from "./fsNotes";
 
@@ -96,9 +96,25 @@ export class InMemoryNotesService implements NotesService {
     // Same three-case rule as FsNotesService (destinations.ts is the truth):
     // All Notes hides the hidden roots; a hidden root shows only its subtree;
     // any normal folder shows its subtree minus hidden (defensive).
+    // A non-default ROOT MARKER ("vault:") scopes to the whole external root by
+    // id prefix (its folders aren't in the descendants() parent-graph). Handle it
+    // before the parent-graph cases so the browser mirror matches fs mode.
+    if (folderId && isRootMarker(folderId)) {
+      return all
+        .filter((n) => n.folderId.startsWith(folderId))
+        .map(({ body: _body, ...summary }) => summary)
+        .sort((a, b) =>
+          a.pinned !== b.pinned
+            ? a.pinned
+              ? -1
+              : 1
+            : b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+        );
+    }
     const within = folderId ? this.descendants(folderId) : null; // once, not per note
     let scoped: Note[];
-    if (!within) scoped = all.filter((n) => !isHidden(n.folderId));
+    // All Notes also excludes the external Vault — browsed only via its own row.
+    if (!within) scoped = all.filter((n) => !isHidden(n.folderId) && !isVault(n.folderId));
     else if (folderId && isHidden(folderId))
       scoped = all.filter((n) => within.has(n.folderId));
     else scoped = all.filter((n) => within.has(n.folderId) && !isHidden(n.folderId));
@@ -118,6 +134,10 @@ export class InMemoryNotesService implements NotesService {
   }
 
   async createNote(folderId: string, body: string): Promise<Note> {
+    // mirror fs mode's safety ceiling: rotli never creates a note inside the
+    // external Vault (the memex is read-mostly; corpus_create's writable() gate
+    // refuses it in the shell). Keeps the browser preview honest.
+    if (isVault(folderId)) throw new Error("the Vault is read-only — notes can't be created there");
     const now = Date.now();
     const note: Note = {
       id: ulid(now),
@@ -159,6 +179,9 @@ export class InMemoryNotesService implements NotesService {
   async moveNote(id: string, targetFolder: string): Promise<Note> {
     const existing = this.notes.get(id);
     if (!existing) throw new Error(`unknown note: ${id}`);
+    // mirror Rust's cross-root refusal: a note can't move into the external
+    // Vault (or out of it, but that path can't arise in browser mode).
+    if (isVault(targetFolder)) throw new Error("moving a note into the Vault isn't supported");
     const from = existing.folderId;
     // The SAME origin rule Rust bakes in (isSink mirrors Rust is_hidden_root —
     // Archive/Trash only, NOT Board): entering a sink from a non-sink folder
@@ -202,9 +225,11 @@ export class InMemoryNotesService implements NotesService {
   }
 
   /** A reserved/destination folder whose id IS its name (or its path under a
-   * reserved root, e.g. "Brain/Work") — matching fs mode where folderId === the
-   * relative path. This is what makes DEST.brain === folder.id true in BOTH
-   * modes; the freshest-note and destination lookups depend on it. */
+   * reserved root, e.g. "Storage/Work", or a prefixed external-root path like
+   * "vault:wiki") — matching fs mode where folderId === the relative path (bare
+   * for the default root, "<rootid>:rel" for a non-default one). This is what
+   * makes DEST.inbox === folder.id true in BOTH modes; the freshest-note and
+   * destination lookups depend on it. */
   seedReserved(id: string, name: string, parentId: string | null = null): Folder {
     const folder: Folder = { id, name, parentId };
     this.folders.set(folder.id, folder);
@@ -260,20 +285,29 @@ if (!FS_MODE) {
     return Math.min(d.getTime(), now);
   };
 
-  // Reserved roots: id === name (mirrors fs mode where folderId is the path),
-  // so DEST.brain === folder.id holds in the browser too.
+  // Reserved LOCAL roots: id === name (mirrors fs mode where folderId is the
+  // path), so DEST.inbox === folder.id holds in the browser too.
   const inbox = svc.seedReserved(DEST.inbox, DEST.inbox);
   inboxId = inbox.id;
-  svc.seedReserved(DEST.brain, DEST.brain);
   svc.seedReserved(DEST.storage, DEST.storage);
   svc.seedReserved(DEST.board, DEST.board);
   svc.seedReserved(DEST.archive, DEST.archive);
   svc.seedReserved(DEST.trash, DEST.trash);
 
-  // A couple of user folders nested under Brain — path-style ids ("Brain/Work")
-  // so the tree renders and descendant scoping behaves exactly like fs mode.
-  const brainWork = svc.seedReserved(`${DEST.brain}/Work`, "Work", DEST.brain);
-  const brainMyela = svc.seedReserved(`${DEST.brain}/Myela`, "Myela", DEST.brain);
+  // The external Vault root (mirrors fs mode's memex auto-bind to ~/smBrain): a
+  // non-default root whose surfaced folders carry the "vault:" prefix. Only
+  // wiki/ (browse-only) + chats/ surface — self/history/etc never do. The Vault
+  // row itself is the marker DEST.vault ("vault:"); these are its top-level
+  // folders (parentId === null, exactly as Rust aggregates them).
+  svc.seedReserved("vault:wiki", "wiki", null);
+  svc.seedReserved("vault:chats", "chats", null);
+  // A nested wiki subfolder so the tree + descendant scoping render like fs mode.
+  const vaultProjects = svc.seedReserved("vault:wiki/projects", "projects", "vault:wiki");
+
+  // A couple of LOCAL user folders under Storage — path-style ids so the tree
+  // renders and descendant scoping behaves exactly like fs mode.
+  const storageWork = svc.seedReserved(`${DEST.storage}/Work`, "Work", DEST.storage);
+  const storageMyela = svc.seedReserved(`${DEST.storage}/Myela`, "Myela", DEST.storage);
 
   if (!SEED_EMPTY) {
     // —— Inbox: the welcome note + a quick capture ——
@@ -302,9 +336,9 @@ Later: breve plugs into the same corpus and the Wiki answers from it. Nothing ch
       { createdAt: now - 2 * DAY, updatedAt: now - 2 * DAY },
     );
 
-    // —— Brain: a pinned decision + nested Work/Myela notes ——
+    // —— Storage: a pinned decision + nested Work/Myela notes ——
     svc.seedNote(
-      DEST.brain,
+      DEST.storage,
       `# Pricing decision
 
 Free local forever. Paid = sync + managed AI. Never gate local features behind the subscription — the corpus is the user's, full stop.
@@ -314,7 +348,7 @@ Launch sync at $4, anchor on Obsidian, revisit at 10k users.`,
     );
 
     svc.seedNote(
-      brainWork.id,
+      storageWork.id,
       `# Q3 platform review — prep
 
 Three things must land before Thursday: the settlement mapping, the gateway export enum, and a clear pricing answer we can defend in front of the partners.
@@ -326,14 +360,37 @@ Maria owns the reconciliation walkthrough; I take pricing.`,
     );
 
     svc.seedNote(
-      brainMyela.id,
+      storageMyela.id,
       `# Q3 priorities — Myela
 
 Ship the gateway migration, land the issuing portal rebuild, and get the partner reporting story straight before the platform review.`,
       { createdAt: todayAt(7, 30), updatedAt: todayAt(7, 30) },
     );
 
-    // —— Storage: long-lived reference, lighter than Brain ——
+    // —— Vault (external memex, browse-only): wiki/ notes that rotli reads but
+    // never writes. These mirror what surfaces from ~/smBrain — note-creation is
+    // redirected to the local Inbox, never into here. ——
+    svc.seedNote(
+      "vault:wiki",
+      `# smBrain — the knowledge base
+
+The durable, human-readable memory. rotli browses it read-only: wiki/ surfaces here, self/ and history/ never do.`,
+      { createdAt: now - 3 * DAY, updatedAt: now - 3 * DAY },
+    );
+
+    svc.seedNote(
+      vaultProjects.id,
+      `# rotli — project note
+
+The warm, local-first menu-bar notes app. Lives in its own repo; the Vault is where its long-form thinking is kept.`,
+      { createdAt: now - 5 * DAY, updatedAt: now - 5 * DAY },
+    );
+
+    // —— a plain local "Brain" folder: the Brain→Vault rename leaves the
+    // pre-existing local folder untouched (Invariant 4) — it's just a folder now.
+    const localBrain = svc.seedFolder("Brain");
+
+    // —— Storage: long-lived reference ——
     svc.seedNote(
       DEST.storage,
       `# Quokka world — where it lives
@@ -360,7 +417,7 @@ Ship review Friday. She'll own the gateway migration writeup. Follow up on the L
       {
         createdAt: now - 30 * DAY,
         updatedAt: now - 7 * DAY,
-        origin: `${DEST.brain}/Work`,
+        origin: `${DEST.storage}/Work`,
       },
     );
 
@@ -372,7 +429,7 @@ Scrap this. The three-tier idea died; we went free-local + one paid sync line. K
       {
         createdAt: now - 14 * DAY,
         updatedAt: now - 5 * DAY,
-        origin: DEST.brain,
+        origin: localBrain.id,
       },
     );
 

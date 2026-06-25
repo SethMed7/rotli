@@ -79,10 +79,12 @@ export type ContentView = "panes" | "board" | "allNotes";
 export const clampSidebarWidth = (px: number): number =>
   Math.min(460, Math.max(190, Math.round(px)));
 
-/** The reserved destination ids the sidebar seeds open (Inbox + Brain) and the
+/** The reserved destination ids the sidebar seeds open (Inbox + Vault) and the
  * persistence layer trusts as a valid folder selection before the first list
- * resolves (Seth, 2026-06-13). */
-export const RESERVED_DESTS = ["Inbox", "Brain", "Storage", "Board", "Archive", "Trash"] as const;
+ * resolves (Seth, 2026-06-13). "vault:" is the external-root MARKER (Track 2);
+ * a stale "Brain" key from before the rename is simply absent here, so it
+ * degrades to a safe default rather than crashing. */
+export const RESERVED_DESTS = ["Inbox", "vault:", "Storage", "Board", "Archive", "Trash"] as const;
 
 interface UiState {
   /** Explicit three-way setting. "system" mirrors the OS only while selected;
@@ -171,7 +173,7 @@ interface UiState {
   setSidebarWidth: (px: number) => void;
 
   /** Which destinations in the sidebar tree are expanded, keyed by dest id —
-   * Inbox + Brain open by default (Seth, 2026-06-13). */
+   * Inbox + Vault open by default (Seth, 2026-06-13). */
   expandedDests: Record<string, boolean>;
   toggleDestExpanded: (id: string) => void;
   setDestExpanded: (id: string, open: boolean) => void;
@@ -334,7 +336,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   sidebarWidth: 240,
   setSidebarWidth: (px) => set({ sidebarWidth: clampSidebarWidth(px) }),
 
-  expandedDests: { Inbox: true, Brain: true },
+  expandedDests: { Inbox: true, "vault:": true },
   toggleDestExpanded: (id) =>
     set((s) => ({ expandedDests: { ...s.expandedDests, [id]: !s.expandedDests[id] } })),
   setDestExpanded: (id, open) =>

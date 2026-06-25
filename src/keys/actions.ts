@@ -10,6 +10,7 @@ import {
   type InlineMark,
   activeEditor,
 } from "../editor/commands";
+import { isVault } from "../services/destinations";
 import { invalidateNotes } from "../services/hooks";
 import { inboxFolderId, notesService } from "../services/notes";
 import { captureHandle } from "../lib/captureHandle";
@@ -41,8 +42,14 @@ function focusedNoteIdNow(): string | null {
  * then open it replacing the focused pane's active tab. */
 async function newNote(): Promise<void> {
   const { selectedFolderId } = useUiStore.getState();
+  // ⌘N / "+ new note" default to the LOCAL Inbox. A smart row (All notes /
+  // Recent) has no folder, and the external Vault is read-mostly — rotli never
+  // creates a note inside the Vault (never into a memex's chats/, even though
+  // the write gate would allow it). Both redirect to the local Inbox.
   const folderId =
-    selectedFolderId === ALL_NOTES || selectedFolderId === RECENT
+    selectedFolderId === ALL_NOTES ||
+    selectedFolderId === RECENT ||
+    isVault(selectedFolderId)
       ? inboxFolderId
       : selectedFolderId;
   const note = await notesService.createNote(folderId, "");

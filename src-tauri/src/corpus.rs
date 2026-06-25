@@ -167,6 +167,190 @@ pub fn relocate(old_root: &Path, new_root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+// ─── multi-root: CorpusRoot + the root registry (Track 2, Build Step 1) ───────
+//
+// THE ID SCHEME (the one law the TS side must mirror): the corpus is becoming
+// MULTI-ROOT. A `folderId` (and every note/board id on the wire) is routed by a
+// root prefix:
+//   • the DEFAULT root keeps BARE ids — "Inbox", "Storage", "Inbox/Work",
+//     a ulid, "Notes/sketch.excalidraw" — ZERO migration of existing
+//     notes/state. The routing layer is TRANSPARENT for the default root.
+//   • a NON-default root prefixes "<rootid>:" — "vault:wiki/foo",
+//     "vault:chats/x", "vault:01J…" (a ulid in the vault). The router splits on
+//     the FIRST colon into (rootid, rel); a bare id is (default, id).
+//
+// `:` is a safe router char: `validate_component` forbids it inside a path
+// component (added below), so split-once-on-first-colon is unambiguous and a
+// folder literally named `a:b` can never collide with the router.
+
+/// The reserved id of the local default root — always registered, always bare.
+pub const DEFAULT_ROOT_ID: &str = "default";
+/// The reserved id of the external "Vault" root (binds to a memex, e.g.
+/// ~/smBrain). Registered only when bound; ids under it carry the `vault:`
+/// prefix.
+pub const VAULT_ROOT_ID: &str = "vault";
+
+/// A registered corpus root. `id` is the stable routing handle ("default",
+/// "vault"); `label` is what the sidebar shows ("Vault"); `abs_path` is the
+/// resolved absolute directory the store binds to.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CorpusRoot {
+    pub id: String,
+    pub label: String,
+    pub abs_path: PathBuf,
+}
+
+/// The on-disk root registry (`corpus-roots.json` in the app config dir, beside
+/// `corpus-root.txt`). Persisted so the set of roots survives relaunch.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RootRegistry {
+    pub version: u32,
+    pub roots: Vec<CorpusRoot>,
+}
+
+impl RootRegistry {
+    pub fn get(&self, id: &str) -> Option<&CorpusRoot> {
+        self.roots.iter().find(|r| r.id == id)
+    }
+
+    /// Insert or replace a root by id.
+    pub fn upsert(&mut self, root: CorpusRoot) {
+        if let Some(existing) = self.roots.iter_mut().find(|r| r.id == root.id) {
+            *existing = root;
+        } else {
+            self.roots.push(root);
+        }
+    }
+}
+
+fn roots_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
+    use tauri::Manager;
+    app.path()
+        .app_config_dir()
+        .ok()
+        .map(|d| d.join("corpus-roots.json"))
+}
+
+pub fn read_root_registry(app: &tauri::AppHandle) -> RootRegistry {
+    roots_config_file(app)
+        .and_then(|f| fs::read_to_string(f).ok())
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default()
+}
+
+pub fn write_root_registry(app: &tauri::AppHandle, reg: &RootRegistry) -> Result<(), String> {
+    let f = roots_config_file(app).ok_or("no app config dir")?;
+    if let Some(p) = f.parent() {
+        fs::create_dir_all(p).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string_pretty(reg).map_err(|e| e.to_string())? + "\n";
+    atomic_write(&f, &json)
+}
+
+/// Resolve the registry to USE at startup: ensure the default root is always
+/// present (id "default", abs_path = today's `resolve_root`), so the registry
+/// can never be missing the default. Persists the default back if it was added
+/// (best-effort). The vault auto-bind is layered on by `lib.rs` at startup — a
+/// vault entry is added there only when ~/smBrain is a valid memex.
+pub fn resolve_registry(app: &tauri::AppHandle) -> RootRegistry {
+    let mut reg = read_root_registry(app);
+    let default_path = resolve_root(app);
+    let needs_default = match reg.get(DEFAULT_ROOT_ID) {
+        Some(existing) => existing.abs_path != default_path,
+        None => true,
+    };
+    if needs_default {
+        reg.upsert(CorpusRoot {
+            id: DEFAULT_ROOT_ID.to_string(),
+            label: "Notes".to_string(),
+            abs_path: default_path,
+        });
+        let _ = write_root_registry(app, &reg);
+    }
+    reg
+}
+
+/// The path the "vault" root auto-binds to on Seth's machine — `~/smBrain` —
+/// BUT only ever when it is a valid memex (`is_memex_root`). Never bind the
+/// vault to a non-memex directory automatically.
+fn default_vault_path() -> Option<PathBuf> {
+    std::env::var("HOME").ok().map(|h| PathBuf::from(h).join("smBrain"))
+}
+
+/// The roots to open at startup, in order. Always includes the DEFAULT root.
+/// Adds the "vault" root when:
+///   • the registry already has a vault entry whose abs_path is STILL a valid
+///     memex (honor-only-while-a-memex, mirroring resolve_root), OR
+///   • the registry has no vault entry AND ~/smBrain exists AND is a valid
+///     memex — then auto-bind vault → ~/smBrain and persist it.
+/// A vault that is absent or no longer a memex is left UNBOUND (no row) — the
+/// per-destination picker can connect it later. NEVER binds to a non-memex dir.
+pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
+    let mut reg = resolve_registry(app);
+    let mut out: Vec<CorpusRoot> = Vec::new();
+
+    // the default root is guaranteed present by resolve_registry
+    if let Some(d) = reg.get(DEFAULT_ROOT_ID) {
+        out.push(d.clone());
+    }
+
+    // the vault: honor a stored binding only while it's still a memex; else try
+    // the ~/smBrain auto-bind. A non-memex binding is dropped (left unbound).
+    let vault: Option<CorpusRoot> = match reg.get(VAULT_ROOT_ID) {
+        Some(existing) if is_memex_root(&existing.abs_path) => Some(existing.clone()),
+        Some(_) => None, // bound dir is no longer a memex → unbind (no row)
+        None => default_vault_path()
+            .filter(|p| p.exists() && is_memex_root(p))
+            .map(|p| CorpusRoot {
+                id: VAULT_ROOT_ID.to_string(),
+                label: "Vault".to_string(),
+                abs_path: p,
+            }),
+    };
+    if let Some(v) = vault {
+        // persist a freshly auto-bound vault so the next launch finds it
+        if reg.get(VAULT_ROOT_ID) != Some(&v) {
+            reg.upsert(v.clone());
+            let _ = write_root_registry(app, &reg);
+        }
+        out.push(v);
+    }
+    out
+}
+
+/// Split a wire id into `(root_id, rel)`. A `:` splits ONCE at the first colon
+/// (root handle ⟂ path); a bare id routes to the default root unchanged. The
+/// `rel` half is RE-VALIDATED (`validate_rel`) unless it is empty (the root
+/// itself) or a ulid/board path that the caller validates downstream — here we
+/// only reject a colon hiding inside a path component, which the prefix split
+/// already removed, so the remaining `rel` is colon-free by construction.
+///
+/// Examples:
+///   "Inbox"            → ("default", "Inbox")
+///   "Inbox/Work"       → ("default", "Inbox/Work")
+///   "vault:wiki/foo"   → ("vault", "wiki/foo")
+///   "vault:"           → ("vault", "")
+///   "01J…ULID…"        → ("default", "01J…ULID…")
+pub fn split_root_id(folder_id: &str) -> (String, String) {
+    match folder_id.split_once(':') {
+        Some((root, rel)) => (root.to_string(), rel.to_string()),
+        None => (DEFAULT_ROOT_ID.to_string(), folder_id.to_string()),
+    }
+}
+
+/// Compose a wire id from `(root_id, rel)`. The DEFAULT root emits a BARE rel
+/// (the byte-identical gate — no prefix, ever); a non-default root prefixes
+/// `<rootid>:`. The inverse of `split_root_id` for the default and non-default
+/// cases alike.
+pub fn compose_root_id(root_id: &str, rel: &str) -> String {
+    if root_id == DEFAULT_ROOT_ID {
+        rel.to_string()
+    } else {
+        format!("{root_id}:{rel}")
+    }
+}
+
 // ─── time ────────────────────────────────────────────────────────────────────
 
 fn now_stamp() -> String {
@@ -662,7 +846,7 @@ impl CorpusStore {
     /// dot-prefixed `.rotli/` sidecar (walk + smBrain's validate.ts both skip
     /// dot-entries, so it never pollutes the brain) and load the index — but
     /// SKIP `ensure_reserved_folders` and SKIP `first_run`: rotli must never
-    /// scaffold its Inbox/Brain/Storage/… inside someone's smBrain. Layout::Memex
+    /// scaffold its Inbox/Vault/Storage/… inside someone's smBrain. Layout::Memex
     /// then keeps every write off self/history/wiki/MAP/inbox + control files.
     fn open_memex(root: PathBuf) -> Result<Self, String> {
         let root = fs::canonicalize(&root)
@@ -699,14 +883,21 @@ impl CorpusStore {
     }
 
     /// The six reserved top-level destinations the sidebar always offers —
-    /// Inbox, Brain, Storage, Board, Archive, Trash — scaffolded on disk so they exist
-    /// even on a corpus that predates them. Called unconditionally from `open`;
-    /// `create_dir_all` is a no-op when a dir is already there, so this is fully
-    /// idempotent. Empty reserved dirs surface as zero-note folders via `walk`;
-    /// the TS layer decides which double as fixed destinations vs. plain folders.
-    /// (Seth, 2026-06-13)
+    /// Inbox, Vault, Storage, Board, Archive, Trash — scaffolded on disk so they
+    /// exist even on a corpus that predates them. Called unconditionally from
+    /// `open` (LegacyRotli ONLY — `open_memex` skips it, so a memex root is never
+    /// scaffolded); `create_dir_all` is a no-op when a dir is already there, so
+    /// this is fully idempotent. Empty reserved dirs surface as zero-note folders
+    /// via `walk`; the TS layer decides which double as fixed destinations vs.
+    /// plain folders.
+    ///
+    /// Brain → Vault rename (Track 2, 2026-06-24): "Brain" is no longer a
+    /// reserved local row — the Vault is now an EXTERNAL root (a memex). An
+    /// existing on-disk `Brain/` folder is NEVER moved, renamed, or deleted; it
+    /// simply stops being scaffolded and surfaces as a plain folder via `walk`
+    /// (Invariant 4 — no data loss). (Seth, 2026-06-13 / 2026-06-24)
     fn ensure_reserved_folders(&self) -> Result<(), String> {
-        for name in ["Inbox", "Brain", "Storage", "Board", "Archive", "Trash"] {
+        for name in ["Inbox", "Vault", "Storage", "Board", "Archive", "Trash"] {
             fs::create_dir_all(self.root.join(name))
                 .map_err(|e| format!("create reserved folder {name}: {e}"))?;
         }
@@ -1290,7 +1481,16 @@ fn validate_rel(rel: &str) -> Result<(), String> {
 }
 
 fn validate_component(name: &str) -> Result<(), String> {
-    if name.is_empty() || name == "." || name == ".." || name.starts_with('.') || name.contains('/') {
+    // `:` is the multi-root router char (split_root_id) — it must NEVER appear
+    // inside a path component, so a folder literally named "a:b" cannot collide
+    // with the "<rootid>:path" wire scheme.
+    if name.is_empty()
+        || name == "."
+        || name == ".."
+        || name.starts_with('.')
+        || name.contains('/')
+        || name.contains(':')
+    {
         return Err(format!("invalid folder name: {name:?}"));
     }
     Ok(())
@@ -1479,26 +1679,108 @@ pub fn path_relevant(root: &Path, suppress: &SuppressSet, path: &Path) -> bool {
 
 // ─── tauri state + commands ──────────────────────────────────────────────────
 
-/// `None` when the corpus failed to open (disk error at startup) — commands
-/// then return a clean error instead of panicking on missing state.
-pub struct CorpusState(pub Mutex<Option<CorpusStore>>);
+/// The multi-root registry behind the Tauri state (Track 2, Build Step 1). A
+/// map of `root id → CorpusStore` plus the default-root id. The DEFAULT root is
+/// always present; non-default roots (the "vault") are added at startup when a
+/// bound external root exists.
+///
+/// The ROUTING LAYER is transparent for the default root: with only the default
+/// registered, every command behaves byte-identically to the single-store world
+/// and every emitted id stays bare. This is the gate before any second root.
+pub struct CorpusRegistry {
+    stores: HashMap<String, CorpusStore>,
+    default_id: String,
+}
+
+impl CorpusRegistry {
+    pub fn new(default_id: String) -> Self {
+        Self { stores: HashMap::new(), default_id }
+    }
+
+    pub fn insert(&mut self, id: String, store: CorpusStore) {
+        self.stores.insert(id, store);
+    }
+}
+
+/// `CorpusState` wraps the registry. Built empty when the corpus failed to open
+/// (disk error at startup) — commands then return a clean error instead of
+/// panicking on missing state.
+pub struct CorpusState(pub Mutex<CorpusRegistry>);
 
 impl CorpusState {
-    fn with<T>(&self, f: impl FnOnce(&mut CorpusStore) -> Result<T, String>) -> Result<T, String> {
-        let mut guard = self.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
-        let store = guard.as_mut().ok_or_else(|| "corpus unavailable".to_string())?;
+    /// Run `f` against the store named by `root_id` (passing the bare `rel`).
+    /// The router: `split_root_id` is applied by the caller; this picks the
+    /// store. An unknown root id is a clean error (an UNBOUND vault, a stale
+    /// stored id) — never a panic.
+    fn route<T>(
+        &self,
+        root_id: &str,
+        f: impl FnOnce(&mut CorpusStore) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let mut reg = self.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+        let store = reg
+            .stores
+            .get_mut(root_id)
+            .ok_or_else(|| format!("corpus root unavailable: {root_id}"))?;
         f(store)
     }
 }
 
+/// Re-prefix a `NoteMeta`'s `folder_id` (and, for boards, its `id`) with the
+/// root id so the wire carries a routable id. Default root → bare (no-op).
+fn prefix_meta(root_id: &str, mut m: NoteMeta) -> NoteMeta {
+    m.folder_id = compose_root_id(root_id, &m.folder_id);
+    if m.kind == NoteKind::Board {
+        // board id IS its relative path — prefix it like a folder id
+        m.id = compose_root_id(root_id, &m.id);
+    }
+    m
+}
+
 #[tauri::command]
 pub fn corpus_list(state: tauri::State<'_, CorpusState>) -> Result<CorpusList, String> {
-    state.with(|s| s.list())
+    // Aggregate across every registered root, prefixing each emitted folder_id /
+    // board id via compose_root_id (default bare). Note ulids stay bare for the
+    // default root; a non-default root prefixes its ulids too so reads route back.
+    let mut reg = state.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+    let mut ids: Vec<String> = reg.stores.keys().cloned().collect();
+    // stable order: default first, then the rest sorted, so the wire is deterministic
+    ids.sort();
+    if let Some(pos) = ids.iter().position(|i| *i == reg.default_id) {
+        let d = ids.remove(pos);
+        ids.insert(0, d);
+    }
+    let mut folders: Vec<FolderMeta> = Vec::new();
+    let mut notes: Vec<NoteMeta> = Vec::new();
+    for id in ids {
+        let store = reg.stores.get_mut(&id).expect("id from keys");
+        let list = store.list()?;
+        for mut f in list.folders {
+            f.parent_id = f.parent_id.map(|p| compose_root_id(&id, &p));
+            f.id = compose_root_id(&id, &f.id);
+            folders.push(f);
+        }
+        for mut n in list.notes {
+            n = prefix_meta(&id, n);
+            if id != reg.default_id && n.kind == NoteKind::Note {
+                // a ulid note in a non-default root: prefix the ulid so a later
+                // read routes back to this store.
+                n.id = compose_root_id(&id, &n.id);
+            }
+            notes.push(n);
+        }
+    }
+    Ok(CorpusList { folders, notes })
 }
 
 #[tauri::command]
 pub fn corpus_read(state: tauri::State<'_, CorpusState>, id: String) -> Result<NoteDoc, String> {
-    state.with(|s| s.read(&id))
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.read(&rel)).map(|mut doc| {
+        doc.id = compose_root_id(&root, &doc.id);
+        doc.folder_id = compose_root_id(&root, &doc.folder_id);
+        doc
+    })
 }
 
 #[tauri::command]
@@ -1508,7 +1790,14 @@ pub fn corpus_write(
     body: String,
     pinned: bool,
 ) -> Result<NoteMeta, String> {
-    state.with(|s| s.write(&id, &body, pinned))
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.write(&rel, &body, pinned)).map(|mut m| {
+        m = prefix_meta(&root, m);
+        if m.kind == NoteKind::Note {
+            m.id = compose_root_id(&root, &m.id);
+        }
+        m
+    })
 }
 
 #[tauri::command]
@@ -1517,31 +1806,50 @@ pub fn corpus_create(
     folder_id: String,
     body: String,
 ) -> Result<NoteMeta, String> {
-    state.with(|s| s.create(&folder_id, &body))
+    let (root, rel) = split_root_id(&folder_id);
+    state.route(&root, |s| s.create(&rel, &body)).map(|mut m| {
+        m = prefix_meta(&root, m);
+        m.id = compose_root_id(&root, &m.id);
+        m
+    })
 }
 
 #[tauri::command]
 pub fn corpus_delete(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
-    state.with(|s| s.delete(&id))
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.delete(&rel))
 }
 
 /// Move a note to another folder, preserving its id (Tauri maps the JS
 /// `targetFolder` arg to `target_folder`). The origin rule for the hidden
-/// Archive/Trash roots is baked into `move_note`.
+/// Archive/Trash roots is baked into `move_note`. Cross-root moves are not
+/// supported this iteration: the note id and the target folder must share a root.
 #[tauri::command]
 pub fn corpus_move(
     state: tauri::State<'_, CorpusState>,
     id: String,
     target_folder: String,
 ) -> Result<NoteMeta, String> {
-    state.with(|s| s.move_note(&id, &target_folder))
+    let (id_root, rel) = split_root_id(&id);
+    let (tgt_root, tgt_rel) = split_root_id(&target_folder);
+    if id_root != tgt_root {
+        return Err("moving a note across roots isn't supported yet".into());
+    }
+    state.route(&id_root, |s| s.move_note(&rel, &tgt_rel)).map(|mut m| {
+        m = prefix_meta(&id_root, m);
+        if m.kind == NoteKind::Note {
+            m.id = compose_root_id(&id_root, &m.id);
+        }
+        m
+    })
 }
 
 /// The hard delete (a future "Empty Trash") — no TS wrapper yet, but registered
 /// so the UI can reach it later.
 #[tauri::command]
 pub fn corpus_purge(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
-    state.with(|s| s.purge(&id))
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.purge(&rel))
 }
 
 #[tauri::command]
@@ -1550,7 +1858,22 @@ pub fn corpus_create_folder(
     name: String,
     parent_id: Option<String>,
 ) -> Result<FolderMeta, String> {
-    state.with(|s| s.create_folder(&name, parent_id.as_deref()))
+    // The root is carried by parent_id (a new top-level folder in a non-default
+    // root would be "<rootid>:") — split it; a bare/None parent → default root.
+    let (root, parent_rel) = match parent_id.as_deref() {
+        Some(p) => {
+            let (r, rel) = split_root_id(p);
+            (r, Some(rel))
+        }
+        None => (DEFAULT_ROOT_ID.to_string(), None),
+    };
+    state
+        .route(&root, |s| s.create_folder(&name, parent_rel.as_deref()))
+        .map(|mut f| {
+            f.parent_id = f.parent_id.map(|p| compose_root_id(&root, &p));
+            f.id = compose_root_id(&root, &f.id);
+            f
+        })
 }
 
 #[tauri::command]
@@ -1558,7 +1881,12 @@ pub fn corpus_read_board(
     state: tauri::State<'_, CorpusState>,
     id: String,
 ) -> Result<CorpusBoardDoc, String> {
-    state.with(|s| s.read_board(&id))
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.read_board(&rel)).map(|mut doc| {
+        doc.id = compose_root_id(&root, &doc.id);
+        doc.folder_id = compose_root_id(&root, &doc.folder_id);
+        doc
+    })
 }
 
 #[tauri::command]
@@ -1567,7 +1895,8 @@ pub fn corpus_write_board(
     id: String,
     body: String,
 ) -> Result<NoteMeta, String> {
-    state.with(|s| s.write_board(&id, &body))
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.write_board(&rel, &body)).map(|m| prefix_meta(&root, m))
 }
 
 /// Create a board in `folderId` (Tauri maps the JS `folderId` arg to
@@ -1578,12 +1907,22 @@ pub fn corpus_create_board(
     folder_id: String,
     body: Option<String>,
 ) -> Result<NoteMeta, String> {
-    state.with(|s| s.create_board(&folder_id, body.as_deref()))
+    let (root, rel) = split_root_id(&folder_id);
+    state
+        .route(&root, |s| s.create_board(&rel, body.as_deref()))
+        .map(|m| prefix_meta(&root, m))
 }
 
 #[tauri::command]
 pub fn corpus_overview(state: tauri::State<'_, CorpusState>) -> Result<CorpusOverview, String> {
-    state.with(|s| s.overview())
+    // The Storage pane shows the DEFAULT (local) root — the user's notes folder.
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |s| s.overview())
 }
 
 #[tauri::command]
@@ -1591,7 +1930,14 @@ pub fn corpus_settings_read(
     state: tauri::State<'_, CorpusState>,
     file: String,
 ) -> Result<String, String> {
-    state.with(|s| s.dot_read(&file))
+    // settings/viewstate/background live in the DEFAULT root's `.rotli/`.
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |s| s.dot_read(&file))
 }
 
 #[tauri::command]
@@ -1600,7 +1946,13 @@ pub fn corpus_settings_write(
     file: String,
     contents: String,
 ) -> Result<(), String> {
-    state.with(|s| s.dot_write(&file, &contents))
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |s| s.dot_write(&file, &contents))
 }
 
 // ─── tests ───────────────────────────────────────────────────────────────────
@@ -2258,16 +2610,231 @@ mod tests {
 
     #[test]
     fn legacy_open_still_scaffolds_reserved_folders() {
-        // a plain (non-memex) dir keeps today's behavior exactly
+        // a plain (non-memex) dir keeps today's behavior exactly — except the
+        // Brain reserved row became the external Vault (Track 2): we now scaffold
+        // "Vault" in its place, never "Brain".
         let dir = TempDir::new().unwrap();
         let mut store = CorpusStore::open(dir.path().join("corpus")).unwrap();
         store.os_trash = false;
         assert_eq!(store.layout, Layout::LegacyRotli);
-        for name in ["Inbox", "Brain", "Storage", "Board", "Archive", "Trash"] {
+        for name in ["Inbox", "Vault", "Storage", "Board", "Archive", "Trash"] {
             assert!(
                 store.root().join(name).is_dir(),
                 "legacy open must still scaffold the reserved folder {name}"
             );
+        }
+        // "Brain" is no longer a reserved row — it is NOT scaffolded by rotli.
+        assert!(
+            !store.root().join("Brain").exists(),
+            "Brain must no longer be scaffolded as a reserved row"
+        );
+    }
+
+    // ── Track 2: multi-root foundation (Build Step 1) ──
+
+    #[test]
+    fn split_and_compose_round_trip_the_id_scheme() {
+        // bare ids → the default root, unchanged (the byte-identical gate)
+        assert_eq!(split_root_id("Inbox"), ("default".into(), "Inbox".into()));
+        assert_eq!(split_root_id("Inbox/Work"), ("default".into(), "Inbox/Work".into()));
+        assert_eq!(
+            split_root_id("01JXF00000000000000000000A"),
+            ("default".into(), "01JXF00000000000000000000A".into())
+        );
+        // a non-default root prefixes "<rootid>:" and splits on the FIRST colon
+        assert_eq!(split_root_id("vault:wiki/foo"), ("vault".into(), "wiki/foo".into()));
+        assert_eq!(split_root_id("vault:chats/x.md"), ("vault".into(), "chats/x.md".into()));
+        assert_eq!(split_root_id("vault:"), ("vault".into(), "".into()));
+
+        // compose: default → BARE (no prefix, ever); non-default → prefixed
+        assert_eq!(compose_root_id("default", "Inbox"), "Inbox");
+        assert_eq!(compose_root_id("default", "Inbox/Work"), "Inbox/Work");
+        assert_eq!(compose_root_id("vault", "wiki/foo"), "vault:wiki/foo");
+
+        // round-trips for the default root are IDENTITY on the wire
+        for id in ["Inbox", "Inbox/Work", "Storage", "01JXF00000000000000000000A"] {
+            let (r, rel) = split_root_id(id);
+            assert_eq!(compose_root_id(&r, &rel), id, "default round-trip must be byte-identical");
+        }
+    }
+
+    #[test]
+    fn colon_is_rejected_inside_a_path_component() {
+        // the router char must never be allowed inside a folder name, or a
+        // folder literally named "a:b" could collide with "<rootid>:path".
+        let (_dir, mut store) = bare();
+        assert!(store.create_folder("a:b", None).is_err(), "colon name must be rejected");
+        assert!(store.create("a:b", "# nope\n").is_err(), "colon folder must be rejected");
+        assert!(validate_component("plain").is_ok());
+        assert!(validate_component("has:colon").is_err());
+    }
+
+    #[test]
+    fn registry_persists_and_resolves_default() {
+        // the root registry serializes and the default is always recoverable.
+        let mut reg = RootRegistry::default();
+        assert!(reg.get(DEFAULT_ROOT_ID).is_none());
+        reg.upsert(CorpusRoot {
+            id: DEFAULT_ROOT_ID.to_string(),
+            label: "Notes".to_string(),
+            abs_path: PathBuf::from("/tmp/rotli"),
+        });
+        // upsert replaces rather than duplicates
+        reg.upsert(CorpusRoot {
+            id: DEFAULT_ROOT_ID.to_string(),
+            label: "Notes".to_string(),
+            abs_path: PathBuf::from("/tmp/rotli2"),
+        });
+        assert_eq!(reg.roots.len(), 1);
+        assert_eq!(reg.get(DEFAULT_ROOT_ID).unwrap().abs_path, PathBuf::from("/tmp/rotli2"));
+        // JSON round-trips
+        let json = serde_json::to_string(&reg).unwrap();
+        let back: RootRegistry = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.roots, reg.roots);
+    }
+
+    #[test]
+    fn ensure_reserved_never_runs_for_a_memex_root() {
+        // a NON-default / memex root (a TempDir fake memex) must never get the
+        // local reserved scaffold — Invariant 2. Proven structurally: open_memex
+        // skips ensure_reserved_folders, so NONE of the local reserved rows
+        // (incl. the renamed "Vault") are created inside the memex.
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+        assert_eq!(store.layout, Layout::Memex);
+        for name in ["Inbox", "Vault", "Storage", "Board"] {
+            assert!(
+                !store.root().join(name).exists(),
+                "memex/non-default root must NEVER scaffold the reserved folder {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn brain_to_vault_rename_never_touches_an_existing_brain_folder() {
+        // Invariant 4: a pre-existing on-disk Brain/ with a note is NOT moved,
+        // renamed, or deleted by the rename — it survives as a plain folder.
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("corpus");
+        fs::create_dir_all(root.join("Brain")).unwrap();
+        fs::write(
+            root.join("Brain/kept.md"),
+            "---\nid: 01BRAINKEEP000000000000AAA\ncreated: 2026-06-01T00:00:00Z\nupdated: 2026-06-01T00:00:00Z\npinned: false\n---\n\n# A Brain note\n",
+        )
+        .unwrap();
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+        // the Brain folder + its note still exist on disk after open
+        assert!(store.root().join("Brain").is_dir(), "existing Brain folder must survive");
+        assert!(store.root().join("Brain/kept.md").is_file(), "the note must survive");
+        // and it surfaces as a plain folder in the listing (no data loss)
+        let list = store.list().unwrap();
+        assert!(list.folders.iter().any(|f| f.id == "Brain"), "Brain surfaces as a plain folder");
+        let note = list.notes.iter().find(|n| n.id == "01BRAINKEEP000000000000AAA").unwrap();
+        assert_eq!(note.folder_id, "Brain");
+    }
+
+    /// Mirror of `corpus_list`'s aggregation, run directly against a registry so
+    /// the routing/prefixing layer is unit-testable without a Tauri State. Keep
+    /// in lockstep with `corpus_list`.
+    fn aggregate(reg: &mut CorpusRegistry) -> CorpusList {
+        let mut ids: Vec<String> = reg.stores.keys().cloned().collect();
+        ids.sort();
+        if let Some(pos) = ids.iter().position(|i| *i == reg.default_id) {
+            let d = ids.remove(pos);
+            ids.insert(0, d);
+        }
+        let mut folders: Vec<FolderMeta> = Vec::new();
+        let mut notes: Vec<NoteMeta> = Vec::new();
+        for id in ids {
+            let store = reg.stores.get_mut(&id).unwrap();
+            let list = store.list().unwrap();
+            for mut f in list.folders {
+                f.parent_id = f.parent_id.map(|p| compose_root_id(&id, &p));
+                f.id = compose_root_id(&id, &f.id);
+                folders.push(f);
+            }
+            for mut n in list.notes {
+                n = prefix_meta(&id, n);
+                if id != reg.default_id && n.kind == NoteKind::Note {
+                    n.id = compose_root_id(&id, &n.id);
+                }
+                notes.push(n);
+            }
+        }
+        CorpusList { folders, notes }
+    }
+
+    #[test]
+    fn default_only_registry_emits_bare_ids() {
+        // Invariant 1, at the routing layer: with ONLY the default root, every
+        // emitted folder/note id is BARE — byte-identical to the single-store world.
+        let (_dir, mut store) = fresh();
+        store.create("Inbox/Work", "# A routed note\n").unwrap();
+        let mut reg = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        reg.insert(DEFAULT_ROOT_ID.to_string(), store);
+        let list = aggregate(&mut reg);
+        for f in &list.folders {
+            assert!(!f.id.contains(':'), "default folder id must be bare: {}", f.id);
+            assert!(f.parent_id.as_deref().map(|p| !p.contains(':')).unwrap_or(true));
+        }
+        for n in &list.notes {
+            assert!(!n.id.contains(':'), "default note id must be bare: {}", n.id);
+            assert!(!n.folder_id.contains(':'), "default folder_id must be bare: {}", n.folder_id);
+        }
+        assert!(list.folders.iter().any(|f| f.id == "Inbox/Work"));
+    }
+
+    #[test]
+    fn vault_root_prefixes_ids_and_scopes_to_wiki_and_chats() {
+        // Invariants 1+2+3 at the routing layer: a memex "vault" root added beside
+        // the default emits "vault:"-prefixed ids, surfaces ONLY wiki/ + chats/,
+        // and never pollutes the default root's bare ids.
+        let (_ddir, default_store) = fresh();
+        let vdir = TempDir::new().unwrap();
+        let vroot = vdir.path().join("brain");
+        seed_memex(&vroot);
+        let mut vault_store = CorpusStore::open(vroot.clone()).unwrap();
+        vault_store.os_trash = false;
+        assert_eq!(vault_store.layout, Layout::Memex);
+
+        let mut reg = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        reg.insert(DEFAULT_ROOT_ID.to_string(), default_store);
+        reg.insert(VAULT_ROOT_ID.to_string(), vault_store);
+        let list = aggregate(&mut reg);
+
+        // default ids stay bare; vault ids are prefixed
+        let default_folders: Vec<&str> =
+            list.folders.iter().filter(|f| !f.id.contains(':')).map(|f| f.id.as_str()).collect();
+        assert!(default_folders.contains(&"Inbox"), "default Inbox stays bare");
+        let vault_folders: Vec<&str> = list
+            .folders
+            .iter()
+            .filter(|f| f.id.starts_with("vault:"))
+            .map(|f| f.id.as_str())
+            .collect();
+        assert!(vault_folders.contains(&"vault:wiki"), "wiki/ surfaces, prefixed");
+        assert!(vault_folders.contains(&"vault:chats"), "chats/ surfaces, prefixed");
+        // the brain's memory never surfaces, even prefixed
+        assert!(
+            !list.folders.iter().any(|f| f.id.starts_with("vault:self")
+                || f.id.starts_with("vault:history")),
+            "self/ + history/ must never surface from the vault"
+        );
+        // every vault note lives under wiki/ or chats/ and its folder_id is prefixed
+        for n in list.notes.iter().filter(|n| n.folder_id.starts_with("vault:")) {
+            assert!(
+                n.folder_id == "vault:wiki" || n.folder_id == "vault:chats",
+                "vault note outside wiki/+chats/: {}",
+                n.folder_id
+            );
+        }
+        // the memex root was never scaffolded with local reserved rows
+        for name in ["Inbox", "Vault", "Storage", "Board"] {
+            assert!(!vroot.join(name).exists(), "vault memex must not be scaffolded: {name}");
         }
     }
 

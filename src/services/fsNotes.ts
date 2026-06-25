@@ -14,7 +14,7 @@ import {
   corpusWrite,
 } from "../lib/tauri";
 import type { Folder, Note, NoteSummary } from "../types";
-import { DEST, isHidden } from "./destinations";
+import { DEST, isHidden, isRootMarker, isVault } from "./destinations";
 import { snippetOf, titleOf } from "./derive";
 import type { NotesService } from "./notes";
 
@@ -45,8 +45,15 @@ export class FsNotesService implements NotesService {
 
   async listNotes(folderId?: string): Promise<NoteSummary[]> {
     const { notes } = await corpusList();
-    // All Notes (no folderId): everything EXCEPT the hidden roots.
-    if (!folderId) return notes.filter((n) => !isHidden(n.folderId));
+    // All Notes (no folderId): everything EXCEPT the hidden roots AND the
+    // external Vault — the Vault is browsed only via its own row, never mixed
+    // into the local "All notes" pick.
+    if (!folderId) return notes.filter((n) => !isHidden(n.folderId) && !isVault(n.folderId));
+    // A non-default ROOT MARKER ("vault:") scopes to the whole external root —
+    // its surfaced subtree (wiki/ + chats/) is everything prefixed with it.
+    if (isRootMarker(folderId)) {
+      return notes.filter((n) => n.folderId.startsWith(folderId));
+    }
     // Asking for a hidden root (Archive/Trash) is the ONLY way to see it:
     // scope to that root's subtree and nothing leaks elsewhere.
     if (isHidden(folderId)) {

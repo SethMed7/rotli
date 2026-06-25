@@ -21,6 +21,7 @@ import { GLASS_BG_SRC } from "../lib/glassBackgrounds";
 import {
   checkForUpdate,
   corpusOverview,
+  corpusSetRoot,
   corpusUseLegacy,
   corpusUseMemex,
   downloadAndInstallUpdate,
@@ -31,7 +32,7 @@ import {
   setHideOnBlur,
 } from "../lib/tauri";
 import { useFolders } from "../services/hooks";
-import { isHidden } from "../services/destinations";
+import { isHidden, isVault } from "../services/destinations";
 import { resetAndReonboard } from "../state/onboarding";
 import { setQuickFolderSynced } from "../state/quick";
 import {
@@ -400,7 +401,9 @@ function GeneralPane() {
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const [confirmReset, setConfirmReset] = useState(false);
   const quickFolder = useUiStore((s) => s.quickFolder);
-  const folderOpts = (useFolders().data ?? []).filter((f) => !isHidden(f.id));
+  // The external Vault is read-mostly — quick notes never land there, so keep it
+  // (and its wiki/chats subfolders) out of the destination picker entirely.
+  const folderOpts = (useFolders().data ?? []).filter((f) => !isHidden(f.id) && !isVault(f.id));
   const hasCurrent = folderOpts.some((f) => f.id === quickFolder);
   return (
     <>
@@ -737,6 +740,8 @@ function StoragePane() {
   const rootPath = real.data?.root ?? "~/Documents/rotli";
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [vaultBusy, setVaultBusy] = useState(false);
+  const [vaultErr, setVaultErr] = useState<string | null>(null);
 
   const change = () => {
     setErr(null);
@@ -747,6 +752,18 @@ function StoragePane() {
       })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => setBusy(false));
+  };
+
+  // Connect the Vault to an external memex (Seth's ~/smBrain). REGISTERS the
+  // picked folder as the vault root — never moves anything. The Rust command
+  // opens the native picker, refuses a non-memex, and relaunches on success
+  // (so this rarely resolves; a cancel resolves false, an error rejects).
+  const connectVault = () => {
+    setVaultErr(null);
+    setVaultBusy(true);
+    corpusSetRoot("vault")
+      .catch((e: unknown) => setVaultErr(e instanceof Error ? e.message : String(e)))
+      .finally(() => setVaultBusy(false));
   };
 
   return (
@@ -804,6 +821,26 @@ function StoragePane() {
         <code>.rotli/</code> holds the search index and settings; deleting it loses nothing but a
         rebuild.
       </p>
+
+      <h3>The Vault</h3>
+      <p className="lead">
+        The Vault is a folder <em>outside</em> rotli that it browses in place — your knowledge base.
+        Connect one and its notes appear under the Vault row, read-only, <em>alongside</em> your local
+        notes. rotli never moves it, never writes your notes into it: new notes always land in your
+        local Inbox. (To make a memex your <em>whole</em> notes corpus instead, see <b>Memory</b>.)
+      </p>
+      <div className="locrow">
+        <div className="loctext">
+          <span className="loclabel">Connected folder</span>
+          <code className="locpath">{isTauri() ? "— pick a folder to connect" : "—"}</code>
+        </div>
+        <div className="locact">
+          <button type="button" className="ghostbtn" onClick={connectVault} disabled={vaultBusy}>
+            {vaultBusy ? "Connecting…" : "Connect a folder…"}
+          </button>
+        </div>
+      </div>
+      {vaultErr && <p className="setnote err">Couldn’t connect the Vault: {vaultErr}</p>}
     </>
   );
 }
@@ -882,9 +919,13 @@ function MemexPane() {
     <>
       <h3>Memory</h3>
       <p className="lead">
-        rotli <b>mirrors</b> a memex — it never imports it. It reads your whole brain (self · wiki ·
-        history · chats · inbox · map) and writes only <b>chats</b> and <b>inbox</b>. Your{" "}
-        <b>history</b> and <b>self</b> are never touched; <b>wiki</b> is read-only for now.
+        rotli <b>mirrors</b> a memex — it never imports it. <b>Memory</b> makes a memex your{" "}
+        <em>whole</em> notes corpus (it replaces <code>~/Documents/rotli</code>). To browse a memex{" "}
+        <em>alongside</em> your local notes instead — as a row in the sidebar — connect it as{" "}
+        <b>Storage → The Vault</b>. Either way rotli reads your whole brain (self · wiki · history ·
+        chats · inbox · map) and writes only <b>chats</b> (the chat area, once you start chats) and{" "}
+        <b>inbox</b> (quick captures); <b>history</b> and <b>self</b> are never touched, and{" "}
+        <b>wiki</b> is read-only.
       </p>
 
       {candidates.length > 0 && (

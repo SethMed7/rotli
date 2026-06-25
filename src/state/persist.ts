@@ -159,8 +159,10 @@ function parseSettings(raw: string): PersistedSettings {
         : DEFAULT_NOTE_STYLE.size;
     noteStyles[id] = { size, measure: asEnum(s.measure, MEASURES, DEFAULT_NOTE_STYLE.measure) };
   }
-  // expandedDests — keep only boolean entries; missing → seed Inbox + Brain so
-  // an old config (which lacked this key) opens with the default tree
+  // expandedDests — keep only boolean entries; missing → seed Inbox + Vault so
+  // an old config (which lacked this key) opens with the default tree. A stale
+  // "Brain" key from before the Brain→Vault rename is harmless: it just expands a
+  // plain folder that may no longer exist (no crash), so we leave it as-is.
   const rawDests = record(data.expandedDests);
   const expandedDests: Record<string, boolean> = {};
   for (const [id, open] of Object.entries(rawDests)) {
@@ -168,7 +170,7 @@ function parseSettings(raw: string): PersistedSettings {
   }
   if (Object.keys(expandedDests).length === 0) {
     expandedDests.Inbox = true;
-    expandedDests.Brain = true;
+    expandedDests["vault:"] = true;
   }
   // the quick set: keep only string ids, cap at QUICK_MAX; the active note must
   // be one of them; the folder falls back to Inbox
@@ -378,10 +380,12 @@ async function hydrateViewstate(): Promise<void> {
     if (focusedPaneId) usePanesStore.setState({ root, focusedPaneId });
   }
 
-  // reserved dest ids (Inbox/Brain/Storage/Archive/Trash) join the smart rows +
-  // real folders in the valid set, so a fresh corpus that selected a
+  // reserved dest ids (Inbox/vault:/Storage/Board/Archive/Trash) join the smart
+  // rows + real folders in the valid set, so a fresh corpus that selected a
   // destination before its first list resolved isn't reset to All Notes
-  // (Seth, 2026-06-13).
+  // (Seth, 2026-06-13). A stored "Brain" id from before the rename is no longer
+  // reserved — it's restored only if "Brain" is still a real folder, else
+  // ignored (falls back to ALL_NOTES), never a crash (Invariant 6).
   const folderIds = new Set<string>([
     ALL_NOTES,
     RECENT,
