@@ -25,6 +25,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { parseBlock } from "./render";
+import { lineInFence, scanFences } from "./fences";
 
 interface Sel {
   from: number;
@@ -237,10 +238,18 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
   const atomics: Range<Decoration>[] = [];
   const sel = view.state.selection.main;
   const doc = view.state.doc;
+  // blockRender owns the three rendered fenced languages; livePreview must leave
+  // every fenced line alone (raw code voice, never markdown-styled, and never a
+  // decoration that collides with the block widget on the same range).
+  const fences = scanFences(doc);
   for (const { from, to } of view.visibleRanges) {
     let pos = from;
     while (pos <= to) {
       const line = doc.lineAt(pos);
+      if (lineInFence(line.from, fences)) {
+        pos = line.to + 1;
+        continue;
+      }
       const text = line.text;
       const ls = line.from;
       const block = parseBlock(text);

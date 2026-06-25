@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Diagrams & math in your notes** — fenced ` ```math ` (KaTeX), ` ```mermaid `,
+  and ` ```jsxgraph ` (interactive plots — sine waves, unit circles, draggable
+  points) now render inline in the editor. They follow your theme, show an
+  **Expand** button, and reveal their raw source when you click/caret into them
+  (your `.md` keeps the literal fenced source — it's a render layer, never a
+  rewrite). Bad input shows a tidy error box instead of breaking the editor.
 - **Excalidraw boards** — a board is a real `.excalidraw` file living in your
   corpus folders next to your `.md` notes (a file you own, openable in
   excalidraw.com). Boards open in a pane like a note, save to disk as you draw,

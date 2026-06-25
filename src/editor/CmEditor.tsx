@@ -25,6 +25,7 @@ import {
   toggleInlineMark,
   unregisterEditor,
 } from "./commands";
+import { blockRender } from "./blockRender";
 import { focusDim } from "./focusMode";
 import { livePreview } from "./livePreview";
 import { stripMarkdown } from "./stripMarkdown";
@@ -261,7 +262,7 @@ export function CmEditor({
         EditorView.scrollMargins.of(() =>
           formatBarRef.current ? { bottom: FORMAT_BAR_SCROLL_MARGIN } : null,
         ),
-        viewModeComp.of(rawEditorRef.current ? [] : livePreview),
+        viewModeComp.of(rawEditorRef.current ? [] : [livePreview, blockRender]),
         EditorView.domEventHandlers({
           copy: (e, v) => copyStripped(e, v, false),
           cut: (e, v) => copyStripped(e, v, true),
@@ -335,7 +336,9 @@ export function CmEditor({
   // beautified ⇄ raw markdown: swap the live-preview decorations on/off
   useEffect(() => {
     rawEditorRef.current = rawEditor;
-    viewRef.current?.dispatch({ effects: viewModeComp.reconfigure(rawEditor ? [] : livePreview) });
+    viewRef.current?.dispatch({
+      effects: viewModeComp.reconfigure(rawEditor ? [] : [livePreview, blockRender]),
+    });
   }, [rawEditor, viewModeComp]);
 
   // keep the slash key-handler bound to the current query + index

@@ -3,6 +3,7 @@ import "./styles/base.css";
 import "./styles/app.css";
 import "./styles/notes.css";
 import "./styles/editor.css";
+import "./styles/render.css";
 import "./styles/command.css";
 import "./styles/quick.css";
 import "./styles/onboarding.css";
