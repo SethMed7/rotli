@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Nested folders** — create a folder inside any folder (e.g. an `excalidraw`
   folder inside Inbox) from the `+` menu. The inline name commits on Enter or
   when you click away (Esc cancels).
+- **Per-section `+`** — hover any section (Inbox / Brain / Storage / a folder)
+  and a `+` appears where the count was: one click drops a new folder *inside*
+  that section. Plus a **collapse-all** button in the sidebar header.
 
 ### Changed
 - **Board** and **All notes** now open as grids in the content area to the right

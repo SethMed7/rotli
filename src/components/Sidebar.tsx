@@ -84,6 +84,26 @@ function RestoreGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
+/** Collapse-all glyph — two chevrons folding toward the center ("fold the tree
+ * up"). Inline like RestoreGlyph; same 1.7 stroke / 24-viewBox family. */
+function FoldGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M7 9l5-5 5 5M7 20l5-5 5 5" />
+    </svg>
+  );
+}
+
 /** Capture-board glyph — a 2×2 grid of cards (the quick-capture Board button).
  * Named distinctly from the imported CanvasItemGlyph (the .excalidraw board icon)
  * so the two never get crossed. Same stroke/viewBox grammar as the family. */
@@ -297,6 +317,7 @@ export function Sidebar() {
   const contentView = useUiStore((s) => s.contentView);
   const setContentView = useUiStore((s) => s.setContentView);
   const expandedDests = useUiStore((s) => s.expandedDests);
+  const collapseAllDests = useUiStore((s) => s.collapseAllDests);
   const toggleDestExpanded = useUiStore((s) => s.toggleDestExpanded);
   const setDestExpanded = useUiStore((s) => s.setDestExpanded);
   const focusedNoteId = useFocusedNoteId();
@@ -512,6 +533,7 @@ export function Sidebar() {
             </span>
             <FolderGlyph size={14} />
             <span className="fname">{folder.name}</span>
+            {sectionAddBtn(folder.id)}
             <span className="count">{countFor(folder, destNotes)}</span>
           </button>
           {open && (
@@ -649,14 +671,16 @@ export function Sidebar() {
     openCanvas(meta.id);
   };
 
-  // "+" → New folder: open the inline input row under the resolved parent (and
-  // expand it so the input is on screen).
-  const startNewFolder = () => {
+  // "+" → New folder: open the inline input row under a parent (and expand it so
+  // the input is on screen). The header "+" passes nothing → the resolved
+  // (selected) folder; a per-section "+" passes that section id directly, so you
+  // can drop a folder inside any section in one click ("folders in folders").
+  const startNewFolder = (parent?: string) => {
     setPlusOpen(false);
-    const parent = resolvedParent();
+    const target = parent ?? resolvedParent();
     setNewFolderName("");
-    setNewFolderParent(parent);
-    setDestExpanded(parent, true);
+    setNewFolderParent(target);
+    setDestExpanded(target, true);
   };
 
   const cancelNewFolder = () => {
@@ -726,6 +750,26 @@ export function Sidebar() {
       </div>
     ) : null;
 
+  // a per-section hover "+" — drops a new folder INSIDE that section in one click
+  // (the reference's per-section add; the cleanest "folders in folders" gesture).
+  // A role=button span: the row itself is a <button>, so a nested <button> would
+  // be invalid markup — same trick the note rows use for archive/trash.
+  const sectionAddBtn = (parentId: string): ReactNode => (
+    <span
+      role="button"
+      tabIndex={0}
+      className="frow-add"
+      aria-label="New folder inside"
+      title="New folder inside"
+      onClick={(event) => {
+        event.stopPropagation();
+        startNewFolder(parentId);
+      }}
+    >
+      <PlusGlyph size={13} />
+    </span>
+  );
+
   return (
     <aside className="sidebar" aria-label="Notes">
       {/* the sidebar toggle now lives in the titlebar (always visible, the clear
@@ -743,6 +787,19 @@ export function Sidebar() {
             aria-label="Filter notes"
           />
         </div>
+        {/* collapse-all — fold every expanded section/folder at once (matches
+            the reference's collapse icon; handy once folders nest deep) */}
+        <button
+          type="button"
+          className="icobtn"
+          aria-label="Collapse all folders"
+          onClick={collapseAllDests}
+        >
+          <FoldGlyph size={16} />
+          <span className="tip" aria-hidden="true">
+            Collapse all
+          </span>
+        </button>
         {/* the "+" create menu (replaces the pencil): New note / board / folder
             (Seth, 2026-06-24). The wrapper holds the anchor ref so toggling the
             button doesn't close-then-reopen on the same click. */}
@@ -791,7 +848,7 @@ export function Sidebar() {
                 type="button"
                 className="rowmenu-item"
                 role="menuitem"
-                onClick={startNewFolder}
+                onClick={() => startNewFolder()}
               >
                 <span className="rowmenu-glyph">
                   <FolderGlyph size={16} />
@@ -875,6 +932,7 @@ export function Sidebar() {
                 </span>
                 <Glyph size={14.5} />
                 <span className="fname">{label}</span>
+                {!isHidden(id) && sectionAddBtn(id)}
                 <span className="count">{destNotes.length}</span>
               </button>
               {open && (

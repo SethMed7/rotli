@@ -175,6 +175,9 @@ interface UiState {
   expandedDests: Record<string, boolean>;
   toggleDestExpanded: (id: string) => void;
   setDestExpanded: (id: string, open: boolean) => void;
+  /** Collapse every expanded destination + folder at once (the sidebar's
+   * collapse-all toolbar button). */
+  collapseAllDests: () => void;
 
   /** Folders-rail selection (window-level). */
   selectedFolderId: string;
@@ -336,6 +339,7 @@ export const useUiStore = create<UiState>((set, get) => ({
     set((s) => ({ expandedDests: { ...s.expandedDests, [id]: !s.expandedDests[id] } })),
   setDestExpanded: (id, open) =>
     set((s) => ({ expandedDests: { ...s.expandedDests, [id]: open } })),
+  collapseAllDests: () => set({ expandedDests: {} }),
 
   selectedFolderId: ALL_NOTES,
   setSelectedFolderId: (id) => set({ selectedFolderId: id }),

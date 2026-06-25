@@ -110,6 +110,35 @@
   font-size: 11px;
   color: var(--text-muted);
 }
+/* per-section hover "+": appears where the count sits (on row hover) to drop a
+   folder inside that section — the reference's per-section add (Seth, 2026-06-24).
+   :has() lets the count make way only on rows that actually carry a "+" (smart
+   rows / Archive / Trash keep their count on hover). */
+.frow-add {
+  display: none;
+  margin-left: auto;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-control);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.frow-add svg {
+  display: block;
+}
+.frow:hover .frow-add {
+  display: inline-flex;
+}
+.frow:hover:has(.frow-add) .count {
+  display: none;
+}
+.frow-add:hover {
+  background: var(--hov);
+  color: var(--text);
+}
 /* the disclosure caret: a 14px slot left of the icon, rotated 90° when open —
    the inline chevron that makes a destination/folder expandable (Seth,
    2026-06-13). Smart rows omit it, so their icon sits where the caret would. */
