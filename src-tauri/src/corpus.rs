@@ -127,7 +127,7 @@ pub fn clear_saved_memex_root(app: &tauri::AppHandle) -> std::io::Result<()> {
 /// chain — the saved legacy choice if it still exists, else `~/Documents/rotli`.
 pub fn resolve_root(app: &tauri::AppHandle) -> PathBuf {
     // The pointer is honored only while it STILL points at a real memex. If the
-    // folder lost its memex.json (a git checkout/rename of smBrain), the pointer
+    // folder lost its memex.json (a git checkout/rename of memex-vault), the pointer
     // is ignored and we fall through to the LEGACY chain (~/Documents/rotli) —
     // never open_legacy on the brain, which would scaffold reserved folders +
     // surface self/history as editable notes.
@@ -186,7 +186,7 @@ pub fn relocate(old_root: &Path, new_root: &Path) -> Result<(), String> {
 /// The reserved id of the local default root — always registered, always bare.
 pub const DEFAULT_ROOT_ID: &str = "default";
 /// The reserved id of the external "Vault" root (binds to a memex, e.g.
-/// ~/smBrain). Registered only when bound; ids under it carry the `vault:`
+/// ~/memex-vault). Registered only when bound; ids under it carry the `vault:`
 /// prefix.
 pub const VAULT_ROOT_ID: &str = "vault";
 
@@ -252,7 +252,7 @@ pub fn write_root_registry(app: &tauri::AppHandle, reg: &RootRegistry) -> Result
 /// present (id "default", abs_path = today's `resolve_root`), so the registry
 /// can never be missing the default. Persists the default back if it was added
 /// (best-effort). The vault auto-bind is layered on by `lib.rs` at startup — a
-/// vault entry is added there only when ~/smBrain is a valid memex.
+/// vault entry is added there only when ~/memex-vault is a valid memex.
 pub fn resolve_registry(app: &tauri::AppHandle) -> RootRegistry {
     let mut reg = read_root_registry(app);
     let default_path = resolve_root(app);
@@ -271,19 +271,19 @@ pub fn resolve_registry(app: &tauri::AppHandle) -> RootRegistry {
     reg
 }
 
-/// The path the "vault" root auto-binds to on Seth's machine — `~/smBrain` —
+/// The path the "vault" root auto-binds to on Seth's machine — `~/memex-vault` —
 /// BUT only ever when it is a valid memex (`is_memex_root`). Never bind the
 /// vault to a non-memex directory automatically.
 fn default_vault_path() -> Option<PathBuf> {
-    std::env::var("HOME").ok().map(|h| PathBuf::from(h).join("smBrain"))
+    std::env::var("HOME").ok().map(|h| PathBuf::from(h).join("memex-vault"))
 }
 
 /// The roots to open at startup, in order. Always includes the DEFAULT root.
 /// Adds the "vault" root when:
 ///   • the registry already has a vault entry whose abs_path is STILL a valid
 ///     memex (honor-only-while-a-memex, mirroring resolve_root), OR
-///   • the registry has no vault entry AND ~/smBrain exists AND is a valid
-///     memex — then auto-bind vault → ~/smBrain and persist it.
+///   • the registry has no vault entry AND ~/memex-vault exists AND is a valid
+///     memex — then auto-bind vault → ~/memex-vault and persist it.
 /// A vault that is absent or no longer a memex is left UNBOUND (no row) — the
 /// per-destination picker can connect it later. NEVER binds to a non-memex dir.
 pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
@@ -296,7 +296,7 @@ pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
     }
 
     // the vault: honor a stored binding only while it's still a memex; else try
-    // the ~/smBrain auto-bind. A non-memex binding is dropped (left unbound).
+    // the ~/memex-vault auto-bind. A non-memex binding is dropped (left unbound).
     let vault: Option<CorpusRoot> = match reg.get(VAULT_ROOT_ID) {
         Some(existing) if is_memex_root(&existing.abs_path) => Some(existing.clone()),
         Some(_) => None, // bound dir is no longer a memex → unbind (no row)
@@ -388,7 +388,7 @@ fn stamp_to_ms(stamp: &str) -> Option<i64> {
 
 /// A plain YYYY-MM-DD date stamp (UTC) — the memex note convention (v3.5). Local
 /// notes keep the RFC3339 `now_stamp`; a memex edit bumps `updated` with this so the
-/// note stays date-shaped like everything smBrain writes.
+/// note stays date-shaped like everything memex-vault writes.
 fn today_stamp() -> String {
     let now = OffsetDateTime::now_utc().date();
     format!("{:04}-{:02}-{:02}", now.year(), u8::from(now.month()), now.day())
@@ -800,7 +800,7 @@ const WELCOME_BODY: &str = "# Welcome to rotli\n\nThis folder is your corpus —
 /// `root/memex.json` for a valid `mx_` id.
 ///   • `LegacyRotli` — today's `~/Documents/rotli`: reserved folders, first-run,
 ///     everything writable. BYTE-IDENTICAL to before Increment 3.
-///   • `Memex` — the root IS someone's memex spine (for Seth, `~/smBrain`). Only
+///   • `Memex` — the root IS someone's memex spine (for Seth, `~/memex-vault`). Only
 ///     `chats/` is writable + surfaced read-write; `wiki/` is read-only; `self/`,
 ///     `history/`, `MAP.md`, `inbox.md` and every control file stay HIDDEN. No
 ///     reserved folders are scaffolded, no first-run seeding ever runs.
@@ -844,7 +844,7 @@ pub enum Surface {
 ///
 /// LegacyRotli surfaces everything read-write (today's behavior). Memex surfaces
 /// ONLY `wiki/` (read-only) + `chats/` (read-write) and hides the brain's memory
-/// (self/history/MAP/inbox) and every smBrain control file. Top-level smBrain
+/// (self/history/MAP/inbox) and every memex-vault control file. Top-level memex-vault
 /// docs (STRUCTURE.md, CONFIG.md, …) are `.md`, so this rule — not the dot-filter
 /// — is what keeps them out of the Notes tree.
 fn surfaced(layout: Layout, rel: &str) -> Surface {
@@ -932,10 +932,10 @@ impl CorpusStore {
     }
 
     /// The memex path (Increment 3): the root IS a memex spine. Create only the
-    /// dot-prefixed `.rotli/` sidecar (walk + smBrain's validate.ts both skip
+    /// dot-prefixed `.rotli/` sidecar (walk + memex-vault's validate.ts both skip
     /// dot-entries, so it never pollutes the brain) and load the index — but
     /// SKIP `ensure_reserved_folders` and SKIP `first_run`: rotli must never
-    /// scaffold its Inbox/Vault/Storage/… inside someone's smBrain. Layout::Memex
+    /// scaffold its Inbox/Vault/Storage/… inside someone's memex-vault. Layout::Memex
     /// then keeps every write off self/history/wiki/MAP/inbox + control files.
     fn open_memex(root: PathBuf) -> Result<Self, String> {
         let root = fs::canonicalize(&root)
@@ -1025,7 +1025,7 @@ impl CorpusStore {
         match surfaced(self.layout, rel) {
             Surface::NoteRW => Ok(()),
             _ => Err(format!(
-                "smBrain's memory is read-only here — rotli only writes chats (refused: {})",
+                "memex-vault's memory is read-only here — rotli only writes chats (refused: {})",
                 if rel.is_empty() { "<root>" } else { rel }
             )),
         }
@@ -1627,7 +1627,7 @@ fn walk(
         };
         // The scope gate (Increment 3): in Memex layout only wiki/ + chats/ are
         // surfaced; self/history/MAP/inbox + every control file are Hidden, so
-        // the brain's memory and smBrain's root docs never appear as notes. A
+        // the brain's memory and memex-vault's root docs never appear as notes. A
         // Hidden DIRECTORY is not descended into. LegacyRotli surfaces all.
         if surfaced(layout, &rel) == Surface::Hidden {
             continue;
@@ -2799,7 +2799,7 @@ mod tests {
         store.os_trash = false;
         assert_eq!(store.layout, Layout::Memex);
 
-        // NO rotli reserved folders scaffolded inside someone's smBrain. (We omit
+        // NO rotli reserved folders scaffolded inside someone's memex-vault. (We omit
         // Archive/Trash: the memex's own lowercase archive//trash/ sinks already
         // exist and macOS's case-insensitive FS would match them — the scope test
         // below proves they don't SURFACE, which is the real guarantee.)
@@ -2827,7 +2827,7 @@ mod tests {
         let folders_of: Vec<&str> = list.notes.iter().map(|n| n.folder_id.as_str()).collect();
         assert!(
             list.notes.iter().all(|n| n.title != "Structure" && n.title != "MAP" && n.title != "Inbox"),
-            "a root smBrain doc surfaced as an editable note"
+            "a root memex-vault doc surfaced as an editable note"
         );
         // every surfaced note lives under wiki/ or chats/, nothing else
         assert!(

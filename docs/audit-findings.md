@@ -80,4 +80,4 @@ this run: `bun test` + the `src/**/*.test.ts` suite.)*
 ## What this run added
 - A real `bun test` unit suite (70 tests, incl. the HIGH-trio regression locks) covering the corpus/lifecycle/keys/editor invariants — see `_review/README.md` for the migration story from the old screenshot scripts.
 - `tsc --noEmit` + `bun test` are now both folded into `bun run check`.
-- The forward build plan for Chat + smBrain multi-root: `docs/next-stages.md`.
+- The forward build plan for Chat + memex-vault multi-root: `docs/next-stages.md`.

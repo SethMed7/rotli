@@ -342,7 +342,7 @@ fn corpus_reveal(app: AppHandle) {
 fn corpus_relocate(app: AppHandle) -> Result<bool, String> {
     use tauri_plugin_dialog::DialogExt;
     // "Move folder…" moves your LEGACY notes folder. If rotli is currently
-    // browsing a memex (the corpus IS someone's smBrain), refuse — relocating
+    // browsing a memex (the corpus IS someone's memex-vault), refuse — relocating
     // would physically scatter the brain out of its home. Switch back first.
     if corpus::read_saved_memex_root(&app)
         .filter(|p| corpus::is_memex_root(p))
@@ -615,7 +615,7 @@ pub fn run() {
 
             // Phase 2 / Track 2 — the corpus, now MULTI-ROOT. Build the root
             // registry (the DEFAULT root is always registered, pointing at
-            // today's resolve_root), auto-bind the "vault" root to ~/smBrain ONLY
+            // today's resolve_root), auto-bind the "vault" root to ~/memex-vault ONLY
             // when it is a valid memex, open a CorpusStore per registered root,
             // and watch EACH for EXTERNAL changes (one watcher per root). The
             // frontend invalidates on "rotli:corpus-changed". A disk error on any

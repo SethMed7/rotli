@@ -1,9 +1,9 @@
 //! Stage 1 — the memex seam. rotli connects to (or initiates) a memex instance:
 //! the shared `self/ wiki/ history/ chats/ inbox.md MAP.md` spine that Breve also
-//! writes to (for Seth, `~/smBrain`).
+//! writes to (for Seth, `~/memex-vault`).
 //!
 //! MIRROR-NOT-IMPORT (the boundary law, see ~/breve/docs/memex-boundary.md): rotli
-//! NEVER imports smBrain's bun/node engine. It does file I/O here and only ever
+//! NEVER imports memex-vault's bun/node engine. It does file I/O here and only ever
 //! SHELLS OUT to the brain's own `scripts/validate.ts`. The byte-shape of the files
 //! it writes is mirrored in `src/memex/contract.ts` (TS) — this module just lays
 //! the bytes down atomically + under an advisory lock (Breve's daemon writes the
@@ -29,13 +29,13 @@ use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-/// The memex contract version rotli is built against (mirrors smBrain's
+/// The memex contract version rotli is built against (mirrors memex-vault's
 /// `CONTRACT_VERSION` and `src/memex/contract.ts`). rotli writes the v3.5 note
 /// contract but still WRITES to a v3.4 brain (the chat/inbox shape is unchanged),
 /// so the supported band is `[MIN_CONTRACT, CONTRACT_VERSION]`.
 const CONTRACT_VERSION: &str = "3.5";
 const MIN_CONTRACT: &str = "3.4";
-/// The inbox sentinel new captures are inserted after (matches smBrain's inbox.md).
+/// The inbox sentinel new captures are inserted after (matches memex-vault's inbox.md).
 const INBOX_MARK: &str = "<!-- entries below this line -->";
 
 // ─── time ─────────────────────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ fn assert_writable(rel: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "rotli only writes chats, inbox, and wiki/_inbox staging here — the rest of smBrain's memory is read-only (refused: {rel})"
+            "rotli only writes chats, inbox, and wiki/_inbox staging here — the rest of memex-vault's memory is read-only (refused: {rel})"
         ))
     }
 }
@@ -357,13 +357,13 @@ fn insert_inbox(existing: &str, line: &str) -> String {
 // ─── commands ──────────────────────────────────────────────────────────────────
 
 /// Scan the likely places for an existing memex (so first-run can offer "merge"):
-/// `~/smBrain`, `$MEMEX_KNOWLEDGE`, and any already-registered instance. Only
+/// `~/memex-vault`, `$MEMEX_KNOWLEDGE`, and any already-registered instance. Only
 /// dirs that are a real memex (valid `mx_` memex.json) are returned.
 #[tauri::command]
 pub fn memex_detect(app: tauri::AppHandle) -> Result<Vec<DetectedMemex>, String> {
     let mut roots: Vec<PathBuf> = Vec::new();
     if let Ok(home) = std::env::var("HOME") {
-        roots.push(PathBuf::from(&home).join("smBrain"));
+        roots.push(PathBuf::from(&home).join("memex-vault"));
     }
     if let Ok(env) = std::env::var("MEMEX_KNOWLEDGE") {
         if !env.is_empty() {
@@ -845,7 +845,7 @@ mod tests {
 
     #[test]
     fn contract_ok_accepts_the_band_only() {
-        assert!(contract_ok(Some("3.4"))); // smBrain's memex.json today
+        assert!(contract_ok(Some("3.4"))); // memex-vault's memex.json today
         assert!(contract_ok(Some("3.5"))); // a bumped card / a rotli-init'd brain
         assert!(!contract_ok(Some("3.3")));
         assert!(!contract_ok(Some("3.6")));

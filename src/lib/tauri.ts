@@ -357,7 +357,7 @@ export function onCorpusChanged(cb: () => void): () => void {
 
 // ——— the memex seam (Stage 1) — typed wrappers over the Rust memex commands
 //     (src-tauri/src/memex.rs). rotli connects to / initiates a memex instance
-//     (the shared self/wiki/history/chats/inbox.md spine; for Seth, ~/smBrain)
+//     (the shared self/wiki/history/chats/inbox.md spine; for Seth, ~/memex-vault)
 //     and OWNS chats/ + inbox.md, nothing else. Mirror-not-import: the byte-shape
 //     of what we write lives in src/memex/contract.ts; these only move bytes. ———
 

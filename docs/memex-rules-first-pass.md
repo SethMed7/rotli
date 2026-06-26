@@ -8,7 +8,7 @@ consistent no matter what plugs in); each client **renders a view that feels lik
 user's own organization**; the user never feels the gap. Both are **projections over
 one set of rule-governed files**. Placement is **rule-derived, never per-note declared.**
 
-**Who does what** (smBrain Configuration Rule #9 — *the brain makes no LLM calls*):
+**Who does what** (memex-vault Configuration Rule #9 — *the brain makes no LLM calls*):
 - **memex = a pure backend: structure + config + rules, nothing else.** `organize.ts`
   builds `MAP.md` from each note's `summary`; `validate.ts` enforces the contract. No LLM.
 - **the client = the "app"** — rotli / breve / voz, **or even a Claude Code session
@@ -149,7 +149,7 @@ read-only") → rotli writes `wiki/` (via the rules), never `history/`.
 
 ## 7. Access · tenancy · sharing (single-person OR multi-person)
 
-Builds directly on smBrain v3.4 tenancy (`users.json` · roles · `accessMode` · per-user
+Builds directly on memex-vault v3.4 tenancy (`users.json` · roles · `accessMode` · per-user
 partitions · "the app enforces who reaches which").
 
 - **Two modes, both supported:**
@@ -204,7 +204,7 @@ Your idea: a per-user **catalog = a table-of-contents of what that user can reac
 Nothing is hard-deleted. `delete` → `git mv` into **`trash/`** (soft, purgeable);
 `archive` → **`archive/`** (retired, kept). **Purge** (the real removal) is explicit +
 rare. The `id` + `reach:` ride along, so a trashed/archived note is still access-scoped
-and restorable. (Matches rotli's never-delete + smBrain's lifecycle.)
+and restorable. (Matches rotli's never-delete + memex-vault's lifecycle.)
 
 ---
 

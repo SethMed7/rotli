@@ -754,7 +754,7 @@ function StoragePane() {
       .finally(() => setBusy(false));
   };
 
-  // Connect the Vault to an external memex (Seth's ~/smBrain). REGISTERS the
+  // Connect the Vault to an external memex (Seth's ~/memex-vault). REGISTERS the
   // picked folder as the vault root — never moves anything. The Rust command
   // opens the native picker, refuses a non-memex, and relaunches on success
   // (so this rarely resolves; a cancel resolves false, an error rejects).
@@ -846,7 +846,7 @@ function StoragePane() {
 }
 
 // ——— Memory: the memex seam. Connect to (or initiate) a memex — the shared
-//     self/wiki/history/chats/inbox spine (for Seth, ~/smBrain) — keep multiple
+//     self/wiki/history/chats/inbox spine (for Seth, ~/memex-vault) — keep multiple
 //     separate non-blending instances, set per-instance write access, and run the
 //     brain's own validate.ts. rotli OWNS chats/ + inbox; the rest is read-only. ———
 

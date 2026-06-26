@@ -2,7 +2,7 @@
 
 *A code-grounded build plan. Stage 1 graduated 2026-06-12; this is what comes
 after the corpus and the unified sidebar. Two tracks, in order: **Chat MVP**
-ships next; **smBrain / memex multi-root** is deferred until smBrain stops
+ships next; **memex-vault / memex multi-root** is deferred until memex-vault stops
 moving. Every claim below points at a real line in today's tree.*
 
 The law that governs both tracks is already written into the code's comments:
@@ -289,24 +289,24 @@ the user has flipped the consent toggle.
 
 ---
 
-## Track 2 — smBrain / memex multi-root  *(DEFERRED)*
+## Track 2 — memex-vault / memex multi-root  *(DEFERRED)*
 
 ### Status: deferred, on purpose
 
 This is the next *structural* leap and it is already named on the roadmap
-(`roadmap.html:248-255`, the "smBrain wiring" card, tagged `planned`): point
-**Brain → `~/smBrain`**, introduce a `CorpusRoot{id,label,abs_path}` model, make
+(`roadmap.html:248-255`, the "memex-vault wiring" card, tagged `planned`): point
+**Brain → `~/memex-vault`**, introduce a `CorpusRoot{id,label,abs_path}` model, make
 folder ids become `root:path`, and add a per-destination directory picker. It is
-deferred not because the rotli side is hard, but because **smBrain's own
+deferred not because the rotli side is hard, but because **memex-vault's own
 structure is mid-change** — pointing Brain at a moving target would bake the
-churn into rotli's id scheme. Defer until smBrain stabilizes (see the checklist
-at the end). The roadmap card even says it out loud: *"you're building smBrain
+churn into rotli's id scheme. Defer until memex-vault stabilizes (see the checklist
+at the end). The roadmap card even says it out loud: *"you're building memex-vault
 now — untouched."*
 
 ### Goal
 
 Let a reserved destination resolve to a directory **outside** the single corpus
-root — specifically **Brain → `~/smBrain`** — so rotli reads and writes Seth's
+root — specifically **Brain → `~/memex-vault`** — so rotli reads and writes Seth's
 real knowledge base in place, without copying it into `~/Documents/rotli`. Today
 there is exactly one root and one store; this track makes roots plural while
 keeping single-root behavior bit-for-bit unchanged for everyone who never adds a
@@ -349,7 +349,7 @@ says so: *"the one place the corpus root is decided."* The relevant machinery:
 pub struct CorpusRoot {
     pub id: String,        // stable handle, e.g. "default" or "brain"
     pub label: String,     // sidebar label, e.g. "Brain"
-    pub abs_path: PathBuf,  // resolved absolute dir, e.g. ~/smBrain
+    pub abs_path: PathBuf,  // resolved absolute dir, e.g. ~/memex-vault
 }
 ```
 
@@ -383,9 +383,9 @@ pub struct CorpusRoot {
   corpus, *register* the picked dir as the `abs_path` for a destination's root.
   Persist the root registry beside `corpus-root.txt` (`corpus.rs:52-58`) — a new
   `corpus-roots.json`, same app-config-dir home, same "outside the corpus so it
-  can move" reasoning (`corpus.rs:50-51`). Pointing **Brain → `~/smBrain`** is
-  then: register a `CorpusRoot{ id:"brain", label:"Brain", abs_path: ~/smBrain }`
-  and route `brain:*` to it. Spawn a second watcher on `~/smBrain`
+  can move" reasoning (`corpus.rs:50-51`). Pointing **Brain → `~/memex-vault`** is
+  then: register a `CorpusRoot{ id:"brain", label:"Brain", abs_path: ~/memex-vault }`
+  and route `brain:*` to it. Spawn a second watcher on `~/memex-vault`
   (`corpus.rs:1032`) so external edits there fire `rotli:corpus-changed` too
   (`lib.rs:420-422`).
 
@@ -420,7 +420,7 @@ migration for the user's other notes. The in-memory mode's `seedReserved`
    reusing the dialog from `corpus_relocate` (`lib.rs:249-268`) but registering
    rather than relocating. Add a `corpus_set_root(dest_id, abs_path)` command
    beside the others in the `invoke_handler` (`lib.rs:379-404`).
-6. **Point Brain at `~/smBrain`** as the first real consumer — only after the
+6. **Point Brain at `~/memex-vault`** as the first real consumer — only after the
    checklist below is green.
 
 ### Risks
@@ -430,22 +430,22 @@ migration for the user's other notes. The in-memory mode's `seedReserved`
   by id (ulid), not folder, so the *index* survives; but any persisted UI state
   that stored a `folderId` (selection, viewstate) needs a migration. Stage the
   `default:` prefix as optional first (Step 2) to make it reversible.
-- **`~/smBrain` is not a flat notes folder.** It has `self/`, `wiki/`, `history/`,
+- **`~/memex-vault` is not a flat notes folder.** It has `self/`, `wiki/`, `history/`,
   `chats/`, `MAP.md`, `inbox.md`, a `STRUCTURE.md` layout contract, and a hard
   rule that **binaries never live in it** (CLAUDE.md). rotli's `walk`
   (`corpus.rs:949-1016`) only surfaces `.md` files and skips dot-entries — good —
-  but it will surface *every* `.md` across all of smBrain's subtrees as notes,
+  but it will surface *every* `.md` across all of memex-vault's subtrees as notes,
   which may not be the intended view. Needs a per-root include/scope rule before
   it's usable, not just a path.
 - **Frontmatter collision.** rotli *owns* four frontmatter keys and bumps
   `updated` on every write (`corpus.rs:600-658`); foreign keys pass through
-  (`corpus.rs:218-239`). smBrain notes may already carry their own frontmatter
+  (`corpus.rs:218-239`). memex-vault notes may already carry their own frontmatter
   conventions and `[[wikilinks]]`; confirm rotli's writeback (the four-fact block
-  + atomic rename, `corpus.rs:597-658`) is acceptable to smBrain's own tooling
-  (`bun ~/smBrain/scripts/validate.ts`) before letting rotli write there.
-- **Two tools writing one tree.** smBrain has its own git remote and validation;
+  + atomic rename, `corpus.rs:597-658`) is acceptable to memex-vault's own tooling
+  (`bun ~/memex-vault/scripts/validate.ts`) before letting rotli write there.
+- **Two tools writing one tree.** memex-vault has its own git remote and validation;
   rotli's atomic writes + watcher (`corpus.rs:406-426`, `1032-1063`) must not race
-  smBrain's tooling. The suppress set (`corpus.rs:387-404`) handles rotli's *own*
+  memex-vault's tooling. The suppress set (`corpus.rs:387-404`) handles rotli's *own*
   echoes, not a third writer.
 
 ### Test plan (when un-deferred)
@@ -463,40 +463,40 @@ migration for the user's other notes. The in-memory mode's `seedReserved`
 - **Origin rule within a root.** Re-run `move_into_archive_stamps_origin…`
   (`corpus.rs:1476-1510`) against a non-default root — the breadcrumb must stay
   root-relative.
-- **smBrain dry-run.** Point a *throwaway copy* of `~/smBrain` as Brain, run
-  smBrain's own `validate.ts`, and confirm rotli's writeback leaves it valid —
+- **memex-vault dry-run.** Point a *throwaway copy* of `~/memex-vault` as Brain, run
+  memex-vault's own `validate.ts`, and confirm rotli's writeback leaves it valid —
   before ever pointing at the real one.
 
-### What must stabilize in smBrain first (the un-defer checklist)
+### What must stabilize in memex-vault first (the un-defer checklist)
 
-Do **not** start Track 2 against the real `~/smBrain` until all of these are true:
+Do **not** start Track 2 against the real `~/memex-vault` until all of these are true:
 
-1. **`~/smBrain/STRUCTURE.md` is stable.** It is the named layout contract
+1. **`~/memex-vault/STRUCTURE.md` is stable.** It is the named layout contract
    (CLAUDE.md: *"read it before moving things; tools resolve its logical roots,
    never hardcode deep paths"*). rotli's per-root scope rule must read from it,
    so it cannot move while we wire to it.
 2. **The logical roots are frozen** — `self/`, `wiki/`, `history/`, `chats/`,
    `MAP.md`, `inbox.md`. rotli needs to know *which* of these are note-folders it
    should surface vs. control files it should ignore.
-3. **The frontmatter convention is decided.** Confirm whether smBrain notes carry
+3. **The frontmatter convention is decided.** Confirm whether memex-vault notes carry
    frontmatter today and whether rotli's four-fact block + `updated` bump
    (`corpus.rs:600-658`) is welcome, or whether Brain should be read-mostly.
-4. **The chats/history shapes settle.** smBrain's `chats/` is explicitly modeled
+4. **The chats/history shapes settle.** memex-vault's `chats/` is explicitly modeled
    on rotli ("everything has a chat", CLAUDE.md) — if Track 1's Chat is going to
    *write* into `chats/`, that format must be fixed first. This couples Track 1
    and Track 2: Chat-writes-to-Brain is the convergence point, and it can't be
    designed against a moving `chats/` schema.
-5. **The binaries rule is enforced** (`bun ~/smBrain/scripts/validate.ts`, the
+5. **The binaries rule is enforced** (`bun ~/memex-vault/scripts/validate.ts`, the
    `storage:` link convention). rotli must never surface or write a binary into
-   smBrain; confirm `walk`'s `.md`-only filter (`corpus.rs:981`) plus a per-root
+   memex-vault; confirm `walk`'s `.md`-only filter (`corpus.rs:981`) plus a per-root
    guard is sufficient.
-6. **smBrain's git/validation cadence is understood**, so rotli's watcher +
-   atomic writes don't fight smBrain's tooling (see the "two tools" risk).
+6. **memex-vault's git/validation cadence is understood**, so rotli's watcher +
+   atomic writes don't fight memex-vault's tooling (see the "two tools" risk).
 
 Until those are green, **leave Brain as a plain folder under `~/Documents/rotli`**
 (today's `ensure_reserved_folders`, `corpus.rs:498-511`). The multi-root scaffold
 (Steps 1–5) can be built and tested against throwaway roots independently of
-smBrain — only Step 6 waits.
+memex-vault — only Step 6 waits.
 
 ---
 
@@ -508,4 +508,4 @@ that already exist (`corpus.rs:1107-1115`), and is the literal next promise in
 the ModuleSwitcher (`ModuleSwitcher.tsx:18`). Track 2 (multi-root) is built in
 two halves: the root-registry scaffold (Steps 1–5) can proceed in parallel
 behind a single `"default"` root with zero user-visible change; pointing Brain at
-the real `~/smBrain` (Step 6) waits on the six-item smBrain checklist above.
+the real `~/memex-vault` (Step 6) waits on the six-item memex-vault checklist above.

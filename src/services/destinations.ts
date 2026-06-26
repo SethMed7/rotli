@@ -16,7 +16,7 @@
 export const VAULT_ROOT_ID = "vault";
 
 /** The Vault root marker id ("vault:"). The sidebar Vault row scopes to it; the
- * external memex (Seth's ~/smBrain) surfaces its wiki/ + chats/ underneath. */
+ * external memex (Seth's ~/memex-vault) surfaces its wiki/ + chats/ underneath. */
 export const VAULT_MARKER = `${VAULT_ROOT_ID}:`;
 
 /** True when folderId targets the external Vault root (the marker itself or any

@@ -151,7 +151,7 @@ function Choice<T extends string>({
   );
 }
 
-/** The "Memory" step — detect an existing memex (Seth's ~/smBrain auto-appears)
+/** The "Memory" step — detect an existing memex (Seth's ~/memex-vault auto-appears)
  * and offer to Merge into it, or keep notes-only for now. The choice is RECORDED
  * into the memex store; App.tsx commits it (connect) on finish, the same deferred
  * pattern as dock/behavior. Creating a fresh separate brain lives in Settings →

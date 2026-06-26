@@ -7,10 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The connected memex is now `memex-vault`** (was `smBrain`). The maintainer's brain
+  moved to `~/memex-vault` (repo `SethMed7/memex-vault`) to read as what it is — a private
+  instance of the open-source **memex** structure. rotli's auto-bind default and all
+  references follow it; the `vault:` root scheme and the **Vault** UI label are unchanged.
+  A memex's binaries now live in an internal, gitignored `storage/` (the `storage:` root),
+  so a connected memex is one self-contained folder. (No corpus migration — rotli keys the
+  Vault by root *name*, not path; re-point it in Settings → Storage if you'd bound the old
+  path, or rebuild so the new `~/memex-vault` default auto-binds.)
+
 ## [0.3.0] — 2026-06-25
 
 The memex release — rotli now reads, writes, edits, and creates notes inside a connected
-memex (your `~/smBrain`) per the v3.5 note contract, plus the Vault, Excalidraw boards,
+memex (your `~/memex-vault`) per the v3.5 note contract, plus the Vault, Excalidraw boards,
 nested folders, and inline diagrams/math from the increments since 0.2.2.
 
 ### Added
@@ -42,15 +52,15 @@ nested folders, and inline diagrams/math from the increments since 0.2.2.
   note contract: a hidden frontmatter block (`id` · `owner` · `created`/`updated` ·
   `shelf` · `reach`) wraps your plain-markdown body, with the AI metadata
   (`area`/`summary`/`tags`/`links`) left blank for a later local-LLM pass to classify
-  and file. The note round-trips smBrain's own `validate.ts` cleanly. This begins
+  and file. The note round-trips memex-vault's own `validate.ts` cleanly. This begins
   retiring the "notes always land in the local Inbox / Vault read-only" interim — the
   Vault sidebar browse stays read-only; the explicit write lives in Memory for now.
   rotli still writes **only** `chats/`, `inbox.md`, and `wiki/_inbox/` — the rest of
   the brain is refused at both the TS gate and the Rust guard. (rotli now speaks the
-  memex contract band **[3.4, 3.5]**, so a `~/smBrain` whose card still reads `3.4`
+  memex contract band **[3.4, 3.5]**, so a `~/memex-vault` whose card still reads `3.4`
   stays writable.)
 - **The Vault** (multi-root corpus) — the old "Brain" destination is now **Vault**
-  and points at an external memex (your `~/smBrain`), browsed in place in the
+  and points at an external memex (your `~/memex-vault`), browsed in place in the
   sidebar (its `wiki/` + `chats/`, read-only) alongside your local notes. Connect
   one in Settings → Storage → "Connect a folder…". rotli never writes your notes
   into it — `chats/` is only the chat area, and new notes always land in your
@@ -122,7 +132,7 @@ brain and signed auto-updates.
 
 ### Added
 - **memex integration** — rotli can read/connect/initiate a memex knowledge spine
-  (for the maintainer, `~/smBrain`): a read-only Memory browser over `wiki`/`self`/
+  (for the maintainer, `~/memex-vault`): a read-only Memory browser over `wiki`/`self`/
   `chats`, a Chat front that writes named `chats/` conversations, ⌥C captures that
   route to the brain's `inbox.md`, and "Browse in Notes" to make a memex the corpus.
   rotli owns `chats/` + `inbox.md` and never writes the brain's memory.

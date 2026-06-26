@@ -269,7 +269,7 @@ describe("the external Vault root (Track 2) — browse-only, prefix-scoped", () 
     return svc;
   }
 
-  // vault notes are SEEDED (read-only, like reading them off ~/smBrain on disk) —
+  // vault notes are SEEDED (read-only, like reading them off ~/memex-vault on disk) —
   // createNote REFUSES the vault (the write ceiling), so populate them directly.
   const TS = 1_700_000_000_000;
   const seedVault = (svc: InMemoryNotesService, folderId: string, body: string) =>

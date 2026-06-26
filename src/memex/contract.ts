@@ -1,6 +1,6 @@
 // The memex contract — MIRRORED BY VALUE, never imported.
 //
-// rotli is a separate repo. The memex (smBrain) is a SIBLING resolved by path at
+// rotli is a separate repo. The memex (memex-vault) is a SIBLING resolved by path at
 // runtime; it may be ABSENT or a DRIFTED copy, and its engine (mounts.ts /
 // conversations.ts / validate.ts) is bun/node — it CANNOT run in this webview at
 // all. So, exactly like Breve's scripts/config.ts (see ~/breve/docs/memex-boundary.md),
@@ -8,14 +8,14 @@
 // actual bytes-to-disk through its own Rust commands. The brain's validate.ts is
 // only ever SHELLED OUT to (Rust), never imported.
 //
-// DO NOT "DRY this up" by importing smBrain's mounts.ts / conversations.ts — that
+// DO NOT "DRY this up" by importing memex-vault's mounts.ts / conversations.ts — that
 // re-introduces module-load coupling and breaks rotli when the memex is missing or
 // its engine has drifted. This file is kept byte-identical to:
-//   • smBrain/scripts/conversations.ts  (slugify, the chat file shape, message
+//   • memex-vault/scripts/conversations.ts  (slugify, the chat file shape, message
 //     lines, the `## Chat` backlink, the inbox line, the `updated:` bump)
-//   • smBrain/scripts/mounts.ts          (accessMode fail-closed, memexId pinning,
+//   • memex-vault/scripts/mounts.ts          (accessMode fail-closed, memexId pinning,
 //     the contract-version range math)
-// contract.test.ts is the guard; re-sync this file whenever smBrain bumps
+// contract.test.ts is the guard; re-sync this file whenever memex-vault bumps
 // CONTRACT_VERSION or changes the chat/inbox shape. All functions here are PURE
 // (no I/O, no React) so they unit-test in a plain browser.
 

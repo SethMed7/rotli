@@ -1,6 +1,6 @@
 // Byte-equality tests for the memex contract mirror. These are the guard that
-// keeps src/memex/contract.ts identical to smBrain's conversations.ts / mounts.ts
-// (which we must NOT import). If smBrain bumps the contract or changes a shape,
+// keeps src/memex/contract.ts identical to memex-vault's conversations.ts / mounts.ts
+// (which we must NOT import). If memex-vault bumps the contract or changes a shape,
 // these fail first — re-sync contract.ts, don't loosen the test.
 
 import { describe, expect, test } from "bun:test";
@@ -172,7 +172,7 @@ describe("parseMemexInfo + isMemexId", () => {
 
 describe("contractInRange", () => {
   test("rotli's default band is [3.4, 3.5] — both the live brain and a bumped card pass", () => {
-    expect(contractInRange("3.4")).toBe(true); // smBrain's memex.json today
+    expect(contractInRange("3.4")).toBe(true); // memex-vault's memex.json today
     expect(contractInRange("3.5")).toBe(true); // a card bumped to the engine version
     expect(contractInRange("3.3")).toBe(false); // older than rotli supports
     expect(contractInRange("3.6")).toBe(false); // newer than rotli was built for

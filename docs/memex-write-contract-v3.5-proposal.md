@@ -1,8 +1,8 @@
 # Proposal — memex write-contract v3.5: a `notes/` root + the app-plugin model
 
 **Status:** STRAWMAN for Seth to redline. Authored from rotli (2026-06-25) against
-smBrain `STRUCTURE.md` **v3.4**. Nothing here is ratified — once you redline, the
-agreed version lands in `~/smBrain/STRUCTURE.md` (+ a `CHANGELOG.md` bump to v3.5)
+memex-vault `STRUCTURE.md` **v3.4**. Nothing here is ratified — once you redline, the
+agreed version lands in `~/memex-vault/STRUCTURE.md` (+ a `CHANGELOG.md` bump to v3.5)
 and the `[[smbrain-integration]]` note; then rotli implements strictly against it.
 
 ---
@@ -39,7 +39,7 @@ organizing — that's not optional, it's the engine. There are two layers:
   that defines files" = this hidden section.
 
 So: **the human organizes for humans; the local AI organizes for AI — on the same
-files.** rotli *inherits* this engine from smBrain (`organize.ts` deterministic MAP +
+files.** rotli *inherits* this engine from memex-vault (`organize.ts` deterministic MAP +
 the enrich/`learn.ts` LLM step + `client.ts` context packs) — it doesn't rebuild it.
 A note created in rotli triggers the local AI to fill its hidden section + index it.
 
@@ -56,7 +56,7 @@ A note created in rotli triggers the local AI to fill its hidden section + index
 
 | Resolver (proposed) | Primary path | Per-user? | Owner (write) |
 |---|---|---|---|
-| `notesPath(user?)` | `~/smBrain/notes` | yes — `userRoot(name)/notes` | **rotli** |
+| `notesPath(user?)` | `~/memex-vault/notes` | yes — `userRoot(name)/notes` | **rotli** |
 
 - **Visible + user-organized.** `notes/<your folders>/<slug>.md`. *You* make the
   folders and arrange them; rotli's sidebar shows them as-is. (Unlike `wiki/`,
@@ -140,7 +140,7 @@ voz captures personal voice insights. It becomes a **memex app** like rotli/Brev
   `history/` — TBD with voz's real shape), `connectApp("voz")`, never touches another
   app's surface; read by rotli + Breve.
 - **`~/voz` exists today and writes ELSEWHERE — so it has to move to plug into the
-  memex.** That's a cross-repo task in `~/voz` (resolve smBrain via a local config
+  memex.** That's a cross-repo task in `~/voz` (resolve memex-vault via a local config
   pointer like Breve/rotli; write through the contract). Until then voz isn't in the
   unified structure.
 - **In rotli: hidden by default, with a Settings toggle to show it.** Most people read
@@ -155,7 +155,7 @@ voz captures personal voice insights. It becomes a **memex app** like rotli/Brev
 
 ## 5. Versioning + enforcement (the deliberate, contract-correct part)
 
-Per smBrain's local-first rule (no "push an update" — change deliberately + version):
+Per memex-vault's local-first rule (no "push an update" — change deliberately + version):
 
 1. `STRUCTURE.md`: add the `notes/` root + the generalized ownership map → **bump
    v3.4 → v3.5** + a dated `CHANGELOG.md` entry (the DOCS contract rule).
@@ -191,7 +191,7 @@ rotli owns `notes/` + `chats/`, reads + may promote into `wiki/`, never `history
    (display ≠ disk, hidden section maps them) — OR the file **stays in the user's
    folder** and the hidden section only *records* its canonical role (semantic overlay,
    "what you see is where it is on disk")? This is the biggest call.
-7. **Local AI dependency:** memex mode needs a local LLM (the organizer). Use smBrain's
+7. **Local AI dependency:** memex mode needs a local LLM (the organizer). Use memex-vault's
    inherited engine (`organize.ts` + the enrich step), and which model (a local
    open-weight one from `~/open-weight-models`, or `agy`/Gemini for enrich)? Is wiring
    that in-scope now, or assumed-present? And what's the graceful degrade if no local

@@ -294,7 +294,7 @@ if (!FS_MODE) {
   svc.seedReserved(DEST.archive, DEST.archive);
   svc.seedReserved(DEST.trash, DEST.trash);
 
-  // The external Vault root (mirrors fs mode's memex auto-bind to ~/smBrain): a
+  // The external Vault root (mirrors fs mode's memex auto-bind to ~/memex-vault): a
   // non-default root whose surfaced folders carry the "vault:" prefix. Only
   // wiki/ (browse-only) + chats/ surface — self/history/etc never do. The Vault
   // row itself is the marker DEST.vault ("vault:"); these are its top-level
@@ -368,11 +368,11 @@ Ship the gateway migration, land the issuing portal rebuild, and get the partner
     );
 
     // —— Vault (external memex, browse-only): wiki/ notes that rotli reads but
-    // never writes. These mirror what surfaces from ~/smBrain — note-creation is
+    // never writes. These mirror what surfaces from ~/memex-vault — note-creation is
     // redirected to the local Inbox, never into here. ——
     svc.seedNote(
       "vault:wiki",
-      `# smBrain — the knowledge base
+      `# memex-vault — the knowledge base
 
 The durable, human-readable memory. rotli browses it read-only: wiki/ surfaces here, self/ and history/ never do.`,
       { createdAt: now - 3 * DAY, updatedAt: now - 3 * DAY },
