@@ -279,6 +279,13 @@ export function corpusCreateBoard(folderId: string, body?: string): Promise<Corp
   return corpusInvoke("corpus_create_board", body === undefined ? { folderId } : { folderId, body });
 }
 
+/** Rename a board (.excalidraw) within its folder. `name` is a free stem (no
+ * extension). Returns the board's NEW meta — its `id` is the new relpath, so the
+ * caller retargets any open canvas tab to it. */
+export function corpusRenameBoard(id: string, name: string): Promise<CorpusNoteMeta> {
+  return corpusInvoke("corpus_rename_board", { id, name });
+}
+
 /** Settings → Storage truth: the real root (home shortened to `~`), every
  * folder, every note file — what actually exists on disk, never a mock. */
 export interface CorpusOverview {

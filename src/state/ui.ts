@@ -224,6 +224,12 @@ interface UiState {
   contentView: ContentView;
   setContentView: (view: ContentView) => void;
 
+  /** The board id currently being renamed inline in the sidebar (its row shows a
+   * text input), or null. Set on right-click "Rename" and on new-board create so
+   * the user names it immediately (Seth, 2026-06-26). */
+  renamingBoardId: string | null;
+  setRenamingBoardId: (id: string | null) => void;
+
   /** The Chat front — named conversations over the connected memex (chats/) — as
    * its own surface (like Board). "Everything has a chat." Not persisted. */
   chatOpen: boolean;
@@ -369,6 +375,9 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   contentView: "panes",
   setContentView: (view) => set({ contentView: view }),
+
+  renamingBoardId: null,
+  setRenamingBoardId: (id) => set({ renamingBoardId: id }),
 
   chatOpen: false,
   setChatOpen: (open) => set({ chatOpen: open }),

@@ -33,7 +33,7 @@ import {
   useTrashNote,
 } from "../services/hooks";
 import { notesService } from "../services/notes";
-import { corpusCreateBoard } from "../lib/tauri";
+import { corpusCreateBoard, corpusRenameBoard } from "../lib/tauri";
 import {
   DEST,
   type Destination,
@@ -270,21 +270,55 @@ function CompactBoardRow({
   selected,
   padLeft,
   onOpen,
+  renaming,
+  onStartRename,
+  onCommitRename,
+  onCancelRename,
   rowProps,
 }: {
   board: NoteSummary;
   selected: boolean;
   padLeft: number;
   onOpen: (newTab: boolean) => void;
+  renaming: boolean;
+  onStartRename: () => void;
+  onCommitRename: (name: string) => void;
+  onCancelRename: () => void;
   rowProps: ReturnType<ReturnType<typeof useRovingList>["rowProps"]>;
 }) {
   const onClick = (event: MouseEvent) => onOpen(event.metaKey);
+  // inline rename: right-click a board (or a freshly created one) turns the row
+  // into a text input. Enter commits; Esc / click-away cancels (Seth, 2026-06-26).
+  if (renaming) {
+    return (
+      <div className="sb-newfolder snrow" style={{ paddingLeft: padLeft }}>
+        <CanvasItemGlyph size={14} className="snicon" />
+        <input
+          autoFocus
+          type="text"
+          defaultValue={board.title}
+          placeholder="Board name…"
+          aria-label="Rename board"
+          onFocus={(e) => e.currentTarget.select()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onCommitRename(e.currentTarget.value);
+            else if (e.key === "Escape") onCancelRename();
+          }}
+          onBlur={() => onCancelRename()}
+        />
+      </div>
+    );
+  }
   return (
     <button
       type="button"
       className={selected ? "snrow sel" : "snrow"}
       style={{ paddingLeft: padLeft }}
       onClick={onClick}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onStartRename();
+      }}
       {...rowProps}
     >
       <CanvasItemGlyph size={14} className="snicon" />
@@ -331,6 +365,9 @@ export function Sidebar() {
   const focusedBoardId = useFocusedBoardId();
   const openNote = usePanesStore((s) => s.openNote);
   const openCanvas = usePanesStore((s) => s.openCanvas);
+  const retargetBoard = usePanesStore((s) => s.retargetBoard);
+  const renamingBoardId = useUiStore((s) => s.renamingBoardId);
+  const setRenamingBoardId = useUiStore((s) => s.setRenamingBoardId);
   const [filter, setFilter] = useState("");
   const filterRef = useRef<HTMLInputElement>(null);
 
@@ -517,6 +554,10 @@ export function Sidebar() {
               selected={board.id === focusedBoardId}
               padLeft={28 + level * 16}
               onOpen={openBoardRow(board.id)}
+              renaming={renamingBoardId === board.id}
+              onStartRename={() => setRenamingBoardId(board.id)}
+              onCommitRename={(name) => void commitBoardRename(board.id, name)}
+              onCancelRename={() => setRenamingBoardId(null)}
               rowProps={rp({ id: board.id, kind: "note" })}
             />
           ))}
@@ -705,6 +746,24 @@ export function Sidebar() {
     await invalidateNotes();
     setDestExpanded(parent, true);
     openCanvas(meta.id);
+    // name it immediately — the new board's sidebar row opens in rename mode
+    setRenamingBoardId(meta.id);
+  };
+
+  // Commit an inline board rename (right-click a board row, or naming a fresh
+  // one): rename the .excalidraw, retarget any open canvas tab to the new id,
+  // refresh. Enter commits; Esc / click-away cancels (Seth, 2026-06-26).
+  const commitBoardRename = async (boardId: string, raw: string) => {
+    setRenamingBoardId(null);
+    const name = raw.trim();
+    if (!name) return;
+    try {
+      const meta = await corpusRenameBoard(boardId, name);
+      retargetBoard(boardId, meta.id);
+      await invalidateNotes();
+    } catch {
+      /* board is read-only or gone — leave it as is */
+    }
   };
 
   // "+" → New folder: open the inline input row under a parent (and expand it so
@@ -807,7 +866,14 @@ export function Sidebar() {
   );
 
   return (
-    <aside className="sidebar" aria-label="Notes">
+    <aside
+      className="sidebar"
+      aria-label="Notes"
+      // suppress the WKWebView's default right-click menu ("Reload", …) inside the
+      // sidebar; rotli's own row menus (board rename) handle contextmenu instead.
+      // The editor keeps its native menu (spell-check / copy) — this is scoped here.
+      onContextMenu={(event) => event.preventDefault()}
+    >
       {/* the sidebar toggle now lives in the titlebar (always visible, the clear
           reopen) — the search row is just the filter + new-note (Seth, 2026-06-15) */}
       <div className="nl-top">

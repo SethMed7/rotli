@@ -75,6 +75,13 @@ function updateLeaf(node: PaneNode, id: string, fn: (leaf: LeafNode) => LeafNode
   return { ...node, children: node.children.map((c) => updateLeaf(c, id, fn)) };
 }
 
+/** Map EVERY tab in the tree (all leaves) — for a global retarget like a board
+ *  rename, where any open canvas tab's boardId must follow the renamed file. */
+function mapAllTabs(node: PaneNode, fn: (t: Tab) => Tab): PaneNode {
+  if (node.kind === "leaf") return { ...node, tabs: node.tabs.map(fn) };
+  return { ...node, children: node.children.map((c) => mapAllTabs(c, fn)) };
+}
+
 /** Replace the leaf with a split (or insert a sibling if the parent already
  * splits in the same direction — keeps the tree flat). `before` puts the new
  * leaf on the leading side of the target (left for "row", top for "col");
@@ -245,6 +252,8 @@ interface PanesState {
   /** Open a board (Excalidraw canvas) — mirrors openNote: replace the focused
    * pane's active tab, or `newTab` opens a fresh canvas tab. */
   openCanvas: (boardId: string, opts?: { newTab?: boolean }) => void;
+  /** Retarget every open canvas tab pointing at `oldId` to `newId` (board rename). */
+  retargetBoard: (oldId: string, newId: string) => void;
   newTab: () => void;
   closeTab: () => void;
   closeTabById: (paneId: string, tabId: string) => void;
@@ -390,6 +399,13 @@ export const usePanesStore = create<PanesState>((set, get) => {
         }),
       });
     },
+
+    retargetBoard: (oldId, newId) =>
+      set((s) => ({
+        root: mapAllTabs(s.root, (t) =>
+          t.surfaceKind === "canvas" && t.boardId === oldId ? { ...t, boardId: newId } : t,
+        ),
+      })),
 
     newTab: () => {
       const leaf = focusedLeaf();

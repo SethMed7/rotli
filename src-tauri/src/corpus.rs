@@ -1431,6 +1431,67 @@ impl CorpusStore {
         rel
     }
 
+    /// Rename a board (`.excalidraw`) inside its own folder. `new_name` is a free
+    /// stem (extension optional); path separators are flattened to `-`, the folder
+    /// is kept, and the result is collision-guarded. Returns the board's new meta
+    /// (its id IS the new relpath). Boards carry no index, so this is a pure file
+    /// move + a fresh meta — no id remap to chase elsewhere (Seth, 2026-06-26).
+    pub fn rename_board(&mut self, id: &str, new_name: &str) -> Result<NoteMeta, String> {
+        if !id.ends_with(".excalidraw") {
+            return Err(format!("not a board: {id}"));
+        }
+        self.writable(id)?;
+        let old_abs = self.abs(id);
+        if !old_abs.exists() {
+            return Err(format!("board not found: {id}"));
+        }
+        let folder = id.rsplit_once('/').map(|(f, _)| f.to_string()).unwrap_or_default();
+        let stem: String = new_name
+            .trim()
+            .trim_end_matches(".excalidraw")
+            .trim()
+            .chars()
+            .map(|c| if c == '/' || c == '\\' { '-' } else { c })
+            .collect();
+        let stem = stem.trim().to_string();
+        if stem.is_empty() {
+            return Err("a board needs a name".into());
+        }
+        let new_rel = self.free_board_filename(&folder, &format!("{stem}.excalidraw"));
+        if new_rel == id {
+            // same name — nothing to do, return current meta
+            let (created_at, updated_at) = file_stamps(&old_abs);
+            return Ok(NoteMeta {
+                id: id.to_string(),
+                title: board_title(id),
+                snippet: String::new(),
+                folder_id: folder,
+                created_at,
+                updated_at,
+                pinned: false,
+                origin: None,
+                kind: NoteKind::Board,
+            });
+        }
+        let new_abs = self.abs(&new_rel);
+        self.writable(&new_rel)?;
+        self.suppress.mark(&old_abs);
+        self.suppress.mark(&new_abs);
+        fs::rename(&old_abs, &new_abs).map_err(|e| format!("rename board: {e}"))?;
+        let (created_at, updated_at) = file_stamps(&new_abs);
+        Ok(NoteMeta {
+            id: new_rel.clone(),
+            title: board_title(&new_rel),
+            snippet: String::new(),
+            folder_id: folder,
+            created_at,
+            updated_at,
+            pinned: false,
+            origin: None,
+            kind: NoteKind::Board,
+        })
+    }
+
     /// Delete is now SOFT and reversible: the note slides into the reserved
     /// `Trash` folder (still a real `.md` in the corpus, still openable in any
     /// editor), stamped with where it came from so it can be restored. It NEVER
@@ -1962,6 +2023,19 @@ pub fn corpus_move(
     })
 }
 
+/// Rename a board (`.excalidraw`) within its folder. Boards are path-id'd and
+/// carry no note index, so the returned meta has the NEW id — the caller swaps
+/// the open tab's `boardId` to it (Seth, 2026-06-26).
+#[tauri::command]
+pub fn corpus_rename_board(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    name: String,
+) -> Result<NoteMeta, String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.rename_board(&rel, &name)).map(|m| prefix_meta(&root, m))
+}
+
 /// The hard delete (a future "Empty Trash") — no TS wrapper yet, but registered
 /// so the UI can reach it later.
 #[tauri::command]
@@ -2415,6 +2489,28 @@ mod tests {
         assert_eq!(board.title, "sketch");
         assert_eq!(board.folder_id, "Notes");
         assert!(!store.index.contains_key("Notes/sketch.excalidraw"));
+    }
+
+    #[test]
+    fn rename_board_moves_the_file_and_returns_new_id() {
+        let (_dir, mut store) = bare();
+        let created = store.create_board("Inbox/excalidraw", None).unwrap();
+        assert_eq!(created.id, "Inbox/excalidraw/untitled.excalidraw");
+
+        // rename within the folder: id becomes the new relpath, kind stays Board
+        let renamed = store.rename_board(&created.id, "My Sketch").unwrap();
+        assert_eq!(renamed.id, "Inbox/excalidraw/My Sketch.excalidraw");
+        assert_eq!(renamed.kind, NoteKind::Board);
+        assert_eq!(renamed.folder_id, "Inbox/excalidraw");
+        assert!(!store.root().join(&created.id).exists(), "old file is gone");
+        assert!(store.root().join(&renamed.id).exists(), "new file is present");
+
+        // path separators in a name are flattened to '-'; empty names refused
+        let flat = store.rename_board(&renamed.id, "a/b").unwrap();
+        assert_eq!(flat.id, "Inbox/excalidraw/a-b.excalidraw");
+        assert!(store.rename_board(&flat.id, "   ").is_err(), "empty name refused");
+        // a non-board id is refused
+        assert!(store.rename_board("Inbox/note", "x").is_err());
     }
 
     #[test]

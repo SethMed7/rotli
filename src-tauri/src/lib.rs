@@ -584,6 +584,7 @@ pub fn run() {
             corpus::corpus_create,
             corpus::corpus_delete,
             corpus::corpus_move,
+            corpus::corpus_rename_board,
             corpus::corpus_purge,
             corpus::corpus_create_folder,
             corpus::corpus_read_board,

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-06-26
+
+### Added
+- **Name and rename your boards.** A new board's sidebar row opens an inline name field
+  the moment you create it (name it first, no more "untitled"), and **right-click any board
+  → rename** in place (Enter commits, Esc / click-away cancels). The `.excalidraw` file is
+  renamed on disk and any open canvas tab follows the new name. (New `corpus_rename_board`,
+  unit-tested.) *(Renaming via the tab, a dedicated new-board chord, and board metadata for
+  AI search are the next step.)*
+
+### Fixed
+- **The sidebar's right-click no longer pops the webview's "Reload" menu** — it's suppressed
+  in the sidebar so rotli's own row actions take over (the editor keeps its native menu for
+  spell-check / copy).
+- **The Vault repopulates after the memex move** (0.4.1's self-heal) — if your Vault still
+  reads empty, Settings → Storage → Connect a folder → `~/memex-vault`.
+
 ## [0.4.1] — 2026-06-26
 
 ### Fixed
