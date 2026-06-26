@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-06-26
+
+### Fixed
+- **The Vault no longer goes empty after the memex move** — an installed app had its Vault
+  bound to the now-gone `~/smBrain`; that dead binding was dropped without rebinding, so the
+  Vault showed nothing. It now **self-heals** to `~/memex-vault` (a vanished bound path
+  re-auto-binds to the default memex; an existing-but-non-memex folder is still left alone).
+- **The note header status is back at the top-right** — centering the header had stranded the
+  `chars · updated · On this Mac · Aa` cluster mid-pane with a gap. The header is full-width
+  again (date left, status right); the body column stays centered.
+
+### Changed
+- **Notes use a bit more width by default** (comfort measure 720→820px) so a note fills more
+  of a wide screen.
+- **Recent reads as a clean table** — hairline row separators + roomier rows + clearer
+  title/snippet/date columns.
+- **New Excalidraw boards open in your color theme** (dark or light), instead of always-light.
+
 ## [0.4.0] — 2026-06-26
 
 The memex-vault + polish release — the connected brain is renamed `memex-vault` (with an

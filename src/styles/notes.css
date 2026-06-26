@@ -887,18 +887,16 @@
   position: relative;
 }
 .ed-head {
-  /* aligned to the centered writing column (matches .cm-content's measure +
-     side padding) so the date/status header sits over the note, not adrift on
-     the left (Seth, 2026-06-26) */
-  width: 100%;
-  max-width: var(--cm-measure, 660px);
-  margin-inline: auto;
-  box-sizing: border-box;
+  /* full-width header: date on the left, the status cluster (chars · updated ·
+     On this Mac · Aa) pinned to the window's top-right. The body column below
+     stays centered; centering the header too had stranded the status mid-pane
+     with a gap (Seth, 2026-06-26). */
   padding: 22px 40px 0;
   font-size: 11.5px;
   color: var(--text-muted);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
   flex: 0 0 auto;
 }

@@ -17,9 +17,9 @@ export const DEFAULT_NOTE_STYLE: NoteStyle = { size: 15, measure: "comfort" };
 /** Comfort = a roomy centered measure; Narrow/Wide step around it. (Widened
  *  2026-06-26 so a note fills more of a big screen once it's centered.) */
 export const MEASURE_MAX_WIDTH: Record<Measure, number> = {
-  narrow: 580,
-  comfort: 720,
-  wide: 900,
+  narrow: 620,
+  comfort: 820,
+  wide: 1000,
 };
 
 export const MIN_TEXT_SIZE = 12;

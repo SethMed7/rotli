@@ -461,3 +461,76 @@ Each phase ships independently and none touches `is_writable`/`canWrite`.
   dropdown → per-note chat → one list → email. Each phase ships independently.
 
 Doc: `~/rotli/docs/notes-chat-inbox-rearchitecture.md`
+
+---
+
+# Addendum — Seth's decided IA (2026-06-26)
+
+This supersedes the recommendation above where they differ. Seth read the analysis and
+chose a concrete shape. **The top-bar module dropdown is removed**; the left menu carries
+**three top-level sections**, each with its own accordions. One window blends email, an
+AI chat, and notes — "no need for that top drop down."
+
+## The three sections (top → bottom of the left menu)
+
+1. **Inbox = email** (the word "Inbox" now means email, not note-capture).
+   - Accordion **by account**, with an **All** at top to search across everything:
+     `All · maintainer@example.com · hello@sethmedina.com · …` (every connected mailbox).
+   - A sub-accordion **by email/thread** under each account.
+   - (The capture concept — today's `inbox.md` / ⌥C — needs a new home/name since "Inbox"
+     is taken; treat capture as a quick-entry that files into Notes, not the email Inbox.)
+
+2. **Chat** — a real **ChatGPT-style** chat front (open-source models), with **history**.
+   - Accordion for **chat history** + an **All** to search across all chats (the accordion
+     itself shows a *limited* view).
+   - **@-mention context:** in a chat you pull notes/emails in as context by typing
+     `@{email}.{email subject}` or `@{note}.{note title}` (and presumably `@{board}.…`).
+
+3. **Notes** — what exists today: All notes · Board · folders + nested folders (the deepest
+   tree, since this holds the corpus).
+
+**Memory is NOT a section** — "the memory is simply part of my Vault, so that doesn't make
+sense" as a separate module. It folds into Notes/Vault.
+
+## Chat ⇄ Note relationship (the precise rule Seth gave)
+
+- **Not everything is a chat.** A board is just a board; a note is just a note. But you can
+  **open a chat *against* any board/note** (chat is a verb you point at an object).
+- **Every chat owns a note.** Opening a chat creates an attached note that is **continuously
+  summarized as the chat goes** (the note is the living summary; the transcript is the chat).
+- The user can go to **just the note** and **edit / share / delete** it independently. Deleting
+  the note **does not** delete the chat — and on the **next prompt** the chat **regenerates a
+  note** if it doesn't have one. (So: chat is the source of truth for the conversation; the note
+  is a regenerable, user-editable projection of it.)
+
+This keeps rotli's existing contract intact: a chat is still a `chats/<slug>.md` file with
+`attachedTo: [[note]]`; the "owned note" is the attach target. The continuous-summary writer
+is the new piece (a client-side LLM job), not a contract change.
+
+## Near-term build queue (the deferred items from this round)
+
+These were scoped out of 0.4.x to do correctly; they precede the big IA rebuild:
+
+- **D — contextual zoom** (`⌘+ / ⌘-`): zoom only the *focused* surface — the note's text when
+  you're in a note, the left menu when you're in it. Needs focus-aware routing that respects the
+  single-dispatcher keymap + a sidebar text-scale (and a non-conflicting reset; `⌘0` is taken by
+  toggle-sidebar).
+- **F — boards are nameable:** a board has no title area. Add (1) **name-on-create** (inline name
+  before the file is written), (2) **rename via the tab (double-click) and the sidebar row** — needs
+  a `corpus_rename_board` command (rename the `.excalidraw` file, remap the id), and (3) a **dedicated
+  new-board chord** (≠ `⌘T`, which stays new-note — e.g. `⌘⇧N`).
+- **G — board metadata for the AI:** boards are images to a text LLM. Give each board attachable
+  **metadata** (title · description · tags) so the AI can know what a board is about and return it in
+  search / pull it into a chat as `@{board}.…` context. Where it lives is the open question — a sibling
+  `.md` (cleanest for the text-first memex + the `storage:` model) vs. inside the `.excalidraw` appState.
+  This is a prerequisite for boards to participate in the Chat section's @-context.
+
+## Phasing (revised to land Seth's IA)
+
+1. **Boards nameable + metadata** (F, G) — small, unblocks board search + @-context.
+2. **Contextual zoom** (D) — independent polish.
+3. **Chat front** — a proper chat UI over `chats/`, with history + the owned-note summarizer.
+4. **Left menu = 3 sections** — fold Board/All-notes/Recent under **Notes**; add **Chat** + **Inbox**
+   placeholders; retire the top dropdown.
+5. **Email (Inbox)** — connect mailboxes; account/thread accordions; read-mostly, never writes the memex.
+6. **@-context + per-object chat** — `@note`/`@email`/`@board` mentions resolve into chat context.

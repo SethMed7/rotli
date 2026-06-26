@@ -298,9 +298,15 @@ pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
     // the vault: honor a stored binding only while it's still a memex; else try
     // the ~/memex-vault auto-bind. A non-memex binding is dropped (left unbound).
     let vault: Option<CorpusRoot> = match reg.get(VAULT_ROOT_ID) {
+        // honor a stored binding while it's still a valid memex
         Some(existing) if is_memex_root(&existing.abs_path) => Some(existing.clone()),
-        Some(_) => None, // bound dir is no longer a memex → unbind (no row)
-        None => default_vault_path()
+        // a stored path that still EXISTS but lost its memex.json: respect the
+        // user's pick — leave it unbound, don't silently jump to another memex.
+        Some(existing) if existing.abs_path.exists() => None,
+        // no binding, OR the bound path VANISHED (e.g. the memex was moved /
+        // renamed — smBrain → memex-vault): self-heal by auto-binding the
+        // ~/memex-vault default when it's a valid memex, replacing the dead entry.
+        _ => default_vault_path()
             .filter(|p| p.exists() && is_memex_root(p))
             .map(|p| CorpusRoot {
                 id: VAULT_ROOT_ID.to_string(),

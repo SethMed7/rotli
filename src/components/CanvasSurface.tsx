@@ -8,6 +8,7 @@
 import { Excalidraw } from "@excalidraw/excalidraw";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type CorpusBoardDoc, corpusReadBoard, corpusWriteBoard, isTauri } from "../lib/tauri";
+import { useUiStore } from "../state/ui";
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -38,6 +39,15 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   // the canvas doesn't need it yet, but keeping the signature parallel avoids a
   // special-case at the call site.
   void paneId;
+
+  // a new board opens in the app's color mode (dark/light), not always-light —
+  // Excalidraw's `theme` prop follows the rotli theme (Seth, 2026-06-26).
+  const themeMode = useUiStore((s) => s.theme);
+  const excaliTheme: "dark" | "light" =
+    themeMode === "dark" ||
+    (themeMode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)
+      ? "dark"
+      : "light";
 
   const [state, setState] = useState<CanvasState>({ status: "loading", initialData: null });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -156,7 +166,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
 
   return (
     <div className="canvas-surface">
-      <Excalidraw initialData={state.initialData} onChange={onChange} />
+      <Excalidraw initialData={state.initialData} onChange={onChange} theme={excaliTheme} />
     </div>
   );
 }
