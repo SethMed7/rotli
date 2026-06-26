@@ -286,6 +286,13 @@ export function corpusRenameBoard(id: string, name: string): Promise<CorpusNoteM
   return corpusInvoke("corpus_rename_board", { id, name });
 }
 
+/** Chat front: one-shot completion from the on-device model. The Rust side POSTs
+ * the local MLX server (the webview CSP can't reach localhost). Rejects with a
+ * readable error string if the model isn't running. */
+export function chatComplete(prompt: string): Promise<string> {
+  return invoke<string>("chat_complete", { prompt });
+}
+
 /** Settings → Storage truth: the real root (home shortened to `~`), every
  * folder, every note file — what actually exists on disk, never a mock. */
 export interface CorpusOverview {

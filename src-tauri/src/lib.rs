@@ -10,6 +10,7 @@
 // rebindable through set_summon_shortcut, and click-away hiding is a setting
 // (set_hide_on_blur) so heavy use can keep the window resident.
 
+mod chat;
 mod corpus;
 mod memex;
 
@@ -585,6 +586,7 @@ pub fn run() {
             corpus::corpus_delete,
             corpus::corpus_move,
             corpus::corpus_rename_board,
+            chat::chat_complete,
             corpus::corpus_purge,
             corpus::corpus_create_folder,
             corpus::corpus_read_board,

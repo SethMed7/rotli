@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-26
+
+The Chat front begins — a real on-device chat (Increment 1).
+
+### Added
+- **Chat actually talks now.** The Chat front (module switcher → **Chat**) is a real conversation:
+  type a message and the **on-device model replies** — the same local MLX/Gemma server Breve uses,
+  bridged through **Rust** (the webview's CSP can't reach `localhost`, so a `chat_complete` command
+  POSTs the model). Messages render as **bubbles**; the thread **persists as `chats/<slug>.md`** in
+  your memex (rotli's owned surface, v3.5 contract) and reloads from there. The left list is your
+  **history**. Needs your local model running on `:11435`; if it's not, the chat says so in-line.
+  *(Increment 1 — one-shot replies, no streaming yet. Next: streaming · `@note`/`@board`/`@email`
+  context · the chat-owns-a-summary-note model · Breve `history/` rendered in this surface · the
+  3-section left menu. Plan: `docs/notes-chat-inbox-rearchitecture.md`.)*
+
 ## [0.4.3] — 2026-06-26
 
 ### Added

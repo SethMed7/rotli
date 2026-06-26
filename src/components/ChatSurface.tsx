@@ -1,16 +1,52 @@
-// The Chat front (Stage 1, minimal) — named conversations over the connected
-// memex's chats/ surface ("everything has a chat"). rotli OWNS chats/, so this is
-// the first place the app WRITES the brain: start a chat, add messages, they land
-// as chats/<slug>.md in the active memex (byte-shape from src/memex/contract.ts,
-// proven against the brain's own validate.ts). Opened from the module switcher;
-// closes back to Notes. A surface flag (chatOpen), not a pane tab, for now.
+// The Chat front (Stage 1 / Increment 1) — a real conversation over the connected
+// memex's chats/ surface ("everything has a chat"). rotli OWNS chats/, so a chat
+// persists as chats/<slug>.md (byte-shape from src/memex/contract.ts, proven
+// against the brain's own validate.ts). The reply comes from the on-device model
+// via the Rust `chat_complete` bridge (the webview CSP can't reach localhost).
+// Opened from the module switcher; closes back to Notes.
+//
+// Increment 1 is one-shot (no streaming), no @-context, no chat-owns-a-summary
+// note yet — those are the next steps in docs/notes-chat-inbox-rearchitecture.md.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { activeInstance } from "../memex/config";
 import { readChat } from "../memex/service";
 import { useInstanceChats, useMemexConfig, useWriteChat } from "../memex/useMemex";
-import { isTauri } from "../lib/tauri";
+import { chatComplete, isTauri } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
+
+interface Msg {
+  speaker: string;
+  text: string;
+}
+
+/** Parse a chat .md's `## Messages` block back into bubbles. rotli writes the
+ * `**speaker** · date — text` shape (contract.ts), so this round-trips its own. */
+function parseMessages(body: string): Msg[] {
+  const i = body.indexOf("## Messages");
+  if (i < 0) return [];
+  const section = body.slice(i + "## Messages".length);
+  const re = /\*\*([^*]+)\*\*\s*·[^—\n]*—\s*([\s\S]*?)(?=\n\*\*[^*]+\*\*\s*·|\s*$)/g;
+  const out: Msg[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(section)) !== null) {
+    out.push({ speaker: (m[1] ?? "").trim(), text: (m[2] ?? "").trim() });
+  }
+  return out;
+}
+
+/** Flatten the thread into one prompt for the Ollama-shape model. */
+function buildPrompt(convo: Msg[]): string {
+  const sys = "You are rotli, a warm, concise, on-device assistant. Answer directly and briefly.";
+  const turns = convo
+    .map((m) => `${m.speaker === "you" ? "User" : "Assistant"}: ${m.text}`)
+    .join("\n\n");
+  return `${sys}\n\n${turns}\n\nAssistant:`;
+}
+
+function deriveTitle(text: string): string {
+  return text.split(/\s+/).slice(0, 6).join(" ").slice(0, 60) || "New chat";
+}
 
 export function ChatSurface() {
   const setChatOpen = useUiStore((s) => s.setChatOpen);
@@ -24,25 +60,32 @@ export function ChatSurface() {
   const [selected, setSelected] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
-  const [body, setBody] = useState("");
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [busy, setBusy] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const writable = active?.perms === "chats+inbox";
 
-  // read the selected chat's text (rendered raw — markdown styling is the editor's
-  // job; for messages a plain transcript is enough for Stage 1)
+  // load the selected chat's messages (or clear for a new chat)
   useEffect(() => {
     let cancelled = false;
     if (active && selected) {
       readChat(active, selected)
-        .then((t) => !cancelled && setBody(t))
-        .catch(() => !cancelled && setBody(""));
+        .then((t) => !cancelled && setMessages(parseMessages(t)))
+        .catch(() => !cancelled && setMessages([]));
     } else {
-      setBody("");
+      setMessages([]);
     }
     return () => {
       cancelled = true;
     };
   }, [active, selected]);
+
+  // keep the newest message in view
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight });
+  }, [messages, busy]);
 
   const openSettings = () => {
     setChatOpen(false);
@@ -50,26 +93,53 @@ export function ChatSurface() {
   };
 
   const send = async () => {
-    if (!active || !writable || !message.trim()) return;
-    const msg = { speaker: "you", text: message.trim() };
-    let slug = selected;
-    if (slug) {
-      const sum = chats.data?.find((c) => c.slug === slug);
-      await write.mutateAsync({
-        instance: active,
-        existingSlug: slug,
-        title: sum?.title ?? slug,
-        messages: [msg],
-      });
-    } else {
-      if (!title.trim()) return;
-      const res = await write.mutateAsync({ instance: active, title: title.trim(), messages: [msg] });
-      slug = res.slug;
-      setSelected(slug);
-      setTitle("");
-    }
+    if (!active || !writable || !message.trim() || busy) return;
+    const userText = message.trim();
     setMessage("");
-    setBody(await readChat(active, slug));
+    const convo = [...messages, { speaker: "you", text: userText }];
+    setMessages(convo);
+    setBusy(true);
+
+    let reply: string;
+    try {
+      reply = (await chatComplete(buildPrompt(convo))).trim() || "(the model returned nothing)";
+    } catch (e) {
+      setMessages((p) => [
+        ...p,
+        { speaker: "rotli", text: `⚠ ${(e as Error)?.message ?? "couldn't reach the local model"}` },
+      ]);
+      setBusy(false);
+      return; // a failed turn isn't persisted
+    }
+    setMessages((p) => [...p, { speaker: "rotli", text: reply }]);
+    setBusy(false);
+
+    // persist the turn (user + assistant) to chats/<slug>.md
+    const turn: Msg[] = [
+      { speaker: "you", text: userText },
+      { speaker: "rotli", text: reply },
+    ];
+    try {
+      if (selected) {
+        const sum = chats.data?.find((c) => c.slug === selected);
+        await write.mutateAsync({
+          instance: active,
+          existingSlug: selected,
+          title: sum?.title ?? selected,
+          messages: turn,
+        });
+      } else {
+        const res = await write.mutateAsync({
+          instance: active,
+          title: title.trim() || deriveTitle(userText),
+          messages: turn,
+        });
+        setSelected(res.slug);
+        setTitle("");
+      }
+    } catch {
+      /* persistence failed — the in-memory thread still shows for this session */
+    }
   };
 
   return (
@@ -77,7 +147,14 @@ export function ChatSurface() {
       <header className="chat-head">
         <button type="button" className="chat-back" onClick={() => setChatOpen(false)}>
           <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-            <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M15 18l-6-6 6-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
           Notes
         </button>
@@ -119,13 +196,24 @@ export function ChatSurface() {
           </aside>
 
           <main className="chat-main">
-            <div className="chat-scroll">
-              {selected ? (
-                <pre className="chat-pre">{body}</pre>
-              ) : (
+            <div className="chat-scroll" ref={scrollRef}>
+              {messages.length === 0 ? (
                 <div className="chat-newhint">
-                  <p>Start a new chat in <b>{active.label}</b>.</p>
-                  <p className="chat-sub">It lands as a plain <code>chats/&lt;slug&gt;.md</code> in your memex.</p>
+                  <p>{selected ? "No messages yet." : "Ask anything — it runs on your Mac."}</p>
+                  <p className="chat-sub">
+                    Saved as a plain <code>chats/&lt;slug&gt;.md</code> in your memex.
+                  </p>
+                </div>
+              ) : (
+                messages.map((m, idx) => (
+                  <div key={idx} className={m.speaker === "you" ? "cmsg you" : "cmsg ai"}>
+                    <div className="cmsg-bubble">{m.text}</div>
+                  </div>
+                ))
+              )}
+              {busy && (
+                <div className="cmsg ai">
+                  <div className="cmsg-bubble cmsg-think">thinking…</div>
                 </div>
               )}
             </div>
@@ -135,7 +223,7 @@ export function ChatSurface() {
                 {!selected && (
                   <input
                     className="chat-input"
-                    placeholder="Chat title…"
+                    placeholder="Chat title (optional)…"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     onKeyDown={(e) => e.stopPropagation()}
@@ -144,7 +232,7 @@ export function ChatSurface() {
                 <div className="chat-send-row">
                   <input
                     className="chat-input"
-                    placeholder={selected ? "Message…" : "First message…"}
+                    placeholder={busy ? "thinking…" : "Message…"}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyDown={(e) => {
@@ -158,15 +246,12 @@ export function ChatSurface() {
                   <button
                     type="button"
                     className="chat-send"
-                    disabled={write.isPending || !message.trim() || (!selected && !title.trim())}
+                    disabled={busy || !message.trim()}
                     onClick={() => void send()}
                   >
-                    {write.isPending ? "…" : "Send"}
+                    {busy ? "…" : "Send"}
                   </button>
                 </div>
-                {write.isError && (
-                  <p className="chat-err">{(write.error as Error)?.message ?? "Couldn’t write the chat."}</p>
-                )}
               </div>
             ) : (
               <div className="chat-readonly">

@@ -485,3 +485,38 @@
   box-shadow: 0 0 0 2px var(--surface);
   pointer-events: none;
 }
+
+/* — Chat front bubbles (Increment 1, 2026-06-26): you right + tinted, the model
+   left + neutral. Plain text for now; markdown rendering rides the editor later. — */
+.cmsg {
+  display: flex;
+  margin: 8px 0;
+}
+.cmsg.you {
+  justify-content: flex-end;
+}
+.cmsg.ai {
+  justify-content: flex-start;
+}
+.cmsg-bubble {
+  max-width: 76%;
+  padding: 9px 13px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+.cmsg.you .cmsg-bubble {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border-bottom-right-radius: 5px;
+}
+.cmsg.ai .cmsg-bubble {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  border-bottom-left-radius: 5px;
+}
+.cmsg-think {
+  color: var(--text-muted);
+  font-style: italic;
+}

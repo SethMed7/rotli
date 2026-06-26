@@ -1,6 +1,6 @@
 [package]
 name = "rotli"
-version = "0.4.3"
+version = "0.5.0"
 description = "rotli — warm, local-first, hotkey-driven notes for the Mac menu bar"
 authors = ["Seth Medina"]
 edition = "2021"
@@ -24,6 +24,7 @@ tauri-plugin-global-shortcut = "2"
 tauri-plugin-dialog = "2"                                        # native folder picker (move the corpus)
 tauri-plugin-updater = "2"                                       # in-app updates (signed feed → download + relaunch)
 tauri-plugin-process = "2"                                       # relaunch() after an update installs
+ureq = { version = "2", features = ["json"] }                   # Chat front: POST the on-device model from Rust (the webview CSP blocks localhost)
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Phase 2 — the corpus (plain .md files become real)
