@@ -754,6 +754,18 @@
 .tab:active {
   cursor: grabbing;
 }
+/* inline rename input on a board tab (double-click) — fills the label slot */
+.tab-rename {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  outline: none;
+  min-width: 60px;
+  max-width: 150px;
+  padding: 0;
+}
 /* the tab being dragged dims to half — same source-leaves-faint grammar the
    divider drag set (Seth, 2026-06-13) */
 .tab.dragging {

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] — 2026-06-26
+
+### Added
+- **Rename a board from its tab, too** — double-click a board's tab to rename it inline (joins the
+  sidebar right-click rename from 0.4.2; both share one flow). And **⌘⇧N makes a new board** (⌘N stays
+  new-note), opening it straight into its name field.
+- **Board metadata for the AI** — each board now carries a **description + tags** via a small **ⓘ**
+  button (bottom-right of a board). A board is just an image to a text LLM, so this is how it'll know
+  what a board is about and pull it into a chat as `@board` context later. Stored top-level in the
+  `.excalidraw` file (not Excalidraw's appState, which it strips) and preserved across drawing edits.
+  *(Wiring it into rotli's own ⌘K search arrives with the Chat front.)*
+
 ## [0.4.2] — 2026-06-26
 
 ### Added

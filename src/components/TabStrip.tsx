@@ -15,6 +15,7 @@
 // its × (closing it is a no-op anyway).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useBoardRename } from "../lib/boardRename";
 import { startTabDrag } from "../lib/tabDrag";
 import { useNotes } from "../services/hooks";
 import { leaves, usePanesStore } from "../state/panes";
@@ -41,6 +42,9 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   const activateTab = usePanesStore((s) => s.activateTab);
   const closeTabById = usePanesStore((s) => s.closeTabById);
   const draggingTab = usePanesStore((s) => s.draggingTab);
+  // double-click a board tab to rename it in place (shares the sidebar's flow)
+  const { renamingBoardId, start: startRename, commit: commitRename, cancel: cancelRename } =
+    useBoardRename();
   // the insertion index previewed for THIS strip (2px line), or null
   const dropAt = usePanesStore((s) =>
     s.dropPreview?.kind === "strip" && s.dropPreview.paneId === pane.id
@@ -125,7 +129,33 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                   ) : (
                     <FileGlyph size={13} className="tglyph" />
                   )}
-                  <span>{tabLabel(tab, titles)}</span>
+                  {tab.surfaceKind === "canvas" && renamingBoardId === tab.boardId ? (
+                    <input
+                      className="tab-rename"
+                      autoFocus
+                      defaultValue={tabLabel(tab, titles)}
+                      aria-label="Rename board"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => event.stopPropagation()}
+                      onFocus={(event) => event.currentTarget.select()}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter")
+                          commitRename(tab.boardId, event.currentTarget.value);
+                        else if (event.key === "Escape") cancelRename();
+                      }}
+                      onBlur={() => cancelRename()}
+                    />
+                  ) : (
+                    <span
+                      onDoubleClick={
+                        tab.surfaceKind === "canvas"
+                          ? () => startRename(tab.boardId)
+                          : undefined
+                      }
+                    >
+                      {tabLabel(tab, titles)}
+                    </span>
+                  )}
                   {!loneInLonePane && (
                     <button
                       type="button"

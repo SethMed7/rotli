@@ -17,6 +17,7 @@ import { invalidateMemex } from "../memex/useMemex";
 import { captureHandle } from "../lib/captureHandle";
 import { quickHandle } from "../lib/quickHandle";
 import {
+  corpusCreateBoard,
   hideMainWindow,
   hideQuickWindow,
   summon,
@@ -55,6 +56,16 @@ async function newNote(): Promise<void> {
   await invalidateNotes();
   await invalidateMemex(); // the memex-derived listing refreshes too
   usePanesStore.getState().openNote(id);
+}
+
+/** ⌘⇧N / "+ New board": create an Excalidraw board in the local Inbox, open it,
+ * and drop its sidebar row into rename mode so you name it first. Boards are
+ * local (the memex is read-mostly), so this never routes into the Vault. */
+async function newBoard(): Promise<void> {
+  const meta = await corpusCreateBoard(inboxFolderId);
+  await invalidateNotes();
+  usePanesStore.getState().openCanvas(meta.id);
+  useUiStore.getState().setRenamingBoardId(meta.id);
 }
 
 export function registerDefaultActions(): void {
@@ -186,6 +197,12 @@ export function registerDefaultActions(): void {
     title: "New note",
     defaultChord: "Meta+N",
     run: () => void newNote(),
+  });
+  registerAction({
+    id: "boards.new",
+    title: "New board",
+    defaultChord: "Meta+Shift+N",
+    run: () => void newBoard(),
   });
 
   // — note lifecycle (Seth, 2026-06-13): archive / trash / restore the FOCUSED

@@ -23,6 +23,19 @@ const EMPTY_SCENE = {
   files: {},
 };
 
+interface BoardMeta {
+  description: string;
+  tags: string;
+}
+const EMPTY_META: BoardMeta = { description: "", tags: "" };
+/** The slice of Excalidraw's imperative API we use to re-serialize the scene on a
+ * metadata save (a metadata edit isn't an Excalidraw change, so we rebuild it). */
+type ExcaliApi = {
+  getSceneElements: () => readonly unknown[];
+  getAppState: () => Record<string, unknown>;
+  getFiles: () => Record<string, unknown>;
+};
+
 // Excalidraw's initialData prop is optional (`| undefined`); we never pass
 // undefined — we hold `null` until loaded, then the parsed scene — so strip the
 // undefined to satisfy exactOptionalPropertyTypes at the call site.
@@ -54,6 +67,14 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   // serialize the latest scene; the debounced write picks up the freshest one.
   const pending = useRef<string | null>(null);
 
+  // G — board metadata (Seth, 2026-06-26): a board is an image to a text LLM, so it
+  // carries a description + tags, stored TOP-LEVEL in the .excalidraw (NOT in
+  // appState, which Excalidraw would strip) so the AI can know + search it later.
+  const apiRef = useRef<ExcaliApi | null>(null);
+  const metaRef = useRef<BoardMeta>(EMPTY_META);
+  const [meta, setMeta] = useState<BoardMeta>(EMPTY_META);
+  const [metaOpen, setMetaOpen] = useState(false);
+
   // load the board once per boardId
   useEffect(() => {
     if (!isTauri()) return;
@@ -71,6 +92,10 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
             scene = EMPTY_SCENE; // corrupt JSON => start from a blank scene
           }
         }
+        const rm = (scene as { rotliMeta?: Partial<BoardMeta> }).rotliMeta;
+        const loaded: BoardMeta = { description: rm?.description ?? "", tags: rm?.tags ?? "" };
+        metaRef.current = loaded;
+        setMeta(loaded);
         setState({ status: "ready", initialData: scene as ExcalidrawInitialData });
       })
       .catch((err: unknown) => {
@@ -119,6 +144,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
           // don't persist transient selection/dragging state
         },
         files,
+        rotliMeta: metaRef.current,
       };
       pending.current = JSON.stringify(scene);
       if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -130,6 +156,28 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
       }, SAVE_DEBOUNCE_MS);
     },
     [boardId, state.status],
+  );
+
+  // Persist a metadata edit right away (it doesn't ride the Excalidraw onChange
+  // save). Re-serialize the live scene from the API + the new meta.
+  const saveMeta = useCallback(
+    (next: BoardMeta) => {
+      metaRef.current = next;
+      setMeta(next);
+      const api = apiRef.current;
+      if (!api || !isTauri()) return;
+      const scene = {
+        type: "excalidraw" as const,
+        version: 2,
+        source: "rotli",
+        elements: api.getSceneElements(),
+        appState: { ...api.getAppState(), collaborators: undefined },
+        files: api.getFiles(),
+        rotliMeta: next,
+      };
+      void corpusWriteBoard(boardId, JSON.stringify(scene)).catch(() => {});
+    },
+    [boardId],
   );
 
   if (!isTauri()) {
@@ -166,7 +214,48 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
 
   return (
     <div className="canvas-surface">
-      <Excalidraw initialData={state.initialData} onChange={onChange} theme={excaliTheme} />
+      <Excalidraw
+        initialData={state.initialData}
+        onChange={onChange}
+        theme={excaliTheme}
+        excalidrawAPI={(api) => {
+          apiRef.current = api as unknown as ExcaliApi;
+        }}
+      />
+      <button
+        type="button"
+        className="canvas-meta-btn"
+        aria-label="Board info — a description + tags so the AI can find and use this board"
+        title="About this board (for AI search)"
+        onClick={() => setMetaOpen((o) => !o)}
+      >
+        ⓘ
+      </button>
+      {metaOpen && (
+        <div className="canvas-meta-panel">
+          <div className="cmp-title">About this board</div>
+          <p className="cmp-hint">
+            A board is just an image to the AI — describe it so it can find and pull it into a chat.
+          </p>
+          <label className="cmp-field">
+            <span>Description</span>
+            <textarea
+              defaultValue={meta.description}
+              placeholder="What's on this board, and what it's for…"
+              onBlur={(e) => saveMeta({ ...metaRef.current, description: e.currentTarget.value })}
+            />
+          </label>
+          <label className="cmp-field">
+            <span>Tags</span>
+            <input
+              type="text"
+              defaultValue={meta.tags}
+              placeholder="comma, separated"
+              onBlur={(e) => saveMeta({ ...metaRef.current, tags: e.currentTarget.value })}
+            />
+          </label>
+        </div>
+      )}
     </div>
   );
 }

@@ -534,3 +534,12 @@ These were scoped out of 0.4.x to do correctly; they precede the big IA rebuild:
    placeholders; retire the top dropdown.
 5. **Email (Inbox)** — connect mailboxes; account/thread accordions; read-mostly, never writes the memex.
 6. **@-context + per-object chat** — `@note`/`@email`/`@board` mentions resolve into chat context.
+
+## Breve / `history/` reads as chat (Seth, 2026-06-26)
+
+The `history/` dailies should render **in the chat UI**, read-only — you can't add to a day, but it's
+fluid: **take a day → start a new chat with that day as context**, **spin a note off a day** (then
+chat on the note), or **just keep the note** — your call. This rides the chat-owns-a-note model: a day
+is a read-only transcript; *acting* on it forks a new (writable) chat + its summary note. So the
+approved "surface Breve read-only" is really **render `history/` inside the Chat surface**, not a plain
+read-only notes folder — fold it into the Chat front. (Until then, `history/` stays hidden.)

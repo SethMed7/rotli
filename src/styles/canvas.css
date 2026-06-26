@@ -45,3 +45,73 @@
   font-size: 14px;
   font-weight: 600;
 }
+
+/* — G: board metadata (Seth, 2026-06-26). A small floating "ⓘ" opens a panel to
+   describe a board (description + tags) so the AI can find + use it. — */
+.canvas-meta-btn {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 5;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+}
+.canvas-meta-btn:hover {
+  color: var(--text);
+  background: var(--hov);
+}
+.canvas-meta-panel {
+  position: absolute;
+  bottom: 54px;
+  right: 14px;
+  z-index: 6;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--text) 18%, transparent);
+}
+.cmp-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+}
+.cmp-hint {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.cmp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.cmp-field textarea,
+.cmp-field input {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.cmp-field textarea {
+  min-height: 56px;
+  resize: vertical;
+}
