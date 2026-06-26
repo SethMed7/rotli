@@ -587,6 +587,7 @@ pub fn run() {
             corpus::corpus_move,
             corpus::corpus_rename_board,
             chat::chat_complete,
+            chat::chat_models,
             corpus::corpus_purge,
             corpus::corpus_create_folder,
             corpus::corpus_read_board,

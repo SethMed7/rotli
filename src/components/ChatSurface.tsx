@@ -1,18 +1,26 @@
-// The Chat front (Stage 1 / Increment 1) — a real conversation over the connected
-// memex's chats/ surface ("everything has a chat"). rotli OWNS chats/, so a chat
-// persists as chats/<slug>.md (byte-shape from src/memex/contract.ts, proven
-// against the brain's own validate.ts). The reply comes from the on-device model
-// via the Rust `chat_complete` bridge (the webview CSP can't reach localhost).
-// Opened from the module switcher; closes back to Notes.
+// The Chat surface (Stage 1) — a real conversation over the connected memex's
+// chats/ surface ("everything has a chat"). rotli OWNS chats/, so a chat persists
+// as chats/<slug>.md (byte-shape from src/memex/contract.ts, proven against the
+// brain's own validate.ts). The reply comes from an on-device model via the Rust
+// `chat_complete` bridge (the webview CSP can't reach localhost).
 //
-// Increment 1 is one-shot (no streaming), no @-context, no chat-owns-a-summary
-// note yet — those are the next steps in docs/notes-chat-inbox-rearchitecture.md.
+// IA rework (Seth, 2026-06-26): Chat is no longer a full-surface front reached
+// from a dropdown — it is the middle LEFT-MENU section. The chat history + "New
+// chat" + "All chats" live in the Sidebar; this surface renders in the content
+// area (contentView "chat") and shows the SELECTED chat (ui.selectedChatSlug) or,
+// in browse mode (ui.chatAllOpen), a searchable list of every chat. The model the
+// reply runs on is picked here from the memex-ai store (~/.memex/ai/registry.json
+// via chat_models) — "the model selecter grabbing from what we have in the memex ai".
+//
+// Still Increment 1: one-shot (no streaming), no @-context, no chat-owns-a-summary
+// note yet — those are later steps in docs/notes-chat-inbox-rearchitecture.md.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { activeInstance } from "../memex/config";
 import { readChat } from "../memex/service";
 import { useInstanceChats, useMemexConfig, useWriteChat } from "../memex/useMemex";
-import { chatComplete, isTauri } from "../lib/tauri";
+import { chatComplete, chatModels, isTauri } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
 
 interface Msg {
@@ -35,7 +43,7 @@ function parseMessages(body: string): Msg[] {
   return out;
 }
 
-/** Flatten the thread into one prompt for the Ollama-shape model. */
+/** Flatten the thread into one prompt for the on-device model. */
 function buildPrompt(convo: Msg[]): string {
   const sys = "You are rotli, a warm, concise, on-device assistant. Answer directly and briefly.";
   const turns = convo
@@ -49,19 +57,39 @@ function deriveTitle(text: string): string {
 }
 
 export function ChatSurface() {
-  const setChatOpen = useUiStore((s) => s.setChatOpen);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
+  const selectedSlug = useUiStore((s) => s.selectedChatSlug);
+  const setSelectedSlug = useUiStore((s) => s.setSelectedChatSlug);
+  const chatAllOpen = useUiStore((s) => s.chatAllOpen);
+  const setChatAllOpen = useUiStore((s) => s.setChatAllOpen);
+  const chatModelId = useUiStore((s) => s.chatModelId);
+  const setChatModelId = useUiStore((s) => s.setChatModelId);
 
   const cfg = useMemexConfig();
   const active = cfg.data ? activeInstance(cfg.data) : null;
   const chats = useInstanceChats(active);
   const write = useWriteChat();
 
-  const [selected, setSelected] = useState<string | null>(null);
+  // the on-device models the memex-ai store offers (kind:llm-chat). Read once;
+  // non-Tauri (the browser/dev demo) has no bridge, so the list stays empty.
+  const models = useQuery({
+    queryKey: ["chat", "models"],
+    queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
+    staleTime: Infinity,
+  });
+  const modelList = models.data ?? [];
+  // the picked model: the saved choice, else the store's flagged default, else first.
+  const picked =
+    modelList.find((m) => m.id === chatModelId) ??
+    modelList.find((m) => m.isDefault) ??
+    modelList[0] ??
+    null;
+
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
+  const [browseFilter, setBrowseFilter] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const writable = active?.perms === "chats+inbox";
@@ -69,8 +97,8 @@ export function ChatSurface() {
   // load the selected chat's messages (or clear for a new chat)
   useEffect(() => {
     let cancelled = false;
-    if (active && selected) {
-      readChat(active, selected)
+    if (active && selectedSlug) {
+      readChat(active, selectedSlug)
         .then((t) => !cancelled && setMessages(parseMessages(t)))
         .catch(() => !cancelled && setMessages([]));
     } else {
@@ -79,7 +107,7 @@ export function ChatSurface() {
     return () => {
       cancelled = true;
     };
-  }, [active, selected]);
+  }, [active, selectedSlug]);
 
   // keep the newest message in view
   useEffect(() => {
@@ -88,8 +116,12 @@ export function ChatSurface() {
   }, [messages, busy]);
 
   const openSettings = () => {
-    setChatOpen(false);
     setSettingsOpen(true);
+  };
+
+  const openChat = (slug: string) => {
+    setChatAllOpen(false);
+    setSelectedSlug(slug);
   };
 
   const send = async () => {
@@ -102,7 +134,10 @@ export function ChatSurface() {
 
     let reply: string;
     try {
-      reply = (await chatComplete(buildPrompt(convo))).trim() || "(the model returned nothing)";
+      const opts = picked
+        ? { model: picked.id, endpoint: picked.endpoint, api: picked.api }
+        : undefined;
+      reply = (await chatComplete(buildPrompt(convo), opts)).trim() || "(the model returned nothing)";
     } catch (e) {
       setMessages((p) => [
         ...p,
@@ -120,12 +155,12 @@ export function ChatSurface() {
       { speaker: "rotli", text: reply },
     ];
     try {
-      if (selected) {
-        const sum = chats.data?.find((c) => c.slug === selected);
+      if (selectedSlug) {
+        const sum = chats.data?.find((c) => c.slug === selectedSlug);
         await write.mutateAsync({
           instance: active,
-          existingSlug: selected,
-          title: sum?.title ?? selected,
+          existingSlug: selectedSlug,
+          title: sum?.title ?? selectedSlug,
           messages: turn,
         });
       } else {
@@ -134,7 +169,7 @@ export function ChatSurface() {
           title: title.trim() || deriveTitle(userText),
           messages: turn,
         });
-        setSelected(res.slug);
+        setSelectedSlug(res.slug);
         setTitle("");
       }
     } catch {
@@ -142,28 +177,43 @@ export function ChatSurface() {
     }
   };
 
+  // the all-chats browse list (the sidebar "All chats" row opens this)
+  const browseList = useMemo(() => {
+    const q = browseFilter.trim().toLowerCase();
+    const all = chats.data ?? [];
+    if (!q) return all;
+    return all.filter(
+      (c) => (c.title || c.slug).toLowerCase().includes(q) || c.slug.toLowerCase().includes(q),
+    );
+  }, [chats.data, browseFilter]);
+
   return (
     <div className="chat-surface">
       <header className="chat-head">
-        <button type="button" className="chat-back" onClick={() => setChatOpen(false)}>
-          <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-            <path
-              d="M15 18l-6-6 6-6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          Notes
-        </button>
         <h2>Chat</h2>
         {active && <span className="chat-inst">· {active.label}</span>}
+        {/* the model selecter — what we have in the memex ai (~/.memex/ai) */}
+        {modelList.length > 0 && (
+          <label className="chat-model" title="On-device model — from your memex AI store">
+            <span className="chat-model-label">Model</span>
+            <select
+              className="chat-model-select"
+              value={picked?.id ?? ""}
+              onChange={(e) => setChatModelId(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              {modelList.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </header>
 
       {!isTauri() ? (
-        <div className="chat-empty">The Chat front talks to your memex — it runs in the app.</div>
+        <div className="chat-empty">The Chat surface talks to your memex — it runs in the app.</div>
       ) : !active ? (
         <div className="chat-empty">
           <p>No memex connected yet.</p>
@@ -171,95 +221,104 @@ export function ChatSurface() {
             Connect one in Settings → Memory
           </button>
         </div>
-      ) : (
-        <div className="chat-body">
-          <aside className="chat-list">
-            <button
-              type="button"
-              className={selected === null ? "chat-new sel" : "chat-new"}
-              onClick={() => setSelected(null)}
-            >
-              + New chat
-            </button>
-            {(chats.data ?? []).map((c) => (
+      ) : chatAllOpen ? (
+        // browse mode: a searchable list of every chat (the sidebar shows a
+        // limited view; "All chats" opens the full search here)
+        <div className="chat-browse">
+          <div className="chat-browse-search">
+            <input
+              className="chat-input"
+              placeholder="Search all chats…"
+              value={browseFilter}
+              onChange={(e) => setBrowseFilter(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+              autoFocus
+            />
+          </div>
+          <div className="chat-browse-list">
+            {browseList.map((c) => (
               <button
                 type="button"
                 key={c.slug}
-                className={selected === c.slug ? "chat-item sel" : "chat-item"}
-                onClick={() => setSelected(c.slug)}
+                className="chat-item"
+                onClick={() => openChat(c.slug)}
               >
                 <span className="chat-item-title">{c.title || c.slug}</span>
                 {c.attachedTo && <span className="chat-item-attach">↳ {c.attachedTo}</span>}
               </button>
             ))}
-            {(chats.data ?? []).length === 0 && <p className="chat-list-empty">No chats yet.</p>}
-          </aside>
-
-          <main className="chat-main">
-            <div className="chat-scroll" ref={scrollRef}>
-              {messages.length === 0 ? (
-                <div className="chat-newhint">
-                  <p>{selected ? "No messages yet." : "Ask anything — it runs on your Mac."}</p>
-                  <p className="chat-sub">
-                    Saved as a plain <code>chats/&lt;slug&gt;.md</code> in your memex.
-                  </p>
-                </div>
-              ) : (
-                messages.map((m, idx) => (
-                  <div key={idx} className={m.speaker === "you" ? "cmsg you" : "cmsg ai"}>
-                    <div className="cmsg-bubble">{m.text}</div>
-                  </div>
-                ))
-              )}
-              {busy && (
-                <div className="cmsg ai">
-                  <div className="cmsg-bubble cmsg-think">thinking…</div>
-                </div>
-              )}
-            </div>
-
-            {writable ? (
-              <div className="chat-composer">
-                {!selected && (
-                  <input
-                    className="chat-input"
-                    placeholder="Chat title (optional)…"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  />
-                )}
-                <div className="chat-send-row">
-                  <input
-                    className="chat-input"
-                    placeholder={busy ? "thinking…" : "Message…"}
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      e.stopPropagation();
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void send();
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="chat-send"
-                    disabled={busy || !message.trim()}
-                    onClick={() => void send()}
-                  >
-                    {busy ? "…" : "Send"}
-                  </button>
-                </div>
+            {browseList.length === 0 && (
+              <p className="chat-list-empty">
+                {(chats.data ?? []).length === 0 ? "No chats yet." : "No chats match."}
+              </p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <main className="chat-main">
+          <div className="chat-scroll" ref={scrollRef}>
+            {messages.length === 0 ? (
+              <div className="chat-newhint">
+                <p>{selectedSlug ? "No messages yet." : "Ask anything — it runs on your Mac."}</p>
+                <p className="chat-sub">
+                  Saved as a plain <code>chats/&lt;slug&gt;.md</code> in your memex.
+                </p>
               </div>
             ) : (
-              <div className="chat-readonly">
-                This memex is connected read-only — enable “Chats + inbox” in Settings → Memory to write.
+              messages.map((m, idx) => (
+                <div key={idx} className={m.speaker === "you" ? "cmsg you" : "cmsg ai"}>
+                  <div className="cmsg-bubble">{m.text}</div>
+                </div>
+              ))
+            )}
+            {busy && (
+              <div className="cmsg ai">
+                <div className="cmsg-bubble cmsg-think">thinking…</div>
               </div>
             )}
-          </main>
-        </div>
+          </div>
+
+          {writable ? (
+            <div className="chat-composer">
+              {!selectedSlug && (
+                <input
+                  className="chat-input"
+                  placeholder="Chat title (optional)…"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
+                />
+              )}
+              <div className="chat-send-row">
+                <input
+                  className="chat-input"
+                  placeholder={busy ? "thinking…" : "Message…"}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void send();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="chat-send"
+                  disabled={busy || !message.trim()}
+                  onClick={() => void send()}
+                >
+                  {busy ? "…" : "Send"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="chat-readonly">
+              This memex is connected read-only — enable “Chats + inbox” in Settings → Memory to write.
+            </div>
+          )}
+        </main>
       )}
     </div>
   );

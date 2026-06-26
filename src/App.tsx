@@ -12,7 +12,6 @@ import "./styles/memex.css";
 import "@excalidraw/excalidraw/index.css";
 import "./styles/canvas.css";
 import { CaptureCard } from "./components/CaptureCard";
-import { ChatSurface } from "./components/ChatSurface";
 import { MemorySurface } from "./components/MemorySurface";
 import { NotesSurface } from "./components/NotesSurface";
 import { Onboarding } from "./components/Onboarding";
@@ -83,7 +82,6 @@ function surfaceFromUrl(): Surface {
 
 function MainShell() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
-  const chatOpen = useUiStore((s) => s.chatOpen);
   const memoryOpen = useUiStore((s) => s.memoryOpen);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
@@ -269,13 +267,12 @@ function MainShell() {
     <div className="app-window">
       <Titlebar />
       <main className="app-content">
-        {/* Settings / Chat / Memory are still full-surface fronts. The Board and
-            All-notes grids are NOT — they render inside NotesSurface's content
-            area so the sidebar stays put (Seth, 2026-06-24). */}
+        {/* Settings + Memory are still full-surface fronts. Chat is NOT anymore —
+            it folded into the left-menu Chat section and renders inside
+            NotesSurface's content area (contentView "chat"), like Board and
+            All-notes, so the three sections stay visible (Seth, 2026-06-26). */}
         {settingsOpen ? (
           <SettingsSurface />
-        ) : chatOpen ? (
-          <ChatSurface />
         ) : memoryOpen ? (
           <MemorySurface />
         ) : (

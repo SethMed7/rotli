@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-06-26
+
+The left menu becomes the navigator — three sections, no more top dropdown (IA rework, Increment 1).
+
+### Added
+- **Three top-level left-menu sections: Inbox · Chat · Notes.** The titlebar module dropdown is
+  retired — the sidebar IS the navigation now. Each section is a collapsible accordion (state
+  persists):
+  - **Inbox = email** — a clear placeholder of the intended structure (an **All** row + an
+    account accordion: `maintainer@example.com`, `hello@sethmedina.com`, …, thread sub-accordion
+    later). The mail integration is a later increment; **rotli writes nothing** for it.
+  - **Chat** — a ChatGPT-style section over your memex `chats/`: **+ New chat**, a searchable
+    **All chats**, and your recent **history** (a limited view; "All chats" opens the full search).
+    Clicking a chat opens it in the content area beside the sidebar — Chat is no longer a
+    full-surface front reached from a dropdown.
+  - **Notes** — the corpus, unchanged: **All notes · Board · Recent**, then the local destinations,
+    the Vault/Knowledge folders, and nested folders. (Memory isn't a section — it's simply your
+    Vault.)
+- **Pick the chat model from your memex AI.** The Chat surface has a **model selector** that reads
+  the shared on-device store (`~/.memex/ai/registry.json`) and lists every chat-capable model it
+  declares (Gemma via MLX, the llama.cpp backup, …), defaulting to the store's default. The bridge
+  now speaks **both** wire shapes — Ollama `/api/generate` (MLX) and OpenAI `/v1/chat/completions`
+  (llama.cpp) — so the picked model actually runs. The choice persists.
+
+### Changed
+- **"Inbox" now means email; the note-capture concept is "Capture."** The local capture destination
+  (and the ⌥C one-breath capture) is **labeled Capture** so the word "Inbox" is free for mail. The
+  on-disk name and the memex contract are **unchanged** (`inbox.md` keeps its name; rotli still writes
+  only `chats/`, `inbox.md`, `wiki/_inbox/`).
+- The titlebar identity is now a plain **rotli** home wordmark (click → back to the note panes).
+
+*(Increment 1 is the structural left-menu rework only. Streaming chat, `@note`/`@board`/`@email`
+context, the chat-owns-a-summary-note model, Breve `history/` rendered in Chat, and the real email
+integration are later increments. Plan: `docs/notes-chat-inbox-rearchitecture.md`.)*
+
 ## [0.5.0] — 2026-06-26
 
 The Chat front begins — a real on-device chat (Increment 1).

@@ -75,8 +75,8 @@ export function registerDefaultActions(): void {
     defaultChord: "Esc",
     run: () => {
       // Esc unwinds one layer at a time (quokka rule): topmost transient
-      // (popovers incl. the module switcher, in stack order) → settings →
-      // board → chat → memory → focus mode → the window itself.
+      // (popovers, in stack order) → settings → a content view (board / all-notes
+      // / chat) back to the note panes → memory → focus mode → the window itself.
       const ui = useUiStore.getState();
       if (ui.closeTopTransient()) return;
       if (ui.settingsOpen) {
@@ -85,10 +85,6 @@ export function registerDefaultActions(): void {
       }
       if (ui.contentView !== "panes") {
         ui.setContentView("panes");
-        return;
-      }
-      if (ui.chatOpen) {
-        ui.setChatOpen(false);
         return;
       }
       if (ui.memoryOpen) {
@@ -144,7 +140,6 @@ export function registerDefaultActions(): void {
     run: () => {
       const ui = useUiStore.getState();
       ui.setSettingsOpen(false);
-      ui.setSwitcherOpen(false);
       ui.setFocusMode(!ui.focusMode);
     },
   });
@@ -155,7 +150,6 @@ export function registerDefaultActions(): void {
     run: () => {
       const ui = useUiStore.getState();
       ui.setFocusMode(false);
-      ui.setSwitcherOpen(false);
       ui.setContentView("panes");
       ui.setSettingsOpen(!ui.settingsOpen);
     },
@@ -171,7 +165,6 @@ export function registerDefaultActions(): void {
     run: () => {
       const ui = useUiStore.getState();
       ui.setFocusMode(false);
-      ui.setSwitcherOpen(false);
       ui.setSettingsOpen(false);
       ui.setContentView(ui.contentView === "board" ? "panes" : "board");
     },
@@ -373,7 +366,38 @@ export function registerDefaultActions(): void {
     id: "modules.notes",
     title: "Go to Notes",
     defaultChord: "Ctrl+1",
-    run: () => useUiStore.getState().setSwitcherOpen(false), // already the current module
+    run: () => {
+      const ui = useUiStore.getState();
+      ui.setSettingsOpen(false);
+      ui.setContentView("panes"); // back to the note panes
+    },
+  });
+
+  // Chat is the middle left-menu section (no longer a dropdown module). The
+  // palette/⌃2 opens a fresh chat in the content area; the sidebar drives chat
+  // selection directly. Both reach ⌘K and are rebindable.
+  registerAction({
+    id: "chat.new",
+    title: "New chat",
+    defaultChord: "Ctrl+2",
+    run: () => {
+      const ui = useUiStore.getState();
+      ui.setSettingsOpen(false);
+      ui.setSelectedChatSlug(null);
+      ui.setChatAllOpen(false);
+      ui.setContentView("chat");
+    },
+  });
+  registerAction({
+    id: "chat.all",
+    title: "All chats",
+    defaultChord: null,
+    run: () => {
+      const ui = useUiStore.getState();
+      ui.setSettingsOpen(false);
+      ui.setChatAllOpen(true);
+      ui.setContentView("chat");
+    },
   });
 
   // — the capture card's own keys (surface: capture — its webview's dispatcher

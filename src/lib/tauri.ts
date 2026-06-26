@@ -286,11 +286,37 @@ export function corpusRenameBoard(id: string, name: string): Promise<CorpusNoteM
   return corpusInvoke("corpus_rename_board", { id, name });
 }
 
+/** One chat-capable model the memex-ai store can serve (read from
+ * ~/.memex/ai/registry.json by Rust). `api` is the server wire shape. */
+export interface ChatModelInfo {
+  id: string;
+  label: string;
+  provider: string;
+  endpoint: string;
+  api: string;
+  isDefault: boolean;
+}
+
+/** Chat front: the on-device models the memex-ai store declares (kind:llm-chat).
+ * Always returns at least the MLX default, even if the registry is missing. */
+export function chatModels(): Promise<ChatModelInfo[]> {
+  return invoke<ChatModelInfo[]>("chat_models");
+}
+
 /** Chat front: one-shot completion from the on-device model. The Rust side POSTs
- * the local MLX server (the webview CSP can't reach localhost). Rejects with a
- * readable error string if the model isn't running. */
-export function chatComplete(prompt: string): Promise<string> {
-  return invoke<string>("chat_complete", { prompt });
+ * the local model server (the webview CSP can't reach localhost). Rejects with a
+ * readable error string if the model isn't running. Pass the picked model's
+ * endpoint/model/api to target a specific memex-ai model (else the MLX default). */
+export function chatComplete(
+  prompt: string,
+  opts?: { model?: string; endpoint?: string; api?: string },
+): Promise<string> {
+  return invoke<string>("chat_complete", {
+    prompt,
+    model: opts?.model,
+    endpoint: opts?.endpoint,
+    api: opts?.api,
+  });
 }
 
 /** Settings → Storage truth: the real root (home shortened to `~`), every

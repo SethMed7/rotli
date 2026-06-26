@@ -70,9 +70,18 @@ export const ALL_NOTES = "all";
 export const RECENT = "recent";
 
 /** What the content area (right of the sidebar) renders: the note panes, the
- * Board grid, or the searchable All-notes grid. Board/All-notes are views in
- * the pane area — the sidebar never moves for them (Seth, 2026-06-24). */
-export type ContentView = "panes" | "board" | "allNotes" | "recent";
+ * Board grid, the searchable All-notes grid, or the Chat surface. All of these
+ * are views in the pane area — the sidebar never moves for them, so the three
+ * left-menu sections (Inbox · Chat · Notes) stay visible (Seth, 2026-06-24;
+ * Chat folded in from a full-surface front 2026-06-26). */
+export type ContentView = "panes" | "board" | "allNotes" | "recent" | "chat";
+
+/** The three top-level left-menu sections (Seth's decided IA, 2026-06-26): Inbox
+ * (email) · Chat · Notes. Each is a collapsible accordion; its open state lives in
+ * expandedDests under these reserved ids (so it persists like a destination). */
+export const SEC_INBOX = "sec:inbox";
+export const SEC_CHAT = "sec:chat";
+export const SEC_NOTES = "sec:notes";
 
 /** Sidebar width clamp — small enough to tuck away, never wide enough to eat
  * the editor (one rail now, not two — Seth, 2026-06-13). */
@@ -185,10 +194,6 @@ interface UiState {
   selectedFolderId: string;
   setSelectedFolderId: (id: string) => void;
 
-  /** The identity module-switcher popover (r5, approved). */
-  switcherOpen: boolean;
-  setSwitcherOpen: (open: boolean) => void;
-
   /** The bottom-center resident slot's visibility — 1c's focus mode hides
    * the format bar through this flag. */
   formatBarVisible: boolean;
@@ -230,14 +235,26 @@ interface UiState {
   renamingBoardId: string | null;
   setRenamingBoardId: (id: string | null) => void;
 
-  /** The Chat front — named conversations over the connected memex (chats/) — as
-   * its own surface (like Board). "Everything has a chat." Not persisted. */
-  chatOpen: boolean;
-  setChatOpen: (open: boolean) => void;
+  /** Chat is the middle left-menu section now (not a dropdown module): the chat
+   * history lives in the sidebar and a chat opens in the content area via
+   * contentView "chat". These hold which chat is open and the browse mode. Not
+   * persisted (transient view state). */
+  /** The chat currently open in the content area (its chats/ slug), or null = a
+   * fresh "New chat". */
+  selectedChatSlug: string | null;
+  setSelectedChatSlug: (slug: string | null) => void;
+  /** "All chats" browse mode — the content area shows a searchable list of every
+   * chat instead of a single conversation. */
+  chatAllOpen: boolean;
+  setChatAllOpen: (open: boolean) => void;
+  /** The on-device model id the Chat surface sends to, picked from the memex-ai
+   * store (~/.memex/ai/registry.json). null = use the store's default. Persisted. */
+  chatModelId: string | null;
+  setChatModelId: (id: string | null) => void;
 
   /** A newer signed build is on the feed — set once by App.tsx's quiet on-mount
    * check (CARL rule 2: no auto-download, no modal). Just lets Settings → General
-   * surface "Update available". Transient, not persisted (mirrors chatOpen). */
+   * surface "Update available". Transient, not persisted (mirrors memoryOpen). */
   updateAvailable: boolean;
   setUpdateAvailable: (on: boolean) => void;
   /** The version the feed offers, when known (e.g. "0.2.0"). */
@@ -342,7 +359,15 @@ export const useUiStore = create<UiState>((set, get) => ({
   sidebarWidth: 240,
   setSidebarWidth: (px) => set({ sidebarWidth: clampSidebarWidth(px) }),
 
-  expandedDests: { Inbox: true, "vault:": true },
+  // the three sections open by default, plus the Capture(Inbox) + Vault dests
+  // inside Notes — so a fresh window shows the full three-section tree.
+  expandedDests: {
+    [SEC_INBOX]: true,
+    [SEC_CHAT]: true,
+    [SEC_NOTES]: true,
+    Inbox: true,
+    "vault:": true,
+  },
   toggleDestExpanded: (id) =>
     set((s) => ({ expandedDests: { ...s.expandedDests, [id]: !s.expandedDests[id] } })),
   setDestExpanded: (id, open) =>
@@ -351,9 +376,6 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   selectedFolderId: ALL_NOTES,
   setSelectedFolderId: (id) => set({ selectedFolderId: id }),
-
-  switcherOpen: false,
-  setSwitcherOpen: (open) => set({ switcherOpen: open }),
 
   formatBarVisible: true,
   setFormatBarVisible: (visible) => set({ formatBarVisible: visible }),
@@ -379,8 +401,12 @@ export const useUiStore = create<UiState>((set, get) => ({
   renamingBoardId: null,
   setRenamingBoardId: (id) => set({ renamingBoardId: id }),
 
-  chatOpen: false,
-  setChatOpen: (open) => set({ chatOpen: open }),
+  selectedChatSlug: null,
+  setSelectedChatSlug: (slug) => set({ selectedChatSlug: slug }),
+  chatAllOpen: false,
+  setChatAllOpen: (open) => set({ chatAllOpen: open }),
+  chatModelId: null,
+  setChatModelId: (id) => set({ chatModelId: id }),
 
   updateAvailable: false,
   setUpdateAvailable: (on) => set({ updateAvailable: on }),

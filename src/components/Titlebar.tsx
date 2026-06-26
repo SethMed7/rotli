@@ -15,9 +15,7 @@ import { startWindowDrag } from "../lib/tauri";
 import { GLASS_TINTS, SOLID_THEMES, useUiStore } from "../state/ui";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
-import { ModuleSwitcher } from "./ModuleSwitcher";
 import {
-  ChevronDown,
   PlusGlyph,
   SidebarGlyph,
   SplitDownGlyph,
@@ -35,8 +33,6 @@ function onDragRegionMouseDown(event: MouseEvent) {
 }
 
 export function Titlebar() {
-  const switcherOpen = useUiStore((s) => s.switcherOpen);
-  const setSwitcherOpen = useUiStore((s) => s.setSwitcherOpen);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const updateAvailable = useUiStore((s) => s.updateAvailable);
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
@@ -75,22 +71,15 @@ export function Titlebar() {
           </button>
         </div>
       ) : (
-        <>
-          <div className="identity-wrap">
-            <button
-              type="button"
-              className={switcherOpen ? "identity open" : "identity"}
-              aria-haspopup="menu"
-              aria-expanded={switcherOpen}
-              onClick={() => setSwitcherOpen(!switcherOpen)}
-            >
-              <Icon name="rotli-notes" size={TB_ICON} />
-              Notes
-              <ChevronDown className="chev" />
-            </button>
-            {switcherOpen && <ModuleSwitcher onClose={() => setSwitcherOpen(false)} />}
-          </div>
-        </>
+        // the module dropdown is retired (Seth, 2026-06-26): the left menu's three
+        // sections (Inbox · Chat · Notes) ARE the navigation now. The identity is a
+        // plain home wordmark — click returns to the note panes.
+        <div className="identity-wrap">
+          <button type="button" className="identity home" onClick={() => dispatch("modules.notes")}>
+            <Icon name="rotli-notes" size={TB_ICON} />
+            rotli
+          </button>
+        </div>
       )}
       <div className="tb-spacer" onMouseDown={onDragRegionMouseDown} />
       <div className="tb-actions">

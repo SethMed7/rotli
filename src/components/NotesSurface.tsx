@@ -13,6 +13,7 @@ import { useUiStore } from "../state/ui";
 import { AllNotesSurface } from "./AllNotesSurface";
 import { RecentSurface } from "./RecentSurface";
 import { BoardSurface } from "./BoardSurface";
+import { ChatSurface } from "./ChatSurface";
 import { EmptyState } from "./EmptyState";
 import { Sidebar } from "./Sidebar";
 import { PaneTree } from "./PaneTree";
@@ -91,6 +92,8 @@ export function NotesSurface() {
         <AllNotesSurface />
       ) : contentView === "recent" ? (
         <RecentSurface />
+      ) : contentView === "chat" ? (
+        <ChatSurface />
       ) : (
         <PaneTree />
       )}

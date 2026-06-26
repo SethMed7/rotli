@@ -527,13 +527,37 @@ These were scoped out of 0.4.x to do correctly; they precede the big IA rebuild:
 
 ## Phasing (revised to land Seth's IA)
 
-1. **Boards nameable + metadata** (F, G) — small, unblocks board search + @-context.
+1. **Boards nameable + metadata** (F, G) — small, unblocks board search + @-context. ✅ 0.4.2/0.4.3
 2. **Contextual zoom** (D) — independent polish.
-3. **Chat front** — a proper chat UI over `chats/`, with history + the owned-note summarizer.
+3. **Chat front** — a proper chat UI over `chats/`, with history + the owned-note summarizer. ✅ 0.5.0 (Inc 1: one-shot, no summarizer yet)
 4. **Left menu = 3 sections** — fold Board/All-notes/Recent under **Notes**; add **Chat** + **Inbox**
-   placeholders; retire the top dropdown.
+   placeholders; retire the top dropdown. ✅ **0.6.0 (Increment 1, this change)**
 5. **Email (Inbox)** — connect mailboxes; account/thread accordions; read-mostly, never writes the memex.
 6. **@-context + per-object chat** — `@note`/`@email`/`@board` mentions resolve into chat context.
+
+### What 0.6.0 (Increment 1) actually shipped
+
+The **structural** left-menu rework only:
+
+- Three collapsible sections (**Inbox · Chat · Notes**), persisted in `expandedDests` under reserved
+  ids (`sec:inbox`/`sec:chat`/`sec:notes`). The top `ModuleSwitcher` dropdown is **deleted**; the
+  titlebar identity is a plain **rotli** home wordmark.
+- **Chat** is no longer a full-surface front (`chatOpen` removed). It's a `contentView "chat"` that
+  renders `ChatSurface` in the content area beside the sidebar; the sidebar Chat section drives
+  selection (`ui.selectedChatSlug` / `ui.chatAllOpen`). Sidebar shows recent history (limited);
+  **All chats** opens a searchable browse in the content area.
+- **Chat model selector** reads `~/.memex/ai/registry.json` (`chat_models` Rust command), lists the
+  `kind:"llm-chat"` models, and `chat_complete` now speaks both the Ollama `/api/generate` (MLX) and
+  OpenAI `/v1/chat/completions` (llama.cpp) shapes. Choice persists in `ui.chatModelId`.
+- **Capture rename:** the note-capture destination is **labeled "Capture"** (the word "Inbox" now
+  means email). The on-disk id stays `"Inbox"` and the memex write boundary is unchanged — rotli
+  still writes only `chats/`, `inbox.md`, `wiki/_inbox/`.
+- **Memory** is not a section (it's the Vault/Knowledge under Notes). `MemorySurface` remains in the
+  tree but is no longer wired to any nav entry.
+
+**Deferred to later increments (NOT in 0.6.0):** streaming, `@note`/`@board`/`@email` context, the
+chat-owns-a-summary-note model, Breve `history/` rendered inside Chat, the email account/thread
+accordion (only stubbed), and the real mail integration.
 
 ## Breve / `history/` reads as chat (Seth, 2026-06-26)
 

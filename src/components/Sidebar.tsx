@@ -42,18 +42,23 @@ import {
   isVault,
 } from "../services/destinations";
 import { useFocusedBoardId, useFocusedNoteId, usePanesStore } from "../state/panes";
-import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
+import { ALL_NOTES, RECENT, SEC_CHAT, SEC_INBOX, SEC_NOTES, useUiStore } from "../state/ui";
+import { activeInstance } from "../memex/config";
+import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
 import type { Folder, NoteSummary } from "../types";
 import { dispatch } from "../keys/registry";
 import { useTransientPopover } from "../lib/popover";
 import {
   ArchiveGlyph,
   BoardGlyph as CanvasItemGlyph,
+  ChatGlyph,
   ChevronRight,
   ClockGlyph,
   FileGlyph,
   FolderGlyph,
   InboxGlyph,
+  MailGlyph,
+  NotesStackGlyph,
   PlusGlyph,
   SearchGlyph,
   StorageGlyph,
@@ -149,14 +154,27 @@ function dayLabel(ts: number): string {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-/** The five reserved destinations, in sidebar order, each with its glyph. */
+/** The five reserved destinations, in sidebar order, each with its glyph. The
+ * note-capture root keeps its on-disk id "Inbox" (the memex contract is unchanged)
+ * but is LABELED "Capture" now that the top-level word "Inbox" means email (Seth,
+ * 2026-06-26). The ⌥C one-breath capture still lands here / in the memex inbox.md. */
 const DEST_ROWS: { id: Destination; label: string; Glyph: typeof InboxGlyph }[] = [
-  { id: DEST.inbox, label: "Inbox", Glyph: InboxGlyph },
+  { id: DEST.inbox, label: "Capture", Glyph: InboxGlyph },
   { id: DEST.vault, label: "Vault", Glyph: VaultGlyph },
   { id: DEST.storage, label: "Storage", Glyph: StorageGlyph },
   { id: DEST.archive, label: "Archive", Glyph: ArchiveGlyph },
   { id: DEST.trash, label: "Trash", Glyph: TrashGlyph },
 ];
+
+/** Stubbed email accounts for the Inbox (email) placeholder — the intended
+ * account/thread structure, rendered disabled until the mail integration lands
+ * (a LATER increment; this writes nothing). These two are Seth's known addresses
+ * from the IA doc Addendum. */
+const STUB_EMAIL_ACCOUNTS = ["maintainer@example.com", "hello@sethmedina.com"];
+
+/** How many chats the sidebar Chat section shows before "All chats" takes over —
+ * the accordion is a LIMITED view; "All chats" opens the full searchable list. */
+const CHAT_SECTION_LIMIT = 12;
 
 /** The lifecycle handlers a compact row needs in its hover slot — wired once at
  * the Sidebar top (the hooks live there) and passed down so the row stays a
@@ -352,6 +370,16 @@ export function Sidebar() {
     ...trashNotes,
   ])
     noteById.set(n.id, n);
+
+  // — the Chat section: the active memex's chats/ history (the same source the
+  // Chat surface reads), plus the chat-selection ui state the surface renders. —
+  const memexCfg = useMemexConfig();
+  const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
+  const chatList = useInstanceChats(activeMemex).data ?? [];
+  const selectedChatSlug = useUiStore((s) => s.selectedChatSlug);
+  const setSelectedChatSlug = useUiStore((s) => s.setSelectedChatSlug);
+  const chatAllOpen = useUiStore((s) => s.chatAllOpen);
+  const setChatAllOpen = useUiStore((s) => s.setChatAllOpen);
 
   const selectedFolderId = useUiStore((s) => s.selectedFolderId);
   const setSelectedFolderId = useUiStore((s) => s.setSelectedFolderId);
@@ -654,21 +682,32 @@ export function Sidebar() {
       ];
     });
 
-  const rows: RovingRow[] = [
-    { id: ALL_NOTES, kind: "smart" },
-    { id: RECENT, kind: "smart" },
-    ...DEST_ROWS.flatMap(({ id }) => {
-      const destNotes = notesByDest[id] ?? [];
-      const open = expandedDests[id] ?? false;
-      const row: RovingRow = { id, kind: "folder" };
-      if (!open) return [row];
-      return [
-        row,
-        ...visibleNoteRows(destNotes, id),
-        ...subtreeRows(id, destNotes),
-      ];
-    }),
-  ];
+  // the three top-level sections' open state (Seth's IA, 2026-06-26). Default
+  // open so a fresh window shows the full tree; persisted via expandedDests.
+  const inboxSecOpen = expandedDests[SEC_INBOX] ?? true;
+  const chatSecOpen = expandedDests[SEC_CHAT] ?? true;
+  const notesSecOpen = expandedDests[SEC_NOTES] ?? true;
+
+  // the roving j/k cursor only walks the NOTES section (the corpus tree). When
+  // that section is collapsed there are no roving rows; the Inbox/Chat sections
+  // are plain buttons, outside the listbox.
+  const rows: RovingRow[] = notesSecOpen
+    ? [
+        { id: ALL_NOTES, kind: "smart" },
+        { id: RECENT, kind: "smart" },
+        ...DEST_ROWS.flatMap(({ id }) => {
+          const destNotes = notesByDest[id] ?? [];
+          const open = expandedDests[id] ?? false;
+          const row: RovingRow = { id, kind: "folder" };
+          if (!open) return [row];
+          return [
+            row,
+            ...visibleNoteRows(destNotes, id),
+            ...subtreeRows(id, destNotes),
+          ];
+        }),
+      ]
+    : [];
 
   // a flat id → note lookup for the menu's hidden-root branch (search every
   // loaded list incl. the hidden Archive/Trash — same source the drop handler
@@ -865,6 +904,48 @@ export function Sidebar() {
     </span>
   );
 
+  // — Chat section openers: each opens the Chat surface in the content area (the
+  //   sidebar stays put), driving the same ui state ChatSurface reads. —
+  const isChatView = contentView === "chat";
+  const openNewChat = () => {
+    setChatAllOpen(false);
+    setSelectedChatSlug(null);
+    setContentView("chat");
+  };
+  const openAllChats = () => {
+    setChatAllOpen(true);
+    setContentView("chat");
+  };
+  const openChatRow = (slug: string) => {
+    setChatAllOpen(false);
+    setSelectedChatSlug(slug);
+    setContentView("chat");
+  };
+
+  // a top-level section header (Inbox · Chat · Notes): a clickable disclosure row
+  // that toggles its accordion (state persisted in expandedDests under SEC_*).
+  const sectionHeader = (
+    id: string,
+    label: string,
+    Glyph: typeof MailGlyph,
+    open: boolean,
+    count?: number,
+  ): ReactNode => (
+    <button
+      type="button"
+      className="sb-section"
+      aria-expanded={open}
+      onClick={() => toggleDestExpanded(id)}
+    >
+      <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
+        <ChevronRight size={11} />
+      </span>
+      <Glyph size={15.5} />
+      <span className="fname">{label}</span>
+      {count != null && count > 0 && <span className="count">{count}</span>}
+    </button>
+  );
+
   return (
     <aside
       className="sidebar"
@@ -962,92 +1043,174 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* the Board — quick captures collected as cards; opens its own surface
-          (Seth, 2026-06-19). Outside the roving listbox: it's an action, not a
-          folder selection. */}
-      <button
-        type="button"
-        className={`frow sb-board${contentView === "board" ? " sel" : ""}`}
-        onClick={() => dispatch("board.open")}
-      >
-        <CaptureBoardGlyph size={14.5} />
-        <span className="fname">Board</span>
-        <span className="count">{boardNotes.length}</span>
-      </button>
-
-      {/* the scrolling tree is the roving listbox: Tab enters at the one
-          tabIndex=0 row, then j/k walk it (Seth, 2026-06-13). The keyboard
-          highlight is :focus-visible — .sel stays the open-note grammar. */}
-      <div className="sb-rows" role="listbox" aria-label="Notes tree">
-        {/* — smart rows: same semantics as FoldersRail (no expansion) — */}
-        <button
-          type="button"
-          className={`frow${contentView === "allNotes" ? " sel" : ""}`}
-          onClick={() => {
-            setSelectedFolderId(ALL_NOTES);
-            setContentView("allNotes");
-          }}
-          {...rowProps({ id: ALL_NOTES, kind: "smart" })}
-        >
-          <FileGlyph size={14.5} />
-          <span className="fname">All notes</span>
-          <span className="count">{allNotes.length}</span>
-        </button>
-        <button
-          type="button"
-          className={`frow${contentView === "recent" ? " sel" : ""}`}
-          onClick={() => {
-            setSelectedFolderId(RECENT);
-            setContentView("recent");
-          }}
-          {...rowProps({ id: RECENT, kind: "smart" })}
-        >
-          <ClockGlyph size={14.5} />
-          <span className="fname">Recent</span>
-          <span className="count">{allNotes.length}</span>
-        </button>
-
-        <div className="fsec">Destinations</div>
-
-        {/* — destination rows: each toggles expansion AND selects (⌘N target) — */}
-        {DEST_ROWS.map(({ id, label, Glyph }) => {
-          const destNotes = notesByDest[id] ?? [];
-          const open = expandedDests[id] ?? false;
-          const selected = selectedFolderId === id;
-          return (
-            <div key={id}>
-              <button
-                type="button"
-                className={`frow${selected ? " sel" : ""}${
-                  dropTarget === id ? " drop-over" : ""
-                }`}
-                onClick={() => {
-                  toggleDestExpanded(id);
-                  setSelectedFolderId(id);
-                  setContentView("panes");
-                }}
-                {...(!isVault(id) ? dropProps(id) : {})}
-                {...rowProps({ id, kind: "folder" })}
-              >
-                <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
+      {/* the three top-level sections (Seth's IA, 2026-06-26): Inbox (email) ·
+          Chat · Notes — replacing the retired top module dropdown. Each is a
+          collapsible accordion; only the Notes tree is the roving j/k listbox. */}
+      <div className="sb-rows" aria-label="Sections">
+        {/* ── INBOX = email. The mail integration is a LATER increment; this is a
+            clear placeholder of the intended account → thread structure and rotli
+            writes nothing for it. ── */}
+        {sectionHeader(SEC_INBOX, "Inbox", MailGlyph, inboxSecOpen)}
+        {inboxSecOpen && (
+          <div className="sb-inbox-stub">
+            <div className="sb-stub-row" aria-disabled="true">
+              <SearchGlyph size={13} />
+              <span className="fname">All</span>
+            </div>
+            {STUB_EMAIL_ACCOUNTS.map((addr) => (
+              <div key={addr} className="sb-stub-row acct" aria-disabled="true">
+                <span className="fchev" aria-hidden="true">
                   <ChevronRight size={10} />
                 </span>
-                <Glyph size={14.5} />
-                <span className="fname">{label}</span>
-                {/* the external Vault is read-mostly — no "+ new note/folder" */}
-                {!isHidden(id) && !isVault(id) && sectionAddBtn(id)}
-                <span className="count">{destNotes.length}</span>
+                <MailGlyph size={13} />
+                <span className="fname">{addr}</span>
+              </div>
+            ))}
+            <p className="sb-stub-note">
+              Connect email — coming. Your mailboxes (account → thread) will live here.
+            </p>
+          </div>
+        )}
+
+        {/* ── CHAT — a ChatGPT-style front over the memex chats/: New chat, a
+            searchable All, and the recent history (a LIMITED view). ── */}
+        {sectionHeader(SEC_CHAT, "Chat", ChatGlyph, chatSecOpen, chatList.length)}
+        {chatSecOpen && (
+          <div className="sb-chat">
+            <button type="button" className="sb-chatnew" onClick={openNewChat}>
+              <PlusGlyph size={13} />
+              <span>New chat</span>
+            </button>
+            <button
+              type="button"
+              className={`sb-chatrow all${isChatView && chatAllOpen ? " sel" : ""}`}
+              onClick={openAllChats}
+            >
+              <SearchGlyph size={13} />
+              <span className="fname">All chats</span>
+            </button>
+            {!activeMemex ? (
+              <button
+                type="button"
+                className="sb-chat-empty"
+                onClick={() => dispatch("app.settings")}
+              >
+                Connect a memex in Settings → Memory
               </button>
-              {open && (
-                <>
-                  {compactRows(destNotes, id, rowProps, 1)}
-                  {!isVault(id) && newFolderRow(id, 44)}
-                  {renderFolderTree(id, destNotes, 0, rowProps)}
-                </>
-              )}
-            </div>
-          );
-        })}
+            ) : chatList.length === 0 ? (
+              <p className="sb-chat-empty">No chats yet.</p>
+            ) : (
+              chatList.slice(0, CHAT_SECTION_LIMIT).map((c) => (
+                <button
+                  type="button"
+                  key={c.slug}
+                  className={`sb-chatrow${
+                    isChatView && !chatAllOpen && selectedChatSlug === c.slug ? " sel" : ""
+                  }`}
+                  onClick={() => openChatRow(c.slug)}
+                  title={c.title || c.slug}
+                >
+                  <ChatGlyph size={13} />
+                  <span className="fname">{c.title || c.slug}</span>
+                </button>
+              ))
+            )}
+            {chatList.length > CHAT_SECTION_LIMIT && (
+              <button type="button" className="sb-chat-more" onClick={openAllChats}>
+                +{chatList.length - CHAT_SECTION_LIMIT} more in All chats
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ── NOTES — the corpus (the deepest tree). All notes · Board · Recent ·
+            the local destinations + Vault/Knowledge + nested folders. This wrapper
+            is the roving listbox: Tab enters at the one tabIndex=0 row, j/k walk
+            it; the keyboard highlight is :focus-visible. ── */}
+        {sectionHeader(SEC_NOTES, "Notes", NotesStackGlyph, notesSecOpen, allNotes.length)}
+        {notesSecOpen && (
+          <div className="sb-notes-tree" role="listbox" aria-label="Notes tree">
+            <button
+              type="button"
+              className={`frow${contentView === "allNotes" ? " sel" : ""}`}
+              onClick={() => {
+                setSelectedFolderId(ALL_NOTES);
+                setContentView("allNotes");
+              }}
+              {...rowProps({ id: ALL_NOTES, kind: "smart" })}
+            >
+              <FileGlyph size={14.5} />
+              <span className="fname">All notes</span>
+              <span className="count">{allNotes.length}</span>
+            </button>
+            {/* Board — quick captures collected as cards; opens its grid in the
+                content area (an action row, not a roving folder). */}
+            <button
+              type="button"
+              className={`frow${contentView === "board" ? " sel" : ""}`}
+              onClick={() => dispatch("board.open")}
+            >
+              <CaptureBoardGlyph size={14.5} />
+              <span className="fname">Board</span>
+              <span className="count">{boardNotes.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`frow${contentView === "recent" ? " sel" : ""}`}
+              onClick={() => {
+                setSelectedFolderId(RECENT);
+                setContentView("recent");
+              }}
+              {...rowProps({ id: RECENT, kind: "smart" })}
+            >
+              <ClockGlyph size={14.5} />
+              <span className="fname">Recent</span>
+              <span className="count">{allNotes.length}</span>
+            </button>
+
+            <div className="fsec">Destinations</div>
+
+            {/* — destination rows: each toggles expansion AND selects (⌘N target) — */}
+            {DEST_ROWS.map(({ id, label, Glyph }) => {
+              const destNotes = notesByDest[id] ?? [];
+              const open = expandedDests[id] ?? false;
+              const selected = selectedFolderId === id;
+              return (
+                <div key={id}>
+                  <button
+                    type="button"
+                    className={`frow${selected ? " sel" : ""}${
+                      dropTarget === id ? " drop-over" : ""
+                    }`}
+                    onClick={() => {
+                      toggleDestExpanded(id);
+                      setSelectedFolderId(id);
+                      setContentView("panes");
+                    }}
+                    {...(!isVault(id) ? dropProps(id) : {})}
+                    {...rowProps({ id, kind: "folder" })}
+                  >
+                    <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
+                      <ChevronRight size={10} />
+                    </span>
+                    <Glyph size={14.5} />
+                    <span className="fname">{label}</span>
+                    {/* the external Vault is read-mostly — no "+ new note/folder" */}
+                    {!isHidden(id) && !isVault(id) && sectionAddBtn(id)}
+                    <span className="count">{destNotes.length}</span>
+                  </button>
+                  {open && (
+                    <>
+                      {compactRows(destNotes, id, rowProps, 1)}
+                      {!isVault(id) && newFolderRow(id, 44)}
+                      {renderFolderTree(id, destNotes, 0, rowProps)}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* the row context menu (m / right-click later): one at a time, anchored

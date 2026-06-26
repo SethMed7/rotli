@@ -56,6 +56,9 @@ import {
   type GlassTint,
   RECENT,
   RESERVED_DESTS,
+  SEC_CHAT,
+  SEC_INBOX,
+  SEC_NOTES,
   type ThemeFamily,
   type ThemeSetting,
   useUiStore,
@@ -120,6 +123,8 @@ interface PersistedSettings {
   rawEditor: boolean;
   /** Route ⌥C quick captures to the active memex's inbox.md; off by default. */
   captureToBrainInbox: boolean;
+  /** The on-device model the Chat surface uses (id from ~/.memex/ai); null = default. */
+  chatModelId: string | null;
   /** First-run onboarding gate — false until the flow is finished/skipped. */
   onboarded: boolean;
   /** The Quick Note window's capped set, remembered note, and new-note folder
@@ -169,6 +174,10 @@ function parseSettings(raw: string): PersistedSettings {
     if (typeof open === "boolean") expandedDests[id] = open;
   }
   if (Object.keys(expandedDests).length === 0) {
+    // the three left-menu sections + the Capture(Inbox) & Vault dests inside Notes
+    expandedDests[SEC_INBOX] = true;
+    expandedDests[SEC_CHAT] = true;
+    expandedDests[SEC_NOTES] = true;
     expandedDests.Inbox = true;
     expandedDests["vault:"] = true;
   }
@@ -202,6 +211,7 @@ function parseSettings(raw: string): PersistedSettings {
     spellcheck: asBool(data.spellcheck, true),
     rawEditor: asBool(data.rawEditor, false),
     captureToBrainInbox: asBool(data.captureToBrainInbox, false),
+    chatModelId: typeof data.chatModelId === "string" ? data.chatModelId : null,
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
     // not this one — treat that as already-onboarded so we don't re-run first-run
     // onboarding on existing users (same migration shape as expandedDests above)
@@ -236,6 +246,7 @@ function applySettings(s: PersistedSettings): void {
     spellcheck: s.spellcheck,
     rawEditor: s.rawEditor,
     captureToBrainInbox: s.captureToBrainInbox,
+    chatModelId: s.chatModelId,
     onboarded: s.onboarded,
     quickNoteIds: s.quickNoteIds,
     quickActiveId: s.quickActiveId,
@@ -472,6 +483,7 @@ function settingsSnapshot(): string {
     spellcheck: ui.spellcheck,
     rawEditor: ui.rawEditor,
     captureToBrainInbox: ui.captureToBrainInbox,
+    chatModelId: ui.chatModelId,
     onboarded: ui.onboarded,
     quickNoteIds: ui.quickNoteIds,
     quickActiveId: ui.quickActiveId,

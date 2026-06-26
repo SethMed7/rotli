@@ -7,6 +7,11 @@
 /* — interactive rows render as buttons; strip the UA chrome — */
 .frow,
 .snrow,
+.sb-section,
+.sb-chatnew,
+.sb-chatrow,
+.sb-chat-empty,
+.sb-chat-more,
 .x,
 .tabplus {
   font: inherit;
@@ -208,6 +213,183 @@
   text-transform: uppercase;
   color: var(--text-muted);
   padding: 14px 10px 5px;
+}
+
+/* — the three top-level left-menu sections (Inbox · Chat · Notes), Seth's IA
+   2026-06-26. A section header is a prominent, full-width disclosure row: bolder
+   than a folder row, with the section glyph + a soft top rule between sections so
+   the three read as distinct zones. — */
+.sb-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  margin-top: 4px;
+  border-radius: var(--r-control);
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  position: relative;
+}
+.sb-section + .sb-section,
+.sb-inbox-stub + .sb-section,
+.sb-chat + .sb-section {
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
+  padding-top: 12px;
+}
+.sb-section:hover {
+  background: var(--hov);
+}
+.sb-section > svg:not(.fchev svg) {
+  color: var(--accent-text);
+  flex: 0 0 auto;
+}
+.sb-section .fname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-section .count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.sb-section .fchev {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 12px;
+  margin-left: -2px;
+  color: var(--text-muted);
+  transition: transform var(--motion-exit) var(--motion-ease);
+}
+.sb-section .fchev.open {
+  transform: rotate(90deg);
+}
+
+/* — Inbox (email) placeholder: the intended account → thread structure, rendered
+   disabled until the mail integration lands. Clearly a stub (muted, no hover). — */
+.sb-inbox-stub {
+  padding: 1px 0 6px;
+}
+.sb-stub-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 10px 5px 16px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  cursor: default;
+}
+.sb-stub-row.acct {
+  padding-left: 14px;
+}
+.sb-stub-row svg {
+  color: var(--text-muted);
+  flex: 0 0 auto;
+  opacity: 0.8;
+}
+.sb-stub-row .fname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-stub-row .fchev {
+  display: grid;
+  place-items: center;
+  width: 12px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+.sb-stub-note {
+  margin: 6px 10px 2px 16px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+/* — Chat section: a "New chat" accent row, an "All chats" search row, then the
+   recent history (limited). The chat rows reuse the folder-row sizing. — */
+.sb-chat {
+  padding: 1px 0 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sb-chatnew,
+.sb-chatrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px 6px 16px;
+  border-radius: var(--r-control);
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  position: relative;
+}
+.sb-chatnew {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.sb-chatnew svg {
+  color: var(--accent-text);
+  flex: 0 0 auto;
+}
+.sb-chatrow svg {
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+.sb-chatrow .fname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-chatnew:hover,
+.sb-chatrow:hover {
+  background: var(--hov);
+}
+/* the open chat is the active row — the same calm accent wash + 2px bar the note
+   tree uses for a selected folder (kept distinct from the open-note pill). */
+.sb-chatrow.sel {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  font-weight: 600;
+}
+.sb-chatrow.sel svg {
+  color: var(--accent-text);
+}
+.sb-chatrow.sel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+}
+.sb-chat-empty,
+.sb-chat-more {
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 6px 10px 6px 16px;
+  cursor: pointer;
+}
+.sb-chat-empty:hover,
+.sb-chat-more:hover {
+  color: var(--text);
 }
 
 /* — compact note rows (Seth, 2026-06-13): title + day label ONLY (no snippet)

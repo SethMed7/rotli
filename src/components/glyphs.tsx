@@ -353,3 +353,34 @@ export function TrashGlyph(props: GlyphProps) {
     </Glyph>
   );
 }
+
+/** Inbox = email section header — a simple envelope (the word "Inbox" means mail
+ * now; the note-capture tray keeps InboxGlyph, relabeled "Capture"). */
+export function MailGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3.5 7 8.5 6 8.5-6" />
+    </Glyph>
+  );
+}
+
+/** Chat section header — a rounded speech bubble. */
+export function ChatGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M5 5h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9l-4 3.5V7a2 2 0 0 1 2-2Z" />
+    </Glyph>
+  );
+}
+
+/** Notes section header — a stacked-pages mark (the corpus). */
+export function NotesStackGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M8 4h7l4 4v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+      <path d="M14.5 4v4.5H19" />
+      <path d="M5 8v11a2 2 0 0 0 2 2h8" opacity="0.55" />
+    </Glyph>
+  );
+}
