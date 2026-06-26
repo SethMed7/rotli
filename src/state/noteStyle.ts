@@ -12,13 +12,14 @@ export interface NoteStyle {
   measure: Measure;
 }
 
-export const DEFAULT_NOTE_STYLE: NoteStyle = { size: 14.5, measure: "comfort" };
+export const DEFAULT_NOTE_STYLE: NoteStyle = { size: 15, measure: "comfort" };
 
-/** Comfort = the gate's 660px editor measure; Narrow/Wide step around it. */
+/** Comfort = a roomy centered measure; Narrow/Wide step around it. (Widened
+ *  2026-06-26 so a note fills more of a big screen once it's centered.) */
 export const MEASURE_MAX_WIDTH: Record<Measure, number> = {
-  narrow: 540,
-  comfort: 660,
-  wide: 840,
+  narrow: 580,
+  comfort: 720,
+  wide: 900,
 };
 
 export const MIN_TEXT_SIZE = 12;

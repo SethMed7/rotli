@@ -346,12 +346,15 @@ export const usePanesStore = create<PanesState>((set, get) => {
             const tab = makeTab(noteId);
             return { ...l, tabs: [...l.tabs, tab], activeTabId: tab.id };
           }
-          // replace: same tab identity, new surface target, fresh view state
+          // replace: keep the tab identity, swap to a clean NOTE tab. We must
+          // NOT spread the old tab — if it was a CanvasTab, `{...t, noteId}` kept
+          // surfaceKind:"canvas" + boardId, so the pane stayed stuck rendering
+          // the board and every sidebar note-click did nothing (Seth, 2026-06-26).
           return {
             ...l,
             tabs: l.tabs.map((t) =>
               t.id === l.activeTabId
-                ? { ...t, noteId, viewState: { cursor: 0, scroll: 0 } }
+                ? { id: l.activeTabId, surfaceKind: "note", noteId, viewState: { cursor: 0, scroll: 0 } }
                 : t,
             ),
           };

@@ -11,6 +11,7 @@ import { useNotes } from "../services/hooks";
 import { DEST } from "../services/destinations";
 import { useUiStore } from "../state/ui";
 import { AllNotesSurface } from "./AllNotesSurface";
+import { RecentSurface } from "./RecentSurface";
 import { BoardSurface } from "./BoardSurface";
 import { EmptyState } from "./EmptyState";
 import { Sidebar } from "./Sidebar";
@@ -88,6 +89,8 @@ export function NotesSurface() {
         <BoardSurface />
       ) : contentView === "allNotes" ? (
         <AllNotesSurface />
+      ) : contentView === "recent" ? (
+        <RecentSurface />
       ) : (
         <PaneTree />
       )}

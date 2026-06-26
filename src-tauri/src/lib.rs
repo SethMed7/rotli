@@ -169,17 +169,18 @@ fn remember_quick_return(app: &AppHandle) {
     *app.state::<QuickReturn>().0.lock().unwrap() = in_main;
 }
 
-/// Close the Quick Note via its own chord / Esc and return focus where it
-/// belongs: back to the main window only if you were working in it, otherwise
-/// step out of rotli (NSApp hide) so the ⌥Q chord never surfaces the main app.
-/// The blur-hide path (clicking elsewhere) stays a plain `hide_quick` — focus is
-/// already moving to whatever you clicked. Mirrors `finish_capture` (#5).
+/// Close the Quick Note via its own chord / Esc. The quick chord controls ONLY
+/// the quick note — closing it NEVER surfaces the main window (Seth, 2026-06-26).
+/// If you came from OUTSIDE rotli (main wasn't the focused window), step out of
+/// rotli (NSApp hide) so focus returns to whatever you were in — and so the chord
+/// can never raise main. If you WERE working in main, just hide the quick note and
+/// let main regain focus naturally (it's already underneath) — no forced raise.
+/// The blur-hide path (clicking elsewhere) stays a plain `hide_quick`.
 fn hide_quick_return(app: &AppHandle) {
     hide_quick(app);
-    let return_to_main = *app.state::<QuickReturn>().0.lock().unwrap();
-    if return_to_main {
-        show_main(app);
-    } else {
+    let was_in_main = *app.state::<QuickReturn>().0.lock().unwrap();
+    if !was_in_main {
+        // came from another app — step out of rotli rather than surface main
         #[cfg(target_os = "macos")]
         let _ = app.hide();
     }

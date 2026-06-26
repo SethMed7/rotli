@@ -1085,7 +1085,7 @@ function PluginsPane() {
 }
 
 export function SettingsSurface() {
-  const [pane, setPane] = useState<SettingsPane>("hotkeys");
+  const [pane, setPane] = useState<SettingsPane>("general");
 
   return (
     <div className="settings">

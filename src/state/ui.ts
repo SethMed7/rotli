@@ -72,7 +72,7 @@ export const RECENT = "recent";
 /** What the content area (right of the sidebar) renders: the note panes, the
  * Board grid, or the searchable All-notes grid. Board/All-notes are views in
  * the pane area — the sidebar never moves for them (Seth, 2026-06-24). */
-export type ContentView = "panes" | "board" | "allNotes";
+export type ContentView = "panes" | "board" | "allNotes" | "recent";
 
 /** Sidebar width clamp — small enough to tuck away, never wide enough to eat
  * the editor (one rail now, not two — Seth, 2026-06-13). */

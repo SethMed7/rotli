@@ -4,7 +4,7 @@
 // mode word count, and the bottom-center format bar. The shared model.ts buffer
 // is still the source of truth (debounced save, dirty dot); CmEditor edits it.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { useNote } from "../services/hooks";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
@@ -104,7 +104,11 @@ export function EditorSurface({
   const measureWidth = focusMode ? FOCUS_MEASURE : MEASURE_MAX_WIDTH[style.measure];
 
   return (
-    <div className="editor" ref={rootRef}>
+    <div
+      className="editor"
+      ref={rootRef}
+      style={{ "--cm-measure": `${measureWidth}px` } as CSSProperties}
+    >
       <div className="ed-head">
         {createdLabel(note.createdAt)}
         <div className="slot">

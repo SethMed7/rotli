@@ -7,7 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-26
+
+The memex-vault + polish release — the connected brain is renamed `memex-vault` (with an
+internal `storage/`), and a round of UI fixes: centered notes, a dated Recent list, the
+Vault's `wiki` reframed as "Knowledge", Settings-on-General, and two interaction bugs
+(the Quick Note hotkey, and a board tab trapping note-clicks) put right.
+
+### Fixed
+- **A note no longer hugs the left on a wide screen** — the writing column is centered and
+  a touch wider (comfort measure 660→720px, default size 14.5→15px), so a note fills more of
+  a big display instead of stranding dead space on the right. The date/status header aligns
+  to the centered column.
+- **Opening a note while a board was open is no longer a dead click** — replacing a canvas
+  (Excalidraw) tab kept `surfaceKind:"canvas"`, so the pane stayed stuck on the board and
+  every sidebar note-click did nothing (and a note could look blank). `openNote` now swaps to
+  a clean note tab. (Fixes the "stuck on the board / blank note" reports.)
+- **The Quick Note hotkey only controls the Quick Note** — closing it (its chord / Esc) no
+  longer surfaces the main window; if you came from another app it steps out cleanly instead.
+
 ### Changed
+- **Settings opens on General** (was Hotkeys).
+- **Recent is a dated list** — every note ordered by most-recently-touched, shown as rows
+  with the date on the right (title · snippet · date), in the content area.
+- **The memex `wiki` reads as "Knowledge"** in the Vault, with a plain-language note (on hover)
+  that it's AI-organized for retrieval; the `_templates`/`_inbox` plumbing folders are hidden
+  from the tree. (A toggle to *reveal* the AI metadata on a note is still to come — it's
+  stripped at the read layer today.)
 - **The connected memex is now `memex-vault`** (was `smBrain`). The maintainer's brain
   moved to `~/memex-vault` (repo `SethMed7/memex-vault`) to read as what it is — a private
   instance of the open-source **memex** structure. rotli's auto-bind default and all

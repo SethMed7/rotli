@@ -531,9 +531,21 @@ export function Sidebar() {
     depth: number,
     rp: ReturnType<typeof useRovingList>["rowProps"],
   ): ReactNode =>
-    childrenOf(parentId).map((folder) => {
+    childrenOf(parentId)
+      // hide memex plumbing folders ("_templates", "_inbox", …): they're how the
+      // AI stages/templates notes, never something the user files into (2026-06-26)
+      .filter((folder) => !(folder.id.startsWith("vault:") && folder.name.startsWith("_")))
+      .map((folder) => {
       const open = expandedDests[folder.id] ?? false;
       const selected = selectedFolderId === folder.id;
+      // the memex "wiki" is the AI's filing structure — surface it as "Knowledge"
+      // with a plain-language note that the AI organizes it (transparency without
+      // the wiki jargon the average user wouldn't know what to do with)
+      const isVaultWiki = folder.id === "vault:wiki";
+      const label = isVaultWiki ? "Knowledge" : folder.name;
+      const hint = isVaultWiki
+        ? "Organized by AI so anything you save here stays findable — your folders are how you see your notes; this is how the AI files them underneath."
+        : undefined;
       return (
         <div key={folder.id}>
           <button
@@ -554,7 +566,7 @@ export function Sidebar() {
               <ChevronRight size={10} />
             </span>
             <FolderGlyph size={14} />
-            <span className="fname">{folder.name}</span>
+            <span className="fname" title={hint}>{label}</span>
             {!isVault(folder.id) && sectionAddBtn(folder.id)}
             <span className="count">{countFor(folder, destNotes)}</span>
           </button>
@@ -917,16 +929,16 @@ export function Sidebar() {
         </button>
         <button
           type="button"
-          className={`frow${selectedFolderId === RECENT ? " sel" : ""}`}
+          className={`frow${contentView === "recent" ? " sel" : ""}`}
           onClick={() => {
             setSelectedFolderId(RECENT);
-            setContentView("panes");
+            setContentView("recent");
           }}
           {...rowProps({ id: RECENT, kind: "smart" })}
         >
           <ClockGlyph size={14.5} />
           <span className="fname">Recent</span>
-          <span className="count">{Math.min(allNotes.length, 9)}</span>
+          <span className="count">{allNotes.length}</span>
         </button>
 
         <div className="fsec">Destinations</div>
