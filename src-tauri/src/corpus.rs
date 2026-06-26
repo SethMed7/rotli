@@ -866,9 +866,11 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
         return Surface::NoteRO;
     }
     // everything else inside a memex is hidden from the Notes tree and unwritable:
-    // self/ history/ archive/ trash/, MAP.md, inbox.md, and all control files
-    // (memex.json, users.json, *.local.json, *.json at root, clients/, scripts/,
-    // STRUCTURE/CONFIG/README/CHANGELOG/ASSETS .md, …).
+    // self/ history/ archive/ trash/ storage/, MAP.md, inbox.md, and all control
+    // files (memex.json, users.json, *.local.json, *.json at root, clients/,
+    // scripts/, STRUCTURE/CONFIG/README/CHANGELOG/ASSETS .md, …). storage/ is the
+    // memex's internal, gitignored binary asset store (the `storage:` root) — its
+    // files are never notes, and the walk never descends into it.
     Surface::Hidden
 }
 
@@ -2734,6 +2736,9 @@ mod tests {
         assert_eq!(surfaced(m, "inbox.md"), Surface::Hidden);
         assert_eq!(surfaced(m, "MAP.md"), Surface::Hidden);
         assert_eq!(surfaced(m, "history/2026/x.md"), Surface::Hidden);
+        // storage/ — the memex's internal binary asset store (storage: root); never notes
+        assert_eq!(surfaced(m, "storage"), Surface::Hidden);
+        assert_eq!(surfaced(m, "storage/wiki/projects/rotli/graph.png"), Surface::Hidden);
         // surfaced: chats writable, wiki read-only
         assert_eq!(surfaced(m, "chats/x.md"), Surface::NoteRW);
         assert_eq!(surfaced(m, "chats"), Surface::NoteRW);
