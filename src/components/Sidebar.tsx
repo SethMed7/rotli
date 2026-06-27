@@ -26,6 +26,7 @@ import {
   invalidateFolders,
   invalidateNotes,
   useArchiveNote,
+  useCorpusRoots,
   useFolders,
   useMoveNote,
   useNotes,
@@ -33,7 +34,13 @@ import {
   useTrashNote,
 } from "../services/hooks";
 import { notesService } from "../services/notes";
-import { corpusCreateBoard, corpusRenameBoard } from "../lib/tauri";
+import {
+  type CorpusRoot,
+  corpusAddFolder,
+  corpusCreateBoard,
+  corpusForgetFolder,
+  corpusRenameBoard,
+} from "../lib/tauri";
 import {
   DEST,
   type Destination,
@@ -345,6 +352,66 @@ function CompactBoardRow({
   );
 }
 
+/** A top-level row for an ADDED external folder (Seth, 2026-06-27): a folder you
+ * pointed rotli at without moving it into the memex. Self-contained (its own
+ * useNotes over the root marker) so the Sidebar can render N of them via
+ * roots.map without breaking rules-of-hooks — the set is fixed per session (adding
+ * or removing a folder relaunches). Expand to browse its notes; the × on hover
+ * forgets the binding (a two-click confirm; the files on disk are never touched). */
+function AddedRootRow({ root }: { root: CorpusRoot }) {
+  const notes = useNotes(`${root.id}:`).data ?? [];
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const openNote = usePanesStore((s) => s.openNote);
+  const focusedNoteId = useFocusedNoteId();
+  return (
+    <div>
+      <button type="button" className="frow" onClick={() => setOpen((o) => !o)}>
+        <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
+          <ChevronRight size={10} />
+        </span>
+        <FolderGlyph size={14.5} />
+        <span className="fname" title={root.absPath}>
+          {root.label}
+        </span>
+        <span
+          role="button"
+          tabIndex={0}
+          className={confirming ? "sb-root-x confirm" : "sb-root-x"}
+          aria-label={confirming ? "Confirm remove folder" : "Remove this folder"}
+          title="Remove this folder from rotli (the files are kept)"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (confirming) void corpusForgetFolder(root.id); // relaunches
+            else setConfirming(true);
+          }}
+        >
+          {confirming ? "Remove?" : "×"}
+        </span>
+        <span className="count">{notes.length}</span>
+      </button>
+      {open &&
+        notes.map((n) => (
+          <button
+            key={n.id}
+            type="button"
+            className={n.id === focusedNoteId ? "snrow sel" : "snrow"}
+            style={{ paddingLeft: 44 }}
+            onClick={(e) => openNote(n.id, { newTab: e.metaKey })}
+          >
+            <FileGlyph size={14} className="snicon" />
+            <span className="snt">{n.title || "Empty note"}</span>
+          </button>
+        ))}
+      {open && notes.length === 0 && (
+        <div className="sb-stub-note" style={{ paddingLeft: 44 }}>
+          No notes in this folder yet.
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Sidebar() {
   const folders = useFolders().data ?? [];
   const allNotes = useNotes().data ?? [];
@@ -356,6 +423,11 @@ export function Sidebar() {
   const archiveNotes = useNotes(DEST.archive).data ?? [];
   const trashNotes = useNotes(DEST.trash).data ?? [];
   const boardNotes = useNotes(DEST.board).data ?? [];
+  // added external folders (Seth, 2026-06-27): roots the user pointed rotli at,
+  // not in the memex — every registered root except the built-in default + vault.
+  const addedRoots = (useCorpusRoots().data ?? []).filter(
+    (r) => r.id !== "default" && r.id !== "vault",
+  );
 
   // a flat id → note lookup across every loaded list (incl. hidden Archive/
   // Trash) — the drop handler's same-folder no-op check trusts this (Seth,
@@ -1209,6 +1281,23 @@ export function Sidebar() {
                 </div>
               );
             })}
+
+            {/* added external folders (Seth, 2026-06-27): folders you point rotli at
+                without moving them into the memex — browse + edit in place. The
+                "Add a folder…" row picks one (relaunches to surface it). */}
+            {addedRoots.length > 0 && <div className="fsec">Folders</div>}
+            {addedRoots.map((r) => (
+              <AddedRootRow key={r.id} root={r} />
+            ))}
+            <button
+              type="button"
+              className="frow sb-addfolder"
+              title="Add a folder to browse + edit in place (not moved into your memex)"
+              onClick={() => void corpusAddFolder()}
+            >
+              <PlusGlyph size={13} />
+              <span className="fname">Add a folder…</span>
+            </button>
           </div>
         )}
       </div>

@@ -224,6 +224,28 @@ impl RootRegistry {
     }
 }
 
+/// A unique, router-safe slug id for a new added root, derived from its folder name.
+/// Non-alphanumerics collapse to '-' (so the id can never contain the `:` router
+/// char); collisions with reserved ids or an existing root get a `-2`, `-3`, … suffix.
+pub fn unique_root_id(reg: &RootRegistry, label: &str) -> String {
+    let mut base: String = label
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .collect();
+    while base.contains("--") {
+        base = base.replace("--", "-");
+    }
+    let base = base.trim_matches('-');
+    let base = if base.is_empty() { "folder" } else { base };
+    let mut id = base.to_string();
+    let mut n = 2;
+    while id == DEFAULT_ROOT_ID || id == VAULT_ROOT_ID || reg.get(&id).is_some() {
+        id = format!("{base}-{n}");
+        n += 1;
+    }
+    id
+}
+
 fn roots_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
     use tauri::Manager;
     app.path()

@@ -143,6 +143,16 @@ export function registerDefaultActions(): void {
       ui.setFocusMode(!ui.focusMode);
     },
   });
+  // Block handles — the Milkdown-style ⠿ drag/add/remove gutter (also an Aa toggle).
+  registerAction({
+    id: "editor.toggleBlocks",
+    title: "Toggle block handles",
+    defaultChord: null,
+    run: () => {
+      const ui = useUiStore.getState();
+      ui.setBlockHandles(!ui.blockHandles);
+    },
+  });
   registerAction({
     id: "app.settings",
     title: "Settings",

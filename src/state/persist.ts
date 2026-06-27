@@ -121,6 +121,8 @@ interface PersistedSettings {
   spellcheck: boolean;
   /** Editor view: raw markdown vs beautified (WYSIWYG); beautified by default. */
   rawEditor: boolean;
+  /** Block handles (drag/add/remove blocks); off by default. */
+  blockHandles: boolean;
   /** Route ⌥C quick captures to the active memex's inbox.md; off by default. */
   captureToBrainInbox: boolean;
   /** The on-device model the Chat surface uses (id from ~/.memex/ai); null = default. */
@@ -210,6 +212,7 @@ function parseSettings(raw: string): PersistedSettings {
     showInDock: asBool(data.showInDock, false),
     spellcheck: asBool(data.spellcheck, true),
     rawEditor: asBool(data.rawEditor, false),
+    blockHandles: asBool(data.blockHandles, false),
     captureToBrainInbox: asBool(data.captureToBrainInbox, false),
     chatModelId: typeof data.chatModelId === "string" ? data.chatModelId : null,
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
@@ -245,6 +248,7 @@ function applySettings(s: PersistedSettings): void {
     showInDock: s.showInDock,
     spellcheck: s.spellcheck,
     rawEditor: s.rawEditor,
+    blockHandles: s.blockHandles,
     captureToBrainInbox: s.captureToBrainInbox,
     chatModelId: s.chatModelId,
     onboarded: s.onboarded,
@@ -482,6 +486,7 @@ function settingsSnapshot(): string {
     showInDock: ui.showInDock,
     spellcheck: ui.spellcheck,
     rawEditor: ui.rawEditor,
+    blockHandles: ui.blockHandles,
     captureToBrainInbox: ui.captureToBrainInbox,
     chatModelId: ui.chatModelId,
     onboarded: ui.onboarded,

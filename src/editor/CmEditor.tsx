@@ -26,6 +26,7 @@ import {
   unregisterEditor,
 } from "./commands";
 import { blockRender } from "./blockRender";
+import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
 import { focusDim } from "./focusMode";
 import { livePreview } from "./livePreview";
 import { stripMarkdown } from "./stripMarkdown";
@@ -90,9 +91,21 @@ export function CmEditor({
   const rawEditorRef = useRef(rawEditor);
   rawEditorRef.current = rawEditor;
 
+  // block handles (⠿ drag/add/remove) — a toggle (Aa panel); off by default.
+  const blockHandlesOn = useUiStore((s) => s.blockHandles);
+  const blockHandlesRef = useRef(blockHandlesOn);
+  blockHandlesRef.current = blockHandlesOn;
+  // the open block-action menu (anchored at a clicked handle), or null.
+  const [blockMenu, setBlockMenu] = useState<{ pos: number; x: number; y: number } | null>(null);
+  const openBlockMenu = useCallback((_view: EditorView, pos: number, rect: DOMRect) => {
+    const host = hostRef.current?.getBoundingClientRect();
+    setBlockMenu({ pos, x: rect.right - (host?.left ?? 0) + 4, y: rect.top - (host?.top ?? 0) });
+  }, []);
+
   const spellComp = useRef(new Compartment()).current;
   const focusComp = useRef(new Compartment()).current;
   const viewModeComp = useRef(new Compartment()).current;
+  const blockComp = useRef(new Compartment()).current;
 
   const [slash, setSlash] = useState<SlashState>({ open: false, query: "", index: 0, left: 0, top: 0 });
   // the slash key-handler reads live state through this ref (the CM dom handler
@@ -263,6 +276,7 @@ export function CmEditor({
           formatBarRef.current ? { bottom: FORMAT_BAR_SCROLL_MARGIN } : null,
         ),
         viewModeComp.of(rawEditorRef.current ? [] : [livePreview, blockRender]),
+        blockComp.of(blockHandlesRef.current ? blockHandles(openBlockMenu) : []),
         EditorView.domEventHandlers({
           copy: (e, v) => copyStripped(e, v, false),
           cut: (e, v) => copyStripped(e, v, true),
@@ -341,6 +355,15 @@ export function CmEditor({
     });
   }, [rawEditor, viewModeComp]);
 
+  // block handles on/off → add/remove the gutter + drop handlers
+  useEffect(() => {
+    blockHandlesRef.current = blockHandlesOn;
+    viewRef.current?.dispatch({
+      effects: blockComp.reconfigure(blockHandlesOn ? blockHandles(openBlockMenu) : []),
+    });
+    if (!blockHandlesOn) setBlockMenu(null);
+  }, [blockHandlesOn, blockComp, openBlockMenu]);
+
   // keep the slash key-handler bound to the current query + index
   useEffect(() => {
     slashRef.current.open = slash.open;
@@ -393,6 +416,34 @@ export function CmEditor({
             onPick={pickSlash}
           />
         </div>
+      )}
+      {blockMenu && (
+        <>
+          <div className="rotli-block-backdrop" onMouseDown={() => setBlockMenu(null)} />
+          <div className="rotli-block-menu" style={{ left: blockMenu.x, top: blockMenu.y }} role="menu">
+            {(
+              [
+                ["Add below", () => addBlockBelow(viewRef.current!, blockMenu.pos)],
+                ["Move up", () => moveBlock(viewRef.current!, blockMenu.pos, -1)],
+                ["Move down", () => moveBlock(viewRef.current!, blockMenu.pos, 1)],
+                ["Delete", () => deleteBlock(viewRef.current!, blockMenu.pos)],
+              ] as const
+            ).map(([label, run]) => (
+              <button
+                type="button"
+                key={label}
+                role="menuitem"
+                className={label === "Delete" ? "rotli-block-item danger" : "rotli-block-item"}
+                onClick={() => {
+                  if (viewRef.current) run();
+                  setBlockMenu(null);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

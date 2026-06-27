@@ -730,3 +730,78 @@
   border-top: 1px solid var(--border);
   padding-top: 9px;
 }
+
+/* — block handles (Seth, 2026-06-27): a Milkdown-style ⠿ per block. The gutter
+   sits left of the text; handles fade in when the editor is hovered, full on
+   handle hover. Drag to reorder, click for the actions menu. — */
+.cm-block-gutter {
+  background: transparent;
+  border: none;
+}
+.cm-block-handle {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 1.4em;
+  margin-left: 2px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: grab;
+  border-radius: var(--r-inner);
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease), background var(--motion-exit) var(--motion-ease);
+  user-select: none;
+}
+.rotli-cm-host:hover .cm-block-handle {
+  opacity: 0.4;
+}
+.cm-block-handle:hover {
+  opacity: 1;
+  background: var(--hov);
+  color: var(--text);
+}
+.cm-block-handle:active {
+  cursor: grabbing;
+}
+/* while dragging a block, dim the body a touch so the drop target reads */
+.cm-block-dragging .cm-content {
+  cursor: grabbing;
+}
+
+/* the block-action menu (click a handle) + its click-away backdrop */
+.rotli-block-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.rotli-block-menu {
+  position: absolute;
+  z-index: 41;
+  min-width: 140px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  box-shadow: var(--shadow-pop, 0 8px 28px rgba(0, 0, 0, 0.18));
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.rotli-block-item {
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: var(--r-inner);
+  cursor: pointer;
+}
+.rotli-block-item:hover {
+  background: var(--hov);
+}
+.rotli-block-item.danger:hover {
+  background: color-mix(in srgb, var(--accent-text) 14%, transparent);
+  color: var(--accent-text);
+}

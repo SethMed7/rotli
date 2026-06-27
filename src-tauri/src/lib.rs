@@ -447,6 +447,67 @@ fn corpus_set_root(app: AppHandle, dest_id: String, path: Option<String>) -> Res
     app.restart();
 }
 
+/// Add an ARBITRARY folder as a browsable + editable corpus root — the "just add a
+/// folder" feature (Seth, 2026-06-27). It is NOT moved into the memex; it opens as a
+/// plain LegacyRotli root (everything writable) so you can use rotli over, say, a
+/// work folder without it living in your brain. Picks natively when no path is given;
+/// generates a unique slug id from the folder name. Relaunches so it surfaces.
+/// Returns false when the picker is cancelled.
+#[tauri::command]
+fn corpus_add_folder(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let abs = match path {
+        Some(p) => std::path::PathBuf::from(p),
+        None => {
+            let Some(picked) = app
+                .dialog()
+                .file()
+                .set_title("Add a folder to rotli")
+                .blocking_pick_folder()
+            else {
+                return Ok(false);
+            };
+            picked.into_path().map_err(|e| e.to_string())?
+        }
+    };
+    if !abs.is_dir() {
+        return Err("That isn't a folder.".into());
+    }
+    let mut reg = corpus::read_root_registry(&app);
+    if reg.roots.iter().any(|r| r.abs_path == abs) {
+        return Ok(true); // already added — no-op, no restart needed
+    }
+    let label = abs
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("folder")
+        .to_string();
+    let id = corpus::unique_root_id(&reg, &label);
+    reg.upsert(corpus::CorpusRoot { id, label, abs_path: abs });
+    corpus::write_root_registry(&app, &reg)?;
+    app.restart();
+}
+
+/// Forget an added folder root (refuses the built-in `default` + `vault`). The files
+/// on disk are NEVER touched — only the binding is dropped. Relaunches.
+#[tauri::command]
+fn corpus_forget_folder(app: AppHandle, id: String) -> Result<(), String> {
+    if id == corpus::DEFAULT_ROOT_ID || id == corpus::VAULT_ROOT_ID {
+        return Err("That's a built-in root — it can't be removed.".into());
+    }
+    let mut reg = corpus::read_root_registry(&app);
+    reg.roots.retain(|r| r.id != id);
+    corpus::write_root_registry(&app, &reg)?;
+    app.restart();
+}
+
+/// Every registered root (default + vault + added folders), for the sidebar to render
+/// the added ones as top-level browsable rows.
+#[tauri::command]
+fn corpus_list_roots(app: AppHandle) -> Vec<corpus::CorpusRoot> {
+    corpus::resolve_registry(&app).roots
+}
+
 #[tauri::command]
 fn summon(app: AppHandle) {
     do_summon(&app);
@@ -575,6 +636,9 @@ pub fn run() {
             corpus_use_memex,
             corpus_use_legacy,
             corpus_set_root,
+            corpus_add_folder,
+            corpus_forget_folder,
+            corpus_list_roots,
             summon,
             set_summon_shortcut,
             set_hide_on_blur,

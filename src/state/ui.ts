@@ -209,6 +209,12 @@ interface UiState {
   rawEditor: boolean;
   setRawEditor: (on: boolean) => void;
 
+  /** Block handles — a Milkdown-style ⠿ gutter handle per block: drag to reorder,
+   * click for add/move/delete. A toggle (Aa panel); off by default. The .md is the
+   * source of truth — every action is a plain text edit. Persisted. */
+  blockHandles: boolean;
+  setBlockHandles: (on: boolean) => void;
+
   /** Quick captures (⌥C) route to the active memex's inbox.md instead of the
    * Board. Off by default (the Board is the safe fallback). Persisted. */
   captureToBrainInbox: boolean;
@@ -385,6 +391,9 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   rawEditor: false,
   setRawEditor: (on) => set({ rawEditor: on }),
+
+  blockHandles: false,
+  setBlockHandles: (on) => set({ blockHandles: on }),
 
   captureToBrainInbox: false,
   setCaptureToBrainInbox: (on) => set({ captureToBrainInbox: on }),

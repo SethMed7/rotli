@@ -1172,3 +1172,36 @@
     transform: translateX(-8px);
   }
 }
+
+/* — added external folders (Seth, 2026-06-27): the "Add a folder…" row + the
+   hover × that forgets a folder (files kept). Mirrors the frow-add hover slot. — */
+.sb-addfolder .fname,
+.sb-addfolder svg {
+  color: var(--text-muted);
+}
+.sb-root-x {
+  display: none;
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: var(--r-inner);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.frow:hover .sb-root-x {
+  display: inline-flex;
+}
+.frow:hover:has(.sb-root-x) .count {
+  display: none;
+}
+.sb-root-x:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.sb-root-x.confirm {
+  display: inline-flex;
+  color: var(--accent-text);
+  font-weight: 600;
+}

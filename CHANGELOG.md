@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-06-27
+
+Two new features — block editing + external folders — plus the small-icon polish.
+
+### Added
+- **Block handles (Milkdown-style)** — a toggle in the **Aa** panel (Blocks: Off / Handles). Turn it on
+  and every block gets a **⠿ handle** in the gutter: **drag it to reorder** the block, or **click it** for
+  a menu — **Add below · Move up · Move down · Delete**. The `.md` stays the source of truth (every action
+  is a plain text edit); off by default. Also reachable from ⌘K ("Toggle block handles").
+- **Add external folders** — point rotli at any folder (e.g. a work folder) without moving it into your
+  memex. The sidebar's Notes section gains an **"Add a folder…"** row (and a **Folders** group for the ones
+  you've added); the folder opens **read-write in place** so you browse + edit its markdown notes through
+  rotli. The files are never copied or touched; a hover **×** forgets the binding (two-click confirm).
+  rotli stays a notes app, not an IDE — only your markdown notes surface.
+
+### Changed
+- **Titlebar identity** — just the quokka mark now, **centered** in the bar (no "rotli" wordmark).
+- **Bolder small icons** — the menu-bar tray + titlebar quokka thicken only the **body outline** (eyes/
+  mouth stay crisp) so they read clearly at chrome size; the full-size art is unchanged.
+- **Memex contract band → [3.4, 3.6]** — stays writable against the upgraded memex (`self/` split into
+  `identity/` + `personality/` + the org layer); rotli's own write surfaces are unchanged.
+
 ## [0.6.3] — 2026-06-26
 
 ### Changed

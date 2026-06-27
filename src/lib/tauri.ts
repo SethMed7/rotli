@@ -331,6 +331,30 @@ export function corpusOverview(): Promise<CorpusOverview> {
   return corpusInvoke("corpus_overview");
 }
 
+/** A registered corpus root — the local default, the Vault, or an added folder. */
+export interface CorpusRoot {
+  id: string;
+  label: string;
+  absPath: string;
+}
+
+/** Add an arbitrary folder as a browsable + editable root (NOT moved into the
+ * memex — opens read-write in place). No path ⇒ native folder picker. Adding a new
+ * folder relaunches the app so it surfaces; returns false if the picker was cancelled. */
+export function corpusAddFolder(path?: string): Promise<boolean> {
+  return corpusInvoke("corpus_add_folder", path === undefined ? {} : { path });
+}
+
+/** Forget an added folder root (the files on disk are never touched). Relaunches. */
+export function corpusForgetFolder(id: string): Promise<void> {
+  return corpusInvoke("corpus_forget_folder", { id });
+}
+
+/** Every registered root — the sidebar renders the added folders (id ≠ default/vault). */
+export function corpusListRoots(): Promise<CorpusRoot[]> {
+  return corpusInvoke("corpus_list_roots");
+}
+
 /** Reveal the corpus folder in Finder. */
 export async function revealCorpus(): Promise<void> {
   if (!isTauri()) return;
