@@ -805,3 +805,44 @@
   background: color-mix(in srgb, var(--accent-text) 14%, transparent);
   color: var(--accent-text);
 }
+
+/* the drop line shown while a block is dragged (pointer-drag; position:fixed so it
+   needs no scroll math) — a 2px accent rule at the target block's top. */
+.cm-block-dropline {
+  position: fixed;
+  z-index: 50;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  pointer-events: none;
+  display: none;
+}
+
+/* — beautified GFM tables (Seth, 2026-06-27): rendered by tableRender.ts when the
+   caret isn't inside; touch the table and the raw markdown reveals to edit. — */
+.rotli-md-tablewrap {
+  overflow-x: auto;
+  margin: 4px 0 10px;
+}
+.rotli-md-table {
+  border-collapse: collapse;
+  font-size: 0.95em;
+  line-height: 1.5;
+  width: auto;
+  max-width: 100%;
+}
+.rotli-md-table th,
+.rotli-md-table td {
+  border: 1px solid var(--border);
+  padding: 6px 11px;
+  text-align: left;
+  vertical-align: top;
+}
+.rotli-md-table thead th {
+  font-weight: 700;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.rotli-md-table tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--surface-2) 45%, transparent);
+}

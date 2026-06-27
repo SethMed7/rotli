@@ -27,6 +27,7 @@ import {
 } from "./commands";
 import { blockRender } from "./blockRender";
 import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
+import { tableRender } from "./tableRender";
 import { focusDim } from "./focusMode";
 import { livePreview } from "./livePreview";
 import { stripMarkdown } from "./stripMarkdown";
@@ -275,7 +276,7 @@ export function CmEditor({
         EditorView.scrollMargins.of(() =>
           formatBarRef.current ? { bottom: FORMAT_BAR_SCROLL_MARGIN } : null,
         ),
-        viewModeComp.of(rawEditorRef.current ? [] : [livePreview, blockRender]),
+        viewModeComp.of(rawEditorRef.current ? [] : [livePreview, blockRender, tableRender]),
         blockComp.of(blockHandlesRef.current ? blockHandles(openBlockMenu) : []),
         EditorView.domEventHandlers({
           copy: (e, v) => copyStripped(e, v, false),
@@ -351,7 +352,7 @@ export function CmEditor({
   useEffect(() => {
     rawEditorRef.current = rawEditor;
     viewRef.current?.dispatch({
-      effects: viewModeComp.reconfigure(rawEditor ? [] : [livePreview, blockRender]),
+      effects: viewModeComp.reconfigure(rawEditor ? [] : [livePreview, blockRender, tableRender]),
     });
   }, [rawEditor, viewModeComp]);
 

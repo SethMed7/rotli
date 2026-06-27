@@ -26,6 +26,7 @@ import {
 } from "@codemirror/view";
 import { parseBlock } from "./render";
 import { lineInFence, scanFences } from "./fences";
+import { lineInTable, scanTables } from "./tables";
 
 interface Sel {
   from: number;
@@ -242,11 +243,14 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
   // every fenced line alone (raw code voice, never markdown-styled, and never a
   // decoration that collides with the block widget on the same range).
   const fences = scanFences(doc);
+  // tableRender owns GFM tables (replaces the whole range with a <table> widget);
+  // livePreview leaves every table line alone, just like fenced lines.
+  const tables = scanTables(doc);
   for (const { from, to } of view.visibleRanges) {
     let pos = from;
     while (pos <= to) {
       const line = doc.lineAt(pos);
-      if (lineInFence(line.from, fences)) {
+      if (lineInFence(line.from, fences) || lineInTable(line.from, tables)) {
         pos = line.to + 1;
         continue;
       }

@@ -108,7 +108,7 @@ export function deleteBlock(view: EditorView, pos: number): void {
   view.focus();
 }
 
-/** Reorder: move the block that started the drag to just before the drop block. */
+/** Reorder: move the source block to just before the block at `toPos`. */
 function reorder(view: EditorView, fromPos: number, toPos: number): void {
   const { state } = view;
   const src = blockAtLine(state, state.doc.lineAt(fromPos).number);
@@ -132,12 +132,36 @@ function reorder(view: EditorView, fromPos: number, toPos: number): void {
   view.focus();
 }
 
-// the line offset where the current drag started (module-level — one drag at a time)
-let dragFromPos: number | null = null;
-
 /** Callback the gutter handle calls on a plain click (opens the React menu). */
 export type BlockMenuOpener = (view: EditorView, blockPos: number, anchor: DOMRect) => void;
 
+// A single shared drop-line element (position:fixed so it ignores scroll/ancestor
+// math). Shown at the top of the target block while a block is dragged.
+let dropLine: HTMLDivElement | null = null;
+function showDropLine(view: EditorView, targetFrom: number) {
+  if (!dropLine) {
+    dropLine = document.createElement("div");
+    dropLine.className = "cm-block-dropline";
+    document.body.appendChild(dropLine);
+  }
+  const coords = view.coordsAtPos(targetFrom);
+  const rect = view.scrollDOM.getBoundingClientRect();
+  if (!coords) {
+    dropLine.style.display = "none";
+    return;
+  }
+  dropLine.style.display = "block";
+  dropLine.style.left = `${rect.left + 8}px`;
+  dropLine.style.width = `${rect.width - 16}px`;
+  dropLine.style.top = `${coords.top - 1}px`;
+}
+function hideDropLine() {
+  if (dropLine) dropLine.style.display = "none";
+}
+
+// WKWebView swallows HTML5 drag-and-drop AND a `draggable` element steals the
+// click — so the handle uses POINTER events instead: a small move past the
+// threshold is a DRAG (reorder, with a drop line); no move is a CLICK (the menu).
 class BlockHandle extends GutterMarker {
   constructor(
     readonly pos: number,
@@ -152,26 +176,42 @@ class BlockHandle extends GutterMarker {
     const el = document.createElement("div");
     el.className = "cm-block-handle";
     el.title = "Drag to reorder · click for actions";
-    el.setAttribute("draggable", "true");
     el.textContent = "⠿";
-    let dragged = false;
-    el.addEventListener("dragstart", (e) => {
-      dragged = true;
-      dragFromPos = this.pos;
-      e.dataTransfer?.setData("text/x-rotli-block", "1");
-      if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
-      view.dom.classList.add("cm-block-dragging");
-    });
-    el.addEventListener("dragend", () => {
-      dragFromPos = null;
-      view.dom.classList.remove("cm-block-dragging");
-      setTimeout(() => (dragged = false), 0);
-    });
-    el.addEventListener("click", (e) => {
-      if (dragged) return; // a drag, not a click
-      e.preventDefault();
-      e.stopPropagation();
-      this.openMenu(view, this.pos, el.getBoundingClientRect());
+    el.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault(); // don't start a text selection from the gutter
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let dragging = false;
+      let targetFrom: number | null = null;
+      const onMove = (ev: MouseEvent) => {
+        if (!dragging && Math.abs(ev.clientY - startY) + Math.abs(ev.clientX - startX) > 4) {
+          dragging = true;
+          view.dom.classList.add("cm-block-dragging");
+        }
+        if (!dragging) return;
+        const p = view.posAtCoords({ x: ev.clientX, y: ev.clientY });
+        const b = p == null ? null : blockAtLine(view.state, view.state.doc.lineAt(p).number);
+        if (b) {
+          targetFrom = b.from;
+          showDropLine(view, b.from);
+        }
+      };
+      const onUp = (ev: MouseEvent) => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        view.dom.classList.remove("cm-block-dragging");
+        hideDropLine();
+        if (dragging) {
+          const p = targetFrom ?? view.posAtCoords({ x: ev.clientX, y: ev.clientY });
+          if (p != null) reorder(view, this.pos, p);
+        } else {
+          // no move → a click: open the actions menu at the handle
+          this.openMenu(view, this.pos, el.getBoundingClientRect());
+        }
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
     });
     return el;
   }
@@ -180,34 +220,15 @@ class BlockHandle extends GutterMarker {
 /** The block-handles gutter extension. `openMenu` is called on a handle click so
  * the host (React) can render the add/move/delete menu at the handle. */
 export function blockHandles(openMenu: BlockMenuOpener) {
-  return [
-    gutter({
-      class: "cm-block-gutter",
-      lineMarker(view, line) {
-        const ln = view.state.doc.lineAt(line.from).number;
-        const b = blockAtLine(view.state, ln);
-        // mark only a block's FIRST line
-        return b && b.fromLine === ln ? new BlockHandle(line.from, openMenu) : null;
-      },
-      lineMarkerChange: (u) => u.docChanged,
-      initialSpacer: () => new BlockHandle(0, openMenu),
-    }),
-    // drop handling: dropping onto a line reorders the dragged block before it
-    EditorView.domEventHandlers({
-      dragover(e) {
-        if (dragFromPos != null) e.preventDefault();
-      },
-      drop(e, view) {
-        if (dragFromPos == null) return false;
-        const toPos = view.posAtCoords({ x: e.clientX, y: e.clientY });
-        if (toPos != null) {
-          e.preventDefault();
-          reorder(view, dragFromPos, toPos);
-        }
-        dragFromPos = null;
-        view.dom.classList.remove("cm-block-dragging");
-        return true;
-      },
-    }),
-  ];
+  return gutter({
+    class: "cm-block-gutter",
+    lineMarker(view, line) {
+      const ln = view.state.doc.lineAt(line.from).number;
+      const b = blockAtLine(view.state, ln);
+      // mark only a block's FIRST line
+      return b && b.fromLine === ln ? new BlockHandle(line.from, openMenu) : null;
+    },
+    lineMarkerChange: (u) => u.docChanged,
+    initialSpacer: () => new BlockHandle(0, openMenu),
+  });
 }

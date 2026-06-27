@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-06-27
+
+### Fixed
+- **Block handles actually drag now.** The handle used HTML5 drag-and-drop, which the macOS WKWebView
+  swallows — and a `draggable` element steals the click, so neither the drag nor the menu fired in the
+  app. Rewrote the interaction with **mouse events**: drag the ⠿ to reorder (with a drop line), or click
+  it for the menu. Both verified.
+
+### Added
+- **Tables are beautified.** GFM markdown tables now render as real tables in the editor (bordered cells,
+  bold header, column alignment from the `:---:` row, zebra rows). Put the caret inside and it reveals the
+  raw markdown to edit — same live-preview model as fenced code. The `.md` is untouched.
+
 ## [0.7.0] — 2026-06-27
 
 Two new features — block editing + external folders — plus the small-icon polish.
