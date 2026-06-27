@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] — 2026-06-26
+
+### Changed
+- **Bolder quokka lines** — the line-art quokka (logo, characters, icons) now draws with a thicker
+  stroke, so it reads with more presence at every size.
+- **Refreshed app/dock icon** — regenerated the full icon set (and the menu-bar mark) from the
+  thicker-lined quokka, so the Dock icon has real weight.
+
 ## [0.6.2] — 2026-06-26
 
 ### Added
