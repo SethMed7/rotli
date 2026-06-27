@@ -466,6 +466,17 @@ fn corpus_choose_folder(app: AppHandle, path: Option<String>) -> Result<bool, St
     app.restart();
 }
 
+/// Onboarding "create a new brain": scaffold a fresh memex at `path` and make it
+/// your corpus — the corpus IS a memex (your folder is your brain). Relaunches
+/// into it. `path` is an absolute folder (the native picker creates/names it).
+#[tauri::command]
+fn corpus_init_memex(app: AppHandle, path: String) -> Result<(), String> {
+    let root = std::path::PathBuf::from(&path);
+    memex::scaffold_memex(&root)?;
+    corpus::set_corpus_path(&app, root)?;
+    app.restart();
+}
+
 /// Connect a brain (a memex) to read — and write into per its perms. Validates +
 /// stamps via the memex module, registers it in corpus.json, makes it active, and
 /// relaunches so its sidebar row appears. False when the picker is cancelled.
@@ -651,6 +662,7 @@ pub fn run() {
             corpus_forget_folder,
             corpus_list_config,
             corpus_choose_folder,
+            corpus_init_memex,
             corpus_connect_brain,
             corpus_forget_brain,
             corpus_set_active_brain,

@@ -12,6 +12,7 @@ import {
   corpusChooseFolder,
   corpusConnectBrain,
   corpusForgetBrain,
+  corpusInitMemex,
   corpusListConfig,
   corpusSetActiveBrain,
   corpusSetBrainPerms,
@@ -67,6 +68,10 @@ export const chooseFolder = (path?: string): Promise<boolean> => corpusChooseFol
 
 /** Connect an existing memex as a brain. Relaunches on success. */
 export const connectBrain = (path?: string): Promise<boolean> => corpusConnectBrain(path);
+
+/** Onboarding "create a new brain": scaffold a fresh memex at `path` and make it
+ * the corpus (the corpus IS a memex). Relaunches on success. */
+export const initMemexAsCorpus = (path: string): Promise<void> => corpusInitMemex(path);
 
 /** Forget a connected brain (binding only). Returns the refreshed config. */
 export async function forget(id: string): Promise<MemexConfig> {

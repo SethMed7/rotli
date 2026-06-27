@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-06-27
+
+### Added
+- **Onboarding picks where your brain lives.** The first-run **Your brain** step now lets you **Use** a
+  memex detected on this Mac, **Create a new brain…** (choose a folder — rotli scaffolds a fresh v3.6 memex
+  there and makes it your corpus), or keep **just simple notes** in `~/Documents/rotli`. Whichever you pick,
+  your one folder *is* your brain (or a plain notes folder if you defer). New Rust `corpus_init_memex`
+  scaffolds the v3.6 spine + a fresh `mx_` `memex.json`; the choice commits once after onboarding, with the
+  `onboarded` flag flushed to disk before the relaunch so first-run can't loop.
+
 ## [0.8.0] — 2026-06-27
 
 ### Changed

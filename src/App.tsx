@@ -40,7 +40,8 @@ import {
 import { activeInstance, isWritable } from "./memex/config";
 import {
   captureToInbox,
-  connectBrain,
+  chooseFolder,
+  initMemexAsCorpus,
   loadConfig as memexLoadConfig,
 } from "./memex/service";
 import { flushSettingsNow } from "./state/persist";
@@ -244,16 +245,20 @@ function MainShell() {
             const ui = useUiStore.getState();
             void setHideOnBlur(!ui.stayOpen);
             void setDockVisible(ui.showInDock);
-            // commit the deferred memex choice recorded in the "Memory" step —
-            // connect the detected brain into the unified corpus.json. connectBrain
-            // RELAUNCHES, so flush `onboarded` to disk FIRST or first-run loops back
-            // into onboarding (the 500 ms debounced writer wouldn't fire in time).
+            // commit the deferred brain choice from the "Your brain" step: "use"
+            // adopts an existing memex AS the corpus, "init" scaffolds a new one.
+            // Both RELAUNCH, so flush `onboarded` to disk FIRST or first-run loops
+            // back into onboarding (the 500 ms debounced writer wouldn't fire in time).
             const choice = useMemexStore.getState().pendingChoice;
             useMemexStore.getState().setPendingChoice(null);
-            if (choice?.path) {
+            if (choice?.path && (choice.kind === "use" || choice.kind === "init")) {
               const path = choice.path;
+              const kind = choice.kind;
               void flushSettingsNow()
-                .then(() => connectBrain(path))
+                .then(async () => {
+                  if (kind === "init") await initMemexAsCorpus(path);
+                  else await chooseFolder(path);
+                })
                 .catch(() => {});
             }
           }}

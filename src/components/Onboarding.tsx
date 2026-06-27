@@ -12,6 +12,7 @@ import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import { conflictFor, getAction, rebind, setDispatchSuspended } from "../keys/registry";
 import { useDetectMemex } from "../memex/useMemex";
+import { pickFolder } from "../memex/service";
 import { useMemexStore } from "../state/memex";
 import { GLASS_TINTS, SOLID_THEMES, type GlassTint, type ThemeFamily, useUiStore } from "../state/ui";
 
@@ -151,25 +152,33 @@ function Choice<T extends string>({
   );
 }
 
-/** The "Memory" step — detect an existing memex (Seth's ~/memex-vault auto-appears)
- * and offer to Merge into it, or keep notes-only for now. The choice is RECORDED
- * into the memex store; App.tsx commits it (connect) on finish, the same deferred
- * pattern as dock/behavior. Creating a fresh separate brain lives in Settings →
- * Memory (it needs a folder picker — kept out of the onboarding flow). */
+/** The "Your brain" step — the user picks WHERE their notes live: adopt a memex we
+ * detect on this Mac (Use), scaffold a fresh one at a folder they choose (Create),
+ * or keep a plain ~/Documents/rotli notes folder (later). The choice is RECORDED
+ * into the memex store; App.tsx commits it on finish (the same deferred pattern as
+ * dock/behavior), so the brain-setting relaunch happens once, after onboarding. */
 function MemexStep() {
   const detect = useDetectMemex(true);
   const setPendingChoice = useMemexStore((s) => s.setPendingChoice);
   const pending = useMemexStore((s) => s.pendingChoice);
-  const found = detect.data ?? [];
-  const isMerge = (root: string) => pending?.kind === "merge" && pending.path === root;
+  // only real memexes are adoptable as the corpus
+  const found = (detect.data ?? []).filter((d) => d.kind === "memex");
+  const isUse = (root: string) => pending?.kind === "use" && pending.path === root;
+  const isInit = pending?.kind === "init";
   const isLater = pending?.kind === "later";
+
+  const createNew = async () => {
+    const path = await pickFolder();
+    if (path) setPendingChoice({ kind: "init", path });
+  };
 
   return (
     <div className="onb-step">
-      <h1 className="onb-title">Your second brain</h1>
+      <h1 className="onb-title">Your brain</h1>
       <p className="onb-sub">
-        rotli can sit on top of a <b>memex</b> — your local knowledge spine. It reads your whole
-        brain and writes your chats and quick captures into it, never your history or self.
+        rotli keeps your notes in <b>one folder</b> — and that folder is your <b>brain</b> (a memex):
+        notes, chats, and knowledge together, organized by AI but always yours to arrange. Pick where
+        it lives.
       </p>
       {detect.isLoading ? (
         <p className="onb-sub">Looking for an existing brain…</p>
@@ -179,27 +188,36 @@ function MemexStep() {
             <button
               key={d.root}
               type="button"
-              className={isMerge(d.root) ? "onb-choice sel" : "onb-choice"}
-              aria-pressed={isMerge(d.root)}
-              onClick={() => setPendingChoice({ kind: "merge", path: d.root, label: d.label })}
+              className={isUse(d.root) ? "onb-choice sel" : "onb-choice"}
+              aria-pressed={isUse(d.root)}
+              onClick={() => setPendingChoice({ kind: "use", path: d.root, label: d.label })}
             >
-              <span className="onb-choice-title">Merge into {d.label}</span>
-              <span className="onb-choice-desc">
-                {d.root} · contract {d.contract ?? "?"}
-              </span>
+              <span className="onb-choice-title">Use {d.label}</span>
+              <span className="onb-choice-desc">{d.root} · the brain we found on this Mac</span>
             </button>
           ))}
+          <button
+            type="button"
+            className={isInit ? "onb-choice sel" : "onb-choice"}
+            aria-pressed={isInit}
+            onClick={() => void createNew()}
+          >
+            <span className="onb-choice-title">Create a new brain…</span>
+            <span className="onb-choice-desc">
+              {isInit && pending?.path
+                ? pending.path
+                : "Choose a folder — rotli starts a fresh memex there."}
+            </span>
+          </button>
           <button
             type="button"
             className={isLater ? "onb-choice sel" : "onb-choice"}
             aria-pressed={isLater}
             onClick={() => setPendingChoice({ kind: "later" })}
           >
-            <span className="onb-choice-title">{found.length ? "Not now" : "Set it up later"}</span>
+            <span className="onb-choice-title">Just simple notes for now</span>
             <span className="onb-choice-desc">
-              {found.length
-                ? "Keep notes only — connect or start a brain anytime in Settings → Memory."
-                : "No brain found here. Create or connect one anytime in Settings → Memory."}
+              Plain Markdown in ~/Documents/rotli — make it a brain anytime in Settings → Location.
             </span>
           </button>
         </div>

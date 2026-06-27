@@ -27,6 +27,7 @@ use serde_json::Value;
 use tauri::Manager;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 /// The memex contract version rotli is built against (mirrors memex-vault's
 /// `CONTRACT_VERSION` and `src/memex/contract.ts`, which is 3.6). rotli writes the
@@ -594,6 +595,44 @@ pub fn brain_view(path: &Path) -> Option<(String, String)> {
     Some((id, perms.to_string()))
 }
 
+/// Scaffold a FRESH memex at `root` (empty/fresh only) — the v3.6 spine + a new
+/// `mx_` memex.json stamped with `apps.rotli`. Returns the new memex id. Drives
+/// onboarding's "create a new brain" path; refuses a non-empty folder.
+pub fn scaffold_memex(root: &Path) -> Result<String, String> {
+    if root.exists() && !dir_has_no_real_entries(root) {
+        return Err("Pick an empty folder — rotli starts a fresh brain there.".into());
+    }
+    fs::create_dir_all(root).map_err(|e| e.to_string())?;
+    for d in [
+        "identity",
+        "personality",
+        "wiki",
+        "wiki/_inbox",
+        "history",
+        "chats",
+        "archive",
+        "trash",
+    ] {
+        fs::create_dir_all(root.join(d)).map_err(|e| e.to_string())?;
+    }
+    atomic_write(&root.join("inbox.md"), &format!("# Inbox\n\n{INBOX_MARK}\n"))?;
+    atomic_write(&root.join("MAP.md"), "# MAP\n\nThe index of this memex.\n")?;
+    let id = format!("mx_{}", Uuid::new_v4());
+    let now = now_iso();
+    let info = serde_json::json!({
+        "id": id,
+        "contract": CONTRACT_VERSION,
+        "createdAt": now,
+        "selfHeal": true,
+        "apps": { "rotli": { "role": "chat-system", "connectedAt": now } },
+    });
+    atomic_write(
+        &root.join("memex.json"),
+        &(serde_json::to_string_pretty(&info).map_err(|e| e.to_string())? + "\n"),
+    )?;
+    Ok(id)
+}
+
 /// A tiny mirror of the contract's fail-closed access-mode rule, for the registry
 /// snapshot only (the authoritative parse is TS `parseAccessMode`).
 fn parse_mode_raw(users_json: &str) -> String {
@@ -737,6 +776,26 @@ pub fn memex_pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scaffold_memex_makes_a_valid_v36_brain() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("brain");
+        let id = scaffold_memex(&root).unwrap();
+        assert!(id.starts_with("mx_"));
+        // it reads back as a real memex on the v3.6 contract
+        let card = detect_one(&root);
+        assert_eq!(card.kind, "memex");
+        assert_eq!(card.memex_id.as_deref(), Some(id.as_str()));
+        assert_eq!(card.contract.as_deref(), Some(CONTRACT_VERSION));
+        // the spine rotli needs exists (incl. its writable wiki/_inbox staging)
+        assert!(root.join("wiki/_inbox").is_dir());
+        assert!(root.join("identity").is_dir());
+        assert!(root.join("inbox.md").is_file());
+        assert!(root.join("MAP.md").is_file());
+        // refuses to scaffold over a non-empty folder
+        assert!(scaffold_memex(&root).is_err());
+    }
 
     #[test]
     fn write_guard_allows_only_chats_inbox_and_wiki_inbox() {

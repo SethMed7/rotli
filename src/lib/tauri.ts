@@ -410,6 +410,13 @@ export async function corpusChooseFolder(path?: string): Promise<boolean> {
   return invoke<boolean>("corpus_choose_folder", { path: path ?? null });
 }
 
+/** Onboarding "create a new brain": scaffold a fresh memex at `path` and make it
+ * your corpus (the corpus IS a memex). Relaunches on success. */
+export async function corpusInitMemex(path: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_init_memex", { path });
+}
+
 /** Connect a memex as a brain (read + write per its perms); relaunches so its row
  * appears. False when the picker is cancelled. */
 export async function corpusConnectBrain(path?: string): Promise<boolean> {
