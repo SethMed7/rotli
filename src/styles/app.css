@@ -92,6 +92,16 @@
   opacity: 0.6;
   transition: opacity 120ms var(--motion-ease);
 }
+/* the home wordmark (Seth, 2026-06-26): the quokka mark + "rotli" in the rounded
+   Baloo 2 wordmark face — the dropdown is retired, this is the identity now. */
+.identity.home .identity-mark {
+  color: var(--text);
+}
+.identity.home .identity-word {
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text);
+}
 /* hairline between the pane/tab buttons and the theme/settings cluster */
 .tb-sep {
   width: 1px;

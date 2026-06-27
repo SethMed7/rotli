@@ -15,6 +15,7 @@ import { startWindowDrag } from "../lib/tauri";
 import { GLASS_TINTS, SOLID_THEMES, useUiStore } from "../state/ui";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
+import { QuokkaMark } from "./Character";
 import {
   PlusGlyph,
   SidebarGlyph,
@@ -76,8 +77,8 @@ export function Titlebar() {
         // plain home wordmark — click returns to the note panes.
         <div className="identity-wrap">
           <button type="button" className="identity home" onClick={() => dispatch("modules.notes")}>
-            <Icon name="rotli-notes" size={TB_ICON} />
-            rotli
+            <QuokkaMark size={19} className="identity-mark" />
+            <span className="rotli-wordmark identity-word">rotli</span>
           </button>
         </div>
       )}

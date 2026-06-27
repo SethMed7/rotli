@@ -280,6 +280,30 @@
   border-radius: var(--r-window);
   margin-bottom: 22px;
 }
+
+/* — the quokka character set: line-art illustrations whose LINE color follows
+   the theme (each SVG is a single currentColor path), shape constant. Used in
+   the quokka-world placements only: empty states, onboarding, the chat connect
+   state (Seth, 2026-06-26). — */
+.quokka,
+.quokka-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  line-height: 0;
+  color: var(--text);
+}
+.quokka svg,
+.quokka-mark svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* the empty-state quokka sits in the warm ink, a touch soft so it reads as a
+   friendly mascot, not a heavy graphic */
+.empty-stage .quokka {
+  color: var(--text);
+  margin-bottom: 18px;
+}
 .empty-stage .et {
   font-family: var(--font-display);
   font-weight: 700;

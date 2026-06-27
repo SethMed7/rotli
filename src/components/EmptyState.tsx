@@ -1,10 +1,11 @@
-// The first-run empty state (r1 frame E) — the ONE place the quokka world
-// appears in the app (placement law: onboarding, empty states, about; never
-// the editor, never notifications). The chord shown is quick capture's LIVE
+// The first-run empty state (r1 frame E) — one of the quokka-world placements
+// (placement law: onboarding, empty states, about; never the editor, never
+// notifications). The line-art character tints with the theme. The chord shown
+// is quick capture's LIVE
 // binding (⌥C by default — the 2026-06-12 summon law: ⌥Space opens the app,
 // capture has its own chord), so a rebind never makes the copy lie.
 
-import quokka from "../assets/world/quokka-master.jpg";
+import { Character } from "./Character";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
 import { dispatch, getAction } from "../keys/registry";
@@ -19,7 +20,7 @@ export function EmptyState() {
   );
   return (
     <div className="empty-stage">
-      <img src={quokka} alt="the rotli quokka, relaxed on its island" />
+      <Character name="base" size={150} />
       <div className="et">Your island is ready</div>
       <div className="es">
         Press <kbd>{formatChord(captureChord ?? "Alt+C")}</kbd> anywhere on your Mac and the first

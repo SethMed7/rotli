@@ -7,7 +7,7 @@
 // re-onboard" in Settings → General brings it back.
 
 import { type KeyboardEvent, useEffect, useState } from "react";
-import rMark from "../brand/logo/r-mark.svg";
+import { Character, QuokkaMark } from "./Character";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import { conflictFor, getAction, rebind, setDispatchSuspended } from "../keys/registry";
@@ -243,7 +243,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       <div className="onb-card">
         {step === "welcome" && (
           <div className="onb-step onb-welcome">
-            <img className="onb-mark" src={rMark} alt="" width={56} height={56} />
+            <Character name="local" size={132} className="onb-mark" />
             <h1 className="onb-title">Welcome to rotli</h1>
             <p className="onb-sub">
               A warm, local-first notes app that lives in your menu bar. Let’s set up the few
@@ -406,7 +406,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
         {step === "done" && (
           <div className="onb-step onb-welcome">
-            <img className="onb-mark" src={rMark} alt="" width={56} height={56} />
+            <QuokkaMark size={64} className="onb-mark" />
             <h1 className="onb-title">You’re set</h1>
             <p className="onb-sub">
               Press your <b>Open</b> shortcut any time to summon rotli, and <b>Quick capture</b> to

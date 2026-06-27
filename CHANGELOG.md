@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-06-26
+
+New brand: the line-art quokka. A warm, hand-drawn identity replaces the AI-generated art.
+
+### Changed
+- **New app icon** — the quokka logo on a **linen** tile with **black lines** (clean and legible at every
+  size). Regenerated the full macOS/iOS/Android icon set from it.
+- **New menu-bar icon** — the quokka as a macOS **template** icon, so it tints to the menu bar
+  automatically (black on light bars, white on dark) — the shape stays constant, the line color follows.
+- **New in-app logo** — the titlebar identity is the quokka mark + **rotli** set in **Baloo 2**, the rounded
+  wordmark face that pairs with the line-art character (self-hosted; Fontshare, commercial-OK).
+- **Quokka characters in the quokka-world surfaces** — the empty state, the Chat connect state, and
+  onboarding now show the hand-drawn **line-art quokka** characters (notes · chat · inbox · board ·
+  knowledge · local · base). Each is a single-path SVG that **tints with the theme** (the line color
+  follows the active theme; the shape never changes).
+
+### Removed
+- The old **AI-generated quokka image** (`assets/world/quokka-master.jpg`) — replaced by the line-art set.
+
 ## [0.6.0] — 2026-06-26
 
 The left menu becomes the navigator — three sections, no more top dropdown (IA rework, Increment 1).

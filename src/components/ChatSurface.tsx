@@ -22,6 +22,7 @@ import { readChat } from "../memex/service";
 import { useInstanceChats, useMemexConfig, useWriteChat } from "../memex/useMemex";
 import { chatComplete, chatModels, isTauri } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
+import { Character } from "./Character";
 
 interface Msg {
   speaker: string;
@@ -213,9 +214,13 @@ export function ChatSurface() {
       </header>
 
       {!isTauri() ? (
-        <div className="chat-empty">The Chat surface talks to your memex — it runs in the app.</div>
+        <div className="chat-empty">
+          <Character name="chat" size={132} />
+          <p>The Chat surface talks to your memex — it runs in the app.</p>
+        </div>
       ) : !active ? (
         <div className="chat-empty">
+          <Character name="chat" size={132} />
           <p>No memex connected yet.</p>
           <button type="button" className="chat-cta" onClick={openSettings}>
             Connect one in Settings → Memory
