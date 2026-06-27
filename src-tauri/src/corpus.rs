@@ -67,15 +67,6 @@ pub fn read_saved_root(app: &tauri::AppHandle) -> Option<PathBuf> {
     }
 }
 
-pub fn write_saved_root(app: &tauri::AppHandle, root: &Path) -> std::io::Result<()> {
-    let file = root_config_file(app)
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no app config dir"))?;
-    if let Some(parent) = file.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(file, root.to_string_lossy().as_bytes())
-}
-
 /// Where the chosen MEMEX corpus root is remembered — beside `corpus-root.txt`
 /// in the app config dir (Increment 3: the Notes tree can BROWSE a memex
 /// instance). Set ⇒ rotli's corpus IS that memex (Layout::Memex); cleared ⇒
@@ -100,45 +91,6 @@ pub fn read_saved_memex_root(app: &tauri::AppHandle) -> Option<PathBuf> {
     }
 }
 
-pub fn write_saved_memex_root(app: &tauri::AppHandle, root: &Path) -> std::io::Result<()> {
-    let file = memex_root_config_file(app)
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no app config dir"))?;
-    if let Some(parent) = file.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(file, root.to_string_lossy().as_bytes())
-}
-
-/// Forget the memex corpus pointer — rotli falls back to the legacy
-/// `~/Documents/rotli` chain. Missing file is a no-op (already legacy).
-pub fn clear_saved_memex_root(app: &tauri::AppHandle) -> std::io::Result<()> {
-    let Some(file) = memex_root_config_file(app) else {
-        return Ok(());
-    };
-    match fs::remove_file(&file) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e),
-    }
-}
-
-/// The corpus root in effect. Increment 3: when a memex corpus is chosen AND it
-/// still exists on disk, the Notes tree browses THAT memex; otherwise today's
-/// chain — the saved legacy choice if it still exists, else `~/Documents/rotli`.
-pub fn resolve_root(app: &tauri::AppHandle) -> PathBuf {
-    // The pointer is honored only while it STILL points at a real memex. If the
-    // folder lost its memex.json (a git checkout/rename of memex-vault), the pointer
-    // is ignored and we fall through to the LEGACY chain (~/Documents/rotli) —
-    // never open_legacy on the brain, which would scaffold reserved folders +
-    // surface self/history as editable notes.
-    if let Some(memex) = read_saved_memex_root(app).filter(|p| is_memex_root(p)) {
-        return memex;
-    }
-    read_saved_root(app)
-        .filter(|p| p.exists())
-        .unwrap_or_else(|| default_corpus_root(app))
-}
-
 /// Move the whole corpus into `new_root` (top-level entries, including
 /// `.rotli/`); the caller then persists the new root and relaunches. We refuse
 /// a non-empty target and a target inside the current root, so notes are never
@@ -151,8 +103,12 @@ pub fn relocate(old_root: &Path, new_root: &Path) -> Result<(), String> {
         return Err("Choose a folder that isn't inside the current notes folder.".into());
     }
     if new_root.exists() {
-        let mut entries = fs::read_dir(new_root).map_err(|e| e.to_string())?;
-        if entries.next().is_some() {
+        // tolerate macOS cruft (.DS_Store) / a stray dotfile — only REAL files block a move
+        let has_real = fs::read_dir(new_root)
+            .map_err(|e| e.to_string())?
+            .filter_map(|e| e.ok())
+            .any(|e| e.file_name().to_str().map(|n| !n.starts_with('.')).unwrap_or(true));
+        if has_real {
             return Err("Pick an empty folder — rotli won't merge into existing files.".into());
         }
     } else {
@@ -185,10 +141,6 @@ pub fn relocate(old_root: &Path, new_root: &Path) -> Result<(), String> {
 
 /// The reserved id of the local default root — always registered, always bare.
 pub const DEFAULT_ROOT_ID: &str = "default";
-/// The reserved id of the external "Vault" root (binds to a memex, e.g.
-/// ~/memex-vault). Registered only when bound; ids under it carry the `vault:`
-/// prefix.
-pub const VAULT_ROOT_ID: &str = "vault";
 
 /// A registered corpus root. `id` is the stable routing handle ("default",
 /// "vault"); `label` is what the sidebar shows ("Vault"); `abs_path` is the
@@ -213,21 +165,414 @@ impl RootRegistry {
     pub fn get(&self, id: &str) -> Option<&CorpusRoot> {
         self.roots.iter().find(|r| r.id == id)
     }
+}
 
-    /// Insert or replace a root by id.
-    pub fn upsert(&mut self, root: CorpusRoot) {
-        if let Some(existing) = self.roots.iter_mut().find(|r| r.id == root.id) {
-            *existing = root;
-        } else {
-            self.roots.push(root);
+/// The roots to open at startup, in order: always the DEFAULT root (the active
+/// corpus = `resolve_corpus`), then one row per CONNECTED BRAIN that is STILL a
+/// valid memex (honor-only-while-a-memex; a brain whose folder vanished or lost
+/// its `memex.json` is left UNBOUND — no row — exactly the old vault rule). Reads
+/// the unified `corpus.json`, migrating the four legacy files into it on first
+/// launch (idempotent, non-destructive).
+pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
+    let cfg = ensure_corpus_config(app);
+    let mut out: Vec<CorpusRoot> = vec![CorpusRoot {
+        id: DEFAULT_ROOT_ID.to_string(),
+        label: "Notes".to_string(),
+        abs_path: resolve_corpus(app),
+    }];
+    for b in &cfg.brains {
+        if is_memex_root(&b.abs_path) {
+            out.push(CorpusRoot {
+                id: b.id.clone(),
+                label: b.label.clone(),
+                abs_path: b.abs_path.clone(),
+            });
         }
+    }
+    // added plain folders open as LegacyRotli roots (everything writable in place)
+    out.extend(cfg.folders.iter().cloned());
+    out
+}
+
+// ─── the unified corpus model (`corpus.json`) ───────────────────────────────
+//
+// ONE file replaces corpus-root.txt + corpus-memex-root.txt + corpus-roots.json
+// + memex-instances.json. The corpus is THE one folder = your notes = your brain;
+// whether it is a memex is DERIVED (`is_memex_root`), never stored, so it can't
+// drift. `brains` are connected, read-only-by-default "other brains" (the former
+// Vault ∪ memex instances). On first launch the four legacy files migrate in.
+
+/// THE one folder = your notes = your brain.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CorpusRef {
+    pub abs_path: PathBuf,
+    // future: `storage_path: Option<PathBuf>` (default `<corpus>/storage`) — the
+    // redirectable binary store. Not built yet (rotli writes no binaries).
+}
+
+/// A connected "other brain" — a memex rotli reads, with per-brain write perms.
+/// `id` is the router slug ("vault" stays reserved for back-compat with the
+/// `vault:` sidebar prefix).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectedBrain {
+    pub id: String,
+    pub label: String,
+    pub abs_path: PathBuf,
+    #[serde(default)]
+    pub memex_id: Option<String>,
+    #[serde(default)]
+    pub mode: Option<String>,
+    /// "chats+inbox" | "read-only"
+    pub perms: String,
+}
+
+/// The unified on-disk config (`corpus.json` in the app config dir).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CorpusConfig {
+    pub version: u32,
+    pub corpus: CorpusRef,
+    #[serde(default)]
+    pub brains: Vec<ConnectedBrain>,
+    /// Arbitrary plain folders added to the sidebar (the "add a folder" feature) —
+    /// browsable + editable in place, NOT memexes. Distinct from `brains`.
+    #[serde(default)]
+    pub folders: Vec<CorpusRoot>,
+    #[serde(default)]
+    pub active_brain_id: Option<String>,
+}
+
+fn corpus_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
+    use tauri::Manager;
+    app.path().app_config_dir().ok().map(|d| d.join("corpus.json"))
+}
+
+pub fn read_corpus_config(app: &tauri::AppHandle) -> Option<CorpusConfig> {
+    corpus_config_file(app)
+        .and_then(|f| fs::read_to_string(f).ok())
+        .and_then(|t| serde_json::from_str(&t).ok())
+}
+
+pub fn write_corpus_config(app: &tauri::AppHandle, cfg: &CorpusConfig) -> Result<(), String> {
+    let f = corpus_config_file(app).ok_or("no app config dir")?;
+    if let Some(p) = f.parent() {
+        fs::create_dir_all(p).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string_pretty(cfg).map_err(|e| e.to_string())? + "\n";
+    atomic_write(&f, &json)
+}
+
+/// The active corpus root. Reads `corpus.json`; if its path vanished (or there's
+/// no config yet) falls back so the app never opens a dead path. A blank/dead
+/// default is the white-screen failure mode — this guard is load-bearing.
+pub fn resolve_corpus(app: &tauri::AppHandle) -> PathBuf {
+    if let Some(cfg) = read_corpus_config(app) {
+        return if cfg.corpus.abs_path.exists() {
+            cfg.corpus.abs_path
+        } else {
+            default_corpus_root(app)
+        };
+    }
+    // no config yet — mirror the legacy precedence so a pre-migration read is sane
+    if let Some(m) = read_saved_memex_root(app).filter(|p| is_memex_root(p)) {
+        return m;
+    }
+    read_saved_root(app)
+        .filter(|p| p.exists())
+        .unwrap_or_else(|| default_corpus_root(app))
+}
+
+/// Ensure `corpus.json` exists, migrating the four legacy files into it ONCE
+/// (idempotent — a no-op once the config exists). Non-destructive: the legacy
+/// files are left in place until the retire step.
+pub fn ensure_corpus_config(app: &tauri::AppHandle) -> CorpusConfig {
+    if let Some(cfg) = read_corpus_config(app) {
+        return cfg;
+    }
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_config_dir()
+        .unwrap_or_else(|_| PathBuf::from("."));
+    // A corpus.json that EXISTS but won't parse must NOT be silently re-migrated over
+    // (that would drop added folders / re-add forgotten brains / reset the active
+    // pick). Preserve the bad file as `.bak` + log, then re-derive from the legacy files.
+    let cfg_file = dir.join("corpus.json");
+    if cfg_file.exists() {
+        eprintln!("rotli: corpus.json is unreadable — preserving it as corpus.json.bak, re-deriving from legacy files");
+        let _ = fs::rename(&cfg_file, dir.join("corpus.json.bak"));
+    }
+    let cfg = migrate_config_at(&dir, &default_corpus_root(app));
+    if let Err(e) = write_corpus_config(app, &cfg) {
+        eprintln!("rotli: failed to write corpus.json ({e})");
+    }
+    cfg
+}
+
+// The legacy `memex-instances.json` shape, read locally so corpus.rs stays
+// decoupled from the memex module's wire types.
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct LegacyInstances {
+    #[serde(default)]
+    active_id: Option<String>,
+    #[serde(default)]
+    instances: Vec<LegacyInstance>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyInstance {
+    id: String,
+    label: String,
+    abs_path: String,
+    #[serde(default)]
+    memex_id: Option<String>,
+    #[serde(default)]
+    mode: Option<String>,
+    perms: String,
+}
+
+fn read_txt_pointer(config_dir: &Path, name: &str) -> Option<PathBuf> {
+    let raw = fs::read_to_string(config_dir.join(name)).ok()?;
+    let t = raw.trim();
+    if t.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(t))
     }
 }
 
-/// A unique, router-safe slug id for a new added root, derived from its folder name.
-/// Non-alphanumerics collapse to '-' (so the id can never contain the `:` router
-/// char); collisions with reserved ids or an existing root get a `-2`, `-3`, … suffix.
-pub fn unique_root_id(reg: &RootRegistry, label: &str) -> String {
+/// Canonicalize for dedup (so `/var` ↔ `/private/var` compare equal); fall back
+/// to the path itself when it can't be resolved (e.g. it no longer exists).
+fn canon(p: &Path) -> PathBuf {
+    fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
+}
+
+/// A unique, router-safe brain id from a label, keeping `default` reserved.
+fn unique_brain_id(brains: &[ConnectedBrain], label: &str) -> String {
+    let mut base: String = label
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .collect();
+    while base.contains("--") {
+        base = base.replace("--", "-");
+    }
+    let base = base.trim_matches('-');
+    let base = if base.is_empty() { "brain" } else { base };
+    let taken = |id: &str| id == DEFAULT_ROOT_ID || brains.iter().any(|b| b.id == id);
+    if !taken(base) {
+        return base.to_string();
+    }
+    let mut n = 2;
+    loop {
+        let id = format!("{base}-{n}");
+        if !taken(&id) {
+            return id;
+        }
+        n += 1;
+    }
+}
+
+/// The migration core — pure over a config dir + the default corpus path, so it
+/// is unit-testable headlessly. Builds the unified `CorpusConfig` from the four
+/// legacy files: corpus path by today's precedence; brains = (corpus-roots
+/// non-default) ∪ (memex instances) deduped on canonical path (a same-folder
+/// merge keeps the corpus-roots id, e.g. "vault", and takes perms/memexId/mode
+/// from the instance); active brain mapped from the instance registry's activeId
+/// via memexId.
+fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
+    let read_roots = || {
+        fs::read_to_string(config_dir.join("corpus-roots.json"))
+            .ok()
+            .and_then(|t| serde_json::from_str::<RootRegistry>(&t).ok())
+    };
+
+    let corpus_path = read_txt_pointer(config_dir, "corpus-memex-root.txt")
+        .filter(|p| is_memex_root(p))
+        .or_else(|| read_txt_pointer(config_dir, "corpus-root.txt").filter(|p| p.exists()))
+        .or_else(|| {
+            read_roots()
+                .and_then(|reg| reg.get(DEFAULT_ROOT_ID).map(|r| r.abs_path.clone()))
+                .filter(|p| p.exists())
+        })
+        .unwrap_or_else(|| default_corpus.to_path_buf());
+    let corpus_canon = canon(&corpus_path);
+
+    let mut brains: Vec<ConnectedBrain> = Vec::new();
+    let mut folders: Vec<CorpusRoot> = Vec::new();
+    if let Some(reg) = read_roots() {
+        for r in reg.roots.into_iter().filter(|r| r.id != DEFAULT_ROOT_ID) {
+            if canon(&r.abs_path) == corpus_canon {
+                continue;
+            }
+            // a memex → a connected brain (instances merge in below); a plain dir →
+            // an added folder (the "add a folder" feature is preserved).
+            if is_memex_root(&r.abs_path) {
+                brains.push(ConnectedBrain {
+                    id: r.id,
+                    label: r.label,
+                    abs_path: r.abs_path,
+                    memex_id: None,
+                    mode: None,
+                    perms: "read-only".to_string(),
+                });
+            } else {
+                folders.push(r);
+            }
+        }
+    }
+
+    let legacy: LegacyInstances = fs::read_to_string(config_dir.join("memex-instances.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default();
+    for inst in &legacy.instances {
+        let path = PathBuf::from(&inst.abs_path);
+        let pcanon = canon(&path);
+        if pcanon == corpus_canon {
+            continue;
+        }
+        let mxid = inst.memex_id.clone().or_else(|| Some(inst.id.clone()));
+        if let Some(b) = brains.iter_mut().find(|b| canon(&b.abs_path) == pcanon) {
+            b.memex_id = mxid;
+            b.mode = inst.mode.clone();
+            b.perms = inst.perms.clone();
+        } else {
+            let id = unique_brain_id(&brains, &inst.label);
+            brains.push(ConnectedBrain {
+                id,
+                label: inst.label.clone(),
+                abs_path: path,
+                memex_id: mxid,
+                mode: inst.mode.clone(),
+                perms: inst.perms.clone(),
+            });
+        }
+    }
+
+    let active_brain_id = legacy.active_id.as_ref().and_then(|aid| {
+        let inst = legacy.instances.iter().find(|i| &i.id == aid)?;
+        let mxid = inst.memex_id.clone().unwrap_or_else(|| inst.id.clone());
+        brains
+            .iter()
+            .find(|b| b.memex_id.as_deref() == Some(mxid.as_str()))
+            .map(|b| b.id.clone())
+    });
+
+    CorpusConfig {
+        version: 1,
+        corpus: CorpusRef { abs_path: corpus_path },
+        brains,
+        folders,
+        active_brain_id,
+    }
+}
+
+// ─── brain + corpus mutators (write ONLY corpus.json) ───────────────────────
+
+/// Repoint the active corpus at `path`. The caller relaunches so it opens.
+pub fn set_corpus_path(app: &tauri::AppHandle, path: PathBuf) -> Result<(), String> {
+    let mut cfg = ensure_corpus_config(app);
+    let target = canon(&path);
+    // a folder can't be BOTH the corpus and a brain/added-folder — drop any dup so
+    // the same dir never opens as two roots (doubled notes / two watchers).
+    let dropped_active = cfg
+        .active_brain_id
+        .as_deref()
+        .and_then(|aid| cfg.brains.iter().find(|b| b.id == aid))
+        .map(|b| canon(&b.abs_path) == target)
+        .unwrap_or(false);
+    cfg.brains.retain(|b| canon(&b.abs_path) != target);
+    cfg.folders.retain(|f| canon(&f.abs_path) != target);
+    if dropped_active {
+        cfg.active_brain_id = cfg.brains.first().map(|b| b.id.clone());
+    }
+    cfg.corpus = CorpusRef { abs_path: path };
+    write_corpus_config(app, &cfg)
+}
+
+/// Connect / update a brain. A same-folder upsert PRESERVES the existing id (so
+/// "vault" and its `vault:` sidebar prefix survive) and pin-checks the memex id
+/// (refuse a different brain at the same path). An empty `brain.id` ⇒ a fresh
+/// unique slug from the label.
+pub fn upsert_brain(
+    app: &tauri::AppHandle,
+    brain: ConnectedBrain,
+    make_active: bool,
+) -> Result<(), String> {
+    let mut cfg = ensure_corpus_config(app);
+    let target = canon(&brain.abs_path);
+    if canon(&cfg.corpus.abs_path) == target {
+        return Err(
+            "That folder is already your notes folder (your brain) — it can't also be a connected brain."
+                .into(),
+        );
+    }
+    let existing = cfg.brains.iter().find(|b| canon(&b.abs_path) == target);
+    if let (Some(e), Some(new_id)) = (existing, brain.memex_id.as_deref()) {
+        if let Some(prev) = e.memex_id.as_deref() {
+            if prev != new_id {
+                return Err(
+                    "This folder is a different memex than the one rotli connected to — refusing."
+                        .into(),
+                );
+            }
+        }
+    }
+    let id = existing.map(|b| b.id.clone()).unwrap_or_else(|| {
+        if brain.id.is_empty() {
+            unique_brain_id(&cfg.brains, &brain.label)
+        } else {
+            brain.id.clone()
+        }
+    });
+    let entry = ConnectedBrain { id: id.clone(), ..brain };
+    cfg.brains.retain(|b| canon(&b.abs_path) != target);
+    cfg.brains.push(entry);
+    if make_active || cfg.active_brain_id.is_none() {
+        cfg.active_brain_id = Some(id);
+    }
+    write_corpus_config(app, &cfg)
+}
+
+/// Forget a connected brain (never the corpus). If it was active, the active
+/// pointer falls to the first remaining brain (or none).
+pub fn forget_brain(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
+    let mut cfg = ensure_corpus_config(app);
+    cfg.brains.retain(|b| b.id != id);
+    if cfg.active_brain_id.as_deref() == Some(id) {
+        cfg.active_brain_id = cfg.brains.first().map(|b| b.id.clone());
+    }
+    write_corpus_config(app, &cfg)
+}
+
+pub fn set_active_brain(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
+    let mut cfg = ensure_corpus_config(app);
+    if !cfg.brains.iter().any(|b| b.id == id) {
+        return Err("no such brain".into());
+    }
+    cfg.active_brain_id = Some(id.to_string());
+    write_corpus_config(app, &cfg)
+}
+
+pub fn set_brain_perms(app: &tauri::AppHandle, id: &str, perms: &str) -> Result<(), String> {
+    if perms != "chats+inbox" && perms != "read-only" {
+        return Err(format!("bad perms: {perms}"));
+    }
+    let mut cfg = ensure_corpus_config(app);
+    let b = cfg
+        .brains
+        .iter_mut()
+        .find(|b| b.id == id)
+        .ok_or("no such brain")?;
+    b.perms = perms.to_string();
+    write_corpus_config(app, &cfg)
+}
+
+/// A unique, router-safe id for an added folder, over the whole config.
+fn unique_folder_id(cfg: &CorpusConfig, label: &str) -> String {
     let mut base: String = label
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
@@ -237,114 +582,56 @@ pub fn unique_root_id(reg: &RootRegistry, label: &str) -> String {
     }
     let base = base.trim_matches('-');
     let base = if base.is_empty() { "folder" } else { base };
-    let mut id = base.to_string();
+    let taken = |id: &str| {
+        id == DEFAULT_ROOT_ID
+            || cfg.brains.iter().any(|b| b.id == id)
+            || cfg.folders.iter().any(|f| f.id == id)
+    };
+    if !taken(base) {
+        return base.to_string();
+    }
     let mut n = 2;
-    while id == DEFAULT_ROOT_ID || id == VAULT_ROOT_ID || reg.get(&id).is_some() {
-        id = format!("{base}-{n}");
+    loop {
+        let id = format!("{base}-{n}");
+        if !taken(&id) {
+            return id;
+        }
         n += 1;
     }
-    id
 }
 
-fn roots_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
-    use tauri::Manager;
-    app.path()
-        .app_config_dir()
-        .ok()
-        .map(|d| d.join("corpus-roots.json"))
-}
-
-pub fn read_root_registry(app: &tauri::AppHandle) -> RootRegistry {
-    roots_config_file(app)
-        .and_then(|f| fs::read_to_string(f).ok())
-        .and_then(|t| serde_json::from_str(&t).ok())
-        .unwrap_or_default()
-}
-
-pub fn write_root_registry(app: &tauri::AppHandle, reg: &RootRegistry) -> Result<(), String> {
-    let f = roots_config_file(app).ok_or("no app config dir")?;
-    if let Some(p) = f.parent() {
-        fs::create_dir_all(p).map_err(|e| e.to_string())?;
+/// Add an arbitrary plain folder as a sidebar root (the "add a folder" feature).
+/// Returns false (no relaunch) when it's already the corpus / a brain / a folder.
+pub fn add_folder(app: &tauri::AppHandle, path: PathBuf) -> Result<bool, String> {
+    let mut cfg = ensure_corpus_config(app);
+    let target = canon(&path);
+    if canon(&cfg.corpus.abs_path) == target
+        || cfg.brains.iter().any(|b| canon(&b.abs_path) == target)
+        || cfg.folders.iter().any(|f| canon(&f.abs_path) == target)
+    {
+        return Ok(false);
     }
-    let json = serde_json::to_string_pretty(reg).map_err(|e| e.to_string())? + "\n";
-    atomic_write(&f, &json)
+    let label = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("folder")
+        .to_string();
+    let id = unique_folder_id(&cfg, &label);
+    cfg.folders.push(CorpusRoot { id, label, abs_path: path });
+    write_corpus_config(app, &cfg)?;
+    Ok(true)
 }
 
-/// Resolve the registry to USE at startup: ensure the default root is always
-/// present (id "default", abs_path = today's `resolve_root`), so the registry
-/// can never be missing the default. Persists the default back if it was added
-/// (best-effort). The vault auto-bind is layered on by `lib.rs` at startup — a
-/// vault entry is added there only when ~/memex-vault is a valid memex.
-pub fn resolve_registry(app: &tauri::AppHandle) -> RootRegistry {
-    let mut reg = read_root_registry(app);
-    let default_path = resolve_root(app);
-    let needs_default = match reg.get(DEFAULT_ROOT_ID) {
-        Some(existing) => existing.abs_path != default_path,
-        None => true,
-    };
-    if needs_default {
-        reg.upsert(CorpusRoot {
-            id: DEFAULT_ROOT_ID.to_string(),
-            label: "Notes".to_string(),
-            abs_path: default_path,
-        });
-        let _ = write_root_registry(app, &reg);
+/// Forget an added folder OR a connected brain by id (never the corpus). If the
+/// active brain is forgotten, the active pointer falls to the first remaining.
+pub fn forget_root(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
+    let mut cfg = ensure_corpus_config(app);
+    cfg.folders.retain(|f| f.id != id);
+    cfg.brains.retain(|b| b.id != id);
+    if cfg.active_brain_id.as_deref() == Some(id) {
+        cfg.active_brain_id = cfg.brains.first().map(|b| b.id.clone());
     }
-    reg
-}
-
-/// The path the "vault" root auto-binds to on Seth's machine — `~/memex-vault` —
-/// BUT only ever when it is a valid memex (`is_memex_root`). Never bind the
-/// vault to a non-memex directory automatically.
-fn default_vault_path() -> Option<PathBuf> {
-    std::env::var("HOME").ok().map(|h| PathBuf::from(h).join("memex-vault"))
-}
-
-/// The roots to open at startup, in order. Always includes the DEFAULT root.
-/// Adds the "vault" root when:
-///   • the registry already has a vault entry whose abs_path is STILL a valid
-///     memex (honor-only-while-a-memex, mirroring resolve_root), OR
-///   • the registry has no vault entry AND ~/memex-vault exists AND is a valid
-///     memex — then auto-bind vault → ~/memex-vault and persist it.
-/// A vault that is absent or no longer a memex is left UNBOUND (no row) — the
-/// per-destination picker can connect it later. NEVER binds to a non-memex dir.
-pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
-    let mut reg = resolve_registry(app);
-    let mut out: Vec<CorpusRoot> = Vec::new();
-
-    // the default root is guaranteed present by resolve_registry
-    if let Some(d) = reg.get(DEFAULT_ROOT_ID) {
-        out.push(d.clone());
-    }
-
-    // the vault: honor a stored binding only while it's still a memex; else try
-    // the ~/memex-vault auto-bind. A non-memex binding is dropped (left unbound).
-    let vault: Option<CorpusRoot> = match reg.get(VAULT_ROOT_ID) {
-        // honor a stored binding while it's still a valid memex
-        Some(existing) if is_memex_root(&existing.abs_path) => Some(existing.clone()),
-        // a stored path that still EXISTS but lost its memex.json: respect the
-        // user's pick — leave it unbound, don't silently jump to another memex.
-        Some(existing) if existing.abs_path.exists() => None,
-        // no binding, OR the bound path VANISHED (e.g. the memex was moved /
-        // renamed — smBrain → memex-vault): self-heal by auto-binding the
-        // ~/memex-vault default when it's a valid memex, replacing the dead entry.
-        _ => default_vault_path()
-            .filter(|p| p.exists() && is_memex_root(p))
-            .map(|p| CorpusRoot {
-                id: VAULT_ROOT_ID.to_string(),
-                label: "Vault".to_string(),
-                abs_path: p,
-            }),
-    };
-    if let Some(v) = vault {
-        // persist a freshly auto-bound vault so the next launch finds it
-        if reg.get(VAULT_ROOT_ID) != Some(&v) {
-            reg.upsert(v.clone());
-            let _ = write_root_registry(app, &reg);
-        }
-        out.push(v);
-    }
-    out
+    write_corpus_config(app, &cfg)
 }
 
 /// Split a wire id into `(root_id, rel)`. A `:` splits ONCE at the first colon
@@ -2177,6 +2464,70 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tempfile::TempDir;
 
+    /// The load-bearing migration: Seth's live shape (plain `~/Documents/rotli`
+    /// corpus + `~/memex-vault` registered BOTH as the `vault` corpus root AND as
+    /// the active memex instance) collapses to one corpus + ONE deduped brain that
+    /// keeps the `vault` id, carries `chats+inbox`, and stays active.
+    #[test]
+    fn migration_collapses_double_registration_to_one_brain() {
+        let tmp = TempDir::new().unwrap();
+        let cfg_dir = tmp.path().join("config");
+        let corpus = tmp.path().join("Documents").join("rotli");
+        let brain = tmp.path().join("memex-vault");
+        fs::create_dir_all(&cfg_dir).unwrap();
+        fs::create_dir_all(&corpus).unwrap();
+        fs::create_dir_all(&brain).unwrap();
+        let mxid = "mx_23e4e1dc-d516-4444-a39a-bc030eb8680b";
+        fs::write(
+            brain.join("memex.json"),
+            format!("{{\"id\":\"{mxid}\",\"contract\":\"3.4\"}}"),
+        )
+        .unwrap();
+        fs::write(
+            cfg_dir.join("corpus-roots.json"),
+            format!(
+                "{{\"version\":0,\"roots\":[{{\"id\":\"default\",\"label\":\"Notes\",\"absPath\":\"{}\"}},{{\"id\":\"vault\",\"label\":\"Vault\",\"absPath\":\"{}\"}}]}}",
+                corpus.display(),
+                brain.display()
+            ),
+        )
+        .unwrap();
+        fs::write(
+            cfg_dir.join("memex-instances.json"),
+            format!(
+                "{{\"version\":1,\"activeId\":\"{mxid}\",\"instances\":[{{\"id\":\"{mxid}\",\"label\":\"memex-vault\",\"absPath\":\"{}\",\"role\":\"chat-system\",\"memexId\":\"{mxid}\",\"mode\":\"secure\",\"perms\":\"chats+inbox\"}}]}}",
+                brain.display()
+            ),
+        )
+        .unwrap();
+
+        let cfg = migrate_config_at(&cfg_dir, &corpus);
+
+        assert_eq!(canon(&cfg.corpus.abs_path), canon(&corpus), "corpus stays the plain notes folder");
+        assert_eq!(cfg.brains.len(), 1, "double registration deduped to one brain");
+        let b = &cfg.brains[0];
+        assert_eq!(b.id, "vault", "keeps the vault id so the sidebar prefix stays valid");
+        assert_eq!(canon(&b.abs_path), canon(&brain));
+        assert_eq!(b.perms, "chats+inbox", "carries write perms from the instance, not read-only");
+        assert_eq!(b.memex_id.as_deref(), Some(mxid));
+        assert_eq!(b.mode.as_deref(), Some("secure"));
+        assert_eq!(cfg.active_brain_id.as_deref(), Some("vault"), "active mapped via memexId");
+    }
+
+    /// A brand-new user (empty config dir) gets the default corpus and no brains —
+    /// never a blank/dead path.
+    #[test]
+    fn migration_fresh_user_defaults_to_documents_rotli() {
+        let tmp = TempDir::new().unwrap();
+        let cfg_dir = tmp.path().join("config");
+        let default_corpus = tmp.path().join("Documents").join("rotli");
+        fs::create_dir_all(&cfg_dir).unwrap();
+        let cfg = migrate_config_at(&cfg_dir, &default_corpus);
+        assert_eq!(cfg.corpus.abs_path, default_corpus);
+        assert!(cfg.brains.is_empty());
+        assert!(cfg.active_brain_id.is_none());
+    }
+
     /// Fresh corpus (first run happens: Inbox + welcome note exist).
     fn fresh() -> (TempDir, CorpusStore) {
         let dir = TempDir::new().unwrap();
@@ -3031,13 +3382,7 @@ mod tests {
         // the root registry serializes and the default is always recoverable.
         let mut reg = RootRegistry::default();
         assert!(reg.get(DEFAULT_ROOT_ID).is_none());
-        reg.upsert(CorpusRoot {
-            id: DEFAULT_ROOT_ID.to_string(),
-            label: "Notes".to_string(),
-            abs_path: PathBuf::from("/tmp/rotli"),
-        });
-        // upsert replaces rather than duplicates
-        reg.upsert(CorpusRoot {
+        reg.roots.push(CorpusRoot {
             id: DEFAULT_ROOT_ID.to_string(),
             label: "Notes".to_string(),
             abs_path: PathBuf::from("/tmp/rotli2"),
@@ -3160,7 +3505,7 @@ mod tests {
 
         let mut reg = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
         reg.insert(DEFAULT_ROOT_ID.to_string(), default_store);
-        reg.insert(VAULT_ROOT_ID.to_string(), vault_store);
+        reg.insert("vault".to_string(), vault_store);
         let list = aggregate(&mut reg);
 
         // default ids stay bare; vault ids are prefixed

@@ -1,12 +1,16 @@
-// The rotli-side view of "which memex am I pointed at." The Rust registry
-// (memex-instances.json, in the app config dir) is the source of truth; this maps
-// its wire shape into the app's model + a couple of pure reducers. Mirrors how
-// Breve's config.ts adapts the brain wiring — but rotli supports MULTIPLE
-// instances (the user can keep separate, non-blending brains).
+// The rotli-side view of "which brain am I writing to." The unified `corpus.json`
+// (read via corpus_list_config) is the source of truth; this maps its view shape
+// into the app's MemexInstance model + a couple of pure reducers. The corpus is
+// THE one folder = your notes = your brain: when it's a memex it IS the active
+// write target; otherwise the active CONNECTED brain is. Other connected brains
+// surface as additional (read-only) instances.
 
-import type { MemexInstanceEntry, MemexPerms, MemexRegistry } from "../lib/tauri";
+import type { CorpusConfigView, MemexPerms } from "../lib/tauri";
 
 export type Perms = MemexPerms;
+
+/** The synthetic instance id for "the corpus itself is a brain". */
+export const CORPUS_INSTANCE_ID = "corpus";
 
 export interface MemexInstance {
   id: string;
@@ -27,20 +31,41 @@ export interface MemexConfig {
 
 export const EMPTY_CONFIG: MemexConfig = { activeId: null, instances: [] };
 
-function fromEntry(e: MemexInstanceEntry): MemexInstance {
-  return {
-    id: e.id,
-    label: e.label,
-    root: e.absPath,
-    role: e.role,
-    memexId: e.memexId,
-    mode: e.mode,
-    perms: e.perms,
-  };
+function baseName(p: string): string {
+  const parts = p.split("/").filter(Boolean);
+  return parts[parts.length - 1] ?? "brain";
 }
 
-export function fromRegistry(reg: MemexRegistry): MemexConfig {
-  return { activeId: reg.activeId, instances: reg.instances.map(fromEntry) };
+/** Map the unified corpus view into the app's instance model. A memex corpus
+ * becomes the (active) `CORPUS_INSTANCE_ID` instance; connected brains follow.
+ * When the corpus is NOT a memex, the active CONNECTED brain stays the write
+ * target — so an existing "plain corpus + connected brain" setup is unchanged. */
+export function fromCorpusConfig(v: CorpusConfigView): MemexConfig {
+  const instances: MemexInstance[] = [];
+  if (v.corpus.isMemex) {
+    instances.push({
+      id: CORPUS_INSTANCE_ID,
+      label: baseName(v.corpus.absPath),
+      root: v.corpus.absPath,
+      role: "corpus",
+      memexId: v.corpus.memexId,
+      mode: null,
+      perms: v.corpus.perms ?? "read-only",
+    });
+  }
+  for (const b of v.brains) {
+    instances.push({
+      id: b.id,
+      label: b.label,
+      root: b.absPath,
+      role: "brain",
+      memexId: b.memexId,
+      mode: b.mode,
+      perms: b.perms,
+    });
+  }
+  const activeId = v.corpus.isMemex ? CORPUS_INSTANCE_ID : v.activeBrainId;
+  return { activeId, instances };
 }
 
 export const activeInstance = (c: MemexConfig): MemexInstance | null =>

@@ -514,6 +514,13 @@ function viewstateSnapshot(): string {
   return JSON.stringify(snapshot);
 }
 
+/** Durably write the current settings snapshot RIGHT NOW (awaitable) — used
+ * before a deliberate relaunch so flags like `onboarded` survive the restart. */
+export async function flushSettingsNow(): Promise<void> {
+  if (!isTauri()) return;
+  await corpusSettingsWrite("settings", settingsSnapshot());
+}
+
 /** Subscribe the one writer to every durable store. Writes are debounced,
  * deduplicated against the last written payload, and flushed the moment the
  * window hides (visibilitychange) or unloads (pagehide). Call once, after

@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-06-27
+
+### Changed
+- **One folder = your brain: the corpus.json unification.** Replaced four separate location
+  mechanisms (`corpus-root.txt`, `corpus-memex-root.txt`, `corpus-roots.json`, `memex-instances.json`)
+  with a single `corpus.json` — the notes corpus IS a memex by default (its folder is your brain), plus
+  connected read-only **brains** and added **folders**. The active write target is the corpus when it's
+  a memex, else the active connected brain. A one-time migration preserves existing installs (and dedupes
+  a brain that was double-registered as both a vault root and an instance — notes load byte-identically).
+- **The Location pane is one folder.** Collapsed to a single **"Choose folder…"** smart picker (a memex →
+  use it as your brain · an empty folder → move your notes there · any folder → use as-is) + **Your brain**
+  + **Other brains** / **Connect a brain…**. The four separate folder pickers, the "rotli sync" card, and
+  the Quick-capture toggle are gone — quick capture has one fixed home (the active brain's `inbox.md`,
+  falling back to the Board only when there's no writable brain).
+- **Memex contract bumped to 3.6** (numeric band `[3.4, 3.6]`), matching memex-vault's `STRUCTURE.md`.
+
+### Fixed
+- First-run onboarding can't loop (the `onboarded` flag is flushed to disk before the connect-brain
+  relaunch); a note created into a memex corpus opens correctly (wire-id prefix derived from the active
+  root); choosing/connecting an already-registered folder can't open the same directory twice; "Check the
+  brain" results show on the right card; a folder with only `.DS_Store` counts as empty; brain perms are
+  validated; a corrupt `corpus.json` is preserved as `.bak` instead of silently re-migrated.
+
+### Docs
+- Reconciled the always-injected CARL contract rule (v3.6 · `identity/`+`personality/` · the corpus.json
+  model) and bannered the superseded design docs (`memex-rules-first-pass.md` write boundary,
+  `next-stages.md` Track 2).
+
 ## [0.7.2] — 2026-06-27
 
 ### Changed

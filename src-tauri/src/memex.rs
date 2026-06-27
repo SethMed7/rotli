@@ -27,13 +27,12 @@ use serde_json::Value;
 use tauri::Manager;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
-use uuid::Uuid;
 
 /// The memex contract version rotli is built against (mirrors memex-vault's
-/// `CONTRACT_VERSION` and `src/memex/contract.ts`). rotli writes the v3.5 note
-/// contract but still WRITES to a v3.4 brain (the chat/inbox shape is unchanged),
-/// so the supported band is `[MIN_CONTRACT, CONTRACT_VERSION]`.
-const CONTRACT_VERSION: &str = "3.5";
+/// `CONTRACT_VERSION` and `src/memex/contract.ts`, which is 3.6). rotli writes the
+/// note contract but still WRITES to a v3.4 brain (the chat/inbox shape is
+/// unchanged), so the supported band is `[MIN_CONTRACT, CONTRACT_VERSION]`.
+const CONTRACT_VERSION: &str = "3.6";
 const MIN_CONTRACT: &str = "3.4";
 /// The inbox sentinel new captures are inserted after (matches memex-vault's inbox.md).
 const INBOX_MARK: &str = "<!-- entries below this line -->";
@@ -160,6 +159,17 @@ pub struct DetectedMemex {
     pub users_json: Option<String>,
 }
 
+/// Whether a dir has no NON-hidden entries (ignores `.DS_Store`, `.rotli`, any
+/// dotfile) — so a folder with only macOS cruft still counts as empty/"fresh".
+fn dir_has_no_real_entries(root: &Path) -> bool {
+    match fs::read_dir(root) {
+        Ok(rd) => !rd
+            .filter_map(|e| e.ok())
+            .any(|e| e.file_name().to_str().map(|n| !n.starts_with('.')).unwrap_or(true)),
+        Err(_) => true,
+    }
+}
+
 fn detect_one(root: &Path) -> DetectedMemex {
     let label = root
         .file_name()
@@ -192,11 +202,7 @@ fn detect_one(root: &Path) -> DetectedMemex {
             }
             None => kind = "plain".to_string(),
         }
-    } else if !root.exists()
-        || fs::read_dir(root)
-            .map(|mut d| d.next().is_none())
-            .unwrap_or(true)
-    {
+    } else if !root.exists() || dir_has_no_real_entries(root) {
         kind = "fresh".to_string();
     } else {
         kind = "plain".to_string();
@@ -221,12 +227,32 @@ fn detect_one(root: &Path) -> DetectedMemex {
     }
 }
 
+/// Public probe for the corpus module's "Choose folder…" smart picker — classify
+/// a directory as `memex` / `plain` / `fresh` without going through a Tauri command.
+pub fn detect_folder(root: &Path) -> DetectedMemex {
+    detect_one(root)
+}
+
 /// Whether a brain's contract is within rotli's supported band [MIN_CONTRACT,
 /// CONTRACT_VERSION]. In-band ⇒ rotli may write (chats/inbox/wiki/_inbox); out of
 /// band ⇒ the brain opens read-only (never write a contract rotli wasn't built for).
 /// Mirrors the TS `contractInRange` default band.
+/// Parse a `"major.minor"` contract into a comparable tuple; non-numeric → None.
+fn parse_contract(c: &str) -> Option<(u32, u32)> {
+    let mut parts = c.trim().split('.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next().unwrap_or("0").parse().ok()?;
+    Some((major, minor))
+}
+
 fn contract_ok(contract: Option<&str>) -> bool {
-    matches!(contract, Some(c) if c == MIN_CONTRACT || c == CONTRACT_VERSION)
+    let Some(c) = contract.and_then(parse_contract) else {
+        return false;
+    };
+    // tuples compare lexicographically: (3,4) ≤ (3,5) ≤ (3,6) — the whole band.
+    let lo = parse_contract(MIN_CONTRACT).expect("MIN_CONTRACT is valid");
+    let hi = parse_contract(CONTRACT_VERSION).expect("CONTRACT_VERSION is valid");
+    c >= lo && c <= hi
 }
 
 // ─── the instance registry (machine-level, outside any corpus) ─────────────────
@@ -265,33 +291,6 @@ pub fn read_registry(app: &tauri::AppHandle) -> InstanceRegistry {
         .and_then(|f| fs::read_to_string(f).ok())
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or_default()
-}
-
-fn write_registry(app: &tauri::AppHandle, reg: &InstanceRegistry) -> Result<(), String> {
-    let f = registry_file(app).ok_or("no app config dir")?;
-    if let Some(p) = f.parent() {
-        fs::create_dir_all(p).map_err(|e| e.to_string())?;
-    }
-    let json = serde_json::to_string_pretty(reg).map_err(|e| e.to_string())? + "\n";
-    atomic_write(&f, &json)
-}
-
-fn upsert_instance(
-    app: &tauri::AppHandle,
-    entry: InstanceEntry,
-    make_active: bool,
-) -> Result<InstanceEntry, String> {
-    let mut reg = read_registry(app);
-    if reg.version == 0 {
-        reg.version = 1;
-    }
-    reg.instances.retain(|i| i.abs_path != entry.abs_path);
-    reg.instances.push(entry.clone());
-    if make_active || reg.active_id.is_none() {
-        reg.active_id = Some(entry.id.clone());
-    }
-    write_registry(app, &reg)?;
-    Ok(entry)
 }
 
 // ─── the additive `apps.rotli` stamp (round-trip raw Value, preserve breve) ────
@@ -542,113 +541,57 @@ pub fn memex_list_dir(root: String, rel: String) -> Result<Vec<DirEntry>, String
     Ok(out)
 }
 
-/// INIT a fresh memex at an empty folder (the "Separate" / brand-new path).
-#[tauri::command]
-pub fn memex_init(
-    app: tauri::AppHandle,
-    path: String,
-    label: String,
-) -> Result<InstanceEntry, String> {
-    let root = PathBuf::from(&path);
-    if root.exists() {
-        if fs::read_dir(&root)
-            .map_err(|e| e.to_string())?
-            .next()
-            .is_some()
-        {
-            return Err("Pick an empty folder — rotli starts a fresh brain there.".into());
-        }
-    } else {
-        fs::create_dir_all(&root).map_err(|e| e.to_string())?;
-    }
-
-    for d in ["identity", "personality", "wiki", "history", "chats", "archive", "trash"] {
-        fs::create_dir_all(root.join(d)).map_err(|e| e.to_string())?;
-    }
-    atomic_write(
-        &root.join("inbox.md"),
-        &format!("# Inbox\n\n{INBOX_MARK}\n"),
-    )?;
-    atomic_write(&root.join("MAP.md"), "# MAP\n\nThe index of this memex.\n")?;
-
-    let id = format!("mx_{}", Uuid::new_v4());
-    let now = now_iso();
-    let info = serde_json::json!({
-        "id": id,
-        "contract": CONTRACT_VERSION,
-        "createdAt": now,
-        "selfHeal": true,
-        "apps": { "rotli": { "role": "chat-system", "connectedAt": now } },
-    });
-    atomic_write(
-        &root.join("memex.json"),
-        &(serde_json::to_string_pretty(&info).map_err(|e| e.to_string())? + "\n"),
-    )?;
-
-    let entry = InstanceEntry {
-        id: id.clone(),
-        label,
-        abs_path: root.to_string_lossy().to_string(),
-        role: "chat-system".into(),
-        memex_id: Some(id),
-        mode: Some("local".into()),
-        perms: "chats+inbox".into(),
-    };
-    upsert_instance(&app, entry, true)
+/// What `corpus.rs` needs to register a connected brain in `corpus.json` — the
+/// memex-specific half of connecting (validate it's a real memex, stamp
+/// `apps.rotli` when in-range, derive perms/mode). The unified model keeps brains
+/// in `corpus.json`, so this returns the data instead of touching any registry.
+pub struct BrainConnect {
+    pub memex_id: String,
+    pub label: String,
+    pub mode: Option<String>,
+    /// "chats+inbox" | "read-only"
+    pub perms: String,
 }
 
-/// CONNECT to an existing memex (the "Merge" path): additive `apps.rotli` stamp,
-/// pin/contract checks, register. Refuses anything that isn't a real memex.
-#[tauri::command]
-pub fn memex_connect(
-    app: tauri::AppHandle,
-    path: String,
-    label: String,
-) -> Result<InstanceEntry, String> {
-    let root = PathBuf::from(&path);
-    let card = detect_one(&root);
+/// Validate + stamp a folder for use as a connected brain. Mirrors `memex_connect`
+/// minus the instance registry: refuses a non-memex, stamps `apps.rotli` only when
+/// the contract is in rotli's band, and returns the id/label/mode/perms.
+pub fn prepare_brain_connect(path: &Path) -> Result<BrainConnect, String> {
+    let card = detect_one(path);
     if card.kind != "memex" {
         return Err("That folder isn't a memex (no valid memex.json with an mx_ id).".into());
     }
-    let memex_id = card
-        .memex_id
-        .clone()
-        .ok_or("memex.json has no id")?;
-
-    // pin check: if we already registered this root under a different id, refuse
-    if let Some(prev) = read_registry(&app)
-        .instances
-        .into_iter()
-        .find(|i| i.abs_path == card.root)
-    {
-        if let Some(pinned) = prev.memex_id {
-            if pinned != memex_id {
-                return Err(
-                    "This folder is a different memex than the one rotli connected to — refusing.".into(),
-                );
-            }
-        }
-    }
-
+    let memex_id = card.memex_id.clone().ok_or("memex.json has no id")?;
     let in_range = contract_ok(card.contract.as_deref());
     let mode = card.users_json.as_deref().map(parse_mode_raw);
     let perms = if in_range { "chats+inbox" } else { "read-only" };
-
     // additive stamp only when we're allowed to write (in-range contract)
     if in_range {
-        stamp_rotli(&root.join("memex.json"))?;
+        stamp_rotli(&path.join("memex.json"))?;
     }
-
-    let entry = InstanceEntry {
-        id: memex_id.clone(),
-        label,
-        abs_path: card.root,
-        role: "chat-system".into(),
-        memex_id: Some(memex_id),
+    Ok(BrainConnect {
+        memex_id,
+        label: card.label,
         mode,
-        perms: perms.into(),
+        perms: perms.to_string(),
+    })
+}
+
+/// Read-only view of a folder AS a brain (no stamp, no side effects):
+/// `Some((memex_id, perms))` when it's a memex, else `None`. Lets the corpus
+/// module tell the UI whether the corpus itself is a brain and with what perms.
+pub fn brain_view(path: &Path) -> Option<(String, String)> {
+    let card = detect_one(path);
+    if card.kind != "memex" {
+        return None;
+    }
+    let id = card.memex_id?;
+    let perms = if contract_ok(card.contract.as_deref()) {
+        "chats+inbox"
+    } else {
+        "read-only"
     };
-    upsert_instance(&app, entry, true)
+    Some((id, perms.to_string()))
 }
 
 /// A tiny mirror of the contract's fail-closed access-mode rule, for the registry
@@ -768,36 +711,6 @@ pub fn memex_validate(root: String) -> Result<ValidateReport, String> {
     })
 }
 
-#[tauri::command]
-pub fn memex_list_instances(app: tauri::AppHandle) -> Result<InstanceRegistry, String> {
-    Ok(read_registry(&app))
-}
-
-#[tauri::command]
-pub fn memex_set_active(app: tauri::AppHandle, id: String) -> Result<(), String> {
-    let mut reg = read_registry(&app);
-    if !reg.instances.iter().any(|i| i.id == id) {
-        return Err(format!("no such instance: {id}"));
-    }
-    reg.active_id = Some(id);
-    write_registry(&app, &reg)
-}
-
-#[tauri::command]
-pub fn memex_set_perms(app: tauri::AppHandle, id: String, perms: String) -> Result<(), String> {
-    if perms != "chats+inbox" && perms != "read-only" {
-        return Err(format!("bad perms: {perms}"));
-    }
-    let mut reg = read_registry(&app);
-    let inst = reg
-        .instances
-        .iter_mut()
-        .find(|i| i.id == id)
-        .ok_or_else(|| format!("no such instance: {id}"))?;
-    inst.perms = perms;
-    write_registry(&app, &reg)
-}
-
 /// Native folder picker that returns a path WITHOUT moving anything (for
 /// "Connect to existing…" / "New separate brain…").
 #[tauri::command]
@@ -846,9 +759,11 @@ mod tests {
     #[test]
     fn contract_ok_accepts_the_band_only() {
         assert!(contract_ok(Some("3.4"))); // memex-vault's memex.json today
-        assert!(contract_ok(Some("3.5"))); // a bumped card / a rotli-init'd brain
-        assert!(!contract_ok(Some("3.3")));
-        assert!(!contract_ok(Some("3.6")));
+        assert!(contract_ok(Some("3.5"))); // mid-band
+        assert!(contract_ok(Some("3.6"))); // a rotli-init'd brain / the ceiling
+        assert!(!contract_ok(Some("3.3"))); // below the floor
+        assert!(!contract_ok(Some("3.7"))); // above the ceiling
+        assert!(!contract_ok(Some("4.0"))); // a future major
         assert!(!contract_ok(None));
     }
 

@@ -2,7 +2,7 @@
 // service. No component touches notesService directly.
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { corpusListRoots, isTauri } from "../lib/tauri";
+import { type CorpusRoot, corpusListConfig, isTauri } from "../lib/tauri";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
 
@@ -13,13 +13,20 @@ export const keys = {
   roots: ["corpus-roots"] as const,
 };
 
-/** Every registered corpus root (default + vault + added folders). Tauri-only —
- * the browser/dev demo has no roots. The set only changes on a relaunch (adding/
- * forgetting a folder restarts), so it's effectively static per session. */
+/** The connected brains, as sidebar roots (their `vault:`-style rows). Tauri-only.
+ * The set only changes on a relaunch (connecting/forgetting a brain restarts), so
+ * it's effectively static per session. Derived from the unified `corpus.json`. */
 export function useCorpusRoots() {
   return useQuery({
     queryKey: keys.roots,
-    queryFn: () => (isTauri() ? corpusListRoots() : Promise.resolve([])),
+    queryFn: async (): Promise<CorpusRoot[]> => {
+      if (!isTauri()) return [];
+      const cfg = await corpusListConfig();
+      return [
+        ...cfg.brains.map((b) => ({ id: b.id, label: b.label, absPath: b.absPath })),
+        ...cfg.folders,
+      ];
+    },
     staleTime: Infinity,
   });
 }

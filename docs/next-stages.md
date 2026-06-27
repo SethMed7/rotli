@@ -289,7 +289,15 @@ the user has flipped the consent toggle.
 
 ---
 
-## Track 2 — memex-vault / memex multi-root  *(DEFERRED)*
+## Track 2 — memex-vault / memex multi-root  *(SUPERSEDED 2026-06-27)*
+
+> **Replaced by the corpus.json unification.** The four files below
+> (`corpus-root.txt`, `corpus-memex-root.txt`, `corpus-roots.json`,
+> `memex-instances.json`) and the `<rootid>:path` multi-root scheme collapsed into ONE
+> `corpus.json`: the corpus IS a memex by default (its folder is your brain), plus
+> connected read-only `brains[]` and added `folders[]`; the active write target is the
+> corpus when it's a memex, else the active brain. `self/` → `identity/`+`personality/`.
+> Kept for history — do NOT implement as written.
 
 ### Status: deferred, on purpose
 

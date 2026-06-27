@@ -9,19 +9,20 @@ import {
   type MemexChatSummary,
   type MemexDirEntry,
   type MemexValidateReport,
+  corpusChooseFolder,
+  corpusConnectBrain,
+  corpusForgetBrain,
+  corpusListConfig,
+  corpusSetActiveBrain,
+  corpusSetBrainPerms,
   memexAppendInbox,
-  memexConnect,
   memexDetect,
-  memexInit,
   memexInspect,
   memexListChats,
   memexListDir,
-  memexListInstances,
   memexPickFolder,
   memexRead,
   memexReadContract,
-  memexSetActive,
-  memexSetPerms,
   memexValidate,
   memexWriteChat,
   memexWriteNote,
@@ -45,40 +46,41 @@ import {
   today,
   ulid,
 } from "./contract";
-import { type MemexConfig, type MemexInstance, type Perms, fromRegistry } from "./config";
+import { type MemexConfig, type MemexInstance, type Perms, fromCorpusConfig } from "./config";
 import { titleOf } from "../services/derive";
 
 export type { DetectedMemex } from "../lib/tauri";
 
-// ── instances ────────────────────────────────────────────────────────────────
+// ── the Location config (corpus + connected brains) ───────────────────────────
 
 export async function loadConfig(): Promise<MemexConfig> {
-  return fromRegistry(await memexListInstances());
+  return fromCorpusConfig(await corpusListConfig());
 }
 
 export const detect = (): Promise<DetectedMemex[]> => memexDetect();
 export const inspect = (path: string): Promise<DetectedMemex> => memexInspect(path);
 export const pickFolder = (): Promise<string | null> => memexPickFolder();
 
-/** Connect (Merge) to an existing memex. Returns the refreshed config. */
-export async function connect(path: string, label: string): Promise<MemexConfig> {
-  await memexConnect(path, label);
-  return loadConfig();
-}
+/** "Choose folder…" — repoint the corpus (smart: memex / move / plain). Relaunches
+ * on success (so it rarely resolves); false when the picker is cancelled. */
+export const chooseFolder = (path?: string): Promise<boolean> => corpusChooseFolder(path);
 
-/** Initiate (Separate / fresh) a new memex at an empty folder. */
-export async function init(path: string, label: string): Promise<MemexConfig> {
-  await memexInit(path, label);
+/** Connect an existing memex as a brain. Relaunches on success. */
+export const connectBrain = (path?: string): Promise<boolean> => corpusConnectBrain(path);
+
+/** Forget a connected brain (binding only). Returns the refreshed config. */
+export async function forget(id: string): Promise<MemexConfig> {
+  await corpusForgetBrain(id);
   return loadConfig();
 }
 
 export async function setActive(id: string): Promise<MemexConfig> {
-  await memexSetActive(id);
+  await corpusSetActiveBrain(id);
   return loadConfig();
 }
 
 export async function setPerms(id: string, perms: Perms): Promise<MemexConfig> {
-  await memexSetPerms(id, perms);
+  await corpusSetBrainPerms(id, perms);
   return loadConfig();
 }
 

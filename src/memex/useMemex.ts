@@ -43,16 +43,26 @@ export function useSpineDir(instance: MemexInstance | null, rel: string) {
   });
 }
 
-export function useConnectMemex() {
+/** "Choose folder…" — the one smart picker for the corpus (relaunches on success). */
+export function useChooseFolder() {
   return useMutation({
-    mutationFn: ({ path, label }: { path: string; label: string }) => svc.connect(path, label),
+    mutationFn: (path?: string) => svc.chooseFolder(path),
     onSuccess: () => invalidateMemex(),
   });
 }
 
-export function useInitMemex() {
+/** Connect an existing memex as a brain (relaunches on success). */
+export function useConnectBrain() {
   return useMutation({
-    mutationFn: ({ path, label }: { path: string; label: string }) => svc.init(path, label),
+    mutationFn: (path: string | undefined) => svc.connectBrain(path),
+    onSuccess: () => invalidateMemex(),
+  });
+}
+
+/** Forget a connected brain (binding only; files untouched). */
+export function useForgetBrain() {
+  return useMutation({
+    mutationFn: (id: string) => svc.forget(id),
     onSuccess: () => invalidateMemex(),
   });
 }

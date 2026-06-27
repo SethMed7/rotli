@@ -40,11 +40,10 @@ import {
 import { activeInstance, isWritable } from "./memex/config";
 import {
   captureToInbox,
-  connect as memexConnect,
-  init as memexInit,
+  connectBrain,
   loadConfig as memexLoadConfig,
 } from "./memex/service";
-import { invalidateMemex } from "./memex/useMemex";
+import { flushSettingsNow } from "./state/persist";
 import { useMemexStore } from "./state/memex";
 import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateNotes } from "./services/hooks";
@@ -131,16 +130,14 @@ function MainShell() {
         void (async () => {
           let saved = false;
           try {
-            if (useUiStore.getState().captureToBrainInbox) {
-              const cfg = await memexLoadConfig();
-              const inst = activeInstance(cfg);
-              if (inst && isWritable(inst)) {
-                // routed to inbox — there's no board note to open, so ⌘Enter
-                // just lands the capture; nothing to surface
-                await captureToInbox(inst, body);
-              } else {
-                await toBoard();
-              }
+            // Quick capture has ONE default home (not a user setting): the active
+            // brain's inbox.md when there's a writable brain, else the Board.
+            const cfg = await memexLoadConfig();
+            const inst = activeInstance(cfg);
+            if (inst && isWritable(inst)) {
+              // routed to inbox — there's no board note to open, so ⌘Enter
+              // just lands the capture; nothing to surface
+              await captureToInbox(inst, body);
             } else {
               await toBoard();
             }
@@ -247,16 +244,18 @@ function MainShell() {
             const ui = useUiStore.getState();
             void setHideOnBlur(!ui.stayOpen);
             void setDockVisible(ui.showInDock);
-            // commit the deferred memex choice recorded in the "Memory" step
+            // commit the deferred memex choice recorded in the "Memory" step —
+            // connect the detected brain into the unified corpus.json. connectBrain
+            // RELAUNCHES, so flush `onboarded` to disk FIRST or first-run loops back
+            // into onboarding (the 500 ms debounced writer wouldn't fire in time).
             const choice = useMemexStore.getState().pendingChoice;
+            useMemexStore.getState().setPendingChoice(null);
             if (choice?.path) {
-              const label = choice.label ?? "memex";
-              const run = choice.kind === "separate" ? memexInit : memexConnect;
-              void run(choice.path, label)
-                .then(() => invalidateMemex())
+              const path = choice.path;
+              void flushSettingsNow()
+                .then(() => connectBrain(path))
                 .catch(() => {});
             }
-            useMemexStore.getState().setPendingChoice(null);
           }}
         />
       </div>

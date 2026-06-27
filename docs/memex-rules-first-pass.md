@@ -1,5 +1,12 @@
 # Memex rule-set — v2 (revised with Seth's redlines, 2026-06-25)
 
+> **SUPERSEDED (2026-06-27) by the ratified v3.6 write contract.** This first-pass
+> proposed rotli *itself* filing notes into `wiki/<area>/`. The shipped model is
+> narrower: **rotli writes ONLY `wiki/_inbox/` (note staging), `chats/`, and `inbox.md`**;
+> a later memex-side **local-LLM** classifies + files staged notes to `wiki/<area>/`.
+> `self/` is now `identity/` + `personality/`. See `~/memex-vault/STRUCTURE.md` (v3.6)
+> and CARL rotli rule 4. Read this for the organizing *ideas*, not the exact write boundary.
+
 **The problem:** wiki-style organization is what an AI needs (parsable, linked,
 summarized) but is *not* how a human naturally works. Closing that gap = the product.
 
@@ -136,14 +143,16 @@ home(note):
 
 | Surface | Owner (write) | Shareable? | Reads |
 |---|---|---|---|
-| `wiki/` (notes) | rotli | **yes** (multi-person) | everything in the user's catalog |
+| `wiki/_inbox/` (note staging) | rotli | **yes** (multi-person) | everything in the user's catalog |
 | `chats/` (AI chats) | rotli | **yes** | " |
 | `history/` (day stream) | Breve | **NO — private** (ties to a phone number) | " |
 | `insights/` | voz | per voz | " |
 
 Enforced by `validate.ts` + the conversation/note writers (a foreign writer in a root it
-doesn't own is flagged). `owner:` records origin. **Revises CARL rotli rule 4** ("wiki
-read-only") → rotli writes `wiki/` (via the rules), never `history/`.
+doesn't own is flagged). `owner:` records origin. **Per CARL rotli rule 4 (v3.6):** rotli
+writes ONLY `wiki/_inbox/` (staging) + `chats/` + `inbox.md`; the memex's local-LLM — not
+rotli — files staged notes into `wiki/<area>/`. rotli never writes `history/`, `identity/`,
+`personality/`, `MAP.md`, or the curated rest of `wiki/`.
 
 ---
 

@@ -350,52 +350,89 @@ export function corpusForgetFolder(id: string): Promise<void> {
   return corpusInvoke("corpus_forget_folder", { id });
 }
 
-/** Every registered root — the sidebar renders the added folders (id ≠ default/vault). */
-export function corpusListRoots(): Promise<CorpusRoot[]> {
-  return corpusInvoke("corpus_list_roots");
-}
-
 /** Reveal the corpus folder in Finder. */
 export async function revealCorpus(): Promise<void> {
   if (!isTauri()) return;
   await invoke("corpus_reveal");
 }
 
-/** Open a native folder picker; if a (empty) destination is chosen, move the
- * whole corpus there, persist it as the new root, and relaunch into it.
- * Resolves false when the picker is cancelled; rejects with a clear message
- * when the target isn't usable. */
-export async function relocateCorpus(): Promise<boolean> {
+// ——— the unified Location model (corpus.json) — ONE folder = your notes = your
+//     brain, plus connected read-only "other brains". Replaces corpus-root.txt +
+//     corpus-memex-root.txt + corpus-roots.json + memex-instances.json. ———
+
+/** A connected "other brain" — a memex rotli reads, with per-brain write perms. */
+export interface ConnectedBrain {
+  id: string;
+  label: string;
+  absPath: string;
+  memexId: string | null;
+  mode: string | null;
+  perms: MemexPerms;
+}
+
+/** The active corpus, enriched with whether it IS a memex (derived) + its perms. */
+export interface CorpusRefView {
+  absPath: string;
+  isMemex: boolean;
+  memexId: string | null;
+  /** when isMemex: "chats+inbox" | "read-only"; else null */
+  perms: MemexPerms | null;
+}
+
+/** The whole Location config (the one place "where do my notes live" is decided). */
+export interface CorpusConfigView {
+  corpus: CorpusRefView;
+  brains: ConnectedBrain[];
+  /** Arbitrary plain folders added to the sidebar (the "add a folder" feature). */
+  folders: CorpusRoot[];
+  activeBrainId: string | null;
+}
+
+/** The whole Location config; migrates the four legacy files in on first read.
+ * Browser preview gets a sane empty config so the UI still renders. */
+export function corpusListConfig(): Promise<CorpusConfigView> {
+  if (!isTauri()) {
+    return Promise.resolve({
+      corpus: { absPath: "~/Documents/rotli", isMemex: false, memexId: null, perms: null },
+      brains: [],
+      folders: [],
+      activeBrainId: null,
+    });
+  }
+  return corpusInvoke("corpus_list_config");
+}
+
+/** "Choose folder…" — the ONE smart picker for your notes folder. Detects a memex
+ * (browse it), an empty folder (move your notes there / start fresh), or a plain
+ * folder (use as-is), then relaunches. False when the picker is cancelled. */
+export async function corpusChooseFolder(path?: string): Promise<boolean> {
   if (!isTauri()) return false;
-  return invoke<boolean>("corpus_relocate");
+  return invoke<boolean>("corpus_choose_folder", { path: path ?? null });
 }
 
-/** Connect a destination root to an external folder (Track 2 multi-root): opens
- * a native folder picker (no path) — or takes an explicit path (programmatic) —
- * and REGISTERS the chosen dir as that destination's root in corpus-roots.json.
- * It REGISTERS, never moves/relocates. For the "vault" dest the folder MUST be a
- * valid memex (else it rejects). The app restarts on success, so it never
- * resolves in practice; resolves false only when the picker is cancelled. */
-export async function corpusSetRoot(destId: string, path?: string): Promise<boolean> {
+/** Connect a memex as a brain (read + write per its perms); relaunches so its row
+ * appears. False when the picker is cancelled. */
+export async function corpusConnectBrain(path?: string): Promise<boolean> {
   if (!isTauri()) return false;
-  return invoke<boolean>("corpus_set_root", { destId, path: path ?? null });
+  return invoke<boolean>("corpus_connect_brain", { path: path ?? null });
 }
 
-/** Point rotli's Notes tree at a memex instance (Increment 3): validates the
- * path is a real memex, remembers it as the corpus-memex pointer, and relaunches
- * into it. The legacy ~/Documents/rotli corpus is left untouched — this is a
- * reversible pointer swap. Rejects with a clear message if the folder isn't a
- * memex. The app restarts on success, so this never resolves in practice. */
-export async function corpusUseMemex(path: string): Promise<void> {
+/** Forget a connected brain (binding only; files untouched). Relaunches. */
+export async function corpusForgetBrain(id: string): Promise<void> {
   if (!isTauri()) return;
-  await invoke("corpus_use_memex", { path });
+  await invoke("corpus_forget_brain", { id });
 }
 
-/** Forget the memex pointer and relaunch into the legacy ~/Documents/rotli
- * corpus. The reversible counterpart to corpusUseMemex. */
-export async function corpusUseLegacy(): Promise<void> {
+/** Make a connected brain the active write target. No relaunch. */
+export async function corpusSetActiveBrain(id: string): Promise<void> {
   if (!isTauri()) return;
-  await invoke("corpus_use_legacy");
+  await invoke("corpus_set_active_brain", { id });
+}
+
+/** Set a brain's write perms. No relaunch. */
+export async function corpusSetBrainPerms(id: string, perms: MemexPerms): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_set_brain_perms", { id, perms });
 }
 
 /** The `.rotli/` dot-files — opaque JSON strings the frontend owns. Missing

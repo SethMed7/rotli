@@ -4,7 +4,7 @@
 // picked a LOCAL folder, which is always respected. One place so every new-note
 // entry point (⌘N, the + menu, …) routes identically.
 
-import { activeInstance, isWritable } from "../memex/config";
+import { CORPUS_INSTANCE_ID, activeInstance, isWritable } from "../memex/config";
 import { loadConfig, writeNote } from "../memex/service";
 import { VAULT_MARKER, isVault } from "./destinations";
 import { notesService } from "./notes";
@@ -59,9 +59,10 @@ export async function createRoutedNote(opts: RoutedCreate): Promise<string> {
 
   if (route.kind === "memex" && active) {
     const { id } = await writeNote({ instance: active, body, ...(route.shelf ? { shelf: route.shelf } : {}) });
-    // the corpus lists a non-default (vault) root's note ids prefixed; mirror that
-    // so the caller can open the new note straight away.
-    return `${VAULT_MARKER}${id}`;
+    // open the new note via the active root's wire prefix: BARE for a memex CORPUS
+    // (the default root), `<id>:` for a connected brain (e.g. `vault:`).
+    const prefix = active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`;
+    return `${prefix}${id}`;
   }
   const note = await notesService.createNote(route.kind === "local" ? route.folder : localFallback, body);
   return note.id;

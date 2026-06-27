@@ -329,122 +329,11 @@ fn show_quick_window(app: AppHandle) {
 /// Settings → Storage → "Reveal in Finder": open the corpus folder.
 #[tauri::command]
 fn corpus_reveal(app: AppHandle) {
-    let root = corpus::resolve_root(&app);
+    let root = corpus::resolve_corpus(&app);
     #[cfg(target_os = "macos")]
     let _ = std::process::Command::new("open").arg(&root).spawn();
     #[cfg(not(target_os = "macos"))]
     let _ = root;
-}
-
-/// Settings → Storage → "Move folder…": pick an empty destination, move the
-/// whole corpus there, remember it as the new root, and relaunch into it (a
-/// clean re-open beats live-swapping the open store + watcher). Returns false
-/// when the picker is cancelled; Err carries a human message for the UI.
-#[tauri::command]
-fn corpus_relocate(app: AppHandle) -> Result<bool, String> {
-    use tauri_plugin_dialog::DialogExt;
-    // "Move folder…" moves your LEGACY notes folder. If rotli is currently
-    // browsing a memex (the corpus IS someone's memex-vault), refuse — relocating
-    // would physically scatter the brain out of its home. Switch back first.
-    if corpus::read_saved_memex_root(&app)
-        .filter(|p| corpus::is_memex_root(p))
-        .is_some()
-    {
-        return Err(
-            "rotli is browsing a memex right now — in Settings → Memory choose \"Use ~/Documents/rotli\" before moving your notes folder."
-                .into(),
-        );
-    }
-    let old_root = corpus::resolve_root(&app);
-    let Some(picked) = app
-        .dialog()
-        .file()
-        .set_title("Choose an empty folder for your notes")
-        .blocking_pick_folder()
-    else {
-        return Ok(false);
-    };
-    let new_root = picked.into_path().map_err(|e| e.to_string())?;
-    if new_root == old_root {
-        return Ok(false);
-    }
-    corpus::relocate(&old_root, &new_root)?;
-    corpus::write_saved_root(&app, &new_root).map_err(|e| e.to_string())?;
-    app.restart();
-}
-
-/// Settings → Memory → "Browse in Notes": point rotli's Notes tree at a memex
-/// instance (Increment 3). Validates that `path` really is a memex (a valid
-/// `mx_` memex.json), remembers it as the corpus-memex pointer, and relaunches
-/// into it — a clean re-open beats live-swapping the store + watcher (mirrors
-/// corpus_relocate's restart). The legacy `~/Documents/rotli` corpus is left
-/// untouched on disk; this is a reversible pointer swap, not a move.
-#[tauri::command]
-fn corpus_use_memex(app: AppHandle, path: String) -> Result<(), String> {
-    let root = std::path::PathBuf::from(&path);
-    if !corpus::is_memex_root(&root) {
-        return Err("That folder isn't a memex (no valid memex.json with an mx_ id).".into());
-    }
-    corpus::write_saved_memex_root(&app, &root).map_err(|e| e.to_string())?;
-    app.restart();
-}
-
-/// Settings → Memory → "Use ~/Documents/rotli instead": forget the memex
-/// pointer and relaunch into the legacy corpus. Reversible counterpart to
-/// corpus_use_memex; the memex itself is never modified.
-#[tauri::command]
-fn corpus_use_legacy(app: AppHandle) -> Result<(), String> {
-    corpus::clear_saved_memex_root(&app).map_err(|e| e.to_string())?;
-    app.restart();
-}
-
-/// Settings → Storage → "Connect a folder…": REGISTER a picked directory as a
-/// root's abs_path in `corpus-roots.json` (Track 2). This is a REGISTER, never a
-/// move/relocate — the directory's contents are never touched. For the reserved
-/// "vault" dest the dir MUST be a valid memex (we never bind the vault to a
-/// non-memex automatically OR via the picker); other dests accept any dir.
-/// Relaunches so the new root opens (mirrors corpus_relocate/corpus_use_memex).
-/// Returns false when the picker is cancelled.
-#[tauri::command]
-fn corpus_set_root(app: AppHandle, dest_id: String, path: Option<String>) -> Result<bool, String> {
-    use tauri_plugin_dialog::DialogExt;
-    // only the Vault is a connectable external root this iteration — refuse any
-    // other dest_id so a future/stray caller can't register an arbitrary writable
-    // root that bypasses the memex gate (the picker only ever passes "vault").
-    if dest_id != corpus::VAULT_ROOT_ID {
-        return Err(format!("not a connectable destination: {dest_id}"));
-    }
-    // resolve the absolute dir: an explicit path (tests / programmatic) or the
-    // native folder picker (the user's frontend control).
-    let abs = match path {
-        Some(p) => std::path::PathBuf::from(p),
-        None => {
-            let Some(picked) = app
-                .dialog()
-                .file()
-                .set_title("Choose a folder to connect")
-                .blocking_pick_folder()
-            else {
-                return Ok(false);
-            };
-            picked.into_path().map_err(|e| e.to_string())?
-        }
-    };
-    if dest_id == corpus::VAULT_ROOT_ID && !corpus::is_memex_root(&abs) {
-        return Err("The Vault must point at a memex (a folder with a valid memex.json).".into());
-    }
-    let label = if dest_id == corpus::VAULT_ROOT_ID {
-        "Vault".to_string()
-    } else {
-        abs.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or(&dest_id)
-            .to_string()
-    };
-    let mut reg = corpus::read_root_registry(&app);
-    reg.upsert(corpus::CorpusRoot { id: dest_id, label, abs_path: abs });
-    corpus::write_root_registry(&app, &reg)?;
-    app.restart();
 }
 
 /// Add an ARBITRARY folder as a browsable + editable corpus root — the "just add a
@@ -473,18 +362,9 @@ fn corpus_add_folder(app: AppHandle, path: Option<String>) -> Result<bool, Strin
     if !abs.is_dir() {
         return Err("That isn't a folder.".into());
     }
-    let mut reg = corpus::read_root_registry(&app);
-    if reg.roots.iter().any(|r| r.abs_path == abs) {
-        return Ok(true); // already added — no-op, no restart needed
+    if !corpus::add_folder(&app, abs)? {
+        return Ok(true); // already the corpus / a brain / a folder — no-op, no restart
     }
-    let label = abs
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("folder")
-        .to_string();
-    let id = corpus::unique_root_id(&reg, &label);
-    reg.upsert(corpus::CorpusRoot { id, label, abs_path: abs });
-    corpus::write_root_registry(&app, &reg)?;
     app.restart();
 }
 
@@ -492,20 +372,155 @@ fn corpus_add_folder(app: AppHandle, path: Option<String>) -> Result<bool, Strin
 /// on disk are NEVER touched — only the binding is dropped. Relaunches.
 #[tauri::command]
 fn corpus_forget_folder(app: AppHandle, id: String) -> Result<(), String> {
-    if id == corpus::DEFAULT_ROOT_ID || id == corpus::VAULT_ROOT_ID {
-        return Err("That's a built-in root — it can't be removed.".into());
+    if id == corpus::DEFAULT_ROOT_ID {
+        return Err("That's your notes folder — it can't be removed.".into());
     }
-    let mut reg = corpus::read_root_registry(&app);
-    reg.roots.retain(|r| r.id != id);
-    corpus::write_root_registry(&app, &reg)?;
+    corpus::forget_root(&app, &id)?;
     app.restart();
 }
 
-/// Every registered root (default + vault + added folders), for the sidebar to render
-/// the added ones as top-level browsable rows.
+// ─── the unified Location surface (corpus.json) ─────────────────────────────
+
+/// The corpus, enriched with whether it IS a memex (derived, never stored) + its
+/// write perms — so the UI/service can treat a memex corpus as the active write
+/// target.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CorpusView {
+    abs_path: std::path::PathBuf,
+    is_memex: bool,
+    memex_id: Option<String>,
+    /// when is_memex: "chats+inbox" | "read-only"; else null
+    perms: Option<String>,
+}
+
+/// The whole Location config — the one folder (+ whether it's a brain) + connected
+/// brains + active brain. Replaces corpus_list_roots + memex_list_instances.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CorpusConfigView {
+    corpus: CorpusView,
+    brains: Vec<corpus::ConnectedBrain>,
+    folders: Vec<corpus::CorpusRoot>,
+    active_brain_id: Option<String>,
+}
+
+/// The whole Location config. Migrates the four legacy files in on first read.
 #[tauri::command]
-fn corpus_list_roots(app: AppHandle) -> Vec<corpus::CorpusRoot> {
-    corpus::resolve_registry(&app).roots
+fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
+    let cfg = corpus::ensure_corpus_config(&app);
+    let (is_memex, memex_id, perms) = match memex::brain_view(&cfg.corpus.abs_path) {
+        Some((id, p)) => (true, Some(id), Some(p)),
+        None => (false, None, None),
+    };
+    CorpusConfigView {
+        corpus: CorpusView {
+            abs_path: cfg.corpus.abs_path,
+            is_memex,
+            memex_id,
+            perms,
+        },
+        brains: cfg.brains,
+        folders: cfg.folders,
+        active_brain_id: cfg.active_brain_id,
+    }
+}
+
+/// "Choose folder…" — the ONE smart picker for your notes folder (your brain).
+/// Detects what you picked: a memex → browse it as the whole corpus; an empty
+/// folder → move your current notes there (only when the current corpus is a
+/// PLAIN folder — a memex is never scattered by a move) else start fresh; a plain
+/// folder with files → use it as-is, never merged. Relaunches into the new
+/// corpus. Returns false when the picker is cancelled.
+#[tauri::command]
+fn corpus_choose_folder(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let abs = match path {
+        Some(p) => std::path::PathBuf::from(p),
+        None => {
+            let Some(picked) = app
+                .dialog()
+                .file()
+                .set_title("Choose your notes folder")
+                .blocking_pick_folder()
+            else {
+                return Ok(false);
+            };
+            picked.into_path().map_err(|e| e.to_string())?
+        }
+    };
+    let current = corpus::resolve_corpus(&app);
+    if abs == current {
+        return Ok(false);
+    }
+    match memex::detect_folder(&abs).kind.as_str() {
+        "memex" => corpus::set_corpus_path(&app, abs)?,
+        "fresh" => {
+            if !corpus::is_memex_root(&current) {
+                corpus::relocate(&current, &abs)?;
+            }
+            corpus::set_corpus_path(&app, abs)?;
+        }
+        _ => corpus::set_corpus_path(&app, abs)?,
+    }
+    app.restart();
+}
+
+/// Connect a brain (a memex) to read — and write into per its perms. Validates +
+/// stamps via the memex module, registers it in corpus.json, makes it active, and
+/// relaunches so its sidebar row appears. False when the picker is cancelled.
+#[tauri::command]
+fn corpus_connect_brain(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let abs = match path {
+        Some(p) => std::path::PathBuf::from(p),
+        None => {
+            let Some(picked) = app
+                .dialog()
+                .file()
+                .set_title("Connect a brain (a memex folder)")
+                .blocking_pick_folder()
+            else {
+                return Ok(false);
+            };
+            picked.into_path().map_err(|e| e.to_string())?
+        }
+    };
+    let meta = memex::prepare_brain_connect(&abs)?;
+    corpus::upsert_brain(
+        &app,
+        corpus::ConnectedBrain {
+            id: String::new(),
+            label: meta.label,
+            abs_path: abs,
+            memex_id: Some(meta.memex_id),
+            mode: meta.mode,
+            perms: meta.perms,
+        },
+        true,
+    )?;
+    app.restart();
+}
+
+/// Forget a connected brain (the binding only — its files are never touched).
+/// Relaunches so its sidebar row disappears.
+#[tauri::command]
+fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
+    corpus::forget_brain(&app, &id)?;
+    app.restart();
+}
+
+/// Make a connected brain the active write target. No relaunch — the frontend
+/// refetches the config.
+#[tauri::command]
+fn corpus_set_active_brain(app: AppHandle, id: String) -> Result<(), String> {
+    corpus::set_active_brain(&app, &id)
+}
+
+/// Set a brain's write perms ("chats+inbox" | "read-only"). No relaunch.
+#[tauri::command]
+fn corpus_set_brain_perms(app: AppHandle, id: String, perms: String) -> Result<(), String> {
+    corpus::set_brain_perms(&app, &id, &perms)
 }
 
 #[tauri::command]
@@ -632,13 +647,14 @@ pub fn run() {
             hide_quick_window,
             show_quick_window,
             corpus_reveal,
-            corpus_relocate,
-            corpus_use_memex,
-            corpus_use_legacy,
-            corpus_set_root,
             corpus_add_folder,
             corpus_forget_folder,
-            corpus_list_roots,
+            corpus_list_config,
+            corpus_choose_folder,
+            corpus_connect_brain,
+            corpus_forget_brain,
+            corpus_set_active_brain,
+            corpus_set_brain_perms,
             summon,
             set_summon_shortcut,
             set_hide_on_blur,
@@ -666,15 +682,10 @@ pub fn run() {
             memex::memex_read,
             memex::memex_list_chats,
             memex::memex_list_dir,
-            memex::memex_init,
-            memex::memex_connect,
             memex::memex_write_chat,
             memex::memex_write_note,
             memex::memex_append_inbox,
             memex::memex_validate,
-            memex::memex_list_instances,
-            memex::memex_set_active,
-            memex::memex_set_perms,
             memex::memex_pick_folder
         ])
         .setup(|app| {
