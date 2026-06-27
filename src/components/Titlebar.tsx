@@ -75,10 +75,14 @@ export function Titlebar() {
         // the module dropdown is retired (Seth, 2026-06-26): the left menu's three
         // sections (Inbox · Chat · Notes) ARE the navigation now. The identity is a
         // plain home wordmark — click returns to the note panes.
-        <div className="identity-wrap">
-          <button type="button" className="identity home" onClick={() => dispatch("modules.notes")}>
-            <QuokkaMark size={19} className="identity-mark" />
-            <span className="rotli-wordmark identity-word">rotli</span>
+        <div className="identity-wrap centered">
+          <button
+            type="button"
+            className="identity home"
+            aria-label="rotli — go to notes"
+            onClick={() => dispatch("modules.notes")}
+          >
+            <QuokkaMark size={22} className="identity-mark" />
           </button>
         </div>
       )}
