@@ -5,7 +5,10 @@
 // the theme (set `color` on the wrapper) while the SHAPE stays constant — exactly
 // Seth's rule (2026-06-26). The mark (upper-body quokka) is the in-app logo.
 
-import logoMark from "../assets/characters/_logo.svg?raw";
+// the bold-body mark: only the body+ears carry a thick stroke (eyes/nose/mouth stay
+// crisp), so the lone mark reads clearly at tiny chrome sizes — tray + titlebar
+// (Seth, 2026-06-27). The full-size characters keep the plain line weight.
+import logoMark from "../assets/characters/_logo-bold.svg?raw";
 import aiChat from "../assets/characters/ai_chat.svg?raw";
 import base from "../assets/characters/base.svg?raw";
 import board from "../assets/characters/excalidraw_board.svg?raw";

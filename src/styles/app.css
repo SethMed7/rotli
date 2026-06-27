@@ -108,11 +108,6 @@
 .identity.home .identity-mark {
   color: var(--text);
 }
-/* the mark is tiny in the bar — thicken its lines well past the baseline so it
-   reads clearly at 22px (CSS stroke-width overrides the SVG's baked-in 12). */
-.identity.home .identity-mark svg path {
-  stroke-width: 38;
-}
 /* hairline between the pane/tab buttons and the theme/settings cluster */
 .tb-sep {
   width: 1px;
