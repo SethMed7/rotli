@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-06-27
+
+### Changed
+- **Settings simplified: Storage + Memory → one "Location" tab.** The two overlapping settings sections
+  collapsed into a single **Location** pane (the nav is now General · Hotkeys · Appearance · Location ·
+  Plugins), organized around the idea that your notes folder *is* — or can become — a **brain** (a memex):
+  **Your notes folder** (storage medium · path · Reveal/Move) → **Your brain** (detect / connect / start a
+  memex, per-instance perms, Browse in Notes, Check the brain) → **The Vault** (browse a brain alongside,
+  read-only) → **Quick capture**. Pure UI re-composition — every control is preserved, with no data-layer
+  or Rust change. First step toward "your corpus is a memex"; the onboarding folder-pick and the underlying
+  root-model unification come next.
+
 ## [0.7.1] — 2026-06-27
 
 ### Fixed

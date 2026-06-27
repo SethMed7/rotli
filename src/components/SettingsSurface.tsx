@@ -43,7 +43,6 @@ import {
   useUiStore,
 } from "../state/ui";
 import {
-  BrainGlyph,
   CheckGlyph,
   CloudGlyph,
   DatabaseGlyph,
@@ -65,14 +64,16 @@ import {
 } from "../memex/useMemex";
 import { useMemexStore } from "../state/memex";
 
-type SettingsPane = "general" | "hotkeys" | "appearance" | "storage" | "memex" | "plugins";
+type SettingsPane = "general" | "hotkeys" | "appearance" | "location" | "plugins";
 
 const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = [
   { id: "general", label: "General", glyph: LaptopGlyph },
   { id: "hotkeys", label: "Hotkeys", glyph: KeyboardGlyph },
   { id: "appearance", label: "Appearance", glyph: SunGlyph },
-  { id: "storage", label: "Storage", glyph: DatabaseGlyph },
-  { id: "memex", label: "Memory", glyph: BrainGlyph },
+  // Storage + Memory collapsed into one "Location" tab (Seth, 2026-06-27): your
+  // notes folder *is* (or can become) a brain — one concept, not two overlapping
+  // ones. See LocationPane below.
+  { id: "location", label: "Location", glyph: DatabaseGlyph },
   { id: "plugins", label: "Plugins", glyph: PlusGlyph },
 ];
 
@@ -745,7 +746,8 @@ function AppearancePane() {
 //     (Seth, 2026-06-15). What's left is the path, the storage options, and a
 //     way to relocate the whole folder. ———
 
-function StoragePane() {
+function LocationPane() {
+  // —— the notes folder (the corpus) ——
   const real = useQuery({
     queryKey: ["corpus", "overview"],
     queryFn: corpusOverview,
@@ -756,6 +758,29 @@ function StoragePane() {
   const [err, setErr] = useState<string | null>(null);
   const [vaultBusy, setVaultBusy] = useState(false);
   const [vaultErr, setVaultErr] = useState<string | null>(null);
+
+  // —— the brain (memex) seam ——
+  const cfg = useMemexConfig();
+  const detect = useDetectMemex(isTauri());
+  const connectMut = useConnectMemex();
+  const initMut = useInitMemex();
+  const setActiveMut = useSetActiveMemex();
+  const permsMut = useSetMemexPerms();
+  const validateMut = useRunValidate();
+  const lastValidate = useMemexStore((s) => s.lastValidate);
+  const setLastValidate = useMemexStore((s) => s.setLastValidate);
+  const captureToBrainInbox = useUiStore((s) => s.captureToBrainInbox);
+  const setCaptureToBrainInbox = useUiStore((s) => s.setCaptureToBrainInbox);
+  const [brainBusy, setBrainBusy] = useState(false);
+  const [brainErr, setBrainErr] = useState<string | null>(null);
+
+  const instances = cfg.data?.instances ?? [];
+  const activeId = cfg.data?.activeId ?? null;
+  const registered = new Set(instances.map((i) => i.root));
+  const candidates = (detect.data ?? []).filter((d) => !registered.has(d.root));
+  const labelOf = (path: string) => path.split("/").filter(Boolean).pop() || "memex";
+  // Is the folder the Notes tree currently browses itself a brain?
+  const browsingBrain = instances.some((i) => isCurrentCorpus(i.root, real.data?.root));
 
   const change = () => {
     setErr(null);
@@ -780,13 +805,35 @@ function StoragePane() {
       .finally(() => setVaultBusy(false));
   };
 
+  const run = (fn: () => Promise<unknown>) => {
+    setBrainErr(null);
+    setBrainBusy(true);
+    fn()
+      .catch((e: unknown) => setBrainErr(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBrainBusy(false));
+  };
+  const connectExisting = () =>
+    run(async () => {
+      const path = await pickFolder();
+      if (path) await connectMut.mutateAsync({ path, label: labelOf(path) });
+    });
+  const newSeparate = () =>
+    run(async () => {
+      const path = await pickFolder();
+      if (path) await initMut.mutateAsync({ path, label: labelOf(path) });
+    });
+
   return (
     <>
-      <PaneHead title="Where your notes live" char="local" />
+      <PaneHead title="Location" char="local" />
       <p className="lead">
-        Your notes are plain Markdown files on this Mac. rotli never holds them hostage — open the
-        folder any time, point any tool at it, leave whenever you want.
+        Your notes are plain Markdown files on this Mac — rotli never holds them hostage. The folder
+        they live in can also be a <b>brain</b> (a memex): the shared spine your other tools read and
+        write too.
       </p>
+
+      {/* —— where the notes folder lives —— */}
+      <h4 className="sethead">Your notes folder</h4>
       <div className="store-grid">
         <div className="store sel">
           <div className="on">
@@ -819,6 +866,7 @@ function StoragePane() {
         <div className="loctext">
           <span className="loclabel">Notes folder</span>
           <code className="locpath">{rootPath}</code>
+          {browsingBrain && <span className="memex-badge write">brain</span>}
         </div>
         <div className="locact">
           <button type="button" className="ghostbtn" onClick={() => void revealCorpus()}>
@@ -836,33 +884,183 @@ function StoragePane() {
         rebuild.
       </p>
 
-      <h3>The Vault</h3>
-      <p className="lead">
-        The Vault is a folder <em>outside</em> rotli that it browses in place — your knowledge base.
-        Connect one and its notes appear under the Vault row, read-only, <em>alongside</em> your local
-        notes. rotli never moves it, never writes your notes into it: new notes always land in your
-        local Inbox. (To make a memex your <em>whole</em> notes corpus instead, see <b>Memory</b>.)
-      </p>
-      <div className="locrow">
-        <div className="loctext">
-          <span className="loclabel">Connected folder</span>
-          <code className="locpath">{isTauri() ? "— pick a folder to connect" : "—"}</code>
-        </div>
-        <div className="locact">
-          <button type="button" className="ghostbtn" onClick={connectVault} disabled={vaultBusy}>
-            {vaultBusy ? "Connecting…" : "Connect a folder…"}
-          </button>
-        </div>
-      </div>
-      {vaultErr && <p className="setnote err">Couldn’t connect the Vault: {vaultErr}</p>}
+      {/* —— the brain (memex) seam: connect / initiate / browse —— */}
+      <h4 className="sethead">Your brain</h4>
+      {!isTauri() ? (
+        <p className="lead">
+          Your brain lives on disk — this connects in the app, not the browser preview.
+        </p>
+      ) : (
+        <>
+          <p className="lead">
+            rotli <b>mirrors</b> a brain — it never imports it. <b>Browse in Notes</b> makes one your{" "}
+            <em>whole</em> notes corpus (it replaces <code>~/Documents/rotli</code>); to browse one{" "}
+            <em>alongside</em> your local notes as a sidebar row instead, connect it as <b>the Vault</b>{" "}
+            below. Either way rotli reads your whole brain (self · wiki · history · chats · inbox · map)
+            and writes only <b>chats</b> and <b>inbox</b>; <b>history</b> and <b>self</b> are never
+            touched, and <b>wiki</b> is read-only.
+          </p>
+
+          {candidates.length > 0 && (
+            <>
+              <h5 className="sethead">Found on this Mac</h5>
+              {candidates.map((d) => (
+                <div className="memex-card" key={d.root}>
+                  <div className="mc-body">
+                    <div className="mc-title">{d.label}</div>
+                    <div className="mc-path">{d.root}</div>
+                    <div className="mc-meta">
+                      contract {d.contract ?? "?"} · {d.memexId?.slice(0, 12) ?? "no id"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghostbtn"
+                    disabled={brainBusy}
+                    onClick={() => run(() => connectMut.mutateAsync({ path: d.root, label: d.label }))}
+                  >
+                    Merge
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+
+          <h5 className="sethead">Connected</h5>
+          {instances.length === 0 && <p className="setnote">No brain connected yet.</p>}
+          {instances.map((inst) => {
+            const isActive = inst.id === activeId;
+            const isBrowsing = isCurrentCorpus(inst.root, real.data?.root);
+            return (
+              <div key={inst.id} className={isActive ? "memex-card sel" : "memex-card"}>
+                <div className="mc-body">
+                  <div className="mc-title">
+                    {inst.label}
+                    <span
+                      className={inst.perms === "chats+inbox" ? "memex-badge write" : "memex-badge"}
+                    >
+                      {inst.perms === "chats+inbox" ? "chats + inbox" : "read-only"}
+                    </span>
+                    {inst.mode && <span className="memex-badge">{inst.mode}</span>}
+                  </div>
+                  <div className="mc-path">{inst.root}</div>
+                  <div className="mc-meta">
+                    {inst.memexId?.slice(0, 14) ?? "—"} · {inst.role}
+                  </div>
+                  <Seg
+                    value={inst.perms}
+                    options={[
+                      ["chats+inbox", "Chats + inbox"],
+                      ["read-only", "Read-only"],
+                    ]}
+                    onPick={(p) => run(() => permsMut.mutateAsync({ id: inst.id, perms: p }))}
+                  />
+                  <div className="memex-actions">
+                    {!isActive && (
+                      <button
+                        type="button"
+                        className="ghostbtn"
+                        disabled={brainBusy}
+                        onClick={() => run(() => setActiveMut.mutateAsync(inst.id))}
+                      >
+                        Make active
+                      </button>
+                    )}
+                    {/* Browse this brain in the Notes tree — relaunches into it.
+                        The brain's memory stays read-only; only chats are writable. */}
+                    {isBrowsing ? (
+                      <button
+                        type="button"
+                        className="ghostbtn"
+                        disabled={brainBusy}
+                        onClick={() => run(() => corpusUseLegacy())}
+                      >
+                        Use ~/Documents/rotli instead
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="ghostbtn"
+                        disabled={brainBusy}
+                        onClick={() => run(() => corpusUseMemex(inst.root))}
+                      >
+                        Browse in Notes
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="ghostbtn"
+                      disabled={brainBusy}
+                      onClick={() => run(() => validateMut.mutateAsync(inst).then(setLastValidate))}
+                    >
+                      Check the brain
+                    </button>
+                  </div>
+                  {lastValidate && isActive && (
+                    <div className="memex-validate">
+                      {lastValidate.skipped
+                        ? lastValidate.stdout
+                        : `${lastValidate.ok ? "✓ invariants pass" : "✗ errors"} — ${lastValidate.errors} error(s), ${lastValidate.warnings} warning(s)`}
+                    </div>
+                  )}
+                </div>
+                {isActive && (
+                  <span className="mc-active">
+                    <CheckGlyph size={12} />
+                  </span>
+                )}
+              </div>
+            );
+          })}
+
+          <div className="memex-actions">
+            <button type="button" className="ghostbtn" disabled={brainBusy} onClick={connectExisting}>
+              Connect to existing…
+            </button>
+            <button type="button" className="ghostbtn" disabled={brainBusy} onClick={newSeparate}>
+              New separate brain…
+            </button>
+          </div>
+          {brainErr && <p className="setnote err">{brainErr}</p>}
+
+          {/* —— the Vault: a brain browsed alongside, read-only —— */}
+          <h5 className="sethead">The Vault</h5>
+          <p className="lead">
+            The Vault is a brain rotli browses <em>in place</em>, read-only, <em>alongside</em> your
+            local notes — it appears under its own sidebar row. rotli never moves it, never writes your
+            notes into it: new notes always land in your local Inbox.
+          </p>
+          <div className="locrow">
+            <div className="loctext">
+              <span className="loclabel">Connected folder</span>
+              <code className="locpath">— pick a folder to connect</code>
+            </div>
+            <div className="locact">
+              <button type="button" className="ghostbtn" onClick={connectVault} disabled={vaultBusy}>
+                {vaultBusy ? "Connecting…" : "Connect a folder…"}
+              </button>
+            </div>
+          </div>
+          {vaultErr && <p className="setnote err">Couldn’t connect the Vault: {vaultErr}</p>}
+
+          {/* —— quick capture routing —— */}
+          <h5 className="sethead">Quick capture</h5>
+          <div className="swgroup">
+            <Toggle
+              on={captureToBrainInbox}
+              title="Send quick captures to the brain inbox"
+              desc="⌥C captures append to your active brain's inbox.md instead of the Board."
+              onChange={() => setCaptureToBrainInbox(!captureToBrainInbox)}
+            />
+          </div>
+        </>
+      )}
     </>
   );
 }
 
-// ——— Memory: the memex seam. Connect to (or initiate) a memex — the shared
-//     self/wiki/history/chats/inbox spine (for Seth, ~/memex-vault) — keep multiple
-//     separate non-blending instances, set per-instance write access, and run the
-//     brain's own validate.ts. rotli OWNS chats/ + inbox; the rest is read-only. ———
+// ——— the brain (memex) seam now lives in LocationPane above (Storage + Memory
+//     merged 2026-06-27). This helper is shared by it. ———
 
 /** Whether `instRoot` (an absolute memex path) is what the Notes tree is
  * currently browsing. `overviewRoot` is the live corpus root with `$HOME`
@@ -872,207 +1070,6 @@ function isCurrentCorpus(instRoot: string, overviewRoot: string | undefined): bo
   if (!overviewRoot) return false;
   const tail = overviewRoot.startsWith("~/") ? overviewRoot.slice(1) : overviewRoot;
   return instRoot === overviewRoot || instRoot.endsWith(tail);
-}
-
-function MemexPane() {
-  const cfg = useMemexConfig();
-  const overview = useQuery({
-    queryKey: ["corpus", "overview", "memex-pane"],
-    queryFn: () => corpusOverview(),
-    enabled: isTauri(),
-  });
-  const detect = useDetectMemex(isTauri());
-  const connectMut = useConnectMemex();
-  const initMut = useInitMemex();
-  const setActiveMut = useSetActiveMemex();
-  const permsMut = useSetMemexPerms();
-  const validateMut = useRunValidate();
-  const lastValidate = useMemexStore((s) => s.lastValidate);
-  const setLastValidate = useMemexStore((s) => s.setLastValidate);
-  const captureToBrainInbox = useUiStore((s) => s.captureToBrainInbox);
-  const setCaptureToBrainInbox = useUiStore((s) => s.setCaptureToBrainInbox);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const instances = cfg.data?.instances ?? [];
-  const activeId = cfg.data?.activeId ?? null;
-  const registered = new Set(instances.map((i) => i.root));
-  const candidates = (detect.data ?? []).filter((d) => !registered.has(d.root));
-  const labelOf = (path: string) => path.split("/").filter(Boolean).pop() || "memex";
-
-  const run = (fn: () => Promise<unknown>) => {
-    setErr(null);
-    setBusy(true);
-    fn()
-      .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
-      .finally(() => setBusy(false));
-  };
-  const connectExisting = () =>
-    run(async () => {
-      const path = await pickFolder();
-      if (path) await connectMut.mutateAsync({ path, label: labelOf(path) });
-    });
-  const newSeparate = () =>
-    run(async () => {
-      const path = await pickFolder();
-      if (path) await initMut.mutateAsync({ path, label: labelOf(path) });
-    });
-
-  if (!isTauri()) {
-    return (
-      <>
-        <PaneHead title="Memory" char="knowledge" />
-        <p className="lead">
-          Your memex lives on disk — this connects in the app, not the browser preview.
-        </p>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <PaneHead title="Memory" char="knowledge" />
-      <p className="lead">
-        rotli <b>mirrors</b> a memex — it never imports it. <b>Memory</b> makes a memex your{" "}
-        <em>whole</em> notes corpus (it replaces <code>~/Documents/rotli</code>). To browse a memex{" "}
-        <em>alongside</em> your local notes instead — as a row in the sidebar — connect it as{" "}
-        <b>Storage → The Vault</b>. Either way rotli reads your whole brain (self · wiki · history ·
-        chats · inbox · map) and writes only <b>chats</b> (the chat area, once you start chats) and{" "}
-        <b>inbox</b> (quick captures); <b>history</b> and <b>self</b> are never touched, and{" "}
-        <b>wiki</b> is read-only.
-      </p>
-
-      {candidates.length > 0 && (
-        <>
-          <h4 className="sethead">Found on this Mac</h4>
-          {candidates.map((d) => (
-            <div className="memex-card" key={d.root}>
-              <div className="mc-body">
-                <div className="mc-title">{d.label}</div>
-                <div className="mc-path">{d.root}</div>
-                <div className="mc-meta">
-                  contract {d.contract ?? "?"} · {d.memexId?.slice(0, 12) ?? "no id"}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="ghostbtn"
-                disabled={busy}
-                onClick={() => run(() => connectMut.mutateAsync({ path: d.root, label: d.label }))}
-              >
-                Merge
-              </button>
-            </div>
-          ))}
-        </>
-      )}
-
-      <h4 className="sethead">Connected</h4>
-      {instances.length === 0 && <p className="setnote">No memex connected yet.</p>}
-      {instances.map((inst) => {
-        const isActive = inst.id === activeId;
-        const isBrowsing = isCurrentCorpus(inst.root, overview.data?.root);
-        return (
-          <div key={inst.id} className={isActive ? "memex-card sel" : "memex-card"}>
-            <div className="mc-body">
-              <div className="mc-title">
-                {inst.label}
-                <span className={inst.perms === "chats+inbox" ? "memex-badge write" : "memex-badge"}>
-                  {inst.perms === "chats+inbox" ? "chats + inbox" : "read-only"}
-                </span>
-                {inst.mode && <span className="memex-badge">{inst.mode}</span>}
-              </div>
-              <div className="mc-path">{inst.root}</div>
-              <div className="mc-meta">
-                {inst.memexId?.slice(0, 14) ?? "—"} · {inst.role}
-              </div>
-              <Seg
-                value={inst.perms}
-                options={[
-                  ["chats+inbox", "Chats + inbox"],
-                  ["read-only", "Read-only"],
-                ]}
-                onPick={(p) => run(() => permsMut.mutateAsync({ id: inst.id, perms: p }))}
-              />
-              <div className="memex-actions">
-                {!isActive && (
-                  <button
-                    type="button"
-                    className="ghostbtn"
-                    disabled={busy}
-                    onClick={() => run(() => setActiveMut.mutateAsync(inst.id))}
-                  >
-                    Make active
-                  </button>
-                )}
-                {/* Browse this memex in the Notes tree — relaunches into it.
-                    The brain's memory stays read-only; only chats are writable. */}
-                {isBrowsing ? (
-                  <button
-                    type="button"
-                    className="ghostbtn"
-                    disabled={busy}
-                    onClick={() => run(() => corpusUseLegacy())}
-                  >
-                    Use ~/Documents/rotli instead
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="ghostbtn"
-                    disabled={busy}
-                    onClick={() => run(() => corpusUseMemex(inst.root))}
-                  >
-                    Browse in Notes
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="ghostbtn"
-                  disabled={busy}
-                  onClick={() => run(() => validateMut.mutateAsync(inst).then(setLastValidate))}
-                >
-                  Check the brain
-                </button>
-              </div>
-              {lastValidate && isActive && (
-                <div className="memex-validate">
-                  {lastValidate.skipped
-                    ? lastValidate.stdout
-                    : `${lastValidate.ok ? "✓ invariants pass" : "✗ errors"} — ${lastValidate.errors} error(s), ${lastValidate.warnings} warning(s)`}
-                </div>
-              )}
-            </div>
-            {isActive && (
-              <span className="mc-active">
-                <CheckGlyph size={12} />
-              </span>
-            )}
-          </div>
-        );
-      })}
-
-      <div className="memex-actions">
-        <button type="button" className="ghostbtn" disabled={busy} onClick={connectExisting}>
-          Connect to existing…
-        </button>
-        <button type="button" className="ghostbtn" disabled={busy} onClick={newSeparate}>
-          New separate brain…
-        </button>
-      </div>
-      {err && <p className="setnote err">{err}</p>}
-
-      <h4 className="sethead">Quick capture</h4>
-      <div className="swgroup">
-        <Toggle
-          on={captureToBrainInbox}
-          title="Send quick captures to the brain inbox"
-          desc="⌥C captures append to your active memex's inbox.md instead of the Board."
-          onChange={() => setCaptureToBrainInbox(!captureToBrainInbox)}
-        />
-      </div>
-    </>
-  );
 }
 
 function PluginsPane() {
@@ -1134,8 +1131,7 @@ export function SettingsSurface() {
           {pane === "general" && <GeneralPane />}
           {pane === "hotkeys" && <HotkeysPane />}
           {pane === "appearance" && <AppearancePane />}
-          {pane === "storage" && <StoragePane />}
-          {pane === "memex" && <MemexPane />}
+          {pane === "location" && <LocationPane />}
           {pane === "plugins" && <PluginsPane />}
         </div>
       </div>

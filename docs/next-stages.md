@@ -416,7 +416,7 @@ migration for the user's other notes. The in-memory mode's `seedReserved`
    update in lockstep so browser mode mirrors fs mode (its whole reason to exist).
 4. **Multi-watcher.** Lift the single `spawn_watcher` (`lib.rs:420`) into a loop
    over registered roots; debounce stays per-root (`corpus.rs:1027`).
-5. **The per-destination picker** in `SettingsSurface.tsx` (Storage section),
+5. **The per-destination picker** in `SettingsSurface.tsx` (Location pane, formerly Storage),
    reusing the dialog from `corpus_relocate` (`lib.rs:249-268`) but registering
    rather than relocating. Add a `corpus_set_root(dest_id, abs_path)` command
    beside the others in the `invoke_handler` (`lib.rs:379-404`).
