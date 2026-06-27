@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] — 2026-06-26
+
+### Added
+- **Quokka accents in Settings** — each Settings section (General · Hotkeys · Appearance · Storage ·
+  Memory · Plugins) now carries a small, muted line-art quokka at the top-right of its heading,
+  matched to the section (Memory → the knowledge quokka, Storage → the stays-local quokka, …). Like
+  the rest of the character set, the accent tints with the theme and stays a quiet flourish.
+
 ## [0.6.1] — 2026-06-26
 
 New brand: the line-art quokka. A warm, hand-drawn identity replaces the AI-generated art.

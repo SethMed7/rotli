@@ -52,6 +52,7 @@ import {
   PlusGlyph,
   SunGlyph,
 } from "./glyphs";
+import { Character, type CharacterName } from "./Character";
 import { pickFolder } from "../memex/service";
 import {
   useConnectMemex,
@@ -74,6 +75,19 @@ const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = 
   { id: "memex", label: "Memory", glyph: BrainGlyph },
   { id: "plugins", label: "Plugins", glyph: PlusGlyph },
 ];
+
+/** A settings pane heading with its quokka character accent (Seth, 2026-06-26) —
+ * a small, muted line-art quokka at the top-right of each section. The accent
+ * tints with the theme (currentColor) and stays a quiet flourish, never the
+ * focus. Each pane gets the character that fits it. */
+function PaneHead({ title, char }: { title: string; char: CharacterName }) {
+  return (
+    <div className="set-panehead">
+      <h3>{title}</h3>
+      <Character name={char} size={56} className="set-paneaccent" />
+    </div>
+  );
+}
 
 // ——— shared settings controls (Seth, 2026-06-15) ———
 
@@ -255,7 +269,7 @@ function HotkeysPane() {
 
   return (
     <>
-      <h3>Hotkeys</h3>
+      <PaneHead title="Hotkeys" char="notes" />
       <p className="lead">
         Every shortcut in rotli is yours to rebind. Click a chord, press the new keys.
       </p>
@@ -407,7 +421,7 @@ function GeneralPane() {
   const hasCurrent = folderOpts.some((f) => f.id === quickFolder);
   return (
     <>
-      <h3>General</h3>
+      <PaneHead title="General" char="base" />
       <p className="lead">
         rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when
         you&rsquo;re living in it.
@@ -544,7 +558,7 @@ function AppearancePane() {
   const followingSystem = theme === "system";
   return (
     <>
-      <h3>Appearance</h3>
+      <PaneHead title="Appearance" char="board" />
       <p className="lead">Pick a theme. The titlebar sun cycles through these four.</p>
       <div className={glassMode ? "famrow off" : "famrow"}>
         {SOLID_THEMES.map(({ family, mode, label }) => {
@@ -768,7 +782,7 @@ function StoragePane() {
 
   return (
     <>
-      <h3>Where your notes live</h3>
+      <PaneHead title="Where your notes live" char="local" />
       <p className="lead">
         Your notes are plain Markdown files on this Mac. rotli never holds them hostage — open the
         folder any time, point any tool at it, leave whenever you want.
@@ -907,7 +921,7 @@ function MemexPane() {
   if (!isTauri()) {
     return (
       <>
-        <h3>Memory</h3>
+        <PaneHead title="Memory" char="knowledge" />
         <p className="lead">
           Your memex lives on disk — this connects in the app, not the browser preview.
         </p>
@@ -917,7 +931,7 @@ function MemexPane() {
 
   return (
     <>
-      <h3>Memory</h3>
+      <PaneHead title="Memory" char="knowledge" />
       <p className="lead">
         rotli <b>mirrors</b> a memex — it never imports it. <b>Memory</b> makes a memex your{" "}
         <em>whole</em> notes corpus (it replaces <code>~/Documents/rotli</code>). To browse a memex{" "}
@@ -1064,7 +1078,7 @@ function MemexPane() {
 function PluginsPane() {
   return (
     <>
-      <h3>Plugins</h3>
+      <PaneHead title="Plugins" char="chat" />
       <p className="lead">
         Plugins extend rotli over the same corpus. The first one is on the way.
       </p>

@@ -373,6 +373,25 @@
   font-size: 19px;
   margin-bottom: 4px;
 }
+/* a settings pane heading with its quokka character accent (Seth, 2026-06-26):
+   the title on the left, a small muted line-art quokka at the top-right — a quiet
+   flourish that tints with the theme (currentColor), never the focus. */
+.set-panehead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.set-panehead h3 {
+  margin-bottom: 4px;
+}
+.set-paneaccent {
+  color: var(--text-muted);
+  opacity: 0.5;
+  flex: 0 0 auto;
+  margin-top: -10px;
+  margin-right: -4px;
+}
 .set-main .lead {
   font-size: 13px;
   color: var(--text-muted);
