@@ -1,6 +1,6 @@
 //! Stage 1 — the memex seam. rotli connects to (or initiates) a memex instance:
-//! the shared `self/ wiki/ history/ chats/ inbox.md MAP.md` spine that Breve also
-//! writes to (for Seth, `~/memex-vault`).
+//! the shared `identity/ personality/ wiki/ history/ chats/ inbox.md MAP.md` spine that
+//! Breve also writes to (for Seth, `~/memex-vault`).
 //!
 //! MIRROR-NOT-IMPORT (the boundary law, see ~/breve/docs/memex-boundary.md): rotli
 //! NEVER imports memex-vault's bun/node engine. It does file I/O here and only ever
@@ -10,8 +10,8 @@
 //! same tree concurrently).
 //!
 //! OWNERSHIP: rotli writes ONLY `chats/`, the `wiki/_inbox/` note staging (v3.5), and
-//! appends `inbox.md`. `self/`, `history/`, `MAP.md`, the CURATED rest of `wiki/`, and
-//! every control file are NEVER written — `assert_writable` refuses, regardless of what
+//! appends `inbox.md`. `identity/`, `personality/`, `history/`, `MAP.md`, the CURATED rest
+//! of `wiki/`, and every control file are NEVER written — `assert_writable` refuses, regardless of what
 //! the frontend sends (the hard guard behind the TS `canWrite` gate). The active-instance
 //! registry lives OUTSIDE any corpus, in the app config dir, so a connected brain is
 //! never littered with rotli wiring.
@@ -562,7 +562,7 @@ pub fn memex_init(
         fs::create_dir_all(&root).map_err(|e| e.to_string())?;
     }
 
-    for d in ["self", "wiki", "history", "chats", "archive", "trash"] {
+    for d in ["identity", "personality", "wiki", "history", "chats", "archive", "trash"] {
         fs::create_dir_all(root.join(d)).map_err(|e| e.to_string())?;
     }
     atomic_write(

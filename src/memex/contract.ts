@@ -20,11 +20,14 @@
 // (no I/O, no React) so they unit-test in a plain browser.
 
 // rotli is built against the v3.5 note contract (it writes the per-note frontmatter
-// + the wiki/_inbox staging path). It still WRITES to a v3.4 brain (the chat/inbox
-// shape didn't change; a 3.4 brain just warns on the new note fields, never errors),
-// so the supported band is [MIN_CONTRACT, CONTRACT_VERSION] — a brain whose memex.json
-// still reads "3.4" stays writable. Out of the band ⇒ the brain opens read-only.
-export const CONTRACT_VERSION = "3.5";
+// + the wiki/_inbox staging path). v3.6 split the brain's self/ → identity/ +
+// personality/ and added the org layer — but rotli's WRITE surfaces (chats/, inbox.md,
+// wiki/_inbox/) are untouched by that, so rotli stays fully compatible; the band just
+// extends to 3.6 so a v3.6 brain is in-range. It still WRITES to a v3.4 brain (the
+// chat/inbox shape didn't change; a 3.4 brain just warns on the new note fields, never
+// errors), so the supported band is [MIN_CONTRACT, CONTRACT_VERSION] — a brain whose
+// memex.json still reads "3.4" stays writable. Out of the band ⇒ the brain opens read-only.
+export const CONTRACT_VERSION = "3.6";
 export const MIN_CONTRACT = "3.4";
 
 /** Sources allowed on the chats surface (conversations.ts SURFACES.chats.sources).
@@ -287,7 +290,8 @@ export function parsePrimaryUser(usersJson: string): string | null {
 
 // ── the spine + the write-permission gate (mirror of the Rust write-guard) ───
 export const SPINE = {
-  self: "self",
+  identity: "identity",
+  personality: "personality",
   wiki: "wiki",
   /** The note staging area (v3.5) — the ONLY part of wiki/ rotli writes. */
   wikiInbox: "wiki/_inbox",
@@ -300,9 +304,9 @@ export const SPINE = {
 } as const;
 
 /** Whether rotli may WRITE this spine-relative path under the given perms. The
- *  belt to the Rust path-guard's braces: self/history/MAP are NEVER writable; the
- *  REST of wiki/ (curated notes) is read-only — only its wiki/_inbox/ staging is
- *  writable (v3.5), alongside chats/** and inbox.md. */
+ *  belt to the Rust path-guard's braces: identity/personality/history/MAP are NEVER
+ *  writable; the REST of wiki/ (curated notes) is read-only — only its wiki/_inbox/
+ *  staging is writable (v3.5), alongside chats/** and inbox.md. */
 export function canWrite(relPath: string, perms: Perms): boolean {
   if (perms === "read-only") return false;
   const p = relPath.replace(/^\/+/, "");

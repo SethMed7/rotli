@@ -171,11 +171,12 @@ describe("parseMemexInfo + isMemexId", () => {
 });
 
 describe("contractInRange", () => {
-  test("rotli's default band is [3.4, 3.5] — both the live brain and a bumped card pass", () => {
-    expect(contractInRange("3.4")).toBe(true); // memex-vault's memex.json today
-    expect(contractInRange("3.5")).toBe(true); // a card bumped to the engine version
+  test("rotli's default band is [3.4, 3.6] — the live brain, prior cards, and the v3.6 brain pass", () => {
+    expect(contractInRange("3.4")).toBe(true); // an older memex.json
+    expect(contractInRange("3.5")).toBe(true); // the prior engine version
+    expect(contractInRange("3.6")).toBe(true); // memex-vault after the identity/personality + org split
     expect(contractInRange("3.3")).toBe(false); // older than rotli supports
-    expect(contractInRange("3.6")).toBe(false); // newer than rotli was built for
+    expect(contractInRange("3.7")).toBe(false); // newer than rotli was built for
   });
   test("can widen the band", () => {
     expect(contractInRange("3.6", "3.4", "3.6")).toBe(true);
@@ -187,12 +188,13 @@ describe("canWrite (mirror of the Rust write-guard)", () => {
     expect(canWrite("chats/foo.md", "chats+inbox")).toBe(true);
     expect(canWrite("inbox.md", "chats+inbox")).toBe(true);
   });
-  test("wiki/_inbox staging is writable (v3.5); the rest of wiki + self/history/MAP are not", () => {
+  test("wiki/_inbox staging is writable (v3.5); the rest of wiki + identity/personality/history/MAP are not", () => {
     expect(canWrite("wiki/_inbox/pricing-decision-01jtes.md", "chats+inbox")).toBe(true);
     expect(canWrite("wiki/_inbox", "chats+inbox")).toBe(true);
     expect(canWrite("wiki/x.md", "chats+inbox")).toBe(false); // curated wiki — read-only
     expect(canWrite("wiki/projects/x.md", "chats+inbox")).toBe(false);
-    expect(canWrite("self/x.md", "chats+inbox")).toBe(false);
+    expect(canWrite("identity/x.md", "chats+inbox")).toBe(false);
+    expect(canWrite("personality/x.md", "chats+inbox")).toBe(false);
     expect(canWrite("history/2026/x.md", "chats+inbox")).toBe(false);
     expect(canWrite("MAP.md", "chats+inbox")).toBe(false);
   });

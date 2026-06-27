@@ -18,7 +18,8 @@ import { useUiStore } from "../state/ui";
  * `history` is deliberately left off: it's the by-day stream, not browse-y. */
 const ROOT_ENTRIES: { name: string; rel: string; isDir: boolean }[] = [
   { name: "wiki", rel: "wiki", isDir: true },
-  { name: "self", rel: "self", isDir: true },
+  { name: "identity", rel: "identity", isDir: true },
+  { name: "personality", rel: "personality", isDir: true },
   { name: "chats", rel: "chats", isDir: true },
   { name: "MAP.md", rel: "MAP.md", isDir: false },
   { name: "inbox.md", rel: "inbox.md", isDir: false },
