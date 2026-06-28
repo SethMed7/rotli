@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default app (kept out of All-Notes/Recent/Palette — they're assets). Will evolve to route dropped
   binaries into the memex `storage/` per the model.
 
+### Changed
+- **"brain" → "linked library"** in Settings → Location: a connected memex is now a **"linked library"** (a
+  second memex you reference, tucked away) — freeing "brain" to mean your own AI-organized areas inside
+  Notes (per `docs/model.md`). A rotli-created memex now scaffolds the gitignored `storage/`.
+
 ### Docs
 - **Locked the rotli model + vocabulary** (`docs/model.md`) and realigned the always-injected `.carl`
   rules: three fronts (Inbox · Chat · Notes); "your notes folder is a memex"; **"brain" = your AI-organized

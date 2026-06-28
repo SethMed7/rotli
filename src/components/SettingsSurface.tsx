@@ -801,7 +801,7 @@ function BrainCard({
             </button>
           )}
           <button type="button" className="ghostbtn" disabled={busy} onClick={onValidate}>
-            Check the brain
+            Check the library
           </button>
           {onForget && (
             <button type="button" className="ghostbtn" disabled={busy} onClick={onForget}>
@@ -853,8 +853,10 @@ function LocationPane() {
   const activeId = cfg.data?.activeId ?? null;
   const active = instances.find((i) => i.id === activeId) ?? null;
   const corpusIsBrain = active?.id === CORPUS_INSTANCE_ID;
-  // "other brains" = connected brains that aren't the active write target
-  const otherBrains = instances.filter((i) => i.id !== activeId);
+  // linked libraries = connected memexes (NOT the corpus-as-memex, which is just
+  // "your notes folder"). Per the model: the corpus IS your brain; a SECOND memex
+  // you reference is a "linked library."
+  const linkedLibraries = instances.filter((i) => i.id !== CORPUS_INSTANCE_ID);
   const registered = new Set(instances.map((i) => i.root));
   const candidates = (detect.data ?? []).filter((d) => !registered.has(d.root));
 
@@ -912,7 +914,7 @@ function LocationPane() {
         <div className="loctext">
           <span className="loclabel">Notes folder</span>
           <code className="locpath">{rootPath}</code>
-          {corpusIsBrain && <span className="memex-badge write">brain</span>}
+          {corpusIsBrain && <span className="memex-badge write">memex</span>}
         </div>
         <div className="locact">
           <button type="button" className="ghostbtn" onClick={() => void revealCorpus()}>
@@ -929,44 +931,19 @@ function LocationPane() {
         </div>
       </div>
       <p className="setnote">
-        <b>Choose folder…</b> takes a memex (rotli uses it as your brain), an empty folder (your notes
-        move there), or any folder (used as-is). The hidden <code>.rotli/</code> is just an index —
+        <b>Choose folder…</b> takes a memex (rotli uses it as your notes folder), an empty folder (your
+        notes move there), or any folder (used as-is). The hidden <code>.rotli/</code> is just an index —
         deleting it loses nothing but a rebuild.
       </p>
 
-      {/* —— the brain (active write target) —— */}
-      <h4 className="sethead">Your brain</h4>
+      {/* —— linked libraries: a SECOND memex you reference (advanced) —— */}
+      <h4 className="sethead">Linked libraries</h4>
       <p className="lead">
-        rotli <b>mirrors</b> a brain — it never imports it. It reads the whole brain (identity · wiki ·
-        history · chats · inbox · map) and writes only <b>chats</b>, <b>inbox</b>, and new notes (the wiki
-        inbox). It never touches <b>history</b> or <b>identity</b>, and the <b>curated wiki</b> is read-only.
+        A <b>linked library</b> is a <em>second</em> memex you reference alongside your notes — a shared or
+        team brain, a reference vault. <b>Most people never need one</b> (your notes folder is already your
+        memex). rotli reads the whole library and, per its perms, writes only <b>chats</b>, <b>inbox</b>,
+        and new notes; it never touches its history or identity, and its curated wiki is read-only.
       </p>
-      {active ? (
-        <BrainCard
-          inst={active}
-          isActive
-          isCorpus={corpusIsBrain}
-          busy={busy}
-          lastValidate={validation?.id === active.id ? validation.report : null}
-          onUseAsFolder={
-            corpusIsBrain ? undefined : () => run(() => chooseMut.mutateAsync(active.root))
-          }
-          onPerms={(p) => run(() => permsMut.mutateAsync({ id: active.id, perms: p }))}
-          onValidate={() =>
-            run(() =>
-              validateMut.mutateAsync(active).then((r) => setValidation({ id: active.id, report: r })),
-            )
-          }
-          onForget={corpusIsBrain ? undefined : () => run(() => forgetMut.mutateAsync(active.id))}
-        />
-      ) : (
-        <p className="setnote">
-          No brain yet — your notes are a plain folder. Choose a memex above, or connect one below, to
-          give rotli a brain.
-        </p>
-      )}
-
-      {/* —— other brains + connect —— */}
       {candidates.length > 0 && (
         <>
           <h5 className="sethead">Found on this Mac</h5>
@@ -985,35 +962,39 @@ function LocationPane() {
                 disabled={busy}
                 onClick={() => run(() => connectBrainMut.mutateAsync(d.root))}
               >
-                Connect
+                Link
               </button>
             </div>
           ))}
         </>
       )}
-      {otherBrains.length > 0 && (
-        <>
-          <h5 className="sethead">Other brains</h5>
-          {otherBrains.map((inst) => (
-            <BrainCard
-              key={inst.id}
-              inst={inst}
-              isActive={false}
-              isCorpus={false}
-              busy={busy}
-              lastValidate={validation?.id === inst.id ? validation.report : null}
-              onMakeActive={corpusIsBrain ? undefined : () => run(() => setActiveMut.mutateAsync(inst.id))}
-              onUseAsFolder={() => run(() => chooseMut.mutateAsync(inst.root))}
-              onPerms={(p) => run(() => permsMut.mutateAsync({ id: inst.id, perms: p }))}
-              onValidate={() =>
-                run(() =>
-                  validateMut.mutateAsync(inst).then((r) => setValidation({ id: inst.id, report: r })),
-                )
-              }
-              onForget={() => run(() => forgetMut.mutateAsync(inst.id))}
-            />
-          ))}
-        </>
+      {linkedLibraries.length === 0 ? (
+        <p className="setnote">
+          No linked libraries. Link one only if you want a second, shared memex — otherwise your notes
+          folder is all you need.
+        </p>
+      ) : (
+        linkedLibraries.map((inst) => (
+          <BrainCard
+            key={inst.id}
+            inst={inst}
+            isActive={inst.id === activeId}
+            isCorpus={false}
+            busy={busy}
+            lastValidate={validation?.id === inst.id ? validation.report : null}
+            onMakeActive={
+              inst.id === activeId ? undefined : () => run(() => setActiveMut.mutateAsync(inst.id))
+            }
+            onUseAsFolder={() => run(() => chooseMut.mutateAsync(inst.root))}
+            onPerms={(p) => run(() => permsMut.mutateAsync({ id: inst.id, perms: p }))}
+            onValidate={() =>
+              run(() =>
+                validateMut.mutateAsync(inst).then((r) => setValidation({ id: inst.id, report: r })),
+              )
+            }
+            onForget={() => run(() => forgetMut.mutateAsync(inst.id))}
+          />
+        ))
       )}
       <div className="memex-actions">
         <button
@@ -1022,7 +1003,7 @@ function LocationPane() {
           disabled={busy}
           onClick={() => run(() => connectBrainMut.mutateAsync(undefined))}
         >
-          Connect a brain…
+          Link a library…
         </button>
       </div>
       {err && <p className="setnote err">{err}</p>}

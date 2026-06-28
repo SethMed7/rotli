@@ -610,6 +610,7 @@ pub fn scaffold_memex(root: &Path) -> Result<String, String> {
         "wiki/_inbox",
         "history",
         "chats",
+        "storage",
         "archive",
         "trash",
     ] {
@@ -617,6 +618,9 @@ pub fn scaffold_memex(root: &Path) -> Result<String, String> {
     }
     atomic_write(&root.join("inbox.md"), &format!("# Inbox\n\n{INBOX_MARK}\n"))?;
     atomic_write(&root.join("MAP.md"), "# MAP\n\nThe index of this memex.\n")?;
+    // the memex is a TEXT tree; binaries live in the gitignored storage/ (referenced
+    // by storage: links), and .rotli/ is rotli's rebuildable sidecar.
+    atomic_write(&root.join(".gitignore"), "storage/\n.rotli/\n")?;
     let id = format!("mx_{}", Uuid::new_v4());
     let now = now_iso();
     let info = serde_json::json!({
@@ -791,6 +795,7 @@ mod tests {
         // the spine rotli needs exists (incl. its writable wiki/_inbox staging)
         assert!(root.join("wiki/_inbox").is_dir());
         assert!(root.join("identity").is_dir());
+        assert!(root.join("storage").is_dir()); // the gitignored binary store
         assert!(root.join("inbox.md").is_file());
         assert!(root.join("MAP.md").is_file());
         // refuses to scaffold over a non-empty folder
