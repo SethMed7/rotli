@@ -430,7 +430,8 @@ Each phase ships independently and none touches `is_writable`/`canWrite`.
 6. **Interaction with the `notes/` root proposal** (write-contract-v3.5): adopt the
    separate visible `notes/` root (and align the default-shelf rename to it), or
    keep writing through `wiki/_inbox` staging? (This is a bigger, separate call —
-   but §3's rename is compatible either way.)
+   but §3's rename is compatible either way.) **RESOLVED (v3.6): keep `wiki/_inbox`
+   staging; the separate visible `notes/` root was rejected.**
 7. **Memory front:** does Memory also become a sidebar lens / tab (consistent with
    killing fronts), or stay a full surface? (Lean: make it a lens too, for
    consistency — but it's lower priority than chat.)

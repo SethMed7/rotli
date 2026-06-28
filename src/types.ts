@@ -19,9 +19,10 @@ export interface NoteSummary {
   createdAt: number;
   updatedAt: number;
   pinned: boolean;
-  /** "note" (a .md file) or "board" (a .excalidraw canvas, id === its corpus
-   * path). Optional/defaulted for back-compat with the in-memory seed. */
-  kind?: "note" | "board";
+  /** "note" (a .md file) · "board" (a .excalidraw canvas, id === its corpus path) ·
+   * "file" (any other file — image/pdf/…, surfaced read-only, opened in the OS
+   * default app). Optional/defaulted for back-compat with the in-memory seed. */
+  kind?: "note" | "board" | "file";
 }
 
 export interface Note extends NoteSummary {

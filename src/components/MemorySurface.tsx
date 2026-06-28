@@ -1,5 +1,5 @@
 // The Memory browser (Stage 1, Increment 2) — a strictly READ-ONLY tour of the
-// active memex's spine. rotli reads the WHOLE brain (self · wiki · history ·
+// active memex's spine. rotli reads the WHOLE brain (identity · personality · wiki · history ·
 // chats · inbox · map) and writes only chats/ + inbox.md; this surface never
 // writes anything. The top level is a small hardcoded root list (the readable
 // spine); folders navigate in via useSpineDir (a breadcrumb tracks where you
@@ -239,7 +239,7 @@ export function MemorySurface() {
                   </p>
                   <p className="chat-sub">
                     Open a folder, then a <code>.md</code> file to read it. This is the whole brain
-                    — self · wiki · chats · map · inbox.
+                    — identity · personality · wiki · chats · map · inbox.
                   </p>
                 </div>
               )}

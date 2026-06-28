@@ -974,6 +974,10 @@ pub enum NoteKind {
     /// An Excalidraw board: a raw `*.excalidraw` scene file, NO frontmatter,
     /// id == its relative path (NOT a ulid, NOT in the `.rotli` index).
     Board,
+    /// Any other file (image, pdf, txt, …) — surfaced READ-ONLY so the folder
+    /// (e.g. Storage) shows what's really in it; id == its relative path. Opened
+    /// in the OS default app, never the markdown editor.
+    File,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1116,8 +1120,8 @@ const WELCOME_BODY: &str = "# Welcome to rotli\n\nThis folder is your corpus —
 ///   • `LegacyRotli` — today's `~/Documents/rotli`: reserved folders, first-run,
 ///     everything writable. BYTE-IDENTICAL to before Increment 3.
 ///   • `Memex` — the root IS someone's memex spine (for Seth, `~/memex-vault`). Only
-///     `chats/` is writable + surfaced read-write; `wiki/` is read-only; `self/`,
-///     `history/`, `MAP.md`, `inbox.md` and every control file stay HIDDEN. No
+///     `chats/` is writable + surfaced read-write; `wiki/` is read-only; `identity/`,
+///     `personality/`, `history/`, `MAP.md`, `inbox.md` and every control file stay HIDDEN. No
 ///     reserved folders are scaffolded, no first-run seeding ever runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Layout {
@@ -1159,7 +1163,7 @@ pub enum Surface {
 ///
 /// LegacyRotli surfaces everything read-write (today's behavior). Memex surfaces
 /// ONLY `wiki/` (read-only) + `chats/` (read-write) and hides the brain's memory
-/// (self/history/MAP/inbox) and every memex-vault control file. Top-level memex-vault
+/// (identity/personality/history/MAP/inbox) and every memex-vault control file. Top-level memex-vault
 /// docs (STRUCTURE.md, CONFIG.md, …) are `.md`, so this rule — not the dot-filter
 /// — is what keeps them out of the Notes tree.
 fn surfaced(layout: Layout, rel: &str) -> Surface {
@@ -1181,7 +1185,7 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
         return Surface::NoteRO;
     }
     // everything else inside a memex is hidden from the Notes tree and unwritable:
-    // self/ history/ archive/ trash/ storage/, MAP.md, inbox.md, and all control
+    // identity/ personality/ history/ archive/ trash/ storage/, MAP.md, inbox.md, and all control
     // files (memex.json, users.json, *.local.json, *.json at root, clients/,
     // scripts/, STRUCTURE/CONFIG/README/CHANGELOG/ASSETS .md, …). storage/ is the
     // memex's internal, gitignored binary asset store (the `storage:` root) — its
@@ -2076,6 +2080,23 @@ fn walk(
                 origin: None,
                 kind: NoteKind::Board,
             });
+        } else if kind.is_file() {
+            // Any OTHER file (image, pdf, txt, …): surfaced read-only so a folder
+            // like Storage shows what's actually in it. id == its relative path,
+            // title = the filename WITH its extension (so "photo.png" reads true).
+            let abs = entry.path();
+            let (file_created, file_updated) = file_stamps(&abs);
+            notes.push(NoteMeta {
+                id: rel.clone(),
+                title: name,
+                snippet: String::new(),
+                folder_id: prefix.to_string(),
+                created_at: file_created,
+                updated_at: file_updated,
+                pinned: false,
+                origin: None,
+                kind: NoteKind::File,
+            });
         }
     }
     Ok(())
@@ -2218,8 +2239,9 @@ impl CorpusState {
 /// root id so the wire carries a routable id. Default root → bare (no-op).
 fn prefix_meta(root_id: &str, mut m: NoteMeta) -> NoteMeta {
     m.folder_id = compose_root_id(root_id, &m.folder_id);
-    if m.kind == NoteKind::Board {
-        // board id IS its relative path — prefix it like a folder id
+    if m.kind == NoteKind::Board || m.kind == NoteKind::File {
+        // a board/file id IS its relative path — prefix it like a folder id so a
+        // later read/open routes back to this store
         m.id = compose_root_id(root_id, &m.id);
     }
     m
@@ -2269,6 +2291,26 @@ pub fn corpus_read(state: tauri::State<'_, CorpusState>, id: String) -> Result<N
         doc.folder_id = compose_root_id(&root, &doc.folder_id);
         doc
     })
+}
+
+/// Open a surfaced FILE (`NoteKind::File`) in the OS default app — resolve its
+/// routed id to an absolute path via the owning store, then `open` it. rotli
+/// never reads/writes a non-note file as markdown; this just hands it to the OS.
+#[tauri::command]
+pub fn corpus_open_file(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
+    if !abs.is_file() {
+        return Err(format!("not a file: {}", abs.display()));
+    }
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open")
+        .arg(&abs)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = abs;
+    Ok(())
 }
 
 #[tauri::command]

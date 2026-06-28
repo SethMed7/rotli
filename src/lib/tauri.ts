@@ -175,9 +175,10 @@ export interface CorpusNoteMeta {
    * bakes the rule (set on entering a hidden root, cleared on leaving). Null
    * for a note that lives in a normal folder (Seth, 2026-06-13). */
   origin?: string | null;
-  /** "note" (a .md file) or "board" (a .excalidraw canvas). Rust serde-defaults
-   * to "note" for back-compat, so it's optional on the wire. */
-  kind?: "note" | "board";
+  /** "note" (a .md file) · "board" (a .excalidraw canvas) · "file" (any other
+   * file — image/pdf/…, surfaced read-only, opened in the OS default app). Rust
+   * serde-defaults to "note" for back-compat, so it's optional on the wire. */
+  kind?: "note" | "board" | "file";
 }
 
 /** What corpus_read_board returns — the raw .excalidraw JSON plus file meta.
@@ -356,6 +357,13 @@ export async function revealCorpus(): Promise<void> {
   await invoke("corpus_reveal");
 }
 
+/** Open a surfaced non-note FILE (kind "file") in the OS default app — rotli
+ * never opens it as markdown. No-op outside Tauri. */
+export async function corpusOpenFile(id: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_open_file", { id });
+}
+
 // ——— the unified Location model (corpus.json) — ONE folder = your notes = your
 //     brain, plus connected read-only "other brains". Replaces corpus-root.txt +
 //     corpus-memex-root.txt + corpus-roots.json + memex-instances.json. ———
@@ -465,7 +473,7 @@ export function onCorpusChanged(cb: () => void): () => void {
 
 // ——— the memex seam (Stage 1) — typed wrappers over the Rust memex commands
 //     (src-tauri/src/memex.rs). rotli connects to / initiates a memex instance
-//     (the shared self/wiki/history/chats/inbox.md spine; for Seth, ~/memex-vault)
+//     (the shared identity/personality/wiki/history/chats/inbox.md spine; for Seth, ~/memex-vault)
 //     and OWNS chats/ + inbox.md, nothing else. Mirror-not-import: the byte-shape
 //     of what we write lives in src/memex/contract.ts; these only move bytes. ———
 

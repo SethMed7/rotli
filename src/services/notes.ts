@@ -296,7 +296,7 @@ if (!FS_MODE) {
 
   // The external Vault root (mirrors fs mode's memex auto-bind to ~/memex-vault): a
   // non-default root whose surfaced folders carry the "vault:" prefix. Only
-  // wiki/ (browse-only) + chats/ surface — self/history/etc never do. The Vault
+  // wiki/ (browse-only) + chats/ surface — identity/personality/history/etc never do. The Vault
   // row itself is the marker DEST.vault ("vault:"); these are its top-level
   // folders (parentId === null, exactly as Rust aggregates them).
   svc.seedReserved("vault:wiki", "wiki", null);
@@ -374,7 +374,7 @@ Ship the gateway migration, land the issuing portal rebuild, and get the partner
       "vault:wiki",
       `# memex-vault — the knowledge base
 
-The durable, human-readable memory. rotli browses it read-only: wiki/ surfaces here, self/ and history/ never do.`,
+The durable, human-readable memory. rotli browses it read-only: wiki/ surfaces here, identity/, personality/ and history/ never do.`,
       { createdAt: now - 3 * DAY, updatedAt: now - 3 * DAY },
     );
 

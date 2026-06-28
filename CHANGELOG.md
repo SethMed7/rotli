@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-06-28
+
+### Added
+- **"Use as notes folder"** on a connected brain — promote it to BE your notes folder, so a separate plain
+  `~/Documents/rotli` no longer lingers alongside it (the same folder can't be both corpus and brain).
+- **Non-note files surface in Storage.** The walker only emitted `.md` + `.excalidraw`, so the Storage
+  folder looked empty; images/PDFs/any file now surface as a read-only `file` kind that opens in the OS
+  default app (kept out of All-Notes/Recent/Palette — they're assets). Will evolve to route dropped
+  binaries into the memex `storage/` per the model.
+
+### Docs
+- **Locked the rotli model + vocabulary** (`docs/model.md`) and realigned the always-injected `.carl`
+  rules: three fronts (Inbox · Chat · Notes); "your notes folder is a memex"; **"brain" = your AI-organized
+  areas inside Notes** (not a connected memex); a second memex is a "linked library"; Storage = the memex
+  `storage/`; access is metadata. Fixed a dead `smbrain-integration` pointer injecting a 404 every session.
+  `self/`→`identity/`+`personality/` wording; "Settings → Memory"→"Location"; superseded banners on
+  `roadmap.html` + the v3.5 proposal + the rearchitecture doc.
+
 ## [0.8.1] — 2026-06-27
 
 ### Added

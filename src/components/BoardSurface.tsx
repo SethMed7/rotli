@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
+import { corpusOpenFile } from "../lib/tauri";
 import { notesService } from "../services/notes";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
@@ -51,8 +52,12 @@ export function BoardSurface() {
 
   // open a card by kind — a stray board in the Board root opens its canvas, not
   // a dead note tab. open* returns the content area to the panes on its own.
-  const openOne = (c: { id: string; kind?: "note" | "board" }) =>
-    c.kind === "board" ? openCanvas(c.id) : openNote(c.id);
+  const openOne = (c: { id: string; kind?: "note" | "board" | "file" }) =>
+    c.kind === "board"
+      ? openCanvas(c.id)
+      : c.kind === "file"
+        ? void corpusOpenFile(c.id)
+        : openNote(c.id);
 
   const back = () => setContentView("panes");
 

@@ -223,7 +223,7 @@ export function ChatSurface() {
           <Character name="chat" size={132} />
           <p>No memex connected yet.</p>
           <button type="button" className="chat-cta" onClick={openSettings}>
-            Connect one in Settings → Memory
+            Connect one in Settings → Location
           </button>
         </div>
       ) : chatAllOpen ? (
@@ -320,7 +320,7 @@ export function ChatSurface() {
             </div>
           ) : (
             <div className="chat-readonly">
-              This memex is connected read-only — enable “Chats + inbox” in Settings → Memory to write.
+              This memex is connected read-only — enable “Chats + inbox” in Settings → Location to write.
             </div>
           )}
         </main>

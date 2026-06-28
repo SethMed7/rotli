@@ -39,6 +39,7 @@ import {
   corpusAddFolder,
   corpusCreateBoard,
   corpusForgetFolder,
+  corpusOpenFile,
   corpusRenameBoard,
 } from "../lib/tauri";
 import {
@@ -602,11 +603,15 @@ export function Sidebar() {
   // an item is a board when its corpus walk tagged it kind:"board"; missing kind
   // (old data, serde default) reads as a note — so this split is back-compat.
   const isBoard = (n: NoteSummary): boolean => n.kind === "board";
+  const isFile = (n: NoteSummary): boolean => n.kind === "file";
 
   // a flat set of every loaded board id — the roving onOpen/onOpenMenu branch on
   // this (board rows ride kind:"note" in the roving list since RovingRow has no
   // board variant, so the Set is how we tell a board apart at open time).
   const boardIds = new Set<string>();
+  // same idea for surfaced files (image/pdf/…): they ride as note rows but open
+  // in the OS default app, never the editor.
+  const fileIds = new Set<string>();
   for (const n of [
     ...allNotes,
     ...inboxNotes,
@@ -614,8 +619,10 @@ export function Sidebar() {
     ...storageNotes,
     ...archiveNotes,
     ...trashNotes,
-  ])
+  ]) {
     if (isBoard(n)) boardIds.add(n.id);
+    else if (isFile(n)) fileIds.add(n.id);
+  }
 
   // —— compact rows for one folder id (own notes + own boards), filtered ——
   // `rp` is the roving rowProps factory (passed in so this helper can run before
@@ -640,7 +647,7 @@ export function Sidebar() {
               note={note}
               selected={note.id === focusedNoteId}
               padLeft={28 + level * 16}
-              onOpen={openRow(note.id)}
+              onOpen={isFile(note) ? () => void corpusOpenFile(note.id) : openRow(note.id)}
               actions={rowActions}
               rowProps={rp({ id: note.id, kind: "note" })}
             />
@@ -793,6 +800,7 @@ export function Sidebar() {
         // board rows ride kind:"note" in the roving list — the Set tells them
         // apart so a board opens its canvas, not the editor (Seth, 2026-06-24)
         if (boardIds.has(row.id)) openCanvas(row.id, { newTab });
+        else if (fileIds.has(row.id)) void corpusOpenFile(row.id);
         else openNote(row.id, { newTab });
         return;
       }
@@ -819,7 +827,7 @@ export function Sidebar() {
     // m: only note rows get the full menu; folder/smart rows — and board rows
     // (no noteById entry, no lifecycle yet) — have no popover.
     onOpenMenu: (row, anchor) => {
-      if (row.kind !== "note" || boardIds.has(row.id)) return;
+      if (row.kind !== "note" || boardIds.has(row.id) || fileIds.has(row.id)) return;
       const note = noteById.get(row.id);
       setMenu({ noteId: row.id, hidden: isHidden(note?.folderId ?? ""), anchor });
     },
@@ -1167,7 +1175,7 @@ export function Sidebar() {
                 className="sb-chat-empty"
                 onClick={() => dispatch("app.settings")}
               >
-                Connect a memex in Settings → Memory
+                Connect a memex in Settings → Location
               </button>
             ) : chatList.length === 0 ? (
               <p className="sb-chat-empty">No chats yet.</p>

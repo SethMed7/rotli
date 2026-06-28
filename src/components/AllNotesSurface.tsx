@@ -6,6 +6,7 @@
 import { useMemo, useState } from "react";
 import { useNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
+import { corpusOpenFile } from "../lib/tauri";
 import { BoardGlyph, FileGlyph, SearchGlyph } from "./glyphs";
 
 /** Relative day label (mirrors the Board's). */
@@ -72,13 +73,16 @@ export function AllNotesSurface() {
           <div className="board-grid">
             {results.map((n) => {
               const board = n.kind === "board";
+              const file = n.kind === "file";
               return (
                 <button
                   type="button"
                   key={n.id}
                   className="board-card"
-                  onClick={() => (board ? openCanvas(n.id) : openNote(n.id))}
-                  title={board ? "Open board" : "Open note"}
+                  onClick={() =>
+                    board ? openCanvas(n.id) : file ? void corpusOpenFile(n.id) : openNote(n.id)
+                  }
+                  title={board ? "Open board" : file ? "Open file" : "Open note"}
                 >
                   <span className="bc-body">
                     <span className="bc-title">

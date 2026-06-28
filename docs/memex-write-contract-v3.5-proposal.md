@@ -1,5 +1,7 @@
 # Proposal — memex write-contract v3.5: a `notes/` root + the app-plugin model
 
+> **DECIDED (v3.6): `wiki/_inbox` staging won; a separate visible `notes/` root was rejected.**
+
 **Status:** STRAWMAN for Seth to redline. Authored from rotli (2026-06-25) against
 memex-vault `STRUCTURE.md` **v3.4**. Nothing here is ratified — once you redline, the
 agreed version lands in `~/memex-vault/STRUCTURE.md` (+ a `CHANGELOG.md` bump to v3.5)

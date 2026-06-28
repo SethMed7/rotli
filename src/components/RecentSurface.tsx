@@ -7,6 +7,7 @@
 import { useMemo } from "react";
 import { useNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
+import { corpusOpenFile } from "../lib/tauri";
 import { BoardGlyph, ClockGlyph, FileGlyph } from "./glyphs";
 
 /** Short, human date for the right column. */
@@ -46,13 +47,16 @@ export function RecentSurface() {
           <ul className="recent-list">
             {rows.map((n) => {
               const board = n.kind === "board";
+              const file = n.kind === "file";
               return (
                 <li key={n.id}>
                   <button
                     type="button"
                     className="recent-row"
-                    onClick={() => (board ? openCanvas(n.id) : openNote(n.id))}
-                    title={board ? "Open board" : "Open note"}
+                    onClick={() =>
+                      board ? openCanvas(n.id) : file ? void corpusOpenFile(n.id) : openNote(n.id)
+                    }
+                    title={board ? "Open board" : file ? "Open file" : "Open note"}
                   >
                     {board ? (
                       <BoardGlyph size={14} className="rr-icon" />

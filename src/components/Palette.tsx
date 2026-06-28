@@ -78,7 +78,9 @@ export function Palette({ onClose }: { onClose: () => void }) {
 
   useTransientPopover([palRef], true, onClose);
 
-  const notes = useNotes().data ?? [];
+  // surfaced non-note files (image/pdf/…) aren't quick-open targets — keep them
+  // out of the palette; they live in their folder (e.g. Storage) in the sidebar.
+  const notes = (useNotes().data ?? []).filter((n) => n.kind !== "file");
   const folders = useFolders().data ?? [];
   const mruIds = useMruStore((s) => s.ids);
   const overrides = useBindingsStore((s) => s.overrides);

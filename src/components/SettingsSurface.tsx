@@ -752,6 +752,7 @@ function BrainCard({
   busy,
   lastValidate,
   onMakeActive,
+  onUseAsFolder,
   onPerms,
   onValidate,
   onForget,
@@ -762,6 +763,7 @@ function BrainCard({
   busy: boolean;
   lastValidate: MemexValidateReport | null;
   onMakeActive?: (() => void) | undefined;
+  onUseAsFolder?: (() => void) | undefined;
   onPerms: (p: Perms) => void;
   onValidate: () => void;
   onForget?: (() => void) | undefined;
@@ -788,6 +790,11 @@ function BrainCard({
           onPick={onPerms}
         />
         <div className="memex-actions">
+          {onUseAsFolder && (
+            <button type="button" className="ghostbtn" disabled={busy} onClick={onUseAsFolder}>
+              Use as notes folder
+            </button>
+          )}
           {onMakeActive && (
             <button type="button" className="ghostbtn" disabled={busy} onClick={onMakeActive}>
               Make active
@@ -941,6 +948,9 @@ function LocationPane() {
           isCorpus={corpusIsBrain}
           busy={busy}
           lastValidate={validation?.id === active.id ? validation.report : null}
+          onUseAsFolder={
+            corpusIsBrain ? undefined : () => run(() => chooseMut.mutateAsync(active.root))
+          }
           onPerms={(p) => run(() => permsMut.mutateAsync({ id: active.id, perms: p }))}
           onValidate={() =>
             run(() =>
@@ -993,6 +1003,7 @@ function LocationPane() {
               busy={busy}
               lastValidate={validation?.id === inst.id ? validation.report : null}
               onMakeActive={corpusIsBrain ? undefined : () => run(() => setActiveMut.mutateAsync(inst.id))}
+              onUseAsFolder={() => run(() => chooseMut.mutateAsync(inst.root))}
               onPerms={(p) => run(() => permsMut.mutateAsync({ id: inst.id, perms: p }))}
               onValidate={() =>
                 run(() =>
