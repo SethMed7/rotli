@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.4] — 2026-06-29
+
 ### Added
 - **Move an inline image** — drag the image itself to reposition it (it drops at the cursor line);
   resize stays on the corner grip, and a plain click still reveals the source.
