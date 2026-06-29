@@ -13,10 +13,13 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { makeTauriHost } from "../ai/host";
+import { runAgent } from "../ai/loop";
+import type { ChatTurn, RunInput } from "../ai/types";
 import { activeInstance } from "../memex/config";
 import { readChat } from "../memex/service";
 import { useInstanceChats, useMemexConfig, useWriteChat } from "../memex/useMemex";
-import { chatComplete, chatModels, isTauri } from "../lib/tauri";
+import { chatModels, isTauri } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
 import { usePanesStore } from "../state/panes";
 import { renderInline } from "../editor/render";
@@ -42,16 +45,32 @@ function parseMessages(body: string): Msg[] {
   return out;
 }
 
-/** Flatten the thread into one prompt for the on-device model. */
-function buildPrompt(convo: Msg[]): string {
-  const sys =
-    "You are rotli, a warm, concise, on-device assistant. Answer ONLY from this conversation. " +
-    "If you don't know something or weren't given the information, say so plainly — never invent " +
-    "facts, file names, or references. Keep replies short and direct.";
-  const turns = convo
-    .map((m) => `${m.speaker === "you" ? "User" : "Assistant"}: ${m.text}`)
-    .join("\n\n");
-  return `${sys}\n\n${turns}\n\nAssistant:`;
+/** Read an attached image file as a base64 data URL (the vision wire shape). */
+function readAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error ?? new Error("couldn't read the image"));
+    r.readAsDataURL(file);
+  });
+}
+
+/** Composer affordance glyphs — line-art, theme-aware (currentColor). */
+function GlobeGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.2" />
+      <ellipse cx="8" cy="8" rx="2.6" ry="6.2" />
+      <path d="M2 8h12M3.2 5h9.6M3.2 11h9.6" />
+    </svg>
+  );
+}
+function ClipGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M11.7 5.6 6.4 10.9a2 2 0 0 1-2.8-2.8l5.4-5.4a3 3 0 0 1 4.3 4.3l-5.4 5.4" />
+    </svg>
+  );
 }
 
 function deriveTitle(text: string): string {
@@ -103,6 +122,8 @@ export function ChatSurface({
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const chatModelId = useUiStore((s) => s.chatModelId);
   const setChatModelId = useUiStore((s) => s.setChatModelId);
+  const chatWeb = useUiStore((s) => s.chatWeb);
+  const setChatWeb = useUiStore((s) => s.setChatWeb);
   const bindChat = usePanesStore((s) => s.bindChat);
 
   const cfg = useMemexConfig();
@@ -127,9 +148,20 @@ export function ChatSurface({
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("thinking…");
+  const [images, setImages] = useState<string[]>([]);
+  const [visionHint, setVisionHint] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const writable = active?.perms === "chats+inbox";
+
+  // per-chat web toggle (the composer globe) — keyed by slug; "" holds a not-yet-saved chat
+  const webKey = chatSlug ?? "";
+  const globeOn = chatWeb[webKey] ?? false;
+  // image attach is gated on the picked model's vision capability
+  const canVision = picked?.vision ?? false;
+  const visionModels = modelList.filter((m) => m.vision);
 
   // load THIS pane's chat (by slug), or clear for a fresh chat
   useEffect(() => {
@@ -154,28 +186,48 @@ export function ChatSurface({
 
   const send = async () => {
     if (!active || !writable || !message.trim() || busy) return;
-    const userText = message.trim();
-    setMessage("");
-    const convo = [...messages, { speaker: "you", text: userText }];
-    setMessages(convo);
-    setBusy(true);
-
-    let reply: string;
-    try {
-      const opts = picked
-        ? { model: picked.id, endpoint: picked.endpoint, api: picked.api }
-        : undefined;
-      reply = (await chatComplete(buildPrompt(convo), opts)).trim() || "(the model returned nothing)";
-    } catch (e) {
+    if (!picked) {
       setMessages((p) => [
         ...p,
-        { speaker: "rotli", text: `⚠ ${(e as Error)?.message ?? "couldn't reach the local model"}` },
+        { speaker: "rotli", text: "⚠ No on-device model is set up — add one in your memex AI store." },
       ]);
-      setBusy(false);
-      return; // a failed turn isn't persisted
+      return;
     }
-    setMessages((p) => [...p, { speaker: "rotli", text: reply }]);
+    const userText = message.trim();
+    const imgs = images;
+    setMessage("");
+    setImages([]);
+    // history = the prior turns; the new user message rides as runAgent's userText
+    const history: ChatTurn[] = messages.map((m) => ({
+      role: m.speaker === "you" ? "user" : "assistant",
+      text: m.text,
+    }));
+    setMessages((p) => [...p, { speaker: "you", text: userText }]);
+    setBusy(true);
+    setStatus("thinking…");
+
+    const host = makeTauriHost(picked);
+    const model = { id: picked.id };
+    const runInput: RunInput =
+      imgs.length > 0
+        ? { history, userText, web: globeOn, model, images: imgs }
+        : { history, userText, web: globeOn, model };
+
+    let reply = "";
+    try {
+      for await (const ev of runAgent(host, runInput)) {
+        if (ev.type === "status") setStatus(ev.text);
+        else if (ev.type === "final") reply = ev.text;
+      }
+    } catch (e) {
+      reply = `⚠ ${(e as Error)?.message ?? "the local model failed"}`;
+    }
     setBusy(false);
+
+    const failed = reply.startsWith("⚠");
+    if (!reply) reply = "(the model returned nothing)";
+    setMessages((p) => [...p, { speaker: "rotli", text: reply }]);
+    if (failed) return; // a failed turn isn't persisted
 
     // persist the turn (user + assistant) to chats/<slug>.md
     const turn: Msg[] = [
@@ -198,11 +250,27 @@ export function ChatSurface({
           messages: turn,
         });
         bindChat(paneId, res.slug); // this tab now IS that chat
+        if (globeOn) setChatWeb(res.slug, true); // carry the globe to the saved chat
         setTitle("");
       }
     } catch {
       /* persistence failed — the in-memory thread still shows for this session */
     }
+  };
+
+  const onAttachClick = () => {
+    if (!canVision) {
+      setVisionHint(true); // this model can't see — prompt to pick one that can
+      return;
+    }
+    fileRef.current?.click();
+  };
+
+  const onPickFiles = async (files: FileList | null) => {
+    if (!files) return;
+    const picks = [...files].filter((f) => f.type.startsWith("image/"));
+    const datas = await Promise.all(picks.map(readAsDataURL));
+    if (datas.length > 0) setImages((prev) => [...prev, ...datas]);
   };
 
   return (
@@ -253,7 +321,7 @@ export function ChatSurface({
               {busy && (
                 <div className="cmsg ai">
                   <div className="cmsg-who">rotli</div>
-                  <div className="cmsg-bubble cmsg-think">thinking…</div>
+                  <div className="cmsg-bubble cmsg-think">{status}</div>
                 </div>
               )}
             </div>
@@ -271,6 +339,61 @@ export function ChatSurface({
                     onKeyDown={(e) => e.stopPropagation()}
                   />
                 )}
+                {images.length > 0 && (
+                  <div className="chat-attachments">
+                    {images.map((src, i) => (
+                      <span key={i} className="chat-attachment">
+                        <img src={src} alt="attachment" />
+                        <button
+                          type="button"
+                          className="chat-attachment-x"
+                          title="Remove"
+                          onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {visionHint && (
+                  <div className="chat-vision-hint">
+                    {visionModels.length > 0 ? (
+                      <>
+                        <span>This model can’t see images. Pick one that can:</span>
+                        {visionModels.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            className="chat-vision-pick"
+                            onClick={() => {
+                              setChatModelId(m.id);
+                              setVisionHint(false);
+                            }}
+                          >
+                            {m.id}
+                          </button>
+                        ))}
+                      </>
+                    ) : (
+                      <span>No vision-capable model is set up in your memex AI store yet.</span>
+                    )}
+                    <button type="button" className="chat-vision-x" onClick={() => setVisionHint(false)}>
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    void onPickFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
                 <div className="chat-box">
                   <textarea
                     className="chat-msg"
@@ -292,7 +415,10 @@ export function ChatSurface({
                         <select
                           className="chat-model-select"
                           value={picked?.id ?? ""}
-                          onChange={(e) => setChatModelId(e.target.value)}
+                          onChange={(e) => {
+                            setChatModelId(e.target.value);
+                            setVisionHint(false);
+                          }}
                           onKeyDown={(e) => e.stopPropagation()}
                         >
                           {modelList.map((m) => (
@@ -303,6 +429,27 @@ export function ChatSurface({
                         </select>
                       </label>
                     )}
+                    <button
+                      type="button"
+                      className={globeOn ? "chat-tool on" : "chat-tool"}
+                      aria-pressed={globeOn}
+                      title={
+                        globeOn
+                          ? "Web search is ON for this chat"
+                          : "Web search — let this chat reach the internet"
+                      }
+                      onClick={() => setChatWeb(webKey, !globeOn)}
+                    >
+                      <GlobeGlyph />
+                    </button>
+                    <button
+                      type="button"
+                      className={images.length > 0 ? "chat-tool on" : "chat-tool"}
+                      title={canVision ? "Attach an image" : "This model can’t see images — pick a vision model"}
+                      onClick={onAttachClick}
+                    >
+                      <ClipGlyph />
+                    </button>
                     <span className="chat-box-grow" />
                     <button
                       type="button"

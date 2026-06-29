@@ -265,6 +265,11 @@ interface UiState {
    * store (~/.memex/ai/registry.json). null = use the store's default. Persisted. */
   chatModelId: string | null;
   setChatModelId: (id: string | null) => void;
+  /** Per-chat web-search toggle (the composer globe), keyed by chat slug. Off by
+   * default; only an enabled chat may use the web_search/web_fetch tools. Persisted.
+   * The "" key holds a not-yet-saved (slug-less) chat's choice until it's bound. */
+  chatWeb: Record<string, boolean>;
+  setChatWeb: (slug: string, on: boolean) => void;
 
   /** A newer signed build is on the feed — set once by App.tsx's quiet on-mount
    * check (CARL rule 2: no auto-download, no modal). Just lets Settings → General
@@ -423,6 +428,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setChatAllOpen: (open) => set({ chatAllOpen: open }),
   chatModelId: null,
   setChatModelId: (id) => set({ chatModelId: id }),
+  chatWeb: {},
+  setChatWeb: (slug, on) => set((s) => ({ chatWeb: { ...s.chatWeb, [slug]: on } })),
 
   updateAvailable: false,
   setUpdateAvailable: (on) => set({ updateAvailable: on }),

@@ -31,7 +31,11 @@ folder.")
   the text tree. A dropped binary routes there.
 - **Boards** — Excalidraw canvases, alongside notes.
 
-**Chat** _(front)_ — your AI conversations (`chats/`). Everything can carry a chat.
+**Chat** _(front)_ — your AI conversations (`chats/`). The on-device model is an **agentic client**,
+not a context-free box: your memex IS its knowledge base, so it **searches and reads your notes** (their
+organization + metadata) to answer. Flip the composer **globe** on for a chat and it can also reach the
+**web** (DuckDuckGo, no key) — off by default, and only used when your notes don't cover the question.
+Attach **images** to a vision-capable model (the composer checks). Everything can carry a chat.
 
 **Inbox** _(front)_ — your **emails**. (Distinct from the memex `inbox.md` capture file
 and from `wiki/_inbox/` note staging — same word, three different things; the FRONT
@@ -45,7 +49,8 @@ second. Read or write per its perms.
 **Access** — who may see/use a note is **metadata**, not a separate ACL: the note's
 `reach` (who) + `owner` (origin) frontmatter, a per-note **`locked`** flag (the metadata
 panel's lock — the AI filer skips a locked note), a per-note **`secure`** flag (secrets
-auto-detected → the note is never sent to a *remote* model and its file is gitignored;
+auto-detected → the note is never sent to a *remote* model **nor out to the web** (the agentic client's
+web tools refuse a query/URL that trips the secret detector) and its file is gitignored;
 a local model may still read it), plus the memex access mode (`local`/`open`/`secure`).
 The AI maintains both organization AND access via metadata.
 

@@ -10,6 +10,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-06-29
+
+### Added
+- **The agentic memex client** — Chat is no longer a context-free one-shot. The on-device model now runs
+  a multi-step **tool-use loop** over your memex (its knowledge base) and, opt-in per chat, the web:
+  - **`search_notes` / `read_note`** — the model searches and reads your notes (their organization +
+    metadata) to answer. Secure notes stay readable by the *local* model (the remote gate still holds).
+  - **Web search — DuckDuckGo, no API key** — a per-chat **globe** toggle in the composer (off by
+    default) lets a chat reach the internet (`web_search` / `web_fetch`); the model only uses it when
+    your notes don't cover the question.
+  - **Image attachment** — a composer paperclip gated on a **vision-capability check**: only a
+    vision-capable model accepts images; otherwise the UI prompts you to pick one.
+  - Engine lives in `src/ai/` (host-agnostic — liftable to the shared `~/.memex/ai` client layer),
+    driving a tolerant single-JSON-object ReAct protocol tuned for Gemma; a live status line replaces the
+    static "thinking…" (no token streaming yet).
+- **Web primitives in Rust** (`src-tauri/src/web.rs`) — `web_search` (DuckDuckGo lite + html fallback)
+  and `web_fetch` (HTML→text), both behind a **secret-egress guard**: a query/URL that trips the secret
+  detector is never sent to the web. The detector is now shared (`src-tauri/src/secret.rs`) by the
+  secure-note flag and the web guard.
+- **Multi-turn model bridge** (`chat_messages`) — flattens the transcript for MLX `/api/generate` (with
+  JSON coercion), or sends a real messages array to llama.cpp **with the Bearer key** (fixes a latent
+  401) plus image content-parts, and lazy-kickstarts the on-demand llama.cpp server.
+- **Vision serving** — gemma-3 is multimodal. Because the shared MLX server runs in a frozen py3.9 venv
+  (Breve's) where the gemma3 mlx-vlm path can't install, vision runs in an **isolated py3.11 sidecar**
+  (`~/.memex/ai/mlx-vlm-venv` + `mlx-vlm-server.py` on :11437); the text server **proxies** image
+  requests to it and lazy-spawns it. The text path (mlx-lm) is byte-for-byte unchanged, so Breve/voz are
+  unaffected. One-time setup: `~/.memex/ai/setup-vision.sh`.
+
+### Changed
+- The Chat composer gained the **globe** (web) and **paperclip** (image) controls beside the model
+  selector; `chat_models` and the memex-ai registry now carry a **`vision`** capability (gemma-3 flagged).
+
 ## [0.8.9] — 2026-06-29
 
 ### Changed

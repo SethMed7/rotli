@@ -127,6 +127,8 @@ interface PersistedSettings {
   captureToBrainInbox: boolean;
   /** The on-device model the Chat surface uses (id from ~/.memex/ai); null = default. */
   chatModelId: string | null;
+  /** Per-chat web-search toggle (the composer globe), keyed by chat slug. */
+  chatWeb: Record<string, boolean>;
   /** First-run onboarding gate — false until the flow is finished/skipped. */
   onboarded: boolean;
   /** The app version onboarding last completed at (the onboardingVersion gate). */
@@ -221,6 +223,16 @@ function parseSettings(raw: string): PersistedSettings {
     blockHandles: asBool(data.blockHandles, false),
     captureToBrainInbox: asBool(data.captureToBrainInbox, false),
     chatModelId: typeof data.chatModelId === "string" ? data.chatModelId : null,
+    chatWeb: (() => {
+      const out: Record<string, boolean> = {};
+      const src = data.chatWeb;
+      if (src && typeof src === "object") {
+        for (const [k, v] of Object.entries(src as Record<string, unknown>)) {
+          if (typeof v === "boolean") out[k] = v;
+        }
+      }
+      return out;
+    })(),
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
     // not this one — treat that as already-onboarded so we don't re-run first-run
     // onboarding on existing users (same migration shape as expandedDests above)
@@ -259,6 +271,7 @@ function applySettings(s: PersistedSettings): void {
     blockHandles: s.blockHandles,
     captureToBrainInbox: s.captureToBrainInbox,
     chatModelId: s.chatModelId,
+    chatWeb: s.chatWeb,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
     quickNoteIds: s.quickNoteIds,
@@ -507,6 +520,7 @@ function settingsSnapshot(): string {
     blockHandles: ui.blockHandles,
     captureToBrainInbox: ui.captureToBrainInbox,
     chatModelId: ui.chatModelId,
+    chatWeb: ui.chatWeb,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
     quickNoteIds: ui.quickNoteIds,

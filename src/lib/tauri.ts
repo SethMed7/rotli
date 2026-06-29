@@ -303,6 +303,8 @@ export interface ChatModelInfo {
   provider: string;
   endpoint: string;
   api: string;
+  /** Can this model see attached images? Gates the composer's image affordance. */
+  vision: boolean;
   isDefault: boolean;
 }
 
@@ -326,6 +328,55 @@ export function chatComplete(
     endpoint: opts?.endpoint,
     api: opts?.api,
   });
+}
+
+/** One message in the agent loop's transcript. `images` are base64 (raw or a full
+ * `data:` URL) and only ride the vision/openai path. */
+export interface ChatWireMsg {
+  role: "system" | "user" | "assistant";
+  content: string;
+  images?: string[];
+}
+
+/** Multi-turn completion for the agentic client. The loop re-sends the growing
+ * transcript each step; `formatJson` asks MLX to coerce a single JSON object. */
+export function chatMessages(
+  messages: ChatWireMsg[],
+  opts?: {
+    model?: string;
+    endpoint?: string;
+    api?: string;
+    formatJson?: boolean;
+    temperature?: number;
+    maxTokens?: number;
+  },
+): Promise<string> {
+  return invoke<string>("chat_messages", {
+    messages,
+    model: opts?.model,
+    endpoint: opts?.endpoint,
+    api: opts?.api,
+    formatJson: opts?.formatJson,
+    temperature: opts?.temperature,
+    maxTokens: opts?.maxTokens,
+  });
+}
+
+/** One web search result the model sees. */
+export interface WebResult {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+/** Web search via DuckDuckGo (no key). Rejects a query that trips the secret guard. */
+export function webSearch(query: string, limit?: number): Promise<WebResult[]> {
+  return invoke<WebResult[]>("web_search", { query, limit });
+}
+
+/** Fetch a page and return readable text (HTML stripped, capped by `maxChars`). */
+export function webFetch(url: string, maxChars?: number): Promise<string> {
+  return invoke<string>("web_fetch", { url, maxChars });
 }
 
 /** Settings → Storage truth: the real root (home shortened to `~`), every

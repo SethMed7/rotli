@@ -841,30 +841,9 @@ fn secure_field(line: &str) -> Option<bool> {
 /// High-signal secret patterns — API keys, private keys, JWTs, SSNs, card numbers.
 /// ANY match → the note holds secrets: it's flagged `secure: true`, its content is
 /// never sent to a REMOTE model, and its path is gitignored (Seth, 2026-06-29).
+/// (Impl lives in `crate::secret` — the single source shared with the web egress guard.)
 fn looks_secure(text: &str) -> bool {
-    use std::sync::OnceLock;
-    static PATTERNS: OnceLock<Vec<regex::Regex>> = OnceLock::new();
-    let pats = PATTERNS.get_or_init(|| {
-        [
-            r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
-            r"-----BEGIN PGP",
-            r"sk-ant-[A-Za-z0-9_-]{16}",
-            r"\b(?:sk|pk|rk)_[A-Za-z0-9]{20}",
-            r"github_pat_[A-Za-z0-9_]{20}",
-            r"\bgh[posru]_[A-Za-z0-9]{20}",
-            r"AIza[A-Za-z0-9_-]{20}",
-            r"\bxox[baprs]-[A-Za-z0-9-]{10}",
-            r"whsec_[A-Za-z0-9+/]{16}",
-            r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{6,}",
-            r"\b\d{3}-\d{2}-\d{4}\b",
-            r"\b\d{4}[ -]\d{6}[ -]\d{5}\b",
-            r"\b\d{4}[ -]\d{4}[ -]\d{4}[ -]\d{4}\b",
-        ]
-        .iter()
-        .filter_map(|p| regex::Regex::new(p).ok())
-        .collect()
-    });
-    pats.iter().any(|re| re.is_match(text))
+    crate::secret::looks_secure(text)
 }
 
 /// The note frontmatter the metadata panel reads: the typed facts, the lock state,

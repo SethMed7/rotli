@@ -13,6 +13,8 @@
 mod chat;
 mod corpus;
 mod memex;
+mod secret;
+mod web;
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -688,6 +690,9 @@ pub fn run() {
             corpus::corpus_rename_board,
             chat::chat_complete,
             chat::chat_models,
+            chat::chat_messages,
+            web::web_search,
+            web::web_fetch,
             corpus::corpus_purge,
             corpus::corpus_create_folder,
             corpus::corpus_read_board,
