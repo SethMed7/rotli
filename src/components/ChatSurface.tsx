@@ -44,7 +44,10 @@ function parseMessages(body: string): Msg[] {
 
 /** Flatten the thread into one prompt for the on-device model. */
 function buildPrompt(convo: Msg[]): string {
-  const sys = "You are rotli, a warm, concise, on-device assistant. Answer directly and briefly.";
+  const sys =
+    "You are rotli, a warm, concise, on-device assistant. Answer ONLY from this conversation. " +
+    "If you don't know something or weren't given the information, say so plainly — never invent " +
+    "facts, file names, or references. Keep replies short and direct.";
   const turns = convo
     .map((m) => `${m.speaker === "you" ? "User" : "Assistant"}: ${m.text}`)
     .join("\n\n");
@@ -207,24 +210,6 @@ export function ChatSurface({
       <header className="chat-head">
         <h2 className="chat-title-h">{chatSlug ? chatSlug.replace(/-/g, " ") : "New chat"}</h2>
         {active && <span className="chat-inst">· {active.label}</span>}
-        <span className="chat-head-grow" />
-        {modelList.length > 0 && (
-          <label className="chat-model" title="On-device model — from your memex AI store">
-            <span className="chat-model-label">Model</span>
-            <select
-              className="chat-model-select"
-              value={picked?.id ?? ""}
-              onChange={(e) => setChatModelId(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()}
-            >
-              {modelList.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
       </header>
 
       {!isTauri() ? (
@@ -243,69 +228,92 @@ export function ChatSurface({
       ) : (
         <main className="chat-main">
           <div className="chat-scroll" ref={scrollRef}>
-            {messages.length === 0 ? (
-              <div className="chat-newhint">
-                <Character name="chat" size={84} />
-                <p className="chat-hint-title">
-                  {chatSlug ? "No messages yet." : "Ask anything — it runs on your Mac."}
-                </p>
-                <p className="chat-sub">
-                  Saved as a plain <code>chats/&lt;slug&gt;.md</code> in your memex.
-                </p>
-              </div>
-            ) : (
-              messages.map((m, idx) => {
-                const you = m.speaker === "you";
-                return (
-                  <div key={idx} className={you ? "cmsg you" : "cmsg ai"}>
-                    <div className="cmsg-who">{you ? "You" : "rotli"}</div>
-                    <div className="cmsg-bubble">{you ? m.text : renderMessage(m.text)}</div>
-                  </div>
-                );
-              })
-            )}
-            {busy && (
-              <div className="cmsg ai">
-                <div className="cmsg-who">rotli</div>
-                <div className="cmsg-bubble cmsg-think">thinking…</div>
-              </div>
-            )}
+            <div className="chat-thread">
+              {messages.length === 0 ? (
+                <div className="chat-newhint">
+                  <Character name="chat" size={84} />
+                  <p className="chat-hint-title">
+                    {chatSlug ? "No messages yet." : "Ask anything — it runs on your Mac."}
+                  </p>
+                  <p className="chat-sub">
+                    Saved as a plain <code>chats/&lt;slug&gt;.md</code> in your memex.
+                  </p>
+                </div>
+              ) : (
+                messages.map((m, idx) => {
+                  const you = m.speaker === "you";
+                  return (
+                    <div key={idx} className={you ? "cmsg you" : "cmsg ai"}>
+                      {!you && <div className="cmsg-who">rotli</div>}
+                      <div className="cmsg-bubble">{you ? m.text : renderMessage(m.text)}</div>
+                    </div>
+                  );
+                })
+              )}
+              {busy && (
+                <div className="cmsg ai">
+                  <div className="cmsg-who">rotli</div>
+                  <div className="cmsg-bubble cmsg-think">thinking…</div>
+                </div>
+              )}
+            </div>
           </div>
 
           {writable ? (
             <div className="chat-composer">
-              {!chatSlug && (
-                <input
-                  className="chat-input chat-title-input"
-                  placeholder="Chat title (optional)…"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
-              )}
-              <div className="chat-send-row">
-                <textarea
-                  className="chat-input chat-msg"
-                  rows={1}
-                  placeholder={busy ? "thinking…" : "Message…  (⏎ to send · ⇧⏎ new line)"}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    e.stopPropagation();
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      void send();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="chat-send"
-                  disabled={busy || !message.trim()}
-                  onClick={() => void send()}
-                >
-                  {busy ? "…" : "Send"}
-                </button>
+              <div className="chat-composer-inner">
+                {!chatSlug && (
+                  <input
+                    className="chat-input chat-title-input"
+                    placeholder="Chat title (optional)…"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
+                )}
+                <div className="chat-box">
+                  <textarea
+                    className="chat-msg"
+                    rows={1}
+                    placeholder={busy ? "thinking…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void send();
+                      }
+                    }}
+                  />
+                  <div className="chat-box-foot">
+                    {modelList.length > 0 && (
+                      <label className="chat-model" title="On-device model — from your memex AI store">
+                        <select
+                          className="chat-model-select"
+                          value={picked?.id ?? ""}
+                          onChange={(e) => setChatModelId(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          {modelList.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    <span className="chat-box-grow" />
+                    <button
+                      type="button"
+                      className="chat-send"
+                      disabled={busy || !message.trim()}
+                      onClick={() => void send()}
+                    >
+                      {busy ? "…" : "Send"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (

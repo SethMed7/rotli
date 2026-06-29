@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.9] — 2026-06-29
+
+### Changed
+- **Chat is a centered modern column** (ChatGPT/Claude style): the conversation + composer share a
+  max-width and center in the pane; the **model selector moved into the composer** (bottom); AI
+  replies render as **plain text** in the column, only your messages are bubbles.
+- **Tighter chat prompt** — the on-device model answers only from the conversation and says "I don't
+  know" rather than inventing facts/file names (the earlier "Fabel 5… see STRUCTURE.md" was a small
+  model hallucinating with no real context).
+
+### Fixed
+- **The welcome quokka's face reads again** — 0.6.3's uniform `stroke-width:12` had filled in the eye
+  cutouts; dialed `stays_local` back to 4 (the body's weight is the fill, so the face returns with
+  minimal body change).
+
 ## [0.8.8] — 2026-06-29
 
 ### Added
