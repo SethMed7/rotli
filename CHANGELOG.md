@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Board → Captures.** The quick-captures view is renamed **Captures**; its cards are now
   sticky notes (softly raised, lift on hover) that you can **drag to reorder** — the order
   persists in `.rotli/settings.json`, never in your notes.
+- **`svg` code blocks render inline** — a ` ```svg ` fenced block shows the vector; click it to edit
+  the source (the code ⇄ preview toggle), joining the existing math/mermaid/jsxgraph block renderers.
 
 ## [0.8.2] — 2026-06-28
 

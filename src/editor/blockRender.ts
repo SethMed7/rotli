@@ -188,6 +188,18 @@ const RENDERERS: Record<LangKey, (code: string, ctx: RenderCtx) => HTMLElement |
     }
     return el;
   },
+
+  // a ```svg fence renders the vector inline; click-to-edit reveals the source
+  // (the code ⇄ preview toggle). User content, so strip <script> before injecting
+  // (the CSP blocks it too).
+  svg: (code) => {
+    const el = document.createElement("div");
+    el.className = "rotli-render-svg";
+    const src = code.trim();
+    if (!src) return el; // empty fence while live-typing — quiet placeholder
+    el.innerHTML = src.replace(/<script[\s\S]*?<\/script>/gi, "");
+    return el;
+  },
 };
 
 type RenderEl = HTMLElement & { __board?: ReturnType<typeof JXG.JSXGraph.initBoard> };
@@ -252,6 +264,9 @@ class RenderBlockWidget extends WidgetType {
     const container = document.createElement("div");
     container.className = "rotli-render-block";
     container.dataset.lang = this.lang;
+    // math/mermaid/svg are click-to-edit: clicking the rendered block lands the
+    // caret in the source — the toggle to see/edit the code.
+    if (this.lang !== "jsxgraph") container.title = "Click to edit the source";
     this.dom = container;
 
     const body = document.createElement("div");
