@@ -260,17 +260,12 @@ interface UiState {
 
   /** A newer signed build is on the feed — set once by App.tsx's quiet on-mount
    * check (CARL rule 2: no auto-download, no modal). Just lets Settings → General
-   * surface "Update available". Transient, not persisted (mirrors memoryOpen). */
+   * surface "Update available". Transient, not persisted. */
   updateAvailable: boolean;
   setUpdateAvailable: (on: boolean) => void;
   /** The version the feed offers, when known (e.g. "0.2.0"). */
   updateVersion: string | null;
   setUpdateVersion: (version: string | null) => void;
-
-  /** The Memory browser — a READ-ONLY tour of the active memex's spine (wiki ·
-   * self · chats · MAP · inbox) — as its own surface (like Chat). Not persisted. */
-  memoryOpen: boolean;
-  setMemoryOpen: (open: boolean) => void;
 
   /** ⌥⌘F focus mode (r3 frame E): chrome leaves, one centered column. */
   focusMode: boolean;
@@ -421,9 +416,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   setUpdateAvailable: (on) => set({ updateAvailable: on }),
   updateVersion: null,
   setUpdateVersion: (version) => set({ updateVersion: version }),
-
-  memoryOpen: false,
-  setMemoryOpen: (open) => set({ memoryOpen: open }),
 
   focusMode: false,
   setFocusMode: (on) => set({ focusMode: on }),

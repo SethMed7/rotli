@@ -856,9 +856,15 @@ fn shelf_of(fm: &Frontmatter) -> Vec<String> {
 /// its disk folder (a curated note with no shelf yet stays where it lives on disk).
 /// Everything outside a memex's wiki/, and the whole local corpus, is unaffected.
 fn project_folder(layout: Layout, disk_folder: &str, fm: &Frontmatter) -> String {
-    if layout == Layout::Memex && (disk_folder == "wiki" || disk_folder.starts_with("wiki/")) {
-        if let Some(primary) = shelf_of(fm).into_iter().next() {
-            return primary;
+    if layout == Layout::Memex {
+        // storage/ binaries surface under the reserved "Storage" destination
+        if disk_folder == "storage" || disk_folder.starts_with("storage/") {
+            return "Storage".to_string();
+        }
+        if disk_folder == "wiki" || disk_folder.starts_with("wiki/") {
+            if let Some(primary) = shelf_of(fm).into_iter().next() {
+                return primary;
+            }
         }
     }
     disk_folder.to_string()
@@ -1184,12 +1190,17 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
     if rel == "wiki" || rel.starts_with("wiki/") {
         return Surface::NoteRO;
     }
+    // storage/ — the memex's gitignored binary asset store; surfaced READ-ONLY so
+    // the Storage front shows your files (projected to the Storage destination,
+    // opened in the OS default app). NEVER written via the note path (is_writable
+    // refuses it); binaries are written by the storage/ drop command instead.
+    if rel == "storage" || rel.starts_with("storage/") {
+        return Surface::NoteRO;
+    }
     // everything else inside a memex is hidden from the Notes tree and unwritable:
-    // identity/ personality/ history/ archive/ trash/ storage/, MAP.md, inbox.md, and all control
+    // identity/ personality/ history/ archive/ trash/, MAP.md, inbox.md, and all control
     // files (memex.json, users.json, *.local.json, *.json at root, clients/,
-    // scripts/, STRUCTURE/CONFIG/README/CHANGELOG/ASSETS .md, …). storage/ is the
-    // memex's internal, gitignored binary asset store (the `storage:` root) — its
-    // files are never notes, and the walk never descends into it.
+    // scripts/, STRUCTURE/CONFIG/README/CHANGELOG/ASSETS .md, …).
     Surface::Hidden
 }
 
@@ -2018,7 +2029,10 @@ fn walk(
             // Memex: the wiki/_inbox staging dir is plumbing, not a folder — its
             // notes are re-homed by their shelf (below), so don't surface it as a
             // browsable folder; still recurse to collect those notes.
-            let staging = layout == Layout::Memex && rel == "wiki/_inbox";
+            // wiki/_inbox staging + storage/ aren't browsable folder ROWS: their
+            // files are re-homed (notes by shelf; storage binaries to Storage).
+            let staging =
+                layout == Layout::Memex && (rel == "wiki/_inbox" || rel == "storage");
             if !staging {
                 folders.push(FolderMeta {
                     id: rel.clone(),
@@ -2090,7 +2104,9 @@ fn walk(
                 id: rel.clone(),
                 title: name,
                 snippet: String::new(),
-                folder_id: prefix.to_string(),
+                // a memex storage/ binary re-homes to the Storage destination; a
+                // plain-corpus file stays in its own folder.
+                folder_id: project_folder(layout, prefix, &Frontmatter::default()),
                 created_at: file_created,
                 updated_at: file_updated,
                 pinned: false,
@@ -3253,9 +3269,10 @@ mod tests {
         assert_eq!(surfaced(m, "inbox.md"), Surface::Hidden);
         assert_eq!(surfaced(m, "MAP.md"), Surface::Hidden);
         assert_eq!(surfaced(m, "history/2026/x.md"), Surface::Hidden);
-        // storage/ — the memex's internal binary asset store (storage: root); never notes
-        assert_eq!(surfaced(m, "storage"), Surface::Hidden);
-        assert_eq!(surfaced(m, "storage/wiki/projects/rotli/graph.png"), Surface::Hidden);
+        // storage/ — the binary asset store: surfaced READ-ONLY (the Storage front),
+        // never writable via the note path (writable() refuses NoteRO, asserted below).
+        assert_eq!(surfaced(m, "storage"), Surface::NoteRO);
+        assert_eq!(surfaced(m, "storage/graph.png"), Surface::NoteRO);
         // surfaced: chats writable, wiki read-only
         assert_eq!(surfaced(m, "chats/x.md"), Surface::NoteRW);
         assert_eq!(surfaced(m, "chats"), Surface::NoteRW);

@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **"brain" → "linked library"** in Settings → Location: a connected memex is now a **"linked library"** (a
   second memex you reference, tucked away) — freeing "brain" to mean your own AI-organized areas inside
   Notes (per `docs/model.md`). A rotli-created memex now scaffolds the gitignored `storage/`.
+- **Removed the orphaned Memory front** (dead code — nothing opened it); the brain is browsed via the
+  Vault tree. Memory is how things are *saved*, not a front.
+- **Storage shows the memex `storage/`.** On a memex corpus the Storage front now surfaces the binary
+  asset store read-only (opened in the OS default app), projected to the Storage destination — it was
+  hidden before. (Dropping a binary *into* `storage/` is the next piece.)
 
 ### Docs
 - **Locked the rotli model + vocabulary** (`docs/model.md`) and realigned the always-injected `.carl`

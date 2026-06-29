@@ -87,10 +87,6 @@ export function registerDefaultActions(): void {
         ui.setContentView("panes");
         return;
       }
-      if (ui.memoryOpen) {
-        ui.setMemoryOpen(false);
-        return;
-      }
       if (ui.focusMode) {
         ui.setFocusMode(false);
         return;

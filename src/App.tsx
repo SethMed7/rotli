@@ -12,7 +12,6 @@ import "./styles/memex.css";
 import "@excalidraw/excalidraw/index.css";
 import "./styles/canvas.css";
 import { CaptureCard } from "./components/CaptureCard";
-import { MemorySurface } from "./components/MemorySurface";
 import { NotesSurface } from "./components/NotesSurface";
 import { Onboarding } from "./components/Onboarding";
 import { Palette } from "./components/Palette";
@@ -82,7 +81,6 @@ function surfaceFromUrl(): Surface {
 
 function MainShell() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
-  const memoryOpen = useUiStore((s) => s.memoryOpen);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const focusMode = useUiStore((s) => s.focusMode);
@@ -271,17 +269,11 @@ function MainShell() {
     <div className="app-window">
       <Titlebar />
       <main className="app-content">
-        {/* Settings + Memory are still full-surface fronts. Chat is NOT anymore —
-            it folded into the left-menu Chat section and renders inside
-            NotesSurface's content area (contentView "chat"), like Board and
-            All-notes, so the three sections stay visible (Seth, 2026-06-26). */}
-        {settingsOpen ? (
-          <SettingsSurface />
-        ) : memoryOpen ? (
-          <MemorySurface />
-        ) : (
-          <NotesSurface />
-        )}
+        {/* Settings is the one full-surface front. Chat · Board · All-notes ·
+            Recent all render inside NotesSurface's content area (contentView), so
+            the three left-menu sections stay visible (Seth, 2026-06-26). Memory is
+            no longer a front — the brain is browsed via the Vault tree (2026-06-28). */}
+        {settingsOpen ? <SettingsSurface /> : <NotesSurface />}
       </main>
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
       {whichKey && <WhichKey onClose={() => setWhichKey(false)} />}
