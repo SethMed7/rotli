@@ -183,6 +183,49 @@ class ImgWidget extends WidgetType {
     void resolveImageSrc(this.src).then((url) => {
       if (url) img.src = url;
     });
+    // drag the image body to MOVE it: past the threshold, cut its line + re-insert
+    // at the drop point; no move falls through to reveal-source (click-to-edit).
+    img.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const sx = e.clientX;
+      const sy = e.clientY;
+      let moving = false;
+      const onMove = (ev: MouseEvent) => {
+        if (!moving && Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 5) {
+          moving = true;
+          wrap.classList.add("rotli-img-moving");
+        }
+      };
+      const onUp = (ev: MouseEvent) => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        wrap.classList.remove("rotli-img-moving");
+        const srcLine = view.state.doc.lineAt(view.posAtDOM(wrap));
+        if (!moving) {
+          view.dispatch({ selection: { anchor: srcLine.from } });
+          view.focus();
+          return;
+        }
+        const dropPos = view.posAtCoords({ x: ev.clientX, y: ev.clientY });
+        if (dropPos == null) return;
+        const dropLine = view.state.doc.lineAt(dropPos);
+        if (dropLine.from === srcLine.from) return;
+        const imgText = view.state.doc.sliceString(srcLine.from, srcLine.to);
+        const cutTo = Math.min(view.state.doc.length, srcLine.to + 1);
+        const insertAt =
+          dropLine.from > srcLine.from ? dropLine.from - (cutTo - srcLine.from) : dropLine.from;
+        view.dispatch({
+          changes: [
+            { from: srcLine.from, to: cutTo, insert: "" },
+            { from: insertAt, insert: `${imgText}\n` },
+          ],
+        });
+        view.focus();
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    });
     const grip = document.createElement("span");
     grip.className = "rotli-img-resize";
     grip.setAttribute("aria-hidden", "true");

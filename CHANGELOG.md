@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Move an inline image** — drag the image itself to reposition it (it drops at the cursor line);
+  resize stays on the corner grip, and a plain click still reveals the source.
+- **Editable metadata** — the metadata panel's fields (shelf/reach/area/tags…) are now editable:
+  type a value (Enter/blur saves), **×** removes, the bottom row **adds** a field. Reserved keys
+  (id/created/updated/pinned/origin/locked) stay managed by rotli.
+
 ## [0.8.3] — 2026-06-29
 
 ### Added

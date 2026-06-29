@@ -822,6 +822,15 @@ fn locked_field(line: &str) -> Option<bool> {
     (k.trim() == "locked").then(|| v.trim() == "true")
 }
 
+/// The key of a `key: value` frontmatter line (trimmed), if any.
+fn field_key(line: &str) -> Option<&str> {
+    line.split_once(':').map(|(k, _)| k.trim())
+}
+
+/// Keys rotli owns directly — the metadata-panel editor touches only OTHER
+/// (foreign) keys; `locked` goes through set_locked, the rest are derived.
+const RESERVED_KEYS: [&str; 6] = ["id", "created", "updated", "pinned", "origin", "locked"];
+
 /// The note frontmatter the metadata panel reads: the typed facts, the lock state,
 /// and every other ("foreign") frontmatter line for display (shelf/reach/area/…).
 #[derive(serde::Serialize)]
@@ -1365,6 +1374,29 @@ impl CorpusStore {
         fm.foreign.retain(|l| locked_field(l).is_none());
         if locked {
             fm.foreign.push("locked: true".to_string());
+        }
+        atomic_write(&path, &compose_document(&fm, body))
+    }
+
+    /// Set (or, with an empty value, remove) a foreign frontmatter field — the
+    /// metadata panel's editor. Reserved keys are off-limits. Preserves the body
+    /// and every other frontmatter line.
+    fn set_field(&self, rel: &str, key: &str, value: &str) -> Result<(), String> {
+        let key = key.trim();
+        if key.is_empty() {
+            return Err("a field needs a name".into());
+        }
+        if RESERVED_KEYS.contains(&key) {
+            return Err(format!("`{key}` is managed by rotli, not editable here"));
+        }
+        let path = self.abs(rel);
+        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let (fm, body) = parse_document(&text);
+        let mut fm = fm.unwrap_or_default();
+        fm.foreign.retain(|l| field_key(l) != Some(key));
+        let value = value.trim();
+        if !value.is_empty() {
+            fm.foreign.push(format!("{key}: {value}"));
         }
         atomic_write(&path, &compose_document(&fm, body))
     }
@@ -2474,6 +2506,18 @@ pub fn corpus_set_locked(
 ) -> Result<(), String> {
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| s.set_locked(&rel, locked))
+}
+
+/// Set or (empty value) remove a foreign frontmatter field from the metadata panel.
+#[tauri::command]
+pub fn corpus_set_field(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.set_field(&rel, &key, &value))
 }
 
 #[tauri::command]

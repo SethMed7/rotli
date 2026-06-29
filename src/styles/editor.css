@@ -845,6 +845,13 @@
   max-width: 100%;
   height: auto;
   border-radius: var(--r-inner);
+  cursor: grab;
+}
+.rotli-img-moving {
+  opacity: 0.5;
+}
+.rotli-img-moving img {
+  cursor: grabbing;
 }
 .rotli-img-resize {
   position: absolute;

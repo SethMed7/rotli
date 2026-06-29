@@ -410,6 +410,12 @@ export async function corpusSetLocked(id: string, locked: boolean): Promise<void
   await invoke("corpus_set_locked", { id, locked });
 }
 
+/** Set or (empty value) remove a foreign frontmatter field — the metadata editor. */
+export async function corpusSetField(id: string, key: string, value: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_set_field", { id, key, value });
+}
+
 // ——— the unified Location model (corpus.json) — ONE folder = your notes = your
 //     brain, plus connected read-only "other brains". Replaces corpus-root.txt +
 //     corpus-memex-root.txt + corpus-roots.json + memex-instances.json. ———
