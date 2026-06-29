@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-06-29
+
 ### Added
 - **Milkdown-style block handles** — each block's left-gutter handle is now a **`+`** (add a
   block below) and a real **6-dot grip** (drag to reorder · click for actions), replacing the
