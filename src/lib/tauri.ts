@@ -389,6 +389,27 @@ export async function resolveImageSrc(src: string, rootId = "default"): Promise<
   return abs ? convertFileSrc(abs) : "";
 }
 
+export interface FrontmatterView {
+  id: string;
+  created: string;
+  updated: string;
+  locked: boolean;
+  /** the foreign frontmatter lines (shelf/reach/area/summary/tags/links/…). */
+  fields: string[];
+}
+
+/** Read a note's frontmatter for the metadata panel (display + lock state). */
+export async function corpusFrontmatter(id: string): Promise<FrontmatterView | null> {
+  if (!isTauri()) return null;
+  return invoke<FrontmatterView>("corpus_frontmatter", { id });
+}
+
+/** Toggle the per-note AI lock (writes/removes a `locked: true` frontmatter line). */
+export async function corpusSetLocked(id: string, locked: boolean): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_set_locked", { id, locked });
+}
+
 // ——— the unified Location model (corpus.json) — ONE folder = your notes = your
 //     brain, plus connected read-only "other brains". Replaces corpus-root.txt +
 //     corpus-memex-root.txt + corpus-roots.json + memex-instances.json. ———

@@ -815,6 +815,25 @@ pub fn compose_document(fm: &Frontmatter, raw_body: &str) -> String {
     out
 }
 
+/// A frontmatter line setting the per-note AI lock — `Some(true/false)` when the
+/// line is `locked: …`, else `None`.
+fn locked_field(line: &str) -> Option<bool> {
+    let (k, v) = line.split_once(':')?;
+    (k.trim() == "locked").then(|| v.trim() == "true")
+}
+
+/// The note frontmatter the metadata panel reads: the typed facts, the lock state,
+/// and every other ("foreign") frontmatter line for display (shelf/reach/area/…).
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FrontmatterView {
+    pub id: String,
+    pub created: String,
+    pub updated: String,
+    pub locked: bool,
+    pub fields: Vec<String>,
+}
+
 /// What the editor sees: the raw body minus the single conventional blank line
 /// after the fence (the write path adds exactly one back).
 fn editor_body(raw: &str) -> &str {
@@ -1313,6 +1332,41 @@ impl CorpusStore {
         let name = unique_file_name(&dir, raw);
         fs::copy(src, dir.join(&name)).map_err(|e| format!("import {}: {e}", src.display()))?;
         Ok(format!("{subdir}/{name}"))
+    }
+
+    /// Read a note's frontmatter for the metadata panel — the typed facts plus the
+    /// lock state and every foreign line (shelf/reach/area/summary/tags/links/…).
+    fn read_frontmatter(&self, rel: &str) -> Result<FrontmatterView, String> {
+        let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
+        let fm = parse_document(&text).0.unwrap_or_default();
+        let locked = fm.foreign.iter().any(|l| locked_field(l) == Some(true));
+        let fields = fm
+            .foreign
+            .iter()
+            .filter(|l| !l.trim().is_empty() && locked_field(l).is_none())
+            .cloned()
+            .collect();
+        Ok(FrontmatterView {
+            id: fm.id.unwrap_or_default(),
+            created: fm.created.unwrap_or_default(),
+            updated: fm.updated.unwrap_or_default(),
+            locked,
+            fields,
+        })
+    }
+
+    /// Toggle the per-note AI lock — a `locked: true` frontmatter line the eventual
+    /// AI filer must respect. Preserves the body + every other frontmatter line.
+    fn set_locked(&self, rel: &str, locked: bool) -> Result<(), String> {
+        let path = self.abs(rel);
+        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let (fm, body) = parse_document(&text);
+        let mut fm = fm.unwrap_or_default();
+        fm.foreign.retain(|l| locked_field(l).is_none());
+        if locked {
+            fm.foreign.push("locked: true".to_string());
+        }
+        atomic_write(&path, &compose_document(&fm, body))
     }
 
     /// First run: the corpus is born with Inbox and ONE warm welcome note.
@@ -2399,6 +2453,27 @@ pub fn corpus_abs(
     rel: String,
 ) -> Result<String, String> {
     state.route(&root_id, |s| Ok(s.abs(&rel).to_string_lossy().into_owned()))
+}
+
+/// The note's frontmatter for the metadata panel (read-only display + lock state).
+#[tauri::command]
+pub fn corpus_frontmatter(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+) -> Result<FrontmatterView, String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.read_frontmatter(&rel))
+}
+
+/// Toggle the per-note AI lock (a `locked: true` frontmatter line).
+#[tauri::command]
+pub fn corpus_set_locked(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    locked: bool,
+) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.set_locked(&rel, locked))
 }
 
 #[tauri::command]

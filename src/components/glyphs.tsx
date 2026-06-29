@@ -186,6 +186,30 @@ export function glyphForNote(
   return <FileGlyph {...props} />;
 }
 
+/** A padlock — closed (locked) or open (the shackle lifted = unlocked). */
+export function LockGlyph({ open = false, ...props }: GlyphProps & { open?: boolean }) {
+  return (
+    <Glyph {...props}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      {open ? <path d="M8 11V7a4 4 0 0 1 7.6-1.8" /> : <path d="M8 11V7a4 4 0 0 1 8 0v4" />}
+    </Glyph>
+  );
+}
+
+/** A properties/metadata list — dotted rows (opens the metadata panel). */
+export function MetaGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <circle cx="6" cy="7" r="1" />
+      <path d="M10 7h8" />
+      <circle cx="6" cy="12" r="1" />
+      <path d="M10 12h8" />
+      <circle cx="6" cy="17" r="1" />
+      <path d="M10 17h8" />
+    </Glyph>
+  );
+}
+
 /** "Recent" row (r1/r2 gates). */
 export function ClockGlyph(props: GlyphProps) {
   return (

@@ -43,7 +43,8 @@ tucked under Advanced. Default is **one** memex = your notes; most people never 
 second. Read or write per its perms.
 
 **Access** — who may see/use a note is **metadata**, not a separate ACL: the note's
-`reach` (who) + `owner` (origin) frontmatter, plus the memex access mode
+`reach` (who) + `owner` (origin) frontmatter, a per-note **`locked`** flag (the metadata
+panel's lock — the AI filer skips a locked note), plus the memex access mode
 (`local`/`open`/`secure`). The AI maintains both organization AND access via metadata.
 
 ## What rotli writes (the contract — v3.6, band [3.4, 3.6])

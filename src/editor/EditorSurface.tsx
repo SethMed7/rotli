@@ -9,6 +9,8 @@ import { useNote } from "../services/hooks";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
 import { AaPanel } from "./AaPanel";
+import { MetaPanel } from "./MetaPanel";
+import { MetaGlyph } from "../components/glyphs";
 import { BottomSlot } from "./BottomSlot";
 import { CmEditor } from "./CmEditor";
 import { FormatBar } from "./FormatBar";
@@ -67,6 +69,7 @@ export function EditorSurface({
   const lines = docLines ?? queryLines;
 
   const [aaOpen, setAaOpen] = useState(false);
+  const [metaOpen, setMetaOpen] = useState(false);
   const [narrow, setNarrow] = useState(false);
   // the caret's line + column, reported by CmEditor — the format bar's active
   // states read it (bold-on, heading level, list-on)
@@ -74,6 +77,7 @@ export function EditorSurface({
 
   const rootRef = useRef<HTMLDivElement>(null);
   const aaChipRef = useRef<HTMLButtonElement>(null);
+  const metaChipRef = useRef<HTMLButtonElement>(null);
 
   const style = useNoteStyle(noteId);
   const formatBarVisible = useUiStore((s) => s.formatBarVisible);
@@ -129,13 +133,34 @@ export function EditorSurface({
             className={aaOpen ? "aachip on" : "aachip"}
             aria-haspopup="dialog"
             aria-expanded={aaOpen}
-            onClick={() => setAaOpen(!aaOpen)}
+            onClick={() => {
+              setMetaOpen(false);
+              setAaOpen(!aaOpen);
+            }}
           >
             Aa
+          </button>
+          <button
+            type="button"
+            ref={metaChipRef}
+            className={metaOpen ? "aachip on" : "aachip"}
+            aria-haspopup="dialog"
+            aria-expanded={metaOpen}
+            aria-label="Metadata & lock"
+            title="Metadata & lock"
+            onClick={() => {
+              setAaOpen(false);
+              setMetaOpen(!metaOpen);
+            }}
+          >
+            <MetaGlyph size={15} />
           </button>
         </div>
       </div>
       {aaOpen && <AaPanel noteId={noteId} anchorRef={aaChipRef} onClose={() => setAaOpen(false)} />}
+      {metaOpen && (
+        <MetaPanel noteId={noteId} anchorRef={metaChipRef} onClose={() => setMetaOpen(false)} />
+      )}
       <CmEditor
         key={noteId}
         noteId={noteId}

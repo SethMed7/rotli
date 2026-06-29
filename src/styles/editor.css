@@ -665,6 +665,56 @@
   color: var(--text-muted);
   margin: 0 0 6px;
 }
+
+/* metadata panel (right of Aa) — the frontmatter view + the AI lock toggle */
+.metalock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  margin: 0 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--motion-exit) var(--motion-ease);
+}
+.metalock:hover:not(:disabled) {
+  background: var(--hov);
+}
+.metalock.on {
+  border-color: var(--accent);
+  color: var(--accent-text);
+  background: var(--tint);
+}
+.metalock svg {
+  flex: 0 0 auto;
+}
+.metafields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  margin: 4px 0 0;
+}
+.metafields dt {
+  color: var(--text-muted);
+}
+.metafields dd {
+  margin: 0;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.metaempty {
+  color: var(--text-muted);
+  margin: 4px 0 0;
+}
 .aarow {
   display: flex;
   gap: 6px;

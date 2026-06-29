@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Drag the corner to **resize** (width stored Obsidian-style, `![alt|420](…)`); click the image to
   edit the source. Images dropped outside the editor still land in Storage. (Enables the
   `protocol-asset` Tauri feature + a scoped `corpus_abs` resolver.)
+- **Metadata panel + AI lock.** A button right of `Aa` opens a panel showing the note's frontmatter
+  (id/created/updated + the AI-filled shelf/area/tags…) with a **lock** toggle — locking writes a
+  `locked: true` frontmatter line the eventual AI filer must respect ("don't touch this note"). The
+  line round-trips losslessly; the editor never sees it.
 
 ## [0.8.2] — 2026-06-28
 
