@@ -1,27 +1,25 @@
-// The Chat surface (Stage 1) — a real conversation over the connected memex's
-// chats/ surface ("everything has a chat"). rotli OWNS chats/, so a chat persists
-// as chats/<slug>.md (byte-shape from src/memex/contract.ts, proven against the
-// brain's own validate.ts). The reply comes from an on-device model via the Rust
-// `chat_complete` bridge (the webview CSP can't reach localhost).
+// The Chat surface — a real conversation over the connected memex's chats/ surface
+// ("everything has a chat"). rotli OWNS chats/, so a chat persists as
+// chats/<slug>.md (byte-shape from src/memex/contract.ts). The reply comes from an
+// on-device model via the Rust `chat_complete` bridge (the webview CSP can't reach
+// localhost).
 //
-// IA rework (Seth, 2026-06-26): Chat is no longer a full-surface front reached
-// from a dropdown — it is the middle LEFT-MENU section. The chat history + "New
-// chat" + "All chats" live in the Sidebar; this surface renders in the content
-// area (contentView "chat") and shows the SELECTED chat (ui.selectedChatSlug) or,
-// in browse mode (ui.chatAllOpen), a searchable list of every chat. The model the
-// reply runs on is picked here from the memex-ai store (~/.memex/ai/registry.json
-// via chat_models) — "the model selecter grabbing from what we have in the memex ai".
+// Pane-able (Seth, 2026-06-29): a chat is a PANE SURFACE now (surfaceKind "chat"),
+// so multiple chats open at once and a pane can hold a chat OR a note side by side.
+// This component is driven by props { paneId, chatSlug } — chatSlug null = a fresh
+// unsent chat; the first send creates the file and BINDS the tab to its slug.
 //
-// Still Increment 1: one-shot (no streaming), no @-context, no chat-owns-a-summary
-// note yet — those are later steps in docs/notes-chat-inbox-rearchitecture.md.
+// Still Increment 1: one-shot (no streaming), no @-context yet.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { activeInstance } from "../memex/config";
 import { readChat } from "../memex/service";
 import { useInstanceChats, useMemexConfig, useWriteChat } from "../memex/useMemex";
 import { chatComplete, chatModels, isTauri } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
+import { usePanesStore } from "../state/panes";
+import { renderInline } from "../editor/render";
 import { Character } from "./Character";
 
 interface Msg {
@@ -29,7 +27,7 @@ interface Msg {
   text: string;
 }
 
-/** Parse a chat .md's `## Messages` block back into bubbles. rotli writes the
+/** Parse a chat .md's `## Messages` block back into bubbles — rotli writes the
  * `**speaker** · date — text` shape (contract.ts), so this round-trips its own. */
 function parseMessages(body: string): Msg[] {
   const i = body.indexOf("## Messages");
@@ -57,29 +55,65 @@ function deriveTitle(text: string): string {
   return text.split(/\s+/).slice(0, 6).join(" ").slice(0, 60) || "New chat";
 }
 
-export function ChatSurface() {
+/** Render an assistant message as light markdown: ``` fenced code → <pre>, every
+ * other line via the editor's inline renderer (bold/italic/code/links), blank
+ * lines kept as gaps. Source-of-truth stays the .md; this is display only. */
+function renderMessage(text: string): ReactNode {
+  const out: ReactNode[] = [];
+  const lines = text.split("\n");
+  let i = 0;
+  let key = 0;
+  while (i < lines.length) {
+    const line = lines[i] ?? "";
+    if (line.trimStart().startsWith("```")) {
+      const code: string[] = [];
+      i++;
+      while (i < lines.length && !(lines[i] ?? "").trimStart().startsWith("```")) {
+        code.push(lines[i] ?? "");
+        i++;
+      }
+      i++; // skip the closing fence
+      out.push(
+        <pre key={key++} className="cmsg-code">
+          <code>{code.join("\n")}</code>
+        </pre>,
+      );
+    } else {
+      out.push(
+        <div key={key++} className="cmsg-line">
+          {line ? renderInline(line) : " "}
+        </div>,
+      );
+      i++;
+    }
+  }
+  return out;
+}
+
+export function ChatSurface({
+  paneId,
+  chatSlug,
+}: {
+  paneId: string;
+  chatSlug: string | null;
+}) {
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
-  const selectedSlug = useUiStore((s) => s.selectedChatSlug);
-  const setSelectedSlug = useUiStore((s) => s.setSelectedChatSlug);
-  const chatAllOpen = useUiStore((s) => s.chatAllOpen);
-  const setChatAllOpen = useUiStore((s) => s.setChatAllOpen);
   const chatModelId = useUiStore((s) => s.chatModelId);
   const setChatModelId = useUiStore((s) => s.setChatModelId);
+  const bindChat = usePanesStore((s) => s.bindChat);
 
   const cfg = useMemexConfig();
   const active = cfg.data ? activeInstance(cfg.data) : null;
   const chats = useInstanceChats(active);
   const write = useWriteChat();
 
-  // the on-device models the memex-ai store offers (kind:llm-chat). Read once;
-  // non-Tauri (the browser/dev demo) has no bridge, so the list stays empty.
+  // the on-device models the memex-ai store offers; non-Tauri has no bridge.
   const models = useQuery({
     queryKey: ["chat", "models"],
     queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
     staleTime: Infinity,
   });
   const modelList = models.data ?? [];
-  // the picked model: the saved choice, else the store's flagged default, else first.
   const picked =
     modelList.find((m) => m.id === chatModelId) ??
     modelList.find((m) => m.isDefault) ??
@@ -90,16 +124,15 @@ export function ChatSurface() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
-  const [browseFilter, setBrowseFilter] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const writable = active?.perms === "chats+inbox";
 
-  // load the selected chat's messages (or clear for a new chat)
+  // load THIS pane's chat (by slug), or clear for a fresh chat
   useEffect(() => {
     let cancelled = false;
-    if (active && selectedSlug) {
-      readChat(active, selectedSlug)
+    if (active && chatSlug) {
+      readChat(active, chatSlug)
         .then((t) => !cancelled && setMessages(parseMessages(t)))
         .catch(() => !cancelled && setMessages([]));
     } else {
@@ -108,22 +141,13 @@ export function ChatSurface() {
     return () => {
       cancelled = true;
     };
-  }, [active, selectedSlug]);
+  }, [active, chatSlug]);
 
   // keep the newest message in view
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight });
   }, [messages, busy]);
-
-  const openSettings = () => {
-    setSettingsOpen(true);
-  };
-
-  const openChat = (slug: string) => {
-    setChatAllOpen(false);
-    setSelectedSlug(slug);
-  };
 
   const send = async () => {
     if (!active || !writable || !message.trim() || busy) return;
@@ -156,12 +180,12 @@ export function ChatSurface() {
       { speaker: "rotli", text: reply },
     ];
     try {
-      if (selectedSlug) {
-        const sum = chats.data?.find((c) => c.slug === selectedSlug);
+      if (chatSlug) {
+        const sum = chats.data?.find((c) => c.slug === chatSlug);
         await write.mutateAsync({
           instance: active,
-          existingSlug: selectedSlug,
-          title: sum?.title ?? selectedSlug,
+          existingSlug: chatSlug,
+          title: sum?.title ?? chatSlug,
           messages: turn,
         });
       } else {
@@ -170,7 +194,7 @@ export function ChatSurface() {
           title: title.trim() || deriveTitle(userText),
           messages: turn,
         });
-        setSelectedSlug(res.slug);
+        bindChat(paneId, res.slug); // this tab now IS that chat
         setTitle("");
       }
     } catch {
@@ -178,22 +202,12 @@ export function ChatSurface() {
     }
   };
 
-  // the all-chats browse list (the sidebar "All chats" row opens this)
-  const browseList = useMemo(() => {
-    const q = browseFilter.trim().toLowerCase();
-    const all = chats.data ?? [];
-    if (!q) return all;
-    return all.filter(
-      (c) => (c.title || c.slug).toLowerCase().includes(q) || c.slug.toLowerCase().includes(q),
-    );
-  }, [chats.data, browseFilter]);
-
   return (
     <div className="chat-surface">
       <header className="chat-head">
-        <h2>Chat</h2>
+        <h2 className="chat-title-h">{chatSlug ? chatSlug.replace(/-/g, " ") : "New chat"}</h2>
         {active && <span className="chat-inst">· {active.label}</span>}
-        {/* the model selecter — what we have in the memex ai (~/.memex/ai) */}
+        <span className="chat-head-grow" />
         {modelList.length > 0 && (
           <label className="chat-model" title="On-device model — from your memex AI store">
             <span className="chat-model-label">Model</span>
@@ -215,69 +229,44 @@ export function ChatSurface() {
 
       {!isTauri() ? (
         <div className="chat-empty">
-          <Character name="chat" size={132} />
+          <Character name="chat" size={120} />
           <p>The Chat surface talks to your memex — it runs in the app.</p>
         </div>
       ) : !active ? (
         <div className="chat-empty">
-          <Character name="chat" size={132} />
+          <Character name="chat" size={120} />
           <p>No memex connected yet.</p>
-          <button type="button" className="chat-cta" onClick={openSettings}>
+          <button type="button" className="chat-cta" onClick={() => setSettingsOpen(true)}>
             Connect one in Settings → Location
           </button>
-        </div>
-      ) : chatAllOpen ? (
-        // browse mode: a searchable list of every chat (the sidebar shows a
-        // limited view; "All chats" opens the full search here)
-        <div className="chat-browse">
-          <div className="chat-browse-search">
-            <input
-              className="chat-input"
-              placeholder="Search all chats…"
-              value={browseFilter}
-              onChange={(e) => setBrowseFilter(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()}
-              autoFocus
-            />
-          </div>
-          <div className="chat-browse-list">
-            {browseList.map((c) => (
-              <button
-                type="button"
-                key={c.slug}
-                className="chat-item"
-                onClick={() => openChat(c.slug)}
-              >
-                <span className="chat-item-title">{c.title || c.slug}</span>
-                {c.attachedTo && <span className="chat-item-attach">↳ {c.attachedTo}</span>}
-              </button>
-            ))}
-            {browseList.length === 0 && (
-              <p className="chat-list-empty">
-                {(chats.data ?? []).length === 0 ? "No chats yet." : "No chats match."}
-              </p>
-            )}
-          </div>
         </div>
       ) : (
         <main className="chat-main">
           <div className="chat-scroll" ref={scrollRef}>
             {messages.length === 0 ? (
               <div className="chat-newhint">
-                <p>{selectedSlug ? "No messages yet." : "Ask anything — it runs on your Mac."}</p>
+                <Character name="chat" size={84} />
+                <p className="chat-hint-title">
+                  {chatSlug ? "No messages yet." : "Ask anything — it runs on your Mac."}
+                </p>
                 <p className="chat-sub">
                   Saved as a plain <code>chats/&lt;slug&gt;.md</code> in your memex.
                 </p>
               </div>
             ) : (
-              messages.map((m, idx) => (
-                <div key={idx} className={m.speaker === "you" ? "cmsg you" : "cmsg ai"}>
-                  <div className="cmsg-bubble">{m.text}</div>
-                </div>
-              ))
+              messages.map((m, idx) => {
+                const you = m.speaker === "you";
+                return (
+                  <div key={idx} className={you ? "cmsg you" : "cmsg ai"}>
+                    <div className="cmsg-who">{you ? "You" : "rotli"}</div>
+                    <div className="cmsg-bubble">{you ? m.text : renderMessage(m.text)}</div>
+                  </div>
+                );
+              })
             )}
             {busy && (
               <div className="cmsg ai">
+                <div className="cmsg-who">rotli</div>
                 <div className="cmsg-bubble cmsg-think">thinking…</div>
               </div>
             )}
@@ -285,9 +274,9 @@ export function ChatSurface() {
 
           {writable ? (
             <div className="chat-composer">
-              {!selectedSlug && (
+              {!chatSlug && (
                 <input
-                  className="chat-input"
+                  className="chat-input chat-title-input"
                   placeholder="Chat title (optional)…"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -295,9 +284,10 @@ export function ChatSurface() {
                 />
               )}
               <div className="chat-send-row">
-                <input
-                  className="chat-input"
-                  placeholder={busy ? "thinking…" : "Message…"}
+                <textarea
+                  className="chat-input chat-msg"
+                  rows={1}
+                  placeholder={busy ? "thinking…" : "Message…  (⏎ to send · ⇧⏎ new line)"}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyDown={(e) => {

@@ -54,7 +54,16 @@ export interface CanvasTab {
   viewState: TabViewState;
 }
 
-export type Tab = NoteTab | CanvasTab;
+/** A chat tab — chatSlug is the chats/<slug>.md basename, or null for a fresh
+ * unsent chat (the file is created on the first send, then the tab is bound to it). */
+export interface ChatTab {
+  id: string;
+  surfaceKind: "chat";
+  chatSlug: string | null;
+  viewState: TabViewState;
+}
+
+export type Tab = NoteTab | CanvasTab | ChatTab;
 
 export type SplitDir = "row" | "col";
 

@@ -328,6 +328,14 @@ function validTab(v: unknown, alive: Set<string>): Tab | null {
     if (typeof o.boardId !== "string" || !o.boardId) return null;
     return { id: o.id, surfaceKind: "canvas", boardId: o.boardId, viewState };
   }
+  if (o.surfaceKind === "chat") {
+    return {
+      id: o.id,
+      surfaceKind: "chat",
+      chatSlug: typeof o.chatSlug === "string" ? o.chatSlug : null,
+      viewState,
+    };
+  }
   if (o.surfaceKind !== "note") return null;
   if (typeof o.noteId !== "string" || !alive.has(o.noteId)) return null;
   return { id: o.id, surfaceKind: "note", noteId: o.noteId, viewState };

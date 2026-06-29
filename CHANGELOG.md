@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   type a value (Enter/blur saves), **×** removes, the bottom row **adds** a field. Reserved keys
   (id/created/updated/pinned/origin/locked) stay managed by rotli.
 
+### Changed
+- **Chat is a pane surface now.** A chat opens in a pane like a note or canvas — so **multiple
+  chats** can be open at once, and a pane can hold a **chat OR a note** (note left, chat right).
+  "New chat" / a chat row opens a chat pane; "All chats" expands the sidebar list; tabs/splits/
+  drag work on chats for free.
+
+### Fixed
+- **Chat UI rebuilt.** Role labels (you · rotli), assistant replies render as **markdown**
+  (bold/italic/code/links + fenced code blocks), a centered empty state, and a **multi-line
+  composer** (⏎ send · ⇧⏎ newline). User-right / AI-left bubbles, the model selector intact.
+
 ## [0.8.3] — 2026-06-29
 
 ### Added

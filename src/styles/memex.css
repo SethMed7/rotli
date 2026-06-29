@@ -541,25 +541,34 @@
    left + neutral. Plain text for now; markdown rendering rides the editor later. — */
 .cmsg {
   display: flex;
-  margin: 8px 0;
+  flex-direction: column;
+  gap: 3px;
+  margin: 10px 0;
 }
 .cmsg.you {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 .cmsg.ai {
-  justify-content: flex-start;
+  align-items: flex-start;
+}
+.cmsg-who {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 0 5px;
 }
 .cmsg-bubble {
-  max-width: 76%;
+  max-width: 82%;
   padding: 9px 13px;
   border-radius: 14px;
   font-size: 14px;
   line-height: 1.5;
-  white-space: pre-wrap;
   word-break: break-word;
   color: var(--text);
 }
 .cmsg.you .cmsg-bubble {
+  white-space: pre-wrap;
   background: color-mix(in srgb, var(--accent) 20%, transparent);
   border-bottom-right-radius: 5px;
 }
@@ -567,7 +576,62 @@
   background: color-mix(in srgb, var(--text) 7%, transparent);
   border-bottom-left-radius: 5px;
 }
+.cmsg-line {
+  min-height: 0.5em;
+}
+.cmsg-line + .cmsg-line {
+  margin-top: 3px;
+}
+.cmsg-code {
+  margin: 7px 0;
+  padding: 8px 11px;
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 9px;
+  font-family: var(--font-mono, ui-monospace, "SF Mono", monospace);
+  font-size: 12.5px;
+  overflow-x: auto;
+  white-space: pre;
+}
+.cmsg-code code {
+  font: inherit;
+}
 .cmsg-think {
   color: var(--text-muted);
   font-style: italic;
+}
+/* head: chat title + grow spacer + the model selector on one line */
+.chat-head-grow {
+  flex: 1 1 auto;
+}
+.chat-title-h {
+  font-size: 14px;
+  font-weight: 650;
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* empty state: centered character + hint */
+.chat-newhint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  margin: auto;
+  padding: 28px;
+  color: var(--text-muted);
+}
+.chat-hint-title {
+  font-size: 15px;
+  color: var(--text);
+  margin: 6px 0 0;
+}
+/* composer: a growing multi-line message box */
+.chat-msg {
+  resize: none;
+  min-height: 38px;
+  max-height: 160px;
+  line-height: 1.4;
+  font-family: inherit;
 }

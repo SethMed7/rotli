@@ -32,6 +32,10 @@ function makeCanvasTab(boardId: string): Tab {
   return { id: ulid(), surfaceKind: "canvas", boardId, viewState: { cursor: 0, scroll: 0 } };
 }
 
+function makeChatTab(chatSlug: string | null): Tab {
+  return { id: ulid(), surfaceKind: "chat", chatSlug, viewState: { cursor: 0, scroll: 0 } };
+}
+
 /** The noteId of a tab, or null for a canvas tab — the one place every
  * `.noteId` read funnels through so a CanvasTab never crashes NoteTab code. */
 function tabNoteId(tab: Tab): string | null {
@@ -40,7 +44,9 @@ function tabNoteId(tab: Tab): string | null {
 
 /** Duplicate a tab (its surface target), fresh identity — for splits / ⌘T. */
 function duplicateTab(tab: Tab): Tab {
-  return tab.surfaceKind === "canvas" ? makeCanvasTab(tab.boardId) : makeTab(tab.noteId);
+  if (tab.surfaceKind === "canvas") return makeCanvasTab(tab.boardId);
+  if (tab.surfaceKind === "chat") return makeChatTab(tab.chatSlug);
+  return makeTab(tab.noteId);
 }
 
 function makeLeaf(tab: Tab): LeafNode {
@@ -254,6 +260,11 @@ interface PanesState {
   openCanvas: (boardId: string, opts?: { newTab?: boolean }) => void;
   /** Retarget every open canvas tab pointing at `oldId` to `newId` (board rename). */
   retargetBoard: (oldId: string, newId: string) => void;
+  /** Open a chat in the focused pane (replace, or `newTab`). `chatSlug` null = a
+   * fresh unsent chat. */
+  openChat: (chatSlug: string | null, opts?: { newTab?: boolean }) => void;
+  /** Bind a freshly-created chat (in `paneId`'s active chat tab) to its new slug. */
+  bindChat: (paneId: string, chatSlug: string) => void;
   newTab: () => void;
   closeTab: () => void;
   closeTabById: (paneId: string, tabId: string) => void;
@@ -407,10 +418,49 @@ export const usePanesStore = create<PanesState>((set, get) => {
         ),
       })),
 
+    openChat: (chatSlug, opts) => {
+      // chats aren't notes — no touchMru. Like openCanvas, surface the panes.
+      useUiStore.getState().setContentView("panes");
+      const leaf = focusedLeaf();
+      set({
+        root: updateLeaf(get().root, leaf.id, (l) => {
+          if (opts?.newTab) {
+            const tab = makeChatTab(chatSlug);
+            return { ...l, tabs: [...l.tabs, tab], activeTabId: tab.id };
+          }
+          // replace: keep the tab id, swap the WHOLE tab to a chat tab
+          return {
+            ...l,
+            tabs: l.tabs.map((t) =>
+              t.id === l.activeTabId
+                ? {
+                    id: l.activeTabId,
+                    surfaceKind: "chat",
+                    chatSlug,
+                    viewState: { cursor: 0, scroll: 0 },
+                  }
+                : t,
+            ),
+          };
+        }),
+      });
+    },
+
+    bindChat: (paneId, chatSlug) =>
+      set((s) => ({
+        root: updateLeaf(s.root, paneId, (l) => ({
+          ...l,
+          tabs: l.tabs.map((t) =>
+            t.id === l.activeTabId && t.surfaceKind === "chat" ? { ...t, chatSlug } : t,
+          ),
+        })),
+      })),
+
     newTab: () => {
       const leaf = focusedLeaf();
       const active = activeTabOf(leaf);
       if (active.surfaceKind === "canvas") get().openCanvas(active.boardId, { newTab: true });
+      else if (active.surfaceKind === "chat") get().openChat(active.chatSlug, { newTab: true });
       else get().openNote(active.noteId, { newTab: true });
     },
 
@@ -624,5 +674,16 @@ export function useFocusedBoardId(): string | null {
     if (!leaf) return null;
     const tab = leaf.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf.tabs[0];
     return tab && tab.surfaceKind === "canvas" ? tab.boardId : null;
+  });
+}
+
+/** The chat companion: the focused pane's active chat slug (null when the active
+ * tab isn't a chat). The Sidebar's chat rows light up against this. */
+export function useFocusedChatSlug(): string | null {
+  return usePanesStore((s) => {
+    const leaf = findLeaf(s.root, s.focusedPaneId) ?? leaves(s.root)[0];
+    if (!leaf) return null;
+    const tab = leaf.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf.tabs[0];
+    return tab && tab.surfaceKind === "chat" ? tab.chatSlug : null;
   });
 }

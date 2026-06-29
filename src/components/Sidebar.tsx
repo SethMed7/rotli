@@ -49,7 +49,12 @@ import {
   isRootMarker,
   isVault,
 } from "../services/destinations";
-import { useFocusedBoardId, useFocusedNoteId, usePanesStore } from "../state/panes";
+import {
+  useFocusedBoardId,
+  useFocusedChatSlug,
+  useFocusedNoteId,
+  usePanesStore,
+} from "../state/panes";
 import { ALL_NOTES, RECENT, SEC_CHAT, SEC_INBOX, SEC_NOTES, useUiStore } from "../state/ui";
 import { activeInstance } from "../memex/config";
 import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
@@ -451,8 +456,6 @@ export function Sidebar() {
   const memexCfg = useMemexConfig();
   const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
   const chatList = useInstanceChats(activeMemex).data ?? [];
-  const selectedChatSlug = useUiStore((s) => s.selectedChatSlug);
-  const setSelectedChatSlug = useUiStore((s) => s.setSelectedChatSlug);
   const chatAllOpen = useUiStore((s) => s.chatAllOpen);
   const setChatAllOpen = useUiStore((s) => s.setChatAllOpen);
 
@@ -468,7 +471,9 @@ export function Sidebar() {
   const focusedBoardId = useFocusedBoardId();
   const openNote = usePanesStore((s) => s.openNote);
   const openCanvas = usePanesStore((s) => s.openCanvas);
+  const openChat = usePanesStore((s) => s.openChat);
   const retargetBoard = usePanesStore((s) => s.retargetBoard);
+  const focusedChatSlug = useFocusedChatSlug();
   const renamingBoardId = useUiStore((s) => s.renamingBoardId);
   const setRenamingBoardId = useUiStore((s) => s.setRenamingBoardId);
   const [filter, setFilter] = useState("");
@@ -986,23 +991,12 @@ export function Sidebar() {
     </span>
   );
 
-  // — Chat section openers: each opens the Chat surface in the content area (the
-  //   sidebar stays put), driving the same ui state ChatSurface reads. —
-  const isChatView = contentView === "chat";
-  const openNewChat = () => {
-    setChatAllOpen(false);
-    setSelectedChatSlug(null);
-    setContentView("chat");
-  };
-  const openAllChats = () => {
-    setChatAllOpen(true);
-    setContentView("chat");
-  };
-  const openChatRow = (slug: string) => {
-    setChatAllOpen(false);
-    setSelectedChatSlug(slug);
-    setContentView("chat");
-  };
+  // — Chat openers: chats open as PANES now (a pane holds a chat OR a note, side
+  //   by side, multiple at once), so "New chat"/a row opens a chat pane; "All
+  //   chats" just expands the sidebar list. The open chat = the focused pane's. —
+  const openNewChat = () => openChat(null);
+  const openAllChats = () => setChatAllOpen(!chatAllOpen);
+  const openChatRow = (slug: string) => openChat(slug);
 
   // a top-level section header (Inbox · Chat · Notes): a clickable disclosure row
   // that toggles its accordion (state persisted in expandedDests under SEC_*).
@@ -1165,7 +1159,7 @@ export function Sidebar() {
             </button>
             <button
               type="button"
-              className={`sb-chatrow all${isChatView && chatAllOpen ? " sel" : ""}`}
+              className={`sb-chatrow all${chatAllOpen ? " sel" : ""}`}
               onClick={openAllChats}
             >
               <SearchGlyph size={13} />
@@ -1182,13 +1176,11 @@ export function Sidebar() {
             ) : chatList.length === 0 ? (
               <p className="sb-chat-empty">No chats yet.</p>
             ) : (
-              chatList.slice(0, CHAT_SECTION_LIMIT).map((c) => (
+              (chatAllOpen ? chatList : chatList.slice(0, CHAT_SECTION_LIMIT)).map((c) => (
                 <button
                   type="button"
                   key={c.slug}
-                  className={`sb-chatrow${
-                    isChatView && !chatAllOpen && selectedChatSlug === c.slug ? " sel" : ""
-                  }`}
+                  className={`sb-chatrow${focusedChatSlug === c.slug ? " sel" : ""}`}
                   onClick={() => openChatRow(c.slug)}
                   title={c.title || c.slug}
                 >
@@ -1197,9 +1189,9 @@ export function Sidebar() {
                 </button>
               ))
             )}
-            {chatList.length > CHAT_SECTION_LIMIT && (
+            {!chatAllOpen && chatList.length > CHAT_SECTION_LIMIT && (
               <button type="button" className="sb-chat-more" onClick={openAllChats}>
-                +{chatList.length - CHAT_SECTION_LIMIT} more in All chats
+                +{chatList.length - CHAT_SECTION_LIMIT} more
               </button>
             )}
           </div>

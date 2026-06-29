@@ -14,6 +14,7 @@ import {
   useRef,
 } from "react";
 import { EditorSurface } from "../editor/EditorSurface";
+import { ChatSurface } from "./ChatSurface";
 import { activeTabOf, leaves, usePanesStore } from "../state/panes";
 import type { LeafNode, PaneNode, SplitNode } from "../types";
 import { TabStrip } from "./TabStrip";
@@ -52,6 +53,9 @@ function LeafView({ node }: { node: LeafNode }) {
           <Suspense fallback={<div className="canvas-surface" />}>
             <CanvasSurface key={tab.id} paneId={node.id} boardId={tab.boardId} />
           </Suspense>
+        )}
+        {tab.surfaceKind === "chat" && (
+          <ChatSurface key={tab.id} paneId={node.id} chatSlug={tab.chatSlug} />
         )}
         {/* split-detach preview — mounted only mid-drag, pointer-events:none
             (the controller hit-tests the pane body, not this overlay) */}
