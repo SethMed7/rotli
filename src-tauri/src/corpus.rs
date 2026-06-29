@@ -829,7 +829,43 @@ fn field_key(line: &str) -> Option<&str> {
 
 /// Keys rotli owns directly — the metadata-panel editor touches only OTHER
 /// (foreign) keys; `locked` goes through set_locked, the rest are derived.
-const RESERVED_KEYS: [&str; 6] = ["id", "created", "updated", "pinned", "origin", "locked"];
+const RESERVED_KEYS: [&str; 7] =
+    ["id", "created", "updated", "pinned", "origin", "locked", "secure"];
+
+/// A frontmatter line setting the per-note SECURE flag (`secure: true`).
+fn secure_field(line: &str) -> Option<bool> {
+    let (k, v) = line.split_once(':')?;
+    (k.trim() == "secure").then(|| v.trim() == "true")
+}
+
+/// High-signal secret patterns — API keys, private keys, JWTs, SSNs, card numbers.
+/// ANY match → the note holds secrets: it's flagged `secure: true`, its content is
+/// never sent to a REMOTE model, and its path is gitignored (Seth, 2026-06-29).
+fn looks_secure(text: &str) -> bool {
+    use std::sync::OnceLock;
+    static PATTERNS: OnceLock<Vec<regex::Regex>> = OnceLock::new();
+    let pats = PATTERNS.get_or_init(|| {
+        [
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
+            r"-----BEGIN PGP",
+            r"sk-ant-[A-Za-z0-9_-]{16}",
+            r"\b(?:sk|pk|rk)_[A-Za-z0-9]{20}",
+            r"github_pat_[A-Za-z0-9_]{20}",
+            r"\bgh[posru]_[A-Za-z0-9]{20}",
+            r"AIza[A-Za-z0-9_-]{20}",
+            r"\bxox[baprs]-[A-Za-z0-9-]{10}",
+            r"whsec_[A-Za-z0-9+/]{16}",
+            r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{6,}",
+            r"\b\d{3}-\d{2}-\d{4}\b",
+            r"\b\d{4}[ -]\d{6}[ -]\d{5}\b",
+            r"\b\d{4}[ -]\d{4}[ -]\d{4}[ -]\d{4}\b",
+        ]
+        .iter()
+        .filter_map(|p| regex::Regex::new(p).ok())
+        .collect()
+    });
+    pats.iter().any(|re| re.is_match(text))
+}
 
 /// The note frontmatter the metadata panel reads: the typed facts, the lock state,
 /// and every other ("foreign") frontmatter line for display (shelf/reach/area/…).
@@ -840,6 +876,7 @@ pub struct FrontmatterView {
     pub created: String,
     pub updated: String,
     pub locked: bool,
+    pub secure: bool,
     pub fields: Vec<String>,
 }
 
@@ -1346,13 +1383,26 @@ impl CorpusStore {
     /// Read a note's frontmatter for the metadata panel — the typed facts plus the
     /// lock state and every foreign line (shelf/reach/area/summary/tags/links/…).
     fn read_frontmatter(&self, rel: &str) -> Result<FrontmatterView, String> {
-        let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
-        let fm = parse_document(&text).0.unwrap_or_default();
+        let path = self.abs(rel);
+        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let (fm_opt, body) = parse_document(&text);
+        let mut fm = fm_opt.unwrap_or_default();
         let locked = fm.foreign.iter().any(|l| locked_field(l) == Some(true));
+        let mut secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
+        // auto-flag: secrets detected + not yet marked → set secure:true + gitignore.
+        // The detector is the regex pass today; the local LLM refines it later.
+        if !secure && looks_secure(body) {
+            fm.foreign.push("secure: true".to_string());
+            atomic_write(&path, &compose_document(&fm, body))?;
+            self.gitignore_add(rel);
+            secure = true;
+        }
         let fields = fm
             .foreign
             .iter()
-            .filter(|l| !l.trim().is_empty() && locked_field(l).is_none())
+            .filter(|l| {
+                !l.trim().is_empty() && locked_field(l).is_none() && secure_field(l).is_none()
+            })
             .cloned()
             .collect();
         Ok(FrontmatterView {
@@ -1360,6 +1410,7 @@ impl CorpusStore {
             created: fm.created.unwrap_or_default(),
             updated: fm.updated.unwrap_or_default(),
             locked,
+            secure,
             fields,
         })
     }
@@ -1399,6 +1450,59 @@ impl CorpusStore {
             fm.foreign.push(format!("{key}: {value}"));
         }
         atomic_write(&path, &compose_document(&fm, body))
+    }
+
+    /// Append a path to the corpus `.gitignore` (idempotent) — a secure note must
+    /// never be pushed when the corpus is a git repo.
+    fn gitignore_add(&self, rel: &str) {
+        let path = self.root.join(".gitignore");
+        let existing = fs::read_to_string(&path).unwrap_or_default();
+        if existing.lines().any(|l| l.trim() == rel) {
+            return;
+        }
+        let mut out = existing;
+        if !out.is_empty() && !out.ends_with('\n') {
+            out.push('\n');
+        }
+        out.push_str(rel);
+        out.push('\n');
+        let _ = atomic_write(&path, &out);
+    }
+
+    /// Toggle the per-note SECURE flag. When set, the note's path is gitignored so a
+    /// pushed vault never leaks it. Preserves the body + every other frontmatter line.
+    fn set_secure(&self, rel: &str, secure: bool) -> Result<(), String> {
+        let path = self.abs(rel);
+        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let (fm, body) = parse_document(&text);
+        let mut fm = fm.unwrap_or_default();
+        fm.foreign.retain(|l| secure_field(l).is_none());
+        if secure {
+            fm.foreign.push("secure: true".to_string());
+        }
+        atomic_write(&path, &compose_document(&fm, body))?;
+        if secure {
+            self.gitignore_add(rel);
+        }
+        Ok(())
+    }
+
+    /// Read a note FOR an AI model. A SECURE note (secrets detected) is refused to a
+    /// REMOTE model — its content must never leave the device; a local model is fine.
+    fn read_for_ai(&self, rel: &str, model_is_local: bool) -> Result<String, String> {
+        let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
+        let secure = parse_document(&text)
+            .0
+            .unwrap_or_default()
+            .foreign
+            .iter()
+            .any(|l| secure_field(l) == Some(true));
+        if secure && !model_is_local {
+            return Err(
+                "This note is marked secure (it contains secrets) and can't be sent to a remote model — switch to a local model to read it.".into(),
+            );
+        }
+        Ok(text)
     }
 
     /// First run: the corpus is born with Inbox and ONE warm welcome note.
@@ -2520,6 +2624,28 @@ pub fn corpus_set_field(
     state.route(&root, |s| s.set_field(&rel, &key, &value))
 }
 
+/// Toggle the per-note SECURE flag (secrets detected → never sent remote + gitignored).
+#[tauri::command]
+pub fn corpus_set_secure(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    secure: bool,
+) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.set_secure(&rel, secure))
+}
+
+/// Read a note for an AI model — refused for a SECURE note unless the model is local.
+#[tauri::command]
+pub fn corpus_read_ai(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    model_is_local: bool,
+) -> Result<String, String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.read_for_ai(&rel, model_is_local))
+}
+
 #[tauri::command]
 pub fn corpus_write(
     state: tauri::State<'_, CorpusState>,
@@ -2775,6 +2901,22 @@ mod tests {
         assert_eq!(cfg.corpus.abs_path, default_corpus);
         assert!(cfg.brains.is_empty());
         assert!(cfg.active_brain_id.is_none());
+    }
+
+    #[test]
+    fn looks_secure_catches_common_secrets() {
+        assert!(looks_secure("key: sk-ant-api03-EXAMPLE0EXAMPLE0EXAM"));
+        assert!(looks_secure("-----BEGIN RSA PRIVATE KEY-----\nMIIEowIB"));
+        assert!(looks_secure("SSN: 078-05-1120"));
+        assert!(looks_secure(
+            "tok eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4f"
+        ));
+        assert!(looks_secure("github_pat_11EXAMPLE0EXAMPLE0EXAM"));
+        assert!(looks_secure("AIzaSyExample0Example0Example0Example0E"));
+        assert!(looks_secure("card 3782 822463 10005")); // amex grouping
+        // plain notes are NOT secure (no false positives on phone/time)
+        assert!(!looks_secure("A normal note — groceries, weather, call 555-1234 at 3pm."));
+        assert!(!looks_secure("Meeting notes: ship v2, review the gateway flow."));
     }
 
     #[test]

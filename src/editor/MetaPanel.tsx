@@ -12,9 +12,10 @@ import {
   corpusFrontmatter,
   corpusSetField,
   corpusSetLocked,
+  corpusSetSecure,
 } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
-import { LockGlyph } from "../components/glyphs";
+import { LockGlyph, ShieldGlyph } from "../components/glyphs";
 
 export function MetaPanel({
   noteId,
@@ -65,6 +66,9 @@ export function MetaPanel({
   const toggleLock = () => {
     if (fm) void run(() => corpusSetLocked(noteId, !fm.locked));
   };
+  const toggleSecure = () => {
+    if (fm) void run(() => corpusSetSecure(noteId, !fm.secure));
+  };
   const saveField = (key: string, value: string) => run(() => corpusSetField(noteId, key, value));
   const addField = () => {
     if (!newKey.trim()) return;
@@ -84,6 +88,20 @@ export function MetaPanel({
       >
         <LockGlyph size={15} open={!fm?.locked} />
         <span>{fm?.locked ? "Locked — the AI won't touch this note" : "Lock from the AI"}</span>
+      </button>
+      <button
+        type="button"
+        className={fm?.secure ? "metalock on" : "metalock"}
+        disabled={busy || !fm}
+        onClick={toggleSecure}
+        title="A secure note's content is never sent to a remote model, and its file is gitignored."
+      >
+        <ShieldGlyph size={15} />
+        <span>
+          {fm?.secure
+            ? "Secure — secrets detected · on-device only · gitignored"
+            : "Mark secure (keep off remote AI)"}
+        </span>
       </button>
       <div className="aalabel">Metadata</div>
       {!fm ? (

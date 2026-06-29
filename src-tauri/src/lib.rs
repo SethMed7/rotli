@@ -679,6 +679,8 @@ pub fn run() {
             corpus::corpus_frontmatter,
             corpus::corpus_set_locked,
             corpus::corpus_set_field,
+            corpus::corpus_set_secure,
+            corpus::corpus_read_ai,
             corpus::corpus_write,
             corpus::corpus_create,
             corpus::corpus_delete,

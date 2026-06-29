@@ -2795,9 +2795,10 @@ dependencies = [
 
 [[package]]
 name = "rotli"
-version = "0.8.5"
+version = "0.8.6"
 dependencies = [
  "notify",
+ "regex",
  "serde",
  "serde_json",
  "tauri",

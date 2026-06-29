@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6] — 2026-06-29
+
+### Added
+- **Secure notes.** A regex pass detects secret patterns (API/private keys, JWTs, SSNs, card
+  numbers) and auto-flags a note `secure: true` — **without recording the secret**. A secure note's
+  content is **never sent to a remote model** (the `corpus_read_ai` gate refuses it; a local model
+  like gemma may still read it), and its file is **auto-gitignored** so a pushed vault never leaks it.
+  The metadata panel shows the flag with a manual toggle.
+
 ## [0.8.5] — 2026-06-29
 
 ### Added

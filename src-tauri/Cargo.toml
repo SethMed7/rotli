@@ -1,6 +1,6 @@
 [package]
 name = "rotli"
-version = "0.8.5"
+version = "0.8.6"
 description = "rotli — warm, local-first, hotkey-driven notes for the Mac menu bar"
 authors = ["Seth Medina"]
 edition = "2021"
@@ -27,6 +27,7 @@ tauri-plugin-process = "2"                                       # relaunch() af
 ureq = { version = "2", features = ["json"] }                   # Chat front: POST the on-device model from Rust (the webview CSP blocks localhost)
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+regex = "1"                                                     # secret-pattern detection (the `secure` flag)
 # Phase 2 — the corpus (plain .md files become real)
 notify = "8"                                                     # fs watcher (external edits → UI refresh)
 ulid = "1"                                                       # note identity (time-sortable, matches the TS ulid)

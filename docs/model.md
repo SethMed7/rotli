@@ -44,8 +44,10 @@ second. Read or write per its perms.
 
 **Access** — who may see/use a note is **metadata**, not a separate ACL: the note's
 `reach` (who) + `owner` (origin) frontmatter, a per-note **`locked`** flag (the metadata
-panel's lock — the AI filer skips a locked note), plus the memex access mode
-(`local`/`open`/`secure`). The AI maintains both organization AND access via metadata.
+panel's lock — the AI filer skips a locked note), a per-note **`secure`** flag (secrets
+auto-detected → the note is never sent to a *remote* model and its file is gitignored;
+a local model may still read it), plus the memex access mode (`local`/`open`/`secure`).
+The AI maintains both organization AND access via metadata.
 
 ## What rotli writes (the contract — v3.6, band [3.4, 3.6])
 

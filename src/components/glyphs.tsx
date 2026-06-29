@@ -196,6 +196,16 @@ export function LockGlyph({ open = false, ...props }: GlyphProps & { open?: bool
   );
 }
 
+/** A shield with a check — the per-note "secure" flag (secrets detected). */
+export function ShieldGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z" />
+      <path d="M9.2 12l1.9 1.9L15 10" />
+    </Glyph>
+  );
+}
+
 /** A properties/metadata list — dotted rows (opens the metadata panel). */
 export function MetaGlyph(props: GlyphProps) {
   return (

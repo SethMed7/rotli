@@ -402,6 +402,8 @@ export interface FrontmatterView {
   created: string;
   updated: string;
   locked: boolean;
+  /** Secrets detected (auto-flagged) → never sent to a remote model + gitignored. */
+  secure: boolean;
   /** the foreign frontmatter lines (shelf/reach/area/summary/tags/links/…). */
   fields: string[];
 }
@@ -422,6 +424,19 @@ export async function corpusSetLocked(id: string, locked: boolean): Promise<void
 export async function corpusSetField(id: string, key: string, value: string): Promise<void> {
   if (!isTauri()) return;
   await invoke("corpus_set_field", { id, key, value });
+}
+
+/** Toggle the per-note SECURE flag (secrets → never sent remote, gitignored). */
+export async function corpusSetSecure(id: string, secure: boolean): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_set_secure", { id, secure });
+}
+
+/** Read a note for an AI model — REJECTS a secure note unless the model is local
+ * (the remote-read gate; the future @-context path calls this). */
+export async function corpusReadAi(id: string, modelIsLocal: boolean): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_read_ai", { id, modelIsLocal });
 }
 
 // ——— the unified Location model (corpus.json) — ONE folder = your notes = your
