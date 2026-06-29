@@ -28,9 +28,28 @@ RELEASES_REPO="${ROTLI_RELEASES_REPO:-SethMed7/rotli-releases}"
 UPDATER_KEY="${ROTLI_UPDATER_KEY:-$HOME/.rotli-updater.key}"
 ENTITLEMENTS="src-tauri/entitlements.plist"
 PUBLISH=0
-[ "${1:-}" = "--publish" ] && PUBLISH=1
+LAUNCH=0   # --launch unlocks a major≥1 version (the public 1.0 launch); see the guard below
+for arg in "$@"; do
+  case "$arg" in
+    --publish) PUBLISH=1 ;;
+    --launch)  LAUNCH=1 ;;
+  esac
+done
 
 VER="$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("src-tauri/tauri.conf.json","utf8")).version)')"
+
+# ── 1.0 guard ────────────────────────────────────────────────────────────────
+# Version 1.x is RESERVED for the FIRST PUBLIC LAUNCH. Everything now is 0.x
+# beta/dev. Refuse to build a major ≥ 1 unless --launch is passed explicitly, so
+# no future session or stray version bump ever ships "1.0" by accident.
+MAJOR="${VER%%.*}"
+if [ "$MAJOR" -ge 1 ] && [ "$LAUNCH" -eq 0 ]; then
+  echo "✗ version $VER has major ≥ 1 — RESERVED for the first live (1.0) launch."
+  echo "  All current releases are 0.x beta/dev. If this truly IS the launch, run:"
+  echo "    bash scripts/release.sh --publish --launch"
+  exit 1
+fi
+
 APP="src-tauri/target/release/bundle/macos/rotli.app"
 TARGZ="$APP.tar.gz"
 SIG="$APP.tar.gz.sig"
