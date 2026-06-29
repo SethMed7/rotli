@@ -1,7 +1,7 @@
 // Tauri seam — every Tauri API call in the frontend goes through here, guarded
 // by isTauri(), so the whole UI renders in a plain browser (vite dev, no shell).
 
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -370,6 +370,23 @@ export async function corpusOpenFile(id: string): Promise<void> {
 export async function corpusImportFile(rootId: string, path: string): Promise<string> {
   if (!isTauri()) return "";
   return invoke<string>("corpus_import_file", { rootId, path });
+}
+
+/** Absolute path for a corpus-relative path (e.g. a `storage:` asset). */
+export async function corpusAbs(rootId: string, rel: string): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_abs", { rootId, rel });
+}
+
+/** Turn an image `src` from markdown into a displayable URL. `storage:NAME` →
+ * the asset-protocol URL for `<corpus>/storage/NAME`; http/https/data/blob/asset
+ * pass through; a bare relative path is treated as corpus-relative. macOS's
+ * case-insensitive FS means `storage:` also resolves a legacy `Storage/` folder. */
+export async function resolveImageSrc(src: string, rootId = "default"): Promise<string> {
+  if (/^(https?:|data:|blob:|asset:)/i.test(src)) return src;
+  const rel = src.startsWith("storage:") ? `storage/${src.slice("storage:".length)}` : src;
+  const abs = await corpusAbs(rootId, rel);
+  return abs ? convertFileSrc(abs) : "";
 }
 
 // ——— the unified Location model (corpus.json) — ONE folder = your notes = your

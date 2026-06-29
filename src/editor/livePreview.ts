@@ -27,6 +27,7 @@ import {
 import { parseBlock } from "./render";
 import { lineInFence, scanFences } from "./fences";
 import { lineInTable, scanTables } from "./tables";
+import { resolveImageSrc } from "../lib/tauri";
 
 interface Sel {
   from: number;
@@ -81,6 +82,9 @@ const INLINE: InlineRule[] = [
   },
   { re: /\*([^*\s](?:[^*]*[^*\s])?)\*/, cls: "rotli-em", parts: fixed(1, 1) },
 ];
+
+// a line that is JUST an image — ![alt](url) or ![caption|width](url)
+const IMG_LINE = /^\s*!\[([^\]]*)\]\(([^)]+)\)\s*$/;
 
 // ——— widgets ———
 
@@ -144,6 +148,68 @@ class CheckboxWidget extends WidgetType {
       view.dispatch({ changes: { from: line.from, to: line.from + m[0].length, insert: next } });
     });
     return btn;
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
+// An inline image: replaces a `![alt](src)` line with the rendered <img>. `storage:`
+// srcs resolve through the asset protocol. The alt may carry an Obsidian-style
+// width ("caption|420"); a corner grip resizes and rewrites that width into the
+// markdown (the .md stays the source of truth). Click the image → caret lands →
+// source reveals (click-to-edit), like the fenced render blocks.
+class ImgWidget extends WidgetType {
+  constructor(
+    readonly alt: string,
+    readonly src: string,
+  ) {
+    super();
+  }
+  eq(o: ImgWidget) {
+    return o.alt === this.alt && o.src === this.src;
+  }
+  toDOM(view: EditorView) {
+    const wrap = document.createElement("span");
+    wrap.className = "rotli-img";
+    const bar = this.alt.lastIndexOf("|");
+    const caption = bar >= 0 ? this.alt.slice(0, bar) : this.alt;
+    const w = bar >= 0 ? Number.parseInt(this.alt.slice(bar + 1), 10) : Number.NaN;
+    const img = document.createElement("img");
+    img.alt = caption;
+    img.draggable = false;
+    if (Number.isFinite(w) && w > 0) img.style.width = `${w}px`;
+    wrap.appendChild(img);
+    void resolveImageSrc(this.src).then((url) => {
+      if (url) img.src = url;
+    });
+    const grip = document.createElement("span");
+    grip.className = "rotli-img-resize";
+    grip.setAttribute("aria-hidden", "true");
+    grip.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startW = img.getBoundingClientRect().width;
+      const onMove = (ev: MouseEvent) => {
+        img.style.width = `${Math.max(60, Math.round(startW + (ev.clientX - startX)))}px`;
+      };
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        const width = Math.round(img.getBoundingClientRect().width);
+        const pos = view.posAtDOM(wrap);
+        const line = view.state.doc.lineAt(pos);
+        const newAlt = caption ? `${caption}|${width}` : `|${width}`;
+        view.dispatch({
+          changes: { from: line.from, to: line.to, insert: `![${newAlt}](${this.src})` },
+        });
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    });
+    wrap.appendChild(grip);
+    return wrap;
   }
   ignoreEvent() {
     return false;
@@ -262,6 +328,16 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
       const lineTouched = sel.from <= line.to && sel.to >= ls;
       const contentBase = prefixEnd;
       const content = text.slice(block.prefixLen);
+
+      // a line that is JUST an image renders inline; caret in the line reveals source
+      const imgM = IMG_LINE.exec(text);
+      if (imgM && !lineTouched && line.to > ls) {
+        const d = Decoration.replace({ widget: new ImgWidget(imgM[1] ?? "", imgM[2] ?? "") });
+        decos.push(d.range(ls, line.to));
+        atomics.push(d.range(ls, line.to));
+        pos = line.to + 1;
+        continue;
+      }
 
       switch (block.kind) {
         case "h1":

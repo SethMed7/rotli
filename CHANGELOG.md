@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   persists in `.rotli/settings.json`, never in your notes.
 - **`svg` code blocks render inline** — a ` ```svg ` fenced block shows the vector; click it to edit
   the source (the code ⇄ preview toggle), joining the existing math/mermaid/jsxgraph block renderers.
+- **Inline images.** Drag an image from Finder onto the editor → it imports into `storage/` and
+  drops in at your cursor as a clean `![](storage:…)` link, rendered inline via the asset protocol.
+  Drag the corner to **resize** (width stored Obsidian-style, `![alt|420](…)`); click the image to
+  edit the source. Images dropped outside the editor still land in Storage. (Enables the
+  `protocol-asset` Tauri feature + a scoped `corpus_abs` resolver.)
 
 ## [0.8.2] — 2026-06-28
 

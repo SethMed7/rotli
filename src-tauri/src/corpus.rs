@@ -2390,6 +2390,17 @@ pub fn corpus_import_file(
     Ok(compose_root_id(&root_id, &rel))
 }
 
+/// Resolve a corpus-relative path (e.g. a `storage:` asset) to its ABSOLUTE path,
+/// so the frontend can convertFileSrc() it into an asset-protocol <img> URL.
+#[tauri::command]
+pub fn corpus_abs(
+    state: tauri::State<'_, CorpusState>,
+    root_id: String,
+    rel: String,
+) -> Result<String, String> {
+    state.route(&root_id, |s| Ok(s.abs(&rel).to_string_lossy().into_owned()))
+}
+
 #[tauri::command]
 pub fn corpus_write(
     state: tauri::State<'_, CorpusState>,

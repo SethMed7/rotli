@@ -675,6 +675,7 @@ pub fn run() {
             corpus::corpus_read,
             corpus::corpus_open_file,
             corpus::corpus_import_file,
+            corpus::corpus_abs,
             corpus::corpus_write,
             corpus::corpus_create,
             corpus::corpus_delete,
@@ -722,6 +723,10 @@ pub fn run() {
                     Ok(store) => {
                         let suppress = store.suppress_set();
                         let watch_root = store.root().to_path_buf();
+                        // let the asset protocol serve this corpus's files, so
+                        // storage/ images render via convertFileSrc — robust even if
+                        // the config scope glob doesn't cover the corpus location.
+                        let _ = app.asset_protocol_scope().allow_directory(store.root(), true);
                         let handle = app.handle().clone();
                         if let Err(e) = corpus::spawn_watcher(watch_root, suppress, move || {
                             let _ = handle.emit_to("main", "rotli:corpus-changed", ());

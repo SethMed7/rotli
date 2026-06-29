@@ -782,6 +782,36 @@
 .cm-bh-grip svg {
   display: block;
 }
+
+/* inline images (livePreview ImgWidget) — a rendered ![alt](src) with a resize grip */
+.rotli-img {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
+}
+.rotli-img img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--r-inner);
+}
+.rotli-img-resize {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease);
+}
+.rotli-img:hover .rotli-img-resize {
+  opacity: 1;
+}
 /* while dragging a block, dim the body a touch so the drop target reads */
 .cm-block-dragging .cm-content {
   cursor: grabbing;

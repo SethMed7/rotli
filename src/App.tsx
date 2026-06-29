@@ -38,6 +38,7 @@ import {
   setHideOnBlur,
 } from "./lib/tauri";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { EditorView } from "@codemirror/view";
 import { activeInstance, isWritable } from "./memex/config";
 import {
   captureToInbox,
@@ -172,18 +173,49 @@ function MainShell() {
     [],
   );
 
-  // external file drop → import into the corpus's binary area (the memex storage/,
-  // or local Storage/) per the model. Tauri's OS drag-drop gives PATHS; Rust copies
-  // them. Imports always target the corpus (the "default" root).
+  // external file drop. Tauri's OS drag-drop gives PATHS + the drop position. An
+  // IMAGE dropped over the editor is imported into storage/ AND inserted at the
+  // caret as a `![](storage:…)` link; everything else just lands in storage/.
   useEffect(() => {
     if (!isTauri()) return;
     let unlisten: (() => void) | undefined;
+    const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|bmp|svg|heic|heif|tiff?)$/i;
+    const handleDrop = async (paths: string[], px: number, py: number) => {
+      const dpr = window.devicePixelRatio || 1;
+      const x = px / dpr;
+      const y = py / dpr;
+      const el = document.elementFromPoint(x, y) as HTMLElement | null;
+      const view = el ? EditorView.findFromDOM(el) : null;
+      const images = view ? paths.filter((p) => IMAGE_EXT.test(p)) : [];
+      const toStorage = view ? paths.filter((p) => !IMAGE_EXT.test(p)) : paths;
+      if (toStorage.length) {
+        await Promise.all(toStorage.map((p) => corpusImportFile("default", p)));
+      }
+      if (view && images.length) {
+        let insert = "";
+        for (const p of images) {
+          const wire = await corpusImportFile("default", p);
+          if (wire) insert += `\n![](storage:${wire.replace(/^storage\//i, "")})\n`;
+        }
+        if (insert) {
+          const at = view.posAtCoords({ x, y }) ?? view.state.selection.main.head;
+          view.dispatch({
+            changes: { from: at, insert },
+            selection: { anchor: at + insert.length },
+          });
+          view.focus();
+        }
+      }
+      await invalidateNotes();
+    };
     void getCurrentWebview()
       .onDragDropEvent((event) => {
         if (event.payload.type === "drop" && event.payload.paths.length > 0) {
-          void Promise.all(event.payload.paths.map((p) => corpusImportFile("default", p)))
-            .then(() => invalidateNotes())
-            .catch(() => {});
+          void handleDrop(
+            event.payload.paths,
+            event.payload.position.x,
+            event.payload.position.y,
+          ).catch(() => {});
         }
       })
       .then((un) => {

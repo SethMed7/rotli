@@ -19,7 +19,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # macos-private-api: groundwork for the transparent always-on-top capture card (1c).
-tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api", "protocol-asset"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-dialog = "2"                                        # native folder picker (move the corpus)
 tauri-plugin-updater = "2"                                       # in-app updates (signed feed → download + relaunch)
