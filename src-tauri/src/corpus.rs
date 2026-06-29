@@ -1294,6 +1294,27 @@ impl CorpusStore {
         self.suppress.clone()
     }
 
+    /// Import an external file (a dropped binary) into the store's binary area —
+    /// the memex `storage/` (Memex) or the reserved `Storage/` folder (Legacy).
+    /// COPIES the source (never moves it), collision-safe, returns the new relative
+    /// path. The sanctioned binary-asset write (model.md: a dropped file routes to
+    /// storage/) — NOT a note write; it can only ever land in the binary area.
+    pub fn import_file(&self, src: &Path) -> Result<String, String> {
+        let subdir = match self.layout {
+            Layout::Memex => "storage",
+            Layout::LegacyRotli => "Storage",
+        };
+        let raw = src
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or("the dropped file has no readable name")?;
+        let dir = self.root.join(subdir);
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let name = unique_file_name(&dir, raw);
+        fs::copy(src, dir.join(&name)).map_err(|e| format!("import {}: {e}", src.display()))?;
+        Ok(format!("{subdir}/{name}"))
+    }
+
     /// First run: the corpus is born with Inbox and ONE warm welcome note.
     /// No demo notes on disk — the in-memory demo corpus stays browser-only.
     fn first_run(&mut self) -> Result<(), String> {
@@ -2118,6 +2139,28 @@ fn walk(
     Ok(())
 }
 
+/// A collision-safe filename in `dir` from a raw source name: drop any path
+/// separators, then suffix `-2`, `-3`, … if the name is already taken.
+fn unique_file_name(dir: &Path, raw: &str) -> String {
+    let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
+    let base = if base.is_empty() { "file" } else { base };
+    if !dir.join(base).exists() {
+        return base.to_string();
+    }
+    let (stem, ext) = match base.rsplit_once('.') {
+        Some((s, e)) if !s.is_empty() => (s, format!(".{e}")),
+        _ => (base, String::new()),
+    };
+    let mut n = 2;
+    loop {
+        let cand = format!("{stem}-{n}{ext}");
+        if !dir.join(&cand).exists() {
+            return cand;
+        }
+        n += 1;
+    }
+}
+
 /// A board's display title = its filename without the `.excalidraw` extension.
 fn board_title(rel: &str) -> String {
     Path::new(rel)
@@ -2327,6 +2370,24 @@ pub fn corpus_open_file(state: tauri::State<'_, CorpusState>, id: String) -> Res
     #[cfg(not(target_os = "macos"))]
     let _ = abs;
     Ok(())
+}
+
+/// Import a dropped external file into the corpus's binary area (the memex
+/// `storage/`, or the local `Storage/` for a plain corpus). `path` is the OS
+/// source path from the drag-drop event; rotli COPIES it. Returns the new file's
+/// wire id so the caller can reveal/open it.
+#[tauri::command]
+pub fn corpus_import_file(
+    state: tauri::State<'_, CorpusState>,
+    root_id: String,
+    path: String,
+) -> Result<String, String> {
+    let src = PathBuf::from(&path);
+    if !src.is_file() {
+        return Err(format!("not a file: {path}"));
+    }
+    let rel = state.route(&root_id, |s| s.import_file(&src))?;
+    Ok(compose_root_id(&root_id, &rel))
 }
 
 #[tauri::command]
@@ -2584,6 +2645,22 @@ mod tests {
         assert_eq!(cfg.corpus.abs_path, default_corpus);
         assert!(cfg.brains.is_empty());
         assert!(cfg.active_brain_id.is_none());
+    }
+
+    #[test]
+    fn import_file_copies_into_storage_collision_safe() {
+        let (dir, store) = bare(); // LegacyRotli → the local Storage/ folder
+        let src = dir.path().join("photo.png");
+        fs::write(&src, b"\x89PNG-fake-bytes").unwrap();
+        let rel = store.import_file(&src).unwrap();
+        assert_eq!(rel, "Storage/photo.png");
+        assert!(store.root().join("Storage/photo.png").is_file());
+        // a second import of the same name gets a collision-safe suffix
+        let rel2 = store.import_file(&src).unwrap();
+        assert_eq!(rel2, "Storage/photo-2.png");
+        assert!(store.root().join("Storage/photo-2.png").is_file());
+        // the source is COPIED, never moved
+        assert!(src.is_file());
     }
 
     /// Fresh corpus (first run happens: Inbox + welcome note exist).

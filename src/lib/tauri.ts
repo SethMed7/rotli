@@ -364,6 +364,14 @@ export async function corpusOpenFile(id: string): Promise<void> {
   await invoke("corpus_open_file", { id });
 }
 
+/** Import a dropped external file into the corpus's binary area (the memex
+ * `storage/`, or local `Storage/`). `path` is the OS source path from a drag-drop;
+ * rotli COPIES it. Returns the new file's wire id. No-op outside Tauri. */
+export async function corpusImportFile(rootId: string, path: string): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_import_file", { rootId, path });
+}
+
 // ——— the unified Location model (corpus.json) — ONE folder = your notes = your
 //     brain, plus connected read-only "other brains". Replaces corpus-root.txt +
 //     corpus-memex-root.txt + corpus-roots.json + memex-instances.json. ———

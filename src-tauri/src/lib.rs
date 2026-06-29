@@ -674,6 +674,7 @@ pub fn run() {
             corpus::corpus_list,
             corpus::corpus_read,
             corpus::corpus_open_file,
+            corpus::corpus_import_file,
             corpus::corpus_write,
             corpus::corpus_create,
             corpus::corpus_delete,

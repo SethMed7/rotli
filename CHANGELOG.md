@@ -25,7 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Vault tree. Memory is how things are *saved*, not a front.
 - **Storage shows the memex `storage/`.** On a memex corpus the Storage front now surfaces the binary
   asset store read-only (opened in the OS default app), projected to the Storage destination — it was
-  hidden before. (Dropping a binary *into* `storage/` is the next piece.)
+  hidden before.
+- **Drop a file to import it.** Dragging a file from Finder onto the window copies it into the corpus's
+  binary area (the memex `storage/`, or local `Storage/` for a plain corpus) — collision-safe — where it
+  shows in Storage and opens in the OS default app.
 
 ### Docs
 - **Locked the rotli model + vocabulary** (`docs/model.md`) and realigned the always-injected `.carl`

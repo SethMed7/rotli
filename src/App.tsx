@@ -25,6 +25,7 @@ import { useHeldModifier } from "./keys/useHeldModifier";
 import { GLASS_BG_SRC } from "./lib/glassBackgrounds";
 import {
   checkForUpdate,
+  corpusImportFile,
   emitCaptureAck,
   emitThemeSet,
   isTauri,
@@ -36,6 +37,7 @@ import {
   setDockVisible,
   setHideOnBlur,
 } from "./lib/tauri";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { activeInstance, isWritable } from "./memex/config";
 import {
   captureToInbox,
@@ -169,6 +171,26 @@ function MainShell() {
       }),
     [],
   );
+
+  // external file drop → import into the corpus's binary area (the memex storage/,
+  // or local Storage/) per the model. Tauri's OS drag-drop gives PATHS; Rust copies
+  // them. Imports always target the corpus (the "default" root).
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: (() => void) | undefined;
+    void getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (event.payload.type === "drop" && event.payload.paths.length > 0) {
+          void Promise.all(event.payload.paths.map((p) => corpusImportFile("default", p)))
+            .then(() => invalidateNotes())
+            .catch(() => {});
+        }
+      })
+      .then((un) => {
+        unlisten = un;
+      });
+    return () => unlisten?.();
+  }, []);
 
   // fs mode: the window opens on the freshest note. The in-memory seed decides
   // this synchronously at module init; the disk corpus answers async — fill
