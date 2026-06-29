@@ -739,30 +739,48 @@
   border: none;
 }
 .cm-block-handle {
-  display: grid;
-  place-items: center;
-  width: 18px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
   height: 1.4em;
   margin-left: 2px;
-  font-size: 13px;
-  line-height: 1;
   color: var(--text-muted);
-  cursor: grab;
-  border-radius: var(--r-inner);
   opacity: 0;
-  transition: opacity var(--motion-exit) var(--motion-ease), background var(--motion-exit) var(--motion-ease);
+  transition: opacity var(--motion-exit) var(--motion-ease);
   user-select: none;
 }
+/* fade the whole pair in when the editor is hovered; each mark lifts on its own hover */
 .rotli-cm-host:hover .cm-block-handle {
-  opacity: 0.4;
+  opacity: 0.55;
 }
-.cm-block-handle:hover {
-  opacity: 1;
+.cm-bh-add,
+.cm-bh-grip {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  border-radius: var(--r-inner);
+  cursor: pointer;
+  transition: background var(--motion-exit) var(--motion-ease), color var(--motion-exit) var(--motion-ease);
+}
+.cm-bh-grip {
+  cursor: grab;
+}
+.cm-bh-grip:active {
+  cursor: grabbing;
+}
+.cm-bh-add:hover,
+.cm-bh-grip:hover {
   background: var(--hov);
   color: var(--text);
 }
-.cm-block-handle:active {
-  cursor: grabbing;
+.cm-bh-add svg,
+.cm-bh-grip svg {
+  display: block;
 }
 /* while dragging a block, dim the body a touch so the drop target reads */
 .cm-block-dragging .cm-content {

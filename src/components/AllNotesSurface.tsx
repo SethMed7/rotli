@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { useNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import { corpusOpenFile } from "../lib/tauri";
-import { BoardGlyph, FileGlyph, SearchGlyph } from "./glyphs";
+import { SearchGlyph, glyphForNote } from "./glyphs";
 
 /** Relative day label (mirrors the Board's). */
 function dayLabel(ts: number): string {
@@ -86,11 +86,7 @@ export function AllNotesSurface() {
                 >
                   <span className="bc-body">
                     <span className="bc-title">
-                      {board ? (
-                        <BoardGlyph size={13} className="bc-icon" />
-                      ) : (
-                        <FileGlyph size={13} className="bc-icon" />
-                      )}
+                      {glyphForNote(n, { size: 13, className: "bc-icon" })}
                       {n.title || (board ? "Untitled board" : "Empty note")}
                     </span>
                     {n.snippet && <span className="bc-snippet">{n.snippet}</span>}

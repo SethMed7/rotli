@@ -20,7 +20,7 @@ import { startTabDrag } from "../lib/tabDrag";
 import { useNotes } from "../services/hooks";
 import { leaves, usePanesStore } from "../state/panes";
 import type { LeafNode, Tab } from "../types";
-import { BoardGlyph, FileGlyph, PlusGlyph, XGlyph } from "./glyphs";
+import { ExcalidrawGlyph, FileGlyph, PlusGlyph, XGlyph } from "./glyphs";
 
 /** A board's display label = its filename minus the .excalidraw extension. */
 function boardLabel(boardId: string): string {
@@ -125,7 +125,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                   }
                 >
                   {tab.surfaceKind === "canvas" ? (
-                    <BoardGlyph size={13} className="tglyph" />
+                    <ExcalidrawGlyph size={13} className="tglyph" />
                   ) : (
                     <FileGlyph size={13} className="tglyph" />
                   )}

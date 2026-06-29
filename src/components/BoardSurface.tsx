@@ -14,7 +14,7 @@ import { corpusOpenFile } from "../lib/tauri";
 import { notesService } from "../services/notes";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
-import { ArchiveGlyph, CheckGlyph, FileGlyph } from "./glyphs";
+import { ArchiveGlyph, CheckGlyph, glyphForNote } from "./glyphs";
 
 /** Relative day label for a card's timestamp (mirrors the sidebar's). */
 function dayLabel(ts: number): string {
@@ -146,7 +146,7 @@ export function BoardSurface() {
                   </span>
                   <span className="bc-body">
                     <span className="bc-title">
-                      <FileGlyph size={13} className="bc-icon" />
+                      {glyphForNote(c, { size: 13, className: "bc-icon" })}
                       {c.title || "Empty capture"}
                     </span>
                     {c.snippet && <span className="bc-snippet">{c.snippet}</span>}

@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Milkdown-style block handles** — each block's left-gutter handle is now a **`+`** (add a
+  block below) and a real **6-dot grip** (drag to reorder · click for actions), replacing the
+  lone `⠿` that font-fell-back to a thin white bar.
+- **Real file-type logos** — the sidebar, surfaces, palette, and tabs show the actual
+  **monochrome** format mark per file: the **Excalidraw** logo for canvases, the **SVG** logo,
+  the **PDF** (Acrobat) mark, and an IDE-standard picture glyph for raster images
+  (`currentColor`, theme-aware; logo paths from simple-icons, CC0).
+
 ## [0.8.2] — 2026-06-28
 
 ### Added

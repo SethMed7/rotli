@@ -26,7 +26,7 @@ import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { Icon } from "./Icon";
 import {
-  FileGlyph,
+  glyphForNote,
   FocusGlyph,
   KeyboardGlyph,
   PlusGlyph,
@@ -103,7 +103,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
     const noteRow = (n: NoteSummary): Row => ({
       key: `note:${n.id}`,
       label: n.title,
-      icon: <FileGlyph size={15} />,
+      icon: glyphForNote(n, { size: 15 }),
       hint: <span className="muted">{folderName(n.folderId)}</span>,
       run: (newTab) => {
         openNote(n.id, { newTab });
@@ -175,7 +175,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
         tabRows.push({
           key: `tab:${leaf.id}:${tab.id}`,
           label: n.title,
-          icon: <FileGlyph size={15} />,
+          icon: glyphForNote(n, { size: 15 }),
           hint:
             leaf.id === focusedPaneId && i < 8 ? (
               <kbd>{formatChord(`Meta+${i + 1}`)}</kbd>

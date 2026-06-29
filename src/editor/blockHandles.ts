@@ -159,6 +159,14 @@ function hideDropLine() {
   if (dropLine) dropLine.style.display = "none";
 }
 
+// Milkdown/Crepe-style handle marks (currentColor so they theme): a "+" to add a
+// block below, and a 6-dot grip to drag/reorder. Inline SVG — NOT the "⠿" braille
+// char, which font-fell-back to a thin "white bar" (Seth, 2026-06-29).
+const PLUS_SVG =
+  '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M8 3.6v8.8M3.6 8h8.8"/></svg>';
+const GRIP_SVG =
+  '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="6" cy="4" r="1.25"/><circle cx="10" cy="4" r="1.25"/><circle cx="6" cy="8" r="1.25"/><circle cx="10" cy="8" r="1.25"/><circle cx="6" cy="12" r="1.25"/><circle cx="10" cy="12" r="1.25"/></svg>';
+
 // WKWebView swallows HTML5 drag-and-drop AND a `draggable` element steals the
 // click — so the handle uses POINTER events instead: a small move past the
 // threshold is a DRAG (reorder, with a drop line); no move is a CLICK (the menu).
@@ -175,9 +183,28 @@ class BlockHandle extends GutterMarker {
   override toDOM(view: EditorView) {
     const el = document.createElement("div");
     el.className = "cm-block-handle";
-    el.title = "Drag to reorder · click for actions";
-    el.textContent = "⠿";
-    el.addEventListener("mousedown", (e) => {
+
+    // "+" — insert a fresh block below (don't let the gutter steal focus first)
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "cm-bh-add";
+    add.title = "Add block below";
+    add.setAttribute("aria-label", "Add block below");
+    add.innerHTML = PLUS_SVG;
+    add.addEventListener("mousedown", (e) => e.preventDefault());
+    add.addEventListener("click", (e) => {
+      e.preventDefault();
+      addBlockBelow(view, this.pos);
+    });
+
+    // ⠿ grip — pointer-drag past the threshold reorders; a plain click opens the menu
+    const grip = document.createElement("button");
+    grip.type = "button";
+    grip.className = "cm-bh-grip";
+    grip.title = "Drag to reorder · click for actions";
+    grip.setAttribute("aria-label", "Block actions");
+    grip.innerHTML = GRIP_SVG;
+    grip.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
       e.preventDefault(); // don't start a text selection from the gutter
       const startX = e.clientX;
@@ -206,13 +233,16 @@ class BlockHandle extends GutterMarker {
           const p = targetFrom ?? view.posAtCoords({ x: ev.clientX, y: ev.clientY });
           if (p != null) reorder(view, this.pos, p);
         } else {
-          // no move → a click: open the actions menu at the handle
-          this.openMenu(view, this.pos, el.getBoundingClientRect());
+          // no move → a click: open the actions menu at the grip
+          this.openMenu(view, this.pos, grip.getBoundingClientRect());
         }
       };
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     });
+
+    el.appendChild(add);
+    el.appendChild(grip);
     return el;
   }
 }

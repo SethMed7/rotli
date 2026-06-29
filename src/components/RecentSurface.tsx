@@ -8,7 +8,7 @@ import { useMemo } from "react";
 import { useNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import { corpusOpenFile } from "../lib/tauri";
-import { BoardGlyph, ClockGlyph, FileGlyph } from "./glyphs";
+import { ClockGlyph, glyphForNote } from "./glyphs";
 
 /** Short, human date for the right column. */
 function dateLabel(ts: number): string {
@@ -58,11 +58,7 @@ export function RecentSurface() {
                     }
                     title={board ? "Open board" : file ? "Open file" : "Open note"}
                   >
-                    {board ? (
-                      <BoardGlyph size={14} className="rr-icon" />
-                    ) : (
-                      <FileGlyph size={14} className="rr-icon" />
-                    )}
+                    {glyphForNote(n, { size: 14, className: "rr-icon" })}
                     <span className="rr-title">
                       {n.title || (board ? "Untitled board" : "Empty note")}
                     </span>

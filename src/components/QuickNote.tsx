@@ -20,7 +20,7 @@ import { pruneQuick, setQuickActive, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { IconButton } from "./IconButton";
-import { FileGlyph, PlusGlyph, SearchGlyph } from "./glyphs";
+import { PlusGlyph, SearchGlyph, glyphForNote } from "./glyphs";
 
 /** activeEditor() resolves through the panes store's focusedPaneId; the quick
  * webview has no pane tree, so we pin it to this id and register the editor
@@ -134,7 +134,7 @@ function NotePicker({
           return (
             <div key={n.id} className={i === sel ? "qsrow sel" : "qsrow"} onMouseEnter={() => setIndex(i)}>
               <button type="button" className="qsopen" onClick={() => onOpen(n.id)}>
-                <FileGlyph size={14} />
+                {glyphForNote(n, { size: 14 })}
                 <span className="qslabel">{n.title || "Untitled"}</span>
                 {n.id === activeId && <span className="qstag">open</span>}
               </button>

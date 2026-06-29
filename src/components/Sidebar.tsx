@@ -62,7 +62,9 @@ import {
   ChatGlyph,
   ChevronRight,
   ClockGlyph,
+  ExcalidrawGlyph,
   FileGlyph,
+  glyphForNote,
   FolderGlyph,
   InboxGlyph,
   MailGlyph,
@@ -236,7 +238,7 @@ function CompactNoteRow({
       onDragStart={onDragStart}
       {...rowProps}
     >
-      <FileGlyph size={14} className="snicon" />
+      {glyphForNote(note, { size: 14, className: "snicon" })}
       <span className="snt">{note.title || "Empty note"}</span>
       <span className="snd">{dayLabel(note.updatedAt)}</span>
       <span className="snact">
@@ -318,7 +320,7 @@ function CompactBoardRow({
   if (renaming) {
     return (
       <div className="sb-newfolder snrow" style={{ paddingLeft: padLeft }}>
-        <CanvasItemGlyph size={14} className="snicon" />
+        <ExcalidrawGlyph size={14} className="snicon" />
         <input
           autoFocus
           type="text"
@@ -400,7 +402,7 @@ function AddedRootRow({ root }: { root: CorpusRoot }) {
             style={{ paddingLeft: 44 }}
             onClick={(e) => openNote(n.id, { newTab: e.metaKey })}
           >
-            <FileGlyph size={14} className="snicon" />
+            {glyphForNote(n, { size: 14, className: "snicon" })}
             <span className="snt">{n.title || "Empty note"}</span>
           </button>
         ))}
