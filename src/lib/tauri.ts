@@ -95,6 +95,14 @@ export async function startWindowDrag(): Promise<void> {
   await getCurrentWindow().startDragging();
 }
 
+/** Toggle the main window between maximized (zoom) and its restored size — the
+ * standard macOS titlebar double-click, re-enabled here since the manual drag
+ * suppresses the native one. */
+export async function toggleMaximize(): Promise<void> {
+  if (!isTauri()) return;
+  await getCurrentWindow().toggleMaximize();
+}
+
 // ——— in-app updates (Part 2 — the signed updater feed) — guarded so the
 //     browser/dev demo never imports the plugins; outside Tauri every call is a
 //     safe no-op ("nothing available, nothing to install"). The Rust side

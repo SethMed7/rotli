@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5] — 2026-06-29
+
+### Added
+- **Opens maximized**, and **double-click the titlebar to zoom** — the standard macOS gesture,
+  re-enabled over the manual-drag titlebar.
+
+### Fixed
+- **Block-handle gutter** no longer shows a light/white bar: the editor gutter is transparent, so the
+  `+` / grip handles sit subtly in the left margin, theme-matched.
+
 ## [0.8.4] — 2026-06-29
 
 ### Added

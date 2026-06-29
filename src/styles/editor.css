@@ -788,6 +788,12 @@
   background: transparent;
   border: none;
 }
+/* CM's default gutter background is light — kill it so the block-handle column is
+   just transparent margin (no white bar), theme-matched (Seth, 2026-06-29). */
+.rotli-cm-host .cm-gutters {
+  background: transparent;
+  border-right: none;
+}
 .cm-block-handle {
   display: flex;
   align-items: center;

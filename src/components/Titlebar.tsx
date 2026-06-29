@@ -11,7 +11,7 @@
 
 import type { MouseEvent } from "react";
 import { dispatch } from "../keys/registry";
-import { startWindowDrag } from "../lib/tauri";
+import { startWindowDrag, toggleMaximize } from "../lib/tauri";
 import { GLASS_TINTS, SOLID_THEMES, useUiStore } from "../state/ui";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
@@ -33,6 +33,11 @@ function onDragRegionMouseDown(event: MouseEvent) {
   void startWindowDrag();
 }
 
+/** Double-click an empty titlebar region → zoom, like every other Mac app. */
+function onDragRegionDoubleClick() {
+  void toggleMaximize();
+}
+
 export function Titlebar() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const updateAvailable = useUiStore((s) => s.updateAvailable);
@@ -49,7 +54,11 @@ export function Titlebar() {
 
   return (
     <header className="titlebar">
-      <div className="tb-inset" onMouseDown={onDragRegionMouseDown} />
+      <div
+        className="tb-inset"
+        onMouseDown={onDragRegionMouseDown}
+        onDoubleClick={onDragRegionDoubleClick}
+      />
       {/* always-visible sidebar toggle (Seth, 2026-06-15): the clear way to
           reopen a collapsed left menu — replaces the subtle warm-edge strip.
           .tb-lead left-aligns its tooltip so the label never clips off-window. */}
@@ -86,7 +95,11 @@ export function Titlebar() {
           </button>
         </div>
       )}
-      <div className="tb-spacer" onMouseDown={onDragRegionMouseDown} />
+      <div
+        className="tb-spacer"
+        onMouseDown={onDragRegionMouseDown}
+        onDoubleClick={onDragRegionDoubleClick}
+      />
       <div className="tb-actions">
         {/* panes & tabs, visible (Seth 2026-06-12: keyboard-only is not discoverable) */}
         {!settingsOpen && (
