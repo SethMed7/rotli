@@ -105,7 +105,7 @@ export function CaptureCard() {
           />
         </div>
         <div className="cap-foot">
-          <span className="chip">→ Board</span>
+          <span className="chip">→ Captures</span>
           <span className="grow" />
           <span>
             <kbd>⏎</kbd> save

@@ -7,7 +7,7 @@
 // stays); the registry's app.hide (Esc) closes it back to the panes via the
 // contentView model (setContentView("panes")).
 
-import { useState } from "react";
+import { type PointerEvent as ReactPointerEvent, useMemo, useRef, useState } from "react";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
 import { corpusOpenFile } from "../lib/tauri";
@@ -41,6 +41,67 @@ export function BoardSurface() {
 
   // only ids still on the board count as selected (a refetch drops archived ones)
   const chosen = captures.filter((c) => selected.has(c.id));
+
+  const captureOrder = useUiStore((s) => s.captureOrder);
+  const setCaptureOrder = useUiStore((s) => s.setCaptureOrder);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<{ id: string; after: boolean } | null>(null);
+  const didDragRef = useRef(false);
+
+  // captures in the user's manual order; new ids (not yet ordered) keep their
+  // newest-first spot from listNotes.
+  const ordered = useMemo(() => {
+    const pos = new Map(captureOrder.map((id, i) => [id, i] as const));
+    return [...captures].sort((a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity));
+  }, [captures, captureOrder]);
+
+  // pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell). A move past
+  // the threshold is a DRAG (reorder); no move falls through to the click (select).
+  const startCardDrag = (e: ReactPointerEvent, id: string) => {
+    if (e.button !== 0) return;
+    const sx = e.clientX;
+    const sy = e.clientY;
+    let dragging = false;
+    let drop: { id: string; after: boolean } | null = null;
+    didDragRef.current = false;
+    const onMove = (ev: PointerEvent) => {
+      if (!dragging) {
+        if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 5) return;
+        dragging = true;
+        didDragRef.current = true;
+        setDragId(id);
+      }
+      const hit = (
+        document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
+      )?.closest("[data-cap-id]") as HTMLElement | null;
+      const tid = hit?.dataset.capId;
+      if (!hit || !tid || tid === id) {
+        drop = null;
+        setDropAt(null);
+        return;
+      }
+      const rect = hit.getBoundingClientRect();
+      drop = { id: tid, after: ev.clientX > rect.left + rect.width / 2 };
+      setDropAt(drop);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setDragId(null);
+      setDropAt(null);
+      if (dragging && drop) {
+        const ids = ordered.map((c) => c.id).filter((x) => x !== id);
+        let idx = ids.indexOf(drop.id);
+        if (idx >= 0) {
+          if (drop.after) idx += 1;
+          ids.splice(idx, 0, id);
+          setCaptureOrder(ids);
+        }
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -114,7 +175,7 @@ export function BoardSurface() {
           </svg>
           <span>Back to notes</span>
         </button>
-        <h2 className="board-title">Board</h2>
+        <h2 className="board-title">Captures</h2>
         <span className="board-count">{captures.length}</span>
       </header>
 
@@ -129,17 +190,29 @@ export function BoardSurface() {
       ) : (
         <div className="board-scroll">
           <div className="board-grid">
-            {captures.map((c) => {
+            {ordered.map((c) => {
               const sel = selected.has(c.id);
+              const cls = ["board-card"];
+              if (sel) cls.push("sel");
+              if (dragId === c.id) cls.push("dragging");
+              if (dropAt?.id === c.id) cls.push(dropAt.after ? "drop-after" : "drop-before");
               return (
                 <button
                   type="button"
                   key={c.id}
-                  className={sel ? "board-card sel" : "board-card"}
+                  data-cap-id={c.id}
+                  className={cls.join(" ")}
                   aria-pressed={sel}
-                  onClick={() => toggle(c.id)}
+                  onPointerDown={(e) => startCardDrag(e, c.id)}
+                  onClick={() => {
+                    if (didDragRef.current) {
+                      didDragRef.current = false;
+                      return;
+                    }
+                    toggle(c.id);
+                  }}
                   onDoubleClick={() => openOne(c)}
-                  title="Click to select · double-click to open"
+                  title="Drag to reorder · click to select · double-click to open"
                 >
                   <span className="bc-check" aria-hidden="true">
                     {sel && <CheckGlyph size={11} />}

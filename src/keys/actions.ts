@@ -166,7 +166,7 @@ export function registerDefaultActions(): void {
   // from the sidebar. Toggles between the board grid and the note panes.
   registerAction({
     id: "board.open",
-    title: "Board — captures",
+    title: "Captures",
     defaultChord: null,
     run: () => {
       const ui = useUiStore.getState();

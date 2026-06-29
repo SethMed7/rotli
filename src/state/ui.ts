@@ -158,6 +158,10 @@ interface UiState {
    * state/quick.ts; these are the raw fields the persistence layer reads. */
   quickNoteIds: string[];
   setQuickNoteIds: (ids: string[]) => void;
+  /** Manual order of the Captures grid (ids). Unknown ids fall back to
+   * newest-first. Persisted in settings.json — never written into the notes. */
+  captureOrder: string[];
+  setCaptureOrder: (ids: string[]) => void;
   /** Which quick note the window reopens on — "remember where I am". */
   quickActiveId: string | null;
   setQuickActiveId: (id: string | null) => void;
@@ -339,6 +343,8 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   quickNoteIds: [],
   setQuickNoteIds: (ids) => set({ quickNoteIds: ids }),
+  captureOrder: [],
+  setCaptureOrder: (ids) => set({ captureOrder: ids }),
   quickActiveId: null,
   setQuickActiveId: (id) => set({ quickActiveId: id }),
   // "Inbox" on disk (fs mode); the seeded Inbox id in the browser

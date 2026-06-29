@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **monochrome** format mark per file: the **Excalidraw** logo for canvases, the **SVG** logo,
   the **PDF** (Acrobat) mark, and an IDE-standard picture glyph for raster images
   (`currentColor`, theme-aware; logo paths from simple-icons, CC0).
+- **Board → Captures.** The quick-captures view is renamed **Captures**; its cards are now
+  sticky notes (softly raised, lift on hover) that you can **drag to reorder** — the order
+  persists in `.rotli/settings.json`, never in your notes.
 
 ## [0.8.2] — 2026-06-28
 

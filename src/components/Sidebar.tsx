@@ -1233,7 +1233,7 @@ export function Sidebar() {
               onClick={() => dispatch("board.open")}
             >
               <CaptureBoardGlyph size={14.5} />
-              <span className="fname">Board</span>
+              <span className="fname">Captures</span>
               <span className="count">{boardNotes.length}</span>
             </button>
             <button

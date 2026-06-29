@@ -132,6 +132,7 @@ interface PersistedSettings {
   /** The Quick Note window's capped set, remembered note, and new-note folder
    * (Seth, 2026-06-15). */
   quickNoteIds: string[];
+  captureOrder: string[];
   quickActiveId: string | null;
   quickFolder: string;
   /** The ONE sidebar's collapse state + width, and which dests are expanded —
@@ -188,6 +189,9 @@ function parseSettings(raw: string): PersistedSettings {
   const quickNoteIds = Array.isArray(data.quickNoteIds)
     ? data.quickNoteIds.filter((x): x is string => typeof x === "string").slice(0, QUICK_MAX)
     : [];
+  const captureOrder = Array.isArray(data.captureOrder)
+    ? data.captureOrder.filter((x): x is string => typeof x === "string")
+    : [];
   // the open note is decoupled from the pinned set — keep it even if unpinned;
   // fall back to the first favorite, else nothing.
   const quickActiveId =
@@ -221,6 +225,7 @@ function parseSettings(raw: string): PersistedSettings {
     onboarded:
       typeof data.onboarded === "boolean" ? data.onboarded : Object.keys(data).length > 0,
     quickNoteIds,
+    captureOrder,
     quickActiveId,
     quickFolder,
     // missing keys default — old configs predate the single sidebar, never crash
@@ -253,6 +258,7 @@ function applySettings(s: PersistedSettings): void {
     chatModelId: s.chatModelId,
     onboarded: s.onboarded,
     quickNoteIds: s.quickNoteIds,
+    captureOrder: s.captureOrder,
     quickActiveId: s.quickActiveId,
     quickFolder: s.quickFolder,
     sidebarCollapsed: s.sidebarCollapsed,
@@ -491,6 +497,7 @@ function settingsSnapshot(): string {
     chatModelId: ui.chatModelId,
     onboarded: ui.onboarded,
     quickNoteIds: ui.quickNoteIds,
+    captureOrder: ui.captureOrder,
     quickActiveId: ui.quickActiveId,
     quickFolder: ui.quickFolder,
     sidebarCollapsed: ui.sidebarCollapsed,
