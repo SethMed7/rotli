@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.7] — 2026-06-29
+
+### Fixed
+- **Onboarding now requires choosing where rotli lives** — no more silent `~/Documents/rotli`
+  default. The location step is required: **"Skip setup" jumps to it**, **"Continue" is gated** until
+  you pick, and the third option is **"Use a plain folder…"** (choose a location) instead of a silent
+  default. So every start is an explicit choice — use an existing memex · create a new one · or a
+  plain folder.
+
 ## [0.8.6] — 2026-06-29
 
 ### Added

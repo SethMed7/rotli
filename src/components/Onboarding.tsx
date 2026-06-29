@@ -165,11 +165,17 @@ function MemexStep() {
   const found = (detect.data ?? []).filter((d) => d.kind === "memex");
   const isUse = (root: string) => pending?.kind === "use" && pending.path === root;
   const isInit = pending?.kind === "init";
-  const isLater = pending?.kind === "later";
+  // a plain-folder pick is kind "use" with a path that ISN'T a detected memex
+  const plainPath =
+    pending?.kind === "use" && !found.some((d) => d.root === pending.path) ? pending.path : null;
 
   const createNew = async () => {
     const path = await pickFolder();
     if (path) setPendingChoice({ kind: "init", path });
+  };
+  const usePlain = async () => {
+    const path = await pickFolder();
+    if (path) setPendingChoice({ kind: "use", path, label: path.split("/").pop() ?? path });
   };
 
   return (
@@ -211,13 +217,14 @@ function MemexStep() {
           </button>
           <button
             type="button"
-            className={isLater ? "onb-choice sel" : "onb-choice"}
-            aria-pressed={isLater}
-            onClick={() => setPendingChoice({ kind: "later" })}
+            className={plainPath ? "onb-choice sel" : "onb-choice"}
+            aria-pressed={!!plainPath}
+            onClick={() => void usePlain()}
           >
-            <span className="onb-choice-title">Just simple notes for now</span>
+            <span className="onb-choice-title">Use a plain folder…</span>
             <span className="onb-choice-desc">
-              Plain Markdown in ~/Documents/rotli — make it a brain anytime in Settings → Location.
+              {plainPath ??
+                "Choose a folder — rotli uses the .md files there as-is (make it a brain later)."}
             </span>
           </button>
         </div>
@@ -254,6 +261,10 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
   const finish = () => onDone();
   const last = STEPS.length - 1;
+  // the location step is REQUIRED — you must choose where rotli lives (no silent
+  // ~/Documents/rotli default). pending.path is set by use / init / plain.
+  const pending = useMemexStore((s) => s.pendingChoice);
+  const needsLocation = step === "memory" && !pending?.path;
 
   return (
     <div className="onb">
@@ -441,8 +452,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             ))}
           </div>
           <div className="onb-actions">
-            {i > 0 && i < last && (
-              <button type="button" className="onb-skip" onClick={finish}>
+            {i > 0 && i < last && step !== "memory" && (
+              <button type="button" className="onb-skip" onClick={() => setStep("memory")}>
                 Skip setup
               </button>
             )}
@@ -452,8 +463,13 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               </button>
             )}
             {i < last ? (
-              <button type="button" className="onb-btn" onClick={() => go(1)}>
-                {i === 0 ? "Get started" : "Continue"}
+              <button
+                type="button"
+                className="onb-btn"
+                disabled={needsLocation}
+                onClick={() => go(1)}
+              >
+                {i === 0 ? "Get started" : needsLocation ? "Choose where rotli lives" : "Continue"}
               </button>
             ) : (
               <button type="button" className="onb-btn" onClick={finish}>
