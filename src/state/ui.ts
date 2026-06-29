@@ -152,6 +152,10 @@ interface UiState {
    * onboarding surface shows whenever this is false (Tauri only). */
   onboarded: boolean;
   setOnboarded: (done: boolean) => void;
+  /** The app version the user last completed onboarding at — the onboardingVersion
+   * gate re-onboards on every 0.x update, then freezes post-1.0. */
+  onboardingVersion: string;
+  setOnboardingVersion: (v: string) => void;
 
   /** The Quick Note window's capped set (Seth, 2026-06-15): up to QUICK_MAX
    * note ids, in switcher order. The mutations + cross-webview sync live in
@@ -340,6 +344,8 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   onboarded: false,
   setOnboarded: (done) => set({ onboarded: done }),
+  onboardingVersion: "",
+  setOnboardingVersion: (v) => set({ onboardingVersion: v }),
 
   quickNoteIds: [],
   setQuickNoteIds: (ids) => set({ quickNoteIds: ids }),

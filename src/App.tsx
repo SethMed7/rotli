@@ -82,6 +82,26 @@ function surfaceFromUrl(): Surface {
   return "main";
 }
 
+declare const __APP_VERSION__: string;
+const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0";
+
+/** Compare dotted versions numerically: <0 if a<b, 0 if equal, >0 if a>b. */
+function cmpVersion(a: string, b: string): number {
+  const pa = a.split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => Number.parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+// The onboardingVersion gate. While 0.x (beta), re-onboard on EVERY version change
+// (the flow keeps evolving). Post-1.0, freeze the bar at 1.0.0 so updates never
+// re-onboard — only a fresh install (no prior onboardingVersion) does.
+const REQUIRED_ONBOARDING_VERSION =
+  (Number.parseInt(APP_VERSION.split(".")[0] ?? "0", 10) || 0) >= 1 ? "1.0.0" : APP_VERSION;
+
 function MainShell() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
@@ -89,8 +109,12 @@ function MainShell() {
   const focusMode = useUiStore((s) => s.focusMode);
   const onboarded = useUiStore((s) => s.onboarded);
   const setOnboarded = useUiStore((s) => s.setOnboarded);
-  // first run (the real app only — the browser/dev demo never onboards)
-  const showOnboarding = isTauri() && !onboarded;
+  const onboardingVersion = useUiStore((s) => s.onboardingVersion);
+  const setOnboardingVersion = useUiStore((s) => s.setOnboardingVersion);
+  // first run (the real app only). The version gate ALSO re-onboards on every 0.x
+  // update — bulletproof regardless of the `onboarded` flag's state on disk.
+  const showOnboarding =
+    isTauri() && (!onboarded || cmpVersion(onboardingVersion, REQUIRED_ONBOARDING_VERSION) < 0);
 
   // hold ⌘ ~0.5s on the main surface → the non-modal shortcut map. Gated off
   // while the palette or settings own the keyboard, so it never doubles up; the
@@ -292,6 +316,7 @@ function MainShell() {
         <Onboarding
           onDone={() => {
             setOnboarded(true);
+            setOnboardingVersion(APP_VERSION);
             // apply the deferred window choices now (changing them live during
             // onboarding can kill the frameless window — #1)
             const ui = useUiStore.getState();

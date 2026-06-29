@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.8] — 2026-06-29
+
+### Added
+- **onboardingVersion gate** — onboarding now re-runs reliably across updates. While `0.x` (beta),
+  **every version change re-onboards** (the flow is still evolving); once `1.0`, the bar freezes at
+  `1.0.0` so updates never re-onboard — **only a fresh install does**. The build version is injected
+  at compile time (`__APP_VERSION__`), persisted as `onboardingVersion`, and compared on launch.
+
 ## [0.8.7] — 2026-06-29
 
 ### Fixed

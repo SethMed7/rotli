@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
+// injected sync so the onboardingVersion gate has the build version at first paint
+const appVersion = JSON.parse(readFileSync("package.json", "utf8")).version as string;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
@@ -13,6 +16,7 @@ export default defineConfig(async () => ({
   // "ReferenceError: process is not defined" the moment <Excalidraw/> mounts.
   define: {
     "process.env.IS_PREACT": JSON.stringify("false"),
+    __APP_VERSION__: JSON.stringify(appVersion),
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

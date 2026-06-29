@@ -129,6 +129,8 @@ interface PersistedSettings {
   chatModelId: string | null;
   /** First-run onboarding gate — false until the flow is finished/skipped. */
   onboarded: boolean;
+  /** The app version onboarding last completed at (the onboardingVersion gate). */
+  onboardingVersion: string;
   /** The Quick Note window's capped set, remembered note, and new-note folder
    * (Seth, 2026-06-15). */
   quickNoteIds: string[];
@@ -224,6 +226,7 @@ function parseSettings(raw: string): PersistedSettings {
     // onboarding on existing users (same migration shape as expandedDests above)
     onboarded:
       typeof data.onboarded === "boolean" ? data.onboarded : Object.keys(data).length > 0,
+    onboardingVersion: typeof data.onboardingVersion === "string" ? data.onboardingVersion : "",
     quickNoteIds,
     captureOrder,
     quickActiveId,
@@ -257,6 +260,7 @@ function applySettings(s: PersistedSettings): void {
     captureToBrainInbox: s.captureToBrainInbox,
     chatModelId: s.chatModelId,
     onboarded: s.onboarded,
+    onboardingVersion: s.onboardingVersion,
     quickNoteIds: s.quickNoteIds,
     captureOrder: s.captureOrder,
     quickActiveId: s.quickActiveId,
@@ -504,6 +508,7 @@ function settingsSnapshot(): string {
     captureToBrainInbox: ui.captureToBrainInbox,
     chatModelId: ui.chatModelId,
     onboarded: ui.onboarded,
+    onboardingVersion: ui.onboardingVersion,
     quickNoteIds: ui.quickNoteIds,
     captureOrder: ui.captureOrder,
     quickActiveId: ui.quickActiveId,
