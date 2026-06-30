@@ -6,7 +6,9 @@
 // the public web. It is host-agnostic: the ONLY rotli/Tauri coupling is the `Host`,
 // so the whole module lifts into the shared ~/.memex/ai client layer later.
 
-export type ToolName = "search_notes" | "read_note" | "web_search" | "web_fetch";
+import type { ModelMeta } from "./budget";
+
+export type ToolName = "search_notes" | "read_note" | "read_file" | "web_search" | "web_fetch";
 
 /** A note the model can read, surfaced by search_notes / the index. */
 export interface NoteHit {
@@ -42,6 +44,9 @@ export interface Host {
   searchNotes(query: string, limit: number): Promise<NoteHit[]>;
   /** Read one note's full text by id (local model ⇒ secure notes are allowed). */
   readNote(id: string): Promise<string>;
+  /** Read a surfaced FILE by name (text, or a spreadsheet as CSV) so the model can
+   * answer questions about it. Returns a not-found message if no file matches. */
+  readFile(query: string): Promise<string>;
   webSearch(query: string, limit: number): Promise<WebHit[]>;
   webFetch(url: string, maxChars: number): Promise<string>;
   /** A compact index of the knowledge base so the model sees what exists up front.
@@ -77,7 +82,7 @@ export interface RunInput {
   /** Per-chat web toggle (the composer globe). */
   web: boolean;
   /** The picked model — drives the context budget (index size, caps, steps). */
-  model: { id: string; contextWindow?: number };
+  model: ModelMeta;
   /** Base64 images attached to this turn (vision models only). */
   images?: string[];
   /** Tool-use step cap (default: the model's budget). */

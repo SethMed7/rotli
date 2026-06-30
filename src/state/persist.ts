@@ -30,7 +30,7 @@ import {
 } from "../lib/tauri";
 import { inboxFolderId, notesService } from "../services/notes";
 import type { PaneNode, Tab } from "../types";
-import { useMruStore } from "./mru";
+import { MRU_CAP, useMruStore } from "./mru";
 import { QUICK_MAX } from "./quick";
 import {
   DEFAULT_NOTE_STYLE,
@@ -65,7 +65,6 @@ import {
 } from "./ui";
 
 const SAVE_DEBOUNCE_MS = 500;
-const MRU_CAP = 24;
 
 /** Which webview this is — only the MAIN window hydrates viewstate, applies
  * shell side-effects (window/dock/global chords), and WRITES the dot-files (one
@@ -123,12 +122,12 @@ interface PersistedSettings {
   rawEditor: boolean;
   /** Block handles (drag/add/remove blocks); off by default. */
   blockHandles: boolean;
-  /** Route ⌥C quick captures to the active memex's inbox.md; off by default. */
-  captureToBrainInbox: boolean;
   /** The on-device model the Chat surface uses (id from ~/.memex/ai); null = default. */
   chatModelId: string | null;
   /** Per-chat web-search toggle (the composer globe), keyed by chat slug. */
   chatWeb: Record<string, boolean>;
+  /** How the Storage destination groups its binaries: Type / Date / Folder. */
+  storageGrouping: "type" | "date" | "folder";
   /** First-run onboarding gate — false until the flow is finished/skipped. */
   onboarded: boolean;
   /** The app version onboarding last completed at (the onboardingVersion gate). */
@@ -221,7 +220,6 @@ function parseSettings(raw: string): PersistedSettings {
     spellcheck: asBool(data.spellcheck, true),
     rawEditor: asBool(data.rawEditor, false),
     blockHandles: asBool(data.blockHandles, false),
-    captureToBrainInbox: asBool(data.captureToBrainInbox, false),
     chatModelId: typeof data.chatModelId === "string" ? data.chatModelId : null,
     chatWeb: (() => {
       const out: Record<string, boolean> = {};
@@ -233,6 +231,10 @@ function parseSettings(raw: string): PersistedSettings {
       }
       return out;
     })(),
+    storageGrouping:
+      data.storageGrouping === "date" || data.storageGrouping === "folder"
+        ? data.storageGrouping
+        : "type",
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
     // not this one — treat that as already-onboarded so we don't re-run first-run
     // onboarding on existing users (same migration shape as expandedDests above)
@@ -269,9 +271,9 @@ function applySettings(s: PersistedSettings): void {
     spellcheck: s.spellcheck,
     rawEditor: s.rawEditor,
     blockHandles: s.blockHandles,
-    captureToBrainInbox: s.captureToBrainInbox,
     chatModelId: s.chatModelId,
     chatWeb: s.chatWeb,
+    storageGrouping: s.storageGrouping,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
     quickNoteIds: s.quickNoteIds,
@@ -518,9 +520,9 @@ function settingsSnapshot(): string {
     spellcheck: ui.spellcheck,
     rawEditor: ui.rawEditor,
     blockHandles: ui.blockHandles,
-    captureToBrainInbox: ui.captureToBrainInbox,
     chatModelId: ui.chatModelId,
     chatWeb: ui.chatWeb,
+    storageGrouping: ui.storageGrouping,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
     quickNoteIds: ui.quickNoteIds,

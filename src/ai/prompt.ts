@@ -57,6 +57,7 @@ the source of truth about the user and their work, and search it before answerin
 TOOLS — to use one, reply with a SINGLE JSON object:
 - {"thought":"…","tool":"search_notes","args":{"query":"…"}}  → find notes (returns id, title, folder, snippet)
 - {"thought":"…","tool":"read_note","args":{"id":"…"}}        → read one note's full text by id
+- {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} → read a file by name (text, or a spreadsheet as CSV)
 ${webTools}
 When you can answer, reply: {"thought":"…","final":"your answer to the user"}
 

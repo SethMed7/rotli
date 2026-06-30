@@ -195,10 +195,6 @@ export function ensureChatBacklink(noteBody: string, slug: string): string {
     : noteBody.replace(/\s*$/, "") + `\n\n## Chat\n- [[${slug}]]\n`;
 }
 
-// ── the inbox surface (byte-identical to conversations.ts capture) ───────────
-export function composeInboxLine(text: string, tag?: string): string {
-  return `- ${tag ? tag + ": " : ""}${text}\n`;
-}
 
 // ── the note surface (v3.5 note contract — wiki/_inbox staging) ───────────────
 // A rotli note is a plain-markdown body the user owns, wrapped in the v3.5 frontmatter

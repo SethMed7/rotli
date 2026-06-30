@@ -253,8 +253,9 @@ export function ChatSurface({
         if (globeOn) setChatWeb(res.slug, true); // carry the globe to the saved chat
         setTitle("");
       }
-    } catch {
-      /* persistence failed — the in-memory thread still shows for this session */
+    } catch (e) {
+      // persistence failed — the in-memory thread still shows for this session
+      console.warn("chat save failed — this conversation may not persist on reload", e);
     }
   };
 

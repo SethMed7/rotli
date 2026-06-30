@@ -183,14 +183,18 @@ fn unwrap_ddg_redirect(href: &str) -> String {
 // ── HTML → text ───────────────────────────────────────────────────────────────
 
 fn html_to_text(html: &str) -> String {
-    let script = Regex::new(r"(?is)<script\b[^>]*>.*?</script>").unwrap();
-    let style = Regex::new(r"(?is)<style\b[^>]*>.*?</style>").unwrap();
+    static SCRIPT: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    static STYLE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    static BLOCKS: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let script = SCRIPT.get_or_init(|| Regex::new(r"(?is)<script\b[^>]*>.*?</script>").unwrap());
+    let style = STYLE.get_or_init(|| Regex::new(r"(?is)<style\b[^>]*>.*?</style>").unwrap());
     let s = script.replace_all(html, " ");
     let s = style.replace_all(&s, " ");
     // block-level tags become newlines so paragraphs/list items don't run together
-    let blocks =
+    let blocks = BLOCKS.get_or_init(|| {
         Regex::new(r"(?is)<\s*/?\s*(br|p|div|li|tr|h[1-6]|ul|ol|section|article|header|footer|nav|main)\b[^>]*>")
-            .unwrap();
+            .unwrap()
+    });
     let s = blocks.replace_all(&s, "\n");
     let s = strip_tags(&s);
     let s = decode_entities(&s);
@@ -198,7 +202,10 @@ fn html_to_text(html: &str) -> String {
 }
 
 fn strip_tags(s: &str) -> String {
-    Regex::new(r"(?s)<[^>]+>").unwrap().replace_all(s, "").to_string()
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"(?s)<[^>]+>").unwrap())
+        .replace_all(s, "")
+        .to_string()
 }
 
 fn clean_text(s: &str) -> String {
@@ -234,7 +241,8 @@ fn decode_entities(s: &str) -> String {
         .replace("&#x27;", "'")
         .replace("&apos;", "'")
         .replace("&nbsp;", " ");
-    let num = Regex::new(r"&#(x?[0-9A-Fa-f]+);").unwrap();
+    static NUM: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let num = NUM.get_or_init(|| Regex::new(r"&#(x?[0-9A-Fa-f]+);").unwrap());
     s = num
         .replace_all(&s, |c: &regex::Captures| {
             let raw = &c[1];

@@ -71,8 +71,5 @@ export function fromCorpusConfig(v: CorpusConfigView): MemexConfig {
 export const activeInstance = (c: MemexConfig): MemexInstance | null =>
   c.instances.find((i) => i.id === c.activeId) ?? null;
 
-export const instanceById = (c: MemexConfig, id: string): MemexInstance | null =>
-  c.instances.find((i) => i.id === id) ?? null;
-
 /** Whether this instance can be written to (perms + a connected, in-range brain). */
 export const isWritable = (i: MemexInstance | null): boolean => i?.perms === "chats+inbox";

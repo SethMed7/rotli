@@ -5,6 +5,7 @@
 // is still the source of truth (debounced save, dirty dot); CmEditor edits it.
 
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { relativeLabel } from "../lib/dateLabels";
 import { useNote } from "../services/hooks";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
@@ -32,15 +33,6 @@ function createdLabel(ts: number): string {
   });
 }
 
-function updatedLabel(ts: number): string {
-  const mins = Math.round((Date.now() - ts) / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs} hr ago`;
-  return `${Math.round(hrs / 24)}d ago`;
-}
-
 /** "just now" must not read "just now" an hour later — a quiet half-minute
  * tick keeps the relative time honest without re-rendering the editor. */
 function UpdatedAt({ ts }: { ts: number }) {
@@ -49,7 +41,7 @@ function UpdatedAt({ ts }: { ts: number }) {
     const timer = setInterval(() => setTick((n) => n + 1), 30_000);
     return () => clearInterval(timer);
   }, []);
-  return <>{updatedLabel(ts)}</>;
+  return <>{relativeLabel(ts)}</>;
 }
 
 export function EditorSurface({

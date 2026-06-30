@@ -308,10 +308,22 @@ export interface ChatModelInfo {
   isDefault: boolean;
 }
 
+/** The on-device model bridge (chat + web). Same guard+normalize contract as
+ * corpusInvoke/memexInvoke: outside the shell it rejects with a clear Error
+ * instead of hanging, and string command errors arrive as Error. */
+function aiInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isTauri()) {
+    return Promise.reject(new Error(`${cmd}: the on-device model only exists inside the Tauri shell`));
+  }
+  return invoke<T>(cmd, args).catch((err: unknown) => {
+    throw err instanceof Error ? err : new Error(String(err));
+  });
+}
+
 /** Chat front: the on-device models the memex-ai store declares (kind:llm-chat).
  * Always returns at least the MLX default, even if the registry is missing. */
 export function chatModels(): Promise<ChatModelInfo[]> {
-  return invoke<ChatModelInfo[]>("chat_models");
+  return aiInvoke("chat_models");
 }
 
 /** Chat front: one-shot completion from the on-device model. The Rust side POSTs
@@ -322,7 +334,7 @@ export function chatComplete(
   prompt: string,
   opts?: { model?: string; endpoint?: string; api?: string },
 ): Promise<string> {
-  return invoke<string>("chat_complete", {
+  return aiInvoke("chat_complete", {
     prompt,
     model: opts?.model,
     endpoint: opts?.endpoint,
@@ -351,7 +363,7 @@ export function chatMessages(
     maxTokens?: number;
   },
 ): Promise<string> {
-  return invoke<string>("chat_messages", {
+  return aiInvoke("chat_messages", {
     messages,
     model: opts?.model,
     endpoint: opts?.endpoint,
@@ -371,12 +383,12 @@ export interface WebResult {
 
 /** Web search via DuckDuckGo (no key). Rejects a query that trips the secret guard. */
 export function webSearch(query: string, limit?: number): Promise<WebResult[]> {
-  return invoke<WebResult[]>("web_search", { query, limit });
+  return aiInvoke("web_search", { query, limit });
 }
 
 /** Fetch a page and return readable text (HTML stripped, capped by `maxChars`). */
 export function webFetch(url: string, maxChars?: number): Promise<string> {
-  return invoke<string>("web_fetch", { url, maxChars });
+  return aiInvoke("web_fetch", { url, maxChars });
 }
 
 /** Settings → Storage truth: the real root (home shortened to `~`), every
@@ -446,6 +458,40 @@ export async function resolveImageSrc(src: string, rootId = "default"): Promise<
   const rel = src.startsWith("storage:") ? `storage/${src.slice("storage:".length)}` : src;
   const abs = await corpusAbs(rootId, rel);
   return abs ? convertFileSrc(abs) : "";
+}
+
+/** Split a corpus wire id into its root + relative path. The default LOCAL root
+ * emits BARE ids ("storage/x.mp3"); a non-default root prefixes "<rootid>:rel"
+ * where rootid has no slash. Mirrors Rust `split_root_id`. */
+function splitRootId(id: string): { rootId: string; rel: string } {
+  const i = id.indexOf(":");
+  if (i > 0 && !id.slice(0, i).includes("/")) {
+    return { rootId: id.slice(0, i), rel: id.slice(i + 1) };
+  }
+  return { rootId: "default", rel: id };
+}
+
+/** Asset-protocol URL for a surfaced file note (kind "file"), to feed an
+ * <audio>/<img>/<video>/<iframe>. "" outside Tauri or when it can't resolve. */
+export async function fileAssetUrl(id: string): Promise<string> {
+  if (!isTauri()) return "";
+  const { rootId, rel } = splitRootId(id);
+  const abs = await corpusAbs(rootId, rel);
+  return abs ? convertFileSrc(abs) : "";
+}
+
+/** Read a surfaced FILE's text content (for the in-app text viewer). Capped on
+ * the Rust side. "" outside Tauri. */
+export async function corpusFileText(id: string, maxBytes?: number): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_file_text", { id, maxBytes });
+}
+
+/** Read a surfaced FILE as BASE64 (for a binary the viewer must parse, e.g. a
+ * `.xlsx` spreadsheet). Capped on the Rust side. "" outside Tauri. */
+export async function corpusFileBytes(id: string, maxBytes?: number): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_file_bytes", { id, maxBytes });
 }
 
 export interface FrontmatterView {
@@ -619,24 +665,6 @@ export interface DetectedMemex {
 
 export type MemexPerms = "chats+inbox" | "read-only";
 
-/** A registered memex instance (the machine-level registry lives outside any
- * corpus, in the app config dir). */
-export interface MemexInstanceEntry {
-  id: string;
-  label: string;
-  absPath: string;
-  role: string;
-  memexId: string | null;
-  mode: string | null;
-  perms: MemexPerms;
-}
-
-export interface MemexRegistry {
-  version: number;
-  activeId: string | null;
-  instances: MemexInstanceEntry[];
-}
-
 export interface MemexContractRaw {
   memexJson: string;
   usersJson: string;
@@ -693,12 +721,6 @@ export function memexListChats(root: string): Promise<MemexChatSummary[]> {
 export function memexListDir(root: string, rel: string): Promise<MemexDirEntry[]> {
   return memexInvoke("memex_list_dir", { root, rel });
 }
-export function memexInit(path: string, label: string): Promise<MemexInstanceEntry> {
-  return memexInvoke("memex_init", { path, label });
-}
-export function memexConnect(path: string, label: string): Promise<MemexInstanceEntry> {
-  return memexInvoke("memex_connect", { path, label });
-}
 export function memexWriteChat(root: string, slug: string, contents: string): Promise<string> {
   return memexInvoke("memex_write_chat", { root, slug, contents });
 }
@@ -707,20 +729,8 @@ export function memexWriteChat(root: string, slug: string, contents: string): Pr
 export function memexWriteNote(root: string, stem: string, contents: string): Promise<string> {
   return memexInvoke("memex_write_note", { root, stem, contents });
 }
-export function memexAppendInbox(root: string, line: string): Promise<void> {
-  return memexInvoke("memex_append_inbox", { root, line });
-}
 export function memexValidate(root: string): Promise<MemexValidateReport> {
   return memexInvoke("memex_validate", { root });
-}
-export function memexListInstances(): Promise<MemexRegistry> {
-  return memexInvoke("memex_list_instances");
-}
-export function memexSetActive(id: string): Promise<void> {
-  return memexInvoke("memex_set_active", { id });
-}
-export function memexSetPerms(id: string, perms: MemexPerms): Promise<void> {
-  return memexInvoke("memex_set_perms", { id, perms });
 }
 export function memexPickFolder(): Promise<string | null> {
   return memexInvoke("memex_pick_folder");

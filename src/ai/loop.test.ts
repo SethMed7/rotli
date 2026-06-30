@@ -37,6 +37,7 @@ function fakeHost(replies: string[], over: Partial<Host> = {}): { host: Host; ca
       calls.readNote.push(id);
       return `# Pricing\nMyela pricing is $99/mo (note ${id}).`;
     },
+    readFile: async (q) => `csv,for,${q}\n1,2,3`,
     webSearch: async (q) => {
       calls.webSearch.push(q);
       return [{ title: "Result", url: "https://example.com", snippet: "a web snippet" }];
@@ -142,7 +143,6 @@ describe("budget", () => {
     expect(big.maxIndexChars).toBeGreaterThan(small.maxIndexChars);
     expect(big.readNoteChars).toBeGreaterThan(small.readNoteChars);
     expect(contextWindowFor({ id: "gemma-3-12b" })).toBeGreaterThan(contextWindowFor({ id: "mystery" }));
-    expect(contextWindowFor({ id: "x", contextWindow: 4096 })).toBe(4096); // explicit override wins
   });
 
   test("pruneScratch keeps the scratchpad within budget", () => {

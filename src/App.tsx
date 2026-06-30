@@ -41,10 +41,10 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { EditorView } from "@codemirror/view";
 import { activeInstance, isWritable } from "./memex/config";
 import {
-  captureToInbox,
   chooseFolder,
   initMemexAsCorpus,
   loadConfig as memexLoadConfig,
+  writeNote,
 } from "./memex/service";
 import { flushSettingsNow } from "./state/persist";
 import { useMemexStore } from "./state/memex";
@@ -161,9 +161,11 @@ function MainShell() {
             const cfg = await memexLoadConfig();
             const inst = activeInstance(cfg);
             if (inst && isWritable(inst)) {
-              // routed to inbox — there's no board note to open, so ⌘Enter
-              // just lands the capture; nothing to surface
-              await captureToInbox(inst, body);
+              // a quick capture is a STAGED NOTE in wiki/_inbox → it shows in the
+              // one Captures surface (Seth, 2026-06-30). ⌘Enter surfaces Captures.
+              await writeNote({ instance: inst, body });
+              await invalidateNotes();
+              if (open) useUiStore.getState().setContentView("board");
             } else {
               await toBoard();
             }

@@ -16,7 +16,6 @@ import {
   corpusListConfig,
   corpusSetActiveBrain,
   corpusSetBrainPerms,
-  memexAppendInbox,
   memexDetect,
   memexInspect,
   memexListChats,
@@ -36,13 +35,9 @@ import {
   appendMessages,
   canWrite,
   chatSlug,
-  composeInboxLine,
   composeNewChat,
   composeNote,
-  contractInRange,
   noteStem,
-  parseAccessMode,
-  parseMemexInfo,
   parsePrimaryUser,
   today,
   ulid,
@@ -89,21 +84,6 @@ export async function setPerms(id: string, perms: Perms): Promise<MemexConfig> {
   return loadConfig();
 }
 
-// ── a probe's contract, parsed with the mirror codec (for the UI to explain) ──
-
-export interface MemexProbe {
-  detected: DetectedMemex;
-  accessMode: ReturnType<typeof parseAccessMode>;
-  contractOk: boolean;
-}
-
-export async function probe(path: string): Promise<MemexProbe> {
-  const detected = await inspect(path);
-  const accessMode = parseAccessMode(detected.usersJson ?? "");
-  const contractOk = detected.contract ? contractInRange(detected.contract) : false;
-  return { detected, accessMode, contractOk };
-}
-
 // ── chats (rotli's owned surface) ─────────────────────────────────────────────
 
 export interface WriteChatInput {
@@ -143,19 +123,6 @@ export const listChats = (instance: MemexInstance): Promise<MemexChatSummary[]> 
 
 export const readChat = (instance: MemexInstance, slug: string): Promise<string> =>
   memexRead(instance.root, `chats/${slug}.md`);
-
-// ── inbox capture (rotli's other writable surface) ────────────────────────────
-
-export async function captureToInbox(
-  instance: MemexInstance,
-  text: string,
-  tag?: string,
-): Promise<void> {
-  if (!canWrite("inbox.md", instance.perms)) {
-    throw new Error("This memex is read-only for rotli.");
-  }
-  await memexAppendInbox(instance.root, composeInboxLine(text, tag));
-}
 
 // ── notes (rotli's owned wiki/_inbox staging — the v3.5 write model) ───────────
 
@@ -201,21 +168,9 @@ export async function writeNote(
 
 // ── read-only spine (Memory) ──────────────────────────────────────────────────
 
-export const readSpine = (instance: MemexInstance, rel: string): Promise<string> =>
-  memexRead(instance.root, rel);
-
 /** List a spine directory (subdirs + .md files) for the read-only browser. */
 export const listDir = (instance: MemexInstance, rel: string): Promise<MemexDirEntry[]> =>
   memexListDir(instance.root, rel);
-
-/** The instance's identity card, parsed from the live memex.json. */
-export async function readInfo(instance: MemexInstance) {
-  const raw = await memexReadContract(instance.root);
-  return {
-    info: parseMemexInfo(raw.memexJson),
-    accessMode: parseAccessMode(raw.usersJson),
-  };
-}
 
 // ── validate.ts gate (mirror-not-import: Rust shells the brain's own script) ──
 

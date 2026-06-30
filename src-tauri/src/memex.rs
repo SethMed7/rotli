@@ -330,30 +330,6 @@ fn find_bun() -> PathBuf {
     PathBuf::from("bun") // last resort: rely on PATH
 }
 
-// ─── inbox insert (after the sentinel, else EOF) ───────────────────────────────
-
-fn insert_inbox(existing: &str, line: &str) -> String {
-    if let Some(idx) = existing.find(INBOX_MARK) {
-        let after = idx + INBOX_MARK.len();
-        let nl = existing[after..]
-            .find('\n')
-            .map(|n| after + n + 1)
-            .unwrap_or(existing.len());
-        let mut s = String::with_capacity(existing.len() + line.len());
-        s.push_str(&existing[..nl]);
-        s.push_str(line);
-        s.push_str(&existing[nl..]);
-        s
-    } else {
-        let mut s = existing.to_string();
-        if !s.is_empty() && !s.ends_with('\n') {
-            s.push('\n');
-        }
-        s.push_str(line);
-        s
-    }
-}
-
 // ─── commands ──────────────────────────────────────────────────────────────────
 
 /// Scan the likely places for an existing memex (so first-run can offer "merge"):
@@ -686,17 +662,6 @@ pub fn memex_write_note(root: String, stem: String, contents: String) -> Result<
     Ok(path.to_string_lossy().to_string())
 }
 
-/// Append a capture line to `inbox.md` (after the sentinel), under the lock.
-#[tauri::command]
-pub fn memex_append_inbox(root: String, line: String) -> Result<(), String> {
-    assert_writable("inbox.md")?;
-    let path = PathBuf::from(root).join("inbox.md");
-    with_file_lock(&path, || {
-        let existing = fs::read_to_string(&path).unwrap_or_default();
-        atomic_write(&path, &insert_inbox(&existing, &line))
-    })
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidateReport {
@@ -867,19 +832,6 @@ mod tests {
         assert!(safe_slug("a/b").is_err());
         assert!(safe_slug("Caps").is_err());
         assert!(safe_slug("").is_err());
-    }
-
-    #[test]
-    fn inbox_inserts_after_the_sentinel() {
-        let existing = format!("# Inbox\n\n{INBOX_MARK}\n- old\n");
-        let out = insert_inbox(&existing, "- new\n");
-        assert_eq!(out, format!("# Inbox\n\n{INBOX_MARK}\n- new\n- old\n"));
-    }
-
-    #[test]
-    fn inbox_appends_when_no_sentinel() {
-        assert_eq!(insert_inbox("- a\n", "- b\n"), "- a\n- b\n");
-        assert_eq!(insert_inbox("", "- b\n"), "- b\n");
     }
 
     #[test]

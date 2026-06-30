@@ -1,10 +1,13 @@
-//! The secret-pattern detector — the SINGLE source of truth for "does this text
-//! hold a secret?". Two callers share it:
+//! The secret-pattern detector — the Rust source of truth for "does this text
+//! hold a secret?". Two Rust callers share it:
 //!   • corpus.rs — auto-flags a note `secure: true` (never sent to a remote model,
 //!     gitignored) when its body trips a pattern.
 //!   • web.rs — the egress backstop: a secret must never ride a web request off the
 //!     machine, so an outbound search query / URL is checked here first.
-//! One regex set, one place (Seth, 2026-06-29).
+//! NOTE: `src/ai/guard.ts` is a hand-maintained TS MIRROR of these patterns — the
+//! frontend can't reach into Rust, so the two sets are duplicated ON PURPOSE and
+//! must be kept in sync by hand: change a pattern here, change it there too
+//! (Seth, 2026-06-29).
 
 use std::sync::OnceLock;
 

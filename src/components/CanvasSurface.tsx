@@ -119,7 +119,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
     }
     const body = pending.current;
     pending.current = null;
-    if (body !== null && isTauri()) void corpusWriteBoard(boardId, body).catch(() => {});
+    if (body !== null && isTauri()) void corpusWriteBoard(boardId, body).catch((e) => console.warn("board write failed — your canvas edit may not have saved", e));
   }, [boardId]);
 
   useEffect(() => () => flush(), [flush]);
@@ -152,7 +152,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
         const body = pending.current;
         pending.current = null;
         saveTimer.current = null;
-        if (body !== null && isTauri()) void corpusWriteBoard(boardId, body).catch(() => {});
+        if (body !== null && isTauri()) void corpusWriteBoard(boardId, body).catch((e) => console.warn("board write failed — your canvas edit may not have saved", e));
       }, SAVE_DEBOUNCE_MS);
     },
     [boardId, state.status],
@@ -175,7 +175,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
         files: api.getFiles(),
         rotliMeta: next,
       };
-      void corpusWriteBoard(boardId, JSON.stringify(scene)).catch(() => {});
+      void corpusWriteBoard(boardId, JSON.stringify(scene)).catch((e) => console.warn("board write failed — your canvas edit may not have saved", e));
     },
     [boardId],
   );

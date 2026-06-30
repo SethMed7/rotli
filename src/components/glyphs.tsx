@@ -3,6 +3,7 @@
 // sprite and render via <Icon>.
 
 import type { ReactNode } from "react";
+import { IMAGE_EXTS, extOf } from "../lib/fileKind";
 
 interface GlyphProps {
   size?: number | undefined;
@@ -155,20 +156,6 @@ export function ImageGlyph(props: GlyphProps) {
   );
 }
 
-const IMAGE_EXTS = new Set([
-  "png",
-  "jpg",
-  "jpeg",
-  "gif",
-  "webp",
-  "heic",
-  "heif",
-  "avif",
-  "bmp",
-  "tiff",
-  "tif",
-]);
-
 /** The row glyph for a note/board/file, by kind + filename extension: the REAL
  * format mark for files (svg/pdf/raster image) and the Excalidraw logo for
  * canvases; notes and unknown files stay the generic document. */
@@ -178,7 +165,7 @@ export function glyphForNote(
 ): ReactNode {
   if (note.kind === "board") return <ExcalidrawGlyph {...props} />;
   if (note.kind === "file") {
-    const ext = (note.title ?? "").split(".").pop()?.toLowerCase() ?? "";
+    const ext = extOf(note.title ?? "");
     if (ext === "svg") return <SvgFormatGlyph {...props} />;
     if (ext === "pdf") return <PdfGlyph {...props} />;
     if (IMAGE_EXTS.has(ext)) return <ImageGlyph {...props} />;

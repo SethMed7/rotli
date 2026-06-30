@@ -519,7 +519,9 @@ fn corpus_connect_brain(app: AppHandle, path: Option<String>) -> Result<bool, St
 /// Relaunches so its sidebar row disappears.
 #[tauri::command]
 fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
-    corpus::forget_brain(&app, &id)?;
+    // forget_root is a superset of the old forget_brain (it also drops a folder by
+    // id, a no-op for a brain id) — one path now handles brains + folders.
+    corpus::forget_root(&app, &id)?;
     app.restart();
 }
 
@@ -676,6 +678,8 @@ pub fn run() {
             corpus::corpus_list,
             corpus::corpus_read,
             corpus::corpus_open_file,
+            corpus::corpus_file_text,
+            corpus::corpus_file_bytes,
             corpus::corpus_import_file,
             corpus::corpus_abs,
             corpus::corpus_frontmatter,
@@ -709,7 +713,6 @@ pub fn run() {
             memex::memex_list_dir,
             memex::memex_write_chat,
             memex::memex_write_note,
-            memex::memex_append_inbox,
             memex::memex_validate,
             memex::memex_pick_folder
         ])
@@ -845,14 +848,20 @@ pub fn run() {
             // way the rest of this file gates every other macOS API.
             #[cfg(target_os = "macos")]
             {
-                // Only a Dock click with NOTHING visible reopens the main window.
-                // Without the has_visible_windows guard, summoning the Quick Note
-                // (⌥Q) — which activates the app — can fire a spurious Reopen while
-                // Quick is up and wrongly surface the whole main window (Seth,
-                // 2026-06-22). When any window (quick/capture/main) is visible, the
-                // Dock click is a no-op here.
+                // Only a Dock click with NOTHING of ours up reopens the main window.
+                // The OS `has_visible_windows` flag ALONE is not enough: the Quick
+                // Note (and capture card) are alwaysOnTop / skipTaskbar floating
+                // panels that macOS does NOT count there, so summoning Quick — e.g.
+                // ⌥. / ⌥Q, which activates the app — fires a spurious Reopen with
+                // has_visible_windows=false and wrongly surfaces the whole main
+                // window (Seth, 2026-06-30). show_quick() shows the panel BEFORE it
+                // steals focus, so our own is_visible() check sees it and suppresses
+                // the reopen. The quick chord must open ONLY the floating note.
                 if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
-                    if !has_visible_windows {
+                    let ours_up = is_visible(app, "quick")
+                        || is_visible(app, "capture")
+                        || is_visible(app, "main");
+                    if !has_visible_windows && !ours_up {
                         show_main(app);
                     }
                 }

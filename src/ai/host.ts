@@ -6,13 +6,19 @@
 import {
   type ChatModelInfo,
   chatMessages,
+  corpusFileBytes,
+  corpusFileText,
   corpusList,
   corpusReadAi,
   webFetch as tauriWebFetch,
   webSearch as tauriWebSearch,
 } from "../lib/tauri";
+import { workbookToCsv } from "../lib/sheets";
 import { buildIndex, rankNotes } from "./tools";
 import type { Host } from "./types";
+
+const SHEET_BIN = new Set(["xlsx", "xls", "xlsm", "ods"]);
+const SHEET_TEXT = new Set(["csv", "tsv"]);
 
 export function makeTauriHost(model: ChatModelInfo): Host {
   return {
@@ -32,6 +38,19 @@ export function makeTauriHost(model: ChatModelInfo): Host {
     readNote(id) {
       // local model ⇒ secure notes are allowed (the gate only blocks REMOTE models).
       return corpusReadAi(id, true);
+    },
+    async readFile(query) {
+      const { notes } = await corpusList();
+      const q = query.toLowerCase().trim().replace(/^["']|["']$/g, "");
+      const files = notes.filter((n) => n.kind === "file");
+      const file =
+        files.find((n) => n.title.toLowerCase() === q) ??
+        files.find((n) => n.title.toLowerCase().includes(q));
+      if (!file) return `no file matching "${query}". Use the exact filename (e.g. report.csv).`;
+      const ext = (file.title.split(".").pop() ?? "").toLowerCase();
+      if (SHEET_BIN.has(ext)) return workbookToCsv({ base64: await corpusFileBytes(file.id) });
+      if (SHEET_TEXT.has(ext)) return workbookToCsv({ csv: await corpusFileText(file.id) });
+      return corpusFileText(file.id);
     },
     webSearch(query, limit) {
       return tauriWebSearch(query, limit);

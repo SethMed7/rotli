@@ -109,6 +109,8 @@ export function statusFor(tool: ToolName): string {
       return "searching your notes…";
     case "read_note":
       return "reading a note…";
+    case "read_file":
+      return "reading a file…";
     case "web_search":
       return "searching the web…";
     case "web_fetch":
@@ -143,6 +145,11 @@ export async function runTool(
       const id = String(args.id ?? "").trim();
       if (id === "") return 'error: read_note needs an "id" from search_notes or the index.';
       return truncate(await host.readNote(id), budget.readNoteChars);
+    }
+    case "read_file": {
+      const q = String(args.query ?? args.name ?? args.file ?? "").trim();
+      if (q === "") return 'error: read_file needs a "query" — the filename (e.g. report.csv).';
+      return truncate(await host.readFile(q), budget.readNoteChars * 2);
     }
     case "web_search": {
       const q = String(args.query ?? "").trim();

@@ -847,6 +847,8 @@ function LocationPane() {
   );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const storageGrouping = useUiStore((s) => s.storageGrouping);
+  const setStorageGrouping = useUiStore((s) => s.setStorageGrouping);
 
   const rootPath = real.data?.root ?? "~/Documents/rotli";
   const instances = cfg.data?.instances ?? [];
@@ -930,6 +932,25 @@ function LocationPane() {
           </button>
         </div>
       </div>
+
+      {/* —— Storage organization (Seth, 2026-06-30) —— */}
+      <h4 className="sethead">Storage</h4>
+      <div className="mprow">
+        <span className="mplabel">Organize Storage by</span>
+        <Seg
+          value={storageGrouping}
+          options={[
+            ["type", "Type"],
+            ["date", "Date"],
+            ["folder", "Folder"],
+          ]}
+          onPick={setStorageGrouping}
+        />
+      </div>
+      <p className="setnote">
+        Your files (audio · images · PDFs · …) group this way under the <b>Storage</b> section.
+      </p>
+
       <p className="setnote">
         <b>Choose folder…</b> takes a memex (rotli uses it as your notes folder), an empty folder (your
         notes move there), or any folder (used as-is). The hidden <code>.rotli/</code> is just an index —

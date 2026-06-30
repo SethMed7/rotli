@@ -10,6 +10,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-06-30
+
+### Changed
+- **The Brain shows in the sidebar.** Your AI-organized wiki areas (People · Projects · Research ·
+  Engineering · Theology · Reference) now render as a navigable **Brain** section under Notes — before
+  they were invisible (the sidebar never asked for the `wiki` folder tree). Area labels are prettified.
+- **One "Captures."** The duplicate capture concept is gone — there was a "Captures" row (under
+  Notes, read the `Board` folder → always 0) AND a "Capture" destination (the `Inbox` folder). Now
+  there is a **single Captures** under Notes: the default `Inbox` shelf projects there, and the bottom
+  "Capture" destination is removed.
+- **⌥C quick-capture lands in Captures.** A quick capture is now a **staged note** in `wiki/_inbox/`
+  (it shows under Captures immediately) instead of appending to `inbox.md` (which surfaced nowhere).
+- **"All notes" is a searchable list.** Replaced the card grid with a clean list (title + date) and a
+  full-width search; binary files (mp3/pdf/png/…) are filtered out (they live under **Storage**). Recent
+  filters files too.
+- **Chat is centered + clean.** The conversation column is now reliably centered (flex-center), matching
+  the md editor's reading measure.
+- **Storage organizes itself.** The Storage section now groups your files — **by Type** (Audio · Images ·
+  PDFs · Documents · Other) by default, or **by Date / by Folder** via a new Settings knob (Location →
+  Storage). Computed in the frontend (`src/services/storageTree.ts`); your files never move on disk.
+
+### Added
+- **In-app file viewers (universal).** Clicking a surfaced file opens it in a right-pane **file surface**
+  instead of shelling the OS default app: audio gets a real player with a play button (no more Apple
+  Music), video/image/pdf render inline, text reads in-pane, and **anything else** falls back to an
+  asset `<iframe>` preview + an "Open externally" escape hatch. New `file` pane surface
+  (`src/components/FileSurface.tsx`) + `corpus_file_text`/`corpus_file_bytes` reads + `media-src`/
+  `frame-src` `asset:` in the CSP.
+- **Spreadsheet viewer + chat review.** `.xlsx`/`.xls`/`.csv` render as a clean read-only table (SheetJS,
+  Apache-2.0; `src/lib/sheets.ts`). A new **`read_file`** agent tool lets the on-device chat read a file
+  by name (text, or a spreadsheet as CSV) so it can answer questions about it — look, don't act.
+
+### Fixed
+- **The Quick Note chord opens ONLY the Quick Note.** Summoning the floating note (⌥Q, or a rebound chord
+  like ⌥.) activates the app, which fired a spurious macOS `Reopen` — and the main window came up too,
+  defeating the whole point. The reopen now uses our OWN window-visibility check (the OS
+  `has_visible_windows` flag excludes the `alwaysOnTop`/`skipTaskbar` panel), so the chord surfaces the
+  floating note alone.
+
+### Internal (code-health pass)
+- A codebase audit drove a cleanup. **Hardened security:** `gitignore_add` now propagates its write error
+  (+ a symmetric `gitignore_remove` when a note is un-secured); the web-egress secret guard keys off
+  `WEB_TOOLS`. **Removed dead code:** the unwired `captureToInbox`/`inbox.md` chain (TS + Rust command +
+  state + persistence), 5 orphaned memex `invoke` wrappers, the ~120-line pre-CodeMirror line renderer,
+  the `contextWindow` budget override, and assorted dead exports. **De-duplicated:** one `dateLabels.ts`
+  (5 drifting copies), `openSummary()` for open-by-kind (also fixes a file ⌘-new-tab regression),
+  `formatGlyphs`, `fileKind`, Rust filename/id helpers (`free_name`/`unique_id`), `forget_brain`→
+  `forget_root`, and cached web.rs regexes. **Fixed:** the broken Ctrl+2 chat hotkeys; 5 silent
+  save-failure `catch`es now log. Net −25 lines across 49 files; all tests green.
+
 ## [0.9.0] — 2026-06-29
 
 ### Added

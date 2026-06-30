@@ -19,8 +19,10 @@ folder.")
 **Notes** _(front)_ — the note system, built on the memex. It has four layers:
 
 - **Capture** — you just jot a note; you do **not** decide where it goes. Frictionless
-  by design: most people don't want a strict filing flow. New notes land in staging
-  (`wiki/_inbox/`); the AI files them later. ⌥C quick-capture appends to `inbox.md`.
+  by design: most people don't want a strict filing flow. Both a typed note and a ⌥C
+  quick-capture land as a **staged note** in `wiki/_inbox/`, all surfaced under the **one**
+  **Captures** view; the AI files them into the brain later. (There is no separate "Capture"
+  destination — captures have a single home.)
 - **The brain** — the **AI-organized** knowledge: areas like **People · Projects ·
   Research** (the memex `wiki/<area>/`). Mention a person in a note and the AI files
   it so they turn up under People. It is a **folder within Notes** — browsable and

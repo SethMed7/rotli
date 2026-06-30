@@ -36,6 +36,10 @@ function makeChatTab(chatSlug: string | null): Tab {
   return { id: ulid(), surfaceKind: "chat", chatSlug, viewState: { cursor: 0, scroll: 0 } };
 }
 
+function makeFileTab(fileId: string): Tab {
+  return { id: ulid(), surfaceKind: "file", fileId, viewState: { cursor: 0, scroll: 0 } };
+}
+
 /** The noteId of a tab, or null for a canvas tab — the one place every
  * `.noteId` read funnels through so a CanvasTab never crashes NoteTab code. */
 function tabNoteId(tab: Tab): string | null {
@@ -46,6 +50,7 @@ function tabNoteId(tab: Tab): string | null {
 function duplicateTab(tab: Tab): Tab {
   if (tab.surfaceKind === "canvas") return makeCanvasTab(tab.boardId);
   if (tab.surfaceKind === "chat") return makeChatTab(tab.chatSlug);
+  if (tab.surfaceKind === "file") return makeFileTab(tab.fileId);
   return makeTab(tab.noteId);
 }
 
@@ -263,6 +268,13 @@ interface PanesState {
   /** Open a chat in the focused pane (replace, or `newTab`). `chatSlug` null = a
    * fresh unsent chat. */
   openChat: (chatSlug: string | null, opts?: { newTab?: boolean }) => void;
+  /** Open a surfaced binary FILE (audio/pdf/image/text) in-app — mirrors openCanvas. */
+  openFile: (fileId: string, opts?: { newTab?: boolean }) => void;
+  /** Open a note/board/file by its summary — the ONE place open-by-kind lives.
+   * Dispatches on `kind` and forwards `opts` so ⌘-click / newTab works uniformly
+   * for every row type (Seth, 2026-06-30 — was hand-written in 5 places, files
+   * silently dropped newTab). */
+  openSummary: (note: { id: string; kind?: string }, opts?: { newTab?: boolean }) => void;
   /** Bind a freshly-created chat (in `paneId`'s active chat tab) to its new slug. */
   bindChat: (paneId: string, chatSlug: string) => void;
   newTab: () => void;
@@ -446,6 +458,40 @@ export const usePanesStore = create<PanesState>((set, get) => {
       });
     },
 
+    openFile: (fileId, opts) => {
+      // files aren't notes — no touchMru. Like openCanvas, surface the panes.
+      useUiStore.getState().setContentView("panes");
+      const leaf = focusedLeaf();
+      set({
+        root: updateLeaf(get().root, leaf.id, (l) => {
+          if (opts?.newTab) {
+            const tab = makeFileTab(fileId);
+            return { ...l, tabs: [...l.tabs, tab], activeTabId: tab.id };
+          }
+          // replace: keep the tab id, swap the WHOLE tab to a file tab
+          return {
+            ...l,
+            tabs: l.tabs.map((t) =>
+              t.id === l.activeTabId
+                ? {
+                    id: l.activeTabId,
+                    surfaceKind: "file",
+                    fileId,
+                    viewState: { cursor: 0, scroll: 0 },
+                  }
+                : t,
+            ),
+          };
+        }),
+      });
+    },
+
+    openSummary: (note, opts) => {
+      if (note.kind === "board") get().openCanvas(note.id, opts);
+      else if (note.kind === "file") get().openFile(note.id, opts);
+      else get().openNote(note.id, opts);
+    },
+
     bindChat: (paneId, chatSlug) =>
       set((s) => ({
         root: updateLeaf(s.root, paneId, (l) => ({
@@ -461,6 +507,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
       const active = activeTabOf(leaf);
       if (active.surfaceKind === "canvas") get().openCanvas(active.boardId, { newTab: true });
       else if (active.surfaceKind === "chat") get().openChat(active.chatSlug, { newTab: true });
+      else if (active.surfaceKind === "file") get().openFile(active.fileId, { newTab: true });
       else get().openNote(active.noteId, { newTab: true });
     },
 

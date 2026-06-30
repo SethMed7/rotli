@@ -1,0 +1,35 @@
+// One row in a note LIST (All notes · Recent) — glyph + title + snippet + date,
+// the whole row a button that opens the note/board/file. Extracted (Seth,
+// 2026-06-30) so the two list surfaces share the exact same markup.
+
+import type { NoteSummary } from "../types";
+import { longDateLabel } from "../lib/dateLabels";
+import { glyphForNote } from "./glyphs";
+
+export function NoteListRow({
+  note,
+  onOpen,
+}: {
+  note: NoteSummary;
+  onOpen: (note: NoteSummary) => void;
+}) {
+  const board = note.kind === "board";
+  const file = note.kind === "file";
+  return (
+    <li>
+      <button
+        type="button"
+        className="recent-row"
+        onClick={() => onOpen(note)}
+        title={board ? "Open board" : file ? "Open file" : "Open note"}
+      >
+        {glyphForNote(note, { size: 14, className: "rr-icon" })}
+        <span className="rr-title">
+          {note.title || (board ? "Untitled board" : "Empty note")}
+        </span>
+        {note.snippet && <span className="rr-snippet">{note.snippet}</span>}
+        <span className="rr-date">{longDateLabel(note.updatedAt)}</span>
+      </button>
+    </li>
+  );
+}

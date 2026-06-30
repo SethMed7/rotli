@@ -34,15 +34,6 @@ export function useInstanceChats(instance: MemexInstance | null) {
   });
 }
 
-/** Read-only Memory browser: one directory listing of the active instance's spine. */
-export function useSpineDir(instance: MemexInstance | null, rel: string) {
-  return useQuery({
-    queryKey: ["memex", "dir", instance?.id ?? "none", rel],
-    queryFn: () => (instance ? svc.listDir(instance, rel) : Promise.resolve([])),
-    enabled: !!instance,
-  });
-}
-
 /** "Choose folder…" — the one smart picker for the corpus (relaunches on success). */
 export function useChooseFolder() {
   return useMutation({
@@ -92,17 +83,6 @@ export function useWriteChat() {
     }) => svc.writeChat(input),
     onSuccess: (_res, vars) =>
       queryClient.invalidateQueries({ queryKey: memexKeys.chats(vars.instance.id) }),
-  });
-}
-
-export function useWriteNote() {
-  return useMutation({
-    mutationFn: (input: { instance: MemexInstance; body: string; shelf?: string[]; reach?: string[] }) =>
-      svc.writeNote(input),
-    onSuccess: (_res, vars) => {
-      // refresh the read-only spine browser so the new staging note shows up.
-      queryClient.invalidateQueries({ queryKey: ["memex", "dir", vars.instance.id] });
-    },
   });
 }
 

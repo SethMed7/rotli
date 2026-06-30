@@ -3,7 +3,7 @@
 
 import { create } from "zustand";
 
-const MRU_CAP = 24;
+export const MRU_CAP = 24;
 
 interface MruState {
   ids: string[];

@@ -223,11 +223,6 @@ interface UiState {
   blockHandles: boolean;
   setBlockHandles: (on: boolean) => void;
 
-  /** Quick captures (⌥C) route to the active memex's inbox.md instead of the
-   * Board. Off by default (the Board is the safe fallback). Persisted. */
-  captureToBrainInbox: boolean;
-  setCaptureToBrainInbox: (on: boolean) => void;
-
   /** ⌘K — the only overlay that dims (r3 frame F). */
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
@@ -253,10 +248,6 @@ interface UiState {
    * history lives in the sidebar and a chat opens in the content area via
    * contentView "chat". These hold which chat is open and the browse mode. Not
    * persisted (transient view state). */
-  /** The chat currently open in the content area (its chats/ slug), or null = a
-   * fresh "New chat". */
-  selectedChatSlug: string | null;
-  setSelectedChatSlug: (slug: string | null) => void;
   /** "All chats" browse mode — the content area shows a searchable list of every
    * chat instead of a single conversation. */
   chatAllOpen: boolean;
@@ -270,6 +261,10 @@ interface UiState {
    * The "" key holds a not-yet-saved (slug-less) chat's choice until it's bound. */
   chatWeb: Record<string, boolean>;
   setChatWeb: (slug: string, on: boolean) => void;
+  /** How the Storage destination groups its binaries (a Settings knob): by Type
+   * (default), Date, or Folder (raw on-disk). Persisted. */
+  storageGrouping: "type" | "date" | "folder";
+  setStorageGrouping: (g: "type" | "date" | "folder") => void;
 
   /** A newer signed build is on the feed — set once by App.tsx's quiet on-mount
    * check (CARL rule 2: no auto-download, no modal). Just lets Settings → General
@@ -407,9 +402,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   blockHandles: false,
   setBlockHandles: (on) => set({ blockHandles: on }),
 
-  captureToBrainInbox: false,
-  setCaptureToBrainInbox: (on) => set({ captureToBrainInbox: on }),
-
   paletteOpen: false,
   setPaletteOpen: (open) => set({ paletteOpen: open }),
 
@@ -422,14 +414,14 @@ export const useUiStore = create<UiState>((set, get) => ({
   renamingBoardId: null,
   setRenamingBoardId: (id) => set({ renamingBoardId: id }),
 
-  selectedChatSlug: null,
-  setSelectedChatSlug: (slug) => set({ selectedChatSlug: slug }),
   chatAllOpen: false,
   setChatAllOpen: (open) => set({ chatAllOpen: open }),
   chatModelId: null,
   setChatModelId: (id) => set({ chatModelId: id }),
   chatWeb: {},
   setChatWeb: (slug, on) => set((s) => ({ chatWeb: { ...s.chatWeb, [slug]: on } })),
+  storageGrouping: "type",
+  setStorageGrouping: (g) => set({ storageGrouping: g }),
 
   updateAvailable: false,
   setUpdateAvailable: (on) => set({ updateAvailable: on }),

@@ -12,7 +12,7 @@ import { gemmaAdapter } from "./prompt";
 import { pruneScratch, runTool, statusFor } from "./tools";
 import type { AgentEvent, Host, RunInput, ScratchStep, ToolName } from "./types";
 
-const NOTE_TOOLS: ToolName[] = ["search_notes", "read_note"];
+const NOTE_TOOLS: ToolName[] = ["search_notes", "read_note", "read_file"];
 const WEB_TOOLS: ToolName[] = ["web_search", "web_fetch"];
 
 export async function* runAgent(
@@ -28,7 +28,8 @@ export async function* runAgent(
   let knowledge = "";
   try {
     knowledge = await host.knowledgeMap(budget.maxIndexChars);
-  } catch {
+  } catch (e) {
+    console.warn("knowledgeMap failed — the model runs without a knowledge index", e);
     knowledge = "";
   }
 
@@ -70,11 +71,14 @@ export async function* runAgent(
 
     if (parsed.kind !== "call") {
       consecutiveBad += 1;
-      scratch.push({
-        action: raw.slice(0, 160),
-        result:
-          'error: your reply was not one valid JSON object. Reply with exactly one: {"tool":…,"args":…} or {"final":"…"}.',
-      });
+      // an INVALID reply (e.g. naming a tool that's off for this chat) gets its
+      // PRECISE reason back so the model fixes the right thing; only a truly
+      // UNPARSEABLE reply gets the JSON-shape nudge (Seth, 2026-06-30 — audit).
+      const result =
+        parsed.kind === "invalid"
+          ? `error: ${parsed.reason}. Reply with ONE JSON object: {"tool":…,"args":…} or {"final":"…"}.`
+          : 'error: your reply was not one valid JSON object. Reply with exactly one: {"tool":…,"args":…} or {"final":"…"}.';
+      scratch.push({ action: raw.slice(0, 160), result });
       if (consecutiveBad >= 2) break; // confused model → stop burning steps, force a final
       continue;
     }
@@ -90,10 +94,8 @@ export async function* runAgent(
     }
 
     // egress guard (mirror of the Rust backstop): no secret ever rides a web tool.
-    if (
-      (parsed.tool === "web_search" || parsed.tool === "web_fetch") &&
-      looksSecret(JSON.stringify(parsed.args))
-    ) {
+    // Keyed off WEB_TOOLS so a future web tool can't be added past the guard (audit).
+    if (WEB_TOOLS.includes(parsed.tool) && looksSecret(JSON.stringify(parsed.args))) {
       scratch.push({
         action: sig,
         result: "blocked: that input looks like it contains a secret — not sent to the web.",

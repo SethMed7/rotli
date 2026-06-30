@@ -24,14 +24,11 @@ export interface Budget {
 
 export interface ModelMeta {
   id: string;
-  /** context window in tokens, if known (else inferred from the id family) */
-  contextWindow?: number;
 }
 
-/** Approx context window (tokens): explicit override → id-family inference → a
- * conservative default. The client uses this to size every retrieval budget. */
+/** Approx context window (tokens), inferred from the model id family (with a
+ * conservative default). The client uses this to size every retrieval budget. */
 export function contextWindowFor(model: ModelMeta): number {
-  if (typeof model.contextWindow === "number" && model.contextWindow > 0) return model.contextWindow;
   const id = model.id.toLowerCase();
   if (id.includes("gemma-3") || id.includes("gemma3") || id.includes("gemma4")) return 128_000;
   if (id.includes("qwen2.5") || id.includes("qwen3") || id.includes("1.5b") || id.includes("3b")) return 32_000;

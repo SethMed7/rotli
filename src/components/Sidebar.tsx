@@ -19,9 +19,11 @@ import {
   type MouseEvent,
   type ReactNode,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
+import { buildStorageTree } from "../services/storageTree";
 import {
   invalidateFolders,
   invalidateNotes,
@@ -39,7 +41,6 @@ import {
   corpusAddFolder,
   corpusCreateBoard,
   corpusForgetFolder,
-  corpusOpenFile,
   corpusRenameBoard,
 } from "../lib/tauri";
 import {
@@ -60,6 +61,7 @@ import { activeInstance } from "../memex/config";
 import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
 import type { Folder, NoteSummary } from "../types";
 import { dispatch } from "../keys/registry";
+import { longDateLabel } from "../lib/dateLabels";
 import { useTransientPopover } from "../lib/popover";
 import {
   ArchiveGlyph,
@@ -155,26 +157,13 @@ function CaptureBoardGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
-/** Day label for a compact row's trailing date (lifted from NoteList). */
-function dayLabel(ts: number): string {
-  const date = new Date(ts);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const days = Math.round((today.getTime() - dayStart.getTime()) / 86_400_000);
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return date.toLocaleDateString(undefined, { weekday: "short" });
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
 /** The five reserved destinations, in sidebar order, each with its glyph. The
  * note-capture root keeps its on-disk id "Inbox" (the memex contract is unchanged)
  * but is LABELED "Capture" now that the top-level word "Inbox" means email (Seth,
  * 2026-06-26). The ⌥C one-breath capture still lands here / in the memex inbox.md. */
 const DEST_ROWS: { id: Destination; label: string; Glyph: typeof InboxGlyph }[] = [
-  { id: DEST.inbox, label: "Capture", Glyph: InboxGlyph },
+  // "Capture" (DEST.inbox) is GONE — captures have ONE home now, the "Captures"
+  // row under Notes (Seth, 2026-06-30). Staged notes (wiki/_inbox) project there.
   { id: DEST.vault, label: "Vault", Glyph: VaultGlyph },
   { id: DEST.storage, label: "Storage", Glyph: StorageGlyph },
   { id: DEST.archive, label: "Archive", Glyph: ArchiveGlyph },
@@ -245,7 +234,7 @@ function CompactNoteRow({
     >
       {glyphForNote(note, { size: 14, className: "snicon" })}
       <span className="snt">{note.title || "Empty note"}</span>
-      <span className="snd">{dayLabel(note.updatedAt)}</span>
+      <span className="snd">{longDateLabel(note.updatedAt)}</span>
       <span className="snact">
         {hidden ? (
           <span
@@ -421,16 +410,40 @@ function AddedRootRow({ root }: { root: CorpusRoot }) {
 }
 
 export function Sidebar() {
-  const folders = useFolders().data ?? [];
+  const rawFolders = useFolders().data ?? [];
   const allNotes = useNotes().data ?? [];
   // the five reserved queries — all served from the one cached corpus_list, so
   // five hooks here are five cache reads, not five fetches
   const inboxNotes = useNotes(DEST.inbox).data ?? [];
   const vaultNotes = useNotes(DEST.vault).data ?? [];
-  const storageNotes = useNotes(DEST.storage).data ?? [];
+  const storageNotesFlat = useNotes(DEST.storage).data ?? [];
   const archiveNotes = useNotes(DEST.archive).data ?? [];
   const trashNotes = useNotes(DEST.trash).data ?? [];
   const boardNotes = useNotes(DEST.board).data ?? [];
+  // Storage organization (Seth, 2026-06-30): regroup the flat binaries into a
+  // synthetic tree (Type / Date / Folder, a Settings knob) IN THE FRONTEND. The
+  // synthetic "Storage/<…>" folders merge into the folder list and the storage
+  // notes re-home, so the existing recursive renderer + roving cursor just work —
+  // no backend change, instant toggle.
+  const storageGrouping = useUiStore((s) => s.storageGrouping);
+  const storageTree = useMemo(
+    () => buildStorageTree(storageNotesFlat, storageGrouping),
+    [storageNotesFlat, storageGrouping],
+  );
+  const storageNotes = storageTree.notes;
+  const folders = useMemo(
+    () => [
+      ...rawFolders.filter((f) => f.id !== "storage" && !f.id.startsWith("storage/")),
+      ...storageTree.folders,
+    ],
+    [rawFolders, storageTree.folders],
+  );
+  // the BRAIN — the AI-organized wiki areas (People · Projects · Research · …).
+  // Curated notes (no shelf) project to their disk area "wiki/<area>"; we surface
+  // them as a navigable Brain section under Notes (Seth, 2026-06-30).
+  const brainNotes = allNotes.filter(
+    (n) => n.folderId === "wiki" || n.folderId.startsWith("wiki/"),
+  );
   // added external folders (Seth, 2026-06-27): roots the user pointed rotli at,
   // not in the memex — every registered root except the built-in default + vault.
   const addedRoots = (useCorpusRoots().data ?? []).filter(
@@ -654,7 +667,11 @@ export function Sidebar() {
               note={note}
               selected={note.id === focusedNoteId}
               padLeft={28 + level * 16}
-              onOpen={isFile(note) ? () => void corpusOpenFile(note.id) : openRow(note.id)}
+              onOpen={
+                isFile(note)
+                  ? (newTab) => usePanesStore.getState().openFile(note.id, { newTab })
+                  : openRow(note.id)
+              }
               actions={rowActions}
               rowProps={rp({ id: note.id, kind: "note" })}
             />
@@ -697,7 +714,14 @@ export function Sidebar() {
       // with a plain-language note that the AI organizes it (transparency without
       // the wiki jargon the average user wouldn't know what to do with)
       const isVaultWiki = folder.id === "vault:wiki";
-      const label = isVaultWiki ? "Knowledge" : folder.name;
+      // a Brain area (wiki/<area> in the corpus) reads with a capitalized label —
+      // "people" → "People", "projects" → "Projects" (Seth, 2026-06-30)
+      const isWikiArea = folder.id.startsWith("wiki/") && folder.parentId === "wiki";
+      const label = isVaultWiki
+        ? "Knowledge"
+        : isWikiArea
+          ? folder.name.charAt(0).toUpperCase() + folder.name.slice(1)
+          : folder.name;
       const hint = isVaultWiki
         ? "Organized by AI so anything you save here stays findable — your folders are how you see your notes; this is how the AI files them underneath."
         : undefined;
@@ -781,6 +805,8 @@ export function Sidebar() {
     ? [
         { id: ALL_NOTES, kind: "smart" },
         { id: RECENT, kind: "smart" },
+        // the Brain areas (wiki/<area>) ride between the smart rows and destinations
+        ...subtreeRows("wiki", brainNotes),
         ...DEST_ROWS.flatMap(({ id }) => {
           const destNotes = notesByDest[id] ?? [];
           const open = expandedDests[id] ?? false;
@@ -807,7 +833,7 @@ export function Sidebar() {
         // board rows ride kind:"note" in the roving list — the Set tells them
         // apart so a board opens its canvas, not the editor (Seth, 2026-06-24)
         if (boardIds.has(row.id)) openCanvas(row.id, { newTab });
-        else if (fileIds.has(row.id)) void corpusOpenFile(row.id);
+        else if (fileIds.has(row.id)) usePanesStore.getState().openFile(row.id, { newTab });
         else openNote(row.id, { newTab });
         return;
       }
@@ -887,8 +913,9 @@ export function Sidebar() {
       const meta = await corpusRenameBoard(boardId, name);
       retargetBoard(boardId, meta.id);
       await invalidateNotes();
-    } catch {
-      /* board is read-only or gone — leave it as is */
+    } catch (e) {
+      // board is read-only or gone — leave it as is, but surface why
+      console.warn("board rename failed", e);
     }
   };
 
@@ -1241,6 +1268,10 @@ export function Sidebar() {
               <span className="fname">Recent</span>
               <span className="count">{allNotes.length}</span>
             </button>
+
+            {/* — the Brain: the AI-organized areas (People · Projects · Research · …) — */}
+            {childrenOf("wiki").length > 0 && <div className="fsec">Brain</div>}
+            {renderFolderTree("wiki", brainNotes, 0, rowProps)}
 
             <div className="fsec">Destinations</div>
 

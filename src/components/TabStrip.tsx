@@ -16,16 +16,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBoardRename } from "../lib/boardRename";
+import { fileName } from "../lib/fileKind";
 import { startTabDrag } from "../lib/tabDrag";
 import { useNotes } from "../services/hooks";
 import { leaves, usePanesStore } from "../state/panes";
 import type { LeafNode, Tab } from "../types";
-import { ChatGlyph, ExcalidrawGlyph, FileGlyph, PlusGlyph, XGlyph } from "./glyphs";
+import { ChatGlyph, ExcalidrawGlyph, FileGlyph, PlusGlyph, XGlyph, glyphForNote } from "./glyphs";
 
 /** A board's display label = its filename minus the .excalidraw extension. */
 function boardLabel(boardId: string): string {
-  const base = boardId.split("/").pop() ?? boardId;
-  return base.replace(/\.excalidraw$/i, "") || "Board";
+  return fileName(boardId).replace(/\.excalidraw$/i, "") || "Board";
 }
 
 function tabLabel(tab: Tab, titles: Map<string, string>): string {
@@ -37,6 +37,8 @@ function tabLabel(tab: Tab, titles: Map<string, string>): string {
       return boardLabel(tab.boardId);
     case "chat":
       return tab.chatSlug ? tab.chatSlug.replace(/-/g, " ") : "New chat";
+    case "file":
+      return fileName(tab.fileId);
   }
 }
 
@@ -130,6 +132,11 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                     <ExcalidrawGlyph size={13} className="tglyph" />
                   ) : tab.surfaceKind === "chat" ? (
                     <ChatGlyph size={13} className="tglyph" />
+                  ) : tab.surfaceKind === "file" ? (
+                    glyphForNote(
+                      { kind: "file", title: fileName(tab.fileId) },
+                      { size: 13, className: "tglyph" },
+                    )
                   ) : (
                     <FileGlyph size={13} className="tglyph" />
                   )}

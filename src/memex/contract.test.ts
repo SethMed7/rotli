@@ -8,7 +8,6 @@ import {
   appendMessages,
   canWrite,
   composeChatFile,
-  composeInboxLine,
   composeMessageLines,
   composeNewChat,
   composeNote,
@@ -126,11 +125,6 @@ describe("ensureChatBacklink (bidirectional ## Chat)", () => {
     const body = "# Note\n\nbody\n";
     expect(ensureChatBacklink(body, "new")).toBe("# Note\n\nbody\n\n## Chat\n- [[new]]\n");
   });
-});
-
-describe("composeInboxLine", () => {
-  test("plain", () => expect(composeInboxLine("hello")).toBe("- hello\n"));
-  test("tagged", () => expect(composeInboxLine("hello", "watch")).toBe("- watch: hello\n"));
 });
 
 describe("parseAccessMode (fail-closed, mounts.ts parity)", () => {

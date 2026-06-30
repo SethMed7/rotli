@@ -7,25 +7,13 @@
 import { useMemo } from "react";
 import { useNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
-import { corpusOpenFile } from "../lib/tauri";
-import { ClockGlyph, glyphForNote } from "./glyphs";
-
-/** Short, human date for the right column. */
-function dateLabel(ts: number): string {
-  const d = new Date(ts);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const days = Math.round((today.getTime() - new Date(ts).setHours(0, 0, 0, 0)) / 86_400_000);
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return d.toLocaleDateString(undefined, { weekday: "short" });
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
+import { ClockGlyph } from "./glyphs";
+import { NoteListRow } from "./NoteListRow";
 
 export function RecentSurface() {
-  const notes = useNotes().data ?? [];
-  const openNote = usePanesStore((s) => s.openNote);
-  const openCanvas = usePanesStore((s) => s.openCanvas);
+  // drop binary FILES — Recent is a note list; files live in Storage (Seth, 2026-06-30)
+  const notes = (useNotes().data ?? []).filter((n) => n.kind !== "file");
+  const openSummary = usePanesStore((s) => s.openSummary);
 
   const rows = useMemo(() => [...notes].sort((a, b) => b.updatedAt - a.updatedAt), [notes]);
 
@@ -45,29 +33,9 @@ export function RecentSurface() {
       ) : (
         <div className="board-scroll">
           <ul className="recent-list">
-            {rows.map((n) => {
-              const board = n.kind === "board";
-              const file = n.kind === "file";
-              return (
-                <li key={n.id}>
-                  <button
-                    type="button"
-                    className="recent-row"
-                    onClick={() =>
-                      board ? openCanvas(n.id) : file ? void corpusOpenFile(n.id) : openNote(n.id)
-                    }
-                    title={board ? "Open board" : file ? "Open file" : "Open note"}
-                  >
-                    {glyphForNote(n, { size: 14, className: "rr-icon" })}
-                    <span className="rr-title">
-                      {n.title || (board ? "Untitled board" : "Empty note")}
-                    </span>
-                    {n.snippet && <span className="rr-snippet">{n.snippet}</span>}
-                    <span className="rr-date">{dateLabel(n.updatedAt)}</span>
-                  </button>
-                </li>
-              );
-            })}
+            {rows.map((n) => (
+              <NoteListRow key={n.id} note={n} onOpen={openSummary} />
+            ))}
           </ul>
         </div>
       )}

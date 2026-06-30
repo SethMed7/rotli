@@ -387,11 +387,10 @@ export function registerDefaultActions(): void {
     title: "New chat",
     defaultChord: "Ctrl+2",
     run: () => {
-      const ui = useUiStore.getState();
-      ui.setSettingsOpen(false);
-      ui.setSelectedChatSlug(null);
-      ui.setChatAllOpen(false);
-      ui.setContentView("chat");
+      useUiStore.getState().setSettingsOpen(false);
+      // chat is a PANE surface now — open a fresh chat pane. The old contentView
+      // "chat" was retired and rendered nothing (Seth, 2026-06-30 — audit).
+      usePanesStore.getState().openChat(null);
     },
   });
   registerAction({
@@ -399,10 +398,9 @@ export function registerDefaultActions(): void {
     title: "All chats",
     defaultChord: null,
     run: () => {
-      const ui = useUiStore.getState();
-      ui.setSettingsOpen(false);
-      ui.setChatAllOpen(true);
-      ui.setContentView("chat");
+      useUiStore.getState().setSettingsOpen(false);
+      useUiStore.getState().setChatAllOpen(true);
+      usePanesStore.getState().openChat(null);
     },
   });
 

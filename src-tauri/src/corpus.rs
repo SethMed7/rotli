@@ -47,50 +47,6 @@ pub fn default_corpus_root(app: &tauri::AppHandle) -> PathBuf {
         })
 }
 
-/// Where the chosen corpus root is remembered — OUTSIDE the corpus (it can
-/// move): the app config dir. Missing/empty → fall back to the default root.
-fn root_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
-    use tauri::Manager;
-    app.path()
-        .app_config_dir()
-        .ok()
-        .map(|d| d.join("corpus-root.txt"))
-}
-
-pub fn read_saved_root(app: &tauri::AppHandle) -> Option<PathBuf> {
-    let raw = fs::read_to_string(root_config_file(app)?).ok()?;
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(PathBuf::from(trimmed))
-    }
-}
-
-/// Where the chosen MEMEX corpus root is remembered — beside `corpus-root.txt`
-/// in the app config dir (Increment 3: the Notes tree can BROWSE a memex
-/// instance). Set ⇒ rotli's corpus IS that memex (Layout::Memex); cleared ⇒
-/// today's `~/Documents/rotli` legacy chain (Layout::LegacyRotli). Kept distinct
-/// from `corpus-root.txt` so relocating the legacy corpus and pointing at a
-/// memex are independent, reversible choices.
-fn memex_root_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
-    use tauri::Manager;
-    app.path()
-        .app_config_dir()
-        .ok()
-        .map(|d| d.join("corpus-memex-root.txt"))
-}
-
-pub fn read_saved_memex_root(app: &tauri::AppHandle) -> Option<PathBuf> {
-    let raw = fs::read_to_string(memex_root_config_file(app)?).ok()?;
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(PathBuf::from(trimmed))
-    }
-}
-
 /// Move the whole corpus into `new_root` (top-level entries, including
 /// `.rotli/`); the caller then persists the new root and relaunches. We refuse
 /// a non-empty target and a target inside the current root, so notes are never
@@ -275,13 +231,10 @@ pub fn resolve_corpus(app: &tauri::AppHandle) -> PathBuf {
             default_corpus_root(app)
         };
     }
-    // no config yet — mirror the legacy precedence so a pre-migration read is sane
-    if let Some(m) = read_saved_memex_root(app).filter(|p| is_memex_root(p)) {
-        return m;
-    }
-    read_saved_root(app)
-        .filter(|p| p.exists())
-        .unwrap_or_else(|| default_corpus_root(app))
+    // No config yet (cold start before migration). Startup's `ensure_corpus_config`
+    // writes `corpus.json` — migrating the legacy txt pointers in — before any UI
+    // read, so a missing config here just means "use the default".
+    default_corpus_root(app)
 }
 
 /// Ensure `corpus.json` exists, migrating the four legacy files into it ONCE
@@ -350,8 +303,11 @@ fn canon(p: &Path) -> PathBuf {
     fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
 }
 
-/// A unique, router-safe brain id from a label, keeping `default` reserved.
-fn unique_brain_id(brains: &[ConnectedBrain], label: &str) -> String {
+/// Slugify `label` into a router-safe id (ascii-lowercase, every run of non-alnum
+/// collapsed to a single `-`, ends trimmed), falling back to `fallback` when the
+/// slug is empty, then dedup with `-2`, `-3`, … against `taken`. The shared core
+/// of the brain + folder id schemes.
+fn unique_id(label: &str, fallback: &str, taken: impl Fn(&str) -> bool) -> String {
     let mut base: String = label
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
@@ -360,8 +316,7 @@ fn unique_brain_id(brains: &[ConnectedBrain], label: &str) -> String {
         base = base.replace("--", "-");
     }
     let base = base.trim_matches('-');
-    let base = if base.is_empty() { "brain" } else { base };
-    let taken = |id: &str| id == DEFAULT_ROOT_ID || brains.iter().any(|b| b.id == id);
+    let base = if base.is_empty() { fallback } else { base };
     if !taken(base) {
         return base.to_string();
     }
@@ -373,6 +328,13 @@ fn unique_brain_id(brains: &[ConnectedBrain], label: &str) -> String {
         }
         n += 1;
     }
+}
+
+/// A unique, router-safe brain id from a label, keeping `default` reserved.
+fn unique_brain_id(brains: &[ConnectedBrain], label: &str) -> String {
+    unique_id(label, "brain", |id| {
+        id == DEFAULT_ROOT_ID || brains.iter().any(|b| b.id == id)
+    })
 }
 
 /// The migration core — pure over a config dir + the default corpus path, so it
@@ -537,17 +499,6 @@ pub fn upsert_brain(
     write_corpus_config(app, &cfg)
 }
 
-/// Forget a connected brain (never the corpus). If it was active, the active
-/// pointer falls to the first remaining brain (or none).
-pub fn forget_brain(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
-    let mut cfg = ensure_corpus_config(app);
-    cfg.brains.retain(|b| b.id != id);
-    if cfg.active_brain_id.as_deref() == Some(id) {
-        cfg.active_brain_id = cfg.brains.first().map(|b| b.id.clone());
-    }
-    write_corpus_config(app, &cfg)
-}
-
 pub fn set_active_brain(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
     let mut cfg = ensure_corpus_config(app);
     if !cfg.brains.iter().any(|b| b.id == id) {
@@ -573,31 +524,11 @@ pub fn set_brain_perms(app: &tauri::AppHandle, id: &str, perms: &str) -> Result<
 
 /// A unique, router-safe id for an added folder, over the whole config.
 fn unique_folder_id(cfg: &CorpusConfig, label: &str) -> String {
-    let mut base: String = label
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
-        .collect();
-    while base.contains("--") {
-        base = base.replace("--", "-");
-    }
-    let base = base.trim_matches('-');
-    let base = if base.is_empty() { "folder" } else { base };
-    let taken = |id: &str| {
+    unique_id(label, "folder", |id| {
         id == DEFAULT_ROOT_ID
             || cfg.brains.iter().any(|b| b.id == id)
             || cfg.folders.iter().any(|f| f.id == id)
-    };
-    if !taken(base) {
-        return base.to_string();
-    }
-    let mut n = 2;
-    loop {
-        let id = format!("{base}-{n}");
-        if !taken(&id) {
-            return id;
-        }
-        n += 1;
-    }
+    })
 }
 
 /// Add an arbitrary plain folder as a sidebar root (the "add a folder" feature).
@@ -907,7 +838,10 @@ fn project_folder(layout: Layout, disk_folder: &str, fm: &Frontmatter) -> String
         }
         if disk_folder == "wiki" || disk_folder.starts_with("wiki/") {
             if let Some(primary) = shelf_of(fm).into_iter().next() {
-                return primary;
+                // the default capture shelf "Inbox" is the ONE Captures surface — route
+                // it to the reserved "Board" root the sidebar reads as "Captures" (Seth,
+                // 2026-06-30); a real user shelf (Myela/Payments) still projects to it.
+                return if primary == "Inbox" { "Board".to_string() } else { primary };
             }
         }
     }
@@ -1354,9 +1288,11 @@ impl CorpusStore {
             .ok_or("the dropped file has no readable name")?;
         let dir = self.root.join(subdir);
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        let name = unique_file_name(&dir, raw);
-        fs::copy(src, dir.join(&name)).map_err(|e| format!("import {}: {e}", src.display()))?;
-        Ok(format!("{subdir}/{name}"))
+        // `raw` is a `file_name()` (a single clean component); free_name picks the
+        // first uncollided rel under the binary subdir and derives its extension.
+        let rel = self.free_name(subdir, raw, None);
+        fs::copy(src, self.abs(&rel)).map_err(|e| format!("import {}: {e}", src.display()))?;
+        Ok(rel)
     }
 
     /// Read a note's frontmatter for the metadata panel — the typed facts plus the
@@ -1373,7 +1309,7 @@ impl CorpusStore {
         if !secure && looks_secure(body) {
             fm.foreign.push("secure: true".to_string());
             atomic_write(&path, &compose_document(&fm, body))?;
-            self.gitignore_add(rel);
+            self.gitignore_add(rel)?;
             secure = true;
         }
         let fields = fm
@@ -1432,12 +1368,14 @@ impl CorpusStore {
     }
 
     /// Append a path to the corpus `.gitignore` (idempotent) — a secure note must
-    /// never be pushed when the corpus is a git repo.
-    fn gitignore_add(&self, rel: &str) {
+    /// never be pushed when the corpus is a git repo. The write error PROPAGATES: a
+    /// note marked secure whose `.gitignore` write failed would silently stay
+    /// committable, so set_secure must learn about it (Seth, 2026-06-30 — audit).
+    fn gitignore_add(&self, rel: &str) -> Result<(), String> {
         let path = self.root.join(".gitignore");
         let existing = fs::read_to_string(&path).unwrap_or_default();
         if existing.lines().any(|l| l.trim() == rel) {
-            return;
+            return Ok(());
         }
         let mut out = existing;
         if !out.is_empty() && !out.ends_with('\n') {
@@ -1445,7 +1383,26 @@ impl CorpusStore {
         }
         out.push_str(rel);
         out.push('\n');
-        let _ = atomic_write(&path, &out);
+        atomic_write(&path, &out)
+    }
+
+    /// Remove a path from the corpus `.gitignore` — called when a note's secure flag
+    /// is cleared, so it isn't left needlessly ignored (the symmetric counterpart of
+    /// gitignore_add). No-op when there's no `.gitignore` or the line isn't present.
+    fn gitignore_remove(&self, rel: &str) -> Result<(), String> {
+        let path = self.root.join(".gitignore");
+        let Ok(existing) = fs::read_to_string(&path) else {
+            return Ok(());
+        };
+        if !existing.lines().any(|l| l.trim() == rel) {
+            return Ok(());
+        }
+        let kept: Vec<&str> = existing.lines().filter(|l| l.trim() != rel).collect();
+        let mut out = kept.join("\n");
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        atomic_write(&path, &out)
     }
 
     /// Toggle the per-note SECURE flag. When set, the note's path is gitignored so a
@@ -1461,7 +1418,9 @@ impl CorpusStore {
         }
         atomic_write(&path, &compose_document(&fm, body))?;
         if secure {
-            self.gitignore_add(rel);
+            self.gitignore_add(rel)?;
+        } else {
+            self.gitignore_remove(rel)?;
         }
         Ok(())
     }
@@ -1655,7 +1614,7 @@ impl CorpusStore {
         let text = compose_document(&fm, &format!("\n{body}"));
 
         let title = title_of(body);
-        // disk_folder routes the file (rename/free_filename/origin); the wire
+        // disk_folder routes the file (rename/free_name/origin); the wire
         // folder_id is the shelf-PROJECTED view, so the optimistic UI update after a
         // save lands the note under its shelf, not wiki/_inbox.
         let disk_folder = folder_of(&rel);
@@ -1668,7 +1627,7 @@ impl CorpusStore {
         let target_rel = if current_name == desired {
             rel.clone()
         } else {
-            self.free_filename(&disk_folder, &desired, Some(&rel))
+            self.free_name(&disk_folder, &desired, Some(&rel))
         };
         let target_abs = self.abs(&target_rel);
 
@@ -1704,7 +1663,7 @@ impl CorpusStore {
     ///   • otherwise keep whatever origin was there (hidden→hidden, or a plain
     ///     visible→visible move that never had one).
     /// `target_folder == ""` means the corpus root (no validation, no dir).
-    /// Filenames collide safely (free_filename); the id is the through-line.
+    /// Filenames collide safely (free_name); the id is the through-line.
     pub fn move_note(&mut self, id: &str, target_folder: &str) -> Result<NoteMeta, String> {
         let rel = self.path_of(id)?;
         // BOTH ends must be writable: the note's current file (a self/ note may
@@ -1746,7 +1705,7 @@ impl CorpusStore {
         // stable identity, fresh-but-collision-safe filename in the new folder
         let title = title_of(&body);
         let desired = filename_for(&title, id);
-        let target_rel = self.free_filename(target_folder, &desired, None);
+        let target_rel = self.free_name(target_folder, &desired, None);
         let target_abs = self.abs(&target_rel);
 
         // preserve id + created; DO NOT bump updated (order stays put)
@@ -1805,7 +1764,7 @@ impl CorpusStore {
         let id = Ulid::new().to_string();
         let now = now_stamp();
         let title = title_of(body);
-        let rel = self.free_filename(folder_id, &filename_for(&title, &id), None);
+        let rel = self.free_name(folder_id, &filename_for(&title, &id), None);
         let fm = Frontmatter {
             id: Some(id.clone()),
             created: Some(now.clone()),
@@ -1907,7 +1866,7 @@ impl CorpusStore {
             fs::create_dir_all(self.abs(folder_id))
                 .map_err(|e| format!("create folder {folder_id}: {e}"))?;
         }
-        let rel = self.free_board_filename(folder_id, "untitled.excalidraw");
+        let rel = self.free_name(folder_id, "untitled.excalidraw", None);
         let abs = self.abs(&rel);
         self.suppress.mark(&abs);
         atomic_write(&abs, body.unwrap_or(EMPTY_EXCALIDRAW))?;
@@ -1923,26 +1882,6 @@ impl CorpusStore {
             origin: None,
             kind: NoteKind::Board,
         })
-    }
-
-    /// First free `.excalidraw` filename in a folder (boards have no id suffix,
-    /// so this is the real collision guard). Mirrors `free_filename` for `.md`.
-    fn free_board_filename(&self, folder: &str, desired: &str) -> String {
-        let join = |name: &str| {
-            if folder.is_empty() {
-                name.to_string()
-            } else {
-                format!("{folder}/{name}")
-            }
-        };
-        let mut rel = join(desired);
-        let mut n = 2;
-        while self.abs(&rel).exists() {
-            let stem = desired.trim_end_matches(".excalidraw");
-            rel = join(&format!("{stem}-{n}.excalidraw"));
-            n += 1;
-        }
-        rel
     }
 
     /// Rename a board (`.excalidraw`) inside its own folder. `new_name` is a free
@@ -1971,7 +1910,7 @@ impl CorpusStore {
         if stem.is_empty() {
             return Err("a board needs a name".into());
         }
-        let new_rel = self.free_board_filename(&folder, &format!("{stem}.excalidraw"));
+        let new_rel = self.free_name(&folder, &format!("{stem}.excalidraw"), None);
         if new_rel == id {
             // same name — nothing to do, return current meta
             let (created_at, updated_at) = file_stamps(&old_abs);
@@ -2106,9 +2045,13 @@ impl CorpusStore {
         atomic_write(&self.root.join(DOT_DIR).join(dot_file(which)?), contents)
     }
 
-    /// First free filename in a folder (the id suffix makes real collisions
-    /// rare; this guards the pathological same-slug-same-tail case).
-    fn free_filename(&self, folder: &str, desired: &str, keep_rel: Option<&str>) -> String {
+    /// First free relative path in `folder` for `desired` — the collision guard
+    /// shared by notes (`.md`), boards (`.excalidraw`), and imported binaries. The
+    /// extension is derived from `desired` (its last `.`), so a taken name becomes
+    /// `stem-2.ext`, `stem-3.ext`, …. `keep_rel` is a path the caller already owns
+    /// (a rename in place), excluded from the collision check. The id suffix makes
+    /// real note collisions rare; this guards the same-slug-same-tail case.
+    fn free_name(&self, folder: &str, desired: &str, keep_rel: Option<&str>) -> String {
         let join = |name: &str| {
             if folder.is_empty() {
                 name.to_string()
@@ -2116,11 +2059,14 @@ impl CorpusStore {
                 format!("{folder}/{name}")
             }
         };
+        let (stem, ext) = match desired.rsplit_once('.') {
+            Some((s, e)) if !s.is_empty() => (s, format!(".{e}")),
+            _ => (desired, String::new()),
+        };
         let mut rel = join(desired);
         let mut n = 2;
         while self.abs(&rel).exists() && keep_rel != Some(rel.as_str()) {
-            let stem = desired.trim_end_matches(".md");
-            rel = join(&format!("{stem}-{n}.md"));
+            rel = join(&format!("{stem}-{n}{ext}"));
             n += 1;
         }
         rel
@@ -2306,28 +2252,6 @@ fn walk(
         }
     }
     Ok(())
-}
-
-/// A collision-safe filename in `dir` from a raw source name: drop any path
-/// separators, then suffix `-2`, `-3`, … if the name is already taken.
-fn unique_file_name(dir: &Path, raw: &str) -> String {
-    let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
-    let base = if base.is_empty() { "file" } else { base };
-    if !dir.join(base).exists() {
-        return base.to_string();
-    }
-    let (stem, ext) = match base.rsplit_once('.') {
-        Some((s, e)) if !s.is_empty() => (s, format!(".{e}")),
-        _ => (base, String::new()),
-    };
-    let mut n = 2;
-    loop {
-        let cand = format!("{stem}-{n}{ext}");
-        if !dir.join(&cand).exists() {
-            return cand;
-        }
-        n += 1;
-    }
 }
 
 /// A board's display title = its filename without the `.excalidraw` extension.
@@ -2539,6 +2463,47 @@ pub fn corpus_open_file(state: tauri::State<'_, CorpusState>, id: String) -> Res
     #[cfg(not(target_os = "macos"))]
     let _ = abs;
     Ok(())
+}
+
+/// Read a surfaced FILE (kind "file") as TEXT for the in-app text viewer (a Breve
+/// `.audio.txt`, a `.csv`, …). Capped at `max_bytes` (default 200 KB) so a huge file
+/// can't lock the UI. Lossy UTF-8 so a stray byte renders rather than erroring.
+#[tauri::command]
+pub fn corpus_file_text(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    max_bytes: Option<usize>,
+) -> Result<String, String> {
+    let (root, rel) = split_root_id(&id);
+    let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
+    if !abs.is_file() {
+        return Err(format!("not a file: {}", abs.display()));
+    }
+    let cap = max_bytes.unwrap_or(200_000);
+    let data = fs::read(&abs).map_err(|e| e.to_string())?;
+    let end = data.len().min(cap);
+    Ok(String::from_utf8_lossy(&data[..end]).into_owned())
+}
+
+/// Read a surfaced FILE as BASE64 — for the in-app viewer to parse a binary that
+/// can't ride a lossy UTF-8 read (a `.xlsx` spreadsheet). Capped at `max_bytes`
+/// (default 8 MB) so a giant workbook can't lock the UI.
+#[tauri::command]
+pub fn corpus_file_bytes(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    max_bytes: Option<usize>,
+) -> Result<String, String> {
+    use base64::Engine;
+    let (root, rel) = split_root_id(&id);
+    let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
+    if !abs.is_file() {
+        return Err(format!("not a file: {}", abs.display()));
+    }
+    let cap = max_bytes.unwrap_or(8_000_000);
+    let data = fs::read(&abs).map_err(|e| e.to_string())?;
+    let end = data.len().min(cap);
+    Ok(base64::engine::general_purpose::STANDARD.encode(&data[..end]))
 }
 
 /// Import a dropped external file into the corpus's binary area (the memex
@@ -3498,8 +3463,8 @@ mod tests {
         // the note is reachable by its frontmatter id (indexed via list)
         let _ = store.list().unwrap();
         let meta = store.write("01ABC", "# Pricing\n\nedited body", false).unwrap();
-        // the wire still projects it onto its shelf, not wiki/_inbox
-        assert_eq!(meta.folder_id, "Inbox");
+        // the default "Inbox" shelf projects onto the Captures surface ("Board"), not wiki/_inbox
+        assert_eq!(meta.folder_id, "Board");
 
         // the corpus tracks the title in the filename via filename_for = slug-<id6>,
         // the SAME scheme as the v3.5 noteStem — so the file stays in wiki/_inbox with
@@ -3567,15 +3532,17 @@ mod tests {
         let folder_of_note = |id: &str| {
             list.notes.iter().find(|n| n.title == id).map(|n| n.folder_id.clone()).unwrap()
         };
-        // staging notes are PROJECTED onto their shelf, not wiki/_inbox
-        assert_eq!(folder_of_note("Pricing"), "Inbox");
+        // staging notes are PROJECTED onto their shelf, not wiki/_inbox. The default
+        // "Inbox" shelf routes to the Captures surface ("Board"); a real shelf stays.
+        assert_eq!(folder_of_note("Pricing"), "Board");
         assert_eq!(folder_of_note("Q3"), "Myela/Payments");
         // the shelf-less curated note falls back to its disk folder
         assert_eq!(folder_of_note("A wiki note"), "wiki");
 
         let has = |id: &str| list.folders.iter().any(|f| f.id == id);
-        // the shelf folders (+ the nested ancestor) were synthesized
-        assert!(has("Inbox"));
+        // the shelf folders (+ the nested ancestor) were synthesized — the default
+        // "Inbox" shelf lands on "Board" (Captures), a real shelf keeps its path
+        assert!(has("Board"));
         assert!(has("Myela"), "the nested shelf's ancestor must exist");
         assert!(has("Myela/Payments"));
         let parent_of = |id: &str| list.folders.iter().find(|f| f.id == id).unwrap().parent_id.clone();

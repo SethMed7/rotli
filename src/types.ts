@@ -63,7 +63,17 @@ export interface ChatTab {
   viewState: TabViewState;
 }
 
-export type Tab = NoteTab | CanvasTab | ChatTab;
+/** A surfaced binary FILE tab (audio/pdf/image/text) — rendered IN-APP, never
+ * shelled to the OS. fileId IS the file's corpus wire id (its relative path,
+ * possibly root-prefixed like "vault:storage/x.mp3"). */
+export interface FileTab {
+  id: string;
+  surfaceKind: "file";
+  fileId: string;
+  viewState: TabViewState;
+}
+
+export type Tab = NoteTab | CanvasTab | ChatTab | FileTab;
 
 export type SplitDir = "row" | "col";
 

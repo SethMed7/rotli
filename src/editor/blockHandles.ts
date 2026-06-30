@@ -11,7 +11,7 @@ import { EditorView, GutterMarker, gutter } from "@codemirror/view";
 
 /** A block = [firstLineNumber, lastLineNumber] (1-based), the maximal run of
  * non-blank lines around `lineNo`. Returns null on a blank line. */
-export interface Block {
+export interface BlockRange {
   fromLine: number;
   toLine: number;
   from: number; // doc offset of the block's first char
@@ -21,7 +21,7 @@ export interface Block {
 const isBlank = (s: string) => s.trim().length === 0;
 
 /** The block containing 1-based `lineNo`, or null if that line is blank. */
-export function blockAtLine(state: EditorState, lineNo: number): Block | null {
+export function blockAtLine(state: EditorState, lineNo: number): BlockRange | null {
   const total = state.doc.lines;
   if (lineNo < 1 || lineNo > total) return null;
   if (isBlank(state.doc.line(lineNo).text)) return null;
@@ -51,7 +51,7 @@ function blockStarts(state: EditorState): number[] {
 }
 
 /** Slice a block's text (without its trailing newline). */
-const blockText = (state: EditorState, b: Block) => state.doc.sliceString(b.from, b.to);
+const blockText = (state: EditorState, b: BlockRange) => state.doc.sliceString(b.from, b.to);
 
 /** Move the block at `pos` up or down past its neighbour (swap the two blocks). */
 export function moveBlock(view: EditorView, pos: number, dir: -1 | 1): void {
