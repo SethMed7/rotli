@@ -30,14 +30,21 @@ export function MetaPanel({
   useTransientPopover([ref, anchorRef], true, onClose);
   const [fm, setFm] = useState<FrontmatterView | null>(null);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const [newKey, setNewKey] = useState("");
   const [newVal, setNewVal] = useState("");
 
   useEffect(() => {
     let alive = true;
-    void corpusFrontmatter(noteId).then((f) => {
-      if (alive) setFm(f);
-    });
+    corpusFrontmatter(noteId)
+      .then((f) => {
+        if (alive) setFm(f);
+      })
+      .catch((e: unknown) => {
+        // never leave the panel stuck on "Reading…" — show why it failed
+        console.warn("metadata read failed", e);
+        if (alive) setErr(e instanceof Error ? e.message : String(e));
+      });
     return () => {
       alive = false;
     };
@@ -54,10 +61,14 @@ export function MetaPanel({
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
+    setErr(null);
     try {
       await fn();
       setFm(await corpusFrontmatter(noteId));
       await invalidateNotes();
+    } catch (e) {
+      console.warn("metadata update failed", e);
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -104,7 +115,9 @@ export function MetaPanel({
         </span>
       </button>
       <div className="aalabel">Metadata</div>
-      {!fm ? (
+      {err ? (
+        <p className="metaempty">⚠ {err}</p>
+      ) : !fm ? (
         <p className="metaempty">Reading…</p>
       ) : (
         <div className="metaedit">

@@ -1306,10 +1306,17 @@ impl CorpusStore {
         let mut secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
         // auto-flag: secrets detected + not yet marked → set secure:true + gitignore.
         // The detector is the regex pass today; the local LLM refines it later.
+        // BEST-EFFORT on this READ path: persist + gitignore, but a write/gitignore
+        // hiccup must NEVER break reading the metadata — that left the panel stuck on
+        // "Reading…" (Seth, 2026-06-30). We still report secure=true (the safe
+        // direction); the explicit set_secure path keeps hard-failing for the user.
         if !secure && looks_secure(body) {
             fm.foreign.push("secure: true".to_string());
-            atomic_write(&path, &compose_document(&fm, body))?;
-            self.gitignore_add(rel)?;
+            if let Err(e) =
+                atomic_write(&path, &compose_document(&fm, body)).and_then(|()| self.gitignore_add(rel))
+            {
+                eprintln!("auto-secure-flag (read) failed for {rel}: {e}");
+            }
             secure = true;
         }
         let fields = fm

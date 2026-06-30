@@ -433,16 +433,34 @@ export function Sidebar() {
   const storageNotes = storageTree.notes;
   const folders = useMemo(
     () => [
-      ...rawFolders.filter((f) => f.id !== "storage" && !f.id.startsWith("storage/")),
+      ...rawFolders.filter(
+        (f) =>
+          f.id !== "storage" &&
+          !f.id.startsWith("storage/") &&
+          // hide internal memex scaffolding from the Brain (_inbox / _templates)
+          !f.id.startsWith("wiki/_"),
+      ),
       ...storageTree.folders,
     ],
     [rawFolders, storageTree.folders],
   );
+  // hide the "Vault" (linked-library) destination until one is actually connected —
+  // an empty Vault row next to the user's own memex-vault folder just confuses
+  // (Seth, 2026-06-30). It returns the moment a vault root has notes/folders.
+  const showVault = vaultNotes.length > 0 || folders.some((f) => f.id.startsWith("vault:"));
+  const visibleDestRows = useMemo(
+    () => DEST_ROWS.filter((d) => d.id !== DEST.vault || showVault),
+    [showVault],
+  );
   // the BRAIN — the AI-organized wiki areas (People · Projects · Research · …).
   // Curated notes (no shelf) project to their disk area "wiki/<area>"; we surface
   // them as a navigable Brain section under Notes (Seth, 2026-06-30).
+  // the BRAIN = the curated wiki AREAS (People/Projects/Research/…). Hide the
+  // internal memex scaffolding: `_inbox` (note staging — surfaced as Captures) and
+  // `_templates` are underscore-prefixed = not user-facing areas (Seth, 2026-06-30).
   const brainNotes = allNotes.filter(
-    (n) => n.folderId === "wiki" || n.folderId.startsWith("wiki/"),
+    (n) =>
+      (n.folderId === "wiki" || n.folderId.startsWith("wiki/")) && !n.folderId.startsWith("wiki/_"),
   );
   // added external folders (Seth, 2026-06-27): roots the user pointed rotli at,
   // not in the memex — every registered root except the built-in default + vault.
@@ -807,7 +825,7 @@ export function Sidebar() {
         { id: RECENT, kind: "smart" },
         // the Brain areas (wiki/<area>) ride between the smart rows and destinations
         ...subtreeRows("wiki", brainNotes),
-        ...DEST_ROWS.flatMap(({ id }) => {
+        ...visibleDestRows.flatMap(({ id }) => {
           const destNotes = notesByDest[id] ?? [];
           const open = expandedDests[id] ?? false;
           const row: RovingRow = { id, kind: "folder" };
@@ -1276,7 +1294,7 @@ export function Sidebar() {
             <div className="fsec">Destinations</div>
 
             {/* — destination rows: each toggles expansion AND selects (⌘N target) — */}
-            {DEST_ROWS.map(({ id, label, Glyph }) => {
+            {visibleDestRows.map(({ id, label, Glyph }) => {
               const destNotes = notesByDest[id] ?? [];
               const open = expandedDests[id] ?? false;
               const selected = selectedFolderId === id;

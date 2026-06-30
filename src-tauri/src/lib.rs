@@ -39,6 +39,11 @@ const DEFAULT_QUICK: &str = "Alt+Q";
 /// immediately re-show.
 const BLUR_TOGGLE_GRACE: Duration = Duration::from_millis(300);
 
+/// Summoning a floating panel (Quick Note / capture card) calls set_focus, which
+/// activates the app and makes macOS fire a Reopen. Within this grace after a
+/// summon, that Reopen is the spurious one — never reopen main (Seth, 2026-06-30).
+const PANEL_SUMMON_GRACE: Duration = Duration::from_millis(700);
+
 /// The OS-registered accelerators, per global registry action (rebindable
 /// from the frontend via the `set_summon_shortcut` command).
 struct GlobalChords {
@@ -52,6 +57,11 @@ struct GlobalChords {
 
 /// When the main window was last hidden because it lost focus.
 struct LastBlurHide(Mutex<Option<Instant>>);
+
+/// When a floating panel (Quick Note / capture) was last summoned — stamped BEFORE
+/// the panel steals focus, so the spurious Reopen its app-activation triggers is
+/// suppressed even if the window's visibility hasn't registered yet.
+struct LastPanelSummon(Mutex<Option<Instant>>);
 
 /// The visitor-vs-resident setting: when false, clicking away no longer hides
 /// the main window (Settings → General → "Stay open"). Capture always hides.
@@ -141,6 +151,7 @@ fn show_capture(app: &AppHandle) {
         .unwrap_or(false);
     *app.state::<CaptureReturn>().0.lock().unwrap() = main_visible;
     center_on_cursor_display(app, &window);
+    *app.state::<LastPanelSummon>().0.lock().unwrap() = Some(Instant::now());
     let _ = window.show();
     let _ = window.set_focus();
     let _ = app.emit_to("capture", "rotli:capture-show", ());
@@ -206,6 +217,10 @@ fn show_quick(app: &AppHandle) {
             *done = true;
         }
     }
+    // stamp BEFORE we show/focus — focusing activates the app and can fire the
+    // spurious Reopen before the window registers as visible (the race that made
+    // ⌥Q / a rebound ⌥. open main too) (Seth, 2026-06-30).
+    *app.state::<LastPanelSummon>().0.lock().unwrap() = Some(Instant::now());
     let _ = window.show();
     let _ = window.set_focus();
     let _ = app.emit_to("quick", "rotli:quick-show", ());
@@ -648,6 +663,7 @@ pub fn run() {
             quick: Mutex::new(Some(DEFAULT_QUICK.to_string())),
         })
         .manage(LastBlurHide(Mutex::new(None)))
+        .manage(LastPanelSummon(Mutex::new(None)))
         .manage(HideOnBlur(Mutex::new(true)))
         .manage(CaptureReturn(Mutex::new(false)))
         .manage(QuickPlaced(Mutex::new(false)))
@@ -861,7 +877,15 @@ pub fn run() {
                     let ours_up = is_visible(app, "quick")
                         || is_visible(app, "capture")
                         || is_visible(app, "main");
-                    if !has_visible_windows && !ours_up {
+                    // deterministic backstop for the show→focus race: if a panel was
+                    // just summoned, this Reopen IS its spurious app-activation event.
+                    let just_summoned = app
+                        .state::<LastPanelSummon>()
+                        .0
+                        .lock()
+                        .unwrap()
+                        .is_some_and(|t| t.elapsed() < PANEL_SUMMON_GRACE);
+                    if !has_visible_windows && !ours_up && !just_summoned {
                         show_main(app);
                     }
                 }

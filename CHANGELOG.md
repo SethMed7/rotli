@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-06-30
+
+### Fixed
+- **Metadata panel no longer hangs on "Reading…".** Opening it on a secret-adjacent note triggers the
+  auto-secure-flag, which writes + updates `.gitignore` *during the read*; 0.10.0's security hardening made
+  that write propagate errors, so any hiccup errored the whole read — and the panel had no `.catch`. The
+  read-path auto-flag is now best-effort (still persists + logs; explicit "Mark secure" still hard-fails),
+  and the panel surfaces the error instead of hanging forever.
+- **Quick Note chord no longer *occasionally* opens the main window too.** 0.10.0's visibility guard had a
+  race — the spurious macOS `Reopen` could fire before the panel registered as visible. Added a
+  deterministic backstop: a summon timestamp stamped before the panel steals focus + a grace window in the
+  reopen handler (belt **and** suspenders).
+- **The Brain hides internal scaffolding.** `_inbox` (note staging — surfaced as **Captures**) and
+  `_templates` no longer appear as Brain areas (underscore-prefixed = internal, not user-facing).
+- **The "Vault" (linked-library) destination is hidden until one is connected** — an empty Vault row next
+  to your own `memex-vault` folder was just confusing. It returns automatically when a second memex is linked.
+
 ## [0.10.0] — 2026-06-30
 
 ### Changed
