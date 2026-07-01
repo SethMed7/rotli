@@ -216,6 +216,8 @@ function CompactNoteRow({
   padLeft,
   onOpen,
   actions,
+  onBeginMainDrag,
+  mainDragRef,
   rowProps,
 }: {
   note: NoteSummary;
@@ -224,25 +226,27 @@ function CompactNoteRow({
   padLeft: number;
   onOpen: (newTab: boolean) => void;
   actions: RowActions;
+  /** Begin a cross-section pointer-drag of this note INTO Main (optional). */
+  onBeginMainDrag?: (e: ReactPointerEvent) => void;
+  /** Shared flag set while such a drag happens — suppresses the row's click. */
+  mainDragRef?: { current: boolean };
   /** Roving-list props (Seth, 2026-06-13): tabIndex/role/aria-selected + the
    * focus-scoped j/k onKeyDown. Spread last so the keyboard handlers win, but
    * the row keeps its own mouse open + drag gestures. */
   rowProps: ReturnType<ReturnType<typeof useRovingList>["rowProps"]>;
 }) {
-  const onClick = (event: MouseEvent) => onOpen(event.metaKey);
-  const hidden = isHidden(note.folderId); // Archive/Trash (or nested) → Restore
-  const onDragStart = (event: DragEvent) => {
-    event.dataTransfer.setData(NOTE_DRAG_TYPE, note.id);
-    event.dataTransfer.effectAllowed = "move";
+  const onClick = (event: MouseEvent) => {
+    if (mainDragRef?.current) return; // a drag-into-Main just happened, not a click
+    onOpen(event.metaKey);
   };
+  const hidden = isHidden(note.folderId); // Archive/Trash (or nested) → Restore
   return (
     <button
       type="button"
       className={selected ? "snrow sel" : "snrow"}
       style={{ paddingLeft: padLeft }}
       onClick={onClick}
-      draggable
-      onDragStart={onDragStart}
+      onPointerDown={onBeginMainDrag}
       {...rowProps}
     >
       {glyphForNote(note, { size: 14, className: "snicon" })}
@@ -625,6 +629,54 @@ export function Sidebar() {
   const [mainDragId, setMainDragId] = useState<string | null>(null);
   const [mainDrop, setMainDrop] = useState<{ id: string; pos: DropPos } | null>(null);
   const didMainDragRef = useRef(false);
+  // cross-section drag: a note dragged FROM the Brain (or any note list) INTO Main.
+  // `crossDragRef` suppresses the row's click when a drag actually happened.
+  const crossDragRef = useRef(false);
+
+  const startAddToMainDrag = (e: ReactPointerEvent, noteId: string) => {
+    if (e.button !== 0) return;
+    const sx = e.clientX;
+    const sy = e.clientY;
+    let dragging = false;
+    let drop: { id: string; pos: DropPos } | null = null;
+    crossDragRef.current = false;
+    const onMove = (ev: PointerEvent) => {
+      if (!dragging) {
+        if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 6) return;
+        dragging = true;
+        crossDragRef.current = true;
+      }
+      const hit = (
+        document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
+      )?.closest("[data-main-id]") as HTMLElement | null;
+      const tid = hit?.dataset.mainId;
+      if (!hit || !tid) {
+        drop = null;
+        setMainDrop(null);
+        return;
+      }
+      const rect = hit.getBoundingClientRect();
+      const rel = rect.height > 0 ? (ev.clientY - rect.top) / rect.height : 0.5;
+      let pos: DropPos = rel < 0.5 ? "before" : "after";
+      if (hit.dataset.mainFolder === "1" && rel > 0.33 && rel < 0.67) pos = "into";
+      if (tid === MAIN_ROOT) pos = "into"; // the whole Main zone → add at root
+      drop = { id: tid, pos };
+      setMainDrop(drop);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setMainDrop(null);
+      if (dragging && drop) {
+        // add the note to Main, then place it at the drop (root add if the zone).
+        let tree = addNoteToMain(mainManifest.tree, noteId);
+        if (drop.id !== MAIN_ROOT) tree = moveInTree(tree, noteId, drop.id, drop.pos);
+        setMainTree(tree, liveIds);
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
   const startMainDrag = (e: ReactPointerEvent, id: string) => {
     if (e.button !== 0) return;
@@ -867,6 +919,8 @@ export function Sidebar() {
                   : openRow(note.id)
               }
               actions={rowActions}
+              onBeginMainDrag={(e) => startAddToMainDrag(e, note.id)}
+              mainDragRef={crossDragRef}
               rowProps={rp({ id: note.id, kind: "note" })}
             />
           ))}
@@ -1492,6 +1546,18 @@ export function Sidebar() {
                 Organized by AI so anything you save stays findable. Your <b>Main</b> view above is
                 yours — same notes, your order.
               </p>
+            )}
+            {childrenOf("wiki").length > 0 && (
+              <button
+                type="button"
+                className="frow child brain-activity-link"
+                style={{ paddingLeft: 26 }}
+                onClick={() => usePanesStore.getState().openActivity()}
+                title="See and undo what the AI has done"
+              >
+                <ClockGlyph size={13} />
+                <span className="fname">Activity</span>
+              </button>
             )}
             {renderFolderTree("wiki", brainNotes, 0, rowProps)}
 

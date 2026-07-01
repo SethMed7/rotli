@@ -523,6 +523,37 @@ export async function corpusSetField(id: string, key: string, value: string): Pr
   await invoke("corpus_set_field", { id, key, value });
 }
 
+// ── the AI Filer (contract v3.7) — driven by the manual "file this note" for now ──
+
+/** Set an AI-owned field (area/summary/tags/…) via the Filer lane. */
+export async function corpusSetAiField(id: string, key: string, value: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_set_ai_field", { id, key, value });
+}
+
+/** File a note into the brain per its `area` field. Returns the note's NEW wire id
+ * (rel path — the file moves, so the id changes; retarget any open pane). */
+export async function corpusFileNote(id: string): Promise<string> {
+  return invoke<string>("corpus_file_note", { id });
+}
+
+/** Move a note to a folder in the brain via the Filer lane (re-file / UNDO). */
+export async function corpusFilerMove(id: string, targetFolder: string): Promise<CorpusNoteMeta> {
+  return invoke<CorpusNoteMeta>("corpus_filer_move", { id, targetFolder });
+}
+
+/** Append one JSON line to the brain change journal (`.rotli/brain-journal.jsonl`). */
+export async function corpusJournalAppend(line: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_journal_append", { line });
+}
+
+/** Read the whole brain change journal (jsonl text; "" outside Tauri / when none). */
+export async function corpusJournalRead(): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_journal_read");
+}
+
 /** Toggle the per-note SECURE flag (secrets → never sent remote, gitignored). */
 export async function corpusSetSecure(id: string, secure: boolean): Promise<void> {
   if (!isTauri()) return;

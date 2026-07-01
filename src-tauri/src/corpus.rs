@@ -1896,9 +1896,9 @@ impl CorpusStore {
     /// comes from the note's own frontmatter.
     pub fn file_note(&mut self, rel: &str) -> Result<NoteMeta, String> {
         let text = fs::read_to_string(self.abs(rel)).map_err(|e| format!("read {rel}: {e}"))?;
-        let fm = parse_document(&text).0.unwrap_or_default();
-        let id = fm.id.clone().ok_or("note has no id to file")?;
-        let area = fm
+        let area = parse_document(&text)
+            .0
+            .unwrap_or_default()
             .foreign
             .iter()
             .find_map(|l| {
@@ -1910,13 +1910,43 @@ impl CorpusStore {
         if area.contains('/') || area.contains("..") {
             return Err(format!("invalid area: {area}"));
         }
-        let target_folder = format!("wiki/{area}");
+        self.filer_move(rel, &format!("wiki/{area}"))
+    }
+
+    /// The Filer's GENERIC move — powers `file_note` (into `wiki/<area>`), re-filing,
+    /// and UNDO (moving a filed note back). Filer-gated on both ends; reuses
+    /// `relocate` (fs-atomic, preserves id, doesn't bump `updated`). The ulid comes
+    /// from the note's own frontmatter.
+    pub fn filer_move(&mut self, rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
         self.filer_writable(rel)?;
-        self.filer_writable(&target_folder)?;
+        self.filer_writable(target_folder)?;
         if folder_of(rel) == target_folder {
-            return Err(format!("already filed in {target_folder}"));
+            return Err(format!("already in {target_folder}"));
         }
-        self.relocate(&id, rel, &target_folder)
+        let text = fs::read_to_string(self.abs(rel)).map_err(|e| format!("read {rel}: {e}"))?;
+        let id = parse_document(&text).0.unwrap_or_default().id.ok_or("note has no id")?;
+        self.relocate(&id, rel, target_folder)
+    }
+
+    /// Append one line to the brain change JOURNAL (`.rotli/brain-journal.jsonl`) —
+    /// the frontend-owned audit + undo log. The frontend composes the JSON; Rust just
+    /// does the append (in the deletable sidecar, per-machine).
+    pub fn journal_append(&self, line: &str) -> Result<(), String> {
+        let dir = self.root.join(DOT_DIR);
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let path = dir.join("brain-journal.jsonl");
+        let mut out = fs::read_to_string(&path).unwrap_or_default();
+        if !out.is_empty() && !out.ends_with('\n') {
+            out.push('\n');
+        }
+        out.push_str(line.trim());
+        out.push('\n');
+        atomic_write(&path, &out)
+    }
+
+    /// Read the whole brain journal (`""` when none yet).
+    pub fn journal_read(&self) -> Result<String, String> {
+        Ok(fs::read_to_string(self.root.join(DOT_DIR).join("brain-journal.jsonl")).unwrap_or_default())
     }
 
     pub fn create(&mut self, folder_id: &str, body: &str) -> Result<NoteMeta, String> {
@@ -2750,9 +2780,13 @@ pub fn corpus_set_ai_field(
 
 /// FILER (v3.7): file a note into the brain per its `area` field (fs-atomic move).
 #[tauri::command]
-pub fn corpus_file_note(state: tauri::State<'_, CorpusState>, id: String) -> Result<NoteMeta, String> {
+pub fn corpus_file_note(state: tauri::State<'_, CorpusState>, id: String) -> Result<String, String> {
+    // returns the note's NEW wire id (rel path) so an open pane can retarget.
     let (root, rel) = split_root_id(&id);
-    state.route(&root, |s| s.file_note(&rel))
+    state.route(&root, |s| {
+        let meta = s.file_note(&rel)?;
+        s.path_of(&meta.id)
+    })
 }
 
 /// FILER (v3.7): (re)write a per-area generated overview `wiki/<area>/_index.md`.
@@ -2769,6 +2803,41 @@ pub fn corpus_write_index(
         .default_id
         .clone();
     state.route(&default_id, |s| s.write_index(&area, &body))
+}
+
+/// FILER (v3.7): move a note to a target folder in the brain — re-file or UNDO a filing.
+#[tauri::command]
+pub fn corpus_filer_move(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    target_folder: String,
+) -> Result<NoteMeta, String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.filer_move(&rel, &target_folder))
+}
+
+/// Append one JSON line to the brain change journal (`.rotli/brain-journal.jsonl`).
+#[tauri::command]
+pub fn corpus_journal_append(state: tauri::State<'_, CorpusState>, line: String) -> Result<(), String> {
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |s| s.journal_append(&line))
+}
+
+/// Read the whole brain change journal (jsonl text; "" when none).
+#[tauri::command]
+pub fn corpus_journal_read(state: tauri::State<'_, CorpusState>) -> Result<String, String> {
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |s| s.journal_read())
 }
 
 /// Toggle the per-note SECURE flag (secrets detected → never sent remote + gitignored).
@@ -3706,6 +3775,11 @@ mod tests {
         let new_rel = store.path_of(&note.id).unwrap();
         assert!(new_rel.starts_with("wiki/Projects/"));
         assert_eq!(store.read_frontmatter(&new_rel).unwrap().updated, before.updated);
+
+        // UNDO direction (Phase 3): filer_move the filed note BACK to _inbox staging.
+        let back = store.filer_move(&new_rel, "wiki/_inbox").unwrap();
+        assert_eq!(back.id, note.id);
+        assert_eq!(back.folder_id, "wiki/_inbox");
 
         // write_index — the one file the filer overwrites wholesale.
         assert!(store.write_index("Projects", "# Projects\n\n- Alazan 84\n").is_ok());

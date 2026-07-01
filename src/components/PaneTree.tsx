@@ -15,6 +15,7 @@ import {
 } from "react";
 import { EditorSurface } from "../editor/EditorSurface";
 import { ChatSurface } from "./ChatSurface";
+import { ActivitySurface } from "./ActivitySurface";
 import { FileSurface } from "./FileSurface";
 import { activeTabOf, leaves, usePanesStore } from "../state/panes";
 import type { LeafNode, PaneNode, SplitNode } from "../types";
@@ -61,6 +62,7 @@ function LeafView({ node }: { node: LeafNode }) {
         {tab.surfaceKind === "file" && (
           <FileSurface key={tab.id} paneId={node.id} fileId={tab.fileId} />
         )}
+        {tab.surfaceKind === "activity" && <ActivitySurface key={tab.id} />}
         {/* split-detach preview — mounted only mid-drag, pointer-events:none
             (the controller hit-tests the pane body, not this overlay) */}
         {draggingTab && (

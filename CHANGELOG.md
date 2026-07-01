@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-07-01
+
+### Added — Phase 3: manual filing + the Brain **Activity** log (see & undo the AI)
+- **File a note into the Brain, by hand.** In a staged note's metadata panel (the Aa chip → metadata),
+  a **"File to the Brain"** row lets you pick an area — the note files into `wiki/<area>/` through the
+  v3.7 Filer gate, and its open pane retargets to the new location. A filed note shows **"🧠 Filed in
+  <area>."**
+- **Brain Activity** — a new pane (open it from **Brain → Activity** in the sidebar, or "Brain Activity →"
+  in the metadata panel) that logs every Filer action to `.rotli/brain-journal.jsonl` and lets you **undo
+  any of it**: a filed note moves back, a set field restores. This is the **trust surface** — see and
+  reverse every AI write *before* any of it becomes automatic (the background daemon is Phase 4). New Rust
+  `filer_move` + journal append/read + a `surfaceKind:"activity"` pane; `src/services/brainJournal.ts`.
+
+### Changed
+- **Drag a note from the Brain (or any list) into Main.** Cross-section pointer-drag: grab a note in the
+  Brain and drop it into your Main view — before/after a row, or into a Main folder (the **⊕** still works
+  too). Areas like **People** stay auto-maintained *in the Brain*; **Main is your curated subset of
+  individual notes**, never a mirror of the areas. (Replaces the dead HTML5 note drag with the pointer
+  pattern that works in the WKWebView shell.)
+
 ## [0.12.0] — 2026-07-01
 
 ### Added — contract v3.7: the AI **Filer** write lane (capability only, no daemon yet)

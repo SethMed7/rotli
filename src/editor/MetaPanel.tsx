@@ -9,12 +9,16 @@ import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { useTransientPopover } from "../lib/popover";
 import {
   type FrontmatterView,
+  corpusFileNote,
   corpusFrontmatter,
+  corpusSetAiField,
   corpusSetField,
   corpusSetLocked,
   corpusSetSecure,
 } from "../lib/tauri";
-import { invalidateNotes } from "../services/hooks";
+import { logAction } from "../services/brainJournal";
+import { invalidateNotes, useFolders } from "../services/hooks";
+import { usePanesStore } from "../state/panes";
 import { LockGlyph, ShieldGlyph } from "../components/glyphs";
 
 export function MetaPanel({
@@ -74,6 +78,46 @@ export function MetaPanel({
     }
   };
 
+  // Brain filing (v3.7 Filer, manual): a STAGED note (wiki/_inbox) can be filed into
+  // an area; a note already under wiki/<area> shows where it landed. The area vocab
+  // is the wiki areas (People/Projects/…), minus the internal underscore folders.
+  const staged = noteId.includes("wiki/_inbox");
+  const filedArea = /(?:^|\/)wiki\/([^/_][^/]*)\//.exec(noteId)?.[1] ?? null;
+  const areas = (useFolders().data ?? [])
+    .filter((f) => f.parentId === "wiki" && !f.name.startsWith("_"))
+    .map((f) => f.name);
+
+  const fileToArea = async (area: string) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const before = noteId.slice(0, noteId.lastIndexOf("/"));
+      const title = (noteId.split("/").pop() ?? noteId).replace(/-[a-z0-9]{6}\.md$/i, "").replace(/\.md$/, "");
+      await corpusSetAiField(noteId, "area", area);
+      const newId = await corpusFileNote(noteId);
+      usePanesStore.getState().retargetNote(noteId, newId);
+      await logAction({
+        action: "file",
+        noteId: newId,
+        noteTitle: title,
+        area,
+        before,
+        after: newId.slice(0, newId.lastIndexOf("/")),
+      });
+      await invalidateNotes();
+      onClose();
+    } catch (e) {
+      console.warn("file to brain failed", e);
+      setErr(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  };
+
+  const openActivity = () => {
+    usePanesStore.getState().openActivity();
+    onClose();
+  };
+
   const toggleLock = () => {
     if (fm) void run(() => corpusSetLocked(noteId, !fm.locked));
   };
@@ -114,6 +158,35 @@ export function MetaPanel({
             : "Mark secure (keep off remote AI)"}
         </span>
       </button>
+
+      {/* — the Brain (v3.7): file a staged note into an area, or show where it landed — */}
+      {staged && areas.length > 0 && (
+        <div className="metabrain">
+          <div className="aalabel">File to the Brain</div>
+          <div className="metafile-areas">
+            {areas.map((area) => (
+              <button
+                key={area}
+                type="button"
+                className="metafile-area"
+                disabled={busy}
+                onClick={() => void fileToArea(area)}
+              >
+                {area}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {filedArea && (
+        <div className="metabrain">
+          <span className="metafiled">🧠 Filed in {filedArea}</span>
+        </div>
+      )}
+      <button type="button" className="meta-activity" onClick={openActivity}>
+        Brain Activity →
+      </button>
+
       <div className="aalabel">Metadata</div>
       {err ? (
         <p className="metaempty">⚠ {err}</p>

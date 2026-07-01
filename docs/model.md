@@ -29,11 +29,15 @@ folder.")
   editable, but **most people never open it**; they just take notes and let the AI
   organize. "The brain" = **your organized areas**, nothing else.
 - **Main** — your **hand-arranged view** over the brain, above it in the sidebar. It
-  holds no files of its own: it references the same brain notes by id, arranged into
-  **your own** folders and order. **One file, two views** — edit a note in Main or in
-  the brain, it's the same file. So you keep it how *you* want while the AI keeps the
-  brain organized underneath (and Main never moves when the AI refiles). Persisted to a
-  committed `.rotli/main.json`. Full spec: `docs/design/main-brain-daemon.md`.
+  holds no files of its own: it's a **curated subset of individual notes** you pick,
+  arranged into **your own** folders and order — **not** a mirror of the areas. (An
+  area like **People** is auto-maintained *in the brain* and just lives there; you pull
+  the specific notes you want into Main — with the **⊕** on a note row, or by dragging
+  a note from the brain into Main.) **One file, two views** — edit a note in Main or in
+  the brain, it's the same file. So you keep it how *you* want while the AI organizes
+  the brain underneath (Main never moves when the AI refiles). Persisted to a committed
+  `.rotli/main.json`. Everything the AI does to the brain is logged + reversible in
+  **Brain → Activity**. Full spec: `docs/design/main-brain-daemon.md`.
 - **Storage** — your files/images/PDFs. They live in the memex's internal `storage/`
   (binaries, gitignored), referenced from notes by a `storage:` link — never loose in
   the text tree. A dropped binary routes there.

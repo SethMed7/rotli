@@ -524,6 +524,107 @@
   padding: 0;
   display: block;
 }
+
+/* — MetaPanel: the Brain filing controls (v3.7 manual Filer) — */
+.metabrain {
+  margin: 4px 0 2px;
+}
+.metafile-areas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 2px 0 4px;
+}
+.metafile-area {
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.metafile-area:hover {
+  border-color: var(--text-muted);
+}
+.metafiled {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.meta-activity {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.meta-activity:hover {
+  text-decoration: underline;
+}
+
+/* — Brain Activity surface: one journal action per row, undoable — */
+.act-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 22px;
+}
+.act-row.done {
+  opacity: 0.5;
+}
+.act-brain {
+  flex: 0 0 auto;
+  font-size: 13px;
+}
+.act-desc {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.act-desc:hover {
+  color: var(--accent-text);
+}
+.act-time {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.act-undo {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11.5px;
+  padding: 2px 9px;
+  cursor: pointer;
+}
+.act-undo:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+.act-undone {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
 .file-text {
   align-self: stretch;
   margin: 0;

@@ -21,7 +21,15 @@ import { startTabDrag } from "../lib/tabDrag";
 import { useNotes } from "../services/hooks";
 import { leaves, usePanesStore } from "../state/panes";
 import type { LeafNode, Tab } from "../types";
-import { ChatGlyph, ExcalidrawGlyph, FileGlyph, PlusGlyph, XGlyph, glyphForNote } from "./glyphs";
+import {
+  ChatGlyph,
+  ClockGlyph,
+  ExcalidrawGlyph,
+  FileGlyph,
+  PlusGlyph,
+  XGlyph,
+  glyphForNote,
+} from "./glyphs";
 
 /** A board's display label = its filename minus the .excalidraw extension. */
 function boardLabel(boardId: string): string {
@@ -39,6 +47,8 @@ function tabLabel(tab: Tab, titles: Map<string, string>): string {
       return tab.chatSlug ? tab.chatSlug.replace(/-/g, " ") : "New chat";
     case "file":
       return fileName(tab.fileId);
+    case "activity":
+      return "Brain Activity";
   }
 }
 
@@ -137,6 +147,8 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                       { kind: "file", title: fileName(tab.fileId) },
                       { size: 13, className: "tglyph" },
                     )
+                  ) : tab.surfaceKind === "activity" ? (
+                    <ClockGlyph size={13} className="tglyph" />
                   ) : (
                     <FileGlyph size={13} className="tglyph" />
                   )}

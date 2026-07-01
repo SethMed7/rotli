@@ -73,7 +73,15 @@ export interface FileTab {
   viewState: TabViewState;
 }
 
-export type Tab = NoteTab | CanvasTab | ChatTab | FileTab;
+/** The Brain Activity view — the AI-Filer change journal (see/review/undo). A
+ * singleton view (no per-note binding). */
+export interface ActivityTab {
+  id: string;
+  surfaceKind: "activity";
+  viewState: TabViewState;
+}
+
+export type Tab = NoteTab | CanvasTab | ChatTab | FileTab | ActivityTab;
 
 export type SplitDir = "row" | "col";
 
