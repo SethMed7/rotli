@@ -108,6 +108,12 @@ function idOf(node: MainNode, parentId: string): string {
   return parentId === MAIN_ROOT ? `${MAIN_ROOT}${node.folder}` : `${parentId}/${node.folder}`;
 }
 
+/** True when `noteId` is referenced anywhere in the Main tree (used by the
+ * context menu to toggle Add ↔ Remove from Main). */
+export function mainHasNote(nodes: MainNode[], noteId: string): boolean {
+  return containsNote(nodes, noteId);
+}
+
 function containsNote(nodes: MainNode[], noteId: string): boolean {
   return nodes.some((n) => ("note" in n ? n.note === noteId : containsNote(n.children, noteId)));
 }

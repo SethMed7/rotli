@@ -36,6 +36,7 @@ import {
 } from "../services/mainTree";
 import { useMainStore } from "../state/main";
 import { QUICK_MAX, togglePinQuick } from "../state/quick";
+import { useNoteMenu } from "./useNoteMenu";
 import {
   invalidateFolders,
   invalidateNotes,
@@ -221,6 +222,7 @@ function CompactNoteRow({
   onBeginMainDrag,
   mainDragRef,
   rowProps,
+  onContextMenu,
 }: {
   note: NoteSummary;
   selected: boolean;
@@ -228,6 +230,8 @@ function CompactNoteRow({
   padLeft: number;
   onOpen: (newTab: boolean) => void;
   actions: RowActions;
+  /** Right-click → open the row's context menu (optional). */
+  onContextMenu?: (e: MouseEvent) => void;
   /** Begin a cross-section pointer-drag of this note INTO Main (optional). */
   onBeginMainDrag?: (e: ReactPointerEvent) => void;
   /** Shared flag set while such a drag happens — suppresses the row's click. */
@@ -248,6 +252,14 @@ function CompactNoteRow({
       className={selected ? "snrow sel" : "snrow"}
       style={{ paddingLeft: padLeft }}
       onClick={onClick}
+      onAuxClick={(event) => {
+        // middle-click opens in a new tab (IDE/browser habit) — no modifier
+        if (event.button === 1) {
+          event.preventDefault();
+          onOpen(true);
+        }
+      }}
+      onContextMenu={onContextMenu}
       onPointerDown={onBeginMainDrag}
       {...rowProps}
     >
@@ -514,6 +526,7 @@ export function Sidebar() {
   // never moves Main. Mouse + drag navigable (not part of the j/k roving list yet).
   const mainManifest = useMainStore((s) => s.manifest);
   const setMainTree = useMainStore((s) => s.setTree);
+  const openNoteMenu = useNoteMenu();
   const notesById = useMemo(() => new Map(allNotes.map((n) => [n.id, n] as const)), [allNotes]);
   const liveIds = useMemo(() => new Set(allNotes.map((n) => n.id)), [allNotes]);
   const mainProjection = useMemo(
@@ -787,6 +800,13 @@ export function Sidebar() {
             onClick={() => {
               if (!didMainDragRef.current) usePanesStore.getState().openSummary(n);
             }}
+            onAuxClick={(e) => {
+              if (e.button === 1) {
+                e.preventDefault();
+                usePanesStore.getState().openSummary(n, { newTab: true });
+              }
+            }}
+            onContextMenu={(e) => openNoteMenu(e, n)}
           >
             {glyphForNote(n, { size: 14, className: "snicon" })}
             <span className="snt">{n.title || "Empty note"}</span>
@@ -951,6 +971,7 @@ export function Sidebar() {
               onBeginMainDrag={(e) => startAddToMainDrag(e, note.id)}
               mainDragRef={crossDragRef}
               rowProps={rp({ id: note.id, kind: "note" })}
+              onContextMenu={(e) => openNoteMenu(e, note)}
             />
           ))}
         {own

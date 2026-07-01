@@ -2,6 +2,7 @@
 // service. No component touches notesService directly.
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { replaceTitleLine } from "../lib/noteTitle";
 import { type CorpusRoot, corpusListConfig, isTauri } from "../lib/tauri";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
@@ -94,6 +95,25 @@ export function useTrashNote() {
     onSuccess: async () => {
       await invalidateNotes();
       await invalidateFolders();
+    },
+  });
+}
+
+/** Rename a note = rewrite the FIRST non-empty line of its body (the note's
+ * title is its first line). Preserves a leading heading marker if present, so a
+ * `# Heading` stays a heading and a plain first line stays plain. Composed from
+ * getNote + updateNote — no new service surface. */
+export function useRenameNote() {
+  return useMutation({
+    mutationFn: async ({ id, title }: { id: string; title: string }) => {
+      const t = title.trim();
+      if (!t) return;
+      const note = await notesService.getNote(id);
+      if (!note) throw new Error(`unknown note: ${id}`);
+      await notesService.updateNote(id, replaceTitleLine(note.body ?? "", t));
+    },
+    onSuccess: async () => {
+      await invalidateNotes();
     },
   });
 }

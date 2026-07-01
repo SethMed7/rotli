@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-07-01
+
+### Added
+- **Right-click context menu on notes.** Right-click any note (in the Brain, a folder, Main, All notes or
+  Recent) for: **Open in new tab · ★ Star / Unstar** (Quick access) **· Add to / Remove from Main ·
+  Rename… · Archive · Delete**. Files get a slimmer menu (open / star / Main / delete). Built on a small
+  context-menu host + a shared `useNoteMenu` hook, so every list wires it the same way; drill-in sub-lists
+  are supported for future submenus.
+- **Rename from the menu.** "Rename…" opens a small dialog that rewrites the note's title (its first line),
+  preserving a `#` heading if it had one. (Pure `replaceTitleLine`, unit-tested.)
+- **Open in a new tab without a modifier.** Besides ⌘-click, **middle-click** a row now opens it in a new
+  tab, and the menu's "Open in new tab" does the same — build up multiple tabs by clicking, no need to make
+  a blank tab first.
+
+### Notes
+- **Move-into-a-Brain-area** from the right-click menu is a fast follow (it needs the note-id → path bridge
+  the Filer uses); today, file a note into an area from its metadata panel's **File to the Brain**.
+
 ## [0.16.0] — 2026-07-01
 
 ### Added

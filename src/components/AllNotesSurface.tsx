@@ -7,12 +7,14 @@ import { useNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import { SearchGlyph } from "./glyphs";
 import { NoteListRow } from "./NoteListRow";
+import { useNoteMenu } from "./useNoteMenu";
 
 export function AllNotesSurface() {
   // useNotes() (no folder) excludes the hidden roots (Archive / Trash / Board). It
   // carries boards (kind:"board"); we drop binary FILES — those live under Storage.
   const notes = (useNotes().data ?? []).filter((n) => n.kind !== "file");
   const openSummary = usePanesStore((s) => s.openSummary);
+  const openMenu = useNoteMenu();
   const [query, setQuery] = useState("");
 
   const q = query.trim().toLowerCase();
@@ -55,7 +57,12 @@ export function AllNotesSurface() {
         <div className="board-scroll">
           <ul className="recent-list">
             {results.map((n) => (
-              <NoteListRow key={n.id} note={n} onOpen={openSummary} />
+              <NoteListRow
+                key={n.id}
+                note={n}
+                onOpen={(note, newTab) => openSummary(note, { newTab })}
+                onContextMenu={openMenu}
+              />
             ))}
           </ul>
         </div>

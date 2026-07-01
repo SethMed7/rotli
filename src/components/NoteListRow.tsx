@@ -2,6 +2,7 @@
 // the whole row a button that opens the note/board/file. Extracted (Seth,
 // 2026-06-30) so the two list surfaces share the exact same markup.
 
+import type { MouseEvent } from "react";
 import type { NoteSummary } from "../types";
 import { longDateLabel } from "../lib/dateLabels";
 import { glyphForNote } from "./glyphs";
@@ -9,9 +10,11 @@ import { glyphForNote } from "./glyphs";
 export function NoteListRow({
   note,
   onOpen,
+  onContextMenu,
 }: {
   note: NoteSummary;
-  onOpen: (note: NoteSummary) => void;
+  onOpen: (note: NoteSummary, newTab: boolean) => void;
+  onContextMenu?: (e: MouseEvent, note: NoteSummary) => void;
 }) {
   const board = note.kind === "board";
   const file = note.kind === "file";
@@ -20,7 +23,14 @@ export function NoteListRow({
       <button
         type="button"
         className="recent-row"
-        onClick={() => onOpen(note)}
+        onClick={(e) => onOpen(note, e.metaKey)}
+        onAuxClick={(e) => {
+          if (e.button === 1) {
+            e.preventDefault();
+            onOpen(note, true);
+          }
+        }}
+        onContextMenu={onContextMenu ? (e) => onContextMenu(e, note) : undefined}
         title={board ? "Open board" : file ? "Open file" : "Open note"}
       >
         {glyphForNote(note, { size: 14, className: "rr-icon" })}

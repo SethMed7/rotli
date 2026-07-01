@@ -15,7 +15,9 @@ import { CaptureCard } from "./components/CaptureCard";
 import { NotesSurface } from "./components/NotesSurface";
 import { Onboarding } from "./components/Onboarding";
 import { Palette } from "./components/Palette";
+import { ContextMenu } from "./components/ContextMenu";
 import { QuickNote } from "./components/QuickNote";
+import { RenameDialog } from "./components/RenameDialog";
 import { SettingsSurface } from "./components/SettingsSurface";
 import { Titlebar } from "./components/Titlebar";
 import { WhichKey } from "./components/WhichKey";
@@ -358,6 +360,8 @@ function MainShell() {
       </main>
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
       {whichKey && <WhichKey onClose={() => setWhichKey(false)} />}
+      <ContextMenu />
+      <RenameDialog />
     </div>
   );
 }

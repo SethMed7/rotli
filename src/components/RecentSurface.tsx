@@ -9,11 +9,13 @@ import { useNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import { ClockGlyph } from "./glyphs";
 import { NoteListRow } from "./NoteListRow";
+import { useNoteMenu } from "./useNoteMenu";
 
 export function RecentSurface() {
   // drop binary FILES — Recent is a note list; files live in Storage (Seth, 2026-06-30)
   const notes = (useNotes().data ?? []).filter((n) => n.kind !== "file");
   const openSummary = usePanesStore((s) => s.openSummary);
+  const openMenu = useNoteMenu();
 
   const rows = useMemo(() => [...notes].sort((a, b) => b.updatedAt - a.updatedAt), [notes]);
 
@@ -34,7 +36,12 @@ export function RecentSurface() {
         <div className="board-scroll">
           <ul className="recent-list">
             {rows.map((n) => (
-              <NoteListRow key={n.id} note={n} onOpen={openSummary} />
+              <NoteListRow
+                key={n.id}
+                note={n}
+                onOpen={(note, newTab) => openSummary(note, { newTab })}
+                onContextMenu={openMenu}
+              />
             ))}
           </ul>
         </div>

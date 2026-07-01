@@ -244,6 +244,11 @@ interface UiState {
   renamingBoardId: string | null;
   setRenamingBoardId: (id: string | null) => void;
 
+  /** The note whose title is being edited in the rename dialog (opened from the
+   * right-click menu), or null. `current` seeds the input (Seth, 2026-07-01). */
+  renameTarget: { id: string; current: string } | null;
+  setRenameTarget: (t: { id: string; current: string } | null) => void;
+
   /** Chat is the middle left-menu section now (not a dropdown module): the chat
    * history lives in the sidebar and a chat opens in the content area via
    * contentView "chat". These hold which chat is open and the browse mode. Not
@@ -410,6 +415,8 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   contentView: "panes",
   setContentView: (view) => set({ contentView: view }),
+  renameTarget: null,
+  setRenameTarget: (t) => set({ renameTarget: t }),
 
   renamingBoardId: null,
   setRenamingBoardId: (id) => set({ renamingBoardId: id }),
