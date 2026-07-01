@@ -88,7 +88,15 @@ export function FileSurface({ fileId }: { paneId: string; fileId: string }) {
         </button>
       </header>
 
-      <div className={kind === "sheet" ? "file-body file-body-sheet" : "file-body"}>
+      <div
+        className={
+          kind === "sheet"
+            ? "file-body file-body-sheet"
+            : kind === "image" || kind === "pdf" || kind === "other"
+              ? "file-body file-body-fill"
+              : "file-body"
+        }
+      >
         {err && <p className="file-err">⚠ {err}</p>}
         {(loadingMedia || loadingText || loadingSheet) && <p className="file-loading">Loading…</p>}
 

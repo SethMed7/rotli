@@ -1,0 +1,98 @@
+// Main — the user's hand-arranged view over the Brain (Seth, 2026-07-01; design in
+// docs/design/main-brain-daemon.md). Main holds NO files of its own: it's an ordered,
+// nested tree of Main-only FOLDERS and note-ID references, stored in `.rotli/main.json`.
+// It references notes by `id` only — so when the background daemon refiles a note's
+// path in the Brain, its Main slot is untouched ("stays how I set it"). "One file, two
+// views": both Main and Brain resolve a row → the same .md by id.
+//
+// This module is the pure core: parse the manifest, and project it into the synthetic
+// { folders, notes } the sidebar's existing renderFolderTree consumes (mirrors
+// buildStorageTree). Orphan ids (a note deleted out from under Main) are dropped.
+
+import type { Folder, NoteSummary } from "../types";
+
+/** The Main root marker id — top-level Main folders/notes hang off this (like the
+ * "wiki" Brain root or the "Storage" destination). */
+export const MAIN_ROOT = "main:";
+
+/** A node in the Main arrangement tree: a Main-only folder (with children) or a
+ * reference to a Brain note by its id. */
+export type MainNode = { folder: string; children: MainNode[] } | { note: string };
+
+export interface MainManifest {
+  version: 1;
+  tree: MainNode[];
+}
+
+export const EMPTY_MAIN: MainManifest = { version: 1, tree: [] };
+
+/** Parse `.rotli/main.json` defensively — a corrupt/absent manifest means an empty
+ * Main, never a crash (mirrors persist.ts's tolerant parsing). */
+export function parseMainManifest(raw: string): MainManifest {
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return { ...EMPTY_MAIN };
+  }
+  if (typeof data !== "object" || data === null) return { ...EMPTY_MAIN };
+  const tree = (data as { tree?: unknown }).tree;
+  return { version: 1, tree: Array.isArray(tree) ? tree.flatMap(sanitizeNode) : [] };
+}
+
+/** Keep only well-formed nodes (drop anything that isn't a proper folder/note). */
+function sanitizeNode(node: unknown): MainNode[] {
+  if (typeof node !== "object" || node === null) return [];
+  if (typeof (node as { note?: unknown }).note === "string") {
+    return [{ note: (node as { note: string }).note }];
+  }
+  const folder = (node as { folder?: unknown }).folder;
+  if (typeof folder === "string" && folder.trim()) {
+    const kids = (node as { children?: unknown }).children;
+    return [{ folder, children: Array.isArray(kids) ? kids.flatMap(sanitizeNode) : [] }];
+  }
+  return [];
+}
+
+/** Serialize back to JSON for `.rotli/main.json`. */
+export function serializeMainManifest(m: MainManifest): string {
+  return JSON.stringify({ version: 1, tree: m.tree }, null, 2);
+}
+
+/** Project the manifest into synthetic sidebar rows: Main-only folders (ids
+ * "main:<path>") + the referenced notes re-homed to their Main folder, IN MANIFEST
+ * ORDER. Notes whose id no longer exists are dropped (orphan GC). The returned notes
+ * carry an `order` you can sort by (the sidebar's default pinned→updated sort is wrong
+ * for a hand-arranged view). */
+export function buildMainTree(
+  tree: MainNode[],
+  notesById: Map<string, NoteSummary>,
+): { folders: Folder[]; notes: (NoteSummary & { mainOrder: number })[] } {
+  const folders: Folder[] = [];
+  const notes: (NoteSummary & { mainOrder: number })[] = [];
+  let order = 0;
+  const walk = (nodes: MainNode[], parentId: string) => {
+    for (const node of nodes) {
+      if ("folder" in node) {
+        const id = parentId === MAIN_ROOT ? `${MAIN_ROOT}${node.folder}` : `${parentId}/${node.folder}`;
+        folders.push({ id, name: node.folder, parentId });
+        walk(node.children, id);
+      } else {
+        const n = notesById.get(node.note);
+        if (n) notes.push({ ...n, folderId: parentId, mainOrder: order++ });
+      }
+    }
+  };
+  walk(tree, MAIN_ROOT);
+  return { folders, notes };
+}
+
+/** Prune manifest note-refs whose id no longer exists (called on save so the file
+ * doesn't accumulate dead ids). Empty folders are KEPT — an empty folder is a valid
+ * "made it, will fill it later" gesture. */
+export function gcManifest(tree: MainNode[], liveIds: Set<string>): MainNode[] {
+  return tree.flatMap((node): MainNode[] => {
+    if ("folder" in node) return [{ folder: node.folder, children: gcManifest(node.children, liveIds) }];
+    return liveIds.has(node.note) ? [node] : [];
+  });
+}
