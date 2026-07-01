@@ -531,10 +531,17 @@ export async function corpusSetAiField(id: string, key: string, value: string): 
   await invoke("corpus_set_ai_field", { id, key, value });
 }
 
-/** File a note into the brain per its `area` field. Returns the note's NEW wire id
- * (rel path — the file moves, so the id changes; retarget any open pane). */
+/** File a note into the brain per its `area` field. Returns the note's NEW rel
+ * path (a .md note's WIRE id is its ULID and survives the move — the rel path is
+ * for the journal + retargeting a pane opened by path). */
 export async function corpusFileNote(id: string): Promise<string> {
   return invoke<string>("corpus_file_note", { id });
+}
+
+/** Resolve a note's wire id to its current REL PATH — the ULID→rel bridge (a rel
+ * path passes through). Staged-detection and the filing journal use this. */
+export async function corpusNotePath(id: string): Promise<string> {
+  return invoke<string>("corpus_note_path", { id });
 }
 
 /** Move a note to a folder in the brain via the Filer lane (re-file / UNDO). */

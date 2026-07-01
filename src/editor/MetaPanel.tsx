@@ -10,6 +10,7 @@ import { useTransientPopover } from "../lib/popover";
 import {
   type FrontmatterView,
   corpusFrontmatter,
+  corpusNotePath,
   corpusSetField,
   corpusSetLocked,
   corpusSetSecure,
@@ -31,6 +32,9 @@ export function MetaPanel({
   const ref = useRef<HTMLDivElement>(null);
   useTransientPopover([ref, anchorRef], true, onClose);
   const [fm, setFm] = useState<FrontmatterView | null>(null);
+  // the note's REL PATH (wire id = ULID for .md notes) — staged-detection and
+  // the "Filed in <area>" line read the path, never the id (v0.18.1 bridge fix)
+  const [relPath, setRelPath] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [newKey, setNewKey] = useState("");
@@ -46,6 +50,13 @@ export function MetaPanel({
         // never leave the panel stuck on "Reading…" — show why it failed
         console.warn("metadata read failed", e);
         if (alive) setErr(e instanceof Error ? e.message : String(e));
+      });
+    corpusNotePath(noteId)
+      .then((rel) => {
+        if (alive) setRelPath(rel);
+      })
+      .catch(() => {
+        if (alive) setRelPath(null); // no path (browser review) → no filing UI
       });
     return () => {
       alive = false;
@@ -77,10 +88,11 @@ export function MetaPanel({
   };
 
   // Brain filing (v3.7 Filer, manual): a STAGED note (wiki/_inbox) can be filed into
-  // an area; a note already under wiki/<area> shows where it landed. The area vocab
+  // an area; a note already under wiki/<area> shows where it landed. Both read the
+  // resolved REL PATH — the wire id is a ULID and matches neither. The area vocab
   // is the wiki areas (People/Projects/…), minus the internal underscore folders.
-  const staged = isStagedNote(noteId);
-  const filedArea = /(?:^|\/)wiki\/([^/_][^/]*)\//.exec(noteId)?.[1] ?? null;
+  const staged = relPath != null && isStagedNote(relPath);
+  const filedArea = relPath ? (/(?:^|\/)wiki\/([^/_][^/]*)\//.exec(relPath)?.[1] ?? null) : null;
   const areas = (useFolders().data ?? [])
     .filter((f) => f.parentId === "wiki" && !f.name.startsWith("_"))
     .map((f) => f.name);

@@ -704,6 +704,7 @@ pub fn run() {
             corpus::corpus_set_ai_field,
             corpus::corpus_file_note,
             corpus::corpus_filer_move,
+            corpus::corpus_note_path,
             corpus::corpus_write_index,
             corpus::corpus_journal_append,
             corpus::corpus_journal_read,

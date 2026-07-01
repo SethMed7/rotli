@@ -4,7 +4,8 @@
 // way: `const openMenu = useNoteMenu(); ... onContextMenu={(e) => openMenu(e, note)}`.
 
 import { type MouseEvent, useCallback, useMemo } from "react";
-import { fileNoteToArea, isStagedNote } from "../services/brainFiling";
+import { fileNoteToArea } from "../services/brainFiling";
+import { DEST } from "../services/destinations";
 import { useArchiveNote, useFolders, useNotes, useTrashNote } from "../services/hooks";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
@@ -69,9 +70,16 @@ export function useNoteMenu() {
             liveIds,
           ),
       });
-      // a STAGED note (wiki/_inbox) can be filed into a Brain area right here —
-      // the 0.17.0 fast-follow; same Filer path as the metadata panel
-      if (!isFile && !isBoard && isStagedNote(note.id) && areas.length > 0) {
+      // file into a Brain area right here — the 0.17.0 fast-follow; same Filer
+      // path as the metadata panel. Offered for STAGED notes (they project to
+      // the Captures "Board" folder on the wire — a .md note's id is a ULID, so
+      // the folder is the sync-readable signal) and for notes already in an
+      // area (re-file). fileNoteToArea resolves the ULID→rel bridge itself.
+      const fileable =
+        note.folderId === DEST.board ||
+        note.folderId === "wiki" ||
+        note.folderId.startsWith("wiki/");
+      if (!isFile && !isBoard && fileable && areas.length > 0) {
         items.push({
           kind: "drill" as const,
           label: "File to the Brain",

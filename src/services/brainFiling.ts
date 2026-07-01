@@ -1,40 +1,46 @@
-// Manual Brain filing — ONE path shared by every surface that files a staged
-// note into a wiki area (the metadata panel's "File to the Brain" and the
-// right-click menu's drill). Sets the AI `area` field, moves the note through
-// the v3.7 Filer gate, retargets any open pane, and journals the action so
-// Brain Activity can show + undo it. UI concerns (busy/error/close) stay with
-// the callers.
+// Manual Brain filing — ONE path shared by every surface that files a note into
+// a wiki area (the metadata panel's "File to the Brain" and the right-click
+// menu's drill). A `.md` note travels the wire as its frontmatter ULID, but the
+// filing journal + staged-detection speak PATHS — so the flow starts by
+// resolving through the ULID→rel bridge (corpus_note_path). The move itself
+// runs through the v3.7 Filer gate, any open pane retargets, and the action is
+// journaled so Brain Activity can show + undo it. UI concerns (busy/error/
+// close) stay with the callers.
 
-import { corpusFileNote, corpusSetAiField } from "../lib/tauri";
+import { corpusFileNote, corpusNotePath, corpusSetAiField } from "../lib/tauri";
 import { usePanesStore } from "../state/panes";
 import { logAction } from "./brainJournal";
 import { invalidateNotes } from "./hooks";
 
-/** True when this note is STAGED (wiki/_inbox) — the only notes the manual
- * filing affordances offer to file. */
-export function isStagedNote(noteId: string): boolean {
-  return noteId.includes("wiki/_inbox");
+/** True when this REL PATH is a STAGED note (wiki/_inbox) — resolve a wire id
+ * through corpusNotePath first; a ULID never matches. */
+export function isStagedNote(relPath: string): boolean {
+  return relPath.includes("wiki/_inbox");
 }
 
-/** File a staged note into `wiki/<area>`: set the AI area field, move through
- * the Filer gate, retarget open panes, journal it, refresh. Returns the note's
- * new wire id. Throws on refusal (locked note, bad area) — callers surface it. */
+/** File a note (by wire id or rel path) into `wiki/<area>`: set the AI area
+ * field, move through the Filer gate, retarget open panes, journal it, refresh.
+ * Throws on refusal (locked note, bad area, not a memex note) — callers surface
+ * it. Returns the note's new rel path. */
 export async function fileNoteToArea(noteId: string, area: string): Promise<string> {
-  const before = noteId.slice(0, noteId.lastIndexOf("/"));
-  const title = (noteId.split("/").pop() ?? noteId)
+  const rel = await corpusNotePath(noteId);
+  const before = rel.slice(0, rel.lastIndexOf("/"));
+  const title = (rel.split("/").pop() ?? rel)
     .replace(/-[a-z0-9]{6}\.md$/i, "")
     .replace(/\.md$/, "");
-  await corpusSetAiField(noteId, "area", area);
-  const newId = await corpusFileNote(noteId);
-  usePanesStore.getState().retargetNote(noteId, newId);
+  await corpusSetAiField(rel, "area", area);
+  const newRel = await corpusFileNote(rel);
+  // a .md note's wire id is its ULID and survives the move — only a tab that was
+  // opened BY rel path needs retargeting (a no-op otherwise).
+  usePanesStore.getState().retargetNote(rel, newRel);
   await logAction({
     action: "file",
-    noteId: newId,
+    noteId: newRel,
     noteTitle: title,
     area,
     before,
-    after: newId.slice(0, newId.lastIndexOf("/")),
+    after: newRel.slice(0, newRel.lastIndexOf("/")),
   });
   await invalidateNotes();
-  return newId;
+  return newRel;
 }

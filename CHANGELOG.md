@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.1] — 2026-07-01
+
+### Fixed
+- **Manual "File to the Brain" actually works now.** A `.md` note travels the app as its
+  frontmatter ULID, but the Filer's commands expected a file path — so the metadata panel's
+  filing section never recognized a staged note, and 0.18.0's right-click drill never showed.
+  Every filing entry point (`set_ai_field` / `file_note` / `filer_move`) now resolves through
+  a ULID→rel bridge (new `corpus_note_path`), the panel and menu detect staged notes by their
+  real path, and the journal keeps recording paths for undo. Locked by a Rust test that files
+  and un-files a note by its ULID. The right-click "File to the Brain" drill also appears on
+  notes already in an area (re-file to another area).
+
 ## [0.18.0] — 2026-07-01
 
 A reported-issues sweep before Phase 4 (the organizer daemon): everything open from the

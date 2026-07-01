@@ -1615,6 +1615,18 @@ impl CorpusStore {
             .ok_or_else(|| format!("note not found: {id}"))
     }
 
+    /// The ULID→rel bridge: a `.md` note travels the wire as its frontmatter
+    /// ULID (boards/files as rel paths), but the Filer's fs-level ops need the
+    /// PATH. Accepts either — a rel path passes through, a wire id resolves via
+    /// the index. Every filing entry point resolves through here so callers
+    /// never have to know which shape they hold (the v0.17 deferral).
+    pub fn resolve_note_rel(&mut self, id_or_rel: &str) -> Result<String, String> {
+        if self.abs(id_or_rel).is_file() {
+            return Ok(id_or_rel.to_string());
+        }
+        self.path_of(id_or_rel)
+    }
+
     pub fn read(&mut self, id: &str) -> Result<NoteDoc, String> {
         let rel = self.path_of(id)?;
         let abs = self.abs(&rel);
@@ -1853,12 +1865,14 @@ impl CorpusStore {
 
     /// Set (empty value ⇒ remove) an AI-OWNED frontmatter field — the Filer's
     /// counterpart to `set_field`. Accepts ONLY `AI_KEYS`; refuses reserved and user
-    /// keys, so the territories stay disjoint. Gated by `filer_writable`.
-    fn set_ai_field(&self, rel: &str, key: &str, value: &str) -> Result<(), String> {
+    /// keys, so the territories stay disjoint. Gated by `filer_writable`. Takes a
+    /// wire id OR a rel path (resolve_note_rel).
+    fn set_ai_field(&mut self, id_or_rel: &str, key: &str, value: &str) -> Result<(), String> {
         let key = key.trim();
         if !AI_KEYS.contains(&key) {
             return Err(format!("`{key}` is not a filer-writable field"));
         }
+        let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
         let path = self.abs(rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
@@ -1889,12 +1903,13 @@ impl CorpusStore {
         atomic_write(&path, body)
     }
 
-    /// FILE a note (by its rel path) into the brain per its `area` frontmatter — the
-    /// Filer's move (`_inbox/…` or a wrong area → `wiki/<area>/<slug>-<id6>.md`).
+    /// FILE a note (by wire id or rel path) into the brain per its `area` frontmatter
+    /// — the Filer's move (`_inbox/…` or a wrong area → `wiki/<area>/<slug>-<id6>.md`).
     /// Gated by `filer_writable` on BOTH ends; reuses `relocate` (fs-atomic,
     /// preserves id/created/foreign, does NOT bump `updated`). The ulid for the index
     /// comes from the note's own frontmatter.
-    pub fn file_note(&mut self, rel: &str) -> Result<NoteMeta, String> {
+    pub fn file_note(&mut self, id_or_rel: &str) -> Result<NoteMeta, String> {
+        let rel = &self.resolve_note_rel(id_or_rel)?;
         let text = fs::read_to_string(self.abs(rel)).map_err(|e| format!("read {rel}: {e}"))?;
         let area = parse_document(&text)
             .0
@@ -1917,7 +1932,8 @@ impl CorpusStore {
     /// and UNDO (moving a filed note back). Filer-gated on both ends; reuses
     /// `relocate` (fs-atomic, preserves id, doesn't bump `updated`). The ulid comes
     /// from the note's own frontmatter.
-    pub fn filer_move(&mut self, rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
+    pub fn filer_move(&mut self, id_or_rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
+        let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
         self.filer_writable(target_folder)?;
         if folder_of(rel) == target_folder {
@@ -2781,12 +2797,22 @@ pub fn corpus_set_ai_field(
 /// FILER (v3.7): file a note into the brain per its `area` field (fs-atomic move).
 #[tauri::command]
 pub fn corpus_file_note(state: tauri::State<'_, CorpusState>, id: String) -> Result<String, String> {
-    // returns the note's NEW wire id (rel path) so an open pane can retarget.
+    // returns the note's NEW rel path so the frontend can journal the move.
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| {
         let meta = s.file_note(&rel)?;
         s.path_of(&meta.id)
     })
+}
+
+/// Resolve a note's wire id to its current REL PATH — the ULID→rel bridge the
+/// manual-filing surfaces use (a `.md` note travels as its frontmatter ULID, but
+/// staged-detection and the journal need the path). A rel path passes through.
+#[tauri::command]
+pub fn corpus_note_path(state: tauri::State<'_, CorpusState>, id: String) -> Result<String, String> {
+    let (root, rel) = split_root_id(&id);
+    let bare = state.route(&root, |s| s.resolve_note_rel(&rel))?;
+    Ok(compose_root_id(&root, &bare))
 }
 
 /// FILER (v3.7): (re)write a per-area generated overview `wiki/<area>/_index.md`.
@@ -3780,6 +3806,19 @@ mod tests {
         let back = store.filer_move(&new_rel, "wiki/_inbox").unwrap();
         assert_eq!(back.id, note.id);
         assert_eq!(back.folder_id, "wiki/_inbox");
+
+        // the ULID→rel bridge (v0.18.1): every filing entry point also takes the
+        // note's WIRE id (its frontmatter ULID) — the shape the frontend holds.
+        let staged_rel = store.path_of(&note.id).unwrap();
+        assert_eq!(store.resolve_note_rel(&note.id).unwrap(), staged_rel);
+        assert_eq!(store.resolve_note_rel(&staged_rel).unwrap(), staged_rel); // rel passes through
+        assert!(store.set_ai_field(&note.id, "area", "Projects").is_ok());
+        let refiled = store.file_note(&note.id).unwrap();
+        assert_eq!(refiled.id, note.id);
+        assert_eq!(refiled.folder_id, "wiki/Projects");
+        let refiled_rel = store.path_of(&note.id).unwrap();
+        assert!(store.filer_move(&note.id, "wiki/_inbox").is_ok()); // undo by ULID too
+        assert!(!store.abs(&refiled_rel).is_file());
 
         // write_index — the one file the filer overwrites wholesale.
         assert!(store.write_index("Projects", "# Projects\n\n- Alazan 84\n").is_ok());
