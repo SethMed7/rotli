@@ -760,8 +760,24 @@ fn field_key(line: &str) -> Option<&str> {
 
 /// Keys rotli owns directly — the metadata-panel editor touches only OTHER
 /// (foreign) keys; `locked` goes through set_locked, the rest are derived.
-const RESERVED_KEYS: [&str; 7] =
-    ["id", "created", "updated", "pinned", "origin", "locked", "secure"];
+/// v3.7: `owner` promoted to RESERVED (provenance, immutable — not user-editable).
+const RESERVED_KEYS: [&str; 8] =
+    ["id", "created", "updated", "pinned", "origin", "locked", "secure", "owner"];
+
+/// The metadata keys the AI FILER owns (contract v3.7). Written ONLY via
+/// `set_ai_field` / `file_note`; the Filer refuses everything NOT in this set, and
+/// these stay disjoint from RESERVED_KEYS (Rust) and the user's `{shelf, reach}` —
+/// two actors, two gates, disjoint territories (Seth, 2026-07-01).
+const AI_KEYS: [&str; 8] = [
+    "area",
+    "summary",
+    "tags",
+    "links",
+    "suggested_area",
+    "area_confidence",
+    "filed_by",
+    "filed_at",
+];
 
 /// A frontmatter line setting the per-note SECURE flag (`secure: true`).
 fn secure_field(line: &str) -> Option<bool> {
@@ -1322,9 +1338,9 @@ impl CorpusStore {
         let fields = fm
             .foreign
             .iter()
-            .filter(|l| {
-                !l.trim().is_empty() && locked_field(l).is_none() && secure_field(l).is_none()
-            })
+            // hide RESERVED keys (locked/secure/owner/…) from the user's editor —
+            // they're managed by rotli, not hand-edited (v3.7).
+            .filter(|l| !l.trim().is_empty() && field_key(l).map_or(true, |k| !RESERVED_KEYS.contains(&k)))
             .cloned()
             .collect();
         Ok(FrontmatterView {
@@ -1714,7 +1730,15 @@ impl CorpusStore {
         // memex). LegacyRotli waves both through.
         self.writable(&rel)?;
         self.writable(target_folder)?;
-        let abs = self.abs(&rel);
+        self.relocate(id, &rel, target_folder)
+    }
+
+    /// The shared move machinery behind `move_note` (USER gate) and `file_note`
+    /// (FILER gate, v3.7): each caller gates BOTH ends first, then relocates here.
+    /// fs-atomic, preserves id/created/foreign, does NOT bump `updated`, rewrites
+    /// the id→path index.
+    fn relocate(&mut self, id: &str, rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
+        let abs = self.abs(rel);
         let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         let (fm, raw) = parse_document(&text);
         let body = match &fm {
@@ -1723,7 +1747,7 @@ impl CorpusStore {
         }
         .to_string();
         let old_fm = fm.unwrap_or_default();
-        let current_folder = folder_of(&rel);
+        let current_folder = folder_of(rel);
 
         // ── the origin rule ──
         let into_hidden = is_hidden_root(target_folder);
@@ -1795,6 +1819,104 @@ impl CorpusStore {
             origin,
             kind: NoteKind::Note,
         })
+    }
+
+    // ─── the AI FILER — the second, narrower write lane (contract v3.7) ──────────
+
+    /// The FILER's write gate: memex-only, and ONLY the brain (`wiki/**` — both the
+    /// `_inbox` staging and the curated areas). Refuses a `locked` note (re-read
+    /// FRESH so a lock set between the classify-read and the write is honored). The
+    /// USER's `writable()` is unchanged — two disjoint lanes (Seth, 2026-07-01).
+    fn filer_writable(&self, rel: &str) -> Result<(), String> {
+        if self.layout != Layout::Memex {
+            return Err("the filer only runs on a memex".into());
+        }
+        let rel = rel.trim_start_matches('/');
+        if !(rel == "wiki" || rel.starts_with("wiki/")) {
+            return Err(format!("the filer may only write the brain (refused: {rel})"));
+        }
+        let abs = self.abs(rel);
+        if abs.is_file() {
+            let text = fs::read_to_string(&abs).map_err(|e| e.to_string())?;
+            let locked = parse_document(&text)
+                .0
+                .unwrap_or_default()
+                .foreign
+                .iter()
+                .any(|l| locked_field(l) == Some(true));
+            if locked {
+                return Err("note is locked — the filer must not touch it".into());
+            }
+        }
+        Ok(())
+    }
+
+    /// Set (empty value ⇒ remove) an AI-OWNED frontmatter field — the Filer's
+    /// counterpart to `set_field`. Accepts ONLY `AI_KEYS`; refuses reserved and user
+    /// keys, so the territories stay disjoint. Gated by `filer_writable`.
+    fn set_ai_field(&self, rel: &str, key: &str, value: &str) -> Result<(), String> {
+        let key = key.trim();
+        if !AI_KEYS.contains(&key) {
+            return Err(format!("`{key}` is not a filer-writable field"));
+        }
+        self.filer_writable(rel)?;
+        let path = self.abs(rel);
+        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let (fm, body) = parse_document(&text);
+        let mut fm = fm.unwrap_or_default();
+        fm.foreign.retain(|l| field_key(l) != Some(key));
+        let value = value.trim();
+        if !value.is_empty() {
+            fm.foreign.push(format!("{key}: {value}"));
+        }
+        self.suppress.mark(&path);
+        atomic_write(&path, &compose_document(&fm, body))
+    }
+
+    /// Overwrite a per-area generated overview `wiki/<area>/_index.md` — the ONLY
+    /// file the Filer writes wholesale (the reserved `_index.md` name can never
+    /// clobber a user note). Gated by `filer_writable`.
+    fn write_index(&self, area: &str, body: &str) -> Result<(), String> {
+        if area.contains('/') || area.contains("..") || area.trim().is_empty() {
+            return Err(format!("invalid area: {area}"));
+        }
+        let dir = self.abs(&format!("wiki/{area}"));
+        let rel = format!("wiki/{area}/_index.md");
+        self.filer_writable(&rel)?;
+        fs::create_dir_all(&dir).map_err(|e| format!("create wiki/{area}: {e}"))?;
+        let path = self.abs(&rel);
+        self.suppress.mark(&path);
+        atomic_write(&path, body)
+    }
+
+    /// FILE a note (by its rel path) into the brain per its `area` frontmatter — the
+    /// Filer's move (`_inbox/…` or a wrong area → `wiki/<area>/<slug>-<id6>.md`).
+    /// Gated by `filer_writable` on BOTH ends; reuses `relocate` (fs-atomic,
+    /// preserves id/created/foreign, does NOT bump `updated`). The ulid for the index
+    /// comes from the note's own frontmatter.
+    pub fn file_note(&mut self, rel: &str) -> Result<NoteMeta, String> {
+        let text = fs::read_to_string(self.abs(rel)).map_err(|e| format!("read {rel}: {e}"))?;
+        let fm = parse_document(&text).0.unwrap_or_default();
+        let id = fm.id.clone().ok_or("note has no id to file")?;
+        let area = fm
+            .foreign
+            .iter()
+            .find_map(|l| {
+                let (k, v) = l.split_once(':')?;
+                (k.trim() == "area").then(|| v.trim().to_string())
+            })
+            .filter(|a| !a.is_empty())
+            .ok_or("note has no `area` to file into")?;
+        if area.contains('/') || area.contains("..") {
+            return Err(format!("invalid area: {area}"));
+        }
+        let target_folder = format!("wiki/{area}");
+        self.filer_writable(rel)?;
+        self.filer_writable(&target_folder)?;
+        if folder_of(rel) == target_folder {
+            return Err(format!("already filed in {target_folder}"));
+        }
+        self.relocate(&id, rel, &target_folder)
     }
 
     pub fn create(&mut self, folder_id: &str, body: &str) -> Result<NoteMeta, String> {
@@ -2610,6 +2732,43 @@ pub fn corpus_set_field(
 ) -> Result<(), String> {
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| s.set_field(&rel, &key, &value))
+}
+
+/// FILER (contract v3.7): set an AI-owned metadata field (area/summary/tags/links/
+/// suggested_area/area_confidence/filed_by/filed_at). The Filer's lane — refuses
+/// reserved + user keys. No caller yet (Phase 3 wires the manual "file this note").
+#[tauri::command]
+pub fn corpus_set_ai_field(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.set_ai_field(&rel, &key, &value))
+}
+
+/// FILER (v3.7): file a note into the brain per its `area` field (fs-atomic move).
+#[tauri::command]
+pub fn corpus_file_note(state: tauri::State<'_, CorpusState>, id: String) -> Result<NoteMeta, String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.file_note(&rel))
+}
+
+/// FILER (v3.7): (re)write a per-area generated overview `wiki/<area>/_index.md`.
+#[tauri::command]
+pub fn corpus_write_index(
+    state: tauri::State<'_, CorpusState>,
+    area: String,
+    body: String,
+) -> Result<(), String> {
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |s| s.write_index(&area, &body))
 }
 
 /// Toggle the per-note SECURE flag (secrets detected → never sent remote + gitignored).
@@ -3496,6 +3655,61 @@ mod tests {
         fs::write(root.join("self/identity.md"), "# Me\n").unwrap();
         fs::write(root.join("wiki/note.md"), "# A wiki note\n").unwrap();
         fs::write(root.join("chats/welcome.md"), "# Welcome chat\n").unwrap();
+    }
+
+    // contract v3.7 — the FILER lane is disjoint from the USER lane: the user still
+    // can't write the curated brain, and the filer can ONLY write the brain, only
+    // AI keys, and never a locked note.
+    #[test]
+    fn filer_lane_is_disjoint_and_files_notes() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        let mut store = CorpusStore::open(root).unwrap();
+        store.os_trash = false;
+        assert_eq!(store.layout, Layout::Memex);
+
+        // USER lane UNCHANGED — still closed to the curated brain.
+        assert!(store.writable("wiki/note.md").is_err());
+        assert!(store.writable("wiki/Projects/x.md").is_err());
+
+        // FILER lane — the brain is writable, everything else refused.
+        assert!(store.filer_writable("wiki").is_ok());
+        assert!(store.filer_writable("wiki/Projects").is_ok());
+        assert!(store.filer_writable("wiki/_inbox/x.md").is_ok());
+        assert!(store.filer_writable("chats/x.md").is_err());
+        assert!(store.filer_writable("storage/x.png").is_err());
+        assert!(store.filer_writable("").is_err());
+
+        // stage a note in _inbox, then the FILER gives it an area/summary.
+        let note = store.create("wiki/_inbox", "# Alazan 84\n\nland deal notes").unwrap();
+        let rel = store.path_of(&note.id).unwrap();
+        assert!(store.set_ai_field(&rel, "area", "Projects").is_ok());
+        assert!(store.set_ai_field(&rel, "summary", "the Alazan 84 land deal").is_ok());
+        // the allowlist refuses a USER key, a RESERVED key, and junk.
+        assert!(store.set_ai_field(&rel, "shelf", "Inbox").is_err());
+        assert!(store.set_ai_field(&rel, "locked", "true").is_err());
+        assert!(store.set_ai_field(&rel, "bogus", "x").is_err());
+
+        // a LOCKED note is untouchable by the filer (TOCTOU-safe fresh re-read).
+        store.set_locked(&rel, true).unwrap();
+        assert!(store.filer_writable(&rel).is_err());
+        store.set_locked(&rel, false).unwrap();
+        assert!(store.filer_writable(&rel).is_ok());
+
+        // file_note: _inbox → wiki/Projects, id preserved, `updated` NOT bumped.
+        let before = store.read_frontmatter(&rel).unwrap();
+        let filed = store.file_note(&rel).unwrap();
+        assert_eq!(filed.id, note.id);
+        assert_eq!(filed.folder_id, "wiki/Projects");
+        let new_rel = store.path_of(&note.id).unwrap();
+        assert!(new_rel.starts_with("wiki/Projects/"));
+        assert_eq!(store.read_frontmatter(&new_rel).unwrap().updated, before.updated);
+
+        // write_index — the one file the filer overwrites wholesale.
+        assert!(store.write_index("Projects", "# Projects\n\n- Alazan 84\n").is_ok());
+        assert!(store.abs("wiki/Projects/_index.md").is_file());
     }
 
     #[test]

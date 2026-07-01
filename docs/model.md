@@ -62,14 +62,19 @@ web tools refuse a query/URL that trips the secret detector) and its file is git
 a local model may still read it), plus the memex access mode (`local`/`open`/`secure`).
 The AI maintains both organization AND access via metadata.
 
-## What rotli writes (the contract — v3.6, band [3.4, 3.6])
+## What rotli writes (the contract — v3.7, band [3.4, 3.7])
 
-rotli READS the whole memex but WRITES only: **`chats/`** (AI chats), **`inbox.md`**
-(captures), and **`wiki/_inbox/`** (new-note staging). The AI/brain files staged notes
-into `wiki/<area>/`. rotli NEVER writes `history/`, `identity/`, `personality/`,
-`MAP.md`, or the curated rest of `wiki/` — refused at both the TS `canWrite` gate and
-the Rust `is_writable` guard. So: **you capture, the brain organizes; rotli never
-overwrites your organized brain, your history, or your identity.**
+Two write actors, two gates. **You** (the interactive editor) write only: **`chats/`**
+(AI chats), **`inbox.md`** (captures), and **`wiki/_inbox/`** (new-note staging) — and
+NEVER `history/`, `identity/`, `personality/`, `MAP.md`, or the curated rest of `wiki/`
+(refused at both the TS `canWrite` gate and the Rust `is_writable` guard). The **AI
+Filer** (v3.7) is the second actor: it writes the curated `wiki/<area>/` brain — the
+`area`/`summary`/`tags`/`links` metadata + filing staged notes into areas + the
+generated `wiki/<area>/_index.md` — through its own narrower gate, and it must skip any
+`locked` note. The two lanes are disjoint: you never write the curated brain, the Filer
+never writes your Main arrangement. So: **you capture + arrange, the AI organizes; neither
+overwrites the other.** (The Filer's daemon isn't wired yet — see
+`docs/design/main-brain-daemon.md`.)
 
 ## Vocabulary — say this, not that
 

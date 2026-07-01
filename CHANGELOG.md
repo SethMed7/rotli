@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-07-01
+
+### Added — contract v3.7: the AI **Filer** write lane (capability only, no daemon yet)
+- **The write-lane foundation for the background AI organizer** (Phase 2 of the Main/Brain/daemon plan,
+  `docs/design/main-brain-daemon.md`). A second, narrower write actor — the **Filer** — may now write the
+  curated `wiki/**` brain (which stays read-only for *you*), gated separately from your own writes. **Two
+  actors, two gates, disjoint key-sets:** you write `chats/`+`_inbox` and never the curated brain; the
+  Filer writes the brain (`area`/`summary`/`tags`/`links`/…) and never your Main arrangement, and it
+  refuses any `locked` note. New Rust `filer_writable` gate + `set_ai_field` (AI-keys-only) + `file_note`
+  (fs-atomic filing move into `wiki/<area>`, preserving id, not bumping `updated`) + `write_index`
+  (`wiki/<area>/_index.md`), mirrored in `contract.ts` (`canFile`/`mayFile`/`AI_KEYS`/`USER_KEYS` + a
+  `chats+inbox+file` perms tier only the daemon host runs with). `owner` is now reserved/immutable.
+- **Nothing calls these yet** — the manual "file this note" + journal/undo (Phase 3) and the Suggest
+  daemon (Phase 4) come next. The contract band extends to **[3.4, 3.7]**; we do **not** flip a brain's
+  stored `memex.json` version (a 3.6 brain stays fully writable, so the Filer works today — the stored
+  flip is a later coordinated step once Breve/voz ship). memex-vault's `STRUCTURE.md` moves to v3.7 in
+  lockstep. Tests assert the two lanes stay disjoint (user closed to `wiki/**`, Filer allowlist enforced).
+
 ## [0.11.0] — 2026-07-01
 
 ### Added

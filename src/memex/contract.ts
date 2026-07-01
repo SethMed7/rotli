@@ -27,7 +27,14 @@
 // chat/inbox shape didn't change; a 3.4 brain just warns on the new note fields, never
 // errors), so the supported band is [MIN_CONTRACT, CONTRACT_VERSION] — a brain whose
 // memex.json still reads "3.4" stays writable. Out of the band ⇒ the brain opens read-only.
-export const CONTRACT_VERSION = "3.6";
+//
+// v3.7 (2026-07-01) opens ONE surface to a SECOND actor: the AI FILER may write the
+// curated `wiki/**` (area/summary/tags/links/… — the AI_KEYS) and file _inbox notes
+// into areas, subject to `locked`. The USER's write lane (canWrite) is byte-unchanged.
+// Purely additive frontmatter keys, so the band just extends to 3.7. We do NOT flip a
+// brain's stored `memex.json` to 3.7 — a 3.6 brain is still in [3.4, 3.7], fully
+// writable, so the Filer works today; flipping is a later step once Breve/voz ship MAX≥3.7.
+export const CONTRACT_VERSION = "3.7";
 export const MIN_CONTRACT = "3.4";
 
 /** Sources allowed on the chats surface (conversations.ts SURFACES.chats.sources).
@@ -36,7 +43,9 @@ export const CHAT_SOURCES = ["rotli", "app", "claude", "manual", "signal"] as co
 export const ROTLI_SOURCE = "rotli";
 
 export type AccessMode = "local" | "open" | "secure";
-export type Perms = "chats+inbox" | "read-only";
+// v3.7: "chats+inbox+file" is the FILER's tier — ONLY the daemon host runs with it;
+// the interactive editor keeps "chats+inbox" (the user never gets the Filer lane).
+export type Perms = "chats+inbox" | "chats+inbox+file" | "read-only";
 
 export interface MemexInfo {
   id: string;
@@ -311,4 +320,44 @@ export function canWrite(relPath: string, perms: Perms): boolean {
   if (p === SPINE.chats || p.startsWith(`${SPINE.chats}/`)) return true;
   if (p === SPINE.wikiInbox || p.startsWith(`${SPINE.wikiInbox}/`)) return true;
   return false;
+}
+
+// ── the AI FILER lane (contract v3.7) — mirror of Rust's filer_writable/AI_KEYS ──
+
+/** The metadata keys the AI FILER owns. Written only via the Filer commands; the
+ * user's field editor never sets these (mirror of Rust `AI_KEYS`). */
+export const AI_KEYS = [
+  "area",
+  "summary",
+  "tags",
+  "links",
+  "suggested_area",
+  "area_confidence",
+  "filed_by",
+  "filed_at",
+] as const;
+
+/** Keys the USER owns on a note — disjoint from AI_KEYS and the Rust-reserved
+ * id/created/updated/pinned/origin/locked/secure/owner. */
+export const USER_KEYS = ["shelf", "reach"] as const;
+
+/** Whether the FILER may write this spine-relative path (the path gate, mirror of
+ * `canWrite` for the AI lane): ONLY the brain — the wiki/_inbox staging AND the
+ * curated wiki/** areas. Everything else is refused. */
+export function canFile(relPath: string): boolean {
+  const p = relPath.replace(/^\/+/, "");
+  if (p.includes("..")) return false;
+  return p === "wiki" || p.startsWith("wiki/");
+}
+
+/** The FILER's per-note policy layer: never a `locked` note; the target `area` must
+ * be in the brain's area vocabulary. (A `secure` note is still classified on-device
+ * but never leaves the machine — enforced in the daemon's secret lane, not here.) */
+export function mayFile(
+  fm: { locked?: boolean; area?: string },
+  areaVocab: readonly string[],
+): boolean {
+  if (fm.locked) return false;
+  if (fm.area && !areaVocab.includes(fm.area)) return false;
+  return true;
 }

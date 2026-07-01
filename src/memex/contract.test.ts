@@ -5,9 +5,13 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  AI_KEYS,
+  USER_KEYS,
   appendMessages,
+  canFile,
   canWrite,
   composeChatFile,
+  mayFile,
   composeMessageLines,
   composeNewChat,
   composeNote,
@@ -165,15 +169,44 @@ describe("parseMemexInfo + isMemexId", () => {
 });
 
 describe("contractInRange", () => {
-  test("rotli's default band is [3.4, 3.6] — the live brain, prior cards, and the v3.6 brain pass", () => {
+  test("rotli's default band is [3.4, 3.7] — prior cards + the v3.6/v3.7 brain pass", () => {
     expect(contractInRange("3.4")).toBe(true); // an older memex.json
     expect(contractInRange("3.5")).toBe(true); // the prior engine version
     expect(contractInRange("3.6")).toBe(true); // memex-vault after the identity/personality + org split
+    expect(contractInRange("3.7")).toBe(true); // v3.7 — the AI Filer lane (still in-band)
     expect(contractInRange("3.3")).toBe(false); // older than rotli supports
-    expect(contractInRange("3.7")).toBe(false); // newer than rotli was built for
+    expect(contractInRange("3.8")).toBe(false); // newer than rotli was built for
   });
   test("can widen the band", () => {
     expect(contractInRange("3.6", "3.4", "3.6")).toBe(true);
+  });
+});
+
+describe("the AI Filer lane (v3.7) — mirror of Rust filer_writable/AI_KEYS", () => {
+  test("canFile: only the brain", () => {
+    expect(canFile("wiki/Projects/x.md")).toBe(true);
+    expect(canFile("wiki/_inbox/x.md")).toBe(true);
+    expect(canFile("wiki")).toBe(true);
+    expect(canFile("chats/x.md")).toBe(false);
+    expect(canFile("inbox.md")).toBe(false);
+    expect(canFile("wiki/../etc")).toBe(false);
+  });
+  test("the user lane and the filer lane are DISJOINT", () => {
+    // user writes chats/_inbox, never the curated brain; the filer the reverse
+    expect(canWrite("wiki/Projects/x.md", "chats+inbox")).toBe(false);
+    expect(canFile("wiki/Projects/x.md")).toBe(true);
+    expect(canWrite("chats/x.md", "chats+inbox")).toBe(true);
+    expect(canFile("chats/x.md")).toBe(false);
+  });
+  test("mayFile honors locked + area vocab", () => {
+    const vocab = ["Projects", "People"];
+    expect(mayFile({ area: "Projects" }, vocab)).toBe(true);
+    expect(mayFile({ locked: true, area: "Projects" }, vocab)).toBe(false);
+    expect(mayFile({ area: "Nonsense" }, vocab)).toBe(false);
+    expect(mayFile({}, vocab)).toBe(true);
+  });
+  test("AI_KEYS and USER_KEYS are disjoint", () => {
+    for (const k of USER_KEYS) expect(AI_KEYS as readonly string[]).not.toContain(k);
   });
 });
 
