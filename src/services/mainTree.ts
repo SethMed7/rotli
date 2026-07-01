@@ -114,6 +114,21 @@ export function mainHasNote(nodes: MainNode[], noteId: string): boolean {
   return containsNote(nodes, noteId);
 }
 
+/** Every note id referenced anywhere in Main, as a Set — the O(1) "is this note
+ * curated?" lookup the Captures filter uses (a note placed in Main is a full
+ * note the user keeps, not a passing capture). */
+export function mainNoteIds(nodes: MainNode[]): Set<string> {
+  const ids = new Set<string>();
+  const walk = (ns: MainNode[]) => {
+    for (const n of ns) {
+      if ("note" in n) ids.add(n.note);
+      else walk(n.children);
+    }
+  };
+  walk(nodes);
+  return ids;
+}
+
 function containsNote(nodes: MainNode[], noteId: string): boolean {
   return nodes.some((n) => ("note" in n ? n.note === noteId : containsNote(n.children, noteId)));
 }

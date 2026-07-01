@@ -4,7 +4,8 @@
 // way: `const openMenu = useNoteMenu(); ... onContextMenu={(e) => openMenu(e, note)}`.
 
 import { type MouseEvent, useCallback, useMemo } from "react";
-import { useArchiveNote, useNotes, useTrashNote } from "../services/hooks";
+import { fileNoteToArea, isStagedNote } from "../services/brainFiling";
+import { useArchiveNote, useFolders, useNotes, useTrashNote } from "../services/hooks";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useMainStore } from "../state/main";
@@ -24,6 +25,14 @@ export function useNoteMenu() {
   const liveIds = useMemo(() => new Set(allNotes.map((n) => n.id)), [allNotes]);
   const archive = useArchiveNote();
   const trash = useTrashNote();
+  // the Brain's area vocabulary (People/Projects/…) for the filing drill —
+  // same source + underscore filter as the metadata panel's "File to the Brain"
+  const folders = useFolders().data ?? [];
+  const areas = useMemo(
+    () =>
+      folders.filter((f) => f.parentId === "wiki" && !f.name.startsWith("_")).map((f) => f.name),
+    [folders],
+  );
 
   return useCallback(
     (e: MouseEvent, note: NoteSummary) => {
@@ -60,6 +69,23 @@ export function useNoteMenu() {
             liveIds,
           ),
       });
+      // a STAGED note (wiki/_inbox) can be filed into a Brain area right here —
+      // the 0.17.0 fast-follow; same Filer path as the metadata panel
+      if (!isFile && !isBoard && isStagedNote(note.id) && areas.length > 0) {
+        items.push({
+          kind: "drill" as const,
+          label: "File to the Brain",
+          items: areas.map((area) => ({
+            kind: "action" as const,
+            label: area.charAt(0).toUpperCase() + area.slice(1),
+            onClick: () => {
+              void fileNoteToArea(note.id, area).catch((err) =>
+                console.warn("file to brain failed", err),
+              );
+            },
+          })),
+        });
+      }
       if (!isFile) {
         items.push({ kind: "sep" as const });
         items.push({
@@ -88,6 +114,6 @@ export function useNoteMenu() {
 
       open(e.clientX, e.clientY, items);
     },
-    [open, openSummary, quickIds, manifest, setTree, liveIds, archive, trash, setRenameTarget],
+    [open, openSummary, quickIds, manifest, setTree, liveIds, archive, trash, setRenameTarget, areas],
   );
 }

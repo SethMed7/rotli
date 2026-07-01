@@ -88,6 +88,12 @@ export const SEC_NOTES = "sec:notes";
 export const clampSidebarWidth = (px: number): number =>
   Math.min(460, Math.max(190, Math.round(px)));
 
+/** Sidebar zoom clamp + step (⌘+/⌘− with focus in the sidebar). Rounded to one
+ * decimal so repeated steps never drift on float error. */
+export const SIDEBAR_ZOOM_STEP = 0.1;
+export const clampSidebarZoom = (z: number): number =>
+  Math.min(1.4, Math.max(0.8, Math.round(z * 10) / 10));
+
 /** The reserved destination ids the sidebar seeds open (Inbox + Vault) and the
  * persistence layer trusts as a valid folder selection before the first list
  * resolves (Seth, 2026-06-13). "vault:" is the external-root MARKER (Track 2);
@@ -188,6 +194,10 @@ interface UiState {
   setSidebarCollapsed: (collapsed: boolean) => void;
   sidebarWidth: number;
   setSidebarWidth: (px: number) => void;
+  /** Sidebar tree zoom (⌘+/⌘− while focus is in the sidebar) — a CSS zoom
+   * factor on the rows, clamped to a readable band. */
+  sidebarZoom: number;
+  setSidebarZoom: (z: number) => void;
 
   /** Which destinations in the sidebar tree are expanded, keyed by dest id —
    * Inbox + Vault open by default (Seth, 2026-06-13). */
@@ -376,6 +386,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   sidebarWidth: 240,
   setSidebarWidth: (px) => set({ sidebarWidth: clampSidebarWidth(px) }),
+  sidebarZoom: 1,
+  setSidebarZoom: (z) => set({ sidebarZoom: clampSidebarZoom(z) }),
 
   // the three sections open by default, plus the Capture(Inbox) + Vault dests
   // inside Notes — so a fresh window shows the full three-section tree.

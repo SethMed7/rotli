@@ -22,7 +22,9 @@ folder.")
   by design: most people don't want a strict filing flow. Both a typed note and a ⌥C
   quick-capture land as a **staged note** in `wiki/_inbox/`, all surfaced under the **one**
   **Captures** view; the AI files them into the brain later. (There is no separate "Capture"
-  destination — captures have a single home.)
+  destination — captures have a single home.) A staged note you **curate** — add it to
+  Main or ★ star it — is a full note you keep, so it leaves the Captures view (its file
+  stays staged on disk until it's filed).
 - **The brain** — the **AI-organized** knowledge: areas like **People · Projects ·
   Research** (the memex `wiki/<area>/`). Mention a person in a note and the AI files
   it so they turn up under People. It is a **folder within Notes** — browsable and

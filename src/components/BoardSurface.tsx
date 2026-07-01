@@ -11,13 +11,25 @@ import { type PointerEvent as ReactPointerEvent, useMemo, useRef, useState } fro
 import { relativeLabel } from "../lib/dateLabels";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
+import { mainNoteIds } from "../services/mainTree";
 import { notesService } from "../services/notes";
+import { useMainStore } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { ArchiveGlyph, CheckGlyph, glyphForNote } from "./glyphs";
 
 export function BoardSurface() {
-  const captures = useNotes(DEST.board).data ?? [];
+  const staged = useNotes(DEST.board).data ?? [];
+  // a CURATED note is a full note, not a passing capture (Seth, 2026-07-01: "my
+  // main note should not be in Captures") — anything placed in Main or starred
+  // for Quick access leaves the board, even while it still lives in _inbox
+  // staging. Sidebar's Captures count applies the same rule.
+  const mainTree = useMainStore((s) => s.manifest.tree);
+  const quickIds = useUiStore((s) => s.quickNoteIds);
+  const captures = useMemo(() => {
+    const curated = mainNoteIds(mainTree);
+    return staged.filter((n) => !curated.has(n.id) && !quickIds.includes(n.id));
+  }, [staged, mainTree, quickIds]);
   const setContentView = useUiStore((s) => s.setContentView);
   const openNote = usePanesStore((s) => s.openNote);
   const openSummary = usePanesStore((s) => s.openSummary);

@@ -142,8 +142,20 @@ export function RowMenu({
     const el = menuRef.current;
     if (!el) return;
     const rect = anchorRef.current.getBoundingClientRect();
-    el.style.top = `${rect.bottom + 4}px`;
-    el.style.left = `${rect.left}px`;
+    // clamp inside the viewport (audit CMP-4): a row near the bottom edge flips
+    // the menu above its anchor; a wide menu never overflows the right edge
+    const pad = 8;
+    const size = el.getBoundingClientRect();
+    let top = rect.bottom + 4;
+    let left = rect.left;
+    if (top + size.height + pad > window.innerHeight) {
+      top = Math.max(pad, rect.top - size.height - 4);
+    }
+    if (left + size.width + pad > window.innerWidth) {
+      left = Math.max(pad, window.innerWidth - size.width - pad);
+    }
+    el.style.top = `${top}px`;
+    el.style.left = `${left}px`;
     // focus the first item so Arrow/Enter work immediately
     el.querySelector<HTMLButtonElement>("[role='menuitem']")?.focus();
   }, []);

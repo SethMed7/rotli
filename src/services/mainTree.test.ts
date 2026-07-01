@@ -6,6 +6,7 @@ import {
   addNoteToMain,
   buildMainTree,
   gcManifest,
+  mainNoteIds,
   moveInTree,
   parseMainManifest,
   removeFromMain,
@@ -108,5 +109,18 @@ describe("tree mutations", () => {
   });
   test("removeFromMain drops a nested note", () => {
     expect(removeFromMain(base, "c")).toEqual([{ note: "a" }, { note: "b" }, { folder: "Today", children: [] }]);
+  });
+});
+
+describe("mainNoteIds", () => {
+  test("collects note ids at every depth (the Captures curated-note filter)", () => {
+    const tree: MainNode[] = [
+      { note: "a" },
+      { folder: "Today", children: [{ note: "b" }, { folder: "Deep", children: [{ note: "c" }] }] },
+    ];
+    expect(mainNoteIds(tree)).toEqual(new Set(["a", "b", "c"]));
+  });
+  test("empty tree → empty set", () => {
+    expect(mainNoteIds([])).toEqual(new Set());
   });
 });

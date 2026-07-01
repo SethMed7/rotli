@@ -46,6 +46,7 @@ import { applyTheme } from "./theme";
 import {
   ALL_NOTES,
   clampSidebarWidth,
+  clampSidebarZoom,
   GLASS_BACKGROUNDS,
   GLASS_BLURS,
   GLASS_CANVASES,
@@ -144,6 +145,8 @@ interface PersistedSettings {
    * foldersWidth/listWidth) are retired (Seth, 2026-06-13). */
   sidebarCollapsed: boolean;
   sidebarWidth: number;
+  /** Sidebar tree zoom factor (⌘+/⌘− with focus in the sidebar). */
+  sidebarZoom: number;
   expandedDests: Record<string, boolean>;
   /** Hotkey overrides keyed by action id; null = explicitly unbound. */
   bindings: Record<string, string | null>;
@@ -249,6 +252,7 @@ function parseSettings(raw: string): PersistedSettings {
     // missing keys default — old configs predate the single sidebar, never crash
     sidebarCollapsed: asBool(data.sidebarCollapsed, false),
     sidebarWidth: clampSidebarWidth(typeof data.sidebarWidth === "number" ? data.sidebarWidth : 240),
+    sidebarZoom: clampSidebarZoom(typeof data.sidebarZoom === "number" ? data.sidebarZoom : 1),
     expandedDests,
     bindings,
     noteStyles,
@@ -283,6 +287,7 @@ function applySettings(s: PersistedSettings): void {
     quickFolder: s.quickFolder,
     sidebarCollapsed: s.sidebarCollapsed,
     sidebarWidth: s.sidebarWidth,
+    sidebarZoom: s.sidebarZoom,
     expandedDests: s.expandedDests,
   });
   useBindingsStore.setState({ overrides: s.bindings });
@@ -533,6 +538,7 @@ function settingsSnapshot(): string {
     quickFolder: ui.quickFolder,
     sidebarCollapsed: ui.sidebarCollapsed,
     sidebarWidth: ui.sidebarWidth,
+    sidebarZoom: ui.sidebarZoom,
     expandedDests: ui.expandedDests,
     bindings: useBindingsStore.getState().overrides,
     noteStyles: useNoteStyleStore.getState().styles,

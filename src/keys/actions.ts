@@ -24,9 +24,10 @@ import {
   toggleMainWindow,
   toggleQuickWindow,
 } from "../lib/tauri";
+import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { cycleQuick, removeQuickNote } from "../state/quick";
-import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
+import { ALL_NOTES, RECENT, SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
 import { registerAction } from "./registry";
 
 /** The focused pane's active tab noteId, read imperatively for action runs
@@ -56,6 +57,33 @@ async function newNote(): Promise<void> {
   await invalidateNotes();
   await invalidateMemex(); // the memex-derived listing refreshes too
   usePanesStore.getState().openNote(id);
+}
+
+/** ⌘+/⌘− — CONTEXTUAL zoom (Seth, 2026-06-26: "zoom in and out but just where I
+ * am"): with focus in the sidebar it scales the sidebar tree; otherwise it steps
+ * the FOCUSED note's body text size (the per-note Aa render layer — persisted to
+ * settings, never written into the .md). Other surfaces (chat/canvas/file) are
+ * untouched for now. */
+function zoomBy(delta: 1 | -1): void {
+  if (document.activeElement?.closest(".sidebar")) {
+    const ui = useUiStore.getState();
+    ui.setSidebarZoom(ui.sidebarZoom + delta * SIDEBAR_ZOOM_STEP);
+    return;
+  }
+  const noteId = focusedNoteIdNow();
+  if (!noteId) return;
+  const styles = useNoteStyleStore.getState();
+  const size = styles.styles[noteId]?.size ?? DEFAULT_NOTE_STYLE.size;
+  styles.setSize(noteId, size + delta); // setSize clamps to the readable band
+}
+
+function zoomReset(): void {
+  if (document.activeElement?.closest(".sidebar")) {
+    useUiStore.getState().setSidebarZoom(1);
+    return;
+  }
+  const noteId = focusedNoteIdNow();
+  if (noteId) useNoteStyleStore.getState().setSize(noteId, DEFAULT_NOTE_STYLE.size);
 }
 
 /** ⌘⇧N / "+ New board": create an Excalidraw board in the local Inbox, open it,
@@ -325,6 +353,27 @@ export function registerDefaultActions(): void {
     title: "Toggle sidebar",
     defaultChord: "Meta+0",
     run: () => useUiStore.getState().toggleSidebar(),
+  });
+
+  // — contextual zoom (Seth, 2026-06-26): ⌘+/⌘− act where the focus is — the
+  // sidebar tree, or the focused note's text size. Reset is palette-reachable.
+  registerAction({
+    id: "view.zoomIn",
+    title: "Zoom in — sidebar or note",
+    defaultChord: "Meta+Equal",
+    run: () => zoomBy(1),
+  });
+  registerAction({
+    id: "view.zoomOut",
+    title: "Zoom out — sidebar or note",
+    defaultChord: "Meta+Minus",
+    run: () => zoomBy(-1),
+  });
+  registerAction({
+    id: "view.zoomReset",
+    title: "Reset zoom",
+    defaultChord: null,
+    run: () => zoomReset(),
   });
 
   // — editor formatting (the r5 format bar's 11 controls + highlight; chords

@@ -14,12 +14,14 @@
 // dropPreview to paint the 2px insertion line. The lone-tab-in-lone-pane hides
 // its × (closing it is a no-op anyway).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBoardRename } from "../lib/boardRename";
 import { fileName } from "../lib/fileKind";
 import { startTabDrag } from "../lib/tabDrag";
 import { useNotes } from "../services/hooks";
+import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { leaves, usePanesStore } from "../state/panes";
+import { useUiStore } from "../state/ui";
 import type { LeafNode, Tab } from "../types";
 import {
   ChatGlyph,
@@ -111,6 +113,44 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
     store.newTab();
   };
 
+  // right-click a tab → the shared context-menu host (Seth, 2026-07-01: rename a
+  // board "via the tab or left menu"). Rename covers boards (inline strip input)
+  // and notes (the title-line dialog); close/close-others round it out.
+  const openTabMenu = (event: MouseEvent, tab: Tab) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const items: MenuSpec[] = [];
+    if (tab.surfaceKind === "canvas") {
+      items.push({ kind: "action", label: "Rename…", onClick: () => startRename(tab.boardId) });
+      items.push({ kind: "sep" });
+    } else if (tab.surfaceKind === "note") {
+      items.push({
+        kind: "action",
+        label: "Rename…",
+        onClick: () =>
+          useUiStore
+            .getState()
+            .setRenameTarget({ id: tab.noteId, current: titles.get(tab.noteId) ?? "" }),
+      });
+      items.push({ kind: "sep" });
+    }
+    items.push({
+      kind: "action",
+      label: "Close tab",
+      disabled: loneInLonePane,
+      onClick: () => closeTabById(pane.id, tab.id),
+    });
+    items.push({
+      kind: "action",
+      label: "Close other tabs",
+      disabled: pane.tabs.length <= 1,
+      onClick: () => {
+        for (const t of pane.tabs) if (t.id !== tab.id) closeTabById(pane.id, t.id);
+      },
+    });
+    useContextMenu.getState().open(event.clientX, event.clientY, items);
+  };
+
   return (
     <div className="tabstrip" role="tablist">
       <div
@@ -134,6 +174,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                     dragging ? " dragging" : ""
                   }`}
                   onClick={() => activateTab(pane.id, tab.id)}
+                  onContextMenu={(event) => openTabMenu(event, tab)}
                   onPointerDown={(event) =>
                     startTabDrag(event, pane.id, tab.id, tabLabel(tab, titles))
                   }

@@ -31,6 +31,7 @@ import {
   addFolderToMain,
   addNoteToMain,
   buildMainTree,
+  mainNoteIds,
   moveInTree,
   removeFromMain,
 } from "../services/mainTree";
@@ -350,23 +351,25 @@ function CompactBoardRow({
   padLeft,
   onOpen,
   renaming,
-  onStartRename,
   onCommitRename,
   onCancelRename,
   rowProps,
+  onContextMenu,
 }: {
   board: NoteSummary;
   selected: boolean;
   padLeft: number;
   onOpen: (newTab: boolean) => void;
   renaming: boolean;
-  onStartRename: () => void;
   onCommitRename: (name: string) => void;
   onCancelRename: () => void;
   rowProps: ReturnType<ReturnType<typeof useRovingList>["rowProps"]>;
+  /** Right-click → the full note context menu (its Rename… drops the row into
+   * the inline rename below — the old rename-only right-click grew up). */
+  onContextMenu: (e: MouseEvent) => void;
 }) {
   const onClick = (event: MouseEvent) => onOpen(event.metaKey);
-  // inline rename: right-click a board (or a freshly created one) turns the row
+  // inline rename: the menu's Rename… (or a freshly created board) turns the row
   // into a text input. Enter commits; Esc / click-away cancels (Seth, 2026-06-26).
   if (renaming) {
     return (
@@ -394,10 +397,14 @@ function CompactBoardRow({
       className={selected ? "snrow sel" : "snrow"}
       style={{ paddingLeft: padLeft }}
       onClick={onClick}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        onStartRename();
+      onAuxClick={(event) => {
+        // middle-click opens in a new tab — the same gesture note rows have
+        if (event.button === 1) {
+          event.preventDefault();
+          onOpen(true);
+        }
       }}
+      onContextMenu={onContextMenu}
       {...rowProps}
     >
       <CanvasItemGlyph size={14} className="snicon" />
@@ -560,6 +567,13 @@ export function Sidebar() {
   const chatList = useInstanceChats(activeMemex).data ?? [];
   const quickNoteIds = useUiStore((s) => s.quickNoteIds);
 
+  // Captures count mirrors BoardSurface's curated-note rule: a staged note
+  // placed in Main or starred for Quick access is a full note, not a capture.
+  const captureCount = useMemo(() => {
+    const curated = mainNoteIds(mainManifest.tree);
+    return boardNotes.filter((n) => !curated.has(n.id) && !quickNoteIds.includes(n.id)).length;
+  }, [boardNotes, mainManifest.tree, quickNoteIds]);
+
   const selectedFolderId = useUiStore((s) => s.selectedFolderId);
   const setSelectedFolderId = useUiStore((s) => s.setSelectedFolderId);
   const contentView = useUiStore((s) => s.contentView);
@@ -577,6 +591,7 @@ export function Sidebar() {
   const focusedChatSlug = useFocusedChatSlug();
   const renamingBoardId = useUiStore((s) => s.renamingBoardId);
   const setRenamingBoardId = useUiStore((s) => s.setRenamingBoardId);
+  const sidebarZoom = useUiStore((s) => s.sidebarZoom);
   const [filter, setFilter] = useState("");
   const filterRef = useRef<HTMLInputElement>(null);
 
@@ -736,10 +751,16 @@ export function Sidebar() {
     window.addEventListener("pointerup", onUp);
   };
 
-  // recursive render of the Main tree — mouse + drag (NOT roving). Synthetic folders
-  // (id "main:<path>") + notes re-homed by the manifest; a note references the same
-  // .md as its Brain twin (one file, two views).
-  const renderMainTree = (parentId: string, depth: number): ReactNode => {
+  // recursive render of the Main tree — mouse + drag + roving j/k (Seth follow-up,
+  // 2026-07-01). Synthetic folders (id "main:<path>") + notes re-homed by the
+  // manifest; a note references the same .md as its Brain twin (one file, two
+  // views). `rp` is the roving rowProps factory; note rows ride with a "main>"
+  // prefix so they never collide with their Brain twins in the roving list.
+  const renderMainTree = (
+    parentId: string,
+    depth: number,
+    rp: ReturnType<typeof useRovingList>["rowProps"],
+  ): ReactNode => {
     const childFolders = mainProjection.folders.filter((f) => f.parentId === parentId);
     const childNotes = mainProjection.notes
       .filter((n) => n.folderId === parentId)
@@ -807,6 +828,7 @@ export function Sidebar() {
               }
             }}
             onContextMenu={(e) => openNoteMenu(e, n)}
+            {...rp({ id: `main>${n.id}`, kind: "note" })}
           >
             {glyphForNote(n, { size: 14, className: "snicon" })}
             <span className="snt">{n.title || "Empty note"}</span>
@@ -826,8 +848,11 @@ export function Sidebar() {
                 style={{ paddingLeft: 10 + (depth + 1) * 16 }}
                 onPointerDown={(e) => startMainDrag(e, f.id)}
                 onClick={() => {
-                  if (!didMainDragRef.current) toggleDestExpanded(f.id);
+                  // toggle against the OPEN default (?? true) — toggleDestExpanded
+                  // assumes closed, so the first click on a fresh folder no-oped
+                  if (!didMainDragRef.current) setDestExpanded(f.id, !open);
                 }}
+                {...rp({ id: f.id, kind: "folder" })}
               >
                 <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
                   <ChevronRight size={10} />
@@ -836,7 +861,7 @@ export function Sidebar() {
                 <span className="fname">{f.name}</span>
                 {removeBtn(f.id, "Remove folder from Main")}
               </button>
-              {open && renderMainTree(f.id, depth + 1)}
+              {open && renderMainTree(f.id, depth + 1, rp)}
             </div>
           );
         })}
@@ -984,10 +1009,10 @@ export function Sidebar() {
               padLeft={28 + level * 16}
               onOpen={openBoardRow(board.id)}
               renaming={renamingBoardId === board.id}
-              onStartRename={() => setRenamingBoardId(board.id)}
               onCommitRename={(name) => void commitBoardRename(board.id, name)}
               onCancelRename={() => setRenamingBoardId(null)}
               rowProps={rp({ id: board.id, kind: "note" })}
+              onContextMenu={(e) => openNoteMenu(e, board)}
             />
           ))}
       </>
@@ -1098,14 +1123,34 @@ export function Sidebar() {
   const brainOpen = expandedDests.Brain ?? true;
   const hasBrain = childrenOf("wiki").length > 0;
 
-  // the roving j/k cursor only walks the NOTES section (the corpus tree). When
+  // Main rows in the roving order — mirrors renderMainTree's traversal exactly
+  // (notes first, then folders + their open subtrees). Main notes reference the
+  // SAME ids as their Brain twins, so their roving ids carry a "main>" prefix
+  // (folders already carry "main:") — no id collision, j/k walks both copies.
+  const MAIN_ROW_PREFIX = "main>";
+  const mainRovingRows = (parentId: string): RovingRow[] => [
+    ...mainProjection.notes
+      .filter((n) => n.folderId === parentId)
+      .sort((a, b) => a.mainOrder - b.mainOrder)
+      .map((n) => ({ id: `${MAIN_ROW_PREFIX}${n.id}`, kind: "note" as const })),
+    ...mainProjection.folders
+      .filter((f) => f.parentId === parentId)
+      .flatMap((f) => {
+        const row: RovingRow = { id: f.id, kind: "folder" };
+        return (expandedDests[f.id] ?? true) ? [row, ...mainRovingRows(f.id)] : [row];
+      }),
+  ];
+
+  // the roving j/k cursor walks the NOTES section (the corpus tree) INCLUDING
+  // the Main manifest rows (Seth follow-up, 2026-07-01 — j/k for Main). When
   // that section is collapsed there are no roving rows; the Inbox/Chat sections
-  // are plain buttons, outside the listbox. (Quick Access — the Main manifest — is
-  // mouse+drag only, not roving.)
+  // are plain buttons, outside the listbox.
   const rows: RovingRow[] = notesSecOpen
     ? [
         { id: ALL_NOTES, kind: "smart" },
         { id: RECENT, kind: "smart" },
+        // Main — the user's hand-arranged rows, in manifest order.
+        ...mainRovingRows(MAIN_ROOT),
         // Brain — a collapsible destination; its areas ride under it when open.
         ...(hasBrain
           ? [
@@ -1136,11 +1181,24 @@ export function Sidebar() {
     // becomes the ⌘N selection — mirrors the click gesture exactly.
     onOpen: (row, newTab) => {
       if (row.kind === "note") {
+        // a Main row references its Brain twin by id — strip the prefix, open
+        // the same file ("one file, two views")
+        if (row.id.startsWith(MAIN_ROW_PREFIX)) {
+          const n = notesById.get(row.id.slice(MAIN_ROW_PREFIX.length));
+          if (n) usePanesStore.getState().openSummary(n, { newTab });
+          return;
+        }
         // board rows ride kind:"note" in the roving list — the Set tells them
         // apart so a board opens its canvas, not the editor (Seth, 2026-06-24)
         if (boardIds.has(row.id)) openCanvas(row.id, { newTab });
         else if (fileIds.has(row.id)) usePanesStore.getState().openFile(row.id, { newTab });
         else openNote(row.id, { newTab });
+        return;
+      }
+      // a Main folder defaults OPEN (?? true) — toggle against that default,
+      // not toggleDestExpanded's closed default (first press must collapse)
+      if (row.id.startsWith(MAIN_ROOT)) {
+        setDestExpanded(row.id, !(expandedDests[row.id] ?? true));
         return;
       }
       setSelectedFolderId(row.id);
@@ -1156,7 +1214,10 @@ export function Sidebar() {
     // false so Esc bubbles to the registry's app.hide (h at the root no-ops).
     onCollapseOrOut: (row) => {
       if (row.kind === "note") return false;
-      if (expandedDests[row.id]) {
+      const open = row.id.startsWith(MAIN_ROOT)
+        ? (expandedDests[row.id] ?? true) // Main folders default open
+        : expandedDests[row.id];
+      if (open) {
         setDestExpanded(row.id, false);
         return true;
       }
@@ -1164,11 +1225,15 @@ export function Sidebar() {
     },
     onFocusFilter: () => filterRef.current?.focus(),
     // m: only note rows get the full menu; folder/smart rows — and board rows
-    // (no noteById entry, no lifecycle yet) — have no popover.
+    // (no noteById entry, no lifecycle yet) — have no popover. A Main row maps
+    // to its underlying note.
     onOpenMenu: (row, anchor) => {
-      if (row.kind !== "note" || boardIds.has(row.id) || fileIds.has(row.id)) return;
-      const note = noteById.get(row.id);
-      setMenu({ noteId: row.id, hidden: isHidden(note?.folderId ?? ""), anchor });
+      const bare = row.id.startsWith(MAIN_ROW_PREFIX)
+        ? row.id.slice(MAIN_ROW_PREFIX.length)
+        : row.id;
+      if (row.kind !== "note" || boardIds.has(bare) || fileIds.has(bare)) return;
+      const note = noteById.get(bare);
+      setMenu({ noteId: bare, hidden: isHidden(note?.folderId ?? ""), anchor });
     },
   });
 
@@ -1456,7 +1521,11 @@ export function Sidebar() {
       {/* the three top-level sections (Seth's IA, 2026-06-26): Inbox (email) ·
           Chat · Notes — replacing the retired top module dropdown. Each is a
           collapsible accordion; only the Notes tree is the roving j/k listbox. */}
-      <div className="sb-rows" aria-label="Sections">
+      {/* the whole section tree scales with the sidebar zoom (⌘+/⌘− while focus
+          is in the sidebar) — CSS zoom scales rows + text together; the fixed-
+          positioned popovers (RowMenu, the "+" menu) sit OUTSIDE this node, so
+          their pixel coordinates stay unscaled. */}
+      <div className="sb-rows" aria-label="Sections" style={{ zoom: sidebarZoom }}>
         {/* ── INBOX = email. The mail integration is a LATER increment; this is a
             clear placeholder of the intended account → thread structure and rotli
             writes nothing for it. ── */}
@@ -1562,7 +1631,7 @@ export function Sidebar() {
             >
               <CaptureBoardGlyph size={14.5} />
               <span className="fname">Captures</span>
-              <span className="count">{boardNotes.length}</span>
+              <span className="count">{captureCount}</span>
             </button>
             <button
               type="button"
@@ -1590,7 +1659,7 @@ export function Sidebar() {
               </p>
             ) : (
               <div data-main-id="main:" className="main-tree">
-                {renderMainTree(MAIN_ROOT, 0)}
+                {renderMainTree(MAIN_ROOT, 0, rowProps)}
               </div>
             )}
             <button

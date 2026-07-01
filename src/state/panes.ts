@@ -648,11 +648,17 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
       if (fromPaneId === toPaneId) {
         // reorder in place: remove, then splice back at the clamped index;
-        // activeTabId is identity-stable so it rides along untouched
+        // activeTabId is identity-stable so it rides along untouched.
+        // toIndex is the VISUAL strip slot (the hit-test counts the dragged tab
+        // itself), so once the tab is pulled out, every slot past its origin
+        // shifts left by one — without this, a rightward drag lands one further
+        // than the preview line (audit CMP-1).
         set({
           root: updateLeaf(root, fromPaneId, (l) => {
+            const origIndex = l.tabs.findIndex((t) => t.id === tabId);
             const without = l.tabs.filter((t) => t.id !== tabId);
-            const at = Math.max(0, Math.min(toIndex, without.length));
+            const slot = origIndex !== -1 && origIndex < toIndex ? toIndex - 1 : toIndex;
+            const at = Math.max(0, Math.min(slot, without.length));
             const tabs = [...without.slice(0, at), tab, ...without.slice(at)];
             return { ...l, tabs };
           }),

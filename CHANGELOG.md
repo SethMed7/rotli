@@ -10,6 +10,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-07-01
+
+A reported-issues sweep before Phase 4 (the organizer daemon): everything open from the
+left-menu / Quick-access / hotkey reports, resolved.
+
+### Added
+- **j/k keyboard nav reaches Main.** The sidebar's roving cursor now walks your Main rows
+  (notes and folders, in your arrangement order) the same as the rest of the tree — j/k to
+  move, Enter/l to open, h to collapse a Main folder, m for the row menu. Main notes ride
+  with their own roving ids, so a note pinned in Main and visible in the Brain are two
+  distinct stops.
+- **Contextual ⌘+ / ⌘− zoom.** Zoom *where you are*: with focus in the sidebar it scales the
+  whole section tree (persisted, clamped 0.8–1.4×); in a note it steps that note's body-text
+  size (the per-note Aa render layer — never written into the .md). "Reset zoom" is in the
+  palette; all three are rebindable in Settings → Hotkeys.
+- **Right-click works on boards and tabs.** A board row now opens the full context menu
+  (Open in new tab · Add to Main · Rename… · Delete — Rename drops into the familiar inline
+  input), and middle-click opens a board in a new tab like notes. **Tabs** got their own
+  right-click menu: Rename… (boards and notes) · Close tab · Close other tabs.
+- **"File to the Brain" from the right-click menu.** A staged note's menu now carries the
+  area drill (the 0.17.0 fast-follow) — pick People/Projects/… right from the row; same
+  Filer gate + Activity journal as the metadata panel, one shared code path.
+
+### Changed
+- **Captures shows only real captures.** A staged note you've **curated** — added to Main or
+  ★ starred for Quick access — is a full note you keep, so it leaves the Captures board (and
+  the sidebar count). Your "main note — seth" no longer poses as a sticky note.
+
+### Fixed
+- **Tab drag-reorder landed one slot right of the preview line** (the hit-test counted the
+  dragged tab itself; audit CMP-1) — now it lands exactly where the line showed, locked by
+  a new `moveTab` test suite.
+- **Row menus could overflow the window edge** (audit CMP-4) — the sidebar row menu now
+  clamps into the viewport and flips above its row near the bottom.
+- **A fresh Main folder ignored its first click** — folders default open, but the toggle
+  assumed closed; the first click now collapses as expected (keyboard h too).
+
 ## [0.17.0] — 2026-07-01
 
 ### Added

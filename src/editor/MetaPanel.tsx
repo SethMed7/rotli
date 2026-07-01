@@ -9,14 +9,12 @@ import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { useTransientPopover } from "../lib/popover";
 import {
   type FrontmatterView,
-  corpusFileNote,
   corpusFrontmatter,
-  corpusSetAiField,
   corpusSetField,
   corpusSetLocked,
   corpusSetSecure,
 } from "../lib/tauri";
-import { logAction } from "../services/brainJournal";
+import { fileNoteToArea, isStagedNote } from "../services/brainFiling";
 import { invalidateNotes, useFolders } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import { LockGlyph, ShieldGlyph } from "../components/glyphs";
@@ -81,7 +79,7 @@ export function MetaPanel({
   // Brain filing (v3.7 Filer, manual): a STAGED note (wiki/_inbox) can be filed into
   // an area; a note already under wiki/<area> shows where it landed. The area vocab
   // is the wiki areas (People/Projects/…), minus the internal underscore folders.
-  const staged = noteId.includes("wiki/_inbox");
+  const staged = isStagedNote(noteId);
   const filedArea = /(?:^|\/)wiki\/([^/_][^/]*)\//.exec(noteId)?.[1] ?? null;
   const areas = (useFolders().data ?? [])
     .filter((f) => f.parentId === "wiki" && !f.name.startsWith("_"))
@@ -91,20 +89,7 @@ export function MetaPanel({
     setBusy(true);
     setErr(null);
     try {
-      const before = noteId.slice(0, noteId.lastIndexOf("/"));
-      const title = (noteId.split("/").pop() ?? noteId).replace(/-[a-z0-9]{6}\.md$/i, "").replace(/\.md$/, "");
-      await corpusSetAiField(noteId, "area", area);
-      const newId = await corpusFileNote(noteId);
-      usePanesStore.getState().retargetNote(noteId, newId);
-      await logAction({
-        action: "file",
-        noteId: newId,
-        noteTitle: title,
-        area,
-        before,
-        after: newId.slice(0, newId.lastIndexOf("/")),
-      });
-      await invalidateNotes();
+      await fileNoteToArea(noteId, area);
       onClose();
     } catch (e) {
       console.warn("file to brain failed", e);
