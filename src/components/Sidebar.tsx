@@ -45,6 +45,8 @@ import {
   useCorpusRoots,
   useFolders,
   useJournal,
+  useMainGcIds,
+  useNoteIndex,
   useNotes,
   useRestoreNote,
   useTrashNote,
@@ -76,6 +78,7 @@ import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
 import type { Folder, NoteSummary } from "../types";
 import { dispatch } from "../keys/registry";
 import { longDateLabel } from "../lib/dateLabels";
+import { type DragGhost, createDragGhost } from "../lib/dragGhost";
 import { useTransientPopover } from "../lib/popover";
 import {
   ArchiveGlyph,
@@ -528,31 +531,23 @@ export function Sidebar() {
   const mainManifest = useMainStore((s) => s.manifest);
   const setMainTree = useMainStore((s) => s.setTree);
   const openNoteMenu = useNoteMenu();
-  const notesById = useMemo(() => new Map(allNotes.map((n) => [n.id, n] as const)), [allNotes]);
-  const liveIds = useMemo(() => new Set(allNotes.map((n) => n.id)), [allNotes]);
+  // the FULL id → note index (staged Board + Archive + Trash + Vault included).
+  // Main references notes by id from ANYWHERE — projecting or GC'ing it from
+  // allNotes alone drops every STAGED (wiki/_inbox → "Board") ref: the row
+  // vanishes AND the next Main save prunes it from main.json for good.
+  // liveIds is undefined until EVERY listing has SUCCEEDED — setTree skips the
+  // GC then (an unreachable vault / a boot-frame drag must never prune live refs).
+  const noteIndex = useNoteIndex();
+  const liveIds = useMainGcIds();
   const mainProjection = useMemo(
-    () => buildMainTree(mainManifest.tree, notesById),
-    [mainManifest.tree, notesById],
+    () => buildMainTree(mainManifest.tree, noteIndex),
+    [mainManifest.tree, noteIndex],
   );
   // added external folders (Seth, 2026-06-27): roots the user pointed rotli at,
   // not in the memex — every registered root except the built-in default + vault.
   const addedRoots = (useCorpusRoots().data ?? []).filter(
     (r) => r.id !== "default" && r.id !== "vault",
   );
-
-  // a flat id → note lookup across every loaded list (incl. hidden Archive/
-  // Trash) — the row menu's hidden-note branch trusts this; allNotes alone
-  // would miss archived/trashed notes.
-  const noteById = new Map<string, NoteSummary>();
-  for (const n of [
-    ...allNotes,
-    ...inboxNotes,
-    ...vaultNotes,
-    ...storageNotes,
-    ...archiveNotes,
-    ...trashNotes,
-  ])
-    noteById.set(n.id, n);
 
   // — the Chat section: the active memex's chats/ history (the same source the
   // Chat surface reads), plus the chat-selection ui state the surface renders. —
@@ -649,11 +644,19 @@ export function Sidebar() {
   // from any other list (Brain, a folder). Same hit-test + drop grammar; the
   // two modes differ only in their commit and which suppress-click ref they
   // arm. (HTML5 DnD stays dead in the WKWebView shell — pointer events only.)
-  const startMainDrag = (e: ReactPointerEvent, id: string, mode: "move" | "add") => {
+  // The dragged row rides the cursor as a floating ghost (the shared
+  // lib/dragGhost, same as tab drags); Esc / pointercancel abandons the drag.
+  const startMainDrag = (
+    e: ReactPointerEvent,
+    id: string,
+    mode: "move" | "add",
+    label: string,
+  ) => {
     if (e.button !== 0) return;
     const sx = e.clientX;
     const sy = e.clientY;
     let dragging = false;
+    let ghost: DragGhost | null = null;
     let drop: { id: string; pos: DropPos } | null = null;
     const dragFlag = mode === "move" ? didMainDragRef : crossDragRef;
     dragFlag.current = false;
@@ -663,7 +666,9 @@ export function Sidebar() {
         dragging = true;
         dragFlag.current = true;
         if (mode === "move") setMainDragId(id);
+        ghost = createDragGhost(label, ev.clientX, ev.clientY);
       }
+      ghost?.move(ev.clientX, ev.clientY);
       const hit = (
         document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
       )?.closest("[data-main-id]") as HTMLElement | null;
@@ -682,11 +687,28 @@ export function Sidebar() {
       drop = { id: tid, pos };
       setMainDrop(drop);
     };
-    const onUp = () => {
+    // every exit path (drop, Esc, pointercancel) tears the same things down;
+    // only onUp commits. dragFlag stays armed so the trailing click is eaten.
+    const cleanup = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", cleanup);
+      window.removeEventListener("keydown", onKey, true);
+      ghost?.destroy();
+      ghost = null;
       if (mode === "move") setMainDragId(null);
       setMainDrop(null);
+    };
+    // globalThis.: React's KeyboardEvent type shadows the DOM one in this file
+    const onKey = (ev: globalThis.KeyboardEvent) => {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        ev.stopPropagation();
+        cleanup();
+      }
+    };
+    const onUp = () => {
+      cleanup();
       if (dragging && drop) {
         if (mode === "add") {
           // add the note to Main, then place it at the drop (root add if the zone)
@@ -700,6 +722,8 @@ export function Sidebar() {
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", cleanup);
+    window.addEventListener("keydown", onKey, true);
   };
 
   // recursive render of the Main tree — mouse + drag + roving j/k (Seth follow-up,
@@ -768,7 +792,7 @@ export function Sidebar() {
             data-main-id={n.id}
             className={`snrow main-row${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
             style={{ paddingLeft: 10 + (depth + 1) * 16 }}
-            onPointerDown={(e) => startMainDrag(e, n.id, "move")}
+            onPointerDown={(e) => startMainDrag(e, n.id, "move", n.title || "Empty note")}
             onClick={() => {
               if (!didMainDragRef.current) usePanesStore.getState().openSummary(n);
             }}
@@ -797,7 +821,7 @@ export function Sidebar() {
                 data-main-folder="1"
                 className={`frow child main-row${dropCls(f.id)}${mainDragId === f.id ? " dragging" : ""}`}
                 style={{ paddingLeft: 10 + (depth + 1) * 16 }}
-                onPointerDown={(e) => startMainDrag(e, f.id, "move")}
+                onPointerDown={(e) => startMainDrag(e, f.id, "move", f.name)}
                 onClick={() => {
                   // toggle against the OPEN default (?? true) — toggleDestExpanded
                   // assumes closed, so the first click on a fresh folder no-oped
@@ -874,14 +898,7 @@ export function Sidebar() {
   // same idea for surfaced files (image/pdf/…): they ride as note rows but open
   // in the OS default app, never the editor.
   const fileIds = new Set<string>();
-  for (const n of [
-    ...allNotes,
-    ...inboxNotes,
-    ...vaultNotes,
-    ...storageNotes,
-    ...archiveNotes,
-    ...trashNotes,
-  ]) {
+  for (const n of noteIndex.values()) {
     if (isBoard(n)) boardIds.add(n.id);
     else if (isFile(n)) fileIds.add(n.id);
   }
@@ -915,7 +932,7 @@ export function Sidebar() {
                   : openRow(note.id)
               }
               actions={rowActions}
-              onBeginMainDrag={(e) => startMainDrag(e, note.id, "add")}
+              onBeginMainDrag={(e) => startMainDrag(e, note.id, "add", note.title || "Empty note")}
               mainDragRef={crossDragRef}
               rowProps={rp({ id: note.id, kind: "note" })}
               onContextMenu={(e) => openNoteMenu(e, note)}
@@ -1091,10 +1108,6 @@ export function Sidebar() {
       ]
     : [];
 
-  // a flat id → note lookup for the menu's hidden-root branch (search every
-  // loaded list incl. the hidden Archive/Trash — same source the drop handler
-  // trusts). noteById already aggregates them above.
-
   const { rowProps, focusActive } = useRovingList(rows, {
     // l / Enter: a note opens in place; a folder/dest toggles its expansion and
     // becomes the ⌘N selection — mirrors the click gesture exactly.
@@ -1103,7 +1116,7 @@ export function Sidebar() {
         // a Main row references its Brain twin by id — strip the prefix, open
         // the same file ("one file, two views")
         if (row.id.startsWith(MAIN_ROW_PREFIX)) {
-          const n = notesById.get(row.id.slice(MAIN_ROW_PREFIX.length));
+          const n = noteIndex.get(row.id.slice(MAIN_ROW_PREFIX.length));
           if (n) usePanesStore.getState().openSummary(n, { newTab });
           return;
         }
@@ -1151,7 +1164,9 @@ export function Sidebar() {
       const bare = row.id.startsWith(MAIN_ROW_PREFIX)
         ? row.id.slice(MAIN_ROW_PREFIX.length)
         : row.id;
-      const note = noteById.get(bare);
+      // the FULL index — the menu's hidden-root branch needs archived/trashed
+      // (and staged Main) rows to resolve, not just the default listing
+      const note = noteIndex.get(bare);
       if (!note) return;
       const rect = anchor.getBoundingClientRect();
       openNoteMenu({ clientX: rect.left + 24, clientY: rect.bottom + 4 }, note, {

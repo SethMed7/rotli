@@ -9,6 +9,7 @@
 
 import { type PointerEvent as ReactPointerEvent, useMemo, useRef, useState } from "react";
 import { relativeLabel } from "../lib/dateLabels";
+import { type DragGhost, createDragGhost } from "../lib/dragGhost";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
 import { mainNoteIds } from "../services/mainTree";
@@ -54,11 +55,14 @@ export function BoardSurface() {
 
   // pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell). A move past
   // the threshold is a DRAG (reorder); no move falls through to the click (select).
-  const startCardDrag = (e: ReactPointerEvent, id: string) => {
+  // The card's title rides the cursor as a floating ghost (the shared
+  // lib/dragGhost, same as tab drags); Esc / pointercancel abandons the drag.
+  const startCardDrag = (e: ReactPointerEvent, id: string, label: string) => {
     if (e.button !== 0) return;
     const sx = e.clientX;
     const sy = e.clientY;
     let dragging = false;
+    let ghost: DragGhost | null = null;
     let drop: { id: string; after: boolean } | null = null;
     didDragRef.current = false;
     const onMove = (ev: PointerEvent) => {
@@ -67,7 +71,9 @@ export function BoardSurface() {
         dragging = true;
         didDragRef.current = true;
         setDragId(id);
+        ghost = createDragGhost(label, ev.clientX, ev.clientY);
       }
+      ghost?.move(ev.clientX, ev.clientY);
       const hit = (
         document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
       )?.closest("[data-cap-id]") as HTMLElement | null;
@@ -81,11 +87,27 @@ export function BoardSurface() {
       drop = { id: tid, after: ev.clientX > rect.left + rect.width / 2 };
       setDropAt(drop);
     };
-    const onUp = () => {
+    // every exit path (drop, Esc, pointercancel) tears the same things down;
+    // only onUp commits. didDragRef stays armed so the trailing click is eaten.
+    const cleanup = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", cleanup);
+      window.removeEventListener("keydown", onKey, true);
+      ghost?.destroy();
+      ghost = null;
       setDragId(null);
       setDropAt(null);
+    };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        ev.stopPropagation();
+        cleanup();
+      }
+    };
+    const onUp = () => {
+      cleanup();
       if (dragging && drop) {
         const ids = ordered.map((c) => c.id).filter((x) => x !== id);
         let idx = ids.indexOf(drop.id);
@@ -98,6 +120,8 @@ export function BoardSurface() {
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", cleanup);
+    window.addEventListener("keydown", onKey, true);
   };
 
   const toggle = (id: string) =>
@@ -195,7 +219,7 @@ export function BoardSurface() {
                   data-cap-id={c.id}
                   className={cls.join(" ")}
                   aria-pressed={sel}
-                  onPointerDown={(e) => startCardDrag(e, c.id)}
+                  onPointerDown={(e) => startCardDrag(e, c.id, c.title || "Empty capture")}
                   onClick={() => {
                     if (didDragRef.current) {
                       didDragRef.current = false;

@@ -642,6 +642,38 @@
   z-index: 30;
 }
 
+/* — the raw-metadata banner ("Show file metadata"): the frontmatter block as
+   real monospaced file text above the body — a block widget inside .cm-content,
+   so it lives in the writing column and scrolls/pushes the note like text — */
+.rotli-fm {
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.rotli-fm-text {
+  display: block;
+  width: 100%;
+  resize: none;
+  overflow: hidden; /* the textarea grows; the NOTE scrolls, never this box */
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.78em; /* rides the Aa size like the body, a step quieter */
+  line-height: 1.55;
+  padding: 0;
+}
+.rotli-fm-text:focus {
+  color: var(--text);
+}
+.rotli-fm-err {
+  margin-top: 6px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.72em;
+  color: var(--danger, var(--accent-text));
+}
+
 /* — the Aa panel (r3 frame C: typography only) — */
 .aapanel {
   position: absolute;

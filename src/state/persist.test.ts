@@ -25,3 +25,18 @@ describe("parseSettings — organizerTrust", () => {
     expect(parseSettings("not json").organizerTrust).toBe("suggest");
   });
 });
+
+describe("parseSettings — fileMetadata (Show file metadata)", () => {
+  it("defaults a missing key to hide", () => {
+    expect(parseSettings("{}").fileMetadata).toBe("hide");
+  });
+
+  it("keeps show when persisted", () => {
+    expect(parseSettings('{"fileMetadata":"show"}').fileMetadata).toBe("show");
+  });
+
+  it("coerces an unknown value (hand-edit / future build) back to hide", () => {
+    expect(parseSettings('{"fileMetadata":"always"}').fileMetadata).toBe("hide");
+    expect(parseSettings('{"fileMetadata":true}').fileMetadata).toBe("hide");
+  });
+});

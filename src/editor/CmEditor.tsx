@@ -26,6 +26,7 @@ import {
   unregisterEditor,
 } from "./commands";
 import { blockRender } from "./blockRender";
+import { fmBlock } from "./fmBlock";
 import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
 import { tableRender } from "./tableRender";
 import { focusDim } from "./focusMode";
@@ -58,6 +59,11 @@ export function CmEditor({
   measureWidth,
   initialText,
   onContext,
+  fmRaw = null,
+  fmGen = 0,
+  fmErr = null,
+  onFmCommit,
+  onFmRead,
 }: {
   noteId: string;
   paneId: string;
@@ -68,6 +74,18 @@ export function CmEditor({
   initialText: string;
   /** Report the caret's line + column up to the format bar (active states). */
   onContext: (line: string | null, selStart: number) => void;
+  /** The note's RAW frontmatter block ("Show file metadata") — rendered as an
+   * editable banner above the body; null hides it. Disk truth, verbatim. */
+  fmRaw?: string | null;
+  /** Commit counter — bumped after every write attempt, so a refused/no-op
+   * commit still rebuilds the banner from disk truth (same block string). */
+  fmGen?: number;
+  /** Why the last commit was refused (rendered inside the banner), or null. */
+  fmErr?: string | null;
+  /** Commit the user-typed block (blur / ⌘S) — the owner writes + re-reads. */
+  onFmCommit?: (text: string) => void;
+  /** Fresh disk truth on demand (the banner re-pulls it when editing starts). */
+  onFmRead?: () => Promise<string>;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -107,6 +125,33 @@ export function CmEditor({
   const focusComp = useRef(new Compartment()).current;
   const viewModeComp = useRef(new Compartment()).current;
   const blockComp = useRef(new Compartment()).current;
+  const fmComp = useRef(new Compartment()).current;
+
+  // the raw-metadata banner reads live values through refs (the view is built
+  // once; the compartment effect below swaps the widget when disk truth moves)
+  const fmRawRef = useRef(fmRaw);
+  fmRawRef.current = fmRaw;
+  const fmGenRef = useRef(fmGen);
+  fmGenRef.current = fmGen;
+  const fmErrRef = useRef(fmErr);
+  fmErrRef.current = fmErr;
+  const onFmCommitRef = useRef(onFmCommit);
+  onFmCommitRef.current = onFmCommit;
+  const onFmReadRef = useRef(onFmRead);
+  onFmReadRef.current = onFmRead;
+  const fmExt = useCallback(
+    (block: string | null, gen: number, error: string | null) =>
+      block == null
+        ? []
+        : fmBlock(
+            block,
+            gen,
+            error,
+            (text) => onFmCommitRef.current?.(text),
+            () => onFmReadRef.current?.() ?? Promise.resolve(block),
+          ),
+    [],
+  );
 
   const [slash, setSlash] = useState<SlashState>({ open: false, query: "", index: 0, left: 0, top: 0 });
   // the slash key-handler reads live state through this ref (the CM dom handler
@@ -278,6 +323,7 @@ export function CmEditor({
         ),
         viewModeComp.of(rawEditorRef.current ? [] : [livePreview, blockRender, tableRender]),
         blockComp.of(blockHandlesRef.current ? blockHandles(openBlockMenu) : []),
+        fmComp.of(fmExt(fmRawRef.current, fmGenRef.current, fmErrRef.current)),
         EditorView.domEventHandlers({
           copy: (e, v) => copyStripped(e, v, false),
           cut: (e, v) => copyStripped(e, v, true),
@@ -355,6 +401,12 @@ export function CmEditor({
       effects: viewModeComp.reconfigure(rawEditor ? [] : [livePreview, blockRender, tableRender]),
     });
   }, [rawEditor, viewModeComp]);
+
+  // the raw-metadata banner: show/hide, swap in fresh disk truth after a commit,
+  // and rebuild after a refused/no-op commit (fmGen bumps, block unchanged)
+  useEffect(() => {
+    viewRef.current?.dispatch({ effects: fmComp.reconfigure(fmExt(fmRaw, fmGen, fmErr)) });
+  }, [fmRaw, fmGen, fmErr, fmComp, fmExt]);
 
   // block handles on/off → add/remove the gutter + drop handlers
   useEffect(() => {

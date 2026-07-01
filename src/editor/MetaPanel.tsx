@@ -1,24 +1,23 @@
-// The metadata panel (sits right of the Aa chip): the per-note AI LOCK plus an
-// editor for the note's frontmatter. The lock writes `locked: true` (the AI filer
-// must skip the note). The fields edit the FOREIGN frontmatter (shelf/reach/area/
-// tags/…) — blur or Enter saves, × removes, the bottom row adds. id/created/updated
-// are shown read-only. All of it rides in the preserved frontmatter; the editor
-// body never sees it.
+// The metadata panel (sits right of the Aa chip): the per-note AI LOCK + SECURE
+// toggles and the Brain filing surface. The old k:v field editor is gone (Seth,
+// 2026-07-01) — metadata now shows IN the note as the raw frontmatter block at
+// the top of the file ("Show file metadata"); this panel keeps the switches and
+// points there.
 
-import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { useTransientPopover } from "../lib/popover";
 import {
   type FrontmatterView,
   corpusFrontmatter,
   corpusNotePath,
-  corpusSetField,
   corpusSetLocked,
   corpusSetSecure,
 } from "../lib/tauri";
 import { fileNoteToArea, isStagedNote } from "../services/brainFiling";
 import { invalidateNotes, useBrainAreas } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
-import { LockGlyph, ShieldGlyph } from "../components/glyphs";
+import { useUiStore } from "../state/ui";
+import { LockGlyph, MetaGlyph, ShieldGlyph } from "../components/glyphs";
 
 export function MetaPanel({
   noteId,
@@ -37,8 +36,8 @@ export function MetaPanel({
   const [relPath, setRelPath] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [newKey, setNewKey] = useState("");
-  const [newVal, setNewVal] = useState("");
+  const fileMetadata = useUiStore((s) => s.fileMetadata);
+  const setFileMetadata = useUiStore((s) => s.setFileMetadata);
 
   useEffect(() => {
     let alive = true;
@@ -62,15 +61,6 @@ export function MetaPanel({
       alive = false;
     };
   }, [noteId]);
-
-  const fields = useMemo(() => {
-    return (fm?.fields ?? []).map((line) => {
-      const i = line.indexOf(":");
-      return i > 0
-        ? { key: line.slice(0, i).trim(), value: line.slice(i + 1).trim() }
-        : { key: line.trim(), value: "" };
-    });
-  }, [fm]);
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -118,14 +108,6 @@ export function MetaPanel({
   };
   const toggleSecure = () => {
     if (fm) void run(() => corpusSetSecure(noteId, !fm.secure));
-  };
-  const saveField = (key: string, value: string) => run(() => corpusSetField(noteId, key, value));
-  const addField = () => {
-    if (!newKey.trim()) return;
-    void run(() => corpusSetField(noteId, newKey.trim(), newVal.trim())).then(() => {
-      setNewKey("");
-      setNewVal("");
-    });
   };
 
   return (
@@ -183,86 +165,25 @@ export function MetaPanel({
       </button>
 
       <div className="aalabel">Metadata</div>
-      {err ? (
-        <p className="metaempty">⚠ {err}</p>
-      ) : !fm ? (
-        <p className="metaempty">Reading…</p>
-      ) : (
-        <div className="metaedit">
-          {fm.created && (
-            <div className="metaro">
-              <span className="mk">created</span>
-              <span className="mv">{fm.created}</span>
-            </div>
-          )}
-          {fm.updated && (
-            <div className="metaro">
-              <span className="mk">updated</span>
-              <span className="mv">{fm.updated}</span>
-            </div>
-          )}
-          {fields.map((f) => (
-            <div className="metarow" key={f.key}>
-              <span className="mk" title={f.key}>
-                {f.key}
-              </span>
-              <input
-                className="mv-input"
-                defaultValue={f.value}
-                disabled={busy}
-                aria-label={`${f.key} value`}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                }}
-                onBlur={(e) => {
-                  if (e.target.value !== f.value) saveField(f.key, e.target.value);
-                }}
-              />
-              <button
-                type="button"
-                className="mx"
-                disabled={busy}
-                title={`Remove ${f.key}`}
-                onClick={() => saveField(f.key, "")}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-          <div className="metarow add">
-            <input
-              className="mk-input"
-              placeholder="field"
-              value={newKey}
-              disabled={busy}
-              aria-label="New field name"
-              onChange={(e) => setNewKey(e.target.value)}
-            />
-            <input
-              className="mv-input"
-              placeholder="value"
-              value={newVal}
-              disabled={busy}
-              aria-label="New field value"
-              onChange={(e) => setNewVal(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") addField();
-              }}
-            />
-            <button
-              type="button"
-              className="madd"
-              disabled={busy || !newKey.trim()}
-              onClick={addField}
-            >
-              +
-            </button>
-          </div>
-          {fields.length === 0 && (
-            <p className="metaempty">No fields yet — add one, or let the AI fill shelf/area/tags later.</p>
-          )}
-        </div>
-      )}
+      {err && <p className="metaempty">⚠ {err}</p>}
+      {/* the raw view replaced the field list (Seth, 2026-07-01): metadata is
+          the top of the FILE now — this is just the switch + the pointer */}
+      <button
+        type="button"
+        className={fileMetadata === "show" ? "metalock on" : "metalock"}
+        role="switch"
+        aria-checked={fileMetadata === "show"}
+        onClick={() => setFileMetadata(fileMetadata === "show" ? "hide" : "show")}
+      >
+        <MetaGlyph size={15} />
+        <span>
+          {fileMetadata === "show" ? "Metadata shown in the note" : "Show metadata in the note"}
+        </span>
+      </button>
+      <p className="metaempty">
+        The raw frontmatter appears at the top of the file, editable as plain text — also in
+        Settings → General → Writing.
+      </p>
     </div>
   );
 }

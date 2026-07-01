@@ -18,7 +18,7 @@ import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } fr
 import { useBoardRename } from "../lib/boardRename";
 import { fileName } from "../lib/fileKind";
 import { startTabDrag } from "../lib/tabDrag";
-import { useNotes } from "../services/hooks";
+import { useNoteIndex } from "../services/hooks";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { leaves, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
@@ -72,11 +72,15 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   const loneInLonePane = usePanesStore(
     (s) => leaves(s.root).length === 1 && pane.tabs.length === 1,
   );
-  const allNotes = useNotes().data ?? [];
-  const titles = useMemo(
-    () => new Map(allNotes.map((n) => [n.id, n.title])),
-    [allNotes],
-  );
+  // the FULL note index — a tab can hold a STAGED note (wiki/_inbox → the
+  // hidden "Board" root) or an archived/trashed one; useNotes() alone read
+  // those tabs as "Untitled".
+  const noteIndex = useNoteIndex();
+  const titles = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const [id, n] of noteIndex) m.set(id, n.title);
+    return m;
+  }, [noteIndex]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fade, setFade] = useState({ left: false, right: false });

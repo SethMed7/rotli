@@ -280,6 +280,11 @@ interface UiState {
    * (default), Date, or Folder (raw on-disk). Persisted. */
   storageGrouping: "type" | "date" | "folder";
   setStorageGrouping: (g: "type" | "date" | "folder") => void;
+  /** "Show file metadata" (Seth, 2026-07-01): render the note's raw frontmatter
+   * block at the top of the file — monospaced, editable, exactly as it sits on
+   * disk — instead of the old panel field list. hide (default) / show. Persisted. */
+  fileMetadata: "hide" | "show";
+  setFileMetadata: (v: "hide" | "show") => void;
   /** The organizer daemon's trust rung (design §4.3): what it may auto-APPLY.
    * Suggest (the shipped default) = journal proposals only, provably write-free
    * on the corpus. Persisted; the caller ALSO pushes it to Rust via
@@ -445,6 +450,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setChatWeb: (slug, on) => set((s) => ({ chatWeb: { ...s.chatWeb, [slug]: on } })),
   storageGrouping: "type",
   setStorageGrouping: (g) => set({ storageGrouping: g }),
+  fileMetadata: "hide",
+  setFileMetadata: (v) => set({ fileMetadata: v }),
   organizerTrust: "suggest",
   setOrganizerTrust: (t) => set({ organizerTrust: t }),
 

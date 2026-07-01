@@ -473,6 +473,51 @@ export async function corpusFileBytes(id: string, maxBytes?: number): Promise<st
   return invoke<string>("corpus_file_bytes", { id, maxBytes });
 }
 
+export interface FileStat {
+  len: number;
+  /** Whether the USER write lane may save this file (false in a memex/linked library). */
+  writable: boolean;
+}
+
+/** Size + writability probe for a surfaced file — the sheet editor decides
+ * read-only vs editable up front. null outside Tauri (browser demo = read-only). */
+export async function corpusFileStat(id: string): Promise<FileStat | null> {
+  if (!isTauri()) return null;
+  return invoke<FileStat>("corpus_file_stat", { id });
+}
+
+/** Save a surfaced FILE's bytes back to disk (base64) — the sheet editor's
+ * explicit Save. `bak` copies the pre-rotli original to `<name>.bak` once. */
+export async function corpusWriteFileBytes(id: string, base64: string, bak = false): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_write_file_bytes", { id, base64, bak });
+}
+
+/** Create a NEW file from base64 bytes in `folderId` (collision-safe) — the
+ * csv → xlsx convert. Returns the new file's wire id. "" outside Tauri. */
+export async function corpusNewFileBytes(folderId: string, name: string, base64: string): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_new_file_bytes", { folderId, name, base64 });
+}
+
+/** Reveal a surfaced file in Finder. No-op outside Tauri. */
+export async function corpusRevealFile(id: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_reveal_file", { id });
+}
+
+/** Which of the known "Open with …" apps (Numbers, Excel, …) are installed. */
+export async function corpusOpenWithApps(): Promise<string[]> {
+  if (!isTauri()) return [];
+  return invoke<string[]>("corpus_open_with_apps");
+}
+
+/** Open a surfaced file with a specific installed app (Rust allowlists names). */
+export async function corpusOpenFileWith(id: string, app: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_open_file_with", { id, app });
+}
+
 export interface FrontmatterView {
   id: string;
   created: string;
@@ -500,6 +545,22 @@ export async function corpusSetLocked(id: string, locked: boolean): Promise<void
 export async function corpusSetField(id: string, key: string, value: string): Promise<void> {
   if (!isTauri()) return;
   await invoke("corpus_set_field", { id, key, value });
+}
+
+/** The note's frontmatter as RAW TEXT (fences included), byte-exact from disk —
+ * the "Show file metadata" view renders this above the body. "" when the note
+ * has none (or outside Tauri). */
+export async function corpusRawFrontmatter(id: string): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_raw_frontmatter", { id });
+}
+
+/** Write back a user-edited raw frontmatter block. Rust keeps the typed lines
+ * verbatim, restores the reserved provenance keys (id/owner/created), and
+ * refuses notes the user can't write (the same gate as every editor save). */
+export async function corpusWriteFrontmatterRaw(id: string, block: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_write_frontmatter_raw", { id, block });
 }
 
 // ── the AI Filer (contract v3.7) — driven by the manual "file this note" for now ──

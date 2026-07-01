@@ -808,12 +808,130 @@ pub struct FrontmatterView {
     pub fields: Vec<String>,
 }
 
+/// Size + writability of a surfaced file — the sheet editor's up-front probe.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileStat {
+    pub len: u64,
+    pub writable: bool,
+}
+
 /// What the editor sees: the raw body minus the single conventional blank line
 /// after the fence (the write path adds exactly one back).
 fn editor_body(raw: &str) -> &str {
     raw.strip_prefix("\r\n")
         .or_else(|| raw.strip_prefix('\n'))
         .unwrap_or(raw)
+}
+
+/// The verbatim frontmatter slice of a document — fences included, byte-exact,
+/// "" when there is none. parse_document already knows where the body starts;
+/// the block is simply everything before it. Nothing is parsed or reformatted
+/// on the way out (the raw-metadata view renders exactly what's on disk).
+pub fn raw_frontmatter_block(text: &str) -> &str {
+    let (fm, body) = parse_document(text);
+    if fm.is_none() {
+        return "";
+    }
+    &text[..text.len() - body.len()]
+}
+
+/// The reserved PROVENANCE keys the raw-metadata editor must never change —
+/// contract v3.7: id/owner/created are not user-editable. Everything else in
+/// the typed block (updated/pinned/locked/secure/shelf/tags/…) lands as typed.
+const RAW_IMMUTABLE_KEYS: [&str; 3] = ["id", "created", "owner"];
+
+/// Rebuild a document from a user-typed raw frontmatter block (the "Show file
+/// metadata" editor). The submitted text is taken VERBATIM — line order,
+/// spacing, everything — with exactly one correction: the reserved provenance
+/// lines (id/owner/created) must match the ORIGINAL file exactly (changed →
+/// restored, dropped → re-inserted at the top, invented → removed). The body
+/// is byte-exact from disk; only the block between the fences is rebuilt.
+/// Tolerant input: with or without the `---` fences, surrounding blank noise
+/// trimmed. A bare `---` line INSIDE the block is refused — it would silently
+/// truncate the frontmatter on the next parse.
+pub fn merge_raw_frontmatter(original: &str, submitted: &str) -> Result<String, String> {
+    let (_, body) = parse_document(original);
+    let orig_block = raw_frontmatter_block(original);
+    // the original block's lines, fences stripped, VERBATIM (never re-serialized
+    // through Frontmatter — a hand-formatted `id:  x` line survives untouched)
+    let orig_lines: Vec<&str> = if orig_block.is_empty() {
+        Vec::new()
+    } else {
+        let mut v: Vec<&str> = orig_block.lines().collect();
+        v.remove(0); // opening ---
+        v.pop(); // closing ---
+        v
+    };
+
+    // unfence the submitted text (the UI shows the fences; a bare key list is
+    // accepted too). Blank lines INSIDE the block are kept verbatim.
+    let mut lines: Vec<String> = submitted.lines().map(str::to_string).collect();
+    while lines.first().is_some_and(|l| l.trim().is_empty()) {
+        lines.remove(0);
+    }
+    while lines.last().is_some_and(|l| l.trim().is_empty()) {
+        lines.pop();
+    }
+    if lines.first().is_some_and(|l| l.trim() == "---") {
+        lines.remove(0);
+        if lines.last().is_some_and(|l| l.trim() == "---") {
+            lines.pop();
+        }
+    }
+    if lines.iter().any(|l| l.trim() == "---") {
+        return Err("the metadata block can't contain a bare --- line".into());
+    }
+
+    // reserved provenance: the output's id/owner/created lines must be EXACTLY
+    // the original's — present ↔ present (same bytes), absent ↔ absent.
+    // Reserved-key match mirrors parse_fields EXACTLY (UNtrimmed key): an
+    // INDENTED `  created:` under a nested map is a foreign line to the codec,
+    // so it must be foreign here too — field_key's trim misclassified it as
+    // the top-level reserved line and deleted/replaced it (2026-07-01 review).
+    let is_key = |line: &str, key: &str| line.split_once(':').is_some_and(|(k, _)| k == key);
+    let mut restore: Vec<&str> = Vec::new();
+    for key in RAW_IMMUTABLE_KEYS {
+        let orig = orig_lines.iter().copied().find(|l| is_key(l, key));
+        let typed = lines.iter().position(|l| is_key(l, key));
+        match (orig, typed) {
+            (Some(o), Some(i)) => {
+                lines[i] = o.to_string();
+                // duplicates beyond the first are dropped (keep the restored one)
+                let mut seen = 0usize;
+                lines.retain(|l| {
+                    if is_key(l, key) {
+                        seen += 1;
+                        seen == 1
+                    } else {
+                        true
+                    }
+                });
+            }
+            // dropped → collect, re-inserted at the top in id/created/owner order
+            (Some(o), None) => restore.push(o),
+            // invented → a user can't mint provenance; the line goes
+            (None, Some(_)) => lines.retain(|l| !is_key(l, key)),
+            (None, None) => {}
+        }
+    }
+    for line in restore.into_iter().rev() {
+        lines.insert(0, line.to_string());
+    }
+
+    // an emptied block: with nothing reserved to restore the fences go too
+    if lines.is_empty() {
+        return Ok(if orig_block.is_empty() { original.to_string() } else { body.to_string() });
+    }
+    let mut out = String::with_capacity(body.len() + submitted.len() + 16);
+    out.push_str("---\n");
+    for l in &lines {
+        out.push_str(l);
+        out.push('\n');
+    }
+    out.push_str("---\n");
+    out.push_str(body);
+    Ok(out)
 }
 
 // ─── shelf-projection (v3.5) ─────────────────────────────────────────────────
@@ -1085,6 +1203,12 @@ impl SuppressSet {
 /// Temp file in the SAME directory + rename: a reader never sees a truncated
 /// note, and a crash mid-write leaves the old file intact.
 fn atomic_write(path: &Path, contents: &str) -> Result<(), String> {
+    atomic_write_bytes(path, contents.as_bytes())
+}
+
+/// The bytes flavor — the spreadsheet editor saves a binary (.xlsx) through the
+/// same tempfile+rename discipline, so a crash mid-save never corrupts the workbook.
+fn atomic_write_bytes(path: &Path, contents: &[u8]) -> Result<(), String> {
     let dir = path
         .parent()
         .ok_or_else(|| format!("no parent dir for {}", path.display()))?;
@@ -1092,7 +1216,7 @@ fn atomic_write(path: &Path, contents: &str) -> Result<(), String> {
         .prefix(".rotli-write-")
         .tempfile_in(dir)
         .map_err(|e| format!("temp file in {}: {e}", dir.display()))?;
-    tmp.write_all(contents.as_bytes())
+    tmp.write_all(contents)
         .map_err(|e| format!("write {}: {e}", path.display()))?;
     tmp.as_file()
         .sync_all()
@@ -1319,9 +1443,73 @@ impl CorpusStore {
         Ok(rel)
     }
 
+    /// Size + user-lane writability of a surfaced file — the sheet editor decides
+    /// read-only vs editable UP FRONT (a memex/linked-library file must never offer
+    /// a Save it would refuse; a file over the read cap must never be written back
+    /// from a truncated parse).
+    pub fn file_stat(&self, rel: &str) -> Result<FileStat, String> {
+        validate_rel(rel)?;
+        let abs = self.abs(rel);
+        let meta = fs::metadata(&abs).map_err(|e| format!("stat {rel}: {e}"))?;
+        if !meta.is_file() {
+            return Err(format!("not a file: {rel}"));
+        }
+        Ok(FileStat { len: meta.len(), writable: self.writable(rel).is_ok() })
+    }
+
+    /// Overwrite a surfaced FILE's raw bytes — the spreadsheet editor's SAVE lane.
+    /// Same per-store `writable()` gate as every user write (contract v3.7: a
+    /// memex's storage/ is read-only here, so a vault workbook refuses cleanly).
+    /// Overwrite ONLY — a missing file is an error, never a create (creation goes
+    /// through import/new_file_bytes). `bak`: copy the original to `<name>.bak`
+    /// once, before the FIRST rotli save — exceljs rewrites the whole workbook and
+    /// can drop exotic features (pivots, charts), so the pre-rotli bytes survive.
+    pub fn write_file_bytes(&mut self, rel: &str, bytes: &[u8], bak: bool) -> Result<(), String> {
+        validate_rel(rel)?;
+        self.writable(rel)?;
+        let abs = self.abs(rel);
+        if !abs.is_file() {
+            return Err(format!("not a file: {rel}"));
+        }
+        if bak {
+            let bak_abs = abs.with_file_name(format!(
+                "{}.bak",
+                abs.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+            ));
+            if !bak_abs.exists() {
+                fs::copy(&abs, &bak_abs).map_err(|e| format!("backup {rel}: {e}"))?;
+            }
+        }
+        self.suppress.mark(&abs);
+        atomic_write_bytes(&abs, bytes)
+    }
+
+    /// Create a NEW file from raw bytes in `folder` — the csv → xlsx convert
+    /// writes the sibling workbook here. Collision-safe via free_name (never
+    /// clobbers); same writable() gate. Returns the new file's rel path.
+    pub fn new_file_bytes(&mut self, folder: &str, name: &str, bytes: &[u8]) -> Result<String, String> {
+        if !folder.is_empty() {
+            validate_rel(folder)?;
+        }
+        validate_component(name)?;
+        let rel = self.free_name(folder, name, None);
+        self.writable(&rel)?;
+        if !folder.is_empty() {
+            fs::create_dir_all(self.abs(folder)).map_err(|e| format!("create folder {folder}: {e}"))?;
+        }
+        let abs = self.abs(&rel);
+        self.suppress.mark(&abs);
+        atomic_write_bytes(&abs, bytes)?;
+        Ok(rel)
+    }
+
     /// Read a note's frontmatter for the metadata panel — the typed facts plus the
     /// lock state and every foreign line (shelf/reach/area/summary/tags/links/…).
-    fn read_frontmatter(&self, rel: &str) -> Result<FrontmatterView, String> {
+    /// Takes a wire id OR a rel path (resolve_note_rel): a `.md` note travels the
+    /// wire as its frontmatter ULID, and reading "<root>/<ULID>" off disk was the
+    /// metadata panel's "No such file or directory" (Seth, 2026-07-01).
+    fn read_frontmatter(&mut self, id_or_rel: &str) -> Result<FrontmatterView, String> {
+        let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let (fm_opt, body) = parse_document(&text);
@@ -1363,7 +1551,9 @@ impl CorpusStore {
 
     /// Toggle the per-note AI lock — a `locked: true` frontmatter line the eventual
     /// AI filer must respect. Preserves the body + every other frontmatter line.
-    fn set_locked(&self, rel: &str, locked: bool) -> Result<(), String> {
+    /// Takes a wire id OR a rel path (resolve_note_rel — same bridge as the filer lane).
+    fn set_locked(&mut self, id_or_rel: &str, locked: bool) -> Result<(), String> {
+        let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
@@ -1377,8 +1567,9 @@ impl CorpusStore {
 
     /// Set (or, with an empty value, remove) a foreign frontmatter field — the
     /// metadata panel's editor. Reserved keys are off-limits. Preserves the body
-    /// and every other frontmatter line.
-    fn set_field(&self, rel: &str, key: &str, value: &str) -> Result<(), String> {
+    /// and every other frontmatter line. Takes a wire id OR a rel path
+    /// (resolve_note_rel — same bridge as the filer lane).
+    fn set_field(&mut self, id_or_rel: &str, key: &str, value: &str) -> Result<(), String> {
         let key = key.trim();
         if key.is_empty() {
             return Err("a field needs a name".into());
@@ -1386,6 +1577,7 @@ impl CorpusStore {
         if RESERVED_KEYS.contains(&key) {
             return Err(format!("`{key}` is managed by rotli, not editable here"));
         }
+        let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
@@ -1396,6 +1588,50 @@ impl CorpusStore {
             fm.foreign.push(format!("{key}: {value}"));
         }
         atomic_write(&path, &compose_document(&fm, body))
+    }
+
+    /// The note's frontmatter as RAW TEXT (fences included), byte-exact from
+    /// disk; "" when the note has none. The "Show file metadata" view renders
+    /// this above the body — the metadata IS the top of the file, not a form.
+    fn raw_frontmatter(&mut self, id_or_rel: &str) -> Result<String, String> {
+        let rel = self.resolve_note_rel(id_or_rel)?;
+        let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
+        Ok(raw_frontmatter_block(&text).to_string())
+    }
+
+    /// Write back a user-edited raw frontmatter block. merge_raw_frontmatter
+    /// keeps the typed lines verbatim but restores the reserved provenance keys
+    /// (id/owner/created) from the file; the body is untouched and `updated` is
+    /// NOT bumped (a metadata edit never reorders the list). Gated by the same
+    /// user-writability as every editor save — curated wiki/** refuses (v3.7).
+    /// Because `secure:` can be typed here, the gitignore stays in step the same
+    /// way set_secure keeps it (secure ⇒ gitignored, cleared ⇒ un-ignored).
+    fn write_frontmatter_raw(&mut self, id_or_rel: &str, block: &str) -> Result<(), String> {
+        let rel = self.resolve_note_rel(id_or_rel)?;
+        self.writable(&rel)?;
+        let path = self.abs(&rel);
+        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let out = merge_raw_frontmatter(&text, block)?;
+        if out == text {
+            return Ok(()); // byte-identical — no write, no watcher echo
+        }
+        let was_secure = |t: &str| {
+            parse_document(t)
+                .0
+                .unwrap_or_default()
+                .foreign
+                .iter()
+                .any(|l| secure_field(l) == Some(true))
+        };
+        let (before, after) = (was_secure(&text), was_secure(&out));
+        self.suppress.mark(&path);
+        atomic_write(&path, &out)?;
+        if after && !before {
+            self.gitignore_add(&rel)?;
+        } else if before && !after {
+            self.gitignore_remove(&rel)?;
+        }
+        Ok(())
     }
 
     /// Append a path to the corpus `.gitignore` (idempotent) — a secure note must
@@ -1474,7 +1710,10 @@ impl CorpusStore {
 
     /// Toggle the per-note SECURE flag. When set, the note's path is gitignored so a
     /// pushed vault never leaks it. Preserves the body + every other frontmatter line.
-    fn set_secure(&self, rel: &str, secure: bool) -> Result<(), String> {
+    /// Takes a wire id OR a rel path (resolve_note_rel) — the gitignore line must be
+    /// the note's PATH, never its ULID.
+    fn set_secure(&mut self, id_or_rel: &str, secure: bool) -> Result<(), String> {
+        let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
@@ -1494,7 +1733,9 @@ impl CorpusStore {
 
     /// Read a note FOR an AI model. A SECURE note (secrets detected) is refused to a
     /// REMOTE model — its content must never leave the device; a local model is fine.
-    fn read_for_ai(&self, rel: &str, model_is_local: bool) -> Result<String, String> {
+    /// Takes a wire id OR a rel path (resolve_note_rel — same bridge as the filer lane).
+    fn read_for_ai(&mut self, id_or_rel: &str, model_is_local: bool) -> Result<String, String> {
+        let rel = &self.resolve_note_rel(id_or_rel)?;
         let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
         let secure = parse_document(&text)
             .0
@@ -1629,7 +1870,12 @@ impl CorpusStore {
     /// the index. Every filing entry point resolves through here so callers
     /// never have to know which shape they hold (the v0.17 deferral).
     pub fn resolve_note_rel(&mut self, id_or_rel: &str) -> Result<String, String> {
-        if self.abs(id_or_rel).is_file() {
+        // the passthrough must validate: this bridge fronts WRITE lanes
+        // (set_field / set_locked / write_frontmatter_raw), and in LegacyRotli
+        // writable() allows everything — a raw "../…" from the webview must
+        // never reach disk outside the root. ULIDs are bare alphanumerics, so
+        // the id path is unaffected (an invalid rel just falls to the index).
+        if validate_rel(id_or_rel).is_ok() && self.abs(id_or_rel).is_file() {
             return Ok(id_or_rel.to_string());
         }
         self.path_of(id_or_rel)
@@ -2774,6 +3020,117 @@ pub fn corpus_import_file(
     Ok(compose_root_id(&root_id, &rel))
 }
 
+/// Size + user-lane writability of a surfaced file. The sheet editor probes this
+/// before offering edit mode: a read-only root (a memex/linked-library) or a file
+/// over the read cap stays a viewer.
+#[tauri::command]
+pub fn corpus_file_stat(state: tauri::State<'_, CorpusState>, id: String) -> Result<FileStat, String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.file_stat(&rel))
+}
+
+/// Save a surfaced FILE's bytes back to disk (base64 in) — the spreadsheet
+/// editor's explicit Save. Gated by the same writable() lane as every user write.
+#[tauri::command]
+pub fn corpus_write_file_bytes(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    base64: String,
+    bak: Option<bool>,
+) -> Result<(), String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64.as_bytes())
+        .map_err(|e| format!("bad file payload: {e}"))?;
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.write_file_bytes(&rel, &bytes, bak.unwrap_or(false)))
+}
+
+/// Create a NEW file from base64 bytes in `folder_id` (collision-safe) — the
+/// csv → xlsx convert. Returns the new file's wire id.
+#[tauri::command]
+pub fn corpus_new_file_bytes(
+    state: tauri::State<'_, CorpusState>,
+    folder_id: String,
+    name: String,
+    base64: String,
+) -> Result<String, String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64.as_bytes())
+        .map_err(|e| format!("bad file payload: {e}"))?;
+    let (root, rel) = split_root_id(&folder_id);
+    let new_rel = state.route(&root, |s| s.new_file_bytes(&rel, &name, &bytes))?;
+    Ok(compose_root_id(&root, &new_rel))
+}
+
+/// Reveal a surfaced file in Finder (`open -R`) — the file surface's dropdown.
+#[tauri::command]
+pub fn corpus_reveal_file(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
+    if !abs.is_file() {
+        return Err(format!("not a file: {}", abs.display()));
+    }
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open")
+        .arg("-R")
+        .arg(&abs)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = abs;
+    Ok(())
+}
+
+/// The FIXED allowlist behind "Open with …" — never a caller-supplied binary
+/// name (`open -a` runs whatever it's handed). TextEdit/Preview live under
+/// /System/Applications on modern macOS, hence the two roots.
+const OPEN_WITH_APPS: &[&str] = &["Numbers", "Microsoft Excel", "TextEdit", "Preview"];
+
+/// Which of the known "Open with …" apps are actually installed — a cheap
+/// exists-check so the dropdown only offers what's there.
+#[tauri::command]
+pub fn corpus_open_with_apps() -> Vec<String> {
+    OPEN_WITH_APPS
+        .iter()
+        .filter(|name| {
+            ["/Applications", "/System/Applications"]
+                .iter()
+                .any(|dir| Path::new(dir).join(format!("{name}.app")).is_dir())
+        })
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Open a surfaced file WITH a specific app (`open -a`). The app must be on the
+/// allowlist above — the id routes like every other file command.
+#[tauri::command]
+pub fn corpus_open_file_with(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    app: String,
+) -> Result<(), String> {
+    if !OPEN_WITH_APPS.contains(&app.as_str()) {
+        return Err(format!("unknown app: {app}"));
+    }
+    let (root, rel) = split_root_id(&id);
+    let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
+    if !abs.is_file() {
+        return Err(format!("not a file: {}", abs.display()));
+    }
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open")
+        .arg("-a")
+        .arg(&app)
+        .arg(&abs)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = (abs, app);
+    Ok(())
+}
+
 /// Resolve a corpus-relative path (e.g. a `storage:` asset) to its ABSOLUTE path,
 /// so the frontend can convertFileSrc() it into an asset-protocol <img> URL.
 #[tauri::command]
@@ -2816,6 +3173,29 @@ pub fn corpus_set_field(
 ) -> Result<(), String> {
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| s.set_field(&rel, &key, &value))
+}
+
+/// The note's frontmatter as RAW TEXT (fences included), verbatim from disk —
+/// the "Show file metadata" view renders this above the body. "" when none.
+#[tauri::command]
+pub fn corpus_raw_frontmatter(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+) -> Result<String, String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.raw_frontmatter(&rel))
+}
+
+/// Write back a user-edited raw frontmatter block. Rust restores the reserved
+/// provenance keys (id/owner/created) and refuses notes the user can't write.
+#[tauri::command]
+pub fn corpus_write_frontmatter_raw(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    block: String,
+) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.write_frontmatter_raw(&rel, &block))
 }
 
 /// FILER (contract v3.7): set an AI-owned metadata field (area/summary/tags/links/
@@ -3235,6 +3615,59 @@ mod tests {
         assert!(src.is_file());
     }
 
+    #[test]
+    fn write_file_bytes_overwrites_with_one_time_bak() {
+        let (_dir, mut store) = bare();
+        fs::create_dir_all(store.root().join("Storage")).unwrap();
+        fs::write(store.root().join("Storage/book.xlsx"), b"original-bytes").unwrap();
+
+        // a missing file is an error — the save lane never creates
+        assert!(store.write_file_bytes("Storage/nope.xlsx", b"x", false).is_err());
+
+        store.write_file_bytes("Storage/book.xlsx", b"first-save", true).unwrap();
+        assert_eq!(fs::read(store.root().join("Storage/book.xlsx")).unwrap(), b"first-save");
+        // .bak holds the PRE-rotli original…
+        assert_eq!(fs::read(store.root().join("Storage/book.xlsx.bak")).unwrap(), b"original-bytes");
+        // …and a second save never touches it (one-time backup)
+        store.write_file_bytes("Storage/book.xlsx", b"second-save", true).unwrap();
+        assert_eq!(fs::read(store.root().join("Storage/book.xlsx.bak")).unwrap(), b"original-bytes");
+        assert_eq!(fs::read(store.root().join("Storage/book.xlsx")).unwrap(), b"second-save");
+    }
+
+    #[test]
+    fn file_bytes_lane_respects_memex_read_only() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("storage")).unwrap();
+        fs::write(root.join("storage/book.xlsx"), b"vault-bytes").unwrap();
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+
+        // the probe says read-only, the write refuses, the bytes survive untouched
+        let stat = store.file_stat("storage/book.xlsx").unwrap();
+        assert_eq!(stat.len, 11);
+        assert!(!stat.writable);
+        assert!(store.write_file_bytes("storage/book.xlsx", b"edited", true).is_err());
+        assert_eq!(fs::read(root.join("storage/book.xlsx")).unwrap(), b"vault-bytes");
+        assert!(!root.join("storage/book.xlsx.bak").exists(), "a refused save must not leave a .bak");
+        // new files refuse too (the csv→xlsx convert can't target the vault)
+        assert!(store.new_file_bytes("storage", "new.xlsx", b"x").is_err());
+    }
+
+    #[test]
+    fn new_file_bytes_is_collision_safe() {
+        let (_dir, mut store) = bare();
+        let a = store.new_file_bytes("Storage", "sheet.xlsx", b"one").unwrap();
+        assert_eq!(a, "Storage/sheet.xlsx");
+        let b = store.new_file_bytes("Storage", "sheet.xlsx", b"two").unwrap();
+        assert_eq!(b, "Storage/sheet-2.xlsx");
+        assert_eq!(fs::read(store.root().join(&a)).unwrap(), b"one");
+        assert_eq!(fs::read(store.root().join(&b)).unwrap(), b"two");
+        // stat sees a legacy corpus as writable
+        assert!(store.file_stat(&a).unwrap().writable);
+    }
+
     /// Fresh corpus (first run happens: Inbox + welcome note exist).
     fn fresh() -> (TempDir, CorpusStore) {
         let dir = TempDir::new().unwrap();
@@ -3357,7 +3790,148 @@ mod tests {
         assert!(on_disk.ends_with("# Kept\n\nEdited.\n"));
     }
 
-    // ── atomic writes ──
+    // ── raw frontmatter (the "Show file metadata" editor) ──
+
+    #[test]
+    fn raw_frontmatter_round_trips_verbatim() {
+        // hand-formatted lines (odd spacing, nested yaml, a comment) survive a
+        // read → write of the SAME block byte-for-byte — nothing reformats
+        let text = "---\nid:  01RAW0000000000000000000A\ncreated: 2026-06-12T10:00:00Z\nowner: seth\ntags: [a,  b]\nmeta:\n  source: web\n# a comment\n---\n\n# A note\n\nBody stays byte-exact.\n";
+        let block = raw_frontmatter_block(text);
+        assert_eq!(block, "---\nid:  01RAW0000000000000000000A\ncreated: 2026-06-12T10:00:00Z\nowner: seth\ntags: [a,  b]\nmeta:\n  source: web\n# a comment\n---\n");
+        assert_eq!(merge_raw_frontmatter(text, block).unwrap(), text);
+        // no frontmatter → empty block; an empty submission leaves the file alone
+        assert_eq!(raw_frontmatter_block("# Bare\n"), "");
+        assert_eq!(merge_raw_frontmatter("# Bare\n", "").unwrap(), "# Bare\n");
+        // a trailing-newline / bare (fence-less) submission lands identically
+        let bare = "id:  01RAW0000000000000000000A\ncreated: 2026-06-12T10:00:00Z\nowner: seth\ntags: [a,  b]\nmeta:\n  source: web\n# a comment";
+        assert_eq!(merge_raw_frontmatter(text, bare).unwrap(), text);
+    }
+
+    #[test]
+    fn raw_frontmatter_restores_reserved_keeps_typed() {
+        let text = "---\nid: 01RAW0000000000000000000B\ncreated: 2026-06-12T10:00:00Z\nupdated: 2026-06-12T11:00:00Z\npinned: false\nowner: breve\nshelf: Inbox\n---\n\nBody.\n";
+        // the user retypes the id, drops created + owner, flips pinned, adds
+        // locked/secure/tags — provenance comes back, everything else as typed
+        let submitted = "---\nid: HACKED\npinned: true\nlocked: true\nsecure: true\ntags: [x]\nshelf: Projects\n---\n";
+        let out = merge_raw_frontmatter(text, submitted).unwrap();
+        let (fm, body) = parse_document(&out);
+        let fm = fm.unwrap();
+        assert_eq!(body, "\nBody.\n", "body must be byte-exact from disk");
+        assert_eq!(fm.id.as_deref(), Some("01RAW0000000000000000000B"), "id restored");
+        assert_eq!(fm.created.as_deref(), Some("2026-06-12T10:00:00Z"), "created restored");
+        assert!(out.contains("owner: breve"), "dropped owner restored:\n{out}");
+        assert_eq!(fm.pinned, Some(true), "pinned lands as typed");
+        assert!(out.contains("locked: true") && out.contains("secure: true"));
+        assert!(out.contains("shelf: Projects") && !out.contains("shelf: Inbox"));
+        // updated was dropped by the user — NOT restored (only id/owner/created are)
+        assert!(!out.contains("updated:"));
+
+        // a user can't MINT provenance: an invented owner on a note without one goes
+        let plain = "---\nid: C\ncreated: 2026-06-12T10:00:00Z\nupdated: 2026-06-12T10:00:00Z\npinned: false\n---\n\nP.\n";
+        let out = merge_raw_frontmatter(plain, "---\nid: C\ncreated: 2026-06-12T10:00:00Z\nowner: me\n---\n").unwrap();
+        assert!(!out.contains("owner:"), "invented owner must be dropped:\n{out}");
+
+        // a stray fence line inside the block would truncate it on the next parse
+        assert!(merge_raw_frontmatter(plain, "---\nid: C\n---\nsneaky: body\n---\n").is_err());
+    }
+
+    #[test]
+    fn raw_frontmatter_store_write_is_gated_and_verbatim() {
+        // LegacyRotli end-to-end: read the raw block, write it back → unchanged;
+        // write a tampered block → provenance restored, typed keys land
+        let (_dir, mut store) = bare();
+        let root = store.root().to_path_buf();
+        let original = "---\nid: 01RAWSTORE000000000000000A\ncreated: 2026-06-01T00:00:00Z\nupdated: 2026-06-01T00:00:00Z\npinned: false\n---\n\n# Raw\n\nBody.\n";
+        fs::write(root.join("raw.md"), original).unwrap();
+        store.list().unwrap();
+        let id = "01RAWSTORE000000000000000A";
+        let block = store.raw_frontmatter(id).unwrap();
+        store.write_frontmatter_raw(id, &block).unwrap();
+        let rel = store.index.get(id).unwrap().clone();
+        assert_eq!(fs::read_to_string(store.root().join(&rel)).unwrap(), original);
+        store
+            .write_frontmatter_raw(id, "---\nid: FORGED\ncreated: yesterday\ntags: [kept]\n---\n")
+            .unwrap();
+        let on_disk = fs::read_to_string(store.root().join(&rel)).unwrap();
+        assert!(on_disk.contains("id: 01RAWSTORE000000000000000A"), "id restored:\n{on_disk}");
+        assert!(on_disk.contains("created: 2026-06-01T00:00:00Z"), "created restored");
+        assert!(on_disk.contains("tags: [kept]"), "typed key lands");
+        assert!(on_disk.ends_with("\n# Raw\n\nBody.\n"), "body byte-exact:\n{on_disk}");
+
+        // Memex: the curated brain refuses (the USER gate — same as every save);
+        // rotli's own chats/ surface accepts
+        let dir = TempDir::new().unwrap();
+        let brain = dir.path().join("brain");
+        seed_memex(&brain);
+        let mut mx = CorpusStore::open(brain).unwrap();
+        mx.os_trash = false;
+        assert!(mx.write_frontmatter_raw("wiki/note.md", "---\ntags: [x]\n---\n").is_err());
+        mx.write_frontmatter_raw("chats/welcome.md", "---\ntags: [x]\n---\n").unwrap();
+        assert_eq!(mx.raw_frontmatter("chats/welcome.md").unwrap(), "---\ntags: [x]\n---\n");
+    }
+
+    #[test]
+    fn raw_frontmatter_nested_indented_reserved_lines_stay_foreign() {
+        // an INDENTED `  created:` / `  id:` inside a nested map is NOT the
+        // reserved top-level line (parse_fields matches UNtrimmed keys) — the
+        // merge must keep it verbatim, never dedupe/replace it (2026-07-01)
+        let text = "---\nid: 01NEST000000000000000000A\ncreated: 2026-06-12T10:00:00Z\nsource:\n  created: 2020-01-01\n  id: web-123\n  url: https://x\n---\n\nBody.\n";
+        let block = raw_frontmatter_block(text);
+        // a same-block commit is byte-exact (the nested lines survive the dedupe)
+        assert_eq!(merge_raw_frontmatter(text, block).unwrap(), text);
+        // adding a key keeps the nested map intact
+        let typed = "---\nid: 01NEST000000000000000000A\ncreated: 2026-06-12T10:00:00Z\nsource:\n  created: 2020-01-01\n  id: web-123\n  url: https://x\ntags: [x]\n---\n";
+        let out = merge_raw_frontmatter(text, typed).unwrap();
+        assert!(out.contains("\n  created: 2020-01-01\n"), "nested created kept:\n{out}");
+        assert!(out.contains("\n  id: web-123\n"), "nested id kept:\n{out}");
+        assert!(out.contains("tags: [x]"));
+        // dropping the TOP-LEVEL provenance restores it up top — the nested
+        // lines are not mistaken for it (they used to satisfy the match)
+        let dropped = "source:\n  created: 2020-01-01\n  id: web-123\n  url: https://x\n";
+        let out = merge_raw_frontmatter(text, dropped).unwrap();
+        assert!(
+            out.starts_with("---\nid: 01NEST000000000000000000A\ncreated: 2026-06-12T10:00:00Z\n"),
+            "top-level provenance restored first:\n{out}"
+        );
+        assert!(out.contains("\n  id: web-123\n") && out.contains("\n  created: 2020-01-01\n"));
+    }
+
+    #[test]
+    fn raw_frontmatter_secure_keeps_gitignore_in_step() {
+        // the doc contract: `secure:` typed through the raw lane keeps the
+        // gitignore in step the same way set_secure does — both directions
+        let (_dir, mut store) = bare();
+        let root = store.root().to_path_buf();
+        let original = "---\nid: 01RAWSEC0000000000000000A\ncreated: 2026-06-01T00:00:00Z\nupdated: 2026-06-01T00:00:00Z\npinned: false\n---\n\nPlain.\n";
+        fs::write(root.join("sec.md"), original).unwrap();
+        store.list().unwrap();
+        let id = "01RAWSEC0000000000000000A";
+        let rel = store.index.get(id).unwrap().clone();
+        store
+            .write_frontmatter_raw(id, "---\nid: x\ncreated: y\nsecure: true\n---\n")
+            .unwrap();
+        let ignored = fs::read_to_string(root.join(".gitignore")).unwrap();
+        assert!(ignored.lines().any(|l| l.trim() == rel), "secure via raw lane must gitignore: {ignored:?}");
+        // clearing it un-ignores (the set_secure symmetry)
+        store.write_frontmatter_raw(id, "---\n---\n").unwrap();
+        let ignored = fs::read_to_string(root.join(".gitignore")).unwrap();
+        assert!(!ignored.lines().any(|l| l.trim() == rel), "cleared secure must un-ignore: {ignored:?}");
+        assert!(!fs::read_to_string(root.join(&rel)).unwrap().contains("secure:"));
+    }
+
+    #[test]
+    fn resolve_note_rel_refuses_traversal() {
+        // the passthrough fronts WRITE lanes (write_frontmatter_raw/set_field)
+        // and LegacyRotli's writable() allows everything — a "../…" that
+        // resolves to a real file outside the root must fail, not write
+        let (dir, mut store) = bare();
+        fs::write(dir.path().join("outside.md"), "---\n---\nX\n").unwrap();
+        assert!(store.abs("../outside.md").is_file(), "test setup: the escape target exists");
+        assert!(store.resolve_note_rel("../outside.md").is_err());
+        assert!(store.write_frontmatter_raw("../outside.md", "---\npwn: true\n---\n").is_err());
+        assert!(!fs::read_to_string(dir.path().join("outside.md")).unwrap().contains("pwn"));
+    }
 
     #[test]
     fn atomic_write_leaves_no_tmp_and_full_content() {
@@ -3857,6 +4431,37 @@ mod tests {
         let refiled_rel = store.path_of(&note.id).unwrap();
         assert!(store.filer_move(&note.id, "wiki/_inbox").is_ok()); // undo by ULID too
         assert!(!store.abs(&refiled_rel).is_file());
+
+        // the METADATA PANEL's commands take the ULID too (the same bridge):
+        // before this, corpus_frontmatter → read_frontmatter("<ULID>") was a raw
+        // fs read of "<root>/<ULID>" — the panel's "No such file or directory"
+        // (Seth's screenshot, 2026-07-01).
+        let fm = store.read_frontmatter(&note.id).unwrap();
+        assert_eq!(fm.id, note.id);
+        store.set_locked(&note.id, true).unwrap();
+        assert!(store.read_frontmatter(&note.id).unwrap().locked);
+        store.set_locked(&note.id, false).unwrap();
+        store.set_field(&note.id, "topic", "land").unwrap();
+        assert!(store
+            .read_frontmatter(&note.id)
+            .unwrap()
+            .fields
+            .iter()
+            .any(|l| field_key(l) == Some("topic")));
+        // secure by ULID: the gitignore line must be the note's PATH, never the
+        // ULID — and metadata must STILL read (secure only guards REMOTE models).
+        store.set_secure(&note.id, true).unwrap();
+        let staged = store.path_of(&note.id).unwrap();
+        let ignored = fs::read_to_string(store.root.join(".gitignore")).unwrap();
+        assert!(ignored.lines().any(|l| l.trim() == staged));
+        assert!(!ignored.lines().any(|l| l.trim() == note.id));
+        let fm = store.read_frontmatter(&note.id).unwrap();
+        assert!(fm.secure);
+        assert_eq!(fm.id, note.id);
+        // read_for_ai by ULID: a secure note is refused remote, readable locally.
+        assert!(store.read_for_ai(&note.id, false).is_err());
+        assert!(store.read_for_ai(&note.id, true).is_ok());
+        store.set_secure(&note.id, false).unwrap();
 
         // write_index — the one file the filer overwrites wholesale.
         assert!(store.write_index("Projects", "# Projects\n\n- Alazan 84\n").is_ok());

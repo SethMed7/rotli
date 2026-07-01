@@ -5,11 +5,11 @@
 // The sidebar's "m" key opens the SAME menu with a synthetic anchor + a
 // returnFocus that hands the cursor back to the row (the RowMenu unification).
 
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { fileNoteToArea } from "../services/brainFiling";
 import { DEST, isHidden } from "../services/destinations";
 import { useArchiveNote, useBrainAreas, useRestoreNote, useTrashNote } from "../services/hooks";
-import { useNotes } from "../services/hooks";
+import { useMainGcIds } from "../services/hooks";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useMainStore } from "../state/main";
@@ -34,8 +34,12 @@ export function useNoteMenu() {
   const setRenameTarget = useUiStore((s) => s.setRenameTarget);
   const manifest = useMainStore((s) => s.manifest);
   const setTree = useMainStore((s) => s.setTree);
-  const allNotes = useNotes().data ?? [];
-  const liveIds = useMemo(() => new Set(allNotes.map((n) => n.id)), [allNotes]);
+  // GC liveIds MUST be the FULL note index (staged/archived/trashed included):
+  // setTree prunes any Main ref not in this set, so building it from useNotes()
+  // alone made "Add to Main" on a STAGED note a silent no-op — the add and the
+  // GC of it happened in the same call. undefined until every listing loaded
+  // (a still-loading or errored vault must not read as "gone" — skip the GC).
+  const liveIds = useMainGcIds();
   const archive = useArchiveNote();
   const trash = useTrashNote();
   const restore = useRestoreNote();

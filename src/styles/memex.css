@@ -736,6 +736,164 @@
   left: 0;
   user-select: none;
 }
+
+/* ── the EDITABLE sheet (SheetEditor: xlsx/csv on a writable root) ─────────── */
+.file-readonly {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  user-select: none;
+}
+.sheet-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sheet-tool {
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  min-width: 28px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 7px;
+  cursor: pointer;
+}
+.sheet-tool:hover:not(:disabled) {
+  border-color: var(--text-muted);
+}
+.sheet-tool:disabled,
+.sheet-color.off {
+  opacity: 0.45;
+  cursor: default;
+}
+.sheet-tool.on {
+  background: var(--surface-2);
+  border-color: var(--text-muted);
+  font-weight: 700;
+}
+/* the two color wells — the native picker hides behind a small swatch */
+.sheet-color input[type="color"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+.sheet-fill-swatch {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--text-muted);
+  border-radius: 2px;
+  background: var(--tint);
+}
+.sheet-toolbar-space {
+  flex: 1 1 auto;
+}
+.sheet-save-err {
+  font-size: 12px;
+  color: var(--danger, var(--accent-text));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet-dirty {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-text);
+}
+.sheet-save {
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--tint);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+.sheet-save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* the csv "styling needs a workbook" offer */
+.sheet-convert {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.sheet-convert button {
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--tint);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.sheet-convert button.quiet {
+  background: none;
+  color: var(--text-muted);
+}
+/* the grid itself */
+.sheet-grid .sheet-colhead {
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  position: sticky;
+  top: 0;
+}
+.sheet-grid .sheet-colhead.sel {
+  color: var(--text);
+  background: var(--tint);
+}
+.sheet-grid .sheet-cell {
+  cursor: cell;
+  outline: none;
+}
+.sheet-grid .sheet-cell.sel {
+  /* selection ring INSIDE the cell so user bg colors stay visible */
+  box-shadow: inset 0 0 0 2px var(--accent-text);
+}
+.sheet-grid .sheet-cell.fx {
+  font-style: italic;
+}
+.sheet-cell-input {
+  width: 100%;
+  min-width: 60px;
+  border: none;
+  outline: none;
+  background: var(--surface-1, var(--surface-2));
+  color: var(--text);
+  font: inherit;
+  padding: 0;
+}
 .chat-readonly {
   flex: 0 0 auto;
   border-top: 1px solid var(--border);

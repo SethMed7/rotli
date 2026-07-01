@@ -2,13 +2,15 @@
 // often dead in the macOS WKWebView (wry) shell, so the tab strip drags with
 // raw pointer events instead — these fire reliably everywhere. One gesture,
 // owned by the tab you press: past a small threshold it starts a drag, paints a
-// floating ghost, and hit-tests document.elementFromPoint against the panes'
+// floating ghost (the shared lib/dragGhost — the Main tree and Board cards
+// paint the same one), and hit-tests document.elementFromPoint against the panes'
 // data-attributes (a strip → reorder/move at an index; a pane body → a 5-zone
 // split-or-move). The panes store's dropPreview drives the live previews; the
 // commit calls moveTab / detachTab. Cancels on Esc / pointercancel.
 
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { type DropZone, usePanesStore } from "../state/panes";
+import { type DragGhost, createDragGhost } from "./dragGhost";
 
 const THRESHOLD_PX = 5;
 const EDGE_BAND = 0.22; // mirror PaneTree's zoneAt
@@ -45,18 +47,15 @@ export function startTabDrag(
   const startX = event.clientX;
   const startY = event.clientY;
   let dragging = false;
-  let ghost: HTMLDivElement | null = null;
+  let ghost: DragGhost | null = null;
 
   const store = () => usePanesStore.getState();
 
-  const begin = () => {
+  const begin = (x: number, y: number) => {
     dragging = true;
     store().setDraggingTab({ paneId: fromPaneId, tabId });
     document.documentElement.dataset.tabDragging = "true";
-    ghost = document.createElement("div");
-    ghost.className = "tab-ghost";
-    ghost.textContent = label;
-    document.body.appendChild(ghost);
+    ghost = createDragGhost(label, x, y);
   };
 
   const hitTest = (x: number, y: number) => {
@@ -83,12 +82,9 @@ export function startTabDrag(
       if (Math.abs(e.clientX - startX) < THRESHOLD_PX && Math.abs(e.clientY - startY) < THRESHOLD_PX) {
         return;
       }
-      begin();
+      begin(e.clientX, e.clientY);
     }
-    if (ghost) {
-      ghost.style.left = `${e.clientX}px`;
-      ghost.style.top = `${e.clientY}px`;
-    }
+    ghost?.move(e.clientX, e.clientY);
     hitTest(e.clientX, e.clientY);
   };
 
@@ -97,7 +93,7 @@ export function startTabDrag(
     window.removeEventListener("pointerup", onUp);
     window.removeEventListener("pointercancel", cleanup);
     window.removeEventListener("keydown", onKey, true);
-    ghost?.remove();
+    ghost?.destroy();
     ghost = null;
     delete document.documentElement.dataset.tabDragging;
     const s = store();

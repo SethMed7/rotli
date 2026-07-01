@@ -1033,10 +1033,11 @@
 .tab.dragging {
   opacity: 0.5;
 }
-/* the floating drag ghost the pointer drag paints at the cursor (lib/tabDrag);
-   positioned imperatively, offset off the pointer, never intercepts (Seth,
-   2026-06-15) */
-.tab-ghost {
+/* the floating drag ghost EVERY pointer drag paints at the cursor (the shared
+   lib/dragGhost — tabs, Main tree rows, Board cards); positioned imperatively,
+   offset off the pointer, pointer-events:none so the drags' elementFromPoint
+   hit-tests pass straight through it (Seth, 2026-06-15 / one impl 2026-07-01) */
+.drag-ghost {
   position: fixed;
   top: 0;
   left: 0;

@@ -418,6 +418,8 @@ function GeneralPane() {
   const setShowInDock = useUiStore((s) => s.setShowInDock);
   const spellcheck = useUiStore((s) => s.spellcheck);
   const setSpellcheck = useUiStore((s) => s.setSpellcheck);
+  const fileMetadata = useUiStore((s) => s.fileMetadata);
+  const setFileMetadata = useUiStore((s) => s.setFileMetadata);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const [confirmReset, setConfirmReset] = useState(false);
   const quickFolder = useUiStore((s) => s.quickFolder);
@@ -489,6 +491,12 @@ function GeneralPane() {
           title="Check spelling"
           desc="Underline misspelled words in red as you write."
           onChange={() => setSpellcheck(!spellcheck)}
+        />
+        <Toggle
+          on={fileMetadata === "show"}
+          title="Show file metadata"
+          desc="The note's raw frontmatter block at the top of the file, exactly as it sits on disk — editable as plain text."
+          onChange={() => setFileMetadata(fileMetadata === "show" ? "hide" : "show")}
         />
       </div>
 

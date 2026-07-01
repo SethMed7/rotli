@@ -1,6 +1,7 @@
 // Spreadsheet parsing for the in-app viewer + the chat's read_file — SheetJS
-// (Apache-2.0) reads .xlsx/.xls/.ods AND .csv/.tsv. Read-only: we render the
-// cells as a table and CSV-ify for the model; rotli never writes the workbook.
+// (Apache-2.0) reads .xlsx/.xls/.ods AND .csv/.tsv. This module stays the
+// READ path (viewer table + CSV-ify for the model); the EDIT/SAVE path lives
+// in sheetEdit.ts on exceljs (MIT), because SheetJS CE can't write styles.
 
 import * as XLSX from "xlsx";
 
@@ -34,6 +35,67 @@ export function parseWorkbook(
   });
 }
 
+/** Parse CSV text EXACTLY — the sheet EDITOR's load path. Unlike parseWorkbook
+ * this must round-trip byte-faithfully through csvTextFromRows: every field
+ * stays the typed string ("007" and a 16+-digit card number survive — SheetJS
+ * coercion rewrote them on save, corrupting UNTOUCHED cells), blank rows are
+ * kept (a blank line is [""] and serializes back to a blank line — SheetJS
+ * padded them to ",,"), and NOTHING is sliced — the caller refuses oversized
+ * sheets instead of silently truncating (a cut grid must never save). A plain
+ * RFC-4180 hand parser, NOT SheetJS: full control is the point here. The only
+ * normalizations Save applies are CRLF → LF, minimal re-quoting, and a final
+ * trailing newline — the one-time .bak keeps the pre-rotli bytes. */
+export function parseCsvExact(csv: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  const endField = () => {
+    row.push(field);
+    field = "";
+  };
+  const endRow = () => {
+    endField();
+    rows.push(row);
+    row = [];
+  };
+  let i = 0;
+  while (i < csv.length) {
+    const ch = csv.charAt(i);
+    if (quoted) {
+      if (ch === '"') {
+        if (csv.charAt(i + 1) === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        quoted = false;
+        i += 1;
+        continue;
+      }
+      field += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === '"' && field === "") {
+      quoted = true;
+    } else if (ch === ",") {
+      endField();
+    } else if (ch === "\n") {
+      endRow();
+    } else if (ch === "\r") {
+      endRow();
+      if (csv.charAt(i + 1) === "\n") i += 1;
+    } else {
+      field += ch;
+    }
+    i += 1;
+  }
+  // the final record — but a trailing newline never mints a phantom empty row
+  if (field !== "" || row.length > 0 || quoted) endRow();
+  return rows;
+}
+
 /** A workbook as plain CSV text (sheets separated) — what the chat reads to
  * answer questions about a spreadsheet. */
 export function workbookToCsv(input: { csv: string } | { base64: string }): string {
@@ -43,6 +105,7 @@ export function workbookToCsv(input: { csv: string } | { base64: string }): stri
     .join("\n\n");
 }
 
-function csvCell(s: string): string {
+/** Quote one CSV cell — shared with the sheet editor's csv serializer. */
+export function csvCell(s: string): string {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }

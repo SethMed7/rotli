@@ -10,6 +10,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-07-01
+
+Files you can actually work in, metadata you can actually see, and drags that
+actually move.
+
+### Added
+- **Editable spreadsheets** — `.xlsx` and `.csv` open in an **editable grid** (typed
+  values + bold/text-color/fill styling, multi-sheet) when the file's store is writable;
+  a vault / linked-library / memex-`storage/` sheet keeps the read-only table. Explicit
+  **Save** only (button or ⌘S — a binary rewrite never autosaves on keystrokes); the
+  first save keeps a one-time **`.bak`** of the pre-rotli original beside the file (it
+  shows up in Storage — that's your escape hatch). Unsaved edits survive a tab switch
+  (the dirty session parks in memory until you Save). Formula cells are read-only in v1
+  (styling them still works and never touches the formula). CSV is values-only and loads
+  **exactly** — no type coercion (a `007` code or a 16-digit card number stays text),
+  blank rows kept — with a one-click **convert to .xlsx** sibling when you want styles;
+  `xls`/`xlsm`/`ods`/`tsv` stay the read-only viewer. Files over the 8 MB read cap (or the
+  row/column caps) stay read-only — a truncated read can never be written back.
+- **"Open externally" is a dropdown** — default app · **Reveal in Finder** · installed
+  **"Open with …"** apps (Numbers/Excel/Preview/TextEdit — only what's actually on the
+  machine, allowlist-gated in Rust so no caller-supplied binary ever runs).
+- **Show file metadata** — a new toggle (Settings → General, or the note's metadata panel):
+  the note's **raw frontmatter block** renders at the top of the file — monospaced,
+  editable as plain text, exactly as it sits on disk. Commits ride a guarded lane that
+  restores the reserved `id`/`owner`/`created` keys and refuses read-only notes; the
+  metadata panel slims down to the Lock/Secure switches + Brain filing (the old key:value
+  field editor is gone — the file itself is the editor now).
+- **Drag ghosts everywhere** — dragging a Main row (reorder *and* pull-in from the brain)
+  or a Board capture card now paints the same floating label ghost tab-dragging always
+  had: what you drag literally comes with you. One shared implementation
+  (`lib/dragGhost`), pointer-events-transparent so drop hit-testing is untouched — and
+  **Esc / pointercancel now abandons** those drags mid-flight, same as tabs.
+
+### Fixed
+- **Main no longer forgets staged notes** — Main, tab titles, and the row menu now read
+  the FULL note index (staged Captures + Archive + Trash + Vault), not just the default
+  listing. A staged note placed in Main used to vanish from the row *and* get GC'd out of
+  `.rotli/main.json` on the next save (the "seeded Main emptied itself / tab says
+  Untitled" bug), and "Add to Main" on a staged note was a silent no-op. A Main ref now
+  survives anywhere its file actually lives.
+
 ## [0.19.0] — 2026-07-01
 
 Phase 4 of the Main/Brain plan (`docs/design/main-brain-daemon.md`): the organizer daemon.

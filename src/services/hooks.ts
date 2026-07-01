@@ -1,13 +1,15 @@
 // The seam components actually consume: TanStack Query hooks over the typed
 // service. No component touches notesService directly.
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { replaceTitleLine } from "../lib/noteTitle";
 import { type CorpusRoot, corpusListConfig, isTauri, organizerStatus } from "../lib/tauri";
 import { readJournal } from "./brainJournal";
+import { DEST } from "./destinations";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
+import type { NoteSummary } from "../types";
 
 export const keys = {
   folders: ["folders"] as const,
@@ -45,6 +47,74 @@ export function useNotes(folderId?: string) {
     queryKey: keys.notes(folderId),
     queryFn: () => notesService.listNotes(folderId),
   });
+}
+
+/** Every listing that can hold a note — the default view, the roots it hides
+ * (Board = STAGED wiki/_inbox notes, Archive, Trash), the external Vault, AND
+ * every ADDED root ("<rootid>:" — a note there is as real as a vault note: its
+ * Main ref must survive GC, its tab needs a title). Same query keys as
+ * useNotes(), so these are cache reads of the one corpus_list, not extra
+ * fetches. Returns the lists (undefined until each loads) plus `complete` —
+ * true only when the roots list AND every note listing have SUCCEEDED.
+ * combine returns plain arrays (not a Map) so TanStack's structural sharing
+ * keeps the identity stable across renders when nothing changed. */
+function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: boolean } {
+  const roots = useCorpusRoots();
+  // the vault marker ("vault:") is already one of the reserved five — the Set
+  // dedupes it so the vault brain doesn't ride twice
+  const markers = new Set([
+    DEST.vault,
+    ...(roots.data ?? []).filter((r) => r.id !== "default").map((r) => `${r.id}:`),
+  ]);
+  const folderIds: (string | undefined)[] = [
+    undefined,
+    DEST.board,
+    DEST.archive,
+    DEST.trash,
+    ...markers,
+  ];
+  const rootsReady = roots.isSuccess;
+  return useQueries({
+    queries: folderIds.map((folderId) => ({
+      queryKey: keys.notes(folderId),
+      queryFn: () => notesService.listNotes(folderId),
+    })),
+    combine: (results) => ({
+      lists: results.map((r) => r.data),
+      complete: rootsReady && results.every((r) => r.isSuccess),
+    }),
+  });
+}
+
+/** The ONE id → summary index over EVERY note that exists. useNotes() alone is
+ * a VIEW, not the universe; anything that treats it as "all notes" silently
+ * loses staged/vaulted/added-root notes (the bug that GC'd Seth's seeded Main
+ * and labeled his tab "Untitled"). The Main projection, tab titles, and the
+ * row-menu lookup read THIS instead. */
+export function useNoteIndex(): Map<string, NoteSummary> {
+  const { lists } = useNoteUniverse();
+  return useMemo(() => {
+    const index = new Map<string, NoteSummary>();
+    for (const list of lists) for (const n of list ?? []) index.set(n.id, n);
+    return index;
+  }, [lists]);
+}
+
+/** liveIds for the Main-manifest GC — undefined until EVERY listing has
+ * SUCCEEDED (setTree treats undefined as skip-GC). A vault on a disconnected
+ * drive (its query errors forever) or the first render frames (lists still
+ * loading) must never read as "these notes don't exist": passing a shrunken
+ * set pruned live refs out of the COMMITTED .rotli/main.json for good — the
+ * exact silent-GC failure this index fixed for staged notes, re-armed through
+ * a narrower door. Better to skip a GC than to amputate the manifest. */
+export function useMainGcIds(): Set<string> | undefined {
+  const { lists, complete } = useNoteUniverse();
+  return useMemo(() => {
+    if (!complete) return undefined;
+    const ids = new Set<string>();
+    for (const list of lists) for (const n of list ?? []) ids.add(n.id);
+    return ids;
+  }, [lists, complete]);
 }
 
 export function useNote(id: string) {

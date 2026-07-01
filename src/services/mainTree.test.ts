@@ -12,12 +12,12 @@ import {
   removeFromMain,
 } from "./mainTree";
 
-const note = (id: string): NoteSummary =>
+const note = (id: string, folderId = "wiki/projects"): NoteSummary =>
   ({
     id,
     title: id,
     snippet: "",
-    folderId: "wiki/projects",
+    folderId,
     createdAt: 0,
     updatedAt: 0,
     pinned: false,
@@ -59,6 +59,11 @@ describe("buildMainTree", () => {
     expect(r.folders.map((f) => f.id)).toEqual(["main:A", "main:A/B"]);
     expect(r.folders[1]?.parentId).toBe("main:A");
   });
+  test("a STAGED note (hidden Board root) projects like any other — given the full index", () => {
+    const index = new Map([["staged", note("staged", "Board")]]);
+    const r = buildMainTree([{ note: "staged" }], index);
+    expect(r.notes.map((n) => [n.id, n.folderId])).toEqual([["staged", "main:"]]);
+  });
 });
 
 describe("gcManifest", () => {
@@ -69,6 +74,31 @@ describe("gcManifest", () => {
       { folder: "Empty", children: [{ note: "dead2" }] },
     ];
     expect(gcManifest(tree, new Set(["a"]))).toEqual([{ note: "a" }, { folder: "Empty", children: [] }]);
+  });
+
+  // The INPUT convention (the bug that silently emptied Seth's seeded Main):
+  // liveIds MUST be the FULL note-index keys — the default listing PLUS the
+  // hidden roots (staged "Board", "Archive", "Trash"). A note that still exists
+  // ANYWHERE is not an orphan; only a truly-deleted id drops.
+  test("liveIds = the full index keys: staged/archived/trashed refs survive, deleted ids drop", () => {
+    const index = new Map(
+      [
+        note("curated", "wiki/projects"),
+        note("staged", "Board"), // wiki/_inbox projects to the hidden Board root
+        note("archived", "Archive"),
+        note("trashed", "Trash"),
+      ].map((n) => [n.id, n] as const),
+    );
+    const tree: MainNode[] = [
+      { note: "curated" },
+      { note: "staged" },
+      { folder: "Keep", children: [{ note: "archived" }, { note: "trashed" }, { note: "deleted" }] },
+    ];
+    expect(gcManifest(tree, new Set(index.keys()))).toEqual([
+      { note: "curated" },
+      { note: "staged" },
+      { folder: "Keep", children: [{ note: "archived" }, { note: "trashed" }] },
+    ]);
   });
 });
 

@@ -51,7 +51,10 @@ folder.")
   want into Main — with the **⊕** on a note row, or by dragging a note from the brain in.)
   **One file, two views** — edit a note in Main or in the brain, it's the same file. So
   you keep it how *you* want while the AI organizes the brain underneath (it never moves
-  when the AI refiles). Persisted to a committed `.rotli/main.json`. Everything the AI does
+  when the AI refiles). Main points at notes **by id, wherever they live** — a staged
+  capture, an archived note, a vault note — and a row leaves Main only when its file is
+  truly gone (curating a staged note is exactly how it exits the Captures view while its
+  file stays staged on disk). Persisted to a committed `.rotli/main.json`. Everything the AI does
   to the brain is logged + reversible in **Brain → Activity** (the Brain is a collapsible
   destination). Full spec: `docs/design/main-brain-daemon.md`.
 - **Quick access** — a **capped set (≤5)** of your very-most-reached notes, **starred**
@@ -61,7 +64,12 @@ folder.")
   from — and layered on top of — Main's arrangement.
 - **Storage** — your files/images/PDFs. They live in the memex's internal `storage/`
   (binaries, gitignored), referenced from notes by a `storage:` link — never loose in
-  the text tree. A dropped binary routes there.
+  the text tree. A dropped binary routes there. Files open **in-app** (image/AV/pdf/text/
+  spreadsheet views); spreadsheets (`xlsx`/`csv`) are **editable in place** when their
+  store is writable — a plain added folder, not the read-only memex `storage/` or a
+  linked library, which stay a read-only table (the first save keeps a one-time
+  `.bak` of the pre-rotli original beside the file). Every file view carries an **Open
+  externally** dropdown: default app · Reveal in Finder · installed "Open with" apps.
 - **Boards** — Excalidraw canvases, alongside notes.
 
 **Chat** _(front)_ — your AI conversations (`chats/`). The on-device model is an **agentic client**,
@@ -86,6 +94,13 @@ auto-detected → the note is never sent to a *remote* model **nor out to the we
 web tools refuse a query/URL that trips the secret detector) and its file is gitignored;
 a local model may still read it), plus the memex access mode (`local`/`open`/`secure`).
 The AI maintains both organization AND access via metadata.
+
+Metadata is visible **in the note**: flip **Show file metadata** (Settings → General, or
+the metadata panel) and the note's raw frontmatter renders at the top of the file —
+monospaced, editable as plain text, exactly as it sits on disk. The write runs the same
+per-store gate as every user write, and the reserved `id`/`owner`/`created` keys are
+restored if touched — plain text in, contract intact. The metadata panel itself keeps
+the lock/secure switches + Brain filing (its old key:value field editor is gone).
 
 ## What rotli writes (the contract — v3.7, band [3.4, 3.7])
 

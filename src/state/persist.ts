@@ -133,6 +133,8 @@ interface PersistedSettings {
   chatWeb: Record<string, boolean>;
   /** How the Storage destination groups its binaries: Type / Date / Folder. */
   storageGrouping: "type" | "date" | "folder";
+  /** Raw frontmatter at the top of the note (Show file metadata): hide / show. */
+  fileMetadata: "hide" | "show";
   /** The organizer daemon's §4.3 trust rung; the Rust daemon re-reads this file
    * each cycle, so persisting here IS the durable knob. Default: suggest. */
   organizerTrust: OrganizerTrust;
@@ -247,6 +249,8 @@ export function parseSettings(raw: string): PersistedSettings {
       data.storageGrouping === "date" || data.storageGrouping === "folder"
         ? data.storageGrouping
         : "type",
+    // hide is the safe default — metadata never surprises a fresh (or old) config
+    fileMetadata: data.fileMetadata === "show" ? "show" : "hide",
     // an unknown rung (hand-edit, future build) falls to the SAFE default —
     // Suggest never applies anything, so a bad parse can't grant auto-apply
     organizerTrust: asEnum(data.organizerTrust, ORGANIZER_TRUSTS, "suggest"),
@@ -290,6 +294,7 @@ function applySettings(s: PersistedSettings): void {
     chatModelId: s.chatModelId,
     chatWeb: s.chatWeb,
     storageGrouping: s.storageGrouping,
+    fileMetadata: s.fileMetadata,
     organizerTrust: s.organizerTrust,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
@@ -545,6 +550,7 @@ function settingsSnapshot(): string {
     chatModelId: ui.chatModelId,
     chatWeb: ui.chatWeb,
     storageGrouping: ui.storageGrouping,
+    fileMetadata: ui.fileMetadata,
     organizerTrust: ui.organizerTrust,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,

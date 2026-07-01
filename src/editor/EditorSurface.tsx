@@ -4,9 +4,10 @@
 // mode word count, and the bottom-center format bar. The shared model.ts buffer
 // is still the source of truth (debounced save, dirty dot); CmEditor edits it.
 
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { relativeLabel } from "../lib/dateLabels";
-import { useNote } from "../services/hooks";
+import { corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
+import { invalidateNotes, useNote } from "../services/hooks";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
 import { AaPanel } from "./AaPanel";
@@ -74,6 +75,62 @@ export function EditorSurface({
   const style = useNoteStyle(noteId);
   const formatBarVisible = useUiStore((s) => s.formatBarVisible);
   const focusMode = useUiStore((s) => s.focusMode);
+
+  // "Show file metadata" (Seth, 2026-07-01): the raw frontmatter block, verbatim
+  // from disk, rendered as an editable banner above the body. Fetched only while
+  // the setting is on; null keeps the banner out of the CM view entirely.
+  const fileMetadata = useUiStore((s) => s.fileMetadata);
+  const [fmRaw, setFmRaw] = useState<string | null>(null);
+  // commit counter + refusal message: a refused (or no-op) commit re-reads the
+  // SAME block string, and both React's setState and the widget's eq() bail on
+  // identical values — the user's unsaved text would sit in the banner looking
+  // saved. Bumping the gen forces the banner to rebuild from disk truth, and
+  // the error renders inside it (a console.warn is not feedback).
+  const [fmGen, setFmGen] = useState(0);
+  const [fmErr, setFmErr] = useState<string | null>(null);
+  useEffect(() => {
+    setFmErr(null); // a refusal never follows the note to another tab
+    if (fileMetadata !== "show") {
+      setFmRaw(null);
+      return;
+    }
+    let alive = true;
+    corpusRawFrontmatter(noteId)
+      .then((block) => {
+        if (alive) setFmRaw(block);
+      })
+      .catch(() => {
+        if (alive) setFmRaw(null); // unreadable (browser demo, race) → no banner
+      });
+    return () => {
+      alive = false;
+    };
+  }, [noteId, fileMetadata]);
+
+  const commitFm = useCallback(
+    (text: string) => {
+      void (async () => {
+        try {
+          await corpusWriteFrontmatterRaw(noteId, text);
+          setFmErr(null);
+        } catch (e) {
+          // refused (read-only note, stray --- line) — the re-read below
+          // reverts the banner and the message renders inside it
+          setFmErr(e instanceof Error ? e.message : String(e));
+        }
+        // re-read either way: a commit shows what Rust actually wrote (reserved
+        // keys restored), a refusal snaps the banner back to the file
+        try {
+          setFmRaw(await corpusRawFrontmatter(noteId));
+        } catch {
+          /* keep the current banner */
+        }
+        setFmGen((g) => g + 1); // rebuild even when the block string is identical
+        await invalidateNotes(); // pinned/secure/shelf may have moved
+      })();
+    },
+    [noteId],
+  );
 
   // the buffer exists as soon as the note loads — edits always hit one buffer
   useEffect(() => {
@@ -163,6 +220,11 @@ export function EditorSurface({
         measureWidth={measureWidth}
         initialText={note.body}
         onContext={(line, selStart) => setCtx({ line, selStart })}
+        fmRaw={focusMode ? null : fmRaw}
+        fmGen={fmGen}
+        fmErr={fmErr}
+        onFmCommit={commitFm}
+        onFmRead={() => corpusRawFrontmatter(noteId)}
       />
       {focusMode && (
         <div className="fwc" aria-hidden="true">
