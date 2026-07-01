@@ -96,3 +96,101 @@ export function gcManifest(tree: MainNode[], liveIds: Set<string>): MainNode[] {
     return liveIds.has(node.note) ? [node] : [];
   });
 }
+
+// ─── tree mutations (drag-drop + add/remove), all pure + immutable ──────────────
+
+export type DropPos = "before" | "after" | "into";
+
+/** The rendered row id of a node — a note id, or a folder's "main:<path>" id (must
+ * match buildMainTree's ids exactly, so drag targets line up with rendered rows). */
+function idOf(node: MainNode, parentId: string): string {
+  if ("note" in node) return node.note;
+  return parentId === MAIN_ROOT ? `${MAIN_ROOT}${node.folder}` : `${parentId}/${node.folder}`;
+}
+
+function containsNote(nodes: MainNode[], noteId: string): boolean {
+  return nodes.some((n) => ("note" in n ? n.note === noteId : containsNote(n.children, noteId)));
+}
+
+function findAndRemove(
+  nodes: MainNode[],
+  dragId: string,
+  parentId: string,
+): { tree: MainNode[]; node: MainNode | null } {
+  const out: MainNode[] = [];
+  let node: MainNode | null = null;
+  for (const n of nodes) {
+    if (idOf(n, parentId) === dragId) {
+      node = n;
+      continue;
+    }
+    if ("folder" in n) {
+      const r = findAndRemove(n.children, dragId, idOf(n, parentId));
+      if (r.node) node = r.node;
+      out.push({ folder: n.folder, children: r.tree });
+    } else {
+      out.push(n);
+    }
+  }
+  return { tree: out, node };
+}
+
+function insertById(
+  nodes: MainNode[],
+  node: MainNode,
+  targetId: string,
+  pos: DropPos,
+  parentId: string,
+): { tree: MainNode[]; found: boolean } {
+  const out: MainNode[] = [];
+  let found = false;
+  for (const n of nodes) {
+    const id = idOf(n, parentId);
+    if (id === targetId && pos === "before") {
+      out.push(node);
+      found = true;
+    }
+    if (id === targetId && pos === "into" && "folder" in n) {
+      out.push({ folder: n.folder, children: [node, ...n.children] });
+      found = true;
+    } else if ("folder" in n) {
+      const r = insertById(n.children, node, targetId, pos, id);
+      out.push({ folder: n.folder, children: r.tree });
+      if (r.found) found = true;
+    } else {
+      out.push(n);
+    }
+    if (id === targetId && pos === "after") {
+      out.push(node);
+      found = true;
+    }
+  }
+  return { tree: out, found };
+}
+
+/** Move a note/folder (by its rendered id) to before/after a sibling or into a
+ * folder. No-ops if the drag would vanish the target (dropping a folder into its own
+ * subtree) or the target isn't found. */
+export function moveInTree(tree: MainNode[], dragId: string, targetId: string, pos: DropPos): MainNode[] {
+  if (dragId === targetId) return tree;
+  const { tree: without, node } = findAndRemove(tree, dragId, MAIN_ROOT);
+  if (!node) return tree;
+  if (targetId === MAIN_ROOT) return [...without, node]; // drop at the Main root
+  const r = insertById(without, node, targetId, pos, MAIN_ROOT);
+  return r.found ? r.tree : tree;
+}
+
+/** Add a note to the Main root (a no-op if it's already anywhere in Main). */
+export function addNoteToMain(tree: MainNode[], noteId: string): MainNode[] {
+  return containsNote(tree, noteId) ? tree : [...tree, { note: noteId }];
+}
+
+/** Append a new empty Main folder at the root. */
+export function addFolderToMain(tree: MainNode[], name: string): MainNode[] {
+  return [...tree, { folder: name, children: [] }];
+}
+
+/** Remove a note/folder from Main by its rendered id (a folder takes its subtree). */
+export function removeFromMain(tree: MainNode[], dragId: string): MainNode[] {
+  return findAndRemove(tree, dragId, MAIN_ROOT).tree;
+}

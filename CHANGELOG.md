@@ -10,6 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-07-01
+
+### Added
+- **Main — your hand-arranged view over the Brain.** A new sidebar section above the Brain where you
+  arrange notes into your *own* folders and order, independent of how the AI files them underneath. It
+  holds no files of its own — it references your Brain notes by id, so it's **"one file, two views"**
+  (edit a note in Main or in Brain, it's the same file). **⊕** on any note row adds it to Main; **drag**
+  rows to reorder or move them into Main folders; **+ New folder** makes a Main-only folder. Persisted to
+  a committed `.rotli/main.json` so your arrangement travels with your memex. This is Phase 1 of the
+  Main/Brain/daemon architecture (`docs/design/main-brain-daemon.md`) — the background local-AI organizer
+  that keeps the Brain filed lands in later phases; because Main references notes by id, it will stay
+  exactly as you set it while the AI reorganizes underneath. (The pinned Brain README + full drag-into-
+  Main from other sections + j/k keyboard nav for Main are follow-ups.)
+
+### Fixed
+- **Images and PDFs use the pane.** A small-resolution image (e.g. a Breve newsletter) no longer renders
+  tiny at its natural size — it fills the pane (object-fit, so it scales up and stays readable); PDFs and
+  the iframe fallback get a full-bleed block body instead of being shrunk by the centered layout.
+
 ## [0.10.1] — 2026-06-30
 
 ### Fixed

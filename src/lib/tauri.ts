@@ -624,7 +624,7 @@ export async function corpusSetBrainPerms(id: string, perms: MemexPerms): Promis
 
 /** The `.rotli/` dot-files — opaque JSON strings the frontend owns. Missing
  * file reads as "{}". `background` carries the custom glass wallpaper. */
-export type SettingsFile = "settings" | "viewstate" | "background";
+export type SettingsFile = "settings" | "viewstate" | "background" | "main";
 
 export function corpusSettingsRead(file: SettingsFile): Promise<string> {
   return corpusInvoke("corpus_settings_read", { file });
@@ -632,6 +632,13 @@ export function corpusSettingsRead(file: SettingsFile): Promise<string> {
 
 export function corpusSettingsWrite(file: SettingsFile, contents: string): Promise<void> {
   return corpusInvoke("corpus_settings_write", { file, contents });
+}
+
+/** Write `.rotli/main.json` — the Main arrangement. A separate command from settings
+ * because it ALSO ensures the corpus `.gitignore` COMMITS it (durable user work,
+ * unlike the per-machine settings/viewstate). Read it back with corpusSettingsRead("main"). */
+export function corpusMainWrite(contents: string): Promise<void> {
+  return corpusInvoke("corpus_main_write", { contents });
 }
 
 /** Rust → main window: the corpus changed UNDER the app (a folder dropped in,

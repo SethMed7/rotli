@@ -17,6 +17,7 @@ import {
   type DragEvent,
   type KeyboardEvent,
   type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useEffect,
   useMemo,
@@ -24,6 +25,16 @@ import {
   useState,
 } from "react";
 import { buildStorageTree } from "../services/storageTree";
+import {
+  type DropPos,
+  MAIN_ROOT,
+  addFolderToMain,
+  addNoteToMain,
+  buildMainTree,
+  moveInTree,
+  removeFromMain,
+} from "../services/mainTree";
+import { useMainStore } from "../state/main";
 import {
   invalidateFolders,
   invalidateNotes,
@@ -187,6 +198,8 @@ interface RowActions {
   archive: (id: string) => void;
   trash: (id: string) => void;
   restore: (id: string) => void;
+  /** Add this note to the user's hand-arranged Main view (a ⊕ hover affordance). */
+  addToMain?: (id: string) => void;
 }
 
 /** A compact note row: title + day label only — NO snippet line (that is the
@@ -251,6 +264,32 @@ function CompactNoteRow({
           </span>
         ) : (
           <>
+            {actions.addToMain && (
+              <span
+                role="button"
+                tabIndex={0}
+                className="snactbtn"
+                aria-label="Add to Main"
+                title="Add to Main"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  actions.addToMain?.(note.id);
+                }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  aria-hidden="true"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </span>
+            )}
             <span
               role="button"
               tabIndex={0}
@@ -462,6 +501,19 @@ export function Sidebar() {
     (n) =>
       (n.folderId === "wiki" || n.folderId.startsWith("wiki/")) && !n.folderId.startsWith("wiki/_"),
   );
+
+  // MAIN — the user's hand-arranged view over the Brain (docs/design/main-brain-daemon.md).
+  // A `.rotli/main.json` manifest of folders + note-id refs, projected into synthetic
+  // sidebar rows. It references notes BY ID, so a daemon refiling the Brain underneath
+  // never moves Main. Mouse + drag navigable (not part of the j/k roving list yet).
+  const mainManifest = useMainStore((s) => s.manifest);
+  const setMainTree = useMainStore((s) => s.setTree);
+  const notesById = useMemo(() => new Map(allNotes.map((n) => [n.id, n] as const)), [allNotes]);
+  const liveIds = useMemo(() => new Set(allNotes.map((n) => n.id)), [allNotes]);
+  const mainProjection = useMemo(
+    () => buildMainTree(mainManifest.tree, notesById),
+    [mainManifest.tree, notesById],
+  );
   // added external folders (Seth, 2026-06-27): roots the user pointed rotli at,
   // not in the memex — every registered root except the built-in default + vault.
   const addedRoots = (useCorpusRoots().data ?? []).filter(
@@ -561,11 +613,135 @@ export function Sidebar() {
     archive: (id) => archiveNote.mutate(id),
     trash: (id) => trashNote.mutate(id),
     restore: (id) => restoreNote.mutate(id),
+    addToMain: (id) => setMainTree(addNoteToMain(mainManifest.tree, id), liveIds),
   };
 
   // — the active dropzone (a destination/folder id) while a note is mid-drag;
   // drives the .drop-over accent ring and is cleared on leave/drop. —
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  // — Main pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell, so the
+  //   BoardSurface pointer pattern; a threshold distinguishes drag from click) —
+  const [mainDragId, setMainDragId] = useState<string | null>(null);
+  const [mainDrop, setMainDrop] = useState<{ id: string; pos: DropPos } | null>(null);
+  const didMainDragRef = useRef(false);
+
+  const startMainDrag = (e: ReactPointerEvent, id: string) => {
+    if (e.button !== 0) return;
+    const sx = e.clientX;
+    const sy = e.clientY;
+    let dragging = false;
+    let drop: { id: string; pos: DropPos } | null = null;
+    didMainDragRef.current = false;
+    const onMove = (ev: PointerEvent) => {
+      if (!dragging) {
+        if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 5) return;
+        dragging = true;
+        didMainDragRef.current = true;
+        setMainDragId(id);
+      }
+      const hit = (
+        document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
+      )?.closest("[data-main-id]") as HTMLElement | null;
+      const tid = hit?.dataset.mainId;
+      if (!hit || !tid || tid === id) {
+        drop = null;
+        setMainDrop(null);
+        return;
+      }
+      const rect = hit.getBoundingClientRect();
+      const rel = rect.height > 0 ? (ev.clientY - rect.top) / rect.height : 0.5;
+      // a folder's middle third = drop INTO it; otherwise before/after by half
+      let pos: DropPos = rel < 0.5 ? "before" : "after";
+      if (hit.dataset.mainFolder === "1" && rel > 0.33 && rel < 0.67) pos = "into";
+      drop = { id: tid, pos };
+      setMainDrop(drop);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setMainDragId(null);
+      setMainDrop(null);
+      if (dragging && drop) {
+        setMainTree(moveInTree(mainManifest.tree, id, drop.id, drop.pos), liveIds);
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  // recursive render of the Main tree — mouse + drag (NOT roving). Synthetic folders
+  // (id "main:<path>") + notes re-homed by the manifest; a note references the same
+  // .md as its Brain twin (one file, two views).
+  const renderMainTree = (parentId: string, depth: number): ReactNode => {
+    const childFolders = mainProjection.folders.filter((f) => f.parentId === parentId);
+    const childNotes = mainProjection.notes
+      .filter((n) => n.folderId === parentId)
+      .sort((a, b) => a.mainOrder - b.mainOrder);
+    const dropCls = (rowId: string) => (mainDrop?.id === rowId ? ` mdrop-${mainDrop.pos}` : "");
+    const removeBtn = (rowId: string, label: string) => (
+      <span
+        role="button"
+        tabIndex={0}
+        className="snactbtn mmx"
+        aria-label={label}
+        title={label}
+        onClick={(ev) => {
+          ev.stopPropagation();
+          setMainTree(removeFromMain(mainManifest.tree, rowId), liveIds);
+        }}
+      >
+        ×
+      </span>
+    );
+    return (
+      <>
+        {childNotes.map((n) => (
+          <button
+            key={`main:${n.id}`}
+            type="button"
+            data-main-id={n.id}
+            className={`snrow main-row${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
+            style={{ paddingLeft: 10 + (depth + 1) * 16 }}
+            onPointerDown={(e) => startMainDrag(e, n.id)}
+            onClick={() => {
+              if (!didMainDragRef.current) usePanesStore.getState().openSummary(n);
+            }}
+          >
+            {glyphForNote(n, { size: 14, className: "snicon" })}
+            <span className="snt">{n.title || "Empty note"}</span>
+            <span className="snact">{removeBtn(n.id, "Remove from Main")}</span>
+          </button>
+        ))}
+        {childFolders.map((f) => {
+          const open = expandedDests[f.id] ?? true;
+          return (
+            <div key={f.id}>
+              <button
+                type="button"
+                data-main-id={f.id}
+                data-main-folder="1"
+                className={`frow child main-row${dropCls(f.id)}${mainDragId === f.id ? " dragging" : ""}`}
+                style={{ paddingLeft: 10 + (depth + 1) * 16 }}
+                onPointerDown={(e) => startMainDrag(e, f.id)}
+                onClick={() => {
+                  if (!didMainDragRef.current) toggleDestExpanded(f.id);
+                }}
+              >
+                <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
+                  <ChevronRight size={10} />
+                </span>
+                <FolderGlyph size={14} />
+                <span className="fname">{f.name}</span>
+                {removeBtn(f.id, "Remove folder from Main")}
+              </button>
+              {open && renderMainTree(f.id, depth + 1)}
+            </div>
+          );
+        })}
+      </>
+    );
+  };
 
   /** Wire one destination/folder row as a note dropzone: highlight on hover,
    * and on drop move the dragged note there (same-folder drop is a no-op —
@@ -1287,8 +1463,36 @@ export function Sidebar() {
               <span className="count">{allNotes.length}</span>
             </button>
 
+            {/* — MAIN: your hand-arranged view over the Brain. Add notes with the ⊕
+                  on any note row, make folders, drag to arrange (Seth, 2026-07-01). — */}
+            <div className="fsec">Main</div>
+            {mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
+              <p className="main-empty" data-main-id="main:">
+                Add notes with the <b>⊕</b> on a note row, then drag to arrange them your way.
+              </p>
+            ) : (
+              <div data-main-id="main:" className="main-tree">
+                {renderMainTree(MAIN_ROOT, 0)}
+              </div>
+            )}
+            <button
+              type="button"
+              className="frow child main-newfolder"
+              style={{ paddingLeft: 26 }}
+              onClick={() => setMainTree(addFolderToMain(mainManifest.tree, "New folder"), liveIds)}
+            >
+              <span className="mnf-plus" aria-hidden="true">+</span>
+              <span className="fname">New folder</span>
+            </button>
+
             {/* — the Brain: the AI-organized areas (People · Projects · Research · …) — */}
             {childrenOf("wiki").length > 0 && <div className="fsec">Brain</div>}
+            {childrenOf("wiki").length > 0 && (
+              <p className="brain-hint">
+                Organized by AI so anything you save stays findable. Your <b>Main</b> view above is
+                yours — same notes, your order.
+              </p>
+            )}
             {renderFolderTree("wiki", brainNotes, 0, rowProps)}
 
             <div className="fsec">Destinations</div>

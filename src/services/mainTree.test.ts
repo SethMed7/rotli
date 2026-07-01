@@ -1,6 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import type { NoteSummary } from "../types";
-import { type MainNode, buildMainTree, gcManifest, parseMainManifest } from "./mainTree";
+import {
+  type MainNode,
+  addFolderToMain,
+  addNoteToMain,
+  buildMainTree,
+  gcManifest,
+  moveInTree,
+  parseMainManifest,
+  removeFromMain,
+} from "./mainTree";
 
 const note = (id: string): NoteSummary =>
   ({
@@ -59,5 +68,45 @@ describe("gcManifest", () => {
       { folder: "Empty", children: [{ note: "dead2" }] },
     ];
     expect(gcManifest(tree, new Set(["a"]))).toEqual([{ note: "a" }, { folder: "Empty", children: [] }]);
+  });
+});
+
+describe("tree mutations", () => {
+  const base: MainNode[] = [{ note: "a" }, { note: "b" }, { folder: "Today", children: [{ note: "c" }] }];
+
+  test("moveInTree: reorder before a sibling", () => {
+    expect(moveInTree(base, "b", "a", "before")).toEqual([
+      { note: "b" },
+      { note: "a" },
+      { folder: "Today", children: [{ note: "c" }] },
+    ]);
+  });
+  test("moveInTree: into a folder (prepends)", () => {
+    expect(moveInTree(base, "a", "main:Today", "into")).toEqual([
+      { note: "b" },
+      { folder: "Today", children: [{ note: "a" }, { note: "c" }] },
+    ]);
+  });
+  test("moveInTree: out of a folder to root", () => {
+    expect(moveInTree(base, "c", "main:", "into")).toEqual([
+      { note: "a" },
+      { note: "b" },
+      { folder: "Today", children: [] },
+      { note: "c" },
+    ]);
+  });
+  test("moveInTree: unknown target → unchanged", () => {
+    expect(moveInTree(base, "a", "nope", "after")).toEqual(base);
+  });
+
+  test("addNoteToMain dedupes (already present anywhere)", () => {
+    expect(addNoteToMain(base, "c")).toEqual(base); // c is inside Today
+    expect(addNoteToMain(base, "z")).toEqual([...base, { note: "z" }]);
+  });
+  test("addFolderToMain appends an empty folder", () => {
+    expect(addFolderToMain([], "Read later")).toEqual([{ folder: "Read later", children: [] }]);
+  });
+  test("removeFromMain drops a nested note", () => {
+    expect(removeFromMain(base, "c")).toEqual([{ note: "a" }, { note: "b" }, { folder: "Today", children: [] }]);
   });
 });

@@ -721,6 +721,7 @@ pub fn run() {
             corpus::corpus_overview,
             corpus::corpus_settings_read,
             corpus::corpus_settings_write,
+            corpus::corpus_main_write,
             memex::memex_detect,
             memex::memex_inspect,
             memex::memex_read_contract,

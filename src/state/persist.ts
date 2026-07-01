@@ -40,6 +40,7 @@ import {
   type NoteStyle,
   useNoteStyleStore,
 } from "./noteStyle";
+import { hydrateMain } from "./main";
 import { findLeaf, leaves, usePanesStore } from "./panes";
 import { applyTheme } from "./theme";
 import {
@@ -491,6 +492,7 @@ export async function hydratePersistedState(): Promise<void> {
     if (settings.glassBackground === "custom") await loadCustomBackground();
     if (isMainSurface()) {
       await hydrateViewstate();
+      await hydrateMain();
       applyShellSideEffects(settings);
     }
   } catch {

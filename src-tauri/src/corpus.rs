@@ -1412,6 +1412,42 @@ impl CorpusStore {
         atomic_write(&path, &out)
     }
 
+    /// Make `.rotli/main.json` git-committable while the rest of `.rotli/` stays
+    /// ignored. Unlike the deletable index/settings sidecar, the Main arrangement is
+    /// hand-organized user work that should travel with the memex (Seth, 2026-07-01).
+    /// A bare `.rotli/` line ignores the whole dir — and git CANNOT re-include a file
+    /// under an ignored dir — so narrow it to `.rotli/*` and add `!.rotli/main.json`.
+    /// Idempotent; a no-op outside a git corpus.
+    fn ensure_main_committable(&self) -> Result<(), String> {
+        let path = self.root.join(".gitignore");
+        if !path.exists() && !self.root.join(".git").exists() {
+            return Ok(());
+        }
+        let existing = fs::read_to_string(&path).unwrap_or_default();
+        let mut lines: Vec<String> = existing.lines().map(str::to_string).collect();
+        let mut changed = false;
+        for l in lines.iter_mut() {
+            if l.trim() == ".rotli/" || l.trim() == ".rotli" {
+                *l = ".rotli/*".to_string();
+                changed = true;
+            }
+        }
+        if !lines.iter().any(|l| l.trim() == ".rotli/*") {
+            lines.push(".rotli/*".to_string());
+            changed = true;
+        }
+        if !lines.iter().any(|l| l.trim() == "!.rotli/main.json") {
+            lines.push("!.rotli/main.json".to_string());
+            changed = true;
+        }
+        if changed {
+            let mut out = lines.join("\n");
+            out.push('\n');
+            atomic_write(&path, &out)?;
+        }
+        Ok(())
+    }
+
     /// Toggle the per-note SECURE flag. When set, the note's path is gitignored so a
     /// pushed vault never leaks it. Preserves the body + every other frontmatter line.
     fn set_secure(&self, rel: &str, secure: bool) -> Result<(), String> {
@@ -2085,6 +2121,7 @@ fn dot_file(which: &str) -> Result<&'static str, String> {
         "settings" => Ok("settings.json"),
         "viewstate" => Ok("viewstate.json"),
         "background" => Ok("background.json"),
+        "main" => Ok("main.json"), // the Main arrangement (committed, unlike the others)
         other => Err(format!("unknown settings file: {other}")),
     }
 }
@@ -2780,6 +2817,26 @@ pub fn corpus_settings_write(
         .default_id
         .clone();
     state.route(&default_id, |s| s.dot_write(&file, &contents))
+}
+
+/// Write `.rotli/main.json` (the user's durable Main arrangement) AND ensure the
+/// corpus `.gitignore` commits it — separate from settings/viewstate, which stay
+/// per-machine (Seth, 2026-07-01). Read it back with `corpus_settings_read("main")`.
+#[tauri::command]
+pub fn corpus_main_write(
+    state: tauri::State<'_, CorpusState>,
+    contents: String,
+) -> Result<(), String> {
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |s| {
+        s.dot_write("main", &contents)?;
+        s.ensure_main_committable()
+    })
 }
 
 // ─── tests ───────────────────────────────────────────────────────────────────
