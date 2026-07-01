@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] — 2026-07-01
+
+### Fixed
+- **Chat is actually centered now.** The conversation was left-pinned once it had messages — a flex-item's
+  default `min-width: auto` let wide message content push the thread past its `max-width`. Switched to plain
+  block centering (`margin: 0 auto` + `min-width: 0`), so the column is locked at its reading width and
+  centered whether the chat is empty or full.
+- **Only one chat row highlights at a time.** "All chats" no longer stays selected while a specific chat is
+  open — it lights up only when you're actually browsing all chats (no chat active).
+
 ## [0.14.0] — 2026-07-01
 
 ### Changed

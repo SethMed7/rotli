@@ -202,17 +202,15 @@
   flex: 1;
   overflow-y: auto;
   padding: 20px 24px;
-  /* center the conversation column robustly (a flex-center scroll can't be
-     left-pinned the way margin:auto can when the layout shifts) — Seth, 2026-06-30 */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
-/* centered conversation column (ChatGPT/Claude style), matching the md editor's
-   reading measure: full-width scroll, the thread + composer share a max-width. */
+/* Centered conversation column (ChatGPT/Claude style). BLOCK centering via
+   margin:auto — NOT flex-center: a flex item's default min-width:auto lets wide
+   message content push the thread past its max-width and left-pin it (that was the
+   bug). min-width:0 + the block box keep it locked at 740, centered (Seth, 2026-07-01). */
 .chat-thread {
-  width: 100%;
   max-width: 740px;
+  margin: 0 auto;
+  min-width: 0;
 }
 .chat-pre {
   white-space: pre-wrap;

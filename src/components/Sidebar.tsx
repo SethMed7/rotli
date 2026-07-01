@@ -1442,7 +1442,10 @@ export function Sidebar() {
             </button>
             <button
               type="button"
-              className={`sb-chatrow all${chatAllOpen ? " sel" : ""}`}
+              /* only highlight "All chats" when it's the active view — i.e. browsing
+                 all AND no specific chat is open — so two rows never light up at once
+                 (Seth, 2026-07-01) */
+              className={`sb-chatrow all${chatAllOpen && !focusedChatSlug ? " sel" : ""}`}
               onClick={openAllChats}
             >
               <SearchGlyph size={13} />
