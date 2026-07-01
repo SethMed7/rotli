@@ -74,7 +74,7 @@ export const RECENT = "recent";
  * are views in the pane area — the sidebar never moves for them, so the three
  * left-menu sections (Inbox · Chat · Notes) stay visible (Seth, 2026-06-24;
  * Chat folded in from a full-surface front 2026-06-26). */
-export type ContentView = "panes" | "board" | "allNotes" | "recent" | "chat";
+export type ContentView = "panes" | "board" | "allNotes" | "allChats" | "recent" | "chat";
 
 /** The three top-level left-menu sections (Seth's decided IA, 2026-06-26): Inbox
  * (email) · Chat · Notes. Each is a collapsible accordion; its open state lives in

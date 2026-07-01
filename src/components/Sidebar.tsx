@@ -546,8 +546,6 @@ export function Sidebar() {
   const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
   const chatList = useInstanceChats(activeMemex).data ?? [];
   const quickNoteIds = useUiStore((s) => s.quickNoteIds);
-  const chatAllOpen = useUiStore((s) => s.chatAllOpen);
-  const setChatAllOpen = useUiStore((s) => s.setChatAllOpen);
 
   const selectedFolderId = useUiStore((s) => s.selectedFolderId);
   const setSelectedFolderId = useUiStore((s) => s.setSelectedFolderId);
@@ -1307,9 +1305,10 @@ export function Sidebar() {
 
   // — Chat openers: chats open as PANES now (a pane holds a chat OR a note, side
   //   by side, multiple at once), so "New chat"/a row opens a chat pane; "All
-  //   chats" just expands the sidebar list. The open chat = the focused pane's. —
+  //   chats" opens a searchable content view (the twin of All notes). The open
+  //   chat = the focused pane's. —
   const openNewChat = () => openChat(null);
-  const openAllChats = () => setChatAllOpen(!chatAllOpen);
+  const openAllChats = () => setContentView("allChats");
   const openChatRow = (slug: string) => openChat(slug);
 
   // a top-level section header (Inbox · Chat · Notes): a clickable disclosure row
@@ -1473,10 +1472,9 @@ export function Sidebar() {
             </button>
             <button
               type="button"
-              /* only highlight "All chats" when it's the active view — i.e. browsing
-                 all AND no specific chat is open — so two rows never light up at once
-                 (Seth, 2026-07-01) */
-              className={`sb-chatrow all${chatAllOpen && !focusedChatSlug ? " sel" : ""}`}
+              /* highlight "All chats" only when its content view is active — so it
+                 never lights up alongside an open chat row (Seth, 2026-07-01) */
+              className={`sb-chatrow all${contentView === "allChats" ? " sel" : ""}`}
               onClick={openAllChats}
             >
               <SearchGlyph size={13} />
@@ -1493,7 +1491,7 @@ export function Sidebar() {
             ) : chatList.length === 0 ? (
               <p className="sb-chat-empty">No chats yet.</p>
             ) : (
-              (chatAllOpen ? chatList : chatList.slice(0, CHAT_SECTION_LIMIT)).map((c) => (
+              chatList.slice(0, CHAT_SECTION_LIMIT).map((c) => (
                 <button
                   type="button"
                   key={c.slug}
@@ -1506,7 +1504,7 @@ export function Sidebar() {
                 </button>
               ))
             )}
-            {!chatAllOpen && chatList.length > CHAT_SECTION_LIMIT && (
+            {chatList.length > CHAT_SECTION_LIMIT && (
               <button type="button" className="sb-chat-more" onClick={openAllChats}>
                 +{chatList.length - CHAT_SECTION_LIMIT} more
               </button>

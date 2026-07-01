@@ -10,7 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.15.0] — 2026-07-01
+## [0.16.0] — 2026-07-01
+
+### Added
+- **All chats — a searchable list, the twin of All notes.** Clicking **All chats** in the sidebar used to
+  just toggle an inline expand (and did nothing when you had only a few chats). It now opens a proper
+  content view: every chat in a searchable list, click a row to open it in a pane. (New `AllChatsSurface`
+  + an `allChats` content view.)
+
+### Changed
+- **Every pane surface fills its pane.** Follow-through on the chat-centering fix: images, PDFs,
+  spreadsheets, markdown, canvases and the activity log all render in a full-width pane body — no more
+  content-width collapse.
+
+### Notes
+- **CSV & Excel render in-app.** (Already built; now demoed.) A `.csv`/`.xlsx` opens read-only as a table
+  with a tab per sheet. Two sample files are seeded into Main to show it off.
 
 ### Changed
 - **"Quick access" is now two things done right — Main + starred Quick access.** The sidebar section is

@@ -10,6 +10,7 @@ import type { CSSProperties, PointerEvent } from "react";
 import { useNotes } from "../services/hooks";
 import { DEST } from "../services/destinations";
 import { useUiStore } from "../state/ui";
+import { AllChatsSurface } from "./AllChatsSurface";
 import { AllNotesSurface } from "./AllNotesSurface";
 import { RecentSurface } from "./RecentSurface";
 import { BoardSurface } from "./BoardSurface";
@@ -89,6 +90,8 @@ export function NotesSurface() {
         <BoardSurface />
       ) : contentView === "allNotes" ? (
         <AllNotesSurface />
+      ) : contentView === "allChats" ? (
+        <AllChatsSurface />
       ) : contentView === "recent" ? (
         <RecentSurface />
       ) : (

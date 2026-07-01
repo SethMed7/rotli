@@ -399,8 +399,8 @@ export function registerDefaultActions(): void {
     defaultChord: null,
     run: () => {
       useUiStore.getState().setSettingsOpen(false);
-      useUiStore.getState().setChatAllOpen(true);
-      usePanesStore.getState().openChat(null);
+      // open the All-chats content view (the Chat-front twin of All notes)
+      useUiStore.getState().setContentView("allChats");
     },
   });
 
