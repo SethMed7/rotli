@@ -253,6 +253,31 @@
   font-size: 16px;
   line-height: 1;
 }
+/* Quick-access star (Seth, 2026-07-01): lives OUTSIDE .snact so a starred note
+   keeps its mark without hovering. A faint hollow star is the always-there
+   affordance; filled + accent = starred; dimmed = the capped set is full. */
+.main-row .mstar {
+  opacity: 0.32;
+  transition:
+    opacity var(--motion-exit) var(--motion-ease),
+    color var(--motion-exit) var(--motion-ease);
+}
+.main-row:hover .mstar {
+  opacity: 0.62;
+}
+.main-row .mstar.on,
+.main-row:hover .mstar.on {
+  opacity: 1;
+  color: var(--accent-text);
+}
+.main-row .mstar.full,
+.main-row:hover .mstar.full {
+  cursor: not-allowed;
+  opacity: 0.14;
+}
+.snrow.sel .mstar.on {
+  color: var(--on-accent);
+}
 .fsec {
   font-size: 10.5px;
   font-weight: 600;
@@ -720,7 +745,15 @@
   min-height: 0;
   position: relative;
 }
-.pane-body > .editor {
+/* Every surface root must GROW to fill the pane row — otherwise a surface with
+   no intrinsic flex (chat, file) collapses to its content width and pins left,
+   dead space on the right, and its own internal `margin:0 auto` has no room to
+   center. The note editor always had this; chat/file did not (Seth, 2026-07-01). */
+.pane-body > .editor,
+.pane-body > .chat-surface,
+.pane-body > .file-surface,
+.pane-body > .canvas-surface,
+.pane-body > .board {
   flex: 1;
   min-width: 0;
   min-height: 0;

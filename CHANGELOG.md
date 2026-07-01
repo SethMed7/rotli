@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-07-01
+
+### Changed
+- **"Quick access" is now two things done right — Main + starred Quick access.** The sidebar section is
+  back to **Main**: your hand-picked notes, arranged your way. **Quick access** is now what it should be —
+  a **capped set (≤5) of starred notes** that live in Main. **★** a Main row to star it; anything starred
+  is what the **⌥ Quick window** opens and cycles. Star / unstar any time; it layers on top of Main's
+  arrangement without moving anything.
+
+### Fixed
+- **Chat is *really* centered now.** The prior fix centered *inside* the chat surface, but the surface
+  itself had no `flex: 1` in the pane row — so it collapsed to its content width and pinned left, dead
+  space on the right, and the internal `margin: 0 auto` had no room to work. Every pane surface
+  (chat, file, canvas, activity) now fills the pane, so the chat column truly sits centered.
+
 ## [0.14.1] — 2026-07-01
 
 ### Fixed

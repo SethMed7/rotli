@@ -16,7 +16,7 @@ editor. By default your rotli notes folder IS a memex. (Internally the code call
 the active folder the _corpus_; that word is **not** user-facing — say "your notes
 folder.")
 
-**Notes** _(front)_ — the note system, built on the memex. It has four layers:
+**Notes** _(front)_ — the note system, built on the memex. Its layers:
 
 - **Capture** — you just jot a note; you do **not** decide where it goes. Frictionless
   by design: most people don't want a strict filing flow. Both a typed note and a ⌥C
@@ -28,17 +28,21 @@ folder.")
   it so they turn up under People. It is a **folder within Notes** — browsable and
   editable, but **most people never open it**; they just take notes and let the AI
   organize. "The brain" = **your organized areas**, nothing else.
-- **Quick access** — your **hand-picked notes**, at the top of the sidebar (the "Main"
-  view in the design). It holds no files of its own: it's a **curated subset of
-  individual notes** you pick, arranged into **your own** folders and order — **not** a
-  mirror of the areas. (An area like **People** is auto-maintained *in the brain* and
-  just lives there; you pull the specific notes you want into Quick access — with the
-  **⊕** on a note row, or by dragging a note from the brain in.) **One file, two views**
-  — edit a note in Quick access or in the brain, it's the same file. So you keep it how
-  *you* want while the AI organizes the brain underneath (it never moves when the AI
-  refiles). Persisted to a committed `.rotli/main.json`. Everything the AI does to the
-  brain is logged + reversible in **Brain → Activity** (the Brain is a collapsible
+- **Main** — your **hand-picked notes**, at the top of the sidebar. It holds no files of
+  its own: it's a **curated subset of individual notes** you pick, arranged into **your
+  own** folders and order — **not** a mirror of the areas. (An area like **People** is
+  auto-maintained *in the brain* and just lives there; you pull the specific notes you
+  want into Main — with the **⊕** on a note row, or by dragging a note from the brain in.)
+  **One file, two views** — edit a note in Main or in the brain, it's the same file. So
+  you keep it how *you* want while the AI organizes the brain underneath (it never moves
+  when the AI refiles). Persisted to a committed `.rotli/main.json`. Everything the AI does
+  to the brain is logged + reversible in **Brain → Activity** (the Brain is a collapsible
   destination). Full spec: `docs/design/main-brain-daemon.md`.
+- **Quick access** — a **capped set (≤5)** of your very-most-reached notes, **starred**
+  from Main (the **★** on a Main row). It is *not* a place — it's a small favorites set
+  that lives inside Main. Starred notes are what the **⌥ Quick window** opens and cycles
+  (the frictionless "jump to my five" hotkey). Star / unstar any time; the set is separate
+  from — and layered on top of — Main's arrangement.
 - **Storage** — your files/images/PDFs. They live in the memex's internal `storage/`
   (binaries, gitignored), referenced from notes by a `storage:` link — never loose in
   the text tree. A dropped binary routes there.

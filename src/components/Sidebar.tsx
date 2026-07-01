@@ -35,6 +35,7 @@ import {
   removeFromMain,
 } from "../services/mainTree";
 import { useMainStore } from "../state/main";
+import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import {
   invalidateFolders,
   invalidateNotes,
@@ -89,6 +90,7 @@ import {
   NotesStackGlyph,
   PlusGlyph,
   SearchGlyph,
+  StarGlyph,
   StorageGlyph,
   TrashGlyph,
   VaultGlyph,
@@ -543,6 +545,7 @@ export function Sidebar() {
   const memexCfg = useMemexConfig();
   const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
   const chatList = useInstanceChats(activeMemex).data ?? [];
+  const quickNoteIds = useUiStore((s) => s.quickNoteIds);
   const chatAllOpen = useUiStore((s) => s.chatAllOpen);
   const setChatAllOpen = useUiStore((s) => s.setChatAllOpen);
 
@@ -731,6 +734,33 @@ export function Sidebar() {
       .filter((n) => n.folderId === parentId)
       .sort((a, b) => a.mainOrder - b.mainOrder);
     const dropCls = (rowId: string) => (mainDrop?.id === rowId ? ` mdrop-${mainDrop.pos}` : "");
+    // Star = "quick access": pins a Main note into the capped set the ⌥ Quick
+    // window cycles (Seth, 2026-07-01 — "anything starred opens with my hotkey").
+    const starBtn = (id: string) => {
+      const starred = quickNoteIds.includes(id);
+      const full = !starred && quickNoteIds.length >= QUICK_MAX;
+      const label = starred
+        ? "Unstar — remove from Quick access"
+        : full
+          ? `Quick access is full (${QUICK_MAX}) — unstar one first`
+          : "Star for Quick access (the ⌥ Quick window)";
+      return (
+        <span
+          role="button"
+          tabIndex={0}
+          className={`snactbtn mstar${starred ? " on" : ""}${full ? " full" : ""}`}
+          aria-label={label}
+          aria-pressed={starred}
+          title={label}
+          onClick={(ev) => {
+            ev.stopPropagation();
+            if (!full) togglePinQuick(id);
+          }}
+        >
+          <StarGlyph size={13} filled={starred} />
+        </span>
+      );
+    };
     const removeBtn = (rowId: string, label: string) => (
       <span
         role="button"
@@ -762,6 +792,7 @@ export function Sidebar() {
           >
             {glyphForNote(n, { size: 14, className: "snicon" })}
             <span className="snt">{n.title || "Empty note"}</span>
+            {starBtn(n.id)}
             <span className="snact">{removeBtn(n.id, "Remove from Main")}</span>
           </button>
         ))}
@@ -1528,13 +1559,15 @@ export function Sidebar() {
               <span className="count">{allNotes.length}</span>
             </button>
 
-            {/* — QUICK ACCESS: your hand-picked notes, arranged your way (was "Main";
-                  Seth, 2026-07-01). Add with the ⊕ on a note row or drag from the Brain. — */}
-            <div className="fsec">Quick access</div>
+            {/* — MAIN: your hand-picked notes, arranged your way. Star a row (★) to
+                  put it in Quick access — the capped set the ⌥ Quick window cycles
+                  (Seth, 2026-07-01). Add with the ⊕ on a note row or drag from the Brain. — */}
+            <div className="fsec">Main</div>
             {mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
               <p className="main-empty" data-main-id="main:">
-                Your handful of most-needed notes. Add one with the <b>⊕</b> on a note row (or drag it
-                here from the Brain), then arrange them your way.
+                The notes you reach for, arranged your way. Add one with the <b>⊕</b> on a note row (or
+                drag it here from the Brain) — then <b>★</b> your top {QUICK_MAX} for Quick access (the ⌥
+                Quick window).
               </p>
             ) : (
               <div data-main-id="main:" className="main-tree">
@@ -1575,8 +1608,8 @@ export function Sidebar() {
                 {brainOpen && (
                   <>
                     <p className="brain-hint">
-                      Organized by AI so anything you save stays findable. Your <b>Quick access</b> above
-                      is yours — same notes, your order.
+                      Organized by AI so anything you save stays findable. Your <b>Main</b> above is
+                      yours — same notes, your order.
                     </p>
                     <button
                       type="button"

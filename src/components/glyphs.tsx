@@ -263,6 +263,27 @@ export function PinGlyph(props: GlyphProps) {
   );
 }
 
+/** A star — the Quick-access marker. `filled` paints it in (starred); hollow =
+    not starred. currentColor for both stroke and fill so it themes. */
+export function StarGlyph({ size = 15, className, filled = false }: GlyphProps & { filled?: boolean }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m12 3 2.6 5.6 6 .8-4.4 4.2 1.1 6-5.3-3-5.3 3 1.1-6L3.4 9.4l6-.8Z" />
+    </svg>
+  );
+}
+
 /** Split-right palette row (r3 frame F). */
 export function SplitGlyph(props: GlyphProps) {
   return (
