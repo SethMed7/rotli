@@ -5,14 +5,16 @@
 //
 // THE SUMMON LAW (revised by Seth, 2026-06-12): ⌥Space toggles the MAIN
 // window — "Option+Space is the way we open the app." The quick-capture card
-// has its own chord (default ⌥C). ⌘⏎ in the card (save & open) reveals the
-// main window. Tray left-click toggles the MAIN window. Both chords are
-// rebindable through set_summon_shortcut, and click-away hiding is a setting
-// (set_hide_on_blur) so heavy use can keep the window resident.
+// has its own chord (default ⌥C), and ⌥A ("ask") summons the main window
+// straight into a chat. ⌘⏎ in the card (save & open) reveals the main window.
+// Tray left-click toggles the MAIN window. All chords are rebindable through
+// set_summon_shortcut, and click-away hiding is a setting (set_hide_on_blur)
+// so heavy use can keep the window resident.
 
 mod chat;
 mod corpus;
 mod memex;
+mod organizer;
 mod secret;
 mod web;
 
@@ -28,10 +30,11 @@ use tauri::{
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 /// Default chords — mirror `app.toggleWindow` / `capture.summon` /
-/// `quick.summon` in src/keys/actions.ts.
+/// `quick.summon` / `chat.summon` in src/keys/actions.ts.
 const DEFAULT_MAIN_TOGGLE: &str = "Alt+Space";
 const DEFAULT_CAPTURE: &str = "Alt+C";
 const DEFAULT_QUICK: &str = "Alt+Q";
+const DEFAULT_CHAT_SUMMON: &str = "Alt+A";
 
 /// Clicking the tray icon steals focus from the window, so blur fires (and
 /// hides it) *before* the tray click arrives. Within this grace window the
@@ -53,6 +56,8 @@ struct GlobalChords {
     main_toggle: Mutex<Option<String>>,
     /// `quick.summon` — the floating Quick Note window.
     quick: Mutex<Option<String>>,
+    /// `chat.summon` — surface the main window and land in a chat ("ask").
+    chat: Mutex<Option<String>>,
 }
 
 /// When the main window was last hidden because it lost focus.
@@ -604,6 +609,7 @@ fn set_summon_shortcut(
         "capture.summon" => chords.capture.lock().unwrap(),
         "app.toggleWindow" => chords.main_toggle.lock().unwrap(),
         "quick.summon" => chords.quick.lock().unwrap(),
+        "chat.summon" => chords.chat.lock().unwrap(),
         other => return Err(format!("unknown global action: {other}")),
     };
     if let Some(old) = current.as_deref() {
@@ -653,6 +659,14 @@ pub fn run() {
                     let quick = chords.quick.lock().unwrap().clone();
                     if quick.as_deref().is_some_and(matches) {
                         toggle_quick(app);
+                        return;
+                    }
+                    let chat = chords.chat.lock().unwrap().clone();
+                    if chat.as_deref().is_some_and(matches) {
+                        // ⌥A: SHOW (never toggle — "ask" must always land you in a
+                        // chat, not hide the app); the webview picks/creates the chat
+                        show_main(app);
+                        let _ = app.emit_to("main", "rotli:summon-chat", ());
                     }
                 })
                 .build(),
@@ -661,6 +675,7 @@ pub fn run() {
             capture: Mutex::new(Some(DEFAULT_CAPTURE.to_string())),
             main_toggle: Mutex::new(Some(DEFAULT_MAIN_TOGGLE.to_string())),
             quick: Mutex::new(Some(DEFAULT_QUICK.to_string())),
+            chat: Mutex::new(Some(DEFAULT_CHAT_SUMMON.to_string())),
         })
         .manage(LastBlurHide(Mutex::new(None)))
         .manage(LastPanelSummon(Mutex::new(None)))
@@ -718,6 +733,9 @@ pub fn run() {
             chat::chat_complete,
             chat::chat_models,
             chat::chat_messages,
+            organizer::organizer_status,
+            organizer::organizer_run_once,
+            organizer::organizer_set_trust,
             web::web_search,
             web::web_fetch,
             corpus::corpus_purge,
@@ -754,6 +772,11 @@ pub fn run() {
             // single root must not kill the shell: that root is skipped and its
             // commands degrade to clean errors; the others still work.
             let mut registry = corpus::CorpusRegistry::new(corpus::DEFAULT_ROOT_ID.to_string());
+            // The organizer daemon (Phase 4): created BEFORE the root loop so the
+            // memex root's watcher closure can feed its queue; the worker thread
+            // starts only after CorpusState is managed (it writes through route()).
+            let organizer_handle = organizer::OrganizerHandle::new();
+            let mut daemon_target: Option<(String, std::path::PathBuf)> = None;
             let roots = corpus::startup_roots(app.handle());
             for root in roots {
                 match corpus::CorpusStore::open(root.abs_path.clone()) {
@@ -765,8 +788,29 @@ pub fn run() {
                         // the config scope glob doesn't cover the corpus location.
                         let _ = app.asset_protocol_scope().allow_directory(store.root(), true);
                         let handle = app.handle().clone();
-                        if let Err(e) = corpus::spawn_watcher(watch_root, suppress, move || {
+                        // The daemon runs over the DEFAULT root, and only when it is
+                        // a memex (the Filer lane only exists there). Never a connected
+                        // brain: the frontend's journal/approve/undo commands all route
+                        // to the default root, so binding the daemon anywhere else
+                        // would split the §4.5 review loop across two corpora —
+                        // proposals journaled where the UI never reads, approvals
+                        // refused where the daemon never wrote.
+                        let is_target = root.id == corpus::DEFAULT_ROOT_ID
+                            && store.is_memex()
+                            && daemon_target.is_none();
+                        if is_target {
+                            daemon_target = Some((root.id.clone(), store.root().to_path_buf()));
+                        }
+                        let org = is_target
+                            .then(|| (organizer_handle.clone(), store.root().to_path_buf()));
+                        if let Err(e) = corpus::spawn_watcher(watch_root, suppress, move |paths| {
                             let _ = handle.emit_to("main", "rotli:corpus-changed", ());
+                            // the memex root also feeds the daemon's queue — the
+                            // watcher already dropped .rotli/, dot-files and our
+                            // own suppressed writes, so no echo can land here
+                            if let Some((org, org_root)) = &org {
+                                org.enqueue(org_root, paths);
+                            }
                         }) {
                             eprintln!(
                                 "rotli: corpus watcher unavailable for root {} ({e}) — external edits won't auto-refresh",
@@ -784,12 +828,24 @@ pub fn run() {
                 }
             }
             app.manage(corpus::CorpusState(Mutex::new(registry)));
+            // Manage the handle either way (the commands must answer), but only
+            // spawn the worker when a memex root exists — organizer_status then
+            // reports running:false on a plain corpus.
+            app.manage(organizer::OrganizerState(organizer_handle.clone()));
+            if let Some((mx_id, mx_root)) = daemon_target {
+                organizer::spawn_organizer(app.handle().clone(), organizer_handle, mx_id, mx_root);
+            }
 
             // ⌥Space opens the app; ⌥C is the one-breath capture (both rebindable).
             // Best-effort: another app owning a chord (launchers love ⌥Space)
             // must DEGRADE — the app still launches, the chord stays rebindable
             // in Settings → Hotkeys — never abort startup.
-            for chord in [DEFAULT_MAIN_TOGGLE, DEFAULT_CAPTURE, DEFAULT_QUICK] {
+            for chord in [
+                DEFAULT_MAIN_TOGGLE,
+                DEFAULT_CAPTURE,
+                DEFAULT_QUICK,
+                DEFAULT_CHAT_SUMMON,
+            ] {
                 if let Err(e) = app.global_shortcut().register(chord) {
                     eprintln!("rotli: global shortcut {chord} unavailable ({e}) — rebind it in Settings");
                 }

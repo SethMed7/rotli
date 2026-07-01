@@ -528,6 +528,58 @@ export async function corpusFilerMove(id: string, targetFolder: string): Promise
   return invoke<CorpusNoteMeta>("corpus_filer_move", { id, targetFolder });
 }
 
+/** (Re)write a generated per-area overview `wiki/<area>/_index.md` wholesale —
+ * approving a daemon "index" proposal writes its full proposed body verbatim. */
+export async function corpusWriteIndex(area: string, body: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_write_index", { area, body });
+}
+
+// ── the organizer daemon (Phase 4) — status + the trust knob. The daemon runs
+//    in Rust (src-tauri/src/organizer.rs) and journals PROPOSALS; these wrappers
+//    only read status and move the §4.3 trust rung. ──
+
+export interface OrganizerStatus {
+  /** false = no memex corpus, the worker never spawned. */
+  running: boolean;
+  trust: string;
+  queued: number;
+  lastRunAt: string | null;
+  lastError: string | null;
+  /** Notes skipped because they look like they hold secrets (§4.2.3) — the
+   * daemon never read them; the UI tells the user to review them personally. */
+  secureSkipped: number;
+  modelOffline: boolean;
+}
+
+export async function organizerStatus(): Promise<OrganizerStatus> {
+  if (!isTauri()) {
+    return {
+      running: false,
+      trust: "suggest",
+      queued: 0,
+      lastRunAt: null,
+      lastError: null,
+      secureSkipped: 0,
+      modelOffline: false,
+    };
+  }
+  return invoke<OrganizerStatus>("organizer_status");
+}
+
+/** The Settings "Run now" nudge — bypasses quiet/idle/AC/thermal (never chat). */
+export async function organizerRunOnce(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("organizer_run_once");
+}
+
+/** Flip the daemon's in-memory trust rung NOW; persistence rides settings.json
+ * (the daemon re-reads it each cycle as the backstop — no ordering dependency). */
+export async function organizerSetTrust(level: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("organizer_set_trust", { level });
+}
+
 /** Append one JSON line to the brain change journal (`.rotli/brain-journal.jsonl`). */
 export async function corpusJournalAppend(line: string): Promise<void> {
   if (!isTauri()) return;
@@ -667,6 +719,15 @@ export function onCorpusChanged(cb: () => void): () => void {
   return () => void unlisten.then((fn) => fn());
 }
 
+/** Rust → main window: the organizer daemon appended to the brain journal (a
+ * new proposal or an auto-applied action) — refetch it so Activity + the
+ * sidebar badge update within a beat, no polling. */
+export function onBrainJournal(cb: () => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen("rotli:brain-journal", () => cb());
+  return () => void unlisten.then((fn) => fn());
+}
+
 // ——— the memex seam (Stage 1) — typed wrappers over the Rust memex commands
 //     (src-tauri/src/memex.rs). rotli connects to / initiates a memex instance
 //     (the shared identity/personality/wiki/history/chats/inbox.md spine; for Seth, ~/memex-vault)
@@ -701,6 +762,8 @@ export interface MemexChatSummary {
   source: string;
   attachedTo: string;
   path: string;
+  /** fs mtime in ms (0 when unreadable) — ⌥A summon-chat picks the newest. */
+  modifiedMs: number;
 }
 
 export interface MemexValidateReport {
@@ -794,6 +857,14 @@ export function onCaptureShow(cb: () => void): () => void {
 export function onQuickShow(cb: () => void): () => void {
   if (!isTauri()) return () => {};
   const unlisten = listen("rotli:quick-show", () => cb());
+  return () => void unlisten.then((fn) => fn());
+}
+
+/** Rust → main window: the ⌥A global chord fired — land in a chat. The window
+ * is already shown Rust-side; the webview only picks/creates the chat tab. */
+export function onSummonChat(cb: () => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen("rotli:summon-chat", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 

@@ -37,12 +37,14 @@ import {
 import { useMainStore } from "../state/main";
 import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { useNoteMenu } from "./useNoteMenu";
+import { deriveJournal } from "../services/brainJournal";
 import {
   invalidateFolders,
   invalidateNotes,
   useArchiveNote,
   useCorpusRoots,
   useFolders,
+  useJournal,
   useNotes,
   useRestoreNote,
   useTrashNote,
@@ -516,6 +518,8 @@ export function Sidebar() {
     (n) =>
       (n.folderId === "wiki" || n.folderId.startsWith("wiki/")) && !n.folderId.startsWith("wiki/_"),
   );
+  // unreviewed daemon proposals — the quiet badge on the Activity link (§4.4.2)
+  const pendingProposals = deriveJournal(useJournal().data ?? []).pending.length;
 
   // MAIN — the user's hand-arranged view over the Brain (docs/design/main-brain-daemon.md).
   // A `.rotli/main.json` manifest of folders + note-id refs, projected into synthetic
@@ -1627,6 +1631,7 @@ export function Sidebar() {
                     >
                       <ClockGlyph size={13} />
                       <span className="fname">Activity</span>
+                      {pendingProposals > 0 && <span className="count">{pendingProposals}</span>}
                     </button>
                     {renderFolderTree("wiki", brainNotes, 1, rowProps)}
                   </>

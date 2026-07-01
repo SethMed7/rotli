@@ -31,10 +31,12 @@ import {
   emitCaptureAck,
   emitThemeSet,
   isTauri,
+  onBrainJournal,
   onCaptureSave,
   onCorpusChanged,
   onQuickSet,
   onRebind,
+  onSummonChat,
   onThemeSet,
   setDockVisible,
   setHideOnBlur,
@@ -48,10 +50,11 @@ import {
   loadConfig as memexLoadConfig,
   writeNote,
 } from "./memex/service";
+import { summonChat } from "./services/chatSummon";
 import { flushSettingsNow } from "./state/persist";
 import { useMemexStore } from "./state/memex";
 import { DEST } from "./services/destinations";
-import { invalidateFolders, invalidateNotes } from "./services/hooks";
+import { invalidateFolders, invalidateJournal, invalidateNotes } from "./services/hooks";
 import { notesService } from "./services/notes";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
 import { applyQuickState } from "./state/quick";
@@ -200,6 +203,20 @@ function MainShell() {
       }),
     [],
   );
+
+  // the daemon journaled (a proposal or an auto-applied action) — refetch the
+  // journal (Activity + the sidebar badge) AND the notes an apply may have moved
+  useEffect(
+    () =>
+      onBrainJournal(() => {
+        void invalidateJournal();
+        void invalidateNotes();
+      }),
+    [],
+  );
+
+  // ⌥A fired OS-side (Rust already showed the window) — land in a chat
+  useEffect(() => onSummonChat(() => void summonChat()), []);
 
   // external file drop. Tauri's OS drag-drop gives PATHS + the drop position. An
   // IMAGE dropped over the editor is imported into storage/ AND inserted at the

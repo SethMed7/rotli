@@ -65,6 +65,13 @@ export const GLASS_CANVASES: { value: GlassCanvas; label: string }[] = [
   { value: "cocoa", label: "Cocoa" },
 ];
 
+/** The organizer daemon's §4.3 trust ladder, monotonic in risk. Off = dormant ·
+ * Suggest (default) = journal proposals only · Tidy = applies annotations +
+ * files brand-new captures · Organize = applies everything, fully journaled. */
+export type OrganizerTrust = "off" | "suggest" | "tidy" | "organize";
+
+export const ORGANIZER_TRUSTS: readonly OrganizerTrust[] = ["off", "suggest", "tidy", "organize"];
+
 /** The folders rail selection: the two smart rows or a real folder id. */
 export const ALL_NOTES = "all";
 export const RECENT = "recent";
@@ -273,6 +280,12 @@ interface UiState {
    * (default), Date, or Folder (raw on-disk). Persisted. */
   storageGrouping: "type" | "date" | "folder";
   setStorageGrouping: (g: "type" | "date" | "folder") => void;
+  /** The organizer daemon's trust rung (design §4.3): what it may auto-APPLY.
+   * Suggest (the shipped default) = journal proposals only, provably write-free
+   * on the corpus. Persisted; the caller ALSO pushes it to Rust via
+   * organizerSetTrust (the daemon re-reads settings.json as the backstop). */
+  organizerTrust: OrganizerTrust;
+  setOrganizerTrust: (t: OrganizerTrust) => void;
 
   /** A newer signed build is on the feed — set once by App.tsx's quiet on-mount
    * check (CARL rule 2: no auto-download, no modal). Just lets Settings → General
@@ -432,6 +445,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setChatWeb: (slug, on) => set((s) => ({ chatWeb: { ...s.chatWeb, [slug]: on } })),
   storageGrouping: "type",
   setStorageGrouping: (g) => set({ storageGrouping: g }),
+  organizerTrust: "suggest",
+  setOrganizerTrust: (t) => set({ organizerTrust: t }),
 
   updateAvailable: false,
   setUpdateAvailable: (on) => set({ updateAvailable: on }),

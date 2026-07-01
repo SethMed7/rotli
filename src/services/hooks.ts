@@ -4,7 +4,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { replaceTitleLine } from "../lib/noteTitle";
-import { type CorpusRoot, corpusListConfig, isTauri } from "../lib/tauri";
+import { type CorpusRoot, corpusListConfig, isTauri, organizerStatus } from "../lib/tauri";
+import { readJournal } from "./brainJournal";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
 
@@ -13,6 +14,8 @@ export const keys = {
   notes: (folderId?: string) => ["notes", folderId ?? "all"] as const,
   note: (id: string) => ["note", id] as const,
   roots: ["corpus-roots"] as const,
+  journal: ["journal"] as const,
+  organizer: ["organizer-status"] as const,
 };
 
 /** The connected brains, as sidebar roots (their `vault:`-style rows). Tauri-only.
@@ -62,6 +65,28 @@ export async function invalidateFolders(): Promise<void> {
 async function invalidateBoth(): Promise<void> {
   await invalidateNotes();
   await invalidateFolders();
+}
+
+/** The brain change journal, raw — consumers fold it with `deriveJournal` (the
+ * one grammar). Refreshed by the daemon's `rotli:brain-journal` event (App.tsx)
+ * and after every frontend journal write (approve/dismiss/undo/file). */
+export function useJournal() {
+  return useQuery({ queryKey: keys.journal, queryFn: readJournal });
+}
+
+/** Live daemon status (Activity's secure-skip + offline lines, Settings → Brain).
+ * Rides the journal invalidation beat — and the daemon emits `rotli:brain-journal`
+ * on STATUS-ONLY changes too (secrets skipped, model offline/back). The slow
+ * poll is the backstop for anything eventless (the queue count while offline,
+ * an error set outside a cycle) — the app-wide staleTime is ∞, so without it
+ * this surface would never refresh on its own. */
+export function useOrganizerStatus() {
+  return useQuery({ queryKey: keys.organizer, queryFn: organizerStatus, refetchInterval: 60_000 });
+}
+
+export async function invalidateJournal(): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: keys.journal });
+  await queryClient.invalidateQueries({ queryKey: keys.organizer });
 }
 
 /** The Brain's area vocabulary (People/Projects/…): the wiki areas minus the

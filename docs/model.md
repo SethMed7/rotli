@@ -30,6 +30,20 @@ folder.")
   it so they turn up under People. It is a **folder within Notes** — browsable and
   editable, but **most people never open it**; they just take notes and let the AI
   organize. "The brain" = **your organized areas**, nothing else.
+- **The organizer** — the always-on, on-device **Brain filer** (a Rust daemon in the
+  shell, `organizer.rs`). Three narrow jobs: **Classify** (a staged capture → an area,
+  or a `suggested_area` hint when unsure), **Enrich** (fill empty `summary`/`tags`/`links`
+  — never a field you edited), and **Refresh index** (regenerate each area's
+  `wiki/<area>/_index.md` overview, deterministically). It runs quietly (idle + AC +
+  after a note settles) and records everything as **journal records** in
+  `.rotli/brain-journal.jsonl`, tracking its own progress in `.rotli/organizer.json`.
+  How much it *applies* is the **trust ladder** (Settings → Brain), monotonic in risk:
+  **Off** (dormant) · **Suggest** *(default — proposes everything, applies nothing;
+  you Approve/Dismiss in Brain → Activity)* · **Tidy** (auto-applies annotations +
+  filing brand-new captures; re-filings and index rewrites stay proposals) ·
+  **Organize** (applies everything, fully journaled + undoable). Two absolutes at
+  every rung: a **`secure` note never enters any model** — local or remote — and a
+  **`locked` note is never touched**. Local only; it never reaches the internet.
 - **Main** — your **hand-picked notes**, at the top of the sidebar. It holds no files of
   its own: it's a **curated subset of individual notes** you pick, arranged into **your
   own** folders and order — **not** a mirror of the areas. (An area like **People** is
@@ -84,8 +98,10 @@ Filer** (v3.7) is the second actor: it writes the curated `wiki/<area>/` brain �
 generated `wiki/<area>/_index.md` — through its own narrower gate, and it must skip any
 `locked` note. The two lanes are disjoint: you never write the curated brain, the Filer
 never writes your Main arrangement. So: **you capture + arrange, the AI organizes; neither
-overwrites the other.** (The Filer's daemon isn't wired yet — see
-`docs/design/main-brain-daemon.md`.)
+overwrites the other.** The Filer's daemon is **the organizer** (above): at the default
+**Suggest** rung it writes *only* its two `.rotli/` sidecars (journal proposals + state)
+— the corpus files are provably untouched until you approve, or climb the ladder. Full
+spec: `docs/design/main-brain-daemon.md`.
 
 ## Vocabulary — say this, not that
 
@@ -96,6 +112,7 @@ overwrites the other.** (The Filer's daemon isn't wired yet — see
 | linked library | connected brain · other brain | a *second* memex is a library you reference |
 | Storage = the memex `storage/` | Storage = a local notes folder | one binary store, not two |
 | Inbox = emails | Inbox = quick capture | the FRONT "Inbox" is email |
+| summon chat = ⌥A ("ask") | open the chat window | ⌥A surfaces the app INTO a chat (newest, or fresh) — chat is a pane, not a window |
 
 ## Why this shape
 

@@ -747,14 +747,15 @@ pub fn compose_document(fm: &Frontmatter, raw_body: &str) -> String {
 }
 
 /// A frontmatter line setting the per-note AI lock — `Some(true/false)` when the
-/// line is `locked: …`, else `None`.
-fn locked_field(line: &str) -> Option<bool> {
+/// line is `locked: …`, else `None`. Shared with the organizer daemon, whose
+/// locked-skip must read the same line the same way.
+pub(crate) fn locked_field(line: &str) -> Option<bool> {
     let (k, v) = line.split_once(':')?;
     (k.trim() == "locked").then(|| v.trim() == "true")
 }
 
 /// The key of a `key: value` frontmatter line (trimmed), if any.
-fn field_key(line: &str) -> Option<&str> {
+pub(crate) fn field_key(line: &str) -> Option<&str> {
     line.split_once(':').map(|(k, _)| k.trim())
 }
 
@@ -780,7 +781,8 @@ const AI_KEYS: [&str; 8] = [
 ];
 
 /// A frontmatter line setting the per-note SECURE flag (`secure: true`).
-fn secure_field(line: &str) -> Option<bool> {
+/// Shared with the organizer daemon (its secure-skip is in-memory, never a write).
+pub(crate) fn secure_field(line: &str) -> Option<bool> {
     let (k, v) = line.split_once(':')?;
     (k.trim() == "secure").then(|| v.trim() == "true")
 }
@@ -1286,6 +1288,12 @@ impl CorpusStore {
 
     pub fn suppress_set(&self) -> SuppressSet {
         self.suppress.clone()
+    }
+
+    /// Whether this root IS a memex spine — the one territory the organizer
+    /// daemon may run over (the Filer lane only exists there, contract v3.7).
+    pub fn is_memex(&self) -> bool {
+        self.layout == Layout::Memex
     }
 
     /// Import an external file (a dropped binary) into the store's binary area —
@@ -1866,8 +1874,9 @@ impl CorpusStore {
     /// Set (empty value ⇒ remove) an AI-OWNED frontmatter field — the Filer's
     /// counterpart to `set_field`. Accepts ONLY `AI_KEYS`; refuses reserved and user
     /// keys, so the territories stay disjoint. Gated by `filer_writable`. Takes a
-    /// wire id OR a rel path (resolve_note_rel).
-    fn set_ai_field(&mut self, id_or_rel: &str, key: &str, value: &str) -> Result<(), String> {
+    /// wire id OR a rel path (resolve_note_rel). pub(crate): the organizer daemon
+    /// writes through this same gate — no second write primitive.
+    pub(crate) fn set_ai_field(&mut self, id_or_rel: &str, key: &str, value: &str) -> Result<(), String> {
         let key = key.trim();
         if !AI_KEYS.contains(&key) {
             return Err(format!("`{key}` is not a filer-writable field"));
@@ -1889,16 +1898,27 @@ impl CorpusStore {
 
     /// Overwrite a per-area generated overview `wiki/<area>/_index.md` — the ONLY
     /// file the Filer writes wholesale (the reserved `_index.md` name can never
-    /// clobber a user note). Gated by `filer_writable`.
-    fn write_index(&self, area: &str, body: &str) -> Result<(), String> {
+    /// clobber a user note). An EMPTY body removes the file instead: undoing the
+    /// FIRST applied index rewrite (journal `before` == "" — no file existed)
+    /// must restore "no file", not leave a 0-byte generated husk behind. Gated
+    /// by `filer_writable`. pub(crate): the organizer daemon's RefreshIndex
+    /// applies through this same gate — no second write lane.
+    pub(crate) fn write_index(&self, area: &str, body: &str) -> Result<(), String> {
         if area.contains('/') || area.contains("..") || area.trim().is_empty() {
             return Err(format!("invalid area: {area}"));
         }
         let dir = self.abs(&format!("wiki/{area}"));
         let rel = format!("wiki/{area}/_index.md");
         self.filer_writable(&rel)?;
-        fs::create_dir_all(&dir).map_err(|e| format!("create wiki/{area}: {e}"))?;
         let path = self.abs(&rel);
+        if body.is_empty() {
+            self.suppress.mark(&path);
+            if path.exists() {
+                fs::remove_file(&path).map_err(|e| format!("remove {rel}: {e}"))?;
+            }
+            return Ok(());
+        }
+        fs::create_dir_all(&dir).map_err(|e| format!("create wiki/{area}: {e}"))?;
         self.suppress.mark(&path);
         atomic_write(&path, body)
     }
@@ -2290,11 +2310,13 @@ fn dot_file(which: &str) -> Result<&'static str, String> {
         "viewstate" => Ok("viewstate.json"),
         "background" => Ok("background.json"),
         "main" => Ok("main.json"), // the Main arrangement (committed, unlike the others)
+        // Rust-daemon-owned hash state — the frontend never writes it.
+        "organizer" => Ok("organizer.json"),
         other => Err(format!("unknown settings file: {other}")),
     }
 }
 
-fn folder_of(rel: &str) -> String {
+pub(crate) fn folder_of(rel: &str) -> String {
     match rel.rsplit_once('/') {
         Some((dir, _)) => dir.to_string(),
         None => String::new(),
@@ -2486,12 +2508,14 @@ fn ms_to_stamp(ms: i64) -> String {
 const DEBOUNCE: Duration = Duration::from_millis(300);
 
 /// Watch the corpus for EXTERNAL changes (a folder dropped in, a note edited
-/// in another app) and fire `on_change` once per quiet burst. `.rotli/`,
-/// dot-files and our own in-flight writes (the suppress set) never fire.
+/// in another app) and fire `on_change` once per quiet burst, carrying the
+/// burst's relevant paths (deduped) so the organizer daemon can enqueue exactly
+/// what changed. `.rotli/`, dot-files and our own in-flight writes (the
+/// suppress set) never fire — so they never reach the daemon's queue either.
 pub fn spawn_watcher(
     root: PathBuf,
     suppress: SuppressSet,
-    on_change: impl Fn() + Send + 'static,
+    on_change: impl Fn(&[PathBuf]) + Send + 'static,
 ) -> notify::Result<()> {
     use notify::{RecursiveMode, Watcher};
     let (tx, rx) = std::sync::mpsc::channel();
@@ -2502,15 +2526,21 @@ pub fn spawn_watcher(
     std::thread::spawn(move || {
         let _keep_alive = watcher;
         while let Ok(res) = rx.recv() {
-            if !event_relevant(&root, &suppress, &res) {
+            let mut paths = relevant_paths(&root, &suppress, &res);
+            if paths.is_empty() {
                 continue;
             }
             // trailing debounce: absorb the burst, fire once when it goes quiet
             loop {
                 match rx.recv_timeout(DEBOUNCE) {
-                    Ok(_) => continue,
+                    Ok(res) => {
+                        paths.extend(relevant_paths(&root, &suppress, &res));
+                        continue;
+                    }
                     Err(RecvTimeoutError::Timeout) => {
-                        on_change();
+                        paths.sort();
+                        paths.dedup();
+                        on_change(&paths);
                         break;
                     }
                     Err(RecvTimeoutError::Disconnected) => return,
@@ -2521,12 +2551,18 @@ pub fn spawn_watcher(
     Ok(())
 }
 
-fn event_relevant(root: &Path, suppress: &SuppressSet, res: &notify::Result<notify::Event>) -> bool {
-    let Ok(event) = res else { return false };
+/// The paths of one fs event that matter (suppress + dot filters applied).
+/// Access events never matter.
+fn relevant_paths(
+    root: &Path,
+    suppress: &SuppressSet,
+    res: &notify::Result<notify::Event>,
+) -> Vec<PathBuf> {
+    let Ok(event) = res else { return Vec::new() };
     if matches!(event.kind, notify::EventKind::Access(_)) {
-        return false;
+        return Vec::new();
     }
-    event.paths.iter().any(|p| path_relevant(root, suppress, p))
+    event.paths.iter().filter(|p| path_relevant(root, suppress, p)).cloned().collect()
 }
 
 /// The unit-testable core of the watcher's filter.
@@ -2584,8 +2620,10 @@ impl CorpusState {
     /// Run `f` against the store named by `root_id` (passing the bare `rel`).
     /// The router: `split_root_id` is applied by the caller; this picks the
     /// store. An unknown root id is a clean error (an UNBOUND vault, a stale
-    /// stored id) — never a panic.
-    fn route<T>(
+    /// stored id) — never a panic. pub(crate): the organizer daemon's writes
+    /// (journal / dot-state / applies) serialize on this same mutex, so the two
+    /// journal writers (TS command + daemon) can never interleave a line.
+    pub(crate) fn route<T>(
         &self,
         root_id: &str,
         f: impl FnOnce(&mut CorpusStore) -> Result<T, String>,
@@ -3823,6 +3861,11 @@ mod tests {
         // write_index — the one file the filer overwrites wholesale.
         assert!(store.write_index("Projects", "# Projects\n\n- Alazan 84\n").is_ok());
         assert!(store.abs("wiki/Projects/_index.md").is_file());
+        // an EMPTY body removes the file: undoing the FIRST applied index
+        // rewrite (journal before == "") restores "no file", not a 0-byte husk
+        assert!(store.write_index("Projects", "").is_ok());
+        assert!(!store.abs("wiki/Projects/_index.md").exists());
+        assert!(store.write_index("Projects", "").is_ok(), "removing a missing index is a no-op");
     }
 
     #[test]
@@ -4292,7 +4335,8 @@ mod tests {
         let suppress = store.suppress_set();
         let fired = Arc::new(AtomicUsize::new(0));
         let counter = fired.clone();
-        spawn_watcher(root.clone(), suppress.clone(), move || {
+        spawn_watcher(root.clone(), suppress.clone(), move |paths: &[PathBuf]| {
+            assert!(!paths.is_empty(), "a fire must carry the burst's paths");
             counter.fetch_add(1, Ordering::SeqCst);
         })
         .unwrap();

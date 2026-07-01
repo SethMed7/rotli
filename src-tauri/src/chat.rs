@@ -13,8 +13,13 @@
 use std::time::Duration;
 
 const DEFAULT_ENDPOINT: &str = "http://localhost:11435";
-const DEFAULT_MODEL: &str = "gemma-3-12b-it-qat-4bit";
+/// pub(crate): the organizer daemon journals which model produced a proposal.
+pub(crate) const DEFAULT_MODEL: &str = "gemma-3-12b-it-qat-4bit";
 const DEFAULT_API: &str = "generate";
+
+/// The interactive paths wait up to two minutes; the background daemon uses a
+/// much shorter caller-set timeout so it never camps on the model server.
+const CHAT_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// One chat-capable model the memex-ai store can serve. `api` is the server wire
 /// shape ("generate" = Ollama `/api/generate` · "openai" = `/v1/chat/completions`).
@@ -38,11 +43,15 @@ pub struct ChatModel {
 /// default to the MLX tier; the Chat surface fills them from the picked model.
 #[tauri::command]
 pub fn chat_complete(
+    state: tauri::State<crate::organizer::OrganizerState>,
     prompt: String,
     endpoint: Option<String>,
     model: Option<String>,
     api: Option<String>,
 ) -> Result<String, String> {
+    // Held for the whole call: the organizer daemon yields to interactive work
+    // (its gate checks the counter before every model call — doc §2).
+    let _interactive = state.0.interactive_guard();
     let endpoint = endpoint.unwrap_or_else(|| DEFAULT_ENDPOINT.to_string());
     let model = model.unwrap_or_else(|| DEFAULT_MODEL.to_string());
     let api = api.unwrap_or_else(|| DEFAULT_API.to_string());
@@ -214,6 +223,7 @@ pub struct WireMsg {
 /// gets a real messages array, the Bearer key (fixes the 401), and image parts.
 #[tauri::command]
 pub fn chat_messages(
+    state: tauri::State<crate::organizer::OrganizerState>,
     messages: Vec<WireMsg>,
     endpoint: Option<String>,
     model: Option<String>,
@@ -222,6 +232,9 @@ pub fn chat_messages(
     temperature: Option<f32>,
     max_tokens: Option<u32>,
 ) -> Result<String, String> {
+    // Chat AND vision ride this command — holding the yield guard here closes
+    // the whole interactive surface to daemon contention (doc §2).
+    let _interactive = state.0.interactive_guard();
     let endpoint = endpoint.unwrap_or_else(|| DEFAULT_ENDPOINT.to_string());
     let model = model.unwrap_or_else(|| DEFAULT_MODEL.to_string());
     let api = api.unwrap_or_else(|| DEFAULT_API.to_string());
@@ -231,8 +244,23 @@ pub fn chat_messages(
     if api == "openai" {
         messages_openai(base, &model, &messages, temperature, max_tokens, &endpoint)
     } else {
-        messages_generate(base, &model, &messages, format_json.unwrap_or(false), temperature, max_tokens, &endpoint)
+        messages_generate(base, &model, &messages, format_json.unwrap_or(false), temperature, max_tokens, &endpoint, CHAT_TIMEOUT)
     }
+}
+
+/// The organizer daemon's transport (doc §2): the MLX `/api/generate` bridge with
+/// a caller-set (short) timeout. LOCAL ONLY by construction — never the
+/// openai/:11436 path, never a web tool: the daemon reads real `_inbox` captures
+/// and nothing may leave the machine.
+pub fn complete_local(
+    messages: &[WireMsg],
+    format_json: bool,
+    temperature: f32,
+    max_tokens: u32,
+    timeout: Duration,
+) -> Result<String, String> {
+    let base = DEFAULT_ENDPOINT.trim_end_matches('/');
+    messages_generate(base, DEFAULT_MODEL, messages, format_json, temperature, max_tokens, DEFAULT_ENDPOINT, timeout)
 }
 
 /// MLX `/api/generate` — flatten the transcript to one prompt; optionally force a
@@ -245,6 +273,7 @@ fn messages_generate(
     temperature: f32,
     max_tokens: u32,
     endpoint: &str,
+    timeout: Duration,
 ) -> Result<String, String> {
     let url = format!("{base}/api/generate");
     let mut body = serde_json::json!({
@@ -257,7 +286,7 @@ fn messages_generate(
         body["format"] = serde_json::Value::String("json".to_string());
     }
     let resp = ureq::post(&url)
-        .timeout(Duration::from_secs(120))
+        .timeout(timeout)
         .send_json(body)
         .map_err(|e| format!("local model unreachable ({e}) — is it running on {endpoint}?"))?;
     let json: serde_json::Value = resp

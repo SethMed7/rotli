@@ -1,11 +1,19 @@
 // Brain Activity — the AI-Filer change journal (design §4.4.3). Every Filer action
-// (file a note, set an AI field) is logged and REVERSIBLE here. In Phase 3 the actions
-// are your own manual "file this note"; Phase 4's daemon appends the same shape. This
-// is the trust surface: see everything the AI does, undo any of it.
+// (file a note, set an AI field, refresh an area overview) is logged and REVERSIBLE
+// here. Phase 3 rows are your own manual "file this note"; Phase 4's daemon appends
+// the same shape — PROPOSALS land in the pending lane on top and apply only on an
+// explicit Approve (the frontend never auto-applies). This is the trust surface:
+// see everything the AI wants to do or has done, and undo any of it.
 
-import { useEffect, useState } from "react";
-import { type BrainAction, readJournal, undoAction } from "../services/brainJournal";
-import { invalidateNotes } from "../services/hooks";
+import { useState } from "react";
+import {
+  type BrainAction,
+  approveProposal,
+  deriveJournal,
+  dismissProposal,
+  undoAction,
+} from "../services/brainJournal";
+import { invalidateJournal, invalidateNotes, useJournal, useOrganizerStatus } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 
 function when(ts: number): string {
@@ -19,35 +27,41 @@ function when(ts: number): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+/** One line per row — same verbs for a proposal and its applied history twin. */
+function describe(a: BrainAction, proposed: boolean): string {
+  const verb =
+    a.action === "file"
+      ? `File “${a.noteTitle}” → ${(a.area ?? a.after).replace(/^wiki\//, "")}`
+      : a.action === "index"
+        ? `Refresh ${a.area ?? a.noteTitle} overview`
+        : `Set ${a.field} on “${a.noteTitle}”`;
+  if (proposed) {
+    const pct = typeof a.confidence === "number" ? ` · ${Math.round(a.confidence * 100)}%` : "";
+    return `Proposes: ${verb}${pct}`;
+  }
+  return a.action === "file" ? `Filed “${a.noteTitle}” → ${a.after.replace(/^wiki\//, "")}` : verb;
+}
+
 export function ActivitySurface() {
-  const [actions, setActions] = useState<BrainAction[] | null>(null);
+  const journal = useJournal();
+  const status = useOrganizerStatus().data;
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const openNote = usePanesStore((s) => s.openNote);
 
-  const load = () =>
-    readJournal()
-      .then((a) => setActions(a))
-      .catch((e) => {
-        console.warn("journal read failed", e);
-        setActions([]);
-      });
-  useEffect(() => {
-    void load();
-  }, []);
+  const actions = journal.data ?? null;
+  const { pending, history } = deriveJournal(actions ?? []);
 
-  const applied = (actions ?? []).filter((a) => a.status === "applied").reverse();
-  const revertedIds = new Set((actions ?? []).filter((a) => a.status === "reverted").map((a) => a.id));
-
-  const undo = async (a: BrainAction) => {
+  // one busy/err funnel for approve/dismiss/undo — same pattern as Phase 3 undo
+  const run = async (a: BrainAction, op: (a: BrainAction) => Promise<void>) => {
     setBusy(a.id);
     setErr(null);
     try {
-      await undoAction(a);
+      await op(a);
       await invalidateNotes();
-      await load();
+      await invalidateJournal();
     } catch (e) {
-      console.warn("undo failed", e);
+      console.warn("journal action failed", e);
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
@@ -58,12 +72,24 @@ export function ActivitySurface() {
     <div className="board activity">
       <header className="board-head">
         <h2 className="board-title">Brain Activity</h2>
-        <span className="board-count">{applied.length}</span>
+        <span className="board-count">{pending.length + history.length}</span>
       </header>
       {err && <p className="file-err" style={{ padding: "0 22px 8px" }}>⚠ {err}</p>}
+      {/* quiet daemon-status lines — show, never nag (§4.8) */}
+      {status?.modelOffline && (
+        <p className="brain-hint" style={{ padding: "0 22px 8px" }}>
+          Paused — local model offline. {status.queued} waiting.
+        </p>
+      )}
+      {(status?.secureSkipped ?? 0) > 0 && (
+        <p className="brain-hint" style={{ padding: "0 22px 8px" }}>
+          {status?.secureSkipped} {status?.secureSkipped === 1 ? "capture looks" : "captures look"}{" "}
+          like they contain secrets — review them yourself. The AI won’t read or move them.
+        </p>
+      )}
       {actions === null ? (
         <p className="main-empty">Loading…</p>
-      ) : applied.length === 0 ? (
+      ) : pending.length === 0 && history.length === 0 ? (
         <div className="board-empty">
           <p className="be-title">Nothing yet</p>
           <p className="be-sub">
@@ -73,9 +99,48 @@ export function ActivitySurface() {
         </div>
       ) : (
         <div className="board-scroll">
+          {pending.length > 0 && (
+            <ul className="recent-list">
+              {pending.map((a) => (
+                <li key={a.id}>
+                  <div className="act-row">
+                    <span className="act-brain" aria-hidden="true">
+                      🧠
+                    </span>
+                    <button
+                      type="button"
+                      className="act-desc"
+                      title="Open the note"
+                      // the ULID survives filings/renames; the rel is a fallback
+                      onClick={() => openNote(a.noteUlid ?? a.noteId)}
+                    >
+                      {describe(a, true)}
+                    </button>
+                    <span className="act-time">{when(a.ts)}</span>
+                    <button
+                      type="button"
+                      className="act-undo"
+                      disabled={busy === a.id}
+                      onClick={() => void run(a, approveProposal)}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      className="act-undo"
+                      disabled={busy === a.id}
+                      onClick={() => void run(a, dismissProposal)}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
           <ul className="recent-list">
-            {applied.map((a) => {
-              const undone = revertedIds.has(a.id);
+            {history.map((a) => {
+              const undone = a.status === "reverted";
               return (
                 <li key={a.id}>
                   <div className={undone ? "act-row done" : "act-row"}>
@@ -86,11 +151,9 @@ export function ActivitySurface() {
                       type="button"
                       className="act-desc"
                       title="Open the note"
-                      onClick={() => openNote(a.noteId)}
+                      onClick={() => openNote(a.noteUlid ?? a.noteId)}
                     >
-                      {a.action === "file"
-                        ? `Filed “${a.noteTitle}” → ${a.after.replace(/^wiki\//, "")}`
-                        : `Set ${a.field} on “${a.noteTitle}”`}
+                      {describe(a, false)}
                     </button>
                     <span className="act-time">{when(a.ts)}</span>
                     {undone ? (
@@ -100,7 +163,7 @@ export function ActivitySurface() {
                         type="button"
                         className="act-undo"
                         disabled={busy === a.id}
-                        onClick={() => void undo(a)}
+                        onClick={() => void run(a, undoAction)}
                       >
                         Undo
                       </button>

@@ -10,6 +10,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-07-01
+
+Phase 4 of the Main/Brain plan (`docs/design/main-brain-daemon.md`): the organizer daemon.
+Your notes now get organized **while you're not looking** — on-device, logged, reversible.
+
+### Added
+- **The Suggest daemon** (`organizer.rs`) — an always-on Rust background worker that watches
+  the memex and runs three narrow jobs against the local model: **Classify** (staged
+  `wiki/_inbox` captures → an area, or a `suggested_area` hint below the confidence
+  threshold), **Enrich** (fill *empty* `summary`/`tags`/`links` — a field you edited is never
+  clobbered; link candidates come from keyword ranking, the model only confirms), and
+  **Refresh index** (deterministic `wiki/<area>/_index.md` overviews — same members, same
+  bytes, no thrash). Gated to run politely: per-note quiet period, user idle or app backgrounded, on
+  AC, thermals OK, and it always yields to an interactive chat.
+- **Approve/Dismiss review lane** — proposals land in **Brain → Activity** ("🧠 Proposes:
+  File 'Foo' → Projects · 91%") with one-click Approve (files/annotates through the same
+  gated Filer lane) or Dismiss; the sidebar Activity link carries an unreviewed-count badge.
+  History rows stay undoable — including applied index rewrites.
+- **Settings → Brain: the trust ladder** — **Off / Suggest / Tidy / Organize** (default
+  **Suggest**), persisted and pushed to the daemon. Suggest applies **nothing** — journal
+  proposals only, provably write-free on your notes. Tidy auto-applies annotations + filing
+  brand-new captures; Organize applies everything — every rung journaled + undoable.
+- **⌥A — summon chat** ("ask") — a new global chord: from anywhere, surface rotli and land
+  in your most recently touched chat (or a fresh one). Rebindable like every action
+  (Settings → Hotkeys → Chat).
+
+### Notes
+- **Secure/locked are absolute:** a `secure` note (or one that merely *looks* secret) never
+  enters **any** model — local included — at any trust rung; a `locked` note is never
+  touched. That includes the *edges*: secure/locked notes are **omitted from the generated
+  `_index.md` overviews** (a quick capture's title is often the secret itself) and their
+  title-derived filenames are **kept out of the link-candidate lists** sent to the model.
+  Activity quietly counts skipped secret-looking captures for you to review yourself — a
+  durable count that stays up across cycles until the capture is actually reviewed. The
+  daemon is local-only: no web tools, nothing leaves the machine.
+- The daemon writes only through the contract-v3.7 Filer lane (`file_note` / `set_ai_field`
+  / `write_index`); your interactive write lane is byte-identical, and Main
+  (`.rotli/main.json`) is structurally out of its reach.
+- **Stale proposals retire themselves:** edit a note after the daemon proposed something for
+  it and the next pass dismisses the outdated row before proposing fresh — and Approve
+  re-checks the note's current state (moved note / user-edited field ⇒ it refuses instead of
+  applying a stale decision). Journal rows carry the note's ULID, so approving one proposal
+  (which moves the file) never strands its siblings. Turning the ladder **Off/down
+  mid-run takes effect at the next note**, not the next cycle — and a debounced settings
+  save can no longer flip it back up.
+
 ## [0.18.2] — 2026-07-01
 
 A whole-codebase dead-code + consolidation sweep (three parallel audits: TS dead code, TS

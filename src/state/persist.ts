@@ -24,6 +24,7 @@ import {
   corpusSettingsRead,
   corpusSettingsWrite,
   isTauri,
+  organizerSetTrust,
   setDockVisible,
   setGlobalShortcut,
   setHideOnBlur,
@@ -56,6 +57,8 @@ import {
   type GlassCanvas,
   type GlassClarity,
   type GlassTint,
+  ORGANIZER_TRUSTS,
+  type OrganizerTrust,
   RECENT,
   RESERVED_DESTS,
   SEC_CHAT,
@@ -130,6 +133,9 @@ interface PersistedSettings {
   chatWeb: Record<string, boolean>;
   /** How the Storage destination groups its binaries: Type / Date / Folder. */
   storageGrouping: "type" | "date" | "folder";
+  /** The organizer daemon's §4.3 trust rung; the Rust daemon re-reads this file
+   * each cycle, so persisting here IS the durable knob. Default: suggest. */
+  organizerTrust: OrganizerTrust;
   /** First-run onboarding gate — false until the flow is finished/skipped. */
   onboarded: boolean;
   /** The app version onboarding last completed at (the onboardingVersion gate). */
@@ -154,7 +160,9 @@ interface PersistedSettings {
   noteStyles: Record<string, NoteStyle>;
 }
 
-function parseSettings(raw: string): PersistedSettings {
+/** Exported for tests (the safe-default locks); production callers stay inside
+ * this module. */
+export function parseSettings(raw: string): PersistedSettings {
   let data: Record<string, unknown>;
   try {
     data = record(JSON.parse(raw));
@@ -239,6 +247,9 @@ function parseSettings(raw: string): PersistedSettings {
       data.storageGrouping === "date" || data.storageGrouping === "folder"
         ? data.storageGrouping
         : "type",
+    // an unknown rung (hand-edit, future build) falls to the SAFE default —
+    // Suggest never applies anything, so a bad parse can't grant auto-apply
+    organizerTrust: asEnum(data.organizerTrust, ORGANIZER_TRUSTS, "suggest"),
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
     // not this one — treat that as already-onboarded so we don't re-run first-run
     // onboarding on existing users (same migration shape as expandedDests above)
@@ -279,6 +290,7 @@ function applySettings(s: PersistedSettings): void {
     chatModelId: s.chatModelId,
     chatWeb: s.chatWeb,
     storageGrouping: s.storageGrouping,
+    organizerTrust: s.organizerTrust,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
     quickNoteIds: s.quickNoteIds,
@@ -320,6 +332,9 @@ function applyShellSideEffects(s: PersistedSettings): void {
   // before App's reactive effect runs. App.tsx re-applies on finish.
   if (s.stayOpen || !s.onboarded) void setHideOnBlur(false);
   if (s.showInDock) void setDockVisible(true);
+  // push the persisted trust rung to the daemon NOW — it also re-reads
+  // settings.json each cycle, so this is immediacy, not correctness
+  organizerSetTrust(s.organizerTrust).catch(() => {});
   for (const action of allActions()) {
     if (!action.global || !(action.id in s.bindings)) continue;
     const chord = s.bindings[action.id] ?? null;
@@ -530,6 +545,7 @@ function settingsSnapshot(): string {
     chatModelId: ui.chatModelId,
     chatWeb: ui.chatWeb,
     storageGrouping: ui.storageGrouping,
+    organizerTrust: ui.organizerTrust,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
     quickNoteIds: ui.quickNoteIds,

@@ -24,10 +24,12 @@ import {
   corpusOverview,
   downloadAndInstallUpdate,
   isTauri,
+  organizerSetTrust,
   revealCorpus,
   setDockVisible,
   setHideOnBlur,
 } from "../lib/tauri";
+import { usePanesStore } from "../state/panes";
 import { useFolders } from "../services/hooks";
 import { isHidden, isVault } from "../services/destinations";
 import { resetAndReonboard } from "../state/onboarding";
@@ -36,6 +38,7 @@ import {
   GLASS_BACKGROUNDS,
   GLASS_BLURS,
   GLASS_TINTS,
+  type OrganizerTrust,
   SOLID_THEMES,
   useUiStore,
 } from "../state/ui";
@@ -45,6 +48,7 @@ import {
   DatabaseGlyph,
   KeyboardGlyph,
   LaptopGlyph,
+  NotesStackGlyph,
   PlusGlyph,
   SunGlyph,
 } from "./glyphs";
@@ -61,12 +65,15 @@ import {
 } from "../memex/useMemex";
 import { CORPUS_INSTANCE_ID, type MemexInstance, type Perms } from "../memex/config";
 
-type SettingsPane = "general" | "hotkeys" | "appearance" | "location" | "plugins";
+type SettingsPane = "general" | "hotkeys" | "appearance" | "brain" | "location" | "plugins";
 
 const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = [
   { id: "general", label: "General", glyph: LaptopGlyph },
   { id: "hotkeys", label: "Hotkeys", glyph: KeyboardGlyph },
   { id: "appearance", label: "Appearance", glyph: SunGlyph },
+  // the organizer daemon's trust ladder (design §4.3) — minimal Phase-4 pane;
+  // capability checkboxes / Pause / Reset Brain are Phase 5 (§4.8)
+  { id: "brain", label: "Brain", glyph: NotesStackGlyph },
   // Storage + Memory collapsed into one "Location" tab (Seth, 2026-06-27): your
   // notes folder *is* (or can become) a brain — one concept, not two overlapping
   // ones. See LocationPane below.
@@ -159,6 +166,7 @@ const HK_SECTIONS: { prefix: string; label: string }[] = [
   { prefix: "capture", label: "Quick capture" },
   { prefix: "quick", label: "Quick note" },
   { prefix: "notes", label: "Notes" },
+  { prefix: "chat", label: "Chat" },
   { prefix: "editor", label: "Editor" },
   { prefix: "tabs", label: "Tabs" },
   { prefix: "panes", label: "Panes" },
@@ -1032,6 +1040,66 @@ function LocationPane() {
   );
 }
 
+// ——— Brain: the organizer daemon's trust ladder (design §4.3). Minimal by
+// design — Phase 4 ships the 4-level radio + the reassurance copy; capability
+// checkboxes, Pause, and Reset Brain are the Phase-5 control panel (§4.8). ———
+
+/** What each rung lets the daemon auto-APPLY — proposals always flow to
+ * Activity regardless (except Off, which is fully dormant). */
+const TRUST_CAPTIONS: Record<OrganizerTrust, string> = {
+  off: "Dormant — it leaves your notes alone entirely.",
+  suggest: "Applies nothing. Everything it wants to do waits in Activity for your OK.",
+  tidy: "Files brand-new captures and fills in summaries/tags on its own; bigger moves still wait for you.",
+  organize: "Keeps everything organized on its own — every action journaled and undoable.",
+};
+
+function BrainPane() {
+  const trust = useUiStore((s) => s.organizerTrust);
+  const setTrust = useUiStore((s) => s.setOrganizerTrust);
+  const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
+  return (
+    <>
+      <PaneHead title="Brain" char="knowledge" />
+      <p className="lead">
+        A small AI on your Mac keeps the Brain organized — it files new notes into areas, writes
+        one-line summaries, suggests tags, and keeps each area&rsquo;s overview current. How much
+        it does on its own is up to you.
+      </p>
+      <Seg
+        value={trust}
+        options={[
+          ["off", "Off"],
+          ["suggest", "Suggest"],
+          ["tidy", "Tidy"],
+          ["organize", "Organize"],
+        ]}
+        onPick={(v) => {
+          // store first (persists via settings.json — the daemon's backstop),
+          // then nudge the in-memory rung so the flip is immediate
+          setTrust(v);
+          organizerSetTrust(v).catch(() => {});
+        }}
+      />
+      <p className="setnote">{TRUST_CAPTIONS[trust]}</p>
+      <p className="setnote">
+        Never touches: locked notes · secure notes · your Main arrangement.
+      </p>
+      <p className="setnote">Local only — never the internet, can&rsquo;t read secrets.</p>
+      <button
+        type="button"
+        className="ghostbtn"
+        onClick={() => {
+          // Activity is a pane in the notes surface — leave Settings to show it
+          setSettingsOpen(false);
+          usePanesStore.getState().openActivity();
+        }}
+      >
+        View activity
+      </button>
+    </>
+  );
+}
+
 function PluginsPane() {
   return (
     <>
@@ -1091,6 +1159,7 @@ export function SettingsSurface() {
           {pane === "general" && <GeneralPane />}
           {pane === "hotkeys" && <HotkeysPane />}
           {pane === "appearance" && <AppearancePane />}
+          {pane === "brain" && <BrainPane />}
           {pane === "location" && <LocationPane />}
           {pane === "plugins" && <PluginsPane />}
         </div>

@@ -431,6 +431,10 @@ pub struct ChatSummary {
     pub source: String,
     pub attached_to: String,
     pub path: String,
+    /// fs mtime (ms since epoch; 0 when unreadable) — ⌥A summon-chat picks the
+    /// most recently touched chat. The listing stays slug-sorted (the sidebar
+    /// depends on that order); recency is the CALLER's concern.
+    pub modified_ms: u64,
 }
 
 /// List the named chats in `chats/` (read-only; mirrors conversations.ts listChats).
@@ -453,12 +457,19 @@ pub fn memex_list_chats(root: String) -> Result<Vec<ChatSummary>, String> {
                 continue;
             }
             let text = fs::read_to_string(&p).unwrap_or_default();
+            let modified_ms = fs::metadata(&p)
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
             out.push(ChatSummary {
                 slug,
                 title: fm(&text, "title"),
                 source: fm(&text, "source"),
                 attached_to: unwrap_wikilink(&fm(&text, "attachedTo")),
                 path: p.to_string_lossy().to_string(),
+                modified_ms,
             });
         }
     }

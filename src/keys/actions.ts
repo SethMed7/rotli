@@ -10,6 +10,7 @@ import {
   type InlineMark,
   activeEditor,
 } from "../editor/commands";
+import { summonChat } from "../services/chatSummon";
 import { createRoutedNote } from "../services/createNote";
 import { invalidateNotes } from "../services/hooks";
 import { inboxFolderId, notesService } from "../services/notes";
@@ -441,6 +442,14 @@ export function registerDefaultActions(): void {
       // "chat" was retired and rendered nothing (Seth, 2026-06-30 — audit).
       usePanesStore.getState().openChat(null);
     },
+  });
+  registerAction({
+    id: "chat.summon",
+    title: "Summon chat",
+    defaultChord: "Alt+A", // "ask" — the ⌥-letter global family (⌥Space/⌥C/⌥Q)
+    global: true, // the OS chord lives in Rust (show_main + rotli:summon-chat);
+    // run() keeps palette/dispatch parity for in-app invocation
+    run: () => void summonChat(),
   });
   registerAction({
     id: "chat.all",

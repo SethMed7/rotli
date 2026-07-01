@@ -10,7 +10,7 @@
 import { corpusFileNote, corpusNotePath, corpusSetAiField } from "../lib/tauri";
 import { usePanesStore } from "../state/panes";
 import { logAction } from "./brainJournal";
-import { invalidateNotes } from "./hooks";
+import { invalidateJournal, invalidateNotes } from "./hooks";
 
 /** True when this REL PATH is a STAGED note (wiki/_inbox) — resolve a wire id
  * through corpusNotePath first; a ULID never matches. */
@@ -21,8 +21,14 @@ export function isStagedNote(relPath: string): boolean {
 /** File a note (by wire id or rel path) into `wiki/<area>`: set the AI area
  * field, move through the Filer gate, retarget open panes, journal it, refresh.
  * Throws on refusal (locked note, bad area, not a memex note) — callers surface
- * it. Returns the note's new rel path. */
-export async function fileNoteToArea(noteId: string, area: string): Promise<string> {
+ * it. Returns the note's new rel path. `journal:false` = the caller owns the
+ * journal row (approving a daemon proposal transitions the PROPOSAL's id —
+ * a fresh row here would double-log the same move). */
+export async function fileNoteToArea(
+  noteId: string,
+  area: string,
+  opts?: { journal?: boolean },
+): Promise<string> {
   const rel = await corpusNotePath(noteId);
   const before = rel.slice(0, rel.lastIndexOf("/"));
   const title = (rel.split("/").pop() ?? rel)
@@ -33,14 +39,19 @@ export async function fileNoteToArea(noteId: string, area: string): Promise<stri
   // a .md note's wire id is its ULID and survives the move — only a tab that was
   // opened BY rel path needs retargeting (a no-op otherwise).
   usePanesStore.getState().retargetNote(rel, newRel);
-  await logAction({
-    action: "file",
-    noteId: newRel,
-    noteTitle: title,
-    area,
-    before,
-    after: newRel.slice(0, newRel.lastIndexOf("/")),
-  });
+  if (opts?.journal !== false) {
+    await logAction({
+      action: "file",
+      noteId: newRel,
+      noteTitle: title,
+      area,
+      before,
+      after: newRel.slice(0, newRel.lastIndexOf("/")),
+    });
+    // queries never go stale on their own (staleTime ∞) — a fresh journal row
+    // must push itself into Activity + the sidebar badge
+    await invalidateJournal();
+  }
   await invalidateNotes();
   return newRel;
 }
