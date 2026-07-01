@@ -1,24 +1,38 @@
-// All notes (Seth, 2026-06-30): a searchable LIST of every note (not a card grid)
-// — title + snippet on the left, date on the right, a full-width search at the top.
-// Binary files are excluded (they live under Storage). Click a row to open it.
+// The dated note LIST in the content area — ONE component behind both "All
+// notes" (searchable) and "Recent" (plain recency), which had grown as twins
+// (2026-07-01 consolidation). Every note ordered by most-recently touched,
+// title + snippet left, date right; click a row to open it. Binary files are
+// excluded — they live under Storage. The sidebar never moves.
 
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { useNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import { SearchGlyph } from "./glyphs";
 import { NoteListRow } from "./NoteListRow";
 import { useNoteMenu } from "./useNoteMenu";
 
-export function AllNotesSurface() {
-  // useNotes() (no folder) excludes the hidden roots (Archive / Trash / Board). It
-  // carries boards (kind:"board"); we drop binary FILES — those live under Storage.
+export function NoteListSurface({
+  title,
+  glyph,
+  searchable = false,
+  searchPlaceholder = "Search…",
+}: {
+  title: string;
+  /** An optional header glyph (Recent shows the clock; All notes goes bare). */
+  glyph?: ReactNode;
+  /** Adds the full-width title/snippet search on top (All notes). */
+  searchable?: boolean;
+  searchPlaceholder?: string;
+}) {
+  // useNotes() (no folder) excludes the hidden roots (Archive / Trash / Board).
+  // It carries boards (kind:"board"); binary FILES live under Storage.
   const notes = (useNotes().data ?? []).filter((n) => n.kind !== "file");
   const openSummary = usePanesStore((s) => s.openSummary);
   const openMenu = useNoteMenu();
   const [query, setQuery] = useState("");
 
   const q = query.trim().toLowerCase();
-  const results = useMemo(
+  const rows = useMemo(
     () =>
       notes
         .filter((n) => !q || n.title.toLowerCase().includes(q) || n.snippet.toLowerCase().includes(q))
@@ -29,22 +43,25 @@ export function AllNotesSurface() {
   return (
     <div className="board allnotes">
       <header className="board-head">
-        <h2 className="board-title">All notes</h2>
+        {glyph}
+        <h2 className="board-title">{title}</h2>
         <span className="board-count">{notes.length}</span>
       </header>
 
-      <div className="allnotes-search">
-        <SearchGlyph size={15} />
-        <input
-          type="text"
-          value={query}
-          placeholder="Search all notes…"
-          aria-label="Search all notes"
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </div>
+      {searchable && (
+        <div className="allnotes-search">
+          <SearchGlyph size={15} />
+          <input
+            type="text"
+            value={query}
+            placeholder={searchPlaceholder}
+            aria-label={searchPlaceholder}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+      )}
 
-      {results.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="board-empty">
           <p className="be-title">{notes.length === 0 ? "No notes yet" : "No matches"}</p>
           <p className="be-sub">
@@ -56,7 +73,7 @@ export function AllNotesSurface() {
       ) : (
         <div className="board-scroll">
           <ul className="recent-list">
-            {results.map((n) => (
+            {rows.map((n) => (
               <NoteListRow
                 key={n.id}
                 note={n}

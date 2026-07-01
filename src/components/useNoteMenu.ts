@@ -1,12 +1,15 @@
-// useNoteMenu — one hook that builds the right-click menu for a note/file/board
-// row and opens the context-menu store. Centralizes the item list + every
-// handler so any surface (sidebar, All-notes, Recent, Main) wires it the same
-// way: `const openMenu = useNoteMenu(); ... onContextMenu={(e) => openMenu(e, note)}`.
+// useNoteMenu — one hook that builds the row menu for a note/file/board row and
+// opens the context-menu store. Centralizes the item list + every handler so
+// any surface (sidebar, All-notes, Recent, Main) wires it the same way:
+// `const openMenu = useNoteMenu(); ... onContextMenu={(e) => openMenu(e, note)}`.
+// The sidebar's "m" key opens the SAME menu with a synthetic anchor + a
+// returnFocus that hands the cursor back to the row (the RowMenu unification).
 
-import { type MouseEvent, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { fileNoteToArea } from "../services/brainFiling";
-import { DEST } from "../services/destinations";
-import { useArchiveNote, useFolders, useNotes, useTrashNote } from "../services/hooks";
+import { DEST, isHidden } from "../services/destinations";
+import { useArchiveNote, useBrainAreas, useRestoreNote, useTrashNote } from "../services/hooks";
+import { useNotes } from "../services/hooks";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useMainStore } from "../state/main";
@@ -14,6 +17,15 @@ import { usePanesStore } from "../state/panes";
 import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
+
+/** What the opener hands us — a real MouseEvent qualifies, and a keyboard
+ * opener passes a plain {clientX, clientY} built from its row's rect. */
+export interface MenuAnchor {
+  clientX: number;
+  clientY: number;
+  preventDefault?: () => void;
+  stopPropagation?: () => void;
+}
 
 export function useNoteMenu() {
   const open = useContextMenu((s) => s.open);
@@ -26,19 +38,39 @@ export function useNoteMenu() {
   const liveIds = useMemo(() => new Set(allNotes.map((n) => n.id)), [allNotes]);
   const archive = useArchiveNote();
   const trash = useTrashNote();
-  // the Brain's area vocabulary (People/Projects/…) for the filing drill —
-  // same source + underscore filter as the metadata panel's "File to the Brain"
-  const folders = useFolders().data ?? [];
-  const areas = useMemo(
-    () =>
-      folders.filter((f) => f.parentId === "wiki" && !f.name.startsWith("_")).map((f) => f.name),
-    [folders],
-  );
+  const restore = useRestoreNote();
+  // the Brain's area vocabulary for the filing drill — shared with MetaPanel
+  const areas = useBrainAreas();
 
   return useCallback(
-    (e: MouseEvent, note: NoteSummary) => {
-      e.preventDefault();
-      e.stopPropagation();
+    (e: MenuAnchor, note: NoteSummary, opts?: { returnFocus?: () => void }) => {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+
+      // an archived/trashed note: open + Restore only — the lifecycle actions
+      // don't apply until it's back (mirrors the retired RowMenu's split)
+      if (isHidden(note.folderId)) {
+        open(
+          e.clientX,
+          e.clientY,
+          [
+            {
+              kind: "action" as const,
+              label: "Open in new tab",
+              onClick: () => openSummary(note, { newTab: true }),
+            },
+            { kind: "sep" as const },
+            {
+              kind: "action" as const,
+              label: "Restore",
+              onClick: () => restore.mutate(note.id),
+            },
+          ],
+          opts,
+        );
+        return;
+      }
+
       const isFile = note.kind === "file";
       const isBoard = note.kind === "board";
       const inMain = mainHasNote(manifest.tree, note.id);
@@ -120,8 +152,8 @@ export function useNoteMenu() {
         onClick: () => trash.mutate(note.id),
       });
 
-      open(e.clientX, e.clientY, items);
+      open(e.clientX, e.clientY, items, opts);
     },
-    [open, openSummary, quickIds, manifest, setTree, liveIds, archive, trash, setRenameTarget, areas],
+    [open, openSummary, quickIds, manifest, setTree, liveIds, archive, trash, restore, setRenameTarget, areas],
   );
 }

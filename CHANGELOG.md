@@ -10,6 +10,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.2] — 2026-07-01
+
+A whole-codebase dead-code + consolidation sweep (three parallel audits: TS dead code, TS
+duplication, the Rust shell) — less to manage, nothing user-visible lost. The Rust side came
+back clean (no unused deps; write paths already share one `atomic_write`/`relocate` core).
+
+### Changed
+- **One menu system.** The sidebar's old keyboard row-popover (RowMenu) is gone; the **m key
+  now opens the same right-click menu**, anchored under the row — so keyboard users get the
+  FULL action set (Star, Add to Main, Rename…, File to the Brain, Archive, Delete) instead of
+  the old three-item subset. The menu host gained first-item autofocus, ArrowUp/Down
+  navigation, and hands focus back to the row on close. Right-clicking an **archived/trashed**
+  note now correctly offers **Restore** (it used to offer Archive again).
+- **All notes + Recent are one component.** The two content lists had grown as twins; both now
+  render a single `NoteListSurface` (All notes = the searchable flavor). Same look, one file.
+- **One Main drag.** The "reorder Main" and "drag a note into Main" pointer gestures shared
+  their whole move/hit-test body — now a single `startMainDrag(mode)` with two commits.
+- Shared `useBrainAreas()` (the metadata panel and the right-click drill derived the area
+  vocabulary separately) and one `invalidateBoth` for the lifecycle mutations.
+
+### Removed (dead code)
+- The **HTML5 note-drag dropzones** in the sidebar (`NOTE_DRAG_TYPE`/`dropProps`): nothing has
+  started an HTML5 drag since the pointer-drag era — the handlers could never fire. (Moving a
+  note is the ⊕/drag-into-Main gesture + Archive/Trash; a pointer-based move-to-folder can
+  reuse the Main drag pattern when wanted.)
+- The retired `chatAllOpen` browse state and the retired `"chat"` content view (chat is a pane).
+- Unwired wrappers + helpers: `chatComplete` (the agentic `chatMessages` path replaced it),
+  `showQuickWindow`, `memexInspect`/`memexListDir` + the service's `inspect`/`listDir`,
+  `useCreateFolder`, `useMoveNote`, `addQuickNote`, `EMPTY_CONFIG`, six unused glyphs, and the
+  `@types/katex` dev-dependency.
+
 ## [0.18.1] — 2026-07-01
 
 ### Fixed

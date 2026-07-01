@@ -19,13 +19,20 @@ export type MenuSpec =
   | { kind: "drill"; label: string; items: MenuSpec[]; disabled?: boolean };
 
 interface ContextMenuState {
-  menu: { x: number; y: number; items: MenuSpec[] } | null;
-  open: (x: number, y: number, items: MenuSpec[]) => void;
+  menu: { x: number; y: number; items: MenuSpec[]; returnFocus?: () => void } | null;
+  /** `returnFocus` runs when the menu closes — a keyboard opener (the sidebar's
+   * "m" key) hands the cursor back to its row so focus never strands. */
+  open: (x: number, y: number, items: MenuSpec[], opts?: { returnFocus?: () => void }) => void;
   close: () => void;
 }
 
-export const useContextMenu = create<ContextMenuState>((set) => ({
+export const useContextMenu = create<ContextMenuState>((set, get) => ({
   menu: null,
-  open: (x, y, items) => set({ menu: { x, y, items } }),
-  close: () => set({ menu: null }),
+  open: (x, y, items, opts) =>
+    set({ menu: { x, y, items, ...(opts?.returnFocus ? { returnFocus: opts.returnFocus } : {}) } }),
+  close: () => {
+    const rf = get().menu?.returnFocus;
+    set({ menu: null });
+    rf?.();
+  },
 }));

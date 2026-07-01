@@ -29,8 +29,6 @@ export interface MemexConfig {
   instances: MemexInstance[];
 }
 
-export const EMPTY_CONFIG: MemexConfig = { activeId: null, instances: [] };
-
 function baseName(p: string): string {
   const parts = p.split("/").filter(Boolean);
   return parts[parts.length - 1] ?? "brain";

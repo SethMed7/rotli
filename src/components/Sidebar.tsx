@@ -14,7 +14,6 @@
 // grammar, shared with the panes.
 
 import {
-  type DragEvent,
   type KeyboardEvent,
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -44,7 +43,6 @@ import {
   useArchiveNote,
   useCorpusRoots,
   useFolders,
-  useMoveNote,
   useNotes,
   useRestoreNote,
   useTrashNote,
@@ -98,12 +96,6 @@ import {
   VaultGlyph,
 } from "./glyphs";
 import { type RovingRow, useRovingList } from "./sidebar/useRovingList";
-import { RowMenu } from "./sidebar/RowMenu";
-
-/** The drag payload type for a note dragged from a compact row onto a
- * destination/folder dropzone (Seth, 2026-06-13). One private MIME so foreign
- * drags (files, text) never match a rotli dropzone. */
-const NOTE_DRAG_TYPE = "application/x-rotli-note";
 
 /** Restore-from-hidden glyph (Seth, 2026-06-13): a counter-clockwise arc arrow
  * — "put it back". Lives here, not in glyphs.tsx, since this is the only place
@@ -208,12 +200,10 @@ interface RowActions {
 
 /** A compact note row: title + day label only — NO snippet line (that is the
  * difference from the old NoteList's three-line .nrow). Click opens the note;
- * ⌘-click opens it in a new tab. Phase 2 (Seth, 2026-06-13): the .snact slot
- * now carries the hover affordances — Archive + Trash for a normal row, a
- * single Restore for a row already in Archive/Trash — and the whole row is
- * draggable onto a destination/folder dropzone (the move/archive/trash gesture
- * with no right-click menu). Each action button stops propagation so it never
- * opens the note. */
+ * ⌘-click opens it in a new tab. The .snact slot carries the hover affordances
+ * — Archive + Trash for a normal row, a single Restore for a row already in
+ * Archive/Trash. Each action button stops propagation so it never opens the
+ * note. */
 function CompactNoteRow({
   note,
   selected,
@@ -547,8 +537,8 @@ export function Sidebar() {
   );
 
   // a flat id → note lookup across every loaded list (incl. hidden Archive/
-  // Trash) — the drop handler's same-folder no-op check trusts this (Seth,
-  // 2026-06-13). allNotes alone would miss hidden notes dragged back home.
+  // Trash) — the row menu's hidden-note branch trusts this; allNotes alone
+  // would miss archived/trashed notes.
   const noteById = new Map<string, NoteSummary>();
   for (const n of [
     ...allNotes,
@@ -596,8 +586,8 @@ export function Sidebar() {
   const filterRef = useRef<HTMLInputElement>(null);
 
   // — the "+" create menu (replaces the old pencil): New note / New board / New
-  // folder, anchored under the button via the same fixed-position trick RowMenu
-  // uses. useTransientPopover wires Esc + outside-click close (Seth, 2026-06-24).
+  // folder, anchored under the button as a fixed-position popover.
+  // useTransientPopover wires Esc + outside-click close (Seth, 2026-06-24).
   const [plusOpen, setPlusOpen] = useState(false);
   const plusBtnRef = useRef<HTMLDivElement>(null);
   const plusMenuRef = useRef<HTMLDivElement>(null);
@@ -615,7 +605,7 @@ export function Sidebar() {
   const newFolderHandled = useRef(false);
 
   // anchor the "+" menu just under its button (fixed-positioned so it escapes
-  // the sidebar's overflow clip) — same mount-from-box trick RowMenu uses.
+  // the sidebar's overflow clip) — positioned from the button's box on open.
   useEffect(() => {
     if (!plusOpen) return;
     const btn = plusBtnRef.current;
@@ -626,14 +616,6 @@ export function Sidebar() {
     // right-align the menu to the button so it never overflows the sidebar edge
     menu.style.left = `${Math.max(8, rect.right - menu.offsetWidth)}px`;
   }, [plusOpen]);
-  // the open row menu (the "m" / context popover) — its note id, hidden flag,
-  // and the row element it hangs off (the focus-return target on close).
-  const [menu, setMenu] = useState<{
-    noteId: string;
-    hidden: boolean;
-    anchor: HTMLElement;
-  } | null>(null);
-
   // — lifecycle mutations (Seth, 2026-06-13): wired once here, the .mutate fns
   // flow down to every compact row's hover slot AND the destination dropzones.
   // moveNote handles the origin rule, so dropping on Archive/Trash archives or
@@ -641,17 +623,12 @@ export function Sidebar() {
   const archiveNote = useArchiveNote();
   const trashNote = useTrashNote();
   const restoreNote = useRestoreNote();
-  const moveNote = useMoveNote();
   const rowActions: RowActions = {
     archive: (id) => archiveNote.mutate(id),
     trash: (id) => trashNote.mutate(id),
     restore: (id) => restoreNote.mutate(id),
     addToMain: (id) => setMainTree(addNoteToMain(mainManifest.tree, id), liveIds),
   };
-
-  // — the active dropzone (a destination/folder id) while a note is mid-drag;
-  // drives the .drop-over accent ring and is cleared on leave/drop. —
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
 
   // — Main pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell, so the
   //   BoardSurface pointer pattern; a threshold distinguishes drag from click) —
@@ -662,70 +639,32 @@ export function Sidebar() {
   // `crossDragRef` suppresses the row's click when a drag actually happened.
   const crossDragRef = useRef(false);
 
-  const startAddToMainDrag = (e: ReactPointerEvent, noteId: string) => {
+  // ONE pointer-drag for the Main tree (2026-07-01 consolidation — this and the
+  // cross-section add had grown as twins): "move" drags a row already in Main
+  // (reorder / into folders, paints the .dragging row); "add" pulls a note in
+  // from any other list (Brain, a folder). Same hit-test + drop grammar; the
+  // two modes differ only in their commit and which suppress-click ref they
+  // arm. (HTML5 DnD stays dead in the WKWebView shell — pointer events only.)
+  const startMainDrag = (e: ReactPointerEvent, id: string, mode: "move" | "add") => {
     if (e.button !== 0) return;
     const sx = e.clientX;
     const sy = e.clientY;
     let dragging = false;
     let drop: { id: string; pos: DropPos } | null = null;
-    crossDragRef.current = false;
-    const onMove = (ev: PointerEvent) => {
-      if (!dragging) {
-        if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 6) return;
-        dragging = true;
-        crossDragRef.current = true;
-      }
-      const hit = (
-        document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
-      )?.closest("[data-main-id]") as HTMLElement | null;
-      const tid = hit?.dataset.mainId;
-      if (!hit || !tid) {
-        drop = null;
-        setMainDrop(null);
-        return;
-      }
-      const rect = hit.getBoundingClientRect();
-      const rel = rect.height > 0 ? (ev.clientY - rect.top) / rect.height : 0.5;
-      let pos: DropPos = rel < 0.5 ? "before" : "after";
-      if (hit.dataset.mainFolder === "1" && rel > 0.33 && rel < 0.67) pos = "into";
-      if (tid === MAIN_ROOT) pos = "into"; // the whole Main zone → add at root
-      drop = { id: tid, pos };
-      setMainDrop(drop);
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      setMainDrop(null);
-      if (dragging && drop) {
-        // add the note to Main, then place it at the drop (root add if the zone).
-        let tree = addNoteToMain(mainManifest.tree, noteId);
-        if (drop.id !== MAIN_ROOT) tree = moveInTree(tree, noteId, drop.id, drop.pos);
-        setMainTree(tree, liveIds);
-      }
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  };
-
-  const startMainDrag = (e: ReactPointerEvent, id: string) => {
-    if (e.button !== 0) return;
-    const sx = e.clientX;
-    const sy = e.clientY;
-    let dragging = false;
-    let drop: { id: string; pos: DropPos } | null = null;
-    didMainDragRef.current = false;
+    const dragFlag = mode === "move" ? didMainDragRef : crossDragRef;
+    dragFlag.current = false;
     const onMove = (ev: PointerEvent) => {
       if (!dragging) {
         if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 5) return;
         dragging = true;
-        didMainDragRef.current = true;
-        setMainDragId(id);
+        dragFlag.current = true;
+        if (mode === "move") setMainDragId(id);
       }
       const hit = (
         document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
       )?.closest("[data-main-id]") as HTMLElement | null;
       const tid = hit?.dataset.mainId;
-      if (!hit || !tid || tid === id) {
+      if (!hit || !tid || (mode === "move" && tid === id)) {
         drop = null;
         setMainDrop(null);
         return;
@@ -735,16 +674,24 @@ export function Sidebar() {
       // a folder's middle third = drop INTO it; otherwise before/after by half
       let pos: DropPos = rel < 0.5 ? "before" : "after";
       if (hit.dataset.mainFolder === "1" && rel > 0.33 && rel < 0.67) pos = "into";
+      if (tid === MAIN_ROOT) pos = "into"; // the whole Main zone → land at root
       drop = { id: tid, pos };
       setMainDrop(drop);
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      setMainDragId(null);
+      if (mode === "move") setMainDragId(null);
       setMainDrop(null);
       if (dragging && drop) {
-        setMainTree(moveInTree(mainManifest.tree, id, drop.id, drop.pos), liveIds);
+        if (mode === "add") {
+          // add the note to Main, then place it at the drop (root add if the zone)
+          let tree = addNoteToMain(mainManifest.tree, id);
+          if (drop.id !== MAIN_ROOT) tree = moveInTree(tree, id, drop.id, drop.pos);
+          setMainTree(tree, liveIds);
+        } else {
+          setMainTree(moveInTree(mainManifest.tree, id, drop.id, drop.pos), liveIds);
+        }
       }
     };
     window.addEventListener("pointermove", onMove);
@@ -817,7 +764,7 @@ export function Sidebar() {
             data-main-id={n.id}
             className={`snrow main-row${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
             style={{ paddingLeft: 10 + (depth + 1) * 16 }}
-            onPointerDown={(e) => startMainDrag(e, n.id)}
+            onPointerDown={(e) => startMainDrag(e, n.id, "move")}
             onClick={() => {
               if (!didMainDragRef.current) usePanesStore.getState().openSummary(n);
             }}
@@ -846,7 +793,7 @@ export function Sidebar() {
                 data-main-folder="1"
                 className={`frow child main-row${dropCls(f.id)}${mainDragId === f.id ? " dragging" : ""}`}
                 style={{ paddingLeft: 10 + (depth + 1) * 16 }}
-                onPointerDown={(e) => startMainDrag(e, f.id)}
+                onPointerDown={(e) => startMainDrag(e, f.id, "move")}
                 onClick={() => {
                   // toggle against the OPEN default (?? true) — toggleDestExpanded
                   // assumes closed, so the first click on a fresh folder no-oped
@@ -868,35 +815,6 @@ export function Sidebar() {
       </>
     );
   };
-
-  /** Wire one destination/folder row as a note dropzone: highlight on hover,
-   * and on drop move the dragged note there (same-folder drop is a no-op —
-   * moveNote handles archive/trash via the origin rule). Smart rows never call
-   * this, so they ignore drops by construction. */
-  const dropProps = (destId: string) => ({
-    onDragOver: (event: DragEvent) => {
-      if (!event.dataTransfer.types.includes(NOTE_DRAG_TYPE)) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-      if (dropTarget !== destId) setDropTarget(destId);
-    },
-    onDragLeave: (event: DragEvent) => {
-      // ignore leaves into a child element of the same row
-      if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-      setDropTarget((t) => (t === destId ? null : t));
-    },
-    onDrop: (event: DragEvent) => {
-      const id = event.dataTransfer.getData(NOTE_DRAG_TYPE);
-      setDropTarget(null);
-      if (!id) return;
-      event.preventDefault();
-      // same-folder drop is a no-op — search every loaded list (incl. the
-      // hidden Archive/Trash) so a back-onto-itself drop is caught too
-      const note = noteById.get(id);
-      if (note && note.folderId === destId) return;
-      moveNote.mutate({ id, targetFolder: destId });
-    },
-  });
 
   // each destination's subtree notes, by dest id (Brain/Storage include their
   // nested user folders; the nested rows slice their own out of this list)
@@ -993,7 +911,7 @@ export function Sidebar() {
                   : openRow(note.id)
               }
               actions={rowActions}
-              onBeginMainDrag={(e) => startAddToMainDrag(e, note.id)}
+              onBeginMainDrag={(e) => startMainDrag(e, note.id, "add")}
               mainDragRef={crossDragRef}
               rowProps={rp({ id: note.id, kind: "note" })}
               onContextMenu={(e) => openNoteMenu(e, note)}
@@ -1052,16 +970,13 @@ export function Sidebar() {
         <div key={folder.id}>
           <button
             type="button"
-            className={`frow child${selected ? " sel" : ""}${
-              dropTarget === folder.id ? " drop-over" : ""
-            }`}
+            className={`frow child${selected ? " sel" : ""}`}
             style={{ paddingLeft: 10 + (depth + 1) * 16 }}
             onClick={() => {
               toggleDestExpanded(folder.id);
               setSelectedFolderId(folder.id);
               setContentView("panes");
             }}
-            {...(!isVault(folder.id) ? dropProps(folder.id) : {})}
             {...rp({ id: folder.id, kind: "folder" })}
           >
             <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
@@ -1224,16 +1139,20 @@ export function Sidebar() {
       return false;
     },
     onFocusFilter: () => filterRef.current?.focus(),
-    // m: only note rows get the full menu; folder/smart rows — and board rows
-    // (no noteById entry, no lifecycle yet) — have no popover. A Main row maps
-    // to its underlying note.
+    // m: a note/board/file row opens the SAME context menu the right-click
+    // uses, anchored under the row; on close the cursor returns to the row
+    // (the RowMenu unification, 2026-07-01). A Main row maps to its note.
     onOpenMenu: (row, anchor) => {
+      if (row.kind !== "note") return;
       const bare = row.id.startsWith(MAIN_ROW_PREFIX)
         ? row.id.slice(MAIN_ROW_PREFIX.length)
         : row.id;
-      if (row.kind !== "note" || boardIds.has(bare) || fileIds.has(bare)) return;
       const note = noteById.get(bare);
-      setMenu({ noteId: bare, hidden: isHidden(note?.folderId ?? ""), anchor });
+      if (!note) return;
+      const rect = anchor.getBoundingClientRect();
+      openNoteMenu({ clientX: rect.left + 24, clientY: rect.bottom + 4 }, note, {
+        returnFocus: () => anchor.focus(),
+      });
     },
   });
 
@@ -1724,15 +1643,12 @@ export function Sidebar() {
                 <div key={id}>
                   <button
                     type="button"
-                    className={`frow${selected ? " sel" : ""}${
-                      dropTarget === id ? " drop-over" : ""
-                    }`}
+                    className={`frow${selected ? " sel" : ""}`}
                     onClick={() => {
                       toggleDestExpanded(id);
                       setSelectedFolderId(id);
                       setContentView("panes");
                     }}
-                    {...(!isVault(id) ? dropProps(id) : {})}
                     {...rowProps({ id, kind: "folder" })}
                   >
                     <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
@@ -1775,21 +1691,6 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* the row context menu (m / right-click later): one at a time, anchored
-          to its row; Esc + outside-click close via the transient stack, and on
-          close focus returns to the row (Seth, 2026-06-13). */}
-      {menu && (
-        <RowMenu
-          noteId={menu.noteId}
-          hidden={menu.hidden}
-          anchor={menu.anchor}
-          onClose={() => {
-            const anchor = menu.anchor;
-            setMenu(null);
-            anchor.focus(); // Esc / outside-click returns the cursor to the row
-          }}
-        />
-      )}
     </aside>
   );
 }

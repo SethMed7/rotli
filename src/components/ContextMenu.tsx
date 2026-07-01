@@ -3,8 +3,13 @@
 // and closes on outside-click / Esc (useTransientPopover) or after an action.
 // "drill" items swap the visible list for a sub-list with a ‹ Back header, so we
 // avoid floating-submenu positioning entirely (Seth, 2026-07-01).
+//
+// Keyboard-first too (the sidebar's "m" key opens this same menu since the
+// RowMenu unification): the first item autofocuses, ArrowUp/Down move focus,
+// Enter runs the focused item, and the store's returnFocus hands the cursor
+// back to the opener on close.
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
 import { useTransientPopover } from "../lib/popover";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { ChevronRight } from "./glyphs";
@@ -26,7 +31,9 @@ export function ContextMenu() {
     setPos(menu ? { left: menu.x, top: menu.y } : null);
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // clamp inside the viewport once we know the menu's size
+  // clamp inside the viewport once we know the menu's size, then focus the
+  // first enabled item so Arrow/Enter work immediately (mouse users are
+  // unaffected — hover still runs items on click)
   useLayoutEffect(() => {
     if (!menu || !ref.current) return;
     const r = ref.current.getBoundingClientRect();
@@ -36,7 +43,24 @@ export function ContextMenu() {
     if (left + r.width + pad > window.innerWidth) left = Math.max(pad, window.innerWidth - r.width - pad);
     if (top + r.height + pad > window.innerHeight) top = Math.max(pad, window.innerHeight - r.height - pad);
     setPos({ left, top });
+    ref.current.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
   }, [menu, stack.length]);
+
+  // ArrowUp/Down walk the visible items (drill Back button included)
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    event.stopPropagation();
+    const buttons = Array.from(
+      ref.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [],
+    );
+    const index = buttons.findIndex((b) => b === document.activeElement);
+    const next =
+      event.key === "ArrowDown"
+        ? Math.min(index + 1, buttons.length - 1)
+        : Math.max(index - 1, 0);
+    buttons[next]?.focus();
+  };
 
   if (!menu) return null;
   const top = stack.length > 0 ? stack[stack.length - 1] : null;
@@ -48,6 +72,7 @@ export function ContextMenu() {
       className="ctxmenu"
       style={{ left: pos?.left ?? menu.x, top: pos?.top ?? menu.y }}
       role="menu"
+      onKeyDown={onKeyDown}
     >
       {top && (
         <button type="button" className="ctxmenu-back" onClick={() => setStack((s) => s.slice(0, -1))}>

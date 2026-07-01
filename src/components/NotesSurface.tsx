@@ -11,10 +11,10 @@ import { useNotes } from "../services/hooks";
 import { DEST } from "../services/destinations";
 import { useUiStore } from "../state/ui";
 import { AllChatsSurface } from "./AllChatsSurface";
-import { AllNotesSurface } from "./AllNotesSurface";
-import { RecentSurface } from "./RecentSurface";
 import { BoardSurface } from "./BoardSurface";
 import { EmptyState } from "./EmptyState";
+import { ClockGlyph } from "./glyphs";
+import { NoteListSurface } from "./NoteListSurface";
 import { Sidebar } from "./Sidebar";
 import { PaneTree } from "./PaneTree";
 
@@ -89,11 +89,11 @@ export function NotesSurface() {
       {contentView === "board" ? (
         <BoardSurface />
       ) : contentView === "allNotes" ? (
-        <AllNotesSurface />
+        <NoteListSurface title="All notes" searchable searchPlaceholder="Search all notes…" />
       ) : contentView === "allChats" ? (
         <AllChatsSurface />
       ) : contentView === "recent" ? (
-        <RecentSurface />
+        <NoteListSurface title="Recent" glyph={<ClockGlyph size={15} />} />
       ) : (
         <PaneTree />
       )}

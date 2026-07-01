@@ -16,7 +16,7 @@ import {
   corpusSetSecure,
 } from "../lib/tauri";
 import { fileNoteToArea, isStagedNote } from "../services/brainFiling";
-import { invalidateNotes, useFolders } from "../services/hooks";
+import { invalidateNotes, useBrainAreas } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import { LockGlyph, ShieldGlyph } from "../components/glyphs";
 
@@ -90,12 +90,10 @@ export function MetaPanel({
   // Brain filing (v3.7 Filer, manual): a STAGED note (wiki/_inbox) can be filed into
   // an area; a note already under wiki/<area> shows where it landed. Both read the
   // resolved REL PATH — the wire id is a ULID and matches neither. The area vocab
-  // is the wiki areas (People/Projects/…), minus the internal underscore folders.
+  // is shared with the right-click drill (useBrainAreas).
   const staged = relPath != null && isStagedNote(relPath);
   const filedArea = relPath ? (/(?:^|\/)wiki\/([^/_][^/]*)\//.exec(relPath)?.[1] ?? null) : null;
-  const areas = (useFolders().data ?? [])
-    .filter((f) => f.parentId === "wiki" && !f.name.startsWith("_"))
-    .map((f) => f.name);
+  const areas = useBrainAreas();
 
   const fileToArea = async (area: string) => {
     setBusy(true);

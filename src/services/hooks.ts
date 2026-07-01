@@ -2,6 +2,7 @@
 // service. No component touches notesService directly.
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { replaceTitleLine } from "../lib/noteTitle";
 import { type CorpusRoot, corpusListConfig, isTauri } from "../lib/tauri";
 import { notesService } from "./notes";
@@ -56,46 +57,38 @@ export async function invalidateFolders(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: keys.folders });
 }
 
-export function useCreateFolder() {
-  return useMutation({
-    mutationFn: ({ name, parentId }: { name: string; parentId?: string | null }) =>
-      notesService.createFolder(name, parentId),
-    onSuccess: () => invalidateFolders(),
-  });
+/** Notes AND folders together — a lifecycle change shifts both the lists and
+ * the hidden-root counts (restore can even resurrect a folder). */
+async function invalidateBoth(): Promise<void> {
+  await invalidateNotes();
+  await invalidateFolders();
 }
 
-// ——— lifecycle (Phase 2c): a note's home changes (move/archive/trash/restore).
-// All four invalidate notes AND folders — restore can resurrect a folder, and
-// archive/trash shift the hidden-root counts (Seth, 2026-06-13).
-
-export function useMoveNote() {
-  return useMutation({
-    mutationFn: ({ id, targetFolder }: { id: string; targetFolder: string }) =>
-      notesService.moveNote(id, targetFolder),
-    onSuccess: async () => {
-      await invalidateNotes();
-      await invalidateFolders();
-    },
-  });
+/** The Brain's area vocabulary (People/Projects/…): the wiki areas minus the
+ * internal underscore folders — the ONE derivation every filing surface
+ * (metadata panel, right-click drill, the Phase-4 daemon UI) shares. */
+export function useBrainAreas(): string[] {
+  const folders = useFolders().data ?? [];
+  return useMemo(
+    () =>
+      folders.filter((f) => f.parentId === "wiki" && !f.name.startsWith("_")).map((f) => f.name),
+    [folders],
+  );
 }
+
+// ——— lifecycle (Phase 2c): a note's home changes (archive/trash/restore).
 
 export function useArchiveNote() {
   return useMutation({
     mutationFn: (id: string) => notesService.archiveNote(id),
-    onSuccess: async () => {
-      await invalidateNotes();
-      await invalidateFolders();
-    },
+    onSuccess: invalidateBoth,
   });
 }
 
 export function useTrashNote() {
   return useMutation({
     mutationFn: (id: string) => notesService.trashNote(id),
-    onSuccess: async () => {
-      await invalidateNotes();
-      await invalidateFolders();
-    },
+    onSuccess: invalidateBoth,
   });
 }
 
@@ -121,9 +114,6 @@ export function useRenameNote() {
 export function useRestoreNote() {
   return useMutation({
     mutationFn: (id: string) => notesService.restoreNote(id),
-    onSuccess: async () => {
-      await invalidateNotes();
-      await invalidateFolders();
-    },
+    onSuccess: invalidateBoth,
   });
 }

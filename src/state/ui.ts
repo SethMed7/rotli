@@ -74,7 +74,8 @@ export const RECENT = "recent";
  * are views in the pane area — the sidebar never moves for them, so the three
  * left-menu sections (Inbox · Chat · Notes) stay visible (Seth, 2026-06-24;
  * Chat folded in from a full-surface front 2026-06-26). */
-export type ContentView = "panes" | "board" | "allNotes" | "allChats" | "recent" | "chat";
+// (the old "chat" contentView is retired — chat is a PANE surface now)
+export type ContentView = "panes" | "board" | "allNotes" | "allChats" | "recent";
 
 /** The three top-level left-menu sections (Seth's decided IA, 2026-06-26): Inbox
  * (email) · Chat · Notes. Each is a collapsible accordion; its open state lives in
@@ -259,14 +260,6 @@ interface UiState {
   renameTarget: { id: string; current: string } | null;
   setRenameTarget: (t: { id: string; current: string } | null) => void;
 
-  /** Chat is the middle left-menu section now (not a dropdown module): the chat
-   * history lives in the sidebar and a chat opens in the content area via
-   * contentView "chat". These hold which chat is open and the browse mode. Not
-   * persisted (transient view state). */
-  /** "All chats" browse mode — the content area shows a searchable list of every
-   * chat instead of a single conversation. */
-  chatAllOpen: boolean;
-  setChatAllOpen: (open: boolean) => void;
   /** The on-device model id the Chat surface sends to, picked from the memex-ai
    * store (~/.memex/ai/registry.json). null = use the store's default. Persisted. */
   chatModelId: string | null;
@@ -433,8 +426,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   renamingBoardId: null,
   setRenamingBoardId: (id) => set({ renamingBoardId: id }),
 
-  chatAllOpen: false,
-  setChatAllOpen: (open) => set({ chatAllOpen: open }),
   chatModelId: null,
   setChatModelId: (id) => set({ chatModelId: id }),
   chatWeb: {},

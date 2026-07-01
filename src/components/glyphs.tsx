@@ -29,40 +29,12 @@ function Glyph({ size = 15, className, children }: GlyphProps & { children: Reac
   );
 }
 
-export function ChevronDown({ size = 10, className }: GlyphProps) {
-  return (
-    <Glyph size={size} className={className}>
-      <path d="m6 9 6 6 6-6" />
-    </Glyph>
-  );
-}
-
 /** Sidebar row disclosure caret — points right when collapsed, the .open class
  * rotates it down (Seth, 2026-06-13: one chevron for every expandable row). */
 export function ChevronRight({ size = 10, className }: GlyphProps) {
   return (
     <Glyph size={size} className={className}>
       <path d="m9 6 6 6-6 6" />
-    </Glyph>
-  );
-}
-
-/** Folders-rail toggle (r4 gate). */
-export function RailFolders(props: GlyphProps) {
-  return (
-    <Glyph {...props}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M9.5 4v16" />
-    </Glyph>
-  );
-}
-
-/** Note-list toggle (r4 gate). */
-export function RailList(props: GlyphProps) {
-  return (
-    <Glyph {...props}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M9.5 4v16M9.5 9h11.5M9.5 14h11.5" />
     </Glyph>
   );
 }
@@ -245,24 +217,6 @@ export function XGlyph(props: GlyphProps) {
   );
 }
 
-/** New-note pencil (r1/r2 gates). */
-export function PencilGlyph(props: GlyphProps) {
-  return (
-    <Glyph {...props}>
-      <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </Glyph>
-  );
-}
-
-/** Pinned marker in the note meta line (r2 gate). */
-export function PinGlyph(props: GlyphProps) {
-  return (
-    <Glyph {...props}>
-      <path d="M12 17v5M9 10.8 5 15h14l-4-4.2V5l1.5-2h-9L9 5Z" />
-    </Glyph>
-  );
-}
-
 /** A star — the Quick-access marker. `filled` paints it in (starred); hollow =
     not starred. currentColor for both stroke and fill so it themes. */
 export function StarGlyph({ size = 15, className, filled = false }: GlyphProps & { filled?: boolean }) {
@@ -432,17 +386,6 @@ export function InboxGlyph(props: GlyphProps) {
     <Glyph {...props}>
       <path d="M4 13h4l1.5 2.5h5L16 13h4" />
       <path d="M5.5 5.5 4 13v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4l-1.5-7.5A2 2 0 0 0 16.6 4H7.4a2 2 0 0 0-1.9 1.5Z" />
-    </Glyph>
-  );
-}
-
-/** Brain destination — a profile head with the brain fold. */
-export function BrainGlyph(props: GlyphProps) {
-  return (
-    <Glyph {...props}>
-      <path d="M9.5 4.5a3 3 0 0 0-3 3 3 3 0 0 0-1.5 5.4V17a2.5 2.5 0 0 0 2.5 2.5h.5" />
-      <path d="M14.5 4.5a3 3 0 0 1 3 3 3 3 0 0 1 1.5 5.4V17a2.5 2.5 0 0 1-2.5 2.5H16" />
-      <path d="M12 4.8v15M9.5 9.5h2.5M12 13.5h3" />
     </Glyph>
   );
 }

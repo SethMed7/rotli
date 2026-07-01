@@ -45,11 +45,6 @@ export async function toggleQuickWindow(): Promise<void> {
   await invoke("toggle_quick_window");
 }
 
-export async function showQuickWindow(): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("show_quick_window");
-}
-
 export async function hideQuickWindow(): Promise<void> {
   if (!isTauri()) return;
   await invoke("hide_quick_window");
@@ -324,22 +319,6 @@ function aiInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
  * Always returns at least the MLX default, even if the registry is missing. */
 export function chatModels(): Promise<ChatModelInfo[]> {
   return aiInvoke("chat_models");
-}
-
-/** Chat front: one-shot completion from the on-device model. The Rust side POSTs
- * the local model server (the webview CSP can't reach localhost). Rejects with a
- * readable error string if the model isn't running. Pass the picked model's
- * endpoint/model/api to target a specific memex-ai model (else the MLX default). */
-export function chatComplete(
-  prompt: string,
-  opts?: { model?: string; endpoint?: string; api?: string },
-): Promise<string> {
-  return aiInvoke("chat_complete", {
-    prompt,
-    model: opts?.model,
-    endpoint: opts?.endpoint,
-    api: opts?.api,
-  });
 }
 
 /** One message in the agent loop's transcript. `images` are base64 (raw or a full
@@ -724,13 +703,6 @@ export interface MemexChatSummary {
   path: string;
 }
 
-/** One entry in the READ-ONLY Memory browser — a subdir or a .md file. */
-export interface MemexDirEntry {
-  name: string;
-  rel: string;
-  isDir: boolean;
-}
-
 export interface MemexValidateReport {
   ok: boolean;
   skipped: boolean;
@@ -751,9 +723,6 @@ function memexInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T>
 export function memexDetect(): Promise<DetectedMemex[]> {
   return memexInvoke("memex_detect");
 }
-export function memexInspect(path: string): Promise<DetectedMemex> {
-  return memexInvoke("memex_inspect", { path });
-}
 export function memexReadContract(root: string): Promise<MemexContractRaw> {
   return memexInvoke("memex_read_contract", { root });
 }
@@ -762,9 +731,6 @@ export function memexRead(root: string, rel: string): Promise<string> {
 }
 export function memexListChats(root: string): Promise<MemexChatSummary[]> {
   return memexInvoke("memex_list_chats", { root });
-}
-export function memexListDir(root: string, rel: string): Promise<MemexDirEntry[]> {
-  return memexInvoke("memex_list_dir", { root, rel });
 }
 export function memexWriteChat(root: string, slug: string, contents: string): Promise<string> {
   return memexInvoke("memex_write_chat", { root, slug, contents });

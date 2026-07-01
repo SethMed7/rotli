@@ -7,7 +7,6 @@
 import {
   type DetectedMemex,
   type MemexChatSummary,
-  type MemexDirEntry,
   type MemexValidateReport,
   corpusChooseFolder,
   corpusConnectBrain,
@@ -17,9 +16,7 @@ import {
   corpusSetActiveBrain,
   corpusSetBrainPerms,
   memexDetect,
-  memexInspect,
   memexListChats,
-  memexListDir,
   memexPickFolder,
   memexRead,
   memexReadContract,
@@ -54,7 +51,6 @@ export async function loadConfig(): Promise<MemexConfig> {
 }
 
 export const detect = (): Promise<DetectedMemex[]> => memexDetect();
-export const inspect = (path: string): Promise<DetectedMemex> => memexInspect(path);
 export const pickFolder = (): Promise<string | null> => memexPickFolder();
 
 /** "Choose folder…" — repoint the corpus (smart: memex / move / plain). Relaunches
@@ -165,12 +161,6 @@ export async function writeNote(
   const path = await memexWriteNote(instance.root, stem, contents);
   return { id, stem, path };
 }
-
-// ── read-only spine (Memory) ──────────────────────────────────────────────────
-
-/** List a spine directory (subdirs + .md files) for the read-only browser. */
-export const listDir = (instance: MemexInstance, rel: string): Promise<MemexDirEntry[]> =>
-  memexListDir(instance.root, rel);
 
 // ── validate.ts gate (mirror-not-import: Rust shells the brain's own script) ──
 

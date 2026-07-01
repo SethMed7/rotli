@@ -34,26 +34,6 @@ function commit(patch: Partial<QuickStatePayload>): void {
   emitQuickSet(next);
 }
 
-/** Add a note to the set and make it active. Already in the set → just focus
- * it. Room left → insert right after the active note (kept adjacent), else
- * append. Full → swap the chosen note into the active slot ("change out those
- * five at any time"). */
-export function addQuickNote(id: string): void {
-  const { quickNoteIds: ids, quickActiveId: active } = useUiStore.getState();
-  if (ids.includes(id)) {
-    commit({ activeId: id });
-    return;
-  }
-  const i = active ? ids.indexOf(active) : -1;
-  if (ids.length < QUICK_MAX) {
-    const next = i >= 0 ? [...ids.slice(0, i + 1), id, ...ids.slice(i + 1)] : [...ids, id];
-    commit({ ids: next, activeId: id });
-    return;
-  }
-  const at = i >= 0 ? i : 0;
-  commit({ ids: ids.map((x, k) => (k === at ? id : x)), activeId: id });
-}
-
 /** Drop a note from the set; if it was active, fall to the note that slid into
  * its place (or the new last, or empty). */
 export function removeQuickNote(id: string): void {
