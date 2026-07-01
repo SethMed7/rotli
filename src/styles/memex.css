@@ -13,9 +13,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 13px 20px;
-  border-bottom: 1px solid var(--border);
+  padding: 13px 24px;
   flex: 0 0 auto;
+  /* align the title to the same centered column as the thread + composer (Seth,
+     2026-07-01) — the whole chat reads as one centered column, no divider line. */
+  width: 100%;
+  max-width: 788px; /* 740 thread + 24px each side of the scroll padding */
+  margin: 0 auto;
 }
 .chat-head h2 {
   font-family: var(--font-display);
@@ -238,7 +242,6 @@
 
 .chat-composer {
   flex: 0 0 auto;
-  border-top: 1px solid var(--border);
   padding: 12px 24px 16px;
 }
 .chat-composer-inner {

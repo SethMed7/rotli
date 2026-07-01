@@ -24,7 +24,9 @@ const TINT_SWATCH: Record<string, string> = {
   olive: "var(--swatch-olive)",
 };
 
-const STEPS = ["welcome", "hotkeys", "dock", "behavior", "appearance", "memory", "done"] as const;
+// Appearance FIRST (right after the greeting) so you pick a theme before walking the
+// rest of setup — never trudge through the flow in a theme that hurts your eyes (Seth).
+const STEPS = ["welcome", "appearance", "hotkeys", "dock", "behavior", "memory", "done"] as const;
 type Step = (typeof STEPS)[number];
 
 const GLOBAL_HOTKEYS: { id: string; label: string; hint: string }[] = [

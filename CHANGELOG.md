@@ -10,6 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-07-01
+
+### Changed
+- **Onboarding picks your theme first.** The appearance step moved right after the welcome, so you set a
+  theme you like *before* walking the rest of setup — no more trudging through it in one that hurts your eyes.
+- **Sidebar: "Quick access" + a collapsible Brain.** The "Main" section is now **Quick access** — your
+  hand-picked, most-needed notes (add with **⊕** on a note row, or drag one from the Brain). The **Brain**
+  is now a **collapsible row inside Destinations** (its Activity link + areas fold away when you don't need
+  them).
+- **Captures look like sticky notes.** The capture cards get a warm paper fill, real lift, and a slight
+  hand-placed tilt — a board of sticky notes you can drag to arrange, not flat dark panels.
+- **Cleaner chat.** Removed the divider lines (above the composer, under the header); the title now aligns
+  to the same centered column as the conversation.
+
+### Fixed
+- **The quokka's face reads again.** The onboarding + empty-state quokkas were rendering with a heavy
+  stroke that filled in the eyes and nose dot — swapped to the original artwork (a clean `evenodd` fill)
+  recolored to `currentColor` so it still follows your theme. (The app icon was already correct.)
+
 ## [0.13.0] — 2026-07-01
 
 ### Added — Phase 3: manual filing + the Brain **Activity** log (see & undo the AI)

@@ -153,8 +153,10 @@
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.06);
+  /* a warm paper fill + real lift so captures read as STICKY NOTES on a board,
+     not flat dark panels (Seth, 2026-07-01). */
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.14), 0 10px 22px rgba(0, 0, 0, 0.16);
   cursor: pointer;
   text-align: left;
   touch-action: none;
@@ -164,10 +166,20 @@
     border-color var(--motion-exit) var(--motion-ease),
     background var(--motion-exit) var(--motion-ease);
 }
+/* a slight, alternating hand-placed tilt — the "notes on a board" feel. */
+.board-grid .board-card:nth-child(3n + 1) {
+  transform: rotate(-0.7deg);
+}
+.board-grid .board-card:nth-child(3n + 2) {
+  transform: rotate(0.5deg);
+}
+.board-grid .board-card:nth-child(3n) {
+  transform: rotate(-0.2deg);
+}
 .board-card:hover {
-  background: var(--hov);
-  transform: translateY(-2px);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.07), 0 10px 24px rgba(0, 0, 0, 0.1);
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  transform: translateY(-3px) rotate(0deg);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.16), 0 14px 30px rgba(0, 0, 0, 0.2);
 }
 /* the card being dragged to reorder */
 .board-card.dragging {

@@ -1045,16 +1045,24 @@ export function Sidebar() {
   const inboxSecOpen = expandedDests[SEC_INBOX] ?? true;
   const chatSecOpen = expandedDests[SEC_CHAT] ?? true;
   const notesSecOpen = expandedDests[SEC_NOTES] ?? true;
+  const brainOpen = expandedDests.Brain ?? true;
+  const hasBrain = childrenOf("wiki").length > 0;
 
   // the roving j/k cursor only walks the NOTES section (the corpus tree). When
   // that section is collapsed there are no roving rows; the Inbox/Chat sections
-  // are plain buttons, outside the listbox.
+  // are plain buttons, outside the listbox. (Quick Access — the Main manifest — is
+  // mouse+drag only, not roving.)
   const rows: RovingRow[] = notesSecOpen
     ? [
         { id: ALL_NOTES, kind: "smart" },
         { id: RECENT, kind: "smart" },
-        // the Brain areas (wiki/<area>) ride between the smart rows and destinations
-        ...subtreeRows("wiki", brainNotes),
+        // Brain — a collapsible destination; its areas ride under it when open.
+        ...(hasBrain
+          ? [
+              { id: "Brain", kind: "folder" } as RovingRow,
+              ...(brainOpen ? subtreeRows("wiki", brainNotes) : []),
+            ]
+          : []),
         ...visibleDestRows.flatMap(({ id }) => {
           const destNotes = notesByDest[id] ?? [];
           const open = expandedDests[id] ?? false;
@@ -1517,12 +1525,13 @@ export function Sidebar() {
               <span className="count">{allNotes.length}</span>
             </button>
 
-            {/* — MAIN: your hand-arranged view over the Brain. Add notes with the ⊕
-                  on any note row, make folders, drag to arrange (Seth, 2026-07-01). — */}
-            <div className="fsec">Main</div>
+            {/* — QUICK ACCESS: your hand-picked notes, arranged your way (was "Main";
+                  Seth, 2026-07-01). Add with the ⊕ on a note row or drag from the Brain. — */}
+            <div className="fsec">Quick access</div>
             {mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
               <p className="main-empty" data-main-id="main:">
-                Add notes with the <b>⊕</b> on a note row, then drag to arrange them your way.
+                Your handful of most-needed notes. Add one with the <b>⊕</b> on a note row (or drag it
+                here from the Brain), then arrange them your way.
               </p>
             ) : (
               <div data-main-id="main:" className="main-tree">
@@ -1539,29 +1548,48 @@ export function Sidebar() {
               <span className="fname">New folder</span>
             </button>
 
-            {/* — the Brain: the AI-organized areas (People · Projects · Research · …) — */}
-            {childrenOf("wiki").length > 0 && <div className="fsec">Brain</div>}
-            {childrenOf("wiki").length > 0 && (
-              <p className="brain-hint">
-                Organized by AI so anything you save stays findable. Your <b>Main</b> view above is
-                yours — same notes, your order.
-              </p>
-            )}
-            {childrenOf("wiki").length > 0 && (
-              <button
-                type="button"
-                className="frow child brain-activity-link"
-                style={{ paddingLeft: 26 }}
-                onClick={() => usePanesStore.getState().openActivity()}
-                title="See and undo what the AI has done"
-              >
-                <ClockGlyph size={13} />
-                <span className="fname">Activity</span>
-              </button>
-            )}
-            {renderFolderTree("wiki", brainNotes, 0, rowProps)}
-
             <div className="fsec">Destinations</div>
+
+            {/* — the Brain: AI-organized areas, now a COLLAPSIBLE destination (Seth) — */}
+            {hasBrain && (
+              <div>
+                <button
+                  type="button"
+                  className={`frow${selectedFolderId === "Brain" ? " sel" : ""}`}
+                  onClick={() => {
+                    toggleDestExpanded("Brain");
+                    setSelectedFolderId("Brain");
+                  }}
+                  {...rowProps({ id: "Brain", kind: "folder" })}
+                >
+                  <span className={`fchev${brainOpen ? " open" : ""}`} aria-hidden="true">
+                    <ChevronRight size={10} />
+                  </span>
+                  <NotesStackGlyph size={14} />
+                  <span className="fname">Brain</span>
+                  <span className="count">{brainNotes.length}</span>
+                </button>
+                {brainOpen && (
+                  <>
+                    <p className="brain-hint">
+                      Organized by AI so anything you save stays findable. Your <b>Quick access</b> above
+                      is yours — same notes, your order.
+                    </p>
+                    <button
+                      type="button"
+                      className="frow child brain-activity-link"
+                      style={{ paddingLeft: 42 }}
+                      onClick={() => usePanesStore.getState().openActivity()}
+                      title="See and undo what the AI has done"
+                    >
+                      <ClockGlyph size={13} />
+                      <span className="fname">Activity</span>
+                    </button>
+                    {renderFolderTree("wiki", brainNotes, 1, rowProps)}
+                  </>
+                )}
+              </div>
+            )}
 
             {/* — destination rows: each toggles expansion AND selects (⌘N target) — */}
             {visibleDestRows.map(({ id, label, Glyph }) => {
