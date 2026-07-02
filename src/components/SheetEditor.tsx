@@ -3,10 +3,13 @@
 // rides the main chunk. The workbook object is the style/structure source of
 // truth; the grid state is its render projection, and every edit lands on both.
 // Explicit Save only (button or ⌘S) — a binary rewrite must never autosave on
-// keystrokes. CSV is values-only (a csv can't hold styles); the style toolbar
-// offers a convert-to-xlsx sibling instead. FileSurface only mounts this when
-// the Rust probe said the file is writable + under the caps — a vault/linked-
-// library sheet stays the read-only viewer.
+// keystrokes; the one backstop is the window-HIDE flush in sheetSessions.ts,
+// which writes parked dirty sessions the moment the window hides/closes so a
+// quit can't silently lose them (#4, audit 2026-07). CSV is values-only (a csv
+// can't hold styles); the style toolbar offers a convert-to-xlsx sibling
+// instead. FileSurface only mounts this when the Rust probe said the file is
+// writable + under the caps — a vault/linked-library sheet stays the read-only
+// viewer.
 
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -45,18 +48,18 @@ import {
   setColumnStyle,
 } from "../lib/sheetEdit";
 import { fileName } from "../lib/fileKind";
+// Unsaved edits must survive the pane lifecycle: PaneTree renders only the
+// active tab, so a tab switch unmounts this whole editor — unlike notes (the
+// shared model.ts buffer) the workbook lived only in component state, and a
+// peek at another tab silently discarded every edit. DIRTY sessions park in
+// sheetSessions per file id (refreshed on every edit, cleared on a successful
+// save); a clean mount always reloads disk truth, so external changes still
+// show. sheetSessions also owns the window-hide flush (#4).
+import { dirtySessions } from "../lib/sheetSessions";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 
 type Sel = { kind: "cell"; r: number; c: number } | { kind: "col"; c: number };
-
-/** Unsaved edits must survive the pane lifecycle: PaneTree renders only the
- * active tab, so a tab switch unmounts this whole editor — unlike notes (the
- * shared model.ts buffer) the workbook lived only in component state, and a
- * peek at another tab silently discarded every edit. DIRTY sessions park here
- * per file id (refreshed on every edit, cleared on a successful save); a clean
- * mount always reloads disk truth, so external changes still show. */
-const dirtySessions = new Map<string, { wb: Workbook | null; grids: EditSheet[] }>();
 
 /** Refusal message shared by every "the load can't round-trip" guard. */
 const TOO_LARGE = "this file is too large to edit in rotli — opening read-only is fine";

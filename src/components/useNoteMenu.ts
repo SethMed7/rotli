@@ -123,8 +123,17 @@ export function useNoteMenu() {
             kind: "action" as const,
             label: area.charAt(0).toUpperCase() + area.slice(1),
             onClick: () => {
+              // failures surface as the sidebar's inline error note — the menu
+              // is closed by the time the write fails (#11, audit 2026-07)
+              useUiStore.getState().setRowActionError(null);
               void fileNoteToArea(note.id, area).catch((err) =>
-                console.warn("file to brain failed", err),
+                useUiStore
+                  .getState()
+                  .setRowActionError(
+                    `Couldn’t file “${note.title || "this note"}” to the Brain — ${
+                      err instanceof Error ? err.message : String(err)
+                    }`,
+                  ),
               );
             },
           })),

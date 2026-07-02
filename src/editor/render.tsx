@@ -5,6 +5,7 @@
 // (the r3 marks law), [text](url) links. No raw HTML passthrough beyond <u>.
 
 import type { MouseEvent, ReactNode } from "react";
+import { openUrl } from "../lib/tauri";
 
 export type BlockKind =
   | "h1"
@@ -62,8 +63,14 @@ interface InlineRule {
   render: (m: RegExpExecArray, key: number) => ReactNode;
 }
 
-function stopLink(event: MouseEvent): void {
-  event.preventDefault(); // Stage 1: links render, never navigate the webview
+/** Rendered links OPEN now (#14, audit 2026-07): clicking routes the href
+ * through the scheme-allowlisted Rust opener — the webview itself never
+ * navigates (that part of the Stage-1 rule stands). */
+function openLink(event: MouseEvent<HTMLAnchorElement>): void {
+  event.preventDefault();
+  const href = event.currentTarget.getAttribute("href") ?? "";
+  // a non-openable scheme simply doesn't open — the allowlist lives in Rust
+  if (href && href !== "#") void openUrl(href).catch(() => {});
 }
 
 /** Order matters: code is opaque, ** wins over *. */
@@ -99,7 +106,7 @@ const INLINE_RULES: InlineRule[] = [
   {
     re: /\[([^\]]+)\]\(([^)]*)\)/,
     render: (m, key) => (
-      <a className="md-link" href={m[2] || "#"} key={key} onClick={stopLink}>
+      <a className="md-link" href={m[2] || "#"} title={m[2] || undefined} key={key} onClick={openLink}>
         {renderInline(m[1] ?? "")}
       </a>
     ),

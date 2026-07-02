@@ -18,6 +18,9 @@ export interface Budget {
   maxIndexChars: number;
   /** total scratchpad cap fed back each step (oldest results trimmed first) */
   maxScratchChars: number;
+  /** conversation-history cap fed into every prompt (oldest turns trimmed
+   *  first) — a long chat must not overflow a small model's window (#65) */
+  maxHistoryChars: number;
   /** tool-use step cap */
   maxSteps: number;
 }
@@ -46,6 +49,7 @@ export function budgetFor(model: ModelMeta): Budget {
       webFetchChars: 6000,
       maxIndexChars: 3500,
       maxScratchChars: 9000,
+      maxHistoryChars: 12_000,
       maxSteps: 5,
     };
   }
@@ -57,6 +61,7 @@ export function budgetFor(model: ModelMeta): Budget {
       webFetchChars: 4000,
       maxIndexChars: 2000,
       maxScratchChars: 5000,
+      maxHistoryChars: 6000,
       maxSteps: 5,
     };
   }
@@ -68,6 +73,7 @@ export function budgetFor(model: ModelMeta): Budget {
     webFetchChars: 2500,
     maxIndexChars: 1200,
     maxScratchChars: 3000,
+    maxHistoryChars: 2500,
     maxSteps: 4,
   };
 }

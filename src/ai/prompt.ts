@@ -27,6 +27,27 @@ function renderConversation(history: ChatTurn[], userText: string): string {
   return lines.join("\n");
 }
 
+/** Keep the NEWEST turns whose total text fits `maxChars` — a long chat must
+ * not overflow a small model's context window (#65, audit 2026-07). The
+ * latest turn always survives (even oversized: better a truncated-context
+ * reply than none), and a trim leaves a one-line marker so the model knows
+ * the conversation didn't start here. */
+export function trimHistory(history: ChatTurn[], maxChars: number): ChatTurn[] {
+  let total = 0;
+  const kept: ChatTurn[] = [];
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    if (!turn) continue;
+    total += turn.text.length;
+    if (kept.length > 0 && total > maxChars) {
+      kept.unshift({ role: "assistant", text: "(earlier conversation trimmed)" });
+      break;
+    }
+    kept.unshift(turn);
+  }
+  return kept;
+}
+
 function renderScratch(scratch: ScratchStep[]): string {
   if (scratch.length === 0) return "(nothing yet)";
   return scratch

@@ -6,7 +6,7 @@
 
 import { CORPUS_INSTANCE_ID, activeInstance, isWritable } from "../memex/config";
 import { loadConfig, writeNote } from "../memex/service";
-import { VAULT_MARKER, isVault } from "./destinations";
+import { VAULT_MARKER, isHidden, isVault } from "./destinations";
 import { notesService } from "./notes";
 
 export type Route =
@@ -16,7 +16,10 @@ export type Route =
 /** The PURE routing decision (no I/O, so it unit-tests): given the selection, whether
  *  a smart row is selected, and whether a writable memex is active, decide whether a
  *  new note goes INTO the memex (and with which shelf) or a LOCAL folder.
- *  - An explicit LOCAL folder selection is ALWAYS respected (never diverted).
+ *  - An explicit LOCAL folder selection is ALWAYS respected (never diverted) —
+ *    except the hidden roots (Archive/Trash/Board): a note must never be BORN into
+ *    a sink or the capture board (#5, audit 2026-07), so those route like a smart
+ *    row (the memex staging when writable, else the local fallback).
  *  - A smart row / a vault selection with a writable memex ⇒ the memex.
  *  - A selected SHELF folder (vault:<shelf>) seeds the note's shelf; the memex's
  *    structural folders (wiki/chats) and the bare marker fall back to the default. */
@@ -27,7 +30,7 @@ export function routeDecision(
   localFallback: string,
 ): Route {
   const sel = selectedFolderId;
-  const explicitLocal = !isSmart && sel !== "" && !isVault(sel);
+  const explicitLocal = !isSmart && sel !== "" && !isVault(sel) && !isHidden(sel);
   if (!explicitLocal && memexWritable) {
     const sub = isVault(sel) ? sel.slice(VAULT_MARKER.length) : "";
     const shelf =
@@ -36,7 +39,7 @@ export function routeDecision(
         : undefined;
     return shelf ? { kind: "memex", shelf } : { kind: "memex" };
   }
-  const folder = isSmart || isVault(sel) || sel === "" ? localFallback : sel;
+  const folder = isSmart || isVault(sel) || isHidden(sel) || sel === "" ? localFallback : sel;
   return { kind: "local", folder };
 }
 

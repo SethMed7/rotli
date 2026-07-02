@@ -6,12 +6,16 @@
 import { create } from "zustand";
 
 /** "use" — adopt an existing memex AS the corpus · "init" — scaffold a new memex
- * AS the corpus · "later" — keep a plain ~/Documents/rotli notes folder. */
-export type MemexChoiceKind = "use" | "init" | "later";
+ * AS the corpus · "keep" — keep the CURRENT corpus exactly where it is (the
+ * pre-seeded default on a 0.x re-onboard: committing it is a deliberate NO-OP,
+ * so a mis-click can never relocate the corpus — #12, audit 2026-07) · "later"
+ * — keep a plain ~/Documents/rotli notes folder. */
+export type MemexChoiceKind = "use" | "init" | "keep" | "later";
 
 export interface PendingMemexChoice {
   kind: MemexChoiceKind;
-  /** "use": the existing memex root to adopt. "init": the empty folder to scaffold in. */
+  /** "use": the existing memex root to adopt. "init": the empty folder to
+   * scaffold in. "keep": the current corpus root (display only — never committed). */
   path?: string;
   label?: string;
 }

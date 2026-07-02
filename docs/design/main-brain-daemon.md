@@ -201,6 +201,10 @@ Resolving the `metadata-contract` vs `safety-ux` naming conflict:
 4. **Never auto-apply on a secure note**, even in Organize.
 5. **Secure-into-index rule:** the Filer must never lift a secure note's `summary`/title into a non-gitignored `_index.md` — a secure note appears as a bare title-only row or is omitted.
 6. `reach:` scoping is honored — the Filer's read/write set is intersected with each note's reach.
+   > **Phase-5 deferral (2026-07 audit #30):** NOT implemented in the shipped daemon — `reach` appears
+   > nowhere in `organizer.rs`, so a reach-scoped note's title/summary can land in the committed
+   > `wiki/<area>/_index.md` like any other member. The secure lane (rules 1–5) IS shipped and is the
+   > load-bearing secrecy wall; `reach` intersection is scheduled with the Phase-5 auto-apply polish.
 
 ### 4.3 Trust ladder (default + how the user climbs)
 
@@ -249,6 +253,10 @@ Pinned at the top of the Brain subtree (synthesized pinned row, `ensure_backing_
 
 **Settings → Brain:** the 4-level radio (doubles as on/off) · capability checkboxes (File captures · Write summaries · Suggest tags · Link related · *Re-file existing* (off by default) · Keep overviews current) · areas it may touch · "Never touches: locked · secure · your Main arrangement" · **Model: Local only — never the internet, can't read secrets** (reassurance as copy) · **Pause** (1h / today / until I resume, also in the menu-bar dropdown) · [View activity] · [Reset Brain…]. Persisted next to `captureOrder`/`expandedDests`.
 
+> **Phase-5 deferral (2026-07 audit #30):** the shipped pane is the 4-level radio + Run now + [View
+> activity]; the **capability checkboxes** (and Pause / areas-it-may-touch / Reset Brain…) are NOT
+> built. Today the ladder is the only granularity — per-capability opt-outs land with Phase 5.
+
 **Degradation (model may be down):** queue, never block — watcher events accumulate as candidates while `:11435` is offline (errors are already graceful, `chat.rs:64`); show don't nag (*"Paused — local model offline. 4 captures waiting."*); resume cleanly under the same budgets; re-evaluate (don't apply a stale decision) if the user edited a note between proposal and apply. Atomic temp+rename means a crash/quit mid-op leaves either the clean before-state or a clean after-state, never a torn file; the queue rebuilds from hash state + startup sweep; every job is idempotent.
 
 ---
@@ -280,6 +288,9 @@ Ordered to ship value early and de-risk the daemon last. **Main (Phase 1) is ind
 **Phase 5 — Auto-apply (Tidy/Organize) + index + earned trust**
 - Flip annotate + homeless-capture filing to auto-apply under Tidy; deterministic `_index.md` regen (RefreshIndex job) — Seth's Projects-overview example; Organize full-auto.
 - Earned-trust nudge; global "Reset Brain"; the Settings ladder UI; battery/thermal/budget polish.
+- Deferred here from the shipped Phase 4 (2026-07 audit #30): **`reach:` intersection** (§4.2.6),
+  the **configurable on-battery budget** (§6.3), and the **Settings → Brain capability checkboxes**
+  (§4.8).
 
 ---
 
@@ -290,6 +301,9 @@ Ordered to ship value early and de-risk the daemon last. **Main (Phase 1) is ind
 2. **Default trust level: Suggest or Tidy?** *Recommend ship Suggest as the product default* (safe first impression on real data with live secrets), and **you flip yourself to Tidy on day one** — you're the developer, it's your vault, and the daemon is always classifying in the background regardless. This honors your "always-running, auto-organizing" vision while keeping the first auto-*write* earned for everyone else.
 
 3. **On-battery policy: off / small budget / full?** *Recommend off on battery* (model work only on AC + idle), configurable. A menu-bar app should be thermally invisible; a 12B generation on battery is felt.
+   > **Shipped as: off on battery, hard-coded** (Run now is the deliberate exception). The
+   > **configurable knob is a Phase-5 deferral** (2026-07 audit #30) — no settings surface exposes a
+   > battery budget today.
 
 4. **Confidence threshold + low-confidence behavior.** *Recommend below-threshold notes stay in `_inbox`* with `suggested_area` + `area_confidence` set and surfaced as "needs your call" (one-click confirm) — never auto-filed to a guess. You set the numeric threshold.
 

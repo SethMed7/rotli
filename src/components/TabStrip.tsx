@@ -179,6 +179,14 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                   }`}
                   onClick={() => activateTab(pane.id, tab.id)}
                   onContextMenu={(event) => openTabMenu(event, tab)}
+                  onAuxClick={(event) => {
+                    // middle-click closes — the twin of the note rows' middle-
+                    // click-opens grammar (#81, audit 2026-07)
+                    if (event.button === 1 && !loneInLonePane) {
+                      event.preventDefault();
+                      closeTabById(pane.id, tab.id);
+                    }
+                  }}
                   onPointerDown={(event) =>
                     startTabDrag(event, pane.id, tab.id, tabLabel(tab, titles))
                   }

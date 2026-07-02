@@ -76,7 +76,11 @@ folder.")
   spreadsheet views); spreadsheets (`xlsx`/`csv`) are **editable in place** when their
   store is writable — a plain added folder, not the read-only memex `storage/` or a
   linked library, which stay a read-only table (the first save keeps a one-time
-  `.bak` of the pre-rotli original beside the file). Viewers are honest: an image opens
+  `.bak` of the pre-rotli original beside the file). Explicit **Save** stays the law
+  while you work, but unsaved sheet edits are no longer quit-fragile: the moment the
+  window hides (which precedes ⌘Q in a menu-bar app) every dirty sheet is flushed
+  through the same save path. A read-only sheet **says why** ("view only · .ods" /
+  "· too large"). Viewers are honest: an image opens
   at its **natural size** (points, matching Preview) with pinch/⌘± zoom and a % readout;
   a sheet too big for the read caps **says it's truncated** (or refuses cleanly) instead
   of silently showing a slice. Every file view carries an **Open externally** dropdown:
@@ -93,10 +97,16 @@ folder.")
   render-only layer (the Aa/typography controls, live preview, widgets — never written
   into the `.md`). Fenced blocks render inline: ```math · ```mermaid · ```jsxgraph ·
   ```svg · ```**html** — the html preview runs in a **sandboxed, script-free** frame
-  (fences are untrusted content; click the block to see/edit the source). **Tables are
-  structurally editable**: Tab/⇧Tab hop cells (Tab past the end appends a row), ↑/↓ hop
-  rows, Enter never splits a row, and the widget's row/column menus insert / delete /
-  move / align — while the file keeps ordinary readable pipes.
+  (fences are untrusted content; click the block to see/edit the source). **Any other
+  fence renders as code**: a ```js block (or a bare ```) keeps a mono voice and is never
+  markdown-styled or table-widgetized — what's inside a fence is code, not prose.
+  **Links open**: **⌘-click** a `[text](url)` (raw or beautified) to open it in the
+  browser — plain click stays the edit path — through a scheme-allowlisted opener
+  (http/https/mailto only; a link can never launch a file path or an app scheme).
+  Rendered links (chat bubbles, previews) open on plain click through the same gate.
+  **Tables are structurally editable**: Tab/⇧Tab hop cells (Tab past the end appends a
+  row), ↑/↓ hop rows, Enter never splits a row, and the widget's row/column menus
+  insert / delete / move / align — while the file keeps ordinary readable pipes.
 
 **Chat** _(front)_ — your AI conversations (`chats/`). The on-device model is an **agentic client**,
 not a context-free box: your memex IS its knowledge base, so it **searches and reads your notes** (their
@@ -105,8 +115,9 @@ organization + metadata) to answer. Flip the composer **globe** on for a chat an
 Attach **images** to a vision-capable model (the composer checks). Everything can carry a chat.
 
 **Inbox** _(front)_ — your **emails**. (Distinct from the memex `inbox.md` capture file
-and from `wiki/_inbox/` note staging — same word, three different things; the FRONT
-named "Inbox" is email.)
+— which belongs to other memex tools like Breve; rotli never writes it — and from
+`wiki/_inbox/` note staging, rotli's one capture home. Same word, three different
+things; the FRONT named "Inbox" is email.)
 
 **Linked library** _(advanced)_ — a **second** memex you reference (a shared/team brain,
 a public knowledge base, a colleague's). Renamed from the code's "connected brain";
@@ -117,8 +128,11 @@ second. Read or write per its perms.
 `reach` (who) + `owner` (origin) frontmatter, a per-note **`locked`** flag (the metadata
 panel's lock — the AI filer skips a locked note), a per-note **`secure`** flag (secrets
 auto-detected → the note is never sent to a *remote* model **nor out to the web** (the agentic client's
-web tools refuse a query/URL that trips the secret detector) and its file is gitignored;
-a local model may still read it), plus the memex access mode (`local`/`open`/`secure`).
+web tools refuse a query/URL that trips the secret detector) and its file is gitignored —
+the gitignore line **follows the file** through renames and Brain filings, so a flagged
+secret never becomes committable by moving; a local model may still read it, and "local"
+is **verified**, not assumed: the shell checks the model's endpoint is loopback rather
+than trusting the registry's word), plus the memex access mode (`local`/`open`/`secure`).
 The AI maintains both organization AND access via metadata.
 
 Metadata is visible **in the note**: flip **Show file metadata** (Settings → General, or
@@ -131,9 +145,11 @@ the lock/secure switches + Brain filing (its old key:value field editor is gone)
 ## What rotli writes (the contract — v3.7, band [3.4, 3.7])
 
 Two write actors, two gates. **You** (the interactive editor) write only: **`chats/`**
-(AI chats), **`inbox.md`** (captures), and **`wiki/_inbox/`** (new-note staging) — and
-NEVER `history/`, `identity/`, `personality/`, `MAP.md`, or the curated rest of `wiki/`
-(refused at both the TS `canWrite` gate and the Rust `is_writable` guard). The **AI
+(AI chats) and **`wiki/_inbox/`** (new-note staging — quick captures land here too) — and
+NEVER `history/`, `identity/`, `personality/`, `MAP.md`, `inbox.md`, or the curated rest
+of `wiki/` (refused at both the TS `canWrite` gate and the Rust `is_writable` guard).
+(`inbox.md` is other tools' capture file — Breve's; rotli never writes it, and the old
+unused allowance was narrowed out of both gates — 2026-07 audit #96.) The **AI
 Filer** (v3.7) is the second actor: it writes the curated `wiki/<area>/` brain — the
 `area`/`summary`/`tags`/`links` metadata + filing staged notes into areas + the
 generated `wiki/<area>/_index.md` — through its own narrower gate, and it must skip any

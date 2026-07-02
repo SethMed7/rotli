@@ -12,7 +12,7 @@ import { EditorSurface } from "../editor/EditorSurface";
 import { useTransientPopover } from "../lib/popover";
 import { setQuickHandle } from "../lib/quickHandle";
 import { onQuickShow, startWindowDrag } from "../lib/tauri";
-import { isVault } from "../services/destinations";
+import { isChatsPath, isVault, isWikiPath } from "../services/destinations";
 import { invalidateNotes, useSearchableNotes } from "../services/hooks";
 import { inboxFolderId, notesService } from "../services/notes";
 import { usePanesStore } from "../state/panes";
@@ -170,6 +170,8 @@ export function QuickNote() {
   );
   const byId = useMemo(() => new Map(notes.map((n) => [n.id, n])), [notes]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // a failed new-note create, surfaced in the window (#6 — never silent)
+  const [err, setErr] = useState<string | null>(null);
   // bumped each summon — keys the editor so it REMOUNTS on every show, re-running
   // autoFocus so re-opens always land a typing caret (#7)
   const [showNonce, setShowNonce] = useState(0);
@@ -217,18 +219,25 @@ export function QuickNote() {
 
   const newNote = () => {
     // Quick notes default to the LOCAL Inbox. The external Vault is read-mostly —
-    // rotli never creates a note inside it (never into a memex's chats/), so a
-    // stored quickFolder that points at the Vault redirects to the local Inbox.
+    // rotli never creates a note inside it (never into a memex's chats/) — and the
+    // local memex's curated wiki/** + chats/ REFUSE creation at the write gate, so
+    // a stored quickFolder pointing at any of those (a stale Settings pick)
+    // redirects to the local Inbox instead of leaving ⌥Q dead (#6, audit 2026-07).
     const stored = useUiStore.getState().quickFolder;
-    const folder = isVault(stored) ? inboxFolderId : stored;
+    const folder =
+      isVault(stored) || isWikiPath(stored) || isChatsPath(stored) ? inboxFolderId : stored;
     creatingRef.current = true;
     void notesService
       .createNote(folder, "")
       .then(async (note) => {
         await invalidateNotes();
+        setErr(null);
         setQuickActive(note.id); // open it (not pinned — pin deliberately via ★)
         setPickerOpen(false);
       })
+      // a refused create (read-only band, a gone folder, …) must SAY so — the
+      // global hotkey silently doing nothing reads as "rotli is broken" (#6)
+      .catch((e: unknown) => setErr((e as Error)?.message ?? "couldn't create the note"))
       .finally(() => {
         creatingRef.current = false;
       });
@@ -251,6 +260,7 @@ export function QuickNote() {
     () =>
       onQuickShow(() => {
         setPickerOpen(false);
+        setErr(null); // a fresh summon starts clean; a re-failure re-surfaces
         setShowNonce((n) => n + 1);
         if (!creatingRef.current && !useUiStore.getState().quickActiveId) newNote();
       }),
@@ -297,6 +307,8 @@ export function QuickNote() {
           </IconButton>
         </div>
       </header>
+
+      {err && <p className="quick-err">⚠ {err}</p>}
 
       {activeId ? (
         // key forces a clean remount per note AND per show (the nonce) — fresh

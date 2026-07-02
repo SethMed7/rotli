@@ -405,6 +405,38 @@
   opacity: 0.85;
 }
 
+/* — a failed row-menu action (file-to-brain, board rename): an inline,
+   dismissible error note pinned above the tree (#11, audit 2026-07) — */
+.sb-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 4px 10px 2px;
+  padding: 6px 8px;
+  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--danger, var(--accent-text)) 9%, transparent);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--danger, var(--accent-text));
+}
+.sb-error-text {
+  flex: 1;
+  min-width: 0;
+}
+.sb-error-x {
+  border: 0;
+  background: none;
+  padding: 0 2px;
+  font-size: 13px;
+  line-height: 1;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.sb-error-x:hover {
+  opacity: 1;
+}
+
 /* — Chat section: a "New chat" accent row, an "All chats" search row, then the
    recent history (limited). The chat rows reuse the folder-row sizing. — */
 .sb-chat {

@@ -14,6 +14,7 @@ import {
   isSink,
   isTrash,
   isVault,
+  isWikiPath,
   memexMarkersOf,
   SINK_ROOTS,
   VAULT_MARKER,
@@ -146,6 +147,22 @@ describe("isChatsPath — the pure chats/ shape test", () => {
     expect(isChatsPath("wiki/projects")).toBe(false);
     expect(isChatsPath("chatscript")).toBe(false); // prefix must be a path segment
     expect(isChatsPath("vault:wiki")).toBe(false);
+  });
+});
+
+describe("isWikiPath — the pure curated-wiki shape test (#6)", () => {
+  it("matches bare and prefixed wiki paths", () => {
+    expect(isWikiPath("wiki")).toBe(true);
+    expect(isWikiPath("wiki/projects")).toBe(true);
+    expect(isWikiPath("vault:wiki")).toBe(true);
+    expect(isWikiPath("vault:wiki/people")).toBe(true);
+  });
+
+  it("never matches notes folders or lookalikes", () => {
+    expect(isWikiPath("Inbox")).toBe(false);
+    expect(isWikiPath("chats")).toBe(false);
+    expect(isWikiPath("wikipedia")).toBe(false); // prefix must be a path segment
+    expect(isWikiPath("vault:chats")).toBe(false);
   });
 });
 

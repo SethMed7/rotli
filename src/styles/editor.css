@@ -651,6 +651,14 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+/* a generic/unknown code fence (```js, plain ```) — raw code voice, never
+   markdown-styled (#13, audit 2026-07). Line-granular: the mono family +
+   a quiet wash so the block reads as one unit while staying editable. */
+.rotli-cm-host .cm-line.rotli-fenceline {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.9em;
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
 
 /* focus mode — the non-active paragraphs dim (r3 frame E) */
 .rotli-cm-host .cm-line.rotli-dim {

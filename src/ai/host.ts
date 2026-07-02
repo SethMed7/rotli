@@ -10,6 +10,7 @@ import {
   corpusFileText,
   corpusList,
   corpusReadAi,
+  corpusSearch,
   webFetch as tauriWebFetch,
   webSearch as tauriWebSearch,
 } from "../lib/tauri";
@@ -32,12 +33,27 @@ export function makeTauriHost(model: ChatModelInfo): Host {
       return chatMessages(messages, opts);
     },
     async searchNotes(query, limit) {
-      const { notes } = await corpusList();
-      return rankNotes(notes, query, limit);
+      // FULL-TEXT search in Rust (corpus_search: title > body rank, framed match
+      // snippets) — the same engine the ⌘K palette uses, instead of keyword-
+      // ranking 140-char list snippets (#9, audit 2026-07). Boards/files are
+      // dropped for parity with rankNotes: read_note can't open them (files go
+      // through read_file). rankNotes stays as the fallback so the browser twin
+      // (and a search error) still answer from the listing.
+      try {
+        const hits = await corpusSearch(query, limit);
+        return hits
+          .filter((h) => h.kind === "note")
+          .map((h) => ({ id: h.id, title: h.title, snippet: h.snippet, folder: h.folderId }));
+      } catch {
+        const { notes } = await corpusList();
+        return rankNotes(notes, query, limit);
+      }
     },
     readNote(id) {
-      // local model ⇒ secure notes are allowed (the gate only blocks REMOTE models).
-      return corpusReadAi(id, true);
+      // Locality is DERIVED from the picked model's endpoint (loopback check) —
+      // never asserted (#2, audit 2026-07). Rust re-derives it from the same
+      // endpoint inside corpus_read_ai, so the webview never sends a trust bit.
+      return corpusReadAi(id, model.endpoint);
     },
     async readFile(query) {
       const { notes } = await corpusList();

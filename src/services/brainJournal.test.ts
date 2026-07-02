@@ -119,11 +119,19 @@ interface Calls {
   setAiField: [string, string, string][];
   writeIndex: [string, string][];
   filerMove: [string, string][];
+  learned: [string, string, string][];
 }
 
 /** Fake corpus: the note lives at `rel`, with `fields` frontmatter lines. */
 function fakeDeps(rel: string, fields: string[] = [], over: Partial<JournalDeps> = {}) {
-  const calls: Calls = { appended: [], fileNote: [], setAiField: [], writeIndex: [], filerMove: [] };
+  const calls: Calls = {
+    appended: [],
+    fileNote: [],
+    setAiField: [],
+    writeIndex: [],
+    filerMove: [],
+    learned: [],
+  };
   const fm: FrontmatterView = {
     id: "01ULID",
     created: "",
@@ -151,6 +159,10 @@ function fakeDeps(rel: string, fields: string[] = [], over: Partial<JournalDeps>
     frontmatter: async () => fm,
     append: async (line) => {
       calls.appended.push(JSON.parse(line) as BrainAction);
+    },
+    readIndex: async () => "", // no overview on disk (a first proposal's `before`)
+    learnField: async (note, key, value) => {
+      calls.learned.push([note, key, value]);
     },
     ...over,
   };
@@ -234,6 +246,114 @@ describe("approveProposal — the same-id transition", () => {
     await expect(approveProposal(p, deps)).rejects.toThrow(/changed since/);
     expect(calls.setAiField).toEqual([]);
     expect(calls.appended).toEqual([]);
+    expect(calls.learned).toEqual([]);
+  });
+
+  it("an approved filing records filed_by/filed_at like an auto-apply (#90)", async () => {
+    const p = row({ id: "01JPROP", noteUlid: "01ULID", model: "gemma-3-12b-it-qat-4bit" });
+    const { deps, calls } = fakeDeps("wiki/_inbox/foo-a1b2c3.md");
+    await approveProposal(p, deps);
+    const keys = calls.setAiField.map(([, k]) => k);
+    expect(keys).toEqual(["filed_by", "filed_at"]);
+    expect(calls.setAiField[0]?.[2]).toBe("gemma-3-12b-it-qat-4bit");
+    expect(calls.setAiField[1]?.[2]).toMatch(/^\d{4}-\d{2}-\d{2}T/); // an ISO stamp
+    expect(calls.fileNote).toHaveLength(1); // the move still rides the Filer lane
+    // stamped AFTER the move, at the note's NEW home (review, 2026-07)
+    expect(calls.setAiField.map(([relArg]) => relArg)).toEqual([
+      "wiki/Projects/foo-a1b2c3.md",
+      "wiki/Projects/foo-a1b2c3.md",
+    ]);
+  });
+
+  it("a refused filing stamps NOTHING — no filed_by on an unfiled note (review, 2026-07)", async () => {
+    const p = row({ id: "01JPROP", noteUlid: "01ULID", model: "gemma-3-12b-it-qat-4bit" });
+    const { deps, calls } = fakeDeps("wiki/_inbox/foo-a1b2c3.md", [], {
+      // the filer gate refuses (the user locked the note mid-flight)
+      fileNote: async () => {
+        throw new Error("the filer may not write a locked note");
+      },
+    });
+    await expect(approveProposal(p, deps)).rejects.toThrow(/locked/);
+    expect(calls.setAiField).toEqual([]); // an unfiled note never reads as filed
+    expect(calls.appended).toEqual([]); // still pending — retry or Dismiss
+  });
+
+  it("a failed stamp does NOT fail an approve whose filing already landed", async () => {
+    const p = row({ id: "01JPROP", noteUlid: "01ULID" });
+    const { deps, calls } = fakeDeps("wiki/_inbox/foo-a1b2c3.md", [], {
+      setAiField: async () => {
+        throw new Error("gate refused the stamp");
+      },
+    });
+    await approveProposal(p, deps);
+    expect(calls.fileNote).toHaveLength(1);
+    expect(calls.appended[0]?.status).toBe("applied"); // the journal transition lands
+  });
+
+  it("an approved field teaches the daemon's never-clobber baseline (#28)", async () => {
+    const p = row({
+      id: "01JFIELD",
+      action: "field",
+      field: "summary",
+      noteUlid: "01ULID",
+      before: "",
+      after: "one line",
+    });
+    const { deps, calls } = fakeDeps("wiki/Projects/foo-a1b2c3.md");
+    await approveProposal(p, deps);
+    expect(calls.learned).toEqual([["01ULID", "summary", "one line"]]);
+    // a learn failure must NOT fail the approve — the field write already landed
+    const { deps: deps2, calls: calls2 } = fakeDeps("wiki/Projects/foo-a1b2c3.md", [], {
+      learnField: async () => {
+        throw new Error("daemon busy");
+      },
+    });
+    await approveProposal(p, deps2);
+    expect(calls2.appended[0]?.status).toBe("applied");
+  });
+
+  it("teaches area_confidence beside an approved suggested_area (#28)", async () => {
+    const p = row({
+      id: "01JSUGG",
+      action: "field",
+      field: "suggested_area",
+      noteUlid: "01ULID",
+      before: "",
+      after: "Research",
+      confidence: 0.4,
+    });
+    const { deps, calls } = fakeDeps("wiki/_inbox/foo-a1b2c3.md");
+    await approveProposal(p, deps);
+    expect(calls.learned).toEqual([
+      ["01ULID", "suggested_area", "Research"],
+      ["01ULID", "area_confidence", "0.40"],
+    ]);
+  });
+
+  it("refuses an index proposal whose overview changed since (§4.8, #26)", async () => {
+    const p = row({
+      id: "01JIDX",
+      action: "index",
+      area: "Projects",
+      noteId: "wiki/Projects/_index.md",
+      before: "# Projects\n\n| Note | Summary |\n| --- | --- |\n| Old |  |\n",
+      after: "# Projects\n\n| Note | Summary |\n| --- | --- |\n| Old |  |\n| New |  |\n",
+    });
+    // a sibling approve / filing rewrote the overview since this was proposed
+    const { deps, calls } = fakeDeps("wiki/Projects/_index.md", [], {
+      readIndex: async () => "# Projects\n\nsomething newer\n",
+    });
+    await expect(approveProposal(p, deps)).rejects.toThrow(/overview changed/);
+    expect(calls.writeIndex).toEqual([]);
+    expect(calls.appended).toEqual([]);
+
+    // unchanged on disk → applies verbatim
+    const { deps: ok, calls: okCalls } = fakeDeps("wiki/Projects/_index.md", [], {
+      readIndex: async () => p.before,
+    });
+    await approveProposal(p, ok);
+    expect(okCalls.writeIndex).toEqual([["Projects", p.after]]);
+    expect(okCalls.appended[0]?.status).toBe("applied");
   });
 });
 

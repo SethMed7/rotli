@@ -9,12 +9,16 @@
 //! the bytes down atomically + under an advisory lock (Breve's daemon writes the
 //! same tree concurrently).
 //!
-//! OWNERSHIP: rotli writes ONLY `chats/`, the `wiki/_inbox/` note staging (v3.5), and
-//! appends `inbox.md`. `identity/`, `personality/`, `history/`, `MAP.md`, the CURATED rest
+//! OWNERSHIP: rotli writes ONLY `chats/` and the `wiki/_inbox/` note staging (v3.5).
+//! `inbox.md` is NOT a rotli write surface (#96, audit 2026-07 — nothing ever appended
+//! it; captures stage in `wiki/_inbox/`; Breve owns its own inbox.md appends; rotli only
+//! scaffolds the file when initiating a NEW memex). `identity/`, `personality/`,
+//! `history/`, `MAP.md`, the CURATED rest
 //! of `wiki/`, and every control file are NEVER written — `assert_writable` refuses, regardless of what
-//! the frontend sends (the hard guard behind the TS `canWrite` gate). The active-instance
-//! registry lives OUTSIDE any corpus, in the app config dir, so a connected brain is
-//! never littered with rotli wiring.
+//! the frontend sends (the hard guard behind the TS `canWrite` gate), and the ROOT itself
+//! must be a registered one (`registered_root`, #20 — the webview can never point these
+//! commands at an arbitrary path). The active-instance registry lives OUTSIDE any corpus,
+//! in the app config dir, so a connected brain is never littered with rotli wiring.
 
 use std::collections::HashSet;
 use std::fs;
@@ -29,11 +33,14 @@ use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-/// The memex contract version rotli is built against (mirrors memex-vault's
-/// `CONTRACT_VERSION` and `src/memex/contract.ts`, which is 3.6). rotli writes the
-/// note contract but still WRITES to a v3.4 brain (the chat/inbox shape is
-/// unchanged), so the supported band is `[MIN_CONTRACT, CONTRACT_VERSION]`.
-const CONTRACT_VERSION: &str = "3.6";
+/// The memex contract version rotli is built against — MUST match
+/// `src/memex/contract.ts` `CONTRACT_VERSION` exactly (the lockstep test below
+/// pins it; #24, audit 2026-07: the two sides drifted 3.6 vs 3.7 and Rust's
+/// verdict is the effective one — a 3.7 brain silently opened read-only).
+/// v3.7 adds the AI Filer lane (additive frontmatter keys only). rotli still
+/// WRITES to a v3.4 brain (the chat/inbox shape is unchanged), so the supported
+/// band is `[MIN_CONTRACT, CONTRACT_VERSION]`.
+const CONTRACT_VERSION: &str = "3.7";
 const MIN_CONTRACT: &str = "3.4";
 /// The inbox sentinel new captures are inserted after (matches memex-vault's inbox.md).
 const INBOX_MARK: &str = "<!-- entries below this line -->";
@@ -69,13 +76,28 @@ fn atomic_write(path: &Path, contents: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// How long a lockfile must sit untouched before it counts as STALE and is
+/// reclaimed — WELL ABOVE the ~10s max wait (#42, audit 2026-07: when the two
+/// were equal, a live >10s holder had its lockfile deleted out from under it).
+const LOCK_STALE: Duration = Duration::from_millis(30_000);
+
 /// A short advisory lock around a read-modify-write (mirrors conversations.ts
 /// `withFileLock`: O_EXCL lockfile, ~10s ceiling, stale-lock reclaim). Breve's
-/// daemon and rotli both append `inbox.md` / merge `memex.json` — this serializes them.
+/// daemon writes the same tree rotli does (e.g. both merge `memex.json`) — this
+/// serializes them. FAIL-CLOSED (#42): if the lock can't be acquired within the
+/// ceiling the write is REFUSED — never run the read-modify-write unserialized.
 fn with_file_lock<T>(target: &Path, f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    with_file_lock_attempts(target, 200, f) // 200 × 50ms ≈ the ~10s ceiling
+}
+
+fn with_file_lock_attempts<T>(
+    target: &Path,
+    attempts: u32,
+    f: impl FnOnce() -> Result<T, String>,
+) -> Result<T, String> {
     let lock = PathBuf::from(format!("{}.lock", target.to_string_lossy()));
     let mut held = false;
-    for _ in 0..200 {
+    for _ in 0..attempts {
         match fs::OpenOptions::new().write(true).create_new(true).open(&lock) {
             Ok(_) => {
                 held = true;
@@ -83,11 +105,7 @@ fn with_file_lock<T>(target: &Path, f: impl FnOnce() -> Result<T, String>) -> Re
             }
             Err(_) => {
                 if let Ok(modified) = fs::metadata(&lock).and_then(|m| m.modified()) {
-                    if modified
-                        .elapsed()
-                        .map(|d| d > Duration::from_millis(10_000))
-                        .unwrap_or(false)
-                    {
+                    if modified.elapsed().map(|d| d > LOCK_STALE).unwrap_or(false) {
                         let _ = fs::remove_file(&lock);
                         continue;
                     }
@@ -96,22 +114,31 @@ fn with_file_lock<T>(target: &Path, f: impl FnOnce() -> Result<T, String>) -> Re
             }
         }
     }
-    let result = f();
-    if held {
-        let _ = fs::remove_file(&lock);
+    if !held {
+        return Err(format!(
+            "another writer is holding {} — try again in a moment",
+            lock.display()
+        ));
     }
+    let result = f();
+    let _ = fs::remove_file(&lock);
     result
 }
 
-// ─── the write guard (rotli owns chats/ + inbox.md + wiki/_inbox/, nothing else) ─
+// ─── the write guard (rotli owns chats/ + wiki/_inbox/, nothing else) ──────────
+//
+// `inbox.md` is NOT in this lane (#96, audit 2026-07): no rotli code has ever
+// appended it — quick captures land as staged notes in wiki/_inbox/ — so the old
+// allowance was dead gate surface that could only rot. Breve appends inbox.md
+// through its own gate; rotli only creates the file when it INITIATES a brand-new
+// memex (the scaffold below, which is initiation, not the write lane).
 
 fn is_writable(rel: &str) -> bool {
     let p = rel.trim_start_matches('/');
     if p.contains("..") {
         return false;
     }
-    p == "inbox.md"
-        || p == "chats"
+    p == "chats"
         || p.starts_with("chats/")
         // the note staging area (v3.5) — the ONLY writable part of wiki/; the
         // curated rest (wiki/note.md, wiki/projects/…) stays read-only.
@@ -124,7 +151,7 @@ fn assert_writable(rel: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "rotli only writes chats, inbox, and wiki/_inbox staging here — the rest of memex-vault's memory is read-only (refused: {rel})"
+            "rotli only writes chats and wiki/_inbox staging here — the rest of memex-vault's memory is read-only (refused: {rel})"
         ))
     }
 }
@@ -250,10 +277,17 @@ fn contract_ok(contract: Option<&str>) -> bool {
     let Some(c) = contract.and_then(parse_contract) else {
         return false;
     };
-    // tuples compare lexicographically: (3,4) ≤ (3,5) ≤ (3,6) — the whole band.
+    // tuples compare lexicographically: (3,4) ≤ (3,5) ≤ … ≤ (3,7) — the whole band.
     let lo = parse_contract(MIN_CONTRACT).expect("MIN_CONTRACT is valid");
     let hi = parse_contract(CONTRACT_VERSION).expect("CONTRACT_VERSION is valid");
     c >= lo && c <= hi
+}
+
+/// Whether the memex at `root` carries a contract inside rotli's supported band —
+/// the corpus store consults this AT OPEN so an out-of-band brain refuses every
+/// write in Rust, not only in TS (#3, audit 2026-07).
+pub(crate) fn contract_in_band_at(root: &Path) -> bool {
+    contract_ok(detect_one(root).contract.as_deref())
 }
 
 // ─── the instance registry (machine-level, outside any corpus) ─────────────────
@@ -330,6 +364,38 @@ fn find_bun() -> PathBuf {
     PathBuf::from("bun") // last resort: rely on PATH
 }
 
+// ─── the registered-roots guard (#20, audit 2026-07) ───────────────────────────
+
+/// Pure core: whether `want` matches one of `roots` after canonicalization
+/// (FSEvents-style `/var` ↔ `/private/var` aliases compare equal). A `want`
+/// that can't be canonicalized (doesn't exist) is NOT registered — fail closed.
+fn root_among(roots: &[PathBuf], want: &Path) -> bool {
+    let Ok(want) = fs::canonicalize(want) else {
+        return false;
+    };
+    roots
+        .iter()
+        .any(|r| fs::canonicalize(r).map(|c| c == want).unwrap_or(false))
+}
+
+/// Resolve a webview-supplied `root` against the REGISTERED roots — the corpus +
+/// connected brains + added folders in corpus.json. Every root-taking memex_*
+/// command runs this FIRST, so the frontend can never point them at an arbitrary
+/// path (`memex_read(root: "/", …)` used to read any file on disk; a crafted
+/// write root could plant chats/ inside a curated tree).
+fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, String> {
+    let cfg = crate::corpus::ensure_corpus_config(app);
+    let mut roots: Vec<PathBuf> = vec![cfg.corpus.abs_path];
+    roots.extend(cfg.brains.into_iter().map(|b| b.abs_path));
+    roots.extend(cfg.folders.into_iter().map(|f| f.abs_path));
+    let want = PathBuf::from(root);
+    if root_among(&roots, &want) {
+        fs::canonicalize(&want).map_err(|e| format!("bad memex root {root}: {e}"))
+    } else {
+        Err(format!("not a registered memex root: {root}"))
+    }
+}
+
 // ─── commands ──────────────────────────────────────────────────────────────────
 
 /// Scan the likely places for an existing memex (so first-run can offer "merge"):
@@ -368,11 +434,9 @@ pub fn memex_detect(app: tauri::AppHandle) -> Result<Vec<DetectedMemex>, String>
     Ok(out)
 }
 
-/// Inspect one folder (after the user picks it in "Connect to existing…").
-#[tauri::command]
-pub fn memex_inspect(path: String) -> Result<DetectedMemex, String> {
-    Ok(detect_one(&PathBuf::from(path)))
-}
+// `memex_inspect` (inspect an arbitrary folder) was UNREGISTERED and removed in
+// the 2026-07 audit (#68): zero frontend callers — the connect flows go through
+// memex_detect / corpus_connect_brain. `detect_one`/`detect_folder` stay.
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -384,8 +448,8 @@ pub struct ContractRaw {
 
 /// Raw contract files (TS parses them with the mirror codec).
 #[tauri::command]
-pub fn memex_read_contract(root: String) -> Result<ContractRaw, String> {
-    let root = PathBuf::from(root);
+pub fn memex_read_contract(app: tauri::AppHandle, root: String) -> Result<ContractRaw, String> {
+    let root = registered_root(&app, &root)?;
     let rd = |n: &str| fs::read_to_string(root.join(n)).unwrap_or_default();
     Ok(ContractRaw {
         memex_json: rd("memex.json"),
@@ -395,12 +459,19 @@ pub fn memex_read_contract(root: String) -> Result<ContractRaw, String> {
 }
 
 /// Read any spine file (rotli reads everything; writes are the gated part).
+/// The ROOT must be registered (#20) — the rel-only jail wasn't enough when the
+/// root itself came from the webview.
 #[tauri::command]
-pub fn memex_read(root: String, rel: String) -> Result<String, String> {
+pub fn memex_read(app: tauri::AppHandle, root: String, rel: String) -> Result<String, String> {
+    let root = registered_root(&app, &root)?;
+    read_at(&root, &rel)
+}
+
+fn read_at(root: &Path, rel: &str) -> Result<String, String> {
     if rel.contains("..") || rel.starts_with('/') {
         return Err("bad path".into());
     }
-    Ok(fs::read_to_string(PathBuf::from(root).join(&rel)).unwrap_or_default())
+    Ok(fs::read_to_string(root.join(rel)).unwrap_or_default())
 }
 
 /// Frontmatter scalar lookup (mirrors conversations.ts `fm`; line-based so it's
@@ -439,8 +510,13 @@ pub struct ChatSummary {
 
 /// List the named chats in `chats/` (read-only; mirrors conversations.ts listChats).
 #[tauri::command]
-pub fn memex_list_chats(root: String) -> Result<Vec<ChatSummary>, String> {
-    let dir = PathBuf::from(root).join("chats");
+pub fn memex_list_chats(app: tauri::AppHandle, root: String) -> Result<Vec<ChatSummary>, String> {
+    let root = registered_root(&app, &root)?;
+    list_chats_at(&root)
+}
+
+fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
+    let dir = root.join("chats");
     let mut out = Vec::new();
     if let Ok(rd) = fs::read_dir(&dir) {
         for e in rd.flatten() {
@@ -477,57 +553,10 @@ pub fn memex_list_chats(root: String) -> Result<Vec<ChatSummary>, String> {
     Ok(out)
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DirEntry {
-    pub name: String,
-    pub rel: String,
-    pub is_dir: bool,
-}
-
-/// List one spine directory for the READ-ONLY Memory browser: subdirectories +
-/// `*.md` files only (dotfiles and other files skipped), dirs-first then
-/// case-insensitive alpha. Missing dir ⇒ `[]`. Rel is jailed (no `..`, no leading
-/// `/`) — Memory only ever reads, never writes, so this is a pure traversal.
-#[tauri::command]
-pub fn memex_list_dir(root: String, rel: String) -> Result<Vec<DirEntry>, String> {
-    if rel.contains("..") || rel.starts_with('/') {
-        return Err("bad path".into());
-    }
-    let dir = PathBuf::from(root).join(&rel);
-    let mut out = Vec::new();
-    if let Ok(rd) = fs::read_dir(&dir) {
-        for e in rd.flatten() {
-            let name = match e.file_name().into_string() {
-                Ok(n) => n,
-                Err(_) => continue,
-            };
-            if name.starts_with('.') {
-                continue; // skip dotfiles
-            }
-            let is_dir = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
-            if !is_dir && !name.to_lowercase().ends_with(".md") {
-                continue; // only subdirs + .md files
-            }
-            let child_rel = if rel.is_empty() {
-                name.clone()
-            } else {
-                format!("{rel}/{name}")
-            };
-            out.push(DirEntry {
-                name,
-                rel: child_rel,
-                is_dir,
-            });
-        }
-    }
-    out.sort_by(|a, b| {
-        b.is_dir
-            .cmp(&a.is_dir)
-            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-    });
-    Ok(out)
-}
+// `memex_list_dir` (the old READ-ONLY Memory browser's directory listing) was
+// UNREGISTERED and removed in the 2026-07 audit (#68): the Memory front folded
+// into the corpus tree long ago and no TS caller remained. Re-add from git
+// history if a spine browser ever returns.
 
 /// What `corpus.rs` needs to register a connected brain in `corpus.json` — the
 /// memex-specific half of connecting (validate it's a real memex, stamp
@@ -641,16 +670,27 @@ fn parse_mode_raw(users_json: &str) -> String {
 }
 
 /// Write a chat file (full bytes composed by TS) into `chats/<slug>.md`.
+/// The ROOT must be registered (#20) — a crafted root could otherwise plant
+/// chats/ inside any tree on disk.
 #[tauri::command]
-pub fn memex_write_chat(root: String, slug: String, contents: String) -> Result<String, String> {
-    let root = PathBuf::from(root);
-    let safe = safe_slug(&slug)?;
+pub fn memex_write_chat(
+    app: tauri::AppHandle,
+    root: String,
+    slug: String,
+    contents: String,
+) -> Result<String, String> {
+    let root = registered_root(&app, &root)?;
+    write_chat_at(&root, &slug, &contents)
+}
+
+fn write_chat_at(root: &Path, slug: &str, contents: &str) -> Result<String, String> {
+    let safe = safe_slug(slug)?;
     let rel = format!("chats/{safe}.md");
     assert_writable(&rel)?;
     let chats = root.join("chats");
     fs::create_dir_all(&chats).map_err(|e| e.to_string())?;
     let path = chats.join(format!("{safe}.md"));
-    with_file_lock(&path, || atomic_write(&path, &contents))?;
+    with_file_lock(&path, || atomic_write(&path, contents))?;
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -658,18 +698,28 @@ pub fn memex_write_chat(root: String, slug: String, contents: String) -> Result<
 /// staging area as `<stem>.md`. The stem is `<slug>-<id6>` from the TS `noteStem`;
 /// `safe_slug` re-validates it on the wire (lowercase-alnum-dash, no separators, no
 /// `..`) so the frontend can never escape the staging dir. Atomic + under the lock,
-/// exactly like a chat write. A later phase's local LLM classifies + `git mv`s the
-/// note out to `wiki/<area>/`; rotli only ever writes the staging copy.
+/// exactly like a chat write. The ROOT must be registered (#20). A later phase's
+/// local LLM classifies + `git mv`s the note out to `wiki/<area>/`; rotli only
+/// ever writes the staging copy.
 #[tauri::command]
-pub fn memex_write_note(root: String, stem: String, contents: String) -> Result<String, String> {
-    let root = PathBuf::from(root);
-    let safe = safe_slug(&stem)?;
+pub fn memex_write_note(
+    app: tauri::AppHandle,
+    root: String,
+    stem: String,
+    contents: String,
+) -> Result<String, String> {
+    let root = registered_root(&app, &root)?;
+    write_note_at(&root, &stem, &contents)
+}
+
+fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, String> {
+    let safe = safe_slug(stem)?;
     let rel = format!("wiki/_inbox/{safe}.md");
     assert_writable(&rel)?;
     let dir = root.join("wiki").join("_inbox");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join(format!("{safe}.md"));
-    with_file_lock(&path, || atomic_write(&path, &contents))?;
+    with_file_lock(&path, || atomic_write(&path, contents))?;
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -685,9 +735,10 @@ pub struct ValidateReport {
 
 /// Shell out to the brain's own `scripts/validate.ts` (mirror-not-import: we exec
 /// it by path, never load it). Degrades to "skipped" if bun / the script is absent.
+/// The ROOT must be registered (#20) — this execs a script FROM the target tree.
 #[tauri::command]
-pub fn memex_validate(root: String) -> Result<ValidateReport, String> {
-    let root = PathBuf::from(root);
+pub fn memex_validate(app: tauri::AppHandle, root: String) -> Result<ValidateReport, String> {
+    let root = registered_root(&app, &root)?;
     let script = root.join("scripts").join("validate.ts");
     if !script.exists() {
         return Ok(ValidateReport {
@@ -758,7 +809,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn scaffold_memex_makes_a_valid_v36_brain() {
+    fn scaffold_memex_makes_a_valid_brain_on_the_current_contract() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("brain");
         let id = scaffold_memex(&root).unwrap();
@@ -779,10 +830,12 @@ mod tests {
     }
 
     #[test]
-    fn write_guard_allows_only_chats_inbox_and_wiki_inbox() {
+    fn write_guard_allows_only_chats_and_wiki_inbox() {
         assert!(is_writable("chats/foo.md"));
         assert!(is_writable("chats"));
-        assert!(is_writable("inbox.md"));
+        // inbox.md is NOT a rotli write surface (#96, audit 2026-07) — nothing ever
+        // appended it; the dead allowance was narrowed out of the gate.
+        assert!(!is_writable("inbox.md"));
         // wiki/_inbox staging (v3.5) is writable; the curated rest of wiki/ is not.
         assert!(is_writable("wiki/_inbox"));
         assert!(is_writable("wiki/_inbox/pricing-decision-01jtes.md"));
@@ -800,40 +853,97 @@ mod tests {
     fn contract_ok_accepts_the_band_only() {
         assert!(contract_ok(Some("3.4"))); // memex-vault's memex.json today
         assert!(contract_ok(Some("3.5"))); // mid-band
-        assert!(contract_ok(Some("3.6"))); // a rotli-init'd brain / the ceiling
+        assert!(contract_ok(Some("3.6"))); // mid-band
+        assert!(contract_ok(Some("3.7"))); // the Filer-lane contract / the ceiling (#24)
         assert!(!contract_ok(Some("3.3"))); // below the floor
-        assert!(!contract_ok(Some("3.7"))); // above the ceiling
+        assert!(!contract_ok(Some("3.8"))); // above the ceiling
         assert!(!contract_ok(Some("4.0"))); // a future major
         assert!(!contract_ok(None));
+    }
+
+    /// #24 (audit 2026-07): the Rust band and the TS band (src/memex/contract.ts)
+    /// drifted once (3.6 vs 3.7) — Rust's verdict is the effective one, so a 3.7
+    /// brain silently opened read-only while every doc claimed support. This
+    /// lockstep assertion makes any future drift a test failure on either side.
+    #[test]
+    fn contract_band_is_in_lockstep_with_contract_ts() {
+        let ts_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../src/memex/contract.ts");
+        let ts = std::fs::read_to_string(ts_path).expect("read src/memex/contract.ts");
+        assert!(
+            ts.contains(&format!("export const CONTRACT_VERSION = \"{CONTRACT_VERSION}\"")),
+            "contract.ts CONTRACT_VERSION must equal Rust's {CONTRACT_VERSION} — bump BOTH sides together"
+        );
+        assert!(
+            ts.contains(&format!("export const MIN_CONTRACT = \"{MIN_CONTRACT}\"")),
+            "contract.ts MIN_CONTRACT must equal Rust's {MIN_CONTRACT} — bump BOTH sides together"
+        );
+    }
+
+    /// #42 (audit 2026-07): a lock that can't be acquired must FAIL the write —
+    /// never run the read-modify-write unserialized — and a LIVE (fresh) lockfile
+    /// must never be reclaimed out from under its holder.
+    #[test]
+    fn with_file_lock_fails_closed_on_a_held_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("inbox.md");
+        let lock = dir.path().join("inbox.md.lock");
+        std::fs::write(&lock, "").unwrap(); // a live holder (fresh mtime)
+        let mut ran = false;
+        let r = with_file_lock_attempts(&target, 3, || {
+            ran = true;
+            Ok(())
+        });
+        assert!(r.is_err(), "non-acquisition must be an Err, not a fallthrough");
+        assert!(!ran, "the closure must NOT run without the lock");
+        assert!(lock.exists(), "a live holder's lockfile is never dispossessed");
+
+        // once the holder releases, the same write goes through and cleans up
+        std::fs::remove_file(&lock).unwrap();
+        let r = with_file_lock_attempts(&target, 3, || Ok(42));
+        assert_eq!(r.unwrap(), 42);
+        assert!(!lock.exists(), "the lock is released after the write");
+    }
+
+    /// #20 (audit 2026-07): the registered-roots guard's pure core.
+    #[test]
+    fn root_among_matches_registered_roots_only() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let roots = vec![a.path().to_path_buf()];
+        assert!(root_among(&roots, a.path()));
+        assert!(!root_among(&roots, b.path()), "an unregistered dir is refused");
+        assert!(
+            !root_among(&roots, &a.path().join("missing")),
+            "a nonexistent path fails closed"
+        );
+        // a subdir of a registered root is NOT the root
+        let sub = a.path().join("wiki");
+        std::fs::create_dir_all(&sub).unwrap();
+        assert!(!root_among(&roots, &sub));
+    }
+
+    #[test]
+    fn read_at_rejects_traversal() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(read_at(dir.path(), "../etc/passwd").is_err());
+        assert!(read_at(dir.path(), "/abs").is_err());
+        // a missing-but-safe rel reads as "", never an error
+        assert_eq!(read_at(dir.path(), "nope.md").unwrap(), "");
     }
 
     #[test]
     fn write_note_lands_in_wiki_inbox_and_refuses_bad_stems() {
         let dir = tempfile::tempdir().unwrap();
-        let root = dir.path().to_string_lossy().to_string();
+        let root = dir.path();
         let stem = "pricing-decision-01jtes";
         let body = "---\nid: 01JTEST\n---\n# Pricing decision\n";
-        let path = memex_write_note(root.clone(), stem.into(), body.into()).unwrap();
+        let path = write_note_at(root, stem, body).unwrap();
         assert!(path.ends_with("wiki/_inbox/pricing-decision-01jtes.md"));
         assert_eq!(std::fs::read_to_string(&path).unwrap(), body);
         // a stem with a path separator / traversal / caps is rejected by safe_slug
-        assert!(memex_write_note(root.clone(), "../escape".into(), "x".into()).is_err());
-        assert!(memex_write_note(root.clone(), "a/b".into(), "x".into()).is_err());
-        assert!(memex_write_note(root, "Caps".into(), "x".into()).is_err());
-    }
-
-    #[test]
-    fn list_dir_rejects_traversal() {
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path().to_string_lossy().to_string();
-        assert!(memex_list_dir(root.clone(), "../etc".into()).is_err());
-        assert!(memex_list_dir(root.clone(), "wiki/../..".into()).is_err());
-        assert!(memex_list_dir(root.clone(), "/abs".into()).is_err());
-        // a missing-but-safe rel reads as an empty listing, never an error
-        assert_eq!(
-            memex_list_dir(root, "nope".into()).unwrap().len(),
-            0
-        );
+        assert!(write_note_at(root, "../escape", "x").is_err());
+        assert!(write_note_at(root, "a/b", "x").is_err());
+        assert!(write_note_at(root, "Caps", "x").is_err());
     }
 
     #[test]

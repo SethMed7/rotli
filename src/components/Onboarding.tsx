@@ -7,10 +7,12 @@
 // re-onboard" in Settings → General brings it back.
 
 import { type KeyboardEvent, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Character, QuokkaMark } from "./Character";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import { conflictFor, getAction, rebind, setDispatchSuspended } from "../keys/registry";
+import { corpusOverview, isTauri } from "../lib/tauri";
 import { useDetectMemex } from "../memex/useMemex";
 import { pickFolder } from "../memex/service";
 import { useMemexStore } from "../state/memex";
@@ -163,8 +165,31 @@ function MemexStep() {
   const detect = useDetectMemex(true);
   const setPendingChoice = useMemexStore((s) => s.setPendingChoice);
   const pending = useMemexStore((s) => s.pendingChoice);
+  // On a 0.x RE-onboard the corpus already lives somewhere the user chose — pre-
+  // seed a SELECTED "Keep my current location" card so walking through with
+  // Continue can never relocate it (#12, audit 2026-07). A true first run
+  // (onboarded=false) still requires the explicit choice — no silent default
+  // (the v0.8.7 rule). Committing "keep" is a deliberate no-op in App.tsx.
+  const onboardedBefore = useUiStore((s) => s.onboarded);
+  const overview = useQuery({
+    queryKey: ["corpus", "overview"],
+    queryFn: corpusOverview,
+    enabled: isTauri() && onboardedBefore,
+  });
+  const currentRoot = onboardedBefore ? (overview.data?.root ?? null) : null;
+  useEffect(() => {
+    if (!currentRoot) return;
+    // never clobber a choice the user already made this session
+    if (useMemexStore.getState().pendingChoice) return;
+    setPendingChoice({
+      kind: "keep",
+      path: currentRoot,
+      label: currentRoot.split("/").pop() ?? currentRoot,
+    });
+  }, [currentRoot, setPendingChoice]);
   // only real memexes are adoptable as the corpus
   const found = (detect.data ?? []).filter((d) => d.kind === "memex");
+  const isKeep = pending?.kind === "keep";
   const isUse = (root: string) => pending?.kind === "use" && pending.path === root;
   const isInit = pending?.kind === "init";
   // a plain-folder pick is kind "use" with a path that ISN'T a detected memex
@@ -192,6 +217,25 @@ function MemexStep() {
         <p className="onb-sub">Looking for an existing brain…</p>
       ) : (
         <div className="onb-choices">
+          {currentRoot && (
+            <button
+              type="button"
+              className={isKeep ? "onb-choice sel" : "onb-choice"}
+              aria-pressed={isKeep}
+              onClick={() =>
+                setPendingChoice({
+                  kind: "keep",
+                  path: currentRoot,
+                  label: currentRoot.split("/").pop() ?? currentRoot,
+                })
+              }
+            >
+              <span className="onb-choice-title">Keep my current location</span>
+              <span className="onb-choice-desc">
+                {currentRoot} · where your notes live now — nothing moves
+              </span>
+            </button>
+          )}
           {found.map((d) => (
             <button
               key={d.root}

@@ -92,6 +92,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
   const root = usePanesStore((s) => s.root);
   const focusedPaneId = usePanesStore((s) => s.focusedPaneId);
   const openNote = usePanesStore((s) => s.openNote);
+  const openSummary = usePanesStore((s) => s.openSummary);
   const activateTab = usePanesStore((s) => s.activateTab);
   const selectedFolderId = useUiStore((s) => s.selectedFolderId);
 
@@ -111,7 +112,10 @@ export function Palette({ onClose }: { onClose: () => void }) {
       icon: glyphForNote(n, { size: 15 }),
       hint: <span className="muted">{folderName(n.folderId)}</span>,
       run: (newTab) => {
-        openNote(n.id, { newTab });
+        // route by KIND (summaries carry it): a board opens its canvas, a file
+        // its viewer — openNote on a board id made a dead erroring note pane
+        // (#55, audit 2026-07).
+        openSummary(n, { newTab });
         onClose();
       },
     });
@@ -251,6 +255,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
     focusedPaneId,
     selectedFolderId,
     openNote,
+    openSummary,
     activateTab,
     onClose,
   ]);

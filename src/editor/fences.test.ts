@@ -20,6 +20,7 @@ describe("scanFences", () => {
     const fences = scanFences(d);
     expect(fences.length).toBe(1);
     expect(fences[0]?.lang).toBe("html");
+    expect(fences[0]?.target).toBe(true);
     expect(fences[0]?.from).toBe(d.line(2).from);
     expect(fences[0]?.to).toBe(d.line(4).to);
   });
@@ -45,13 +46,27 @@ describe("scanFences", () => {
     expect(scanFences(d)).toEqual([]);
   });
 
-  test("a non-target lang (```js) is ignored but still consumed", () => {
+  test("a non-target lang (```js) scans too, flagged target:false (#13)", () => {
     const d = doc("```js", "let x = 1;", "```", "```html", "<hr>", "```");
     const fences = scanFences(d);
-    expect(fences.map((f) => f.lang)).toEqual(["html"]);
+    expect(fences.map((f) => [f.lang, f.target])).toEqual([
+      ["js", false],
+      ["html", true],
+    ]);
   });
 
-  test("all five target langs scan", () => {
+  test("a bare ``` fence scans as lang '' target:false (#13)", () => {
+    const d = doc("```", "# not a heading", "```");
+    const fences = scanFences(d);
+    expect(fences.length).toBe(1);
+    expect(fences[0]?.lang).toBe("");
+    expect(fences[0]?.target).toBe(false);
+    // livePreview skips every fenced line via lineInFence — the `# h` inside
+    // a plain fence never gets H1-styled
+    expect(lineInFence(d.line(2).from, fences)).toBe(true);
+  });
+
+  test("all five target langs scan with target:true", () => {
     const d = doc(
       "```math", "x", "```",
       "```mermaid", "x", "```",
@@ -59,7 +74,9 @@ describe("scanFences", () => {
       "```svg", "x", "```",
       "```html", "x", "```",
     );
-    expect(scanFences(d).map((f) => f.lang)).toEqual(["math", "mermaid", "jsxgraph", "svg", "html"]);
+    const fences = scanFences(d);
+    expect(fences.map((f) => f.lang)).toEqual(["math", "mermaid", "jsxgraph", "svg", "html"]);
+    expect(fences.every((f) => f.target)).toBe(true);
   });
 
   test("lineInFence covers the open line, body, and close line", () => {

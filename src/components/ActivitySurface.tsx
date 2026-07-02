@@ -37,7 +37,9 @@ function describe(a: BrainAction, proposed: boolean): string {
         ? `Refresh ${a.area ?? a.noteTitle} overview`
         : `Set ${a.field} on “${a.noteTitle}”`;
   if (proposed) {
-    const pct = typeof a.confidence === "number" ? ` · ${Math.round(a.confidence * 100)}%` : "";
+    // labeled, not a bare number (#84, audit 2026-07)
+    const pct =
+      typeof a.confidence === "number" ? ` · ${Math.round(a.confidence * 100)}% sure` : "";
     return `Proposes: ${verb}${pct}`;
   }
   return a.action === "file" ? `Filed “${a.noteTitle}” → ${a.after.replace(/^wiki\//, "")}` : verb;
@@ -139,7 +141,9 @@ export function ActivitySurface() {
                     <span className="act-time">{when(a.ts)}</span>
                     <button
                       type="button"
-                      className="act-undo"
+                      /* the affirmative action gets the quiet accent — no more
+                         identical ghost twins (#84, audit 2026-07) */
+                      className="act-undo act-approve"
                       disabled={busy === a.id}
                       onClick={() => void run(a, approveProposal)}
                     >

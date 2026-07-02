@@ -365,9 +365,28 @@ export function FileSurface({ fileId }: { paneId: string; fileId: string }) {
             {imgNat.w}×{imgNat.h} · {Math.round(imgScale * 100)}%
           </button>
         )}
-        {kind === "sheet" && probed && !sheetEditable && stat !== null && !stat.writable && (
-          <span className="file-readonly" title="This root is read-only — rotli never writes it">
-            read-only
+        {/* EVERY read-only sheet says WHY editing is off, not just the read-only
+            root — .ods/.xls/oversize/failed-probe were silent (#53, audit 2026-07) */}
+        {kind === "sheet" && probed && !sheetEditable && !tooLarge && (
+          <span
+            className="file-readonly"
+            title={
+              stat === null
+                ? "rotli couldn't verify this file, so it opened as a view-only table"
+                : !stat.writable
+                  ? "This root is read-only — rotli never writes it"
+                  : !SHEET_EDITABLE.has(ext)
+                    ? `Editing supports .xlsx and .csv — .${ext} opens as a view-only table (use Open externally to edit)`
+                    : "Too large to edit safely in rotli — use Open externally to edit"
+            }
+          >
+            {stat === null
+              ? "view only"
+              : !stat.writable
+                ? "read-only"
+                : !SHEET_EDITABLE.has(ext)
+                  ? `view only · .${ext}`
+                  : "view only · too large"}
           </span>
         )}
         <button
@@ -434,7 +453,25 @@ export function FileSurface({ fileId }: { paneId: string; fileId: string }) {
             />
           </div>
         )}
-        {!err && kind === "pdf" && url && <iframe className="file-pdf" title={name} src={url} />}
+        {/* pdf: WKWebView's built-in viewer in the frame. Focus treatment (#54,
+            audit 2026-07): the frame takes focus when it loads (and via Tab),
+            so space/arrows page the document without a blind click first. The
+            real pdf.js viewer (pages/zoom/search) is a deferred feature project. */}
+        {!err && kind === "pdf" && url && (
+          <iframe
+            className="file-pdf"
+            title={name}
+            src={url}
+            tabIndex={0}
+            onLoad={(e) => {
+              // …but never steal focus from live typing in another pane
+              const ae = document.activeElement as HTMLElement | null;
+              const typing =
+                ae && (ae.isContentEditable || ae.tagName === "INPUT" || ae.tagName === "TEXTAREA");
+              if (!typing) e.currentTarget.focus();
+            }}
+          />
+        )}
         {!err && kind === "text" && text !== null && (
           <pre className="file-text">{text || "(empty file)"}</pre>
         )}

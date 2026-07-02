@@ -66,6 +66,23 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // serialize the latest scene; the debounced write picks up the freshest one.
   const pending = useRef<string | null>(null);
+  // a failed board write is the closest thing the shell has to data loss —
+  // SAY so inline instead of a console.warn (#11, audit 2026-07). Cleared by
+  // the next successful write (the debounced saves keep retrying naturally).
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+
+  // every save path (debounce, flush-on-unmount, metadata) funnels here so the
+  // failure/recovery surfacing can't drift between them
+  const writeBoard = useCallback(
+    (body: string) => {
+      if (!isTauri()) return;
+      corpusWriteBoard(boardId, body).then(
+        () => setSaveErr(null),
+        (e: unknown) => setSaveErr(e instanceof Error ? e.message : String(e)),
+      );
+    },
+    [boardId],
+  );
 
   // G — board metadata (Seth, 2026-06-26): a board is an image to a text LLM, so it
   // carries a description + tags, stored TOP-LEVEL in the .excalidraw (NOT in
@@ -119,8 +136,8 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
     }
     const body = pending.current;
     pending.current = null;
-    if (body !== null && isTauri()) void corpusWriteBoard(boardId, body).catch((e) => console.warn("board write failed — your canvas edit may not have saved", e));
-  }, [boardId]);
+    if (body !== null) writeBoard(body);
+  }, [writeBoard]);
 
   useEffect(() => () => flush(), [flush]);
 
@@ -152,10 +169,10 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
         const body = pending.current;
         pending.current = null;
         saveTimer.current = null;
-        if (body !== null && isTauri()) void corpusWriteBoard(boardId, body).catch((e) => console.warn("board write failed — your canvas edit may not have saved", e));
+        if (body !== null) writeBoard(body);
       }, SAVE_DEBOUNCE_MS);
     },
-    [boardId, state.status],
+    [state.status, writeBoard],
   );
 
   // Persist a metadata edit right away (it doesn't ride the Excalidraw onChange
@@ -175,9 +192,9 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
         files: api.getFiles(),
         rotliMeta: next,
       };
-      void corpusWriteBoard(boardId, JSON.stringify(scene)).catch((e) => console.warn("board write failed — your canvas edit may not have saved", e));
+      writeBoard(JSON.stringify(scene));
     },
-    [boardId],
+    [writeBoard],
   );
 
   if (!isTauri()) {
@@ -222,6 +239,11 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
           apiRef.current = api as unknown as ExcaliApi;
         }}
       />
+      {saveErr && (
+        <div className="canvas-save-err" role="alert">
+          ⚠ This board isn’t saving — your latest strokes may not be on disk. {saveErr}
+        </div>
+      )}
       <button
         type="button"
         className="canvas-meta-btn"

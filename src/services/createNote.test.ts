@@ -38,4 +38,16 @@ describe("routeDecision (memex-vs-local)", () => {
     expect(routeDecision("Storage/Work", false, true, FALLBACK)).toEqual({ kind: "local", folder: "Storage/Work" });
     expect(routeDecision("Inbox", false, true, FALLBACK)).toEqual({ kind: "local", folder: "Inbox" });
   });
+
+  test("a HIDDEN root selection (Archive/Trash/Board) never births a note there (#5)", () => {
+    // no memex: the sink selection falls back to the local Inbox
+    expect(routeDecision("Archive", false, false, FALLBACK)).toEqual({ kind: "local", folder: FALLBACK });
+    expect(routeDecision("Trash", false, false, FALLBACK)).toEqual({ kind: "local", folder: FALLBACK });
+    expect(routeDecision("Trash/Old", false, false, FALLBACK)).toEqual({ kind: "local", folder: FALLBACK });
+    expect(routeDecision("Board", false, false, FALLBACK)).toEqual({ kind: "local", folder: FALLBACK });
+    // with a writable memex it routes like a smart row — into the staging default
+    expect(routeDecision("Archive", false, true, FALLBACK)).toEqual({ kind: "memex" });
+    // a folder that merely STARTS with a sink's name is a normal folder
+    expect(routeDecision("Archives", false, false, FALLBACK)).toEqual({ kind: "local", folder: "Archives" });
+  });
 });

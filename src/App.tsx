@@ -144,12 +144,12 @@ function MainShell() {
   // in your list), then acks so the card may clear. Plain Enter never surfaces
   // the app (open=false); ⌘Enter (open=true) opens the Board so you can see it.
   //
-  // Settings → Memory → "Send quick captures to the brain inbox" reroutes ⌥C to
-  // the active writable memex's inbox.md instead (no Board card). The brain path
-  // resolves the active instance imperatively each time (it's not in a store yet
-  // here), and falls back to the Board on ANY failure — a capture must never be
-  // lost. The card clears ONLY when we ack, so we ack ONLY on a confirmed save —
-  // on total failure the draft stays put for the next summon.
+  // With a writable memex, ⌥C lands as a STAGED NOTE in wiki/_inbox/ instead (no
+  // Board card; inbox.md is not a rotli write surface — #96, audit 2026-07). The
+  // brain path resolves the active instance imperatively each time (it's not in a
+  // store yet here), and falls back to the Board on ANY failure — a capture must
+  // never be lost. The card clears ONLY when we ack, so we ack ONLY on a confirmed
+  // save — on total failure the draft stays put for the next summon.
   useEffect(
     () =>
       onCaptureSave(({ id, body, open }) => {
@@ -161,8 +161,8 @@ function MainShell() {
         void (async () => {
           let saved = false;
           try {
-            // Quick capture has ONE default home (not a user setting): the active
-            // brain's inbox.md when there's a writable brain, else the Board.
+            // Quick capture has ONE default home (not a user setting): a staged
+            // note in the brain's wiki/_inbox when writable, else the Board.
             const cfg = await memexLoadConfig();
             const inst = activeInstance(cfg);
             if (inst && isWritable(inst)) {
@@ -349,6 +349,8 @@ function MainShell() {
             // back into onboarding (the 500 ms debounced writer wouldn't fire in time).
             const choice = useMemexStore.getState().pendingChoice;
             useMemexStore.getState().setPendingChoice(null);
+            // "keep" (the pre-seeded re-onboard default, #12) deliberately
+            // commits NOTHING — the corpus stays exactly where it is.
             if (choice?.path && (choice.kind === "use" || choice.kind === "init")) {
               const path = choice.path;
               const kind = choice.kind;

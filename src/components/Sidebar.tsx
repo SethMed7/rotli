@@ -30,11 +30,14 @@ import {
   addFolderToMain,
   addNoteToMain,
   buildMainTree,
+  mainFolderIds,
   mainNoteIds,
   moveInTree,
   removeFromMain,
+  renameFolderInMain,
 } from "../services/mainTree";
-import { useMainStore } from "../state/main";
+import { useContextMenu } from "../state/contextMenu";
+import { renameMainRef, useMainStore } from "../state/main";
 import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { useNoteMenu } from "./useNoteMenu";
 import { deriveJournal } from "../services/brainJournal";
@@ -49,6 +52,7 @@ import {
   useNoteIndex,
   useNotes,
   useRestoreNote,
+  useSearchableNotes,
   useTrashNote,
 } from "../services/hooks";
 import { notesService } from "../services/notes";
@@ -172,7 +176,8 @@ function CaptureBoardGlyph({ size = 16 }: { size?: number }) {
 /** The five reserved destinations, in sidebar order, each with its glyph. The
  * note-capture root keeps its on-disk id "Inbox" (the memex contract is unchanged)
  * but is LABELED "Capture" now that the top-level word "Inbox" means email (Seth,
- * 2026-06-26). The ⌥C one-breath capture still lands here / in the memex inbox.md. */
+ * 2026-06-26). The ⌥C one-breath capture lands as a staged note in wiki/_inbox/
+ * (inbox.md is not a rotli write surface — #96, audit 2026-07). */
 const DEST_ROWS: { id: Destination; label: string; Glyph: typeof InboxGlyph }[] = [
   // "Capture" (DEST.inbox) is GONE — captures have ONE home now, the "Captures"
   // row under Notes (Seth, 2026-06-30). Staged notes (wiki/_inbox) project there.
@@ -471,6 +476,11 @@ function AddedRootRow({ root }: { root: CorpusRoot }) {
 export function Sidebar() {
   const rawFolders = useFolders().data ?? [];
   const allNotes = useNotes().data ?? [];
+  // the COUNTS speak the same universe the All-notes surface renders
+  // (useSearchableNotes — staged + Brain + Vault + added roots): counting the
+  // plain useNotes VIEW made the sidebar and the surface disagree the moment
+  // an ⌥C capture landed (#60, audit 2026-07). Cache reads, not new fetches.
+  const searchableCount = useSearchableNotes().notes.length;
   // the five reserved queries — all served from the one cached corpus_list, so
   // five hooks here are five cache reads, not five fetches
   const inboxNotes = useNotes(DEST.inbox).data ?? [];
@@ -580,6 +590,10 @@ export function Sidebar() {
   const focusedChatSlug = useFocusedChatSlug();
   const renamingBoardId = useUiStore((s) => s.renamingBoardId);
   const setRenamingBoardId = useUiStore((s) => s.setRenamingBoardId);
+  // failed row-menu actions (file-to-brain, board rename) land here — the menu
+  // that launched them is gone by the time they fail (#11, audit 2026-07)
+  const rowActionError = useUiStore((s) => s.rowActionError);
+  const setRowActionError = useUiStore((s) => s.setRowActionError);
   const sidebarZoom = useUiStore((s) => s.sidebarZoom);
   const [filter, setFilter] = useState("");
   const filterRef = useRef<HTMLInputElement>(null);
@@ -628,6 +642,17 @@ export function Sidebar() {
     restore: (id) => restoreNote.mutate(id),
     addToMain: (id) => setMainTree(addNoteToMain(mainManifest.tree, id), liveIds),
   };
+
+  // — Main folder rename + name-first create (#16, audit 2026-07): the ⊕ used to
+  //   mint a permanent "New folder 2" with no rename anywhere. renamingMainId
+  //   turns that folder's row into an inline input (the board-row pattern);
+  //   mainNewFolder is the ⊕'s name-first input at the Main root. —
+  const [renamingMainId, setRenamingMainId] = useState<string | null>(null);
+  const [mainNewFolder, setMainNewFolder] = useState(false);
+  // Enter/Esc unmount the new-folder input, which fires its commit-on-blur —
+  // this ref tells the blur the keystroke already settled it (newFolderHandled's law)
+  const mainNewFolderHandled = useRef(false);
+  const openContextMenu = useContextMenu((s) => s.open);
 
   // — Main pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell, so the
   //   BoardSurface pointer pattern; a threshold distinguishes drag from click) —
@@ -815,6 +840,38 @@ export function Sidebar() {
         ))}
         {childFolders.map((f) => {
           const open = expandedDests[f.id] ?? true;
+          // inline rename (#16): the context menu's Rename… turns the row into a
+          // text input — Enter commits (sibling-uniquified), Esc/click-away cancels
+          // (the CompactBoardRow grammar).
+          if (renamingMainId === f.id) {
+            return (
+              <div
+                key={f.id}
+                className="sb-newfolder"
+                style={{ paddingLeft: 10 + (depth + 1) * 16 }}
+              >
+                <FolderGlyph size={14} />
+                <input
+                  autoFocus
+                  type="text"
+                  defaultValue={f.name}
+                  placeholder="Folder name…"
+                  aria-label="Rename Main folder"
+                  onFocus={(e) => e.currentTarget.select()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setRenamingMainId(null);
+                      setMainTree(
+                        renameFolderInMain(mainManifest.tree, f.id, e.currentTarget.value),
+                        liveIds,
+                      );
+                    } else if (e.key === "Escape") setRenamingMainId(null);
+                  }}
+                  onBlur={() => setRenamingMainId(null)}
+                />
+              </div>
+            );
+          }
           return (
             <div key={f.id}>
               <button
@@ -828,6 +885,23 @@ export function Sidebar() {
                   // toggle against the OPEN default (?? true) — toggleDestExpanded
                   // assumes closed, so the first click on a fresh folder no-oped
                   if (!didMainDragRef.current) setDestExpanded(f.id, !open);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openContextMenu(e.clientX, e.clientY, [
+                    {
+                      kind: "action" as const,
+                      label: "Rename folder…",
+                      onClick: () => setRenamingMainId(f.id),
+                    },
+                    { kind: "sep" as const },
+                    {
+                      kind: "action" as const,
+                      label: "Remove from Main",
+                      onClick: () => setMainTree(removeFromMain(mainManifest.tree, f.id), liveIds),
+                    },
+                  ]);
                 }}
                 {...rp({ id: f.id, kind: "folder" })}
               >
@@ -960,6 +1034,13 @@ export function Sidebar() {
     );
   };
 
+  // hide memex plumbing folders ("_templates", "_inbox", …): they're how the
+  // AI stages/templates notes, never something the user files into (2026-06-26).
+  // ONE predicate for the JSX tree AND the roving list — subtreeRows missing it
+  // put phantom rows in the j/k order that wedged the cursor (#45, audit 2026-07).
+  const isPlumbingFolder = (folder: { id: string; name: string }): boolean =>
+    folder.id.startsWith("vault:") && folder.name.startsWith("_");
+
   // —— recursive user-folder subtree under a destination (like FoldersRail) ——
   const renderFolderTree = (
     parentId: string,
@@ -968,9 +1049,7 @@ export function Sidebar() {
     rp: ReturnType<typeof useRovingList>["rowProps"],
   ): ReactNode =>
     childrenOf(parentId)
-      // hide memex plumbing folders ("_templates", "_inbox", …): they're how the
-      // AI stages/templates notes, never something the user files into (2026-06-26)
-      .filter((folder) => !(folder.id.startsWith("vault:") && folder.name.startsWith("_")))
+      .filter((folder) => !isPlumbingFolder(folder))
       .map((folder) => {
       const open = expandedDests[folder.id] ?? false;
       const selected = selectedFolderId === folder.id;
@@ -1042,16 +1121,20 @@ export function Sidebar() {
     parentId: string,
     destNotes: NoteSummary[],
   ): RovingRow[] =>
-    childrenOf(parentId).flatMap((folder) => {
-      const open = expandedDests[folder.id] ?? false;
-      const row: RovingRow = { id: folder.id, kind: "folder" };
-      if (!open) return [row];
-      return [
-        row,
-        ...visibleNoteRows(destNotes, folder.id),
-        ...subtreeRows(folder.id, destNotes),
-      ];
-    });
+    childrenOf(parentId)
+      // MUST mirror renderFolderTree's plumbing filter — a folder the JSX hides
+      // must never become a roving row (#45: j/k wedged on the phantom)
+      .filter((folder) => !isPlumbingFolder(folder))
+      .flatMap((folder) => {
+        const open = expandedDests[folder.id] ?? false;
+        const row: RovingRow = { id: folder.id, kind: "folder" };
+        if (!open) return [row];
+        return [
+          row,
+          ...visibleNoteRows(destNotes, folder.id),
+          ...subtreeRows(folder.id, destNotes),
+        ];
+      });
 
   // the three top-level sections' open state (Seth's IA, 2026-06-26). Default
   // open so a fresh window shows the full tree; persisted via expandedDests.
@@ -1223,12 +1306,17 @@ export function Sidebar() {
     const name = raw.trim();
     if (!name) return;
     try {
+      setRowActionError(null);
       const meta = await corpusRenameBoard(boardId, name);
       retargetBoard(boardId, meta.id);
+      renameMainRef(boardId, meta.id); // the Main slot follows the new path id (#33)
       await invalidateNotes();
     } catch (e) {
-      // board is read-only or gone — leave it as is, but surface why
-      console.warn("board rename failed", e);
+      // board is read-only or gone — leave it as is, and SAY why: the inline
+      // sidebar error note, not a console.warn (#11, audit 2026-07)
+      setRowActionError(
+        `Couldn’t rename the board — ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   };
 
@@ -1393,7 +1481,9 @@ export function Sidebar() {
           type="button"
           className="icobtn"
           aria-label="Collapse all folders"
-          onClick={collapseAllDests}
+          /* default-OPEN rows (Main folders, the Brain header) need an explicit
+             false — wiping the map alone re-EXPANDED them (#83, audit 2026-07) */
+          onClick={() => collapseAllDests([...mainFolderIds(mainManifest.tree), "Brain"])}
         >
           <FoldGlyph size={16} />
           <span className="tip" aria-hidden="true">
@@ -1459,6 +1549,22 @@ export function Sidebar() {
           )}
         </div>
       </div>
+
+      {/* a failed row-menu action (file-to-brain, board rename) says so HERE —
+          inline, dismissible, above the tree it happened in (#11, audit 2026-07) */}
+      {rowActionError && (
+        <div className="sb-error" role="alert">
+          <span className="sb-error-text">⚠ {rowActionError}</span>
+          <button
+            type="button"
+            className="sb-error-x"
+            aria-label="Dismiss"
+            onClick={() => setRowActionError(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* the three top-level sections (Seth's IA, 2026-06-26): Inbox (email) ·
           Chat · Notes — replacing the retired top module dropdown. Each is a
@@ -1548,7 +1654,7 @@ export function Sidebar() {
             the local destinations + Vault/Knowledge + nested folders. This wrapper
             is the roving listbox: Tab enters at the one tabIndex=0 row, j/k walk
             it; the keyboard highlight is :focus-visible. ── */}
-        {sectionHeader(SEC_NOTES, "Notes", NotesStackGlyph, notesSecOpen, allNotes.length)}
+        {sectionHeader(SEC_NOTES, "Notes", NotesStackGlyph, notesSecOpen, searchableCount)}
         {notesSecOpen && (
           <div className="sb-notes-tree" role="listbox" aria-label="Notes tree">
             <button
@@ -1562,7 +1668,7 @@ export function Sidebar() {
             >
               <FileGlyph size={14.5} />
               <span className="fname">All notes</span>
-              <span className="count">{allNotes.length}</span>
+              <span className="count">{searchableCount}</span>
             </button>
             {/* Board — quick captures collected as cards; opens its grid in the
                 content area (an action row, not a roving folder). */}
@@ -1585,8 +1691,9 @@ export function Sidebar() {
               {...rowProps({ id: RECENT, kind: "smart" })}
             >
               <ClockGlyph size={14.5} />
+              {/* no count: "how many notes exist" says nothing about RECENCY —
+                  the total lives on All notes (#60, audit 2026-07) */}
               <span className="fname">Recent</span>
-              <span className="count">{allNotes.length}</span>
             </button>
 
             {/* — MAIN: your hand-picked notes, arranged your way. Star a row (★) to
@@ -1602,16 +1709,56 @@ export function Sidebar() {
                 className="fsec-add"
                 aria-label="New folder in Main"
                 title="New folder in Main"
-                onClick={() => setMainTree(addFolderToMain(mainManifest.tree, "New folder"), liveIds)}
+                /* name-FIRST (#16): open the inline input instead of minting a
+                   permanent "New folder 2" the old flow could never rename */
+                onClick={() => setMainNewFolder(true)}
               >
                 <PlusGlyph size={12} />
               </button>
             </div>
+            {mainNewFolder && (
+              <div className="sb-newfolder" style={{ paddingLeft: 26 }}>
+                <FolderGlyph size={14} />
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Folder name…"
+                  aria-label="New folder in Main"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      mainNewFolderHandled.current = true; // the ensuing blur must not re-commit
+                      const name = e.currentTarget.value.trim();
+                      setMainNewFolder(false);
+                      if (name) setMainTree(addFolderToMain(mainManifest.tree, name), liveIds);
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      mainNewFolderHandled.current = true; // …nor override the cancel
+                      setMainNewFolder(false);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (mainNewFolderHandled.current) {
+                      mainNewFolderHandled.current = false;
+                      return;
+                    }
+                    // click-away commits a non-empty name (the corpus new-folder law)
+                    const name = e.currentTarget.value.trim();
+                    setMainNewFolder(false);
+                    if (name) setMainTree(addFolderToMain(mainManifest.tree, name), liveIds);
+                  }}
+                />
+              </div>
+            )}
             {mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
               <p className="main-empty" data-main-id="main:">
-                The notes you reach for, arranged your way. Add one with the <b>⊕</b> on a note row (or
-                drag it here from the Brain) — then <b>★</b> your top {QUICK_MAX} for Quick access (the ⌥
-                Quick window).
+                {/* the Brain section may not exist yet — only promise a drag
+                    source that's actually on screen (#82, audit 2026-07) */}
+                The notes you reach for, arranged your way. Add one with the <b>⊕</b> on a note row
+                {hasBrain ? " (or drag it here from the Brain)" : ""} — then <b>★</b> your top{" "}
+                {QUICK_MAX} for Quick access (the ⌥ Quick window).
               </p>
             ) : (
               <div data-main-id="main:" className="main-tree">

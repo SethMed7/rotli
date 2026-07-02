@@ -72,6 +72,28 @@ describe("tableToText", () => {
   });
 });
 
+describe("scanTables + fences (#13)", () => {
+  it("a pipe table inside ANY code fence is opaque — never a table block", () => {
+    // the SlashMenu repro: a `# h` + pipe-table example inside a plain fence
+    const doc = Text.of([
+      "```",
+      "# h",
+      "| a | b |",
+      "| - | - |",
+      "| 1 | 2 |",
+      "```",
+      "",
+      "| real | table |",
+      "| ---- | ----- |",
+      "| x    | y     |",
+    ]);
+    const tables = scanTables(doc);
+    expect(tables.length).toBe(1);
+    expect(tables[0]?.header).toEqual(["real", "table"]);
+    expect(tables[0]?.from).toBe(doc.line(8).from);
+  });
+});
+
 describe("insertTableText", () => {
   it("scaffolds a parseable cols×rows table of empty cells", () => {
     const doc = Text.of(`${insertTableText(3, 2)}\n`.split("\n"));

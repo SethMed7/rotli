@@ -511,6 +511,14 @@
   max-height: 100%;
   object-fit: contain;
   border-radius: var(--r-control);
+  /* transparency checkerboard (#80, audit 2026-07) — theme-aware (token-mixed,
+     no raw hex) so transparent art never dissolves into the pane background */
+  background:
+    repeating-conic-gradient(
+        color-mix(in srgb, var(--text) 8%, transparent) 0% 25%,
+        transparent 0% 50%
+      )
+      0 0 / 16px 16px;
 }
 /* an svg with no intrinsic size keeps the old fill-the-pane behavior (vectors
    scale losslessly, and max-w/h alone would collapse it) */
@@ -671,6 +679,17 @@
 .act-undo:hover {
   color: var(--text);
   border-color: var(--text-muted);
+}
+/* Approve reads as the AFFIRMATIVE action — Dismiss stays the ghost twin
+   (#84, audit 2026-07). Quiet accent, not a loud primary. */
+.act-approve {
+  color: var(--accent-text);
+  border-color: color-mix(in srgb, var(--accent-text) 45%, transparent);
+  background: color-mix(in srgb, var(--accent-text) 8%, transparent);
+}
+.act-approve:hover {
+  color: var(--accent-text);
+  border-color: var(--accent-text);
 }
 .act-undone {
   flex: 0 0 auto;
@@ -1291,6 +1310,12 @@
 .cmsg-think {
   color: var(--text-muted);
   font-style: italic;
+}
+/* a failed chats/<slug>.md write — inline under the thread (#11, audit 2026-07) */
+.chat-save-err {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
 }
 /* head: chat title + grow spacer + the model selector on one line */
 .chat-head-grow {

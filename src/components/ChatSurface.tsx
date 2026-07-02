@@ -124,6 +124,7 @@ export function ChatSurface({
   const setChatModelId = useUiStore((s) => s.setChatModelId);
   const chatWeb = useUiStore((s) => s.chatWeb);
   const setChatWeb = useUiStore((s) => s.setChatWeb);
+  const clearChatWeb = useUiStore((s) => s.clearChatWeb);
   const bindChat = usePanesStore((s) => s.bindChat);
 
   const cfg = useMemexConfig();
@@ -151,13 +152,19 @@ export function ChatSurface({
   const [status, setStatus] = useState("thinking…");
   const [images, setImages] = useState<string[]>([]);
   const [visionHint, setVisionHint] = useState(false);
+  // a failed chats/<slug>.md write — the thread still shows for this session,
+  // but SAY it won't survive a reload (#11, audit 2026-07); cleared on the
+  // next successful save.
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const writable = active?.perms === "chats+inbox";
 
-  // per-chat web toggle (the composer globe) — keyed by slug; "" holds a not-yet-saved chat
-  const webKey = chatSlug ?? "";
+  // per-chat web toggle (the composer globe) — keyed by slug; a not-yet-saved chat
+  // rides a PANE-scoped key (session-only, never persisted): a shared "" key leaked
+  // one globe click into every future fresh chat across relaunches (#7, audit 2026-07)
+  const webKey = chatSlug ?? `unsaved:${paneId}`;
   const globeOn = chatWeb[webKey] ?? false;
   // image attach is gated on the picked model's vision capability
   const canVision = picked?.vision ?? false;
@@ -251,11 +258,14 @@ export function ChatSurface({
         });
         bindChat(paneId, res.slug); // this tab now IS that chat
         if (globeOn) setChatWeb(res.slug, true); // carry the globe to the saved chat
+        clearChatWeb(webKey); // the pane-scoped unsaved key is spent (#7)
         setTitle("");
       }
+      setSaveErr(null);
     } catch (e) {
-      // persistence failed — the in-memory thread still shows for this session
-      console.warn("chat save failed — this conversation may not persist on reload", e);
+      // persistence failed — the in-memory thread still shows for this session,
+      // and the inline note below the thread says it won't survive a reload
+      setSaveErr(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -274,10 +284,18 @@ export function ChatSurface({
     if (datas.length > 0) setImages((prev) => [...prev, ...datas]);
   };
 
+  // the STORED title, not the de-dashed slug (#87, audit 2026-07): the slug is
+  // truncated + date/ulid-suffixed wire plumbing; the frontmatter `title` is
+  // what the user named it (the sidebar/All-chats already show it). Slug stays
+  // the fallback while the listing loads or for a title-less foreign chat.
+  const storedTitle = chatSlug ? chats.data?.find((c) => c.slug === chatSlug)?.title : null;
+
   return (
     <div className="chat-surface">
       <header className="chat-head">
-        <h2 className="chat-title-h">{chatSlug ? chatSlug.replace(/-/g, " ") : "New chat"}</h2>
+        <h2 className="chat-title-h">
+          {chatSlug ? storedTitle || chatSlug.replace(/-/g, " ") : "New chat"}
+        </h2>
         {active && <span className="chat-inst">· {active.label}</span>}
       </header>
 
@@ -324,6 +342,12 @@ export function ChatSurface({
                   <div className="cmsg-who">rotli</div>
                   <div className="cmsg-bubble cmsg-think">{status}</div>
                 </div>
+              )}
+              {saveErr && (
+                <p className="file-err chat-save-err" role="alert">
+                  ⚠ This conversation couldn’t be saved — it stays for this session but won’t
+                  survive a reload. {saveErr}
+                </p>
               )}
             </div>
           </div>

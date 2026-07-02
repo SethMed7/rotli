@@ -8,7 +8,7 @@
 import { budgetFor } from "./budget";
 import { looksSecret } from "./guard";
 import { extractJsonObject, parseAction } from "./parse";
-import { gemmaAdapter } from "./prompt";
+import { gemmaAdapter, trimHistory } from "./prompt";
 import { pruneScratch, runTool, statusFor } from "./tools";
 import type { AgentEvent, Host, RunInput, ScratchStep, ToolName } from "./types";
 
@@ -33,6 +33,10 @@ export async function* runAgent(
     knowledge = "";
   }
 
+  // history is capped to the model's budget (#65) — newest turns win, so a
+  // long-running chat degrades to "recent context" instead of a blown window
+  const history = trimHistory(input.history, budget.maxHistoryChars);
+
   const scratch: ScratchStep[] = [];
   let consecutiveBad = 0;
 
@@ -42,7 +46,7 @@ export async function* runAgent(
     const prompt = gemmaAdapter.renderPrompt({
       web: input.web,
       knowledge,
-      history: input.history,
+      history,
       userText: input.userText,
       scratch: pruneScratch(scratch, budget.maxScratchChars),
       maxSteps,
@@ -82,26 +86,33 @@ export async function* runAgent(
       if (consecutiveBad >= 2) break; // confused model → stop burning steps, force a final
       continue;
     }
-    consecutiveBad = 0;
-
+    // futile-but-parseable calls STRIKE too (#93, audit 2026-07): a model
+    // re-issuing the same call (or retrying a blocked one) is exactly as stuck
+    // as an unparseable reply — before this, those steps never counted and the
+    // loop burned its whole budget before forcing a final.
     const sig = `${parsed.tool} ${JSON.stringify(parsed.args)}`;
     if (scratch.some((s) => s.action === sig)) {
+      consecutiveBad += 1;
       scratch.push({
         action: sig,
         result: "(already requested above — use that result, or give your final answer)",
       });
+      if (consecutiveBad >= 2) break; // looping → force a final
       continue;
     }
 
     // egress guard (mirror of the Rust backstop): no secret ever rides a web tool.
     // Keyed off WEB_TOOLS so a future web tool can't be added past the guard (audit).
     if (WEB_TOOLS.includes(parsed.tool) && looksSecret(JSON.stringify(parsed.args))) {
+      consecutiveBad += 1;
       scratch.push({
         action: sig,
         result: "blocked: that input looks like it contains a secret — not sent to the web.",
       });
+      if (consecutiveBad >= 2) break; // insisting on the blocked call → force a final
       continue;
     }
+    consecutiveBad = 0; // a genuinely NEW, allowed call — the model is working
 
     yield { type: "tool", tool: parsed.tool, args: parsed.args };
     yield { type: "status", text: statusFor(parsed.tool) };

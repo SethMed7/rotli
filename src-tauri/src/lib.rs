@@ -18,7 +18,7 @@ mod organizer;
 mod secret;
 mod web;
 
-use std::sync::Mutex;
+use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use tauri::{
@@ -90,6 +90,61 @@ struct QuickPlaced(Mutex<bool>);
 /// chord controls ONLY the quick note — closing it never surfaces the main app
 /// (Seth, 2026-06-24). Mirrors CaptureReturn.
 struct QuickReturn(Mutex<bool>);
+
+/// The quit-flush handshake (#4 follow-up, review 2026-07). Dirty spreadsheet
+/// sessions flush on window-hide/pagehide, but BOTH real quit paths could fire
+/// with the window still up and no hide ever seen ("Stay open" mode): tray-Quit
+/// ran `app.exit(0)` directly, and ⌘Q rides the default menu's predefined Quit —
+/// native `terminate:`, which tao surfaces only as `applicationWillTerminate`,
+/// far too late for the webview's ASYNC serialize (exceljs) to finish. So both
+/// paths now route through `graceful_quit`: emit "rotli:flush-before-quit" to
+/// the main webview, hold the exit until `quit_flush_done` acks (this condvar),
+/// and exit anyway after `QUIT_FLUSH_MAX` — quit can never hang on a wedged
+/// webview.
+struct QuitFlush {
+    acked: Mutex<bool>,
+    cv: Condvar,
+}
+
+/// The longest a quit will wait for the webview's flush ack. The idle ack is
+/// milliseconds (the listener lives in the always-loaded persist chunk); this
+/// bound only matters when a big workbook is mid-serialize or the webview hung.
+const QUIT_FLUSH_MAX: Duration = Duration::from_secs(2);
+
+/// The webview finished its pre-quit flush — release `graceful_quit`'s wait.
+#[tauri::command]
+fn quit_flush_done(app: AppHandle) {
+    let state = app.state::<QuitFlush>();
+    *state.acked.lock().unwrap() = true;
+    state.cv.notify_all();
+}
+
+/// Quit, but let the main webview flush dirty state first (see QuitFlush).
+/// Called by the tray's Quit item and the app menu's ⌘Q replacement.
+fn graceful_quit(app: &AppHandle) {
+    if app.get_webview_window("main").is_none()
+        || app.emit_to("main", "rotli:flush-before-quit", ()).is_err()
+    {
+        app.exit(0); // nothing to flush / nothing reachable — just go
+        return;
+    }
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        let state = handle.state::<QuitFlush>();
+        let deadline = Instant::now() + QUIT_FLUSH_MAX;
+        let mut acked = state.acked.lock().unwrap();
+        while !*acked {
+            let now = Instant::now();
+            if now >= deadline {
+                break; // wedged webview — quit anyway, bounded
+            }
+            let (guard, _timeout) = state.cv.wait_timeout(acked, deadline - now).unwrap();
+            acked = guard;
+        }
+        drop(acked);
+        handle.exit(0);
+    });
+}
 
 fn show_main(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -343,10 +398,9 @@ fn hide_quick_window(app: AppHandle) {
     hide_quick_return(&app);
 }
 
-#[tauri::command]
-fn show_quick_window(app: AppHandle) {
-    show_quick(&app);
-}
+// `show_quick_window` was UNREGISTERED and removed in the 2026-07 audit (#68):
+// zero frontend callers — the quick window is summoned by its global chord /
+// `toggle_quick_window` only.
 
 /// Settings → Storage → "Reveal in Finder": open the corpus folder.
 #[tauri::command]
@@ -552,10 +606,20 @@ fn corpus_set_active_brain(app: AppHandle, id: String) -> Result<(), String> {
     corpus::set_active_brain(&app, &id)
 }
 
-/// Set a brain's write perms ("chats+inbox" | "read-only"). No relaunch.
+/// Set a brain's write perms ("chats+inbox" | "read-only"). No relaunch — the
+/// LIVE store's Rust write gate is updated in the same breath (#3, audit
+/// 2026-07), so the perms hold immediately, not only after the next launch.
+/// The store may be unbound (its folder vanished) — that's fine, startup will
+/// re-apply the persisted perms whenever it binds again.
 #[tauri::command]
 fn corpus_set_brain_perms(app: AppHandle, id: String, perms: String) -> Result<(), String> {
-    corpus::set_brain_perms(&app, &id, &perms)
+    corpus::set_brain_perms(&app, &id, &perms)?;
+    let state = app.state::<corpus::CorpusState>();
+    let _ = state.route(&id, |s| {
+        s.set_perms_read_only(perms == "read-only");
+        Ok(())
+    });
+    Ok(())
 }
 
 #[tauri::command]
@@ -683,15 +747,23 @@ pub fn run() {
         .manage(CaptureReturn(Mutex::new(false)))
         .manage(QuickPlaced(Mutex::new(false)))
         .manage(QuickReturn(Mutex::new(false)))
+        .manage(QuitFlush { acked: Mutex::new(false), cv: Condvar::new() })
+        // the app-menu ⌘Q replacement (see setup) — tray menu events have their
+        // own handler; the ids are distinct so double-dispatch can't double-quit
+        .on_menu_event(|app, event| {
+            if event.id().as_ref() == "quit-app" {
+                graceful_quit(app);
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             toggle_main_window,
+            quit_flush_done,
             hide_main_window,
             show_main_window,
             hide_capture_window,
             finish_capture_window,
             toggle_quick_window,
             hide_quick_window,
-            show_quick_window,
             corpus_reveal,
             corpus_add_folder,
             corpus_forget_folder,
@@ -739,15 +811,15 @@ pub fn run() {
             corpus::corpus_delete,
             corpus::corpus_move,
             corpus::corpus_rename_board,
-            chat::chat_complete,
             chat::chat_models,
             chat::chat_messages,
             organizer::organizer_status,
             organizer::organizer_run_once,
             organizer::organizer_set_trust,
+            organizer::organizer_learn_field,
             web::web_search,
             web::web_fetch,
-            corpus::corpus_purge,
+            web::open_url,
             corpus::corpus_create_folder,
             corpus::corpus_read_board,
             corpus::corpus_write_board,
@@ -757,11 +829,9 @@ pub fn run() {
             corpus::corpus_settings_write,
             corpus::corpus_main_write,
             memex::memex_detect,
-            memex::memex_inspect,
             memex::memex_read_contract,
             memex::memex_read,
             memex::memex_list_chats,
-            memex::memex_list_dir,
             memex::memex_write_chat,
             memex::memex_write_note,
             memex::memex_validate,
@@ -786,10 +856,21 @@ pub fn run() {
             // starts only after CorpusState is managed (it writes through route()).
             let organizer_handle = organizer::OrganizerHandle::new();
             let mut daemon_target: Option<(String, std::path::PathBuf)> = None;
+            // #3 (audit 2026-07): a connected brain's USER-SET perms must reach the
+            // Rust write gates, not only the TS canWrite — carry them by root id.
+            let brain_perms: std::collections::HashMap<String, String> =
+                corpus::ensure_corpus_config(app.handle())
+                    .brains
+                    .into_iter()
+                    .map(|b| (b.id, b.perms))
+                    .collect();
             let roots = corpus::startup_roots(app.handle());
             for root in roots {
                 match corpus::CorpusStore::open(root.abs_path.clone()) {
-                    Ok(store) => {
+                    Ok(mut store) => {
+                        if brain_perms.get(&root.id).map(String::as_str) == Some("read-only") {
+                            store.set_perms_read_only(true);
+                        }
                         let suppress = store.suppress_set();
                         let watch_root = store.root().to_path_buf();
                         // let the asset protocol serve this corpus's files, so
@@ -872,7 +953,8 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "open" => show_main(app),
-                    "quit" => app.exit(0),
+                    // let the webview flush dirty sheets/settings first (#4)
+                    "quit" => graceful_quit(app),
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
@@ -887,6 +969,31 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // ⌘Q must flush before exit (#4 follow-up): the default app menu ends
+            // in the PREDEFINED Quit item — native `terminate:`, which kills the
+            // process with no interceptable event (tao implements only
+            // applicationWillTerminate). Swap it for a look-alike custom item
+            // (same title, same ⌘Q) wired to graceful_quit. Structural, not
+            // id-matched: the default app submenu's LAST item is the quit slot
+            // (menu.rs in tauri pins that shape); if the shape ever changes the
+            // swap degrades to a no-op and ⌘Q just quits un-flushed — never a
+            // startup failure.
+            #[cfg(target_os = "macos")]
+            if let Some(menu) = app.menu() {
+                if let Some(tauri::menu::MenuItemKind::Submenu(app_sub)) =
+                    menu.items().unwrap_or_default().into_iter().next()
+                {
+                    let items = app_sub.items().unwrap_or_default();
+                    if let Some(last @ tauri::menu::MenuItemKind::Predefined(_)) = items.last() {
+                        let quit_app = MenuItemBuilder::with_id("quit-app", "Quit rotli")
+                            .accelerator("CmdOrCtrl+Q")
+                            .build(app)?;
+                        app_sub.remove(last)?;
+                        app_sub.append(&quit_app)?;
+                    }
+                }
+            }
 
             Ok(())
         })

@@ -7,6 +7,7 @@
 // before anything becomes automatic.
 
 import {
+  corpusFileText,
   corpusFilerMove,
   corpusFrontmatter,
   corpusJournalAppend,
@@ -14,6 +15,7 @@ import {
   corpusNotePath,
   corpusSetAiField,
   corpusWriteIndex,
+  organizerLearnField,
 } from "../lib/tauri";
 import { fileNoteToArea } from "./brainFiling";
 
@@ -103,6 +105,12 @@ export interface JournalDeps {
   notePath: typeof corpusNotePath;
   frontmatter: typeof corpusFrontmatter;
   append: typeof corpusJournalAppend;
+  /** The current on-disk `wiki/<area>/_index.md` body ("" when none) — the
+   * index branch's freshness read (#26, audit 2026-07). */
+  readIndex: (area: string) => Promise<string>;
+  /** Teach the daemon an approved field value (#28) — best-effort; the caller
+   * swallows a failure (the field stays user-owned until the next Approve). */
+  learnField: typeof organizerLearnField;
 }
 
 const live: JournalDeps = {
@@ -113,6 +121,10 @@ const live: JournalDeps = {
   notePath: corpusNotePath,
   frontmatter: corpusFrontmatter,
   append: corpusJournalAppend,
+  // a missing overview reads as "" — exactly the shape a first proposal's
+  // `before` carries, so freshness compares clean either way
+  readIndex: (area) => corpusFileText(`wiki/${area}/_index.md`).catch(() => ""),
+  learnField: organizerLearnField,
 };
 
 /** The stable handle for a row's note: the ULID when the daemon recorded one
@@ -158,6 +170,17 @@ export async function approveProposal(p: BrainAction, deps: JournalDeps = live):
     const newRel = await deps.fileNote(handleOf(p), p.area, { journal: false });
     marker.noteId = newRel;
     marker.after = newRel.slice(0, newRel.lastIndexOf("/"));
+    // filed_by/filed_at ride the approve exactly like a daemon auto-apply
+    // (#90, audit 2026-07) — the audit trail must not depend on WHO clicked.
+    // The decider is the row's model; a model-less row records the approval.
+    // Stamped AFTER the move succeeds (review, 2026-07): stamping first left a
+    // fileNote refusal (note locked mid-flight, area unwritable) with an
+    // UNFILED note marked filed — the divergence #90 exists to remove, in the
+    // opposite direction. Best-effort on the NEW rel: the filing is real by
+    // now, so a failed stamp must not fail the approve (re-clicking would only
+    // hit the "note moved" freshness refusal).
+    await deps.setAiField(newRel, "filed_by", p.model || "user-approved").catch(() => {});
+    await deps.setAiField(newRel, "filed_at", new Date().toISOString()).catch(() => {});
   } else if (p.action === "field") {
     if (!p.field) throw new Error("field proposal without a field");
     // resolve the CURRENT rel (a sibling filing may have moved the note) and
@@ -169,13 +192,28 @@ export async function approveProposal(p: BrainAction, deps: JournalDeps = live):
     }
     await deps.setAiField(rel, p.field, p.after);
     marker.noteId = rel;
+    // teach the daemon the approved value (#28) — else the never-clobber
+    // baseline reads it as a user edit and freezes the field forever.
+    // Best-effort: the write above already landed, so a learn failure must
+    // not fail the approve (the row would re-approve into a freshness refusal).
+    await deps.learnField(handleOf(p), p.field, p.after).catch(() => {});
     // a suggested_area proposal carries the classifier's confidence — persist it
     // beside the suggestion (same "{:.2}" shape the daemon writes at Tidy)
     if (p.field === "suggested_area" && typeof p.confidence === "number") {
-      await deps.setAiField(rel, "area_confidence", p.confidence.toFixed(2));
+      const conf = p.confidence.toFixed(2);
+      await deps.setAiField(rel, "area_confidence", conf);
+      await deps.learnField(handleOf(p), "area_confidence", conf).catch(() => {});
     }
   } else {
     if (!p.area) throw new Error("index proposal without an area");
+    // §4.8 freshness for INDEX rows too (#26): the overview this row proposed
+    // FROM must still be on disk — a filing or a sibling approve rewrote it
+    // since, and applying this row would roll the overview back.
+    if ((await deps.readIndex(p.area)) !== p.before) {
+      throw new Error(
+        "The overview changed since this was proposed — dismiss it; the AI will re-evaluate.",
+      );
+    }
     await deps.writeIndex(p.area, p.after);
   }
   await deps.append(JSON.stringify(marker));

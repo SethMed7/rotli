@@ -141,6 +141,15 @@
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
 }
+/* the quiet one-liner explaining why a curated card VANISHES from this grid
+   (#56, audit 2026-07) */
+.board-foot-hint {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
 
 /* sticky-note cards: a softly-raised paper that lifts on hover; pointer-drag to
    reorder (Seth, 2026-06-29). */

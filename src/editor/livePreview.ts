@@ -25,9 +25,9 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { parseBlock } from "./render";
-import { lineInFence, scanFences } from "./fences";
+import { scanFences } from "./fences";
 import { lineInTable, scanTables } from "./tables";
-import { resolveImageSrc } from "../lib/tauri";
+import { openUrl, resolveImageSrc } from "../lib/tauri";
 
 interface Sel {
   from: number;
@@ -40,6 +40,8 @@ interface Sel {
 interface InlineRule {
   re: RegExp;
   cls: string;
+  /** Extra DOM attributes on the content mark (the link's ⌘-click tooltip). */
+  attrs?: Record<string, string>;
   /** Marker + content ranges RELATIVE to the match start. */
   parts: (m: RegExpExecArray) => { markers: [number, number][]; content: [number, number] };
 }
@@ -67,6 +69,7 @@ const INLINE: InlineRule[] = [
   {
     re: /\[([^\]]+)\]\(([^)]*)\)/,
     cls: "rotli-link",
+    attrs: { title: "⌘-click to open" },
     // [text](url): hide "[" and "](url)", style the text
     parts: (m) => {
       const L = m[0].length;
@@ -307,7 +310,13 @@ function scanInline(
     const spanEnd = matchStart + m[0].length;
     const cs = matchStart + cr[0];
     const ce = matchStart + cr[1];
-    if (ce > cs) decos.push(Decoration.mark({ class: rule.cls }).range(cs, ce));
+    if (ce > cs) {
+      decos.push(
+        Decoration.mark(
+          rule.attrs ? { class: rule.cls, attributes: rule.attrs } : { class: rule.cls },
+        ).range(cs, ce),
+      );
+    }
     const touched = sel.from <= spanEnd && sel.to >= spanStart;
     for (const [s, e] of markers) {
       const a = matchStart + s;
@@ -369,9 +378,11 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
   const atomics: Range<Decoration>[] = [];
   const sel = view.state.selection.main;
   const doc = view.state.doc;
-  // blockRender owns the three rendered fenced languages; livePreview must leave
+  // blockRender owns the rendered fenced languages; livePreview must leave
   // every fenced line alone (raw code voice, never markdown-styled, and never a
-  // decoration that collides with the block widget on the same range).
+  // decoration that collides with the block widget on the same range). Since
+  // #13 (audit 2026-07) scanFences reports EVERY closed fence — generic ones
+  // (```js, plain ```) get a mono-voice line class instead of markdown styling.
   const fences = scanFences(doc);
   // tableRender owns GFM tables (replaces the whole range with a <table> widget);
   // livePreview leaves every table line alone, just like fenced lines.
@@ -380,7 +391,14 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
     let pos = from;
     while (pos <= to) {
       const line = doc.lineAt(pos);
-      if (lineInFence(line.from, fences) || lineInTable(line.from, tables)) {
+      const fence = fences.find((f) => line.from >= f.from && line.from <= f.to);
+      if (fence || lineInTable(line.from, tables)) {
+        // a NON-target fence is raw code the editor keeps verbatim — mono voice
+        // only (a line class never collides with a replace decoration; target
+        // fences stay untouched since blockRender swaps their whole range).
+        if (fence && !fence.target) {
+          decos.push(Decoration.line({ class: "rotli-fenceline" }).range(line.from));
+        }
         pos = line.to + 1;
         continue;
       }
@@ -463,6 +481,38 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
   }
   return { deco: Decoration.set(decos, true), atomic: RangeSet.of(atomics, true) };
 }
+
+// ─── ⌘-click opens a link (#14, audit 2026-07) ───────────────────────────────
+// Plain click stays the edit path (caret in, markers reveal); holding ⌘ routes
+// the link's url through the scheme-allowlisted Rust opener instead. Works in
+// beautified AND raw mode — the match runs on the underlying markdown text, not
+// the decoration, so it doesn't care whether the markers are hidden.
+
+const MD_LINK = /\[([^\]]+)\]\(([^)]*)\)/g;
+
+export const linkOpener = EditorView.domEventHandlers({
+  mousedown(e, view) {
+    if (!e.metaKey || e.button !== 0) return false;
+    const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+    if (pos == null) return false;
+    const line = view.state.doc.lineAt(pos);
+    MD_LINK.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = MD_LINK.exec(line.text)) !== null) {
+      const from = line.from + m.index;
+      const to = from + m[0].length;
+      if (pos >= from && pos <= to) {
+        const url = (m[2] ?? "").trim();
+        // non-openable schemes just don't open — the guard lives in Rust
+        if (url) void openUrl(url).catch(() => {});
+        e.preventDefault();
+        return true;
+      }
+      if (from > pos) break; // matches walk left→right; past the click = done
+    }
+    return false;
+  },
+});
 
 export const livePreview = ViewPlugin.fromClass(
   class {

@@ -1512,10 +1512,21 @@ pub struct CorpusStore {
     suppress: SuppressSet,
     /// OS trash in production; tests flip this to use `.rotli/trash/` so they
     /// never touch the user's real Trash. Either way: never a hard delete.
+    /// (allow(dead_code): only read by `purge`, whose command was unregistered
+    /// in the 2026-07 audit (#68) — both stay for the future "Empty Trash".)
+    #[allow(dead_code)]
     os_trash: bool,
     /// How this root is shaped (Increment 3). LegacyRotli = today's behavior in
     /// every respect; Memex gates folders/ownership/scope. Decided at `open()`.
     layout: Layout,
+    /// Contract-band verdict, decided at `open_memex` (#3, audit 2026-07): a memex
+    /// whose contract is OUTSIDE rotli's supported band opens read-only — never
+    /// write a contract rotli wasn't built for. Both write gates consult it.
+    band_read_only: bool,
+    /// User-set "read-only" perms for a connected brain (corpus.json) — carried
+    /// into the store so the Rust gates enforce it, not only the TS `canWrite`
+    /// (#3, audit 2026-07). Never cleared below the band verdict.
+    perms_read_only: bool,
 }
 
 impl CorpusStore {
@@ -1550,6 +1561,8 @@ impl CorpusStore {
             suppress: SuppressSet::default(),
             os_trash: true,
             layout: Layout::LegacyRotli,
+            band_read_only: false,
+            perms_read_only: false,
         };
         store.load_index();
         // Scaffold the six reserved sidebar destinations every open (idempotent),
@@ -1573,15 +1586,28 @@ impl CorpusStore {
         fs::create_dir_all(root.join(DOT_DIR))
             .map_err(|e| format!("create {}: {e}", root.join(DOT_DIR).display()))?;
 
+        // The contract band decides writability AT OPEN (#3): out-of-band ⇒ every
+        // write refused in Rust, matching the TS read-only verdict (brain_view).
+        let band_read_only = !crate::memex::contract_in_band_at(&root);
         let mut store = Self {
             root,
             index: HashMap::new(),
             suppress: SuppressSet::default(),
             os_trash: true,
             layout: Layout::Memex,
+            band_read_only,
+            perms_read_only: false,
         };
         store.load_index();
         Ok(store)
+    }
+
+    /// Apply a connected brain's USER-SET "read-only" perms to the live store —
+    /// called at startup (from corpus.json) and when Settings flips the perms.
+    /// Only ever narrows on top of the band verdict (band read-only can't be
+    /// un-done by generous perms).
+    pub fn set_perms_read_only(&mut self, read_only: bool) {
+        self.perms_read_only = read_only;
     }
 
     pub fn root(&self) -> &Path {
@@ -1730,6 +1756,9 @@ impl CorpusStore {
     /// Toggle the per-note AI lock — a `locked: true` frontmatter line the eventual
     /// AI filer must respect. Preserves the body + every other frontmatter line.
     /// Takes a wire id OR a rel path (resolve_note_rel — same bridge as the filer lane).
+    /// SANCTIONED writable() exception (#22): `locked` is a rotli-managed CONTROL
+    /// flag, and locking a curated wiki note against the filer must work even
+    /// where the user can't edit the note itself.
     fn set_locked(&mut self, id_or_rel: &str, locked: bool) -> Result<(), String> {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
@@ -1744,8 +1773,12 @@ impl CorpusStore {
     }
 
     /// Set (or, with an empty value, remove) a foreign frontmatter field — the
-    /// metadata panel's editor. Reserved keys are off-limits. Preserves the body
-    /// and every other frontmatter line. Takes a wire id OR a rel path
+    /// metadata panel's editor, i.e. the USER lane. Reserved keys AND the AI
+    /// Filer's keys are off-limits (#22, audit 2026-07: the two lanes'
+    /// territories must stay disjoint in BOTH directions), and the same
+    /// `writable()` gate as every editor save applies — the user can't edit
+    /// fields on curated wiki notes they can't write. Preserves the body and
+    /// every other frontmatter line. Takes a wire id OR a rel path
     /// (resolve_note_rel — same bridge as the filer lane).
     fn set_field(&mut self, id_or_rel: &str, key: &str, value: &str) -> Result<(), String> {
         let key = key.trim();
@@ -1755,7 +1788,11 @@ impl CorpusStore {
         if RESERVED_KEYS.contains(&key) {
             return Err(format!("`{key}` is managed by rotli, not editable here"));
         }
+        if AI_KEYS.contains(&key) {
+            return Err(format!("`{key}` belongs to the AI filer — not editable here"));
+        }
         let rel = &self.resolve_note_rel(id_or_rel)?;
+        self.writable(rel)?;
         let path = self.abs(rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
@@ -1765,6 +1802,7 @@ impl CorpusStore {
         if !value.is_empty() {
             fm.foreign.push(format!("{key}: {value}"));
         }
+        self.suppress.mark(&path);
         atomic_write(&path, &compose_document(&fm, body))
     }
 
@@ -1890,6 +1928,9 @@ impl CorpusStore {
     /// pushed vault never leaks it. Preserves the body + every other frontmatter line.
     /// Takes a wire id OR a rel path (resolve_note_rel) — the gitignore line must be
     /// the note's PATH, never its ULID.
+    /// SANCTIONED writable() exception (#22): `secure` is a rotli-managed CONTROL
+    /// flag (like the auto-flag on the read path) — marking a note secure must
+    /// never be refused by the user-lane gate.
     fn set_secure(&mut self, id_or_rel: &str, secure: bool) -> Result<(), String> {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
@@ -1911,16 +1952,21 @@ impl CorpusStore {
 
     /// Read a note FOR an AI model. A SECURE note (secrets detected) is refused to a
     /// REMOTE model — its content must never leave the device; a local model is fine.
+    /// The `secure:` flag is checked first; when it's ABSENT the secret DETECTOR
+    /// runs on the body too (#21, audit 2026-07) — the auto-flag only fires when
+    /// the metadata panel is opened, so a never-inspected note with detectable
+    /// secrets must not slip through on the flag alone.
     /// Takes a wire id OR a rel path (resolve_note_rel — same bridge as the filer lane).
     fn read_for_ai(&mut self, id_or_rel: &str, model_is_local: bool) -> Result<String, String> {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
-        let secure = parse_document(&text)
-            .0
+        let (fm, body) = parse_document(&text);
+        let secure = fm
             .unwrap_or_default()
             .foreign
             .iter()
-            .any(|l| secure_field(l) == Some(true));
+            .any(|l| secure_field(l) == Some(true))
+            || looks_secure(body);
         if secure && !model_is_local {
             return Err(
                 "This note is marked secure (it contains secrets) and can't be sent to a remote model — switch to a local model to read it.".into(),
@@ -1986,6 +2032,19 @@ impl CorpusStore {
     /// every other path returns a user-facing Err that the TS layer renders.
     /// `rel == ""` is the corpus root — writable only in LegacyRotli.
     fn writable(&self, rel: &str) -> Result<(), String> {
+        // #3 (audit 2026-07): perms + contract band are enforced HERE, not only in
+        // the TS canWrite — a user-set read-only brain and an out-of-band contract
+        // both refuse every user write.
+        if self.band_read_only {
+            return Err(
+                "this brain's contract is outside the band rotli supports — it opens read-only".into(),
+            );
+        }
+        if self.perms_read_only {
+            return Err(
+                "this brain is connected read-only — allow writes in Settings → Location first".into(),
+            );
+        }
         if self.layout == Layout::LegacyRotli {
             return Ok(());
         }
@@ -2182,11 +2241,29 @@ impl CorpusStore {
         };
         let target_abs = self.abs(&target_rel);
 
+        // #1 (audit 2026-07, CRITICAL): a SECURE note's `.gitignore` line is its
+        // PATH — a title rename moves the file, so the line must follow or the
+        // secret becomes committable. The NEW line lands BEFORE the file moves:
+        // if the `.gitignore` write fails the rename aborts with nothing moved
+        // (a "move failed" error must mean nothing moved — the file at a path
+        // the ignore doesn't cover, with the index still on the old rel, was
+        // the worse failure). A pre-added line for a rename that then fails is
+        // a harmless stale entry.
+        let is_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
+        if target_abs != abs && is_secure {
+            self.gitignore_add(&target_rel)?;
+        }
         self.suppress.mark(&target_abs);
         atomic_write(&target_abs, &text)?;
         if target_abs != abs {
             self.suppress.mark(&abs);
             let _ = fs::remove_file(&abs);
+            // best-effort AFTER the move: a failed removal leaves a harmless
+            // stale line, never an unprotected note — and must not report a
+            // completed rename as a failure.
+            if is_secure {
+                let _ = self.gitignore_remove(&rel);
+            }
         }
         self.index.insert(id.to_string(), target_rel);
         self.persist_index();
@@ -2290,12 +2367,30 @@ impl CorpusStore {
         };
         let out = compose_document(&fm, &format!("\n{body}"));
 
+        // #1 (audit 2026-07, CRITICAL): a SECURE note's `.gitignore` line is its
+        // PATH — every move (user move, archive/trash, filer file/undo) must
+        // carry the line along or the secret becomes committable. The NEW line
+        // lands BEFORE the file moves: if the `.gitignore` write fails the move
+        // aborts with nothing moved (an unwritable `.gitignore` used to fire
+        // AFTER the move — the note sat at a path no ignore line covered while
+        // the index still pointed at the removed old rel). A pre-added line for
+        // a move that then fails is a harmless stale entry.
+        let is_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
+        if target_abs != abs && is_secure {
+            self.gitignore_add(&target_rel)?;
+        }
         // both paths are OUR writes — neither should echo back as external
         self.suppress.mark(&abs);
         self.suppress.mark(&target_abs);
         atomic_write(&target_abs, &out)?;
         if target_abs != abs {
             let _ = fs::remove_file(&abs);
+            // best-effort AFTER the move: a failed removal leaves a harmless
+            // stale line, never an unprotected note — and must not report a
+            // completed move as a failure.
+            if is_secure {
+                let _ = self.gitignore_remove(rel);
+            }
         }
         self.index.insert(id.to_string(), target_rel);
         self.persist_index();
@@ -2322,6 +2417,16 @@ impl CorpusStore {
     fn filer_writable(&self, rel: &str) -> Result<(), String> {
         if self.layout != Layout::Memex {
             return Err("the filer only runs on a memex".into());
+        }
+        // #3 (audit 2026-07): the FILER lane honors the same read-only verdicts as
+        // the user lane — an out-of-band contract or read-only perms close BOTH.
+        if self.band_read_only {
+            return Err(
+                "this brain's contract is outside the band rotli supports — the filer may not write it".into(),
+            );
+        }
+        if self.perms_read_only {
+            return Err("this brain is connected read-only — the filer may not write it".into());
         }
         let rel = rel.trim_start_matches('/');
         if !(rel == "wiki" || rel.starts_with("wiki/")) {
@@ -2665,8 +2770,11 @@ impl CorpusStore {
 
     /// The ONLY hard delete — a future "Empty Trash". The note actually leaves
     /// the corpus: OS trash first, `.rotli/trash/` as the fallback (and as the
-    /// test path — tests must not touch the user's real Trash). No TS wrapper
-    /// yet; wired into the invoke_handler so the UI can call it later.
+    /// test path — tests must not touch the user's real Trash).
+    /// (allow(dead_code): its `corpus_purge` command was UNREGISTERED in the
+    /// 2026-07 audit (#68) — an exposed, unreachable destructive command is the
+    /// wrong default. The method + its test stay for when Empty Trash ships.)
+    #[allow(dead_code)]
     pub fn purge(&mut self, id: &str) -> Result<(), String> {
         let rel = self.path_of(id)?;
         self.writable(&rel)?;
@@ -2784,6 +2892,20 @@ fn dot_file(which: &str) -> Result<&'static str, String> {
         "main" => Ok("main.json"), // the Main arrangement (committed, unlike the others)
         // Rust-daemon-owned hash state — the frontend never writes it.
         "organizer" => Ok("organizer.json"),
+        other => Err(format!("unknown settings file: {other}")),
+    }
+}
+
+/// The dot-files the WEBVIEW may write via `corpus_settings_write` — a separate
+/// whitelist from the read table (#44, audit 2026-07): `organizer` is the
+/// daemon's own convergence state (a webview write would wipe its hashes) and
+/// `main` must go through `corpus_main_write` (which also keeps it committable).
+/// Internal writers (the daemon, corpus_main_write) call `dot_write` directly.
+fn user_dot_writable(which: &str) -> Result<(), String> {
+    match which {
+        "settings" | "viewstate" | "background" => Ok(()),
+        "main" => Err("write .rotli/main.json through corpus_main_write".into()),
+        "organizer" => Err("`organizer` is the daemon's own state — not writable from the app".into()),
         other => Err(format!("unknown settings file: {other}")),
     }
 }
@@ -3089,6 +3211,17 @@ impl CorpusRegistry {
 pub struct CorpusState(pub Mutex<CorpusRegistry>);
 
 impl CorpusState {
+    /// The registry's default root id — the memex the journal/organizer
+    /// commands ride (their dot-state lives under ITS `.rotli/`).
+    pub(crate) fn default_root_id(&self) -> Result<String, String> {
+        Ok(self
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?
+            .default_id
+            .clone())
+    }
+
     /// Run `f` against the store named by `root_id` (passing the bare `rel`).
     /// The router: `split_root_id` is applied by the caller; this picks the
     /// store. An unknown root id is a clean error (an UNBOUND vault, a stale
@@ -3566,13 +3699,17 @@ pub fn corpus_set_secure(
     state.route(&root, |s| s.set_secure(&rel, secure))
 }
 
-/// Read a note for an AI model — refused for a SECURE note unless the model is local.
+/// Read a note for an AI model — refused for a SECURE note unless the model is
+/// LOCAL. Locality is DERIVED here from the picked model's ENDPOINT (loopback
+/// check, #2 audit 2026-07) — the webview passes where the model lives, never a
+/// "trust me, it's local" bit.
 #[tauri::command]
 pub fn corpus_read_ai(
     state: tauri::State<'_, CorpusState>,
     id: String,
-    model_is_local: bool,
+    endpoint: String,
 ) -> Result<String, String> {
+    let model_is_local = crate::chat::endpoint_is_local(&endpoint);
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| s.read_for_ai(&rel, model_is_local))
 }
@@ -3651,13 +3788,10 @@ pub fn corpus_rename_board(
     state.route(&root, |s| s.rename_board(&rel, &name)).map(|m| prefix_meta(&root, m))
 }
 
-/// The hard delete (a future "Empty Trash") — no TS wrapper yet, but registered
-/// so the UI can reach it later.
-#[tauri::command]
-pub fn corpus_purge(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
-    let (root, rel) = split_root_id(&id);
-    state.route(&root, |s| s.purge(&rel))
-}
+// The `corpus_purge` command (the only hard-delete lane) was UNREGISTERED and
+// removed in the 2026-07 audit (#68): an exposed, unreachable destructive command
+// is the wrong default. The store's `purge` + its tests stay — re-add the command
+// when "Empty Trash" ships a caller.
 
 #[tauri::command]
 pub fn corpus_create_folder(
@@ -3753,6 +3887,9 @@ pub fn corpus_settings_write(
     file: String,
     contents: String,
 ) -> Result<(), String> {
+    // #44: the write whitelist is NARROWER than the read table — `organizer`
+    // (daemon-owned) and `main` (corpus_main_write's job) are refused here.
+    user_dot_writable(&file)?;
     let default_id = state
         .0
         .lock()
@@ -4891,6 +5028,198 @@ mod tests {
         assert!(store.write_index("Projects", "").is_ok());
         assert!(!store.abs("wiki/Projects/_index.md").exists());
         assert!(store.write_index("Projects", "").is_ok(), "removing a missing index is a no-op");
+    }
+
+    /// #1 (audit 2026-07, CRITICAL): a SECURE note's `.gitignore` line is its
+    /// PATH — a rename, a user move, and a filer move must all carry it along,
+    /// or the flagged secret becomes committable the moment the file moves.
+    #[test]
+    fn gitignore_follows_a_secure_note_on_rename_move_and_filing() {
+        let ignored_lines = |root: &Path| -> Vec<String> {
+            fs::read_to_string(root.join(".gitignore"))
+                .unwrap_or_default()
+                .lines()
+                .map(|l| l.trim().to_string())
+                .collect()
+        };
+
+        // — legacy corpus: title rename (write) + user move (move_note) —
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        let note = store.create("Inbox", "# Api key\n\nsk-ant-abcdefghijklmnop123").unwrap();
+        store.set_secure(&note.id, true).unwrap();
+        let old_rel = store.path_of(&note.id).unwrap();
+        assert!(ignored_lines(&store.root).contains(&old_rel));
+
+        // retitle → the file renames; the gitignore line must follow
+        store.write(&note.id, "# Rotated key\n\nsk-ant-abcdefghijklmnop123", false).unwrap();
+        let renamed_rel = store.path_of(&note.id).unwrap();
+        assert_ne!(renamed_rel, old_rel, "the title change renames the file");
+        let lines = ignored_lines(&store.root);
+        assert!(lines.contains(&renamed_rel), "new path must be ignored: {lines:?}");
+        assert!(!lines.contains(&old_rel), "old line must be gone: {lines:?}");
+
+        // user move (Archive) → same discipline
+        store.move_note(&note.id, "Archive").unwrap();
+        let archived_rel = store.path_of(&note.id).unwrap();
+        assert!(archived_rel.starts_with("Archive/"));
+        let lines = ignored_lines(&store.root);
+        assert!(lines.contains(&archived_rel), "moved path must be ignored: {lines:?}");
+        assert!(!lines.contains(&renamed_rel), "pre-move line must be gone: {lines:?}");
+
+        // a NON-secure note's moves never touch the gitignore
+        let plain = store.create("Inbox", "# Plain note\n\nnothing secret").unwrap();
+        store.move_note(&plain.id, "Archive").unwrap();
+        let plain_rel = store.path_of(&plain.id).unwrap();
+        assert!(!ignored_lines(&store.root).contains(&plain_rel));
+
+        // — memex corpus: the FILER lane (file_note) moves a secure note too —
+        let tmp2 = TempDir::new().unwrap();
+        let brain = tmp2.path().join("brain");
+        seed_memex(&brain);
+        let mut mx = CorpusStore::open(brain).unwrap();
+        mx.os_trash = false;
+        let staged = mx.create("wiki/_inbox", "# Card\n\n4242-4242-4242-4242").unwrap();
+        mx.set_secure(&staged.id, true).unwrap();
+        let staged_rel = mx.path_of(&staged.id).unwrap();
+        assert!(ignored_lines(&mx.root).contains(&staged_rel));
+        mx.set_ai_field(&staged.id, "area", "Projects").unwrap();
+        mx.file_note(&staged.id).unwrap();
+        let filed_rel = mx.path_of(&staged.id).unwrap();
+        assert!(filed_rel.starts_with("wiki/Projects/"));
+        let lines = ignored_lines(&mx.root);
+        assert!(lines.contains(&filed_rel), "filed path must be ignored: {lines:?}");
+        assert!(!lines.contains(&staged_rel), "staging line must be gone: {lines:?}");
+    }
+
+    /// Follow-up to #1 (review, 2026-07): the gitignore sync fires BEFORE the
+    /// fs move — an unwritable `.gitignore` used to error AFTER the file had
+    /// already moved, leaving the secure note at a path no ignore line covered
+    /// and the id→path index pointing at the removed old rel ("note not found"
+    /// for the rest of the session). Failing first keeps the error honest:
+    /// nothing moved, the note still reads, the old ignore line still protects.
+    #[test]
+    fn gitignore_failure_aborts_a_secure_move_before_anything_moves() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        let note = store.create("Inbox", "# Api key\n\nsk-ant-abcdefghijklmnop123").unwrap();
+        store.set_secure(&note.id, true).unwrap();
+        let old_rel = store.path_of(&note.id).unwrap();
+
+        // make every `.gitignore` write fail: a DIRECTORY at its path can't be
+        // read (add sees "") and atomic_write's rename onto it errors
+        fs::remove_file(store.root.join(".gitignore")).unwrap();
+        fs::create_dir(store.root.join(".gitignore")).unwrap();
+
+        // user move refuses…
+        assert!(store.move_note(&note.id, "Archive").is_err());
+        // …and NOTHING moved: same rel, file present, note still readable
+        assert_eq!(store.path_of(&note.id).unwrap(), old_rel);
+        assert!(store.root.join(&old_rel).is_file());
+        assert!(store.read(&note.id).is_ok());
+
+        // the title-rename branch of write() holds the same line
+        assert!(store.write(&note.id, "# Rotated key\n\nsk-ant-abcdefghijklmnop123", false).is_err());
+        assert_eq!(store.path_of(&note.id).unwrap(), old_rel);
+        assert!(store.root.join(&old_rel).is_file());
+
+        // a NON-secure note never touches the gitignore — its moves still work
+        let plain = store.create("Inbox", "# Plain\n\nnothing secret").unwrap();
+        store.move_note(&plain.id, "Archive").unwrap();
+        assert!(store.path_of(&plain.id).unwrap().starts_with("Archive/"));
+    }
+
+    /// #21 (audit 2026-07): read_for_ai must run the secret DETECTOR when the
+    /// `secure:` flag is absent — the auto-flag only fires when the metadata
+    /// panel opens, so a never-inspected note with detectable secrets must not
+    /// ride to a remote model on the missing flag.
+    #[test]
+    fn read_for_ai_runs_the_detector_not_just_the_flag() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        // detectable secret, NO secure: flag (the panel was never opened)
+        let hot = store.create("Inbox", "# Stripe\n\ncard 4242424242424242").unwrap();
+        assert!(store.read_for_ai(&hot.id, false).is_err(), "unflagged secret must refuse remote");
+        assert!(store.read_for_ai(&hot.id, true).is_ok(), "a local model may read it");
+        // a clean note passes remote
+        let clean = store.create("Inbox", "# Groceries\n\neggs, milk").unwrap();
+        assert!(store.read_for_ai(&clean.id, false).is_ok());
+    }
+
+    /// #22 (audit 2026-07): set_field is the USER lane — it must refuse the AI
+    /// filer's keys (disjoint territories, BOTH directions) and honor the same
+    /// writable() gate as every editor save.
+    #[test]
+    fn set_field_refuses_ai_keys_and_honors_the_write_gate() {
+        let tmp = TempDir::new().unwrap();
+        let brain = tmp.path().join("brain");
+        seed_memex(&brain);
+        fs::create_dir_all(brain.join("wiki/_inbox")).unwrap();
+        let mut store = CorpusStore::open(brain).unwrap();
+        store.os_trash = false;
+
+        let staged = store.create("wiki/_inbox", "# A staged note\n\nbody").unwrap();
+        let rel = store.path_of(&staged.id).unwrap();
+        // a user key on a user-writable note: fine
+        assert!(store.set_field(&rel, "shelf", "[Inbox]").is_ok());
+        // every AI key is refused in the user lane — even where writable() passes
+        for key in AI_KEYS {
+            assert!(store.set_field(&rel, key, "x").is_err(), "AI key `{key}` must refuse");
+        }
+        // reserved keys stay refused (existing behavior)
+        assert!(store.set_field(&rel, "locked", "true").is_err());
+        // the CURATED wiki is not user-writable — set_field must refuse it too
+        assert!(store.set_field("wiki/note.md", "topic", "x").is_err());
+    }
+
+    /// #3 (audit 2026-07): the contract band and a brain's user-set read-only
+    /// perms are enforced by the RUST write gates — both lanes — not only TS.
+    #[test]
+    fn out_of_band_or_read_only_brain_refuses_writes_in_rust() {
+        // a memex on a FUTURE contract rotli wasn't built for → read-only, both lanes
+        let tmp = TempDir::new().unwrap();
+        let ahead = tmp.path().join("ahead");
+        seed_memex(&ahead);
+        fs::write(ahead.join("memex.json"), "{\"id\":\"mx_future\",\"contract\":\"9.9\",\"apps\":{}}")
+            .unwrap();
+        let mut store = CorpusStore::open(ahead).unwrap();
+        store.os_trash = false;
+        assert!(store.writable("chats/x.md").is_err(), "user lane closed out of band");
+        assert!(store.filer_writable("wiki/_inbox").is_err(), "filer lane closed out of band");
+        assert!(store.create("chats", "# chat").is_err());
+
+        // in-band brain: open, then user-set read-only perms close both lanes live
+        let inband = tmp.path().join("inband");
+        seed_memex(&inband);
+        let mut store = CorpusStore::open(inband).unwrap();
+        store.os_trash = false;
+        assert!(store.writable("chats/x.md").is_ok());
+        assert!(store.filer_writable("wiki/_inbox").is_ok());
+        store.set_perms_read_only(true);
+        assert!(store.writable("chats/x.md").is_err(), "read-only perms close the user lane");
+        assert!(store.filer_writable("wiki/_inbox").is_err(), "…and the filer lane");
+        store.set_perms_read_only(false);
+        assert!(store.writable("chats/x.md").is_ok(), "perms can re-open an in-band brain");
+    }
+
+    /// #44 (audit 2026-07): the webview's settings-write whitelist is NARROWER
+    /// than the read table — the daemon's `organizer.json` and the committed
+    /// `main.json` are not writable through corpus_settings_write.
+    #[test]
+    fn settings_write_whitelist_protects_daemon_and_main_files() {
+        assert!(user_dot_writable("settings").is_ok());
+        assert!(user_dot_writable("viewstate").is_ok());
+        assert!(user_dot_writable("background").is_ok());
+        assert!(user_dot_writable("organizer").is_err(), "daemon-owned state");
+        assert!(user_dot_writable("main").is_err(), "main goes through corpus_main_write");
+        assert!(user_dot_writable("junk").is_err());
+        // the READ table still serves all five
+        for f in ["settings", "viewstate", "background", "main", "organizer"] {
+            assert!(dot_file(f).is_ok());
+        }
     }
 
     #[test]

@@ -14,6 +14,7 @@ import {
   allActions,
   conflictFor,
   dispatch,
+  getAction,
   rebind,
   setDispatchSuspended,
 } from "../keys/registry";
@@ -32,7 +33,7 @@ import {
 } from "../lib/tauri";
 import { usePanesStore } from "../state/panes";
 import { useFolders } from "../services/hooks";
-import { isHidden, isVault } from "../services/destinations";
+import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
 import { resetAndReonboard } from "../state/onboarding";
 import { setQuickFolderSynced } from "../state/quick";
 import {
@@ -412,7 +413,17 @@ function UpdatesSection() {
   );
 }
 
+/** The LIVE chord for an action, formatted for copy — the General blurbs must
+ * follow a rebind instead of forever teaching the shipped defaults (#86, audit
+ * 2026-07). "unbound" when the user cleared it. */
+function chordLabel(overrides: Record<string, string | null>, actionId: string): string {
+  const action = getAction(actionId);
+  const chord = action ? resolveChord(overrides, actionId, action.defaultChord) : null;
+  return chord ? formatChord(chord) : "unbound";
+}
+
 function GeneralPane() {
+  const bindingOverrides = useBindingsStore((s) => s.overrides);
   const stayOpen = useUiStore((s) => s.stayOpen);
   const setStayOpen = useUiStore((s) => s.setStayOpen);
   const showInDock = useUiStore((s) => s.showInDock);
@@ -424,9 +435,13 @@ function GeneralPane() {
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const [confirmReset, setConfirmReset] = useState(false);
   const quickFolder = useUiStore((s) => s.quickFolder);
-  // The external Vault is read-mostly — quick notes never land there, so keep it
-  // (and its wiki/chats subfolders) out of the destination picker entirely.
-  const folderOpts = (useFolders().data ?? []).filter((f) => !isHidden(f.id) && !isVault(f.id));
+  // The external Vault is read-mostly — quick notes never land there — and the
+  // LOCAL memex's curated wiki/** + chats/ refuse note creation at the write
+  // gate: offering one here would leave ⌥Q silently dead forever (#6, audit
+  // 2026-07). Keep all of them out of the destination picker entirely.
+  const folderOpts = (useFolders().data ?? []).filter(
+    (f) => !isHidden(f.id) && !isVault(f.id) && !isWikiPath(f.id) && !isChatsPath(f.id),
+  );
   const hasCurrent = folderOpts.some((f) => f.id === quickFolder);
   return (
     <>
@@ -458,15 +473,16 @@ function GeneralPane() {
         />
       </div>
       <p className="setnote">
-        Either way the menu-bar icon stays, ⌥Space opens the app, and ⌥C is the one-breath
-        capture — all rebindable in Hotkeys.
+        Either way the menu-bar icon stays, {chordLabel(bindingOverrides, "app.toggleWindow")} opens
+        the app, and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture —
+        all rebindable in Hotkeys.
       </p>
 
       <h4 className="sethead">Quick note</h4>
       <p className="lead">
-        A floating note you summon with ⌥Q — pin up to five notes in it, cycle them with ‹ ›, and
-        ⌘K searches every note to swap one in. It always reopens where you left off and closes when
-        you click away.
+        A floating note you summon with {chordLabel(bindingOverrides, "quick.summon")} — pin up to
+        five notes in it, cycle them with ‹ ›, and ⌘K searches every note to swap one in. It always
+        reopens where you left off and closes when you click away.
       </p>
       <label className="setselect-row">
         <span>New quick notes go to</span>
@@ -1066,8 +1082,10 @@ function BrainPane() {
   const trust = useUiStore((s) => s.organizerTrust);
   const setTrust = useUiStore((s) => s.setOrganizerTrust);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
-  // the Run-now nudge — a quiet inline note instead of an error toast
-  const [ranNote, setRanNote] = useState<string | null>(null);
+  // the Run-now nudge — a quiet inline note instead of an error toast. The
+  // note never claims a live state it can't see ("Running a pass…" showed
+  // forever — #85, audit 2026-07); errors get the err class other panes use.
+  const [ranNote, setRanNote] = useState<{ text: string; err: boolean } | null>(null);
   return (
     <>
       <PaneHead title="Brain" char="knowledge" />
@@ -1107,8 +1125,15 @@ function BrainPane() {
         disabled={trust === "off"}
         onClick={() => {
           organizerRunOnce()
-            .then(() => setRanNote("Running a pass…"))
-            .catch((e) => setRanNote(e instanceof Error ? e.message : String(e)));
+            .then(() =>
+              setRanNote({
+                text: "Pass queued — what it finds lands in Brain Activity.",
+                err: false,
+              }),
+            )
+            .catch((e) =>
+              setRanNote({ text: e instanceof Error ? e.message : String(e), err: true }),
+            );
         }}
       >
         Run now
@@ -1124,7 +1149,7 @@ function BrainPane() {
       >
         View activity
       </button>
-      {ranNote && <p className="setnote">{ranNote}</p>}
+      {ranNote && <p className={ranNote.err ? "setnote err" : "setnote"}>{ranNote.text}</p>}
     </>
   );
 }

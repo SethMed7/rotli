@@ -379,6 +379,19 @@ export function webFetch(url: string, maxChars?: number): Promise<string> {
   return aiInvoke("web_fetch", { url, maxChars });
 }
 
+/** Open a rendered link in the user's browser/mail app (#14, audit 2026-07).
+ * Rust allowlists the scheme (http/https/mailto only — never file:// or a
+ * custom app scheme); the browser fallback keeps the review build working. */
+export function openUrl(url: string): Promise<void> {
+  if (!isTauri()) {
+    window.open(url, "_blank", "noopener,noreferrer");
+    return Promise.resolve();
+  }
+  return invoke<void>("open_url", { url }).catch((err: unknown) => {
+    throw err instanceof Error ? err : new Error(String(err));
+  });
+}
+
 /** Settings → Storage truth: the real root (home shortened to `~`), every
  * folder, every note file — what actually exists on disk, never a mock. */
 export interface CorpusOverview {
@@ -650,6 +663,15 @@ export async function organizerSetTrust(level: string): Promise<void> {
   await invoke("organizer_set_trust", { level });
 }
 
+/** Teach the daemon a field value the user just APPROVED (#28, audit 2026-07):
+ * records it as daemon-owned in `.rotli/organizer.json` so the never-clobber
+ * baseline keeps maintaining the field instead of freezing it as a user edit.
+ * `note` = the note's state key (its frontmatter ULID, else its rel path). */
+export async function organizerLearnField(note: string, key: string, value: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("organizer_learn_field", { note, key, value });
+}
+
 /** Append one JSON line to the brain change journal (`.rotli/brain-journal.jsonl`). */
 export async function corpusJournalAppend(line: string): Promise<void> {
   if (!isTauri()) return;
@@ -668,11 +690,13 @@ export async function corpusSetSecure(id: string, secure: boolean): Promise<void
   await invoke("corpus_set_secure", { id, secure });
 }
 
-/** Read a note for an AI model — REJECTS a secure note unless the model is local
- * (the remote-read gate; the future @-context path calls this). */
-export async function corpusReadAi(id: string, modelIsLocal: boolean): Promise<string> {
+/** Read a note for an AI model — REJECTS a secure note unless the model's
+ * ENDPOINT is loopback-local. Rust derives locality from the endpoint itself
+ * (#2, audit 2026-07): the webview passes WHERE the model lives, never a
+ * "trust me, it's local" bit. */
+export async function corpusReadAi(id: string, endpoint: string): Promise<string> {
   if (!isTauri()) return "";
-  return invoke<string>("corpus_read_ai", { id, modelIsLocal });
+  return invoke<string>("corpus_read_ai", { id, endpoint });
 }
 
 // ——— the unified Location model (corpus.json) — ONE folder = your notes = your
@@ -765,11 +789,16 @@ export async function corpusSetBrainPerms(id: string, perms: MemexPerms): Promis
  * file reads as "{}". `background` carries the custom glass wallpaper. */
 export type SettingsFile = "settings" | "viewstate" | "background" | "main";
 
+/** The dot-files the app may WRITE through this lane. `main` goes through
+ * corpusMainWrite (which also keeps it committable); `organizer` is the
+ * daemon's own convergence state and is never webview-writable (#44). */
+export type WritableSettingsFile = "settings" | "viewstate" | "background";
+
 export function corpusSettingsRead(file: SettingsFile): Promise<string> {
   return corpusInvoke("corpus_settings_read", { file });
 }
 
-export function corpusSettingsWrite(file: SettingsFile, contents: string): Promise<void> {
+export function corpusSettingsWrite(file: WritableSettingsFile, contents: string): Promise<void> {
   return corpusInvoke("corpus_settings_write", { file, contents });
 }
 
@@ -801,7 +830,8 @@ export function onBrainJournal(cb: () => void): () => void {
 // ——— the memex seam (Stage 1) — typed wrappers over the Rust memex commands
 //     (src-tauri/src/memex.rs). rotli connects to / initiates a memex instance
 //     (the shared identity/personality/wiki/history/chats/inbox.md spine; for Seth, ~/memex-vault)
-//     and OWNS chats/ + inbox.md, nothing else. Mirror-not-import: the byte-shape
+//     and OWNS chats/ + the wiki/_inbox/ staging, nothing else (inbox.md is not a
+//     rotli surface — #96, audit 2026-07). Mirror-not-import: the byte-shape
 //     of what we write lives in src/memex/contract.ts; these only move bytes. ———
 
 /** A folder probed for a memex signature (the memex.json `mx_` marker). */

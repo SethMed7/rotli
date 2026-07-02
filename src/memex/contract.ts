@@ -21,8 +21,9 @@
 
 // rotli is built against the v3.5 note contract (it writes the per-note frontmatter
 // + the wiki/_inbox staging path). v3.6 split the brain's self/ → identity/ +
-// personality/ and added the org layer — but rotli's WRITE surfaces (chats/, inbox.md,
-// wiki/_inbox/) are untouched by that, so rotli stays fully compatible; the band just
+// personality/ and added the org layer — but rotli's WRITE surfaces (chats/ and
+// wiki/_inbox/; inbox.md was dropped as a declared surface 2026-07, #96 — nothing
+// ever wrote it) are untouched by that, so rotli stays fully compatible; the band just
 // extends to 3.6 so a v3.6 brain is in-range. It still WRITES to a v3.4 brain (the
 // chat/inbox shape didn't change; a 3.4 brain just warns on the new note fields, never
 // errors), so the supported band is [MIN_CONTRACT, CONTRACT_VERSION] — a brain whose
@@ -43,8 +44,13 @@ export const CHAT_SOURCES = ["rotli", "app", "claude", "manual", "signal"] as co
 export const ROTLI_SOURCE = "rotli";
 
 export type AccessMode = "local" | "open" | "secure";
-// v3.7: "chats+inbox+file" is the FILER's tier — ONLY the daemon host runs with it;
-// the interactive editor keeps "chats+inbox" (the user never gets the Filer lane).
+// v3.7: "chats+inbox+file" NAMES the Filer lane in the contract mirror — no TS code
+// runs with it (#95, audit 2026-07). The Filer executes entirely in Rust (organizer.rs
+// through corpus.rs's filer gates); the app-facing Perms (memex/config.ts / tauri.ts
+// MemexPerms) deliberately exclude the tier, so no user or linked library can ever be
+// granted it. The interactive editor is always "chats+inbox". The tier stays in this
+// union only so the contract can name both lanes; canFile/mayFile below are likewise
+// mirror-by-value pins of the Rust gate (contract.test.ts), not a live TS write path.
 export type Perms = "chats+inbox" | "chats+inbox+file" | "read-only";
 
 export interface MemexInfo {
@@ -311,12 +317,17 @@ export const SPINE = {
 /** Whether rotli may WRITE this spine-relative path under the given perms. The
  *  belt to the Rust path-guard's braces: identity/personality/history/MAP are NEVER
  *  writable; the REST of wiki/ (curated notes) is read-only — only its wiki/_inbox/
- *  staging is writable (v3.5), alongside chats/** and inbox.md. */
+ *  staging is writable (v3.5), alongside chats/**.
+ *
+ *  `inbox.md` is NOT a rotli write surface (#96, audit 2026-07): no rotli code has
+ *  ever appended it — quick captures land as staged notes in wiki/_inbox/ — so the
+ *  old allowance was dead gate surface that could only rot. Breve owns its own
+ *  inbox.md writes through its own gate; rotli only scaffolds the file when it
+ *  INITIATES a brand-new memex. */
 export function canWrite(relPath: string, perms: Perms): boolean {
   if (perms === "read-only") return false;
   const p = relPath.replace(/^\/+/, "");
   if (p.includes("..")) return false;
-  if (p === SPINE.inbox) return true;
   if (p === SPINE.chats || p.startsWith(`${SPINE.chats}/`)) return true;
   if (p === SPINE.wikiInbox || p.startsWith(`${SPINE.wikiInbox}/`)) return true;
   return false;
@@ -351,8 +362,9 @@ export function canFile(relPath: string): boolean {
 }
 
 /** The FILER's per-note policy layer: never a `locked` note; the target `area` must
- * be in the brain's area vocabulary. (A `secure` note is still classified on-device
- * but never leaves the machine — enforced in the daemon's secret lane, not here.) */
+ * be in the brain's area vocabulary. (A `secure` note is NEVER sent to ANY model —
+ * not even a local one: the daemon skips it entirely (Skip::Secure, constraint #1)
+ * and it can only be filed by hand. Enforced in the daemon's secure lane, not here.) */
 export function mayFile(
   fm: { locked?: boolean; area?: string },
   areaVocab: readonly string[],

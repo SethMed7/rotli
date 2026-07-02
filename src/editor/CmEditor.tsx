@@ -30,7 +30,7 @@ import { fmBlock } from "./fmBlock";
 import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
 import { tableRender } from "./tableRender";
 import { focusDim } from "./focusMode";
-import { livePreview } from "./livePreview";
+import { linkOpener, livePreview } from "./livePreview";
 import { stripMarkdown } from "./stripMarkdown";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import { cellSpansOf, insertTableText } from "./tables";
@@ -332,6 +332,9 @@ export function CmEditor({
         EditorView.scrollMargins.of(() =>
           formatBarRef.current ? { bottom: FORMAT_BAR_SCROLL_MARGIN } : null,
         ),
+        // ⌘-click opens a markdown link (raw AND beautified — it reads the text,
+        // not the decorations), so it sits outside the view-mode compartment
+        linkOpener,
         viewModeComp.of(rawEditorRef.current ? [] : [livePreview, blockRender, tableRender]),
         blockComp.of(blockHandlesRef.current ? blockHandles(openBlockMenu) : []),
         fmComp.of(fmExt(fmRawRef.current, fmGenRef.current, fmErrRef.current)),

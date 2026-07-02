@@ -11,7 +11,12 @@ export type LangKey = "math" | "mermaid" | "jsxgraph" | "svg" | "html";
 export const TARGET_LANGS = new Set<string>(["math", "mermaid", "jsxgraph", "svg", "html"]);
 
 export interface FenceBlock {
-  lang: LangKey;
+  /** The fence's info-string ("js", "python", "" …) — a LangKey when `target`. */
+  lang: string;
+  /** True when blockRender owns this fence (lang ∈ TARGET_LANGS → a widget).
+   * A non-target fence renders as plain code (mono voice, never markdown-styled,
+   * never table-widgetized) — #13, audit 2026-07. */
+  target: boolean;
   /** Doc position: start of the ```lang opening line. */
   from: number;
   /** Doc position: end of the closing ``` line. */
@@ -21,9 +26,12 @@ export interface FenceBlock {
 const FENCE_OPEN = /^```([A-Za-z0-9_-]*)\s*$/;
 const FENCE_CLOSE = /^```\s*$/;
 
-/** Collect fully-CLOSED fences whose info-string is one of the target langs.
- * An unterminated fence is skipped (treated as plain text) so a half-typed block
- * never blanks the editor. Cheap line-regex walk; callers cache by doc. */
+/** Collect EVERY fully-closed fence — target langs flagged for blockRender, and
+ * generic/unknown fences (```js, plain ```) so livePreview/tableRender can leave
+ * their code alone (they used to markdown-style it and rewrite pipe-table
+ * examples inside it — #13, audit 2026-07). An unterminated fence is skipped
+ * (treated as plain text) so a half-typed block never blanks the editor. Cheap
+ * line-regex walk; callers cache by doc. */
 export function scanFences(doc: Text): FenceBlock[] {
   const blocks: FenceBlock[] = [];
   const lines = doc.lines;
@@ -41,9 +49,12 @@ export function scanFences(doc: Text): FenceBlock[] {
         }
       }
       if (close === -1) break; // unterminated — leave the rest as plain text
-      if (TARGET_LANGS.has(lang)) {
-        blocks.push({ lang: lang as LangKey, from: line.from, to: doc.line(close).to });
-      }
+      blocks.push({
+        lang,
+        target: TARGET_LANGS.has(lang),
+        from: line.from,
+        to: doc.line(close).to,
+      });
       n = close + 1;
       continue;
     }

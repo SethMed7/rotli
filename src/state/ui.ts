@@ -213,8 +213,12 @@ interface UiState {
   toggleDestExpanded: (id: string) => void;
   setDestExpanded: (id: string, open: boolean) => void;
   /** Collapse every expanded destination + folder at once (the sidebar's
-   * collapse-all toolbar button). */
-  collapseAllDests: () => void;
+   * collapse-all toolbar button). `defaultOpenIds` are the rows that read the
+   * map with an OPEN default (Main folders, the Brain header) — they get an
+   * explicit `false`, or wiping the map would EXPAND them (#83, audit
+   * 2026-07). The three sections stay open by design (an all-empty sidebar
+   * helps nobody). */
+  collapseAllDests: (defaultOpenIds?: string[]) => void;
 
   /** Folders-rail selection (window-level). */
   selectedFolderId: string;
@@ -268,15 +272,26 @@ interface UiState {
   renameTarget: { id: string; current: string } | null;
   setRenameTarget: (t: { id: string; current: string } | null) => void;
 
+  /** A failed row-menu action (file-to-brain, board rename …) surfaced as an
+   * inline note in the sidebar — the menu that launched the action is gone by
+   * the time it fails, so this is its error home (#11, audit 2026-07). Not
+   * persisted (transient); dismissed by the × or replaced by the next failure. */
+  rowActionError: string | null;
+  setRowActionError: (e: string | null) => void;
+
   /** The on-device model id the Chat surface sends to, picked from the memex-ai
    * store (~/.memex/ai/registry.json). null = use the store's default. Persisted. */
   chatModelId: string | null;
   setChatModelId: (id: string | null) => void;
   /** Per-chat web-search toggle (the composer globe), keyed by chat slug. Off by
-   * default; only an enabled chat may use the web_search/web_fetch tools. Persisted.
-   * The "" key holds a not-yet-saved (slug-less) chat's choice until it's bound. */
+   * default; only an enabled chat may use the web_search/web_fetch tools. Persisted —
+   * except the session-scoped "unsaved:<paneId>" keys: a not-yet-saved chat's choice
+   * lives under its PANE (never a shared "" key that would leak web-ON into every
+   * future fresh chat — #7, audit 2026-07) and is carried to the slug on bind. */
   chatWeb: Record<string, boolean>;
   setChatWeb: (slug: string, on: boolean) => void;
+  /** Drop one chatWeb key — the unsaved-pane key after bind carries it to the slug. */
+  clearChatWeb: (key: string) => void;
   /** How the Storage destination groups its binaries (a Settings knob): by Type
    * (default), Date, or Folder (raw on-disk). Persisted. */
   storageGrouping: "type" | "date" | "folder";
@@ -414,7 +429,8 @@ export const useUiStore = create<UiState>((set, get) => ({
     set((s) => ({ expandedDests: { ...s.expandedDests, [id]: !s.expandedDests[id] } })),
   setDestExpanded: (id, open) =>
     set((s) => ({ expandedDests: { ...s.expandedDests, [id]: open } })),
-  collapseAllDests: () => set({ expandedDests: {} }),
+  collapseAllDests: (defaultOpenIds = []) =>
+    set({ expandedDests: Object.fromEntries(defaultOpenIds.map((id) => [id, false])) }),
 
   selectedFolderId: ALL_NOTES,
   setSelectedFolderId: (id) => set({ selectedFolderId: id }),
@@ -444,11 +460,19 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   renamingBoardId: null,
   setRenamingBoardId: (id) => set({ renamingBoardId: id }),
+  rowActionError: null,
+  setRowActionError: (e) => set({ rowActionError: e }),
 
   chatModelId: null,
   setChatModelId: (id) => set({ chatModelId: id }),
   chatWeb: {},
   setChatWeb: (slug, on) => set((s) => ({ chatWeb: { ...s.chatWeb, [slug]: on } })),
+  clearChatWeb: (key) =>
+    set((s) => {
+      if (!(key in s.chatWeb)) return s;
+      const { [key]: _gone, ...rest } = s.chatWeb;
+      return { chatWeb: rest };
+    }),
   storageGrouping: "type",
   setStorageGrouping: (g) => set({ storageGrouping: g }),
   fileMetadata: "hide",

@@ -79,7 +79,9 @@ export function AaPanel({
           </button>
         ))}
       </div>
-      <div className="aalabel">View</div>
+      {/* View / Blocks / Canvas are GLOBAL knobs (ui store) — say so instead of
+          letting them ride the per-note footer promise (#52, audit 2026-07) */}
+      <div className="aalabel">View · all notes</div>
       <div className="aarow">
         <button
           type="button"
@@ -96,7 +98,7 @@ export function AaPanel({
           Raw markdown
         </button>
       </div>
-      <div className="aalabel">Blocks</div>
+      <div className="aalabel">Blocks · all notes</div>
       <div className="aarow">
         <button
           type="button"
@@ -115,7 +117,7 @@ export function AaPanel({
       </div>
       {glassMode && (
         <>
-          <div className="aalabel">Canvas</div>
+          <div className="aalabel">Canvas · all notes</div>
           <div className="aarow">
             {GLASS_CANVASES.map((c) => (
               <button
@@ -131,8 +133,9 @@ export function AaPanel({
         </>
       )}
       <div className="aanote">
-        Styling lives with the editor, saved for this note — the note itself never changes. Marks
-        (bold, highlight…) are real markdown via the format bar.
+        Text size &amp; measure are saved for this note; the &ldquo;all notes&rdquo; rows apply
+        everywhere. Either way the note itself never changes — marks (bold, highlight…) are real
+        markdown via the format bar.
       </div>
     </div>
   );

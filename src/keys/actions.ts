@@ -45,7 +45,9 @@ function focusedNoteIdNow(): string | null {
 /** ⌘N / "+ New note": create where the memex-is-the-home model dictates — INTO the
  * connected memex's wiki/_inbox staging (v3.5) when a writable memex is active and no
  * explicit LOCAL folder is selected, else the local Inbox — then open it. A selected
- * shelf folder seeds the note's shelf; an explicit local folder is always respected. */
+ * shelf folder seeds the note's shelf; an explicit local folder is always respected —
+ * except the hidden roots (Archive/Trash/Board), which routeDecision diverts to the
+ * fallback so ⌘N can never birth a note inside a sink (#5, audit 2026-07). */
 async function newNote(): Promise<void> {
   const { selectedFolderId } = useUiStore.getState();
   const isSmart = selectedFolderId === ALL_NOTES || selectedFolderId === RECENT;

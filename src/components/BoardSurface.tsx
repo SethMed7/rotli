@@ -18,6 +18,7 @@ import { useMainStore } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { ArchiveGlyph, CheckGlyph, glyphForNote } from "./glyphs";
+import { useNoteMenu } from "./useNoteMenu";
 
 export function BoardSurface() {
   const staged = useNotes(DEST.board).data ?? [];
@@ -34,6 +35,10 @@ export function BoardSurface() {
   const setContentView = useUiStore((s) => s.setContentView);
   const openNote = usePanesStore((s) => s.openNote);
   const openSummary = usePanesStore((s) => s.openSummary);
+  // right-click = the app's one row menu (#56's other half: the graduating
+  // gestures — star, Add to Main, File to the Brain — live ON the cards, not
+  // only back in the sidebar). Same hook every note row wires.
+  const openMenu = useNoteMenu();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
@@ -205,6 +210,12 @@ export function BoardSurface() {
         </div>
       ) : (
         <div className="board-scroll">
+          {/* curating a card GRADUATES it — say so, or the instant vanish reads
+              as data loss (#56, audit 2026-07) */}
+          <p className="board-foot-hint">
+            A card added to Main or starred for Quick access graduates — it leaves this board and
+            lives with your notes.
+          </p>
           <div className="board-grid">
             {ordered.map((c) => {
               const sel = selected.has(c.id);
@@ -228,7 +239,8 @@ export function BoardSurface() {
                     toggle(c.id);
                   }}
                   onDoubleClick={() => openOne(c)}
-                  title="Drag to reorder · click to select · double-click to open"
+                  onContextMenu={(e) => openMenu(e, c)}
+                  title="Drag to reorder · click to select · double-click to open · right-click for actions"
                 >
                   <span className="bc-check" aria-hidden="true">
                     {sel && <CheckGlyph size={11} />}

@@ -457,6 +457,10 @@ function buildFrom(state: EditorState, fences: FenceBlock[]): BlockState {
   const sig = themeSignature();
 
   for (const block of fences) {
+    // scanFences now reports EVERY closed fence (#13) — only the target langs
+    // become render widgets; a generic ```js fence stays raw code, styled by
+    // livePreview's mono voice.
+    if (!block.target) continue;
     // reveal-on-caret at block granularity — same intersection test livePreview
     // uses, widened to the whole fenced range. NOT atomic: arrowing to the
     // block's edge lands the caret as "touching" and reveals the raw source so
@@ -465,7 +469,7 @@ function buildFrom(state: EditorState, fences: FenceBlock[]): BlockState {
     if (touched) continue; // raw source shows (livePreview skips these lines too)
 
     const code = innerCode(state.doc, block.from, block.to);
-    const widget = new RenderBlockWidget(block.lang, code, sig);
+    const widget = new RenderBlockWidget(block.lang as LangKey, code, sig);
     decos.push(Decoration.replace({ widget, block: true }).range(block.from, block.to));
   }
 

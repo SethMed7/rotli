@@ -91,6 +91,17 @@ export function isChatsPath(folderId: string): boolean {
   return rel === "chats" || rel.startsWith("chats/");
 }
 
+/** True when folderId has the curated-wiki SHAPE — "wiki", "wiki/x", and the
+ * prefixed "vault:wiki/x". In a memex layout the Rust write gate refuses note
+ * CREATION anywhere under wiki/** (only the AI Filer and the wiki/_inbox
+ * staging write there), so pickers that choose a create-destination must never
+ * offer these ids (#6, audit 2026-07). Same rel-slicing rule as isChatsPath. */
+export function isWikiPath(folderId: string): boolean {
+  const i = folderId.indexOf(":");
+  const rel = i >= 0 ? folderId.slice(i + 1) : folderId;
+  return rel === "wiki" || rel.startsWith("wiki/");
+}
+
 /** The root markers whose layout is a MEMEX — "" for the local corpus when it
  * is one, "<rootid>:" per connected brain (a brain IS a memex by definition).
  * Added plain folders stay out: a plain root has no Chat front, so its "chats"

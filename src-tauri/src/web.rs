@@ -305,6 +305,45 @@ fn truncate_chars(s: &str, max: usize) -> String {
     out
 }
 
+// ─── open a rendered link in the browser (#14, audit 2026-07) ────────────────
+//
+// The editor/chat render markdown links but nothing could OPEN one. This is the
+// scheme-allowlisted opener: http/https/mailto ONLY — never file:// (a note
+// could point at anything on disk), never a custom scheme (arbitrary app
+// launch). The allowlist also guarantees the argument can't start with "-", so
+// `open` can't mistake it for a flag.
+
+/// Pure: is this URL safe to hand to the OS opener? Lowercased scheme must be
+/// http/https/mailto and the string must carry no whitespace/control chars.
+pub fn url_openable(url: &str) -> bool {
+    if url.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return false;
+    }
+    let lower = url.to_ascii_lowercase();
+    // a bare scheme opens nothing — require at least one char after it
+    (lower.starts_with("http://") || lower.starts_with("https://") || lower.starts_with("mailto:"))
+        && lower != "http://"
+        && lower != "https://"
+        && lower != "mailto:"
+}
+
+/// Open a link from a rendered note/chat in the user's browser (or mail app).
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    let url = url.trim();
+    if !url_openable(url) {
+        return Err("only http(s) and mailto links open from here.".into());
+    }
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open")
+        .arg(url)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = url;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -350,5 +389,23 @@ mod tests {
     fn percent_decode_basics() {
         assert_eq!(percent_decode("a%20b+c"), "a b c");
         assert_eq!(percent_decode("https%3A%2F%2Fx.com"), "https://x.com");
+    }
+
+    #[test]
+    fn url_openable_allows_only_web_and_mail_schemes() {
+        assert!(url_openable("https://example.com/page?q=1"));
+        assert!(url_openable("http://localhost:3000/x"));
+        assert!(url_openable("HTTPS://EXAMPLE.COM")); // scheme case-insensitive
+        assert!(url_openable("mailto:seth@example.com"));
+        // never these: disk paths, app launches, flags, injection shapes
+        assert!(!url_openable("file:///etc/passwd"));
+        assert!(!url_openable("javascript:alert(1)"));
+        assert!(!url_openable("x-apple.systempreferences:"));
+        assert!(!url_openable("-a Calculator"));
+        assert!(!url_openable("https://a.com/ b")); // whitespace
+        assert!(!url_openable("https://a.com/\u{0}b")); // control char
+        assert!(!url_openable("https://")); // bare scheme
+        assert!(!url_openable("mailto:"));
+        assert!(!url_openable(""));
     }
 }

@@ -10,7 +10,9 @@ import {
   type MainManifest,
   type MainNode,
   gcManifest,
+  mainHasNote,
   parseMainManifest,
+  renameNoteRef,
   serializeMainManifest,
 } from "../services/mainTree";
 
@@ -32,6 +34,15 @@ export const useMainStore = create<MainState>((set) => ({
     );
   },
 }));
+
+/** Retarget a Main note-ref after a path-id rename (boards: rename mints a new
+ * id) — the manifest slot follows the note instead of being GC'd on the next
+ * setTree (#33, audit 2026-07). No liveIds on purpose: a rename must never
+ * double as a prune. No-op when the old id isn't in Main. */
+export function renameMainRef(oldId: string, newId: string): void {
+  const { manifest, setTree } = useMainStore.getState();
+  if (mainHasNote(manifest.tree, oldId)) setTree(renameNoteRef(manifest.tree, oldId, newId));
+}
 
 /** Load `.rotli/main.json` into the store — called from hydratePersistedState so the
  * Main view is right on the first paint. Missing/corrupt → empty Main, never a crash. */

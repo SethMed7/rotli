@@ -6,6 +6,7 @@
 
 import { useCallback } from "react";
 import { invalidateNotes } from "../services/hooks";
+import { renameMainRef } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { corpusRenameBoard } from "./tauri";
@@ -23,6 +24,7 @@ export function useBoardRename() {
       try {
         const meta = await corpusRenameBoard(boardId, name);
         retargetBoard(boardId, meta.id);
+        renameMainRef(boardId, meta.id); // the Main slot follows the new path id (#33)
         await invalidateNotes();
       } catch {
         /* board is read-only or gone — leave it */

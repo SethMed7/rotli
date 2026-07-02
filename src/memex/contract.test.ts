@@ -211,9 +211,11 @@ describe("the AI Filer lane (v3.7) — mirror of Rust filer_writable/AI_KEYS", (
 });
 
 describe("canWrite (mirror of the Rust write-guard)", () => {
-  test("chats/** and inbox.md are writable under chats+inbox", () => {
+  test("chats/** is writable under chats+inbox; inbox.md is NOT a rotli surface (#96)", () => {
     expect(canWrite("chats/foo.md", "chats+inbox")).toBe(true);
-    expect(canWrite("inbox.md", "chats+inbox")).toBe(true);
+    // no rotli code has ever appended inbox.md (captures stage in wiki/_inbox/) —
+    // the dead allowance was narrowed out (audit 2026-07 #96)
+    expect(canWrite("inbox.md", "chats+inbox")).toBe(false);
   });
   test("wiki/_inbox staging is writable (v3.5); the rest of wiki + identity/personality/history/MAP are not", () => {
     expect(canWrite("wiki/_inbox/pricing-decision-01jtes.md", "chats+inbox")).toBe(true);

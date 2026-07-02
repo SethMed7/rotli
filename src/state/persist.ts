@@ -20,6 +20,9 @@ import { useBindingsStore } from "../keys/bindings";
 import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
 import { GLASS_BG_SRC } from "../lib/glassBackgrounds";
+// the quit-flush ack listener must exist from first paint — an idle ⌘Q acks
+// instantly instead of riding out the Rust-side hold (#4).
+import { onQuitFlush } from "../lib/quitFlush";
 import {
   corpusSettingsRead,
   corpusSettingsWrite,
@@ -29,6 +32,8 @@ import {
   setGlobalShortcut,
   setHideOnBlur,
 } from "../lib/tauri";
+import { listChats, loadConfig } from "../memex/service";
+import { mainFolderIds } from "../services/mainTree";
 import { inboxFolderId, notesService } from "../services/notes";
 import type { PaneNode, Tab } from "../types";
 import { MRU_CAP, useMruStore } from "./mru";
@@ -41,7 +46,7 @@ import {
   type NoteStyle,
   useNoteStyleStore,
 } from "./noteStyle";
-import { hydrateMain } from "./main";
+import { hydrateMain, useMainStore } from "./main";
 import { findLeaf, leaves, usePanesStore } from "./panes";
 import { applyTheme } from "./theme";
 import {
@@ -105,6 +110,15 @@ const BLURS: readonly GlassBlur[] = GLASS_BLURS.map((b) => b.value);
 const CANVASES: readonly GlassCanvas[] = GLASS_CANVASES.map((c) => c.value);
 const MEASURES: readonly Measure[] = ["narrow", "comfort", "wide"];
 
+/** Drop the session-scoped chatWeb keys — an unsaved chat's globe choice belongs
+ * to its pane for this session only, never to settings.json (#7). Shared by the
+ * parse (heals a poisoned config) and the snapshot (never writes one again). */
+function persistableChatWeb(m: Record<string, boolean>): Record<string, boolean> {
+  return Object.fromEntries(
+    Object.entries(m).filter(([k]) => k !== "" && !k.startsWith("unsaved:")),
+  );
+}
+
 // ─── settings.json ───────────────────────────────────────────────────────────
 
 interface PersistedSettings {
@@ -133,7 +147,10 @@ interface PersistedSettings {
   blockHandles2: boolean;
   /** The on-device model the Chat surface uses (id from ~/.memex/ai); null = default. */
   chatModelId: string | null;
-  /** Per-chat web-search toggle (the composer globe), keyed by chat slug. */
+  /** Per-chat web-search toggle (the composer globe), keyed by chat slug. The
+   * session-scoped unsaved-chat keys ("unsaved:<paneId>", and the legacy "" key)
+   * never persist — a stored one flipped the silent-egress default for every
+   * future fresh chat (#7, audit 2026-07). */
   chatWeb: Record<string, boolean>;
   /** How the Storage destination groups its binaries: Type / Date / Folder. */
   storageGrouping: "type" | "date" | "folder";
@@ -165,6 +182,14 @@ interface PersistedSettings {
   /** The per-note Aa layer — NEVER written into the .md files. */
   noteStyles: Record<string, NoteStyle>;
 }
+
+/** Keys the file carried that this build doesn't know — a hand-set daemon knob
+ * (e.g. the organizer's documented `organizerThreshold`), a future build's
+ * setting after a downgrade. The writer must ROUND-TRIP them: rebuilding the
+ * file from the known-key literal alone destroyed them on the next theme
+ * toggle (#35, audit 2026-07). Captured at hydration, spread under every
+ * snapshot (known keys always win). */
+let settingsPassthrough: Record<string, unknown> = {};
 
 /** Exported for tests (the safe-default locks); production callers stay inside
  * this module. */
@@ -247,7 +272,7 @@ export function parseSettings(raw: string): PersistedSettings {
           if (typeof v === "boolean") out[k] = v;
         }
       }
-      return out;
+      return persistableChatWeb(out);
     })(),
     storageGrouping:
       data.storageGrouping === "date" || data.storageGrouping === "folder"
@@ -276,6 +301,20 @@ export function parseSettings(raw: string): PersistedSettings {
     bindings,
     noteStyles,
   };
+}
+
+/** The unknown-key remainder of a settings.json — everything parseSettings has
+ * no field for. Pure (exported for tests); hydration stores the result in
+ * `settingsPassthrough` so the snapshot can round-trip it (#35). */
+export function unknownSettingsKeys(raw: string): Record<string, unknown> {
+  let data: Record<string, unknown>;
+  try {
+    data = record(JSON.parse(raw));
+  } catch {
+    return {};
+  }
+  const known = new Set(Object.keys(parseSettings("{}")));
+  return Object.fromEntries(Object.entries(data).filter(([k]) => !known.has(k)));
 }
 
 function applySettings(s: PersistedSettings): void {
@@ -363,7 +402,11 @@ interface PersistedViewstate {
   mru: string[];
 }
 
-function validTab(v: unknown, alive: Set<string>): Tab | null {
+/** Revalidate ONE persisted tab against the live Tab union — every surfaceKind
+ * must have a branch here, or its tabs silently vanish at relaunch (and a
+ * single-tab leaf's split collapses with them — #34, audit 2026-07: file +
+ * activity were missing). Exported for the per-kind round-trip tests. */
+export function validTab(v: unknown, alive: Set<string>): Tab | null {
   const o = record(v);
   if (typeof o.id !== "string" || !o.id) return null;
   const vs = record(o.viewState);
@@ -384,6 +427,16 @@ function validTab(v: unknown, alive: Set<string>): Tab | null {
       chatSlug: typeof o.chatSlug === "string" ? o.chatSlug : null,
       viewState,
     };
+  }
+  // file: like canvas, ids are paths (no alive-set) — FileSurface itself shows
+  // the honest error for a since-deleted file.
+  if (o.surfaceKind === "file") {
+    if (typeof o.fileId !== "string" || !o.fileId) return null;
+    return { id: o.id, surfaceKind: "file", fileId: o.fileId, viewState };
+  }
+  // activity: a singleton view with no binding — nothing to validate but shape.
+  if (o.surfaceKind === "activity") {
+    return { id: o.id, surfaceKind: "activity", viewState };
   }
   if (o.surfaceKind !== "note") return null;
   if (typeof o.noteId !== "string" || !alive.has(o.noteId)) return null;
@@ -482,6 +535,69 @@ async function hydrateViewstate(): Promise<void> {
   }
 }
 
+// ─── persisted-map GC (#78, audit 2026-07) ──────────────────────────────────
+
+/** Keep only entries whose key passes `keep`. Returns the SAME object when
+ * nothing was dropped (no pointless store write). Pure — exported for tests. */
+export function pruneMap<T>(
+  m: Record<string, T>,
+  keep: (k: string) => boolean,
+): Record<string, T> {
+  const kept = Object.entries(m).filter(([k]) => keep(k));
+  return kept.length === Object.keys(m).length ? m : Object.fromEntries(kept);
+}
+
+/** GC the grow-only persisted maps the way the noteStyles prune above already
+ * does for the Aa layer: chatWeb keys whose chat no longer exists, and
+ * expandedDests keys whose folder/Main row is gone (#78). Conservative on
+ * purpose — a failed read skips ITS prune entirely (the useMainGcIds lesson:
+ * better to keep a stale boolean than to drop live state on an error). */
+async function gcPersistedMaps(): Promise<void> {
+  // chatWeb — live slugs are the UNION of every configured brain's chats/
+  // listing, not just the active one's (review, 2026-07): pruning against the
+  // active brain alone deleted every per-chat web toggle belonging to a
+  // non-active brain's chats on the first relaunch after switching brains —
+  // silent state loss, and the toggles were gone when the user switched back.
+  // No configured instance ⇒ nothing is listable ⇒ leave the map alone; ANY
+  // failed listing aborts the whole prune (the same keep-on-error rule).
+  try {
+    const cfg = await loadConfig();
+    if (cfg.instances.length > 0) {
+      const slugs = new Set<string>();
+      for (const inst of cfg.instances) {
+        for (const c of await listChats(inst)) slugs.add(c.slug);
+      }
+      const ui = useUiStore.getState();
+      const kept = pruneMap(ui.chatWeb, (k) => slugs.has(k) || k.startsWith("unsaved:"));
+      if (kept !== ui.chatWeb) useUiStore.setState({ chatWeb: kept });
+    }
+  } catch {
+    // an unreadable chats/ anywhere — keep everything
+  }
+  try {
+    const folders = await notesService.listFolders();
+    const valid = new Set<string>([
+      SEC_INBOX,
+      SEC_CHAT,
+      SEC_NOTES,
+      "Brain", // the Brain section header keys its accordion here
+      ...RESERVED_DESTS,
+      ...folders.map((f) => f.id),
+      ...mainFolderIds(useMainStore.getState().manifest.tree),
+    ]);
+    const ui = useUiStore.getState();
+    const kept = pruneMap(
+      ui.expandedDests,
+      // root markers ("vault:", "<rootid>:") and the synthetic Storage
+      // grouping rows aren't in listFolders — keep them by shape
+      (k) => valid.has(k) || k.endsWith(":") || k.startsWith("Storage/"),
+    );
+    if (kept !== ui.expandedDests) useUiStore.setState({ expandedDests: kept });
+  } catch {
+    // unreadable folders — keep everything
+  }
+}
+
 // ─── first paint ─────────────────────────────────────────────────────────────
 
 /** Mirror App.tsx's theme effects BEFORE React renders — useEffect runs after
@@ -516,12 +632,17 @@ function prePaint(): void {
 export async function hydratePersistedState(): Promise<void> {
   if (!isTauri()) return; // the browser keeps the in-memory demo, untouched
   try {
-    const settings = parseSettings(await corpusSettingsRead("settings"));
+    const raw = await corpusSettingsRead("settings");
+    const settings = parseSettings(raw);
+    // keys this build doesn't know survive every rewrite (#35) — main window
+    // only would suffice (it's the one writer), but capturing here is harmless
+    settingsPassthrough = unknownSettingsKeys(raw);
     applySettings(settings);
     if (settings.glassBackground === "custom") await loadCustomBackground();
     if (isMainSurface()) {
       await hydrateViewstate();
       await hydrateMain();
+      await gcPersistedMaps(); // needs the hydrated Main manifest (#78)
       applyShellSideEffects(settings);
     }
   } catch {
@@ -552,7 +673,7 @@ function settingsSnapshot(): string {
     rawEditor: ui.rawEditor,
     blockHandles2: ui.blockHandles,
     chatModelId: ui.chatModelId,
-    chatWeb: ui.chatWeb,
+    chatWeb: persistableChatWeb(ui.chatWeb),
     storageGrouping: ui.storageGrouping,
     fileMetadata: ui.fileMetadata,
     organizerTrust: ui.organizerTrust,
@@ -569,7 +690,8 @@ function settingsSnapshot(): string {
     bindings: useBindingsStore.getState().overrides,
     noteStyles: useNoteStyleStore.getState().styles,
   };
-  return JSON.stringify(snapshot);
+  // unknown keys ride under the known ones (known always win) — see #35
+  return JSON.stringify({ ...settingsPassthrough, ...snapshot });
 }
 
 function viewstateSnapshot(): string {
@@ -644,6 +766,9 @@ export function attachPersistence(): () => void {
   };
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("pagehide", flush);
+  // ⌘Q / tray-Quit with the window still up fires neither of the above —
+  // the quit handshake (#4) holds the exit until this settles too.
+  onQuitFlush(flush);
 
   return () => {
     flush();

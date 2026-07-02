@@ -6,10 +6,13 @@ import {
   addNoteToMain,
   buildMainTree,
   gcManifest,
+  mainFolderIds,
   mainNoteIds,
   moveInTree,
   parseMainManifest,
   removeFromMain,
+  renameFolderInMain,
+  renameNoteRef,
 } from "./mainTree";
 
 const note = (id: string, folderId = "wiki/projects"): NoteSummary =>
@@ -170,5 +173,91 @@ describe("mainNoteIds", () => {
   });
   test("empty tree → empty set", () => {
     expect(mainNoteIds([])).toEqual(new Set());
+  });
+});
+
+describe("renameNoteRef — a board rename retargets its Main slot (#33)", () => {
+  test("rewrites the ref in place at any depth, preserving order and nesting", () => {
+    const tree: MainNode[] = [
+      { note: "a" },
+      { folder: "Today", children: [{ note: "Inbox/old.excalidraw" }, { note: "b" }] },
+    ];
+    expect(renameNoteRef(tree, "Inbox/old.excalidraw", "Inbox/new.excalidraw")).toEqual([
+      { note: "a" },
+      { folder: "Today", children: [{ note: "Inbox/new.excalidraw" }, { note: "b" }] },
+    ]);
+  });
+
+  test("no-op when the old id isn't referenced", () => {
+    const tree: MainNode[] = [{ note: "a" }];
+    expect(renameNoteRef(tree, "gone", "new")).toEqual([{ note: "a" }]);
+  });
+
+  test("the renamed ref then survives a gc against the NEW id (the silent-GC repro)", () => {
+    const tree: MainNode[] = [{ note: "Inbox/old.excalidraw" }];
+    const renamed = renameNoteRef(tree, "Inbox/old.excalidraw", "Inbox/new.excalidraw");
+    // after the rename only the new id is alive — the slot must survive
+    expect(gcManifest(renamed, new Set(["Inbox/new.excalidraw"]))).toEqual([
+      { note: "Inbox/new.excalidraw" },
+    ]);
+    // whereas the UN-renamed tree is exactly the bug: the slot vanishes
+    expect(gcManifest(tree, new Set(["Inbox/new.excalidraw"]))).toEqual([]);
+  });
+});
+
+describe("renameFolderInMain — Main folders are renameable (#16)", () => {
+  const tree: MainNode[] = [
+    { note: "a" },
+    { folder: "Today", children: [{ note: "b" }, { folder: "Deep", children: [] }] },
+    { folder: "Later", children: [] },
+  ];
+
+  test("renames a root folder, keeping children + position", () => {
+    const out = renameFolderInMain(tree, "main:Today", "Now");
+    expect(out).toEqual([
+      { note: "a" },
+      { folder: "Now", children: [{ note: "b" }, { folder: "Deep", children: [] }] },
+      { folder: "Later", children: [] },
+    ]);
+  });
+
+  test("renames a NESTED folder by its main:<path> id", () => {
+    const out = renameFolderInMain(tree, "main:Today/Deep", "Deeper");
+    expect(out[1]).toEqual({
+      folder: "Today",
+      children: [{ note: "b" }, { folder: "Deeper", children: [] }],
+    });
+  });
+
+  test("uniquifies against SIBLINGS (never against itself)", () => {
+    expect(renameFolderInMain(tree, "main:Later", "Today")[2]).toEqual({
+      folder: "Today 2",
+      children: [],
+    });
+    // renaming to its own current name is a clean no-op, not "Today 2"
+    expect(renameFolderInMain(tree, "main:Today", "Today")[1]).toMatchObject({ folder: "Today" });
+  });
+
+  test("empty/whitespace name and a missing id are no-ops", () => {
+    expect(renameFolderInMain(tree, "main:Today", "   ")).toEqual(tree);
+    expect(renameFolderInMain(tree, "main:Nope", "X")).toEqual(tree);
+  });
+});
+
+describe("mainFolderIds — the collapse-all / GC id grammar (#83/#78)", () => {
+  test("collects every folder id in buildMainTree's exact \"main:<path>\" shape", () => {
+    const tree: MainNode[] = [
+      { note: "a" },
+      {
+        folder: "Today",
+        children: [{ note: "b" }, { folder: "Deep", children: [{ note: "c" }] }],
+      },
+      { folder: "Later", children: [] },
+    ];
+    expect(mainFolderIds(tree)).toEqual(["main:Today", "main:Today/Deep", "main:Later"]);
+  });
+
+  test("empty tree → no ids", () => {
+    expect(mainFolderIds([])).toEqual([]);
   });
 });

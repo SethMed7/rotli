@@ -133,6 +133,26 @@ function containsNote(nodes: MainNode[], noteId: string): boolean {
   return nodes.some((n) => ("note" in n ? n.note === noteId : containsNote(n.children, noteId)));
 }
 
+/** Every synthetic Main FOLDER id ("main:<path>", buildMainTree's exact
+ * grammar) — the ids the sidebar keys expansion state under. Collapse-all
+ * writes these explicitly closed (Main folders default OPEN, so wiping the
+ * map re-expanded them — #83, audit 2026-07), and the persisted-map GC keeps
+ * only these among "main:*" keys (#78). */
+export function mainFolderIds(nodes: MainNode[]): string[] {
+  const ids: string[] = [];
+  const walk = (ns: MainNode[], parentId: string) => {
+    for (const n of ns) {
+      if ("folder" in n) {
+        const id = parentId === MAIN_ROOT ? `${MAIN_ROOT}${n.folder}` : `${parentId}/${n.folder}`;
+        ids.push(id);
+        walk(n.children, id);
+      }
+    }
+  };
+  walk(nodes, MAIN_ROOT);
+  return ids;
+}
+
 function findAndRemove(
   nodes: MainNode[],
   dragId: string,
@@ -219,4 +239,47 @@ export function addFolderToMain(tree: MainNode[], name: string): MainNode[] {
 /** Remove a note/folder from Main by its rendered id (a folder takes its subtree). */
 export function removeFromMain(tree: MainNode[], dragId: string): MainNode[] {
   return findAndRemove(tree, dragId, MAIN_ROOT).tree;
+}
+
+/** Rename a Main folder by its rendered id ("main:<path>"). The new name
+ * uniquifies against its SIBLING folders (addFolderToMain's collision law —
+ * twins would collide as React keys / drag targets); children, order and
+ * nesting are untouched. Descendant rendered ids change with the path, so
+ * their expansion state falls back to the open default — cosmetic. No-op on
+ * an empty name or an id that isn't in the tree (#16, audit 2026-07). */
+export function renameFolderInMain(tree: MainNode[], folderId: string, name: string): MainNode[] {
+  const trimmed = name.trim();
+  if (!trimmed) return tree;
+  const walk = (nodes: MainNode[], parentId: string): MainNode[] => {
+    const here = nodes.some((n) => "folder" in n && idOf(n, parentId) === folderId);
+    if (!here) {
+      return nodes.map((n) =>
+        "folder" in n ? { folder: n.folder, children: walk(n.children, idOf(n, parentId)) } : n,
+      );
+    }
+    const taken = new Set(
+      nodes.flatMap((n) =>
+        "folder" in n && idOf(n, parentId) !== folderId ? [n.folder] : [],
+      ),
+    );
+    let unique = trimmed;
+    for (let i = 2; taken.has(unique); i++) unique = `${trimmed} ${i}`;
+    return nodes.map((n) =>
+      "folder" in n && idOf(n, parentId) === folderId
+        ? { folder: unique, children: n.children }
+        : n,
+    );
+  };
+  return walk(tree, MAIN_ROOT);
+}
+
+/** Retarget a note ref in place — board (and file) ids ARE paths, so a rename
+ * mints a NEW id; without this the next setTree GC'd the committed Main slot
+ * (#33, audit 2026-07). Position/nesting are preserved exactly (a rename must
+ * never move the row the user placed). No-op when oldId isn't referenced. */
+export function renameNoteRef(tree: MainNode[], oldId: string, newId: string): MainNode[] {
+  return tree.map((node) => {
+    if ("note" in node) return node.note === oldId ? { note: newId } : node;
+    return { folder: node.folder, children: renameNoteRef(node.children, oldId, newId) };
+  });
 }

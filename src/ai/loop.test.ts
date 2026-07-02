@@ -5,11 +5,12 @@
 import { describe, expect, test } from "bun:test";
 import type { CorpusNoteMeta } from "../lib/tauri";
 import { budgetFor, contextWindowFor } from "./budget";
-import { looksSecret } from "./guard";
+import { endpointIsLocal, looksSecret } from "./guard";
 import { runAgent } from "./loop";
 import { extractJsonObject, parseAction } from "./parse";
+import { trimHistory } from "./prompt";
 import { buildIndex, pruneScratch, rankNotes } from "./tools";
-import type { AgentEvent, Host, RunInput, ToolName } from "./types";
+import type { AgentEvent, ChatTurn, Host, RunInput, ToolName } from "./types";
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
 
@@ -145,6 +146,24 @@ describe("budget", () => {
     expect(contextWindowFor({ id: "gemma-3-12b" })).toBeGreaterThan(contextWindowFor({ id: "mystery" }));
   });
 
+  test("trimHistory keeps the newest turns within the cap (#65)", () => {
+    const history: ChatTurn[] = [
+      { role: "user", text: "A".repeat(1000) },
+      { role: "assistant", text: "B".repeat(1000) },
+      { role: "user", text: "C".repeat(1000) },
+    ];
+    const trimmed = trimHistory(history, 2100);
+    // the two newest turns fit; the oldest is folded into the trim marker
+    expect(trimmed.map((t) => t.text[0])).toEqual(["(", "B", "C"]);
+    expect(trimmed[0]?.text).toContain("trimmed");
+    // the latest turn ALWAYS survives, even oversized
+    const tiny = trimHistory(history, 10);
+    expect(tiny[tiny.length - 1]?.text[0]).toBe("C");
+    // under the cap → untouched, no marker
+    expect(trimHistory(history, 50_000)).toEqual(history);
+    expect(trimHistory([], 1000)).toEqual([]);
+  });
+
   test("pruneScratch keeps the scratchpad within budget", () => {
     const scratch = [
       { action: "a1", result: "X".repeat(2000) },
@@ -165,6 +184,29 @@ describe("guard", () => {
     expect(looksSecret("my key sk-ant-api03-EXAMPLE0EXAMPLE0EXAM")).toBe(true);
     expect(looksSecret("SSN 078-05-1120")).toBe(true);
     expect(looksSecret("just a normal question about pricing")).toBe(false);
+  });
+
+  test("unseparated card numbers trip only when Luhn-valid (#23)", () => {
+    // mirrors secret.rs — keep the two suites' cases in lockstep by hand
+    expect(looksSecret("card 4242424242424242 exp 12/28")).toBe(true);
+    expect(looksSecret("amex 371449635398431")).toBe(true); // 15-digit
+    expect(looksSecret("card: 4242 4242 4242 4242")).toBe(true); // separated, as before
+    expect(looksSecret("order 1234567890123456")).toBe(false); // 16 digits, Luhn-fail
+    expect(looksSecret("id a4242424242424242z")).toBe(false); // glued to word chars
+    expect(looksSecret("n 42424242424242")).toBe(false); // too short
+  });
+
+  test("endpointIsLocal accepts loopback hosts only (#2)", () => {
+    // mirrors chat.rs endpoint_is_local — keep the cases in lockstep by hand
+    expect(endpointIsLocal("http://localhost:11435")).toBe(true);
+    expect(endpointIsLocal("http://127.0.0.1:11436/v1")).toBe(true);
+    expect(endpointIsLocal("http://[::1]:11435")).toBe(true);
+    expect(endpointIsLocal("https://api.openai.com/v1")).toBe(false);
+    expect(endpointIsLocal("http://localhost.evil.com:11435")).toBe(false);
+    expect(endpointIsLocal("http://127.0.0.1.evil.com")).toBe(false);
+    expect(endpointIsLocal("http://10.0.0.5:11435")).toBe(false);
+    expect(endpointIsLocal("")).toBe(false); // unparseable ⇒ fail closed
+    expect(endpointIsLocal("not a url")).toBe(false);
   });
 });
 
@@ -227,5 +269,32 @@ describe("runAgent", () => {
     const { host } = fakeHost(["not json at all", "still not json", '{"final":"recovered"}']);
     const { final } = await run(host, { history: [], userText: "q", web: false });
     expect(final).toBe("recovered");
+  });
+
+  test("repeated duplicate calls strike out instead of burning every step (#93)", async () => {
+    const same = '{"tool":"search_notes","args":{"query":"pricing"}}';
+    // step 1 executes; steps 2+3 are duplicates → two strikes → force-final
+    const { host, calls } = fakeHost([same, same, same, "forced final answer"]);
+    const { final } = await run(host, { history: [], userText: "q", web: false });
+    expect(final).toBe("forced final answer");
+    expect(calls.searchNotes).toEqual(["pricing"]); // executed exactly once
+  });
+
+  test("insisting on a guard-blocked web call strikes out too (#93)", async () => {
+    const leak = '{"tool":"web_search","args":{"query":"sk-ant-api03-EXAMPLE0EXAMPLE0EXAM"}}';
+    // blocked (strike 1) → re-issued, now also a duplicate (strike 2) → final
+    const { host, calls } = fakeHost([leak, leak, "best effort without the web"]);
+    const { final } = await run(host, { history: [], userText: "q", web: true });
+    expect(final).toBe("best effort without the web");
+    expect(calls.webSearch).toEqual([]); // never reached the host
+  });
+
+  test("a fresh valid call resets the strike counter", async () => {
+    const dup = '{"tool":"search_notes","args":{"query":"pricing"}}';
+    const other = '{"tool":"read_note","args":{"id":"n1"}}';
+    // duplicate (strike 1) → NEW call (reset) → duplicate (strike 1) → final
+    const { host } = fakeHost([dup, dup, other, dup, '{"final":"done"}']);
+    const { final } = await run(host, { history: [], userText: "q", web: false, maxSteps: 5 });
+    expect(final).toBe("done");
   });
 });

@@ -5,6 +5,7 @@
 // or more data rows — ending at a blank line or any non-`|` line.
 
 import type { Text } from "@codemirror/state";
+import { lineInFence, scanFences } from "./fences";
 
 export type Align = "left" | "right" | "center" | "";
 
@@ -43,15 +44,19 @@ export function splitRow(s: string): string[] {
   return cells;
 }
 
-/** All GFM tables in the doc, in order. */
+/** All GFM tables in the doc, in order. Fenced code is OPAQUE: a pipe-table
+ * example inside ANY ``` fence is the user's code, never a live widget whose
+ * chips would rewrite it (#13, audit 2026-07) — so a header line inside a
+ * fence can't start a table. */
 export function scanTables(doc: Text): TableBlock[] {
   const out: TableBlock[] = [];
+  const fences = scanFences(doc);
   const total = doc.lines;
   let n = 1;
   while (n < total) {
     const headLine = doc.line(n);
     const delimLine = doc.line(n + 1);
-    if (looksLikeRow(headLine.text)) {
+    if (looksLikeRow(headLine.text) && !lineInFence(headLine.from, fences)) {
       const align = parseDelimiter(delimLine.text);
       const header = splitRow(headLine.text);
       if (align && header.length > 0) {

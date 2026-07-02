@@ -14,7 +14,10 @@ import type { NoteSummary } from "../types";
 
 export const keys = {
   folders: ["folders"] as const,
-  notes: (folderId?: string) => ["notes", folderId ?? "all"] as const,
+  // null is the ALL-notes sentinel — a real folder named "all" must get its
+  // own cache entry, not share (and clobber) the default view's (#77, audit
+  // 2026-07). null can never collide with a folder id (ids are strings).
+  notes: (folderId?: string) => ["notes", folderId ?? null] as const,
   note: (id: string) => ["note", id] as const,
   roots: ["corpus-roots"] as const,
   memexRoots: ["memex-root-markers"] as const,

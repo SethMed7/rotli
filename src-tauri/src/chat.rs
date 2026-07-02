@@ -37,73 +37,38 @@ pub struct ChatModel {
     is_default: bool,
 }
 
-/// One-shot completion: send `prompt` to the chosen on-device model, return its
-/// reply. Errors come back as a string the Chat surface shows in-line (e.g. the
-/// model isn't running) — never a panic. `endpoint`/`model`/`api` are optional and
-/// default to the MLX tier; the Chat surface fills them from the picked model.
-#[tauri::command]
-pub fn chat_complete(
-    state: tauri::State<crate::organizer::OrganizerState>,
-    prompt: String,
-    endpoint: Option<String>,
-    model: Option<String>,
-    api: Option<String>,
-) -> Result<String, String> {
-    // Held for the whole call: the organizer daemon yields to interactive work
-    // (its gate checks the counter before every model call — doc §2).
-    let _interactive = state.0.interactive_guard();
-    let endpoint = endpoint.unwrap_or_else(|| DEFAULT_ENDPOINT.to_string());
-    let model = model.unwrap_or_else(|| DEFAULT_MODEL.to_string());
-    let api = api.unwrap_or_else(|| DEFAULT_API.to_string());
-    let base = endpoint.trim_end_matches('/');
-    if api == "openai" {
-        complete_openai(base, &model, &prompt, &endpoint)
+// The one-shot `chat_complete` command lived here until the 2026-07 audit (#68):
+// registered with zero frontend callers, it was unregistered and removed — the
+// multi-turn `chat_messages` below is the only interactive bridge. Re-add it from
+// git history if a one-shot caller ever appears.
+
+/// Whether a model ENDPOINT is local to this machine — the host is loopback
+/// (localhost / 127.0.0.0/8 / ::1). The secure-note gate derives locality from
+/// the endpoint itself, never from a webview-asserted flag (#2, audit 2026-07).
+/// Anything unparseable is NOT local (fail closed). Mirrors `endpointIsLocal`
+/// in src/ai/guard.ts.
+pub(crate) fn endpoint_is_local(endpoint: &str) -> bool {
+    let rest = endpoint.trim();
+    let Some(rest) = rest
+        .strip_prefix("http://")
+        .or_else(|| rest.strip_prefix("https://"))
+    else {
+        return false; // no scheme / unknown scheme ⇒ fail closed
+    };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    let host_port = authority.rsplit('@').next().unwrap_or(authority);
+    let host = if let Some(v6) = host_port.strip_prefix('[') {
+        v6.split(']').next().unwrap_or("")
     } else {
-        complete_generate(base, &model, &prompt, &endpoint)
+        host_port.split(':').next().unwrap_or("")
+    };
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
     }
-}
-
-/// Ollama `/api/generate` shape (MLX) — `{ model, stream:false, prompt }` → `response`.
-fn complete_generate(base: &str, model: &str, prompt: &str, endpoint: &str) -> Result<String, String> {
-    let url = format!("{base}/api/generate");
-    let body = serde_json::json!({ "model": model, "stream": false, "prompt": prompt });
-    let resp = ureq::post(&url)
-        .timeout(Duration::from_secs(120))
-        .send_json(body)
-        .map_err(|e| format!("local model unreachable ({e}) — is it running on {endpoint}?"))?;
-    let json: serde_json::Value = resp
-        .into_json()
-        .map_err(|e| format!("bad model response: {e}"))?;
-    Ok(json
-        .get("response")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .trim()
-        .to_string())
-}
-
-/// OpenAI `/v1/chat/completions` shape (llama.cpp) — the flattened prompt rides as
-/// one user message → `choices[0].message.content`.
-fn complete_openai(base: &str, model: &str, prompt: &str, endpoint: &str) -> Result<String, String> {
-    let url = format!("{base}/v1/chat/completions");
-    let body = serde_json::json!({
-        "model": model,
-        "stream": false,
-        "messages": [{ "role": "user", "content": prompt }],
-    });
-    let resp = ureq::post(&url)
-        .timeout(Duration::from_secs(120))
-        .send_json(body)
-        .map_err(|e| format!("local model unreachable ({e}) — is it running on {endpoint}?"))?;
-    let json: serde_json::Value = resp
-        .into_json()
-        .map_err(|e| format!("bad model response: {e}"))?;
-    Ok(json
-        .pointer("/choices/0/message/content")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .trim()
-        .to_string())
+    // a REAL loopback IP only ("127.0.0.1.evil.com" is a DNS name, not an IP)
+    host.parse::<std::net::IpAddr>()
+        .map(|ip| ip.is_loopback())
+        .unwrap_or(false)
 }
 
 /// The chat-capable models the memex-ai store declares (`kind: "llm-chat"`). Read
@@ -236,6 +201,10 @@ pub fn chat_messages(
     // the whole interactive surface to daemon contention (doc §2).
     let _interactive = state.0.interactive_guard();
     let endpoint = endpoint.unwrap_or_else(|| DEFAULT_ENDPOINT.to_string());
+    // #2's SEND-side backstop (review, 2026-07): corpus_read_ai refuses secure
+    // text to a non-local endpoint, but THIS command is the transport that
+    // actually ships bytes — so the invariant is re-derived at the egress too.
+    egress_allowed(&endpoint, &messages)?;
     let model = model.unwrap_or_else(|| DEFAULT_MODEL.to_string());
     let api = api.unwrap_or_else(|| DEFAULT_API.to_string());
     let base = endpoint.trim_end_matches('/');
@@ -246,6 +215,29 @@ pub fn chat_messages(
     } else {
         messages_generate(base, &model, &messages, format_json.unwrap_or(false), temperature, max_tokens, &endpoint, CHAT_TIMEOUT)
     }
+}
+
+/// The secure-egress law at the SEND seam (review follow-up to #2, 2026-07):
+/// "secure text never leaves the device" was enforced only where text is READ
+/// (`corpus_read_ai` derives locality from the endpoint), which holds only as
+/// long as TS passes the SAME endpoint to both commands. A future TS path that
+/// diverges — a fallback that retries a failed local model against a remote
+/// one, a per-tool endpoint override — could read a secure note locally and
+/// legally ship it here. So the transport re-derives locality and scans the
+/// OUTGOING transcript itself: a non-local endpoint refuses secret-shaped
+/// content, symmetric with web.rs's `looks_secure` gate on search/fetch.
+/// Local endpoints are unrestricted (secure notes may always ride to a local
+/// model). Pure — `chat_messages` is otherwise untestable (tauri::State).
+fn egress_allowed(endpoint: &str, messages: &[WireMsg]) -> Result<(), String> {
+    if endpoint_is_local(endpoint) {
+        return Ok(());
+    }
+    if messages.iter().any(|m| crate::secret::looks_secure(&m.content)) {
+        return Err(
+            "This conversation carries secret-shaped content and can't be sent to a remote model — switch to a local model to continue.".into(),
+        );
+    }
+    Ok(())
 }
 
 /// The organizer daemon's transport (doc §2): the MLX `/api/generate` bridge with
@@ -282,6 +274,15 @@ fn messages_generate(
         "prompt": flatten_messages(messages),
         "options": { "temperature": temperature, "num_predict": max_tokens },
     });
+    // Vision (#8, audit 2026-07): the Ollama-generate wire carries attachments as
+    // a top-level `images` array of RAW base64 — the mlx server routes to the vlm
+    // sidecar only when the body has them, so dropping them here meant the
+    // composer's vision model never saw the image. Flattening loses per-turn
+    // placement anyway, so collect every attachment across the transcript.
+    let images = generate_images(messages);
+    if !images.is_empty() {
+        body["images"] = serde_json::json!(images);
+    }
     if format_json {
         body["format"] = serde_json::Value::String("json".to_string());
     }
@@ -298,6 +299,20 @@ fn messages_generate(
         .unwrap_or("")
         .trim()
         .to_string())
+}
+
+/// Every attachment in the transcript as RAW base64 for the generate body — the
+/// webview sends full `data:image/…;base64,…` URLs (the openai path wants those);
+/// the Ollama-generate shape wants the bare payload after `base64,`.
+fn generate_images(messages: &[WireMsg]) -> Vec<String> {
+    messages
+        .iter()
+        .flat_map(|m| m.images.iter())
+        .map(|img| match img.split_once("base64,") {
+            Some((prefix, raw)) if prefix.starts_with("data:") => raw.to_string(),
+            _ => img.clone(),
+        })
+        .collect()
 }
 
 /// Flatten a transcript into one prompt for MLX `/api/generate` (which wraps the
@@ -403,4 +418,107 @@ fn ensure_llamacpp_up(endpoint: &str) {
     let _ = std::process::Command::new("launchctl")
         .args(["kickstart", &format!("gui/{uid}/com.sethmedina.memex-llamacpp")])
         .output();
+}
+
+// ─── tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn endpoint_is_local_accepts_loopback_only() {
+        assert!(endpoint_is_local("http://localhost:11435"));
+        assert!(endpoint_is_local("http://LOCALHOST:11435/api"));
+        assert!(endpoint_is_local("http://127.0.0.1:11436"));
+        assert!(endpoint_is_local("http://127.9.9.9/v1"));
+        assert!(endpoint_is_local("http://[::1]:11435"));
+        assert!(endpoint_is_local("https://localhost"));
+        // remote / lookalike hosts are NOT local
+        assert!(!endpoint_is_local("https://api.openai.com/v1"));
+        assert!(!endpoint_is_local("http://localhost.evil.com:11435"));
+        assert!(!endpoint_is_local("http://127.0.0.1.evil.com"));
+        assert!(!endpoint_is_local("http://user@evil.com:11435"));
+        assert!(!endpoint_is_local("http://10.0.0.5:11435"));
+        // unparseable ⇒ fail closed
+        assert!(!endpoint_is_local(""));
+        assert!(!endpoint_is_local("localhost:11435"));
+        assert!(!endpoint_is_local("file:///etc/hosts"));
+    }
+
+    #[test]
+    fn endpoint_is_local_ignores_userinfo_tricks() {
+        // loopback hidden behind userinfo still resolves to the REAL host
+        assert!(endpoint_is_local("http://evil.com@127.0.0.1:11435"));
+        assert!(!endpoint_is_local("http://127.0.0.1@evil.com:11435"));
+    }
+
+    #[test]
+    fn generate_images_collects_and_strips_data_urls() {
+        // the vision fix (#8): data URLs → raw base64; raw base64 passes through;
+        // attachments are collected across the whole transcript
+        let msgs = vec![
+            WireMsg {
+                role: "user".into(),
+                content: "what is this?".into(),
+                images: vec!["data:image/png;base64,AAAA".into(), "BBBB".into()],
+            },
+            WireMsg { role: "assistant".into(), content: "hm".into(), images: vec![] },
+            WireMsg {
+                role: "user".into(),
+                content: "and this?".into(),
+                images: vec!["data:image/jpeg;base64,CCCC".into()],
+            },
+        ];
+        assert_eq!(generate_images(&msgs), vec!["AAAA", "BBBB", "CCCC"]);
+        // a text-only transcript adds NO images key to the body
+        let none = vec![WireMsg { role: "user".into(), content: "hi".into(), images: vec![] }];
+        assert!(generate_images(&none).is_empty());
+    }
+
+    /// The send-side secure backstop (review follow-up to #2): a non-local
+    /// endpoint refuses a transcript with secret-shaped content; a local one
+    /// never objects — the read seam already decided secure text may reach it.
+    #[test]
+    fn egress_refuses_secrets_to_a_remote_endpoint_only() {
+        let secret = vec![WireMsg {
+            role: "user".into(),
+            content: "summarize: card 4242-4242-4242-4242".into(),
+            images: vec![],
+        }];
+        let clean = vec![WireMsg { role: "user".into(), content: "hi there".into(), images: vec![] }];
+        // local endpoint: secure content rides fine
+        assert!(egress_allowed("http://127.0.0.1:11435", &secret).is_ok());
+        // remote endpoint: the secret refuses, clean text passes
+        assert!(egress_allowed("https://api.example.com/v1", &secret).is_err());
+        assert!(egress_allowed("https://api.example.com/v1", &clean).is_ok());
+        // ANY turn carrying the secret trips it, not just the last
+        let buried = vec![
+            WireMsg { role: "assistant".into(), content: "ssn: 123-45-6789".into(), images: vec![] },
+            WireMsg { role: "user".into(), content: "go on".into(), images: vec![] },
+        ];
+        assert!(egress_allowed("https://api.example.com/v1", &buried).is_err());
+        // unparseable endpoint ⇒ NOT local ⇒ fail closed on secrets
+        assert!(egress_allowed("", &secret).is_err());
+    }
+
+    #[test]
+    fn flatten_messages_passes_a_lone_user_turn_verbatim() {
+        let msgs = vec![WireMsg { role: "user".into(), content: "hi".into(), images: vec![] }];
+        assert_eq!(flatten_messages(&msgs), "hi");
+    }
+
+    #[test]
+    fn flatten_messages_labels_multi_turn_and_cues_assistant() {
+        let msgs = vec![
+            WireMsg { role: "system".into(), content: "be kind".into(), images: vec![] },
+            WireMsg { role: "user".into(), content: "hi".into(), images: vec![] },
+            WireMsg { role: "assistant".into(), content: "hello".into(), images: vec![] },
+        ];
+        let s = flatten_messages(&msgs);
+        assert!(s.starts_with("System: be kind\n\n"));
+        assert!(s.contains("User: hi\n\n"));
+        assert!(s.contains("Assistant: hello\n\n"));
+        assert!(s.ends_with("Assistant:"));
+    }
 }

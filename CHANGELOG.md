@@ -10,6 +10,135 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-07-02
+
+**The audit release.** A deep adversarial review of v0.19.0 —
+[`docs/audit-2026-07-forge.md`](docs/audit-2026-07-forge.md), **97 verified findings**
+across structure · UX · AI, from one critical to small polish — followed by a fix train
+that landed **54 of them** in four batches: the security batch first (several findings
+were armed against a vault that really holds SSNs and card numbers), then data-safety +
+daemon correctness, then the bug-class UX fixes and cheap enhancements, and finally this
+honesty pass over the docs. The rest of the findings stay tracked in the report (the
+performance batch and the mega-refactors are sequenced there, not forgotten).
+
+### Fixed — security & secrets (the batch that shipped first)
+- **A secure note's `.gitignore` line now follows the file** *(the audit's one
+  critical, #1)* — flagging a note `secure:` gitignores it, but renaming it, filing it
+  to the Brain, moving or undoing it used to leave the OLD path in `.gitignore`,
+  silently making the secret committable. Every relocate/rename now re-syncs the
+  gitignore entry (remove old, add new), test-pinned through the flag→file→assert loop.
+- **"Local model" is verified, not assumed** (#2) — secure notes were gated by a
+  hardcoded `true`; locality is now derived from the picked model's actual endpoint
+  (loopback check, TS + Rust in lockstep), so a registry entry can't masquerade as
+  local and walk off with a secure note.
+- **Secret detection runs at the AI boundary too** (#21, #23) — a note that *looks*
+  secret (even if its metadata panel was never opened) is refused to remote models,
+  and the detectors on both sides now catch **separator-less** card numbers
+  (Luhn-checked 15–16 digit runs) — the exact shape in the migrated notes. Dash-less
+  SSNs carry no checksum, so a bare 9-digit run still isn't flagged (too many false
+  positives) — dashed SSNs are caught, and the `secure:` flag covers the rest.
+  The transport itself now re-checks too: `chat_messages` refuses a secret-shaped
+  transcript to any non-local endpoint, the same backstop web search/fetch already had.
+- **The write gates got their missing teeth** (#3, #22, #20, #44) — a brain's
+  "read-only" perms + contract band are now enforced in Rust, not just TS;
+  `corpus_set_field` refuses AI-owned keys and honors `writable()`; the `memex_*`
+  commands only accept **registered** roots (a webview can no longer point them at an
+  arbitrary path); and the daemon-owned `organizer.json` can't be wiped from the
+  webview settings lane.
+- **Contract honesty** — the TS/Rust contract band re-locked at [3.4, 3.7] with a
+  lockstep test (#24); the file-lock now **fails closed** instead of proceeding
+  unserialized after 10s (#42); five registered-but-unwired commands — including
+  `corpus_purge`, the only hard-delete lane — are unregistered until something real
+  calls them (#68); an inverted secure-policy comment that a future re-sync would have
+  propagated is corrected (#31); and the contract surface is narrowed to what actually
+  runs: the TS "Filer tier" is documented as the Rust lane's mirror, not a live TS
+  path (#95), and `inbox.md` — a declared write surface **no code ever wrote** — is
+  out of both write gates (#96; captures stage in `wiki/_inbox/`, Breve owns its own
+  inbox appends).
+
+### Fixed — data safety & correctness
+- **Dirty spreadsheets survive quit** (#4) — unsaved sheet edits used to die silently
+  with ⌘Q; every parked dirty session now flushes through the real save path the
+  moment the window hides (the same seam settings flush on) — **and quit itself is
+  intercepted**: ⌘Q and tray-Quit ask the webview to flush first and hold the exit
+  (bounded at 2s, quit can never hang) until it acks, so edits survive even when no
+  hide ever fired ("Stay open" mode, quitting from the focused window). Explicit Save
+  stays the law while you work.
+- **⌘N can't create a note in Archive/Trash** (#5), the **⌥Q quick-note target can no
+  longer be pointed at a folder the gate refuses** (and a refused capture says so
+  instead of breaking the hotkey forever, #6), and a **fresh chat no longer inherits
+  web-ON** from a stale unsaved-chat toggle (#7 — the silent-egress default stays off).
+- **Vision actually sees** (#8) — the MLX generate path never forwarded the attached
+  image; the composer's only vision model was confidently answering about pictures it
+  never received. The image bytes now ride the request.
+- **The chat agent searches full text** (#9) — `search_notes` now rides the real
+  `corpus_search` (title + body, ranked, snippets) instead of keyword-ranking 140-char
+  snippets; long conversations are budget-trimmed instead of overflowing small-model
+  context (#65); futile tool calls count toward the loop's two-strike exit (#93).
+- **Daemon correctness** — a failed mid-apply write can no longer strand a capture as
+  "already classified" (state mutates only after the writes succeed, #25); index
+  proposals get the same supersede + approve-time freshness grammar file/field rows
+  always had (no more zombie rows or stale-approve overwrites, #26); a frontmatter
+  edit made *during* a model call is no longer clobbered by the apply window (#27);
+  **approving a proposal now teaches the daemon** the approved value is daemon-owned
+  (it used to freeze the field forever — cooperation reduced maintenance, #28); an
+  explicit **Run now** on battery is queued instead of silently swallowed by the power
+  gate (#29); and approved filings carry the same `filed_by`/`filed_at` audit trail as
+  auto-applied ones (#90).
+- **State that survives a relaunch** — open spreadsheet/Activity tabs no longer vanish
+  at startup (the viewstate validator knows all five tab kinds now, #34); a hand-set
+  unknown key in `settings.json` (like the daemon's documented threshold knob) is
+  round-tripped instead of destroyed by the next theme toggle (#35); renaming a board
+  keeps its committed Main slot instead of letting the manifest GC eat it (#33); and
+  the two long-lived persisted maps that never forgot a chat/folder are GC'd (#78).
+- **Small but real** — ⌘K opens boards as boards, not dead note panes (#55); j/k no
+  longer wedges on phantom rows in a linked library's `_`-folders (#45); the sidebar
+  and All-notes counts agree (one universe, and Recent dropped its meaningless total,
+  #60); collapse-all collapses Main too (#83); a real folder named "all" no longer
+  collides with the All-notes query key (#77); Settings hotkey copy shows your actual
+  chords after a rebind (#86); a chat pane header shows the stored title, not the
+  de-dashed slug (#87).
+
+### Changed / Added — the UX batch
+- **Failures surface where you work** (#11) — a failed board write shows a data-loss
+  strip over the canvas; a failed chat save renders an inline "won't survive a reload"
+  note; a failed file-to-Brain or board rename lands as a dismissible sidebar note.
+  Nothing important dies in the console anymore.
+- **Re-onboarding keeps your notes where they are** (#12) — a 0.x update's onboarding
+  now pre-seeds a selected **"Keep my current location"** card; clicking through can
+  never relocate the corpus. (A true first run still requires the explicit choice —
+  the v0.8.7 no-silent-default rule stands.)
+- **Generic code fences render as code** (#13) — a ```js block (or a bare ```) keeps a
+  mono voice; its contents are never markdown-styled, and a pipe-table *example* inside
+  any fence is never turned into a live table widget (the slash menu shipped the repro).
+- **Links open** (#14) — **⌘-click** a markdown link (raw or beautified) to open it,
+  with a tooltip that says so; plain click stays the edit path. Rendered links (chat
+  bubbles, previews) open on plain click. Everything routes through one
+  scheme-allowlisted Rust opener — http/https/mailto only, so a link can never launch
+  a file path, app scheme, or flag.
+- **Main folders are renameable** (#16) — inline rename (context menu or the row),
+  and the ⊕ is now **name-first**: it opens an input instead of minting a permanent
+  "New folder 2".
+- **Honest labels** — the Aa panel's global rows say "· all notes" instead of hiding
+  behind the per-note footnote (#52); a read-only sheet says *why* ("view only · .ods"
+  / "· too large", #53); the PDF pane takes keyboard focus so space/arrows page
+  immediately (#54); the Captures board quietly explains that a curated card
+  *graduates* — it leaves the board and lives with your notes — and the cards carry
+  the app's right-click menu (star · Add to Main · File to the Brain · archive), so
+  graduating happens where the captures live (#56).
+- **Small pleasures** (#80–#85) — a theme-aware checkerboard behind transparent
+  images; middle-click closes a tab; Main's empty state only mentions the Brain when a
+  Brain exists; Approve gets a quiet accent (no longer Dismiss's twin) and "· 78%"
+  became "· 78% sure"; Run now stops claiming "Running…" forever and its errors render
+  styled.
+
+### Docs
+- **The design doc tells the shipped truth** (#30) — `docs/design/main-brain-daemon.md`
+  now marks `reach:` scoping (§4.2.6), the configurable battery budget (§6.3), and the
+  Settings → Brain capability checkboxes (§4.8) as **Phase-5 deferrals** instead of
+  implying they shipped with the daemon. `docs/model.md` refreshed for everything
+  user-visible above.
+
 ## [0.19.0] — 2026-07-01
 
 One release, three batches. **Phase 4 of the Main/Brain plan**
