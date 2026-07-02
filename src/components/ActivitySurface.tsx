@@ -13,6 +13,7 @@ import {
   dismissProposal,
   undoAction,
 } from "../services/brainJournal";
+import { organizerRunOnce } from "../lib/tauri";
 import { invalidateJournal, invalidateNotes, useJournal, useOrganizerStatus } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 
@@ -73,6 +74,25 @@ export function ActivitySurface() {
       <header className="board-head">
         <h2 className="board-title">Brain Activity</h2>
         <span className="board-count">{pending.length + history.length}</span>
+        {/* the daemon is event-driven and sleeps when idle — this is the
+            explicit nudge (one pass now, then back to sleep). Hidden when the
+            worker never spawned (not a memex) or the ladder is Off. */}
+        {status?.running && status.trust !== "off" && (
+          <button
+            type="button"
+            className="act-undo"
+            style={{ marginLeft: "auto" }}
+            title="Run one organizer pass now (it never interrupts a chat)"
+            onClick={() => {
+              organizerRunOnce().then(
+                () => void invalidateJournal(),
+                (e) => setErr(e instanceof Error ? e.message : String(e)),
+              );
+            }}
+          >
+            Run now
+          </button>
+        )}
       </header>
       {err && <p className="file-err" style={{ padding: "0 22px 8px" }}>⚠ {err}</p>}
       {/* quiet daemon-status lines — show, never nag (§4.8) */}

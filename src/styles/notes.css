@@ -12,6 +12,7 @@
 .sb-chatrow,
 .sb-chat-empty,
 .sb-chat-more,
+.fsec-add,
 .x,
 .tabplus {
   font: inherit;
@@ -236,18 +237,35 @@
 .mdrop-into {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
-.main-newfolder {
+/* the section-header hover "+" (Seth, 2026-07-01: "new folder can be a lot more
+   subtle") — the old always-visible "+ New folder" row folded into the Main
+   header. Same reveal grammar as .frow-add, but opacity (not display) so the
+   button stays in the tab order; keyboard focus reveals it too. */
+.fsec-hdr {
+  display: flex;
+  align-items: center;
+}
+.fsec-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 18px;
+  margin: -4px 0 -4px auto;
+  border-radius: var(--r-control);
   color: var(--text-muted);
-  font-size: 12.5px;
-  gap: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease);
 }
-.main-newfolder:hover {
+.fsec-hdr:hover .fsec-add,
+.fsec-add:focus-visible {
+  opacity: 1;
+}
+.fsec-add:hover {
+  background: var(--hov);
   color: var(--text);
-}
-.mnf-plus {
-  width: 14px;
-  font-size: 15px;
-  text-align: center;
 }
 .mmx {
   font-size: 16px;
@@ -1259,6 +1277,17 @@
 .sb-addfolder .fname,
 .sb-addfolder svg {
   color: var(--text-muted);
+}
+/* same subtlety pass (Seth, 2026-07-01): the trailing "Add a folder…" row now
+   fades in while the pointer is over the Notes tree (or on keyboard focus)
+   instead of sitting there always-on — opacity keeps it in the tab order. */
+.sb-addfolder {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease);
+}
+.sb-notes-tree:hover .sb-addfolder,
+.sb-addfolder:focus-visible {
+  opacity: 1;
 }
 .sb-root-x {
   display: none;

@@ -13,7 +13,7 @@ import { useTransientPopover } from "../lib/popover";
 import { setQuickHandle } from "../lib/quickHandle";
 import { onQuickShow, startWindowDrag } from "../lib/tauri";
 import { isVault } from "../services/destinations";
-import { invalidateNotes, useNotes } from "../services/hooks";
+import { invalidateNotes, useSearchableNotes } from "../services/hooks";
 import { inboxFolderId, notesService } from "../services/notes";
 import { usePanesStore } from "../state/panes";
 import { pruneQuick, setQuickActive, togglePinQuick } from "../state/quick";
@@ -159,8 +159,15 @@ function NotePicker({
 export function QuickNote() {
   const ids = useUiStore((s) => s.quickNoteIds);
   const activeId = useUiStore((s) => s.quickActiveId);
-  const notesQuery = useNotes();
-  const notes = useMemo(() => notesQuery.data ?? [], [notesQuery.data]);
+  // the SEARCHABLE universe (staged + Brain + Vault + added roots) minus
+  // boards — this picker feeds the MARKDOWN editor, so a .excalidraw scene or
+  // an image/pdf must never be pickable (corpus_read on one fails or renders
+  // garbage). useNotes() alone missed staged notes (the search audit's P0).
+  const universe = useSearchableNotes();
+  const notes = useMemo(
+    () => universe.notes.filter((n) => n.kind !== "board"),
+    [universe.notes],
+  );
   const byId = useMemo(() => new Map(notes.map((n) => [n.id, n])), [notes]);
   const [pickerOpen, setPickerOpen] = useState(false);
   // bumped each summon — keys the editor so it REMOUNTS on every show, re-running
@@ -178,7 +185,9 @@ export function QuickNote() {
   // id-preserving move, not a delete — confirm via getNote before dropping). The
   // OPEN note is kept by pruneQuick whenever it still exists, pinned or not.
   useEffect(() => {
-    if (!notesQuery.isSuccess) return;
+    // ready = EVERY listing succeeded — pruning against a half-loaded universe
+    // would read "still loading" as "gone" (the pruneQuick data-loss lesson)
+    if (!universe.ready) return;
     const visible = new Set(notes.map((n) => n.id));
     // ids absent from the visible list MIGHT be gone — but archive/trash is an
     // id-preserving move, so confirm via getNote before dropping. The OPEN note
@@ -204,7 +213,7 @@ export function QuickNote() {
     return () => {
       cancelled = true;
     };
-  }, [notesQuery.isSuccess, notes, ids, activeId]);
+  }, [universe.ready, notes, ids, activeId]);
 
   const newNote = () => {
     // Quick notes default to the LOCAL Inbox. The external Vault is read-mostly —

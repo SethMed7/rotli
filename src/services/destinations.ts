@@ -72,3 +72,48 @@ export function isHidden(folderId: string): boolean {
 export function isSink(folderId: string): boolean {
   return SINK_ROOTS.some((root) => folderId === root || folderId.startsWith(`${root}/`));
 }
+
+/** Trash and its subtree only — the ONE root note SEARCH never surfaces
+ * (Archive stays findable; restore is what resurrects Trash). Mirrors Rust
+ * `is_trash_folder` (corpus.rs). */
+export function isTrash(folderId: string): boolean {
+  return folderId === DEST.trash || folderId.startsWith(`${DEST.trash}/`);
+}
+
+/** True when folderId has the chats/ SHAPE — "chats", "chats/x", and the
+ * prefixed "vault:chats/x". A pure path test: whether it MEANS a Chat-front
+ * transcript depends on the root's layout (see `isChats`). `:` can never
+ * appear inside a path component (Rust validate_component refuses it), so the
+ * first `:` is always the root marker. Mirrors Rust `is_chats_folder`. */
+export function isChatsPath(folderId: string): boolean {
+  const i = folderId.indexOf(":");
+  const rel = i >= 0 ? folderId.slice(i + 1) : folderId;
+  return rel === "chats" || rel.startsWith("chats/");
+}
+
+/** The root markers whose layout is a MEMEX — "" for the local corpus when it
+ * is one, "<rootid>:" per connected brain (a brain IS a memex by definition).
+ * Added plain folders stay out: a plain root has no Chat front, so its "chats"
+ * folder is just a folder. Pure derivation over the Location config shape —
+ * the session cache lives in fsNotes.ts (`memexRootMarkers`). */
+export function memexMarkersOf(cfg: {
+  corpus: { isMemex: boolean };
+  brains: { id: string }[];
+}): ReadonlySet<string> {
+  const markers = new Set<string>();
+  if (cfg.corpus.isMemex) markers.add("");
+  for (const b of cfg.brains) markers.add(`${b.id}:`);
+  return markers;
+}
+
+/** True for a memex chats/ TRANSCRIPT — the chats/ shape inside a root whose
+ * layout is a memex. Chat transcripts belong to the Chat front (All chats);
+ * they never ride note listings or note search (the "chats leak into All
+ * notes" fix, 2026-07-01). In a PLAIN root a folder named "chats" is just a
+ * folder and stays listed/searchable — mirrors Rust store.search's
+ * `layout == Memex && is_chats_folder` gate. */
+export function isChats(folderId: string, memexMarkers: ReadonlySet<string>): boolean {
+  const i = folderId.indexOf(":");
+  const marker = i > 0 ? folderId.slice(0, i + 1) : "";
+  return memexMarkers.has(marker) && isChatsPath(folderId);
+}

@@ -502,11 +502,46 @@
   max-height: 100%;
   border-radius: var(--r-control);
 }
+/* image: "fit" contains WITHOUT upscaling (max-w/h, not w/h 100% — a small image
+   stays its crisp natural size); once dims are known, an inline width drives
+   zoom and the wrap + the body's overflow:auto give centered scroll-pan. */
 .file-image {
-  width: 100%;
-  height: 100%;
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   border-radius: var(--r-control);
+}
+/* an svg with no intrinsic size keeps the old fill-the-pane behavior (vectors
+   scale losslessly, and max-w/h alone would collapse it) */
+.file-image.fill {
+  width: 100%;
+  height: 100%;
+}
+/* sized to max(content, pane): smaller images center, larger ones scroll */
+.file-image-wrap {
+  display: grid;
+  place-items: center;
+  min-width: 100%;
+  min-height: 100%;
+  width: max-content;
+  height: max-content;
+}
+/* the header's dimensions readout — doubles as the fit ⇄ 100% toggle */
+.file-dims {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.file-dims:hover {
+  color: var(--text);
 }
 .file-pdf {
   width: 100%;
@@ -515,9 +550,26 @@
   border: none;
   background: var(--surface-2);
 }
+/* the html Preview iframe — a browser-like white page canvas (the CSS keyword,
+   not a hex): unstyled HTML paints black text, unreadable on a dark surface */
+.file-html {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: none;
+  background: white;
+}
+/* the Preview ⇄ Code segmented pills in the file header (the fsh-tab pattern) */
+.file-mode-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+}
 /* Full-bleed media (image / pdf / iframe fallback): a plain BLOCK body so the
    element truly fills the pane. The flex-centered body shrank iframes to the left
-   and showed small-res images at their tiny natural size (Seth, 2026-06-30). */
+   and showed small-res images at their tiny natural size (Seth, 2026-06-30).
+   Images now sit in .file-image-wrap for centering + zoom scroll-pan; small ones
+   stay natural size ON PURPOSE (crisp, with the header % readout to say so). */
 .file-body-fill {
   flex: 1 1 auto;
   min-height: 0;
@@ -721,11 +773,14 @@
   text-overflow: ellipsis;
   vertical-align: top;
 }
+/* sticky layering: header row over body rownums, corner over both — without
+   the z-indexes, later-DOM rownums paint OVER the header on two-axis scroll */
 .file-table th {
   font-weight: 600;
   background: var(--surface-2);
   position: sticky;
   top: 0;
+  z-index: 2;
 }
 .file-table .fsh-rownum {
   color: var(--text-muted);
@@ -734,7 +789,21 @@
   font-variant-numeric: tabular-nums;
   position: sticky;
   left: 0;
+  z-index: 1;
   user-select: none;
+}
+/* the top-left corner cell pins on BOTH axes (viewer header row + editor grid) */
+.file-table .fsh-corner {
+  top: 0;
+  z-index: 3;
+}
+/* the silent-cut banner: a capped read-only sheet says so, quietly */
+.file-sheet-note {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 /* ── the EDITABLE sheet (SheetEditor: xlsx/csv on a writable root) ─────────── */

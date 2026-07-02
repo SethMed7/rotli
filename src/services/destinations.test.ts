@@ -7,10 +7,14 @@ import { describe, expect, it } from "bun:test";
 import {
   DEST,
   HIDDEN_ROOTS,
+  isChats,
+  isChatsPath,
   isHidden,
   isRootMarker,
   isSink,
+  isTrash,
   isVault,
+  memexMarkersOf,
   SINK_ROOTS,
   VAULT_MARKER,
 } from "./destinations";
@@ -117,6 +121,64 @@ describe("the WRITE MODEL redirect — note-creation never lands in the Vault", 
     expect(redirect("Storage")).toBe("Storage");
     expect(redirect("Storage/Work")).toBe("Storage/Work");
     expect(redirect("Brain")).toBe("Brain"); // a plain local folder after the rename
+  });
+});
+
+describe("isTrash — the one root search never surfaces", () => {
+  it("is true for Trash and its subtree, false for Archive (findable)", () => {
+    expect(isTrash(DEST.trash)).toBe(true);
+    expect(isTrash("Trash/Old")).toBe(true);
+    expect(isTrash(DEST.archive)).toBe(false);
+    expect(isTrash("Trashy")).toBe(false);
+  });
+});
+
+describe("isChatsPath — the pure chats/ shape test", () => {
+  it("matches bare and prefixed chats paths", () => {
+    expect(isChatsPath("chats")).toBe(true);
+    expect(isChatsPath("chats/2026")).toBe(true);
+    expect(isChatsPath("vault:chats")).toBe(true);
+    expect(isChatsPath("vault:chats/x")).toBe(true);
+  });
+
+  it("never matches notes folders or lookalikes", () => {
+    expect(isChatsPath("Inbox")).toBe(false);
+    expect(isChatsPath("wiki/projects")).toBe(false);
+    expect(isChatsPath("chatscript")).toBe(false); // prefix must be a path segment
+    expect(isChatsPath("vault:wiki")).toBe(false);
+  });
+});
+
+describe("isChats — transcripts stay with the Chat front, in MEMEX roots only", () => {
+  // a memex corpus + one connected brain — both roots own a Chat front
+  const memexCorpus = memexMarkersOf({ corpus: { isMemex: true }, brains: [{ id: "vault" }] });
+  // a plain corpus + the same brain — only the brain's chats/ is transcripts
+  const plainCorpus = memexMarkersOf({ corpus: { isMemex: false }, brains: [{ id: "vault" }] });
+
+  it("memexMarkersOf derives '' for a memex corpus + '<id>:' per brain", () => {
+    expect([...memexCorpus].sort()).toEqual(["", "vault:"]);
+    expect([...plainCorpus]).toEqual(["vault:"]);
+  });
+
+  it("matches chats paths only inside memex roots", () => {
+    expect(isChats("chats", memexCorpus)).toBe(true);
+    expect(isChats("chats/2026", memexCorpus)).toBe(true);
+    expect(isChats("vault:chats/x", memexCorpus)).toBe(true);
+    expect(isChats("vault:chats/x", plainCorpus)).toBe(true);
+  });
+
+  it("a PLAIN root's folder named 'chats' is just a folder (the search/All-notes fix)", () => {
+    expect(isChats("chats", plainCorpus)).toBe(false);
+    expect(isChats("chats/ideas", plainCorpus)).toBe(false);
+    // an added plain folder root ("notes:") has no Chat front either
+    expect(isChats("notes:chats/x", memexCorpus)).toBe(false);
+  });
+
+  it("never matches notes folders or lookalikes, in any layout", () => {
+    expect(isChats("Inbox", memexCorpus)).toBe(false);
+    expect(isChats("wiki/projects", memexCorpus)).toBe(false);
+    expect(isChats("chatscript", memexCorpus)).toBe(false);
+    expect(isChats("vault:wiki", memexCorpus)).toBe(false);
   });
 });
 

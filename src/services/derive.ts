@@ -38,6 +38,12 @@ function stripMarkdown(line: string): string {
     }
     if (s === before) break;
   }
+  // `![alt](url)` → alt (or "Image" when the alt is empty) and `[text](url)` →
+  // text — a note that starts with an image reads as a human title, never raw
+  // markdown. Images first, then links, in lockstep with corpus.rs
+  // reduce_md_links (label runs to the FIRST ']', url to the FIRST ')').
+  s = s.replace(/!\[([^\]]*)\]\(([^)]*)\)/g, (_m, alt: string) => alt || "Image");
+  s = s.replace(/\[([^\]]*)\]\(([^)]*)\)/g, (_m, text: string) => text);
   return rustTrim(s.replace(/[*_`]/g, ""));
 }
 

@@ -9,18 +9,30 @@ import {
   corpusCreateFolder,
   corpusDelete,
   corpusList,
+  corpusListConfig,
   corpusMove,
   corpusRead,
+  corpusSearch,
   corpusWrite,
 } from "../lib/tauri";
-import type { Folder, Note, NoteSummary } from "../types";
-import { DEST, isHidden, isRootMarker, isVault } from "./destinations";
+import type { Folder, Note, NoteSummary, SearchHit } from "../types";
+import { DEST, isChats, isHidden, isRootMarker, isVault, memexMarkersOf } from "./destinations";
 import { snippetOf, titleOf } from "./derive";
 import type { NotesService } from "./notes";
 
 /** corpus.rs says "note not found: <id>" for a stale/unknown id. */
 function isNotFound(err: unknown): boolean {
   return err instanceof Error && err.message.includes("note not found");
+}
+
+/** The MEMEX root markers ("" = the local corpus when it's a memex, "<id>:" per
+ * connected brain) — the only roots whose chats/ means Chat-front transcripts.
+ * Cached for the session: the Location config only changes across a relaunch
+ * (choose/connect/forget all restart the app). */
+let memexMarkersP: Promise<ReadonlySet<string>> | null = null;
+export function memexRootMarkers(): Promise<ReadonlySet<string>> {
+  memexMarkersP ??= corpusListConfig().then(memexMarkersOf);
+  return memexMarkersP;
 }
 
 export class FsNotesService implements NotesService {
@@ -45,10 +57,18 @@ export class FsNotesService implements NotesService {
 
   async listNotes(folderId?: string): Promise<NoteSummary[]> {
     const { notes } = await corpusList();
-    // All Notes (no folderId): everything EXCEPT the hidden roots AND the
-    // external Vault — the Vault is browsed only via its own row, never mixed
-    // into the local "All notes" pick.
-    if (!folderId) return notes.filter((n) => !isHidden(n.folderId) && !isVault(n.folderId));
+    // All Notes (no folderId): everything EXCEPT the hidden roots, the external
+    // Vault (browsed only via its own row, never mixed into the local "All
+    // notes" pick) AND chats/ transcripts — in a memex layout chats/*.md
+    // surface as writable notes, but the Chat front (All chats) owns that
+    // domain; letting them ride here was the "chats leak into All notes" bug.
+    // Layout-gated: a PLAIN root's folder named "chats" is just a folder.
+    if (!folderId) {
+      const memex = await memexRootMarkers();
+      return notes.filter(
+        (n) => !isHidden(n.folderId) && !isVault(n.folderId) && !isChats(n.folderId, memex),
+      );
+    }
     // A non-default ROOT MARKER ("vault:") scopes to the whole external root —
     // its surfaced subtree (wiki/ + chats/) is everything prefixed with it.
     if (isRootMarker(folderId)) {
@@ -68,6 +88,13 @@ export class FsNotesService implements NotesService {
         !isHidden(n.folderId) &&
         (n.folderId === folderId || n.folderId.startsWith(`${folderId}/`)),
     );
+  }
+
+  /** FULL-TEXT search — Rust walks + reads + matches (corpus_search), same
+   * cost class as one corpus_list. Scope/ranking live on the Rust side. */
+  async searchNotes(query: string, limit = 50): Promise<SearchHit[]> {
+    if (!query.trim()) return [];
+    return corpusSearch(query, limit);
   }
 
   async getNote(id: string): Promise<Note | null> {

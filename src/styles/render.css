@@ -45,6 +45,20 @@
   max-width: 100%;
   height: auto;
 }
+/* the ```html fence's sandboxed srcdoc iframe. Unstyled HTML paints black text
+   on a transparent canvas, so the frame gets a plain white page behind it (the
+   CSS keyword, not a hex — a browser-like canvas regardless of app theme). */
+.rotli-render-html {
+  width: 100%;
+}
+.rotli-render-html iframe {
+  display: block;
+  width: 100%;
+  height: 280px;
+  border: none;
+  border-radius: var(--r-inner);
+  background: white;
+}
 
 /* Expand — a small top-right button that surfaces on hover (zennotes feel) */
 .rotli-render-expand {
@@ -131,4 +145,10 @@
 .rotli-render-overlay-card .rotli-render-mermaid svg {
   max-width: 100%;
   height: auto;
+}
+.rotli-render-overlay-card .rotli-render-html {
+  width: min(80vw, 760px);
+}
+.rotli-render-overlay-card .rotli-render-html iframe {
+  height: min(70vh, 560px);
 }

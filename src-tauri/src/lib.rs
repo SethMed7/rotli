@@ -707,6 +707,7 @@ pub fn run() {
             set_hide_on_blur,
             set_dock_visible,
             corpus::corpus_list,
+            corpus::corpus_search,
             corpus::corpus_read,
             corpus::corpus_open_file,
             corpus::corpus_file_text,

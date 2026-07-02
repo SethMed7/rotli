@@ -30,13 +30,21 @@ folder.")
   it so they turn up under People. It is a **folder within Notes** — browsable and
   editable, but **most people never open it**; they just take notes and let the AI
   organize. "The brain" = **your organized areas**, nothing else.
-- **The organizer** — the always-on, on-device **Brain filer** (a Rust daemon in the
+- **The organizer** — the on-device **Brain filer** (a Rust daemon in the
   shell, `organizer.rs`). Three narrow jobs: **Classify** (a staged capture → an area,
   or a `suggested_area` hint when unsure), **Enrich** (fill empty `summary`/`tags`/`links`
   — never a field you edited), and **Refresh index** (regenerate each area's
-  `wiki/<area>/_index.md` overview, deterministically). It runs quietly (idle + AC +
-  after a note settles) and records everything as **journal records** in
-  `.rotli/brain-journal.jsonl`, tracking its own progress in `.rotli/organizer.json`.
+  `wiki/<area>/_index.md` overview, deterministically). **Event-driven and lazy — it
+  preserves your machine.** It never polls: work is triggered only by the file watcher
+  (a quiet-window debounce folds a typing burst into one run after the last save
+  settles), by an approval you make in Activity, or by the explicit **Run now**
+  (Settings → Brain, or the Activity header). When nothing is staged it sleeps outright
+  — zero wakeups, zero disk reads, no timers. It runs only while you're idle (or rotli
+  is backgrounded), **on AC — never on battery** (Run now is the deliberate exception),
+  backs off when the machine is hot, and always yields to an interactive chat. It never
+  keeps the model warm: calls ride the normal transport with no keep-alive/warm-up, so
+  the model server's own idle-unload applies. Everything it does lands as **journal
+  records** in `.rotli/brain-journal.jsonl`, with its own progress in `.rotli/organizer.json`.
   How much it *applies* is the **trust ladder** (Settings → Brain), monotonic in risk:
   **Off** (dormant) · **Suggest** *(default — proposes everything, applies nothing;
   you Approve/Dismiss in Brain → Activity)* · **Tidy** (auto-applies annotations +
@@ -68,9 +76,27 @@ folder.")
   spreadsheet views); spreadsheets (`xlsx`/`csv`) are **editable in place** when their
   store is writable — a plain added folder, not the read-only memex `storage/` or a
   linked library, which stay a read-only table (the first save keeps a one-time
-  `.bak` of the pre-rotli original beside the file). Every file view carries an **Open
-  externally** dropdown: default app · Reveal in Finder · installed "Open with" apps.
+  `.bak` of the pre-rotli original beside the file). Viewers are honest: an image opens
+  at its **natural size** (points, matching Preview) with pinch/⌘± zoom and a % readout;
+  a sheet too big for the read caps **says it's truncated** (or refuses cleanly) instead
+  of silently showing a slice. Every file view carries an **Open externally** dropdown:
+  default app · Reveal in Finder · installed "Open with" apps.
 - **Boards** — Excalidraw canvases, alongside notes.
+- **Search** — typing in **All notes**, the sidebar filter, the palette, or Quick Note
+  searches **full text** (not just titles) across the searchable universe: staged
+  captures, the brain, the Vault, and added folders. A title hit ranks above a body hit;
+  body hits show a highlighted-match snippet. Trash is the one place search never
+  surfaces (Archive stays findable — restore is what resurrects Trash). The same
+  ranking/snippet grammar lives twice (Rust `corpus_search` + the TS twin) and is
+  test-locked in lockstep.
+- **The editor** — notes stay **plain markdown you own**; everything rich is a
+  render-only layer (the Aa/typography controls, live preview, widgets — never written
+  into the `.md`). Fenced blocks render inline: ```math · ```mermaid · ```jsxgraph ·
+  ```svg · ```**html** — the html preview runs in a **sandboxed, script-free** frame
+  (fences are untrusted content; click the block to see/edit the source). **Tables are
+  structurally editable**: Tab/⇧Tab hop cells (Tab past the end appends a row), ↑/↓ hop
+  rows, Enter never splits a row, and the widget's row/column menus insert / delete /
+  move / align — while the file keeps ordinary readable pipes.
 
 **Chat** _(front)_ — your AI conversations (`chats/`). The on-device model is an **agentic client**,
 not a context-free box: your memex IS its knowledge base, so it **searches and reads your notes** (their

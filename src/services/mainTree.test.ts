@@ -137,6 +137,24 @@ describe("tree mutations", () => {
   test("addFolderToMain appends an empty folder", () => {
     expect(addFolderToMain([], "Read later")).toEqual([{ folder: "Read later", children: [] }]);
   });
+  test("addFolderToMain uniquifies against root siblings (ids are name-derived)", () => {
+    const one = addFolderToMain([], "New folder");
+    const two = addFolderToMain(one, "New folder");
+    const three = addFolderToMain(two, "New folder");
+    expect(three.flatMap((n) => ("folder" in n ? [n.folder] : []))).toEqual([
+      "New folder",
+      "New folder 2",
+      "New folder 3",
+    ]);
+  });
+  test("addFolderToMain ignores note ids and nested folder names when uniquifying", () => {
+    const tree: MainNode[] = [
+      { note: "New folder" }, // a note id never blocks a folder name
+      { folder: "Today", children: [{ folder: "New folder", children: [] }] },
+    ];
+    const out = addFolderToMain(tree, "New folder");
+    expect(out[out.length - 1]).toEqual({ folder: "New folder", children: [] });
+  });
   test("removeFromMain drops a nested note", () => {
     expect(removeFromMain(base, "c")).toEqual([{ note: "a" }, { note: "b" }, { folder: "Today", children: [] }]);
   });

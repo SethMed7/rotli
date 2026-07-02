@@ -125,8 +125,12 @@ interface PersistedSettings {
   spellcheck: boolean;
   /** Editor view: raw markdown vs beautified (WYSIWYG); beautified by default. */
   rawEditor: boolean;
-  /** Block handles (drag/add/remove blocks); off by default. */
-  blockHandles: boolean;
+  /** Block handles (drag/add/remove blocks); ON by default since the floating
+   * rework (2026-07-01). A FRESH KEY on purpose: the gutter-era `blockHandles`
+   * persisted its off-default into every config, which would keep the redesigned
+   * handle hidden forever — this one-time reset lands everyone on the new
+   * default; an explicit Off re-persists here. */
+  blockHandles2: boolean;
   /** The on-device model the Chat surface uses (id from ~/.memex/ai); null = default. */
   chatModelId: string | null;
   /** Per-chat web-search toggle (the composer globe), keyed by chat slug. */
@@ -233,7 +237,7 @@ export function parseSettings(raw: string): PersistedSettings {
     showInDock: asBool(data.showInDock, false),
     spellcheck: asBool(data.spellcheck, true),
     rawEditor: asBool(data.rawEditor, false),
-    blockHandles: asBool(data.blockHandles, false),
+    blockHandles2: asBool(data.blockHandles2, true),
     chatModelId: typeof data.chatModelId === "string" ? data.chatModelId : null,
     chatWeb: (() => {
       const out: Record<string, boolean> = {};
@@ -290,7 +294,7 @@ function applySettings(s: PersistedSettings): void {
     showInDock: s.showInDock,
     spellcheck: s.spellcheck,
     rawEditor: s.rawEditor,
-    blockHandles: s.blockHandles,
+    blockHandles: s.blockHandles2,
     chatModelId: s.chatModelId,
     chatWeb: s.chatWeb,
     storageGrouping: s.storageGrouping,
@@ -546,7 +550,7 @@ function settingsSnapshot(): string {
     showInDock: ui.showInDock,
     spellcheck: ui.spellcheck,
     rawEditor: ui.rawEditor,
-    blockHandles: ui.blockHandles,
+    blockHandles2: ui.blockHandles,
     chatModelId: ui.chatModelId,
     chatWeb: ui.chatWeb,
     storageGrouping: ui.storageGrouping,

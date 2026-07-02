@@ -86,6 +86,10 @@ const INLINE: InlineRule[] = [
 // a line that is JUST an image — ![alt](url) or ![caption|width](url)
 const IMG_LINE = /^\s*!\[([^\]]*)\]\(([^)]+)\)\s*$/;
 
+// a thematic break — ---, ***, ___ (frontmatter never reaches here: the Rust
+// corpus splits it off the body; table delimiter rows carry pipes so they miss)
+const HR_LINE = /^ {0,3}(-{3,}|\*{3,}|_{3,})\s*$/;
+
 // ——— widgets ———
 
 const BULLET_GLYPHS = ["•", "◦", "▪"];
@@ -259,6 +263,23 @@ class ImgWidget extends WidgetType {
   }
 }
 
+// A horizontal rule — replaces a `---` line with a thin themed rule; caret in
+// the line reveals the raw dashes (the usual reveal-on-caret law).
+class HrWidget extends WidgetType {
+  eq(): boolean {
+    return true;
+  }
+  toDOM(): HTMLElement {
+    const s = document.createElement("span");
+    s.className = "rotli-hr";
+    s.setAttribute("aria-hidden", "true");
+    return s;
+  }
+  ignoreEvent(): boolean {
+    return false; // let CM place the caret on click → the dashes reveal
+  }
+}
+
 // ——— builder ———
 
 function scanInline(
@@ -376,6 +397,15 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
       const imgM = IMG_LINE.exec(text);
       if (imgM && !lineTouched && line.to > ls) {
         const d = Decoration.replace({ widget: new ImgWidget(imgM[1] ?? "", imgM[2] ?? "") });
+        decos.push(d.range(ls, line.to));
+        atomics.push(d.range(ls, line.to));
+        pos = line.to + 1;
+        continue;
+      }
+
+      // a divider (--- / *** / ___) renders as a thin rule; caret reveals dashes
+      if (HR_LINE.test(text) && !lineTouched && line.to > ls) {
+        const d = Decoration.replace({ widget: new HrWidget() });
         decos.push(d.range(ls, line.to));
         atomics.push(d.range(ls, line.to));
         pos = line.to + 1;

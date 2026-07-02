@@ -449,7 +449,8 @@ export default function SheetEditor({ fileId, mode }: { fileId: string; mode: "x
           <table className="file-table sheet-grid">
             <tbody>
               <tr>
-                <td className="fsh-rownum" />
+                {/* the corner — pinned on both axes so it survives two-axis scroll */}
+                <td className="fsh-rownum fsh-corner" />
                 {Array.from({ length: colCount }, (_, c) => (
                   <th
                     key={c}

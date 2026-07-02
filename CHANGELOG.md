@@ -10,12 +10,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.20.0] — 2026-07-01
+## [0.19.0] — 2026-07-01
 
-Files you can actually work in, metadata you can actually see, and drags that
-actually move.
+One release, three batches. **Phase 4 of the Main/Brain plan**
+(`docs/design/main-brain-daemon.md`): the organizer daemon — your notes get organized
+**while you're not looking**, on-device, logged, reversible, and easy on the battery.
+Plus the files/metadata batch and an editor · search · viewer batch.
 
-### Added
+### Added — the organizer daemon (Phase 4)
+- **The Suggest daemon** (`organizer.rs`) — an event-driven Rust background worker that
+  runs three narrow jobs against the local model: **Classify** (staged `wiki/_inbox`
+  captures → an area, or a `suggested_area` hint below the confidence threshold),
+  **Enrich** (fill *empty* `summary`/`tags`/`links` — a field you edited is never
+  clobbered; link candidates come from keyword ranking, the model only confirms), and
+  **Refresh index** (deterministic `wiki/<area>/_index.md` overviews — same members, same
+  bytes, no thrash). Gated to run politely: per-note quiet period, user idle or app
+  backgrounded, on AC, thermals OK, and it always yields to an interactive chat.
+- **It preserves your computer** — the daemon never polls and is never "running 24/7."
+  Work is scheduled only by the file watcher (a quiet-window debounce folds a typing
+  burst into **one** run after the last save settles), by an Approve/Dismiss/Undo you
+  make (which owes it one reconciliation sweep — the old 15-minute polling sweep is
+  gone), or by **Run now**. With nothing staged it **parks outright**: zero wakeups, no
+  tick, no timers, no settings reads, no `pmset` shell-outs (locked by a scheduler test —
+  an idle corpus plans exactly `Park`). **Off on battery by default** (the design doc's
+  §6.3 call); a hot machine backs it off; and it never keeps the model warm — no
+  keep-alive/warm-up calls exist, so the model server's own idle-unload governs.
+- **"Run now"** — Settings → Brain and the Brain Activity header both carry the explicit
+  nudge: one pass immediately (even on battery — it's your deliberate call), then back to
+  sleep. It still never interrupts an in-flight chat.
+- **Approve/Dismiss review lane** — proposals land in **Brain → Activity** ("🧠 Proposes:
+  File 'Foo' → Projects · 91%") with one-click Approve (files/annotates through the same
+  gated Filer lane) or Dismiss; the sidebar Activity link carries an unreviewed-count badge.
+  History rows stay undoable — including applied index rewrites.
+- **Settings → Brain: the trust ladder** — **Off / Suggest / Tidy / Organize** (default
+  **Suggest**), persisted and pushed to the daemon. Suggest applies **nothing** — journal
+  proposals only, provably write-free on your notes. Tidy auto-applies annotations + filing
+  brand-new captures; Organize applies everything — every rung journaled + undoable.
+- **⌥A — summon chat** ("ask") — a new global chord: from anywhere, surface rotli and land
+  in your most recently touched chat (or a fresh one). Rebindable like every action
+  (Settings → Hotkeys → Chat).
+
+### Added — files & metadata
 - **Editable spreadsheets** — `.xlsx` and `.csv` open in an **editable grid** (typed
   values + bold/text-color/fill styling, multi-sheet) when the file's store is writable;
   a vault / linked-library / memex-`storage/` sheet keeps the read-only table. Explicit
@@ -43,6 +78,43 @@ actually move.
   (`lib/dragGhost`), pointer-events-transparent so drop hit-testing is untouched — and
   **Esc / pointercancel now abandons** those drags mid-flight, same as tabs.
 
+### Added — editor · search · viewers
+- **Full-text search, everywhere you type a query** — All notes, the sidebar filter, the
+  palette picker, and Quick Note now search **note bodies**, not just titles, across the
+  whole searchable universe (staged captures + the brain + the Vault + added folders).
+  Title hits rank above body hits; a body hit shows a ±60-char snippet with the **match
+  highlighted**. Trash is the one place search never surfaces (Archive stays findable).
+  The ranking/snippet grammar is one pure core in Rust (`corpus_search`) with a TS twin
+  for the dev surface — mirrored test vectors keep them in lockstep, and offsets are
+  char-counted so no emoji ever shifts a highlight.
+- **```html fences render** — same code ⇄ preview model as ```svg: the markup renders in
+  a **sandboxed, script-free** iframe (verified against the shipped CSP — no
+  `allow-scripts`, opaque origin; fence content is untrusted the moment a note is
+  shared); click the block to see/edit the source.
+- **Tables you can actually edit** — inside a markdown table, **Tab/⇧Tab hop cells**
+  (Tab past the last cell appends a row), **↑/↓ hop rows** in the same column, **Enter
+  moves down instead of splitting a row** (and exits below the table from the last row).
+  The rendered table carries row/column menus — insert · delete · move · align — the
+  slash menu inserts a fresh scaffold, and every op serializes back to ordinary padded
+  pipes (a deliberate edit only; never a background reformat).
+- **Image zoom done right** — an image opens at its **natural size in points**
+  (`naturalWidth ÷ devicePixelRatio`, matching Preview — a small screenshot is crisp,
+  not inflated), with a live % readout in the header. Click the readout for 100%,
+  pinch-zoom or ⌘+/⌘−/⌘0/⌘1 after clicking the image, and scroll-pan when zoomed in.
+  (This deliberately revisits "small images fill the pane" — crisp-at-natural won.)
+- **Honest big sheets** — a read-only sheet clipped by the row/column caps now says so
+  in a banner instead of silently showing a slice; an over-cap `.xlsx` in a linked
+  library refuses with a friendly message (not a zip error); sticky header row + column
+  stay correctly layered under two-axis scroll, and a clipped read-only cell shows its
+  full value on hover.
+
+### Changed
+- **Sidebar polish** — the live filter now narrows **Main** too (it used to skip the one
+  section you curate by hand) and matches **snippets**, not just titles — with the j/k
+  roving cursor kept honest (it never lands on a filtered-out row). Main's always-visible
+  "+ New folder" row quieted down to a hover **+** on the section header (still
+  Tab-reachable).
+
 ### Fixed
 - **Main no longer forgets staged notes** — Main, tab titles, and the row menu now read
   the FULL note index (staged Captures + Archive + Trash + Vault), not just the default
@@ -50,32 +122,6 @@ actually move.
   `.rotli/main.json` on the next save (the "seeded Main emptied itself / tab says
   Untitled" bug), and "Add to Main" on a staged note was a silent no-op. A Main ref now
   survives anywhere its file actually lives.
-
-## [0.19.0] — 2026-07-01
-
-Phase 4 of the Main/Brain plan (`docs/design/main-brain-daemon.md`): the organizer daemon.
-Your notes now get organized **while you're not looking** — on-device, logged, reversible.
-
-### Added
-- **The Suggest daemon** (`organizer.rs`) — an always-on Rust background worker that watches
-  the memex and runs three narrow jobs against the local model: **Classify** (staged
-  `wiki/_inbox` captures → an area, or a `suggested_area` hint below the confidence
-  threshold), **Enrich** (fill *empty* `summary`/`tags`/`links` — a field you edited is never
-  clobbered; link candidates come from keyword ranking, the model only confirms), and
-  **Refresh index** (deterministic `wiki/<area>/_index.md` overviews — same members, same
-  bytes, no thrash). Gated to run politely: per-note quiet period, user idle or app backgrounded, on
-  AC, thermals OK, and it always yields to an interactive chat.
-- **Approve/Dismiss review lane** — proposals land in **Brain → Activity** ("🧠 Proposes:
-  File 'Foo' → Projects · 91%") with one-click Approve (files/annotates through the same
-  gated Filer lane) or Dismiss; the sidebar Activity link carries an unreviewed-count badge.
-  History rows stay undoable — including applied index rewrites.
-- **Settings → Brain: the trust ladder** — **Off / Suggest / Tidy / Organize** (default
-  **Suggest**), persisted and pushed to the daemon. Suggest applies **nothing** — journal
-  proposals only, provably write-free on your notes. Tidy auto-applies annotations + filing
-  brand-new captures; Organize applies everything — every rung journaled + undoable.
-- **⌥A — summon chat** ("ask") — a new global chord: from anywhere, surface rotli and land
-  in your most recently touched chat (or a fresh one). Rebindable like every action
-  (Settings → Hotkeys → Chat).
 
 ### Notes
 - **Secure/locked are absolute:** a `secure` note (or one that merely *looks* secret) never
@@ -211,6 +257,8 @@ left-menu / Quick-access / hotkey reports, resolved.
 ### Notes
 - **CSV & Excel render in-app.** (Already built; now demoed.) A `.csv`/`.xlsx` opens read-only as a table
   with a tab per sheet. Two sample files are seeded into Main to show it off.
+
+## [0.15.0] — 2026-07-01
 
 ### Changed
 - **"Quick access" is now two things done right — Main + starred Quick access.** The sidebar section is

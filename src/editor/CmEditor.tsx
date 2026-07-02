@@ -33,6 +33,7 @@ import { focusDim } from "./focusMode";
 import { livePreview } from "./livePreview";
 import { stripMarkdown } from "./stripMarkdown";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
+import { cellSpansOf, insertTableText } from "./tables";
 import { type SlashItem, SlashMenu, filterSlashItems } from "./SlashMenu";
 
 interface SlashState {
@@ -110,7 +111,7 @@ export function CmEditor({
   const rawEditorRef = useRef(rawEditor);
   rawEditorRef.current = rawEditor;
 
-  // block handles (⠿ drag/add/remove) — a toggle (Aa panel); off by default.
+  // block handles (⠿ drag/add/remove) — a toggle (Aa panel); ON by default.
   const blockHandlesOn = useUiStore((s) => s.blockHandles);
   const blockHandlesRef = useRef(blockHandlesOn);
   blockHandlesRef.current = blockHandlesOn;
@@ -218,6 +219,16 @@ export function CmEditor({
     if (item.op.kind === "code") {
       insert = "``"; // inline code on the cleared line, caret between the ticks
       caret = 1;
+    } else if (item.op.kind === "table") {
+      insert = insertTableText(3, 2); // scaffold; caret in the first header cell
+      caret = cellSpansOf(insert.split("\n")[0] ?? "")[0]?.start ?? 2;
+    } else if (item.op.kind === "divider") {
+      insert = "---\n\n"; // rule + a fresh line to keep writing on
+      caret = insert.length;
+    } else if (item.op.kind === "fence") {
+      // ``` / ```math / ```mermaid with the caret on the empty middle line
+      insert = `\`\`\`${item.op.lang}\n\n\`\`\``;
+      caret = 4 + item.op.lang.length;
     } else if (item.op.kind === "heading") {
       const r = applyHeading("", item.op.level);
       insert = r.line;

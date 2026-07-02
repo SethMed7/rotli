@@ -6,10 +6,17 @@
 // hooks in ./hooks.ts.
 
 import { isTauri } from "../lib/tauri";
-import type { Folder, Note, NoteSummary } from "../types";
-import { DEST, isHidden, isRootMarker, isSink, isVault } from "./destinations";
+import type { Folder, Note, NoteSummary, SearchHit } from "../types";
+import { DEST, isChats, isHidden, isRootMarker, isSink, isTrash, isVault } from "./destinations";
+
+/** The browser world's memex roots: the seeded corpus is a PLAIN local root
+ * (Inbox/Storage/…), and the one memex is the seeded Vault brain — so only
+ * "vault:chats/…" counts as Chat-front transcripts here, exactly like fs mode
+ * with a plain corpus + a connected brain. */
+const MEMEX_MARKERS: ReadonlySet<string> = new Set([DEST.vault]);
 import { snippetOf, titleOf } from "./derive";
 import { FsNotesService } from "./fsNotes";
+import { searchMatch, sortHits } from "./search";
 
 export interface NotesService {
   listFolders(): Promise<Folder[]>;
@@ -19,6 +26,11 @@ export interface NotesService {
   /** No folderId = all notes. With a folderId, includes descendant folders
    * (one mental model: a folder holds everything under it). */
   listNotes(folderId?: string): Promise<NoteSummary[]>;
+  /** FULL-TEXT search (title > body ranking, highlighted-match snippet, capped).
+   * Covers staged + Brain + Vault + added roots + Archive; never Trash, never
+   * chats/ transcripts, never boards/binaries. A LOCAL user read — secure notes
+   * stay findable (contract v3.7 gates AI reads, not the user's own eyes). */
+  searchNotes(query: string, limit?: number): Promise<SearchHit[]>;
   getNote(id: string): Promise<Note | null>;
   createNote(folderId: string, body: string): Promise<Note>;
   updateNote(id: string, body: string): Promise<Note>;
@@ -113,8 +125,12 @@ export class InMemoryNotesService implements NotesService {
     }
     const within = folderId ? this.descendants(folderId) : null; // once, not per note
     let scoped: Note[];
-    // All Notes also excludes the external Vault — browsed only via its own row.
-    if (!within) scoped = all.filter((n) => !isHidden(n.folderId) && !isVault(n.folderId));
+    // All Notes also excludes the external Vault (browsed only via its own row)
+    // AND chats/ transcripts — the Chat front owns those (the fs twin agrees).
+    if (!within)
+      scoped = all.filter(
+        (n) => !isHidden(n.folderId) && !isVault(n.folderId) && !isChats(n.folderId, MEMEX_MARKERS),
+      );
     else if (folderId && isHidden(folderId))
       scoped = all.filter((n) => within.has(n.folderId));
     else scoped = all.filter((n) => within.has(n.folderId) && !isHidden(n.folderId));
@@ -127,6 +143,32 @@ export class InMemoryNotesService implements NotesService {
             : 1
           : b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
       );
+  }
+
+  /** The browser twin of Rust corpus_search: same scope (never Trash, never
+   * chats/ — Archive/staged/Vault stay findable), same pure grammar
+   * (search.ts searchMatch/sortHits), same cap. In-memory notes are all
+   * kind:"note", so no board/binary filter is needed here. */
+  async searchNotes(query: string, limit = 50): Promise<SearchHit[]> {
+    if (!query.trim()) return [];
+    const hits: SearchHit[] = [];
+    for (const n of this.notes.values()) {
+      if (isTrash(n.folderId) || isChats(n.folderId, MEMEX_MARKERS)) continue;
+      const m = searchMatch(query, n.title, n.body, n.snippet);
+      if (!m) continue;
+      hits.push({
+        id: n.id,
+        title: n.title,
+        snippet: m.snippet,
+        folderId: n.folderId,
+        kind: n.kind ?? "note",
+        rank: m.rank,
+        matchStart: m.matchStart,
+        matchLen: m.matchLen,
+        updatedAt: n.updatedAt,
+      });
+    }
+    return sortHits(hits).slice(0, limit);
   }
 
   async getNote(id: string): Promise<Note | null> {

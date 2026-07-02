@@ -1,12 +1,13 @@
 // The seam components actually consume: TanStack Query hooks over the typed
 // service. No component touches notesService directly.
 
-import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { keepPreviousData, useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { replaceTitleLine } from "../lib/noteTitle";
 import { type CorpusRoot, corpusListConfig, isTauri, organizerStatus } from "../lib/tauri";
 import { readJournal } from "./brainJournal";
-import { DEST } from "./destinations";
+import { DEST, isChats, isChatsPath, isSink } from "./destinations";
+import { memexRootMarkers } from "./fsNotes";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
 import type { NoteSummary } from "../types";
@@ -16,6 +17,7 @@ export const keys = {
   notes: (folderId?: string) => ["notes", folderId ?? "all"] as const,
   note: (id: string) => ["note", id] as const,
   roots: ["corpus-roots"] as const,
+  memexRoots: ["memex-root-markers"] as const,
   journal: ["journal"] as const,
   organizer: ["organizer-status"] as const,
 };
@@ -115,6 +117,69 @@ export function useMainGcIds(): Set<string> | undefined {
     for (const list of lists) for (const n of list ?? []) ids.add(n.id);
     return ids;
   }, [lists, complete]);
+}
+
+/** Every SEARCHABLE note — the merged universe (staged Board + Brain wiki/ +
+ * Vault + added roots + plain folders) minus what note search never lists:
+ * binary files, memex chats/ transcripts (the Chat front owns them; a PLAIN
+ * root's "chats" folder is just a folder and stays in), and the two sinks
+ * (Archive stays reachable via its own row AND full-text search; Trash never
+ * surfaces). The ⌘K palette, All notes, and the Quick ⌘P picker all read
+ * THIS — useNotes() alone is a VIEW that silently misses staged notes (the
+ * 2026-07-01 search audit's P0: a staged Main note was unfindable everywhere).
+ * `ready` = every listing has SUCCEEDED (the same completeness bar as the GC). */
+export function useSearchableNotes(): { notes: NoteSummary[]; ready: boolean } {
+  const { lists, complete } = useNoteUniverse();
+  // which roots' chats/ means transcripts — session-static, like the roots list.
+  // Browser twin: the one seeded memex is the Vault brain (mirrors notes.ts).
+  const memexQ = useQuery({
+    queryKey: keys.memexRoots,
+    queryFn: (): Promise<ReadonlySet<string>> | ReadonlySet<string> =>
+      isTauri() ? memexRootMarkers() : new Set([DEST.vault]),
+    staleTime: Infinity,
+  });
+  const memex = memexQ.data;
+  const notes = useMemo(() => {
+    const seen = new Map<string, NoteSummary>();
+    for (const list of lists)
+      for (const n of list ?? []) {
+        // until the markers load, fall back to the pure shape test — the
+        // conservative transient (a plain root's chats/ appears a beat later,
+        // never flashes in and out)
+        const chats = memex ? isChats(n.folderId, memex) : isChatsPath(n.folderId);
+        if (n.kind === "file" || isSink(n.folderId) || chats) continue;
+        seen.set(n.id, n);
+      }
+    return [...seen.values()];
+  }, [lists, memex]);
+  return { notes, ready: complete };
+}
+
+/** A value that settles `ms` after its source stops changing. */
+function useDebouncedValue<T>(value: T, ms: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return settled;
+}
+
+/** FULL-TEXT body search (corpus_search / the browser twin), debounced 180ms,
+ * min 2 chars. keepPreviousData keeps rows steady between keystrokes; the
+ * short staleTime means an edit made seconds ago is re-findable (search sits
+ * outside the ["notes"] invalidation beat). Consumers must gate on their OWN
+ * live query length — a placeholder can briefly carry the previous query's
+ * hits. */
+export function useNoteSearch(query: string) {
+  const q = useDebouncedValue(query.trim(), 180);
+  return useQuery({
+    queryKey: ["search", q],
+    queryFn: () => notesService.searchNotes(q, 50),
+    enabled: q.length >= 2,
+    placeholderData: keepPreviousData,
+    staleTime: 5_000,
+  });
 }
 
 export function useNote(id: string) {

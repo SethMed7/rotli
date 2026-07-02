@@ -29,6 +29,23 @@ export interface Note extends NoteSummary {
   body: string; // markdown
 }
 
+/** One FULL-TEXT search hit — the corpus_search wire shape (Rust SearchHit,
+ * camelCase) and the browser twin's output. rank 0 = title hit (matchStart/
+ * matchLen index the TITLE; snippet is the stored list snippet), rank 1 = body
+ * hit (offsets index `snippet`). Offsets are CHAR counts (code points) — slice
+ * with [...spread], never String.slice (UTF-16 splits surrogate pairs). */
+export interface SearchHit {
+  id: string;
+  title: string;
+  snippet: string;
+  folderId: string;
+  kind: "note" | "board" | "file";
+  rank: number;
+  matchStart: number;
+  matchLen: number;
+  updatedAt: number;
+}
+
 /** Per-tab view state only — the document buffer is shared per noteId
  * (r2 lock #4); tabs hold cursor/scroll, never content. */
 export interface TabViewState {

@@ -1,13 +1,16 @@
-// Block handles (Seth, 2026-06-27) — a Milkdown-style "move things around + add/
-// remove" layer over the CodeMirror markdown, toggled on/off from the Aa panel.
-// The .md stays the source of truth: a block is just a run of consecutive non-blank
-// lines (paragraph, heading, a list, a quote…) bounded by blank lines. Each block
-// gets a ⠿ handle in the gutter — DRAG it to reorder, or CLICK it for a small menu
-// (add below · move up/down · delete). Everything is a plain text transaction, so
-// nothing proprietary touches the file. Off by default.
+// Block handles (Seth, 2026-06-27; floating rework 2026-07-01) — a Milkdown-
+// style "move things around + add/remove" layer over the CodeMirror markdown,
+// with an Aa-panel escape hatch (ON by default). The .md stays the source of
+// truth: a block is just a run of consecutive non-blank lines (paragraph,
+// heading, a list, a quote…) bounded by blank lines. ONE +/⠿ handle floats
+// immediately left of the HOVERED block's first line (the Crepe/Notion model —
+// the old version drew a gutter of handles pinned to the scroller's far-left
+// edge, hundreds of px from a centered text column). DRAG the grip to reorder,
+// CLICK it for a small menu (add below · move up/down · delete). Everything is
+// a plain text transaction, so nothing proprietary touches the file.
 
 import type { EditorState } from "@codemirror/state";
-import { EditorView, GutterMarker, gutter } from "@codemirror/view";
+import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 
 /** A block = [firstLineNumber, lastLineNumber] (1-based), the maximal run of
  * non-blank lines around `lineNo`. Returns null on a blank line. */
@@ -167,24 +170,45 @@ const PLUS_SVG =
 const GRIP_SVG =
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="6" cy="4" r="1.25"/><circle cx="10" cy="4" r="1.25"/><circle cx="6" cy="8" r="1.25"/><circle cx="10" cy="8" r="1.25"/><circle cx="6" cy="12" r="1.25"/><circle cx="10" cy="12" r="1.25"/></svg>';
 
+const HANDLE_GAP = 6; // px between the handle and the text column's left edge
+const LINGER_MS = 150; // crossing the gap (text → handle) must never drop it
+
 // WKWebView swallows HTML5 drag-and-drop AND a `draggable` element steals the
-// click — so the handle uses POINTER events instead: a small move past the
+// click — so the grip uses POINTER events instead: a small move past the
 // threshold is a DRAG (reorder, with a drop line); no move is a CLICK (the menu).
-class BlockHandle extends GutterMarker {
+//
+// ONE handle for the whole editor: a mousemove listener resolves the hovered
+// block (posAtCoords → blockAtLine) and floats the +/⠿ pair just left of the
+// text column, vertically centered on the block's first line. It appears
+// instantly on block hover, lingers briefly on leave, and hides on scroll/edit.
+class HandleView {
+  private el: HTMLDivElement;
+  private blockFrom = -1;
+  private hideTimer: ReturnType<typeof setTimeout> | null = null;
+  private dragging = false;
+
+  private onDomMove = (e: MouseEvent) => {
+    if (this.dragging) return;
+    if (e.target instanceof Node && this.el.contains(e.target)) {
+      this.cancelHide();
+      return;
+    }
+    const pos = this.view.posAtCoords({ x: e.clientX, y: e.clientY }, false);
+    const b = blockAtLine(this.view.state, this.view.state.doc.lineAt(pos).number);
+    if (b) this.place(b);
+    else this.scheduleHide();
+  };
+  private onDomLeave = () => this.scheduleHide();
+  private onScroll = () => this.hideNow();
+
   constructor(
-    readonly pos: number,
+    readonly view: EditorView,
     readonly openMenu: BlockMenuOpener,
   ) {
-    super();
-  }
-  override eq(other: BlockHandle) {
-    return other.pos === this.pos;
-  }
-  override toDOM(view: EditorView) {
     const el = document.createElement("div");
     el.className = "cm-block-handle";
 
-    // "+" — insert a fresh block below (don't let the gutter steal focus first)
+    // "+" — insert a fresh block below (don't let the button steal focus first)
     const add = document.createElement("button");
     add.type = "button";
     add.className = "cm-bh-add";
@@ -194,7 +218,7 @@ class BlockHandle extends GutterMarker {
     add.addEventListener("mousedown", (e) => e.preventDefault());
     add.addEventListener("click", (e) => {
       e.preventDefault();
-      addBlockBelow(view, this.pos);
+      if (this.blockFrom >= 0) addBlockBelow(view, this.blockFrom);
     });
 
     // ⠿ grip — pointer-drag past the threshold reorders; a plain click opens the menu
@@ -205,18 +229,18 @@ class BlockHandle extends GutterMarker {
     grip.setAttribute("aria-label", "Block actions");
     grip.innerHTML = GRIP_SVG;
     grip.addEventListener("mousedown", (e) => {
-      if (e.button !== 0) return;
-      e.preventDefault(); // don't start a text selection from the gutter
+      if (e.button !== 0 || this.blockFrom < 0) return;
+      e.preventDefault(); // don't start a text selection from the handle
+      const srcPos = this.blockFrom;
       const startX = e.clientX;
       const startY = e.clientY;
-      let dragging = false;
       let targetFrom: number | null = null;
       const onMove = (ev: MouseEvent) => {
-        if (!dragging && Math.abs(ev.clientY - startY) + Math.abs(ev.clientX - startX) > 4) {
-          dragging = true;
+        if (!this.dragging && Math.abs(ev.clientY - startY) + Math.abs(ev.clientX - startX) > 4) {
+          this.dragging = true;
           view.dom.classList.add("cm-block-dragging");
         }
-        if (!dragging) return;
+        if (!this.dragging) return;
         const p = view.posAtCoords({ x: ev.clientX, y: ev.clientY });
         const b = p == null ? null : blockAtLine(view.state, view.state.doc.lineAt(p).number);
         if (b) {
@@ -229,12 +253,14 @@ class BlockHandle extends GutterMarker {
         window.removeEventListener("mouseup", onUp);
         view.dom.classList.remove("cm-block-dragging");
         hideDropLine();
-        if (dragging) {
+        const dragged = this.dragging;
+        this.dragging = false;
+        if (dragged) {
           const p = targetFrom ?? view.posAtCoords({ x: ev.clientX, y: ev.clientY });
-          if (p != null) reorder(view, this.pos, p);
+          if (p != null) reorder(view, srcPos, p);
         } else {
           // no move → a click: open the actions menu at the grip
-          this.openMenu(view, this.pos, grip.getBoundingClientRect());
+          this.openMenu(view, srcPos, grip.getBoundingClientRect());
         }
       };
       window.addEventListener("mousemove", onMove);
@@ -243,22 +269,69 @@ class BlockHandle extends GutterMarker {
 
     el.appendChild(add);
     el.appendChild(grip);
-    return el;
+    el.addEventListener("mouseenter", () => this.cancelHide());
+    el.addEventListener("mouseleave", () => this.scheduleHide());
+    this.el = el;
+    view.dom.appendChild(el); // .cm-editor is position:relative — our anchor
+    view.dom.addEventListener("mousemove", this.onDomMove);
+    view.dom.addEventListener("mouseleave", this.onDomLeave);
+    view.scrollDOM.addEventListener("scroll", this.onScroll, { passive: true });
+  }
+
+  /** Float the handle just left of the text column, centered on the block's
+   * first line (headings included — the line box carries their height). */
+  private place(b: BlockRange): void {
+    this.cancelHide();
+    const coords = this.view.coordsAtPos(b.from);
+    if (!coords) {
+      this.hideNow();
+      return;
+    }
+    const edRect = this.view.dom.getBoundingClientRect();
+    const contentRect = this.view.contentDOM.getBoundingClientRect();
+    const padL = Number.parseFloat(getComputedStyle(this.view.contentDOM).paddingLeft) || 0;
+    const w = this.el.offsetWidth || 46;
+    const h = this.el.offsetHeight || 22;
+    const left = Math.max(2, contentRect.left + padL - w - HANDLE_GAP - edRect.left);
+    const top = coords.top + (coords.bottom - coords.top - h) / 2 - edRect.top;
+    this.el.style.left = `${left}px`;
+    this.el.style.top = `${top}px`;
+    this.el.classList.add("on"); // instant — no fade-in delay
+    this.blockFrom = b.from;
+  }
+
+  private cancelHide(): void {
+    if (this.hideTimer != null) clearTimeout(this.hideTimer);
+    this.hideTimer = null;
+  }
+  private scheduleHide(): void {
+    if (this.dragging) return;
+    this.cancelHide();
+    this.hideTimer = setTimeout(() => this.hideNow(), LINGER_MS);
+  }
+  private hideNow(): void {
+    this.cancelHide();
+    if (this.dragging) return;
+    this.el.classList.remove("on");
+    this.blockFrom = -1;
+  }
+
+  update(u: ViewUpdate): void {
+    // edits shift blocks under the handle — hide; the next mousemove re-anchors
+    if (u.docChanged) this.hideNow();
+  }
+
+  destroy(): void {
+    this.cancelHide();
+    this.view.dom.removeEventListener("mousemove", this.onDomMove);
+    this.view.dom.removeEventListener("mouseleave", this.onDomLeave);
+    this.view.scrollDOM.removeEventListener("scroll", this.onScroll);
+    this.el.remove();
   }
 }
 
-/** The block-handles gutter extension. `openMenu` is called on a handle click so
+/** The floating block-handle extension. `openMenu` is called on a grip click so
  * the host (React) can render the add/move/delete menu at the handle. */
 export function blockHandles(openMenu: BlockMenuOpener) {
-  return gutter({
-    class: "cm-block-gutter",
-    lineMarker(view, line) {
-      const ln = view.state.doc.lineAt(line.from).number;
-      const b = blockAtLine(view.state, ln);
-      // mark only a block's FIRST line
-      return b && b.fromLine === ln ? new BlockHandle(line.from, openMenu) : null;
-    },
-    lineMarkerChange: (u) => u.docChanged,
-    initialSpacer: () => new BlockHandle(0, openMenu),
-  });
+  return ViewPlugin.define((view) => new HandleView(view, openMenu));
 }

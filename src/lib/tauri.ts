@@ -4,6 +4,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { SearchHit } from "../types";
 
 export function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
@@ -226,6 +227,14 @@ function corpusInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
 
 export function corpusList(): Promise<CorpusListPayload> {
   return corpusInvoke("corpus_list");
+}
+
+/** FULL-TEXT note search (corpus_search): Rust walks + reads + matches every
+ * root — title > body ranking with a highlighted-match snippet (char offsets;
+ * see SearchHit in src/types.ts). A local user read: secure notes stay in,
+ * bodies are never logged. */
+export function corpusSearch(query: string, limit?: number): Promise<SearchHit[]> {
+  return corpusInvoke("corpus_search", limit === undefined ? { query } : { query, limit });
 }
 
 export function corpusRead(id: string): Promise<CorpusNoteDoc> {

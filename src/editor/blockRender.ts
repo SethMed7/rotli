@@ -1,5 +1,5 @@
-// The fenced-block render layer (Phase 1e). Renders the three target languages
-// (```math · ```mermaid · ```jsxgraph) inline in the editor, composed ALONGSIDE
+// The fenced-block render layer (Phase 1e). Renders the target languages
+// (```math · ```mermaid · ```jsxgraph · ```svg · ```html) inline in the editor, composed ALONGSIDE
 // livePreview. livePreview SKIPS fenced lines (see fences.ts), so the two never
 // collide; blockRender owns the whole multi-line fenced range.
 //
@@ -200,6 +200,27 @@ const RENDERERS: Record<LangKey, (code: string, ctx: RenderCtx) => HTMLElement |
     el.innerHTML = src.replace(/<script[\s\S]*?<\/script>/gi, "");
     return el;
   },
+
+  // a ```html fence renders the markup in a SANDBOXED srcdoc iframe (same
+  // code ⇄ preview model as svg: click the block to reveal/edit the source).
+  // Verified against the shipped CSP in WebKit: frame-src doesn't block
+  // about:srcdoc, and `sandbox` WITHOUT allow-scripts refuses to run any
+  // <script> in the fence ("Blocked script execution … 'allow-scripts'
+  // permission is not set"). The srcdoc document also inherits the app CSP
+  // (script-src 'self'), so scripts are doubly off. Never loosen the sandbox
+  // for note content — fences are untrusted the moment a note is shared.
+  html: (code) => {
+    const el = document.createElement("div");
+    el.className = "rotli-render-html";
+    const src = code.trim();
+    if (!src) return el; // empty fence while live-typing — quiet placeholder
+    const frame = document.createElement("iframe");
+    frame.setAttribute("sandbox", ""); // opaque origin, no scripts
+    frame.title = "html preview";
+    frame.srcdoc = src;
+    el.appendChild(frame);
+    return el;
+  },
 };
 
 type RenderEl = HTMLElement & { __board?: ReturnType<typeof JXG.JSXGraph.initBoard> };
@@ -264,8 +285,9 @@ class RenderBlockWidget extends WidgetType {
     const container = document.createElement("div");
     container.className = "rotli-render-block";
     container.dataset.lang = this.lang;
-    // math/mermaid/svg are click-to-edit: clicking the rendered block lands the
-    // caret in the source — the toggle to see/edit the code.
+    // math/mermaid/svg/html are click-to-edit: clicking the rendered block lands
+    // the caret in the source — the toggle to see/edit the code. (For html the
+    // iframe swallows clicks on its own area; the block's padding still works.)
     if (this.lang !== "jsxgraph") container.title = "Click to edit the source";
     this.dom = container;
 

@@ -24,6 +24,7 @@ import {
   corpusOverview,
   downloadAndInstallUpdate,
   isTauri,
+  organizerRunOnce,
   organizerSetTrust,
   revealCorpus,
   setDockVisible,
@@ -1065,6 +1066,8 @@ function BrainPane() {
   const trust = useUiStore((s) => s.organizerTrust);
   const setTrust = useUiStore((s) => s.setOrganizerTrust);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
+  // the Run-now nudge — a quiet inline note instead of an error toast
+  const [ranNote, setRanNote] = useState<string | null>(null);
   return (
     <>
       <PaneHead title="Brain" char="knowledge" />
@@ -1093,6 +1096,23 @@ function BrainPane() {
         Never touches: locked notes · secure notes · your Main arrangement.
       </p>
       <p className="setnote">Local only — never the internet, can&rsquo;t read secrets.</p>
+      <p className="setnote">
+        It waits for its moment: it works only when you&rsquo;re away, plugged in, and the machine
+        is cool — never on battery, never over a chat — and when there&rsquo;s nothing new it sleeps
+        outright. Run now does one pass immediately, then it goes back to sleep.
+      </p>
+      <button
+        type="button"
+        className="ghostbtn"
+        disabled={trust === "off"}
+        onClick={() => {
+          organizerRunOnce()
+            .then(() => setRanNote("Running a pass…"))
+            .catch((e) => setRanNote(e instanceof Error ? e.message : String(e)));
+        }}
+      >
+        Run now
+      </button>{" "}
       <button
         type="button"
         className="ghostbtn"
@@ -1104,6 +1124,7 @@ function BrainPane() {
       >
         View activity
       </button>
+      {ranNote && <p className="setnote">{ranNote}</p>}
     </>
   );
 }

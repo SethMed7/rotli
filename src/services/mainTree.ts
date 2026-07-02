@@ -206,9 +206,14 @@ export function addNoteToMain(tree: MainNode[], noteId: string): MainNode[] {
   return containsNote(tree, noteId) ? tree : [...tree, { note: noteId }];
 }
 
-/** Append a new empty Main folder at the root. */
+/** Append a new empty Main folder at the root. The name uniquifies against its
+ * root siblings ("New folder" → "New folder 2") because a root folder's rendered
+ * id IS "main:<name>" — twins would collide as React keys / drag targets. */
 export function addFolderToMain(tree: MainNode[], name: string): MainNode[] {
-  return [...tree, { folder: name, children: [] }];
+  const taken = new Set(tree.flatMap((n) => ("folder" in n ? [n.folder] : [])));
+  let unique = name;
+  for (let i = 2; taken.has(unique); i++) unique = `${name} ${i}`;
+  return [...tree, { folder: unique, children: [] }];
 }
 
 /** Remove a note/folder from Main by its rendered id (a folder takes its subtree). */

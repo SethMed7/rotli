@@ -94,6 +94,7 @@ Shape: one `std::thread::spawn`'d worker (mirrors `spawn_watcher`) draining a jo
 1. **Per-note quiet period** (~45–60s, configurable) — a note being actively typed never gets filed under the cursor.
 2. **Idle / foreground + power gate** — heavy model work runs only when the user is idle or rotli is backgrounded, **on AC by default** (battery policy is §6.3), and backs off when `NSProcessInfo.thermalState` is serious/critical (a 12B generation is a real thermal event on a laptop).
 3. **Periodic reconciliation sweep** — on startup and a slow idle-on-AC cron, walk the corpus and enqueue anything whose content hash differs from last-processed (catches notes changed while the app was closed). A *diff* sweep, not re-process-everything.
+   > **Shipped tighter (2026-07-01 energy audit):** the cron is gone. The sweep is fully event-driven — startup, **Run now**, a frontend Approve/Dismiss/Undo (whose suppress-marked writes never reach the watcher), and re-enabling trust each owe exactly one sweep (3s settle folds a spree into one walk). With nothing staged the worker **parks on the condvar** — zero wakeups (`plan_wait` in `organizer.rs`, test-locked).
 
 This is **not a tight poll** — mostly "capture lands → settles → files," with a cheap safety net.
 

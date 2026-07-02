@@ -1,14 +1,14 @@
-// Shared fenced-code-block scanner — used by blockRender (renders the three
-// math / mermaid / jsxgraph languages as widgets) AND by livePreview (which
+// Shared fenced-code-block scanner — used by blockRender (renders the target
+// math / mermaid / jsxgraph / svg / html languages as widgets) AND by livePreview (which
 // skips fenced lines so code is never markdown-styled and never collides with a
 // block widget). Pure + dependency-light on purpose: livePreview must NOT pull
 // katex/mermaid/jsxgraph into its module graph, so the scanner lives here.
 
 import type { Text } from "@codemirror/state";
 
-export type LangKey = "math" | "mermaid" | "jsxgraph" | "svg";
+export type LangKey = "math" | "mermaid" | "jsxgraph" | "svg" | "html";
 
-export const TARGET_LANGS = new Set<string>(["math", "mermaid", "jsxgraph", "svg"]);
+export const TARGET_LANGS = new Set<string>(["math", "mermaid", "jsxgraph", "svg", "html"]);
 
 export interface FenceBlock {
   lang: LangKey;

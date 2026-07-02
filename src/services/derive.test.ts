@@ -75,6 +75,25 @@ describe("snippetOf — lines after the title, stripped + joined (mirrors Rust s
   });
 });
 
+describe("image/link reduction — `![alt](url)` → alt, `[text](url)` → text (mirrors Rust reduce_md_links)", () => {
+  it("reduces an image to its alt so raw markdown never reads as a title", () => {
+    // the "images in All notes" leak: a note starting with an image used to show
+    // the literal `![photo](storage:abc.png)` as its title row
+    expect(titleOf("![photo](storage:abc.png)\nrest")).toBe("photo");
+    expect(titleOf("![](storage:abc.png)\nrest")).toBe("Image");
+  });
+
+  it("reduces a link to its text and handles both inside snippets", () => {
+    expect(titleOf("[the doc](https://x.y/z)")).toBe("the doc");
+    expect(snippetOf("# T\nsee ![chart](a.png) and [spec](b)")).toBe("see chart and spec");
+  });
+
+  it("leaves malformed spans untouched (Rust parity)", () => {
+    expect(titleOf("[not a link] (gap)")).toBe("[not a link] (gap)");
+    expect(titleOf("![dangling](no close")).toBe("![dangling](no close");
+  });
+});
+
 describe("whitespace alphabet matches Rust char::is_whitespace (not JS trim)", () => {
   // The two code points where JS String.trim() and Rust disagree: JS trim drops
   // U+FEFF (BOM) and keeps U+0085 (NEL); Rust does the opposite. derive.ts must

@@ -1031,8 +1031,66 @@ fn strip_markdown(line: &str) -> String {
             break;
         }
     }
-    let cleaned: String = s.chars().filter(|c| !matches!(c, '*' | '_' | '`')).collect();
+    // `![alt](url)` → alt (or "Image" when the alt is empty) and `[text](url)` →
+    // text — a note that STARTS with an image reads as a human title, never the
+    // raw markdown (render-only: the .md file is untouched). Images first, then
+    // links, in lockstep with derive.ts stripMarkdown.
+    let reduced = reduce_md_links(&reduce_md_links(s, true), false);
+    let cleaned: String =
+        reduced.chars().filter(|c| !matches!(c, '*' | '_' | '`')).collect();
     cleaned.trim().to_string()
+}
+
+/// One reduction pass over `[label](url)` spans — `image` selects the `![…](…)`
+/// form. The label runs to the FIRST `]`, the url to the FIRST `)` (mirroring
+/// the derive.ts regexes `!\[([^\]]*)\]\(([^)]*)\)` / `\[([^\]]*)\]\(([^)]*)\)`
+/// — the twins MUST stay in lockstep; derive.test.ts guards it). Malformed
+/// spans pass through untouched; an image with an EMPTY alt reads "Image" so a
+/// bare `![](…)` never yields an empty title.
+fn reduce_md_links(s: &str, image: bool) -> String {
+    let b: Vec<char> = s.chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < b.len() {
+        let lb = if image {
+            if b[i] == '!' && b.get(i + 1) == Some(&'[') {
+                i + 1
+            } else {
+                out.push(b[i]);
+                i += 1;
+                continue;
+            }
+        } else if b[i] == '[' {
+            i
+        } else {
+            out.push(b[i]);
+            i += 1;
+            continue;
+        };
+        let Some(rb) = (lb + 1..b.len()).find(|&j| b[j] == ']') else {
+            out.push(b[i]);
+            i += 1;
+            continue;
+        };
+        if b.get(rb + 1) != Some(&'(') {
+            out.push(b[i]);
+            i += 1;
+            continue;
+        }
+        let Some(rp) = (rb + 2..b.len()).find(|&j| b[j] == ')') else {
+            out.push(b[i]);
+            i += 1;
+            continue;
+        };
+        let label: String = b[lb + 1..rb].iter().collect();
+        if image && label.is_empty() {
+            out.push_str("Image");
+        } else {
+            out.push_str(&label);
+        }
+        i = rp + 1;
+    }
+    out
 }
 
 /// First lines after the title, markdown stripped, for list rows (≤140 chars).
@@ -1052,6 +1110,126 @@ pub fn snippet_of(body: &str) -> String {
         }
     }
     parts.join(" ").chars().take(140).collect()
+}
+
+// ─── full-text search (corpus_search) ────────────────────────────────────────
+
+/// One full-text hit on the wire (camelCase → src/types.ts SearchHit). `rank`
+/// 0 = title hit (matchStart/matchLen index the TITLE; `snippet` is the stored
+/// list snippet), 1 = body hit (offsets index the returned `snippet` window).
+/// Offsets are CHAR counts (code points), never bytes/UTF-16 units.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHit {
+    pub id: String,
+    pub title: String,
+    pub folder_id: String,
+    pub kind: NoteKind,
+    pub rank: u8,
+    pub snippet: String,
+    pub match_start: usize,
+    pub match_len: usize,
+    pub updated_at: i64,
+}
+
+/// The pure core of one hit — what `search_match` derives from a query + note.
+pub struct SearchMatch {
+    pub rank: u8,
+    pub snippet: String,
+    pub match_start: usize,
+    pub match_len: usize,
+}
+
+/// Context chars on each side of a body match in the snippet window.
+const SNIPPET_CTX: usize = 60;
+
+/// Per-char case fold: the FIRST char of each lowercase expansion — strictly
+/// 1:1, so a char offset in the folded text equals the offset in the original.
+/// TS twin: `fold` in src/services/search.ts.
+fn fold_chars(s: &str) -> Vec<char> {
+    s.chars().map(|c| c.to_lowercase().next().unwrap_or(c)).collect()
+}
+
+/// Char offset of the first occurrence of `needle` in `hay` (both pre-folded).
+fn find_ci(hay: &[char], needle: &[char]) -> Option<usize> {
+    if needle.is_empty() || needle.len() > hay.len() {
+        return None;
+    }
+    (0..=hay.len() - needle.len()).find(|&i| hay[i..i + needle.len()] == *needle)
+}
+
+/// The ranking + snippet grammar (pure, unit-tested). Title match beats body
+/// match. A body hit gets a ±60-char window around the FIRST match: newlines
+/// flatten to spaces, emphasis chars (`*` `_` `` ` ``) are stripped OUTSIDE the
+/// matched span (inside stays verbatim so the offsets always frame exactly what
+/// matched), "…" marks a clipped edge. MUST stay in lockstep with searchMatch
+/// in src/services/search.ts (search.test.ts mirrors these vectors).
+pub fn search_match(
+    query: &str,
+    title: &str,
+    body: &str,
+    stored_snippet: &str,
+) -> Option<SearchMatch> {
+    let q = fold_chars(query.trim());
+    if q.is_empty() {
+        return None;
+    }
+    if let Some(i) = find_ci(&fold_chars(title), &q) {
+        return Some(SearchMatch {
+            rank: 0,
+            snippet: stored_snippet.to_string(),
+            match_start: i,
+            match_len: q.len(),
+        });
+    }
+    let chars: Vec<char> = body.chars().collect();
+    let i = find_ci(&fold_chars(body), &q)?;
+    let start = i.saturating_sub(SNIPPET_CTX);
+    let end = (i + q.len() + SNIPPET_CTX).min(chars.len());
+    let mut snippet = String::new();
+    let mut match_start = i - start;
+    if start > 0 {
+        snippet.push('…');
+        match_start += 1;
+    }
+    for (w, &c) in chars[start..end].iter().enumerate() {
+        let in_match = w >= i - start && w < i - start + q.len();
+        if !in_match && matches!(c, '*' | '_' | '`') {
+            if w < i - start {
+                match_start -= 1;
+            }
+            continue;
+        }
+        snippet.push(if matches!(c, '\n' | '\r' | '\t') { ' ' } else { c });
+    }
+    if end < chars.len() {
+        snippet.push('…');
+    }
+    Some(SearchMatch { rank: 1, snippet, match_start, match_len: q.len() })
+}
+
+/// Trash and its subtree only — the ONE root search never surfaces (Archive
+/// stays findable; restore is what resurrects Trash).
+fn is_trash_folder(folder: &str) -> bool {
+    folder == "Trash" || folder.starts_with("Trash/")
+}
+
+/// A memex chats/ transcript — the Chat front (All chats) owns that domain;
+/// transcripts never ride note search or note listings. MEMEX layout only:
+/// in a plain (LegacyRotli) root there is no Chat front, so a user folder
+/// that happens to be named "chats" is just a folder — callers gate on layout.
+fn is_chats_folder(folder: &str) -> bool {
+    folder == "chats" || folder.starts_with("chats/")
+}
+
+/// rank asc (title hits first) → recency desc → id asc (deterministic wire).
+fn sort_hits(hits: &mut [SearchHit]) {
+    hits.sort_by(|a, b| {
+        a.rank
+            .cmp(&b.rank)
+            .then(b.updated_at.cmp(&a.updated_at))
+            .then(a.id.cmp(&b.id))
+    });
 }
 
 pub fn slugify(title: &str) -> String {
@@ -1847,6 +2025,54 @@ impl CorpusStore {
                 .then(a.id.cmp(&b.id))
         });
         Ok(CorpusList { folders, notes })
+    }
+
+    /// Case-insensitive FULL-TEXT search over this root's notes: one `list()`
+    /// pass for fresh metas + a body read per note through the index — the same
+    /// cost class as a sidebar refresh (list() already re-reads every body).
+    /// Scope: kind Note only (boards are scene JSON, files are binary), never
+    /// Trash (gone until restored), never a MEMEX root's chats/ (the Chat front
+    /// owns transcripts; a plain root's "chats" folder is just a folder and
+    /// stays findable) — Archive and staged/wiki/Vault notes stay findable.
+    /// `secure:` notes stay in: search is a LOCAL user read (contract v3.7
+    /// gates AI reads, not the user's own eyes); bodies are never logged.
+    pub fn search(&mut self, query: &str, limit: usize) -> Result<Vec<SearchHit>, String> {
+        let mut hits: Vec<SearchHit> = Vec::new();
+        if query.trim().is_empty() {
+            return Ok(hits);
+        }
+        let list = self.list()?;
+        for meta in &list.notes {
+            if meta.kind != NoteKind::Note
+                || is_trash_folder(&meta.folder_id)
+                || (self.layout == Layout::Memex && is_chats_folder(&meta.folder_id))
+            {
+                continue;
+            }
+            let Some(rel) = self.index.get(&meta.id) else { continue };
+            let Ok(text) = fs::read_to_string(self.abs(rel)) else { continue };
+            let (fm, raw) = parse_document(&text);
+            let body = match &fm {
+                Some(_) => editor_body(raw),
+                None => raw,
+            };
+            if let Some(m) = search_match(query, &meta.title, body, &meta.snippet) {
+                hits.push(SearchHit {
+                    id: meta.id.clone(),
+                    title: meta.title.clone(),
+                    folder_id: meta.folder_id.clone(),
+                    kind: meta.kind,
+                    rank: m.rank,
+                    snippet: m.snippet,
+                    match_start: m.match_start,
+                    match_len: m.match_len,
+                    updated_at: meta.updated_at,
+                });
+            }
+        }
+        sort_hits(&mut hits);
+        hits.truncate(limit);
+        Ok(hits)
     }
 
     /// Resolve an id through the index; on a miss (stale index, external
@@ -2931,6 +3157,41 @@ pub fn corpus_list(state: tauri::State<'_, CorpusState>) -> Result<CorpusList, S
     Ok(CorpusList { folders, notes })
 }
 
+/// FULL-TEXT search across every registered root — the same aggregation +
+/// id-prefixing discipline as `corpus_list` (default root first, ulids prefixed
+/// only for non-default roots so an open routes back). `limit` caps the MERGED
+/// result (default 50); hits re-sort rank→recency after the merge.
+#[tauri::command]
+pub fn corpus_search(
+    state: tauri::State<'_, CorpusState>,
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<SearchHit>, String> {
+    let cap = limit.unwrap_or(50).clamp(1, 200);
+    let mut reg = state.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+    let mut ids: Vec<String> = reg.stores.keys().cloned().collect();
+    ids.sort();
+    if let Some(pos) = ids.iter().position(|i| *i == reg.default_id) {
+        let d = ids.remove(pos);
+        ids.insert(0, d);
+    }
+    let default_id = reg.default_id.clone();
+    let mut hits: Vec<SearchHit> = Vec::new();
+    for id in ids {
+        let store = reg.stores.get_mut(&id).expect("id from keys");
+        for mut h in store.search(&query, cap)? {
+            h.folder_id = compose_root_id(&id, &h.folder_id);
+            if id != default_id {
+                h.id = compose_root_id(&id, &h.id);
+            }
+            hits.push(h);
+        }
+    }
+    sort_hits(&mut hits);
+    hits.truncate(cap);
+    Ok(hits)
+}
+
 #[tauri::command]
 pub fn corpus_read(state: tauri::State<'_, CorpusState>, id: String) -> Result<NoteDoc, String> {
     let (root, rel) = split_root_id(&id);
@@ -3086,7 +3347,7 @@ pub fn corpus_reveal_file(state: tauri::State<'_, CorpusState>, id: String) -> R
 /// The FIXED allowlist behind "Open with …" — never a caller-supplied binary
 /// name (`open -a` runs whatever it's handed). TextEdit/Preview live under
 /// /System/Applications on modern macOS, hence the two roots.
-const OPEN_WITH_APPS: &[&str] = &["Numbers", "Microsoft Excel", "TextEdit", "Preview"];
+const OPEN_WITH_APPS: &[&str] = &["Numbers", "Microsoft Excel", "TextEdit", "Preview", "Safari"];
 
 /// Which of the known "Open with …" apps are actually installed — a cheap
 /// exists-check so the dropdown only offers what's there.
@@ -3262,14 +3523,24 @@ pub fn corpus_filer_move(
 
 /// Append one JSON line to the brain change journal (`.rotli/brain-journal.jsonl`).
 #[tauri::command]
-pub fn corpus_journal_append(state: tauri::State<'_, CorpusState>, line: String) -> Result<(), String> {
+pub fn corpus_journal_append(
+    state: tauri::State<'_, CorpusState>,
+    organizer: tauri::State<'_, crate::organizer::OrganizerState>,
+    line: String,
+) -> Result<(), String> {
     let default_id = state
         .0
         .lock()
         .map_err(|_| "corpus lock poisoned".to_string())?
         .default_id
         .clone();
-    state.route(&default_id, |s| s.journal_append(&line))
+    state.route(&default_id, |s| s.journal_append(&line))?;
+    // every frontend Approve/Dismiss/Undo journals through here, and their
+    // corpus writes are suppress-marked (no watcher event) — owe the organizer
+    // one reconciliation sweep so the index diff catches up. Event-driven: this
+    // nudge replaced the daemon's old 15-minute polling sweep.
+    organizer.0.nudge_sweep();
+    Ok(())
 }
 
 /// Read the whole brain change journal (jsonl text; "" when none).
@@ -4018,6 +4289,155 @@ mod tests {
         let pb = store.index.get(&b.id).unwrap().clone();
         assert_ne!(pa, pb, "same-title notes must get distinct filenames");
         assert!(pa.starts_with("same-title-") && pa.ends_with(".md"));
+    }
+
+    #[test]
+    fn strip_markdown_reduces_images_and_links() {
+        // raw image markdown never reads as a title (the "images in All notes" leak)
+        assert_eq!(title_of("![photo](storage:abc.png)\nrest"), "photo");
+        assert_eq!(title_of("![](storage:abc.png)\nrest"), "Image");
+        assert_eq!(title_of("[the doc](https://x.y/z)"), "the doc");
+        assert_eq!(snippet_of("# T\nsee ![chart](a.png) and [spec](b)"), "see chart and spec");
+        // malformed spans pass through untouched
+        assert_eq!(title_of("[not a link] (gap)"), "[not a link] (gap)");
+        assert_eq!(title_of("![dangling](no close"), "![dangling](no close");
+    }
+
+    // ── full-text search (corpus_search) — the pure grammar + the store pass ──
+
+    #[test]
+    fn search_match_ranks_title_over_body_with_offsets() {
+        // title hit: rank 0, offsets index the TITLE, stored snippet rides through
+        let m = search_match("groc", "Groceries", "# Groceries\n\nOlive oil.\n", "Olive oil.")
+            .unwrap();
+        assert_eq!((m.rank, m.match_start, m.match_len), (0, 0, 4));
+        assert_eq!(m.snippet, "Olive oil.");
+
+        // body hit: rank 1, snippet frames the match, offsets index the SNIPPET
+        let m = search_match(
+            "sourdough",
+            "Groceries",
+            "# Groceries\n\nOlive oil, sourdough, butter.\n",
+            "Olive oil, sourdough, butter.",
+        )
+        .unwrap();
+        assert_eq!(m.rank, 1);
+        let chars: Vec<char> = m.snippet.chars().collect();
+        let hit: String = chars[m.match_start..m.match_start + m.match_len].iter().collect();
+        assert_eq!(hit, "sourdough");
+
+        // case-insensitive both directions; no match / blank query → None
+        assert!(search_match("OLIVE", "Groceries", "olive oil", "").is_some());
+        assert!(search_match("olive", "Groceries", "OLIVE OIL", "").is_some());
+        assert!(search_match("zebra", "Groceries", "olive oil", "").is_none());
+        assert!(search_match("   ", "Groceries", "olive oil", "").is_none());
+    }
+
+    #[test]
+    fn search_match_snippet_window_strips_and_marks_edges() {
+        // deep in a long body: ±60 chars of context, "…" on both clipped edges
+        let long = format!("{}NEEDLE{}", "a".repeat(100), "b".repeat(100));
+        let m = search_match("needle", "T", &long, "").unwrap();
+        assert!(m.snippet.starts_with('…') && m.snippet.ends_with('…'));
+        let chars: Vec<char> = m.snippet.chars().collect();
+        let hit: String = chars[m.match_start..m.match_start + m.match_len].iter().collect();
+        assert_eq!(hit, "NEEDLE");
+        assert_eq!(chars.len(), 1 + 60 + 6 + 60 + 1);
+
+        // emphasis stripped OUTSIDE the match, newlines flattened — offsets stay true
+        let m = search_match("needle", "T", "**bold**\nneedle `x`", "").unwrap();
+        let chars: Vec<char> = m.snippet.chars().collect();
+        let hit: String = chars[m.match_start..m.match_start + m.match_len].iter().collect();
+        assert_eq!(hit, "needle");
+        assert!(!m.snippet.contains('*') && !m.snippet.contains('`'));
+        assert!(!m.snippet.contains('\n'));
+    }
+
+    #[test]
+    fn store_search_covers_bodies_ranks_titles_first_and_skips_trash() {
+        let (_dir, mut store) = bare();
+        let a = store.create("Inbox", "# Wire limit\n\nCall the bank about the cap.\n").unwrap();
+        let b = store
+            .create("Notes", "# Meeting prep\n\nRaise the wire limit question with finance.\n")
+            .unwrap();
+        let c = store.create("Inbox", "# Old wire limit note\n\ndead\n").unwrap();
+        store.move_note(&c.id, "Trash").unwrap();
+
+        let hits = store.search("wire limit", 50).unwrap();
+        let ids: Vec<&str> = hits.iter().map(|h| h.id.as_str()).collect();
+        assert!(ids.contains(&a.id.as_str()), "title hit found");
+        assert!(ids.contains(&b.id.as_str()), "BODY hit found — full-text works");
+        assert!(!ids.contains(&c.id.as_str()), "Trash never surfaces in search");
+        // title hit outranks the body hit
+        assert_eq!(hits[0].id, a.id);
+        assert_eq!(hits[0].rank, 0);
+        let body_hit = hits.iter().find(|h| h.id == b.id).unwrap();
+        assert_eq!(body_hit.rank, 1);
+        assert!(body_hit.snippet.contains("wire limit"));
+        // blank query is empty, never everything
+        assert!(store.search("  ", 50).unwrap().is_empty());
+    }
+
+    #[test]
+    fn sort_hits_ranks_then_recency_then_id_lockstep() {
+        // mirrors sortHits in src/services/search.test.ts — the TS twin asserts
+        // this exact vector; a drift here means the shell and the dev surface
+        // rank equal-rank hits differently.
+        let hit = |id: &str, rank: u8, updated_at: i64| SearchHit {
+            id: id.into(),
+            title: "t".into(),
+            folder_id: "Inbox".into(),
+            kind: NoteKind::Note,
+            rank,
+            snippet: String::new(),
+            match_start: 0,
+            match_len: 1,
+            updated_at,
+        };
+        let mut hits = vec![hit("old-body", 1, 10), hit("new-body", 1, 20), hit("title", 0, 1)];
+        sort_hits(&mut hits);
+        let ids: Vec<&str> = hits.iter().map(|h| h.id.as_str()).collect();
+        assert_eq!(ids, ["title", "new-body", "old-body"], "rank asc → recency desc");
+        // the id tie-break: identical rank + recency sorts ascending by id
+        let mut ties = vec![hit("b", 1, 5), hit("a", 1, 5)];
+        sort_hits(&mut ties);
+        assert_eq!(ties[0].id, "a");
+        assert_eq!(ties[1].id, "b");
+    }
+
+    #[test]
+    fn plain_root_search_covers_a_user_folder_named_chats() {
+        // LegacyRotli has no Chat front — a folder literally named "chats" is
+        // just a folder, and its notes MUST stay findable (only a memex root's
+        // chats/ transcripts are excluded).
+        let (_dir, mut store) = bare();
+        let n = store.create("chats", "# Chat ideas\n\nthe kelpie fragment\n").unwrap();
+        let hits = store.search("kelpie", 50).unwrap();
+        assert_eq!(hits.len(), 1, "plain-root chats/ note is searchable: {hits:?}");
+        assert_eq!(hits[0].id, n.id);
+    }
+
+    #[test]
+    fn memex_search_covers_staged_and_wiki_but_never_chats() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        fs::write(
+            root.join("wiki/_inbox/staged.md"),
+            "---\nshelf: Inbox\n---\n\n# Staged capture\n\nthe kelpie fragment\n",
+        )
+        .unwrap();
+        fs::write(root.join("chats/k.md"), "# Chat\n\nthe kelpie fragment too\n").unwrap();
+        let mut store = CorpusStore::open(root).unwrap();
+        store.os_trash = false;
+
+        // the staged note (projected to "Board") hits; the chat transcript never does
+        let hits = store.search("kelpie", 50).unwrap();
+        assert_eq!(hits.len(), 1, "staged yes, chats no: {hits:?}");
+        assert_eq!(hits[0].folder_id, "Board");
+        // curated wiki bodies stay findable (read-only ≠ unsearchable)
+        assert!(!store.search("A wiki note", 50).unwrap().is_empty());
     }
 
     #[test]

@@ -737,8 +737,10 @@ export function Sidebar() {
     rp: ReturnType<typeof useRovingList>["rowProps"],
   ): ReactNode => {
     const childFolders = mainProjection.folders.filter((f) => f.parentId === parentId);
+    // the live filter narrows Main too (it used to skip this section entirely —
+    // the one Seth curates by hand); MUST mirror mainRovingRows below
     const childNotes = mainProjection.notes
-      .filter((n) => n.folderId === parentId)
+      .filter((n) => n.folderId === parentId && matches(n))
       .sort((a, b) => a.mainOrder - b.mainOrder);
     const dropCls = (rowId: string) => (mainDrop?.id === rowId ? ` mdrop-${mainDrop.pos}` : "");
     // Star = "quick access": pins a Main note into the capped set the ⌥ Quick
@@ -877,11 +879,11 @@ export function Sidebar() {
     return own + childrenOf(folder.id).reduce((sum, c) => sum + countFor(c, destNotes), 0);
   };
 
-  // the live filter narrows the compact rows by title (the old NoteList filter,
-  // applied per section now)
+  // the live filter narrows the compact rows by title OR snippet (applied per
+  // section — including Main, which the first filter pass skipped entirely)
   const q = filter.trim().toLowerCase();
   const matches = (note: NoteSummary): boolean =>
-    !q || note.title.toLowerCase().includes(q);
+    !q || note.title.toLowerCase().includes(q) || note.snippet.toLowerCase().includes(q);
 
   const openRow = (id: string) => (newTab: boolean) => openNote(id, { newTab });
   const openBoardRow = (id: string) => (newTab: boolean) => openCanvas(id, { newTab });
@@ -1065,8 +1067,10 @@ export function Sidebar() {
   // (folders already carry "main:") — no id collision, j/k walks both copies.
   const MAIN_ROW_PREFIX = "main>";
   const mainRovingRows = (parentId: string): RovingRow[] => [
+    // filtered by matches() exactly like renderMainTree — the roving cursor
+    // must never point at a row the live filter hid
     ...mainProjection.notes
-      .filter((n) => n.folderId === parentId)
+      .filter((n) => n.folderId === parentId && matches(n))
       .sort((a, b) => a.mainOrder - b.mainOrder)
       .map((n) => ({ id: `${MAIN_ROW_PREFIX}${n.id}`, kind: "note" as const })),
     ...mainProjection.folders
@@ -1588,7 +1592,21 @@ export function Sidebar() {
             {/* — MAIN: your hand-picked notes, arranged your way. Star a row (★) to
                   put it in Quick access — the capped set the ⌥ Quick window cycles
                   (Seth, 2026-07-01). Add with the ⊕ on a note row or drag from the Brain. — */}
-            <div className="fsec">Main</div>
+            {/* the header carries a QUIET hover "+" (Seth, 2026-07-01: the always-
+                visible "+ New folder" row was too loud) — same grammar as the
+                per-section frow-add, but opacity-hidden so Tab still reaches it. */}
+            <div className="fsec fsec-hdr">
+              Main
+              <button
+                type="button"
+                className="fsec-add"
+                aria-label="New folder in Main"
+                title="New folder in Main"
+                onClick={() => setMainTree(addFolderToMain(mainManifest.tree, "New folder"), liveIds)}
+              >
+                <PlusGlyph size={12} />
+              </button>
+            </div>
             {mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
               <p className="main-empty" data-main-id="main:">
                 The notes you reach for, arranged your way. Add one with the <b>⊕</b> on a note row (or
@@ -1600,15 +1618,6 @@ export function Sidebar() {
                 {renderMainTree(MAIN_ROOT, 0, rowProps)}
               </div>
             )}
-            <button
-              type="button"
-              className="frow child main-newfolder"
-              style={{ paddingLeft: 26 }}
-              onClick={() => setMainTree(addFolderToMain(mainManifest.tree, "New folder"), liveIds)}
-            >
-              <span className="mnf-plus" aria-hidden="true">+</span>
-              <span className="fname">New folder</span>
-            </button>
 
             <div className="fsec">Destinations</div>
 

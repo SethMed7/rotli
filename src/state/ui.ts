@@ -235,8 +235,9 @@ interface UiState {
   rawEditor: boolean;
   setRawEditor: (on: boolean) => void;
 
-  /** Block handles — a Milkdown-style ⠿ gutter handle per block: drag to reorder,
-   * click for add/move/delete. A toggle (Aa panel); off by default. The .md is the
+  /** Block handles — ONE floating +/⠿ handle beside the hovered block: drag to
+   * reorder, click for add/move/delete. ON by default (invisible until hover —
+   * low-pulse by construction); the Aa panel is the escape hatch. The .md is the
    * source of truth — every action is a plain text edit. Persisted. */
   blockHandles: boolean;
   setBlockHandles: (on: boolean) => void;
@@ -427,7 +428,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   rawEditor: false,
   setRawEditor: (on) => set({ rawEditor: on }),
 
-  blockHandles: false,
+  blockHandles: true,
   setBlockHandles: (on) => set({ blockHandles: on }),
 
   paletteOpen: false,

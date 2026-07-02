@@ -401,6 +401,15 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Full-text search: the matched span inside a snippet (All notes rows + the
+   ⌘K palette hint). Quiet tint, never the browser-default yellow — low pulse. */
+mark.hitmark {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
 /* All-chats list rows — the Chat-front twin of a note row (Seth, 2026-07-01). */
 .chatlist-row {
   width: 100%;

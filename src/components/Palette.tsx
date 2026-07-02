@@ -19,12 +19,13 @@ import { useBindingsStore, resolveChord } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
 import { type KeyAction, allActions, dispatch, getAction } from "../keys/registry";
 import { useTransientPopover } from "../lib/popover";
-import { useFolders, useNotes } from "../services/hooks";
+import { useFolders, useNoteSearch, useSearchableNotes } from "../services/hooks";
 import { useMruStore } from "../state/mru";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
-import type { NoteSummary } from "../types";
+import type { NoteSummary, SearchHit } from "../types";
 import { Icon } from "./Icon";
+import { MatchText } from "./MatchText";
 import {
   glyphForNote,
   FocusGlyph,
@@ -78,9 +79,13 @@ export function Palette({ onClose }: { onClose: () => void }) {
 
   useTransientPopover([palRef], true, onClose);
 
-  // surfaced non-note files (image/pdf/…) aren't quick-open targets — keep them
-  // out of the palette; they live in their folder (e.g. Storage) in the sidebar.
-  const notes = (useNotes().data ?? []).filter((n) => n.kind !== "file");
+  // the SEARCHABLE universe (staged + Brain + Vault + added roots; no binary
+  // files, no chats, no sinks) — useNotes() alone missed staged notes (P0).
+  const { notes } = useSearchableNotes();
+  // full-text BODY hits (debounced, min 2 chars); gated on the LIVE query
+  // length so a keepPreviousData placeholder can't ride under a cleared box.
+  const searchData = useNoteSearch(query).data;
+  const hits = query.trim().length >= 2 ? searchData : undefined;
   const folders = useFolders().data ?? [];
   const mruIds = useMruStore((s) => s.ids);
   const overrides = useBindingsStore((s) => s.overrides);
@@ -190,10 +195,40 @@ export function Palette({ onClose }: { onClose: () => void }) {
         });
       });
     }
-    const noteRows = notes
-      .filter((n) => fuzzy(q, n.title) || fuzzy(q, n.snippet))
-      .slice(0, 8)
-      .map(noteRow);
+    // Notes = full-text hits first (Rust corpus_search: title > body rank, a
+    // framed snippet with the match highlighted), then instant local fuzzy
+    // matches the hits missed (boards; the debounce window before hits land).
+    const hitRow = (h: SearchHit): Row => {
+      const known = noteById.get(h.id);
+      const summary: NoteSummary = known ?? {
+        id: h.id,
+        title: h.title,
+        snippet: h.snippet,
+        folderId: h.folderId,
+        createdAt: 0,
+        updatedAt: h.updatedAt,
+        pinned: false,
+        kind: h.kind,
+      };
+      return {
+        ...noteRow(summary),
+        hint:
+          h.rank === 1 ? (
+            <span className="muted">
+              <MatchText text={h.snippet} start={h.matchStart} len={h.matchLen} />
+            </span>
+          ) : (
+            <span className="muted">{folderName(h.folderId)}</span>
+          ),
+      };
+    };
+    const hitIds = new Set((hits ?? []).map((h) => h.id));
+    const noteRows = [
+      ...(hits ?? []).map(hitRow),
+      ...notes
+        .filter((n) => !hitIds.has(n.id) && (fuzzy(q, n.title) || fuzzy(q, n.snippet)))
+        .map(noteRow),
+    ].slice(0, 8);
     // capture-surface actions live in the other webview — their handle is
     // null here and dispatching them would silently no-op
     const actionRows = allActions()
@@ -208,6 +243,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
   }, [
     query,
     notes,
+    hits,
     folders,
     mruIds,
     overrides,

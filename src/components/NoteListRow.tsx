@@ -2,17 +2,21 @@
 // the whole row a button that opens the note/board/file. Extracted (Seth,
 // 2026-06-30) so the two list surfaces share the exact same markup.
 
-import type { MouseEvent } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import type { NoteSummary } from "../types";
 import { longDateLabel } from "../lib/dateLabels";
 import { glyphForNote } from "./glyphs";
 
 export function NoteListRow({
   note,
+  snippetNode,
   onOpen,
   onContextMenu,
 }: {
   note: NoteSummary;
+  /** Replaces the plain snippet — a full-text search row passes the framed
+   * match snippet with its <mark> (MatchText). Plain lists omit it. */
+  snippetNode?: ReactNode | undefined;
   onOpen: (note: NoteSummary, newTab: boolean) => void;
   onContextMenu?: (e: MouseEvent, note: NoteSummary) => void;
 }) {
@@ -37,7 +41,11 @@ export function NoteListRow({
         <span className="rr-title">
           {note.title || (board ? "Untitled board" : "Empty note")}
         </span>
-        {note.snippet && <span className="rr-snippet">{note.snippet}</span>}
+        {snippetNode ? (
+          <span className="rr-snippet">{snippetNode}</span>
+        ) : (
+          note.snippet && <span className="rr-snippet">{note.snippet}</span>
+        )}
         <span className="rr-date">{longDateLabel(note.updatedAt)}</span>
       </button>
     </li>

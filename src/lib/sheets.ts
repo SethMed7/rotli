@@ -8,10 +8,13 @@ import * as XLSX from "xlsx";
 export interface SheetTable {
   name: string;
   rows: string[][];
+  /** True when the sheet had MORE rows than the cap — the viewer must say so. */
+  truncated: boolean;
 }
 
 /** Parse a workbook from CSV/TSV text OR base64 (xlsx/binary) into plain string
- * tables (one per sheet). Capped rows/cols so a huge workbook can't lock the UI. */
+ * tables (one per sheet). Capped rows/cols so a huge workbook can't lock the UI —
+ * a capped table carries `truncated: true` so no consumer shows a silent cut. */
 export function parseWorkbook(
   input: { csv: string } | { base64: string },
   maxRows = 2000,
@@ -22,7 +25,7 @@ export function parseWorkbook(
       : XLSX.read(input.base64, { type: "base64" });
   return wb.SheetNames.map((name) => {
     const ws = wb.Sheets[name];
-    if (!ws) return { name, rows: [] };
+    if (!ws) return { name, rows: [], truncated: false };
     const raw = XLSX.utils.sheet_to_json(ws, {
       header: 1,
       blankrows: false,
@@ -31,7 +34,7 @@ export function parseWorkbook(
     const rows = raw
       .slice(0, maxRows)
       .map((r) => r.map((c) => (c === null || c === undefined ? "" : String(c))));
-    return { name, rows };
+    return { name, rows, truncated: raw.length > maxRows };
   });
 }
 
@@ -101,7 +104,11 @@ export function parseCsvExact(csv: string): string[][] {
 export function workbookToCsv(input: { csv: string } | { base64: string }): string {
   const tables = parseWorkbook(input, 5000);
   return tables
-    .map((t) => `### ${t.name}\n${t.rows.map((r) => r.map(csvCell).join(",")).join("\n")}`)
+    .map((t) => {
+      const csv = t.rows.map((r) => r.map(csvCell).join(",")).join("\n");
+      const note = t.truncated ? `\n… truncated — showing the first ${t.rows.length} rows` : "";
+      return `### ${t.name}\n${csv}${note}`;
+    })
     .join("\n\n");
 }
 

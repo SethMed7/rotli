@@ -459,7 +459,29 @@
   letter-spacing: -0.02em;
 }
 .slashrow .slashlabel {
+  flex: 0 0 auto;
+}
+/* the muted one-line description at the row's right (Crepe-style hints) */
+.slashrow .slashhint {
   flex: 1 1 auto;
+  margin-left: 14px;
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+/* Crepe-style section headers between groups (Text / List / Insert) */
+.slashgroup {
+  padding: 6px 10px 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  user-select: none;
+}
+.slashgrouped + .slashgrouped .slashgroup {
+  margin-top: 3px;
+  border-top: 1px solid var(--border);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -813,40 +835,39 @@
   padding-top: 9px;
 }
 
-/* — block handles (Seth, 2026-06-27): a Milkdown-style ⠿ per block. The gutter
-   sits left of the text; handles fade in when the editor is hovered, full on
-   handle hover. Drag to reorder, click for the actions menu. — */
-.cm-block-gutter {
-  background: transparent;
-  border: none;
-}
-/* CM's default gutter background is light — kill it so the block-handle column is
+/* — block handles (Seth, 2026-06-27; floating rework 2026-07-01): ONE +/⠿ pair
+   floats just left of the HOVERED block's first line (blockHandles.ts positions
+   it; .cm-editor is the anchor). Appears instantly on block hover, quick fade
+   on leave — never a column of handles, never far from a centered text run. — */
+/* CM's default gutter background is light — kill it so any gutter column is
    just transparent margin (no white bar), theme-matched (Seth, 2026-06-29). */
 .rotli-cm-host .cm-gutters {
   background: transparent;
   border-right: none;
 }
 .cm-block-handle {
+  position: absolute;
+  z-index: 6;
   display: flex;
   align-items: center;
   gap: 1px;
-  height: 1.4em;
-  margin-left: 2px;
   color: var(--text-muted);
   opacity: 0;
+  pointer-events: none;
   transition: opacity var(--motion-exit) var(--motion-ease);
   user-select: none;
 }
-/* fade the whole pair in when the editor is hovered; each mark lifts on its own hover */
-.rotli-cm-host:hover .cm-block-handle {
-  opacity: 0.55;
+.cm-block-handle.on {
+  opacity: 1;
+  pointer-events: auto;
+  transition: none; /* instant in, soft out */
 }
 .cm-bh-add,
 .cm-bh-grip {
   display: grid;
   place-items: center;
-  width: 17px;
-  height: 17px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: none;
   background: none;
@@ -961,11 +982,25 @@
   display: none;
 }
 
-/* — beautified GFM tables (Seth, 2026-06-27): rendered by tableRender.ts when the
-   caret isn't inside; touch the table and the raw markdown reveals to edit. — */
+/* — beautified GFM tables (Seth, 2026-06-27; interactive 2026-07-01): rendered
+   by tableRender.ts. Reveal is ROW-granular — the caret's line shows raw (the
+   .rotli-table-rawline voice below) while the rest keeps rendering as partial
+   widgets. Hover chips (row/col grips, +row/+col, the `</>` hatch) live inside
+   the wrap; the wrap itself must NOT clip (chips overhang), so horizontal
+   scrolling moved to an inner .rotli-tbl-scroll. — */
 .rotli-md-tablewrap {
-  overflow-x: auto;
+  position: relative;
   margin: 4px 0 10px;
+  /* room for the col chips above + the +col strip at the right */
+  padding: 10px 14px 0 0;
+}
+.rotli-md-tablewrap.rotli-md-tablepart {
+  /* a split twin (rows above/below the revealed line) hugs its neighbour */
+  margin: 0;
+  padding-top: 2px;
+}
+.rotli-tbl-scroll {
+  overflow-x: auto;
 }
 .rotli-md-table {
   border-collapse: collapse;
@@ -988,4 +1023,148 @@
 }
 .rotli-md-table tbody tr:nth-child(even) td {
   background: color-mix(in srgb, var(--surface-2) 45%, transparent);
+}
+.rotli-md-table th,
+.rotli-md-table td {
+  cursor: text; /* cells are click-to-edit (caret lands in the source span) */
+}
+
+/* the caret's own table line, revealed raw — mono so the pipes read as
+   structure, a whisper of surface so the open row is findable */
+.rotli-cm-host .cm-line.rotli-table-rawline {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.88em;
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+  border-radius: var(--r-inner);
+}
+
+/* hover chips: a grip left of the hovered row / above the hovered column —
+   invisible until the table is hovered AND a cell placed them (.on) */
+.rotli-tbl-chip {
+  position: absolute;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-exit) var(--motion-ease);
+}
+.rotli-md-tablewrap:hover .rotli-tbl-chip.on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.rotli-tbl-chip:hover {
+  color: var(--text);
+  background: var(--hov);
+}
+
+/* +row (a thin strip under the table) / +col (a thin strip at its right) */
+.rotli-tbl-append {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-inner);
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease);
+}
+.rotli-md-tablewrap:hover .rotli-tbl-append {
+  opacity: 0.7;
+}
+.rotli-tbl-append:hover {
+  opacity: 1 !important;
+  background: var(--hov);
+  color: var(--text);
+}
+.rotli-tbl-append.addrow {
+  left: 0;
+  right: 14px;
+  bottom: -12px;
+  height: 11px;
+}
+.rotli-tbl-append.addcol {
+  top: 10px;
+  bottom: 0;
+  right: 0;
+  width: 11px;
+}
+
+/* the `</>` escape hatch — whole table raw until the caret leaves it */
+.rotli-tbl-raw {
+  position: absolute;
+  top: -8px;
+  right: 18px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 9.5px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease);
+}
+.rotli-md-tablewrap:hover .rotli-tbl-raw {
+  opacity: 0.8;
+}
+.rotli-tbl-raw:hover {
+  opacity: 1;
+  color: var(--text);
+  background: var(--hov);
+}
+
+/* the row/col mini menu — the block-menu voice, viewport-fixed at the chip */
+.rotli-tblmenu {
+  position: fixed;
+  z-index: 60;
+}
+.rotli-tblmenu-align {
+  display: flex;
+  gap: 3px;
+  padding: 3px 6px 5px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 3px;
+}
+.rotli-tblalign {
+  flex: 1;
+  padding: 3px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  background: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.rotli-tblalign:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.rotli-tblalign.sel {
+  background: var(--tint);
+  color: var(--text);
+}
+
+/* a rendered divider (--- / *** / ___) — livePreview's HrWidget */
+.rotli-hr {
+  display: inline-block;
+  width: 100%;
+  height: 0;
+  border-top: 1.5px solid var(--border);
+  vertical-align: middle;
 }

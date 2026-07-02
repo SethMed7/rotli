@@ -6,7 +6,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { csvTextFromRows } from "./sheetEdit";
-import { parseCsvExact } from "./sheets";
+import { parseCsvExact, parseWorkbook, workbookToCsv } from "./sheets";
 
 describe("parseCsvExact", () => {
   test("no type coercion — leading zeros and >15-digit ids stay text", () => {
@@ -46,5 +46,35 @@ describe("parseCsvExact", () => {
     expect(parseCsvExact("a\r\nb\r\n")).toEqual([["a"], ["b"]]); // CRLF → LF normalization
     expect(parseCsvExact('""\n')).toEqual([[""]]);
     expect(parseCsvExact('"unterminated')).toEqual([["unterminated"]]);
+  });
+});
+
+// parseWorkbook may cap rows — but a cut must never be SILENT: the truncated
+// flag is what the viewer's banner and the chat's read_file marker hang on.
+describe("parseWorkbook truncation flag", () => {
+  const csvRows = (n: number) => `a,b\n${Array.from({ length: n }, (_, i) => `x${i},y${i}`).join("\n")}\n`;
+
+  test("under the cap → truncated false, all rows kept", () => {
+    const [t] = parseWorkbook({ csv: csvRows(10) });
+    expect(t?.rows.length).toBe(11);
+    expect(t?.truncated).toBe(false);
+  });
+
+  test("over the cap → sliced to maxRows and flagged", () => {
+    const [t] = parseWorkbook({ csv: csvRows(30) }, 20);
+    expect(t?.rows.length).toBe(20);
+    expect(t?.truncated).toBe(true);
+  });
+
+  test("exactly at the cap is NOT truncated", () => {
+    const [t] = parseWorkbook({ csv: csvRows(19) }, 20); // header + 19 = 20 rows
+    expect(t?.rows.length).toBe(20);
+    expect(t?.truncated).toBe(false);
+  });
+
+  test("workbookToCsv marks a truncated sheet for the model", () => {
+    const big = csvRows(6000); // > the 5000-row chat cap
+    expect(workbookToCsv({ csv: big })).toContain("… truncated — showing the first 5000 rows");
+    expect(workbookToCsv({ csv: csvRows(3) })).not.toContain("truncated");
   });
 });
