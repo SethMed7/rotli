@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { activeInstance } from "../memex/config";
 import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
 import { usePanesStore } from "../state/panes";
+import { Character } from "./Character";
 import { ChatGlyph, SearchGlyph } from "./glyphs";
 
 export function AllChatsSurface() {
@@ -46,6 +47,7 @@ export function AllChatsSurface() {
 
       {results.length === 0 ? (
         <div className="board-empty">
+          {chats.length === 0 && <Character name="chat" size={104} className="be-quokka" />}
           <p className="be-title">{chats.length === 0 ? "No chats yet" : "No matches"}</p>
           <p className="be-sub">
             {chats.length === 0

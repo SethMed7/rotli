@@ -17,6 +17,7 @@ import { notesService } from "../services/notes";
 import { useMainStore } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
+import { Character } from "./Character";
 import { ArchiveGlyph, CheckGlyph, glyphForNote } from "./glyphs";
 import { useNoteMenu } from "./useNoteMenu";
 
@@ -202,6 +203,7 @@ export function BoardSurface() {
 
       {captures.length === 0 ? (
         <div className="board-empty">
+          <Character name="rest" size={104} className="be-quokka" />
           <p className="be-title">Nothing captured yet</p>
           <p className="be-sub">
             Press your Quick capture shortcut (⌥C) from anywhere — each thought lands here as a

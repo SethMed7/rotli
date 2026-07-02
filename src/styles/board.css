@@ -281,6 +281,13 @@
   padding: 24px;
   gap: 6px;
 }
+/* the empty-state quokka (a quokka-world placement) — soft ink, a breath of
+   space before the title so it reads as a mascot, not a heavy graphic */
+.board-empty .be-quokka {
+  color: var(--text);
+  opacity: 0.9;
+  margin-bottom: 6px;
+}
 .board-empty .be-title {
   font-family: var(--font-display);
   font-weight: 700;

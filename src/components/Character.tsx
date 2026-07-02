@@ -8,6 +8,15 @@
 // the bold-body mark: only the body+ears carry a thick stroke (eyes/nose/mouth stay
 // crisp), so the lone mark reads clearly at tiny chrome sizes — tray + titlebar
 // (Seth, 2026-06-27). The full-size characters keep the plain line weight.
+//
+// Re-vendored 2026-07-02: the original export's FILENAMES were rotated one pose
+// off (base showed the shield, stays_local the easel, …) — each file now carries
+// the pose its name claims: base = plain standing · notes = notepad+pencil ·
+// ai_chat = laptop+speech bubble · inbox = envelope · excalidraw_board = easel ·
+// knowledge_system = files+org tree · stays_local = shield+padlock. Same pass
+// doubled the eye-highlight holes (17→34 viewBox units) so the eyes read as eyes
+// with a catchlight instead of blobs at empty-state sizes; and a derived `rest`
+// pose (closed eyes, same line grammar) joined the set for quiet empty states.
 import logoMark from "../assets/characters/_logo-bold.svg?raw";
 import aiChat from "../assets/characters/ai_chat.svg?raw";
 import base from "../assets/characters/base.svg?raw";
@@ -15,6 +24,7 @@ import board from "../assets/characters/excalidraw_board.svg?raw";
 import inbox from "../assets/characters/inbox.svg?raw";
 import knowledge from "../assets/characters/knowledge_system.svg?raw";
 import notes from "../assets/characters/notes.svg?raw";
+import rest from "../assets/characters/rest.svg?raw";
 import staysLocal from "../assets/characters/stays_local.svg?raw";
 
 /** Each character maps to a part of the app (used in that surface's empty state). */
@@ -25,7 +35,8 @@ export type CharacterName =
   | "inbox"
   | "board"
   | "knowledge"
-  | "local";
+  | "local"
+  | "rest";
 
 const SVGS: Record<CharacterName, string> = {
   base,
@@ -35,6 +46,7 @@ const SVGS: Record<CharacterName, string> = {
   board,
   knowledge,
   local: staysLocal,
+  rest,
 };
 
 interface CharacterProps {

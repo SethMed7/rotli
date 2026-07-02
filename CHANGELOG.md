@@ -10,6 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] — 2026-07-02
+
+The quokkas, properly.
+
+### Fixed
+- **The eyes read as eyes now.** Every character's eye-highlight hole doubled (17→34 viewBox
+  units) — at empty-state sizes the eyes now carry a visible catchlight instead of collapsing
+  into blobs. (The set is single-path evenodd line art; the holes were simply too small to
+  survive rasterization below ~120px.)
+- **Every character file was mislabeled.** The original export's filenames were rotated one
+  pose off — "base" was the shield, "stays_local" the easel, "knowledge_system" the laptop, and
+  so on around the whole set. Re-vendored with each file carrying the pose its name claims, so
+  every placement finally shows the RIGHT quokka: onboarding's "stays local" step gets the
+  shield+padlock, the chat empty state gets the laptop+speech bubble, Settings pane accents all
+  match their panes.
+
+### Added
+- **A new `rest` character** — closed eyes, same hand-drawn line grammar (derived from the base
+  pose) — for quiet empty states.
+- **Quokkas in more empty states:** All notes ("No notes yet" → the notepad quokka), All chats
+  (the laptop quokka), Captures ("Nothing captured yet" → the resting quokka), and Brain →
+  Activity ("Nothing yet" → the knowledge quokka). Search "no matches" states stay art-free —
+  they're transient, not empty worlds.
+
 ## [0.20.0] — 2026-07-02
 
 **The audit release.** A deep adversarial review of v0.19.0 —

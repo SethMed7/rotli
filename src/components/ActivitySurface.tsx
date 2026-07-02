@@ -16,6 +16,7 @@ import {
 import { organizerRunOnce } from "../lib/tauri";
 import { invalidateJournal, invalidateNotes, useJournal, useOrganizerStatus } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
+import { Character } from "./Character";
 
 function when(ts: number): string {
   const d = new Date(ts);
@@ -113,6 +114,7 @@ export function ActivitySurface() {
         <p className="main-empty">Loading…</p>
       ) : pending.length === 0 && history.length === 0 ? (
         <div className="board-empty">
+          <Character name="knowledge" size={104} className="be-quokka" />
           <p className="be-title">Nothing yet</p>
           <p className="be-sub">
             When the AI files a note or updates its metadata it shows here — and you can undo any of it.

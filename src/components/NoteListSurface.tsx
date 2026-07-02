@@ -12,6 +12,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import { useNoteSearch, useSearchableNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import type { NoteSummary, SearchHit } from "../types";
+import { Character } from "./Character";
 import { SearchGlyph } from "./glyphs";
 import { MatchText } from "./MatchText";
 import { NoteListRow } from "./NoteListRow";
@@ -101,6 +102,7 @@ export function NoteListSurface({
 
       {rows.length === 0 ? (
         <div className="board-empty">
+          {notes.length === 0 && <Character name="notes" size={104} className="be-quokka" />}
           <p className="be-title">{notes.length === 0 ? "No notes yet" : "No matches"}</p>
           <p className="be-sub">
             {notes.length === 0
