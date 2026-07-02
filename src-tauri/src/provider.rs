@@ -137,7 +137,9 @@ fn build_args(provider: &str, model: &str, prompt: &str, timeout_secs: u64) -> R
             ]),
             PromptVia::Stdin,
         )),
-        // exec mode, read-only sandbox, no approvals, shell tool off, JSONL out;
+        // exec mode (non-interactive — it never prompts, so there is NO
+        // --ask-for-approval flag here; verified against 0.137.0), read-only
+        // sandbox, shell tool off, JSONL out, no session litter (--ephemeral);
         // "-" = prompt from stdin. --cd pins it to a scratch dir OUTSIDE any repo.
         "codex" => {
             let scratch = codex_scratch_dir()?;
@@ -147,9 +149,8 @@ fn build_args(provider: &str, model: &str, prompt: &str, timeout_secs: u64) -> R
                     "--json".into(),
                     "--sandbox".into(),
                     "read-only".into(),
-                    "--ask-for-approval".into(),
-                    "never".into(),
                     "--skip-git-repo-check".into(),
+                    "--ephemeral".into(),
                     "--color".into(),
                     "never".into(),
                     "--cd".into(),
@@ -449,9 +450,8 @@ pub async fn generate_image(
                 "--json".into(),
                 "--sandbox".into(),
                 "workspace-write".into(),
-                "--ask-for-approval".into(),
-                "never".into(),
                 "--skip-git-repo-check".into(),
+                "--ephemeral".into(),
                 "--color".into(),
                 "never".into(),
                 "--cd".into(),
@@ -608,9 +608,12 @@ mod tests {
         assert_eq!(args[0], "exec");
         assert!(args.contains(&"--json".to_string()));
         assert!(args.contains(&"read-only".to_string()));
-        assert!(args.contains(&"never".to_string()));
         assert!(args.contains(&"--skip-git-repo-check".to_string()));
+        assert!(args.contains(&"--ephemeral".to_string()));
         assert!(args.contains(&"features.shell_tool=false".to_string()));
+        // exec is non-interactive — this flag DOESN'T EXIST on `codex exec`
+        // (0.137.0 rejects it; caught live 2026-07-02) — never reintroduce it
+        assert!(!args.contains(&"--ask-for-approval".to_string()));
         assert_eq!(args.last().unwrap(), "-");
     }
 

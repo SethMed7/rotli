@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.1] — 2026-07-02
+
+The pre-test verification sweep: every connected lane's exact invocation was executed
+live against the installed CLIs before handing the build over for testing.
+
+### Fixed
+- **The Codex lane was broken on arrival** — `codex exec` (0.137.0) has no
+  `--ask-for-approval` flag (exec mode never prompts; that flag belongs to interactive
+  mode), so every codex chat turn and codex image job would have died on argv parsing.
+  Both recipes drop the flag and gain `--ephemeral` (no session litter — the codex twin
+  of claude's `--no-session-persistence`). A regression test now pins the flag OUT.
+
+### Verified (no changes needed)
+- The exact claude argv end-to-end (haiku ping → `result`/`is_error` envelope parses),
+  the corrected codex argv end-to-end (`item.completed` → `agent_message`), the agy argv
+  end-to-end ("OK" on stdout), the claude Keychain detect probe, and all five curated
+  catalog repo ids (HTTP 200 on Hugging Face).
+
 ## [0.23.0] — 2026-07-02
 
 Install on-device models straight from Settings — and pick any of them per chat.
