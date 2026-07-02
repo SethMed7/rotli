@@ -17,15 +17,25 @@
 // doubled the eye-highlight holes (17→34 viewBox units) so the eyes read as eyes
 // with a catchlight instead of blobs at empty-state sizes; and a derived `rest`
 // pose (closed eyes, same line grammar) joined the set for quiet empty states.
+//
+// waving / searching / celebrating (2026-07-02): three NEW poses generated with
+// gpt-image-2 against the base as a style reference, binarized, and potrace'd
+// back to single-path currentColor vectors — same character, same line weight.
+// waving greets on onboarding's welcome; celebrating closes it; searching is
+// reserved for a future search surface (transient "no matches" states stay
+// art-free by the placement law).
 import logoMark from "../assets/characters/_logo-bold.svg?raw";
 import aiChat from "../assets/characters/ai_chat.svg?raw";
 import base from "../assets/characters/base.svg?raw";
 import board from "../assets/characters/excalidraw_board.svg?raw";
+import celebrating from "../assets/characters/celebrating.svg?raw";
 import inbox from "../assets/characters/inbox.svg?raw";
 import knowledge from "../assets/characters/knowledge_system.svg?raw";
 import notes from "../assets/characters/notes.svg?raw";
 import rest from "../assets/characters/rest.svg?raw";
+import searching from "../assets/characters/searching.svg?raw";
 import staysLocal from "../assets/characters/stays_local.svg?raw";
+import waving from "../assets/characters/waving.svg?raw";
 
 /** Each character maps to a part of the app (used in that surface's empty state). */
 export type CharacterName =
@@ -36,7 +46,10 @@ export type CharacterName =
   | "board"
   | "knowledge"
   | "local"
-  | "rest";
+  | "rest"
+  | "waving"
+  | "searching"
+  | "celebrating";
 
 const SVGS: Record<CharacterName, string> = {
   base,
@@ -47,6 +60,9 @@ const SVGS: Record<CharacterName, string> = {
   knowledge,
   local: staysLocal,
   rest,
+  waving,
+  searching,
+  celebrating,
 };
 
 interface CharacterProps {

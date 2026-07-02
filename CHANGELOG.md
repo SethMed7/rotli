@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.1] — 2026-07-02
+
+### Added
+- **Three new quokka poses** — `waving`, `searching`, and `celebrating` — generated against the
+  base character as a style reference (gpt-image-2), binarized, and vector-traced back into the
+  set's single-path `currentColor` format. Same character, same line weight, big catchlight eyes.
+- **Onboarding got its moments:** the welcome step now greets you with the waving quokka, and
+  the final "You're set" step celebrates (confetti). `searching` is vendored and registered,
+  reserved for a future search surface.
+
 ## [0.21.0] — 2026-07-02
 
 The quokkas, properly.
