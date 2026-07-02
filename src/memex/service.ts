@@ -36,6 +36,7 @@ import {
   composeNote,
   noteStem,
   parsePrimaryUser,
+  setAttachedTo,
   today,
   ulid,
 } from "./contract";
@@ -112,6 +113,22 @@ export async function writeChat(input: WriteChatInput): Promise<{ slug: string; 
   }
   const path = await memexWriteChat(instance.root, slug, contents);
   return { slug, path };
+}
+
+/** Point an EXISTING chat at its attached note (`attachedTo: [[<stem>]]`) —
+ * the header note-toggle's lazy link, written after the note materializes. */
+export async function setChatAttachedTo(
+  instance: MemexInstance,
+  slug: string,
+  stem: string,
+): Promise<void> {
+  const rel = `chats/${slug}.md`;
+  if (!canWrite(rel, instance.perms)) {
+    throw new Error("This memex is read-only for rotli — connect it with write access first.");
+  }
+  const existing = await memexRead(instance.root, rel);
+  const next = setAttachedTo(existing, stem);
+  if (next !== existing) await memexWriteChat(instance.root, slug, next);
 }
 
 export const listChats = (instance: MemexInstance): Promise<MemexChatSummary[]> =>

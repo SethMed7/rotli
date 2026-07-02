@@ -86,6 +86,16 @@ export function useWriteChat() {
   });
 }
 
+/** Point an existing chat at its attached note (the header note-toggle link). */
+export function useSetChatAttachedTo() {
+  return useMutation({
+    mutationFn: ({ instance, slug, stem }: { instance: MemexInstance; slug: string; stem: string }) =>
+      svc.setChatAttachedTo(instance, slug, stem),
+    onSuccess: (_res, vars) =>
+      queryClient.invalidateQueries({ queryKey: memexKeys.chats(vars.instance.id) }),
+  });
+}
+
 export function useRunValidate() {
   return useMutation({
     mutationFn: (instance: MemexInstance) => svc.runValidate(instance),

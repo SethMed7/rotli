@@ -10,6 +10,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] — 2026-07-02
+
+Install on-device models straight from Settings — and pick any of them per chat.
+
+### Added
+- **Local model installer (Settings → AI Models → On this Mac):** browse a curated set of
+  MLX chat models or paste any Hugging Face repo id, and rotli downloads the weights (via
+  the memex-ai venv's `hf` CLI) into the shared store with a live progress bar + Cancel,
+  then registers them. Installed models can be **uninstalled** (registry entry dropped,
+  dir trashed — never a hard `rm`).
+- **Every installed model is pickable per chat.** The shared MLX server (bumped to 0.3,
+  live-verified) now honors the request's `model`: a known id (registry id or models/ dir
+  name, resolution locked inside the shared store) swaps the single loaded slot on demand.
+  Models load lazily and idle-unload after ~10 minutes — nothing runs 24/7. A request
+  without a model (Breve, voz, warmup) gets the pinned default, byte-for-byte unchanged.
+- **Default model control:** one local model is the **default** — what no-model callers
+  get. "Make default" repoints the server's launchd env (PlistBuddy `Set` + a reload); the
+  default model refuses uninstall so other memex apps never lose their model.
+
+### Changed
+- rotli now *writes* two shared memex-ai artifacts (it only read them before): spliced
+  `registry.json` model entries and the MLX server's `MEMEX_MLX_MODEL` launchd env. Both
+  are surgical and reversible — the registry rewrite preserves every other key (atomic
+  tmp+rename), and the plist edit is a single value `Set`.
+
+### Notes
+- Connected models (Claude/Codex/Antigravity CLIs, Gemini API) are entirely separate
+  lanes and unaffected by local model choices.
+- Downloads shell the venv's `hf` binary (`~/.memex/ai/mlx-venv/bin/hf`); a repo id is
+  validated `owner/name` and the install dir name is a safe slug, so a download can't
+  escape `~/.memex/ai/models/`. Success is verified by config + weight files on disk, never
+  by the CLI's stderr.
+- The shared `~/.memex/ai/mlx-server.py` was updated in place (0.2 → 0.3, backup kept at
+  `mlx-server.py.bak-0.2`); its registry `lifecycle` note documents the new behavior.
+
+## [0.22.0] — 2026-07-02
+
+The AI Chat flow, rethought: connected subscription models, hybrid routing, and the
+chat that organizes itself.
+
+### Added
+- **Connected models (Settings → AI Models):** chat can now run on the subscriptions
+  already signed in on this Mac — **Claude Code** (Claude Pro/Max), **Codex** (ChatGPT),
+  **Antigravity** (Google AI Pro/Ultra; bundles Gemini 3.x + Claude 4.6 models) — plus a
+  bring-your-own-key **Gemini API** lane. Each lane shows a live status chip (installed /
+  signed in / ready) and an enable toggle; the Gemini key lives in the **macOS Keychain**
+  (native Keychain Services — never argv, never a config file, never IPC'd back out).
+  Rust drives each CLI as a **tool-less, sandboxed completion backend** under the existing
+  agent loop (hardcoded binary + model allowlist, kill-on-cancel, per-step deadline;
+  agy runs single-flight). The picker groups **On this Mac · Connected · Presets** and is
+  honest about locality; **secure notes stay refused** to every connected lane (the
+  `endpoint: ""` locality check fails closed + a secret-shaped-transcript egress backstop
+  in the CLI bridge itself).
+- **Hybrid presets:** settings-defined routing — an **organizer** model reads each message
+  and picks a route ("when …" → model); the routed model runs the normal agent loop; an
+  optional **fallback** retries a failed executor once. Presets ride the model picker as
+  pseudo-models, statuses narrate the hops ("routing via gemma… → Gemini 3 Pro"), and
+  routing never fails a turn (garbage/organizer-down → first route). **Generate
+  templates** drafts three presets from "what do you mostly use chat for?".
+- **Every chat carries a note:** the chat header's note button opens the chat's attached
+  note — materialized lazily into `wiki/_inbox/` staging on first open (`attachedTo:`
+  frontmatter + the note's `## Chat` backlink) — as a **new tab or a right split**
+  (Settings → AI Models → Chat & its note).
+- **Chat width:** Narrow / Comfort / Wide from the chat header — the notes Aa measure
+  vocabulary, per-chat, persisted, carried from an unsaved chat to its slug on first send.
+- **`generate_image` chat tool + assets drawer:** chats on a connected engine (Codex
+  gpt-image / Antigravity Nano Banana — a Settings radio) can generate images; PNGs land
+  in `storage/chats/<slug>/` (path pinned by Rust from a registered root + safe slug —
+  the model never shapes it; postcondition: the file exists non-empty). The header's
+  assets button opens a thumbnail drawer; a click opens the file in a tab. Image prompts
+  ride the same secret-egress guard as the web tools.
+
+### Changed
+- **The send button is a button now** — a filled circular ↑ (ChatGPT/Claude style);
+  spinner while a local model thinks, a real **stop** square for connected models
+  (Rust kills the subprocess mid-step).
+- The agent loop grew a **frontier adapter + 200k budget tier** for connected models
+  (terser system-style scaffold, same one-JSON tool protocol, deeper read/history/step
+  caps) — local models keep the tuned Gemma scaffold and their exact tiers.
+
+### Notes
+- Personal-use lane: rotli drives the **user's own** installed, signed-in CLIs on their
+  own machine. Distributing this to other users would need each vendor's blessing
+  (Anthropic requires approval for third-party subscription auth) — fine for 0.x.
+- Gemini CLI's OAuth/subscription lane died 2026-06-18 (Google's transition to
+  Antigravity); that's why the Google-subscription path is `agy` and Gemini is
+  API-key-only.
+
 ## [0.21.1] — 2026-07-02
 
 ### Added

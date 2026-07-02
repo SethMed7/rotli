@@ -1,6 +1,8 @@
 // UI state only (the Zustand law). Data lives behind src/services/.
 
+import type { HybridPreset, ProviderId } from "../ai/models";
 import { inboxFolderId } from "../services/notes";
+import type { Measure } from "./noteStyle";
 import { create } from "zustand";
 
 export type ThemeSetting = "light" | "dark" | "system";
@@ -292,6 +294,26 @@ interface UiState {
   setChatWeb: (slug: string, on: boolean) => void;
   /** Drop one chatWeb key — the unsaved-pane key after bind carries it to the slug. */
   clearChatWeb: (key: string) => void;
+  /** Per-chat measure (Narrow/Comfort/Wide — the notes Aa vocabulary), keyed
+   * exactly like chatWeb (slug, or "unsaved:<paneId>" until the first send
+   * binds it). Missing key = comfort. Persisted (unsaved keys excluded). */
+  chatMeasure: Record<string, Measure>;
+  setChatMeasure: (key: string, m: Measure) => void;
+  clearChatMeasure: (key: string) => void;
+  /** Where a chat's attached note opens from the header toggle: a new tab in
+   * this pane, or a right split beside the chat. Persisted. */
+  chatNoteOpen: "tab" | "split";
+  setChatNoteOpen: (v: "tab" | "split") => void;
+  /** Connected subscription models (Settings → AI Models): which lanes are
+   * enabled. A lane must ALSO detect as installed+authed to serve. Persisted. */
+  aiProviders: Record<ProviderId, boolean>;
+  setAiProvider: (id: ProviderId, on: boolean) => void;
+  /** Hybrid model presets (organizer → routes → fallback). Persisted. */
+  hybridPresets: HybridPreset[];
+  setHybridPresets: (list: HybridPreset[]) => void;
+  /** Which connected engine draws the chat's generate_image tool. Persisted. */
+  imageEngine: "codex" | "agy";
+  setImageEngine: (e: "codex" | "agy") => void;
   /** How the Storage destination groups its binaries (a Settings knob): by Type
    * (default), Date, or Folder (raw on-disk). Persisted. */
   storageGrouping: "type" | "date" | "folder";
@@ -473,6 +495,22 @@ export const useUiStore = create<UiState>((set, get) => ({
       const { [key]: _gone, ...rest } = s.chatWeb;
       return { chatWeb: rest };
     }),
+  chatMeasure: {},
+  setChatMeasure: (key, m) => set((s) => ({ chatMeasure: { ...s.chatMeasure, [key]: m } })),
+  clearChatMeasure: (key) =>
+    set((s) => {
+      if (!(key in s.chatMeasure)) return s;
+      const { [key]: _gone, ...rest } = s.chatMeasure;
+      return { chatMeasure: rest };
+    }),
+  chatNoteOpen: "tab",
+  setChatNoteOpen: (v) => set({ chatNoteOpen: v }),
+  aiProviders: { claude: false, codex: false, agy: false, gemini: false },
+  setAiProvider: (id, on) => set((s) => ({ aiProviders: { ...s.aiProviders, [id]: on } })),
+  hybridPresets: [],
+  setHybridPresets: (list) => set({ hybridPresets: list }),
+  imageEngine: "codex",
+  setImageEngine: (e) => set({ imageEngine: e }),
   storageGrouping: "type",
   setStorageGrouping: (g) => set({ storageGrouping: g }),
   fileMetadata: "hide",

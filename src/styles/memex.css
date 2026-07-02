@@ -16,10 +16,106 @@
   padding: 13px 24px;
   flex: 0 0 auto;
   /* align the title to the same centered column as the thread + composer (Seth,
-     2026-07-01) — the whole chat reads as one centered column, no divider line. */
+     2026-07-01) — the whole chat reads as one centered column, no divider line.
+     The column is the per-chat measure (--chat-measure, set inline by the
+     surface; Narrow/Comfort/Wide — Seth, 2026-07-02) + the 24px scroll padding. */
   width: 100%;
-  max-width: 788px; /* 740 thread + 24px each side of the scroll padding */
+  max-width: calc(var(--chat-measure, 740px) + 48px);
   margin: 0 auto;
+}
+/* header tools (right-pinned): the width picker + the attached-note toggle */
+.chat-head-tools {
+  position: relative;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-measure-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 14%, transparent);
+}
+.chat-measure-seg {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  padding: 5px 26px 5px 10px;
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+.chat-measure-seg:hover {
+  background: var(--tint);
+  color: var(--text);
+}
+.chat-measure-seg.sel {
+  background: var(--tint);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+/* the chat's generated-assets drawer */
+.chat-assets-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: 264px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 14%, transparent);
+}
+.chat-assets-empty {
+  margin: 4px 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.chat-assets-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.chat-asset {
+  display: block;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  background: var(--surface-2);
+  overflow: hidden;
+  cursor: pointer;
+  aspect-ratio: 1;
+}
+.chat-asset img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.chat-asset:hover {
+  border-color: var(--text-muted);
+}
+.chat-asset-wait {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-muted);
 }
 .chat-head h2 {
   font-family: var(--font-display);
@@ -208,7 +304,7 @@
    message content push the thread past its max-width and left-pin it (that was the
    bug). min-width:0 + the block box keep it locked at 740, centered (Seth, 2026-07-01). */
 .chat-thread {
-  max-width: 740px;
+  max-width: var(--chat-measure, 740px);
   margin: 0 auto;
   min-width: 0;
 }
@@ -244,7 +340,7 @@
 }
 .chat-composer-inner {
   width: 100%;
-  max-width: 740px;
+  max-width: var(--chat-measure, 740px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -317,22 +413,39 @@
   outline: none;
   border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
 }
+/* the send button — a filled circle with an ↑ arrow (ChatGPT/Claude style,
+   Seth 2026-07-02); monochrome accent, so it lands in every theme */
 .chat-send {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border: none;
-  background: var(--tint);
-  color: var(--text);
-  font: inherit;
-  font-weight: 600;
-  font-size: 13px;
-  padding: 7px 16px;
-  border-radius: var(--r-control);
+  border-radius: 50%;
+  background: var(--accent-text);
+  color: var(--surface);
   cursor: pointer;
+  transition:
+    opacity var(--motion-exit) var(--motion-ease),
+    transform var(--motion-exit) var(--motion-ease);
+}
+.chat-send:not(:disabled):hover {
+  transform: scale(1.07);
 }
 .chat-send:disabled {
-  color: var(--text-muted);
   cursor: default;
-  opacity: 0.7;
+  opacity: 0.35;
+}
+.chat-send-spin {
+  animation: chat-send-spin 0.9s linear infinite;
+}
+@keyframes chat-send-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .chat-err {
   font-size: 12px;

@@ -11,15 +11,20 @@
 //
 // Still Increment 1: one-shot (no streaming), no @-context yet.
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { makeTauriHost } from "../ai/host";
+import { presetFor, runHybrid } from "../ai/hybrid";
 import { runAgent } from "../ai/loop";
+import { flattenModels, mergedModels } from "../ai/models";
 import type { ChatTurn, RunInput } from "../ai/types";
-import { activeInstance } from "../memex/config";
-import { readChat } from "../memex/service";
-import { useInstanceChats, useMemexConfig, useWriteChat } from "../memex/useMemex";
-import { chatModels, isTauri } from "../lib/tauri";
+import { CORPUS_INSTANCE_ID, activeInstance } from "../memex/config";
+import { readChat, writeNote } from "../memex/service";
+import { useInstanceChats, useMemexConfig, useSetChatAttachedTo, useWriteChat } from "../memex/useMemex";
+import { chatModels, cliCancel, fileAssetUrl, isTauri } from "../lib/tauri";
+import { useTransientPopover } from "../lib/popover";
+import { invalidateNotes, useNoteIndex } from "../services/hooks";
+import { type Measure } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
 import { usePanesStore } from "../state/panes";
 import { renderInline } from "../editor/render";
@@ -73,8 +78,141 @@ function ClipGlyph() {
   );
 }
 
+function NoteGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 1.8h5.5L13 5.3v8.9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.8a1 1 0 0 1 1-1z" />
+      <path d="M9.5 1.8v3.5H13M5.5 8.5h5M5.5 11h5" />
+    </svg>
+  );
+}
+function WidthGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.2 2.5v11M13.8 2.5v11" />
+      <path d="M4.6 8h6.8M4.6 8l1.8-1.8M4.6 8l1.8 1.8M11.4 8l-1.8-1.8M11.4 8l-1.8 1.8" />
+    </svg>
+  );
+}
+function SendGlyph() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 12.5v-9M4 7l4-3.5L12 7" />
+    </svg>
+  );
+}
+function SpinGlyph() {
+  return (
+    <svg className="chat-send-spin" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+      <path d="M8 1.8a6.2 6.2 0 1 1-6.2 6.2" />
+    </svg>
+  );
+}
+function StopGlyph() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <rect x="3" y="3" width="10" height="10" rx="2" />
+    </svg>
+  );
+}
+
 function deriveTitle(text: string): string {
   return text.split(/\s+/).slice(0, 6).join(" ").slice(0, 60) || "New chat";
+}
+
+/** Chat measure widths — comfort keeps the tuned 740 column (Seth, 2026-07-01);
+ * narrow/wide step around it. Same Aa vocabulary as notes, chat-tuned values. */
+const CHAT_MEASURE_PX: Record<Measure, number> = { narrow: 620, comfort: 740, wide: 1000 };
+
+const MEASURE_LABELS: { id: Measure; label: string }[] = [
+  { id: "narrow", label: "Narrow" },
+  { id: "comfort", label: "Comfort" },
+  { id: "wide", label: "Wide" },
+];
+
+function AssetsGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="2.8" width="12" height="10.4" rx="1.5" />
+      <circle cx="5.6" cy="6.4" r="1.1" />
+      <path d="M2.5 12 6.7 8.2l2.6 2.4 2.3-2 1.9 1.7" />
+    </svg>
+  );
+}
+
+/** One generated asset in the drawer — thumbnail via the asset protocol. */
+function AssetThumb({ id, onOpen }: { id: string; onOpen: () => void }) {
+  const url = useQuery({ queryKey: ["asset-url", id], queryFn: () => fileAssetUrl(id) });
+  const name = id.split("/").pop() ?? id;
+  return (
+    <button type="button" className="chat-asset" title={name} onClick={onOpen}>
+      {url.data ? <img src={url.data} alt={name} /> : <span className="chat-asset-wait">…</span>}
+    </button>
+  );
+}
+
+/** The chat's generated assets — everything under storage/chats/<slug>/. */
+function AssetsDrawer({
+  ids,
+  anchorRef,
+  onOpen,
+  onClose,
+}: {
+  ids: string[];
+  anchorRef: RefObject<HTMLElement | null>;
+  onOpen: (id: string) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useTransientPopover([ref, anchorRef], true, onClose);
+  return (
+    <div className="chat-assets-pop" ref={ref} role="dialog" aria-label="Chat assets">
+      {ids.length === 0 ? (
+        <p className="chat-assets-empty">
+          Nothing yet — ask the chat to generate an image and it lands here.
+        </p>
+      ) : (
+        <div className="chat-assets-grid">
+          {ids.map((id) => (
+            <AssetThumb key={id} id={id} onOpen={() => onOpen(id)} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The header width picker — the notes Aa measure, as a chat popover. */
+function MeasureMenu({
+  value,
+  anchorRef,
+  onPick,
+  onClose,
+}: {
+  value: Measure;
+  anchorRef: RefObject<HTMLElement | null>;
+  onPick: (m: Measure) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useTransientPopover([ref, anchorRef], true, onClose);
+  return (
+    <div className="chat-measure-pop" ref={ref} role="menu" aria-label="Chat width">
+      {MEASURE_LABELS.map((m) => (
+        <button
+          type="button"
+          key={m.id}
+          className={value === m.id ? "chat-measure-seg sel" : "chat-measure-seg"}
+          onClick={() => {
+            onPick(m.id);
+            onClose();
+          }}
+        >
+          {m.label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /** Render an assistant message as light markdown: ``` fenced code → <pre>, every
@@ -125,7 +263,17 @@ export function ChatSurface({
   const chatWeb = useUiStore((s) => s.chatWeb);
   const setChatWeb = useUiStore((s) => s.setChatWeb);
   const clearChatWeb = useUiStore((s) => s.clearChatWeb);
+  const chatMeasure = useUiStore((s) => s.chatMeasure);
+  const setChatMeasure = useUiStore((s) => s.setChatMeasure);
+  const clearChatMeasure = useUiStore((s) => s.clearChatMeasure);
+  const chatNoteOpen = useUiStore((s) => s.chatNoteOpen);
+  const imageEngine = useUiStore((s) => s.imageEngine);
   const bindChat = usePanesStore((s) => s.bindChat);
+  const openNote = usePanesStore((s) => s.openNote);
+  const openFile = usePanesStore((s) => s.openFile);
+  const splitRight = usePanesStore((s) => s.splitRight);
+  const noteIndex = useNoteIndex();
+  const setAttached = useSetChatAttachedTo();
 
   const cfg = useMemexConfig();
   const active = cfg.data ? activeInstance(cfg.data) : null;
@@ -138,7 +286,12 @@ export function ChatSurface({
     queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
     staleTime: Infinity,
   });
-  const modelList = models.data ?? [];
+  // + the connected lanes the user enabled (Settings → AI Models) + presets.
+  // Local models come first, so a stale pick falls back on-device.
+  const aiProviders = useUiStore((s) => s.aiProviders);
+  const hybridPresets = useUiStore((s) => s.hybridPresets);
+  const groups = mergedModels(models.data ?? [], aiProviders, hybridPresets);
+  const modelList = flattenModels(groups);
   const picked =
     modelList.find((m) => m.id === chatModelId) ??
     modelList.find((m) => m.isDefault) ??
@@ -156,8 +309,17 @@ export function ChatSurface({
   // but SAY it won't survive a reload (#11, audit 2026-07); cleared on the
   // next successful save.
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  // the attached-note toggle (header): creating/opening state + its error slot
+  const [noteBusy, setNoteBusy] = useState(false);
+  const [noteErr, setNoteErr] = useState<string | null>(null);
+  const [measureOpen, setMeasureOpen] = useState(false);
+  const [assetsOpen, setAssetsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const measureBtnRef = useRef<HTMLButtonElement>(null);
+  const assetsBtnRef = useRef<HTMLButtonElement>(null);
+  // the live turn's cancel key (connected CLIs only — Rust kills the child)
+  const requestRef = useRef<string | null>(null);
 
   const writable = active?.perms === "chats+inbox";
 
@@ -166,6 +328,8 @@ export function ChatSurface({
   // one globe click into every future fresh chat across relaunches (#7, audit 2026-07)
   const webKey = chatSlug ?? `unsaved:${paneId}`;
   const globeOn = chatWeb[webKey] ?? false;
+  // per-chat measure rides the same key; missing = the tuned comfort column
+  const measure: Measure = chatMeasure[webKey] ?? "comfort";
   // image attach is gated on the picked model's vision capability
   const canVision = picked?.vision ?? false;
   const visionModels = modelList.filter((m) => m.vision);
@@ -213,22 +377,42 @@ export function ChatSurface({
     setBusy(true);
     setStatus("thinking…");
 
-    const host = makeTauriHost(picked);
-    const model = { id: picked.id };
-    const runInput: RunInput =
-      imgs.length > 0
-        ? { history, userText, web: globeOn, model, images: imgs }
-        : { history, userText, web: globeOn, model };
+    const requestId = crypto.randomUUID();
+    requestRef.current = requestId;
+    const model = { id: picked.id, api: picked.api };
+    // the image tool needs a pinned assets dir — a SAVED chat only — and its
+    // engine's lane enabled; the globe doesn't gate it
+    const image =
+      chatSlug && aiProviders[imageEngine]
+        ? { root: active.root, slug: chatSlug, engine: imageEngine }
+        : undefined;
+    const runInput: RunInput = {
+      history,
+      userText,
+      web: globeOn,
+      model,
+      ...(imgs.length > 0 ? { images: imgs } : {}),
+      ...(image ? { imageTool: true } : {}),
+    };
+
+    // a preset pick routes through the hybrid layer; everything else is the
+    // normal loop. Both yield the same event stream.
+    const preset = presetFor(picked.id, hybridPresets);
+    const hostOpts = image ? { requestId, image } : { requestId };
+    const events = preset
+      ? runHybrid(preset, modelList, runInput, (m, o) => makeTauriHost(m, { ...hostOpts, ...o }), requestId)
+      : runAgent(makeTauriHost(picked, hostOpts), runInput);
 
     let reply = "";
     try {
-      for await (const ev of runAgent(host, runInput)) {
+      for await (const ev of events) {
         if (ev.type === "status") setStatus(ev.text);
         else if (ev.type === "final") reply = ev.text;
       }
     } catch (e) {
-      reply = `⚠ ${(e as Error)?.message ?? "the local model failed"}`;
+      reply = `⚠ ${(e as Error)?.message ?? "the model failed"}`;
     }
+    requestRef.current = null;
     setBusy(false);
 
     const failed = reply.startsWith("⚠");
@@ -259,6 +443,9 @@ export function ChatSurface({
         bindChat(paneId, res.slug); // this tab now IS that chat
         if (globeOn) setChatWeb(res.slug, true); // carry the globe to the saved chat
         clearChatWeb(webKey); // the pane-scoped unsaved key is spent (#7)
+        const m = chatMeasure[webKey];
+        if (m) setChatMeasure(res.slug, m); // carry the measure the same way
+        clearChatMeasure(webKey);
         setTitle("");
       }
       setSaveErr(null);
@@ -288,15 +475,139 @@ export function ChatSurface({
   // truncated + date/ulid-suffixed wire plumbing; the frontmatter `title` is
   // what the user named it (the sidebar/All-chats already show it). Slug stays
   // the fallback while the listing loads or for a title-less foreign chat.
-  const storedTitle = chatSlug ? chats.data?.find((c) => c.slug === chatSlug)?.title : null;
+  const summary = chatSlug ? chats.data?.find((c) => c.slug === chatSlug) : undefined;
+  const storedTitle = summary?.title ?? null;
+  // the chat's attached note, as its staging stem ("[[<slug>-<id6>]]" stripped)
+  const attachedStem = (summary?.attachedTo ?? "").replace(/^\[\[|\]\]$/g, "").trim();
+
+  // this chat's generated assets: everything under storage/chats/<slug>/ in the
+  // active root (wire ids are bare for the corpus, "<rootid>:rel" otherwise)
+  const assetPrefix =
+    active && chatSlug
+      ? `${active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`}storage/chats/${chatSlug}/`
+      : null;
+  const assetIds = assetPrefix
+    ? [...noteIndex.keys()].filter((id) => id.startsWith(assetPrefix)).sort()
+    : [];
+
+  /** Open the attached note per the Settings choice: a new tab here, or a
+   * right split beside the chat (split() focuses the new pane, so openNote
+   * lands in it). */
+  const openAttachedNote = (noteId: string) => {
+    if (chatNoteOpen === "split") {
+      splitRight();
+      openNote(noteId);
+    } else {
+      openNote(noteId, { newTab: true });
+    }
+  };
+
+  /** The header note toggle — every chat has a note; it MATERIALIZES on first
+   * open (lazy, so quick chats never litter the staging inbox with empties).
+   * An existing note is resolved by its stem's ULID tail — the id never changes
+   * when the organizer files it, so the match survives moves; a missing note
+   * (deleted) self-heals by creating a fresh one. */
+  const onNoteToggle = async () => {
+    if (!active || !chatSlug || noteBusy) return;
+    if (attachedStem) {
+      const tail = attachedStem.slice(-6).toLowerCase();
+      for (const id of noteIndex.keys()) {
+        if (id.slice(-6).toLowerCase() === tail) {
+          openAttachedNote(id);
+          return;
+        }
+      }
+      // not in the index (deleted, or a cold listing) — fall through, re-create
+    }
+    setNoteBusy(true);
+    setNoteErr(null);
+    try {
+      const name = storedTitle || chatSlug.replace(/-/g, " ");
+      const { id, stem } = await writeNote({
+        instance: active,
+        body: `# ${name}\n\n> chat: [[${chatSlug}]]\n\n`,
+      });
+      await setAttached.mutateAsync({ instance: active, slug: chatSlug, stem });
+      await invalidateNotes();
+      const prefix = active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`;
+      openAttachedNote(`${prefix}${id}`);
+    } catch (e) {
+      setNoteErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setNoteBusy(false);
+    }
+  };
 
   return (
-    <div className="chat-surface">
+    <div
+      className="chat-surface"
+      style={{ "--chat-measure": `${CHAT_MEASURE_PX[measure]}px` } as CSSProperties}
+    >
       <header className="chat-head">
         <h2 className="chat-title-h">
           {chatSlug ? storedTitle || chatSlug.replace(/-/g, " ") : "New chat"}
         </h2>
         {active && <span className="chat-inst">· {active.label}</span>}
+        {active && (
+          <div className="chat-head-tools">
+            {assetIds.length > 0 && (
+              <>
+                <button
+                  ref={assetsBtnRef}
+                  type="button"
+                  className="chat-tool"
+                  title={`Assets generated in this chat (${assetIds.length})`}
+                  onClick={() => setAssetsOpen((v) => !v)}
+                >
+                  <AssetsGlyph />
+                </button>
+                {assetsOpen && (
+                  <AssetsDrawer
+                    ids={assetIds}
+                    anchorRef={assetsBtnRef}
+                    onOpen={(id) => {
+                      setAssetsOpen(false);
+                      openFile(id, { newTab: true });
+                    }}
+                    onClose={() => setAssetsOpen(false)}
+                  />
+                )}
+              </>
+            )}
+            <button
+              ref={measureBtnRef}
+              type="button"
+              className="chat-tool"
+              title="Chat width — Narrow / Comfort / Wide"
+              onClick={() => setMeasureOpen((v) => !v)}
+            >
+              <WidthGlyph />
+            </button>
+            {measureOpen && (
+              <MeasureMenu
+                value={measure}
+                anchorRef={measureBtnRef}
+                onPick={(m) => setChatMeasure(webKey, m)}
+                onClose={() => setMeasureOpen(false)}
+              />
+            )}
+            <button
+              type="button"
+              className={attachedStem ? "chat-tool on" : "chat-tool"}
+              disabled={!chatSlug || !writable || noteBusy}
+              title={
+                !chatSlug
+                  ? "Send a message first — the note attaches to the saved chat"
+                  : attachedStem
+                    ? "Open this chat's note"
+                    : "Create this chat's note"
+              }
+              onClick={() => void onNoteToggle()}
+            >
+              <NoteGlyph />
+            </button>
+          </div>
+        )}
       </header>
 
       {!isTauri() ? (
@@ -347,6 +658,11 @@ export function ChatSurface({
                 <p className="file-err chat-save-err" role="alert">
                   ⚠ This conversation couldn’t be saved — it stays for this session but won’t
                   survive a reload. {saveErr}
+                </p>
+              )}
+              {noteErr && (
+                <p className="file-err chat-save-err" role="alert">
+                  ⚠ Couldn’t create this chat’s note. {noteErr}
                 </p>
               )}
             </div>
@@ -436,7 +752,14 @@ export function ChatSurface({
                   />
                   <div className="chat-box-foot">
                     {modelList.length > 0 && (
-                      <label className="chat-model" title="On-device model — from your memex AI store">
+                      <label
+                        className="chat-model"
+                        title={
+                          picked && picked.api !== "generate" && picked.provider !== "mlx" && picked.provider !== "llamacpp"
+                            ? "Connected model — runs on your subscription, this chat leaves your Mac"
+                            : "On-device model — from your memex AI store"
+                        }
+                      >
                         <select
                           className="chat-model-select"
                           value={picked?.id ?? ""}
@@ -446,11 +769,31 @@ export function ChatSurface({
                           }}
                           onKeyDown={(e) => e.stopPropagation()}
                         >
-                          {modelList.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.label}
-                            </option>
-                          ))}
+                          <optgroup label="On this Mac">
+                            {groups.local.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                          {groups.connected.length > 0 && (
+                            <optgroup label="Connected">
+                              {groups.connected.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {groups.presets.length > 0 && (
+                            <optgroup label="Presets">
+                              {groups.presets.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
                         </select>
                       </label>
                     )}
@@ -476,14 +819,29 @@ export function ChatSurface({
                       <ClipGlyph />
                     </button>
                     <span className="chat-box-grow" />
-                    <button
-                      type="button"
-                      className="chat-send"
-                      disabled={busy || !message.trim()}
-                      onClick={() => void send()}
-                    >
-                      {busy ? "…" : "Send"}
-                    </button>
+                    {(() => {
+                      // connected CLIs (and presets, which may route to one)
+                      // cancel for real — Rust kills the child mid-step
+                      const cancellable = picked?.api === "cli" || picked?.api === "preset";
+                      return (
+                        <button
+                          type="button"
+                          className="chat-send"
+                          aria-label={busy && cancellable ? "Stop" : "Send"}
+                          title={busy && cancellable ? "Stop this reply" : undefined}
+                          disabled={busy ? !cancellable : !message.trim()}
+                          onClick={() => {
+                            if (busy) {
+                              if (requestRef.current) void cliCancel(requestRef.current).catch(() => {});
+                              return;
+                            }
+                            void send();
+                          }}
+                        >
+                          {busy ? cancellable ? <StopGlyph /> : <SpinGlyph /> : <SendGlyph />}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

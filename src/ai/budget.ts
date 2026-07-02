@@ -27,12 +27,27 @@ export interface Budget {
 
 export interface ModelMeta {
   id: string;
+  /** Transport hint: "cli" = a connected subscription CLI (frontier-class);
+   * "openai"/"generate" = the local server wire shapes. Optional — existing
+   * `{ id }` callers keep their local tiers untouched. */
+  api?: string;
 }
 
 /** Approx context window (tokens), inferred from the model id family (with a
  * conservative default). The client uses this to size every retrieval budget. */
 export function contextWindowFor(model: ModelMeta): number {
   const id = model.id.toLowerCase();
+  // the connected lanes (subscription CLIs + the Gemini key lane) are all
+  // 200k-class. Checked FIRST, and strictly above the local families, so no
+  // local id can drift into the frontier tier (nor the reverse).
+  if (
+    model.api === "cli" ||
+    /\b(sonnet|opus|haiku|fable)\b/.test(id) ||
+    id.includes("gpt-5") ||
+    id.includes("gemini-")
+  ) {
+    return 200_000;
+  }
   if (id.includes("gemma-3") || id.includes("gemma3") || id.includes("gemma4")) return 128_000;
   if (id.includes("qwen2.5") || id.includes("qwen3") || id.includes("1.5b") || id.includes("3b")) return 32_000;
   return 8_000;
@@ -41,6 +56,20 @@ export function contextWindowFor(model: ModelMeta): number {
 /** The retrieval budget for a model — a few tiers by context window. */
 export function budgetFor(model: ModelMeta): Budget {
   const ctx = contextWindowFor(model);
+  // the frontier tier sits ABOVE the local 128k family on purpose — gemma-3
+  // (128k) must keep its tuned local budget, not inherit the frontier one
+  if (ctx >= 180_000) {
+    return {
+      maxHits: 8,
+      snippetChars: 220,
+      readNoteChars: 6000,
+      webFetchChars: 12_000,
+      maxIndexChars: 6000,
+      maxScratchChars: 20_000,
+      maxHistoryChars: 24_000,
+      maxSteps: 8,
+    };
+  }
   if (ctx >= 64_000) {
     return {
       maxHits: 6,

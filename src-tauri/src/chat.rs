@@ -17,6 +17,12 @@ const DEFAULT_ENDPOINT: &str = "http://localhost:11435";
 pub(crate) const DEFAULT_MODEL: &str = "gemma-3-12b-it-qat-4bit";
 const DEFAULT_API: &str = "generate";
 
+/// Gemini's OpenAI-compatible surface (Settings → AI Models, bring-your-own
+/// key). Rides this same openai pipeline; the Bearer comes from the Keychain.
+/// NON-LOCAL on purpose — `egress_allowed` + `corpus_read_ai` treat it as the
+/// remote it is (secure notes never ride to it).
+pub(crate) const GEMINI_OPENAI_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
+
 /// The interactive paths wait up to two minutes; the background daemon uses a
 /// much shorter caller-set timeout so it never camps on the model server.
 const CHAT_TIMEOUT: Duration = Duration::from_secs(120);
@@ -35,6 +41,13 @@ pub struct ChatModel {
     vision: bool,
     #[serde(rename = "isDefault")]
     is_default: bool,
+    /// Is this the shared MLX server's PINNED DEFAULT (its launchd env)? Since
+    /// server 0.3 every installed mlx model serves on demand (the request's
+    /// `model` swaps the slot), so this no longer gates the picker — it marks
+    /// which model no-model callers (Breve, warmup) get, and what Settings
+    /// badges as "default". llama.cpp models are never the mlx default.
+    #[serde(rename = "localDefault")]
+    local_default: bool,
 }
 
 // The one-shot `chat_complete` command lived here until the 2026-07 audit (#68):
@@ -89,6 +102,7 @@ fn default_models() -> Vec<ChatModel> {
         api: DEFAULT_API.to_string(),
         vision: true, // gemma-3 is natively multimodal (served once mlx-vlm is wired)
         is_default: true,
+        local_default: true, // the sole fallback model IS the pinned one
     }]
 }
 
@@ -99,6 +113,10 @@ fn read_models() -> Option<Vec<ChatModel>> {
     let reg: serde_json::Value = serde_json::from_str(&raw).ok()?;
     let providers = reg.get("providers")?;
     let models = reg.get("models")?.as_array()?;
+
+    // which mlx model the shared server is PINNED to (its launchd env) — the
+    // default for no-model callers; every registered mlx model serves on demand
+    let default_mlx = crate::localmodel::local_model_default();
 
     let mut out: Vec<ChatModel> = Vec::new();
     let mut picked_default = false;
@@ -139,6 +157,19 @@ fn read_models() -> Option<Vec<ChatModel>> {
         }
         // vision capability: the model entry opts in with `vision: true`.
         let vision = m.get("vision").and_then(|v| v.as_bool()).unwrap_or(false);
+        // the shared server's pinned default (a badge + the no-model fallback,
+        // NOT a usability gate — server 0.3 swaps to any requested mlx model)
+        let model_path = m.get("path").and_then(|v| v.as_str());
+        let local_default = if provider == "mlx" {
+            match (model_path, default_mlx.as_deref()) {
+                (Some(p), Some(a)) => same_model_path(p, a),
+                // no plist yet (fresh setup / no launchd) → trust the registry default
+                (Some(_), None) => is_default,
+                _ => false,
+            }
+        } else {
+            false
+        };
         out.push(ChatModel {
             label: format!("{id} · {}", provider_human(&provider)),
             id,
@@ -147,6 +178,7 @@ fn read_models() -> Option<Vec<ChatModel>> {
             api,
             vision,
             is_default,
+            local_default,
         });
     }
     if out.is_empty() {
@@ -159,6 +191,20 @@ fn read_models() -> Option<Vec<ChatModel>> {
         }
     }
     Some(out)
+}
+
+/// Two on-disk model paths refer to the same model — trailing-slash tolerant,
+/// canonicalized when both resolve (a symlinked store, `..`), else trimmed
+/// string equality (the common case: the registry path IS the plist env).
+fn same_model_path(a: &str, b: &str) -> bool {
+    let trim = |s: &str| s.trim_end_matches('/').to_string();
+    if trim(a) == trim(b) {
+        return true;
+    }
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(pa), Ok(pb)) => pa == pb,
+        _ => false,
+    }
 }
 
 fn provider_human(provider: &str) -> &str {
@@ -351,7 +397,7 @@ fn messages_openai(
     endpoint: &str,
 ) -> Result<String, String> {
     ensure_llamacpp_up(endpoint);
-    let url = format!("{base}/v1/chat/completions");
+    let url = openai_url(base);
     let msgs: Vec<serde_json::Value> = messages.iter().map(wire_to_openai).collect();
     let body = serde_json::json!({
         "model": model,
@@ -361,12 +407,12 @@ fn messages_openai(
         "messages": msgs,
     });
     let mut req = ureq::post(&url).timeout(Duration::from_secs(120));
-    if let Some(key) = read_api_key() {
+    if let Some(key) = openai_bearer(base)? {
         req = req.set("Authorization", &format!("Bearer {key}"));
     }
     let resp = req
         .send_json(body)
-        .map_err(|e| format!("local model unreachable ({e}) — is it running on {endpoint}?"))?;
+        .map_err(|e| format!("model unreachable ({e}) — endpoint {endpoint}"))?;
     let json: serde_json::Value = resp
         .into_json()
         .map_err(|e| format!("bad model response: {e}"))?;
@@ -394,6 +440,29 @@ fn wire_to_openai(m: &WireMsg) -> serde_json::Value {
         parts.push(serde_json::json!({ "type": "image_url", "image_url": { "url": url } }));
     }
     serde_json::json!({ "role": m.role, "content": parts })
+}
+
+/// The chat-completions URL for an openai-shaped base. Local servers
+/// (llama.cpp) mount at `/v1/chat/completions`; Gemini's compatibility base
+/// already ends in `/openai` and mounts directly at `/chat/completions`.
+fn openai_url(base: &str) -> String {
+    if base.ends_with("/openai") {
+        format!("{base}/chat/completions")
+    } else {
+        format!("{base}/v1/chat/completions")
+    }
+}
+
+/// Which Bearer an openai-shaped base gets: Gemini → the Keychain key (a
+/// MISSING key is a hard, actionable error — never an unauthenticated call);
+/// local llama.cpp → the supervisor's 0600 file key, absent = no header.
+fn openai_bearer(base: &str) -> Result<Option<String>, String> {
+    if base.starts_with(GEMINI_OPENAI_BASE) {
+        return crate::keychain::get_secret("gemini-api-key")
+            .map(Some)
+            .ok_or_else(|| "Gemini needs its API key — add it in Settings → AI Models.".to_string());
+    }
+    Ok(read_api_key())
 }
 
 /// The 0600 local API key the llama.cpp supervisor expects (`--api-key`). None if
@@ -451,6 +520,23 @@ mod tests {
         // loopback hidden behind userinfo still resolves to the REAL host
         assert!(endpoint_is_local("http://evil.com@127.0.0.1:11435"));
         assert!(!endpoint_is_local("http://127.0.0.1@evil.com:11435"));
+    }
+
+    #[test]
+    fn openai_url_branches_on_the_gemini_base() {
+        // local llama.cpp mounts under /v1; Gemini's compat base already ends
+        // in /openai and mounts directly at /chat/completions
+        assert_eq!(openai_url("http://localhost:11436"), "http://localhost:11436/v1/chat/completions");
+        assert_eq!(
+            openai_url(GEMINI_OPENAI_BASE),
+            format!("{GEMINI_OPENAI_BASE}/chat/completions")
+        );
+    }
+
+    #[test]
+    fn gemini_base_is_never_local() {
+        // the whole secure-note gate hangs on this: the Gemini lane is REMOTE
+        assert!(!endpoint_is_local(GEMINI_OPENAI_BASE));
     }
 
     #[test]

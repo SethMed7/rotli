@@ -23,11 +23,12 @@ interface Calls {
   readNote: string[];
   webSearch: string[];
   webFetch: string[];
+  generateImage: string[];
 }
 
 function fakeHost(replies: string[], over: Partial<Host> = {}): { host: Host; calls: Calls } {
   let i = 0;
-  const calls: Calls = { searchNotes: [], readNote: [], webSearch: [], webFetch: [] };
+  const calls: Calls = { searchNotes: [], readNote: [], webSearch: [], webFetch: [], generateImage: [] };
   const host: Host = {
     complete: async () => replies[i++] ?? '{"final":"(script exhausted)"}',
     searchNotes: async (q) => {
@@ -46,6 +47,10 @@ function fakeHost(replies: string[], over: Partial<Host> = {}): { host: Host; ca
     webFetch: async (url) => {
       calls.webFetch.push(url);
       return "fetched web page text";
+    },
+    generateImage: async (prompt) => {
+      calls.generateImage.push(prompt);
+      return "storage/chats/test/img-01x.png";
     },
     knowledgeMap: async () => "## Projects\n- Pricing  {id: n1}",
     ...over,
@@ -254,6 +259,36 @@ describe("runAgent", () => {
     ]);
     await run(host, { history: [], userText: "latest rust?", web: true });
     expect(calls.webSearch).toEqual(["rust 2024 release"]);
+  });
+
+  test("generate_image dispatches only when imageTool is on", async () => {
+    const { host, calls } = fakeHost([
+      '{"tool":"generate_image","args":{"prompt":"a warm quokka sticker"}}',
+      '{"final":"your image is ready"}',
+    ]);
+    const { final } = await run(host, { history: [], userText: "draw me a quokka", web: false, imageTool: true });
+    expect(final).toBe("your image is ready");
+    expect(calls.generateImage).toEqual(["a warm quokka sticker"]);
+  });
+
+  test("generate_image is refused when imageTool is off (never reaches the host)", async () => {
+    const { host, calls } = fakeHost([
+      '{"tool":"generate_image","args":{"prompt":"anything"}}', // invalid → observation
+      '{"final":"no images here"}',
+    ]);
+    const { final } = await run(host, { history: [], userText: "draw", web: false });
+    expect(final).toBe("no images here");
+    expect(calls.generateImage).toEqual([]);
+  });
+
+  test("the egress guard blocks a secret-shaped image prompt", async () => {
+    const { host, calls } = fakeHost([
+      '{"tool":"generate_image","args":{"prompt":"render sk-ant-api03-EXAMPLE0EXAMPLE0EXAM"}}',
+      '{"final":"not sending that"}',
+    ]);
+    const { final } = await run(host, { history: [], userText: "draw my key", web: false, imageTool: true });
+    expect(final).toBe("not sending that");
+    expect(calls.generateImage).toEqual([]); // guard fired before the host
   });
 
   test("forces a final answer when the step budget runs out", async () => {

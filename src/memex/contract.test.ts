@@ -22,6 +22,7 @@ import {
   parseAccessMode,
   parseMemexInfo,
   parsePrimaryUser,
+  setAttachedTo,
   slugify,
 } from "./contract";
 
@@ -113,6 +114,38 @@ describe("messages", () => {
     );
     expect(slug).toBe("rotli-architecture");
     expect(contents.endsWith("## Messages\n**you** · 2026-06-24 — hi\n")).toBe(true);
+  });
+});
+
+describe("setAttachedTo (the lazy chat↔note link)", () => {
+  test("rewrites the existing attachedTo line in place", () => {
+    const base = composeChatFile({ title: "Rotli architecture", source: "rotli" }, DATE);
+    const out = setAttachedTo(base, "rotli-architecture-x1y2z3");
+    expect(out).toContain("attachedTo: [[rotli-architecture-x1y2z3]]");
+    // exactly one attachedTo line survives
+    expect(out.match(/^attachedTo:/gm)?.length).toBe(1);
+    // nothing else moved
+    expect(out).toContain("title: Rotli architecture");
+    expect(out).toContain("## Messages");
+  });
+
+  test("inserts the line into a foreign frontmatter that lacks it", () => {
+    const foreign = "---\ntitle: Imported\n---\n\nbody\n";
+    const out = setAttachedTo(foreign, "note-abc123");
+    expect(out).toBe("---\ntitle: Imported\nattachedTo: [[note-abc123]]\n---\n\nbody\n");
+  });
+
+  test("never touches an attachedTo-shaped line in the BODY", () => {
+    const base =
+      composeChatFile({ title: "T", source: "rotli" }, DATE) + "attachedTo: [[decoy]]\n";
+    const out = setAttachedTo(base, "real-stem-abc123");
+    expect(out).toContain("attachedTo: [[decoy]]"); // the body line survives untouched
+    expect(out).toContain("attachedTo: [[real-stem-abc123]]"); // the frontmatter one is set
+  });
+
+  test("a file without frontmatter is left byte-identical", () => {
+    const bare = "# just a body\n";
+    expect(setAttachedTo(bare, "x")).toBe(bare);
   });
 });
 

@@ -310,6 +310,11 @@ export interface ChatModelInfo {
   /** Can this model see attached images? Gates the composer's image affordance. */
   vision: boolean;
   isDefault: boolean;
+  /** Is this the shared MLX server's PINNED DEFAULT (what no-model callers like
+   * Breve get)? A Settings badge + the uninstall guard — NOT a usability gate:
+   * since server 0.3 every installed mlx model serves on demand per request.
+   * Optional (absent on connected/preset synthetic models). */
+  localDefault?: boolean;
 }
 
 /** The on-device model bridge (chat + web). Same guard+normalize contract as
@@ -360,6 +365,103 @@ export function chatMessages(
     temperature: opts?.temperature,
     maxTokens: opts?.maxTokens,
   });
+}
+
+// ── connected models (the subscription CLIs + the Gemini key lane) ───────────
+
+/** Settings → AI Models: one connected lane's cheap local probe (binary +
+ * auth artifact; never a model call). */
+export interface CliDetect {
+  installed: boolean;
+  version: string | null;
+  authenticated: boolean;
+}
+
+export function cliDetect(provider: string): Promise<CliDetect> {
+  return aiInvoke("cli_detect", { provider });
+}
+
+/** One TOOL-LESS completion step on a connected CLI. Rust owns the binary +
+ * model allowlist and the sandbox flags; the prompt is the only caller-shaped
+ * input. `requestId` keys kill-on-cancel across the whole turn. */
+export function cliComplete(args: {
+  requestId: string;
+  provider: string;
+  model: string;
+  prompt: string;
+  timeoutMs?: number;
+}): Promise<string> {
+  return aiInvoke("cli_complete", { ...args });
+}
+
+/** Kill a live connected-CLI step (the composer's stop). Unknown id = no-op. */
+export function cliCancel(requestId: string): Promise<void> {
+  return aiInvoke("cli_cancel", { requestId });
+}
+
+// ── local model installer (the shared memex-ai store) ────────────────────────
+
+/** In-flight download progress — the Settings UI polls this while an install
+ * runs (byte total of the target dir; `done` once the weights land). */
+export interface LocalInstallProgress {
+  bytes: number;
+  done: boolean;
+}
+
+/** Download an MLX model from Hugging Face into `~/.memex/ai/models/<name>` and
+ * register it. Long-running (GB); poll `localModelInstallProgress(name)`. */
+export function localModelInstall(args: {
+  requestId: string;
+  repo: string;
+  name: string;
+  approxMb?: number;
+  vision?: boolean;
+}): Promise<void> {
+  return aiInvoke("local_model_install", { ...args });
+}
+export function localModelInstallProgress(name: string): Promise<LocalInstallProgress> {
+  return aiInvoke("local_model_install_progress", { name });
+}
+export function localModelInstallCancel(requestId: string): Promise<void> {
+  return aiInvoke("local_model_install_cancel", { requestId });
+}
+/** Make this installed model the shared server's DEFAULT (what no-model callers
+ * like Breve get) — per-chat picks don't need this; any installed model serves. */
+export function localModelSetDefault(id: string): Promise<void> {
+  return aiInvoke("local_model_set_default", { id });
+}
+/** The path the shared MLX server's default is pinned to (null if none/no server). */
+export function localModelDefault(): Promise<string | null> {
+  return aiInvoke("local_model_default");
+}
+/** Remove an installed model (registry entry + trashed dir). Refuses the default one. */
+export function localModelUninstall(id: string): Promise<void> {
+  return aiInvoke("local_model_uninstall", { id });
+}
+
+/** Generate an image into a CHAT'S assets (`storage/chats/<slug>/`) via the
+ * chosen connected engine. Rust pins the destination from the registered root
+ * + slug — the prompt never shapes the path. Returns the corpus-relative path. */
+export function generateImage(args: {
+  requestId: string;
+  root: string;
+  slug: string;
+  prompt: string;
+  engine: "codex" | "agy";
+}): Promise<string> {
+  return aiInvoke("generate_image", { ...args });
+}
+
+/** Keychain-backed secrets (Rust allowlists the names; a stored value never
+ * crosses IPC back — only exists/absent does). */
+export function secretStore(name: string, value: string): Promise<void> {
+  return aiInvoke("secret_store", { name, value });
+}
+export function secretExists(name: string): Promise<boolean> {
+  return aiInvoke("secret_exists", { name });
+}
+export function secretDelete(name: string): Promise<void> {
+  return aiInvoke("secret_delete", { name });
 }
 
 /** One web search result the model sees. */

@@ -20,17 +20,43 @@ import {
 } from "../keys/registry";
 import { GLASS_BG_SRC } from "../lib/glassBackgrounds";
 import {
+  type ChatModelInfo,
   type MemexValidateReport,
+  chatModels,
   checkForUpdate,
+  cliDetect,
   corpusOverview,
   downloadAndInstallUpdate,
   isTauri,
+  localModelInstall,
+  localModelInstallCancel,
+  localModelInstallProgress,
+  localModelSetDefault,
+  localModelUninstall,
   organizerRunOnce,
   organizerSetTrust,
   revealCorpus,
+  secretDelete,
+  secretExists,
+  secretStore,
   setDockVisible,
   setHideOnBlur,
 } from "../lib/tauri";
+import { makeTauriHost } from "../ai/host";
+import { suggestPresets } from "../ai/hybrid";
+import {
+  type HybridPreset,
+  type LocalCatalogEntry,
+  PROVIDER_IDS,
+  PROVIDER_LABELS,
+  type ProviderId,
+  flattenModels,
+  installableCatalog,
+  isValidRepo,
+  mergedModels,
+  nameFromRepo,
+} from "../ai/models";
+import { queryClient } from "../services/query";
 import { usePanesStore } from "../state/panes";
 import { useFolders } from "../services/hooks";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
@@ -67,7 +93,14 @@ import {
 } from "../memex/useMemex";
 import { CORPUS_INSTANCE_ID, type MemexInstance, type Perms } from "../memex/config";
 
-type SettingsPane = "general" | "hotkeys" | "appearance" | "brain" | "location" | "plugins";
+type SettingsPane =
+  | "general"
+  | "hotkeys"
+  | "appearance"
+  | "brain"
+  | "models"
+  | "location"
+  | "plugins";
 
 const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = [
   { id: "general", label: "General", glyph: LaptopGlyph },
@@ -76,6 +109,8 @@ const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = 
   // the organizer daemon's trust ladder (design §4.3) — minimal Phase-4 pane;
   // capability checkboxes / Pause / Reset Brain are Phase 5 (§4.8)
   { id: "brain", label: "Brain", glyph: NotesStackGlyph },
+  // connected subscription models + hybrid presets (Seth, 2026-07-02)
+  { id: "models", label: "AI Models", glyph: CloudGlyph },
   // Storage + Memory collapsed into one "Location" tab (Seth, 2026-06-27): your
   // notes folder *is* (or can become) a brain — one concept, not two overlapping
   // ones. See LocationPane below.
@@ -1154,6 +1189,588 @@ function BrainPane() {
   );
 }
 
+// ——— AI Models (Seth, 2026-07-02): connected subscription lanes + hybrid presets ———
+
+/** MB → a human size (the catalog's approx, and the live download total). */
+function formatSize(mb: number): string {
+  return mb >= 1000 ? `${(mb / 1000).toFixed(1)} GB` : `${Math.round(mb)} MB`;
+}
+
+/** An in-flight download: which model, its request id (for cancel), known size. */
+interface Installing {
+  requestId: string;
+  name: string;
+  label: string;
+  approxMb?: number;
+}
+
+/** "On this Mac" — installed local models + the installer. Every installed model
+ * is pickable per chat (the shared server swaps on demand, loads lazily, and
+ * idle-unloads); "default" marks what no-model callers (Breve) get. */
+function LocalModelsSection({
+  installed,
+  onChanged,
+}: {
+  installed: ChatModelInfo[];
+  onChanged: () => void;
+}) {
+  const [installing, setInstalling] = useState<Installing | null>(null);
+  const [repo, setRepo] = useState("");
+  const [note, setNote] = useState<{ text: string; err: boolean } | null>(null);
+
+  // poll the byte total while a download runs (mirrors the organizer poll)
+  const progress = useQuery({
+    queryKey: ["local-install", installing?.name],
+    queryFn: () => (installing ? localModelInstallProgress(installing.name) : Promise.resolve(null)),
+    enabled: !!installing,
+    refetchInterval: 1000,
+  });
+
+  const installedNames = new Set(installed.map((m) => m.id));
+  const picks = installableCatalog(installedNames);
+
+  const startInstall = (repoId: string, name: string, label: string, approxMb?: number, vision?: boolean) => {
+    if (installing) return;
+    const requestId = crypto.randomUUID();
+    setInstalling({ requestId, name, label, ...(approxMb ? { approxMb } : {}) });
+    setNote(null);
+    localModelInstall({ requestId, repo: repoId, name, ...(approxMb ? { approxMb } : {}), ...(vision ? { vision } : {}) })
+      .then(() => {
+        setNote({ text: `${label} installed.`, err: false });
+        onChanged();
+      })
+      .catch((e) => setNote({ text: e instanceof Error ? e.message : String(e), err: true }))
+      .finally(() => setInstalling(null));
+  };
+
+  const installPick = (e: LocalCatalogEntry) => startInstall(e.repo, e.name, e.label, e.approxMb, e.vision);
+
+  const installRepo = () => {
+    const r = repo.trim();
+    if (!isValidRepo(r)) {
+      setNote({ text: "That isn't a Hugging Face repo id (owner/name).", err: true });
+      return;
+    }
+    const name = nameFromRepo(r);
+    if (installedNames.has(name)) {
+      setNote({ text: `${name} is already installed.`, err: true });
+      return;
+    }
+    setRepo("");
+    startInstall(r, name, r);
+  };
+
+  const makeDefault = (id: string) => {
+    localModelSetDefault(id)
+      .then(() => {
+        setNote({ text: "Default updated — the local server is switching over.", err: false });
+        onChanged();
+      })
+      .catch((e) => setNote({ text: e instanceof Error ? e.message : String(e), err: true }));
+  };
+  const uninstall = (id: string) => {
+    localModelUninstall(id)
+      .then(() => {
+        setNote({ text: "Removed.", err: false });
+        onChanged();
+      })
+      .catch((e) => setNote({ text: e instanceof Error ? e.message : String(e), err: true }));
+  };
+
+  const bytes = progress.data?.bytes ?? 0;
+  const pct =
+    installing?.approxMb && installing.approxMb > 0
+      ? Math.min(99, Math.round((bytes / (installing.approxMb * 1_000_000)) * 100))
+      : null;
+
+  return (
+    <>
+      <h4 className="set-subhead">On this Mac</h4>
+      <p className="setnote">
+        Models that run entirely on your Mac. Pick any of them per chat — a model loads when
+        asked and unloads after a few idle minutes, so nothing runs around the clock. The
+        <b> default</b> is what your other memex apps (like Breve) use.
+      </p>
+      {installed.length > 0 && (
+        <div className="localmodel-list">
+          {installed.map((m) => {
+            const isDefault = m.localDefault === true;
+            return (
+              <div className="localmodel-row" key={m.id}>
+                <span className="localmodel-name">{m.label}</span>
+                {isDefault ? (
+                  <span className="localmodel-active">default</span>
+                ) : (
+                  m.provider === "mlx" && (
+                    <button type="button" className="ghostbtn" onClick={() => makeDefault(m.id)}>
+                      Make default
+                    </button>
+                  )
+                )}
+                {!isDefault && (
+                  <button type="button" className="ghostbtn" onClick={() => uninstall(m.id)}>
+                    Uninstall
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {installing ? (
+        <div className="localmodel-progress">
+          <div className="localmodel-prog-head">
+            <span>Downloading {installing.label}…</span>
+            <span>
+              {pct !== null ? `${pct}%` : formatSize(Math.round(bytes / 1_000_000))}
+            </span>
+          </div>
+          <div className="localmodel-track">
+            <div className="localmodel-fill" style={{ width: pct !== null ? `${pct}%` : "40%" }} />
+          </div>
+          <button
+            type="button"
+            className="ghostbtn"
+            onClick={() => {
+              localModelInstallCancel(installing.requestId).catch(() => {});
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <>
+          {picks.length > 0 && (
+            <div className="localmodel-list">
+              {picks.map((e) => (
+                <div className="localmodel-row" key={e.name}>
+                  <span className="localmodel-name">{e.label}</span>
+                  <span className="localmodel-size">
+                    {formatSize(e.approxMb)}
+                    {e.vision ? " · 👁" : ""}
+                  </span>
+                  <button type="button" className="ghostbtn" onClick={() => installPick(e)}>
+                    Install
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="aikey">
+            <input
+              className="aikey-input"
+              placeholder="Advanced: paste a Hugging Face repo id (e.g. mlx-community/…)"
+              value={repo}
+              onChange={(e) => setRepo(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+            />
+            <button type="button" className="ghostbtn" disabled={!repo.trim()} onClick={installRepo}>
+              Install
+            </button>
+          </div>
+        </>
+      )}
+      {note && <p className={note.err ? "setnote err" : "setnote"}>{note.text}</p>}
+    </>
+  );
+}
+
+
+const PROVIDER_DESC: Record<ProviderId, string> = {
+  claude: "Claude Code CLI — rides your Claude Pro/Max subscription.",
+  codex: "Codex CLI — rides your ChatGPT subscription.",
+  agy: "Antigravity CLI — your Google AI subscription (bundles Gemini + Claude models).",
+  gemini: "Gemini API — bring your own API key (stored in the macOS Keychain).",
+};
+
+function ProviderRow({ id }: { id: ProviderId }) {
+  const enabled = useUiStore((s) => s.aiProviders[id]);
+  const setAiProvider = useUiStore((s) => s.setAiProvider);
+  const det = useQuery({
+    queryKey: ["cli-detect", id],
+    queryFn: () => cliDetect(id),
+    enabled: isTauri(),
+    staleTime: 60_000,
+  });
+  const d = det.data;
+  const status = !isTauri()
+    ? "app only"
+    : !d
+      ? "checking…"
+      : !d.installed
+        ? "not installed"
+        : !d.authenticated
+          ? "not signed in"
+          : `ready${d.version ? ` · ${d.version}` : ""}`;
+  return (
+    <Toggle
+      on={enabled}
+      onChange={() => setAiProvider(id, !enabled)}
+      title={PROVIDER_LABELS[id]}
+      desc={`${PROVIDER_DESC[id]} Status: ${status}.`}
+    />
+  );
+}
+
+/** The Gemini key editor — the value goes straight to the Keychain and never
+ * comes back out; the row only knows whether one is saved. */
+function GeminiKeyRow() {
+  const [val, setVal] = useState("");
+  const [note, setNote] = useState<{ text: string; err: boolean } | null>(null);
+  const saved = useQuery({
+    queryKey: ["secret", "gemini-api-key"],
+    queryFn: () => secretExists("gemini-api-key"),
+    enabled: isTauri(),
+  });
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ["secret", "gemini-api-key"] });
+    void queryClient.invalidateQueries({ queryKey: ["cli-detect", "gemini"] });
+  };
+  return (
+    <div className="aikey">
+      <input
+        type="password"
+        className="aikey-input"
+        placeholder={saved.data ? "Key saved — paste a new one to replace it" : "Gemini API key…"}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => e.stopPropagation()}
+      />
+      <button
+        type="button"
+        className="ghostbtn"
+        disabled={!val.trim()}
+        onClick={() => {
+          secretStore("gemini-api-key", val.trim())
+            .then(() => {
+              setVal("");
+              setNote({ text: "Key saved to the Keychain.", err: false });
+              refresh();
+            })
+            .catch((e) => setNote({ text: e instanceof Error ? e.message : String(e), err: true }));
+        }}
+      >
+        Save key
+      </button>
+      {saved.data && (
+        <button
+          type="button"
+          className="ghostbtn"
+          onClick={() => {
+            secretDelete("gemini-api-key")
+              .then(() => {
+                setNote({ text: "Key removed.", err: false });
+                refresh();
+              })
+              .catch((e) => setNote({ text: e instanceof Error ? e.message : String(e), err: true }));
+          }}
+        >
+          Remove
+        </button>
+      )}
+      {note && <p className={note.err ? "setnote err" : "setnote"}>{note.text}</p>}
+    </div>
+  );
+}
+
+/** One preset's editor — plain controlled fields over a draft copy. */
+function PresetEditor({
+  draft,
+  models,
+  onSave,
+  onCancel,
+}: {
+  draft: HybridPreset;
+  models: ChatModelInfo[];
+  onSave: (p: HybridPreset) => void;
+  onCancel: () => void;
+}) {
+  const [p, setP] = useState<HybridPreset>(draft);
+  const modelOpts = models.map((m) => (
+    <option key={m.id} value={m.id}>
+      {m.label}
+    </option>
+  ));
+  const setRoute = (i: number, patch: Partial<{ when: string; model: string }>) =>
+    setP((prev) => ({
+      ...prev,
+      routes: prev.routes.map((r, j) => (j === i ? { ...r, ...patch } : r)),
+    }));
+  const valid = p.name.trim() && p.routes.length > 0 && p.routes.every((r) => r.model);
+  return (
+    <div className="preset-editor">
+      <input
+        className="aikey-input"
+        placeholder="Preset name…"
+        value={p.name}
+        onChange={(e) => setP((prev) => ({ ...prev, name: e.target.value }))}
+        onKeyDown={(e) => e.stopPropagation()}
+      />
+      <label className="preset-field">
+        <span>Organizer (routes each message)</span>
+        <select
+          value={p.organizer}
+          onChange={(e) => setP((prev) => ({ ...prev, organizer: e.target.value }))}
+        >
+          {modelOpts}
+        </select>
+      </label>
+      {p.routes.map((r, i) => (
+        // routes are positional (no stable id) — index keys are correct here
+        // eslint-disable-next-line react/no-array-index-key
+        <div className="preset-route" key={i}>
+          <input
+            className="aikey-input"
+            placeholder={`When… (e.g. "quick lookups")`}
+            value={r.when}
+            onChange={(e) => setRoute(i, { when: e.target.value })}
+            onKeyDown={(e) => e.stopPropagation()}
+          />
+          <select value={r.model} onChange={(e) => setRoute(i, { model: e.target.value })}>
+            {modelOpts}
+          </select>
+          <button
+            type="button"
+            className="ghostbtn"
+            disabled={p.routes.length <= 1}
+            onClick={() =>
+              setP((prev) => ({ ...prev, routes: prev.routes.filter((_, j) => j !== i) }))
+            }
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <div className="preset-actions">
+        <button
+          type="button"
+          className="ghostbtn"
+          onClick={() =>
+            setP((prev) => ({
+              ...prev,
+              routes: [...prev.routes, { when: "", model: models[0]?.id ?? "" }],
+            }))
+          }
+        >
+          + Route
+        </button>
+        <label className="preset-field preset-fallback">
+          <span>Fallback</span>
+          <select
+            value={p.fallback ?? ""}
+            onChange={(e) =>
+              setP((prev) => {
+                const { fallback: _gone, ...rest } = prev;
+                return e.target.value ? { ...rest, fallback: e.target.value } : rest;
+              })
+            }
+          >
+            <option value="">(none)</option>
+            {modelOpts}
+          </select>
+        </label>
+      </div>
+      <div className="preset-actions">
+        <button type="button" className="ghostbtn" disabled={!valid} onClick={() => onSave(p)}>
+          Save preset
+        </button>
+        <button type="button" className="ghostbtn" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ModelsPane() {
+  const aiProviders = useUiStore((s) => s.aiProviders);
+  const hybridPresets = useUiStore((s) => s.hybridPresets);
+  const setHybridPresets = useUiStore((s) => s.setHybridPresets);
+  const imageEngine = useUiStore((s) => s.imageEngine);
+  const setImageEngine = useUiStore((s) => s.setImageEngine);
+  const chatNoteOpen = useUiStore((s) => s.chatNoteOpen);
+  const setChatNoteOpen = useUiStore((s) => s.setChatNoteOpen);
+
+  const local = useQuery({
+    queryKey: ["chat", "models"],
+    queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
+    staleTime: Infinity,
+  });
+  // every model a preset may reference: local + the ENABLED connected lanes
+  const available = flattenModels(mergedModels(local.data ?? [], aiProviders, []));
+
+  const [draft, setDraft] = useState<HybridPreset | null>(null);
+  const [usage, setUsage] = useState("");
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<HybridPreset[]>([]);
+  const [genNote, setGenNote] = useState<{ text: string; err: boolean } | null>(null);
+
+  const savePreset = (p: HybridPreset) => {
+    const rest = hybridPresets.filter((x) => x.id !== p.id);
+    setHybridPresets([...rest, p]);
+    setDraft(null);
+  };
+
+  const generate = () => {
+    const def = (local.data ?? []).find((m) => m.isDefault) ?? available[0];
+    if (!def) {
+      setGenNote({ text: "No model available to generate with yet.", err: true });
+      return;
+    }
+    setSuggesting(true);
+    setGenNote(null);
+    suggestPresets(makeTauriHost(def), available, usage.trim() || "general note-taking and research")
+      .then((out) => {
+        setSuggestions(out);
+        if (out.length === 0)
+          setGenNote({ text: "The model returned nothing usable — try rewording.", err: true });
+      })
+      .catch((e) => setGenNote({ text: e instanceof Error ? e.message : String(e), err: true }))
+      .finally(() => setSuggesting(false));
+  };
+
+  const summarize = (p: HybridPreset) => {
+    const label = (id: string) => available.find((m) => m.id === id)?.label ?? id;
+    const routes = p.routes.map((r) => label(r.model)).join(" · ");
+    return `${label(p.organizer)} → ${routes}${p.fallback ? ` (fallback ${label(p.fallback)})` : ""}`;
+  };
+
+  return (
+    <>
+      <PaneHead title="AI Models" char="knowledge" />
+      <p className="lead">
+        Chat runs on your Mac by default. Install more on-device models below, or connect the
+        subscriptions you already have — their models join the picker, and rotli drives the official
+        CLI on this machine. A connected model runs remotely: the conversation leaves your Mac,
+        secure notes never do.
+      </p>
+
+      <LocalModelsSection
+        installed={local.data ?? []}
+        onChanged={() => queryClient.invalidateQueries({ queryKey: ["chat", "models"] })}
+      />
+
+      <h4 className="set-subhead">Connected models</h4>
+      {PROVIDER_IDS.map((id) => (
+        <ProviderRow key={id} id={id} />
+      ))}
+      {aiProviders.gemini && <GeminiKeyRow />}
+
+      <h4 className="set-subhead">Hybrid presets</h4>
+      <p className="setnote">
+        A preset lets one model ORGANIZE each message and route it to the model best suited — e.g.
+        gemma routes, Gemini executes, Claude catches failures. Presets show up in the chat&rsquo;s
+        model picker.
+      </p>
+      {hybridPresets.length > 0 && (
+        <div className="preset-list">
+          {hybridPresets.map((p) => (
+            <div className="preset-row" key={p.id}>
+              <span className="preset-name">{p.name}</span>
+              <span className="preset-sum">{summarize(p)}</span>
+              <button type="button" className="ghostbtn" onClick={() => setDraft(p)}>
+                Edit
+              </button>
+              <button
+                type="button"
+                className="ghostbtn"
+                onClick={() => setHybridPresets(hybridPresets.filter((x) => x.id !== p.id))}
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {draft ? (
+        <PresetEditor
+          draft={draft}
+          models={available}
+          onSave={savePreset}
+          onCancel={() => setDraft(null)}
+        />
+      ) : (
+        <button
+          type="button"
+          className="ghostbtn"
+          disabled={available.length === 0}
+          onClick={() =>
+            setDraft({
+              id: crypto.randomUUID(),
+              name: "",
+              organizer: (local.data ?? []).find((m) => m.isDefault)?.id ?? available[0]?.id ?? "",
+              routes: [{ when: "", model: available[0]?.id ?? "" }],
+            })
+          }
+        >
+          New preset
+        </button>
+      )}
+
+      <p className="setnote">Not sure where to start? Say what you mostly use chat for:</p>
+      <div className="aikey">
+        <input
+          className="aikey-input"
+          placeholder="e.g. research + summarizing my notes, some coding questions…"
+          value={usage}
+          onChange={(e) => setUsage(e.target.value)}
+          onKeyDown={(e) => e.stopPropagation()}
+        />
+        <button type="button" className="ghostbtn" disabled={suggesting} onClick={generate}>
+          {suggesting ? "Generating…" : "Generate templates"}
+        </button>
+      </div>
+      {genNote && <p className={genNote.err ? "setnote err" : "setnote"}>{genNote.text}</p>}
+      {suggestions.length > 0 && (
+        <div className="preset-list">
+          {suggestions.map((p) => (
+            <div className="preset-row" key={p.id}>
+              <span className="preset-name">{p.name}</span>
+              <span className="preset-sum">{summarize(p)}</span>
+              <button
+                type="button"
+                className="ghostbtn"
+                onClick={() => {
+                  setHybridPresets([...hybridPresets, p]);
+                  setSuggestions(suggestions.filter((x) => x.id !== p.id));
+                }}
+              >
+                Save
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <h4 className="set-subhead">Images in chat</h4>
+      <p className="setnote">
+        Which connected engine draws when a chat generates an image (saved into this chat&rsquo;s
+        assets).
+      </p>
+      <Seg
+        value={imageEngine}
+        options={[
+          ["codex", "Codex (gpt-image)"],
+          ["agy", "Antigravity (Nano Banana)"],
+        ]}
+        onPick={setImageEngine}
+      />
+
+      <h4 className="set-subhead">Chat &amp; its note</h4>
+      <p className="setnote">Every chat carries a note. Opening it from the chat header:</p>
+      <Seg
+        value={chatNoteOpen}
+        options={[
+          ["tab", "Opens a new tab"],
+          ["split", "Splits to the right"],
+        ]}
+        onPick={setChatNoteOpen}
+      />
+    </>
+  );
+}
+
 function PluginsPane() {
   return (
     <>
@@ -1214,6 +1831,7 @@ export function SettingsSurface() {
           {pane === "hotkeys" && <HotkeysPane />}
           {pane === "appearance" && <AppearancePane />}
           {pane === "brain" && <BrainPane />}
+          {pane === "models" && <ModelsPane />}
           {pane === "location" && <LocationPane />}
           {pane === "plugins" && <PluginsPane />}
         </div>

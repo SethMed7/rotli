@@ -115,6 +115,8 @@ export function statusFor(tool: ToolName): string {
       return "searching the web…";
     case "web_fetch":
       return "reading a web page…";
+    case "generate_image":
+      return "generating an image…";
   }
 }
 
@@ -167,6 +169,12 @@ export async function runTool(
       const url = String(args.url ?? "").trim();
       if (url === "") return 'error: web_fetch needs a "url".';
       return truncate(await host.webFetch(url, budget.webFetchChars), budget.webFetchChars);
+    }
+    case "generate_image": {
+      const prompt = String(args.prompt ?? "").trim();
+      if (prompt === "") return 'error: generate_image needs a "prompt" describing the image.';
+      const rel = await host.generateImage(prompt);
+      return `saved: ${rel} — it's in this chat's assets. Tell the user it's ready (mention the filename).`;
     }
   }
 }

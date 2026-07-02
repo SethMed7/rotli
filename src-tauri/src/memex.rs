@@ -158,7 +158,8 @@ fn assert_writable(rel: &str) -> Result<(), String> {
 
 /// A chat slug must be a plain filename (it comes from `slugify`, but never trust
 /// the wire): lowercase alphanumerics + dashes only, no separators, no `..`.
-fn safe_slug(slug: &str) -> Result<String, String> {
+/// pub(crate): provider.rs pins a chat's image-assets dir by the same slug law.
+pub(crate) fn safe_slug(slug: &str) -> Result<String, String> {
     let ok = !slug.is_empty()
         && slug.len() <= 80
         && slug
@@ -383,7 +384,8 @@ fn root_among(roots: &[PathBuf], want: &Path) -> bool {
 /// command runs this FIRST, so the frontend can never point them at an arbitrary
 /// path (`memex_read(root: "/", …)` used to read any file on disk; a crafted
 /// write root could plant chats/ inside a curated tree).
-fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, String> {
+/// pub(crate): provider.rs validates the image-assets root through the same gate.
+pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, String> {
     let cfg = crate::corpus::ensure_corpus_config(app);
     let mut roots: Vec<PathBuf> = vec![cfg.corpus.abs_path];
     roots.extend(cfg.brains.into_iter().map(|b| b.abs_path));

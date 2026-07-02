@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "bun:test";
 import type { Tab } from "../types";
-import { parseSettings, pruneMap, unknownSettingsKeys, validTab } from "./persist";
+import { parseHybridPresets, parseSettings, pruneMap, unknownSettingsKeys, validTab } from "./persist";
 
 describe("parseSettings — organizerTrust", () => {
   it("defaults a missing key to suggest", () => {
@@ -50,6 +50,73 @@ describe("parseSettings — chatWeb (#7: no session keys in the durable map)", (
 
   it("drops non-boolean entries entirely", () => {
     expect(parseSettings('{"chatWeb":{"a":"yes","b":true}}').chatWeb).toEqual({ b: true });
+  });
+});
+
+describe("parseSettings — the AI Models keys (Seth, 2026-07-02)", () => {
+  it("defaults: every lane OFF, no presets, codex engine, note opens as tab", () => {
+    const s = parseSettings("{}");
+    expect(s.aiProviders).toEqual({ claude: false, codex: false, agy: false, gemini: false });
+    expect(s.hybridPresets).toEqual([]);
+    expect(s.imageEngine).toBe("codex");
+    expect(s.chatNoteOpen).toBe("tab");
+    expect(s.chatMeasure).toEqual({});
+  });
+
+  it("round-trips enabled lanes; unknown lanes and non-booleans are ignored", () => {
+    const s = parseSettings('{"aiProviders":{"claude":true,"gemini":true,"evil":true,"codex":"yes"}}');
+    expect(s.aiProviders).toEqual({ claude: true, codex: false, agy: false, gemini: true });
+    expect("evil" in s.aiProviders).toBe(false);
+  });
+
+  it("chatMeasure keeps valid measures only and drops session keys", () => {
+    const raw = '{"chatMeasure":{"my-chat":"wide","other":"huge","unsaved:p1":"narrow"}}';
+    expect(parseSettings(raw).chatMeasure).toEqual({ "my-chat": "wide" });
+  });
+
+  it("imageEngine / chatNoteOpen fall to safe defaults on garbage", () => {
+    expect(parseSettings('{"imageEngine":"dalle"}').imageEngine).toBe("codex");
+    expect(parseSettings('{"imageEngine":"agy"}').imageEngine).toBe("agy");
+    expect(parseSettings('{"chatNoteOpen":"window"}').chatNoteOpen).toBe("tab");
+    expect(parseSettings('{"chatNoteOpen":"split"}').chatNoteOpen).toBe("split");
+  });
+});
+
+describe("parseHybridPresets — shape-validated, invalid entries dropped", () => {
+  const good = {
+    id: "p1",
+    name: "My hybrid",
+    organizer: "gemma-3",
+    routes: [{ when: "quick", model: "sonnet" }],
+    fallback: "gpt-5.5",
+  };
+
+  it("keeps a well-shaped preset byte-for-byte", () => {
+    expect(parseHybridPresets([good])).toEqual([good]);
+  });
+
+  it("drops entries missing id/name/organizer or with no usable routes", () => {
+    expect(parseHybridPresets([{ ...good, id: "" }])).toEqual([]);
+    expect(parseHybridPresets([{ ...good, name: 42 }])).toEqual([]);
+    expect(parseHybridPresets([{ ...good, organizer: undefined }])).toEqual([]);
+    expect(parseHybridPresets([{ ...good, routes: [] }])).toEqual([]);
+    expect(parseHybridPresets([{ ...good, routes: [{ when: "x", model: "" }] }])).toEqual([]);
+  });
+
+  it("scrubs bad routes + a non-string fallback, keeps the rest", () => {
+    const messy = {
+      ...good,
+      routes: [{ when: "ok", model: "sonnet" }, { model: 3 }, "junk"],
+      fallback: 7,
+    };
+    expect(parseHybridPresets([messy])).toEqual([
+      { id: "p1", name: "My hybrid", organizer: "gemma-3", routes: [{ when: "ok", model: "sonnet" }] },
+    ]);
+  });
+
+  it("non-arrays return []", () => {
+    expect(parseHybridPresets("nope")).toEqual([]);
+    expect(parseHybridPresets(undefined)).toEqual([]);
   });
 });
 

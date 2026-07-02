@@ -108,11 +108,50 @@ folder.")
   row), ↑/↓ hop rows, Enter never splits a row, and the widget's row/column menus
   insert / delete / move / align — while the file keeps ordinary readable pipes.
 
-**Chat** _(front)_ — your AI conversations (`chats/`). The on-device model is an **agentic client**,
+**Chat** _(front)_ — your AI conversations (`chats/`). The model is an **agentic client**,
 not a context-free box: your memex IS its knowledge base, so it **searches and reads your notes** (their
 organization + metadata) to answer. Flip the composer **globe** on for a chat and it can also reach the
 **web** (DuckDuckGo, no key) — off by default, and only used when your notes don't cover the question.
 Attach **images** to a vision-capable model (the composer checks). Everything can carry a chat.
+
+Chat runs **on-device by default**, and can also run on **connected models** (Settings →
+AI Models): the subscription CLIs already signed in on this Mac — **Claude Code**
+(Claude Pro/Max), **Codex** (ChatGPT), **Antigravity** (Google AI; bundles Gemini +
+Claude models) — plus a bring-your-own-key **Gemini API** lane (key in the macOS
+Keychain, never a config file). rotli drives the official CLI as a **tool-less,
+sandboxed completion backend** under the same agent loop (a hardcoded binary + model
+allowlist in Rust; the prompt is the only caller-shaped input). A connected model is
+**remote** by definition: the conversation leaves your Mac; **secure notes never do**
+(the endpoint-locality gate + the egress backstop both refuse them). The model picker
+groups **On this Mac · Connected · Presets**.
+
+**Installing on-device models** (Settings → AI Models → On this Mac) — browse curated
+MLX chat models or paste any Hugging Face repo id; rotli downloads the weights (via the
+memex-ai venv's `hf` CLI) into the **shared memex-ai store** (`~/.memex/ai/models/`) and
+registers them. **Every installed model is pickable per chat**: the shared MLX server
+(0.3+) honors the request's model and swaps its single loaded slot on demand — a model
+loads lazily when asked and idle-unloads after ~10 minutes, so nothing runs around the
+clock. One model marks the **default** — what no-model callers (Breve, warmup) get;
+"Make default" repoints the server's launchd env (+ a reload), and the default model
+refuses uninstall. The store is shared with your other memex apps (Breve, voz); rotli
+writes only two shared artifacts here — spliced `registry.json` entries and the one
+MLX-server env value — both surgical and reversible; every other key is left untouched.
+Connected (API/CLI) models are entirely separate and unaffected by any of this.
+
+**Hybrid presets** (Settings → AI Models) rethink *which* model works for you: an
+**organizer** model reads each message and routes it to the route whose "when …"
+fits (e.g. gemma routes → Gemini executes → Claude catches failures); a **fallback**
+retries a failed executor once. Presets appear in the picker as pseudo-models, and
+"**Generate templates**" drafts three from a description of what you mostly do.
+
+**Every chat carries a note** (`attachedTo:` frontmatter + the note's `## Chat`
+backlink). The header's note button opens it — creating it lazily in `wiki/_inbox/`
+staging on first use — as a new tab or a right split (a Settings choice). The header
+also holds the chat **width** (Narrow / Comfort / Wide — the notes Aa vocabulary, a
+render layer only) and, once a chat has generated images, its **assets** drawer:
+`generate_image` (a chat tool, engine = Codex gpt-image or Antigravity Nano Banana,
+per Settings) saves PNGs under `storage/chats/<slug>/`, pinned by Rust so the model
+never shapes the path.
 
 **Inbox** _(front)_ — your **emails**. (Distinct from the memex `inbox.md` capture file
 — which belongs to other memex tools like Breve; rotli never writes it — and from

@@ -8,22 +8,29 @@
 import { budgetFor } from "./budget";
 import { looksSecret } from "./guard";
 import { extractJsonObject, parseAction } from "./parse";
-import { gemmaAdapter, trimHistory } from "./prompt";
+import { adapterFor, trimHistory } from "./prompt";
 import { pruneScratch, runTool, statusFor } from "./tools";
 import type { AgentEvent, Host, RunInput, ScratchStep, ToolName } from "./types";
 
 const NOTE_TOOLS: ToolName[] = ["search_notes", "read_note", "read_file"];
 const WEB_TOOLS: ToolName[] = ["web_search", "web_fetch"];
+const IMAGE_TOOLS: ToolName[] = ["generate_image"];
+// every tool whose ARGS leave the device — the secret guard covers them all
+// (an image prompt ships to a remote engine exactly like a web query)
+const EGRESS_TOOLS: ToolName[] = [...WEB_TOOLS, ...IMAGE_TOOLS];
 
 export async function* runAgent(
   host: Host,
   input: RunInput,
 ): AsyncGenerator<AgentEvent, void, void> {
   const budget = budgetFor(input.model); // the client's rules, sized to THIS model
+  const adapter = adapterFor(input.model); // gemma (local default) or frontier
   const maxSteps = input.maxSteps ?? budget.maxSteps;
-  const allowed: ReadonlySet<ToolName> = new Set<ToolName>(
-    input.web ? [...NOTE_TOOLS, ...WEB_TOOLS] : NOTE_TOOLS,
-  );
+  const allowed: ReadonlySet<ToolName> = new Set<ToolName>([
+    ...NOTE_TOOLS,
+    ...(input.web ? WEB_TOOLS : []),
+    ...(input.imageTool ? IMAGE_TOOLS : []),
+  ]);
 
   let knowledge = "";
   try {
@@ -43,13 +50,14 @@ export async function* runAgent(
   for (let step = 1; step <= maxSteps; step++) {
     yield { type: "status", text: step === 1 ? "thinking…" : `thinking… (step ${step})` };
 
-    const prompt = gemmaAdapter.renderPrompt({
+    const prompt = adapter.renderPrompt({
       web: input.web,
       knowledge,
       history,
       userText: input.userText,
       scratch: pruneScratch(scratch, budget.maxScratchChars),
       maxSteps,
+      ...(input.imageTool ? { imageTool: true } : {}),
     });
 
     const imgs = step === 1 ? input.images : undefined;
@@ -60,9 +68,9 @@ export async function* runAgent(
 
     let raw: string;
     try {
-      raw = await host.complete({ messages: [message], formatJson: gemmaAdapter.wantsFormatJson });
+      raw = await host.complete({ messages: [message], formatJson: adapter.wantsFormatJson });
     } catch (e) {
-      yield { type: "final", text: `⚠ ${errMsg(e, "couldn't reach the local model")}` };
+      yield { type: "final", text: `⚠ ${errMsg(e, "couldn't reach the model")}` };
       return;
     }
 
@@ -101,13 +109,14 @@ export async function* runAgent(
       continue;
     }
 
-    // egress guard (mirror of the Rust backstop): no secret ever rides a web tool.
-    // Keyed off WEB_TOOLS so a future web tool can't be added past the guard (audit).
-    if (WEB_TOOLS.includes(parsed.tool) && looksSecret(JSON.stringify(parsed.args))) {
+    // egress guard (mirror of the Rust backstop): no secret ever rides a tool
+    // whose args leave the device. Keyed off EGRESS_TOOLS so a future one
+    // can't be added past the guard (audit).
+    if (EGRESS_TOOLS.includes(parsed.tool) && looksSecret(JSON.stringify(parsed.args))) {
       consecutiveBad += 1;
       scratch.push({
         action: sig,
-        result: "blocked: that input looks like it contains a secret — not sent to the web.",
+        result: "blocked: that input looks like it contains a secret — it wasn't sent off-device.",
       });
       if (consecutiveBad >= 2) break; // insisting on the blocked call → force a final
       continue;
@@ -135,7 +144,7 @@ export async function* runAgent(
 }
 
 async function forceFinal(host: Host, input: RunInput, scratch: ScratchStep[]): Promise<string> {
-  const prompt = gemmaAdapter.renderForceFinal({
+  const prompt = adapterFor(input.model).renderForceFinal({
     history: input.history,
     userText: input.userText,
     scratch,
@@ -153,7 +162,7 @@ async function forceFinal(host: Host, input: RunInput, scratch: ScratchStep[]): 
     }
     return raw.trim() || "I couldn't find enough to answer that confidently.";
   } catch (e) {
-    return `⚠ ${errMsg(e, "couldn't reach the local model")}`;
+    return `⚠ ${errMsg(e, "couldn't reach the model")}`;
   }
 }
 

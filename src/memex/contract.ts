@@ -201,6 +201,21 @@ export function composeNewChat(
   return { slug, contents };
 }
 
+/** Rewrite (or insert) the `attachedTo:` frontmatter line on an EXISTING chat
+ * file — the lazy chat↔note link (the note materializes on first open, then the
+ * chat points at its staging stem). Pure; only the FIRST frontmatter block is
+ * touched, so a message line that happens to start "attachedTo:" never matches. */
+export function setAttachedTo(contents: string, stem: string): string {
+  const line = `attachedTo: [[${stem}]]`;
+  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
+  if (!fm || fm[1] === undefined) return contents; // no frontmatter — leave the file alone
+  const block = fm[1];
+  const next = /^attachedTo:.*$/m.test(block)
+    ? block.replace(/^attachedTo:.*$/m, line)
+    : `${block}\n${line}`;
+  return `${contents.slice(0, fm.index)}---\n${next}\n---${contents.slice(fm.index + fm[0].length)}`;
+}
+
 /** Keep the attached note's `## Chat` backlink in sync (byte-identical to
  *  conversations.ts ensureChatLink). Pure: returns the new note body; Rust writes it. */
 export function ensureChatBacklink(noteBody: string, slug: string): string {

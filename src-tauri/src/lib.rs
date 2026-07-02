@@ -13,8 +13,11 @@
 
 mod chat;
 mod corpus;
+mod keychain;
+mod localmodel;
 mod memex;
 mod organizer;
+mod provider;
 mod secret;
 mod web;
 
@@ -748,6 +751,8 @@ pub fn run() {
         .manage(QuickPlaced(Mutex::new(false)))
         .manage(QuickReturn(Mutex::new(false)))
         .manage(QuitFlush { acked: Mutex::new(false), cv: Condvar::new() })
+        .manage(provider::ProviderState::default())
+        .manage(localmodel::LocalModelState::default())
         // the app-menu ⌘Q replacement (see setup) — tray menu events have their
         // own handler; the ids are distinct so double-dispatch can't double-quit
         .on_menu_event(|app, event| {
@@ -813,6 +818,19 @@ pub fn run() {
             corpus::corpus_rename_board,
             chat::chat_models,
             chat::chat_messages,
+            provider::cli_detect,
+            provider::cli_complete,
+            provider::cli_cancel,
+            provider::generate_image,
+            localmodel::local_model_install,
+            localmodel::local_model_install_progress,
+            localmodel::local_model_install_cancel,
+            localmodel::local_model_set_default,
+            localmodel::local_model_default,
+            localmodel::local_model_uninstall,
+            keychain::secret_store,
+            keychain::secret_exists,
+            keychain::secret_delete,
             organizer::organizer_status,
             organizer::organizer_run_once,
             organizer::organizer_set_trust,

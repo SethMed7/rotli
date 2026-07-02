@@ -16,6 +16,7 @@
 // In a plain browser (vite dev) every entry point here is a no-op — the
 // in-memory demo corpus stays exactly as it was (the seam's whole point).
 
+import { type HybridPreset, PROVIDER_IDS, type ProviderId } from "../ai/models";
 import { useBindingsStore } from "../keys/bindings";
 import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
@@ -110,13 +111,44 @@ const BLURS: readonly GlassBlur[] = GLASS_BLURS.map((b) => b.value);
 const CANVASES: readonly GlassCanvas[] = GLASS_CANVASES.map((c) => c.value);
 const MEASURES: readonly Measure[] = ["narrow", "comfort", "wide"];
 
-/** Drop the session-scoped chatWeb keys — an unsaved chat's globe choice belongs
- * to its pane for this session only, never to settings.json (#7). Shared by the
- * parse (heals a poisoned config) and the snapshot (never writes one again). */
-function persistableChatWeb(m: Record<string, boolean>): Record<string, boolean> {
+/** Drop the session-scoped per-chat keys — an unsaved chat's choice (globe,
+ * measure) belongs to its pane for this session only, never to settings.json
+ * (#7). Shared by the parse (heals a poisoned config) and the snapshot (never
+ * writes one again). */
+function persistableChatMap<T>(m: Record<string, T>): Record<string, T> {
   return Object.fromEntries(
     Object.entries(m).filter(([k]) => k !== "" && !k.startsWith("unsaved:")),
   );
+}
+
+/** Shape-validate the persisted hybrid presets — a hand-edited or future-build
+ * entry that doesn't parse is DROPPED, never half-loaded. Exported for tests. */
+export function parseHybridPresets(raw: unknown): HybridPreset[] {
+  if (!Array.isArray(raw)) return [];
+  const out: HybridPreset[] = [];
+  for (const item of raw) {
+    const p = record(item);
+    if (typeof p.id !== "string" || !p.id) continue;
+    if (typeof p.name !== "string" || !p.name) continue;
+    if (typeof p.organizer !== "string" || !p.organizer) continue;
+    if (!Array.isArray(p.routes)) continue;
+    const routes: { when: string; model: string }[] = [];
+    for (const r of p.routes) {
+      const route = record(r);
+      if (typeof route.when === "string" && typeof route.model === "string" && route.model) {
+        routes.push({ when: route.when, model: route.model });
+      }
+    }
+    if (routes.length === 0) continue;
+    out.push({
+      id: p.id,
+      name: p.name,
+      organizer: p.organizer,
+      routes,
+      ...(typeof p.fallback === "string" && p.fallback ? { fallback: p.fallback } : {}),
+    });
+  }
+  return out;
 }
 
 // ─── settings.json ───────────────────────────────────────────────────────────
@@ -152,6 +184,17 @@ interface PersistedSettings {
    * never persist — a stored one flipped the silent-egress default for every
    * future fresh chat (#7, audit 2026-07). */
   chatWeb: Record<string, boolean>;
+  /** Per-chat measure (Narrow/Comfort/Wide), same keying + unsaved-key rule. */
+  chatMeasure: Record<string, Measure>;
+  /** Where a chat's attached note opens: a new tab (default) or a right split. */
+  chatNoteOpen: "tab" | "split";
+  /** Connected subscription lanes (Settings → AI Models); all off by default —
+   * a chat never leaves the Mac without the user flipping a lane on. */
+  aiProviders: Record<ProviderId, boolean>;
+  /** Hybrid model presets (organizer → routes → fallback). */
+  hybridPresets: HybridPreset[];
+  /** Which connected engine draws generate_image: codex (default) or agy. */
+  imageEngine: "codex" | "agy";
   /** How the Storage destination groups its binaries: Type / Date / Folder. */
   storageGrouping: "type" | "date" | "folder";
   /** Raw frontmatter at the top of the note (Show file metadata): hide / show. */
@@ -272,8 +315,29 @@ export function parseSettings(raw: string): PersistedSettings {
           if (typeof v === "boolean") out[k] = v;
         }
       }
-      return persistableChatWeb(out);
+      return persistableChatMap(out);
     })(),
+    chatMeasure: (() => {
+      const out: Record<string, Measure> = {};
+      for (const [k, v] of Object.entries(record(data.chatMeasure))) {
+        if (typeof v === "string" && (MEASURES as readonly string[]).includes(v)) {
+          out[k] = v as Measure;
+        }
+      }
+      return persistableChatMap(out);
+    })(),
+    chatNoteOpen: data.chatNoteOpen === "split" ? "split" : "tab",
+    // booleans only, unknown lanes ignored — the safe default is every lane OFF
+    aiProviders: (() => {
+      const src = record(data.aiProviders);
+      const out = { claude: false, codex: false, agy: false, gemini: false };
+      for (const id of PROVIDER_IDS) {
+        if (typeof src[id] === "boolean") out[id] = src[id];
+      }
+      return out;
+    })(),
+    hybridPresets: parseHybridPresets(data.hybridPresets),
+    imageEngine: data.imageEngine === "agy" ? "agy" : "codex",
     storageGrouping:
       data.storageGrouping === "date" || data.storageGrouping === "folder"
         ? data.storageGrouping
@@ -336,6 +400,11 @@ function applySettings(s: PersistedSettings): void {
     blockHandles: s.blockHandles2,
     chatModelId: s.chatModelId,
     chatWeb: s.chatWeb,
+    chatMeasure: s.chatMeasure,
+    chatNoteOpen: s.chatNoteOpen,
+    aiProviders: s.aiProviders,
+    hybridPresets: s.hybridPresets,
+    imageEngine: s.imageEngine,
     storageGrouping: s.storageGrouping,
     fileMetadata: s.fileMetadata,
     organizerTrust: s.organizerTrust,
@@ -568,8 +637,11 @@ async function gcPersistedMaps(): Promise<void> {
         for (const c of await listChats(inst)) slugs.add(c.slug);
       }
       const ui = useUiStore.getState();
-      const kept = pruneMap(ui.chatWeb, (k) => slugs.has(k) || k.startsWith("unsaved:"));
+      const liveKey = (k: string) => slugs.has(k) || k.startsWith("unsaved:");
+      const kept = pruneMap(ui.chatWeb, liveKey);
       if (kept !== ui.chatWeb) useUiStore.setState({ chatWeb: kept });
+      const keptMeasure = pruneMap(ui.chatMeasure, liveKey);
+      if (keptMeasure !== ui.chatMeasure) useUiStore.setState({ chatMeasure: keptMeasure });
     }
   } catch {
     // an unreadable chats/ anywhere — keep everything
@@ -673,7 +745,12 @@ function settingsSnapshot(): string {
     rawEditor: ui.rawEditor,
     blockHandles2: ui.blockHandles,
     chatModelId: ui.chatModelId,
-    chatWeb: persistableChatWeb(ui.chatWeb),
+    chatWeb: persistableChatMap(ui.chatWeb),
+    chatMeasure: persistableChatMap(ui.chatMeasure),
+    chatNoteOpen: ui.chatNoteOpen,
+    aiProviders: ui.aiProviders,
+    hybridPresets: ui.hybridPresets,
+    imageEngine: ui.imageEngine,
     storageGrouping: ui.storageGrouping,
     fileMetadata: ui.fileMetadata,
     organizerTrust: ui.organizerTrust,

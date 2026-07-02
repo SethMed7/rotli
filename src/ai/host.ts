@@ -6,31 +6,67 @@
 import {
   type ChatModelInfo,
   chatMessages,
+  cliComplete,
   corpusFileBytes,
   corpusFileText,
   corpusList,
   corpusReadAi,
   corpusSearch,
+  generateImage as tauriGenerateImage,
   webFetch as tauriWebFetch,
   webSearch as tauriWebSearch,
 } from "../lib/tauri";
 import { workbookToCsv } from "../lib/sheets";
 import { buildIndex, rankNotes } from "./tools";
-import type { Host } from "./types";
+import type { CompleteReq, Host } from "./types";
 
 const SHEET_BIN = new Set(["xlsx", "xls", "xlsm", "ods"]);
 const SHEET_TEXT = new Set(["csv", "tsv"]);
 
-export function makeTauriHost(model: ChatModelInfo): Host {
+/** Mirror of Rust `flatten_messages`: the loop sends ONE user message (the
+ * whole rendered prompt) which passes verbatim; anything else gets labeled
+ * turns + a trailing Assistant: cue. */
+function flattenWire(messages: CompleteReq["messages"]): string {
+  const [only] = messages;
+  if (messages.length === 1 && only && only.role === "user") return only.content;
+  const labeled = messages.map((m) => {
+    const label = m.role === "system" ? "System" : m.role === "assistant" ? "Assistant" : "User";
+    return `${label}: ${m.content}`;
+  });
+  return `${labeled.join("\n\n")}\n\nAssistant:`;
+}
+
+export interface HostImageCtx {
+  /** The active memex root path (Rust re-validates against registered roots). */
+  root: string;
+  /** The chat's slug — pins the assets dir storage/chats/<slug>/. */
+  slug: string;
+  engine: "codex" | "agy";
+}
+
+export function makeTauriHost(
+  model: ChatModelInfo,
+  opts?: { requestId?: string; image?: HostImageCtx },
+): Host {
   return {
     complete({ messages, formatJson }) {
-      const opts: { model: string; endpoint: string; api: string; formatJson?: boolean } = {
+      // the connected lanes: one tool-less subprocess per step (Rust owns the
+      // allowlist + sandbox flags). Stateless — the prompt carries everything.
+      if (model.api === "cli") {
+        return cliComplete({
+          requestId: opts?.requestId ?? crypto.randomUUID(),
+          provider: model.provider,
+          model: model.id,
+          prompt: flattenWire(messages),
+        });
+      }
+      const wireOpts: { model: string; endpoint: string; api: string; formatJson?: boolean } = {
         model: model.id,
         endpoint: model.endpoint,
         api: model.api,
       };
-      if (formatJson !== undefined) opts.formatJson = formatJson;
-      return chatMessages(messages, opts);
+      if (formatJson !== undefined) wireOpts.formatJson = formatJson;
+      return chatMessages(messages, wireOpts);
     },
     async searchNotes(query, limit) {
       // FULL-TEXT search in Rust (corpus_search: title > body rank, framed match
@@ -73,6 +109,19 @@ export function makeTauriHost(model: ChatModelInfo): Host {
     },
     webFetch(url, maxChars) {
       return tauriWebFetch(url, maxChars);
+    },
+    async generateImage(prompt) {
+      // only offered to the loop when the caller wired the chat's assets ctx
+      // (imageTool gate) — this branch is the belt-and-suspenders message
+      if (!opts?.image) return "error: image generation isn't set up for this chat.";
+      const { root, slug, engine } = opts.image;
+      return tauriGenerateImage({
+        requestId: opts?.requestId ?? crypto.randomUUID(),
+        root,
+        slug,
+        prompt,
+        engine,
+      });
     },
     async knowledgeMap(maxChars) {
       const { notes } = await corpusList();

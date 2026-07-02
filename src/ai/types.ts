@@ -8,7 +8,13 @@
 
 import type { ModelMeta } from "./budget";
 
-export type ToolName = "search_notes" | "read_note" | "read_file" | "web_search" | "web_fetch";
+export type ToolName =
+  | "search_notes"
+  | "read_note"
+  | "read_file"
+  | "web_search"
+  | "web_fetch"
+  | "generate_image";
 
 /** A note the model can read, surfaced by search_notes / the index. */
 export interface NoteHit {
@@ -49,6 +55,9 @@ export interface Host {
   readFile(query: string): Promise<string>;
   webSearch(query: string, limit: number): Promise<WebHit[]>;
   webFetch(url: string, maxChars: number): Promise<string>;
+  /** Generate an image into this chat's assets via a connected engine. Returns
+   * the saved corpus-relative path (the observation the model reports). */
+  generateImage(prompt: string): Promise<string>;
   /** A compact index of the knowledge base so the model sees what exists up front.
    * Bounded by `maxChars`: a full per-note index if it fits, else an areas map. */
   knowledgeMap(maxChars: number): Promise<string>;
@@ -87,4 +96,7 @@ export interface RunInput {
   images?: string[];
   /** Tool-use step cap (default: the model's budget). */
   maxSteps?: number;
+  /** Offer the generate_image tool (a connected engine is set up + the chat is
+   * saved, so its assets dir is well-defined). Independent of the web globe. */
+  imageTool?: boolean;
 }

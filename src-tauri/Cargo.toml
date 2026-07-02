@@ -1,6 +1,6 @@
 [package]
 name = "rotli"
-version = "0.21.1"
+version = "0.23.0"
 description = "rotli — warm, local-first, hotkey-driven notes for the Mac menu bar"
 authors = ["Seth Medina"]
 edition = "2021"
@@ -36,3 +36,4 @@ time = { version = "0.3", features = ["formatting", "parsing"] } # frontmatter c
 tempfile = "3"                                                   # atomic writes: tmp in the same dir + rename
 trash = "5"                                                     # delete = OS trash, never a hard rm
 uuid = { version = "1", features = ["v4"] }                     # mx_<uuid> ids for a rotli-initiated memex
+security-framework = "3"                                        # Keychain-backed secrets (Gemini API key) — never argv/ps/config

@@ -1,9 +1,12 @@
 // The prompt scaffold — the "client" that makes a small local model succeed over
 // the memex. It frames the memex AS the model's knowledge base, lists the tools in
 // a single-JSON-object protocol the model can actually follow, renders the running
-// scratchpad, and (the Gemma default) asks for JSON coercion. Per-model adapters can
-// branch off `Adapter` later (e.g. a model with native tool-calls).
+// scratchpad, and (the Gemma default) asks for JSON coercion. Two adapters:
+// `gemmaAdapter` (the local default, JSON coercion + heavy hand-holding) and
+// `frontierAdapter` (the connected lanes — same protocol, terser framing, no
+// server-side coercion). `adapterFor` picks by the model's budget family.
 
+import { type ModelMeta, contextWindowFor } from "./budget";
 import type { ChatTurn, ScratchStep } from "./types";
 
 export interface PromptCtx {
@@ -13,6 +16,8 @@ export interface PromptCtx {
   userText: string;
   scratch: ScratchStep[];
   maxSteps: number;
+  /** Offer the generate_image tool (a connected engine is configured). */
+  imageTool?: boolean;
 }
 
 export interface Adapter {
@@ -68,6 +73,9 @@ export const gemmaAdapter: Adapter = {
     const webRule = ctx.web
       ? "Prefer the user's notes; reach for the web only when the notes don't cover it."
       : "The web is OFF for this chat — answer from the notes and what you already know.";
+    const imageTool = ctx.imageTool
+      ? `\n- {"thought":"…","tool":"generate_image","args":{"prompt":"…"}}  → create an image (saved into this chat's assets) — describe the IMAGE, never a file path`
+      : "";
 
     return `You are rotli, a warm, concise assistant running entirely on the user's Mac.
 
@@ -79,7 +87,7 @@ TOOLS — to use one, reply with a SINGLE JSON object:
 - {"thought":"…","tool":"search_notes","args":{"query":"…"}}  → find notes (returns id, title, folder, snippet)
 - {"thought":"…","tool":"read_note","args":{"id":"…"}}        → read one note's full text by id
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} → read a file by name (text, or a spreadsheet as CSV)
-${webTools}
+${webTools}${imageTool}
 When you can answer, reply: {"thought":"…","final":"your answer to the user"}
 
 RULES:
@@ -114,3 +122,66 @@ ${renderScratch(ctx.scratch)}
 Your answer:`;
   },
 };
+
+// The connected lanes (Claude · Codex · Antigravity · Gemini): the SAME
+// single-JSON protocol (parse.ts stays untouched), but framed system-style and
+// terser — a frontier model follows the instruction without coercion, and the
+// CLI transports have no `format:"json"` anyway (extractJsonObject strips a
+// stray fence as the safety net).
+export const frontierAdapter: Adapter = {
+  wantsFormatJson: false,
+
+  renderPrompt(ctx) {
+    const webTools = ctx.web
+      ? `\n- {"thought":"…","tool":"web_search","args":{"query":"…"}} — search the public web
+- {"thought":"…","tool":"web_fetch","args":{"url":"…"}} — read a web page's text`
+      : "";
+    const webRule = ctx.web
+      ? "Prefer the notes; use the web only where they don't cover it."
+      : "The web is OFF for this chat — answer from the notes and what you know.";
+    const imageTool = ctx.imageTool
+      ? `\n- {"thought":"…","tool":"generate_image","args":{"prompt":"…"}} — create an image (saved into this chat's assets); describe the IMAGE, never a file path`
+      : "";
+
+    return `You are rotli's reasoning engine. The user's memex — their personal notes folder, indexed below — is your knowledge base; search it before answering from memory.
+
+Reply with EXACTLY ONE JSON object on a single line — no prose around it, no markdown fences.
+Tools:
+- {"thought":"…","tool":"search_notes","args":{"query":"…"}} — find notes (id, title, folder, snippet)
+- {"thought":"…","tool":"read_note","args":{"id":"…"}} — read one note by id
+- {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}
+To answer the user: {"thought":"…","final":"your answer"}
+
+Rules: ${webRule} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
+
+KNOWLEDGE BASE INDEX:
+${ctx.knowledge || "(no notes indexed yet — use search_notes)"}
+
+CONVERSATION:
+${renderConversation(ctx.history, ctx.userText)}
+
+WORK SO FAR:
+${renderScratch(ctx.scratch)}
+
+The next single JSON object:`;
+  },
+
+  renderForceFinal(ctx) {
+    return `Give your FINAL answer to the user now, in plain prose — no JSON, no tools. Base it on the conversation and findings below; say plainly what you couldn't verify.
+
+CONVERSATION:
+${renderConversation(ctx.history, ctx.userText)}
+
+FINDINGS:
+${renderScratch(ctx.scratch)}
+
+Your answer:`;
+  },
+};
+
+/** Pick the adapter by the model's budget family — the frontier tier (the
+ * connected lanes) gets the terse system-style scaffold, everything local
+ * keeps the tuned Gemma one. One signal (budget.ts), used consistently. */
+export function adapterFor(model: ModelMeta): Adapter {
+  return contextWindowFor(model) >= 180_000 ? frontierAdapter : gemmaAdapter;
+}

@@ -529,6 +529,179 @@
   padding: 1.5px 5px;
 }
 
+/* AI Models (Seth, 2026-07-02): connected lanes + hybrid presets */
+.set-subhead {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 26px 0 6px;
+}
+.aikey {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+  max-width: 560px;
+}
+.aikey-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 7px 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.aikey-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+}
+.preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+  max-width: 560px;
+}
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+}
+.preset-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 0 0 auto;
+}
+.preset-sum {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preset-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 12px;
+  max-width: 560px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+}
+.preset-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.preset-field select,
+.preset-route select {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 5px 8px;
+  max-width: 220px;
+}
+.preset-route {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.preset-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.preset-fallback {
+  margin-left: auto;
+}
+
+/* local models (On this Mac) — installed list + installer + download bar */
+.localmodel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+  max-width: 560px;
+}
+.localmodel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+}
+.localmodel-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.localmodel-size {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+.localmodel-active {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-text);
+  flex: 0 0 auto;
+}
+.localmodel-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 12px;
+  max-width: 560px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+}
+.localmodel-prog-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.localmodel-track {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--tint);
+  overflow: hidden;
+}
+.localmodel-fill {
+  height: 100%;
+  background: var(--accent-text);
+  border-radius: var(--r-pill);
+  transition: width var(--motion-exit) var(--motion-ease);
+}
+
 /* hotkeys — the rebind list */
 .hkrows {
   max-width: 560px;
