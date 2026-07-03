@@ -83,7 +83,6 @@ import type { Folder, NoteSummary } from "../types";
 import { dispatch } from "../keys/registry";
 import { longDateLabel } from "../lib/dateLabels";
 import { type DragGhost, createDragGhost } from "../lib/dragGhost";
-import { useTransientPopover } from "../lib/popover";
 import {
   ArchiveGlyph,
   BoardGlyph as CanvasItemGlyph,
@@ -96,6 +95,8 @@ import {
   FolderGlyph,
   InboxGlyph,
   MailGlyph,
+  NewFileGlyph,
+  NewFolderGlyph,
   NotesStackGlyph,
   PlusGlyph,
   SearchGlyph,
@@ -192,10 +193,6 @@ const DEST_ROWS: { id: Destination; label: string; Glyph: typeof InboxGlyph }[] 
  * (a LATER increment; this writes nothing). These two are Seth's known addresses
  * from the IA doc Addendum. */
 const STUB_EMAIL_ACCOUNTS = ["maintainer@example.com", "hello@sethmedina.com"];
-
-/** How many chats the sidebar Chat section shows before "All chats" takes over —
- * the accordion is a LIMITED view; "All chats" opens the full searchable list. */
-const CHAT_SECTION_LIMIT = 12;
 
 /** The lifecycle handlers a compact row needs in its hover slot — wired once at
  * the Sidebar top (the hooks live there) and passed down so the row stays a
@@ -565,6 +562,8 @@ export function Sidebar() {
   const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
   const chatList = useInstanceChats(activeMemex).data ?? [];
   const quickNoteIds = useUiStore((s) => s.quickNoteIds);
+  // the LIMITED Chat view's cap — a Settings knob (5/10/15), default 5 (#17)
+  const chatSidebarLimit = useUiStore((s) => s.chatSidebarLimit);
 
   // Captures count mirrors BoardSurface's curated-note rule: a staged note
   // placed in Main or starred for Quick access is a full note, not a capture.
@@ -598,14 +597,6 @@ export function Sidebar() {
   const [filter, setFilter] = useState("");
   const filterRef = useRef<HTMLInputElement>(null);
 
-  // — the "+" create menu (replaces the old pencil): New note / New board / New
-  // folder, anchored under the button as a fixed-position popover.
-  // useTransientPopover wires Esc + outside-click close (Seth, 2026-06-24).
-  const [plusOpen, setPlusOpen] = useState(false);
-  const plusBtnRef = useRef<HTMLDivElement>(null);
-  const plusMenuRef = useRef<HTMLDivElement>(null);
-  useTransientPopover([plusMenuRef, plusBtnRef], plusOpen, () => setPlusOpen(false));
-
   // — inline nested new-folder row: when set, an <input> renders under this
   // parent id; null = not creating. Enter (or clicking away) commits a non-empty
   // name — Finder/Apple Notes commit on blur, not discard; Esc/empty cancels
@@ -617,18 +608,6 @@ export function Sidebar() {
   // (a double-create on Enter) or override an Esc-cancel.
   const newFolderHandled = useRef(false);
 
-  // anchor the "+" menu just under its button (fixed-positioned so it escapes
-  // the sidebar's overflow clip) — positioned from the button's box on open.
-  useEffect(() => {
-    if (!plusOpen) return;
-    const btn = plusBtnRef.current;
-    const menu = plusMenuRef.current;
-    if (!btn || !menu) return;
-    const rect = btn.getBoundingClientRect();
-    menu.style.top = `${rect.bottom + 4}px`;
-    // right-align the menu to the button so it never overflows the sidebar edge
-    menu.style.left = `${Math.max(8, rect.right - menu.offsetWidth)}px`;
-  }, [plusOpen]);
   // — lifecycle mutations (Seth, 2026-06-13): wired once here, the .mutate fns
   // flow down to every compact row's hover slot AND the destination dropzones.
   // moveNote handles the origin rule, so dropping on Archive/Trash archives or
@@ -817,7 +796,9 @@ export function Sidebar() {
             key={`main:${n.id}`}
             type="button"
             data-main-id={n.id}
-            className={`snrow main-row${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
+            /* the current file's Main copy wins the highlight (#25) — the same
+               accent pill a compact row gets when it's the focused note */
+            className={`snrow main-row${n.id === focusedNoteId ? " sel" : ""}${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
             style={{ paddingLeft: 10 + (depth + 1) * 16 }}
             onPointerDown={(e) => startMainDrag(e, n.id, "move", n.title || "Empty note")}
             onClick={() => {
@@ -1272,6 +1253,43 @@ export function Sidebar() {
     }
   };
 
+  // #25 — reveal the current file: when the focused note changes, auto-expand the
+  // folder that holds it so its row is on screen (and highlighted). Main's copy
+  // wins; a note not in Main is revealed in the Brain instead. Keyed ONLY on
+  // focusedNoteId (the latest projections ride in a ref) so it fires on
+  // navigation, never re-opening a folder the user just collapsed by hand.
+  const revealRef = useRef({ mainProjection, noteIndex });
+  revealRef.current = { mainProjection, noteIndex };
+  useEffect(() => {
+    if (!focusedNoteId) return;
+    const proj = revealRef.current.mainProjection;
+    const idx = revealRef.current.noteIndex;
+    // Main copy wins — walk the note's Main-folder chain open
+    const inMain = proj.notes.find((n) => n.id === focusedNoteId);
+    if (inMain) {
+      let parent: string | null = inMain.folderId;
+      const seen = new Set<string>();
+      while (parent && parent !== MAIN_ROOT && !seen.has(parent)) {
+        seen.add(parent);
+        setDestExpanded(parent, true);
+        parent = proj.folders.find((f) => f.id === parent)?.parentId ?? null;
+      }
+      return;
+    }
+    // else reveal in the Brain: open the Brain header + the note's wiki-area chain
+    const note = idx.get(focusedNoteId);
+    if (!note) return;
+    const fid = note.folderId;
+    if (fid === "wiki" || fid.startsWith("wiki/")) {
+      setDestExpanded("Brain", true);
+      // "wiki/projects/rotli" → open "wiki/projects" then "wiki/projects/rotli"
+      const parts = fid.split("/");
+      for (let i = 2; i <= parts.length; i++) {
+        setDestExpanded(parts.slice(0, i).join("/"), true);
+      }
+    }
+  }, [focusedNoteId, setDestExpanded]);
+
   // the create target: the selected folder, falling back to Inbox when a smart
   // row (All notes / Recent), a hidden root (Archive / Trash / Board), OR the
   // external read-mostly Vault is selected — so freshly created content never
@@ -1288,7 +1306,6 @@ export function Sidebar() {
   // "+" → New Excalidraw board: create it in the resolved folder, refresh the
   // listing, then open its canvas (meta.id is the new board's relpath).
   const createBoard = async () => {
-    setPlusOpen(false);
     const parent = resolvedParent();
     const meta = await corpusCreateBoard(parent);
     await invalidateNotes();
@@ -1325,7 +1342,6 @@ export function Sidebar() {
   // (selected) folder; a per-section "+" passes that section id directly, so you
   // can drop a folder inside any section in one click ("folders in folders").
   const startNewFolder = (parent?: string) => {
-    setPlusOpen(false);
     const target = parent ?? resolvedParent();
     setNewFolderName("");
     setNewFolderParent(target);
@@ -1399,24 +1415,42 @@ export function Sidebar() {
       </div>
     ) : null;
 
-  // a per-section hover "+" — drops a new folder INSIDE that section in one click
-  // (the reference's per-section add; the cleanest "folders in folders" gesture).
-  // A role=button span: the row itself is a <button>, so a nested <button> would
-  // be invalid markup — same trick the note rows use for archive/trash.
+  // per-destination hover icons (Seth #7/#13, 2026-07-03): VS Code drops a
+  // new-file + new-folder pair on a folder row's hover — content lands in THAT
+  // exact folder, no target ambiguity. role=button spans (the row itself is a
+  // <button>, so a nested <button> would be invalid markup — the same trick the
+  // note rows use for archive/trash). New note routes through notes.new after
+  // selecting the folder, so it inherits every routing + Main-filing rule.
   const sectionAddBtn = (parentId: string): ReactNode => (
-    <span
-      role="button"
-      tabIndex={0}
-      className="frow-add"
-      aria-label="New folder inside"
-      title="New folder inside"
-      onClick={(event) => {
-        event.stopPropagation();
-        startNewFolder(parentId);
-      }}
-    >
-      <PlusGlyph size={13} />
-    </span>
+    <>
+      <span
+        role="button"
+        tabIndex={0}
+        className="frow-add"
+        aria-label="New note here"
+        title="New note here"
+        onClick={(event) => {
+          event.stopPropagation();
+          setSelectedFolderId(parentId);
+          dispatch("notes.new");
+        }}
+      >
+        <NewFileGlyph size={13} />
+      </span>
+      <span
+        role="button"
+        tabIndex={0}
+        className="frow-add"
+        aria-label="New folder inside"
+        title="New folder inside"
+        onClick={(event) => {
+          event.stopPropagation();
+          startNewFolder(parentId);
+        }}
+      >
+        <NewFolderGlyph size={13} />
+      </span>
+    </>
   );
 
   // — Chat openers: chats open as PANES now (a pane holds a chat OR a note, side
@@ -1475,8 +1509,46 @@ export function Sidebar() {
             aria-label="Filter notes"
           />
         </div>
-        {/* collapse-all — fold every expanded section/folder at once (matches
-            the reference's collapse icon; handy once folders nest deep) */}
+        {/* IDE-style create icons (Seth #7/#13, 2026-07-03): the old "+" dropdown
+            became three explicit, always-visible actions — New note · New folder ·
+            New board — mirroring VS Code's file-explorer title bar. Each targets
+            the resolved (selected) folder; per-destination hover icons below drop
+            content into an exact folder. */}
+        <button
+          type="button"
+          className="icobtn"
+          aria-label="New note"
+          onClick={() => dispatch("notes.new")}
+        >
+          <NewFileGlyph size={16} />
+          <span className="tip" aria-hidden="true">
+            New note
+          </span>
+        </button>
+        <button
+          type="button"
+          className="icobtn"
+          aria-label="New folder"
+          onClick={() => startNewFolder()}
+        >
+          <NewFolderGlyph size={16} />
+          <span className="tip" aria-hidden="true">
+            New folder
+          </span>
+        </button>
+        <button
+          type="button"
+          className="icobtn"
+          aria-label="New board"
+          onClick={() => void createBoard()}
+        >
+          <CanvasItemGlyph size={16} />
+          <span className="tip" aria-hidden="true">
+            New board
+          </span>
+        </button>
+        {/* collapse-all — fold every expanded section/folder at once (VS Code's
+            collapse icon; handy once folders nest deep). Kept last, like the IDE. */}
         <button
           type="button"
           className="icobtn"
@@ -1490,64 +1562,6 @@ export function Sidebar() {
             Collapse all
           </span>
         </button>
-        {/* the "+" create menu (replaces the pencil): New note / board / folder
-            (Seth, 2026-06-24). The wrapper holds the anchor ref so toggling the
-            button doesn't close-then-reopen on the same click. */}
-        <div className="sb-plus" ref={plusBtnRef}>
-          <button
-            type="button"
-            className="icobtn"
-            aria-label="New…"
-            aria-haspopup="menu"
-            aria-expanded={plusOpen}
-            onClick={() => setPlusOpen((o) => !o)}
-          >
-            <PlusGlyph size={16} />
-            <span className="tip" aria-hidden="true">
-              New…
-            </span>
-          </button>
-          {plusOpen && (
-            <div className="rowmenu" ref={plusMenuRef} role="menu">
-              <button
-                type="button"
-                className="rowmenu-item"
-                role="menuitem"
-                onClick={() => {
-                  setPlusOpen(false);
-                  dispatch("notes.new");
-                }}
-              >
-                <span className="rowmenu-glyph">
-                  <FileGlyph size={16} />
-                </span>
-                New note
-              </button>
-              <button
-                type="button"
-                className="rowmenu-item"
-                role="menuitem"
-                onClick={() => void createBoard()}
-              >
-                <span className="rowmenu-glyph">
-                  <CanvasItemGlyph size={16} />
-                </span>
-                New Excalidraw board
-              </button>
-              <button
-                type="button"
-                className="rowmenu-item"
-                role="menuitem"
-                onClick={() => startNewFolder()}
-              >
-                <span className="rowmenu-glyph">
-                  <FolderGlyph size={16} />
-                </span>
-                New folder
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* a failed row-menu action (file-to-brain, board rename) says so HERE —
@@ -1629,7 +1643,7 @@ export function Sidebar() {
             ) : chatList.length === 0 ? (
               <p className="sb-chat-empty">No chats yet.</p>
             ) : (
-              chatList.slice(0, CHAT_SECTION_LIMIT).map((c) => (
+              chatList.slice(0, chatSidebarLimit).map((c) => (
                 <button
                   type="button"
                   key={c.slug}
@@ -1642,9 +1656,9 @@ export function Sidebar() {
                 </button>
               ))
             )}
-            {chatList.length > CHAT_SECTION_LIMIT && (
+            {chatList.length > chatSidebarLimit && (
               <button type="button" className="sb-chat-more" onClick={openAllChats}>
-                +{chatList.length - CHAT_SECTION_LIMIT} more
+                +{chatList.length - chatSidebarLimit} more
               </button>
             )}
           </div>

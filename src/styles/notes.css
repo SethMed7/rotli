@@ -225,6 +225,15 @@
 .main-row {
   cursor: grab;
 }
+/* #9 (Seth, 2026-07-03): the star + × sat with an awkward gap between them on a
+   short-title row. Root cause — the shared `.snact { margin-left: auto }` absorbed
+   ALL the free space, so `.snt`'s flex-grow never kicked in and the title stayed
+   content-width. Here we DROP that auto margin: `.snt` (flex:1) grows to fill, so
+   the star and the × ride flush to the trailing edge as one group. The × reserves
+   its slot even when hidden (opacity, not display), so nothing shifts on hover. */
+.main-row .snact {
+  margin-left: 0;
+}
 .main-row.dragging {
   opacity: 0.4;
 }
@@ -665,6 +674,15 @@
   gap: 8px;
   padding: 12px 12px 10px;
   flex: 0 0 auto;
+  /* the IDE create icons (New note · folder · board · Collapse all) sit right of
+     the filter well; on a narrow sidebar the whole cluster wraps below the filter
+     instead of squeezing the field to nothing (#7/#13, 2026-07-03). */
+  flex-wrap: wrap;
+}
+/* keep the filter usable when the row wraps — it takes the first line, the icons
+   drop to the next */
+.nl-top .filter {
+  min-width: 140px;
 }
 /* the unified sidebar toggle (Seth, 2026-06-13): a quiet 28px icon button,
    same grammar as the titlebar .icobtn, sitting left of the filter well */
@@ -690,14 +708,6 @@
   opacity: 1;
   transition-delay: 300ms;
 }
-/* the "+" create-menu wrapper (Seth, 2026-06-24): holds the icon button + its
-   anchor ref so the transient popover toggles cleanly. The .rowmenu it opens is
-   position:fixed (JS sets top/left from this box), so it escapes the sidebar. */
-.sb-plus {
-  flex: 0 0 auto;
-  position: relative;
-}
-
 /* the inline nested new-folder input row (Seth, 2026-06-24): a folder glyph +
    a bare text field that reads like the filter well's input — same .snrow
    metrics so it sits in the tree where the new folder will land. */

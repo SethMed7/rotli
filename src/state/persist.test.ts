@@ -5,6 +5,33 @@
 import { describe, expect, it } from "bun:test";
 import type { Tab } from "../types";
 import { parseHybridPresets, parseSettings, pruneMap, unknownSettingsKeys, validTab } from "./persist";
+import { clampChatSidebarLimit } from "./ui";
+
+describe("chatSidebarLimit (#17 — chat list cap)", () => {
+  it("defaults a missing key to 5", () => {
+    expect(parseSettings("{}").chatSidebarLimit).toBe(5);
+  });
+
+  it("keeps every allowed cap (5/10/15)", () => {
+    for (const n of [5, 10, 15]) {
+      expect(parseSettings(JSON.stringify({ chatSidebarLimit: n })).chatSidebarLimit).toBe(n);
+    }
+  });
+
+  it("coerces an out-of-set value (hand-edit / future build) to the default", () => {
+    expect(parseSettings('{"chatSidebarLimit":12}').chatSidebarLimit).toBe(5);
+    expect(parseSettings('{"chatSidebarLimit":0}').chatSidebarLimit).toBe(5);
+    expect(parseSettings('{"chatSidebarLimit":"10"}').chatSidebarLimit).toBe(5);
+  });
+
+  it("clampChatSidebarLimit is pure + safe on junk", () => {
+    expect(clampChatSidebarLimit(10)).toBe(10);
+    expect(clampChatSidebarLimit(7)).toBe(5);
+    expect(clampChatSidebarLimit(undefined)).toBe(5);
+    expect(clampChatSidebarLimit(null)).toBe(5);
+    expect(clampChatSidebarLimit("15")).toBe(5);
+  });
+});
 
 describe("parseSettings — organizerTrust", () => {
   // Organize is the default rung (Seth, 2026-07-02): the daemon touches only
