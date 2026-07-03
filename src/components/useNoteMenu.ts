@@ -6,9 +6,10 @@
 // returnFocus that hands the cursor back to the row (the RowMenu unification).
 
 import { useCallback } from "react";
+import { corpusFrontmatter, corpusSetLocked, corpusSetSecure } from "../lib/tauri";
 import { fileNoteToArea } from "../services/brainFiling";
 import { DEST, isHidden } from "../services/destinations";
-import { useArchiveNote, useBrainAreas, useRestoreNote, useTrashNote } from "../services/hooks";
+import { invalidateNotes, useArchiveNote, useBrainAreas, useRestoreNote, useTrashNote } from "../services/hooks";
 import { useMainGcIds } from "../services/hooks";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
@@ -48,64 +49,90 @@ export function useNoteMenu() {
 
   return useCallback(
     (e: MenuAnchor, note: NoteSummary, opts?: { returnFocus?: () => void }) => {
+      // preventDefault MUST be synchronous (suppress the native menu before any
+      // await), then the async build fetches lock/secure state before opening.
       e.preventDefault?.();
       e.stopPropagation?.();
+      const x = e.clientX;
+      const y = e.clientY;
 
-      // an archived/trashed note: open + Restore only — the lifecycle actions
-      // don't apply until it's back (mirrors the retired RowMenu's split)
-      if (isHidden(note.folderId)) {
-        open(
-          e.clientX,
-          e.clientY,
-          [
-            {
-              kind: "action" as const,
-              label: "Open in new tab",
-              onClick: () => openSummary(note, { newTab: true }),
-            },
-            { kind: "sep" as const },
-            {
-              kind: "action" as const,
-              label: "Restore",
-              onClick: () => restore.mutate(note.id),
-            },
-          ],
-          opts,
-        );
-        return;
-      }
+      void (async () => {
+        // an archived/trashed note: open + Restore only — the lifecycle actions
+        // don't apply until it's back (mirrors the retired RowMenu's split)
+        if (isHidden(note.folderId)) {
+          open(
+            x,
+            y,
+            [
+              {
+                kind: "action" as const,
+                label: "Open in new tab",
+                onClick: () => openSummary(note, { newTab: true }),
+              },
+              { kind: "sep" as const },
+              {
+                kind: "action" as const,
+                label: "Restore",
+                onClick: () => restore.mutate(note.id),
+              },
+            ],
+            opts,
+          );
+          return;
+        }
 
-      const isFile = note.kind === "file";
-      const isBoard = note.kind === "board";
-      const inMain = mainHasNote(manifest.tree, note.id);
-      const starred = quickIds.includes(note.id);
-      const full = !starred && quickIds.length >= QUICK_MAX;
+        const isFile = note.kind === "file";
+        const isBoard = note.kind === "board";
+        const isNote = !isFile && !isBoard;
+        const inMain = mainHasNote(manifest.tree, note.id);
+        const starred = quickIds.includes(note.id);
+        const full = !starred && quickIds.length >= QUICK_MAX;
+        // lock/secure aren't on NoteSummary — read them from frontmatter so the
+        // menu shows the right toggle label + check (Seth #23, 2026-07-03: these
+        // moved out of the metadata popover into this menu).
+        const fm = isNote ? await corpusFrontmatter(note.id).catch(() => null) : null;
 
-      const items: MenuSpec[] = [];
-      items.push({
-        kind: "action" as const,
-        label: "Open in new tab",
-        onClick: () => openSummary(note, { newTab: true }),
-      });
-      items.push({ kind: "sep" as const });
-      if (!isBoard) {
+        const items: MenuSpec[] = [];
         items.push({
           kind: "action" as const,
-          label: starred ? "Unstar — remove from Quick access" : "Star for Quick access",
-          checked: starred,
-          disabled: full,
-          onClick: () => togglePinQuick(note.id),
+          label: "Open in new tab",
+          onClick: () => openSummary(note, { newTab: true }),
         });
-      }
-      items.push({
-        kind: "action" as const,
-        label: inMain ? "Remove from Main" : "Add to Main",
-        onClick: () =>
-          setTree(
-            inMain ? removeFromMain(manifest.tree, note.id) : addNoteToMain(manifest.tree, note.id),
-            liveIds,
-          ),
-      });
+        items.push({ kind: "sep" as const });
+        if (!isBoard) {
+          items.push({
+            kind: "action" as const,
+            label: starred ? "Unstar — remove from Quick access" : "Star for Quick access",
+            checked: starred,
+            disabled: full,
+            onClick: () => togglePinQuick(note.id),
+          });
+        }
+        items.push({
+          kind: "action" as const,
+          label: inMain ? "Remove from Main" : "Add to Main",
+          onClick: () =>
+            setTree(
+              inMain
+                ? removeFromMain(manifest.tree, note.id)
+                : addNoteToMain(manifest.tree, note.id),
+              liveIds,
+            ),
+        });
+        if (isNote) {
+          items.push({
+            kind: "action" as const,
+            label: fm?.locked ? "Unlock — let the AI organize it" : "Lock from the AI",
+            checked: !!fm?.locked,
+            onClick: () => void corpusSetLocked(note.id, !fm?.locked).then(invalidateNotes),
+          });
+          items.push({
+            kind: "action" as const,
+            label: fm?.secure ? "Unmark secure" : "Mark secure — keep off remote AI",
+            checked: !!fm?.secure,
+            onClick: () => void corpusSetSecure(note.id, !fm?.secure).then(invalidateNotes),
+          });
+        }
       // file into a Brain area right here — the 0.17.0 fast-follow; same Filer
       // path as the metadata panel. Offered for STAGED notes (they project to
       // the Captures "Board" folder on the wire — a .md note's id is a ULID, so
@@ -165,7 +192,8 @@ export function useNoteMenu() {
         onClick: () => trash.mutate(note.id),
       });
 
-      open(e.clientX, e.clientY, items, opts);
+        open(x, y, items, opts);
+      })();
     },
     [open, openSummary, quickIds, manifest, setTree, liveIds, archive, trash, restore, setRenameTarget, areas],
   );

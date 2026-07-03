@@ -37,6 +37,10 @@ use crate::corpus::{self, CorpusState};
 /// The daemon's model timeout — deliberately far below chat's 120s so a stuck
 /// server never camps a background thread (doc §2: "shorter timeout than chat").
 const MODEL_TIMEOUT: Duration = Duration::from_secs(45);
+/// The Claude lane's timeout — a remote `claude -p` round-trip (spawn + network
+/// + Sonnet) is slower than the local server, so it gets a longer leash than the
+/// local MODEL_TIMEOUT. Still bounded so a hung CLI never camps the thread.
+const CLAUDE_TIMEOUT: Duration = Duration::from_secs(120);
 /// Daemon replies are one small JSON object (classify: an area + confidence;
 /// enrich: a summary line + short tag/link arrays) — cap generation accordingly.
 const GEN_MAX_TOKENS: u32 = 512;
@@ -53,7 +57,10 @@ const BACKOFF_MAX: Duration = Duration::from_secs(15 * 60);
 /// Knob defaults — knob-not-constant per §6.4; the settings.json keys
 /// (`organizerThreshold` / `organizerQuietSecs`) override per cycle.
 const DEFAULT_THRESHOLD: f64 = 0.8;
-const DEFAULT_QUIET: Duration = Duration::from_secs(45);
+/// Default quiet window: organize a note only after it's sat UNTOUCHED this long
+/// (Seth, 2026-07-03: "watch the file, wait 5 minutes, then organize"). The
+/// `organizerQuietSecs` knob overrides it per cycle.
+const DEFAULT_QUIET: Duration = Duration::from_secs(300);
 /// How much note body rides in a classify/enrich prompt (chars — the model only
 /// needs the gist, and `_inbox` captures are usually short anyway).
 const BODY_BUDGET: usize = 4000;
@@ -980,10 +987,30 @@ pub(crate) fn plan_wait(
 
 // ─── knobs (settings.json — frontend-owned, Rust READS only) ─────────────────
 
+/// Which model the organizer runs (settings.json `organizerModel`). `Local` is
+/// the on-device MLX server (default — organizing never leaves the Mac); `Claude`
+/// routes to `claude -p` Sonnet (Seth's choice — non-secure notes go remote,
+/// secure/locked never do). Copy so the per-cycle transport can close over it.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum OrgModel {
+    Local,
+    Claude,
+}
+
+impl OrgModel {
+    fn parse(s: &str) -> Self {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "claude" => OrgModel::Claude,
+            _ => OrgModel::Local,
+        }
+    }
+}
+
 struct Knobs {
     trust: Option<Trust>,
     threshold: f64,
     quiet: Duration,
+    model: OrgModel,
 }
 
 fn parse_knobs(settings_json: &str) -> Knobs {
@@ -1001,6 +1028,11 @@ fn parse_knobs(settings_json: &str) -> Knobs {
             .filter(|q| q.is_finite() && *q >= 0.0)
             .map(Duration::from_secs_f64)
             .unwrap_or(DEFAULT_QUIET),
+        model: v
+            .get("organizerModel")
+            .and_then(|m| m.as_str())
+            .map(OrgModel::parse)
+            .unwrap_or(OrgModel::Local),
     }
 }
 
@@ -1935,13 +1967,25 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                 // the gates passed — the nudge's cycle is really starting (#29)
                 inner.run_now.store(false, Ordering::SeqCst);
             }
-            let transport = |prompt: &str| {
-                let msgs = [WireMsg {
-                    role: "user".to_string(),
-                    content: prompt.to_string(),
-                    images: Vec::new(),
-                }];
-                chat::complete_local(&msgs, true, 0.0, GEN_MAX_TOKENS, MODEL_TIMEOUT)
+            // which model organizes — re-read each cycle so a Settings change
+            // takes effect on the next wake (Seth, 2026-07-03). Default Local
+            // (on-device); Claude routes to `claude -p` Sonnet.
+            let org_model = {
+                let s = corpus_state
+                    .route(&root_id, |s| s.dot_read("settings"))
+                    .unwrap_or_else(|_| "{}".into());
+                parse_knobs(&s).model
+            };
+            let transport = |prompt: &str| match org_model {
+                OrgModel::Claude => crate::provider::organizer_claude_complete(prompt, CLAUDE_TIMEOUT),
+                OrgModel::Local => {
+                    let msgs = [WireMsg {
+                        role: "user".to_string(),
+                        content: prompt.to_string(),
+                        images: Vec::new(),
+                    }];
+                    chat::complete_local(&msgs, true, 0.0, GEN_MAX_TOKENS, MODEL_TIMEOUT)
+                }
             };
             match run_cycle(&corpus_state, &root_id, &root, inner, &gates, &transport) {
                 Ok(report) => {
@@ -2582,6 +2626,12 @@ mod tests {
         let k = parse_knobs("not json");
         assert_eq!(k.threshold, DEFAULT_THRESHOLD);
         assert_eq!(k.quiet, DEFAULT_QUIET);
+        assert_eq!(k.model, OrgModel::Local, "absent/garbage organizerModel → on-device");
+        // organizerModel: only "claude" (any case) opts into the remote lane
+        assert_eq!(parse_knobs("{\"organizerModel\":\"claude\"}").model, OrgModel::Claude);
+        assert_eq!(parse_knobs("{\"organizerModel\":\"Claude\"}").model, OrgModel::Claude);
+        assert_eq!(parse_knobs("{\"organizerModel\":\"local\"}").model, OrgModel::Local);
+        assert_eq!(parse_knobs("{\"organizerModel\":\"gpt\"}").model, OrgModel::Local);
     }
 
     // ── the cycle ──

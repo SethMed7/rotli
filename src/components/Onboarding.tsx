@@ -187,8 +187,16 @@ function MemexStep() {
       label: currentRoot.split("/").pop() ?? currentRoot,
     });
   }, [currentRoot, setPendingChoice]);
-  // only real memexes are adoptable as the corpus
-  const found = (detect.data ?? []).filter((d) => d.kind === "memex");
+  // only real memexes are adoptable as the corpus — and never offer the one that
+  // IS the current location: the "Keep my current location" card already
+  // represents it, so a separate "Use …" card is the SAME folder shown twice and
+  // choosing it is a no-op relocate-to-where-you-already-are (Seth #6,
+  // 2026-07-03). Compare path-normalized (tolerate a trailing slash).
+  const samePath = (a: string | null, b: string | null): boolean =>
+    !!a && !!b && a.replace(/\/+$/, "") === b.replace(/\/+$/, "");
+  const found = (detect.data ?? []).filter(
+    (d) => d.kind === "memex" && !samePath(d.root, currentRoot),
+  );
   const isKeep = pending?.kind === "keep";
   const isUse = (root: string) => pending?.kind === "use" && pending.path === root;
   const isInit = pending?.kind === "init";

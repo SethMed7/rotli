@@ -43,6 +43,13 @@
   border-radius: 50%;
   background: var(--border);
 }
+/* "In Main" — a subtle accent marker so an open note tells you it lives in Main
+   (Seth #23, 2026-07-03: Main membership isn't in frontmatter by design, so it
+   needs a glanceable indicator here). */
+.status-inline .ed-inmain {
+  color: var(--accent-text);
+  font-weight: 600;
+}
 .aachip {
   display: flex;
   align-items: center;

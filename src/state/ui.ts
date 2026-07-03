@@ -74,6 +74,17 @@ export type OrganizerTrust = "off" | "suggest" | "tidy" | "organize";
 
 export const ORGANIZER_TRUSTS: readonly OrganizerTrust[] = ["off", "suggest", "tidy", "organize"];
 
+/** Which model organizes the Brain: `local` = the on-device MLX server (default,
+ * never leaves the Mac); `claude` = `claude -p` Sonnet (Seth's pick — non-secure
+ * notes go remote, secure/locked never do). The Rust daemon re-reads this. */
+export type OrganizerModel = "local" | "claude";
+
+export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local", "claude"];
+
+/** Selectable idle-delay presets (seconds): how long a note must sit UNTOUCHED
+ * before the organizer scans it. Default 5 min (Seth, 2026-07-03). */
+export const ORGANIZER_QUIET_PRESETS: readonly number[] = [60, 120, 300, 600, 900];
+
 /** The folders rail selection: the two smart rows or a real folder id. */
 export const ALL_NOTES = "all";
 export const RECENT = "recent";
@@ -333,6 +344,13 @@ interface UiState {
    * organizerSetTrust (the daemon re-reads settings.json as the backstop). */
   organizerTrust: OrganizerTrust;
   setOrganizerTrust: (t: OrganizerTrust) => void;
+  /** Which model the organizer runs (design §4; Seth, 2026-07-03). Persisted;
+   * the Rust daemon re-reads settings.json each cycle, so no push command. */
+  organizerModel: OrganizerModel;
+  setOrganizerModel: (m: OrganizerModel) => void;
+  /** Idle delay (seconds) before the organizer scans a just-touched note. */
+  organizerQuietSecs: number;
+  setOrganizerQuietSecs: (n: number) => void;
 
   /** A newer signed build is on the feed — set once by App.tsx's quiet on-mount
    * check (CARL rule 2: no auto-download, no modal). Just lets Settings → General
@@ -530,6 +548,10 @@ export const useUiStore = create<UiState>((set, get) => ({
   // note's LOCATION + METADATA — journaled and undoable — never the words.
   organizerTrust: "organize",
   setOrganizerTrust: (t) => set({ organizerTrust: t }),
+  organizerModel: "local",
+  setOrganizerModel: (m) => set({ organizerModel: m }),
+  organizerQuietSecs: 300,
+  setOrganizerQuietSecs: (n) => set({ organizerQuietSecs: n }),
 
   updateAvailable: false,
   setUpdateAvailable: (on) => set({ updateAvailable: on }),

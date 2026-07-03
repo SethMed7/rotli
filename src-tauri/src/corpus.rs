@@ -1259,6 +1259,22 @@ fn filename_for(title: &str, id: &str) -> String {
     format!("{}-{}.md", slugify(title), tail.to_lowercase())
 }
 
+/// Make a dropped file's name safe for a `storage:` link: slugify the STEM
+/// (lowercase, non-alnum → single `-`) and keep the lowercased extension. A
+/// spaced/exotic name (e.g. macOS "Screenshot 2026-… AM.png") otherwise becomes
+/// a `storage:` link that breaks markdown AND the memex asset regex
+/// `[A-Za-z0-9._/-]` — the validator then reads it as a broken ref (Seth,
+/// 2026-07-03: the recurring Breve check-up failures).
+fn sanitize_asset_name(raw: &str) -> String {
+    let p = Path::new(raw);
+    let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or(raw);
+    let slug = slugify(stem);
+    match p.extension().and_then(|e| e.to_str()) {
+        Some(e) if !e.is_empty() => format!("{slug}.{}", e.to_ascii_lowercase()),
+        _ => slug,
+    }
+}
+
 // ─── wire types (camelCase to match src/types.ts) ────────────────────────────
 
 /// What kind of corpus item this is. Serialized lowercase so the TS side reads
@@ -1638,11 +1654,14 @@ impl CorpusStore {
             .file_name()
             .and_then(|n| n.to_str())
             .ok_or("the dropped file has no readable name")?;
+        // slugify the name so the returned `storage:` link is markdown- and
+        // validator-safe (no spaces — see sanitize_asset_name).
+        let safe = sanitize_asset_name(raw);
         let dir = self.root.join(subdir);
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        // `raw` is a `file_name()` (a single clean component); free_name picks the
-        // first uncollided rel under the binary subdir and derives its extension.
-        let rel = self.free_name(subdir, raw, None);
+        // `safe` is a single clean component; free_name picks the first uncollided
+        // rel under the binary subdir and derives its extension.
+        let rel = self.free_name(subdir, &safe, None);
         fs::copy(src, self.abs(&rel)).map_err(|e| format!("import {}: {e}", src.display()))?;
         Ok(rel)
     }
@@ -4021,6 +4040,18 @@ mod tests {
         assert!(store.root().join("Storage/photo-2.png").is_file());
         // the source is COPIED, never moved
         assert!(src.is_file());
+    }
+
+    #[test]
+    fn import_file_slugifies_spaced_names() {
+        // a macOS screenshot name (spaces + dots) must become a storage:-safe
+        // slug so the ref passes the memex asset regex (Seth, 2026-07-03).
+        let (dir, store) = bare();
+        let src = dir.path().join("Screenshot 2026-07-03 at 8.59.00 AM.png");
+        fs::write(&src, b"png").unwrap();
+        let rel = store.import_file(&src).unwrap();
+        assert_eq!(rel, "Storage/screenshot-2026-07-03-at-8-59-00-am.png");
+        assert!(store.root().join(&rel).is_file());
     }
 
     #[test]

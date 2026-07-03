@@ -10,6 +10,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.3] — 2026-07-03
+
+Feedback sweep, day 2: organizer controls (pick the model + idle delay), the Breve
+check-up fix, and the metadata/onboarding polish from Seth's live pass.
+
+### Added
+- **Pick the organizer's model** (Settings → Brain). Choose **On this Mac** (the
+  local MLX model — default, nothing leaves the machine) or **Claude Sonnet 5**
+  (via `claude -p`). With the Claude lane, non-secure notes are sent to Anthropic
+  to file; **secure and locked notes are never sent anywhere** (a hard guarantee
+  in the daemon). The Rust daemon re-reads the choice each cycle.
+- **Set the organizer's idle delay** (Settings → Brain): 1 / 2 / 5 / 10 / 15 min.
+  A note is only scanned after it's sat **untouched** that long — the default is
+  now **5 minutes** (was 45s), so the organizer waits until you've moved on.
+
+### Changed
+- **The metadata (≡) icon is now an instant toggle** (feedback #23). Clicking it
+  shows/hides the note's frontmatter immediately — no more popover. The controls
+  that lived in that popover — **Lock from the AI**, **Mark secure**, and **File
+  to the Brain** — moved into the note's **right-click menu** (alongside the
+  existing Add-to-Main / Star / Rename), reachable by right-clicking a note in the
+  sidebar or the editor's header chrome. The old `MetaPanel` popover is retired.
+- **An open note now shows "★ In Main"** in its header status line when it's in
+  Main (feedback #1). Main membership is deliberately *not* in the note's
+  frontmatter — it lives in `.rotli/main.json` so the AI reorganizing the Brain
+  never disturbs your arrangement — so this is the glanceable indicator that was
+  missing, plus Add/Remove-from-Main in the right-click menu.
+
+### Fixed
+- **Dropped images no longer create "broken asset" refs.** `import_file` copied a
+  dropped file into `storage/` with its original name, so a macOS screenshot
+  ("Screenshot 2026-… AM.png") produced a spaced `storage:` link that breaks
+  markdown *and* the memex validator's `[A-Za-z0-9._/-]` regex — the recurring
+  Breve check-up failures. Names are now slugified on import
+  (`screenshot-2026-…-am.png`); the existing rotli-feedback note's 16 refs + files
+  were de-spaced so `validate.ts` passes.
+- **Onboarding no longer shows your one brain twice** (feedback #6). When the memex
+  rotli auto-detects on the Mac IS your current notes location, the "Use …" card
+  was the same folder as "Keep my current location" — two cards, one folder,
+  where picking "Use" just relocated you to where you already were. The detected
+  list now drops any memex whose path equals the current location, so you're never
+  offered the same folder twice. (Pulled forward from Batch 7.)
+
 ## [0.24.2] — 2026-07-03
 
 The 2026-07-03 feedback sweep begins (26 items, shipped in subsystem batches —

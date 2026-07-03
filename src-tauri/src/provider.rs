@@ -341,6 +341,46 @@ fn run_registered(
     Ok((stdout, stderr, ok))
 }
 
+/// The Claude model the ORGANIZER uses (the `--model` alias tracks the current
+/// Sonnet — "Sonnet 5" today; Seth, 2026-07-03). Kept separate from the chat
+/// lane so tuning one never moves the other.
+pub const ORGANIZER_CLAUDE_MODEL: &str = "sonnet";
+
+/// Synchronous one-shot Claude completion for the ORGANIZER daemon, which runs
+/// on its own `std::thread` (no `ProviderState`, no cancellation registry). A
+/// tool-less `claude -p --model sonnet --output-format json`, prompt on stdin,
+/// parsed down to the `result` string — reusing `run_registered` for the stdin
+/// write, stderr drain, timeout watchdog, and reap. Any failure (CLI missing,
+/// not authenticated, network, timeout) is a plain `Err`, which the daemon
+/// already treats as model-offline (requeue + backoff) — the note is never lost.
+/// Secure/locked notes never reach here: the daemon filters them before any
+/// transport call, so a REMOTE lane still honors the on-device promise for them.
+pub fn organizer_claude_complete(prompt: &str, timeout: Duration) -> Result<String, String> {
+    let bin = resolve_bin(spec("claude")?).ok_or("the claude CLI isn't installed")?;
+    let (args, _via) = build_args("claude", ORGANIZER_CLAUDE_MODEL, prompt, timeout.as_secs())?;
+    let mut cmd = Command::new(&bin);
+    cmd.args(&args);
+    // a private, single-entry registry — the organizer has no shared children map
+    let children: Arc<Mutex<HashMap<String, Running>>> = Arc::new(Mutex::new(HashMap::new()));
+    let (stdout, stderr, ok) = run_registered(&children, "organizer", cmd, Some(prompt), timeout)?;
+    let parsed = parse_claude_json(&stdout);
+    if parsed.is_err() && !ok {
+        // a nonzero exit with no parsable envelope: surface the stderr tail so
+        // "model offline" in the journal is diagnosable (auth expiry, no net)
+        let tail: String = stderr
+            .lines()
+            .rev()
+            .take(3)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join(" · ");
+        return Err(if tail.is_empty() { "claude produced no output".into() } else { tail });
+    }
+    parsed
+}
+
 // ── commands ──────────────────────────────────────────────────────────────────
 
 /// One tool-less completion step on a connected CLI. Blocking work rides

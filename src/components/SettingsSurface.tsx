@@ -1124,6 +1124,10 @@ const TRUST_CAPTIONS: Record<OrganizerTrust, string> = {
 function BrainPane() {
   const trust = useUiStore((s) => s.organizerTrust);
   const setTrust = useUiStore((s) => s.setOrganizerTrust);
+  const model = useUiStore((s) => s.organizerModel);
+  const setModel = useUiStore((s) => s.setOrganizerModel);
+  const quiet = useUiStore((s) => s.organizerQuietSecs);
+  const setQuiet = useUiStore((s) => s.setOrganizerQuietSecs);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   // the Run-now nudge — a quiet inline note instead of an error toast. The
   // note never claims a live state it can't see ("Running a pass…" showed
@@ -1158,8 +1162,42 @@ function BrainPane() {
         won&rsquo;t touch it at all — not even its metadata) · <b>secure notes</b> · your hand-arranged{" "}
         <b>Main</b>.
       </p>
+
+      <span className="mplabel">Organizing model</span>
+      <Seg
+        value={model}
+        options={[
+          ["local", "On this Mac"],
+          ["claude", "Claude Sonnet 5"],
+        ]}
+        onPick={(m) => setModel(m)}
+      />
       <p className="setnote">
-        100% on this Mac — it never uses the internet and can&rsquo;t read secrets.
+        {model === "claude" ? (
+          <>
+            <b>Claude Sonnet 5</b> (via <code>claude -p</code>) does the organizing — your{" "}
+            <b>non-secure</b> notes are sent to Anthropic to file. <b>Secure</b> and <b>locked</b>{" "}
+            notes are never sent anywhere.
+          </>
+        ) : (
+          <>A local model on this Mac organizes — nothing ever leaves your machine.</>
+        )}
+      </p>
+
+      <span className="mplabel">Wait before organizing</span>
+      <Seg
+        value={String(quiet)}
+        options={[
+          ["60", "1 min"],
+          ["120", "2 min"],
+          ["300", "5 min"],
+          ["600", "10 min"],
+          ["900", "15 min"],
+        ]}
+        onPick={(v) => setQuiet(Number(v))}
+      />
+      <p className="setnote">
+        After you stop touching a note, the organizer waits this long before it scans it.
       </p>
       <p className="setnote">
         It waits for its moment: only when you&rsquo;re away, plugged in, and the machine is cool —

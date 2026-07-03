@@ -87,6 +87,19 @@ Parse defensively like `parseSettings` (drop non-string ids, ignore unknown keys
 
 ## 2. The daemon — the Brain filer
 
+**Amendment (Seth, 2026-07-03):** the model transport is now **pluggable** via an
+`organizerModel` setting. **`local`** (default) is the on-device MLX server as
+below; **`claude`** routes each classify/enrich call to `claude -p` **Sonnet**
+(`provider::organizer_claude_complete`, reusing the chat lane's `run_registered`).
+The `Local`/`Claude` split lives in `Knobs` (re-read each cycle in
+`spawn_organizer`). Privacy invariant is **unchanged**: secure/locked notes are
+filtered *before* any transport call, so they never reach a remote lane — only
+non-secure note content is sent to Anthropic under `claude`. Also the default
+**quiet window** (a note must sit untouched before it's scanned) moved from 45s to
+**300s (5 min)**, still overridable via `organizerQuietSecs`. Both are surfaced in
+Settings → Brain. *(This is a stepping-stone to the Breve→rotli merge — routines
+will run on the same pluggable transport.)*
+
 **Where it runs — a Rust background worker inside the Tauri app (new `organizer.rs`).** This **overrides** the `safety-ux` design's "reuse `src/ai` loop.ts/host.ts in the webview." rotli is an always-running menu-bar `Accessory` app; background organizing belongs in the always-on Rust process, not the webview (which dies/pauses with UI, competes with rendering, and can't run with no window shown). The Rust side already holds everything in one place: the `CorpusStore` + id↔path index, the `SuppressSet`, the per-root watcher seam, and a dependency-free model client. **What we reuse is the model *transport*, not the ReAct *loop*** — the daemon's jobs are narrow, single-shot, structured-output calls with deterministic post-processing, not multi-step agentic reasoning. The `src/ai` loop stays exactly where it is, for interactive chat.
 
 Shape: one `std::thread::spawn`'d worker (mirrors `spawn_watcher`) draining a job queue, managed as `OrganizerState(Mutex<…>)` next to `CorpusState`. Lift `messages_generate` (`chat.rs:240`) out from behind its `#[tauri::command]` into a plain `complete_local(messages, format_json, temperature, timeout) -> Result<String>` the worker calls directly.

@@ -63,7 +63,9 @@ import {
   type GlassCanvas,
   type GlassClarity,
   type GlassTint,
+  ORGANIZER_MODELS,
   ORGANIZER_TRUSTS,
+  type OrganizerModel,
   type OrganizerTrust,
   RECENT,
   RESERVED_DESTS,
@@ -204,6 +206,12 @@ interface PersistedSettings {
   /** The organizer daemon's §4.3 trust rung; the Rust daemon re-reads this file
    * each cycle, so persisting here IS the durable knob. Default: suggest. */
   organizerTrust: OrganizerTrust;
+  /** Which model the organizer runs — `local` (on-device MLX, default) or
+   * `claude` (`claude -p` Sonnet). The Rust daemon re-reads this each cycle. */
+  organizerModel: OrganizerModel;
+  /** Idle delay (seconds) before the organizer scans a just-touched note. The
+   * Rust daemon's `organizerQuietSecs` knob; default 300 (5 min). */
+  organizerQuietSecs: number;
   /** First-run onboarding gate — false until the flow is finished/skipped. */
   onboarded: boolean;
   /** The app version onboarding last completed at (the onboardingVersion gate). */
@@ -354,6 +362,15 @@ export function parseSettings(raw: string): PersistedSettings {
     // note's words — so full auto-organize is the intended out-of-box behavior.
     // An unknown rung (hand-edit, future build) falls to the same default.
     organizerTrust: asEnum(data.organizerTrust, ORGANIZER_TRUSTS, "organize"),
+    // default LOCAL (on-device) so organizing never leaves the Mac unless chosen
+    organizerModel: asEnum(data.organizerModel, ORGANIZER_MODELS, "local"),
+    // idle delay before organizing; default 5 min, non-negative finite only
+    organizerQuietSecs:
+      typeof data.organizerQuietSecs === "number" &&
+      Number.isFinite(data.organizerQuietSecs) &&
+      data.organizerQuietSecs >= 0
+        ? data.organizerQuietSecs
+        : 300,
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
     // not this one — treat that as already-onboarded so we don't re-run first-run
     // onboarding on existing users (same migration shape as expandedDests above)
@@ -416,6 +433,8 @@ function applySettings(s: PersistedSettings): void {
     storageGrouping: s.storageGrouping,
     fileMetadata: s.fileMetadata,
     organizerTrust: s.organizerTrust,
+    organizerModel: s.organizerModel,
+    organizerQuietSecs: s.organizerQuietSecs,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
     quickNoteIds: s.quickNoteIds,
@@ -763,6 +782,8 @@ function settingsSnapshot(): string {
     storageGrouping: ui.storageGrouping,
     fileMetadata: ui.fileMetadata,
     organizerTrust: ui.organizerTrust,
+    organizerModel: ui.organizerModel,
+    organizerQuietSecs: ui.organizerQuietSecs,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
     quickNoteIds: ui.quickNoteIds,

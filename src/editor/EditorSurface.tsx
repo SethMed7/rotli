@@ -11,8 +11,10 @@ import { invalidateNotes, useNote } from "../services/hooks";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
 import { AaPanel } from "./AaPanel";
-import { MetaPanel } from "./MetaPanel";
 import { MetaGlyph } from "../components/glyphs";
+import { useNoteMenu } from "../components/useNoteMenu";
+import { useMainStore } from "../state/main";
+import { mainHasNote } from "../services/mainTree";
 import { BottomSlot } from "./BottomSlot";
 import { CmEditor } from "./CmEditor";
 import { FormatBar } from "./FormatBar";
@@ -62,7 +64,6 @@ export function EditorSurface({
   const lines = docLines ?? queryLines;
 
   const [aaOpen, setAaOpen] = useState(false);
-  const [metaOpen, setMetaOpen] = useState(false);
   const [narrow, setNarrow] = useState(false);
   // the caret's line + column, reported by CmEditor — the format bar's active
   // states read it (bold-on, heading level, list-on)
@@ -70,11 +71,16 @@ export function EditorSurface({
 
   const rootRef = useRef<HTMLDivElement>(null);
   const aaChipRef = useRef<HTMLButtonElement>(null);
-  const metaChipRef = useRef<HTMLButtonElement>(null);
 
   const style = useNoteStyle(noteId);
   const formatBarVisible = useUiStore((s) => s.formatBarVisible);
   const focusMode = useUiStore((s) => s.focusMode);
+  const setFileMetadata = useUiStore((s) => s.setFileMetadata);
+  // "In Main" indicator + the note's right-click menu (Seth #23, 2026-07-03: the
+  // metadata popover is gone — the ≡ chip toggles metadata instantly, and Lock /
+  // Secure / File-to-Brain / Add-to-Main live in the right-click menu).
+  const inMain = useMainStore((s) => mainHasNote(s.manifest.tree, noteId));
+  const openNoteMenu = useNoteMenu();
 
   // "Show file metadata" (Seth, 2026-07-01): the raw frontmatter block, verbatim
   // from disk, rendered as an editable banner above the body. Fetched only while
@@ -162,12 +168,19 @@ export function EditorSurface({
       ref={rootRef}
       style={{ "--cm-measure": `${measureWidth}px` } as CSSProperties}
     >
-      <div className="ed-head">
+      {/* right-click the header chrome (never the text body — that keeps
+          selection/spellcheck) → the note's menu: Lock · Secure · File to Brain ·
+          Add to Main · … (Seth #23). Gated to the main editor: the Quick window
+          has no context-menu host, so it keeps its native menu. */}
+      <div
+        className="ed-head"
+        onContextMenu={autoFocus ? undefined : (e) => openNoteMenu(e, note)}
+      >
         {createdLabel(note.createdAt)}
         <div className="slot">
-          {/* header-inline status (r5): dot · chars · updated · where. The dot is
-              the whole save grammar: muted while edits are in flight, olive once
-              the corpus confirmed them. No spinners. */}
+          {/* header-inline status (r5): dot · chars · updated · where · Main. The
+              dot is the whole save grammar: muted while edits are in flight, olive
+              once the corpus confirmed them. No spinners. */}
           <div className="status-inline">
             <span className={dirty ? "dot-ok dirty" : "dot-ok"} />
             {text.length.toLocaleString()} chars
@@ -175,6 +188,12 @@ export function EditorSurface({
             <UpdatedAt ts={note.updatedAt} />
             <span className="sep" />
             On this Mac
+            {inMain && (
+              <>
+                <span className="sep" />
+                <span className="ed-inmain">★ In Main</span>
+              </>
+            )}
           </div>
           <button
             type="button"
@@ -182,34 +201,23 @@ export function EditorSurface({
             className={aaOpen ? "aachip on" : "aachip"}
             aria-haspopup="dialog"
             aria-expanded={aaOpen}
-            onClick={() => {
-              setMetaOpen(false);
-              setAaOpen(!aaOpen);
-            }}
+            onClick={() => setAaOpen(!aaOpen)}
           >
             Aa
           </button>
           <button
             type="button"
-            ref={metaChipRef}
-            className={metaOpen ? "aachip on" : "aachip"}
-            aria-haspopup="dialog"
-            aria-expanded={metaOpen}
-            aria-label="Metadata & lock"
-            title="Metadata & lock"
-            onClick={() => {
-              setAaOpen(false);
-              setMetaOpen(!metaOpen);
-            }}
+            className={fileMetadata === "show" ? "aachip on" : "aachip"}
+            aria-pressed={fileMetadata === "show"}
+            aria-label={fileMetadata === "show" ? "Hide metadata" : "Show metadata"}
+            title={fileMetadata === "show" ? "Hide metadata" : "Show metadata"}
+            onClick={() => setFileMetadata(fileMetadata === "show" ? "hide" : "show")}
           >
             <MetaGlyph size={15} />
           </button>
         </div>
       </div>
       {aaOpen && <AaPanel noteId={noteId} anchorRef={aaChipRef} onClose={() => setAaOpen(false)} />}
-      {metaOpen && (
-        <MetaPanel noteId={noteId} anchorRef={metaChipRef} onClose={() => setMetaOpen(false)} />
-      )}
       <CmEditor
         key={noteId}
         noteId={noteId}
