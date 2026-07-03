@@ -10,12 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The 2026-07-03 feedback sweep (26 items, shipped in subsystem batches — tracker in
-`docs/design/feedback-2026-07-03.md`).
+## [0.25.0] — 2026-07-03
 
-### Batch 1 · Tabs & Main core
+The 2026-07-03 feedback sweep begins (26 items, shipped in subsystem batches —
+tracker in `docs/design/feedback-2026-07-03.md`). This release is **Batch 1 of 7 ·
+Tabs & Main core**.
 
-#### Changed
+### Changed
 - **⌘T opens a new *blank* note, not a duplicate** (#8). The tab-strip "+" and ⌘T
   both created another tab of the *same* note; now they open a fresh note in a new
   tab — the IDE "new tab" gesture. The old duplicate-the-active-tab `newTab()` store
