@@ -100,4 +100,20 @@ describe("openNote — reuse-or-new-tab, never replace", () => {
     expect(count("p1")).toBe(2);
     expect(activeNoteId("p1")).toBe("n-A");
   });
+
+  test("fills the pristine startup placeholder (empty noteId) — no ghost tab", () => {
+    // the real fs app boots with one note tab whose target is "" (initialNoteId)
+    usePanesStore.setState({
+      root: {
+        kind: "leaf",
+        id: "p1",
+        tabs: [{ id: "seed", surfaceKind: "note", noteId: "", viewState: { cursor: 0, scroll: 0 } }],
+        activeTabId: "seed",
+      },
+      focusedPaneId: "p1",
+    });
+    usePanesStore.getState().openNote("n-fresh");
+    expect(count("p1")).toBe(1); // filled the placeholder, did NOT append
+    expect(activeNoteId("p1")).toBe("n-fresh");
+  });
 });

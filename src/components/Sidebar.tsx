@@ -1289,6 +1289,13 @@ export function Sidebar() {
       for (let i = 2; i <= parts.length; i++) {
         setDestExpanded(parts.slice(0, i).join("/"), true);
       }
+    } else if (fid) {
+      // Storage/… · Archive · Trash · a plain folder: open the id chain so the
+      // row is on screen (reveal was a no-op for these — pre-release review).
+      const parts = fid.split("/");
+      for (let i = 1; i <= parts.length; i++) {
+        setDestExpanded(parts.slice(0, i).join("/"), true);
+      }
     }
   };
 
@@ -1304,12 +1311,20 @@ export function Sidebar() {
   useEffect(() => {
     if (!revealNonce) return;
     expandToFocusedNote();
-    const raf = requestAnimationFrame(() => {
-      document
-        .querySelector(".sidebar .snrow.sel")
-        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    // two frames: the first lets the just-expanded folder chain commit to the
+    // DOM, the second scrolls the now-rendered row into view (pre-release review).
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        document
+          .querySelector(".sidebar .snrow.sel")
+          ?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
     });
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealNonce]);
 

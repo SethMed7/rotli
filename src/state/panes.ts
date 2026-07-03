@@ -80,6 +80,16 @@ function placeTab(
   if (!opts?.newTab) {
     const existing = l.tabs.find(matches);
     if (existing) return { ...l, activeTabId: existing.id };
+    // FILL the pristine startup placeholder rather than leaving a ghost tab
+    // beside the note: the real (fs) app boots with one note tab whose target is
+    // "" (initialNoteId), and the startup effect opens the freshest note into it.
+    // Only that uninitialized placeholder has an empty noteId, so this never
+    // swallows a real note (Seth, 2026-07-03 — the pre-release review's blocker).
+    const active = l.tabs.find((t) => t.id === l.activeTabId);
+    if (active && active.surfaceKind === "note" && active.noteId === "") {
+      const filled = make();
+      return { ...l, tabs: l.tabs.map((t) => (t.id === active.id ? filled : t)), activeTabId: filled.id };
+    }
   }
   const tab = make();
   return { ...l, tabs: [...l.tabs, tab], activeTabId: tab.id };
