@@ -381,6 +381,33 @@ pub fn organizer_claude_complete(prompt: &str, timeout: Duration) -> Result<Stri
     parsed
 }
 
+/// Try an ordered list of provider lanes and return the FIRST success — the
+/// brief-generation fallback chain (breve-merge.md §2.4: Claude→Gemini→Codex,
+/// stop at first success, independent auth per lane). `run` performs one lane's
+/// attempt (a completion, a detect+complete, …); the first `Ok` short-circuits
+/// and no further lanes are touched. If every lane fails, their errors are
+/// joined so the journal shows why the whole chain gave up. An empty lane list
+/// is itself an error.
+///
+/// Pure over `run` — no IO of its own — so it unit-tests with a mock closure.
+/// P0 foundation: nothing wires it into the live daemon yet (P1 does that).
+pub fn provider_chain(
+    lanes: &[&str],
+    run: impl Fn(&str) -> Result<String, String>,
+) -> Result<String, String> {
+    if lanes.is_empty() {
+        return Err("no provider lanes to try".into());
+    }
+    let mut errs = Vec::with_capacity(lanes.len());
+    for &lane in lanes {
+        match run(lane) {
+            Ok(out) => return Ok(out),
+            Err(e) => errs.push(format!("{lane}: {e}")),
+        }
+    }
+    Err(format!("every provider lane failed — {}", errs.join(" · ")))
+}
+
 // ── commands ──────────────────────────────────────────────────────────────────
 
 /// One tool-less completion step on a connected CLI. Blocking work rides
@@ -700,6 +727,36 @@ mod tests {
         let err = parse_agy_text("", "line1\nboom: quota\n").unwrap_err();
         assert!(err.contains("agy returned nothing"));
         assert!(err.contains("boom: quota"));
+    }
+
+    #[test]
+    fn provider_chain_returns_first_success_and_stops() {
+        use std::cell::Cell;
+        let calls = Cell::new(0u32);
+        let out = provider_chain(&["claude", "gemini", "codex"], |lane| {
+            calls.set(calls.get() + 1);
+            match lane {
+                "claude" => Err("not authenticated".into()),
+                "gemini" => Ok("brief text".into()),
+                other => panic!("chain should have stopped before {other}"),
+            }
+        });
+        assert_eq!(out.unwrap(), "brief text");
+        assert_eq!(calls.get(), 2, "stops at the first Ok — codex never runs");
+    }
+
+    #[test]
+    fn provider_chain_joins_all_errors_when_every_lane_fails() {
+        let out = provider_chain(&["claude", "codex"], |lane| Err(format!("{lane} down")));
+        let err = out.unwrap_err();
+        assert!(err.contains("claude: claude down"));
+        assert!(err.contains("codex: codex down"));
+        assert!(err.contains("every provider lane failed"));
+    }
+
+    #[test]
+    fn provider_chain_errors_on_empty_lane_list() {
+        assert!(provider_chain(&[], |_| Ok("x".into())).is_err());
     }
 
     #[test]
