@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.4] — 2026-07-03
+
+The tab model, the note-location finder, and the Batch 2 sidebar pass — plus the
+first foundations of the Breve→rotli merge.
+
 ### Added
 
 - **Every note now shows where it lives.** The editor header has a clickable
@@ -45,6 +50,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `src/state/navHistory.ts` trail records every opened note (replayable, capped).
   The ‹ › buttons + the filter's move up by the wordmark, and the IDE-style search
   dropdown (feedback #26), are deferred to a dedicated follow-up.
+
+### Fixed
+
+- **No more ghost tab on launch.** With the new tab model, the app's pristine
+  startup tab is now *filled* with your freshest note instead of leaving an empty
+  tab beside it (caught by the pre-release review).
+
+### Internal
+
+- **Breve→rotli merge, P0 foundations:** a pure `src/routines/` layer (types, a
+  tz-aware `nextRun` scheduler, a watchlist parser) and an additive Rust
+  `provider_chain` fallback helper — groundwork for scheduled briefs, not yet
+  wired to anything. Design in `docs/design/breve-merge.md`.
 
 ## [0.24.3] — 2026-07-03
 
