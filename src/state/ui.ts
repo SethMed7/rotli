@@ -239,6 +239,11 @@ interface UiState {
   expandedDests: Record<string, boolean>;
   toggleDestExpanded: (id: string) => void;
   setDestExpanded: (id: string, open: boolean) => void;
+  /** Bumped to ask the sidebar to REVEAL the focused note — expand its folder
+   * chain AND scroll its row into view (Seth, 2026-07-03: "I can't find where
+   * this file is"). The editor's location chip fires it. Not persisted. */
+  revealNonce: number;
+  revealFocusedNote: () => void;
   /** Collapse every expanded destination + folder at once (the sidebar's
    * collapse-all toolbar button). `defaultOpenIds` are the rows that read the
    * map with an OPEN default (Main folders, the Brain header) — they get an
@@ -491,6 +496,8 @@ export const useUiStore = create<UiState>((set, get) => ({
     set((s) => ({ expandedDests: { ...s.expandedDests, [id]: !s.expandedDests[id] } })),
   setDestExpanded: (id, open) =>
     set((s) => ({ expandedDests: { ...s.expandedDests, [id]: open } })),
+  revealNonce: 0,
+  revealFocusedNote: () => set((s) => ({ revealNonce: s.revealNonce + 1 })),
   collapseAllDests: (defaultOpenIds = []) =>
     set({ expandedDests: Object.fromEntries(defaultOpenIds.map((id) => [id, false])) }),
 

@@ -43,10 +43,24 @@
   border-radius: 50%;
   background: var(--border);
 }
-/* "In Main" — a subtle accent marker so an open note tells you it lives in Main
-   (Seth #23, 2026-07-03: Main membership isn't in frontmatter by design, so it
-   needs a glanceable indicator here). */
-.status-inline .ed-inmain {
+/* The note's location — a clickable chip in the header that reveals + scrolls to
+   the note in the sidebar (Seth, 2026-07-03: "I can't find where this file is").
+   Main membership isn't in frontmatter by design, so ★ Main shows here. */
+.status-inline .ed-loc {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--r-control);
+}
+.status-inline .ed-loc:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.status-inline .ed-loc.in-main {
   color: var(--accent-text);
   font-weight: 600;
 }

@@ -1260,11 +1260,14 @@ export function Sidebar() {
   // navigation, never re-opening a folder the user just collapsed by hand.
   const revealRef = useRef({ mainProjection, noteIndex });
   revealRef.current = { mainProjection, noteIndex };
-  useEffect(() => {
+  const revealNonce = useUiStore((s) => s.revealNonce);
+
+  // Expand the folder chain that holds the focused note (Main copy wins; a note
+  // not in Main is revealed in the Brain). Reads the latest projections via the
+  // ref so it never re-opens a folder the user just collapsed by hand.
+  const expandToFocusedNote = () => {
     if (!focusedNoteId) return;
-    const proj = revealRef.current.mainProjection;
-    const idx = revealRef.current.noteIndex;
-    // Main copy wins — walk the note's Main-folder chain open
+    const { mainProjection: proj, noteIndex: idx } = revealRef.current;
     const inMain = proj.notes.find((n) => n.id === focusedNoteId);
     if (inMain) {
       let parent: string | null = inMain.folderId;
@@ -1276,7 +1279,6 @@ export function Sidebar() {
       }
       return;
     }
-    // else reveal in the Brain: open the Brain header + the note's wiki-area chain
     const note = idx.get(focusedNoteId);
     if (!note) return;
     const fid = note.folderId;
@@ -1288,7 +1290,28 @@ export function Sidebar() {
         setDestExpanded(parts.slice(0, i).join("/"), true);
       }
     }
+  };
+
+  // #25 — auto-reveal on navigation: expand the holder, never scroll (a yanked
+  // scroll on every click is jarring). Keyed on the note id, not the closure.
+  useEffect(() => {
+    expandToFocusedNote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedNoteId, setDestExpanded]);
+
+  // Explicit reveal (the editor's location chip): expand AND scroll the row into
+  // view. Fires ONLY on the nonce bump, so normal navigation never scroll-yanks.
+  useEffect(() => {
+    if (!revealNonce) return;
+    expandToFocusedNote();
+    const raf = requestAnimationFrame(() => {
+      document
+        .querySelector(".sidebar .snrow.sel")
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealNonce]);
 
   // the create target: the selected folder, falling back to Inbox when a smart
   // row (All notes / Recent), a hidden root (Archive / Trash / Board), OR the

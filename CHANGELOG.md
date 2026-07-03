@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Every note now shows where it lives.** The editor header has a clickable
+  **location** — e.g. `Projects`, `Storage › Images`, `Captures`, and **★ Main**
+  when the note is in Main (Main membership stays out of the frontmatter by
+  design, so this is the signal). Clicking it **reveals + scrolls to the note in
+  the sidebar** (expands its Main-folder chain, else its Brain area). Notes not in
+  Main can be added from All Notes via the row's right-click menu.
+
 ### Changed
 
 - **Clicking a file follows the standard editor model now.** A plain click in the

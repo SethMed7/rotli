@@ -15,6 +15,7 @@ import { MetaGlyph } from "../components/glyphs";
 import { useNoteMenu } from "../components/useNoteMenu";
 import { useMainStore } from "../state/main";
 import { mainHasNote } from "../services/mainTree";
+import { noteLocationLabel } from "../lib/noteLocation";
 import { BottomSlot } from "./BottomSlot";
 import { CmEditor } from "./CmEditor";
 import { FormatBar } from "./FormatBar";
@@ -76,6 +77,7 @@ export function EditorSurface({
   const formatBarVisible = useUiStore((s) => s.formatBarVisible);
   const focusMode = useUiStore((s) => s.focusMode);
   const setFileMetadata = useUiStore((s) => s.setFileMetadata);
+  const revealFocusedNote = useUiStore((s) => s.revealFocusedNote);
   // "In Main" indicator + the note's right-click menu (Seth #23, 2026-07-03: the
   // metadata popover is gone — the ≡ chip toggles metadata instantly, and Lock /
   // Secure / File-to-Brain / Add-to-Main live in the right-click menu).
@@ -188,12 +190,17 @@ export function EditorSurface({
             <UpdatedAt ts={note.updatedAt} />
             <span className="sep" />
             On this Mac
-            {inMain && (
-              <>
-                <span className="sep" />
-                <span className="ed-inmain">★ In Main</span>
-              </>
-            )}
+            <span className="sep" />
+            {/* where this note lives — click to reveal + scroll to it in the
+                sidebar (Seth, 2026-07-03). ★ Main shows when it's in Main. */}
+            <button
+              type="button"
+              className={inMain ? "ed-loc in-main" : "ed-loc"}
+              title="Reveal where this note lives"
+              onClick={() => revealFocusedNote()}
+            >
+              {noteLocationLabel(note.folderId, inMain)}
+            </button>
           </div>
           <button
             type="button"
