@@ -286,7 +286,6 @@ interface PanesState {
   openSummary: (note: { id: string; kind?: string }, opts?: { newTab?: boolean }) => void;
   /** Bind a freshly-created chat (in `paneId`'s active chat tab) to its new slug. */
   bindChat: (paneId: string, chatSlug: string) => void;
-  newTab: () => void;
   closeTab: () => void;
   closeTabById: (paneId: string, tabId: string) => void;
   activateTab: (paneId: string, tabId: string) => void;
@@ -537,16 +536,6 @@ export const usePanesStore = create<PanesState>((set, get) => {
           ),
         })),
       })),
-
-    newTab: () => {
-      const leaf = focusedLeaf();
-      const active = activeTabOf(leaf);
-      if (active.surfaceKind === "canvas") get().openCanvas(active.boardId, { newTab: true });
-      else if (active.surfaceKind === "chat") get().openChat(active.chatSlug, { newTab: true });
-      else if (active.surfaceKind === "file") get().openFile(active.fileId, { newTab: true });
-      else if (active.surfaceKind === "activity") get().openActivity();
-      else get().openNote(active.noteId, { newTab: true });
-    },
 
     closeTab: () => {
       const leaf = focusedLeaf();

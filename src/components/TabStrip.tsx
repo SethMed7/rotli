@@ -18,6 +18,7 @@ import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } fr
 import { useBoardRename } from "../lib/boardRename";
 import { fileName } from "../lib/fileKind";
 import { startTabDrag } from "../lib/tabDrag";
+import { newNoteInTab } from "../keys/actions";
 import { useNoteIndex } from "../services/hooks";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { leaves, usePanesStore } from "../state/panes";
@@ -112,9 +113,10 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   }, [pane.activeTabId, updateFade]);
 
   const newTabHere = () => {
-    const store = usePanesStore.getState();
-    store.focusPane(pane.id);
-    store.newTab();
+    // focus this pane first so the fresh note tab opens HERE, then create a new
+    // blank note (not a duplicate — Seth #8, 2026-07-03).
+    usePanesStore.getState().focusPane(pane.id);
+    newNoteInTab();
   };
 
   // right-click a tab → the shared context-menu host (Seth, 2026-07-01: rename a

@@ -26,6 +26,8 @@ import {
   toggleQuickWindow,
 } from "../lib/tauri";
 import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
+import { useMainStore } from "../state/main";
+import { MAIN_ROOT, addNoteToMainAt, mainFolderIds, mainParentOfNote } from "../services/mainTree";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { cycleQuick, removeQuickNote } from "../state/quick";
 import { ALL_NOTES, RECENT, SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
@@ -48,18 +50,49 @@ function focusedNoteIdNow(): string | null {
  * shelf folder seeds the note's shelf; an explicit local folder is always respected —
  * except the hidden roots (Archive/Trash/Board), which routeDecision diverts to the
  * fallback so ⌘N can never birth a note inside a sink (#5, audit 2026-07). */
-async function newNote(): Promise<void> {
+async function newNote(opts?: { newTab?: boolean }): Promise<void> {
   const { selectedFolderId } = useUiStore.getState();
-  const isSmart = selectedFolderId === ALL_NOTES || selectedFolderId === RECENT;
+  // A Main folder ("main:<path>") is a VIEW, not a disk folder — never route
+  // physical creation into it (routeDecision would treat it as a real local
+  // folder and try to write to a path that doesn't exist). Route like a smart
+  // row, but remember the Main folder as the slot the new note lands in.
+  const inMainFolder = selectedFolderId.startsWith(MAIN_ROOT) && selectedFolderId !== MAIN_ROOT;
+  const routeFolderId = inMainFolder ? ALL_NOTES : selectedFolderId;
+  const isSmart = routeFolderId === ALL_NOTES || routeFolderId === RECENT;
   const id = await createRoutedNote({
-    selectedFolderId,
+    selectedFolderId: routeFolderId,
     isSmart,
     localFallback: inboxFolderId,
     body: "",
   });
   await invalidateNotes();
   await invalidateMemex(); // the memex-derived listing refreshes too
-  usePanesStore.getState().openNote(id);
+  fileNewNoteIntoMain(id, inMainFolder ? selectedFolderId : null);
+  usePanesStore.getState().openNote(id, opts);
+}
+
+/** #15/#16 (Seth, 2026-07-03): every new note lands in Main, inside the folder
+ * the user is working in — an explicitly selected Main folder, else the Main
+ * folder of the currently-active note — else at the Main root. Main references
+ * notes by id, so this is a pure manifest add (the physical file is untouched). */
+function fileNewNoteIntoMain(noteId: string, selectedMainFolder: string | null): void {
+  const { manifest, setTree } = useMainStore.getState();
+  let parent = MAIN_ROOT;
+  if (selectedMainFolder && mainFolderIds(manifest.tree).includes(selectedMainFolder)) {
+    parent = selectedMainFolder;
+  } else {
+    const active = focusedNoteIdNow();
+    const viaNote = active ? mainParentOfNote(manifest.tree, active) : null;
+    if (viaNote) parent = viaNote;
+  }
+  setTree(addNoteToMainAt(manifest.tree, noteId, parent));
+}
+
+/** ⌘T / the tab-strip "+": open a NEW blank note in a new tab — not a duplicate
+ * of the current tab (Seth #8, 2026-07-03) — filed into Main like any new note,
+ * inheriting the current note's Main folder (#16). */
+export function newNoteInTab(): void {
+  void newNote({ newTab: true });
 }
 
 /** ⌘+/⌘− — CONTEXTUAL zoom (Seth, 2026-06-26: "zoom in and out but just where I
@@ -268,12 +301,14 @@ export function registerDefaultActions(): void {
     },
   });
 
-  // — tabs (created only by explicit gestures; plain click replaces) —
+  // — tabs (created only by explicit gestures; plain click replaces). ⌘T opens
+  //   a fresh blank note in a new tab (Seth #8: "new tab AND note, not a
+  //   duplicate of where you already are"), filed into the current Main folder. —
   registerAction({
     id: "tabs.new",
     title: "New tab",
     defaultChord: "Meta+T",
-    run: () => usePanesStore.getState().newTab(),
+    run: () => newNoteInTab(),
   });
   registerAction({
     id: "tabs.close",

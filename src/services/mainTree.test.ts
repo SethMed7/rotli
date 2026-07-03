@@ -4,7 +4,9 @@ import {
   type MainNode,
   addFolderToMain,
   addNoteToMain,
+  addNoteToMainAt,
   buildMainTree,
+  mainParentOfNote,
   gcManifest,
   mainFolderIds,
   mainNoteIds,
@@ -137,6 +139,29 @@ describe("tree mutations", () => {
     expect(addNoteToMain(base, "c")).toEqual(base); // c is inside Today
     expect(addNoteToMain(base, "z")).toEqual([...base, { note: "z" }]);
   });
+  test("addNoteToMainAt: into a Main folder by its rendered id", () => {
+    expect(addNoteToMainAt(base, "z", "main:Today")).toEqual([
+      { note: "a" },
+      { note: "b" },
+      { folder: "Today", children: [{ note: "c" }, { note: "z" }] },
+    ]);
+  });
+  test("addNoteToMainAt: MAIN_ROOT appends at the top level", () => {
+    expect(addNoteToMainAt(base, "z", "main:")).toEqual([...base, { note: "z" }]);
+  });
+  test("addNoteToMainAt: unknown folder → lands at the root", () => {
+    expect(addNoteToMainAt(base, "z", "main:Nope")).toEqual([...base, { note: "z" }]);
+  });
+  test("addNoteToMainAt: dedupes (already anywhere in Main)", () => {
+    expect(addNoteToMainAt(base, "c", "main:")).toEqual(base);
+  });
+
+  test("mainParentOfNote: folder child → the folder id; top-level → MAIN_ROOT; absent → null", () => {
+    expect(mainParentOfNote(base, "c")).toBe("main:Today");
+    expect(mainParentOfNote(base, "a")).toBe("main:");
+    expect(mainParentOfNote(base, "zzz")).toBeNull();
+  });
+
   test("addFolderToMain appends an empty folder", () => {
     expect(addFolderToMain([], "Read later")).toEqual([{ folder: "Read later", children: [] }]);
   });

@@ -10,6 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The 2026-07-03 feedback sweep (26 items, shipped in subsystem batches — tracker in
+`docs/design/feedback-2026-07-03.md`).
+
+### Batch 1 · Tabs & Main core
+
+#### Changed
+- **⌘T opens a new *blank* note, not a duplicate** (#8). The tab-strip "+" and ⌘T
+  both created another tab of the *same* note; now they open a fresh note in a new
+  tab — the IDE "new tab" gesture. The old duplicate-the-active-tab `newTab()` store
+  method is retired (splits still duplicate, unchanged).
+- **Every new note auto-files into Main** (#15). ⌘N, the "+" menu, and ⌘T now drop
+  the new note into Main the moment it's created — Main is your main work area, so a
+  new note shows up there immediately instead of only in Captures/Brain.
+- **A new note inherits the Main folder you're working in** (#16). Create a note
+  while an in-a-Main-folder note is active (or with a Main folder selected) and it
+  lands in that same folder; otherwise it lands at the Main root. A `main:<path>`
+  selection is treated as a view, never a disk path, so physical creation still
+  routes normally (memex staging / local Inbox) — only the Main slot follows.
+
 ## [0.24.1] — 2026-07-02
 
 The first-contact fixes from Seth's live pass over 0.24.0.

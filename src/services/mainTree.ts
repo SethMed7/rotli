@@ -226,6 +226,47 @@ export function addNoteToMain(tree: MainNode[], noteId: string): MainNode[] {
   return containsNote(tree, noteId) ? tree : [...tree, { note: noteId }];
 }
 
+/** Add a note INTO the Main folder with rendered id `parentId` ("main:<path>"),
+ * or the Main root when `parentId` is MAIN_ROOT / the folder can't be found.
+ * A no-op if the note already lives anywhere in Main. Every new note lands in
+ * Main, inside the folder the user is working in (Seth #15/#16, 2026-07-03). */
+export function addNoteToMainAt(tree: MainNode[], noteId: string, parentId: string): MainNode[] {
+  if (containsNote(tree, noteId)) return tree;
+  const ref: MainNode = { note: noteId };
+  if (parentId === MAIN_ROOT) return [...tree, ref];
+  let found = false;
+  const walk = (nodes: MainNode[], pid: string): MainNode[] =>
+    nodes.map((n) => {
+      if (!("folder" in n)) return n;
+      const id = idOf(n, pid);
+      if (id === parentId) {
+        found = true;
+        return { folder: n.folder, children: [...n.children, ref] };
+      }
+      return { folder: n.folder, children: walk(n.children, id) };
+    });
+  const next = walk(tree, MAIN_ROOT);
+  return found ? next : [...tree, ref]; // folder vanished → land at the root
+}
+
+/** The rendered id of the Main folder that DIRECTLY contains `noteId` — MAIN_ROOT
+ * when it sits at the top level, or null when the note isn't in Main at all. Lets
+ * a new note inherit the current note's Main folder (#16). */
+export function mainParentOfNote(tree: MainNode[], noteId: string): string | null {
+  const walk = (nodes: MainNode[], parentId: string): string | null => {
+    for (const n of nodes) {
+      if ("note" in n) {
+        if (n.note === noteId) return parentId;
+      } else {
+        const hit = walk(n.children, idOf(n, parentId));
+        if (hit) return hit;
+      }
+    }
+    return null;
+  };
+  return walk(tree, MAIN_ROOT);
+}
+
 /** Append a new empty Main folder at the root. The name uniquifies against its
  * root siblings ("New folder" → "New folder 2") because a root folder's rendered
  * id IS "main:<name>" — twins would collide as React keys / drag targets. */
