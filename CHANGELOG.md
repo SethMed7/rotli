@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.25.0] — 2026-07-03
+## [0.24.2] — 2026-07-03
 
 The 2026-07-03 feedback sweep begins (26 items, shipped in subsystem batches —
 tracker in `docs/design/feedback-2026-07-03.md`). This release is **Batch 1 of 7 ·
