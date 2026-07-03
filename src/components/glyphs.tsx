@@ -48,6 +48,30 @@ export function FolderGlyph(props: GlyphProps) {
   );
 }
 
+/** New note — a page with a corner + (the VS Code "New File" title action;
+ * Seth #7/#13, 2026-07-03). Same 1.7-stroke family; the plus rides the
+ * bottom-right so it reads as "add a file here". */
+export function NewFileGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5" />
+      <path d="M14 3v5h5" />
+      <path d="M18 14.5v6M15 17.5h6" />
+    </Glyph>
+  );
+}
+
+/** New folder — a folder with a corner + (the VS Code "New Folder" action). */
+export function NewFolderGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v3" />
+      <path d="M4 7v11a2 2 0 0 0 2 2h6" />
+      <path d="M18 14.5v6M15 17.5h6" />
+    </Glyph>
+  );
+}
+
 /** Note/file — "All notes" row + tab type glyph (r1/r2 gates). */
 export function FileGlyph(props: GlyphProps) {
   return (

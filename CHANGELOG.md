@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Sidebar structure & navigation (Batch 2)
+
+- **Chat list shows 5 by default** (feedback #17), with a **5 / 10 / 15** picker in
+  Settings → AI Models ("Chats in the sidebar"). The old flat cap of 12 is gone.
+- **The current file is highlighted in the sidebar and its folder auto-expands**
+  (feedback #25) — the Main copy wins the highlight; a note not in Main is revealed
+  in the Brain. Only reveals on navigation, never fighting a manual collapse.
+- **IDE-style create icons** (feedback #7 / #13): the old "+" dropdown became
+  explicit VS Code-style **New note · New folder · New board · Collapse all** icons
+  in the sidebar toolbar, plus a **new-note + new-folder pair on each folder's
+  hover** (content lands in that exact folder). The toolbar wraps on a narrow rail.
+- **Stars-column whitespace fixed** on Main rows (feedback #9): the star and × now
+  ride flush to the trailing edge instead of leaving an awkward gap on short titles.
+- **Back/Forward navigation history** substrate (feedback #14): a new
+  `src/state/navHistory.ts` trail records every opened note (replayable, capped).
+  The ‹ › buttons + the filter's move up by the wordmark, and the IDE-style search
+  dropdown (feedback #26), are deferred to a dedicated follow-up.
+
 ## [0.24.3] — 2026-07-03
 
 Feedback sweep, day 2: organizer controls (pick the model + idle delay), the Breve

@@ -16,6 +16,7 @@ import { create } from "zustand";
 import { initialNoteId, ulid } from "../services/notes";
 import type { LeafNode, PaneNode, SplitDir, Tab } from "../types";
 import { touchMru } from "./mru";
+import { recordNav } from "./navHistory";
 import { useUiStore } from "./ui";
 
 const MIN_PANE_WIDTH = 320;
@@ -307,6 +308,7 @@ interface PanesState {
 
 const initialLeaf = makeLeaf(makeTab(initialNoteId));
 touchMru(initialNoteId); // the note the window opens on is the freshest "recent"
+recordNav(initialNoteId); // …and the first entry in the Back/Forward trail (#14)
 
 /** Before a row split: does one more column fit at the 320px floor?
  * Auto-collapse the ONE sidebar if that's what it takes (Seth, 2026-06-13: the
@@ -376,6 +378,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
     openNote: (noteId, opts) => {
       touchMru(noteId);
+      recordNav(noteId); // #14: the Back/Forward trail (no-op while replaying)
       // opening a note always returns the content area to the panes — so a
       // click in the Board / All-notes grid (or the sidebar) leaves that view
       useUiStore.getState().setContentView("panes");

@@ -85,6 +85,20 @@ export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local", "claude"];
  * before the organizer scans it. Default 5 min (Seth, 2026-07-03). */
 export const ORGANIZER_QUIET_PRESETS: readonly number[] = [60, 120, 300, 600, 900];
 
+/** How many recent chats the sidebar Chat section shows before "All chats" takes
+ * over — the accordion is a LIMITED view. 5 (default) / 10 / 15 (Seth's decision
+ * 2026-07-03: the old flat 12 was too much). */
+export const CHAT_SIDEBAR_LIMITS: readonly number[] = [5, 10, 15];
+export const DEFAULT_CHAT_SIDEBAR_LIMIT = 5;
+
+/** Coerce any stored / hand-set value to an allowed chat cap; unknown → default.
+ * Pure (exported for the persist parse + its tests). */
+export function clampChatSidebarLimit(n: unknown): number {
+  return typeof n === "number" && CHAT_SIDEBAR_LIMITS.includes(n)
+    ? n
+    : DEFAULT_CHAT_SIDEBAR_LIMIT;
+}
+
 /** The folders rail selection: the two smart rows or a real folder id. */
 export const ALL_NOTES = "all";
 export const RECENT = "recent";
@@ -315,6 +329,10 @@ interface UiState {
    * this pane, or a right split beside the chat. Persisted. */
   chatNoteOpen: "tab" | "split";
   setChatNoteOpen: (v: "tab" | "split") => void;
+  /** How many recent chats the sidebar Chat section shows before "All chats"
+   * (5/10/15, default 5 — Seth, 2026-07-03). Persisted. */
+  chatSidebarLimit: number;
+  setChatSidebarLimit: (n: number) => void;
   /** Connected subscription models (Settings → AI Models): which lanes are
    * enabled. A lane must ALSO detect as installed+authed to serve. Persisted. */
   aiProviders: Record<ProviderId, boolean>;
@@ -527,6 +545,8 @@ export const useUiStore = create<UiState>((set, get) => ({
     }),
   chatNoteOpen: "tab",
   setChatNoteOpen: (v) => set({ chatNoteOpen: v }),
+  chatSidebarLimit: DEFAULT_CHAT_SIDEBAR_LIMIT,
+  setChatSidebarLimit: (n) => set({ chatSidebarLimit: clampChatSidebarLimit(n) }),
   aiProviders: { claude: false, codex: false, agy: false, gemini: false },
   setAiProvider: (id, on) => set((s) => ({ aiProviders: { ...s.aiProviders, [id]: on } })),
   hybridPresets: [],

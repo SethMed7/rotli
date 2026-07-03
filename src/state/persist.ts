@@ -52,6 +52,7 @@ import { findLeaf, leaves, usePanesStore } from "./panes";
 import { applyTheme } from "./theme";
 import {
   ALL_NOTES,
+  clampChatSidebarLimit,
   clampSidebarWidth,
   clampSidebarZoom,
   GLASS_BACKGROUNDS,
@@ -190,6 +191,8 @@ interface PersistedSettings {
   chatMeasure: Record<string, Measure>;
   /** Where a chat's attached note opens: a new tab (default) or a right split. */
   chatNoteOpen: "tab" | "split";
+  /** Sidebar Chat section cap (5/10/15, default 5). */
+  chatSidebarLimit: number;
   /** Connected subscription lanes (Settings → AI Models); all off by default —
    * a chat never leaves the Mac without the user flipping a lane on. */
   aiProviders: Record<ProviderId, boolean>;
@@ -337,6 +340,8 @@ export function parseSettings(raw: string): PersistedSettings {
       return persistableChatMap(out);
     })(),
     chatNoteOpen: data.chatNoteOpen === "split" ? "split" : "tab",
+    // 5/10/15 only; any other value (hand-edit, future build) → default 5
+    chatSidebarLimit: clampChatSidebarLimit(data.chatSidebarLimit),
     // booleans only, unknown lanes ignored — the safe default is every lane OFF
     aiProviders: (() => {
       const src = record(data.aiProviders);
@@ -426,6 +431,7 @@ function applySettings(s: PersistedSettings): void {
     chatWeb: s.chatWeb,
     chatMeasure: s.chatMeasure,
     chatNoteOpen: s.chatNoteOpen,
+    chatSidebarLimit: s.chatSidebarLimit,
     aiProviders: s.aiProviders,
     hybridPresets: s.hybridPresets,
     blockedModels: s.blockedModels,
@@ -775,6 +781,7 @@ function settingsSnapshot(): string {
     chatWeb: persistableChatMap(ui.chatWeb),
     chatMeasure: persistableChatMap(ui.chatMeasure),
     chatNoteOpen: ui.chatNoteOpen,
+    chatSidebarLimit: ui.chatSidebarLimit,
     aiProviders: ui.aiProviders,
     hybridPresets: ui.hybridPresets,
     blockedModels: ui.blockedModels,
