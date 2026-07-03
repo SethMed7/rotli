@@ -123,7 +123,12 @@ sandboxed completion backend** under the same agent loop (a hardcoded binary + m
 allowlist in Rust; the prompt is the only caller-shaped input). A connected model is
 **remote** by definition: the conversation leaves your Mac; **secure notes never do**
 (the endpoint-locality gate + the egress backstop both refuse them). The model picker
-groups **On this Mac · Connected · Presets**.
+groups **On this Mac · Connected · Presets**. Each lane is a card: toggling it on runs
+one tiny real reply in the background (**verification** — the honest "it works"), a
+missing lane offers setup steps, and the models inside a lane are **pills you can
+block/allow individually** (blocked models leave the picker and the preset editor).
+"**Scan my Mac**" reads the chip/memory/disk and badges every installable local model
+by what this machine comfortably runs.
 
 **Installing on-device models** (Settings → AI Models → On this Mac) — browse curated
 MLX chat models or paste any Hugging Face repo id; rotli downloads the weights (via the

@@ -828,6 +828,7 @@ pub fn run() {
             localmodel::local_model_set_default,
             localmodel::local_model_default,
             localmodel::local_model_uninstall,
+            localmodel::system_profile,
             keychain::secret_store,
             keychain::secret_exists,
             keychain::secret_delete,

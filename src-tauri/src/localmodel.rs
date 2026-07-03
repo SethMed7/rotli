@@ -181,7 +181,17 @@ fn append_model(id: &str, repo: &str, abs: &Path, approx_mb: u64, vision: bool) 
         .and_then(|m| m.as_array_mut())
         .ok_or("registry has no models array")?;
     models.push(entry);
+    bump_updated(&mut reg);
     write_registry(&reg)
+}
+
+/// Stamp the registry's `updated` field with today (a write just happened).
+fn bump_updated(reg: &mut serde_json::Value) {
+    if let Ok(now) = time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Iso8601::DATE)
+    {
+        reg["updated"] = serde_json::Value::String(now);
+    }
 }
 
 // ── the active model (the plist's MEMEX_MLX_MODEL) ────────────────────────────
@@ -323,6 +333,57 @@ pub fn local_model_install_cancel(
     Ok(())
 }
 
+// ── "Scan my Mac" (Settings → AI Models) ─────────────────────────────────────
+
+/// What this Mac can comfortably run — the raw facts; the comfort tiers are a
+/// pure TS function over them (unit-tested there).
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemProfile {
+    pub chip: String,
+    pub ram_gb: f64,
+    pub cpu_cores: u32,
+    pub free_disk_gb: f64,
+}
+
+fn sysctl(name: &str) -> Option<String> {
+    // GUI apps don't get the login-shell PATH — sysctl lives in /usr/sbin
+    let out = Command::new("/usr/sbin/sysctl").args(["-n", name]).output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (!s.is_empty()).then_some(s)
+}
+
+#[tauri::command]
+pub fn system_profile() -> Result<SystemProfile, String> {
+    let ram_bytes: u64 = sysctl("hw.memsize")
+        .and_then(|s| s.parse().ok())
+        .ok_or("couldn't read this Mac's memory size")?;
+    let chip = sysctl("machdep.cpu.brand_string").unwrap_or_else(|| "Apple Silicon".into());
+    let cpu_cores: u32 = sysctl("hw.ncpu").and_then(|s| s.parse().ok()).unwrap_or(0);
+    // free disk on the volume holding the model store (df -k: avail is col 4)
+    let free_disk_gb = Command::new("/bin/df")
+        .args(["-k"])
+        .arg(memex_ai())
+        .output()
+        .ok()
+        .and_then(|o| {
+            let text = String::from_utf8_lossy(&o.stdout).to_string();
+            let line = text.lines().last()?.to_string();
+            let kb: f64 = line.split_whitespace().nth(3)?.parse().ok()?;
+            Some(kb / 1_000_000.0)
+        })
+        .unwrap_or(0.0);
+    Ok(SystemProfile {
+        chip,
+        ram_gb: ram_bytes as f64 / 1_073_741_824.0,
+        cpu_cores,
+        free_disk_gb,
+    })
+}
+
 /// The `provider` + on-disk `path` of a registered model by id.
 fn registry_entry(id: &str) -> Result<(String, PathBuf), String> {
     let reg = read_registry()?;
@@ -445,6 +506,7 @@ pub fn local_model_uninstall(id: String) -> Result<(), String> {
     if let Some(arr) = reg.get_mut("models").and_then(|m| m.as_array_mut()) {
         arr.retain(|m| m.get("id").and_then(|v| v.as_str()) != Some(id.as_str()));
     }
+    bump_updated(&mut reg);
     write_registry(&reg)?;
     if path.exists() {
         let _ = trash::delete(&path);

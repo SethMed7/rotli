@@ -9,7 +9,12 @@ import {
   CLI_CATALOG,
   GEMINI_OPENAI_BASE,
   type HybridPreset,
+  LANE_PING_MODEL,
   LOCAL_CATALOG,
+  PROVIDER_IDS,
+  STARTER_PRESETS,
+  comfortFor,
+  fitLabel,
   flattenModels,
   installableCatalog,
   isValidRepo,
@@ -17,6 +22,7 @@ import {
   nameFromRepo,
   presetModel,
 } from "./models";
+import { parseHybridPresets } from "../state/persist";
 import { adapterFor, frontierAdapter, gemmaAdapter } from "./prompt";
 import type { ChatModelInfo } from "../lib/tauri";
 
@@ -121,6 +127,59 @@ describe("local model catalog", () => {
     const out = installableCatalog(installed);
     expect(out.some((e) => e.name === "qwen2.5-3b-instruct-4bit")).toBe(false);
     expect(out.length).toBe(LOCAL_CATALOG.length - 1);
+  });
+});
+
+describe("blocked models (per-lane model control)", () => {
+  test("a blocked connected model disappears from the picker; the rest stay", () => {
+    const g = mergedModels(local, { ...noneEnabled, claude: true }, [], ["opus", "fable"]);
+    const ids = g.connected.map((m) => m.id);
+    expect(ids).toContain("sonnet");
+    expect(ids).toContain("haiku");
+    expect(ids).not.toContain("opus");
+    expect(ids).not.toContain("fable");
+  });
+
+  test("blocking never touches local models or presets", () => {
+    const p: HybridPreset = { id: "p", name: "P", organizer: "x", routes: [{ when: "", model: "sonnet" }] };
+    const g = mergedModels(local, noneEnabled, [p], ["gemma-3-12b-it-qat-4bit", "preset:p"]);
+    expect(g.local).toHaveLength(1);
+    expect(g.presets).toHaveLength(1);
+  });
+});
+
+describe("comfort tiers (Scan my Mac)", () => {
+  test("a 64GB M4 Max: 32B-4bit is comfortable, everything smaller too", () => {
+    expect(fitLabel(18500, 64)).toBe("great fit"); // Qwen 32B
+    expect(fitLabel(7500, 64)).toBe("great fit"); // gemma 12B
+  });
+  test("16GB: 7B is comfortable, 12B workable, 32B too big", () => {
+    expect(fitLabel(4300, 16)).toBe("great fit");
+    expect(fitLabel(7500, 16)).toBe("workable");
+    expect(fitLabel(18500, 16)).toBe("too big");
+  });
+  test("8GB: 3B fits, 7B workable, 12B too big", () => {
+    expect(fitLabel(1800, 8)).toBe("great fit");
+    expect(fitLabel(4300, 8)).toBe("workable");
+    expect(fitLabel(7500, 8)).toBe("too big");
+  });
+  test("tiers are monotonic in RAM", () => {
+    expect(comfortFor(64).comfortableMb).toBeGreaterThan(comfortFor(16).comfortableMb);
+  });
+});
+
+describe("starter presets + lane pings", () => {
+  test("every starter preset survives the persistence shape-validator byte-for-byte", () => {
+    expect(parseHybridPresets(STARTER_PRESETS)).toEqual(STARTER_PRESETS);
+  });
+  test("starter ids are stable + prefixed (re-adding never duplicates)", () => {
+    for (const p of STARTER_PRESETS) expect(p.id.startsWith("starter-")).toBe(true);
+    expect(new Set(STARTER_PRESETS.map((p) => p.id)).size).toBe(STARTER_PRESETS.length);
+  });
+  test("every lane's ping model exists in its own catalog (gemini included)", () => {
+    for (const id of PROVIDER_IDS) {
+      expect(CLI_CATALOG[id].some((m) => m.id === LANE_PING_MODEL[id])).toBe(true);
+    }
   });
 });
 

@@ -62,7 +62,35 @@ export const LOCAL_CATALOG: LocalCatalogEntry[] = [
   { repo: "mlx-community/Phi-3.5-mini-instruct-4bit", name: "phi-3.5-mini-instruct-4bit", label: "Phi-3.5 mini Instruct", approxMb: 2200, vision: false },
   { repo: "mlx-community/Qwen2.5-7B-Instruct-4bit", name: "qwen2.5-7b-instruct-4bit", label: "Qwen2.5 7B Instruct", approxMb: 4300, vision: false },
   { repo: "mlx-community/Ministral-8B-Instruct-2410-4bit", name: "ministral-8b-instruct-4bit", label: "Ministral 8B Instruct", approxMb: 4500, vision: false },
+  { repo: "mlx-community/Qwen2.5-14B-Instruct-4bit", name: "qwen2.5-14b-instruct-4bit", label: "Qwen2.5 14B Instruct", approxMb: 8500, vision: false },
+  { repo: "mlx-community/Qwen2.5-32B-Instruct-4bit", name: "qwen2.5-32b-instruct-4bit", label: "Qwen2.5 32B Instruct", approxMb: 18500, vision: false },
 ];
+
+// ── "Scan my Mac" comfort tiers (pure — the Rust command supplies raw facts) ──
+
+/** How much MODEL a Mac's unified memory comfortably carries. Rule of thumb for
+ * 4-bit MLX weights on Apple Silicon: comfortable ≤ ~45% of RAM (the OS, the
+ * apps, and the KV cache keep breathing room), workable ≤ ~65% (it runs, with
+ * swap pressure under load). Display guidance, not a hard gate. */
+export function comfortFor(ramGb: number): { comfortableMb: number; workableMb: number } {
+  return { comfortableMb: ramGb * 1000 * 0.45, workableMb: ramGb * 1000 * 0.65 };
+}
+
+export type FitLabel = "great fit" | "workable" | "too big";
+
+export function fitLabel(approxMb: number, ramGb: number): FitLabel {
+  const c = comfortFor(ramGb);
+  if (approxMb <= c.comfortableMb) return "great fit";
+  if (approxMb <= c.workableMb) return "workable";
+  return "too big";
+}
+
+/** The scan verdict line — one human sentence from the raw facts. */
+export function scanVerdict(ramGb: number): string {
+  const c = comfortFor(ramGb);
+  const gb = (mb: number) => (mb / 1000).toFixed(0);
+  return `comfortably runs models up to ~${gb(c.comfortableMb)} GB of weights (4-bit); up to ~${gb(c.workableMb)} GB is workable under load.`;
+}
 
 /** Derive a safe install name from a pasted HF repo id — the last path segment,
  * lowercased, non-slug chars → dashes. Matches the Rust `valid_name` law. */
@@ -160,18 +188,68 @@ export function presetModel(p: HybridPreset): ChatModelInfo {
  * EVERY installed local model is offered: since server 0.3 the shared MLX
  * server honors the request's model and swaps its slot on demand (load lazily,
  * idle-unload — nothing runs 24/7). `localDefault` is a Settings badge, not a
- * usability gate. */
+ * usability gate. `blocked` hides individual CONNECTED models the user turned
+ * off inside a lane (e.g. keep Sonnet, block Opus). */
 export function mergedModels(
   local: ChatModelInfo[],
   enabled: Record<ProviderId, boolean>,
   presets: HybridPreset[],
+  blocked: readonly string[] = [],
 ): ModelGroups {
+  const off = new Set(blocked);
   const connected: ChatModelInfo[] = [];
   for (const id of PROVIDER_IDS) {
-    if (enabled[id]) connected.push(...CLI_CATALOG[id]);
+    if (enabled[id]) connected.push(...CLI_CATALOG[id].filter((m) => !off.has(m.id)));
   }
   return { local, connected, presets: presets.map(presetModel) };
 }
+
+/** The cheapest model per lane for the toggle-on VERIFICATION ping — a real
+ * one-line completion is the only honest "this lane works". */
+export const LANE_PING_MODEL: Record<ProviderId, string> = {
+  claude: "haiku",
+  codex: "gpt-5.4-mini",
+  agy: "Gemini 3.5 Flash (Medium)",
+  gemini: "gemini-3-flash",
+};
+
+/** Ready-made hybrid presets (stable ids so re-adding never duplicates). They
+ * reference Seth's real defaults — routes to a lane you haven't enabled simply
+ * fall away at runtime (runHybrid degrades, never fails a turn). */
+export const STARTER_PRESETS: HybridPreset[] = [
+  {
+    id: "starter-everyday",
+    name: "Everyday — local first, frontier when it's hard",
+    organizer: "gemma-3-12b-it-qat-4bit",
+    routes: [
+      { when: "notes lookups, summaries, quick questions", model: "gemma-3-12b-it-qat-4bit" },
+      { when: "deep reasoning, long documents, careful writing", model: "sonnet" },
+      { when: "code questions and debugging", model: "gpt-5.5" },
+    ],
+    fallback: "gemma-3-12b-it-qat-4bit",
+  },
+  {
+    id: "starter-private",
+    name: "Private by default",
+    organizer: "qwen2.5-3b-instruct-4bit",
+    routes: [
+      { when: "almost everything — stay on this Mac", model: "gemma-3-12b-it-qat-4bit" },
+      { when: "only when explicitly asked to go big or use the web's knowledge", model: "gemini-3-flash" },
+    ],
+    fallback: "gemma-3-12b-it-qat-4bit",
+  },
+  {
+    id: "starter-delegate",
+    name: "Frontier delegate — route to the specialist",
+    organizer: "gemma-3-12b-it-qat-4bit",
+    routes: [
+      { when: "hard reasoning, analysis, strategy", model: "opus" },
+      { when: "coding, refactors, technical depth", model: "gpt-5.5" },
+      { when: "everything else", model: "sonnet" },
+    ],
+    fallback: "gemma-3-12b-it-qat-4bit",
+  },
+];
 
 /** The flat pick-list (local first, so the `isDefault`/first fallback stays
  * on-device when a persisted choice goes stale). */

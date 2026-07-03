@@ -311,6 +311,10 @@ interface UiState {
   /** Hybrid model presets (organizer → routes → fallback). Persisted. */
   hybridPresets: HybridPreset[];
   setHybridPresets: (list: HybridPreset[]) => void;
+  /** Individual CONNECTED models turned off inside an enabled lane (e.g. keep
+   * Sonnet, block Opus) — hidden from the picker + preset editor. Persisted. */
+  blockedModels: string[];
+  toggleBlockedModel: (id: string) => void;
   /** Which connected engine draws the chat's generate_image tool. Persisted. */
   imageEngine: "codex" | "agy";
   setImageEngine: (e: "codex" | "agy") => void;
@@ -509,6 +513,13 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAiProvider: (id, on) => set((s) => ({ aiProviders: { ...s.aiProviders, [id]: on } })),
   hybridPresets: [],
   setHybridPresets: (list) => set({ hybridPresets: list }),
+  blockedModels: [],
+  toggleBlockedModel: (id) =>
+    set((s) => ({
+      blockedModels: s.blockedModels.includes(id)
+        ? s.blockedModels.filter((x) => x !== id)
+        : [...s.blockedModels, id],
+    })),
   imageEngine: "codex",
   setImageEngine: (e) => set({ imageEngine: e }),
   storageGrouping: "type",

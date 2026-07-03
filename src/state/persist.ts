@@ -193,6 +193,8 @@ interface PersistedSettings {
   aiProviders: Record<ProviderId, boolean>;
   /** Hybrid model presets (organizer → routes → fallback). */
   hybridPresets: HybridPreset[];
+  /** Connected models turned off inside an enabled lane (picker-hidden). */
+  blockedModels: string[];
   /** Which connected engine draws generate_image: codex (default) or agy. */
   imageEngine: "codex" | "agy";
   /** How the Storage destination groups its binaries: Type / Date / Folder. */
@@ -337,6 +339,9 @@ export function parseSettings(raw: string): PersistedSettings {
       return out;
     })(),
     hybridPresets: parseHybridPresets(data.hybridPresets),
+    blockedModels: Array.isArray(data.blockedModels)
+      ? data.blockedModels.filter((x): x is string => typeof x === "string")
+      : [],
     imageEngine: data.imageEngine === "agy" ? "agy" : "codex",
     storageGrouping:
       data.storageGrouping === "date" || data.storageGrouping === "folder"
@@ -404,6 +409,7 @@ function applySettings(s: PersistedSettings): void {
     chatNoteOpen: s.chatNoteOpen,
     aiProviders: s.aiProviders,
     hybridPresets: s.hybridPresets,
+    blockedModels: s.blockedModels,
     imageEngine: s.imageEngine,
     storageGrouping: s.storageGrouping,
     fileMetadata: s.fileMetadata,
@@ -750,6 +756,7 @@ function settingsSnapshot(): string {
     chatNoteOpen: ui.chatNoteOpen,
     aiProviders: ui.aiProviders,
     hybridPresets: ui.hybridPresets,
+    blockedModels: ui.blockedModels,
     imageEngine: ui.imageEngine,
     storageGrouping: ui.storageGrouping,
     fileMetadata: ui.fileMetadata,

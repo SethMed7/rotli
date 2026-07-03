@@ -439,6 +439,17 @@ export function localModelUninstall(id: string): Promise<void> {
   return aiInvoke("local_model_uninstall", { id });
 }
 
+/** "Scan my Mac" — the raw hardware facts; comfort tiers are computed in TS. */
+export interface SystemProfile {
+  chip: string;
+  ramGb: number;
+  cpuCores: number;
+  freeDiskGb: number;
+}
+export function systemProfile(): Promise<SystemProfile> {
+  return aiInvoke("system_profile");
+}
+
 /** Generate an image into a CHAT'S assets (`storage/chats/<slug>/`) via the
  * chosen connected engine. Rust pins the destination from the registered root
  * + slug — the prompt never shapes the path. Returns the corpus-relative path. */

@@ -22,6 +22,7 @@ import { GLASS_BG_SRC } from "../lib/glassBackgrounds";
 import {
   type ChatModelInfo,
   type MemexValidateReport,
+  type SystemProfile,
   chatModels,
   checkForUpdate,
   cliDetect,
@@ -41,21 +42,27 @@ import {
   secretStore,
   setDockVisible,
   setHideOnBlur,
+  systemProfile,
 } from "../lib/tauri";
 import { makeTauriHost } from "../ai/host";
 import { suggestPresets } from "../ai/hybrid";
 import {
+  CLI_CATALOG,
   type HybridPreset,
   type LocalCatalogEntry,
   PROVIDER_IDS,
   PROVIDER_LABELS,
   type ProviderId,
+  STARTER_PRESETS,
+  fitLabel,
   flattenModels,
   installableCatalog,
   isValidRepo,
   mergedModels,
   nameFromRepo,
+  scanVerdict,
 } from "../ai/models";
+import { verifyLane } from "../ai/verify";
 import { queryClient } from "../services/query";
 import { usePanesStore } from "../state/panes";
 import { useFolders } from "../services/hooks";
@@ -1217,6 +1224,9 @@ function LocalModelsSection({
   const [installing, setInstalling] = useState<Installing | null>(null);
   const [repo, setRepo] = useState("");
   const [note, setNote] = useState<{ text: string; err: boolean } | null>(null);
+  // "Scan my Mac" — chip + RAM + free disk, then fit badges on the picks
+  const [scan, setScan] = useState<SystemProfile | null>(null);
+  const [scanErr, setScanErr] = useState<string | null>(null);
 
   // poll the byte total while a download runs (mirrors the organizer poll)
   const progress = useQuery({
@@ -1283,14 +1293,50 @@ function LocalModelsSection({
       ? Math.min(99, Math.round((bytes / (installing.approxMb * 1_000_000)) * 100))
       : null;
 
+  const fitClass = (mb: number) =>
+    !scan
+      ? ""
+      : {
+          "great fit": "fit good",
+          workable: "fit warn",
+          "too big": "fit bad",
+        }[fitLabel(mb, scan.ramGb)];
+
   return (
-    <>
+    <section className="aisection">
       <h4 className="set-subhead">On this Mac</h4>
       <p className="setnote">
         Models that run entirely on your Mac. Pick any of them per chat — a model loads when
         asked and unloads after a few idle minutes, so nothing runs around the clock. The
         <b> default</b> is what your other memex apps (like Breve) use.
       </p>
+
+      <div className="aiscan-row">
+        <button
+          type="button"
+          className="ghostbtn"
+          onClick={() => {
+            setScanErr(null);
+            systemProfile()
+              .then(setScan)
+              .catch((e) => setScanErr(e instanceof Error ? e.message : String(e)));
+          }}
+        >
+          Scan my Mac
+        </button>
+        {scan && (
+          <span className="aiscan-fact">
+            {scan.chip} · {Math.round(scan.ramGb)} GB memory · {Math.round(scan.freeDiskGb)} GB
+            free
+          </span>
+        )}
+      </div>
+      {scan && (
+        <p className="setnote">
+          This Mac {scanVerdict(scan.ramGb)} The picks below are badged accordingly.
+        </p>
+      )}
+      {scanErr && <p className="setnote err">{scanErr}</p>}
       {installed.length > 0 && (
         <div className="localmodel-list">
           {installed.map((m) => {
@@ -1346,6 +1392,7 @@ function LocalModelsSection({
               {picks.map((e) => (
                 <div className="localmodel-row" key={e.name}>
                   <span className="localmodel-name">{e.label}</span>
+                  {scan && <span className={fitClass(e.approxMb)}>{fitLabel(e.approxMb, scan.ramGb)}</span>}
                   <span className="localmodel-size">
                     {formatSize(e.approxMb)}
                     {e.vision ? " · 👁" : ""}
@@ -1372,7 +1419,7 @@ function LocalModelsSection({
         </>
       )}
       {note && <p className={note.err ? "setnote err" : "setnote"}>{note.text}</p>}
-    </>
+    </section>
   );
 }
 
@@ -1384,9 +1431,64 @@ const PROVIDER_DESC: Record<ProviderId, string> = {
   gemini: "Gemini API — bring your own API key (stored in the macOS Keychain).",
 };
 
-function ProviderRow({ id }: { id: ProviderId }) {
+/** How to get a lane working when it isn't installed / signed in. */
+const LANE_SETUP: Record<ProviderId, string[]> = {
+  claude: [
+    "Install Claude Code — claude.com/claude-code (installer or `npm i -g @anthropic-ai/claude-code`).",
+    "Run `claude` in Terminal once and sign in with your Claude account (Pro or Max).",
+    "Come back here — the status flips to ready on its own.",
+  ],
+  codex: [
+    "Install the Codex CLI: `brew install codex`.",
+    "Run `codex login` and sign in with your ChatGPT account.",
+    "Come back here — the status flips to ready on its own.",
+  ],
+  agy: [
+    "Install Google's Antigravity CLI (antigravity.google).",
+    "Run `agy` once and sign in with your Google account (Google AI Pro/Ultra).",
+    "Come back here — the status flips to ready on its own.",
+  ],
+  gemini: [
+    "Create a free API key at aistudio.google.com/apikey.",
+    "Paste it below — it's stored in the macOS Keychain, never in a file.",
+  ],
+};
+
+/** A bare switch (the Toggle row's knob, without the full-width row). */
+function LaneSwitch({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      className={on ? "ailane-sw on" : "ailane-sw"}
+      onClick={onToggle}
+    >
+      <span className="sw" aria-hidden="true">
+        <span className="swknob" />
+      </span>
+    </button>
+  );
+}
+
+type VerifyState =
+  | { state: "idle" }
+  | { state: "running" }
+  | { state: "ok"; ms: number; model: string }
+  | { state: "fail"; error: string };
+
+/** One connected lane: toggle (validates in the background on enable), live
+ * status, a Test button, setup instructions when it isn't ready, and per-model
+ * pills — a lane can keep Sonnet but block Opus. */
+function LaneCard({ id }: { id: ProviderId }) {
   const enabled = useUiStore((s) => s.aiProviders[id]);
   const setAiProvider = useUiStore((s) => s.setAiProvider);
+  const blockedModels = useUiStore((s) => s.blockedModels);
+  const toggleBlockedModel = useUiStore((s) => s.toggleBlockedModel);
+  const [help, setHelp] = useState(false);
+  const [verify, setVerify] = useState<VerifyState>({ state: "idle" });
+
   const det = useQuery({
     queryKey: ["cli-detect", id],
     queryFn: () => cliDetect(id),
@@ -1394,6 +1496,7 @@ function ProviderRow({ id }: { id: ProviderId }) {
     staleTime: 60_000,
   });
   const d = det.data;
+  const ready = !!d && d.installed && d.authenticated;
   const status = !isTauri()
     ? "app only"
     : !d
@@ -1401,21 +1504,103 @@ function ProviderRow({ id }: { id: ProviderId }) {
       : !d.installed
         ? "not installed"
         : !d.authenticated
-          ? "not signed in"
-          : `ready${d.version ? ` · ${d.version}` : ""}`;
+          ? id === "gemini"
+            ? "no key yet"
+            : "not signed in"
+          : `ready${d.version ? ` · ${d.version.replace(/^[a-z-]+ /i, "")}` : ""}`;
+
+  const runVerify = () => {
+    setVerify({ state: "running" });
+    verifyLane(id).then((r) =>
+      setVerify(
+        r.ok
+          ? { state: "ok", ms: r.ms, model: r.model }
+          : { state: "fail", error: r.error ?? "failed" },
+      ),
+    );
+  };
+
+  const onToggle = () => {
+    const next = !enabled;
+    setAiProvider(id, next);
+    // the honest check: turning a working lane on runs ONE real (tiny) reply
+    // in the background — detection alone only proves a binary + a credential
+    if (next && ready) runVerify();
+    if (!next) setVerify({ state: "idle" });
+  };
+
   return (
-    <Toggle
-      on={enabled}
-      onChange={() => setAiProvider(id, !enabled)}
-      title={PROVIDER_LABELS[id]}
-      desc={`${PROVIDER_DESC[id]} Status: ${status}.`}
-    />
+    <div className={enabled ? "ailane on" : "ailane"}>
+      <div className="ailane-head">
+        <span className="ailane-name">{PROVIDER_LABELS[id]}</span>
+        <span className={ready ? "ailane-chip ok" : "ailane-chip"}>{status}</span>
+        <span className="chat-box-grow" />
+        <LaneSwitch on={enabled} onToggle={onToggle} label={`Use ${PROVIDER_LABELS[id]}`} />
+      </div>
+      <p className="ailane-desc">{PROVIDER_DESC[id]}</p>
+
+      {id === "gemini" && enabled && <GeminiKeyRow onSaved={runVerify} />}
+
+      {!ready && (
+        <div className="ailane-help">
+          <button type="button" className="ailane-helptoggle" onClick={() => setHelp((v) => !v)}>
+            {help ? "▾" : "▸"} How to set this up
+          </button>
+          {help && (
+            <ol className="ailane-steps">
+              {LANE_SETUP[id].map((s) => (
+                <li key={s}>{s}</li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
+
+      {enabled && ready && (
+        <>
+          <div className="ailane-verify">
+            <button
+              type="button"
+              className="ghostbtn"
+              disabled={verify.state === "running"}
+              onClick={runVerify}
+            >
+              {verify.state === "running" ? "Testing…" : "Test connection"}
+            </button>
+            {verify.state === "ok" && (
+              <span className="ailane-chip ok">
+                working ✓ · {verify.model} · {(verify.ms / 1000).toFixed(1)}s
+              </span>
+            )}
+            {verify.state === "fail" && <span className="ailane-chip err">{verify.error}</span>}
+          </div>
+          <div className="ailane-models">
+            <span className="ailane-modelslabel">In the picker:</span>
+            {CLI_CATALOG[id].map((m) => {
+              const off = blockedModels.includes(m.id);
+              return (
+                <button
+                  type="button"
+                  key={m.id}
+                  className={off ? "ailane-model off" : "ailane-model"}
+                  aria-pressed={!off}
+                  title={off ? "Blocked — click to allow" : "Click to block this model"}
+                  onClick={() => toggleBlockedModel(m.id)}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
 /** The Gemini key editor — the value goes straight to the Keychain and never
  * comes back out; the row only knows whether one is saved. */
-function GeminiKeyRow() {
+function GeminiKeyRow({ onSaved }: { onSaved?: () => void }) {
   const [val, setVal] = useState("");
   const [note, setNote] = useState<{ text: string; err: boolean } | null>(null);
   const saved = useQuery({
@@ -1447,6 +1632,7 @@ function GeminiKeyRow() {
               setVal("");
               setNote({ text: "Key saved to the Keychain.", err: false });
               refresh();
+              onSaved?.();
             })
             .catch((e) => setNote({ text: e instanceof Error ? e.message : String(e), err: true }));
         }}
@@ -1592,13 +1778,15 @@ function ModelsPane() {
   const chatNoteOpen = useUiStore((s) => s.chatNoteOpen);
   const setChatNoteOpen = useUiStore((s) => s.setChatNoteOpen);
 
+  const blockedModels = useUiStore((s) => s.blockedModels);
   const local = useQuery({
     queryKey: ["chat", "models"],
     queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
     staleTime: Infinity,
   });
-  // every model a preset may reference: local + the ENABLED connected lanes
-  const available = flattenModels(mergedModels(local.data ?? [], aiProviders, []));
+  // every model a preset may reference: local + the ENABLED connected lanes,
+  // minus anything blocked inside a lane
+  const available = flattenModels(mergedModels(local.data ?? [], aiProviders, [], blockedModels));
 
   const [draft, setDraft] = useState<HybridPreset | null>(null);
   const [usage, setUsage] = useState("");
@@ -1651,18 +1839,46 @@ function ModelsPane() {
         onChanged={() => queryClient.invalidateQueries({ queryKey: ["chat", "models"] })}
       />
 
-      <h4 className="set-subhead">Connected models</h4>
-      {PROVIDER_IDS.map((id) => (
-        <ProviderRow key={id} id={id} />
-      ))}
-      {aiProviders.gemini && <GeminiKeyRow />}
+      <section className="aisection">
+        <h4 className="set-subhead">Connected models</h4>
+        <p className="setnote">
+          Turning a lane on runs one tiny test reply in the background — the honest &ldquo;it
+          works&rdquo;. Inside a lane, click a model to block or allow it in the picker.
+        </p>
+        {PROVIDER_IDS.map((id) => (
+          <LaneCard key={id} id={id} />
+        ))}
+      </section>
 
+      <section className="aisection">
       <h4 className="set-subhead">Hybrid presets</h4>
       <p className="setnote">
         A preset lets one model ORGANIZE each message and route it to the model best suited — e.g.
         gemma routes, Gemini executes, Claude catches failures. Presets show up in the chat&rsquo;s
         model picker.
       </p>
+      {STARTER_PRESETS.some((sp) => !hybridPresets.some((p) => p.id === sp.id)) && (
+        <>
+          <p className="setnote">Ready-made — add one and tweak it to taste:</p>
+          <div className="preset-list">
+            {STARTER_PRESETS.filter((sp) => !hybridPresets.some((p) => p.id === sp.id)).map(
+              (sp) => (
+                <div className="preset-row" key={sp.id}>
+                  <span className="preset-name">{sp.name}</span>
+                  <span className="preset-sum">{summarize(sp)}</span>
+                  <button
+                    type="button"
+                    className="ghostbtn"
+                    onClick={() => setHybridPresets([...hybridPresets, sp])}
+                  >
+                    Add
+                  </button>
+                </div>
+              ),
+            )}
+          </div>
+        </>
+      )}
       {hybridPresets.length > 0 && (
         <div className="preset-list">
           {hybridPresets.map((p) => (
@@ -1742,31 +1958,36 @@ function ModelsPane() {
           ))}
         </div>
       )}
+      </section>
 
-      <h4 className="set-subhead">Images in chat</h4>
-      <p className="setnote">
-        Which connected engine draws when a chat generates an image (saved into this chat&rsquo;s
-        assets).
-      </p>
-      <Seg
-        value={imageEngine}
-        options={[
-          ["codex", "Codex (gpt-image)"],
-          ["agy", "Antigravity (Nano Banana)"],
-        ]}
-        onPick={setImageEngine}
-      />
+      <section className="aisection">
+        <h4 className="set-subhead">Images in chat</h4>
+        <p className="setnote">
+          Which connected engine draws when a chat generates an image (saved into this
+          chat&rsquo;s assets).
+        </p>
+        <Seg
+          value={imageEngine}
+          options={[
+            ["codex", "Codex (gpt-image)"],
+            ["agy", "Antigravity (Nano Banana)"],
+          ]}
+          onPick={setImageEngine}
+        />
+      </section>
 
-      <h4 className="set-subhead">Chat &amp; its note</h4>
-      <p className="setnote">Every chat carries a note. Opening it from the chat header:</p>
-      <Seg
-        value={chatNoteOpen}
-        options={[
-          ["tab", "Opens a new tab"],
-          ["split", "Splits to the right"],
-        ]}
-        onPick={setChatNoteOpen}
-      />
+      <section className="aisection">
+        <h4 className="set-subhead">Chat &amp; its note</h4>
+        <p className="setnote">Every chat carries a note. Opening it from the chat header:</p>
+        <Seg
+          value={chatNoteOpen}
+          options={[
+            ["tab", "Opens a new tab"],
+            ["split", "Splits to the right"],
+          ]}
+          onPick={setChatNoteOpen}
+        />
+      </section>
     </>
   );
 }

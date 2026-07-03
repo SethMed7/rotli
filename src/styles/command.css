@@ -561,15 +561,15 @@
 .preset-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 10px 0;
+  gap: 8px;
+  margin: 12px 0;
   max-width: 560px;
 }
 .preset-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 10px;
+  padding: 11px 14px;
   border: 1px solid var(--border);
   border-radius: var(--r-card);
   background: var(--surface-2);
@@ -632,19 +632,184 @@
   margin-left: auto;
 }
 
+/* AI Models pane — section rhythm (Seth, 2026-07-02: air between the groups) */
+.aisection {
+  margin: 0 0 38px;
+}
+.aisection .set-subhead {
+  margin-top: 0;
+  font-size: 13.5px;
+}
+.aisection > .setnote:first-of-type {
+  margin-top: 6px;
+}
+
+/* connected lanes — one card per provider */
+.ailane {
+  max-width: 560px;
+  margin: 12px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+}
+.ailane.on {
+  border-color: color-mix(in srgb, var(--accent-text) 30%, var(--border));
+}
+.ailane-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ailane-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.ailane-chip {
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.ailane-chip.ok {
+  color: var(--accent-text);
+  border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+}
+.ailane-chip.err {
+  color: var(--danger, var(--accent-text));
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ailane-desc {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+/* the bare switch (the Toggle row's knob without the row) */
+.ailane-sw {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+}
+.ailane-verify {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.ailane-help {
+  margin-top: 10px;
+}
+.ailane-helptoggle {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.ailane-steps {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+.ailane-steps code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  background: var(--surface);
+  border-radius: var(--r-inner);
+  padding: 1px 4px;
+}
+.ailane-models {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.ailane-modelslabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+.ailane-model {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--accent-text) 35%, var(--border));
+  border-radius: var(--r-pill);
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.ailane-model.off {
+  color: var(--text-muted);
+  border-color: var(--border);
+  border-style: dashed;
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+/* Scan my Mac */
+.aiscan-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 4px;
+}
+.aiscan-fact {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.fit {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+}
+.fit.good {
+  color: var(--accent-text);
+  border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+}
+.fit.warn {
+  color: var(--text-muted);
+}
+.fit.bad {
+  color: var(--text-muted);
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
 /* local models (On this Mac) — installed list + installer + download bar */
 .localmodel-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 10px 0;
+  gap: 8px;
+  margin: 14px 0;
   max-width: 560px;
 }
 .localmodel-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 10px;
+  padding: 11px 14px;
   border: 1px solid var(--border);
   border-radius: var(--r-card);
   background: var(--surface-2);

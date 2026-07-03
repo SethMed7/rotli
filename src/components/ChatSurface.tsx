@@ -286,11 +286,13 @@ export function ChatSurface({
     queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
     staleTime: Infinity,
   });
-  // + the connected lanes the user enabled (Settings → AI Models) + presets.
-  // Local models come first, so a stale pick falls back on-device.
+  // + the connected lanes the user enabled (Settings → AI Models) + presets,
+  // minus any models blocked inside a lane. Local first, so a stale pick
+  // falls back on-device.
   const aiProviders = useUiStore((s) => s.aiProviders);
   const hybridPresets = useUiStore((s) => s.hybridPresets);
-  const groups = mergedModels(models.data ?? [], aiProviders, hybridPresets);
+  const blockedModels = useUiStore((s) => s.blockedModels);
+  const groups = mergedModels(models.data ?? [], aiProviders, hybridPresets, blockedModels);
   const modelList = flattenModels(groups);
   const picked =
     modelList.find((m) => m.id === chatModelId) ??

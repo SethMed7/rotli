@@ -10,7 +10,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.23.1] — 2026-07-02
+## [0.24.0] — 2026-07-02
+
+The AI Models pane grows up: verification, per-model control, starter presets, and
+"Scan my Mac".
+
+### Added
+- **Connected lanes are now cards that prove themselves.** Toggling a lane on runs one
+  tiny REAL reply in the background on the lane's cheapest model (detection only proves a
+  binary + a credential; a ping proves the path) — the card shows "working ✓ · haiku ·
+  2.1s" or the actual error, and a **Test connection** button re-checks any time. Saving
+  a Gemini key verifies immediately.
+- **Setup instructions where they're needed:** a lane that isn't installed or signed in
+  grows a "How to set this up" disclosure with the exact install + login steps.
+- **Per-model control inside a lane:** click a model pill to block or allow it in the
+  picker (e.g. keep Sonnet, block Opus). Blocked models also leave the preset editor.
+  Persisted.
+- **Starter presets** — three ready-made hybrids (Everyday · Private by default ·
+  Frontier delegate) with stable ids; add one and tweak it like any preset.
+- **Scan my Mac:** reads the chip, unified memory, and free disk (this M4 Max: 64 GB),
+  says what weight class the machine comfortably runs, and badges every catalog pick
+  (great fit / workable / too big). The catalog also gained **Qwen2.5 14B and 32B** for
+  the Macs that can carry them.
+
+### Changed
+- The whole AI Models pane breathes: sectioned groups with real spacing, roomier rows,
+  cards instead of packed toggles.
+- The shared registry's `updated` field is now stamped on every install/uninstall.
 
 The pre-test verification sweep: every connected lane's exact invocation was executed
 live against the installed CLIs before handing the build over for testing.
