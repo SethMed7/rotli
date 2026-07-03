@@ -58,3 +58,46 @@ describe("moveTab — same-pane reorder (visual-slot semantics)", () => {
     expect(findLeaf(usePanesStore.getState().root, "p1")?.activeTabId).toBe("A");
   });
 });
+
+// The standard editor open model (Seth, 2026-07-03): clicking a file in the
+// sidebar ACTIVATES its open tab if there is one, else opens a NEW tab — it must
+// never REPLACE the tab you're working in. ⌘-click / ⌘T force a fresh tab.
+describe("openNote — reuse-or-new-tab, never replace", () => {
+  const count = (paneId: string): number =>
+    findLeaf(usePanesStore.getState().root, paneId)?.tabs.length ?? 0;
+  const activeNoteId = (paneId: string): string | null => {
+    const l = findLeaf(usePanesStore.getState().root, paneId);
+    const t = l?.tabs.find((x) => x.id === l.activeTabId);
+    return t && t.surfaceKind === "note" ? t.noteId : null;
+  };
+
+  beforeEach(() => {
+    // one open tab, note "n-A" (the leaf helper builds noteId = `n-${id}`)
+    usePanesStore.setState({ root: leaf("p1", ["A"]), focusedPaneId: "p1" });
+  });
+
+  test("opening a DIFFERENT file opens a new tab (never replaces the current one)", () => {
+    usePanesStore.getState().openNote("n-B");
+    expect(count("p1")).toBe(2);
+    expect(activeNoteId("p1")).toBe("n-B");
+  });
+
+  test("opening an ALREADY-open file activates its tab and adds none", () => {
+    usePanesStore.getState().openNote("n-B"); // → tabs n-A, n-B
+    usePanesStore.getState().openNote("n-A"); // click the already-open n-A
+    expect(count("p1")).toBe(2);
+    expect(activeNoteId("p1")).toBe("n-A");
+  });
+
+  test("clicking the current file again is a no-op (stays put)", () => {
+    usePanesStore.getState().openNote("n-A");
+    expect(count("p1")).toBe(1);
+    expect(activeNoteId("p1")).toBe("n-A");
+  });
+
+  test("⌘-click / newTab forces a fresh tab even when the file is already open", () => {
+    usePanesStore.getState().openNote("n-A", { newTab: true });
+    expect(count("p1")).toBe(2);
+    expect(activeNoteId("p1")).toBe("n-A");
+  });
+});

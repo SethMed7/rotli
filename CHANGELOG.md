@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Clicking a file follows the standard editor model now.** A plain click in the
+  sidebar **activates that file's tab if it's already open**, otherwise opens it in
+  a **new tab** — it never replaces the file you're working in. ⌘-click / ⌘T still
+  force a fresh tab. (Previously a plain click *replaced* the active tab, so opening
+  a second file lost your place.) Applies to notes, boards, files, and saved chats;
+  "New chat" always opens fresh.
+
 ### Sidebar structure & navigation (Batch 2)
 
 - **Chat list shows 5 by default** (feedback #17), with a **5 / 10 / 15** picker in

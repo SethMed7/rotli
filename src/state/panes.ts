@@ -1,9 +1,11 @@
 // The pane tree (UI state only — the Zustand law). Implements the r2 pane/tab
 // law: every pane owns tabs; splits DUPLICATE the active tab (never an empty
-// pane); the note list mirrors the focused pane's active tab; plain click
-// replaces, only explicit gestures (⌘T / ⌘-click) create tabs. 320px min pane
-// width — when a split would break the floor, the folders rail auto-collapses
-// first, then the list.
+// pane); the note list mirrors the focused pane's active tab. OPEN is the
+// standard editor model (Seth, 2026-07-03): a plain click on a file REUSES its
+// open tab if the focused pane already has one, else opens a NEW tab — it never
+// replaces the tab you're working in; ⌘T / ⌘-click always force a fresh tab.
+// 320px min pane width — when a split would break the floor, the folders rail
+// auto-collapses first, then the list.
 //
 // Tab discoverability law (Seth, 2026-06-13): EVERY pane shows its tab strip —
 // the old "single-tab pane renders zero chrome" Apple-Notes default is gone,
@@ -62,6 +64,25 @@ function duplicateTab(tab: Tab): Tab {
 
 function makeLeaf(tab: Tab): LeafNode {
   return { kind: "leaf", id: ulid(), tabs: [tab], activeTabId: tab.id };
+}
+
+/** The standard editor open (Seth, 2026-07-03): a plain open ACTIVATES the
+ * target's already-open tab in this pane if there is one, else APPENDS a new
+ * tab — it never replaces the tab you're in. `opts.newTab` (⌘T / ⌘-click) forces
+ * a fresh tab even when the target is already open. `matches` identifies an
+ * existing tab for the same target; `make` mints a fresh one. */
+function placeTab(
+  l: LeafNode,
+  opts: { newTab?: boolean } | undefined,
+  matches: (t: Tab) => boolean,
+  make: () => Tab,
+): LeafNode {
+  if (!opts?.newTab) {
+    const existing = l.tabs.find(matches);
+    if (existing) return { ...l, activeTabId: existing.id };
+  }
+  const tab = make();
+  return { ...l, tabs: [...l.tabs, tab], activeTabId: tab.id };
 }
 
 // ——— pure tree helpers ———
@@ -263,18 +284,19 @@ interface PanesState {
   setDropPreview: (preview: DropPreview) => void;
   focusPane: (paneId: string) => void;
   focusDir: (dir: FocusDir) => void;
-  /** Plain list click: REPLACE the focused pane's active tab's note.
-   * `newTab` (⌘-click / ⌘T path) opens a new tab instead. */
+  /** Plain list click: ACTIVATE the note's open tab in the focused pane if there
+   * is one, else open a NEW tab (the standard editor model — never replaces the
+   * tab you're in). `newTab` (⌘-click / ⌘T) forces a fresh tab. */
   openNote: (noteId: string, opts?: { newTab?: boolean }) => void;
-  /** Open a board (Excalidraw canvas) — mirrors openNote: replace the focused
-   * pane's active tab, or `newTab` opens a fresh canvas tab. */
+  /** Open a board (Excalidraw canvas) — mirrors openNote: reuse its open tab or
+   * open a new one; `newTab` forces a fresh canvas tab. */
   openCanvas: (boardId: string, opts?: { newTab?: boolean }) => void;
   /** Retarget every open canvas tab pointing at `oldId` to `newId` (board rename). */
   retargetBoard: (oldId: string, newId: string) => void;
   /** Point open note tabs at a note's new id after it moved (e.g. the Filer filed it). */
   retargetNote: (oldId: string, newId: string) => void;
-  /** Open a chat in the focused pane (replace, or `newTab`). `chatSlug` null = a
-   * fresh unsent chat. */
+  /** Open a chat in the focused pane: reuse its open tab or open a new one
+   * (`newTab` forces fresh). `chatSlug` null = a fresh unsent chat, always a new tab. */
   openChat: (chatSlug: string | null, opts?: { newTab?: boolean }) => void;
   /** Open a surfaced binary FILE (audio/pdf/image/text) in-app — mirrors openCanvas. */
   openFile: (fileId: string, opts?: { newTab?: boolean }) => void;
@@ -384,24 +406,14 @@ export const usePanesStore = create<PanesState>((set, get) => {
       useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
       set({
-        root: updateLeaf(get().root, leaf.id, (l) => {
-          if (opts?.newTab) {
-            const tab = makeTab(noteId);
-            return { ...l, tabs: [...l.tabs, tab], activeTabId: tab.id };
-          }
-          // replace: keep the tab identity, swap to a clean NOTE tab. We must
-          // NOT spread the old tab — if it was a CanvasTab, `{...t, noteId}` kept
-          // surfaceKind:"canvas" + boardId, so the pane stayed stuck rendering
-          // the board and every sidebar note-click did nothing (Seth, 2026-06-26).
-          return {
-            ...l,
-            tabs: l.tabs.map((t) =>
-              t.id === l.activeTabId
-                ? { id: l.activeTabId, surfaceKind: "note", noteId, viewState: { cursor: 0, scroll: 0 } }
-                : t,
-            ),
-          };
-        }),
+        root: updateLeaf(get().root, leaf.id, (l) =>
+          placeTab(
+            l,
+            opts,
+            (t) => t.surfaceKind === "note" && t.noteId === noteId,
+            () => makeTab(noteId),
+          ),
+        ),
       });
     },
 
@@ -410,27 +422,14 @@ export const usePanesStore = create<PanesState>((set, get) => {
       useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
       set({
-        root: updateLeaf(get().root, leaf.id, (l) => {
-          if (opts?.newTab) {
-            const tab = makeCanvasTab(boardId);
-            return { ...l, tabs: [...l.tabs, tab], activeTabId: tab.id };
-          }
-          // replace: keep the tab id, swap the WHOLE tab to a canvas tab (never
-          // spread a NoteTab's fields onto it)
-          return {
-            ...l,
-            tabs: l.tabs.map((t) =>
-              t.id === l.activeTabId
-                ? {
-                    id: l.activeTabId,
-                    surfaceKind: "canvas",
-                    boardId,
-                    viewState: { cursor: 0, scroll: 0 },
-                  }
-                : t,
-            ),
-          };
-        }),
+        root: updateLeaf(get().root, leaf.id, (l) =>
+          placeTab(
+            l,
+            opts,
+            (t) => t.surfaceKind === "canvas" && t.boardId === boardId,
+            () => makeCanvasTab(boardId),
+          ),
+        ),
       });
     },
 
@@ -452,27 +451,18 @@ export const usePanesStore = create<PanesState>((set, get) => {
       // chats aren't notes — no touchMru. Like openCanvas, surface the panes.
       useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
+      // a fresh chat (null slug — "New chat") is ALWAYS a new tab; a saved chat
+      // reuses its open tab or opens a new one (never replaces).
+      const placeOpts = chatSlug === null ? { newTab: true } : opts;
       set({
-        root: updateLeaf(get().root, leaf.id, (l) => {
-          if (opts?.newTab) {
-            const tab = makeChatTab(chatSlug);
-            return { ...l, tabs: [...l.tabs, tab], activeTabId: tab.id };
-          }
-          // replace: keep the tab id, swap the WHOLE tab to a chat tab
-          return {
-            ...l,
-            tabs: l.tabs.map((t) =>
-              t.id === l.activeTabId
-                ? {
-                    id: l.activeTabId,
-                    surfaceKind: "chat",
-                    chatSlug,
-                    viewState: { cursor: 0, scroll: 0 },
-                  }
-                : t,
-            ),
-          };
-        }),
+        root: updateLeaf(get().root, leaf.id, (l) =>
+          placeTab(
+            l,
+            placeOpts,
+            (t) => t.surfaceKind === "chat" && t.chatSlug === chatSlug,
+            () => makeChatTab(chatSlug),
+          ),
+        ),
       });
     },
 
@@ -481,26 +471,14 @@ export const usePanesStore = create<PanesState>((set, get) => {
       useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
       set({
-        root: updateLeaf(get().root, leaf.id, (l) => {
-          if (opts?.newTab) {
-            const tab = makeFileTab(fileId);
-            return { ...l, tabs: [...l.tabs, tab], activeTabId: tab.id };
-          }
-          // replace: keep the tab id, swap the WHOLE tab to a file tab
-          return {
-            ...l,
-            tabs: l.tabs.map((t) =>
-              t.id === l.activeTabId
-                ? {
-                    id: l.activeTabId,
-                    surfaceKind: "file",
-                    fileId,
-                    viewState: { cursor: 0, scroll: 0 },
-                  }
-                : t,
-            ),
-          };
-        }),
+        root: updateLeaf(get().root, leaf.id, (l) =>
+          placeTab(
+            l,
+            opts,
+            (t) => t.surfaceKind === "file" && t.fileId === fileId,
+            () => makeFileTab(fileId),
+          ),
+        ),
       });
     },
 
