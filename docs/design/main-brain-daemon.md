@@ -210,6 +210,11 @@ Resolving the `metadata-contract` vs `safety-ux` naming conflict:
 
 A single Settings control, **monotonic in risk**. **Default: Suggest** (this resolves the `daemon` "default fully-automatic" vs `safety-ux` "default Suggest" conflict — see §6.2; the daemon is *always running and always classifying in the background*, the ladder governs only whether it auto-*applies*).
 
+> **Amended 2026-07-02 (Seth, v0.24.1): the default is now Organize.** After living with the
+> shipped daemon, the original conflict resolved the other way: the daemon only ever changes a
+> note's *location + metadata* — journaled and undoable, never the note's words — so full
+> auto-organize is the intended out-of-box behavior. An explicit settings choice always wins.
+
 | Level | Auto-applies | Proposes | For |
 |---|---|---|---|
 | **Off** | nothing (dormant) | nothing | "leave my notes alone" |

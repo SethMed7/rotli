@@ -46,12 +46,15 @@ folder.")
   the model server's own idle-unload applies. Everything it does lands as **journal
   records** in `.rotli/brain-journal.jsonl`, with its own progress in `.rotli/organizer.json`.
   How much it *applies* is the **trust ladder** (Settings → Brain), monotonic in risk:
-  **Off** (dormant) · **Suggest** *(default — proposes everything, applies nothing;
-  you Approve/Dismiss in Brain → Activity)* · **Tidy** (auto-applies annotations +
+  **Off** (dormant) · **Suggest** (proposes everything, applies nothing; you
+  Approve/Dismiss in Brain → Activity) · **Tidy** (auto-applies annotations +
   filing brand-new captures; re-filings and index rewrites stay proposals) ·
-  **Organize** (applies everything, fully journaled + undoable). Two absolutes at
-  every rung: a **`secure` note never enters any model** — local or remote — and a
-  **`locked` note is never touched**. Local only; it never reaches the internet.
+  **Organize** *(default since 0.24.1, Seth 2026-07-02 — applies everything, fully
+  journaled + undoable; safe as the default because the daemon only ever changes a
+  note's LOCATION and METADATA, never its words)*. Two absolutes at every rung: a
+  **`secure` note never enters any model** — local or remote — and a **`locked` note
+  is never touched** (the lock in a note's metadata panel = organizer, hands off
+  entirely). Local only; it never reaches the internet.
 - **Main** — your **hand-picked notes**, at the top of the sidebar. It holds no files of
   its own: it's a **curated subset of individual notes** you pick, arranged into **your
   own** folders and order — **not** a mirror of the areas. (An area like **People** is

@@ -10,7 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.24.0] — 2026-07-02
+## [0.24.1] — 2026-07-02
+
+The first-contact fixes from Seth's live pass over 0.24.0.
+
+### Fixed
+- **The lane toggle now actually flips.** The bare switch in a lane card was missing its
+  ON-state styling (the knob styles only existed under the old full-row toggle), so an
+  enabled lane looked OFF — the "enabled UI is confusing" report. Enabled lanes now show a
+  filled accent switch.
+- **Preset cards are readable.** The one-line summary that ellipsized into raw model ids
+  ("gemma-3-12b-it-qat-4bit · MLX → ge…") is now a stacked flow: who organizes, each
+  route's "when → model" on its own line, and the fallback — with human model names.
+- **Model pills read at a glance:** allowed = filled with a ✓, hidden = dashed +
+  struck-through, and the label says what clicking does. Version chips are clean
+  ("ready · v2.1.199").
+
+### Changed
+- **The Brain organizes by default.** The trust ladder's default rung is now **Organize**
+  (was Suggest) — across the UI default, the settings parse, and the Rust daemon — because
+  the daemon only ever changes a note's **location + metadata** (journaled, undoable); the
+  words inside notes are never touched. An explicit settings choice always wins; the design
+  doc carries a dated amendment.
+- **Brain pane copy rewritten** around that promise: what it touches (location + metadata,
+  never your words), what **locked** means (lock a note in its metadata panel → the
+  organizer skips it entirely), and when it runs.
 
 The AI Models pane grows up: verification, per-model control, starter presets, and
 "Scan my Mac".

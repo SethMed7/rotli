@@ -349,9 +349,11 @@ export function parseSettings(raw: string): PersistedSettings {
         : "type",
     // hide is the safe default — metadata never surprises a fresh (or old) config
     fileMetadata: data.fileMetadata === "show" ? "show" : "hide",
-    // an unknown rung (hand-edit, future build) falls to the SAFE default —
-    // Suggest never applies anything, so a bad parse can't grant auto-apply
-    organizerTrust: asEnum(data.organizerTrust, ORGANIZER_TRUSTS, "suggest"),
+    // Organize is the DEFAULT rung (Seth, 2026-07-02): the daemon only ever
+    // changes a note's location + metadata — journaled and undoable, never the
+    // note's words — so full auto-organize is the intended out-of-box behavior.
+    // An unknown rung (hand-edit, future build) falls to the same default.
+    organizerTrust: asEnum(data.organizerTrust, ORGANIZER_TRUSTS, "organize"),
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
     // not this one — treat that as already-onboarded so we don't re-run first-run
     // onboarding on existing users (same migration shape as expandedDests above)

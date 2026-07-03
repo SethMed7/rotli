@@ -526,7 +526,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   setStorageGrouping: (g) => set({ storageGrouping: g }),
   fileMetadata: "hide",
   setFileMetadata: (v) => set({ fileMetadata: v }),
-  organizerTrust: "suggest",
+  // Organize by default (Seth, 2026-07-02): the daemon only ever changes a
+  // note's LOCATION + METADATA — journaled and undoable — never the words.
+  organizerTrust: "organize",
   setOrganizerTrust: (t) => set({ organizerTrust: t }),
 
   updateAvailable: false,

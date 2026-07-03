@@ -1114,10 +1114,11 @@ function LocationPane() {
 /** What each rung lets the daemon auto-APPLY — proposals always flow to
  * Activity regardless (except Off, which is fully dormant). */
 const TRUST_CAPTIONS: Record<OrganizerTrust, string> = {
-  off: "Dormant — it leaves your notes alone entirely.",
+  off: "Dormant — it does nothing at all.",
   suggest: "Applies nothing. Everything it wants to do waits in Activity for your OK.",
-  tidy: "Files brand-new captures and fills in summaries/tags on its own; bigger moves still wait for you.",
-  organize: "Keeps everything organized on its own — every action journaled and undoable.",
+  tidy: "Files brand-new captures and fills in metadata on its own; bigger moves still wait for you.",
+  organize:
+    "Files and tidies everything on its own (the default) — every action journaled in Activity and undoable.",
 };
 
 function BrainPane() {
@@ -1132,9 +1133,9 @@ function BrainPane() {
     <>
       <PaneHead title="Brain" char="knowledge" />
       <p className="lead">
-        A small AI on your Mac keeps the Brain organized — it files new notes into areas, writes
-        one-line summaries, suggests tags, and keeps each area&rsquo;s overview current. How much
-        it does on its own is up to you.
+        A small AI on your Mac keeps the Brain organized: it files notes into the right areas and
+        fills in their metadata (area, tags, a one-line summary). It only ever changes <b>where a
+        note lives</b> and its <b>metadata</b> — the words inside your notes are never touched.
       </p>
       <Seg
         value={trust}
@@ -1153,13 +1154,16 @@ function BrainPane() {
       />
       <p className="setnote">{TRUST_CAPTIONS[trust]}</p>
       <p className="setnote">
-        Never touches: locked notes · secure notes · your Main arrangement.
+        It always skips: <b>locked notes</b> (lock a note in its metadata panel and the organizer
+        won&rsquo;t touch it at all — not even its metadata) · <b>secure notes</b> · your hand-arranged{" "}
+        <b>Main</b>.
       </p>
-      <p className="setnote">Local only — never the internet, can&rsquo;t read secrets.</p>
       <p className="setnote">
-        It waits for its moment: it works only when you&rsquo;re away, plugged in, and the machine
-        is cool — never on battery, never over a chat — and when there&rsquo;s nothing new it sleeps
-        outright. Run now does one pass immediately, then it goes back to sleep.
+        100% on this Mac — it never uses the internet and can&rsquo;t read secrets.
+      </p>
+      <p className="setnote">
+        It waits for its moment: only when you&rsquo;re away, plugged in, and the machine is cool —
+        never on battery, never over a chat. <b>Run now</b> does one pass immediately.
       </p>
       <button
         type="button"
@@ -1497,6 +1501,8 @@ function LaneCard({ id }: { id: ProviderId }) {
   });
   const d = det.data;
   const ready = !!d && d.installed && d.authenticated;
+  // "2.1.199 (Claude Code)" / "codex-cli 0.137.0" → "v2.1.199" / "v0.137.0"
+  const version = d?.version?.match(/\d+(?:\.\d+)+/)?.[0];
   const status = !isTauri()
     ? "app only"
     : !d
@@ -1507,7 +1513,7 @@ function LaneCard({ id }: { id: ProviderId }) {
           ? id === "gemini"
             ? "no key yet"
             : "not signed in"
-          : `ready${d.version ? ` · ${d.version.replace(/^[a-z-]+ /i, "")}` : ""}`;
+          : `ready${version ? ` · v${version}` : ""}`;
 
   const runVerify = () => {
     setVerify({ state: "running" });
@@ -1575,7 +1581,7 @@ function LaneCard({ id }: { id: ProviderId }) {
             {verify.state === "fail" && <span className="ailane-chip err">{verify.error}</span>}
           </div>
           <div className="ailane-models">
-            <span className="ailane-modelslabel">In the picker:</span>
+            <span className="ailane-modelslabel">Models — click one to hide it from the picker:</span>
             {CLI_CATALOG[id].map((m) => {
               const off = blockedModels.includes(m.id);
               return (
@@ -1584,7 +1590,7 @@ function LaneCard({ id }: { id: ProviderId }) {
                   key={m.id}
                   className={off ? "ailane-model off" : "ailane-model"}
                   aria-pressed={!off}
-                  title={off ? "Blocked — click to allow" : "Click to block this model"}
+                  title={off ? "Hidden — click to bring it back" : "In the picker — click to hide"}
                   onClick={() => toggleBlockedModel(m.id)}
                 >
                   {m.label}
@@ -1818,11 +1824,30 @@ function ModelsPane() {
       .finally(() => setSuggesting(false));
   };
 
-  const summarize = (p: HybridPreset) => {
-    const label = (id: string) => available.find((m) => m.id === id)?.label ?? id;
-    const routes = p.routes.map((r) => label(r.model)).join(" · ");
-    return `${label(p.organizer)} → ${routes}${p.fallback ? ` (fallback ${label(p.fallback)})` : ""}`;
-  };
+  // human model names for the preset cards — "gemma-3-12b-it-qat-4bit · MLX"
+  // reads as "gemma-3-12b" (Seth, 2026-07-02: the raw ids were unreadable)
+  const pretty = (id: string) =>
+    (available.find((x) => x.id === id)?.label ?? id)
+      .replace(/ · (MLX|llama\.cpp)$/, "")
+      .replace(/-(it-qat|instruct)-4bit$/i, "");
+
+  const breakdown = (p: HybridPreset) => (
+    <div className="preset-flow">
+      <span className="preset-step">
+        <em>{pretty(p.organizer)}</em> reads each message and picks the route:
+      </span>
+      {p.routes.map((r, i) => (
+        // routes are positional — index keys are correct here
+        // eslint-disable-next-line react/no-array-index-key
+        <span className="preset-step" key={i}>
+          → {r.when || "everything else"} · <b>{pretty(r.model)}</b>
+        </span>
+      ))}
+      {p.fallback && (
+        <span className="preset-step">↩ if a route fails, <b>{pretty(p.fallback)}</b> takes over</span>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -1864,15 +1889,18 @@ function ModelsPane() {
             {STARTER_PRESETS.filter((sp) => !hybridPresets.some((p) => p.id === sp.id)).map(
               (sp) => (
                 <div className="preset-row" key={sp.id}>
-                  <span className="preset-name">{sp.name}</span>
-                  <span className="preset-sum">{summarize(sp)}</span>
-                  <button
-                    type="button"
-                    className="ghostbtn"
-                    onClick={() => setHybridPresets([...hybridPresets, sp])}
-                  >
-                    Add
-                  </button>
+                  <div className="preset-rowhead">
+                    <span className="preset-name">{sp.name}</span>
+                    <span className="chat-box-grow" />
+                    <button
+                      type="button"
+                      className="ghostbtn"
+                      onClick={() => setHybridPresets([...hybridPresets, sp])}
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {breakdown(sp)}
                 </div>
               ),
             )}
@@ -1883,18 +1911,21 @@ function ModelsPane() {
         <div className="preset-list">
           {hybridPresets.map((p) => (
             <div className="preset-row" key={p.id}>
-              <span className="preset-name">{p.name}</span>
-              <span className="preset-sum">{summarize(p)}</span>
-              <button type="button" className="ghostbtn" onClick={() => setDraft(p)}>
-                Edit
-              </button>
-              <button
-                type="button"
-                className="ghostbtn"
-                onClick={() => setHybridPresets(hybridPresets.filter((x) => x.id !== p.id))}
-              >
-                Delete
-              </button>
+              <div className="preset-rowhead">
+                <span className="preset-name">{p.name}</span>
+                <span className="chat-box-grow" />
+                <button type="button" className="ghostbtn" onClick={() => setDraft(p)}>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="ghostbtn"
+                  onClick={() => setHybridPresets(hybridPresets.filter((x) => x.id !== p.id))}
+                >
+                  Delete
+                </button>
+              </div>
+              {breakdown(p)}
             </div>
           ))}
         </div>
@@ -1942,18 +1973,21 @@ function ModelsPane() {
         <div className="preset-list">
           {suggestions.map((p) => (
             <div className="preset-row" key={p.id}>
-              <span className="preset-name">{p.name}</span>
-              <span className="preset-sum">{summarize(p)}</span>
-              <button
-                type="button"
-                className="ghostbtn"
-                onClick={() => {
-                  setHybridPresets([...hybridPresets, p]);
-                  setSuggestions(suggestions.filter((x) => x.id !== p.id));
-                }}
-              >
-                Save
-              </button>
+              <div className="preset-rowhead">
+                <span className="preset-name">{p.name}</span>
+                <span className="chat-box-grow" />
+                <button
+                  type="button"
+                  className="ghostbtn"
+                  onClick={() => {
+                    setHybridPresets([...hybridPresets, p]);
+                    setSuggestions(suggestions.filter((x) => x.id !== p.id));
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+              {breakdown(p)}
             </div>
           ))}
         </div>

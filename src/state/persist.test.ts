@@ -7,23 +7,25 @@ import type { Tab } from "../types";
 import { parseHybridPresets, parseSettings, pruneMap, unknownSettingsKeys, validTab } from "./persist";
 
 describe("parseSettings — organizerTrust", () => {
-  it("defaults a missing key to suggest", () => {
-    expect(parseSettings("{}").organizerTrust).toBe("suggest");
+  // Organize is the default rung (Seth, 2026-07-02): the daemon touches only
+  // location + metadata (journaled, undoable), never a note's words.
+  it("defaults a missing key to organize", () => {
+    expect(parseSettings("{}").organizerTrust).toBe("organize");
   });
 
-  it("keeps every known rung", () => {
+  it("keeps every known rung — an explicit choice always wins", () => {
     for (const t of ["off", "suggest", "tidy", "organize"] as const) {
       expect(parseSettings(JSON.stringify({ organizerTrust: t })).organizerTrust).toBe(t);
     }
   });
 
-  it("coerces an unknown rung (hand-edit / future build) back to suggest", () => {
-    expect(parseSettings('{"organizerTrust":"autopilot"}').organizerTrust).toBe("suggest");
-    expect(parseSettings('{"organizerTrust":42}').organizerTrust).toBe("suggest");
+  it("coerces an unknown rung (hand-edit / future build) to the default", () => {
+    expect(parseSettings('{"organizerTrust":"autopilot"}').organizerTrust).toBe("organize");
+    expect(parseSettings('{"organizerTrust":42}').organizerTrust).toBe("organize");
   });
 
   it("survives corrupt json entirely", () => {
-    expect(parseSettings("not json").organizerTrust).toBe("suggest");
+    expect(parseSettings("not json").organizerTrust).toBe("organize");
   });
 });
 

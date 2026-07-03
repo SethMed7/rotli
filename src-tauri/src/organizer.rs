@@ -78,10 +78,13 @@ pub enum Trust {
 }
 
 impl Trust {
-    /// Settings-read parse: unknown/missing input falls to the SAFE default
-    /// (Suggest — propose-only), never to an applying rung.
+    /// Settings-read parse: unknown/missing input falls to the DEFAULT rung —
+    /// Organize (Seth, 2026-07-02): the daemon only ever changes a note's
+    /// location + metadata, journaled and undoable, never the note's words,
+    /// so full auto-organize is the intended out-of-box behavior. An explicit
+    /// user choice (any valid rung in settings.json) always wins over this.
     pub fn parse(s: &str) -> Trust {
-        Self::parse_strict(s).unwrap_or(Trust::Suggest)
+        Self::parse_strict(s).unwrap_or(Trust::Organize)
     }
 
     /// Command-input parse: an unknown level is the caller's bug — reject it
@@ -208,7 +211,7 @@ impl OrganizerHandle {
         OrganizerHandle(Arc::new(OrganizerInner {
             queue: Mutex::new(HashMap::new()),
             cv: Condvar::new(),
-            trust: Mutex::new(Trust::Suggest),
+            trust: Mutex::new(Trust::Organize), // the default rung; settings.json overrides each cycle
             settings_trust: Mutex::new(None),
             status: Mutex::new(StatusSnapshot::default()),
             running: AtomicBool::new(false),
@@ -2563,8 +2566,10 @@ mod tests {
     #[test]
     fn trust_parse_is_safe_and_strict_where_it_must_be() {
         assert_eq!(Trust::parse("tidy"), Trust::Tidy);
-        assert_eq!(Trust::parse("garbage"), Trust::Suggest, "unknown → the safe default");
-        assert_eq!(Trust::parse(""), Trust::Suggest);
+        // Organize is the default rung (2026-07-02) — location+metadata only,
+        // journaled+undoable; an explicit settings choice always wins
+        assert_eq!(Trust::parse("garbage"), Trust::Organize, "unknown → the default rung");
+        assert_eq!(Trust::parse(""), Trust::Organize);
         assert!(Trust::parse_strict("garbage").is_none(), "the command rejects junk");
         // knob parsing: bad values fall back, never explode
         let k = parse_knobs("{\"organizerTrust\":\"organize\",\"organizerThreshold\":0.6,\"organizerQuietSecs\":10}");
@@ -2584,7 +2589,7 @@ mod tests {
     #[test]
     fn secure_and_locked_never_reach_the_transport() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerQuietSecs\":0}");
+        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit: these assertions encode propose-only (Suggest) semantics
         // a locked capture, a flagged-secure capture, and a raw-secret capture
         let locked = stage_capture(&state, "# Locked one\n\nplain");
         add_flag(&root, &locked, "locked: true");
@@ -2641,7 +2646,7 @@ mod tests {
         // captures + a placed note), and refresh-index (the placed member) —
         // and at Suggest not one byte outside `.rotli/` may change.
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerQuietSecs\":0}"); // trust defaults to Suggest
+        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // EXPLICIT: this test proves Suggest is write-free (Organize is the default now)
         let high = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         let low = stage_capture(&state, "# Mystery\n\nunclear scribble");
         let placed = seed_placed(
@@ -2693,7 +2698,7 @@ mod tests {
     #[test]
     fn second_run_same_corpus_is_a_noop() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerQuietSecs\":0}");
+        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit: these assertions encode propose-only (Suggest) semantics
         let rel = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         let calls = AtomicUsize::new(0);
         let transport = |p: &str| {
@@ -2729,7 +2734,7 @@ mod tests {
         // PARKS — a plain condvar wait, no tick, no timer, no model call —
         // until a real event (watcher / Run-now / approval nudge) arrives.
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerQuietSecs\":0}");
+        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit: these assertions encode propose-only (Suggest) semantics
         let rel = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         handle.enqueue(&root, &[root.join(&rel)]);
         run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
@@ -2837,7 +2842,7 @@ mod tests {
     #[test]
     fn model_offline_requeues_and_reports() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerQuietSecs\":0}");
+        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit: these assertions encode propose-only (Suggest) semantics
         let rel = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         handle.enqueue(&root, &[root.join(&rel)]);
         let transport = |_: &str| Err("local model unreachable".to_string());
@@ -2911,7 +2916,7 @@ mod tests {
     #[test]
     fn reproposal_supersedes_the_stale_pending_rows() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerQuietSecs\":0}"); // Suggest
+        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit Suggest (Organize is the default now)
         let rel = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         handle.enqueue(&root, &[root.join(&rel)]);
         run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
@@ -2959,7 +2964,7 @@ mod tests {
     #[test]
     fn secure_hint_survives_small_cycles_and_clears_when_reviewed() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerQuietSecs\":0}");
+        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit: these assertions encode propose-only (Suggest) semantics
         let secret = stage_capture(&state, "# Card\n\ncard 4242 4242 4242 4242\n");
         let plain = stage_capture(&state, "# Plain\n\ngroceries\n");
         handle.enqueue(&root, &[root.join(&secret), root.join(&plain)]);
@@ -3120,7 +3125,7 @@ mod tests {
         // files/fields have — a membership change retires the pending row, and
         // reaching the fixed point (approved / reverted) retires it too.
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerQuietSecs\":0}"); // Suggest
+        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit Suggest (Organize is the default now)
         place_note(&state, "# Alazan 84\n\nland deal notes", "Projects");
         run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
         let p1 = journal_rows(&state)
@@ -3192,7 +3197,7 @@ mod tests {
         // FILENAME, whose slug is title-derived (for a quick capture the title
         // is often the secret itself).
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerQuietSecs\":0}");
+        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit: these assertions encode propose-only (Suggest) semantics
         let note = place_note(&state, "# Alazan 84\n\nland deal notes", "Projects");
         let peer = place_note(&state, "# Alazan history\n\nolder land papers", "Research");
         let peer_stem = peer.rsplit('/').next().unwrap().trim_end_matches(".md").to_string();
