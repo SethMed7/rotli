@@ -1,14 +1,15 @@
 ---
 import Base from '../layouts/Base.astro';
 import quokka from '../assets/quokka.svg?raw';
+import waving from '../assets/waving.svg?raw';
+import staysLocal from '../assets/stays_local.svg?raw';
 
-// TODO(seth): set the real release download URL. Placeholder '#download' for now.
-// When the notarized DMG is on rotli-releases, point this at the GitHub latest asset
-// (e.g. https://github.com/SethMed7/rotli/releases/latest/download/rotli.dmg).
-const DOWNLOAD_URL = '#download';
-
-// TODO(seth): confirm the public repo URL. rotli's repo is SethMed7/rotli (currently private).
+// the release feed — always the newest signed build (never a version-stamped
+// asset URL, which would break each release).
+const DOWNLOAD_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
 const GITHUB_URL = 'https://github.com/SethMed7/rotli';
+// the open foundation for how rotli organizes data
+const MEMEX_URL = 'https://github.com/SethMed7/memex';
 
 const features = [
   {
@@ -24,34 +25,53 @@ const features = [
     body: '⌥Space and it’s there. dismiss it and it’s gone. no dock icon, no badges, no fuss.',
   },
 ];
+
+const promises = [
+  'Plain Markdown files on your Mac — open them in any editor, back them up, keep them forever.',
+  'Secrets are auto-detected and never sent to a remote model.',
+  'Works fully offline — no account, nothing phones home.',
+];
 ---
 <Base>
-  <!-- (1) slim top bar -->
+  <!-- (1) top bar — logo hard-left, GitHub + theme toggle right -->
   <header class="topbar">
-    <span class="brand">
+    <a class="brand" href="/" aria-label="rotli — home">
       <span class="logo-mark logo-sm" set:html={quokka} />
       <span class="wordmark">rotli</span>
-    </span>
-    <a class="ghlink" href={GITHUB_URL} rel="noopener">GitHub</a>
+    </a>
+    <div class="nav-right">
+      <a class="icon-link" href={GITHUB_URL} rel="noopener" aria-label="rotli on GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+      </a>
+      <button id="theme-toggle" class="icon-btn" type="button" aria-label="Switch light / dark">
+        <span class="ic ic-moon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </span>
+        <span class="ic ic-sun">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </span>
+      </button>
+    </div>
   </header>
 
   <main>
-    <!-- (2) hero — the quokka mark IS the logo -->
+    <!-- (2) hero — a waving quokka greets -->
     <section class="hero">
-      <span class="logo-mark logo-lg" set:html={quokka} />
+      <span class="char hero-char" set:html={waving} />
       <h1 class="hero-mark">rotli</h1>
-      <p class="tagline">Warm. Quiet. Instant.</p>
       <p class="subhead">
         A local-first notes app that lives in your Mac’s menu bar —
         summon it, write, dismiss it.
       </p>
       <div class="cta">
-        <a class="btn btn-primary" href={DOWNLOAD_URL}>Download for Mac</a>
+        <a class="btn btn-primary" href={DOWNLOAD_URL} rel="noopener">Download for Mac</a>
         <a class="btn btn-secondary" href={GITHUB_URL} rel="noopener">View on GitHub</a>
       </div>
     </section>
 
-    <!-- (3) hero screenshot in a soft frame -->
+    <!-- (3) hero screenshot -->
     <section class="shot-wrap">
       <div class="shot-frame">
         <img
@@ -63,7 +83,7 @@ const features = [
       </div>
     </section>
 
-    <!-- (4) quiet 3-item feature row -->
+    <!-- (4) three fronts -->
     <section class="features">
       {features.map((f) => (
         <div class="feature">
@@ -72,9 +92,34 @@ const features = [
         </div>
       ))}
     </section>
+
+    <!-- (5) your data stays yours -->
+    <section class="privacy">
+      <div class="privacy-text">
+        <h2>Your data stays yours</h2>
+        <ul class="checks">
+          {promises.map((p) => (
+            <li>
+              <span class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+              </span>
+              <span>{p}</span>
+            </li>
+          ))}
+        </ul>
+        <p class="privacy-note">
+          You work how you want in <b>Main</b>; your data organizes itself into your
+          <b>Brain</b> for the AI — location and metadata only, never the words inside your notes.
+        </p>
+        <a class="memex-link" href={MEMEX_URL} rel="noopener">
+          Built on memex — the open foundation for how your data is organized →
+        </a>
+      </div>
+      <span class="char privacy-char" set:html={staysLocal} />
+    </section>
   </main>
 
-  <!-- (5) tiny footer -->
+  <!-- (6) footer -->
   <footer class="footer">
     <span class="logo-mark footer-mark" set:html={quokka} />
     <span>© rotli</span>
@@ -82,50 +127,86 @@ const features = [
     <span>local-first</span>
   </footer>
 
+  <script>
+    // manual light/dark toggle — persists and wins over the system default
+    const btn = document.getElementById('theme-toggle');
+    const root = document.documentElement;
+    const effective = () =>
+      root.dataset.theme ||
+      (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const sync = () => btn && btn.setAttribute('data-mode', effective());
+    sync();
+    btn &&
+      btn.addEventListener('click', () => {
+        const next = effective() === 'dark' ? 'light' : 'dark';
+        root.dataset.theme = next;
+        try { localStorage.setItem('rotli-theme', next); } catch (e) {}
+        sync();
+      });
+  </script>
+
   <style>
-    header, main, .footer {
+    main, .footer {
       max-width: var(--maxw);
       margin-inline: auto;
       padding-inline: 1.5rem;
     }
 
-    /* ---- logo mark sizes ---- */
-    .logo-sm { width: 26px; }
-    .logo-lg { width: 108px; margin: 0 auto 0.4rem; }
+    /* ---- logo + character sizes ---- */
+    .logo-sm { width: 30px; }
     .footer-mark { width: 18px; opacity: 0.7; }
+    .hero-char { width: 150px; margin: 0 auto 0.25rem; }
+    .privacy-char { width: 200px; justify-self: center; opacity: 0.9; }
 
-    /* ---- top bar ---- */
+    /* ---- top bar (full-width, logo hard-left) ---- */
     .topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding-block: 1.25rem;
+      padding: 1.1rem 1.75rem;
     }
     .brand {
       display: inline-flex;
       align-items: center;
       gap: 0.55rem;
+      text-decoration: none;
     }
     .wordmark {
       font-family: var(--font-display);
       font-weight: 600;
-      font-size: 1.35rem;
+      font-size: 1.4rem;
       letter-spacing: -0.01em;
       color: var(--text);
     }
-    .ghlink {
-      text-decoration: none;
-      font-weight: 500;
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      transition: color 0.15s ease;
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
     }
-    .ghlink:hover { color: var(--text); }
+    .icon-link, .icon-btn {
+      display: inline-grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 0.6rem;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .icon-link:hover, .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+    .icon-link svg { width: 20px; height: 20px; display: block; }
+    .icon-btn .ic { display: none; line-height: 0; }
+    .icon-btn .ic svg { width: 20px; height: 20px; display: block; }
+    /* light → show the moon (go dark); dark → show the sun (go light) */
+    .icon-btn:not([data-mode='dark']) .ic-moon { display: block; }
+    .icon-btn[data-mode='dark'] .ic-sun { display: block; }
 
     /* ---- hero ---- */
     .hero {
       text-align: center;
-      padding-top: 4.5rem;
+      padding-top: 3.5rem;
       padding-bottom: 3rem;
     }
     .hero-mark {
@@ -136,13 +217,6 @@ const features = [
       margin: 0;
       letter-spacing: -0.02em;
       color: var(--text);
-    }
-    .tagline {
-      font-family: var(--font-display);
-      font-weight: 600;
-      font-size: clamp(1.1rem, 3.5vw, 1.5rem);
-      color: var(--text);
-      margin: 1rem 0 0;
     }
     .subhead {
       max-width: 34rem;
@@ -155,7 +229,7 @@ const features = [
       gap: 0.9rem;
       justify-content: center;
       flex-wrap: wrap;
-      margin-top: 2.25rem;
+      margin-top: 2rem;
     }
     .btn {
       display: inline-block;
@@ -165,20 +239,12 @@ const features = [
       padding: 0.7rem 1.4rem;
       border-radius: 0.7rem;
       border: 1px solid transparent;
-      transition: transform 0.12s ease, opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+      transition: transform 0.12s ease, opacity 0.15s ease, border-color 0.15s ease;
     }
     .btn:active { transform: translateY(1px); }
-    /* mono accent = near-black on paper / near-white on charcoal → high contrast */
-    .btn-primary {
-      background: var(--accent);
-      color: var(--on-accent);
-    }
+    .btn-primary { background: var(--accent); color: var(--on-accent); }
     .btn-primary:hover { opacity: 0.88; }
-    .btn-secondary {
-      color: var(--text);
-      border-color: var(--border);
-      background: var(--surface);
-    }
+    .btn-secondary { color: var(--text); border-color: var(--border); background: var(--surface); }
     .btn-secondary:hover { border-color: var(--text); }
 
     /* ---- screenshot ---- */
@@ -195,13 +261,9 @@ const features = [
       box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.4);
       overflow: hidden;
     }
-    .shot-frame img {
-      width: 100%;
-      height: auto;
-      border-radius: 0.6rem;
-    }
+    .shot-frame img { width: 100%; height: auto; border-radius: 0.6rem; }
 
-    /* ---- features ---- */
+    /* ---- three fronts ---- */
     .features {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -215,19 +277,41 @@ const features = [
       margin: 0 0 0.5rem;
       color: var(--text);
     }
-    .feature p {
+    .feature p { margin: 0; color: var(--text-muted); font-size: 1rem; }
+
+    /* ---- your data stays yours ---- */
+    .privacy {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 3rem;
+      align-items: center;
+      padding-block: 3rem 6rem;
+    }
+    .privacy h2 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: clamp(1.8rem, 4vw, 2.4rem);
+      letter-spacing: -0.01em;
       margin: 0;
-      color: var(--text-muted);
-      font-size: 1rem;
+      color: var(--text);
     }
-    @media (max-width: 640px) {
-      .features {
-        grid-template-columns: 1fr;
-        gap: 2rem;
-        padding-block: 4rem 3rem;
-      }
-      .hero { padding-top: 3rem; }
+    .checks { list-style: none; padding: 0; margin: 1.5rem 0 0; display: flex; flex-direction: column; gap: 1rem; }
+    .checks li { display: flex; gap: 0.75rem; align-items: flex-start; color: var(--text); }
+    .check { flex: 0 0 auto; color: var(--text-muted); margin-top: 3px; line-height: 0; }
+    .check svg { width: 18px; height: 18px; display: block; }
+    .privacy-note { margin: 1.5rem 0 0; max-width: 36rem; color: var(--text-muted); }
+    .privacy-note b { color: var(--text); font-weight: 600; }
+    .memex-link {
+      display: inline-block;
+      margin-top: 1.25rem;
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 500;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1px;
+      transition: border-color 0.15s ease;
     }
+    .memex-link:hover { border-color: var(--text); }
 
     /* ---- footer ---- */
     .footer {
@@ -240,5 +324,12 @@ const features = [
       font-size: 0.9rem;
     }
     .footer .dot { opacity: 0.5; }
+
+    @media (max-width: 720px) {
+      .features { grid-template-columns: 1fr; gap: 2rem; padding-block: 4rem 3rem; }
+      .privacy { grid-template-columns: 1fr; gap: 1.5rem; padding-block: 2rem 4rem; }
+      .privacy-char { grid-row: 1; width: 150px; }
+      .hero { padding-top: 2.5rem; }
+    }
   </style>
 </Base>

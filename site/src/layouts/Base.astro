@@ -1,10 +1,12 @@
 ---
-// Base layout — mono brand tokens (Paper light / Charcoal dark), fonts, and calm
-// global styles. Palette mirrors src/styles/themes.css: [data-theme="paper"] +
-// [data-theme="charcoal"] — the app's minimal black-&-white theme pair.
-const { title = 'rotli — warm, quiet, instant', description = 'A local-first notes app that lives in your Mac’s menu bar.' } = Astro.props;
+// Base layout — mono brand tokens (Paper light / Charcoal dark), fonts, and a
+// manual light/dark toggle (persisted in localStorage, applied pre-paint so
+// there's no flash). Palette mirrors src/styles/themes.css paper + charcoal.
+const {
+  title = 'rotli — a local-first notes app for your Mac menu bar',
+  description = 'A local-first notes app that lives in your Mac’s menu bar — summon it, write, dismiss it.',
+} = Astro.props;
 ---
-<!-- Full document — this layout owns <html>/<head>/<body>. -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -13,6 +15,13 @@ const { title = 'rotli — warm, quiet, instant', description = 'A local-first n
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%A8%3C/text%3E%3C/svg%3E" />
+    <!-- apply the saved theme before first paint (no flash) -->
+    <script is:inline>
+      try {
+        const t = localStorage.getItem('rotli-theme');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
     <style is:global>
       /* ---- Fonts (copied from src/brand/fonts) ---- */
       @font-face {
@@ -40,7 +49,7 @@ const { title = 'rotli — warm, quiet, instant', description = 'A local-first n
         font-display: swap;
       }
 
-      /* ---- Paper (light) — mirrors themes.css [data-theme="paper"] ---- */
+      /* ---- Paper (light) — the default ---- */
       :root {
         --ground: #fafaf9;
         --surface: #ffffff;
@@ -55,13 +64,12 @@ const { title = 'rotli — warm, quiet, instant', description = 'A local-first n
 
         --font-body: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         --font-display: 'Baloo 2', var(--font-body);
-
         --maxw: 62rem;
       }
 
-      /* ---- Charcoal (dark) — mirrors themes.css [data-theme="charcoal"] ---- */
+      /* ---- Charcoal (dark): follow the system, UNLESS the user forced light ---- */
       @media (prefers-color-scheme: dark) {
-        :root {
+        :root:not([data-theme='light']) {
           --ground: #161616;
           --surface: #1f1e1c;
           --surface-2: #2a2825;
@@ -73,6 +81,19 @@ const { title = 'rotli — warm, quiet, instant', description = 'A local-first n
           --accent-text: #e9e7e2;
           --on-accent: #161616;
         }
+      }
+      /* ---- Charcoal when the user explicitly chose dark (wins over the media) ---- */
+      :root[data-theme='dark'] {
+        --ground: #161616;
+        --surface: #1f1e1c;
+        --surface-2: #2a2825;
+        --tint: #33312d;
+        --text: #e9e7e2;
+        --text-muted: #a8a49c;
+        --border: #2e2c29;
+        --accent: #e9e7e2;
+        --accent-text: #e9e7e2;
+        --on-accent: #161616;
       }
 
       * { box-sizing: border-box; }
@@ -93,17 +114,13 @@ const { title = 'rotli — warm, quiet, instant', description = 'A local-first n
       }
 
       a { color: inherit; }
-
       img { max-width: 100%; display: block; }
 
-      /* the quokka mark — a single currentColor silhouette, so it inks with the theme */
-      .logo-mark { display: inline-block; line-height: 0; color: var(--text); }
-      .logo-mark svg { display: block; width: 100%; height: auto; }
+      /* the quokka mark + full-body characters ink with the theme (currentColor) */
+      .logo-mark, .char { display: inline-block; line-height: 0; color: var(--text); }
+      .logo-mark svg, .char svg { display: block; width: 100%; height: auto; }
 
-      ::selection {
-        background: var(--tint);
-        color: var(--text);
-      }
+      ::selection { background: var(--tint); color: var(--text); }
     </style>
   </head>
   <body>
