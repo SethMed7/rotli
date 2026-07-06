@@ -120,6 +120,61 @@
   flex: 1;
   align-self: stretch;
 }
+/* the center strip that holds the global search field (Seth, 2026-07-06). Still
+   a window-drag region; the search button inside it captures its own clicks. */
+.tb-mid {
+  flex: 1;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+/* a search field that opens the ⌘K palette — reads like an input (cursor:text),
+   quiet until hovered. Capped width so it stays a tidy top-center affordance. */
+.tb-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--r-pill);
+  color: var(--text-muted);
+  cursor: text;
+  transition:
+    background var(--motion-exit) var(--motion-ease),
+    border-color var(--motion-exit) var(--motion-ease),
+    color var(--motion-exit) var(--motion-ease);
+}
+.tb-search:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+.tb-search > svg {
+  flex: 0 0 auto;
+}
+.tb-search-label {
+  flex: 1 1 auto;
+  text-align: left;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tb-search-kbd {
+  flex: 0 0 auto;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 5px;
+  opacity: 0.85;
+}
 .tb-actions {
   display: flex;
   gap: 10px;

@@ -1,0 +1,45 @@
+/* rotli — motion. One idea: the visitor. Things don't sweep in, they appear the way the
+   window does — a crossfade with a 1px lift. Calm + instant; nothing longer than it must be.
+   (camino lesson applied: never CSS-animate transform on SVG groups carrying transform
+   attributes — stagger with opacity, move the WRAPPER.) */
+
+:root {
+  --ro-ease: cubic-bezier(0.3, 0, 0.2, 1);
+  --ro-dur-visit: 360ms;   /* the signature show/hide — fast, it was "already there" */
+  --ro-dur-settle: 700ms;  /* section reveals on scroll */
+}
+
+/* 1 · the visit — apply .ro-visit to anything that appears (cards, panels, the window) */
+.ro-visit { animation: ro-visit var(--ro-dur-visit) var(--ro-ease) both; }
+@keyframes ro-visit {
+  from { opacity: 0; transform: translateY(1px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* 2 · settle — scroll-reveal for sections; pair with IntersectionObserver adding .is-in */
+.ro-settle { opacity: 0; transform: translateY(8px); transition: opacity var(--ro-dur-settle) var(--ro-ease), transform var(--ro-dur-settle) var(--ro-ease); }
+.ro-settle.is-in { opacity: 1; transform: none; }
+.ro-settle:nth-child(2) { transition-delay: 70ms; }
+.ro-settle:nth-child(3) { transition-delay: 140ms; }
+
+/* 3 · wordmark reveal — opacity-only stagger on the two paths (r, then otli);
+   the WRAPPER lifts, the glyph groups only fade (SVG-transform-safe) */
+.ro-wordmark-reveal { animation: ro-visit 420ms var(--ro-ease) both; }
+.ro-wordmark-reveal svg path { opacity: 0; animation: ro-fade 500ms var(--ro-ease) forwards; }
+.ro-wordmark-reveal svg path:nth-of-type(1) { animation-delay: 60ms; }  /* the quokka-r first */
+.ro-wordmark-reveal svg path:nth-of-type(2) { animation-delay: 200ms; }
+@keyframes ro-fade { to { opacity: 1; } }
+
+/* 4 · hover — a quiet acknowledgement, never a performance */
+.ro-hover { transition: transform 200ms var(--ro-ease), box-shadow 200ms var(--ro-ease); }
+.ro-hover:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(58, 48, 40, 0.12); }
+
+/* 5 · reduced motion — everything skippable (!important beats stagger specificity) */
+@media (prefers-reduced-motion: reduce) {
+  .ro-visit, .ro-settle, .ro-wordmark-reveal, .ro-wordmark-reveal svg path, .ro-hover {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

@@ -6,9 +6,9 @@
 // returnFocus that hands the cursor back to the row (the RowMenu unification).
 
 import { useCallback } from "react";
-import { corpusFrontmatter, corpusSetLocked, corpusSetSecure } from "../lib/tauri";
+import { corpusFrontmatter, corpusSetLocked, corpusSetPinned, corpusSetSecure } from "../lib/tauri";
 import { fileNoteToArea } from "../services/brainFiling";
-import { DEST, isHidden } from "../services/destinations";
+import { DEST, isSink } from "../services/destinations";
 import { invalidateNotes, useArchiveNote, useBrainAreas, useRestoreNote, useTrashNote } from "../services/hooks";
 import { useMainGcIds } from "../services/hooks";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
@@ -58,8 +58,12 @@ export function useNoteMenu() {
 
       void (async () => {
         // an archived/trashed note: open + Restore only — the lifecycle actions
-        // don't apply until it's back (mirrors the retired RowMenu's split)
-        if (isHidden(note.folderId)) {
+        // don't apply until it's back (mirrors the retired RowMenu's split).
+        // Gate on isSink (Archive/Trash), NOT isHidden: a STAGED capture lives
+        // in Board (isHidden) yet is a live note that shows in All notes — it
+        // must get the full menu, not a dead "Restore" that no-ops (Seth,
+        // 2026-07-06: "Restore does nothing but I can see it in All notes").
+        if (isSink(note.folderId)) {
           open(
             x,
             y,
@@ -120,6 +124,12 @@ export function useNoteMenu() {
             ),
         });
         if (isNote) {
+          items.push({
+            kind: "action" as const,
+            label: fm?.pinned ? "Unpin from top" : "Pin to top",
+            checked: !!fm?.pinned,
+            onClick: () => void corpusSetPinned(note.id, !fm?.pinned).then(invalidateNotes),
+          });
           items.push({
             kind: "action" as const,
             label: fm?.locked ? "Unlock — let the AI organize it" : "Lock from the AI",

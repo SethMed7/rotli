@@ -1102,6 +1102,11 @@
   margin-top: 6px;
   max-width: 560px;
 }
+/* soft filled cards, no hard outline (Seth, 2026-07-06: "I don't like the white
+   outline style"). The card is a subtle raised fill (--surface-2) on the page's
+   --surface, so it reads as a panel WITHOUT a border line — and the accent-border
+   the ON state used to draw (near-white in the mono-dark themes) is gone; the
+   switch alone signals state now. */
 .swrow {
   display: flex;
   align-items: center;
@@ -1109,17 +1114,15 @@
   width: 100%;
   text-align: left;
   padding: 12px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border: 1px solid transparent;
   border-radius: var(--r-card);
   color: var(--text);
   cursor: pointer;
-  transition:
-    background var(--motion-exit) var(--motion-ease),
-    border-color var(--motion-exit) var(--motion-ease);
+  transition: background var(--motion-exit) var(--motion-ease);
 }
 .swrow:hover {
-  background: var(--hov);
+  background: color-mix(in srgb, var(--surface-2) 90%, var(--text));
 }
 .swtext {
   flex: 1;
@@ -1158,9 +1161,6 @@
   transition:
     left var(--motion-exit) var(--motion-ease),
     background var(--motion-exit) var(--motion-ease);
-}
-.swrow.on {
-  border-color: var(--accent);
 }
 .swrow.on .sw {
   background: var(--accent);

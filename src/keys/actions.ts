@@ -19,6 +19,8 @@ import { captureHandle } from "../lib/captureHandle";
 import { quickHandle } from "../lib/quickHandle";
 import {
   corpusCreateBoard,
+  corpusFrontmatter,
+  corpusSetPinned,
   hideMainWindow,
   hideQuickWindow,
   summon,
@@ -298,6 +300,22 @@ export function registerDefaultActions(): void {
     run: () => {
       const id = focusedNoteIdNow();
       if (id) void notesService.restoreNote(id).then(invalidateNotes);
+    },
+  });
+  // Pin / unpin the FOCUSED note (Seth, 2026-07-06: "a hotkey for pinning the
+  // note I am already on"). Reads the note's current pin state, then flips the
+  // typed `pinned` frontmatter fact — pinned notes float to the top of every
+  // list. Never bumps `updated`, so a pin doesn't reorder by recency.
+  registerAction({
+    id: "notes.pin",
+    title: "Pin / unpin note to top",
+    defaultChord: "Meta+Shift+P",
+    run: () => {
+      const id = focusedNoteIdNow();
+      if (!id) return;
+      void corpusFrontmatter(id).then((fm) =>
+        corpusSetPinned(id, !fm?.pinned).then(invalidateNotes),
+      );
     },
   });
 

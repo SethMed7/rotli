@@ -51,9 +51,9 @@
         },
         {
           "id": 4,
-          "text": "rotli READS the whole memex and WRITES only its owned surfaces per the v3.6 contract: chats/ (AI chats), inbox.md (⌥C captures), and wiki/_inbox/ NOTE STAGING (new notes land there with frontmatter id/owner/created/updated/shelf/reach + blank AI metadata; a later local-LLM files them to wiki/<area>/ — the 'brain'). It NEVER writes history/ (Breve's), identity/ or personality/ (the former self/), MAP, or the curated rest of wiki/ — refused at both the TS canWrite gate and the Rust is_writable guard. Contract band [3.4, 3.6]. VOCAB (see docs/model.md): your NOTES FOLDER is a memex (one corpus.json; one memex by default — 'corpus' is internal, never user-facing). The 'BRAIN' = the AI-organized wiki areas INSIDE Notes (filed by metadata), NOT a connected memex. A SECOND memex is a 'linked library' (advanced; the active one is writable per its perms). Storage = the memex storage/ (binaries via storage: links; a dropped file routes there). Access is metadata (note reach/owner + a per-note 'locked' flag the AI filer must respect + a per-note 'secure' flag — secrets auto-detected by a regex pass, never sent to a REMOTE model, gitignored — + the local/open/secure mode). Mirror-not-import the boundary, exactly like Breve. See docs/model.md + ~/memex-vault/STRUCTURE.md (v3.6) + memex-vault wiki/projects/rotli/memex-integration.",
+          "text": "rotli READS the whole memex and WRITES only its owned surfaces per the v3.7 contract: chats/ (AI chats), inbox.md (⌥C captures), and wiki/_inbox/ NOTE STAGING (new notes land there with frontmatter id/owner/created/updated/shelf/reach + blank AI metadata; a later local-LLM files them to wiki/<area>/ — the 'brain', via the v3.7 AI Filer lane). It NEVER writes history/ (Breve's), identity/ or personality/ (the former self/), MAP, or the curated rest of wiki/ — refused at both the TS canWrite gate and the Rust is_writable guard. Contract band [3.4, 3.7] (code truth: CONTRACT_VERSION 3.7, MIN_CONTRACT 3.4 in both src-tauri/src/memex.rs and src/memex/contract.ts; v3.7 adds the additive-only AI Filer lane). VOCAB (see docs/model.md): your NOTES FOLDER is a memex (one corpus.json; one memex by default — 'corpus' is internal, never user-facing). The 'BRAIN' = the AI-organized wiki areas INSIDE Notes (filed by metadata), NOT a connected memex. A SECOND memex is a 'linked library' (advanced; the active one is writable per its perms). Storage = the memex storage/ (binaries via storage: links; a dropped file routes there). Access is metadata (note reach/owner + a per-note 'locked' flag the AI filer must respect + a per-note 'secure' flag — secrets auto-detected by a regex pass, never sent to a REMOTE model, gitignored — + the local/open/secure mode). Mirror-not-import the boundary, exactly like Breve. See docs/model.md + ~/memex-vault/STRUCTURE.md (v3.6) + memex-vault wiki/projects/rotli/memex-integration.",
           "added": "2026-06-22",
-          "last_reviewed": "2026-06-28",
+          "last_reviewed": "2026-07-06",
           "source": "manual"
         },
         {
@@ -65,9 +65,9 @@
         },
         {
           "id": 6,
-          "text": "Docs live in docs/; the brand kit + brand home live in smLab (apps/rotli + brand/kits/rotli). Change code that a doc describes → update the doc (+ a CHANGELOG entry) in the same commit — see the global DOCS domain.",
+          "text": "Docs live IN THIS REPO under docs/; the brand kit is now IN-REPO too — the app-embedded canonical kit at src/brand/ (single source of truth for colors/tokens/logo/fonts), enforced by `bun run check:hex` (no raw hex anywhere outside src/brand/). Brand provenance/history lives under brand/engine-history/. (Migrated out of smLab on 2026-07-06 — smLab no longer hosts rotli's brand or docs.) Change code that a doc describes → update the doc (+ a CHANGELOG entry) in the same commit — see the global DOCS domain.",
           "added": "2026-06-22",
-          "last_reviewed": null,
+          "last_reviewed": "2026-07-06",
           "source": "manual"
         }
       ],
@@ -100,6 +100,21 @@
             "default",
             "brain",
             "daemon"
+          ],
+          "status": "active"
+        },
+        {
+          "id": "rotli-003",
+          "decision": "2026-07-06 full cleanup: rotli's brand + docs now live IN-REPO — src/brand/ is the canonical app-embedded brand kit (enforced by `bun run check:hex`), brand/engine-history/ holds brand provenance/history, and docs/ holds the docs; smLab no longer hosts rotli.",
+          "rationale": "One home for code, brand, and docs kills cross-repo drift and makes the brand kit the app's single source of truth.",
+          "date": "2026-07-06",
+          "source": "manual",
+          "recall": [
+            "cleanup",
+            "brand",
+            "migration",
+            "smlab",
+            "in-repo"
           ],
           "status": "active"
         }

@@ -805,6 +805,9 @@ pub struct FrontmatterView {
     pub updated: String,
     pub locked: bool,
     pub secure: bool,
+    /// The typed pin fact — floats the note to the top of every list (the list
+    /// sort is pinned → updated → id). Toggled from the row menu / a hotkey.
+    pub pinned: bool,
     pub fields: Vec<String>,
 }
 
@@ -1768,6 +1771,7 @@ impl CorpusStore {
             updated: fm.updated.unwrap_or_default(),
             locked,
             secure,
+            pinned: fm.pinned.unwrap_or(false),
             fields,
         })
     }
@@ -1788,6 +1792,24 @@ impl CorpusStore {
         if locked {
             fm.foreign.push("locked: true".to_string());
         }
+        atomic_write(&path, &compose_document(&fm, body))
+    }
+
+    /// Toggle the per-note PIN — the typed `pinned` frontmatter fact that floats
+    /// a note to the top of every list (the list sort is pinned → updated → id).
+    /// Preserves the body + every other frontmatter line, and — unlike `write` —
+    /// does NOT bump `updated`, so pinning never reorders the note by recency.
+    /// Takes a wire id OR a rel path (resolve_note_rel). SANCTIONED writable()
+    /// exception, like set_locked: `pinned` is a rotli-managed typed fact every
+    /// note already carries, so pinning works even on curated notes the user
+    /// can't body-edit.
+    fn set_pinned(&mut self, id_or_rel: &str, pinned: bool) -> Result<(), String> {
+        let rel = &self.resolve_note_rel(id_or_rel)?;
+        let path = self.abs(rel);
+        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let (fm, body) = parse_document(&text);
+        let mut fm = fm.unwrap_or_default();
+        fm.pinned = Some(pinned);
         atomic_write(&path, &compose_document(&fm, body))
     }
 
@@ -3576,6 +3598,18 @@ pub fn corpus_set_locked(
     state.route(&root, |s| s.set_locked(&rel, locked))
 }
 
+/// Toggle the per-note PIN (the typed `pinned` frontmatter fact) — floats the
+/// note to the top of every list. Does not bump `updated`.
+#[tauri::command]
+pub fn corpus_set_pinned(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    pinned: bool,
+) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.set_pinned(&rel, pinned))
+}
+
 /// Set or (empty value) remove a foreign frontmatter field from the metadata panel.
 #[tauri::command]
 pub fn corpus_set_field(
@@ -4624,6 +4658,34 @@ mod tests {
         // id↔path index stays authoritative: read by the same id still works
         let doc = store.read(&meta.id).unwrap();
         assert_eq!(doc.body, "# Second title\n\nBody.\n");
+    }
+
+    #[test]
+    fn set_pinned_toggles_without_bumping_updated() {
+        let (_dir, mut store) = bare();
+        let meta = store.create("Inbox", "# Pin me\n\nBody.\n").unwrap();
+        assert!(!meta.pinned, "notes start unpinned");
+        let before = store.read_frontmatter(&meta.id).unwrap();
+        assert!(!before.pinned);
+
+        // pin: the typed fact flips, `updated` is NOT bumped (a pin never
+        // reorders by recency), and the body is untouched.
+        store.set_pinned(&meta.id, true).unwrap();
+        let after = store.read_frontmatter(&meta.id).unwrap();
+        assert!(after.pinned, "pinned reads true");
+        assert_eq!(after.updated, before.updated, "pin must not bump updated");
+        let doc = store.read(&meta.id).unwrap();
+        assert!(doc.pinned);
+        assert_eq!(doc.body, "# Pin me\n\nBody.\n", "body untouched by pin");
+
+        // unpin round-trips
+        store.set_pinned(&meta.id, false).unwrap();
+        assert!(!store.read_frontmatter(&meta.id).unwrap().pinned);
+
+        // takes the wire id OR a rel path (the resolve_note_rel bridge)
+        let rel = store.path_of(&meta.id).unwrap();
+        store.set_pinned(&rel, true).unwrap();
+        assert!(store.read(&meta.id).unwrap().pinned);
     }
 
     // ── full cycle ──

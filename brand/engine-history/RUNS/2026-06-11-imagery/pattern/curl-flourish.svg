@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+  <!-- rotli curl motif — echo of the quokka-r tail (sparing use: dividers, bullets, empty states).
+       Tileable 96-grid; constructed monoline, one idea: the tail's gentle under-curl. -->
+  <path d="M30 38 C30 26, 46 22, 56 30 C66 38, 64 52, 52 56 C44 58.6, 37 54, 37 47 C37 41.5, 42.5 38.5, 47 41"/>
+</svg>

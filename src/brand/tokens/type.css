@@ -1,8 +1,8 @@
 /* rotli — type tokens. From the Seth-approved brand board (2026-06-06).
    Display + headings + wordmark: Satoshi. UI + body: General Sans. Fallback: Inter / system.
    Both faces are Fontshare (ITF) — free for personal AND commercial use, self-hosted. NOT OFL and NOT in
-   smLab's Fontsource catalog — a deliberate, Seth-approved deviation for rotli (record in LICENSES.md at
-   freeze). Drop the font files into ../fonts/ (Fontshare download). The wordmark also ships as outlined
+   the studio's standard Fontsource catalog — a deliberate, Seth-approved deviation for rotli (recorded in
+   LICENSES.md). Drop the font files into ../fonts/ (Fontshare download). The wordmark also ships as outlined
    SVG paths, so the font is only needed for live UI text. */
 @font-face{
   font-family:"Satoshi";

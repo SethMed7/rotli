@@ -10,6 +10,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.5] — 2026-07-06
+
+Pin + a global titlebar search, a repo-wide cleanup (brand & docs now live
+in-repo, aligned to the current three-fronts model), and a new minimal
+marketing site.
+
+### Added
+
+- **Pin a note to the top.** Every note now has a real **Pin** — the row's
+  right-click menu gains **Pin to top / Unpin from top**, and **⌘⇧P** pins (or
+  unpins) whatever note you're on. Pinned notes float above everything in **All
+  notes** (and sort first in their sidebar folder), marked with a small pin.
+  Pinning writes the note's `pinned` frontmatter fact and **never bumps
+  `updated`**, so it doesn't reorder the note by recency. Locked/secure/Main
+  rules are unaffected. (New `corpus_set_pinned` command.)
+- **Global search in the titlebar.** The rotli mark moved to the **top-left**
+  beside the sidebar toggle, and a **Search…** field now sits at the top center
+  — click it (or ⌘K) to search every note and action.
+
+### Changed
+
+- **Settings toggles lost the hard outline.** The on/off cards are now soft
+  filled panels instead of bordered boxes — the bright accent outline the "on"
+  state drew (near-white in the dark themes) is gone; the switch alone shows
+  state.
+- **All notes = every note except Archive and Trash, newest first** (pinned
+  above that) — and a staged **Capture** shown there now gets the full
+  right-click menu instead of a dead **Restore** that did nothing. Restore is
+  reserved for genuinely archived/trashed notes again.
+
+### Fixed
+
+- **Folder-row hover icons no longer drift apart.** The **New note** / **New
+  folder** pair on a folder's hover now rides the right edge together instead of
+  splitting the free space between them.
+
+### Website
+
+- **New marketing site** (`site/`, Astro) — a minimal, Ollama-style landing page
+  built around the **quokka mark** as the logo, in the **Paper (light) / Charcoal
+  (dark)** black-&-white theme pair. Self-contained; its own deps, doesn't touch
+  the app's lockfile.
+
+### Docs, brand & repo
+
+- **Brand + docs now live in the repo.** rotli's brand kit is the app-embedded,
+  hex-enforced `src/brand/` (single source of truth); provenance/history is under
+  `brand/engine-history/`; docs are in `docs/`. (Migrated out of smLab.)
+- **Everything aligned to the current model.** README, the brand copy
+  (`brand.json` / `kit.json`), and the promoted docs (`docs/vision.md`,
+  `docs/philosophy.md`, `docs/design-system.md`) were rewritten from the old
+  "six fronts / Voice / Memory / bundled LLM" framing to the three-fronts memex
+  model; stale/duplicate rough-drafts were removed.
+- **CARL refreshed** — the project rules now describe the in-repo brand/docs and
+  the correct contract band **[3.4, 3.7]**.
+
 ## [0.24.4] — 2026-07-03
 
 The tab model, the note-location finder, and the Batch 2 sidebar pass — plus the

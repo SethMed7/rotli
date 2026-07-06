@@ -1,7 +1,7 @@
 # logo/ — rotli marks (pending formalization)
 
 The logo direction is **Seth-approved** (the 2026-06-06 board) but **not yet formalized into SVG**. The
-board is a raster; the smLab doctrine forbids auto-tracing geometry. To formalize, get the marks as clean
+board is a raster; the brand doctrine forbids auto-tracing geometry. To formalize, get the marks as clean
 outlined SVG from Seth's design source (Figma/AI export of the wordmark + `r` mark), or rebuild the `r`
 glyph as exact path geometry, then render → judge → present → freeze.
 

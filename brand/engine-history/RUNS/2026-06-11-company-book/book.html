@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rotli — the company book · 2026-06-11</title>
+<link rel="stylesheet" href="../../../../kits/rotli/tokens/colors.css">
+<link rel="stylesheet" href="../../../../kits/rotli/tokens/type.css">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:var(--font-body);color:var(--text);background:var(--ground)}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 36px}
+
+  /* cover */
+  .cover{padding:110px 0 70px;border-bottom:1px solid var(--border)}
+  .cover img{height:84px;display:block;margin-bottom:26px}
+  .cover .tag{font-family:var(--font-display);font-weight:500;font-size:21px;color:var(--text);letter-spacing:-.01em}
+  .cover .sub{font-size:13.5px;color:var(--text-muted);margin-top:10px;line-height:1.6}
+  .cover .ed{display:inline-flex;align-items:center;gap:8px;margin-top:22px;background:var(--tint);border-radius:999px;padding:5px 14px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--accent-text)}
+
+  /* toc */
+  .toc{position:sticky;top:0;z-index:50;background:color-mix(in srgb, var(--ground), transparent 8%);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:10px 0}
+  .toc .wrap{display:flex;gap:4px;flex-wrap:wrap}
+  .toc a{font-size:11.5px;font-weight:500;color:var(--text-muted);text-decoration:none;padding:5px 11px;border-radius:999px}
+  .toc a:hover{background:rgba(58,48,40,.07);color:var(--text)}
+
+  /* sections */
+  section{padding:74px 0 10px}
+  .secnum{font-family:var(--font-display);font-weight:700;font-size:12px;letter-spacing:.1em;color:var(--accent-text);text-transform:uppercase;margin-bottom:6px}
+  h2{font-family:var(--font-display);font-weight:700;font-size:30px;letter-spacing:-.015em;margin-bottom:8px}
+  .lead{font-size:14px;line-height:1.65;color:#5C5246;max-width:760px;margin-bottom:30px}
+  .lead strong{color:var(--text)}
+  h3{font-family:var(--font-display);font-weight:700;font-size:16px;margin:30px 0 12px}
+
+  .panelgrid{display:flex;gap:16px;flex-wrap:wrap}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+  .panel.dark{background:var(--rotli-cocoa)}
+  .panel.linen{background:var(--rotli-linen)}
+  .plabel{position:absolute;bottom:9px;left:13px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)}
+  .panel.dark .plabel{color:#B7A593}
+
+  /* modules row */
+  .modrow{display:flex;gap:12px;flex-wrap:wrap}
+  .modcard{flex:1;min-width:190px;background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:16px 18px}
+  .modcard .mi{display:flex;align-items:center;gap:9px;font-family:var(--font-display);font-weight:700;font-size:15px;margin-bottom:5px}
+  .modcard .mi svg{width:17px;height:17px;stroke:var(--accent-text);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .modcard p{font-size:11.5px;color:var(--text-muted);line-height:1.55}
+  .modcard .ph{display:inline-block;margin-top:8px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--surface-2);border-radius:999px;padding:2.5px 8px;color:var(--text-muted)}
+  .modcard.live .ph{background:var(--tint);color:var(--accent-text)}
+
+  .pillrow{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+  .pill{background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:5px 13px;font-size:11.5px;font-weight:500;color:var(--text)}
+
+  /* color */
+  .swrow{display:flex;gap:12px;flex-wrap:wrap}
+  .sw{width:170px;border-radius:13px;overflow:hidden;border:1px solid var(--border);background:var(--surface)}
+  .sw .c{height:84px}
+  .sw .n{padding:9px 13px}
+  .sw .n b{display:block;font-size:12.5px}
+  .sw .n span{font-size:10.5px;color:var(--text-muted);font-family:ui-monospace,Menlo,monospace}
+  .sw .n i{display:block;font-style:normal;font-size:10.5px;color:var(--text-muted);margin-top:3px;line-height:1.45}
+  .surfrow{display:flex;gap:0;border-radius:12px;overflow:hidden;border:1px solid var(--border);margin-top:14px;max-width:860px}
+  .surf{flex:1;padding:14px 16px;font-size:11px}
+  .surf b{display:block;font-size:12px;margin-bottom:2px}
+  .surf span{font-family:ui-monospace,Menlo,monospace;font-size:10px;opacity:.75}
+
+  /* type */
+  .typespec{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:26px 30px;max-width:860px}
+  .typespec .big{font-family:var(--font-display);font-weight:700;font-size:34px;letter-spacing:-.015em;margin-bottom:4px}
+  .typespec .mid{font-family:var(--font-display);font-weight:500;font-size:20px;color:var(--text);margin-bottom:14px}
+  .typespec .body{font-size:14px;line-height:1.6;max-width:560px;color:var(--text)}
+  .typespec .mut{font-size:11.5px;color:var(--text-muted);margin-top:14px;border-top:1px solid var(--border);padding-top:12px;line-height:1.6}
+  table.scale{border-collapse:collapse;font-size:12.5px;margin-top:8px}
+  table.scale td{padding:6px 18px 6px 0;color:var(--text-muted)}
+  table.scale td:first-child{font-weight:600;color:var(--text)}
+
+  /* icons */
+  .icogrid{display:flex;gap:12px;flex-wrap:wrap}
+  .ico{width:104px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 8px 10px;text-align:center}
+  .ico svg{width:26px;height:26px;color:var(--text)}
+  .ico div{font-size:9.5px;font-weight:600;color:var(--text-muted);margin-top:8px;letter-spacing:.02em}
+  .note{font-size:12px;color:var(--text-muted);line-height:1.6;max-width:760px;margin-top:14px;background:var(--surface-2);border-radius:10px;padding:11px 15px}
+
+  /* world */
+  .worldgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .wcard{border-radius:13px;overflow:hidden;border:1px solid var(--border);background:var(--surface)}
+  .wcard img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+  .wcard.wide{grid-column:span 2}
+  .wcard.wide img{aspect-ratio:2/1}
+  .wcard .wl{font-size:10.5px;font-weight:600;color:var(--text-muted);padding:8px 12px}
+
+  /* patterns */
+  .patrow{display:flex;gap:14px;flex-wrap:wrap}
+  .pat{width:260px;height:130px;border-radius:13px;border:1px solid var(--border);position:relative;overflow:hidden}
+
+  /* app shots */
+  .shot{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:22px}
+  .shot img{width:100%;display:block}
+  .shot .cap{display:flex;align-items:baseline;gap:10px;padding:12px 18px;border-top:1px solid var(--border)}
+  .shot .cap b{font-family:var(--font-display);font-size:13.5px}
+  .shot .cap span{font-size:11.5px;color:var(--text-muted);flex:1}
+  .shot .cap a{font-size:11px;font-weight:600;color:var(--accent-text);text-decoration:none;white-space:nowrap}
+  .shot .cap a:hover{text-decoration:underline}
+  .shotgrid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .shotgrid .shot{margin-bottom:0}
+
+  /* laws */
+  .lawcard{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:16px 20px;margin-bottom:14px;max-width:980px}
+  .lawcard b{font-family:var(--font-display);font-size:13.5px;display:block;margin-bottom:5px}
+  .lawcard p{font-size:12.5px;color:#5C5246;line-height:1.65}
+  kbd{font:500 10.5px/1 var(--font-body);background:var(--surface-2);border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:2px 5px;color:var(--text);white-space:nowrap}
+
+  /* ledger */
+  table.ledger{border-collapse:collapse;font-size:12.5px;width:100%;max-width:980px;background:var(--surface);border-radius:13px;overflow:hidden;border:1px solid var(--border)}
+  table.ledger th{font-family:var(--font-display);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);text-align:left;padding:11px 16px;border-bottom:1px solid var(--border);background:var(--ground)}
+  table.ledger td{padding:10px 16px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.55;color:#5C5246}
+  table.ledger td:first-child{font-weight:600;color:var(--text);white-space:nowrap}
+  table.ledger tr:last-child td{border-bottom:none}
+  .ok{color:var(--rotli-olive-text);font-weight:600}
+  .no{color:#A14A32;font-weight:600}
+
+  footer{padding:60px 0 90px;font-size:12px;color:var(--text-muted);line-height:1.7}
+  footer a{color:var(--accent-text);text-decoration:none}
+</style>
+</head>
+<body>
+
+<!-- inlined kit icon sprite (v2, FROZEN 1.0.0) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <!-- rotli icon set v2 — FROZEN 2026-06-11 (run: engine/RUNS/rotli/2026-06-11-icons-recut, Seth-approved).
+       11 symbols re-cut to module truth: 6 modules (notes chat voice memory inbox board) + 5 supports
+       (capture tags search sync settings). 24-grid · 1.8 stroke · outline · currentColor · ≤1 clay accent
+       (sync keeps its approved clay+olive pair — it IS the semantic). On dark grounds lift olive to
+       var(--rotli-olive-bright) #A9B78F (see tokens/colors.css). Mono contexts: force accents to currentColor. -->
+  <symbol id="rotli-notes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h6" stroke="#C97E62"/><path d="M8 12h8"/><path d="M8 16h5"/>
+  </symbol>
+  <symbol id="rotli-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 11.8a8.3 8.3 0 0 1-8.9 8.3 8.5 8.5 0 0 1-3.5-.8L3.2 21l1.9-5.4A8.3 8.3 0 1 1 21 11.8Z"/>
+    <path d="M8.6 11.8h6.8" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="rotli-voice" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="2.5" width="6" height="11.5" rx="3"/>
+    <path d="M5 10.5v1.5a7 7 0 0 0 14 0v-1.5"/><path d="M12 19v2.5"/>
+    <circle cx="12" cy="8" r="1.2" fill="#C97E62" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="rotli-memory" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 4.5a4 4 0 0 0-3.9 3 3.5 3.5 0 0 0-2.4 4.4A3.3 3.3 0 0 0 6.3 17c.4 1.5 1.8 2.5 3.3 2.3a3.1 3.1 0 0 0 2.4-1.3 3.1 3.1 0 0 0 2.4 1.3c1.5.2 2.9-.8 3.3-2.3a3.3 3.3 0 0 0 .6-5.1A3.5 3.5 0 0 0 15.9 7.5a4 4 0 0 0-3.9-3Z"/>
+    <path d="M12 4.5V18" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="rotli-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 12.5h-5.5l-2 3h-5l-2-3H2"/>
+    <path d="M5.5 5.6 2 12.5V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.5l-3.5-6.9A2 2 0 0 0 16.7 4.5H7.3a2 2 0 0 0-1.8 1.1Z"/>
+    <circle cx="18.5" cy="8" r="1.3" fill="#C97E62" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="rotli-board" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3.5" y="3.5" width="7" height="9.5" rx="1.8"/><rect x="14" y="3.5" width="6.5" height="5.5" rx="1.8"/>
+    <rect x="14" y="12.5" width="6.5" height="8" rx="1.8" fill="#C97E62" stroke="#C97E62"/><rect x="3.5" y="16.5" width="7" height="4" rx="1.8"/>
+  </symbol>
+  <symbol id="rotli-capture" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/>
+    <path d="M12 8.5v7M8.5 12h7" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="rotli-tags" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4Z"/>
+    <circle cx="7.5" cy="7.5" r="1.5" fill="#C97E62" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="rotli-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/>
+  </symbol>
+  <symbol id="rotli-sync" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4.5 9.5a7.5 7.5 0 0 1 12.8-3.4" stroke="#C97E62"/><path d="M17.5 2.5v3.8h-3.8" stroke="#C97E62"/>
+    <path d="M19.5 14.5a7.5 7.5 0 0 1-12.8 3.4" stroke="#8D9A76"/><path d="M6.5 21.5v-3.8h3.8" stroke="#8D9A76"/>
+  </symbol>
+  <symbol id="rotli-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 6.5h7.6M18.4 6.5H20"/><circle cx="15.1" cy="6.5" r="2.1"/>
+    <path d="M4 12h1.7M12.4 12H20"/><circle cx="9.1" cy="12" r="2.1" stroke="#C97E62"/>
+    <path d="M4 17.5h5.7M16.4 17.5H20"/><circle cx="13.1" cy="17.5" r="2.1"/>
+  </symbol>
+</svg>
+
+<div class="cover"><div class="wrap">
+  <img src="../../../../kits/rotli/logo/wordmark.svg" alt="rotli">
+  <div class="tag">Warm. Quiet. Instant. — I will quietly hold what matters, and I will not get in your way.</div>
+  <div class="sub">The company book — brand, world, product, and laws in one place.<br>Working edition · 2026-06-11 · Stage 1.5 (kit soft-approved, freeze pending) · UI rounds 1–5</div>
+  <span class="ed">pre-freeze · everything herein gated by Seth</span>
+</div></div>
+
+<nav class="toc"><div class="wrap">
+  <a href="#product">01 Product</a><a href="#identity">02 Identity</a><a href="#color">03 Color</a>
+  <a href="#type">04 Type</a><a href="#icons">05 Icons</a><a href="#world">06 World</a>
+  <a href="#patterns">07 Patterns</a><a href="#app">08 The App</a><a href="#modules">09 Modules</a>
+  <a href="#laws">10 Laws</a><a href="#decisions">11 Decisions</a><a href="#status">12 Status</a>
+</div></nav>
+
+<div class="wrap">
+
+  <!-- 01 PRODUCT -->
+  <section id="product">
+    <div class="secnum">01 · Product</div>
+    <h2>What rotli is</h2>
+    <p class="lead">A modular, hotkey-driven, <strong>local-first Mac menu-bar app</strong> — five modules in one warm shell, bundled
+    LLM/STT/TTS, nothing to install but rotli. The user is the <strong>quokka</strong>; the app is the island, designed so nothing has to be
+    learned. Summon with <kbd>⌥Space</kbd>, click-away closes. The wider vision: notes as <strong>plain markdown files in one structure</strong>
+    that every view, every storage backend, and every AI (breve first) simply <em>reads</em> — Obsidian's economics, OpenClaw's capability,
+    Apple Notes' approachability. Free local forever; paid is convenience (sync, managed AI), never the product.</p>
+    <div class="modrow">
+      <div class="modcard live"><div class="mi"><svg><use href="#rotli-notes"/></svg>Notes</div><p>“Apple Notes, in markdown.” Folders · list · editor, tabs-in-panes, quick capture. The anchor — it writes the brain.</p><span class="ph">v1 — now</span></div>
+      <div class="modcard live"><div class="mi"><svg><use href="#rotli-chat"/></svg>Chat</div><p>Many conversations over your own local models (<code>/model</code> to switch). Tag a chat to a note — done talking, summary already written. ⌘J asks inline from Notes.</p><span class="ph">next</span></div>
+      <div class="modcard live"><div class="mi"><svg><use href="#rotli-voice"/></svg>Voice</div><p>Dictate (Parakeet STT, Wispr-Flow-grade cleanup, system-wide), listen to any note (local TTS, breve's engines), and voice mode — Chat worn as a voice interface.</p><span class="ph">next</span></div>
+      <div class="modcard"><div class="mi"><svg><use href="#rotli-memory"/></svg>Memory</div><p>Ask everything you know; cited answers, fully offline. The corpus is the brain — the Memory recalls it. Grounds Chat the day it lands.</p><span class="ph">then</span></div>
+      <div class="modcard"><div class="mi"><svg><use href="#rotli-inbox"/></svg>Inbox</div><p>A calm client over your own email — Proton first (via Bridge), Gmail second, any IMAP. No rotli server.</p><span class="ph">later</span></div>
+      <div class="modcard"><div class="mi"><svg><use href="#rotli-board"/></svg>Board</div><p>Drag-arrange thinking surface; the day-planner. Not a kanban.</p><span class="ph">later</span></div>
+    </div>
+    <p class="lead" style="margin-top:18px;margin-bottom:0"><strong>One brain underneath, six fronts:</strong> the corpus (plain .md + index) is the brain — Notes writes it, Chat talks with it, Voice speaks it, the Memory recalls it, Inbox and Board feed it. Order: Notes → Chat → Voice → Memory → Inbox → Board.</p>
+    <div class="pillrow">
+      <span class="pill">menu bar, not dock</span><span class="pill">⌥Space from anywhere</span><span class="pill">click-away closes</span>
+      <span class="pill">local-first — plain .md + SQLite index</span><span class="pill">nothing to install but rotli</span>
+      <span class="pill">every hotkey rebindable</span><span class="pill">every icon labeled</span><span class="pill">notifications never louder than needed</span>
+    </div>
+  </section>
+
+  <!-- 02 IDENTITY -->
+  <section id="identity">
+    <div class="secnum">02 · Identity</div>
+    <h2>The marks</h2>
+    <p class="lead">Lowercase <strong>rotli</strong> — outlined Baloo 2 (true 600) with the traced curled-tail <strong>r</strong> as the signature
+    glyph and the standalone compact mark. Approved gate round 3 (2026-06-08 → 06-10 board intake). Full kit: <a href="../../../../kits/rotli/board.html" style="color:var(--accent-text)">board.html</a>.</p>
+    <div class="panelgrid">
+      <div class="panel linen" style="width:360px;height:170px"><img src="../../../../kits/rotli/logo/wordmark.svg" style="height:64px" alt="wordmark"><span class="plabel">wordmark · cocoa on linen</span></div>
+      <div class="panel dark" style="width:360px;height:170px"><img src="../../../../kits/rotli/logo/wordmark.mono-white.svg" style="height:64px" alt="wordmark reversed"><span class="plabel">reversed · on cocoa</span></div>
+      <div class="panel linen" style="width:170px;height:170px"><img src="../../../../kits/rotli/logo/r-mark.svg" style="height:84px" alt="r mark"><span class="plabel">r-mark</span></div>
+      <div class="panel dark" style="width:170px;height:170px"><img src="../../../../kits/rotli/logo/r-mark.mono-white.svg" style="height:84px" alt="r mark white"><span class="plabel">r-mark · mono</span></div>
+    </div>
+    <h3>Tiles & avatars</h3>
+    <div class="panelgrid">
+      <div class="panel" style="width:150px;height:150px;padding:0"><img src="../../../../kits/rotli/tiles/tile-linen.svg" style="width:100%;height:100%" alt=""><span class="plabel" style="mix-blend-mode:multiply">linen tile</span></div>
+      <div class="panel" style="width:150px;height:150px;padding:0"><img src="../../../../kits/rotli/tiles/tile-cocoa.svg" style="width:100%;height:100%" alt=""></div>
+      <div class="panel" style="width:150px;height:150px;padding:0"><img src="../../../../kits/rotli/tiles/tile-clay.svg" style="width:100%;height:100%" alt=""></div>
+      <div class="panel linen" style="width:150px;height:150px"><img src="../../../../kits/rotli/tiles/favicon.svg" style="width:32px" alt=""><span class="plabel">favicon @32</span></div>
+      <div class="panel linen" style="width:150px;height:150px"><img src="../../../../kits/rotli/tiles/app-icon-512.svg" style="width:96px;border-radius:22px;box-shadow:0 6px 18px rgba(58,48,40,.2)" alt=""><span class="plabel">app icon</span></div>
+      <div class="panel linen" style="width:150px;height:150px"><img src="../../../../kits/rotli/tiles/social-avatar-1024.svg" style="width:96px;border-radius:50%" alt=""><span class="plabel">avatar</span></div>
+    </div>
+  </section>
+
+  <!-- 03 COLOR -->
+  <section id="color">
+    <div class="secnum">03 · Color</div>
+    <h2>Five colors, tiered</h2>
+    <p class="lead">Brand core = Cocoa (ink) + Clay (the one accent — punctuation, never a field). Supporting = Peach (tint) · Linen (ground) ·
+    Olive (success/sync). One clay element per pane; no pure white grounds; no clinical grey, ever.</p>
+    <div class="swrow">
+      <div class="sw"><div class="c" style="background:#3A3028"></div><div class="n"><b>Cocoa</b><span>#3A3028</span><i>ink · wordmark · dark ground base</i></div></div>
+      <div class="sw"><div class="c" style="background:#C97E62"></div><div class="n"><b>Clay Blush</b><span>#C97E62</span><i>the signature accent — active, key moments</i></div></div>
+      <div class="sw"><div class="c" style="background:#F2D6C2"></div><div class="n"><b>Peach Cream</b><span>#F2D6C2</span><i>selection tint · highlights</i></div></div>
+      <div class="sw"><div class="c" style="background:#F8F2E9;border-bottom:1px solid var(--border)"></div><div class="n"><b>Linen</b><span>#F8F2E9</span><i>light ground — never pure white</i></div></div>
+      <div class="sw"><div class="c" style="background:#8D9A76"></div><div class="n"><b>Olive Moss</b><span>#8D9A76</span><i>success · saved · sync · “all caught up”</i></div></div>
+    </div>
+    <div class="surfrow">
+      <div class="surf" style="background:#F8F2E9;color:#3A3028"><b>Light</b><span>ground F8F2E9 · surface FFF · text 3A3028 · muted 6E6155 · border E7DBC9 · accent-text 8F4E37</span></div>
+      <div class="surf" style="background:#241D18;color:#F1E7DA"><b>Dark — warm, never clinical</b><span>ground 241D18 · surface 2E2620 · text F1E7DA · muted B7A593 · border 3D3229 · clay clears AA</span></div>
+    </div>
+  </section>
+
+  <!-- 04 TYPE -->
+  <section id="type">
+    <div class="secnum">04 · Type</div>
+    <h2>Satoshi & General Sans</h2>
+    <div class="typespec">
+      <div class="big">Quietly holds what matters.</div>
+      <div class="mid">Satoshi — display, headings, the voice of the brand.</div>
+      <p class="body">General Sans carries the UI and every note body — clean, friendly, legible at small sizes. The wordmark itself ships as
+      outlined paths (Baloo 2-600 provenance), so no surface ever waits on a font.</p>
+      <table class="scale">
+        <tr><td>Heading</td><td>32 / 40</td><td>Satoshi Bold</td></tr>
+        <tr><td>Subheading</td><td>20 / 28</td><td>Satoshi Medium</td></tr>
+        <tr><td>Body</td><td>14 / 22</td><td>General Sans Regular</td></tr>
+        <tr><td>UI label</td><td>12 / 16</td><td>Medium</td></tr>
+      </table>
+      <div class="mut">Both faces: Fontshare (ITF) — free commercial, self-hosted, recorded in LICENSES.md. A deliberate deviation from
+      smLab's Fontsource default, Seth-approved.</div>
+    </div>
+  </section>
+
+  <!-- 05 ICONS -->
+  <section id="icons">
+    <div class="secnum">05 · Icons</div>
+    <h2>The kit set — v2, frozen 1.0.0</h2>
+    <p class="lead">Re-cut to module truth and frozen 2026-06-11. Outline family, 24-grid, 1.8 stroke, currentColor, ≤1 clay accent (sync excepted). On dark grounds olive lifts to <code>--rotli-olive-bright</code>. Every icon labeled (the quokka rule).</p>
+    <div class="icogrid">
+      <div class="ico"><svg><use href="#rotli-notes"/></svg><div>Notes</div></div>
+      <div class="ico"><svg><use href="#rotli-chat"/></svg><div>Chat</div></div>
+      <div class="ico"><svg><use href="#rotli-voice"/></svg><div>Voice</div></div>
+      <div class="ico"><svg><use href="#rotli-memory"/></svg><div>Memory</div></div>
+      <div class="ico"><svg><use href="#rotli-inbox"/></svg><div>Inbox</div></div>
+      <div class="ico"><svg><use href="#rotli-board"/></svg><div>Board</div></div>
+      <div class="ico"><svg><use href="#rotli-capture"/></svg><div>Capture</div></div>
+      <div class="ico"><svg><use href="#rotli-tags"/></svg><div>Tags</div></div>
+      <div class="ico"><svg><use href="#rotli-search"/></svg><div>Search</div></div>
+      <div class="ico"><svg><use href="#rotli-sync"/></svg><div>Sync</div></div>
+      <div class="ico"><svg><use href="#rotli-settings"/></svg><div>Settings</div></div>
+    </div>
+    <div class="note"><strong>Frozen 2026-06-11</strong> (run <code>2026-06-11-icons-recut</code>, Seth-approved). Retired from draft v1: Calendar, Sheets, Transcript, Quick Notes, Reminder, Action Items.</div>
+  </section>
+
+  <!-- 06 WORLD -->
+  <section id="world">
+    <div class="secnum">06 · World</div>
+    <h2>The quokka & the island</h2>
+    <p class="lead">Stage-1.5 illustrated register (soft-approved — “overall good, we'll play around more”). Placement law: the world appears at
+    <strong>low-frequency moments only</strong> — onboarding, empty states, about, the model-download wait. Never in the editor, never in
+    notifications, never in the tray.</p>
+    <div class="worldgrid">
+      <div class="wcard"><img src="../2026-06-11-imagery/quokka-master.png" alt=""><div class="wl">quokka — master</div></div>
+      <div class="wcard"><img src="../2026-06-11-imagery/quokka-poses.png" alt=""><div class="wl">pose sheet</div></div>
+      <div class="wcard wide"><img src="../2026-06-11-imagery/island-wide.png" alt=""><div class="wl">island — wide (onboarding / about)</div></div>
+      <div class="wcard"><img src="../2026-06-11-imagery/island-path.png" alt=""><div class="wl">island path (onboarding)</div></div>
+      <div class="wcard"><img src="../2026-06-11-imagery/lamp-nook.png" alt=""><div class="wl">lamp nook (dark / night)</div></div>
+      <div class="wcard"><img src="../2026-06-11-imagery/botanical-spots.png" alt=""><div class="wl">botanical spots (empty states)</div></div>
+      <div class="wcard"><img src="../2026-06-11-imagery/paper-linen.png" alt=""><div class="wl">paper grain (texture)</div></div>
+    </div>
+  </section>
+
+  <!-- 07 PATTERNS -->
+  <section id="patterns">
+    <div class="secnum">07 · Patterns</div>
+    <h2>Constructed, below conscious perception</h2>
+    <div class="patrow">
+      <div class="pat" style="background:var(--rotli-linen) url('../2026-06-11-imagery/pattern/curl-flourish.svg'); background-size:64px"><span class="plabel">curl flourish — the r's tail as motif</span></div>
+      <div class="pat" style="background:var(--rotli-linen) url('../2026-06-11-imagery/pattern/dot-grid.svg'); background-size:24px"><span class="plabel">dot grid — lamplit tooth</span></div>
+    </div>
+  </section>
+
+  <!-- 08 THE APP -->
+  <section id="app">
+    <div class="secnum">08 · The App — Notes v1, current state (round 5)</div>
+    <h2>The window today</h2>
+    <p class="lead">Five gated rounds, multi-agent reviewed, competitor-researched (Apple Notes, Bear, Craft, Obsidian, GoodNotes, Raycast, Linear).
+    Every shot below links to its live gate.</p>
+    <div class="shot">
+      <img src="shots/editor.png" alt="">
+      <div class="cap"><b>The editor</b><span>Raycast-style floating format bar · header status (chars · updated · where) · visible rail toggles · markdown-native active line · clickable module identity</span><a href="../2026-06-11-ui-notes-mockups-r5/gate.html">open gate r5 →</a></div>
+    </div>
+    <div class="shotgrid">
+      <div class="shot"><img src="shots/lightdark.png" alt=""><div class="cap"><b>Light ↔ dark</b><span>one markup, two themes — pinned light root</span><a href="../2026-06-11-ui-notes-mockups-r5/gate.html">r5 →</a></div></div>
+      <div class="shot"><img src="shots/switcher.png" alt=""><div class="cap"><b>Module switcher</b><span>“Notes ⌄” opens it — popover doubles as roadmap</span><a href="../2026-06-11-ui-notes-mockups-r5/gate.html">r5 →</a></div></div>
+      <div class="shot"><img src="shots/collapse.png" alt=""><div class="cap"><b>Nothing forced</b><span>⌘0 · ⌥⌘L · down to just the note; warm-edge reveal</span><a href="../2026-06-11-ui-notes-mockups-r3/gate.html">r3 →</a></div></div>
+      <div class="shot"><img src="shots/tabs.png" alt=""><div class="cap"><b>Tabs in panes</b><span>terminal-grade; single-tab pane = zero chrome</span><a href="../2026-06-11-ui-notes-mockups-r2/gate.html">r2 →</a></div></div>
+      <div class="shot"><img src="shots/focus.png" alt=""><div class="cap"><b>Focus mode ✓</b><span>⌥⌘F · 65ch · typewriter · paragraph dimming (approved)</span><a href="../2026-06-11-ui-notes-mockups-r3/gate.html">r3 →</a></div></div>
+      <div class="shot"><img src="shots/cmdk.png" alt=""><div class="cap"><b>⌘K ✓</b><span>top-third, dim + blur, recents-first (approved)</span><a href="../2026-06-11-ui-notes-mockups-r3/gate.html">r3 →</a></div></div>
+      <div class="shot"><img src="shots/capture.png" alt=""><div class="cap"><b>Quick capture</b><span>⌥Space · one breath · lands in Inbox folder</span><a href="../2026-06-11-ui-notes-mockups-r2/gate.html">r2 →</a></div></div>
+      <div class="shot"><img src="shots/empty.png" alt=""><div class="cap"><b>Empty state</b><span>where the quokka lives</span><a href="../2026-06-11-ui-notes-mockups-r2/gate.html">r2 →</a></div></div>
+      <div class="shot"><img src="shots/storage.png" alt=""><div class="cap"><b>Storage</b><span>~/rotli plain files · This Mac default · adapters later</span><a href="../2026-06-11-ui-notes-mockups-r2/gate.html">r2 →</a></div></div>
+      <div class="shot"><img src="shots/onboarding.png" alt=""><div class="cap"><b>Onboarding</b><span>three cards, under a minute, no account</span><a href="../2026-06-11-ui-notes-mockups-r2/gate.html">r2 →</a></div></div>
+    </div>
+  </section>
+
+  <!-- 09 MODULES -->
+  <section id="modules">
+    <div class="secnum">09 · Modules ahead</div>
+    <h2>One chassis, five inhabitants</h2>
+    <div class="shot">
+      <img src="shots/inbox.png" alt="">
+      <div class="cap"><b>The chassis proof</b><span>Inbox in the identical shell (Wiki / Voice / Board minis live in the r3 gate). Mail: Proton first (via Bridge, on-device decryption) · Gmail second · any IMAP. No rotli server, ever.</span><a href="../2026-06-11-ui-notes-mockups-r3/gate.html">r3 →</a></div>
+    </div>
+    <div class="shot">
+      <img src="shots/chatnote.png" alt="">
+      <div class="cap"><b>Concept — chat on a note</b><span>the note IS the living summary; transcript is scaffolding (sidecar .jsonl); breve = the local-AI first layer with Resend + Signal delivery. Structure locked in r2; ships with the breve round.</span><a href="../2026-06-11-ui-notes-mockups-r2/gate.html">r2 →</a></div>
+    </div>
+  </section>
+
+  <!-- 10 LAWS -->
+  <section id="laws">
+    <div class="secnum">10 · Laws</div>
+    <h2>The grammar everything obeys</h2>
+    <div class="shot" style="max-width:980px"><img src="shots/grammar.png" alt=""><div class="cap"><b>Shape & state board</b><span>radii 4/8/10/12/14/999 · hover = 7% ink (8% paper dark) · selected = tint · focus = 2px clay ring · ≤200ms, exit faster than enter</span><a href="../2026-06-11-ui-notes-mockups-r3/gate.html">r3 →</a></div></div>
+    <div class="lawcard"><b>Markdown law</b><p>v1 is markdown-native: marks are visible syntax (<kbd>**…**</kbd>, <kbd>==…==</kbd>, <kbd>&lt;u&gt;</kbd>); typography (size · measure) is a styling layer saved to <kbd>.rotli/</kbd>, never written into the file. Doc-style arrives later as a view mode over the same <kbd>.md</kbd>.</p></div>
+    <div class="lawcard"><b>The corpus</b><p>One canonical structure: plain <kbd>.md</kbd> files in <kbd>~/rotli/</kbd> (folders on disk = folders in the sidebar, 4-line frontmatter incl. <kbd>id:</kbd>) + a rebuildable <kbd>.rotli/</kbd> index. Every module writes into it; every AI reads from it. Local is the truth; sync and clouds are adapters.</p></div>
+    <div class="lawcard"><b>Quiet AI</b><p>Sentence/paragraph reveals, opacity only; one static status line, never a spinner; zero AI indicators in the note list; the freshest AI edit sits on a peach tint that fades to ground.</p></div>
+    <div class="lawcard"><b>Speech stack — open source, no OpenAI lineage</b><p>STT: <strong>Parakeet TDT</strong> (NVIDIA, CC-BY-4.0) bundled default — locked 2026-06-11, verified trivial on the dev machine (M4 Max / 64 GB) · Moonshine as the lite fallback for low-spec Macs · Qwen3-ASR (52 languages) as the multilingual option. TTS: the same open engines breve uses. Everything behind swappable <kbd>SttService</kbd>/<kbd>TtsService</kbd> interfaces — engines are config, not marriage. Cleanup pass (filler stripped, sentences repaired) runs on the bundled LLM; verbatim is a setting.</p></div>
+    <div class="lawcard"><b>Keymap</b><p><kbd>⌥Space</kbd> summon · <kbd>⌘K</kbd> palette · <kbd>⌘N</kbd> new note · tabs <kbd>⌘T</kbd>/<kbd>⌘W</kbd>/<kbd>⌃Tab</kbd>/<kbd>⌘1–8</kbd> · panes <kbd>⌘D</kbd>/<kbd>⌘⇧D</kbd>/<kbd>⌘⌥←→</kbd> · rails <kbd>⌘0</kbd>/<kbd>⌥⌘L</kbd> · focus <kbd>⌥⌘F</kbd> · modules <kbd>⌃1–5</kbd>. Everything rebindable; everything also in ⌘K.</p></div>
+  </section>
+
+  <!-- 11 DECISIONS -->
+  <section id="decisions">
+    <div class="secnum">11 · Decisions</div>
+    <h2>The gate ledger — rounds 1–5</h2>
+    <table class="ledger">
+      <tr><th>Round</th><th>Verdicts</th></tr>
+      <tr><td>r1</td><td>Three-pane Apple-Notes baseline established. Module pills <span class="no">felt thrown-in</span> → review ordered.</td></tr>
+      <tr><td>r2</td><td>Workflow review (47 findings). Pills removed; readability + clay-budget pass; tabs-in-panes designed (single-tab pane = zero chrome); chat-on-note structure locked (typed tabs · note ids · sidecar transcripts).</td></tr>
+      <tr><td>r3</td><td><span class="ok">Focus mode approved</span> · <span class="ok">⌘K v2 approved</span>. Research digest adopted (Bear collapse, Craft toolbar split, iA focus, Raycast/Linear palette, Material/Radix grammar).</td></tr>
+      <tr><td>r4</td><td>Light-mode bug found (system dark override) → gates pinned light. Floating status pill · visible rail toggles · markdown law restated · Inbox story (<span class="ok">liked</span>, Proton required).</td></tr>
+      <tr><td>r5</td><td>Selection bubble <span class="no">rejected</span> → Raycast-style bottom format bar in kit clothes. Status → header-inline. Identity = module switcher (clickable, day one). <span class="ok">Proton-first</span> provider order. <em>Pending Seth's r5 verdicts.</em></td></tr>
+      <tr><td>r6</td><td><span class="ok">Wiki renamed “the Memory”</span> (Seth's call — the corpus is the brain; Notes/Chat/Memory are its fronts). New <strong>Chat module</strong> designed: Inbox-style chassis, /model switching over configured local models, chat-tagged-to-note loop (consent-only edits, summary already written), ⌘J ask-while-writing. Proposed order Notes → Chat → Memory → Inbox → Voice → Board. <em>Pending r6 verdicts.</em></td></tr>
+      <tr><td>r7</td><td><span class="ok">Voice promoted</span> (Seth: it's just STT + TTS — breve's engines + whisper). Designed: system-wide dictation with cleanup-by-default (verbatim a setting), listen-to-a-note (player takes the format bar's slot), voice mode = Chat in a voice skin (orb, “see as chat”, “tag a note”). Order v2: <strong>Notes → Chat → Voice → Memory → Inbox → Board</strong>. <span class="ok">STT engine locked: Parakeet TDT</span> (no OpenAI lineage; M4 Max verified) with Moonshine lite + Qwen3-ASR multilingual behind SttService. Open: pull dictation into Notes v1. <em>Pending r7 verdicts.</em></td></tr>
+      <tr><td>lock-in</td><td><span class="ok">Seth approved everything, 2026-06-11</span> — r5/r6/r7 verdicts ✓ (incl. dictation in v1) · <span class="ok">stack confirmed</span> per the theology canon (Tauri v2 + React + Vite + TS + Bun; plain CSS on tokens; CRDT deferred to sync) · STACK v2 + ROADMAP v2 + DECISIONS lock-in written. Remaining before code: icon re-cut → kit freeze → fresh repo.</td></tr>
+    </table>
+  </section>
+
+  <!-- 12 STATUS -->
+  <section id="status">
+    <div class="secnum">12 · Status</div>
+    <h2>Where we stand — LOCKED 2026-06-11</h2>
+    <p class="lead"><strong>All seven gate rounds approved.</strong> <strong>Stack confirmed</strong> against the theology
+    (<code>~/memex-vault/theology/personal-canon.md</code>): Tauri v2 + React + Vite + TS strict + Bun · plain CSS on kit tokens · corpus =
+    plain .md + rebuildable <code>.rotli/</code> · bundled local AI (Gemma-class LLM, <strong>Parakeet</strong> STT, breve's TTS — no OpenAI
+    lineage). <strong>v1 = Notes + dictation</strong>, then the Chat/Voice wave, then the Memory. STACK.md v2, ROADMAP.md v2, and the
+    DECISIONS lock-in block are the written canon; the seven gates are the visual spec.</p>
+    <div class="pillrow">
+      <span class="pill">✓ UI rounds 1–7 approved</span><span class="pill">✓ Stack confirmed</span><span class="pill">✓ Order locked — Notes·Chat·Voice·Memory·Inbox·Board</span>
+      <span class="pill">✓ Icons v2 approved</span><span class="pill">✓ KIT FROZEN 1.0.0 (kit.json)</span><span class="pill">→ Fresh repo · Stage-1 build workflow</span>
+    </div>
+  </section>
+
+  <footer>
+    rotli company book · working edition 2026-06-11 · built from <a href="../../../../kits/rotli/board.html">the kit</a> + runs
+    <a href="../2026-06-11-ui-notes-mockups/gate.html">r1</a> · <a href="../2026-06-11-ui-notes-mockups-r2/gate.html">r2</a> ·
+    <a href="../2026-06-11-ui-notes-mockups-r3/gate.html">r3</a> · <a href="../2026-06-11-ui-notes-mockups-r4/gate.html">r4</a> ·
+    <a href="../2026-06-11-ui-notes-mockups-r5/gate.html">r5</a> · <a href="../2026-06-11-imagery/cohesion.html">world cohesion</a><br>
+    Docs: <code>apps/rotli/docs/</code> (VISION · PHILOSOPHY · ROADMAP · STACK · DISCOVERY) · decisions live in each run's DECISION.md ·
+    AI generates · rules guide · <strong>Seth judges</strong> · code formalizes.
+  </footer>
+
+</div>
+</body>
+</html>

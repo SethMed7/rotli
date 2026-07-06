@@ -48,7 +48,10 @@ export function NoteListSurface({
 
   const q = query.trim().toLowerCase();
   const rows = useMemo<ListRow[]>(() => {
-    const sorted = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
+    // pinned notes float to the top (Seth, 2026-07-06), then most-recent first
+    const sorted = [...notes].sort(
+      (a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt,
+    );
     if (!q) return sorted.map((note) => ({ note }));
     const local = sorted.filter(
       (n) => n.title.toLowerCase().includes(q) || n.snippet.toLowerCase().includes(q),

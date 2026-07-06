@@ -660,6 +660,8 @@ export interface FrontmatterView {
   locked: boolean;
   /** Secrets detected (auto-flagged) → never sent to a remote model + gitignored. */
   secure: boolean;
+  /** Pinned to the top of every list (pinned → updated → id sort). */
+  pinned: boolean;
   /** the foreign frontmatter lines (shelf/reach/area/summary/tags/links/…). */
   fields: string[];
 }
@@ -674,6 +676,13 @@ export async function corpusFrontmatter(id: string): Promise<FrontmatterView | n
 export async function corpusSetLocked(id: string, locked: boolean): Promise<void> {
   if (!isTauri()) return;
   await invoke("corpus_set_locked", { id, locked });
+}
+
+/** Toggle the per-note PIN (the typed `pinned` frontmatter fact) — floats the
+ * note to the top of every list. Does not bump the note's `updated` stamp. */
+export async function corpusSetPinned(id: string, pinned: boolean): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_set_pinned", { id, pinned });
 }
 
 /** Set or (empty value) remove a foreign frontmatter field — the metadata editor. */

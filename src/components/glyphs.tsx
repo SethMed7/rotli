@@ -262,6 +262,27 @@ export function StarGlyph({ size = 15, className, filled = false }: GlyphProps &
   );
 }
 
+/** A pin (thumbtack) — the "pinned to top" marker. `filled` paints the head in.
+    currentColor throughout so it themes with the row. */
+export function PinGlyph({ size = 14, className, filled = false }: GlyphProps & { filled?: boolean }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 4h6M10 4l-.7 6L6 13h12l-3.3-3-.7-6M12 13v7" />
+    </svg>
+  );
+}
+
 /** Split-right palette row (r3 frame F). */
 export function SplitGlyph(props: GlyphProps) {
   return (

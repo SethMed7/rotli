@@ -1,9 +1,9 @@
 # rotli kit — font & asset licenses
 
-All faces are self-hostable. **No rented/metered fonts** (per smLab doctrine — Avenir-class faces banned).
+All faces are self-hostable. **No rented/metered fonts** (per the brand doctrine — Avenir-class faces banned).
 
 ## Satoshi — display / headings
-- **License:** Fontshare (Indian Type Foundry) Free Font License — free for personal & commercial use, web-embeddable. NOT OFL; a deliberate, Seth-approved deviation from smLab's Fontsource catalog.
+- **License:** Fontshare (Indian Type Foundry) Free Font License — free for personal & commercial use, web-embeddable. NOT OFL; a deliberate, Seth-approved deviation from the studio's standard Fontsource catalog.
 - **Source:** `fontshare.com`.
 - **Files:** `fonts/Satoshi-Regular.woff2` (400), `Satoshi-Medium.woff2` (500), `Satoshi-Bold.woff2` (700).
 

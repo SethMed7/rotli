@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 120" role="img" aria-label="rotli">
+  <!-- rotli primary wordmark — formalized monoline candidate v1 (rounded, warm; the r carries the signature curl).
+       Outlined-path / font-independent. The board shows a heavier filled treatment — reconcile with Seth's source. -->
+  <g fill="none" stroke="#3A3028" stroke-width="15" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M34 92 L34 44 C34 24 72 22 78 46"/>
+    <path d="M104 70 a24 24 0 1 0 48 0 a24 24 0 1 0 -48 0"/>
+    <path d="M186 30 L186 80 C186 90 194 92 202 88"/>
+    <path d="M170 52 L204 52"/>
+    <path d="M236 30 L236 80 C236 90 244 92 252 88"/>
+    <path d="M270 48 L270 92"/>
+  </g>
+  <circle cx="270" cy="30" r="8" fill="#3A3028"/>
+</svg>

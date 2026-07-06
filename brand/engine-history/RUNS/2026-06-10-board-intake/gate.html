@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>rotli · marks gate — live SVG</title>
+<style>
+  :root{
+    --cocoa:#3A3028; --clay:#C97E62; --peach:#F2D6C2; --linen:#F8F2E9; --olive:#8D9A76;
+    --dark:#241D18; --dark-surface:#2E2620;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--linen);color:var(--cocoa);font:15px/1.5 -apple-system,system-ui,sans-serif;padding:48px 56px 96px}
+  h1{font-size:22px;margin-bottom:4px}
+  .sub{color:#6E6155;margin-bottom:40px}
+  h2{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--clay);margin:48px 0 16px;border-top:1px solid #E7DBC9;padding-top:24px}
+  .row{display:flex;gap:24px;flex-wrap:wrap;align-items:stretch}
+  .cell{background:#fff;border:1px solid #E7DBC9;border-radius:12px;padding:32px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+  .cell.dark{background:var(--dark);border-color:var(--dark)}
+  .cell .lab{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#6E6155}
+  .cell.dark .lab{color:#B7A593}
+  .cell.linen{background:var(--linen)}
+  .cell.clay{background:var(--clay);border-color:var(--clay)}
+  img{display:block}
+  /* live 50/50 blend: the SVG laid over the board crop, both pinned to the same ink box */
+  .blend{position:relative;display:inline-block}
+  .blend img{display:block}
+  .blend .vec{position:absolute;inset:0;width:100%;height:100%;opacity:.5}
+  .note{font-size:12px;color:#6E6155;max-width:62ch;margin-top:8px}
+</style>
+</head>
+<body>
+  <h1>rotli — marks gate</h1>
+  <p class="sub">Everything below is the <b>live SVG</b> (the actual kit deliverable), not a raster.
+     The only PNGs on this page are the supplied board crops, shown as reference under the vectors.</p>
+
+  <h2>1 · Wordmark — wordmark.svg</h2>
+  <div class="row">
+    <div class="cell linen" style="flex:2"><img src="wordmark.svg" style="width:520px"><span class="lab">cocoa on linen</span></div>
+    <div class="cell dark" style="flex:2"><img src="wordmark.mono-white.svg" style="width:520px"><span class="lab">reversed on dark cocoa</span></div>
+  </div>
+  <div class="row" style="margin-top:24px">
+    <div class="cell"><img src="wordmark.svg" style="width:128px"><span class="lab">128px</span></div>
+    <div class="cell"><img src="wordmark.svg" style="width:64px"><span class="lab">64px</span></div>
+    <div class="cell"><img src="wordmark.svg" style="width:32px"><span class="lab">32px</span></div>
+  </div>
+
+  <h2>2 · Wordmark vs the board — live 50/50 blend</h2>
+  <div class="row">
+    <div class="cell"><img src="source/wordmark-ink.png" style="width:520px"><span class="lab">board (reference raster)</span></div>
+    <div class="cell">
+      <span class="blend"><img src="source/wordmark-ink.png" style="width:520px"><img class="vec" src="wordmark.compare.svg"></span>
+      <span class="lab">svg over board · 50%</span>
+    </div>
+  </div>
+  <p class="note">Ghosting = disagreement. The total width matches within ~1 board-px; the residual wobble
+     (the board's wider <b>t</b>, rounder <b>o</b>) is the AI render drifting from any real font —
+     the vector is true Baloo&nbsp;2 @600 (real static instance), tracking −0.01.</p>
+
+  <h2>3 · r mark — r-mark.svg</h2>
+  <div class="row">
+    <div class="cell linen"><img src="r-mark.svg" style="height:180px"><span class="lab">cocoa on linen</span></div>
+    <div class="cell dark"><img src="r-mark.mono-white.svg" style="height:180px"><span class="lab">knockout on dark</span></div>
+    <div class="cell clay"><img src="r-mark.mono-white.svg" style="height:180px"><span class="lab">on clay</span></div>
+    <div class="cell">
+      <span class="blend"><img src="source/r-mark-tight.png" style="height:180px"><img class="vec" src="r-mark.svg"></span>
+      <span class="lab">svg over board · 50%</span>
+    </div>
+  </div>
+
+  <h2>4 · r mark — small sizes (favicon floor)</h2>
+  <div class="row">
+    <div class="cell"><img src="r-mark.svg" style="height:48px"><span class="lab">48</span></div>
+    <div class="cell"><img src="r-mark.svg" style="height:32px"><span class="lab">32</span></div>
+    <div class="cell"><img src="r-mark.svg" style="height:16px"><span class="lab">16</span></div>
+    <div class="cell dark"><img src="r-mark.mono-white.svg" style="height:16px"><span class="lab">16 dark</span></div>
+  </div>
+
+  <h2>Verdict</h2>
+  <p class="note">Approve → the six SVGs go into <code>kits/rotli/logo/</code>, board.html gets rebuilt from
+     kit vectors, then fonts/tiles/LICENSES → your <code>kit.json</code> freeze call.
+     Caveat on file: the board's r panel is only 131px tall; a higher-res export would allow a finer re-trace.</p>
+</body>
+</html>

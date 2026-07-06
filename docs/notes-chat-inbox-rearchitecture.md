@@ -2,7 +2,9 @@
 
 *Research + design doc. Authored 2026-06-26, from rotli's tree, against the
 memex-vault v3.5 contract. RESEARCH ONLY — no code changed. This is a proposal for
-Seth to redline.*
+Seth to redline. **Shipped:** the three-fronts model (Notes · Chat · Inbox)
+proposed here is now live — current truth is `docs/model.md`; Voice/Memory
+references below are the old state this doc moved away from.*
 
 Seth's three early ideas, restated up front:
 

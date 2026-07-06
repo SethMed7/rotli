@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rotli — icon re-cut to module truth · gate</title>
+<link rel="stylesheet" href="../../../../kits/rotli/tokens/colors.css">
+<link rel="stylesheet" href="../../../../kits/rotli/tokens/type.css">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font-body);color:var(--text);background:var(--surface-2);padding:56px 32px 120px}
+  .page{max-width:1180px;margin:0 auto}
+  .gate-head{display:flex;align-items:baseline;gap:18px;margin-bottom:8px}
+  .gate-head img{height:30px;transform:translateY(4px)}
+  .gate-head .meta{font-size:13px;color:#5C5246}
+  .gate-sub{font-size:14px;line-height:1.6;color:#5C5246;max-width:800px;margin-bottom:40px}
+  h2{font-family:var(--font-display);font-weight:700;font-size:20px;letter-spacing:-.01em;margin:54px 0 6px}
+  .sub{font-size:12.5px;color:#5C5246;margin-bottom:18px;max-width:760px;line-height:1.55}
+  kbd{font:500 11px/1 var(--font-body);background:var(--surface);border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:2.5px 5.5px}
+
+  .grid{display:flex;gap:14px;flex-wrap:wrap}
+  .cell{width:96px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 6px 10px;text-align:center}
+  .cell svg{width:26px;height:26px;color:var(--text)}
+  .cell .n{font-size:9.5px;font-weight:600;color:var(--text-muted);margin-top:8px;letter-spacing:.02em}
+
+  .row16{display:flex;gap:0;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 18px;width:fit-content}
+  .row16 .slot{width:40px;display:grid;place-items:center}
+  .row16 svg{width:16px;height:16px;color:var(--text)}
+
+  .dark-panel{background:var(--rotli-cocoa);border-radius:12px;padding:14px 18px;width:fit-content;display:flex;gap:0}
+  .dark-panel .slot{width:40px;display:grid;place-items:center}
+  .dark-panel svg{width:18px;height:18px;color:#F1E7DA}
+  /* dark-ground accent lift: olive reads muddy at 1.8px strokes on cocoa — lift it (color fix only) */
+  .dark-panel svg [stroke="#8D9A76"]{stroke:#A9B78F}
+  .dark-panel svg [fill="#8D9A76"]{fill:#A9B78F}
+
+  /* pure mono: force accents to currentColor (template/tray contexts) */
+  .mono svg [stroke="#C97E62"],.mono svg [stroke="#8D9A76"]{stroke:currentColor}
+  .mono svg [fill="#C97E62"],.mono svg [fill="#8D9A76"]{fill:currentColor}
+  .mono{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 18px;width:fit-content;display:flex}
+  .mono .slot{width:40px;display:grid;place-items:center}
+  .mono svg{width:16px;height:16px;color:var(--text)}
+
+  .retired{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .ret{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px dashed var(--border);border-radius:10px;padding:8px 12px;font-size:11px;color:var(--text-muted)}
+  .ret svg{width:16px;height:16px;color:var(--text-muted);opacity:.55}
+  .ret s{margin-right:2px}
+
+  .judge{border-top:1px solid rgba(58,48,40,.18);margin-top:48px;padding-top:14px;font-size:12.5px;line-height:1.65;color:#5C5246;max-width:940px}
+  .judge b{font-family:var(--font-display);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--accent-text);margin-right:10px}
+  .judge li{display:block;margin:0 0 6px 18px;list-style:disc}
+</style>
+</head>
+<body>
+<!-- ——— the re-cut sprite (draft v2 — becomes kits/rotli/icons/ on approval) ——— -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <!-- modules -->
+  <symbol id="i-notes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h6" stroke="#C97E62"/><path d="M8 12h8"/><path d="M8 16h5"/>
+  </symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 11.8a8.3 8.3 0 0 1-8.9 8.3 8.5 8.5 0 0 1-3.5-.8L3.2 21l1.9-5.4A8.3 8.3 0 1 1 21 11.8Z"/>
+    <path d="M8.6 11.8h6.8" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="i-voice" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="2.5" width="6" height="11.5" rx="3"/>
+    <path d="M5 10.5v1.5a7 7 0 0 0 14 0v-1.5"/><path d="M12 19v2.5"/>
+    <circle cx="12" cy="8" r="1.2" fill="#C97E62" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="i-memory" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 4.5a4 4 0 0 0-3.9 3 3.5 3.5 0 0 0-2.4 4.4A3.3 3.3 0 0 0 6.3 17c.4 1.5 1.8 2.5 3.3 2.3a3.1 3.1 0 0 0 2.4-1.3 3.1 3.1 0 0 0 2.4 1.3c1.5.2 2.9-.8 3.3-2.3a3.3 3.3 0 0 0 .6-5.1A3.5 3.5 0 0 0 15.9 7.5a4 4 0 0 0-3.9-3Z"/>
+    <path d="M12 4.5V18" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 12.5h-5.5l-2 3h-5l-2-3H2"/>
+    <path d="M5.5 5.6 2 12.5V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.5l-3.5-6.9A2 2 0 0 0 16.7 4.5H7.3a2 2 0 0 0-1.8 1.1Z"/>
+    <circle cx="18.5" cy="8" r="1.3" fill="#C97E62" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="i-board" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3.5" y="3.5" width="7" height="9.5" rx="1.8"/><rect x="14" y="3.5" width="6.5" height="5.5" rx="1.8"/>
+    <rect x="14" y="12.5" width="6.5" height="8" rx="1.8" fill="#C97E62" stroke="#C97E62"/><rect x="3.5" y="16.5" width="7" height="4" rx="1.8"/>
+  </symbol>
+  <!-- supports -->
+  <symbol id="i-capture" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/>
+    <path d="M12 8.5v7M8.5 12h7" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="i-tags" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4Z"/>
+    <circle cx="7.5" cy="7.5" r="1.5" fill="#C97E62" stroke="#C97E62"/>
+  </symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/>
+  </symbol>
+  <symbol id="i-sync" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4.5 9.5a7.5 7.5 0 0 1 12.8-3.4" stroke="#C97E62"/><path d="M17.5 2.5v3.8h-3.8" stroke="#C97E62"/>
+    <path d="M19.5 14.5a7.5 7.5 0 0 1-12.8 3.4" stroke="#8D9A76"/><path d="M6.5 21.5v-3.8h3.8" stroke="#8D9A76"/>
+  </symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 6.5h7.6M18.4 6.5H20"/><circle cx="15.1" cy="6.5" r="2.1"/>
+    <path d="M4 12h1.7M12.4 12H20"/><circle cx="9.1" cy="12" r="2.1" stroke="#C97E62"/>
+    <path d="M4 17.5h5.7M16.4 17.5H20"/><circle cx="13.1" cy="17.5" r="2.1"/>
+  </symbol>
+  <!-- retired (reference only) -->
+  <symbol id="x-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M8 3v3M16 3v3M3.5 9.5h17"/></symbol>
+  <symbol id="x-sheets" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/></symbol>
+  <symbol id="x-transcript" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10V14M9.5 8V16M13 5V19M16.5 8V16M20 10V14"/></symbol>
+  <symbol id="x-reminder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5a5 5 0 0 0-5 5c0 4-1.2 5.2-2 6.5h14c-.8-1.3-2-2.5-2-6.5a5 5 0 0 0-5-5Z"/></symbol>
+  <symbol id="x-action" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="6" height="6" rx="1.5"/><path d="M12.5 7h7.5"/><rect x="3.5" y="14" width="6" height="6" rx="1.5"/><path d="M12.5 17h7.5"/></symbol>
+  <symbol id="x-quick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-7l-4 3v-3H6a2 2 0 0 1-2-2z"/></symbol>
+</svg>
+
+<div class="page">
+  <div class="gate-head">
+    <img src="../../../../kits/rotli/logo/wordmark.svg" alt="rotli">
+    <span class="meta">icon re-cut to module truth · 2026-06-11 · gate (live SVGs — pre-freeze)</span>
+  </div>
+  <p class="gate-sub">
+    The set re-cut to what rotli actually is: <strong>six module icons + five supports</strong>, same family as the approved draft
+    (24-grid · 1.8 stroke · outline · currentColor · one sparing clay/olive accent each). Kept untouched from the approved draft:
+    Notes, Tags, Search, Sync. New: Chat, Voice, Memory, Inbox, Board, Capture, Settings. Retired: Calendar, Sheets, Transcript,
+    Reminder, Action Items, Quick Notes (Capture replaces it).
+  </p>
+
+  <h2>The eleven — 26px on white</h2>
+  <p class="sub">Modules first, supports after.</p>
+  <div class="grid">
+    <div class="cell"><svg><use href="#i-notes"/></svg><div class="n">Notes</div></div>
+    <div class="cell"><svg><use href="#i-chat"/></svg><div class="n">Chat</div></div>
+    <div class="cell"><svg><use href="#i-voice"/></svg><div class="n">Voice</div></div>
+    <div class="cell"><svg><use href="#i-memory"/></svg><div class="n">Memory</div></div>
+    <div class="cell"><svg><use href="#i-inbox"/></svg><div class="n">Inbox</div></div>
+    <div class="cell"><svg><use href="#i-board"/></svg><div class="n">Board</div></div>
+    <div class="cell"><svg><use href="#i-capture"/></svg><div class="n">Capture</div></div>
+    <div class="cell"><svg><use href="#i-tags"/></svg><div class="n">Tags</div></div>
+    <div class="cell"><svg><use href="#i-search"/></svg><div class="n">Search</div></div>
+    <div class="cell"><svg><use href="#i-sync"/></svg><div class="n">Sync</div></div>
+    <div class="cell"><svg><use href="#i-settings"/></svg><div class="n">Settings</div></div>
+  </div>
+
+  <h2>The survival floor — 16px</h2>
+  <p class="sub">Sidebar/list size. Every glyph must stay itself here.</p>
+  <div class="row16">
+    <div class="slot"><svg><use href="#i-notes"/></svg></div><div class="slot"><svg><use href="#i-chat"/></svg></div>
+    <div class="slot"><svg><use href="#i-voice"/></svg></div><div class="slot"><svg><use href="#i-memory"/></svg></div>
+    <div class="slot"><svg><use href="#i-inbox"/></svg></div><div class="slot"><svg><use href="#i-board"/></svg></div>
+    <div class="slot"><svg><use href="#i-capture"/></svg></div><div class="slot"><svg><use href="#i-tags"/></svg></div>
+    <div class="slot"><svg><use href="#i-search"/></svg></div><div class="slot"><svg><use href="#i-sync"/></svg></div>
+    <div class="slot"><svg><use href="#i-settings"/></svg></div>
+  </div>
+
+  <h2>Mono — accents collapse to ink (tray / template contexts)</h2>
+  <p class="sub">Same SVGs, accents forced to currentColor. This is the knockout test.</p>
+  <div class="mono">
+    <div class="slot"><svg><use href="#i-notes"/></svg></div><div class="slot"><svg><use href="#i-chat"/></svg></div>
+    <div class="slot"><svg><use href="#i-voice"/></svg></div><div class="slot"><svg><use href="#i-memory"/></svg></div>
+    <div class="slot"><svg><use href="#i-inbox"/></svg></div><div class="slot"><svg><use href="#i-board"/></svg></div>
+    <div class="slot"><svg><use href="#i-capture"/></svg></div><div class="slot"><svg><use href="#i-tags"/></svg></div>
+    <div class="slot"><svg><use href="#i-search"/></svg></div><div class="slot"><svg><use href="#i-sync"/></svg></div>
+    <div class="slot"><svg><use href="#i-settings"/></svg></div>
+  </div>
+
+  <h2>On cocoa — 18px</h2>
+  <p class="sub">Dark-ground check; clay and olive both clear AA on cocoa.</p>
+  <div class="dark-panel">
+    <div class="slot"><svg><use href="#i-notes"/></svg></div><div class="slot"><svg><use href="#i-chat"/></svg></div>
+    <div class="slot"><svg><use href="#i-voice"/></svg></div><div class="slot"><svg><use href="#i-memory"/></svg></div>
+    <div class="slot"><svg><use href="#i-inbox"/></svg></div><div class="slot"><svg><use href="#i-board"/></svg></div>
+    <div class="slot"><svg><use href="#i-capture"/></svg></div><div class="slot"><svg><use href="#i-tags"/></svg></div>
+    <div class="slot"><svg><use href="#i-search"/></svg></div><div class="slot"><svg><use href="#i-sync"/></svg></div>
+    <div class="slot"><svg><use href="#i-settings"/></svg></div>
+  </div>
+
+  <h2>Retired</h2>
+  <p class="sub">From the draft set — they named features rotli refuses or duplicates.</p>
+  <div class="retired">
+    <div class="ret"><svg><use href="#x-calendar"/></svg><s>Calendar</s> — “not a calendar” (VISION)</div>
+    <div class="ret"><svg><use href="#x-sheets"/></svg><s>Sheets</s> — no tables; Board absorbed the grid idea</div>
+    <div class="ret"><svg><use href="#x-transcript"/></svg><s>Transcript</s> — Voice owns it; waveform lives inside Voice surfaces</div>
+    <div class="ret"><svg><use href="#x-quick"/></svg><s>Quick Notes</s> — replaced by Capture (bubble read as Chat)</div>
+    <div class="ret"><svg><use href="#x-reminder"/></svg><s>Reminder</s> — future notification surface; revisit at Inbox phase</div>
+    <div class="ret"><svg><use href="#x-action"/></svg><s>Action Items</s> — checkboxes live in the editor, not a destination</div>
+  </div>
+
+  <div class="judge"><b>Judge</b><ul>
+    <li><strong>Memory</strong> — the two-lobe brain with the clay center seam (“the spark of recall”). The hardest glyph at 16px; check it first.</li>
+    <li><strong>Voice</strong> — mic with a clay dot in the capsule. <strong>Chat</strong> — bubble with a clay line (echoes Notes' clay first-line; one family gesture).</li>
+    <li><strong>Capture</strong> — card with clay plus (replaces Quick Notes; the old bubble collided with Chat).</li>
+    <li><strong>Settings</strong> — sliders with one clay knob (the gear died at 16px; sliders also say “everything rebindable”).</li>
+    <li><strong>Inbox</strong> — tray with a clay unread dot. <strong>Board</strong> — four tiles, one clay-filled (kept from the approved Sheets aesthetic).</li>
+    <li>Accent budget: exactly one clay element per icon (Sync keeps its approved clay+olive pair — the one two-hue exception, it IS the sync semantic).</li>
+    <li>On approval these become <code>kits/rotli/icons/rotli-icons.sprite.svg</code> v2 + 11 source files → then <strong>KIT FREEZE</strong>.</li>
+  </ul></div>
+</div>
+</body>
+</html>

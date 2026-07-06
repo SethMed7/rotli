@@ -416,6 +416,18 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
+/* the "pinned to top" marker on an All-notes row — a quiet accent pin sitting
+   just left of the date (Seth, 2026-07-06). margin-left:auto so it rides the
+   right edge next to the date even when the snippet is short. */
+.rr-pin {
+  flex: 0 0 auto;
+  align-self: center;
+  margin-left: auto;
+  color: var(--accent-text);
+}
+.rr-pin + .rr-date {
+  margin-left: 8px;
+}
 
 /* Full-text search: the matched span inside a snippet (All notes rows + the
    ⌘K palette hint). Quiet tint, never the browser-default yellow — low pulse. */

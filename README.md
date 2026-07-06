@@ -7,7 +7,7 @@
 
 **A warm, local-first notes app that lives in your Mac's menu bar.**
 
-*One brain, six fronts — Notes writes it, Chat talks with it, Voice speaks it,<br>the Memory recalls it, Inbox and Board feed it.*
+*Your notes folder **is** a memex — one local folder for your notes, chats, and knowledge.<br>Three fronts over it: **Notes** you write · **Chat** you talk with · **Inbox** for your email.*
 
 <img src="docs/media/rotli-warm-light.png" alt="rotli — Warm Light" width="760">
 
@@ -19,13 +19,14 @@
 
 Most tools have a resting pulse that's too high — badges, pings, sidebars that never quite close. rotli makes no demands. **You summon it (`⌥Space`), it's there. You dismiss it, it's gone.** No dock icon, no ⌘Tab entry, no noise. Only your work has a pulse.
 
-And your work is **yours**: every note is a plain markdown file in `~/Documents/rotli`. Folders on disk are folders in the sidebar. Open them in any editor, back them up however you like, keep them forever. rotli is just a warm window onto them.
+And your work is **yours**: every note is a plain markdown file in a single local folder you choose — one folder that *is* your memex. Folders on disk are folders in the sidebar. Open them in any editor, back them up however you like, keep them forever. rotli is just a warm window onto them.
 
 ```
-~/Documents/rotli/
-  Inbox/
-    welcome-to-rotli-…md     ← plain markdown, a 4-line frontmatter (id · created · updated · pinned)
-  Work/
+your notes folder/           ← one folder = your memex; openable in any editor
+  a-note.md                  ← plain markdown + a small frontmatter (id · created · updated …)
+  wiki/                      ← the AI-organized "brain" (People · Projects · Research …)
+  chats/                     ← your AI conversations
+  storage/                   ← files · images · PDFs, referenced from notes
   .rotli/                    ← settings · view state · index — delete it, lose nothing but a rebuild
 ```
 
@@ -34,7 +35,7 @@ And your work is **yours**: every note is a plain markdown file in `~/Documents/
 - **The editor** — hybrid markdown: the line under your caret shows raw syntax, everything else renders. `- ` starts a list and `Enter` continues it, `[ ]` + space makes a checkbox, and a quiet 11-control format bar floats below. Typography (`Aa`) is a styling layer — never written into your files.
 - **Panes & tabs** — split with the titlebar buttons or `⌘D`/`⌘⇧D`, tabs with `⌘T`; one tab means zero tab chrome. Everything drag-resizable, everything remembered.
 - **⌘K** — notes and every action in one palette, recents first.
-- **Quick capture** — `⌥C` from anywhere on your Mac: one breath, type, `⏎` — the thought is a file in Inbox.
+- **Quick capture** — `⌥C` from anywhere on your Mac: one breath, type, `⏎` — the thought is a note in Captures, and the AI files it into the right area later.
 - **Autosave** — the olive dot. No spinners, ever.
 - **Every hotkey rebindable** — one registry, searchable in Settings.
 
@@ -73,10 +74,11 @@ cargo test          # the corpus layer (run inside src-tauri/)
 | | |
 |---|---|
 | ✅ | Shell · panes & tabs · hybrid editor · ⌘K · themes & liquid glass |
-| ✅ | **The corpus** — plain files, atomic writes, fs watcher, persistence |
-| ⏳ | The index — SQLite FTS5; ⌘K becomes true full-text search |
-| ⏳ | Dictation — bundled local STT (Parakeet), cleanup by default → **v1** |
-| 🌅 | Chat · Voice · the Memory · Inbox · Board |
+| ✅ | **Your notes folder is a memex** — plain files, atomic writes, fs watcher, persistence |
+| ✅ | **Search** — full-text across your notes (titles + bodies), instant |
+| ✅ | **Chat** — on-device by default, or your own connected models (Claude Code · Codex · Antigravity CLIs); your notes are its knowledge base |
+| ✅ | **The brain** — an on-device organizer files your captures into areas (People · Projects · Research), fully journaled + undoable |
+| ⏳ | **Inbox** — a calm layer over your own email |
 
 ---
 

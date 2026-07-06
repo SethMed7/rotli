@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="rotli">
+  <!-- rotli r-mark — knockout / reversed master (white on dark). -->
+  <path d="M23 51 L23 24 C23 13.5 43 12.5 46 27"
+        fill="none" stroke="#FFFFFF" stroke-width="9"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

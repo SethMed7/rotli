@@ -801,6 +801,7 @@ pub fn run() {
             corpus::corpus_raw_frontmatter,
             corpus::corpus_write_frontmatter_raw,
             corpus::corpus_set_locked,
+            corpus::corpus_set_pinned,
             corpus::corpus_set_field,
             corpus::corpus_set_ai_field,
             corpus::corpus_file_note,

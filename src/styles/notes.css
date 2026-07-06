@@ -132,6 +132,12 @@
   color: var(--text-muted);
   cursor: pointer;
 }
+/* only the FIRST add-icon takes the auto margin — the pair then rides the right
+   edge together, 8px apart (the row gap). Both taking `margin-left:auto` split
+   the free space BETWEEN them, stranding one mid-row (Seth, 2026-07-06). */
+.frow-add + .frow-add {
+  margin-left: 0;
+}
 .frow-add svg {
   display: block;
 }

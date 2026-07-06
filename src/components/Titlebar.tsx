@@ -18,6 +18,7 @@ import { IconButton } from "./IconButton";
 import { QuokkaMark } from "./Character";
 import {
   PlusGlyph,
+  SearchGlyph,
   SidebarGlyph,
   SplitDownGlyph,
   SplitRightGlyph,
@@ -83,8 +84,9 @@ export function Titlebar() {
       ) : (
         // the module dropdown is retired (Seth, 2026-06-26): the left menu's three
         // sections (Inbox · Chat · Notes) ARE the navigation now. The identity is a
-        // plain home wordmark — click returns to the note panes.
-        <div className="identity-wrap centered">
+        // plain home mark, LEFT-aligned beside the sidebar toggle (Seth, 2026-07-06:
+        // logo + search live together at the top) — click returns to the note panes.
+        <div className="identity-wrap">
           <button
             type="button"
             className="identity home"
@@ -95,11 +97,29 @@ export function Titlebar() {
           </button>
         </div>
       )}
+      {/* global search (Seth, 2026-07-06): a top search field beside the logo —
+          opens the ⌘K command palette (search every note + every action). The
+          surrounding strip stays a window-drag region; the button stops its own
+          mousedown so a click never starts a drag. */}
       <div
-        className="tb-spacer"
+        className="tb-mid"
         onMouseDown={onDragRegionMouseDown}
         onDoubleClick={onDragRegionDoubleClick}
-      />
+      >
+        {!settingsOpen && (
+          <button
+            type="button"
+            className="tb-search"
+            aria-label="Search notes & actions — ⌘K"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={() => dispatch("palette.toggle")}
+          >
+            <SearchGlyph size={14} />
+            <span className="tb-search-label">Search…</span>
+            <kbd className="tb-search-kbd">⌘K</kbd>
+          </button>
+        )}
+      </div>
       <div className="tb-actions">
         {/* panes & tabs, visible (Seth 2026-06-12: keyboard-only is not discoverable) */}
         {!settingsOpen && (

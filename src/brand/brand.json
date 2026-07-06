@@ -2,10 +2,10 @@
   "slug": "rotli",
   "name": "rotli",
   "nameCasing": "lowercase always — never \"Rotli\" or \"ROTLI\" in UI/copy",
-  "status": "marks APPROVED (gate round 3, 2026-06-11) — freeze pending Seth's board sign-off (kit.json not yet written)",
+  "status": "SHIPPED — marks approved (gate round 3, 2026-06-11), board frozen, kit.json written. This is the live, app-embedded kit (src/brand/, v0.24.4).",
   "source": "Seth-approved brand board 2026-06-06, regenerated 2026-06-10 (../../engine/BRANDS/rotli/_reference/brand-board.png; intake run ../../engine/RUNS/rotli/2026-06-10-board-intake/)",
   "identity": {
-    "what": "A modular, hotkey-driven, local-first productivity app for Mac — Notes · Inbox · Wiki · Voice · Board in one menu-bar shell. Bundles its own LLM/STT/TTS; nothing to install but rotli.",
+    "what": "A warm, local-first, hotkey-driven notes app for Mac — one menu-bar shell where your notes folder *is* a memex (one folder: notes · chats · knowledge · files). Three fronts: Inbox (emails) · Chat (AI chats) · Notes (Capture · the AI-organized 'brain' wiki areas · Storage · Boards). AI rides your own CLI subscriptions (claude/codex/agy) or a local MLX model — rotli bundles no LLM/STT/TTS and has no separate Voice front (dictation lives in a sibling app, voz).",
     "essence": "Warm, quiet, instant — a visitor on your screen, not a resident.",
     "oneIdea": "Cognitive quiet — it holds what matters and gets out of your way.",
     "oneWord": "Quiet",
@@ -46,7 +46,7 @@
     "body": "General Sans",
     "bodyNote": "Regular (400) / Medium (500) for UI + body; legible at small sizes.",
     "fallback": "Inter, system-ui",
-    "license": "Fontshare (Indian Type Foundry) Free Font License — free for personal AND commercial use. Self-host. NOT OFL and NOT in smLab's Fontsource catalog (Mona Sans/Figtree/Inter) — a deliberate, Seth-approved deviation for rotli; record in LICENSES.md at freeze.",
+    "license": "Fontshare (Indian Type Foundry) Free Font License — free for personal AND commercial use. Self-host. NOT OFL and NOT in the studio's standard Fontsource catalog (Mona Sans/Figtree/Inter) — a deliberate, Seth-approved deviation for rotli; recorded in LICENSES.md.",
     "rejected": "Cabin 600 — the prior rotli direction; retired.",
     "tokens": "tokens/type.css",
     "wordmarkOutlined": "logo/wordmark.svg (to be formalized — ships as outlined paths, no runtime font dependency)"

@@ -5,7 +5,7 @@
 import type { MouseEvent, ReactNode } from "react";
 import type { NoteSummary } from "../types";
 import { longDateLabel } from "../lib/dateLabels";
-import { glyphForNote } from "./glyphs";
+import { glyphForNote, PinGlyph } from "./glyphs";
 
 export function NoteListRow({
   note,
@@ -46,6 +46,7 @@ export function NoteListRow({
         ) : (
           note.snippet && <span className="rr-snippet">{note.snippet}</span>
         )}
+        {note.pinned && <PinGlyph size={13} className="rr-pin" filled />}
         <span className="rr-date">{longDateLabel(note.updatedAt)}</span>
       </button>
     </li>

@@ -1,0 +1,47 @@
+/* rotli — textures. Matte + warm (lamplit, organic). Opacities sit below conscious perception:
+   the surface should feel like paper, never look like a texture. */
+
+:root {
+  --ro-linen: #F8F2E9;
+  --ro-cocoa: #3A3028;
+  --ro-dark: #241D18;
+  --ro-clay: #C97E62;
+  --ro-peach: #F2D6C2;
+  --ro-olive: #8D9A76;
+}
+
+/* 1 · paper grain — one soft monochrome turbulence overlay for any field.
+   Apply .ro-grain to a position:relative section; the grain rides on top, pointer-events none. */
+.ro-grain { position: relative; }
+.ro-grain::after {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23g)' opacity='0.5'/%3E%3C/svg%3E");
+  background-size: 240px 240px;
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+}
+.ro-dark-field.ro-grain::after { mix-blend-mode: screen; opacity: 0.04; }
+
+/* 2 · grounds — warm fields with a breath of light (code-only fallbacks for the imagery) */
+.ro-linen-field { background: radial-gradient(120% 90% at 50% 0%, #FDF9F2 0%, var(--ro-linen) 58%, #F1E7D8 100%); }
+.ro-dark-field  { background: radial-gradient(110% 95% at 22% 8%, #2E2620 0%, var(--ro-dark) 62%, #1E1813 100%); color: #F1E7DA; }
+.ro-peach-field { background: linear-gradient(180deg, var(--ro-peach) 0%, var(--ro-linen) 100%); }
+
+/* 3 · dot-grid + curl pattern fields — currentColor-tintable via mask (use sparingly) */
+.ro-dots {
+  -webkit-mask-image: url("pattern/dot-grid.svg");
+  mask-image: url("pattern/dot-grid.svg");
+  -webkit-mask-size: 48px 48px;
+  mask-size: 48px 48px;
+  background: currentColor;
+  opacity: 0.06;
+}
+
+/* 4 · scrims — WCAG-safe type over imagery (cocoa ink on light art; linen on dark art) */
+.ro-scrim-light { background: linear-gradient(180deg, rgba(248,242,233,0) 0%, rgba(248,242,233,0.82) 55%, rgba(248,242,233,0.95) 100%); }
+.ro-scrim-dark  { background: linear-gradient(180deg, rgba(36,29,24,0) 0%, rgba(36,29,24,0.78) 55%, rgba(36,29,24,0.94) 100%); }
+
+/* 5 · soft warm shadow (shape language: gentle warm shadows over hard borders) */
+.ro-shadow { box-shadow: 0 10px 30px rgba(58, 48, 40, 0.10), 0 2px 8px rgba(58, 48, 40, 0.06); }

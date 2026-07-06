@@ -1,0 +1,244 @@
+---
+import Base from '../layouts/Base.astro';
+import quokka from '../assets/quokka.svg?raw';
+
+// TODO(seth): set the real release download URL. Placeholder '#download' for now.
+// When the notarized DMG is on rotli-releases, point this at the GitHub latest asset
+// (e.g. https://github.com/SethMed7/rotli/releases/latest/download/rotli.dmg).
+const DOWNLOAD_URL = '#download';
+
+// TODO(seth): confirm the public repo URL. rotli's repo is SethMed7/rotli (currently private).
+const GITHUB_URL = 'https://github.com/SethMed7/rotli';
+
+const features = [
+  {
+    title: 'your notes, a memex',
+    body: 'one folder holds it all — notes, chats, knowledge, files. plain files on your Mac, yours to keep.',
+  },
+  {
+    title: 'three fronts',
+    body: 'inbox for email, chat for your models, notes for capture and the quietly-organized brain.',
+  },
+  {
+    title: 'low-pulse',
+    body: '⌥Space and it’s there. dismiss it and it’s gone. no dock icon, no badges, no fuss.',
+  },
+];
+---
+<Base>
+  <!-- (1) slim top bar -->
+  <header class="topbar">
+    <span class="brand">
+      <span class="logo-mark logo-sm" set:html={quokka} />
+      <span class="wordmark">rotli</span>
+    </span>
+    <a class="ghlink" href={GITHUB_URL} rel="noopener">GitHub</a>
+  </header>
+
+  <main>
+    <!-- (2) hero — the quokka mark IS the logo -->
+    <section class="hero">
+      <span class="logo-mark logo-lg" set:html={quokka} />
+      <h1 class="hero-mark">rotli</h1>
+      <p class="tagline">Warm. Quiet. Instant.</p>
+      <p class="subhead">
+        A local-first notes app that lives in your Mac’s menu bar —
+        summon it, write, dismiss it.
+      </p>
+      <div class="cta">
+        <a class="btn btn-primary" href={DOWNLOAD_URL}>Download for Mac</a>
+        <a class="btn btn-secondary" href={GITHUB_URL} rel="noopener">View on GitHub</a>
+      </div>
+    </section>
+
+    <!-- (3) hero screenshot in a soft frame -->
+    <section class="shot-wrap">
+      <div class="shot-frame">
+        <img
+          src="/rotli-warm-light.png"
+          alt="rotli open in the menu bar — a warm, calm notes window"
+          width="1280"
+          loading="eager"
+        />
+      </div>
+    </section>
+
+    <!-- (4) quiet 3-item feature row -->
+    <section class="features">
+      {features.map((f) => (
+        <div class="feature">
+          <h3>{f.title}</h3>
+          <p>{f.body}</p>
+        </div>
+      ))}
+    </section>
+  </main>
+
+  <!-- (5) tiny footer -->
+  <footer class="footer">
+    <span class="logo-mark footer-mark" set:html={quokka} />
+    <span>© rotli</span>
+    <span class="dot">·</span>
+    <span>local-first</span>
+  </footer>
+
+  <style>
+    header, main, .footer {
+      max-width: var(--maxw);
+      margin-inline: auto;
+      padding-inline: 1.5rem;
+    }
+
+    /* ---- logo mark sizes ---- */
+    .logo-sm { width: 26px; }
+    .logo-lg { width: 108px; margin: 0 auto 0.4rem; }
+    .footer-mark { width: 18px; opacity: 0.7; }
+
+    /* ---- top bar ---- */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-block: 1.25rem;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+    }
+    .wordmark {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.35rem;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    .ghlink {
+      text-decoration: none;
+      font-weight: 500;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      transition: color 0.15s ease;
+    }
+    .ghlink:hover { color: var(--text); }
+
+    /* ---- hero ---- */
+    .hero {
+      text-align: center;
+      padding-top: 4.5rem;
+      padding-bottom: 3rem;
+    }
+    .hero-mark {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: clamp(3rem, 10vw, 5rem);
+      line-height: 1;
+      margin: 0;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .tagline {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: clamp(1.1rem, 3.5vw, 1.5rem);
+      color: var(--text);
+      margin: 1rem 0 0;
+    }
+    .subhead {
+      max-width: 34rem;
+      margin: 1rem auto 0;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+    }
+    .cta {
+      display: flex;
+      gap: 0.9rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 2.25rem;
+    }
+    .btn {
+      display: inline-block;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 1rem;
+      padding: 0.7rem 1.4rem;
+      border-radius: 0.7rem;
+      border: 1px solid transparent;
+      transition: transform 0.12s ease, opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+    .btn:active { transform: translateY(1px); }
+    /* mono accent = near-black on paper / near-white on charcoal → high contrast */
+    .btn-primary {
+      background: var(--accent);
+      color: var(--on-accent);
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-secondary {
+      color: var(--text);
+      border-color: var(--border);
+      background: var(--surface);
+    }
+    .btn-secondary:hover { border-color: var(--text); }
+
+    /* ---- screenshot ---- */
+    .shot-wrap {
+      max-width: calc(var(--maxw) + 4rem);
+      margin: 1rem auto 0;
+      padding-inline: 1.5rem;
+    }
+    .shot-frame {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1.1rem;
+      padding: 0.75rem;
+      box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+    }
+    .shot-frame img {
+      width: 100%;
+      height: auto;
+      border-radius: 0.6rem;
+    }
+
+    /* ---- features ---- */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2.5rem;
+      padding-block: 6rem 4rem;
+    }
+    .feature h3 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.15rem;
+      margin: 0 0 0.5rem;
+      color: var(--text);
+    }
+    .feature p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+    @media (max-width: 640px) {
+      .features {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+        padding-block: 4rem 3rem;
+      }
+      .hero { padding-top: 3rem; }
+    }
+
+    /* ---- footer ---- */
+    .footer {
+      display: flex;
+      gap: 0.6rem;
+      justify-content: center;
+      align-items: center;
+      padding-block: 3rem 4rem;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .footer .dot { opacity: 0.5; }
+  </style>
+</Base>
