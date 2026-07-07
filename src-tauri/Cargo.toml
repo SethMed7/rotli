@@ -37,3 +37,9 @@ tempfile = "3"                                                   # atomic writes
 trash = "5"                                                     # delete = OS trash, never a hard rm
 uuid = { version = "1", features = ["v4"] }                     # mx_<uuid> ids for a rotli-initiated memex
 security-framework = "3"                                        # Keychain-backed secrets (Gemini API key) — never argv/ps/config
+
+# macOS-only: swap the Dock/app icon at runtime (Settings → Appearance → App icon)
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSResponder"] }
+objc2-foundation = { version = "0.3", features = ["NSData"] }

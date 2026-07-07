@@ -71,6 +71,8 @@ export const GLASS_CANVASES: { value: GlassCanvas; label: string }[] = [
  * Suggest (default) = journal proposals only · Tidy = applies annotations +
  * files brand-new captures · Organize = applies everything, fully journaled. */
 export type OrganizerTrust = "off" | "suggest" | "tidy" | "organize";
+/** The macOS Dock/app icon variants (Settings → Appearance → App icon). */
+export type AppIcon = "default" | "warm" | "paper" | "charcoal" | "clay";
 
 export const ORGANIZER_TRUSTS: readonly OrganizerTrust[] = ["off", "suggest", "tidy", "organize"];
 
@@ -356,6 +358,10 @@ interface UiState {
    * (default), Date, or Folder (raw on-disk). Persisted. */
   storageGrouping: "type" | "date" | "folder";
   setStorageGrouping: (g: "type" | "date" | "folder") => void;
+  /** The macOS Dock/app icon variant (Settings → Appearance). "default" is the
+   * shipped icon; the rest re-tile the quokka in a theme palette. Persisted. */
+  appIcon: AppIcon;
+  setAppIcon: (v: AppIcon) => void;
   /** "Show file metadata" (Seth, 2026-07-01): render the note's raw frontmatter
    * block at the top of the file — monospaced, editable, exactly as it sits on
    * disk — instead of the old panel field list. hide (default) / show. Persisted. */
@@ -569,6 +575,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setImageEngine: (e) => set({ imageEngine: e }),
   storageGrouping: "type",
   setStorageGrouping: (g) => set({ storageGrouping: g }),
+  appIcon: "default",
+  setAppIcon: (v) => set({ appIcon: v }),
   fileMetadata: "hide",
   setFileMetadata: (v) => set({ fileMetadata: v }),
   // Organize by default (Seth, 2026-07-02): the daemon only ever changes a

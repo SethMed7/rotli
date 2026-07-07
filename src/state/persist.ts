@@ -204,6 +204,8 @@ interface PersistedSettings {
   imageEngine: "codex" | "agy";
   /** How the Storage destination groups its binaries: Type / Date / Folder. */
   storageGrouping: "type" | "date" | "folder";
+  /** The macOS Dock/app icon variant. */
+  appIcon: "default" | "warm" | "paper" | "charcoal" | "clay";
   /** Raw frontmatter at the top of the note (Show file metadata): hide / show. */
   fileMetadata: "hide" | "show";
   /** The organizer daemon's §4.3 trust rung; the Rust daemon re-reads this file
@@ -360,6 +362,13 @@ export function parseSettings(raw: string): PersistedSettings {
       data.storageGrouping === "date" || data.storageGrouping === "folder"
         ? data.storageGrouping
         : "type",
+    appIcon:
+      data.appIcon === "warm" ||
+      data.appIcon === "paper" ||
+      data.appIcon === "charcoal" ||
+      data.appIcon === "clay"
+        ? data.appIcon
+        : "default",
     // hide is the safe default — metadata never surprises a fresh (or old) config
     fileMetadata: data.fileMetadata === "show" ? "show" : "hide",
     // Organize is the DEFAULT rung (Seth, 2026-07-02): the daemon only ever
@@ -437,6 +446,7 @@ function applySettings(s: PersistedSettings): void {
     blockedModels: s.blockedModels,
     imageEngine: s.imageEngine,
     storageGrouping: s.storageGrouping,
+    appIcon: s.appIcon,
     fileMetadata: s.fileMetadata,
     organizerTrust: s.organizerTrust,
     organizerModel: s.organizerModel,
@@ -787,6 +797,7 @@ function settingsSnapshot(): string {
     blockedModels: ui.blockedModels,
     imageEngine: ui.imageEngine,
     storageGrouping: ui.storageGrouping,
+    appIcon: ui.appIcon,
     fileMetadata: ui.fileMetadata,
     organizerTrust: ui.organizerTrust,
     organizerModel: ui.organizerModel,

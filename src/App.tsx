@@ -38,6 +38,7 @@ import {
   onRebind,
   onSummonChat,
   onThemeSet,
+  setAppIcon,
   setDockVisible,
   setHideOnBlur,
 } from "./lib/tauri";
@@ -496,6 +497,11 @@ export default function App() {
   // the quick-access set is kept in step across webviews (the same pattern) —
   // the quick window emits its edits, the main window records + persists them
   useEffect(() => onQuickSet(applyQuickState), []);
+
+  // apply the persisted Dock/app icon on startup (macOS; no-op elsewhere)
+  useEffect(() => {
+    if (isTauri()) void setAppIcon(useUiStore.getState().appIcon);
+  }, []);
 
   if (surface === "capture") return <CaptureCard />;
   if (surface === "quick") return <QuickNote />;

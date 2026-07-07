@@ -654,6 +654,37 @@ fn set_dock_visible(app: AppHandle, visible: bool) {
     let _ = (app, visible);
 }
 
+/// Swap the macOS Dock/app icon at runtime (Settings → Appearance → App icon).
+/// The variant PNGs are compiled in; "default" (or any unknown value) resets to
+/// the bundle icon. AppKit's setApplicationIconImage must run on the main thread.
+#[tauri::command]
+fn set_app_icon(app: AppHandle, variant: String) {
+    #[cfg(target_os = "macos")]
+    {
+        let bytes: Option<Vec<u8>> = match variant.as_str() {
+            "warm" => Some(include_bytes!("../icons/variants/warm.png").to_vec()),
+            "paper" => Some(include_bytes!("../icons/variants/paper.png").to_vec()),
+            "charcoal" => Some(include_bytes!("../icons/variants/charcoal.png").to_vec()),
+            "clay" => Some(include_bytes!("../icons/variants/clay.png").to_vec()),
+            _ => None, // "default" → the bundle icon (nil clears the override)
+        };
+        let _ = app.run_on_main_thread(move || {
+            use objc2::{AllocAnyThread, MainThreadMarker};
+            use objc2_app_kit::{NSApplication, NSImage};
+            use objc2_foundation::NSData;
+            let Some(mtm) = MainThreadMarker::new() else { return };
+            let ns_app = NSApplication::sharedApplication(mtm);
+            let image = bytes.as_ref().and_then(|b| {
+                let data = NSData::with_bytes(b);
+                NSImage::initWithData(NSImage::alloc(), &data)
+            });
+            unsafe { ns_app.setApplicationIconImage(image.as_deref()) };
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, variant);
+}
+
 /// Re-register a global chord (the keys registry calls this when a global
 /// action is rebound); `None` unbinds it OS-side. Keeps the old chord if the
 /// new one fails to register — and returns Err so the frontend does NOT
@@ -783,6 +814,7 @@ pub fn run() {
             set_summon_shortcut,
             set_hide_on_blur,
             set_dock_visible,
+            set_app_icon,
             corpus::corpus_list,
             corpus::corpus_search,
             corpus::corpus_read,

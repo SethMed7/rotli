@@ -1128,6 +1128,66 @@
   opacity: 0.5;
   cursor: default;
 }
+/* app-icon picker (Settings → Appearance → App icon) */
+.appicon-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.appicon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+}
+.appicon-tile {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  transition: transform var(--motion-exit) var(--motion-ease);
+}
+.appicon:hover .appicon-tile {
+  transform: translateY(-1px);
+}
+.appicon.sel .appicon-tile {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+}
+.appicon-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.appicon.sel .appicon-label {
+  color: var(--text);
+  font-weight: 600;
+}
+.appicon-tile--default {
+  background: var(--appicon-default-tile);
+  color: var(--appicon-default-ink);
+}
+.appicon-tile--paper {
+  background: var(--appicon-paper-tile);
+  color: var(--appicon-paper-ink);
+}
+.appicon-tile--charcoal {
+  background: var(--appicon-charcoal-tile);
+  color: var(--appicon-charcoal-ink);
+}
+.appicon-tile--clay {
+  background: var(--appicon-clay-tile);
+  color: var(--appicon-clay-ink);
+}
+
 /* an inline "Coming soon" pill for a section heading (Seth, 2026-07-07) */
 .soon-inline {
   font-size: 10px;

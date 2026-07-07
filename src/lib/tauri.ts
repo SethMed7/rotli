@@ -84,6 +84,12 @@ export async function setDockVisible(visible: boolean): Promise<void> {
   await invoke("set_dock_visible", { visible });
 }
 
+/** Swap the macOS Dock/app icon at runtime. "default" resets to the bundle icon. */
+export async function setAppIcon(variant: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("set_app_icon", { variant });
+}
+
 /** Manual drag (instead of data-tauri-drag-region) so double-clicking the
  * titlebar never triggers the built-in maximize/zoom. */
 export async function startWindowDrag(): Promise<void> {

@@ -21,6 +21,16 @@
   --swatch-blush: #c386a5;
   --swatch-clay: var(--rotli-clay);
   --swatch-olive: var(--rotli-olive);
+
+  /* app-icon picker tiles — fixed palettes, theme-independent (Settings → App icon) */
+  --appicon-default-tile: #f8f2e9;
+  --appicon-default-ink: #3a3028;
+  --appicon-paper-tile: #ffffff;
+  --appicon-paper-ink: #161616;
+  --appicon-charcoal-tile: #1f1e1c;
+  --appicon-charcoal-ink: #e9e7e2;
+  --appicon-clay-tile: #c97e62;
+  --appicon-clay-ink: #f8f2e9;
 }
 
 /* — MONO · paper (light) — */

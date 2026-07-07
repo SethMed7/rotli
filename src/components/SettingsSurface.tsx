@@ -40,6 +40,7 @@ import {
   secretDelete,
   secretExists,
   secretStore,
+  setAppIcon,
   setDockVisible,
   setHideOnBlur,
   systemProfile,
@@ -70,6 +71,7 @@ import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinat
 import { resetAndReonboard } from "../state/onboarding";
 import { setQuickFolderSynced } from "../state/quick";
 import {
+  type AppIcon,
   GLASS_BACKGROUNDS,
   GLASS_BLURS,
   GLASS_TINTS,
@@ -87,7 +89,7 @@ import {
   PlusGlyph,
   SunGlyph,
 } from "./glyphs";
-import { Character, type CharacterName } from "./Character";
+import { Character, type CharacterName, QuokkaMark } from "./Character";
 import {
   useChooseFolder,
   useConnectBrain,
@@ -612,6 +614,15 @@ const TINT_SWATCH: Record<string, string> = {
   olive: "var(--swatch-olive)",
 };
 
+/** Dock/app icon options — the quokka re-tiled in a few palettes. "default" is
+ * the shipped icon; colors live in themes.css (the appicon-tile-- classes). */
+const APP_ICONS: { id: AppIcon; label: string }[] = [
+  { id: "default", label: "Default" },
+  { id: "paper", label: "Paper" },
+  { id: "charcoal", label: "Charcoal" },
+  { id: "clay", label: "Clay" },
+];
+
 function AppearancePane() {
   const theme = useUiStore((s) => s.theme);
   const setTheme = useUiStore((s) => s.setTheme);
@@ -632,6 +643,8 @@ function AppearancePane() {
   const setGlassClarity = useUiStore((s) => s.setGlassClarity);
   const glassBlur = useUiStore((s) => s.glassBlur);
   const setGlassBlur = useUiStore((s) => s.setGlassBlur);
+  const appIcon = useUiStore((s) => s.appIcon);
+  const setAppIconState = useUiStore((s) => s.setAppIcon);
   const followingSystem = theme === "system";
   // Glass is shelved as "coming soon" — if it was enabled before, don't leave the
   // app stuck in glass now that the toggle is disabled (Seth, 2026-07-07).
@@ -705,6 +718,30 @@ function AppearancePane() {
             </div>
           </div>
         ))}
+
+      <h4 className="sethead">App icon</h4>
+      <p className="lead">
+        Pick the Dock icon — it shows when <b>Show in the Dock</b> is on.
+      </p>
+      <div className="appicon-row" role="radiogroup" aria-label="App icon">
+        {APP_ICONS.map(({ id, label }) => (
+          <button
+            type="button"
+            key={id}
+            className={appIcon === id ? "appicon sel" : "appicon"}
+            aria-pressed={appIcon === id}
+            onClick={() => {
+              setAppIconState(id);
+              void setAppIcon(id);
+            }}
+          >
+            <span className={`appicon-tile appicon-tile--${id}`}>
+              <QuokkaMark size={26} />
+            </span>
+            <span className="appicon-label">{label}</span>
+          </button>
+        ))}
+      </div>
 
       <h4 className="sethead">
         Liquid Glass <span className="soon-inline">Coming soon</span>
