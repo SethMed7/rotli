@@ -93,10 +93,10 @@ const promises = [
     <!-- (3) hero screenshot -->
     <section class="shot-wrap">
       <div class="shot-frame">
-        <img class="shot shot-warm-light" src="/rotli-app-warm-light.png" alt="rotli in Warm Light" width="2000" height="1258" loading="eager" />
-        <img class="shot shot-warm-dark" src="/rotli-app-warm-dark.png" alt="rotli in Warm Dark" width="2000" height="1258" loading="lazy" />
-        <img class="shot shot-soft-light" src="/rotli-app-paper.png" alt="rotli in Paper (soft light)" width="2000" height="1258" loading="lazy" />
-        <img class="shot shot-soft-dark" src="/rotli-app-charcoal.png" alt="rotli in Charcoal (soft dark)" width="2000" height="1258" loading="lazy" />
+        <img class="shot shot-warm-light" src="/rotli-app-warm-light.png" alt="rotli in Warm Light" width="1994" height="1250" loading="eager" />
+        <img class="shot shot-warm-dark" src="/rotli-app-warm-dark.png" alt="rotli in Warm Dark" width="1994" height="1250" loading="lazy" />
+        <img class="shot shot-soft-light" src="/rotli-app-paper.png" alt="rotli in Paper (soft light)" width="1994" height="1250" loading="lazy" />
+        <img class="shot shot-soft-dark" src="/rotli-app-charcoal.png" alt="rotli in Charcoal (soft dark)" width="1994" height="1250" loading="lazy" />
       </div>
     </section>
 
@@ -325,7 +325,10 @@ const promises = [
       overflow: hidden;
       box-shadow: 0 40px 80px -44px rgba(0, 0, 0, 0.45), 0 12px 28px -20px rgba(0, 0, 0, 0.25);
     }
-    .shot-frame img { width: 100%; height: auto; display: block; }
+    /* NB: no `display` here — the four .shot images are toggled by the theme
+       selectors in Base.astro (.shot { display:none } + one match → block); a
+       `display:block` on this selector would out-specify them and show all four. */
+    .shot-frame img { width: 100%; height: auto; }
 
     /* ---- three fronts ---- */
     .features {
