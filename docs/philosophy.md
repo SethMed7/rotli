@@ -58,7 +58,7 @@ The screen is an LCD; the light is direct; the default of most apps is blue and 
 
 - Light mode is warm linen, never pure white.
 - Dark mode is warm dark, never clinical gray.
-- A near-zero-blue night mode is amber-brown — for late-night use when even dark mode is too stimulating.
+- A neutral pair — **Paper** (simple white & ink) and **Charcoal** — sits alongside the warm two for a cooler, quieter ground: four themes in all, with a **Liquid Glass** mode layerable over any of them.
 - The clay accent marks moments, never the whole interface. One signature, not a theme park.
 
 **Design rule:** after thirty minutes of use, your eyes should feel like you've been reading a book, not looking at a monitor. If a surface violates that feeling, redesign it.

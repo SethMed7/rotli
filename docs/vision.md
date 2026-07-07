@@ -85,7 +85,7 @@ We don't ship features that make the app more capable at the cost of making it f
 Data lives on your Mac as plain files. The cloud is a convenience, not a requirement. Sync, when it exists, is a relay — never the source of truth. If it disappears, rotli keeps working forever.
 
 ### 3. Warmth is the brand
-Every surface is warm. Every default is the kind option for your eyes. The linen light mode, the clay accent, the near-zero-blue night mode — these are the same across every surface. The user's eyes never get a jolt when switching.
+Every surface is warm. Every default is the kind option for your eyes. The linen light mode, the clay accent, the warm dark — and the neutral Paper and Charcoal when you want a cooler ground — are the same across every surface. The user's eyes never get a jolt when switching.
 
 ### 4. Personal before team
 Solo-use works perfectly before any team features show up. Collaboration layers on later; it never compromises the solo experience. If a collab feature would make the solo version worse, it gets cut, not ship-anyway-with-a-setting.
@@ -125,7 +125,7 @@ That's the feature. The quokka is smiling. You made more progress than you thoug
 
 ## What this doc is not
 
-- **Not a roadmap** — see [next-stages.md](./next-stages.md) for sequencing.
+- **Not a roadmap** — sequencing lives in the `docs/design/` specs.
 - **Not the object model** — [model.md](./model.md) owns the canonical objects and vocabulary.
 - **Not a design system** — [design-system.md](./design-system.md) owns visual rules.
 - **Not immutable** — if the vision shifts, this doc gets rewritten. Don't patch; replace.

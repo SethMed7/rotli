@@ -6,7 +6,7 @@ Source of truth: the vendored brand kit at `src/brand/tokens/` (`colors.css` · 
 
 ## The soul
 
-Cognitive quiet · warmth as the brand · everything instant · local-first as a feeling · every control earns its place · the quokka principle (every icon labeled, every hotkey rebindable) · warm light, warm dark, and a near-zero-blue night mode (plus a liquid-glass mode over any of them).
+Cognitive quiet · warmth as the brand · everything instant · local-first as a feeling · every control earns its place · the quokka principle (every icon labeled, every hotkey rebindable) · the four themes — Warm Light, Warm Dark, Paper, Charcoal — plus a Liquid Glass mode (tints: Dusk · Blush · Clay · Olive) layerable over any of them.
 
 ## Color
 
@@ -27,7 +27,7 @@ Semantic surfaces (see `src/brand/tokens/colors.css` for the full set + the cont
   `#F2D6C2`.
 - **Dark (warm, never clinical):** ground `#241D18` · surface `#2E2620` · surface-2 `#392F28` · text
   `#F1E7DA` · muted `#B7A593` · border `#3D3229` · accent Clay `#C97E62` (clears AA on the cocoa ground).
-- **Night Paper:** amber-brown, near-zero blue. Every value warm; if it has blue in it, it doesn't belong.
+- **Two families, four themes:** the warm pair above (Warm Light · Warm Dark) keeps every value warm — if it has blue in it, it doesn't belong; the neutral pair (**Paper** · **Charcoal**) runs the same layout at near-zero saturation for a cooler, quieter ground.
 
 Rules: no pure white in light mode (use Linen / `#FFFFFF` cards). No pure black for UI (Cocoa is the ink).
 Clay is punctuation — never body text, never two clay elements competing at once. Borders translucent +

@@ -202,10 +202,12 @@ Filer** (v3.7) is the second actor: it writes the curated `wiki/<area>/` brain �
 generated `wiki/<area>/_index.md` — through its own narrower gate, and it must skip any
 `locked` note. The two lanes are disjoint: you never write the curated brain, the Filer
 never writes your Main arrangement. So: **you capture + arrange, the AI organizes; neither
-overwrites the other.** The Filer's daemon is **the organizer** (above): at the default
-**Suggest** rung it writes *only* its two `.rotli/` sidecars (journal proposals + state)
-— the corpus files are provably untouched until you approve, or climb the ladder. Full
-spec: `docs/design/main-brain-daemon.md`.
+overwrites the other.** The Filer's daemon is **the organizer** (above): how much it writes
+rides the **trust ladder**. At the default **Organize** rung *(since 0.24.1)* it applies
+filings + metadata straight to the brain — every change journaled to `.rotli/` and
+undoable in Activity, never a note's words. Drop to **Suggest** and it writes *only* its
+two `.rotli/` sidecars (journal proposals + state), the corpus files provably untouched
+until you approve. Full spec: `docs/design/main-brain-daemon.md`.
 
 ## Vocabulary — say this, not that
 
