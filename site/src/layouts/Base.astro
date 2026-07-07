@@ -24,10 +24,10 @@ const {
         const r = document.documentElement;
         const m = localStorage.getItem('rotli-mode');
         const f = localStorage.getItem('rotli-family');
-        r.dataset.mode = m === 'light' || m === 'dark'
-          ? m
-          : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        r.dataset.family = f === 'warm' || f === 'soft' ? f : 'soft';
+        // Default is Warm Light — the app's own default look. Honor a stored
+        // preference if the visitor has toggled before; otherwise warm + light.
+        r.dataset.mode = m === 'light' || m === 'dark' ? m : 'light';
+        r.dataset.family = f === 'warm' || f === 'soft' ? f : 'warm';
       } catch (e) {}
     </script>
     <style is:global>
@@ -36,14 +36,14 @@ const {
       @font-face { font-family: 'General Sans'; src: url('/fonts/GeneralSans-Semibold.woff2') format('woff2'); font-weight: 600; font-display: swap; }
       @font-face { font-family: 'Baloo 2'; src: url('/fonts/Baloo2-600.ttf') format('truetype'); font-weight: 600; font-display: swap; }
 
-      /* base tokens + fallback palette (soft light) for the no-JS case */
+      /* base tokens + fallback palette (WARM LIGHT — the default) for the no-JS case */
       :root {
         --font-body: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         --font-display: 'Baloo 2', var(--font-body);
         --maxw: 62rem;
-        --ground: #fafaf9; --surface: #ffffff; --surface-2: #f5f5f4; --tint: #ececea;
-        --text: #161616; --text-muted: #6b6b68; --border: #e6e6e3;
-        --accent: #161616; --accent-text: #161616; --on-accent: #ffffff;
+        --ground: #f8f2e9; --surface: #ffffff; --surface-2: #f1e7d8; --tint: #f2d6c2;
+        --text: #3a3028; --text-muted: #6e6155; --border: #e7dbc9;
+        --accent: #c97e62; --accent-text: #8f4e37; --on-accent: #ffffff;
       }
 
       /* ── SOFT · light (Paper) ── */

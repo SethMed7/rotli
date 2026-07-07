@@ -1,12 +1,20 @@
 ---
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import Base from '../layouts/Base.astro';
 import quokka from '../assets/quokka.svg?raw';
 import waving from '../assets/waving.svg?raw';
 import staysLocal from '../assets/stays_local.svg?raw';
 
-// the release feed — always the newest signed build (never a version-stamped
-// asset URL, which would break each release).
-const DOWNLOAD_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
+// The download always tracks the NEWEST build: the version is read at build time
+// from the app's own package.json (the single source of truth release.sh ships),
+// so the button links straight to that release's DMG — never a hand-typed, stale
+// version. Rebuilding the site after a release picks up the new version for free.
+const VERSION = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../../../package.json', import.meta.url)), 'utf8'),
+).version;
+const DOWNLOAD_URL = `https://github.com/SethMed7/rotli-releases/releases/download/v${VERSION}/rotli_${VERSION}_aarch64.dmg`;
+const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
 const GITHUB_URL = 'https://github.com/SethMed7/rotli';
 // the open foundation for how rotli organizes data
 const MEMEX_URL = 'https://github.com/SethMed7/memex';
@@ -77,15 +85,18 @@ const promises = [
         <a class="btn btn-primary" href={DOWNLOAD_URL} rel="noopener">Download for Mac</a>
         <a class="btn btn-secondary" href={GITHUB_URL} rel="noopener">View on GitHub</a>
       </div>
+      <p class="cta-meta">
+        macOS · Apple Silicon · <a href={RELEASES_URL} rel="noopener">v{VERSION}</a>
+      </p>
     </section>
 
     <!-- (3) hero screenshot -->
     <section class="shot-wrap">
       <div class="shot-frame">
-        <img class="shot shot-warm-light" src="/rotli-app-warm-light.png" alt="rotli in Warm Light" width="1360" loading="eager" />
-        <img class="shot shot-warm-dark" src="/rotli-app-warm-dark.png" alt="rotli in Warm Dark" width="1360" loading="eager" />
-        <img class="shot shot-soft-light" src="/rotli-app-paper.png" alt="rotli in Paper (soft light)" width="1360" loading="eager" />
-        <img class="shot shot-soft-dark" src="/rotli-app-charcoal.png" alt="rotli in Charcoal (soft dark)" width="1360" loading="eager" />
+        <img class="shot shot-warm-light" src="/rotli-app-warm-light.png" alt="rotli in Warm Light" width="2000" height="1258" loading="eager" />
+        <img class="shot shot-warm-dark" src="/rotli-app-warm-dark.png" alt="rotli in Warm Dark" width="2000" height="1258" loading="lazy" />
+        <img class="shot shot-soft-light" src="/rotli-app-paper.png" alt="rotli in Paper (soft light)" width="2000" height="1258" loading="lazy" />
+        <img class="shot shot-soft-dark" src="/rotli-app-charcoal.png" alt="rotli in Charcoal (soft dark)" width="2000" height="1258" loading="lazy" />
       </div>
     </section>
 
@@ -270,6 +281,19 @@ const promises = [
       flex-wrap: wrap;
       margin-top: 2rem;
     }
+    .cta-meta {
+      margin: 0.9rem 0 0;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .cta-meta a {
+      color: var(--text-muted);
+      text-decoration: none;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1px;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+    .cta-meta a:hover { color: var(--text); border-color: var(--text); }
     .btn {
       display: inline-block;
       text-decoration: none;
