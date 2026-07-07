@@ -16,15 +16,7 @@ import { corpusOverview, isTauri } from "../lib/tauri";
 import { useDetectMemex } from "../memex/useMemex";
 import { pickFolder } from "../memex/service";
 import { useMemexStore } from "../state/memex";
-import { GLASS_TINTS, SOLID_THEMES, type GlassTint, type ThemeFamily, useUiStore } from "../state/ui";
-
-/** Tint swatch tokens (mirrors Settings → Appearance). */
-const TINT_SWATCH: Record<string, string> = {
-  dusk: "var(--swatch-dusk)",
-  blush: "var(--swatch-blush)",
-  clay: "var(--swatch-clay)",
-  olive: "var(--swatch-olive)",
-};
+import { SOLID_THEMES, type ThemeFamily, useUiStore } from "../state/ui";
 
 // Appearance FIRST (right after the greeting) so you pick a theme before walking the
 // rest of setup — never trudge through the flow in a theme that hurts your eyes (Seth).
@@ -305,8 +297,6 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const setThemeFamily = useUiStore((s) => s.setThemeFamily);
   const glassMode = useUiStore((s) => s.glassMode);
   const setGlassMode = useUiStore((s) => s.setGlassMode);
-  const glassTint = useUiStore((s) => s.glassTint);
-  const setGlassTint = useUiStore((s) => s.setGlassTint);
 
   // Record the choice only; App applies the Dock policy + hide-on-blur when
   // onboarding FINISHES — changing either live can kill the frameless window (#1).
@@ -404,10 +394,10 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           <div className="onb-step">
             <h1 className="onb-title">Pick a look</h1>
             <p className="onb-sub">
-              Four base themes — the titlebar sun cycles them. Turn on Liquid Glass for floating
-              panels over a tint.
+              Four base themes — the titlebar sun cycles between them. Pick the one that feels
+              right; you can change it any time in Settings.
             </p>
-            <div className={glassMode ? "famrow dim" : "famrow"}>
+            <div className="famrow">
               {SOLID_THEMES.map(({ family, mode, label }) => {
                 const selected = !glassMode && themeFamily === family && theme === mode;
                 return (
@@ -417,6 +407,11 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                     className={selected ? "famcard sel" : "famcard"}
                     aria-pressed={selected}
                     onClick={() => {
+                      // Onboarding picks a SOLID base look — Liquid Glass is an
+                      // advanced mode discovered in Settings, never offered here
+                      // (Seth, 2026-07-07). Choosing a card also drops out of glass
+                      // so the preview never lies about what you picked.
+                      if (glassMode) setGlassMode(false);
                       setThemeFamily(family as ThemeFamily);
                       setTheme(mode);
                     }}
@@ -431,56 +426,6 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                   </button>
                 );
               })}
-            </div>
-            <div className="onb-glass">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={glassMode}
-                className={glassMode ? "onb-glass-toggle on" : "onb-glass-toggle"}
-                onClick={() => setGlassMode(!glassMode)}
-              >
-                <span className="onb-glass-text">
-                  <span className="onb-glass-title">Liquid Glass</span>
-                  <span className="onb-glass-desc">
-                    Floating glass panels over a tint — a mode layered on your theme.
-                  </span>
-                </span>
-                <span className="sw" aria-hidden="true">
-                  <span className="swknob" />
-                </span>
-              </button>
-              {glassMode && (
-                <>
-                  <div className="onb-glass-modes" role="radiogroup" aria-label="Glass mode">
-                    {(["light", "dark"] as const).map((m) => (
-                      <button
-                        type="button"
-                        key={m}
-                        className={theme === m ? "onb-glass-mode sel" : "onb-glass-mode"}
-                        aria-pressed={theme === m}
-                        onClick={() => setTheme(m)}
-                      >
-                        {m === "light" ? "Glass Light" : "Glass Dark"}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="onb-tints" role="radiogroup" aria-label="Glass tint">
-                    {GLASS_TINTS.map(({ value, label }) => (
-                      <button
-                        type="button"
-                        key={value}
-                        className={glassTint === value ? "onb-tint sel" : "onb-tint"}
-                        aria-pressed={glassTint === value}
-                        onClick={() => setGlassTint(value as GlassTint)}
-                      >
-                        <i style={{ background: TINT_SWATCH[value] }} aria-hidden="true" />
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
             </div>
           </div>
         )}
@@ -499,34 +444,46 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           </div>
         )}
 
+        {/* Footer is a locked frame: dots + Skip on the left, Back + the primary
+            button pinned right. Back always holds its slot (hidden on welcome) and
+            the primary button has a fixed width, so Continue never shifts between
+            steps — it sits in exactly the same place the whole way through (Seth,
+            2026-07-07). Skip lives on the LEFT so its coming and going can't nudge
+            the right cluster either. */}
         <div className="onb-foot">
-          <div className="onb-dots" aria-hidden="true">
-            {STEPS.map((s, n) => (
-              <span key={s} className={n === i ? "onb-dot on" : "onb-dot"} />
-            ))}
-          </div>
-          <div className="onb-actions">
+          <div className="onb-lead">
+            <div className="onb-dots" aria-hidden="true">
+              {STEPS.map((s, n) => (
+                <span key={s} className={n === i ? "onb-dot on" : "onb-dot"} />
+              ))}
+            </div>
             {i > 0 && i < last && step !== "memory" && (
               <button type="button" className="onb-skip" onClick={() => setStep("memory")}>
                 Skip setup
               </button>
             )}
-            {i > 0 && (
-              <button type="button" className="onb-btn ghost" onClick={() => go(-1)}>
-                Back
-              </button>
-            )}
+          </div>
+          <div className="onb-actions">
+            <button
+              type="button"
+              className={i > 0 ? "onb-btn ghost" : "onb-btn ghost onb-hidden"}
+              onClick={() => go(-1)}
+              tabIndex={i > 0 ? 0 : -1}
+              aria-hidden={i > 0 ? undefined : true}
+            >
+              Back
+            </button>
             {i < last ? (
               <button
                 type="button"
-                className="onb-btn"
+                className="onb-btn onb-primary"
                 disabled={needsLocation}
                 onClick={() => go(1)}
               >
-                {i === 0 ? "Get started" : needsLocation ? "Choose where rotli lives" : "Continue"}
+                {i === 0 ? "Get started" : "Continue"}
               </button>
             ) : (
-              <button type="button" className="onb-btn" onClick={finish}>
+              <button type="button" className="onb-btn onb-primary" onClick={finish}>
                 Start using rotli
               </button>
             )}

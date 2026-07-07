@@ -2,12 +2,12 @@
 
 The always-loaded index. (demo)
 
-## wiki/projects
-- [[q3-priorities]] — the three things that must land this quarter
-- [[gateway-migration]] — Elavon → Lithic, the cutover plan
+## wiki/guides
+- [[welcome-to-rotli]] — start here; what rotli is and a few things to try
+- [[main-and-the-brain]] — one file, two ways to reach it
 
-## wiki/research
-- [[ai-coding-tools]] — the landscape, March 2026
+## wiki/ideas
+- [[note-taking-that-lasts]] — plain files, one folder, yours
 
-## wiki/people
-- [[nathalia]] — wife; the person behind every good decision
+## wiki/reading
+- [[local-first-software]] — data you own, that works offline

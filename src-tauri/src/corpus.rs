@@ -240,18 +240,27 @@ pub fn write_corpus_config(app: &tauri::AppHandle, cfg: &CorpusConfig) -> Result
 // The demo memex is marked `"demo": true` in its own memex.json, so onboarding /
 // memex_detect skip it (it's never offered as a real memex to connect).
 
-/// The bundled seed content, written into memex-demo on first activation.
+/// Bump when the seed content changes so an already-seeded demo memex re-seeds on
+/// next activation (Seth, 2026-07-07 — v2 is the public, rotli-about-rotli seed).
+const DEMO_SEED_VERSION: &str = "2";
+
+/// The bundled seed content, written into memex-demo on first activation. It is a
+/// PUBLIC demo — general, about rotli itself, nothing personal (it ships in
+/// screenshots and demos). `.rotli/main.json` seeds a hand-arranged Main so the
+/// demo shows the same note reachable two ways: in Main (your view) and in the
+/// Brain (where it lives).
 const DEMO_SEED: &[(&str, &str)] = &[
     ("memex.json", include_str!("../demo-seed/memex.json")),
     ("MAP.md", include_str!("../demo-seed/MAP.md")),
     ("inbox.md", include_str!("../demo-seed/inbox.md")),
-    ("wiki/projects/q3-priorities.md", include_str!("../demo-seed/wiki/projects/q3-priorities.md")),
-    ("wiki/projects/gateway-migration.md", include_str!("../demo-seed/wiki/projects/gateway-migration.md")),
-    ("wiki/research/ai-coding-tools.md", include_str!("../demo-seed/wiki/research/ai-coding-tools.md")),
-    ("wiki/people/nathalia.md", include_str!("../demo-seed/wiki/people/nathalia.md")),
-    ("wiki/_inbox/lunch.md", include_str!("../demo-seed/wiki/_inbox/lunch.md")),
-    ("wiki/_inbox/call-bank.md", include_str!("../demo-seed/wiki/_inbox/call-bank.md")),
-    ("chats/plan-the-week.md", include_str!("../demo-seed/chats/plan-the-week.md")),
+    (".rotli/main.json", include_str!("../demo-seed/main.json")),
+    ("wiki/guides/welcome-to-rotli.md", include_str!("../demo-seed/wiki/guides/welcome-to-rotli.md")),
+    ("wiki/guides/main-and-the-brain.md", include_str!("../demo-seed/wiki/guides/main-and-the-brain.md")),
+    ("wiki/ideas/note-taking-that-lasts.md", include_str!("../demo-seed/wiki/ideas/note-taking-that-lasts.md")),
+    ("wiki/reading/local-first-software.md", include_str!("../demo-seed/wiki/reading/local-first-software.md")),
+    ("wiki/_inbox/try-quick-capture.md", include_str!("../demo-seed/wiki/_inbox/try-quick-capture.md")),
+    ("wiki/_inbox/weekend-project.md", include_str!("../demo-seed/wiki/_inbox/weekend-project.md")),
+    ("chats/getting-started.md", include_str!("../demo-seed/chats/getting-started.md")),
 ];
 
 /// Scaffold the seeded demo memex at `root` (idempotent — overwrites the seed).
@@ -291,11 +300,20 @@ pub fn demo_root(app: &tauri::AppHandle) -> Option<PathBuf> {
     parent.map(|d| d.join("memex-demo"))
 }
 
-/// Ensure the demo memex exists + is seeded (idempotent — re-seeds if missing).
+/// Ensure the demo memex exists + is seeded (idempotent). Re-seeds when the folder
+/// isn't a memex yet OR the bundled seed version changed — so shipping new demo
+/// content refreshes an already-seeded `memex-demo` on the next activation. A
+/// seed-version stamp in `.rotli/` records what's on disk.
 fn ensure_demo_memex(app: &tauri::AppHandle) -> Option<PathBuf> {
     let demo = demo_root(app)?;
-    if !is_memex_root(&demo) {
+    let stamp = demo.join(DOT_DIR).join("demo-seed-version");
+    let current = fs::read_to_string(&stamp).ok();
+    if !is_memex_root(&demo) || current.as_deref() != Some(DEMO_SEED_VERSION) {
         let _ = seed_demo_memex(&demo);
+        if let Some(p) = stamp.parent() {
+            let _ = fs::create_dir_all(p);
+        }
+        let _ = fs::write(&stamp, DEMO_SEED_VERSION);
     }
     Some(demo)
 }
@@ -4043,12 +4061,39 @@ pub fn corpus_overview(state: tauri::State<'_, CorpusState>) -> Result<CorpusOve
     state.route(&default_id, |s| s.overview())
 }
 
+/// Demo mode swaps the NOTES memex but must not touch per-machine chrome: the
+/// user's look and — crucially — the `onboarded` flag live in settings.json /
+/// viewstate.json / background.json, which we keep reading from and writing to the
+/// REAL corpus's `.rotli/` so a demo never forces re-onboarding or resets the theme
+/// (Seth, 2026-07-07). `main.json` is per-MEMEX (it travels with the notes), so it
+/// is deliberately NOT redirected — it still routes to the active (demo) store.
+fn demo_machine_dot_path(app: &tauri::AppHandle, file: &str) -> Option<PathBuf> {
+    if !demo_active(app) {
+        return None;
+    }
+    if !matches!(file, "settings" | "viewstate" | "background") {
+        return None;
+    }
+    let real = read_corpus_config(app)?.corpus.abs_path;
+    let name = dot_file(file).ok()?;
+    Some(real.join(DOT_DIR).join(name))
+}
+
 #[tauri::command]
 pub fn corpus_settings_read(
+    app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
     file: String,
 ) -> Result<String, String> {
-    // settings/viewstate/background live in the DEFAULT root's `.rotli/`.
+    // settings/viewstate/background live in the DEFAULT root's `.rotli/` — except in
+    // demo mode, where per-machine chrome stays with the user's real corpus (#3).
+    if let Some(path) = demo_machine_dot_path(&app, &file) {
+        return match fs::read_to_string(&path) {
+            Ok(s) => Ok(s),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),
+            Err(e) => Err(format!("read {file}: {e}")),
+        };
+    }
     let default_id = state
         .0
         .lock()
@@ -4060,6 +4105,7 @@ pub fn corpus_settings_read(
 
 #[tauri::command]
 pub fn corpus_settings_write(
+    app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
     file: String,
     contents: String,
@@ -4067,6 +4113,14 @@ pub fn corpus_settings_write(
     // #44: the write whitelist is NARROWER than the read table — `organizer`
     // (daemon-owned) and `main` (corpus_main_write's job) are refused here.
     user_dot_writable(&file)?;
+    // demo mode: per-machine chrome writes land on the real corpus, never the demo
+    // memex — so tweaking the look mid-demo persists to the user's real config (#3).
+    if let Some(path) = demo_machine_dot_path(&app, &file) {
+        if let Some(p) = path.parent() {
+            fs::create_dir_all(p).map_err(|e| e.to_string())?;
+        }
+        return atomic_write(&path, &contents);
+    }
     let default_id = state
         .0
         .lock()
@@ -5614,12 +5668,18 @@ mod tests {
         store.os_trash = false;
         assert_eq!(store.layout, Layout::Memex);
 
-        // create/write are refused outside the writable chats/ surface…
-        assert!(store.create_board("self", None).is_err());
+        // ⌘⇧N from a non-writable folder (e.g. the hidden self/) no longer FAILS —
+        // it STAGES the board into wiki/_inbox so a board always lands (Seth,
+        // 2026-07-07). write_board takes an explicit path with no such redirect, so
+        // a hidden root is still refused outright.
+        let staged = store.create_board("self", None).unwrap();
+        assert_eq!(staged.kind, NoteKind::Board);
+        assert_eq!(staged.folder_id, "wiki/_inbox");
         assert!(store.write_board("self/x.excalidraw", "{}").is_err());
-        // …and allowed inside chats/ (rotli's owned surface)
+        // …and a board created directly on chats/ (rotli's owned surface) stays there
         let meta = store.create_board("chats", None).unwrap();
         assert_eq!(meta.kind, NoteKind::Board);
+        assert_eq!(meta.folder_id, "chats");
         assert!(store.read_board(&meta.id).unwrap().body.contains("excalidraw"));
 
         // read is gated too: a board that physically sits under a hidden root

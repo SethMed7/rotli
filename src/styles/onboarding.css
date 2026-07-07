@@ -156,6 +156,11 @@
   gap: 12px;
   margin-top: 6px;
 }
+.onb-lead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 .onb-dots {
   display: flex;
   align-items: center;
@@ -229,95 +234,15 @@
   margin: 0;
 }
 
-/* #3 — Liquid Glass option under the theme cards */
-.famrow.dim .famcard {
-  opacity: 0.5;
+/* the primary button holds ONE fixed width across every step so its label can
+   swap (Get started → Continue → Start using rotli) without the button — and the
+   Back button beside it — ever shifting position (Seth, 2026-07-07). */
+.onb-primary {
+  min-width: 160px;
 }
-.onb-glass {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 4px;
-}
-.onb-glass-toggle {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-card);
-  background: var(--surface);
-  cursor: pointer;
-  text-align: left;
-}
-.onb-glass-toggle.on {
-  border-color: var(--accent);
-  background: var(--tint);
-}
-.onb-glass-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.onb-glass-title {
-  font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 650;
-  color: var(--text);
-}
-.onb-glass-desc {
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--text-muted);
-}
-.onb-tints {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.onb-tint {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 11px 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  background: var(--surface);
-  font-family: var(--font-body);
-  font-size: 12.5px;
-  color: var(--text);
-  cursor: pointer;
-}
-.onb-tint.sel {
-  border-color: var(--accent);
-  background: var(--tint);
-}
-.onb-tint i {
-  width: 14px;
-  height: 14px;
-  border-radius: var(--r-pill);
-  display: inline-block;
-}
-.onb-glass-modes {
-  display: flex;
-  gap: 8px;
-}
-.onb-glass-mode {
-  flex: 1;
-  padding: 9px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
-  background: var(--surface);
-  font-family: var(--font-body);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text);
-  cursor: pointer;
-}
-.onb-glass-mode.sel {
-  border-color: var(--accent);
-  background: var(--tint);
+/* Back keeps its slot on the welcome step (no button, but the space is reserved)
+   so the primary button doesn't slide right when Back appears on step two. */
+.onb-hidden {
+  visibility: hidden;
+  pointer-events: none;
 }

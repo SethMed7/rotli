@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "tree": [
+    { "note": "demo-welcome" },
+    { "note": "demo-brain" },
+    { "note": "demo-ideas" },
+    {
+      "folder": "Reading",
+      "children": [{ "note": "demo-reading" }]
+    }
+  ]
+}

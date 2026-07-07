@@ -10,6 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.8] — 2026-07-07
+
+Onboarding + demo-mode polish.
+
+### Fixed
+
+- **Demo mode no longer forces you through onboarding.** It swaps only the notes
+  memex now — your per-machine settings (look, shortcuts, and the onboarded flag)
+  keep reading your real corpus, so turning demo on just changes what notes you're
+  looking at, temporarily.
+
+### Changed
+
+- **Onboarding no longer offers Liquid Glass.** "Pick a look" is four solid base
+  themes; Liquid Glass stays an advanced mode you discover in Settings.
+- **Onboarding's Continue button is locked in place.** Skip moved next to the
+  progress dots, Back holds its slot on the welcome step, and the primary button
+  has a fixed width — so Continue never shifts between steps.
+- **The seeded demo library is public and about rotli itself.** Replaced the
+  personal/work sample notes with a general getting-started set (Welcome, Main &
+  the Brain, note-taking, local-first) and seeded a hand-arranged **Main** so the
+  demo shows the same note reachable two ways — in Main and in the Brain.
+
 ## [0.24.7] — 2026-07-07
 
 Archive/Trash/boards work in a memex now, plus a seeded demo library.
