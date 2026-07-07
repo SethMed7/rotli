@@ -12,7 +12,7 @@ import {
 } from "../editor/commands";
 import { summonChat } from "../services/chatSummon";
 import { createRoutedNote } from "../services/createNote";
-import { invalidateNotes } from "../services/hooks";
+import { invalidateNotes, lifecycleError } from "../services/hooks";
 import { inboxFolderId, notesService } from "../services/notes";
 import { invalidateMemex } from "../memex/useMemex";
 import { captureHandle } from "../lib/captureHandle";
@@ -265,9 +265,16 @@ export function registerDefaultActions(): void {
   });
   registerAction({
     id: "boards.new",
-    title: "New board",
+    title: "New Excalidraw board",
     defaultChord: "Meta+Shift+N",
-    run: () => void newBoard(),
+    run: () =>
+      void newBoard().catch((e) =>
+        useUiStore
+          .getState()
+          .setRowActionError(
+            `Couldn’t create a board — ${e instanceof Error ? e.message : String(e)}`,
+          ),
+      ),
   });
 
   // — note lifecycle (Seth, 2026-06-13): archive / trash / restore the FOCUSED
@@ -281,7 +288,7 @@ export function registerDefaultActions(): void {
     defaultChord: "Meta+Shift+A",
     run: () => {
       const id = focusedNoteIdNow();
-      if (id) void notesService.archiveNote(id).then(invalidateNotes);
+      if (id) void notesService.archiveNote(id).then(invalidateNotes).catch(lifecycleError("archive"));
     },
   });
   registerAction({
@@ -290,7 +297,7 @@ export function registerDefaultActions(): void {
     defaultChord: null,
     run: () => {
       const id = focusedNoteIdNow();
-      if (id) void notesService.trashNote(id).then(invalidateNotes);
+      if (id) void notesService.trashNote(id).then(invalidateNotes).catch(lifecycleError("delete"));
     },
   });
   registerAction({
@@ -299,7 +306,7 @@ export function registerDefaultActions(): void {
     defaultChord: null,
     run: () => {
       const id = focusedNoteIdNow();
-      if (id) void notesService.restoreNote(id).then(invalidateNotes);
+      if (id) void notesService.restoreNote(id).then(invalidateNotes).catch(lifecycleError("restore"));
     },
   });
   // Pin / unpin the FOCUSED note (Seth, 2026-07-06: "a hotkey for pinning the

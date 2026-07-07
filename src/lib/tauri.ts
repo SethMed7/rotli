@@ -90,6 +90,18 @@ export async function setAppIcon(variant: string): Promise<void> {
   await invoke("set_app_icon", { variant });
 }
 
+/** Demo mode — swap to an isolated demo corpus (or back) + relaunch. Never
+ * touches the real corpus config, so real notes are perfectly safe. */
+export async function setDemoMode(on: boolean): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("set_demo_mode", { on });
+}
+/** Is demo mode currently on? */
+export async function demoMode(): Promise<boolean> {
+  if (!isTauri()) return false;
+  return invoke<boolean>("demo_mode");
+}
+
 /** Manual drag (instead of data-tauri-drag-region) so double-clicking the
  * titlebar never triggers the built-in maximize/zoom. */
 export async function startWindowDrag(): Promise<void> {

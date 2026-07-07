@@ -27,6 +27,7 @@ import {
   checkForUpdate,
   cliDetect,
   corpusOverview,
+  demoMode,
   downloadAndInstallUpdate,
   isTauri,
   localModelInstall,
@@ -41,6 +42,7 @@ import {
   secretExists,
   secretStore,
   setAppIcon,
+  setDemoMode,
   setDockVisible,
   setHideOnBlur,
   systemProfile,
@@ -482,6 +484,10 @@ function GeneralPane() {
   const setFileMetadata = useUiStore((s) => s.setFileMetadata);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [demo, setDemo] = useState(false);
+  useEffect(() => {
+    void demoMode().then(setDemo);
+  }, []);
   const quickFolder = useUiStore((s) => s.quickFolder);
   // The external Vault is read-mostly — quick notes never land there — and the
   // LOCAL memex's curated wiki/** + chats/ refuse note creation at the write
@@ -566,6 +572,18 @@ function GeneralPane() {
       </div>
 
       <UpdatesSection />
+
+      <h4 className="sethead">Demo mode</h4>
+      <p className="lead">
+        Switch to a separate demo library with sample content — for screenshots or trying things out.
+        Your real notes are never touched; toggling relaunches rotli.
+      </p>
+      <Toggle
+        on={demo}
+        title="Demo mode"
+        desc="Read and write a throwaway demo library instead of your real notes."
+        onChange={() => void setDemoMode(!demo)}
+      />
 
       <h4 className="sethead">Start fresh</h4>
       <p className="lead">

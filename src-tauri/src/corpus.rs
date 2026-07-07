@@ -130,6 +130,18 @@ impl RootRegistry {
 /// the unified `corpus.json`, migrating the four legacy files into it on first
 /// launch (idempotent, non-destructive).
 pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
+    // demo mode: a single isolated demo corpus — the real brains/folders are
+    // hidden and corpus.json is never touched (Seth, 2026-07-07).
+    if demo_active(app) {
+        if let Some(demo) = demo_root(app) {
+            let _ = fs::create_dir_all(&demo);
+            return vec![CorpusRoot {
+                id: DEFAULT_ROOT_ID.to_string(),
+                label: "Notes".to_string(),
+                abs_path: demo,
+            }];
+        }
+    }
     let cfg = ensure_corpus_config(app);
     let mut out: Vec<CorpusRoot> = vec![CorpusRoot {
         id: DEFAULT_ROOT_ID.to_string(),
@@ -220,10 +232,58 @@ pub fn write_corpus_config(app: &tauri::AppHandle, cfg: &CorpusConfig) -> Result
     atomic_write(&f, &json)
 }
 
+// ─── demo mode ──────────────────────────────────────────────────────────────
+// A fully-isolated throwaway corpus for screenshots/demos. A marker file
+// (`demo.on` in app_config_dir) flips it; when set, the app opens a fresh plain
+// folder (app_data_dir/rotli-demo, auto-seeded by first_run) INSTEAD of the real
+// corpus, and hides the real connected brains/folders. The user's corpus.json is
+// never read or written — flipping demo off restores everything exactly.
+
+fn demo_flag_file(app: &tauri::AppHandle) -> Option<PathBuf> {
+    use tauri::Manager;
+    app.path().app_config_dir().ok().map(|d| d.join("demo.on"))
+}
+
+/// The isolated demo corpus folder (a plain rotli folder; first_run seeds it).
+pub fn demo_root(app: &tauri::AppHandle) -> Option<PathBuf> {
+    use tauri::Manager;
+    app.path().app_data_dir().ok().map(|d| d.join("rotli-demo"))
+}
+
+/// Is demo mode currently on? (the marker file exists)
+pub fn demo_active(app: &tauri::AppHandle) -> bool {
+    demo_flag_file(app).map(|f| f.exists()).unwrap_or(false)
+}
+
+/// Turn demo mode on/off — writes/removes the marker (the caller relaunches).
+/// On enable, ensures the demo folder exists so first_run seeds it on open.
+pub fn set_demo(app: &tauri::AppHandle, on: bool) -> Result<(), String> {
+    let f = demo_flag_file(app).ok_or("no app config dir")?;
+    if on {
+        if let Some(p) = f.parent() {
+            fs::create_dir_all(p).map_err(|e| e.to_string())?;
+        }
+        if let Some(demo) = demo_root(app) {
+            fs::create_dir_all(&demo).map_err(|e| e.to_string())?;
+        }
+        fs::write(&f, b"1").map_err(|e| e.to_string())?;
+    } else {
+        let _ = fs::remove_file(&f);
+    }
+    Ok(())
+}
+
 /// The active corpus root. Reads `corpus.json`; if its path vanished (or there's
 /// no config yet) falls back so the app never opens a dead path. A blank/dead
 /// default is the white-screen failure mode — this guard is load-bearing.
 pub fn resolve_corpus(app: &tauri::AppHandle) -> PathBuf {
+    // demo mode: the isolated demo folder, never the user's real corpus
+    if demo_active(app) {
+        if let Some(demo) = demo_root(app) {
+            let _ = fs::create_dir_all(&demo);
+            return demo;
+        }
+    }
     if let Some(cfg) = read_corpus_config(app) {
         return if cfg.corpus.abs_path.exists() {
             cfg.corpus.abs_path
@@ -1503,6 +1563,14 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
     if rel == "wiki/_inbox" || rel.starts_with("wiki/_inbox/") {
         return Surface::NoteRW;
     }
+    // Archive/ + Trash/ — rotli's LIFECYCLE sinks (capitalized, matching the TS
+    // destinations + is_hidden_root). A note the user archives/trashes lands in
+    // these rotli-owned dirs at the memex root; they're never the curated
+    // knowledge, so lifecycle moves are a sanctioned write lane even in a memex.
+    // Without this, archive/trash silently no-op in a memex (Seth, 2026-07-07).
+    if is_hidden_root(rel) {
+        return Surface::NoteRW;
+    }
     // wiki/ — browsable folders; the curated rest is read-only (only _inbox writes)
     if rel == "wiki" || rel.starts_with("wiki/") {
         return Surface::NoteRO;
@@ -2709,6 +2777,15 @@ impl CorpusStore {
     /// Create a new board in `folder_id`. `body` defaults to an empty scene.
     /// Filename is a free `untitled.excalidraw` (collision-safe). id == relpath.
     pub fn create_board(&mut self, folder_id: &str, body: Option<&str>) -> Result<NoteMeta, String> {
+        // In a memex the app's default board folder ("Inbox") isn't writable — stage
+        // the board in wiki/_inbox instead so ⌘⇧N actually lands one (Seth, 2026-07-07).
+        let folder_id = if self.layout == Layout::Memex
+            && !matches!(surfaced(self.layout, folder_id), Surface::NoteRW)
+        {
+            "wiki/_inbox"
+        } else {
+            folder_id
+        };
         self.writable(folder_id)?;
         if !folder_id.is_empty() {
             validate_rel(folder_id)?;

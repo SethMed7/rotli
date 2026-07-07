@@ -8,6 +8,7 @@
 import { useCallback } from "react";
 import { corpusFrontmatter, corpusSetLocked, corpusSetPinned, corpusSetSecure } from "../lib/tauri";
 import { fileNoteToArea } from "../services/brainFiling";
+import { isEmptyNote } from "../services/mainDismiss";
 import { DEST, isSink } from "../services/destinations";
 import { invalidateNotes, useArchiveNote, useBrainAreas, useRestoreNote, useTrashNote } from "../services/hooks";
 import { useMainGcIds } from "../services/hooks";
@@ -115,13 +116,18 @@ export function useNoteMenu() {
         items.push({
           kind: "action" as const,
           label: inMain ? "Remove from Main" : "Add to Main",
-          onClick: () =>
-            setTree(
-              inMain
-                ? removeFromMain(manifest.tree, note.id)
-                : addNoteToMain(manifest.tree, note.id),
-              liveIds,
-            ),
+          onClick: () => {
+            if (inMain) {
+              setTree(removeFromMain(manifest.tree, note.id), liveIds);
+              // an empty note pulled into Main and never written in is deleted on
+              // dismiss (Seth, 2026-07-07) — otherwise just unlink from Main
+              void isEmptyNote(note.id).then((empty) => {
+                if (empty) trash.mutate(note.id);
+              });
+            } else {
+              setTree(addNoteToMain(manifest.tree, note.id), liveIds);
+            }
+          },
         });
         if (isNote) {
           items.push({

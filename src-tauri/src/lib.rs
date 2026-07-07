@@ -685,6 +685,20 @@ fn set_app_icon(app: AppHandle, variant: String) {
     let _ = (app, variant);
 }
 
+/// Turn demo mode on/off — swap the app to an isolated demo corpus (or back to
+/// the real one), then relaunch. The user's real corpus config is never touched.
+#[tauri::command]
+fn set_demo_mode(app: AppHandle, on: bool) -> Result<(), String> {
+    corpus::set_demo(&app, on)?;
+    app.restart();
+}
+
+/// Is demo mode currently on?
+#[tauri::command]
+fn demo_mode(app: AppHandle) -> bool {
+    corpus::demo_active(&app)
+}
+
 /// Re-register a global chord (the keys registry calls this when a global
 /// action is rebound); `None` unbinds it OS-side. Keeps the old chord if the
 /// new one fails to register — and returns Err so the frontend does NOT
@@ -815,6 +829,8 @@ pub fn run() {
             set_hide_on_blur,
             set_dock_visible,
             set_app_icon,
+            set_demo_mode,
+            demo_mode,
             corpus::corpus_list,
             corpus::corpus_search,
             corpus::corpus_read,

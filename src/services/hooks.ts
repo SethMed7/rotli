@@ -10,7 +10,16 @@ import { DEST, isChats, isChatsPath, isSink } from "./destinations";
 import { memexRootMarkers } from "./fsNotes";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
+import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
+
+/** Surface a lifecycle failure inline instead of swallowing it — the memex write
+ * gate can refuse a move, and a silent rejection reads as "nothing happened"
+ * (Seth, 2026-07-07). Rendered by the sidebar's row-action error banner. */
+export const lifecycleError = (verb: string) => (e: unknown) =>
+  useUiStore
+    .getState()
+    .setRowActionError(`Couldn’t ${verb} this note — ${e instanceof Error ? e.message : String(e)}`);
 
 export const keys = {
   folders: ["folders"] as const,
@@ -245,6 +254,7 @@ export function useArchiveNote() {
   return useMutation({
     mutationFn: (id: string) => notesService.archiveNote(id),
     onSuccess: invalidateBoth,
+    onError: lifecycleError("archive"),
   });
 }
 
@@ -252,6 +262,7 @@ export function useTrashNote() {
   return useMutation({
     mutationFn: (id: string) => notesService.trashNote(id),
     onSuccess: invalidateBoth,
+    onError: lifecycleError("delete"),
   });
 }
 
@@ -278,5 +289,6 @@ export function useRestoreNote() {
   return useMutation({
     mutationFn: (id: string) => notesService.restoreNote(id),
     onSuccess: invalidateBoth,
+    onError: lifecycleError("restore"),
   });
 }

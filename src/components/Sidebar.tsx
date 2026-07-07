@@ -56,6 +56,7 @@ import {
   useTrashNote,
 } from "../services/hooks";
 import { notesService } from "../services/notes";
+import { isEmptyNote } from "../services/mainDismiss";
 import {
   type CorpusRoot,
   corpusAddFolder,
@@ -775,7 +776,7 @@ export function Sidebar() {
         </span>
       );
     };
-    const removeBtn = (rowId: string, label: string) => (
+    const removeBtn = (rowId: string, label: string, dismissEmpty = false) => (
       <span
         role="button"
         tabIndex={0}
@@ -785,6 +786,12 @@ export function Sidebar() {
         onClick={(ev) => {
           ev.stopPropagation();
           setMainTree(removeFromMain(mainManifest.tree, rowId), liveIds);
+          // a note (not a folder) that's empty is deleted on dismiss (Seth, 2026-07-07)
+          if (dismissEmpty) {
+            void isEmptyNote(rowId).then((empty) => {
+              if (empty) trashNote.mutate(rowId);
+            });
+          }
         }}
       >
         ×
@@ -817,7 +824,7 @@ export function Sidebar() {
             {glyphForNote(n, { size: 14, className: "snicon" })}
             <span className="snt">{n.title || "Empty note"}</span>
             {starBtn(n.id)}
-            <span className="snact">{removeBtn(n.id, "Remove from Main")}</span>
+            <span className="snact">{removeBtn(n.id, "Remove from Main", true)}</span>
           </button>
         ))}
         {childFolders.map((f) => {
