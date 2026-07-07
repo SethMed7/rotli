@@ -88,7 +88,9 @@ folder.")
   a sheet too big for the read caps **says it's truncated** (or refuses cleanly) instead
   of silently showing a slice. Every file view carries an **Open externally** dropdown:
   default app · Reveal in Finder · installed "Open with" apps.
-- **Boards** — Excalidraw canvases, alongside notes.
+- **Boards** — Excalidraw canvases, alongside notes. In a memex they live in the
+  `storage/excalidraw/` **board lane** — a writable surface rotli owns (so a board
+  always saves), carved out of the otherwise read-only `storage/`.
 - **Search** — typing in **All notes**, the sidebar filter, the palette, or Quick Note
   searches **full text** (not just titles) across the searchable universe: staged
   captures, the brain, the Vault, and added folders. A title hit ranks above a body hit;
@@ -192,9 +194,10 @@ the lock/secure switches + Brain filing (its old key:value field editor is gone)
 ## What rotli writes (the contract — v3.7, band [3.4, 3.7])
 
 Two write actors, two gates. **You** (the interactive editor) write only: **`chats/`**
-(AI chats) and **`wiki/_inbox/`** (new-note staging — quick captures land here too) — and
-NEVER `history/`, `identity/`, `personality/`, `MAP.md`, `inbox.md`, or the curated rest
-of `wiki/` (refused at both the TS `canWrite` gate and the Rust `is_writable` guard).
+(AI chats), **`wiki/_inbox/`** (new-note staging — quick captures land here too), and
+**`storage/excalidraw/`** (the Excalidraw board lane) — and NEVER `history/`, `identity/`,
+`personality/`, `MAP.md`, `inbox.md`, the rest of `storage/`, or the curated rest of
+`wiki/` (refused at both the TS `canWrite` gate and the Rust `is_writable` guard).
 (`inbox.md` is other tools' capture file — Breve's; rotli never writes it, and the old
 unused allowance was narrowed out of both gates — 2026-07 audit #96.) The **AI
 Filer** (v3.7) is the second actor: it writes the curated `wiki/<area>/` brain — the

@@ -10,7 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.24.8] — 2026-07-07
+### Fixed
+
+- **Excalidraw boards save in a memex again.** A board like `call-w_Jorge` living
+  in the memex's `storage/excalidraw/` was refused every save ("this board isn't
+  saving — read-only here"), because `storage/` is read-only to rotli. Boards now
+  have their own writable lane: `storage/excalidraw/` is a rotli-owned surface, so
+  boards edit and save while the rest of `storage/` stays read-only. New boards in
+  a memex land there too.
+
+### Added
+
+- **Right-click a tab → Add to Main** (note and board tabs), mirroring the
+  note-row menu.
 
 Onboarding + demo-mode polish.
 

@@ -1640,6 +1640,13 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
     if rel == "wiki" || rel.starts_with("wiki/") {
         return Surface::NoteRO;
     }
+    // storage/excalidraw/ — the memex's BOARD lane (Seth, 2026-07-07). Excalidraw
+    // scenes rotli creates + edits live here, so they're WRITABLE even though the
+    // rest of storage/ (foreign binary drops) stays read-only below. Must precede
+    // the storage/ rule. A board is rotli's own content, not a foreign asset.
+    if rel == "storage/excalidraw" || rel.starts_with("storage/excalidraw/") {
+        return Surface::NoteRW;
+    }
     // storage/ — the memex's gitignored binary asset store; surfaced READ-ONLY so
     // the Storage front shows your files (projected to the Storage destination,
     // opened in the OS default app). NEVER written via the note path (is_writable
@@ -2225,7 +2232,7 @@ impl CorpusStore {
         match surfaced(self.layout, rel) {
             Surface::NoteRW => Ok(()),
             _ => Err(format!(
-                "memex-vault's memory is read-only here — rotli only writes chats (refused: {})",
+                "this location is read-only to rotli in a memex — it writes chats, note staging, and boards (refused: {})",
                 if rel.is_empty() { "<root>" } else { rel }
             )),
         }
@@ -2842,12 +2849,14 @@ impl CorpusStore {
     /// Create a new board in `folder_id`. `body` defaults to an empty scene.
     /// Filename is a free `untitled.excalidraw` (collision-safe). id == relpath.
     pub fn create_board(&mut self, folder_id: &str, body: Option<&str>) -> Result<NoteMeta, String> {
-        // In a memex the app's default board folder ("Inbox") isn't writable — stage
-        // the board in wiki/_inbox instead so ⌘⇧N actually lands one (Seth, 2026-07-07).
+        // In a memex, boards live in the storage/excalidraw board lane (writable —
+        // see surfaced()). If the caller's folder isn't itself a writable surface,
+        // land the board there so ⌘⇧N always saves and every board shares one home
+        // (Seth, 2026-07-07).
         let folder_id = if self.layout == Layout::Memex
             && !matches!(surfaced(self.layout, folder_id), Surface::NoteRW)
         {
-            "wiki/_inbox"
+            "storage/excalidraw"
         } else {
             folder_id
         };
@@ -5669,12 +5678,15 @@ mod tests {
         assert_eq!(store.layout, Layout::Memex);
 
         // ⌘⇧N from a non-writable folder (e.g. the hidden self/) no longer FAILS —
-        // it STAGES the board into wiki/_inbox so a board always lands (Seth,
-        // 2026-07-07). write_board takes an explicit path with no such redirect, so
-        // a hidden root is still refused outright.
+        // it lands the board in the storage/excalidraw board lane so a board always
+        // saves (Seth, 2026-07-07). write_board takes an explicit path with no such
+        // redirect, so a hidden root is still refused outright.
         let staged = store.create_board("self", None).unwrap();
         assert_eq!(staged.kind, NoteKind::Board);
-        assert_eq!(staged.folder_id, "wiki/_inbox");
+        assert_eq!(staged.folder_id, "storage/excalidraw");
+        // …and a board in that lane is EDITABLE (the jorge case: saves succeed).
+        assert!(store.write_board(&staged.id, EMPTY_EXCALIDRAW).is_ok());
+        assert!(store.writable("storage/other.png").is_err(), "rest of storage stays read-only");
         assert!(store.write_board("self/x.excalidraw", "{}").is_err());
         // …and a board created directly on chats/ (rotli's owned surface) stays there
         let meta = store.create_board("chats", None).unwrap();
