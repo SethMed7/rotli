@@ -1,7 +1,10 @@
 ---
-// Base layout — mono brand tokens (Paper light / Charcoal dark), fonts, and a
-// manual light/dark toggle (persisted in localStorage, applied pre-paint so
-// there's no flash). Palette mirrors src/styles/themes.css paper + charcoal.
+// Base layout — the four rotli palettes on two axes: warm ⇄ soft, light ⇄ dark.
+// The pre-paint script stamps data-family + data-mode on <html> (stored prefs, or
+// soft + the system mode), so the palette blocks and the matching hero preview are
+// pure attribute selectors — no flash, no media-query juggling.
+// Palettes mirror the app: warm = colors.json (Warm Light/Dark); soft = themes.css
+// (Paper / Charcoal).
 const {
   title = 'rotli — a local-first notes app for your Mac menu bar',
   description = 'A local-first notes app that lives in your Mac’s menu bar — summon it, write, dismiss it.',
@@ -15,120 +18,77 @@ const {
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- apply the saved theme before first paint (no flash) -->
+    <!-- resolve theme before first paint (no flash) -->
     <script is:inline>
       try {
-        const t = localStorage.getItem('rotli-theme');
-        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+        const r = document.documentElement;
+        const m = localStorage.getItem('rotli-mode');
+        const f = localStorage.getItem('rotli-family');
+        r.dataset.mode = m === 'light' || m === 'dark'
+          ? m
+          : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        r.dataset.family = f === 'warm' || f === 'soft' ? f : 'soft';
       } catch (e) {}
     </script>
     <style is:global>
-      /* ---- Fonts (copied from src/brand/fonts) ---- */
-      @font-face {
-        font-family: 'General Sans';
-        src: url('/fonts/GeneralSans-Regular.woff2') format('woff2');
-        font-weight: 400;
-        font-display: swap;
-      }
-      @font-face {
-        font-family: 'General Sans';
-        src: url('/fonts/GeneralSans-Medium.woff2') format('woff2');
-        font-weight: 500;
-        font-display: swap;
-      }
-      @font-face {
-        font-family: 'General Sans';
-        src: url('/fonts/GeneralSans-Semibold.woff2') format('woff2');
-        font-weight: 600;
-        font-display: swap;
-      }
-      @font-face {
-        font-family: 'Baloo 2';
-        src: url('/fonts/Baloo2-600.ttf') format('truetype');
-        font-weight: 600;
-        font-display: swap;
-      }
+      @font-face { font-family: 'General Sans'; src: url('/fonts/GeneralSans-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+      @font-face { font-family: 'General Sans'; src: url('/fonts/GeneralSans-Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+      @font-face { font-family: 'General Sans'; src: url('/fonts/GeneralSans-Semibold.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+      @font-face { font-family: 'Baloo 2'; src: url('/fonts/Baloo2-600.ttf') format('truetype'); font-weight: 600; font-display: swap; }
 
-      /* ---- Paper (light) — the default ---- */
+      /* base tokens + fallback palette (soft light) for the no-JS case */
       :root {
-        --ground: #fafaf9;
-        --surface: #ffffff;
-        --surface-2: #f5f5f4;
-        --tint: #ececea;
-        --text: #161616;
-        --text-muted: #6b6b68;
-        --border: #e6e6e3;
-        --accent: #161616;
-        --accent-text: #161616;
-        --on-accent: #ffffff;
-
         --font-body: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         --font-display: 'Baloo 2', var(--font-body);
         --maxw: 62rem;
+        --ground: #fafaf9; --surface: #ffffff; --surface-2: #f5f5f4; --tint: #ececea;
+        --text: #161616; --text-muted: #6b6b68; --border: #e6e6e3;
+        --accent: #161616; --accent-text: #161616; --on-accent: #ffffff;
       }
 
-      /* ---- Charcoal (dark): follow the system, UNLESS the user forced light ---- */
-      @media (prefers-color-scheme: dark) {
-        :root:not([data-theme='light']) {
-          --ground: #161616;
-          --surface: #1f1e1c;
-          --surface-2: #2a2825;
-          --tint: #33312d;
-          --text: #e9e7e2;
-          --text-muted: #a8a49c;
-          --border: #2e2c29;
-          --accent: #e9e7e2;
-          --accent-text: #e9e7e2;
-          --on-accent: #161616;
-        }
+      /* ── SOFT · light (Paper) ── */
+      :root[data-family='soft'][data-mode='light'] {
+        --ground: #fafaf9; --surface: #ffffff; --surface-2: #f5f5f4; --tint: #ececea;
+        --text: #161616; --text-muted: #6b6b68; --border: #e6e6e3;
+        --accent: #161616; --accent-text: #161616; --on-accent: #ffffff;
       }
-      /* ---- Charcoal when the user explicitly chose dark (wins over the media) ---- */
-      :root[data-theme='dark'] {
-        --ground: #161616;
-        --surface: #1f1e1c;
-        --surface-2: #2a2825;
-        --tint: #33312d;
-        --text: #e9e7e2;
-        --text-muted: #a8a49c;
-        --border: #2e2c29;
-        --accent: #e9e7e2;
-        --accent-text: #e9e7e2;
-        --on-accent: #161616;
+      /* ── SOFT · dark (Charcoal) ── */
+      :root[data-family='soft'][data-mode='dark'] {
+        --ground: #161616; --surface: #1f1e1c; --surface-2: #2a2825; --tint: #33312d;
+        --text: #e9e7e2; --text-muted: #a8a49c; --border: #2e2c29;
+        --accent: #e9e7e2; --accent-text: #e9e7e2; --on-accent: #161616;
+      }
+      /* ── WARM · light (Warm Light) ── */
+      :root[data-family='warm'][data-mode='light'] {
+        --ground: #f8f2e9; --surface: #ffffff; --surface-2: #f1e7d8; --tint: #f2d6c2;
+        --text: #3a3028; --text-muted: #6e6155; --border: #e7dbc9;
+        --accent: #c97e62; --accent-text: #8f4e37; --on-accent: #ffffff;
+      }
+      /* ── WARM · dark (Warm Dark) ── */
+      :root[data-family='warm'][data-mode='dark'] {
+        --ground: #241d18; --surface: #2e2620; --surface-2: #392f28; --tint: #3e332b;
+        --text: #f1e7da; --text-muted: #b7a593; --border: #3d3229;
+        --accent: #c97e62; --accent-text: #c97e62; --on-accent: #241d18;
       }
 
       * { box-sizing: border-box; }
-
-      html {
-        -webkit-font-smoothing: antialiased;
-        text-rendering: optimizeLegibility;
-      }
-
+      html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
       body {
-        margin: 0;
-        background: var(--ground);
-        color: var(--text);
-        font-family: var(--font-body);
-        font-weight: 400;
-        line-height: 1.6;
-        font-size: 17px;
+        margin: 0; background: var(--ground); color: var(--text);
+        font-family: var(--font-body); font-weight: 400; line-height: 1.6; font-size: 17px;
       }
-
       a { color: inherit; }
       img { max-width: 100%; display: block; }
 
-      /* the quokka mark + full-body characters ink with the theme (currentColor) */
       .logo-mark, .char { display: inline-block; line-height: 0; color: var(--text); }
       .logo-mark svg, .char svg { display: block; width: 100%; height: auto; }
 
-      /* the hero screenshot follows the theme — light shot by default, dark shot
-         when the site is dark (system OR the manual toggle) */
-      .shot-dark { display: none; }
-      @media (prefers-color-scheme: dark) {
-        :root:not([data-theme='light']) .shot-light { display: none; }
-        :root:not([data-theme='light']) .shot-dark { display: block; }
-      }
-      :root[data-theme='dark'] .shot-light { display: none; }
-      :root[data-theme='dark'] .shot-dark { display: block; }
+      /* the hero screenshot matches the selected theme — one of four, by attributes */
+      .shot { display: none; }
+      :root[data-family='warm'][data-mode='light'] .shot-warm-light { display: block; }
+      :root[data-family='warm'][data-mode='dark'] .shot-warm-dark { display: block; }
+      :root[data-family='soft'][data-mode='light'] .shot-soft-light { display: block; }
+      :root[data-family='soft'][data-mode='dark'] .shot-soft-dark { display: block; }
 
       ::selection { background: var(--tint); color: var(--text); }
     </style>
