@@ -147,19 +147,23 @@ function Toggle({
   onChange,
   title,
   desc,
+  disabled,
 }: {
   on: boolean;
   onChange: () => void;
   title: string;
   desc?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
-      className={on ? "swrow on" : "swrow"}
-      onClick={onChange}
+      aria-disabled={disabled}
+      disabled={disabled}
+      className={`${on ? "swrow on" : "swrow"}${disabled ? " disabled" : ""}`}
+      onClick={disabled ? undefined : onChange}
     >
       <span className="swtext">
         <span className="swt">{title}</span>
@@ -629,6 +633,12 @@ function AppearancePane() {
   const glassBlur = useUiStore((s) => s.glassBlur);
   const setGlassBlur = useUiStore((s) => s.setGlassBlur);
   const followingSystem = theme === "system";
+  // Glass is shelved as "coming soon" — if it was enabled before, don't leave the
+  // app stuck in glass now that the toggle is disabled (Seth, 2026-07-07).
+  useEffect(() => {
+    if (glassMode) setGlassMode(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <>
       <PaneHead title="Appearance" char="board" />
@@ -696,13 +706,15 @@ function AppearancePane() {
           </div>
         ))}
 
-      <h4 className="sethead">Liquid Glass</h4>
+      <h4 className="sethead">
+        Liquid Glass <span className="soon-inline">Coming soon</span>
+      </h4>
       <p className="lead">
-        A mode over your theme: floating glass panels on a background. While it&rsquo;s on, the
-        titlebar sun becomes the tint dot — click it to cycle hues.
+        A mode over your theme: floating glass panels on a background, with the titlebar sun becoming
+        a tint dot. It&rsquo;s on the way — here&rsquo;s a preview of what&rsquo;s coming.
       </p>
-      <Toggle on={glassMode} title="Glass mode" onChange={() => setGlassMode(!glassMode)} />
-      <div className={glassMode ? "glassopts" : "glassopts off"} aria-hidden={!glassMode}>
+      <Toggle on={false} disabled title="Glass mode" onChange={() => {}} />
+      <div className="glassopts off" aria-hidden="true">
         <>
           <div className="glassrows">
             <div className="glassrow">

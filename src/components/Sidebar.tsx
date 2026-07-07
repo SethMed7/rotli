@@ -594,8 +594,9 @@ export function Sidebar() {
   const rowActionError = useUiStore((s) => s.rowActionError);
   const setRowActionError = useUiStore((s) => s.setRowActionError);
   const sidebarZoom = useUiStore((s) => s.sidebarZoom);
-  const [filter, setFilter] = useState("");
-  const filterRef = useRef<HTMLInputElement>(null);
+  // the sidebar's live filter is retired (Seth, 2026-07-07) — the global titlebar
+  // search covers it; `filter` stays empty so `matches()` passes every row.
+  const filter = "";
 
   // — inline nested new-folder row: when set, an <input> renders under this
   // parent id; null = not creating. Enter (or clicking away) commits a non-empty
@@ -1176,7 +1177,7 @@ export function Sidebar() {
       ]
     : [];
 
-  const { rowProps, focusActive } = useRovingList(rows, {
+  const { rowProps } = useRovingList(rows, {
     // l / Enter: a note opens in place; a folder/dest toggles its expansion and
     // becomes the ⌘N selection — mirrors the click gesture exactly.
     onOpen: (row, newTab) => {
@@ -1223,7 +1224,7 @@ export function Sidebar() {
       }
       return false;
     },
-    onFocusFilter: () => filterRef.current?.focus(),
+    onFocusFilter: () => dispatch("palette.toggle"),
     // m: a note/board/file row opens the SAME context menu the right-click
     // uses, anchored under the row; on close the cursor returns to the row
     // (the RowMenu unification, 2026-07-01). A Main row maps to its note.
@@ -1242,16 +1243,6 @@ export function Sidebar() {
       });
     },
   });
-
-  // Esc in the filter input returns focus to the active row (so the cursor is
-  // never stranded in the field) — its own local handler, not the global rule.
-  const onFilterKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      focusActive();
-    }
-  };
 
   // #25 — reveal the current file: when the focused note changes, auto-expand the
   // folder that holds it so its row is on screen (and highlighted). Main's copy
@@ -1535,18 +1526,6 @@ export function Sidebar() {
       {/* the sidebar toggle now lives in the titlebar (always visible, the clear
           reopen) — the search row is just the filter + new-note (Seth, 2026-06-15) */}
       <div className="nl-top">
-        <div className="filter">
-          <SearchGlyph size={13} />
-          <input
-            ref={filterRef}
-            type="text"
-            placeholder="Filter notes…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            onKeyDown={onFilterKeyDown}
-            aria-label="Filter notes"
-          />
-        </div>
         {/* IDE-style create icons (Seth #7/#13, 2026-07-03): the old "+" dropdown
             became three explicit, always-visible actions — New note · New folder ·
             New board — mirroring VS Code's file-explorer title bar. Each targets

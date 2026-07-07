@@ -9,7 +9,7 @@
   position: fixed;
   inset: 0;
   z-index: 20;
-  background: rgba(58, 48, 40, 0.38); /* the gate's dim, = cocoa @ 38% */
+  background: var(--scrim); /* theme dim — warm by default, neutral in the mono themes */
   backdrop-filter: blur(7px);
   -webkit-backdrop-filter: blur(7px);
   display: flex;
@@ -28,9 +28,9 @@
   max-width: calc(100vw - 48px);
   background: var(--surface);
   border-radius: var(--r-card);
-  box-shadow: 0 30px 80px -16px rgba(36, 29, 24, 0.55);
+  box-shadow: 0 30px 80px -16px rgba(0, 0, 0, 0.45);
   overflow: hidden;
-  border: 1px solid rgba(58, 48, 40, 0.1);
+  border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 }
@@ -1123,6 +1123,24 @@
 }
 .swrow:hover {
   background: color-mix(in srgb, var(--surface-2) 90%, var(--text));
+}
+.swrow:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* an inline "Coming soon" pill for a section heading (Seth, 2026-07-07) */
+.soon-inline {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  margin-left: 8px;
+  vertical-align: middle;
 }
 .swtext {
   flex: 1;

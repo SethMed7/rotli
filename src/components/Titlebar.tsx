@@ -18,7 +18,6 @@ import { IconButton } from "./IconButton";
 import { QuokkaMark } from "./Character";
 import {
   PlusGlyph,
-  SearchGlyph,
   SidebarGlyph,
   SplitDownGlyph,
   SplitRightGlyph,
@@ -72,7 +71,7 @@ export function Titlebar() {
           <SidebarGlyph size={TB_ICON} />
         </IconButton>
       )}
-      {settingsOpen ? (
+      {settingsOpen && (
         // settings surface (r1 frame F): the identity reads Settings; the rail
         // toggles step aside — clicking the identity walks back to notes
         <div className="identity-wrap">
@@ -81,24 +80,10 @@ export function Titlebar() {
             Settings
           </button>
         </div>
-      ) : (
-        // the module dropdown is retired (Seth, 2026-06-26): the left menu's three
-        // sections (Inbox · Chat · Notes) ARE the navigation now. The identity is a
-        // plain home mark, LEFT-aligned beside the sidebar toggle (Seth, 2026-07-06:
-        // logo + search live together at the top) — click returns to the note panes.
-        <div className="identity-wrap">
-          <button
-            type="button"
-            className="identity home"
-            aria-label="rotli — go to notes"
-            onClick={() => dispatch("modules.notes")}
-          >
-            <QuokkaMark size={22} className="identity-mark" />
-          </button>
-        </div>
       )}
-      {/* global search (Seth, 2026-07-06): a top search field beside the logo —
-          opens the ⌘K command palette (search every note + every action). The
+      {/* global search (Seth, 2026-07-06): the wide top search field. The rotli
+          mark moved OFF the far left and INTO the field as a circular badge in
+          place of the search glyph (Seth, 2026-07-07). Opens the ⌘K palette. The
           surrounding strip stays a window-drag region; the button stops its own
           mousedown so a click never starts a drag. */}
       <div
@@ -114,7 +99,9 @@ export function Titlebar() {
             onMouseDown={(event) => event.stopPropagation()}
             onClick={() => dispatch("palette.toggle")}
           >
-            <SearchGlyph size={14} />
+            <span className="tb-search-mark" aria-hidden="true">
+              <QuokkaMark size={15} />
+            </span>
             <span className="tb-search-label">Search…</span>
             <kbd className="tb-search-kbd">⌘K</kbd>
           </button>

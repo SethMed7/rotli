@@ -14,6 +14,9 @@
      Never a new color, never a shape change. */
   --hov: rgba(58, 48, 40, 0.07);
   --act: rgba(58, 48, 40, 0.11);
+  /* the dim behind the ⌘K palette — warm by default; the mono themes override it
+     to a neutral scrim so charcoal doesn't read warm-brown (Seth, 2026-07-06). */
+  --scrim: rgba(58, 48, 40, 0.4);
 
   /* — radius scale, one family (r3 gate) —
      4 inner elements · 8 controls/rows · 10 tabs/bubbles · 12 cards/panels ·

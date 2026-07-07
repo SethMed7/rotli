@@ -38,6 +38,7 @@
   --success: #6b6b68;
   --hov: rgba(22, 22, 22, 0.07);
   --act: rgba(22, 22, 22, 0.11);
+  --scrim: rgba(22, 22, 22, 0.42);
 }
 
 /* — MONO · charcoal (dark) — breve theme values, verbatim where possible — */
@@ -55,6 +56,7 @@
   --success: #a8a49c;
   --hov: rgba(233, 231, 226, 0.08);
   --act: rgba(233, 231, 226, 0.13);
+  --scrim: rgba(0, 0, 0, 0.5);
 }
 
 /* In the mono and glass families the kit icons drop their clay/olive accents to

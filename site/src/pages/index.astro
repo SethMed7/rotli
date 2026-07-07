@@ -75,8 +75,16 @@ const promises = [
     <section class="shot-wrap">
       <div class="shot-frame">
         <img
+          class="shot shot-light"
           src="/rotli-app.png"
           alt="rotli’s three-pane window — Inbox · Chat · Notes in the sidebar, a note open in the editor"
+          width="1360"
+          loading="eager"
+        />
+        <img
+          class="shot shot-dark"
+          src="/rotli-app-dark.png"
+          alt="rotli’s three-pane window in dark mode"
           width="1360"
           loading="eager"
         />
@@ -143,6 +151,12 @@ const promises = [
         try { localStorage.setItem('rotli-theme', next); } catch (e) {}
         sync();
       });
+
+    // the locked top bar grows a hairline once the page scrolls under it
+    const bar = document.querySelector('.topbar');
+    const onScroll = () => bar && bar.classList.toggle('stuck', window.scrollY > 4);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
   </script>
 
   <style>
@@ -158,12 +172,21 @@ const promises = [
     .hero-char { width: 150px; margin: 0 auto 0.25rem; }
     .privacy-char { width: 200px; justify-self: center; opacity: 0.9; }
 
-    /* ---- top bar (full-width, logo hard-left) ---- */
+    /* ---- top bar (full-width, logo hard-left, locked to the top) ---- */
     .topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 1.1rem 1.75rem;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: var(--ground);
+      border-bottom: 1px solid transparent;
+    }
+    /* a hairline appears once the page scrolls under the locked bar */
+    .topbar.stuck {
+      border-bottom-color: var(--border);
     }
     .brand {
       display: inline-flex;

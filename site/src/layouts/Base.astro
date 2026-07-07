@@ -120,6 +120,16 @@ const {
       .logo-mark, .char { display: inline-block; line-height: 0; color: var(--text); }
       .logo-mark svg, .char svg { display: block; width: 100%; height: auto; }
 
+      /* the hero screenshot follows the theme — light shot by default, dark shot
+         when the site is dark (system OR the manual toggle) */
+      .shot-dark { display: none; }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) .shot-light { display: none; }
+        :root:not([data-theme='light']) .shot-dark { display: block; }
+      }
+      :root[data-theme='dark'] .shot-light { display: none; }
+      :root[data-theme='dark'] .shot-dark { display: block; }
+
       ::selection { background: var(--tint); color: var(--text); }
     </style>
   </head>
