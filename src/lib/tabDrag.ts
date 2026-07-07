@@ -9,8 +9,10 @@
 // commit calls moveTab / detachTab. Cancels on Esc / pointercancel.
 
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { type DropZone, usePanesStore } from "../state/panes";
+import type { DropPos } from "../services/mainTree";
+import { type DropZone, leaves, usePanesStore } from "../state/panes";
 import { type DragGhost, createDragGhost } from "./dragGhost";
+import { commitMainAdd, mainDropAt } from "./mainAddDrag";
 
 const THRESHOLD_PX = 5;
 const EDGE_BAND = 0.22; // mirror PaneTree's zoneAt
@@ -48,6 +50,13 @@ export function startTabDrag(
   const startY = event.clientY;
   let dragging = false;
   let ghost: DragGhost | null = null;
+  // a tab can also be dropped onto the sidebar's Main tree → add it to Main
+  let mainDrop: { id: string; pos: DropPos } | null = null;
+  let mainHover: HTMLElement | null = null;
+  const clearMainHover = () => {
+    mainHover?.classList.remove("main-dropover");
+    mainHover = null;
+  };
 
   const store = () => usePanesStore.getState();
 
@@ -59,6 +68,9 @@ export function startTabDrag(
   };
 
   const hitTest = (x: number, y: number) => {
+    // reset the Main-drop candidate each move; the branches below re-set it
+    clearMainHover();
+    mainDrop = null;
     const el = document.elementFromPoint(x, y);
     const strip = el?.closest<HTMLElement>("[data-tabscroll]");
     if (strip?.dataset.paneId) {
@@ -72,6 +84,15 @@ export function startTabDrag(
         leafId: body.dataset.leafId,
         zone: zoneAt(body.getBoundingClientRect(), x, y),
       });
+      return;
+    }
+    // over the sidebar's Main tree → highlight the row, arm a Main add
+    const at = mainDropAt(x, y);
+    if (at) {
+      store().setDropPreview(null);
+      mainDrop = { id: at.id, pos: at.pos };
+      mainHover = at.el;
+      at.el.classList.add("main-dropover");
       return;
     }
     store().setDropPreview(null);
@@ -95,6 +116,7 @@ export function startTabDrag(
     window.removeEventListener("keydown", onKey, true);
     ghost?.destroy();
     ghost = null;
+    clearMainHover();
     delete document.documentElement.dataset.tabDragging;
     const s = store();
     s.setDraggingTab(null);
@@ -103,6 +125,20 @@ export function startTabDrag(
 
   const commit = () => {
     const s = store();
+    // dropped onto Main → add this tab's note/board to Main (a board too — you
+    // can shelve a canvas). Resolve the tab to its id from the live pane tree.
+    if (mainDrop) {
+      const pane = leaves(s.root).find((p) => p.id === fromPaneId);
+      const tab = pane?.tabs.find((t) => t.id === tabId);
+      const mainId =
+        tab?.surfaceKind === "note"
+          ? tab.noteId
+          : tab?.surfaceKind === "canvas"
+            ? tab.boardId
+            : null;
+      if (mainId) commitMainAdd(mainId, mainDrop);
+      return;
+    }
     const preview = s.dropPreview;
     if (!preview) return;
     if (preview.kind === "strip") {

@@ -252,6 +252,13 @@
 .mdrop-into {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
+/* cross-surface Main-add drag: a tab or an All-notes row dragged in highlights
+   the Main row/zone it will land on (startMainAddDrag + tabDrag paint this). */
+.main-dropover {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  border-radius: 6px;
+}
 /* the section-header hover "+" (Seth, 2026-07-01: "new folder can be a lot more
    subtle") — the old always-visible "+ New folder" row folded into the Main
    header. Same reveal grammar as .frow-add, but opacity (not display) so the

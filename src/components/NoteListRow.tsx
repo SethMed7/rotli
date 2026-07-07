@@ -5,6 +5,7 @@
 import type { MouseEvent, ReactNode } from "react";
 import type { NoteSummary } from "../types";
 import { longDateLabel } from "../lib/dateLabels";
+import { startMainAddDrag } from "../lib/mainAddDrag";
 import { glyphForNote, PinGlyph } from "./glyphs";
 
 export function NoteListRow({
@@ -28,6 +29,11 @@ export function NoteListRow({
         type="button"
         className="recent-row"
         onClick={(e) => onOpen(note, e.metaKey)}
+        onPointerDown={
+          // drag a note/board row into Main (a plain click still opens it); files
+          // can't be arranged in Main, so they don't drag (Seth, 2026-07-07).
+          file ? undefined : (e) => startMainAddDrag(e, note.id, note.title || "Empty note")
+        }
         onAuxClick={(e) => {
           if (e.button === 1) {
             e.preventDefault();
