@@ -10,6 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.6] — 2026-07-07
+
+Titlebar search, a calmer charcoal, and an app-icon picker.
+
+### Added
+
+- **App-icon picker** (Settings → Appearance): choose the Dock icon — **Default ·
+  Paper · Charcoal · Clay** (the quokka re-tiled in each palette). Persisted and
+  applied on launch; shows when **Show in the Dock** is on.
+
+### Changed
+
+- **Titlebar search reworked.** The field is wider, the rotli mark moved off the
+  far left and **into** the field as a circular badge (in place of the search
+  glyph), and the **⌘K** hint is quieter (no card). The sidebar's **"Filter
+  notes…"** field is gone — the global search covers it (and `/` opens it).
+- **Liquid Glass is "Coming soon"** — the section still previews, but the toggle
+  is disabled for now.
+
+### Fixed
+
+- **The ⌘K palette no longer reads warm-brown in Charcoal.** Its dim is a theme
+  token now — warm in the warm themes, neutral in the mono ones.
+
 ## [0.24.5] — 2026-07-06
 
 Pin + a global titlebar search, a repo-wide cleanup (brand & docs now live
