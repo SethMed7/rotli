@@ -130,11 +130,10 @@ impl RootRegistry {
 /// the unified `corpus.json`, migrating the four legacy files into it on first
 /// launch (idempotent, non-destructive).
 pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
-    // demo mode: a single isolated demo corpus — the real brains/folders are
+    // demo mode: a single isolated demo memex — the real brains/folders are
     // hidden and corpus.json is never touched (Seth, 2026-07-07).
     if demo_active(app) {
-        if let Some(demo) = demo_root(app) {
-            let _ = fs::create_dir_all(&demo);
+        if let Some(demo) = ensure_demo_memex(app) {
             return vec![CorpusRoot {
                 id: DEFAULT_ROOT_ID.to_string(),
                 label: "Notes".to_string(),
@@ -233,21 +232,72 @@ pub fn write_corpus_config(app: &tauri::AppHandle, cfg: &CorpusConfig) -> Result
 }
 
 // ─── demo mode ──────────────────────────────────────────────────────────────
-// A fully-isolated throwaway corpus for screenshots/demos. A marker file
-// (`demo.on` in app_config_dir) flips it; when set, the app opens a fresh plain
-// folder (app_data_dir/rotli-demo, auto-seeded by first_run) INSTEAD of the real
-// corpus, and hides the real connected brains/folders. The user's corpus.json is
-// never read or written — flipping demo off restores everything exactly.
+// A fully-isolated SEEDED MEMEX for screenshots/demos, named `memex-demo` and
+// living next to the user's real memex (same parent dir). A marker file
+// (`demo.on` in app_config_dir) flips it; when set, the app opens memex-demo
+// INSTEAD of the real corpus and hides the real brains/folders. The user's
+// corpus.json is never read or written — flipping demo off restores everything.
+// The demo memex is marked `"demo": true` in its own memex.json, so onboarding /
+// memex_detect skip it (it's never offered as a real memex to connect).
+
+/// The bundled seed content, written into memex-demo on first activation.
+const DEMO_SEED: &[(&str, &str)] = &[
+    ("memex.json", include_str!("../demo-seed/memex.json")),
+    ("MAP.md", include_str!("../demo-seed/MAP.md")),
+    ("inbox.md", include_str!("../demo-seed/inbox.md")),
+    ("wiki/projects/q3-priorities.md", include_str!("../demo-seed/wiki/projects/q3-priorities.md")),
+    ("wiki/projects/gateway-migration.md", include_str!("../demo-seed/wiki/projects/gateway-migration.md")),
+    ("wiki/research/ai-coding-tools.md", include_str!("../demo-seed/wiki/research/ai-coding-tools.md")),
+    ("wiki/people/nathalia.md", include_str!("../demo-seed/wiki/people/nathalia.md")),
+    ("wiki/_inbox/lunch.md", include_str!("../demo-seed/wiki/_inbox/lunch.md")),
+    ("wiki/_inbox/call-bank.md", include_str!("../demo-seed/wiki/_inbox/call-bank.md")),
+    ("chats/plan-the-week.md", include_str!("../demo-seed/chats/plan-the-week.md")),
+];
+
+/// Scaffold the seeded demo memex at `root` (idempotent — overwrites the seed).
+pub fn seed_demo_memex(root: &Path) -> Result<(), String> {
+    for (rel, content) in DEMO_SEED {
+        let path = root.join(rel);
+        if let Some(p) = path.parent() {
+            fs::create_dir_all(p).map_err(|e| e.to_string())?;
+        }
+        fs::write(&path, content).map_err(|e| format!("seed {rel}: {e}"))?;
+    }
+    Ok(())
+}
+
+/// A memex marked demo-only in its own config (`memex.json` `demo: true`) — hidden
+/// from onboarding/detection; only opened while demo mode is on.
+pub fn is_demo_memex(root: &Path) -> bool {
+    fs::read_to_string(root.join("memex.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .and_then(|v| v.get("demo").and_then(serde_json::Value::as_bool))
+        .unwrap_or(false)
+}
 
 fn demo_flag_file(app: &tauri::AppHandle) -> Option<PathBuf> {
     use tauri::Manager;
     app.path().app_config_dir().ok().map(|d| d.join("demo.on"))
 }
 
-/// The isolated demo corpus folder (a plain rotli folder; first_run seeds it).
+/// The demo memex folder — `memex-demo`, a sibling of the user's real corpus.
 pub fn demo_root(app: &tauri::AppHandle) -> Option<PathBuf> {
-    use tauri::Manager;
-    app.path().app_data_dir().ok().map(|d| d.join("rotli-demo"))
+    let parent = read_corpus_config(app)
+        .map(|c| c.corpus.abs_path)
+        .as_ref()
+        .and_then(|p| p.parent().map(Path::to_path_buf))
+        .or_else(|| std::env::var("HOME").ok().map(PathBuf::from));
+    parent.map(|d| d.join("memex-demo"))
+}
+
+/// Ensure the demo memex exists + is seeded (idempotent — re-seeds if missing).
+fn ensure_demo_memex(app: &tauri::AppHandle) -> Option<PathBuf> {
+    let demo = demo_root(app)?;
+    if !is_memex_root(&demo) {
+        let _ = seed_demo_memex(&demo);
+    }
+    Some(demo)
 }
 
 /// Is demo mode currently on? (the marker file exists)
@@ -256,16 +306,14 @@ pub fn demo_active(app: &tauri::AppHandle) -> bool {
 }
 
 /// Turn demo mode on/off — writes/removes the marker (the caller relaunches).
-/// On enable, ensures the demo folder exists so first_run seeds it on open.
+/// On enable, seeds the demo memex if it isn't there yet.
 pub fn set_demo(app: &tauri::AppHandle, on: bool) -> Result<(), String> {
     let f = demo_flag_file(app).ok_or("no app config dir")?;
     if on {
         if let Some(p) = f.parent() {
             fs::create_dir_all(p).map_err(|e| e.to_string())?;
         }
-        if let Some(demo) = demo_root(app) {
-            fs::create_dir_all(&demo).map_err(|e| e.to_string())?;
-        }
+        ensure_demo_memex(app);
         fs::write(&f, b"1").map_err(|e| e.to_string())?;
     } else {
         let _ = fs::remove_file(&f);
@@ -277,10 +325,9 @@ pub fn set_demo(app: &tauri::AppHandle, on: bool) -> Result<(), String> {
 /// no config yet) falls back so the app never opens a dead path. A blank/dead
 /// default is the white-screen failure mode — this guard is load-bearing.
 pub fn resolve_corpus(app: &tauri::AppHandle) -> PathBuf {
-    // demo mode: the isolated demo folder, never the user's real corpus
+    // demo mode: the seeded demo memex, never the user's real corpus
     if demo_active(app) {
-        if let Some(demo) = demo_root(app) {
-            let _ = fs::create_dir_all(&demo);
+        if let Some(demo) = ensure_demo_memex(app) {
             return demo;
         }
     }

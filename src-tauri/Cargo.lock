@@ -2817,7 +2817,7 @@ dependencies = [
 
 [[package]]
 name = "rotli"
-version = "0.24.6"
+version = "0.24.7"
 dependencies = [
  "base64 0.22.1",
  "notify",

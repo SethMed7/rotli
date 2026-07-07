@@ -1,0 +1,7 @@
+{
+  "id": "mx_rotlidemo0000000000000001",
+  "contract": "3.7",
+  "createdAt": "2026-07-01T09:00:00Z",
+  "demo": true,
+  "apps": { "rotli": { "role": "notes", "connectedAt": "2026-07-01T09:00:00Z" } }
+}

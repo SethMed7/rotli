@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.7] — 2026-07-07
+
+Archive/Trash/boards work in a memex now, plus a seeded demo library.
+
+### Fixed
+
+- **Archive, Trash, and new boards work when your notes folder is a memex.** They
+  were silently refused by the memex write-gate (Archive/Trash/new-board targets
+  weren't writable), so they appeared to do nothing. Archive/Trash are now a
+  sanctioned rotli lifecycle lane, and **⌘⇧N** (new Excalidraw board) stages into
+  the memex. Any refused lifecycle move now shows an inline error instead of
+  silently failing.
+
+### Changed
+
+- **Dismissing a note from Main deletes it when it's empty** (no title + no body);
+  a note with content just unlinks from Main.
+
+### Added
+
+- **Demo mode** (Settings → General): switch to a **seeded demo library**
+  (`memex-demo`, next to your real memex) with sample notes, boards, and a chat —
+  for clean screenshots or trying things out. It's marked demo-only in its own
+  config, so onboarding never sees it, and your real notes are never touched.
+  Toggling relaunches.
+
 ## [0.24.6] — 2026-07-07
 
 Titlebar search, a calmer charcoal, and an app-icon picker.

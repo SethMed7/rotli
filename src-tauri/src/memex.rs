@@ -429,7 +429,8 @@ pub fn memex_detect(app: tauri::AppHandle) -> Result<Vec<DetectedMemex>, String>
             continue;
         }
         let d = detect_one(&r);
-        if d.kind == "memex" {
+        // skip demo-only memexes (memex.json `demo: true`) — never offered to connect
+        if d.kind == "memex" && !crate::corpus::is_demo_memex(&r) {
             out.push(d);
         }
     }
