@@ -14,11 +14,11 @@ const MEMEX_URL = 'https://github.com/SethMed7/memex';
 const features = [
   {
     title: 'your notes, a memex',
-    body: 'one folder holds it all — notes, chats, knowledge, files. plain files on your Mac, yours to keep.',
+    body: 'one folder holds it all — notes, chats, knowledge, files, even Excalidraw boards. plain files on your Mac, yours to keep.',
   },
   {
     title: 'three fronts',
-    body: 'inbox for email, chat for your models, notes for capture and the quietly-organized brain.',
+    body: 'inbox for email, chat for your models, notes — with Excalidraw boards built in, saved as plain files in the same folder.',
   },
   {
     title: 'low-pulse',
@@ -45,10 +45,14 @@ const promises = [
           <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
         </svg>
       </a>
-      <div class="fam-seg" role="radiogroup" aria-label="Palette">
-        <button class="fam-sw fam-warm" data-fam="warm" type="button" title="Warm palette" aria-label="Warm palette"></button>
-        <button class="fam-sw fam-soft" data-fam="soft" type="button" title="Soft palette" aria-label="Soft palette"></button>
-      </div>
+      <button id="family-toggle" class="icon-btn thermo" type="button" title="Warm / soft palette" aria-label="Toggle warm / soft palette">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/>
+          <circle class="bulb" cx="12" cy="18" r="3.1" stroke="none"/>
+          <rect class="merc merc-warm" x="10.7" y="6.5" width="2.6" height="9.2" rx="1.3" stroke="none"/>
+          <rect class="merc merc-soft" x="10.7" y="11.5" width="2.6" height="4.2" rx="1.3" stroke="none"/>
+        </svg>
+      </button>
       <button id="mode-toggle" class="icon-btn" type="button" aria-label="Switch light / dark">
         <span class="ic ic-moon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
@@ -135,26 +139,22 @@ const promises = [
     // (CSS in Base.astro), so toggling just re-stamps the attribute + persists it.
     const root = document.documentElement;
     const modeBtn = document.getElementById('mode-toggle');
-    const famBtns = document.querySelectorAll('.fam-sw');
+    const famBtn = document.getElementById('family-toggle');
     const store = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
     const syncMode = () => modeBtn && modeBtn.setAttribute('data-mode', root.dataset.mode || 'light');
-    const syncFam = () =>
-      famBtns.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.fam === root.dataset.family)));
     syncMode();
-    syncFam();
     modeBtn &&
       modeBtn.addEventListener('click', () => {
         root.dataset.mode = root.dataset.mode === 'dark' ? 'light' : 'dark';
         store('rotli-mode', root.dataset.mode);
         syncMode();
       });
-    famBtns.forEach((b) =>
-      b.addEventListener('click', () => {
-        root.dataset.family = b.dataset.fam;
-        store('rotli-family', b.dataset.fam);
-        syncFam();
-      }),
-    );
+    // the thermometer toggles palette warmth — warm (mercury high) ⇄ soft (low)
+    famBtn &&
+      famBtn.addEventListener('click', () => {
+        root.dataset.family = root.dataset.family === 'warm' ? 'soft' : 'warm';
+        store('rotli-family', root.dataset.family);
+      });
 
     // the locked top bar grows a hairline once the page scrolls under it
     const bar = document.querySelector('.topbar');
@@ -230,26 +230,17 @@ const promises = [
     .icon-btn:not([data-mode='dark']) .ic-moon { display: block; }
     .icon-btn[data-mode='dark'] .ic-sun { display: block; }
 
-    /* ---- warm / soft palette swatches ---- */
-    .fam-seg { display: inline-flex; align-items: center; gap: 6px; margin-right: 2px; }
-    .fam-sw {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      border: none;
-      padding: 0;
-      cursor: pointer;
-      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-      transition: transform 0.12s ease;
-    }
-    .fam-sw:hover { transform: scale(1.08); }
-    .fam-warm { background: #c97e62; }
-    .fam-soft { background: #8f8f8b; }
-    /* the active family gets a themed ring */
-    :root[data-family='warm'] .fam-warm,
-    :root[data-family='soft'] .fam-soft {
-      box-shadow: 0 0 0 2px var(--ground), 0 0 0 4px var(--text);
-    }
+    /* ---- warm / soft thermometer toggle ---- */
+    .thermo svg { width: 20px; height: 20px; display: block; }
+    /* mercury level: warm = high, soft = low; the bulb + fill take the family hue */
+    .thermo .merc { display: none; }
+    :root[data-family='warm'] .thermo .merc-warm { display: block; }
+    :root[data-family='soft'] .thermo .merc-soft { display: block; }
+    :root[data-family='warm'] .thermo .bulb,
+    :root[data-family='warm'] .thermo .merc-warm { fill: #c97e62; }
+    :root[data-family='soft'] .thermo .bulb,
+    :root[data-family='soft'] .thermo .merc-soft { fill: #8f9199; }
+    .thermo .merc { transition: fill 0.15s ease; }
 
     /* ---- hero ---- */
     .hero {
