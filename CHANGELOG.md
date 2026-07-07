@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tabs). And you can now **drag into Main** from two more places: an editor **tab**
   and a row in the **All notes** list — the hovered Main row highlights and the
   note lands where you drop it (a plain click still just opens it).
+- **Settings → Plugins: "Use rotli for your docs."** A copy-paste command for
+  Claude Code that routes a project's planning + docs into rotli instead of the
+  repo (README excepted).
 
 Onboarding + demo-mode polish.
 

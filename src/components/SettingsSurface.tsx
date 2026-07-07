@@ -2149,7 +2149,31 @@ function ModelsPane() {
   );
 }
 
+/** The prompt you paste into Claude Code so a project's docs live in rotli (your
+ * memex) instead of the repo — planning + documentation you organize in rotli,
+ * the README the only thing that stays in the repo. Copy-first; you refine the
+ * wording to taste (Seth, 2026-07-07). */
+const CLAUDE_DOCS_COMMAND = `When you create or update documentation for this project, keep it in my rotli
+memex — NOT this repo. The README is the ONLY doc that stays in the repo.
+
+• Before writing a new doc, ask me: "rotli or repo?" (the README always → repo).
+• When a doc goes to rotli, write the Markdown file into my rotli notes folder
+  under wiki/_inbox/<slug>.md with frontmatter:
+      ---
+      owner: rotli
+      shelf: [<Project>]     # this project's name, e.g. Rotli or Memex
+      ---
+  rotli files it, and I keep it under my <Project> folder in Main.
+• Do not create or leave project docs in this repo's docs/ folder.`;
+
 function PluginsPane() {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    void navigator.clipboard?.writeText(CLAUDE_DOCS_COMMAND).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    });
+  };
   return (
     <>
       <PaneHead title="Plugins" char="chat" />
@@ -2167,6 +2191,22 @@ function PluginsPane() {
           </span>
           <span className="plugsoon">Soon</span>
         </div>
+      </div>
+
+      {/* Use rotli for your docs — a prompt you paste into Claude Code so a
+          project's docs live in rotli, not the repo (Seth, 2026-07-07). */}
+      <div className="claudecmd">
+        <div className="claudecmd-head">
+          <h4>Use rotli for your docs</h4>
+          <button type="button" className="claudecmd-copy" onClick={copy}>
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+        <p className="plugdesc">
+          Paste this into Claude Code in any project and your planning + docs land in rotli
+          instead of the repo — everything but the README.
+        </p>
+        <pre className="claudecmd-block">{CLAUDE_DOCS_COMMAND}</pre>
       </div>
     </>
   );

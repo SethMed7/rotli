@@ -1388,6 +1388,51 @@
   font-size: 12px;
   color: var(--text-muted);
 }
+/* "Use rotli for your docs" — the Claude Code copy-paste command block. */
+.claudecmd {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.claudecmd-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.claudecmd-head h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+}
+.claudecmd-copy {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.claudecmd-copy:hover {
+  border-color: var(--text);
+}
+.claudecmd-block {
+  margin: 12px 0 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
 .plugsoon {
   flex: 0 0 auto;
   font-size: 9.5px;
