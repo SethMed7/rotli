@@ -314,18 +314,18 @@ const promises = [
     /* ---- screenshot ---- */
     .shot-wrap {
       max-width: calc(var(--maxw) + 4rem);
-      margin: 1rem auto 0;
+      margin: 1.5rem auto 0;
       padding-inline: 1.5rem;
     }
+    /* No card — the screenshot sits raw on the page, softly rounded and gently
+       lifted so it reads as a real floating window (not a boxed thumbnail). The
+       captures are opaque + edge-to-edge, so nothing behind them shows through. */
     .shot-frame {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 1.1rem;
-      padding: 0.75rem;
-      box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.4);
+      border-radius: 0.9rem;
       overflow: hidden;
+      box-shadow: 0 40px 80px -44px rgba(0, 0, 0, 0.45), 0 12px 28px -20px rgba(0, 0, 0, 0.25);
     }
-    .shot-frame img { width: 100%; height: auto; border-radius: 0.6rem; }
+    .shot-frame img { width: 100%; height: auto; display: block; }
 
     /* ---- three fronts ---- */
     .features {
