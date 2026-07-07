@@ -9,7 +9,9 @@
 
 *Your notes folder **is** a memex — one local folder for your notes, chats, and knowledge.<br>Three fronts over it: **Notes** you write · **Chat** you talk with · **Inbox** for your email.*
 
-<img src="docs/media/rotli-warm-light.png" alt="rotli — Warm Light" width="760">
+**[⬇ Download for Mac](https://github.com/SethMed7/rotli-releases/releases/latest)** — macOS · Apple Silicon · always the newest signed build
+
+<img src="docs/media/rotli-warm-light.png" alt="rotli in Warm Light" width="820">
 
 </div>
 
@@ -39,22 +41,13 @@ your notes folder/           ← one folder = your memex; openable in any editor
 - **Autosave** — the olive dot. No spinners, ever.
 - **Every hotkey rebindable** — one registry, searchable in Settings.
 
-## Six appearances (and liquid glass)
+## Four themes — and Liquid Glass
 
-Warm Light · Warm Dark · Paper · Charcoal — and **Liquid Glass**, a mode over any of them: floating glass panels over a tinted field or a bundled wallpaper (or your own image), four hues, frosted or clear, with a paper writing canvas if you want ink-on-linen inside the glass.
-
-<div align="center">
-<img src="docs/media/rotli-glass-dusk.png" alt="Liquid Glass — Dusk" width="386">
-<img src="docs/media/rotli-charcoal.png" alt="Charcoal" width="386">
-</div>
+Four base looks the titlebar sun cycles through — **Warm Light · Warm Dark · Paper · Charcoal**. Warm Light is the default. On top of any of them, turn on **Liquid Glass**: floating glass panels over a tint (**Dusk · Blush · Clay · Olive**) or your own wallpaper, frosted or clear, with an optional ink-on-linen writing canvas.
 
 <div align="center">
-
-| | | | | |
-|:-:|:-:|:-:|:-:|:-:|
-| ![Cocoa](https://img.shields.io/badge/-%20-3A3028?style=flat-square) | ![Clay](https://img.shields.io/badge/-%20-C97E62?style=flat-square) | ![Peach](https://img.shields.io/badge/-%20-F2D6C2?style=flat-square) | ![Linen](https://img.shields.io/badge/-%20-F8F2E9?style=flat-square) | ![Olive](https://img.shields.io/badge/-%20-8D9A76?style=flat-square) |
-| Cocoa | Clay Blush | Peach Cream | Linen | Olive Moss |
-
+<img src="docs/media/rotli-warm-dark.png" alt="rotli in Warm Dark" width="386">
+<img src="docs/media/rotli-charcoal.png" alt="rotli in Charcoal" width="386">
 </div>
 
 ## Run it
@@ -67,7 +60,7 @@ bun run check       # tsc strict + raw-hex lint
 cargo test          # the corpus layer (run inside src-tauri/)
 ```
 
-**Stack** — Tauri v2 · React 18 · Vite · TypeScript strict · Bun · Zustand + TanStack Query · plain CSS driven entirely by the frozen rotli brand kit (vendored at `src/brand/`, v1.0.0, read-only). Local-first is the architecture, not a feature: nothing phones home, nothing requires an account, offline is the default.
+**Stack** — Tauri v2 · React 18 · Vite · TypeScript strict · Bun · Zustand + TanStack Query · plain CSS driven entirely by the in-repo rotli brand kit (`src/brand/`, v1.0.0 — the single source of truth for colors, type, and logo, enforced by `bun run check:hex`: no raw hex lives outside it). Local-first is the architecture, not a feature: nothing phones home, nothing requires an account, offline is the default.
 
 ## Where it's going
 
