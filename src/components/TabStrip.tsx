@@ -19,8 +19,10 @@ import { useBoardRename } from "../lib/boardRename";
 import { fileName } from "../lib/fileKind";
 import { startTabDrag } from "../lib/tabDrag";
 import { newNoteInTab } from "../keys/actions";
+import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { useNoteIndex } from "../services/hooks";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
+import { useMainStore } from "../state/main";
 import { leaves, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { LeafNode, Tab } from "../types";
@@ -59,6 +61,10 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   const activateTab = usePanesStore((s) => s.activateTab);
   const closeTabById = usePanesStore((s) => s.closeTabById);
   const draggingTab = usePanesStore((s) => s.draggingTab);
+  // Main lives here too — a tab is a note (or board) you're looking at, so
+  // right-click → Add to Main mirrors the note-row menu (Seth, 2026-07-07).
+  const mainManifest = useMainStore((s) => s.manifest);
+  const setMainTree = useMainStore((s) => s.setTree);
   // double-click a board tab to rename it in place (shares the sidebar's flow)
   const { renamingBoardId, start: startRename, commit: commitRename, cancel: cancelRename } =
     useBoardRename();
@@ -126,6 +132,24 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
     event.preventDefault();
     event.stopPropagation();
     const items: MenuSpec[] = [];
+    // Add/Remove from Main — for the tabs that hold a real note or board id.
+    const mainId =
+      tab.surfaceKind === "note" ? tab.noteId : tab.surfaceKind === "canvas" ? tab.boardId : null;
+    if (mainId) {
+      const inMain = mainHasNote(mainManifest.tree, mainId);
+      items.push({
+        kind: "action",
+        label: inMain ? "Remove from Main" : "Add to Main",
+        onClick: () =>
+          setMainTree(
+            inMain
+              ? removeFromMain(mainManifest.tree, mainId)
+              : addNoteToMain(mainManifest.tree, mainId),
+            new Set(noteIndex.keys()),
+          ),
+      });
+      items.push({ kind: "sep" });
+    }
     if (tab.surfaceKind === "canvas") {
       items.push({ kind: "action", label: "Rename…", onClick: () => startRename(tab.boardId) });
       items.push({ kind: "sep" });
