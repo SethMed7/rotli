@@ -1004,6 +1004,8 @@ export interface MemexChatSummary {
   path: string;
   /** fs mtime in ms (0 when unreadable) — ⌥A summon-chat picks the newest. */
   modifiedMs: number;
+  /** `pinned: true` frontmatter — the sidebar sorts pinned chats first. */
+  pinned: boolean;
 }
 
 export interface MemexValidateReport {

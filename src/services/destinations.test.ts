@@ -6,6 +6,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   DEST,
+  destContains,
   HIDDEN_ROOTS,
   isChats,
   isChatsPath,
@@ -122,6 +123,31 @@ describe("the WRITE MODEL redirect — note-creation never lands in the Vault", 
     expect(redirect("Storage")).toBe("Storage");
     expect(redirect("Storage/Work")).toBe("Storage/Work");
     expect(redirect("Brain")).toBe("Brain"); // a plain local folder after the rename
+  });
+});
+
+describe("destContains — the sidebar's derived destination highlight", () => {
+  it("maps Brain ⇔ wiki/* and Storage ⇔ storage/* + legacy Storage/*", () => {
+    expect(destContains("Brain", "wiki")).toBe(true);
+    expect(destContains("Brain", "wiki/projects/rotli")).toBe(true);
+    expect(destContains("Brain", "storage/samples")).toBe(false);
+    expect(destContains(DEST.storage, "storage/samples")).toBe(true);
+    expect(destContains(DEST.storage, "Storage/Work")).toBe(true);
+    expect(destContains(DEST.storage, "wiki/projects")).toBe(false);
+  });
+  it("uses a literal prefix for sinks, vault markers, and plain folders", () => {
+    expect(destContains(DEST.archive, "Archive/2025")).toBe(true);
+    expect(destContains(DEST.trash, "Trash")).toBe(true);
+    expect(destContains(DEST.trash, "Trashy")).toBe(false); // prefix, not substring
+    expect(destContains("vault:lib", "vault:lib/notes")).toBe(true);
+    expect(destContains("Projects", "Projects/rotli")).toBe(true);
+    expect(destContains("Projects", "Other")).toBe(false);
+  });
+  it("a BARE root marker contains everything inside that root (colon-joined, no slash)", () => {
+    expect(destContains(DEST.vault, "vault:wiki/foo")).toBe(true);
+    expect(destContains(DEST.vault, "vault:")).toBe(true);
+    expect(destContains(DEST.vault, "wiki/foo")).toBe(false);
+    expect(destContains("lib:", "lib:storage/x")).toBe(true);
   });
 });
 

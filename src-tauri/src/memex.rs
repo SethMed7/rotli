@@ -479,9 +479,22 @@ fn read_at(root: &Path, rel: &str) -> Result<String, String> {
 
 /// Frontmatter scalar lookup (mirrors conversations.ts `fm`; line-based so it's
 /// safe on any UTF-8 — frontmatter sits in the first handful of lines).
+/// Read a `key:` value from the FIRST frontmatter block ONLY — a body line can
+/// never match (a pasted YAML snippet inside a chat message used to read as the
+/// chat's own `pinned:`, and Unpin couldn't clear it because the TS writer is
+/// properly block-scoped — reviewer, 2026-07-08). A file that doesn't open with
+/// `---` has no frontmatter and yields "". The 40-line cap is a backstop against
+/// a pathological unterminated block.
 fn fm(text: &str, key: &str) -> String {
     let want = format!("{key}:");
-    for line in text.lines().take(20) {
+    let mut lines = text.lines();
+    if lines.next().map(str::trim_end) != Some("---") {
+        return String::new();
+    }
+    for line in lines.take(40) {
+        if line.trim_end() == "---" {
+            break;
+        }
         if let Some(rest) = line.strip_prefix(&want) {
             return rest.trim().to_string();
         }
@@ -509,6 +522,8 @@ pub struct ChatSummary {
     /// most recently touched chat. The listing stays slug-sorted (the sidebar
     /// depends on that order); recency is the CALLER's concern.
     pub modified_ms: u64,
+    /// `pinned: true` frontmatter — the sidebar sorts pinned chats first.
+    pub pinned: bool,
 }
 
 /// List the named chats in `chats/` (read-only; mirrors conversations.ts listChats).
@@ -549,6 +564,7 @@ fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
                 attached_to: unwrap_wikilink(&fm(&text, "attachedTo")),
                 path: p.to_string_lossy().to_string(),
                 modified_ms,
+                pinned: fm(&text, "pinned") == "true",
             });
         }
     }
@@ -899,6 +915,19 @@ mod tests {
         assert!(root.join("MAP.md").is_file());
         // refuses to scaffold over a non-empty folder
         assert!(scaffold_memex(&root).is_err());
+    }
+
+    #[test]
+    fn fm_reads_only_the_first_frontmatter_block() {
+        let chat = "---\ntitle: T\npinned: true\n---\n\n# T\n\nbody\n";
+        assert_eq!(fm(chat, "title"), "T");
+        assert_eq!(fm(chat, "pinned"), "true");
+        // a body-line `pinned:` never matches (it used to pin the chat, and Unpin
+        // couldn't clear it — the TS writer only touches the frontmatter block)
+        let body_only = "---\ntitle: T\n---\n\npinned: true\n";
+        assert_eq!(fm(body_only, "pinned"), "");
+        // a file that doesn't open with --- has no frontmatter at all
+        assert_eq!(fm("title: sneaky\n", "title"), "");
     }
 
     #[test]

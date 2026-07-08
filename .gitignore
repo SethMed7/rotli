@@ -20,3 +20,6 @@ secrets.*
 
 # CARL ephemeral session state (runtime; the hook recreates it) — carl.json IS tracked
 .carl/sessions/
+
+# local MCP server wiring (machine-specific paths; not part of the app)
+.mcp.json

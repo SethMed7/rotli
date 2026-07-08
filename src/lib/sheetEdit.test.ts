@@ -6,6 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import ExcelJS from "exceljs";
 import {
+  type EditCell,
   argbFromHex,
   b64FromBytes,
   b64FromText,
@@ -13,13 +14,18 @@ import {
   coerceInput,
   colLabel,
   csvTextFromRows,
+  deleteCols,
+  deleteRows,
   exceedsEditCaps,
   fillWorkbookFromRows,
   gridFromWorkbook,
   hexFromArgb,
+  insertCols,
+  insertRows,
   setCellStyle,
   setCellValue,
   setColumnStyle,
+  trimTrailingEmptyCols,
   valueText,
 } from "./sheetEdit";
 
@@ -144,6 +150,97 @@ describe("xlsx round-trip through exceljs", () => {
       pattern: "solid",
       fgColor: { argb: "FF00FF88" },
     });
+  });
+
+  test("italic, underline, font, size, wrap, align, and borders survive write → reload", async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Styled");
+    ws.addRow(["a", "b"]);
+    setCellStyle(ws, 1, 1, {
+      italic: true,
+      underline: true,
+      fontName: "Georgia",
+      fontSize: 18,
+      wrap: true,
+      align: "center",
+      border: { top: false, right: false, bottom: true, left: false },
+    });
+    const buffer = await wb.xlsx.writeBuffer();
+    const wb2 = new ExcelJS.Workbook();
+    await wb2.xlsx.load(buffer);
+    const s = cellAt(gridFromWorkbook(wb2), 0, 0, 0).style;
+    expect(s?.italic).toBe(true);
+    expect(s?.underline).toBe(true);
+    expect(s?.fontName).toBe("Georgia");
+    expect(s?.fontSize).toBe(18);
+    expect(s?.wrap).toBe(true);
+    expect(s?.align).toBe("center");
+    expect(s?.border).toEqual({ top: false, right: false, bottom: true, left: false });
+  });
+
+  test("a border preset replaces prior sides (Bottom clears a prior All)", async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("B");
+    ws.addRow(["x"]);
+    setCellStyle(ws, 1, 1, { border: { top: true, right: true, bottom: true, left: true } });
+    setCellStyle(ws, 1, 1, { border: { top: false, right: false, bottom: true, left: false } });
+    const buffer = await wb.xlsx.writeBuffer();
+    const wb2 = new ExcelJS.Workbook();
+    await wb2.xlsx.load(buffer);
+    expect(cellAt(gridFromWorkbook(wb2), 0, 0, 0).style?.border).toEqual({
+      top: false,
+      right: false,
+      bottom: true,
+      left: false,
+    });
+  });
+
+  test("insert/delete rows and columns shift the grid (values move with them)", () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("S");
+    ws.addRow(["a1", "b1"]);
+    ws.addRow(["a2", "b2"]);
+
+    insertRows(ws, 2, 1); // a blank row before row 2
+    expect(gridFromWorkbook(wb)[0]?.rows.map((r) => r.map((c) => c.v))).toEqual([
+      ["a1", "b1"],
+      ["", ""],
+      ["a2", "b2"],
+    ]);
+
+    deleteRows(ws, 2, 1);
+    expect(gridFromWorkbook(wb)[0]?.rows.map((r) => r.map((c) => c.v))).toEqual([
+      ["a1", "b1"],
+      ["a2", "b2"],
+    ]);
+
+    insertCols(ws, 2, 1); // a blank column before column 2
+    expect(gridFromWorkbook(wb)[0]?.rows[0]?.map((c) => c.v)).toEqual(["a1", "", "b1"]);
+
+    deleteCols(ws, 1, 1); // drop the first column — exceljs leaves a phantom trailing col
+    const rows = must(gridFromWorkbook(wb)[0], "sheet").rows;
+    expect(rows[0]?.map((c) => c.v)).toEqual(["", "b1", ""]);
+    // the editor trims that phantom (only after a column delete, never on read)
+    expect(trimTrailingEmptyCols(rows)[0]?.map((c) => c.v)).toEqual(["", "b1"]);
+  });
+
+  test("trimTrailingEmptyCols drops trailing empty-unstyled columns, keeps the rest", () => {
+    const rows: EditCell[][] = [
+      [
+        { v: "x", style: null, formula: false },
+        { v: "", style: null, formula: false },
+        { v: "", style: null, formula: false },
+      ],
+    ];
+    expect(trimTrailingEmptyCols(rows)[0]).toHaveLength(1);
+    // a value in the trailing column stops the trim (a leading empty stays)
+    const kept: EditCell[][] = [
+      [
+        { v: "", style: null, formula: false },
+        { v: "b1", style: null, formula: false },
+      ],
+    ];
+    expect(trimTrailingEmptyCols(kept)[0]?.map((c) => c.v)).toEqual(["", "b1"]);
   });
 
   test("clearing a style patch removes it", async () => {

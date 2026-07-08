@@ -10,6 +10,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A real spreadsheet editor.** The sheet surface grew from cell edits into a
+  Sheets-style suite: a formatting bar (font family + size · bold / italic /
+  underline · text + fill color · borders · wrap · alignment), **range
+  multi-select** (drag a rectangle, ⇧ extends, ⌘ toggles single cells in or out,
+  arrows walk and ⇧+arrows extend), **insert / delete rows and columns**
+  (right-click a row number or column header), and a **Live ⇄ Theme** color
+  toggle — *Live* shows the sheet's true colors on a paper canvas exactly as
+  Excel would, *Theme* lets it blend into rotli. Display only; the file always
+  keeps its real colors, and ⌘S remains the only write.
+- **Chats are first-class in the sidebar.** Right-click a chat for **Pin to
+  top** (rides the chat's own frontmatter), **Rename…** (inline), **Archive**,
+  and **Delete** — archive/delete move the file into hidden `chats/archive/` /
+  `chats/trash/`, so nothing is ever hard-deleted.
+
+### Fixed
+
+- **Deleting a storage file from Main no longer errors.** A binary in the memex
+  `storage/` is an asset, not a note — removing it from Main just unpins it
+  (the old path tried to trash a "note" that didn't exist and failed).
+- **Main only shows what really lives in your memex.** A note moved to
+  Archive/Trash (or living in an external vault) no longer lingers as a phantom
+  Main row; trashing or archiving a pinned note also unpins it.
+- **Open in Brain actually opens the Brain.** It now reveals the note's real
+  `wiki/` home even when the note is also pinned in Main (Main used to win).
+- **The destination highlight tells the truth.** Brain/Storage/Archive/Trash
+  rows only read as selected while the content you're focused on actually lives
+  there — a stale ⌘N target no longer glows while you work elsewhere.
+
 ## [0.25.0] - 2026-07-08
 
 

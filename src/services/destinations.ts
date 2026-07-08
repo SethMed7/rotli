@@ -80,6 +80,24 @@ export function isTrash(folderId: string): boolean {
   return folderId === DEST.trash || folderId.startsWith(`${DEST.trash}/`);
 }
 
+/** Does an item whose REAL home is `folderId` live under sidebar destination (or
+ * plain folder) `destId`? The sidebar's derived highlight rule (Seth #1,
+ * 2026-07-08): a destination row only reads "selected" while the focused
+ * content actually lives under it. The two aliased destinations map to their
+ * disk shapes — "Brain" ⇔ wiki/*, "Storage" ⇔ memex storage/* AND the legacy
+ * Storage/* folder; everything else (Archive, Trash, Inbox, vault: markers,
+ * plain folders) is a literal prefix match. Pure. */
+export function destContains(destId: string, folderId: string): boolean {
+  // a BARE root marker ("vault:", "lib:") — ids inside it are "vault:wiki/x",
+  // colon-joined with NO slash after the marker, so the plain prefix rule below
+  // would never match (reviewer blocker, 2026-07-08)
+  if (isRootMarker(destId)) return folderId.startsWith(destId);
+  const under = (root: string) => folderId === root || folderId.startsWith(`${root}/`);
+  if (destId === "Brain") return under("wiki");
+  if (destId === DEST.storage) return under("storage") || under(DEST.storage);
+  return under(destId);
+}
+
 /** True when folderId has the chats/ SHAPE — "chats", "chats/x", and the
  * prefixed "vault:chats/x". A pure path test: whether it MEANS a Chat-front
  * transcript depends on the root's layout (see `isChats`). `:` can never

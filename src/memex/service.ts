@@ -40,6 +40,7 @@ import {
   noteStem,
   parsePrimaryUser,
   setAttachedTo,
+  setChatPinned,
   today,
   ulid,
 } from "./contract";
@@ -167,6 +168,17 @@ export async function archiveChat(instance: MemexInstance, slug: string): Promis
     throw new Error("this brain is read-only — can't archive a chat here");
   }
   await memexArchiveChat(instance.root, slug);
+}
+
+/** Pin/unpin a chat (frontmatter `pinned:` — the sidebar sorts pinned first). */
+export async function pinChat(instance: MemexInstance, slug: string, pinned: boolean): Promise<void> {
+  const rel = `chats/${slug}.md`;
+  if (!canWrite(rel, instance.perms)) {
+    throw new Error("this brain is read-only — can't pin a chat here");
+  }
+  const existing = await memexRead(instance.root, rel);
+  const next = setChatPinned(existing, pinned);
+  if (next !== existing) await memexWriteChat(instance.root, slug, next);
 }
 
 // ── notes (rotli's owned wiki/_inbox staging — the v3.5 write model) ───────────

@@ -1036,9 +1036,42 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+  row-gap: 6px;
   padding: 7px 12px;
   border-bottom: 1px solid var(--border);
+}
+/* the font/size/borders dropdowns — same height/grammar as .sheet-tool */
+.sheet-tool-select {
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 0 6px;
+  max-width: 150px;
+  cursor: pointer;
+}
+.sheet-tool-select:hover:not(:disabled) {
+  border-color: var(--text-muted);
+}
+.sheet-tool-select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.sheet-tool-size {
+  max-width: 74px;
+}
+/* a hairline divider between toolbar groups */
+.sheet-tool-sep {
+  width: 1px;
+  align-self: stretch;
+  min-height: 18px;
+  margin: 0 2px;
+  background: var(--border);
 }
 .sheet-tool {
   border: 1px solid var(--border);
@@ -1163,8 +1196,28 @@
   outline: none;
 }
 .sheet-grid .sheet-cell.sel {
-  /* selection ring INSIDE the cell so user bg colors stay visible */
+  /* a translucent wash so a whole RANGE reads as selected without ringing every
+     cell — user bg colors stay visible underneath (low-clutter, Phase B) */
+  box-shadow: inset 0 0 0 100px color-mix(in srgb, var(--accent-text) 12%, transparent);
+}
+.sheet-grid .sheet-cell.sel-focus {
+  /* the active cell of the selection gets the crisp ring (source order wins over
+     .sel, so a single-cell selection still shows just the ring) */
   box-shadow: inset 0 0 0 2px var(--accent-text);
+}
+/* live ⇄ in-theme (Phase D): "live" renders the DOCUMENT on paper — white canvas,
+   near-black default text, light grid lines — so authored fills/colors read
+   exactly as Excel shows them. rotli's chrome (row numbers, column headers,
+   toolbar) stays themed. Display only; keyword colors, never hex (check:hex). */
+.sheet-live .file-sheet-scroll {
+  background: white;
+}
+.sheet-live .sheet-grid .sheet-cell {
+  color: color-mix(in srgb, black 85%, white);
+  border-color: color-mix(in srgb, black 14%, white);
+}
+.sheet-live .sheet-cell-input {
+  color: color-mix(in srgb, black 85%, white);
 }
 .sheet-grid .sheet-cell.fx {
   font-style: italic;

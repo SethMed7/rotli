@@ -756,6 +756,17 @@ export function useFocusedBoardId(): string | null {
   });
 }
 
+/** The focused pane's active TAB itself (a stable reference from the tree — safe
+ * as a zustand selector). The Sidebar derives the destination highlight from
+ * where this tab's content actually lives (Seth #1, 2026-07-08). */
+export function useFocusedTab(): Tab | null {
+  return usePanesStore((s) => {
+    const leaf = findLeaf(s.root, s.focusedPaneId) ?? leaves(s.root)[0];
+    if (!leaf) return null;
+    return leaf.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf.tabs[0] ?? null;
+  });
+}
+
 /** The chat companion: the focused pane's active chat slug (null when the active
  * tab isn't a chat). The Sidebar's chat rows light up against this. */
 export function useFocusedChatSlug(): string | null {

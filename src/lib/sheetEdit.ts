@@ -9,14 +9,42 @@
 // exists at the <input type=color> boundary and is always built at runtime —
 // never a hex literal in source (check:hex).
 
-import type { Cell, CellValue, Column, Fill, Font, Workbook, Worksheet } from "exceljs";
+import type {
+  Alignment,
+  Border,
+  Borders,
+  Cell,
+  CellValue,
+  Column,
+  Fill,
+  Font,
+  Workbook,
+  Worksheet,
+} from "exceljs";
 import { csvCell } from "./sheets";
 
-/** The three style knobs rotli edits. Colors are ARGB; null = unset. */
+export type CellAlign = "left" | "center" | "right";
+/** Which of a cell's four edges carry a (thin) border. */
+export interface BorderSides {
+  top: boolean;
+  right: boolean;
+  bottom: boolean;
+  left: boolean;
+}
+
+/** The style knobs rotli edits — a Sheets/Excel-style bar (Seth, 2026-07-08).
+ * Colors are ARGB; null/false = unset. exceljs round-trips every one of these. */
 export interface CellStyle {
   bold: boolean;
+  italic: boolean;
+  underline: boolean;
   color: string | null;
   bg: string | null;
+  fontName: string | null;
+  fontSize: number | null;
+  wrap: boolean;
+  align: CellAlign | null;
+  border: BorderSides | null;
 }
 
 export interface EditCell {
@@ -109,30 +137,68 @@ export function coerceInput(text: string): number | string | null {
 // ── style read/apply ─────────────────────────────────────────────────────────
 
 /** The rotli-visible style of a cell (bold / text color / solid bg); null when plain. */
-export function styleOfCell(cell: Cell): CellStyle | null {
-  const bold = !!cell.font?.bold;
-  const color = cell.font?.color?.argb ?? null;
-  const fill = cell.fill;
-  const bg =
-    fill && fill.type === "pattern" && fill.pattern === "solid"
-      ? (fill.fgColor?.argb ?? null)
-      : null;
-  return bold || color || bg ? { bold, color, bg } : null;
+/** Which edges of an exceljs border carry a real (styled) line. */
+function bordersOf(b: Partial<Borders> | undefined): BorderSides | null {
+  const has = (s: Partial<Border> | undefined) => !!s?.style;
+  const sides = { top: has(b?.top), right: has(b?.right), bottom: has(b?.bottom), left: has(b?.left) };
+  return sides.top || sides.right || sides.bottom || sides.left ? sides : null;
 }
 
-/** Both Cell and Column expose font/fill this way — one apply for either. */
+export function styleOfCell(cell: Cell): CellStyle | null {
+  const f = cell.font;
+  const bold = !!f?.bold;
+  const italic = !!f?.italic;
+  // exceljs underline is `boolean | 'none' | 'single' | …` — a string "none" is
+  // falsy-in-intent but truthy-as-a-string, so exclude it explicitly.
+  const underline = !!f?.underline && f.underline !== "none";
+  const color = f?.color?.argb ?? null;
+  const fontName = f?.name ?? null;
+  const fontSize = typeof f?.size === "number" ? f.size : null;
+  const fill = cell.fill;
+  const bg =
+    fill && fill.type === "pattern" && fill.pattern === "solid" ? (fill.fgColor?.argb ?? null) : null;
+  const h = cell.alignment?.horizontal;
+  const align: CellAlign | null = h === "left" || h === "center" || h === "right" ? h : null;
+  const wrap = !!cell.alignment?.wrapText;
+  const border = bordersOf(cell.border);
+  return bold || italic || underline || color || bg || fontName || fontSize !== null || wrap || align || border
+    ? { bold, italic, underline, color, bg, fontName, fontSize, wrap, align, border }
+    : null;
+}
+
+/** Cell and Column both expose font/fill/alignment/border this way — one apply
+ * for either. */
 interface Styleable {
   font?: Partial<Font>;
   fill?: Fill;
+  alignment?: Partial<Alignment>;
+  border?: Partial<Borders>;
 }
 
 function applyStyle(target: Styleable, patch: Partial<CellStyle>): void {
-  if (patch.bold !== undefined || patch.color !== undefined) {
+  if (
+    patch.bold !== undefined ||
+    patch.italic !== undefined ||
+    patch.underline !== undefined ||
+    patch.color !== undefined ||
+    patch.fontName !== undefined ||
+    patch.fontSize !== undefined
+  ) {
     const font: Partial<Font> = { ...target.font };
     if (patch.bold !== undefined) font.bold = patch.bold;
+    if (patch.italic !== undefined) font.italic = patch.italic;
+    if (patch.underline !== undefined) font.underline = patch.underline;
     if (patch.color !== undefined) {
       if (patch.color === null) delete font.color;
       else font.color = { argb: patch.color };
+    }
+    if (patch.fontName !== undefined) {
+      if (patch.fontName === null) delete font.name;
+      else font.name = patch.fontName;
+    }
+    if (patch.fontSize !== undefined) {
+      if (patch.fontSize === null) delete font.size;
+      else font.size = patch.fontSize;
     }
     target.font = font;
   }
@@ -141,6 +207,31 @@ function applyStyle(target: Styleable, patch: Partial<CellStyle>): void {
       patch.bg === null
         ? { type: "pattern", pattern: "none" }
         : { type: "pattern", pattern: "solid", fgColor: { argb: patch.bg } };
+  }
+  if (patch.wrap !== undefined || patch.align !== undefined) {
+    const al: Partial<Alignment> = { ...target.alignment };
+    if (patch.wrap !== undefined) al.wrapText = patch.wrap;
+    if (patch.align !== undefined) {
+      if (patch.align === null) delete al.horizontal;
+      else al.horizontal = patch.align;
+    }
+    target.alignment = al;
+  }
+  if (patch.border !== undefined) {
+    if (patch.border === null) {
+      target.border = {};
+    } else {
+      // assign a FRESH border object with only the on-sides — this replaces the
+      // whole border, so a preset (e.g. Bottom) also clears the sides it omits.
+      const b = patch.border;
+      const line: Partial<Border> = { style: "thin" };
+      target.border = {
+        ...(b.top ? { top: line } : {}),
+        ...(b.right ? { right: line } : {}),
+        ...(b.bottom ? { bottom: line } : {}),
+        ...(b.left ? { left: line } : {}),
+      };
+    }
   }
 }
 
@@ -175,6 +266,27 @@ export function setCellValue(ws: Worksheet, row: number, col: number, text: stri
   return valueText(cell.value);
 }
 
+// ── structural edits: insert / delete rows + columns ─────────────────────────
+// exceljs splice* shifts existing cells (and their styles) for us; the caller
+// re-derives the grid from the workbook afterwards so the two never diverge.
+
+/** Insert `count` blank rows BEFORE 1-based row `at`. */
+export function insertRows(ws: Worksheet, at: number, count: number): void {
+  ws.spliceRows(at, 0, ...Array.from({ length: count }, () => [] as CellValue[]));
+}
+/** Delete `count` rows starting at 1-based row `at`. */
+export function deleteRows(ws: Worksheet, at: number, count: number): void {
+  ws.spliceRows(at, count);
+}
+/** Insert `count` blank columns BEFORE 1-based column `at`. */
+export function insertCols(ws: Worksheet, at: number, count: number): void {
+  ws.spliceColumns(at, 0, ...Array.from({ length: count }, () => [] as CellValue[]));
+}
+/** Delete `count` columns starting at 1-based column `at`. */
+export function deleteCols(ws: Worksheet, at: number, count: number): void {
+  ws.spliceColumns(at, count);
+}
+
 // ── workbook ⇄ grid ──────────────────────────────────────────────────────────
 
 /** Extract the render/edit grid from a loaded workbook (values + styles +
@@ -199,6 +311,23 @@ export function gridFromWorkbook(wb: Workbook, maxRows = MAX_EDIT_ROWS): EditShe
     }
     return { name: ws.name, rows };
   });
+}
+
+/** Drop trailing columns that are empty AND unstyled AND non-formula in EVERY
+ * row. exceljs leaves a phantom trailing column after a `spliceColumns` delete
+ * (its columnCount goes stale). The editor applies this ONLY after a column
+ * delete — never on every read, so a freshly INSERTED trailing column survives
+ * (it would otherwise be trimmed the same tick it's created). Pure. */
+export function trimTrailingEmptyCols(rows: EditCell[][]): EditCell[][] {
+  const width = rows.reduce((m, r) => Math.max(m, r.length), 0);
+  let w = width;
+  const emptyAt = (col: number) =>
+    rows.every((row) => {
+      const cell = row[col - 1];
+      return !cell || (cell.v === "" && !cell.style && !cell.formula);
+    });
+  while (w > 0 && emptyAt(w)) w--;
+  return w < width ? rows.map((row) => row.slice(0, w)) : rows;
 }
 
 /** Was the sheet truncated by the caps? A truncated grid must never save. */

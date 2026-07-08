@@ -216,6 +216,21 @@ export function setAttachedTo(contents: string, stem: string): string {
   return `${contents.slice(0, fm.index)}---\n${next}\n---${contents.slice(fm.index + fm[0].length)}`;
 }
 
+/** Rewrite (or insert) the `pinned:` frontmatter line on an EXISTING chat file —
+ * the sidebar's pin-to-top (Seth #4 fast-follow, 2026-07-08). Pure; same
+ * first-frontmatter-block discipline as setAttachedTo. Unpinning a chat that was
+ * never pinned is a no-op (no line is added just to say `false`). */
+export function setChatPinned(contents: string, pinned: boolean): string {
+  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
+  if (!fm || fm[1] === undefined) return contents; // no frontmatter — leave the file alone
+  const block = fm[1];
+  let next: string;
+  if (/^pinned:.*$/m.test(block)) next = block.replace(/^pinned:.*$/m, `pinned: ${pinned}`);
+  else if (pinned) next = `${block}\npinned: true`;
+  else return contents;
+  return `${contents.slice(0, fm.index)}---\n${next}\n---${contents.slice(fm.index + fm[0].length)}`;
+}
+
 /** Keep the attached note's `## Chat` backlink in sync (byte-identical to
  *  conversations.ts ensureChatLink). Pure: returns the new note body; Rust writes it. */
 export function ensureChatBacklink(noteBody: string, slug: string): string {

@@ -67,6 +67,7 @@ import {
 import {
   DEST,
   type Destination,
+  destContains,
   isHidden,
   isRootMarker,
   isVault,
@@ -75,12 +76,13 @@ import {
   useFocusedBoardId,
   useFocusedChatSlug,
   useFocusedNoteId,
+  useFocusedTab,
   usePanesStore,
 } from "../state/panes";
 import { ALL_NOTES, RECENT, SEC_CHAT, SEC_INBOX, SEC_NOTES, useUiStore } from "../state/ui";
 import { activeInstance } from "../memex/config";
 import { invalidateMemex, useInstanceChats, useMemexConfig } from "../memex/useMemex";
-import { archiveChat, deleteChat } from "../memex/service";
+import { archiveChat, deleteChat, pinChat } from "../memex/service";
 import { useChatRename } from "../lib/chatRename";
 import type { Folder, NoteSummary } from "../types";
 import { dispatch } from "../keys/registry";
@@ -101,6 +103,7 @@ import {
   NewFileGlyph,
   NewFolderGlyph,
   NotesStackGlyph,
+  PinGlyph,
   PlusGlyph,
   SearchGlyph,
   StarGlyph,
@@ -563,7 +566,13 @@ export function Sidebar() {
   // Chat surface reads), plus the chat-selection ui state the surface renders. —
   const memexCfg = useMemexConfig();
   const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
-  const chatList = useInstanceChats(activeMemex).data ?? [];
+  const rawChatList = useInstanceChats(activeMemex).data ?? [];
+  // pinned chats float to the top (stable sort keeps the slug order within each
+  // group) — the pin lives in the chat's own frontmatter (Seth #4, 2026-07-08)
+  const chatList = useMemo(
+    () => [...rawChatList].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
+    [rawChatList],
+  );
   const chatRename = useChatRename();
   const quickNoteIds = useUiStore((s) => s.quickNoteIds);
   // the LIMITED Chat view's cap — a Settings knob (5/10/15), default 5 (#17)
@@ -591,6 +600,33 @@ export function Sidebar() {
   const openChat = usePanesStore((s) => s.openChat);
   const retargetBoard = usePanesStore((s) => s.retargetBoard);
   const focusedChatSlug = useFocusedChatSlug();
+  // The DERIVED destination highlight (Seth #1, 2026-07-08): a destination/folder
+  // row only reads "selected" while the focused tab's content actually LIVES
+  // under it — a stale ⌘N create-target (e.g. Storage) no longer glows while you
+  // work in a Main note. Where the content lives = its REAL home (the note
+  // index), never the Main projection; a file's home is its wire folder; a chat
+  // lives in the Chat front, so every destination goes quiet. Nothing focused
+  // (or a meta surface like Activity) keeps the plain behavior.
+  const focusedTab = useFocusedTab();
+  const focusedHome = useMemo(() => {
+    if (!focusedTab) return null;
+    if (focusedTab.surfaceKind === "note")
+      return noteIndex.get(focusedTab.noteId)?.folderId ?? null;
+    if (focusedTab.surfaceKind === "canvas")
+      return noteIndex.get(focusedTab.boardId)?.folderId ?? null;
+    if (focusedTab.surfaceKind === "file") {
+      const slash = focusedTab.fileId.lastIndexOf("/");
+      if (slash >= 0) return focusedTab.fileId.slice(0, slash);
+      // slashless: a root-marker file ("lib:x.pdf") homes to its marker ("lib:");
+      // a bare corpus-root file keeps its own id (matches no destination — quiet)
+      const colon = focusedTab.fileId.indexOf(":");
+      return colon > 0 ? focusedTab.fileId.slice(0, colon + 1) : focusedTab.fileId;
+    }
+    if (focusedTab.surfaceKind === "chat") return "chats";
+    return null; // activity + future meta surfaces
+  }, [focusedTab, noteIndex]);
+  const destSelected = (id: string) =>
+    selectedFolderId === id && (focusedHome === null || destContains(id, focusedHome));
   const renamingBoardId = useUiStore((s) => s.renamingBoardId);
   const setRenamingBoardId = useUiStore((s) => s.setRenamingBoardId);
   // failed row-menu actions (file-to-brain, board rename) land here — the menu
@@ -1044,7 +1080,7 @@ export function Sidebar() {
       .filter((folder) => !isPlumbingFolder(folder))
       .map((folder) => {
       const open = expandedDests[folder.id] ?? false;
-      const selected = selectedFolderId === folder.id;
+      const selected = destSelected(folder.id);
       // the memex "wiki" is the AI's filing structure — surface it as "Knowledge"
       // with a plain-language note that the AI organizes it (transparency without
       // the wiki jargon the average user wouldn't know what to do with)
@@ -1704,14 +1740,35 @@ export function Sidebar() {
                     onContextMenu={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      // failures (e.g. a read-only brain) land in the sidebar's
+                      // inline error note — the menu is gone by the time they
+                      // reject (#11 pattern; reviewer, 2026-07-08)
+                      const runChatOp = (verb: string, op: Promise<void>) => {
+                        setRowActionError(null);
+                        void op
+                          .then(() => invalidateMemex())
+                          .catch((err) =>
+                            setRowActionError(
+                              `Couldn't ${verb} this chat — ${err instanceof Error ? err.message : String(err)}`,
+                            ),
+                          );
+                      };
                       openContextMenu(e.clientX, e.clientY, [
+                        {
+                          kind: "action" as const,
+                          label: c.pinned ? "Unpin from top" : "Pin to top",
+                          checked: c.pinned,
+                          onClick: () => {
+                            if (activeMemex) runChatOp("pin", pinChat(activeMemex, c.slug, !c.pinned));
+                          },
+                        },
                         { kind: "action" as const, label: "Rename…", onClick: () => chatRename.start(c.slug) },
                         { kind: "sep" as const },
                         {
                           kind: "action" as const,
                           label: "Archive",
                           onClick: () => {
-                            if (activeMemex) void archiveChat(activeMemex, c.slug).then(() => invalidateMemex());
+                            if (activeMemex) runChatOp("archive", archiveChat(activeMemex, c.slug));
                           },
                         },
                         {
@@ -1719,7 +1776,7 @@ export function Sidebar() {
                           label: "Delete",
                           danger: true,
                           onClick: () => {
-                            if (activeMemex) void deleteChat(activeMemex, c.slug).then(() => invalidateMemex());
+                            if (activeMemex) runChatOp("delete", deleteChat(activeMemex, c.slug));
                           },
                         },
                       ]);
@@ -1728,6 +1785,7 @@ export function Sidebar() {
                   >
                     <ChatGlyph size={13} />
                     <span className="fname">{c.title || c.slug}</span>
+                    {c.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
                   </button>
                 ),
               )
@@ -1863,7 +1921,7 @@ export function Sidebar() {
               <div>
                 <button
                   type="button"
-                  className={`frow${selectedFolderId === "Brain" ? " sel" : ""}`}
+                  className={`frow${destSelected("Brain") ? " sel" : ""}`}
                   onClick={() => {
                     toggleDestExpanded("Brain");
                     setSelectedFolderId("Brain");
@@ -1904,7 +1962,7 @@ export function Sidebar() {
             {visibleDestRows.map(({ id, label, Glyph }) => {
               const destNotes = notesByDest[id] ?? [];
               const open = expandedDests[id] ?? false;
-              const selected = selectedFolderId === id;
+              const selected = destSelected(id);
               return (
                 <div key={id}>
                   <button

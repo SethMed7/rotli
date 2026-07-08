@@ -23,6 +23,7 @@ import {
   parseMemexInfo,
   parsePrimaryUser,
   setAttachedTo,
+  setChatPinned,
   slugify,
 } from "./contract";
 
@@ -146,6 +147,24 @@ describe("setAttachedTo (the lazy chat↔note link)", () => {
   test("a file without frontmatter is left byte-identical", () => {
     const bare = "# just a body\n";
     expect(setAttachedTo(bare, "x")).toBe(bare);
+  });
+});
+
+describe("setChatPinned (sidebar pin-to-top)", () => {
+  test("inserts pinned: true, rewrites in place, and unpin flips it", () => {
+    const base = "---\ntitle: T\n---\n\nbody\n";
+    const pinned = setChatPinned(base, true);
+    expect(pinned).toBe("---\ntitle: T\npinned: true\n---\n\nbody\n");
+    const unpinned = setChatPinned(pinned, false);
+    expect(unpinned).toContain("pinned: false");
+    expect(unpinned.match(/^pinned:/gm)?.length).toBe(1);
+  });
+
+  test("unpinning a never-pinned chat is a no-op; no frontmatter → byte-identical", () => {
+    const base = "---\ntitle: T\n---\n\nbody\n";
+    expect(setChatPinned(base, false)).toBe(base);
+    const bare = "# just a body\npinned: true\n";
+    expect(setChatPinned(bare, true)).toBe(bare); // a body line never matches
   });
 });
 

@@ -495,6 +495,12 @@
 .sb-chatrename:focus-visible {
   outline: none;
 }
+/* the pinned-chat marker — quiet, right-aligned (Seth #4, 2026-07-08) */
+.sb-chatrow .sb-chatpin {
+  margin-left: auto;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
 .sb-chatnew {
   color: var(--accent-text);
   font-weight: 600;
