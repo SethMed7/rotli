@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-07-08
+
+
 ### Added
 
 - **A real spreadsheet editor.** The sheet surface grew from cell edits into a
