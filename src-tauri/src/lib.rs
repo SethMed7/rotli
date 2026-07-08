@@ -901,6 +901,7 @@ pub fn run() {
             memex::memex_read,
             memex::memex_list_chats,
             memex::memex_write_chat,
+            memex::memex_rename_chat,
             memex::memex_write_note,
             memex::memex_validate,
             memex::memex_pick_folder

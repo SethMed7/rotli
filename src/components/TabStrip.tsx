@@ -16,6 +16,7 @@
 
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBoardRename } from "../lib/boardRename";
+import { useChatRename } from "../lib/chatRename";
 import { fileName } from "../lib/fileKind";
 import { startTabDrag } from "../lib/tabDrag";
 import { newNoteInTab } from "../keys/actions";
@@ -68,6 +69,13 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   // double-click a board tab to rename it in place (shares the sidebar's flow)
   const { renamingBoardId, start: startRename, commit: commitRename, cancel: cancelRename } =
     useBoardRename();
+  // double-click / right-click a chat tab to rename it (renames chats/<slug>.md)
+  const {
+    renamingChatSlug,
+    start: startChatRename,
+    commit: commitChatRename,
+    cancel: cancelChatRename,
+  } = useChatRename();
   // the insertion index previewed for THIS strip (2px line), or null
   const dropAt = usePanesStore((s) =>
     s.dropPreview?.kind === "strip" && s.dropPreview.paneId === pane.id
@@ -163,6 +171,10 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
             .setRenameTarget({ id: tab.noteId, current: titles.get(tab.noteId) ?? "" }),
       });
       items.push({ kind: "sep" });
+    } else if (tab.surfaceKind === "chat" && tab.chatSlug) {
+      const slug = tab.chatSlug;
+      items.push({ kind: "action", label: "Rename…", onClick: () => startChatRename(slug) });
+      items.push({ kind: "sep" });
     }
     items.push({
       kind: "action",
@@ -247,12 +259,30 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                       }}
                       onBlur={() => cancelRename()}
                     />
+                  ) : tab.surfaceKind === "chat" && !!tab.chatSlug && renamingChatSlug === tab.chatSlug ? (
+                    <input
+                      className="tab-rename"
+                      autoFocus
+                      defaultValue={tabLabel(tab, titles)}
+                      aria-label="Rename chat"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => event.stopPropagation()}
+                      onFocus={(event) => event.currentTarget.select()}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter")
+                          commitChatRename(tab.chatSlug ?? "", event.currentTarget.value);
+                        else if (event.key === "Escape") cancelChatRename();
+                      }}
+                      onBlur={() => cancelChatRename()}
+                    />
                   ) : (
                     <span
                       onDoubleClick={
                         tab.surfaceKind === "canvas"
                           ? () => startRename(tab.boardId)
-                          : undefined
+                          : tab.surfaceKind === "chat" && tab.chatSlug
+                            ? () => startChatRename(tab.chatSlug ?? "")
+                            : undefined
                       }
                     >
                       {tabLabel(tab, titles)}

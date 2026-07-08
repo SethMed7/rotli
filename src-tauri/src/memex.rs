@@ -697,6 +697,37 @@ fn write_chat_at(root: &Path, slug: &str, contents: &str) -> Result<String, Stri
     Ok(path.to_string_lossy().to_string())
 }
 
+/// Rename a chat: `chats/<old>.md` → `chats/<new>.md`. Both slugs are re-validated
+/// on the wire (lowercase-alnum-dash, no separators, no `..`), so a crafted slug
+/// can never escape `chats/`. Returns the new safe slug the caller re-binds to.
+/// The ROOT must be registered (#20).
+#[tauri::command]
+pub fn memex_rename_chat(
+    app: tauri::AppHandle,
+    root: String,
+    old_slug: String,
+    new_slug: String,
+) -> Result<String, String> {
+    let root = registered_root(&app, &root)?;
+    let old_safe = safe_slug(&old_slug)?;
+    let new_safe = safe_slug(&new_slug)?;
+    assert_writable(&format!("chats/{old_safe}.md"))?;
+    assert_writable(&format!("chats/{new_safe}.md"))?;
+    let chats = root.join("chats");
+    let old_path = chats.join(format!("{old_safe}.md"));
+    let new_path = chats.join(format!("{new_safe}.md"));
+    if !old_path.exists() {
+        return Err(format!("chat not found: {old_safe}"));
+    }
+    if new_safe != old_safe && new_path.exists() {
+        return Err(format!("a chat named \"{new_safe}\" already exists"));
+    }
+    with_file_lock(&old_path, || {
+        fs::rename(&old_path, &new_path).map_err(|e| e.to_string())
+    })?;
+    Ok(new_safe)
+}
+
 /// Write a brand-new note (full v3.5 bytes composed by TS) into the `wiki/_inbox/`
 /// staging area as `<stem>.md`. The stem is `<slug>-<id6>` from the TS `noteStem`;
 /// `safe_slug` re-validates it on the wire (lowercase-alnum-dash, no separators, no

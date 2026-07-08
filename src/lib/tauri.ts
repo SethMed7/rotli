@@ -1038,6 +1038,11 @@ export function memexListChats(root: string): Promise<MemexChatSummary[]> {
 export function memexWriteChat(root: string, slug: string, contents: string): Promise<string> {
   return memexInvoke("memex_write_chat", { root, slug, contents });
 }
+
+/** Rename a chat file (chats/<old>.md → chats/<new>.md). Returns the new slug. */
+export function memexRenameChat(root: string, oldSlug: string, newSlug: string): Promise<string> {
+  return memexInvoke("memex_rename_chat", { root, oldSlug, newSlug });
+}
 /** Write a v3.5 note (full bytes composed by the contract codec) into wiki/_inbox/
  *  staging as `<stem>.md`. Returns the absolute path. */
 export function memexWriteNote(root: string, stem: string, contents: string): Promise<string> {

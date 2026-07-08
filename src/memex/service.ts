@@ -21,6 +21,7 @@ import {
   memexRead,
   memexReadContract,
   memexValidate,
+  memexRenameChat,
   memexWriteChat,
   memexWriteNote,
 } from "../lib/tauri";
@@ -136,6 +137,19 @@ export const listChats = (instance: MemexInstance): Promise<MemexChatSummary[]> 
 
 export const readChat = (instance: MemexInstance, slug: string): Promise<string> =>
   memexRead(instance.root, `chats/${slug}.md`);
+
+/** Rename a chat (chats/<old>.md → chats/<new>.md). Returns the new slug. Refused
+ * unless the chats surface is writable for this instance. */
+export async function renameChat(
+  instance: MemexInstance,
+  oldSlug: string,
+  newSlug: string,
+): Promise<string> {
+  if (!canWrite(`chats/${newSlug}.md`, instance.perms)) {
+    throw new Error("this brain is read-only — can't rename a chat here");
+  }
+  return memexRenameChat(instance.root, oldSlug, newSlug);
+}
 
 // ── notes (rotli's owned wiki/_inbox staging — the v3.5 write model) ───────────
 

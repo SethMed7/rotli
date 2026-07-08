@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings → Plugins: "Use rotli for your docs."** A copy-paste command for
   Claude Code that routes a project's planning + docs into rotli instead of the
   repo (README excepted).
+- **Rename a chat** — right-click (or double-click) a chat tab → **Rename…**
+  renames `chats/<slug>.md` on disk and re-points the open tab.
+- **Find any note.** Right-click → **Show in Finder** (reveals the file) and
+  **Open in Brain** (opens it and reveals where it lives in the sidebar — Main is
+  just a view). The editor's location chip now shows the note's Brain folder + its
+  absolute on-disk path in its tooltip.
 
 Onboarding + demo-mode polish.
 

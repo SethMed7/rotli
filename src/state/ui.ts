@@ -300,6 +300,8 @@ interface UiState {
    * the user names it immediately (Seth, 2026-06-26). */
   renamingBoardId: string | null;
   setRenamingBoardId: (id: string | null) => void;
+  renamingChatSlug: string | null;
+  setRenamingChatSlug: (slug: string | null) => void;
 
   /** The note whose title is being edited in the rename dialog (opened from the
    * right-click menu), or null. `current` seeds the input (Seth, 2026-07-01). */
@@ -535,6 +537,8 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   renamingBoardId: null,
   setRenamingBoardId: (id) => set({ renamingBoardId: id }),
+  renamingChatSlug: null,
+  setRenamingChatSlug: (slug) => set({ renamingChatSlug: slug }),
   rowActionError: null,
   setRowActionError: (e) => set({ rowActionError: e }),
 

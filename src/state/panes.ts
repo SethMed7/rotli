@@ -303,6 +303,8 @@ interface PanesState {
   openCanvas: (boardId: string, opts?: { newTab?: boolean }) => void;
   /** Retarget every open canvas tab pointing at `oldId` to `newId` (board rename). */
   retargetBoard: (oldId: string, newId: string) => void;
+  /** Re-point every open chat tab from `oldSlug` to `newSlug` after a rename. */
+  retargetChat: (oldSlug: string, newSlug: string) => void;
   /** Point open note tabs at a note's new id after it moved (e.g. the Filer filed it). */
   retargetNote: (oldId: string, newId: string) => void;
   /** Open a chat in the focused pane: reuse its open tab or open a new one
@@ -454,6 +456,13 @@ export const usePanesStore = create<PanesState>((set, get) => {
       set((s) => ({
         root: mapAllTabs(s.root, (t) =>
           t.surfaceKind === "note" && t.noteId === oldId ? { ...t, noteId: newId } : t,
+        ),
+      })),
+
+    retargetChat: (oldSlug, newSlug) =>
+      set((s) => ({
+        root: mapAllTabs(s.root, (t) =>
+          t.surfaceKind === "chat" && t.chatSlug === oldSlug ? { ...t, chatSlug: newSlug } : t,
         ),
       })),
 
