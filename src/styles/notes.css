@@ -684,12 +684,13 @@
 .nl-top {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 12px 12px 10px;
   flex: 0 0 auto;
-  /* the IDE create icons (New note · folder · board · Collapse all) sit right of
-     the filter well; on a narrow sidebar the whole cluster wraps below the filter
-     instead of squeezing the field to nothing (#7/#13, 2026-07-03). */
+  /* the IDE create icons (New note · folder · board · Collapse all) are centered
+     as a cluster; on a narrow sidebar they wrap instead of squeezing
+     (#7/#13, 2026-07-03; centered 2026-07-08). */
   flex-wrap: wrap;
 }
 /* keep the filter usable when the row wraps — it takes the first line, the icons

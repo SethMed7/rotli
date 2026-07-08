@@ -1338,6 +1338,24 @@
   opacity: 0.5;
   cursor: default;
 }
+/* Settings action hierarchy (low-pulse — Seth 2026-07-08 model UX pass, phase 1):
+   additive modifiers on .ghostbtn. Constructive actions (Install / Add / Save /
+   New) take a RESTRAINED accent — never a loud fill; destructive ones (Uninstall /
+   Delete / Remove) de-emphasize to muted so they never read as the row's CTA. */
+.ghostbtn.primary {
+  color: var(--accent-text);
+  border-color: color-mix(in srgb, var(--accent-text) 40%, var(--border));
+}
+.ghostbtn.primary:hover:not(:disabled) {
+  background: var(--tint);
+  border-color: color-mix(in srgb, var(--accent-text) 55%, var(--border));
+}
+.ghostbtn.quiet {
+  color: var(--text-muted);
+}
+.ghostbtn.quiet:hover:not(:disabled) {
+  color: var(--text);
+}
 .setnote.err {
   color: var(--accent-text);
 }

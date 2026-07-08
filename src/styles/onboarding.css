@@ -246,3 +246,68 @@
   visibility: hidden;
   pointer-events: none;
 }
+
+/* first-run model step (Seth, 2026-07-08 model UX pass, phase 3) */
+.onb-sub.small {
+  font-size: 12px;
+  margin-top: 10px;
+}
+.onb-model-ready,
+.onb-model-pick,
+.onb-model-progress {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+}
+.onb-model-ready {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+.onb-model-pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.onb-model-pickinfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.onb-model-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.onb-model-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.onb-model-proghead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.onb-model-track {
+  height: 6px;
+  margin-top: 8px;
+  border-radius: var(--r-pill);
+  background: var(--tint);
+  overflow: hidden;
+}
+.onb-model-fill {
+  height: 100%;
+  background: var(--accent-text);
+  border-radius: var(--r-pill);
+  transition: width var(--motion-exit) var(--motion-ease);
+}
+.onb-model-err {
+  color: var(--accent-text);
+}

@@ -1820,19 +1820,30 @@ impl CorpusStore {
         if !meta.is_file() {
             return Err(format!("not a file: {rel}"));
         }
-        Ok(FileStat { len: meta.len(), writable: self.writable(rel).is_ok() })
+        Ok(FileStat {
+            len: meta.len(),
+            // an existing storage/ sheet is editable in place (storage_sheet_editable)
+            // even though the contract's writable() refuses the storage lane at large
+            writable: self.writable(rel).is_ok() || self.storage_sheet_editable(rel),
+        })
     }
 
     /// Overwrite a surfaced FILE's raw bytes — the spreadsheet editor's SAVE lane.
-    /// Same per-store `writable()` gate as every user write (contract v3.7: a
-    /// memex's storage/ is read-only here, so a vault workbook refuses cleanly).
+    /// Same per-store `writable()` gate as every user write, PLUS the sanctioned
+    /// storage-sheet exception (storage_sheet_editable): an existing `.xlsx`/`.csv`
+    /// in a memex's storage/ edits in place, the way storage/excalidraw already does.
     /// Overwrite ONLY — a missing file is an error, never a create (creation goes
     /// through import/new_file_bytes). `bak`: copy the original to `<name>.bak`
     /// once, before the FIRST rotli save — exceljs rewrites the whole workbook and
     /// can drop exotic features (pivots, charts), so the pre-rotli bytes survive.
     pub fn write_file_bytes(&mut self, rel: &str, bytes: &[u8], bak: bool) -> Result<(), String> {
         validate_rel(rel)?;
-        self.writable(rel)?;
+        // the contract gate — unless this is the sanctioned in-place edit of an
+        // existing storage/ sheet (storage_sheet_editable), which the note lanes
+        // still refuse. Overwrite-only is preserved by the is_file() check below.
+        if !self.storage_sheet_editable(rel) {
+            self.writable(rel)?;
+        }
         let abs = self.abs(rel);
         if !abs.is_file() {
             return Err(format!("not a file: {rel}"));
@@ -2236,6 +2247,33 @@ impl CorpusStore {
                 if rel.is_empty() { "<root>" } else { rel }
             )),
         }
+    }
+
+    /// A memex `storage/` binary is contract-read-only (the note lanes never write
+    /// it — foreign assets are mirrored, not owned). But a user editing an EXISTING
+    /// spreadsheet they dropped there is a deliberate, IN-PLACE overwrite — the same
+    /// reasoning that already makes `storage/excalidraw` a writable board lane. This
+    /// SANCTIONED exception (Seth, 2026-07-08) lets the sheet editor's Save — and the
+    /// file_stat that gates edit mode — overwrite an existing `.xlsx`/`.csv` in
+    /// storage. It NEVER widens to: new-file creation (new_file_bytes still refuses
+    /// storage), note writes, or any non-sheet file — and it still yields to a
+    /// band/perms read-only brain (checked in `writable`, mirrored here).
+    fn storage_sheet_editable(&self, rel: &str) -> bool {
+        if self.layout != Layout::Memex || self.band_read_only || self.perms_read_only {
+            return false;
+        }
+        // excalidraw is already its own writable lane — this is for foreign sheets.
+        if rel == "storage/excalidraw" || rel.starts_with("storage/excalidraw/") {
+            return false;
+        }
+        if rel != "storage" && !rel.starts_with("storage/") {
+            return false;
+        }
+        let ext = Path::new(rel)
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase);
+        matches!(ext.as_deref(), Some("xlsx") | Some("csv")) && self.abs(rel).is_file()
     }
 
     /// Scan the disk (the truth), reconciling the id↔path index as we go:
@@ -4300,19 +4338,59 @@ mod tests {
         let root = dir.path().join("brain");
         seed_memex(&root);
         fs::create_dir_all(root.join("storage")).unwrap();
-        fs::write(root.join("storage/book.xlsx"), b"vault-bytes").unwrap();
+        // a foreign (non-sheet) binary stays fully read-only in the storage lane
+        fs::write(root.join("storage/graph.png"), b"pixels").unwrap();
         let mut store = CorpusStore::open(root.clone()).unwrap();
         store.os_trash = false;
 
-        // the probe says read-only, the write refuses, the bytes survive untouched
-        let stat = store.file_stat("storage/book.xlsx").unwrap();
-        assert_eq!(stat.len, 11);
+        let stat = store.file_stat("storage/graph.png").unwrap();
         assert!(!stat.writable);
-        assert!(store.write_file_bytes("storage/book.xlsx", b"edited", true).is_err());
-        assert_eq!(fs::read(root.join("storage/book.xlsx")).unwrap(), b"vault-bytes");
-        assert!(!root.join("storage/book.xlsx.bak").exists(), "a refused save must not leave a .bak");
-        // new files refuse too (the csv→xlsx convert can't target the vault)
+        assert!(store.write_file_bytes("storage/graph.png", b"edited", true).is_err());
+        assert_eq!(fs::read(root.join("storage/graph.png")).unwrap(), b"pixels");
+        assert!(!root.join("storage/graph.png.bak").exists(), "a refused save must not leave a .bak");
+        // new files refuse too (the csv→xlsx convert can't create in the vault)
         assert!(store.new_file_bytes("storage", "new.xlsx", b"x").is_err());
+    }
+
+    #[test]
+    fn storage_sheets_are_editable_in_place() {
+        // the sanctioned exception (Seth, 2026-07-08): an EXISTING .xlsx/.csv in the
+        // memex storage/ can be overwritten in place — but nothing else in storage.
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("storage/samples")).unwrap();
+        fs::write(root.join("storage/samples/company-overview.xlsx"), b"vault-bytes").unwrap();
+        fs::write(root.join("storage/notes.csv"), b"a,b\n").unwrap();
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+
+        // the probe now offers edit mode, the in-place save lands, the pre-rotli
+        // bytes survive as a one-time .bak
+        assert!(store.file_stat("storage/samples/company-overview.xlsx").unwrap().writable);
+        assert!(store.file_stat("storage/notes.csv").unwrap().writable);
+        assert!(store
+            .write_file_bytes("storage/samples/company-overview.xlsx", b"edited", true)
+            .is_ok());
+        assert_eq!(
+            fs::read(root.join("storage/samples/company-overview.xlsx")).unwrap(),
+            b"edited"
+        );
+        assert_eq!(
+            fs::read(root.join("storage/samples/company-overview.xlsx.bak")).unwrap(),
+            b"vault-bytes"
+        );
+
+        // still refused: a MISSING sheet (overwrite-only, never a create) and any
+        // NEW file in storage (the csv→xlsx convert can't target the vault)
+        assert!(store.write_file_bytes("storage/nope.xlsx", b"x", false).is_err());
+        assert!(store.new_file_bytes("storage", "fresh.xlsx", b"x").is_err());
+
+        // a read-only-connected brain closes even the storage-sheet lane — the
+        // exception must yield to perms, exactly like writable() does
+        store.set_perms_read_only(true);
+        assert!(!store.file_stat("storage/notes.csv").unwrap().writable);
+        assert!(store.write_file_bytes("storage/notes.csv", b"x,y\n", false).is_err());
     }
 
     #[test]

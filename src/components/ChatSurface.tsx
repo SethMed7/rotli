@@ -16,18 +16,19 @@ import { useQuery } from "@tanstack/react-query";
 import { makeTauriHost } from "../ai/host";
 import { presetFor, runHybrid } from "../ai/hybrid";
 import { runAgent } from "../ai/loop";
-import { flattenModels, mergedModels } from "../ai/models";
+import { type ModelGroups, flattenModels, mergedModels } from "../ai/models";
 import type { ChatTurn, RunInput } from "../ai/types";
 import { CORPUS_INSTANCE_ID, activeInstance } from "../memex/config";
 import { readChat, writeNote } from "../memex/service";
 import { useInstanceChats, useMemexConfig, useSetChatAttachedTo, useWriteChat } from "../memex/useMemex";
-import { chatModels, cliCancel, fileAssetUrl, isTauri } from "../lib/tauri";
+import { type ChatModelInfo, chatModels, cliCancel, fileAssetUrl, isTauri } from "../lib/tauri";
 import { useTransientPopover } from "../lib/popover";
 import { invalidateNotes, useNoteIndex } from "../services/hooks";
 import { type Measure } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
 import { usePanesStore } from "../state/panes";
 import { renderInline } from "../editor/render";
+import { CheckGlyph, CloudGlyph, LaptopGlyph } from "./glyphs";
 import { Character } from "./Character";
 
 interface Msg {
@@ -211,6 +212,135 @@ function MeasureMenu({
           {m.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** Strip the transport suffix + quant noise so a raw id reads as a name —
+ * "gemma-3-12b-it-qat-4bit · MLX" → "gemma-3-12b" (mirrors Settings' pretty()). */
+function shortModelLabel(label: string): string {
+  return label.replace(/ · (MLX|llama\.cpp)$/, "").replace(/-(it-qat|instruct)-4bit$/i, "");
+}
+
+type ModelKind = "local" | "connected" | "preset";
+
+/** local → on this Mac · connected → leaves your Mac · preset → routes. */
+function modelKindGlyph(kind: ModelKind) {
+  if (kind === "local") return <LaptopGlyph size={13} />;
+  if (kind === "connected") return <CloudGlyph size={13} />;
+  return (
+    <span className="chat-modelrow-route" aria-hidden="true">
+      ⇢
+    </span>
+  );
+}
+
+/** The per-chat model picker — a quiet popover (same grammar as MeasureMenu)
+ * grouped On this Mac · Connected · Presets, with a local-vs-"leaves your Mac"
+ * cue and a vision badge. Replaces the bare native <select> (Seth, 2026-07-08
+ * model UX pass, phase 2). */
+function ModelPicker({
+  groups,
+  picked,
+  onPick,
+}: {
+  groups: ModelGroups;
+  picked: ChatModelInfo | null;
+  onPick: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  useTransientPopover([popRef, anchorRef], open, () => setOpen(false));
+
+  const localIds = new Set(groups.local.map((m) => m.id));
+  const connectedIds = new Set(groups.connected.map((m) => m.id));
+  const kindOf = (m: ChatModelInfo): ModelKind =>
+    localIds.has(m.id) ? "local" : connectedIds.has(m.id) ? "connected" : "preset";
+
+  const sections = (
+    [
+      { key: "local", label: "On this Mac", items: groups.local },
+      {
+        key: "connected",
+        label: "Connected",
+        items: groups.connected,
+        hint: "Runs on your subscription — this chat leaves your Mac.",
+      },
+      {
+        key: "preset",
+        label: "Presets",
+        items: groups.presets,
+        hint: "May route to a connected model — that turn can leave your Mac.",
+      },
+    ] as { key: ModelKind; label: string; items: ChatModelInfo[]; hint?: string }[]
+  ).filter((s) => s.items.length > 0);
+
+  const pickedKind: ModelKind = picked ? kindOf(picked) : "local";
+  const triggerTitle =
+    pickedKind === "connected"
+      ? "Connected model — this chat leaves your Mac"
+      : pickedKind === "preset"
+        ? "Preset — routes each message to the model best suited"
+        : "On-device model — stays on your Mac";
+
+  return (
+    <div className="chat-modelpick">
+      <button
+        type="button"
+        ref={anchorRef}
+        className="chat-model-trigger"
+        title={triggerTitle}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="chat-modelrow-ico">{modelKindGlyph(pickedKind)}</span>
+        <span className="chat-model-trigger-name">
+          {picked ? shortModelLabel(picked.label) : "Pick a model"}
+        </span>
+        <span className="chat-model-caret" aria-hidden="true">
+          ▾
+        </span>
+      </button>
+      {open && (
+        <div className="chat-modelpop" ref={popRef} role="menu" aria-label="Model">
+          {sections.map((s) => (
+            <div className="chat-modelpop-group" key={s.key}>
+              <div className="chat-modelpop-grouplabel">{s.label}</div>
+              {s.hint && <div className="chat-modelpop-grouphint">{s.hint}</div>}
+              {s.items.map((m) => {
+                const sel = m.id === picked?.id;
+                return (
+                  <button
+                    type="button"
+                    key={m.id}
+                    className={sel ? "chat-modelrow sel" : "chat-modelrow"}
+                    role="menuitemradio"
+                    aria-checked={sel}
+                    onClick={() => {
+                      onPick(m.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <span className="chat-modelrow-ico">{modelKindGlyph(s.key)}</span>
+                    <span className="chat-modelrow-name">{shortModelLabel(m.label)}</span>
+                    {m.vision && (
+                      <span className="chat-modelrow-tag" title="Can see attached images">
+                        👁
+                      </span>
+                    )}
+                    {(m.localDefault || m.isDefault) && (
+                      <span className="chat-modelrow-tag def">default</span>
+                    )}
+                    {sel && <CheckGlyph size={13} className="chat-modelrow-check" />}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -754,50 +884,14 @@ export function ChatSurface({
                   />
                   <div className="chat-box-foot">
                     {modelList.length > 0 && (
-                      <label
-                        className="chat-model"
-                        title={
-                          picked && picked.api !== "generate" && picked.provider !== "mlx" && picked.provider !== "llamacpp"
-                            ? "Connected model — runs on your subscription, this chat leaves your Mac"
-                            : "On-device model — from your memex AI store"
-                        }
-                      >
-                        <select
-                          className="chat-model-select"
-                          value={picked?.id ?? ""}
-                          onChange={(e) => {
-                            setChatModelId(e.target.value);
-                            setVisionHint(false);
-                          }}
-                          onKeyDown={(e) => e.stopPropagation()}
-                        >
-                          <optgroup label="On this Mac">
-                            {groups.local.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.label}
-                              </option>
-                            ))}
-                          </optgroup>
-                          {groups.connected.length > 0 && (
-                            <optgroup label="Connected">
-                              {groups.connected.map((m) => (
-                                <option key={m.id} value={m.id}>
-                                  {m.label}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {groups.presets.length > 0 && (
-                            <optgroup label="Presets">
-                              {groups.presets.map((m) => (
-                                <option key={m.id} value={m.id}>
-                                  {m.label}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
-                        </select>
-                      </label>
+                      <ModelPicker
+                        groups={groups}
+                        picked={picked ?? null}
+                        onPick={(id) => {
+                          setChatModelId(id);
+                          setVisionHint(false);
+                        }}
+                      />
                     )}
                     <button
                       type="button"

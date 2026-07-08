@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-07-08
+
+
 ### Fixed
 
 - **Excalidraw boards save in a memex again.** A board like `call-w_Jorge` living
@@ -18,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   have their own writable lane: `storage/excalidraw/` is a rotli-owned surface, so
   boards edit and save while the rest of `storage/` stays read-only. New boards in
   a memex land there too.
+- **Spreadsheets in your memex are editable now.** An `.xlsx`/`.csv` living in the
+  memex `storage/` (like `company-overview.xlsx`) opened read-only, because
+  `storage/` is read-only to rotli. Existing sheets there now edit **in place** —
+  double-click a cell, ⌘S saves, and a one-time `.bak` keeps the original — the
+  same writable-lane idea as boards. Creating brand-new files in `storage/` stays
+  refused.
 
 ### Changed
 
@@ -27,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Rotli** folder in Main — so project planning + docs are organized in rotli
   itself. The repo keeps only the README (+ `docs/media` assets and `docs/archive`
   history). CARL + code references now point at the memex.
+- **The in-chat model picker is a real picker.** The composer's plain dropdown
+  became a quiet grouped popover — **On this Mac · Connected · Presets** — with a
+  local-vs-"this chat leaves your Mac" cue, a 👁 badge for vision models, a
+  `default` tag, and the current pick checked. Same low-pulse grammar as the width
+  menu.
+- **AI Models settings read at a glance.** Constructive actions (Install / Add /
+  Save / New) now take a restrained accent while destructive ones (Uninstall /
+  Delete / Remove) step back to muted — hierarchy without any loud fills.
+- **Sidebar create icons are centered.** New note · New folder · New board ·
+  Collapse all now sit as a centered cluster.
 
 ### Added
 
@@ -43,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Open in Brain** (opens it and reveals where it lives in the sidebar — Main is
   just a view). The editor's location chip now shows the note's Brain folder + its
   absolute on-disk path in its tooltip.
+- **First-run model setup.** Onboarding now has an *Its mind* step: grab a small
+  on-device model in one click (the download keeps going if you continue), or skip
+  and connect a subscription later in Settings — so a fresh install lands with a
+  working chat. Optional; it never blocks setup.
 
 Onboarding + demo-mode polish.
 

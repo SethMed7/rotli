@@ -7,12 +7,20 @@
 // re-onboard" in Settings → General brings it back.
 
 import { type KeyboardEvent, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Character } from "./Character";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import { conflictFor, getAction, rebind, setDispatchSuspended } from "../keys/registry";
-import { corpusOverview, isTauri } from "../lib/tauri";
+import {
+  chatModels,
+  corpusOverview,
+  isTauri,
+  localModelInstall,
+  localModelInstallProgress,
+} from "../lib/tauri";
+import { LOCAL_CATALOG } from "../ai/models";
+import { LaptopGlyph } from "./glyphs";
 import { useDetectMemex } from "../memex/useMemex";
 import { pickFolder } from "../memex/service";
 import { useMemexStore } from "../state/memex";
@@ -20,7 +28,7 @@ import { SOLID_THEMES, type ThemeFamily, useUiStore } from "../state/ui";
 
 // Appearance FIRST (right after the greeting) so you pick a theme before walking the
 // rest of setup — never trudge through the flow in a theme that hurts your eyes (Seth).
-const STEPS = ["welcome", "appearance", "hotkeys", "dock", "behavior", "memory", "done"] as const;
+const STEPS = ["welcome", "appearance", "hotkeys", "dock", "behavior", "memory", "models", "done"] as const;
 type Step = (typeof STEPS)[number];
 
 const GLOBAL_HOTKEYS: { id: string; label: string; hint: string }[] = [
@@ -279,6 +287,107 @@ function MemexStep() {
   );
 }
 
+/** First-run model setup (Seth, 2026-07-08 model UX pass, phase 3): rotli's chat
+ * runs on-device by default — this step lets a fresh user grab a small local model
+ * in one click, or skip and connect a subscription later in Settings. Optional:
+ * Continue is never gated here, and the download keeps going if you move on. */
+function ModelsStep() {
+  const qc = useQueryClient();
+  const models = useQuery({
+    queryKey: ["chat", "models"],
+    queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
+  });
+  const hasModel = (models.data ?? []).length > 0;
+  // the smallest capable starter — a fast, low-footprint first model
+  const starter = LOCAL_CATALOG[0];
+
+  const [installing, setInstalling] = useState(false);
+  const [justInstalled, setJustInstalled] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const progress = useQuery({
+    queryKey: ["onb-install", starter?.name],
+    queryFn: () =>
+      installing && starter ? localModelInstallProgress(starter.name) : Promise.resolve(null),
+    enabled: installing && !!starter,
+    refetchInterval: 1000,
+  });
+  const bytes = progress.data?.bytes ?? 0;
+  const pct = starter ? Math.min(99, Math.round((bytes / (starter.approxMb * 1_000_000)) * 100)) : 0;
+
+  const install = () => {
+    if (!starter || installing) return;
+    setInstalling(true);
+    setErr(null);
+    localModelInstall({
+      requestId: crypto.randomUUID(),
+      repo: starter.repo,
+      name: starter.name,
+      approxMb: starter.approxMb,
+    })
+      .then(() => {
+        setJustInstalled(true);
+        void qc.invalidateQueries({ queryKey: ["chat", "models"] });
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
+      .finally(() => setInstalling(false));
+  };
+
+  const ready = hasModel || justInstalled;
+  const gb = starter ? (starter.approxMb / 1000).toFixed(1) : "0";
+
+  return (
+    <div className="onb-step">
+      <h1 className="onb-title">Its mind</h1>
+      <p className="onb-sub">
+        rotli’s chat runs a model right on your Mac — private, no account, nothing leaves your
+        machine.{" "}
+        {ready
+          ? "You’re all set."
+          : "Grab a small one to start, or connect a subscription later."}
+      </p>
+
+      {ready ? (
+        <div className="onb-model-ready">
+          <LaptopGlyph size={16} />
+          <span>
+            {justInstalled
+              ? `${starter?.label} is installed and ready.`
+              : "A local model is ready on this Mac."}
+          </span>
+        </div>
+      ) : installing ? (
+        <div className="onb-model-progress">
+          <div className="onb-model-proghead">
+            <span>Downloading {starter?.label}…</span>
+            <span>{pct}%</span>
+          </div>
+          <div className="onb-model-track">
+            <div className="onb-model-fill" style={{ width: `${pct}%` }} />
+          </div>
+          <p className="onb-sub small">This keeps going if you continue — you don’t have to wait.</p>
+        </div>
+      ) : (
+        <div className="onb-model-pick">
+          <div className="onb-model-pickinfo">
+            <span className="onb-model-name">{starter?.label}</span>
+            <span className="onb-model-meta">{gb} GB · runs on your Mac</span>
+          </div>
+          <button type="button" className="ghostbtn primary" onClick={install}>
+            Install
+          </button>
+        </div>
+      )}
+
+      {err && <p className="onb-sub small onb-model-err">{err}</p>}
+      <p className="onb-sub small">
+        Prefer your own subscription? Connect Claude, ChatGPT, or Gemini any time in Settings → AI
+        Models — you can skip this and set it up later.
+      </p>
+    </div>
+  );
+}
+
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState<Step>("welcome");
   const i = STEPS.indexOf(step);
@@ -432,6 +541,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
         {step === "memory" && <MemexStep />}
 
+        {step === "models" && <ModelsStep />}
+
         {step === "done" && (
           <div className="onb-step onb-welcome">
             <Character name="celebrating" size={132} className="onb-mark" />
@@ -457,7 +568,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                 <span key={s} className={n === i ? "onb-dot on" : "onb-dot"} />
               ))}
             </div>
-            {i > 0 && i < last && step !== "memory" && (
+            {i > 0 && i < STEPS.indexOf("memory") && (
               <button type="button" className="onb-skip" onClick={() => setStep("memory")}>
                 Skip setup
               </button>

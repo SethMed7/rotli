@@ -1457,13 +1457,13 @@ function LocalModelsSection({
                   <span className="localmodel-active">default</span>
                 ) : (
                   m.provider === "mlx" && (
-                    <button type="button" className="ghostbtn" onClick={() => makeDefault(m.id)}>
+                    <button type="button" className="ghostbtn primary" onClick={() => makeDefault(m.id)}>
                       Make default
                     </button>
                   )
                 )}
                 {!isDefault && (
-                  <button type="button" className="ghostbtn" onClick={() => uninstall(m.id)}>
+                  <button type="button" className="ghostbtn quiet" onClick={() => uninstall(m.id)}>
                     Uninstall
                   </button>
                 )}
@@ -1506,7 +1506,7 @@ function LocalModelsSection({
                     {formatSize(e.approxMb)}
                     {e.vision ? " · 👁" : ""}
                   </span>
-                  <button type="button" className="ghostbtn" onClick={() => installPick(e)}>
+                  <button type="button" className="ghostbtn primary" onClick={() => installPick(e)}>
                     Install
                   </button>
                 </div>
@@ -1521,7 +1521,7 @@ function LocalModelsSection({
               onChange={(e) => setRepo(e.target.value)}
               onKeyDown={(e) => e.stopPropagation()}
             />
-            <button type="button" className="ghostbtn" disabled={!repo.trim()} onClick={installRepo}>
+            <button type="button" className="ghostbtn primary" disabled={!repo.trim()} onClick={installRepo}>
               Install
             </button>
           </div>
@@ -1735,7 +1735,7 @@ function GeminiKeyRow({ onSaved }: { onSaved?: () => void }) {
       />
       <button
         type="button"
-        className="ghostbtn"
+        className="ghostbtn primary"
         disabled={!val.trim()}
         onClick={() => {
           secretStore("gemini-api-key", val.trim())
@@ -1753,7 +1753,7 @@ function GeminiKeyRow({ onSaved }: { onSaved?: () => void }) {
       {saved.data && (
         <button
           type="button"
-          className="ghostbtn"
+          className="ghostbtn quiet"
           onClick={() => {
             secretDelete("gemini-api-key")
               .then(() => {
@@ -1869,7 +1869,7 @@ function PresetEditor({
         </label>
       </div>
       <div className="preset-actions">
-        <button type="button" className="ghostbtn" disabled={!valid} onClick={() => onSave(p)}>
+        <button type="button" className="ghostbtn primary" disabled={!valid} onClick={() => onSave(p)}>
           Save preset
         </button>
         <button type="button" className="ghostbtn" onClick={onCancel}>
@@ -2001,7 +2001,7 @@ function ModelsPane() {
                     <span className="chat-box-grow" />
                     <button
                       type="button"
-                      className="ghostbtn"
+                      className="ghostbtn primary"
                       onClick={() => setHybridPresets([...hybridPresets, sp])}
                     >
                       Add
@@ -2026,7 +2026,7 @@ function ModelsPane() {
                 </button>
                 <button
                   type="button"
-                  className="ghostbtn"
+                  className="ghostbtn quiet"
                   onClick={() => setHybridPresets(hybridPresets.filter((x) => x.id !== p.id))}
                 >
                   Delete
@@ -2047,7 +2047,7 @@ function ModelsPane() {
       ) : (
         <button
           type="button"
-          className="ghostbtn"
+          className="ghostbtn primary"
           disabled={available.length === 0}
           onClick={() =>
             setDraft({
@@ -2085,7 +2085,7 @@ function ModelsPane() {
                 <span className="chat-box-grow" />
                 <button
                   type="button"
-                  className="ghostbtn"
+                  className="ghostbtn primary"
                   onClick={() => {
                     setHybridPresets([...hybridPresets, p]);
                     setSuggestions(suggestions.filter((x) => x.id !== p.id));
