@@ -111,6 +111,17 @@ export function useNoteMenu() {
         });
         items.push({
           kind: "action" as const,
+          label: "Open in Brain",
+          onClick: () => {
+            // everything lives in the Brain; Main is just a view. Open the note,
+            // then reveal it where it actually lives in the sidebar (Seth,
+            // 2026-07-07). A tick lets the open focus settle before the reveal.
+            openSummary(note);
+            setTimeout(() => useUiStore.getState().revealFocusedNote(), 0);
+          },
+        });
+        items.push({
+          kind: "action" as const,
           label: "Show in Finder",
           onClick: () => void corpusRevealFile(note.id),
         });

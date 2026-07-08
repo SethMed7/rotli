@@ -6,7 +6,7 @@
 
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { relativeLabel } from "../lib/dateLabels";
-import { corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
+import { corpusNotePath, corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
 import { invalidateNotes, useNote } from "../services/hooks";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
@@ -83,6 +83,19 @@ export function EditorSurface({
   // Secure / File-to-Brain / Add-to-Main live in the right-click menu).
   const inMain = useMainStore((s) => mainHasNote(s.manifest.tree, noteId));
   const openNoteMenu = useNoteMenu();
+
+  // the note's real home — its Brain folder + its absolute path on disk — shown
+  // on the location chip so "where is this file?" is answerable (Seth, 2026-07-07).
+  const [diskPath, setDiskPath] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    corpusNotePath(noteId)
+      .then((p) => alive && setDiskPath(p))
+      .catch(() => alive && setDiskPath(null));
+    return () => {
+      alive = false;
+    };
+  }, [noteId]);
 
   // "Show file metadata" (Seth, 2026-07-01): the raw frontmatter block, verbatim
   // from disk, rendered as an editable banner above the body. Fetched only while
@@ -196,7 +209,9 @@ export function EditorSurface({
             <button
               type="button"
               className={inMain ? "ed-loc in-main" : "ed-loc"}
-              title="Reveal where this note lives"
+              title={`In the Brain: ${note.folderId || "—"}${
+                diskPath ? `\nOn disk: ${diskPath}` : ""
+              }\nClick to reveal in the sidebar`}
               onClick={() => revealFocusedNote()}
             >
               {noteLocationLabel(note.folderId, inMain)}
