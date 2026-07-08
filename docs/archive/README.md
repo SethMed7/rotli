@@ -4,9 +4,10 @@ These documents captured earlier product directions, proposals, or plans that ha
 since **shipped, been rejected, or been superseded.** They're kept only for
 decision history — **none of them describes the current product.**
 
-For current truth, start at [`../model.md`](../model.md) (the canonical conceptual
-model) and [`../design/main-brain-daemon.md`](../design/main-brain-daemon.md) (the
-Main / Brain / organizer spec, contract v3.7).
+For current truth, see the living docs — which now live in the **memex**, not this
+repo: `memex-vault/wiki/projects/rotli/model.md` (the canonical conceptual model)
+and `memex-vault/wiki/projects/rotli/main-brain-daemon.md` (the Main / Brain /
+organizer spec, contract v3.7). The repo keeps only the README + this archive.
 
 | File | Why it's archived |
 |---|---|

@@ -1,4 +1,4 @@
-//! organizer.rs — the Brain filer daemon (Phase 4 of docs/design/main-brain-daemon.md).
+//! organizer.rs — the Brain filer daemon (Phase 4 of memex-vault wiki/projects/rotli/main-brain-daemon.md).
 //!
 //! A single std::thread worker (mirrors `spawn_watcher` — no runtime, no tokio)
 //! that drains a queue of changed `wiki/**` notes and runs the narrow, single-shot

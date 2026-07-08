@@ -532,7 +532,7 @@ export function Sidebar() {
   // unreviewed daemon proposals — the quiet badge on the Activity link (§4.4.2)
   const pendingProposals = deriveJournal(useJournal().data ?? []).pending.length;
 
-  // MAIN — the user's hand-arranged view over the Brain (docs/design/main-brain-daemon.md).
+  // MAIN — the user's hand-arranged view over the Brain (memex-vault wiki/projects/rotli/main-brain-daemon.md).
   // A `.rotli/main.json` manifest of folders + note-id refs, projected into synthetic
   // sidebar rows. It references notes BY ID, so a daemon refiling the Brain underneath
   // never moves Main. Mouse + drag navigable (not part of the j/k roving list yet).

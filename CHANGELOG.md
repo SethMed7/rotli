@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   boards edit and save while the rest of `storage/` stays read-only. New boards in
   a memex land there too.
 
+### Changed
+
+- **rotli's docs now live in the memex, not this repo.** The living docs (model,
+  design-system, philosophy, vision, the Main/Brain daemon spec, design notes,
+  audit logs) moved into `memex-vault/wiki/projects/rotli/`, surfaced under a
+  **Rotli** folder in Main — so project planning + docs are organized in rotli
+  itself. The repo keeps only the README (+ `docs/media` assets and `docs/archive`
+  history). CARL + code references now point at the memex.
+
 ### Added
 
 - **More ways into Main.** Right-click a tab → **Add to Main** (note and board

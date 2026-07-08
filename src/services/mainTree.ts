@@ -1,5 +1,5 @@
 // Main — the user's hand-arranged view over the Brain (Seth, 2026-07-01; design in
-// docs/design/main-brain-daemon.md). Main holds NO files of its own: it's an ordered,
+// memex-vault wiki/projects/rotli/main-brain-daemon.md). Main holds NO files of its own: it's an ordered,
 // nested tree of Main-only FOLDERS and note-ID references, stored in `.rotli/main.json`.
 // It references notes by `id` only — so when the background daemon refiles a note's
 // path in the Brain, its Main slot is untouched ("stays how I set it"). "One file, two

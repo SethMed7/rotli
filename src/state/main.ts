@@ -1,5 +1,5 @@
 // The Main arrangement store — the user's hand-organized view over the Brain
-// (design: docs/design/main-brain-daemon.md). The manifest lives in `.rotli/main.json`
+// (design: memex-vault wiki/projects/rotli/main-brain-daemon.md). The manifest lives in `.rotli/main.json`
 // (committed, so it travels with the memex). Every mutation (a drag, a new folder)
 // replaces the tree and persists; hydration loads it before first render.
 

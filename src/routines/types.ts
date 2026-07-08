@@ -3,7 +3,7 @@
 // are PURE type shapes for the P0 foundation: the scheduler (P1) and the Bun
 // routines-engine sidecar consume them; nothing here touches the clock or IO.
 //
-// Design notes are in docs/design/breve-merge.md §4 (scheduler) and §9 (P0).
+// Design notes are in memex-vault wiki/projects/rotli/breve-merge.md §4 (scheduler) and §9 (P0).
 
 /** Which Breve subsystem a routine drives. */
 export type RoutineKind = "brief" | "creators" | "watchers" | "doctor" | "signal";
