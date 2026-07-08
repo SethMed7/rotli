@@ -480,6 +480,21 @@
   cursor: pointer;
   position: relative;
 }
+/* inline rename over a chat row (Seth #4, 2026-07-08) — same footprint as the row */
+.sb-chatrename {
+  width: 100%;
+  margin: 0;
+  padding: 6px 10px 6px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent-text) 45%, var(--border));
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.sb-chatrename:focus-visible {
+  outline: none;
+}
 .sb-chatnew {
   color: var(--accent-text);
   font-weight: 600;

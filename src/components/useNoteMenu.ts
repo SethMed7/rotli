@@ -117,7 +117,7 @@ export function useNoteMenu() {
             // then reveal it where it actually lives in the sidebar (Seth,
             // 2026-07-07). A tick lets the open focus settle before the reveal.
             openSummary(note);
-            setTimeout(() => useUiStore.getState().revealFocusedNote(), 0);
+            setTimeout(() => useUiStore.getState().revealFocusedNote("brain"), 0);
           },
         });
         items.push({
@@ -220,15 +220,28 @@ export function useNoteMenu() {
         items.push({
           kind: "action" as const,
           label: "Archive",
-          onClick: () => archive.mutate(note.id),
+          onClick: () => {
+            // a note leaving for a sink also leaves Main (Seth #5, 2026-07-08)
+            if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
+            archive.mutate(note.id);
+          },
         });
       }
-      items.push({
-        kind: "action" as const,
-        label: isFile ? "Delete file" : "Delete",
-        danger: true,
-        onClick: () => trash.mutate(note.id),
-      });
+      // Files (storage binaries) are ASSETS, not notes: no note-index entry and no
+      // writable Trash in a memex, so the old "Delete file" hit "note not found"
+      // (Seth #6, 2026-07-08). A pinned file is managed via "Remove from Main"
+      // above; hard-deleting the binary from disk is a separate feature.
+      if (!isFile) {
+        items.push({
+          kind: "action" as const,
+          label: "Delete",
+          danger: true,
+          onClick: () => {
+            if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
+            trash.mutate(note.id);
+          },
+        });
+      }
 
         open(x, y, items, opts);
       })();

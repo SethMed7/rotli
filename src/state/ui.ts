@@ -245,7 +245,11 @@ interface UiState {
    * chain AND scroll its row into view (Seth, 2026-07-03: "I can't find where
    * this file is"). The editor's location chip fires it. Not persisted. */
   revealNonce: number;
-  revealFocusedNote: () => void;
+  /** "auto" reveals in Main when the note is pinned there (Main's copy wins);
+   * "brain" forces the reveal to the note's REAL home in the Brain, bypassing the
+   * Main short-circuit — the "Open in Brain" menu action (Seth, 2026-07-08). */
+  revealMode: "auto" | "brain";
+  revealFocusedNote: (mode?: "auto" | "brain") => void;
   /** Collapse every expanded destination + folder at once (the sidebar's
    * collapse-all toolbar button). `defaultOpenIds` are the rows that read the
    * map with an OPEN default (Main folders, the Brain header) — they get an
@@ -505,7 +509,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setDestExpanded: (id, open) =>
     set((s) => ({ expandedDests: { ...s.expandedDests, [id]: open } })),
   revealNonce: 0,
-  revealFocusedNote: () => set((s) => ({ revealNonce: s.revealNonce + 1 })),
+  revealMode: "auto",
+  revealFocusedNote: (mode = "auto") => set((s) => ({ revealNonce: s.revealNonce + 1, revealMode: mode })),
   collapseAllDests: (defaultOpenIds = []) =>
     set({ expandedDests: Object.fromEntries(defaultOpenIds.map((id) => [id, false])) }),
 

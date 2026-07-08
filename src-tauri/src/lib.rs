@@ -18,6 +18,7 @@ mod localmodel;
 mod memex;
 mod organizer;
 mod provider;
+mod routines;
 mod secret;
 mod web;
 
@@ -902,6 +903,8 @@ pub fn run() {
             memex::memex_list_chats,
             memex::memex_write_chat,
             memex::memex_rename_chat,
+            memex::memex_delete_chat,
+            memex::memex_archive_chat,
             memex::memex_write_note,
             memex::memex_validate,
             memex::memex_pick_folder

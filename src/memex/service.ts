@@ -21,6 +21,8 @@ import {
   memexRead,
   memexReadContract,
   memexValidate,
+  memexArchiveChat,
+  memexDeleteChat,
   memexRenameChat,
   memexWriteChat,
   memexWriteNote,
@@ -149,6 +151,22 @@ export async function renameChat(
     throw new Error("this brain is read-only — can't rename a chat here");
   }
   return memexRenameChat(instance.root, oldSlug, newSlug);
+}
+
+/** Soft-delete a chat (→ hidden chats/trash/, recoverable in Finder). */
+export async function deleteChat(instance: MemexInstance, slug: string): Promise<void> {
+  if (!canWrite(`chats/${slug}.md`, instance.perms)) {
+    throw new Error("this brain is read-only — can't delete a chat here");
+  }
+  await memexDeleteChat(instance.root, slug);
+}
+
+/** Archive a chat (→ hidden chats/archive/). */
+export async function archiveChat(instance: MemexInstance, slug: string): Promise<void> {
+  if (!canWrite(`chats/${slug}.md`, instance.perms)) {
+    throw new Error("this brain is read-only — can't archive a chat here");
+  }
+  await memexArchiveChat(instance.root, slug);
 }
 
 // ── notes (rotli's owned wiki/_inbox staging — the v3.5 write model) ───────────

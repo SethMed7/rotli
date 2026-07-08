@@ -79,7 +79,9 @@ import {
 } from "../state/panes";
 import { ALL_NOTES, RECENT, SEC_CHAT, SEC_INBOX, SEC_NOTES, useUiStore } from "../state/ui";
 import { activeInstance } from "../memex/config";
-import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
+import { invalidateMemex, useInstanceChats, useMemexConfig } from "../memex/useMemex";
+import { archiveChat, deleteChat } from "../memex/service";
+import { useChatRename } from "../lib/chatRename";
 import type { Folder, NoteSummary } from "../types";
 import { dispatch } from "../keys/registry";
 import { longDateLabel } from "../lib/dateLabels";
@@ -562,6 +564,7 @@ export function Sidebar() {
   const memexCfg = useMemexConfig();
   const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
   const chatList = useInstanceChats(activeMemex).data ?? [];
+  const chatRename = useChatRename();
   const quickNoteIds = useUiStore((s) => s.quickNoteIds);
   // the LIMITED Chat view's cap — a Settings knob (5/10/15), default 5 (#17)
   const chatSidebarLimit = useUiStore((s) => s.chatSidebarLimit);
@@ -1263,10 +1266,13 @@ export function Sidebar() {
   // Expand the folder chain that holds the focused note (Main copy wins; a note
   // not in Main is revealed in the Brain). Reads the latest projections via the
   // ref so it never re-opens a folder the user just collapsed by hand.
-  const expandToFocusedNote = () => {
+  const expandToFocusedNote = (mode: "auto" | "brain" = "auto") => {
     if (!focusedNoteId) return;
     const { mainProjection: proj, noteIndex: idx } = revealRef.current;
-    const inMain = proj.notes.find((n) => n.id === focusedNoteId);
+    // "brain" mode skips the Main-wins short-circuit so "Open in Brain" reveals the
+    // note's REAL home in the Brain even when it's also pinned in Main (Seth #3,
+    // 2026-07-08). "auto" keeps Main's copy winning on ordinary navigation.
+    const inMain = mode === "brain" ? undefined : proj.notes.find((n) => n.id === focusedNoteId);
     if (inMain) {
       let parent: string | null = inMain.folderId;
       const seen = new Set<string>();
@@ -1308,15 +1314,21 @@ export function Sidebar() {
   // view. Fires ONLY on the nonce bump, so normal navigation never scroll-yanks.
   useEffect(() => {
     if (!revealNonce) return;
-    expandToFocusedNote();
+    const mode = useUiStore.getState().revealMode;
+    expandToFocusedNote(mode);
     // two frames: the first lets the just-expanded folder chain commit to the
     // DOM, the second scrolls the now-rendered row into view (pre-release review).
+    // In "brain" mode, scroll to the BRAIN occurrence (not the Main copy, which
+    // also carries .sel) by skipping .main-row (Seth #3, 2026-07-08).
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => {
-        document
-          .querySelector(".sidebar .snrow.sel")
-          ?.scrollIntoView({ block: "center", behavior: "smooth" });
+        const sel =
+          mode === "brain"
+            ? document.querySelector(".sidebar .snrow.sel:not(.main-row)") ??
+              document.querySelector(".sidebar .snrow.sel")
+            : document.querySelector(".sidebar .snrow.sel");
+        sel?.scrollIntoView({ block: "center", behavior: "smooth" });
       });
     });
     return () => {
@@ -1667,18 +1679,58 @@ export function Sidebar() {
             ) : chatList.length === 0 ? (
               <p className="sb-chat-empty">No chats yet.</p>
             ) : (
-              chatList.slice(0, chatSidebarLimit).map((c) => (
-                <button
-                  type="button"
-                  key={c.slug}
-                  className={`sb-chatrow${focusedChatSlug === c.slug ? " sel" : ""}`}
-                  onClick={() => openChatRow(c.slug)}
-                  title={c.title || c.slug}
-                >
-                  <ChatGlyph size={13} />
-                  <span className="fname">{c.title || c.slug}</span>
-                </button>
-              ))
+              chatList.slice(0, chatSidebarLimit).map((c) =>
+                chatRename.renamingChatSlug === c.slug ? (
+                  <input
+                    key={c.slug}
+                    className="sb-chatrename"
+                    autoFocus
+                    defaultValue={c.title || c.slug}
+                    aria-label="Rename chat"
+                    onFocus={(e) => e.currentTarget.select()}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === "Enter") void chatRename.commit(c.slug, e.currentTarget.value);
+                      else if (e.key === "Escape") chatRename.cancel();
+                    }}
+                    onBlur={() => chatRename.cancel()}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    key={c.slug}
+                    className={`sb-chatrow${focusedChatSlug === c.slug ? " sel" : ""}`}
+                    onClick={() => openChatRow(c.slug)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openContextMenu(e.clientX, e.clientY, [
+                        { kind: "action" as const, label: "Rename…", onClick: () => chatRename.start(c.slug) },
+                        { kind: "sep" as const },
+                        {
+                          kind: "action" as const,
+                          label: "Archive",
+                          onClick: () => {
+                            if (activeMemex) void archiveChat(activeMemex, c.slug).then(() => invalidateMemex());
+                          },
+                        },
+                        {
+                          kind: "action" as const,
+                          label: "Delete",
+                          danger: true,
+                          onClick: () => {
+                            if (activeMemex) void deleteChat(activeMemex, c.slug).then(() => invalidateMemex());
+                          },
+                        },
+                      ]);
+                    }}
+                    title={c.title || c.slug}
+                  >
+                    <ChatGlyph size={13} />
+                    <span className="fname">{c.title || c.slug}</span>
+                  </button>
+                ),
+              )
             )}
             {chatList.length > chatSidebarLimit && (
               <button type="button" className="sb-chat-more" onClick={openAllChats}>

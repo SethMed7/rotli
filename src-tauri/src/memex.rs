@@ -349,7 +349,7 @@ fn stamp_rotli(memex_path: &Path) -> Result<(), String> {
 
 // ─── bun resolution (for the validate.ts shell-out) ────────────────────────────
 
-fn find_bun() -> PathBuf {
+pub(crate) fn find_bun() -> PathBuf {
     if let Ok(home) = std::env::var("HOME") {
         let p = PathBuf::from(format!("{home}/.bun/bin/bun"));
         if p.exists() {
@@ -726,6 +726,44 @@ pub fn memex_rename_chat(
         fs::rename(&old_path, &new_path).map_err(|e| e.to_string())
     })?;
     Ok(new_safe)
+}
+
+/// Soft-delete a chat: move `chats/<slug>.md` → `chats/trash/<slug>.md`, a hidden
+/// subfolder `list_chats_at` never scans (it reads the top level only), so the chat
+/// leaves the sidebar but the file survives — recoverable in Finder. Stays under
+/// rotli's writable `chats/` surface. Registered root (#20). (Seth #4, 2026-07-08.)
+#[tauri::command]
+pub fn memex_delete_chat(app: tauri::AppHandle, root: String, slug: String) -> Result<(), String> {
+    move_chat_to_bucket(&app, &root, &slug, "trash")
+}
+
+/// Archive a chat: the same move, into `chats/archive/` — out of the way, still kept.
+#[tauri::command]
+pub fn memex_archive_chat(app: tauri::AppHandle, root: String, slug: String) -> Result<(), String> {
+    move_chat_to_bucket(&app, &root, &slug, "archive")
+}
+
+/// Move `chats/<slug>.md` into a hidden `chats/<bucket>/` subfolder (trash/archive).
+/// Both ends are writable-gated and `bucket` is a fixed literal, so no slug can
+/// escape `chats/`.
+fn move_chat_to_bucket(
+    app: &tauri::AppHandle,
+    root: &str,
+    slug: &str,
+    bucket: &str,
+) -> Result<(), String> {
+    let root = registered_root(app, root)?;
+    let safe = safe_slug(slug)?;
+    assert_writable(&format!("chats/{safe}.md"))?;
+    assert_writable(&format!("chats/{bucket}/{safe}.md"))?;
+    let src = root.join("chats").join(format!("{safe}.md"));
+    if !src.exists() {
+        return Err(format!("chat not found: {safe}"));
+    }
+    let dir = root.join("chats").join(bucket);
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let dst = dir.join(format!("{safe}.md"));
+    with_file_lock(&src, || fs::rename(&src, &dst).map_err(|e| e.to_string()))
 }
 
 /// Write a brand-new note (full v3.5 bytes composed by TS) into the `wiki/_inbox/`

@@ -9,6 +9,7 @@
 // { folders, notes } the sidebar's existing renderFolderTree consumes (mirrors
 // buildStorageTree). Orphan ids (a note deleted out from under Main) are dropped.
 
+import { isSink, isVault } from "./destinations";
 import type { Folder, NoteSummary } from "../types";
 
 /** The Main root marker id — top-level Main folders/notes hang off this (like the
@@ -79,7 +80,14 @@ export function buildMainTree(
         walk(node.children, id);
       } else {
         const n = notesById.get(node.note);
-        if (n) notes.push({ ...n, folderId: parentId, mainOrder: order++ });
+        // RENDER only refs whose real home is Main-eligible. A note moved to a
+        // sink (Archive/Trash) or living in the external Vault keeps its manifest
+        // slot — so it survives GC (which uses the FULL index) — but must not show
+        // as a live Main row (Seth, 2026-07-08: "if it's not in the Brain or
+        // Storage, Main shouldn't have it"). Board/Storage/wiki homes pass.
+        if (n && !isSink(n.folderId) && !isVault(n.folderId)) {
+          notes.push({ ...n, folderId: parentId, mainOrder: order++ });
+        }
       }
     }
   };

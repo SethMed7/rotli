@@ -69,6 +69,19 @@ describe("buildMainTree", () => {
     const r = buildMainTree([{ note: "staged" }], index);
     expect(r.notes.map((n) => [n.id, n.folderId])).toEqual([["staged", "main:"]]);
   });
+  test("a ref whose home is a sink (Archive/Trash) or the Vault is NOT rendered", () => {
+    const index = new Map([
+      ["trashed", note("trashed", "Trash")],
+      ["archived", note("archived", "Archive")],
+      ["vaulted", note("vaulted", "vault:lib")],
+      ["live", note("live", "wiki/projects")],
+    ]);
+    const r = buildMainTree(
+      [{ note: "trashed" }, { note: "archived" }, { note: "vaulted" }, { note: "live" }],
+      index,
+    );
+    expect(r.notes.map((n) => n.id)).toEqual(["live"]);
+  });
 });
 
 describe("gcManifest", () => {
