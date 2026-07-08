@@ -6,7 +6,13 @@
 // returnFocus that hands the cursor back to the row (the RowMenu unification).
 
 import { useCallback } from "react";
-import { corpusFrontmatter, corpusSetLocked, corpusSetPinned, corpusSetSecure } from "../lib/tauri";
+import {
+  corpusFrontmatter,
+  corpusRevealFile,
+  corpusSetLocked,
+  corpusSetPinned,
+  corpusSetSecure,
+} from "../lib/tauri";
 import { fileNoteToArea } from "../services/brainFiling";
 import { isEmptyNote } from "../services/mainDismiss";
 import { DEST, isSink } from "../services/destinations";
@@ -102,6 +108,11 @@ export function useNoteMenu() {
           kind: "action" as const,
           label: "Open in new tab",
           onClick: () => openSummary(note, { newTab: true }),
+        });
+        items.push({
+          kind: "action" as const,
+          label: "Show in Finder",
+          onClick: () => void corpusRevealFile(note.id),
         });
         items.push({ kind: "sep" as const });
         if (!isBoard) {
