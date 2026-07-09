@@ -130,6 +130,35 @@
   justify-content: center;
   min-width: 0;
 }
+/* ‹ › — back/forward over opened notes (Seth #14), sitting left of the search
+   field. Quiet icon buttons; disabled = barely-there (no trail to walk). */
+.tb-nav {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  margin-right: 6px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  border-radius: var(--r-control);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.tb-nav + .tb-search {
+  margin-left: 4px;
+}
+.tb-nav:hover:not(:disabled) {
+  background: var(--hov);
+  color: var(--text);
+}
+.tb-nav:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.tb-nav .tb-nav-back {
+  transform: scaleX(-1);
+}
 /* a search field that opens the ⌘K palette — reads like an input (cursor:text),
    quiet until hovered. Capped width so it stays a tidy top-center affordance. */
 .tb-search {

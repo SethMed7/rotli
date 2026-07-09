@@ -45,13 +45,11 @@
   --success:#8D9A76;       /* AA (5.55) on the cocoa ground */
 }
 
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --ground:#241D18; --surface:#2E2620; --surface-2:#392F28; --tint:#3E332B;
-    --text:#F1E7DA; --text-muted:#B7A593; --border:#3D3229;
-    --accent:#C97E62; --accent-text:#C97E62; --on-accent:#241D18; --success:#8D9A76;
-  }
-}
+/* NOTE: the old `prefers-color-scheme: dark` media block was removed
+   (2026-07-08). theme.ts implements the "system" setting explicitly and always
+   lands a concrete data-theme, so the block was redundant — and it silently
+   re-declared these warm-dark tokens over paper/charcoal/glass on any dark-OS
+   Mac, held at bay only by cascade order. A latent theme-bleed trap. */
 
 /* Night Paper (future): amber-brown, near-zero blue. Derive from this palette when built —
    the old copper/cream amber set is retired. Every value must be warm. */

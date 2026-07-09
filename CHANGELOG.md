@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Back / Forward.** The titlebar grew ‹ › buttons beside search — walk your
+  trail of opened notes like a browser (⌘[ and ⌘] too). The history was being
+  recorded all along; now there's a way to travel it.
+- **The ⌘K palette finds more.** Files by name (that PDF in Storage is one
+  keystroke away) and chats by title now show up alongside notes and actions.
+  Result rows got richer, too: a title match highlights the matched letters,
+  and a body match shows the note's home *and* the snippet instead of one or
+  the other.
+
+### Fixed
+
+- **Other themes no longer creep in.** Three real leaks, all sealed: native
+  dropdown menus and scrollbars now follow *rotli's* theme instead of the OS
+  appearance (`color-scheme` per theme); the ⌘-hold shortcut overlay's blur
+  was hardcoded warm-cocoa and painted the warm theme over Paper/Charcoal/
+  Glass — it now uses the theme's own scrim (glass got a proper one); and a
+  latent CSS block that quietly re-applied warm-dark colors on dark-OS Macs
+  was removed.
+
 ## [0.26.0] - 2026-07-08
 
 

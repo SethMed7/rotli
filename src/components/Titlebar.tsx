@@ -16,7 +16,9 @@ import { GLASS_TINTS, SOLID_THEMES, useUiStore } from "../state/ui";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 import { QuokkaMark } from "./Character";
+import { canBack, canForward, useNavHistory } from "../state/navHistory";
 import {
+  ChevronRight,
   PlusGlyph,
   SidebarGlyph,
   SplitDownGlyph,
@@ -40,6 +42,9 @@ function onDragRegionDoubleClick() {
 
 export function Titlebar() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
+  // Back/Forward over opened notes (Seth #14) — ‹ › beside the search field
+  const navBack = useNavHistory(canBack);
+  const navForward = useNavHistory(canForward);
   const updateAvailable = useUiStore((s) => s.updateAvailable);
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const theme = useUiStore((s) => s.theme);
@@ -92,19 +97,44 @@ export function Titlebar() {
         onDoubleClick={onDragRegionDoubleClick}
       >
         {!settingsOpen && (
-          <button
-            type="button"
-            className="tb-search"
-            aria-label="Search notes & actions — ⌘K"
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={() => dispatch("palette.toggle")}
-          >
-            <span className="tb-search-mark" aria-hidden="true">
-              <QuokkaMark size={15} />
-            </span>
-            <span className="tb-search-label">Search…</span>
-            <kbd className="tb-search-kbd">⌘K</kbd>
-          </button>
+          <>
+            {/* ‹ › — walk the opened-notes trail (Seth #14; ⌘[ / ⌘]) */}
+            <button
+              type="button"
+              className="tb-nav"
+              aria-label="Back — previous note (⌘[)"
+              title="Back — previous note ⌘["
+              disabled={!navBack}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => dispatch("nav.back")}
+            >
+              <ChevronRight size={12} className="tb-nav-back" />
+            </button>
+            <button
+              type="button"
+              className="tb-nav"
+              aria-label="Forward — next note (⌘])"
+              title="Forward — next note ⌘]"
+              disabled={!navForward}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => dispatch("nav.forward")}
+            >
+              <ChevronRight size={12} />
+            </button>
+            <button
+              type="button"
+              className="tb-search"
+              aria-label="Search notes & actions — ⌘K"
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => dispatch("palette.toggle")}
+            >
+              <span className="tb-search-mark" aria-hidden="true">
+                <QuokkaMark size={15} />
+              </span>
+              <span className="tb-search-label">Search…</span>
+              <kbd className="tb-search-kbd">⌘K</kbd>
+            </button>
+          </>
         )}
       </div>
       <div className="tb-actions">

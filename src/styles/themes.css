@@ -11,6 +11,20 @@
    definition file, same role as the kit's colors.css — check-hex exempts it by name).
    Components never read these values directly; they consume the same semantic tokens. */
 
+/* Native-control appearance follows the APP theme, never the OS. Without this,
+   WKWebView renders select popups, scrollbars, the WebKit context menu, and
+   autofill chrome in the OS mode — a dark-Mac user in Warm Light saw dark
+   dropdowns "creep in" from another theme (Seth, 2026-07-08). Light is the
+   base; every dark theme flips it. */
+:root {
+  color-scheme: light;
+}
+:root[data-theme="dark"],
+:root[data-theme="charcoal"],
+:root[data-theme="glass-dark"] {
+  color-scheme: dark;
+}
+
 /* picker swatches — available in every theme, for Settings → Appearance */
 :root {
   --swatch-warm-light: #f8f2e9;
@@ -146,6 +160,8 @@
   --success: var(--glass-hue-deep);
   --hov: rgba(28, 32, 38, 0.06);
   --act: rgba(28, 32, 38, 0.1);
+  /* the ⌘K/⌘-hold dim — the warm kit's cocoa scrim must not bleed into glass */
+  --scrim: rgba(28, 32, 38, 0.35);
 }
 
 /* — GLASS · dark — */
@@ -163,6 +179,8 @@
   --success: var(--glass-hue);
   --hov: rgba(238, 241, 244, 0.08);
   --act: rgba(238, 241, 244, 0.13);
+  /* see glass-light — a neutral dark scrim in place of the warm cocoa one */
+  --scrim: rgba(10, 12, 15, 0.45);
 }
 
 /* the ambient field the glass floats over — soft hue blobs (glass needs color

@@ -19,7 +19,9 @@ import { useBindingsStore, resolveChord } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
 import { type KeyAction, allActions, dispatch, getAction } from "../keys/registry";
 import { useTransientPopover } from "../lib/popover";
-import { useFolders, useNoteSearch, useSearchableNotes } from "../services/hooks";
+import { useFolders, useNoteIndex, useNoteSearch, useSearchableNotes } from "../services/hooks";
+import { activeInstance } from "../memex/config";
+import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
 import { useMruStore } from "../state/mru";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
@@ -28,6 +30,7 @@ import { Icon } from "./Icon";
 import { MatchText } from "./MatchText";
 import {
   glyphForNote,
+  ChatGlyph,
   FocusGlyph,
   KeyboardGlyph,
   PlusGlyph,
@@ -60,7 +63,8 @@ function actionIcon(id: string): ReactNode {
 
 interface Row {
   key: string;
-  label: string;
+  /** ReactNode so a title hit can carry its <mark> highlight (audit F6). */
+  label: ReactNode;
   icon: ReactNode;
   hint: ReactNode;
   run: (newTab: boolean) => void;
@@ -87,12 +91,19 @@ export function Palette({ onClose }: { onClose: () => void }) {
   const searchData = useNoteSearch(query).data;
   const hits = query.trim().length >= 2 ? searchData : undefined;
   const folders = useFolders().data ?? [];
+  // the FULL index (files included) — the filename pass (audit F4); and the
+  // active memex's chats for the chat-title pass (audit F3)
+  const noteIndex = useNoteIndex();
+  const memexCfg = useMemexConfig();
+  const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
+  const chats = useInstanceChats(activeMemex).data ?? [];
   const mruIds = useMruStore((s) => s.ids);
   const overrides = useBindingsStore((s) => s.overrides);
   const root = usePanesStore((s) => s.root);
   const focusedPaneId = usePanesStore((s) => s.focusedPaneId);
   const openNote = usePanesStore((s) => s.openNote);
   const openSummary = usePanesStore((s) => s.openSummary);
+  const openChat = usePanesStore((s) => s.openChat);
   const activateTab = usePanesStore((s) => s.activateTab);
   const selectedFolderId = useUiStore((s) => s.selectedFolderId);
 
@@ -214,15 +225,22 @@ export function Palette({ onClose }: { onClose: () => void }) {
         pinned: false,
         kind: h.kind,
       };
+      const home = folderName(h.folderId);
       return {
         ...noteRow(summary),
+        // a TITLE hit highlights the match in the title itself; a BODY hit shows
+        // the note's home AND the framed snippet, not one or the other (audit F6)
+        ...(h.rank === 0
+          ? { label: <MatchText text={h.title} start={h.matchStart} len={h.matchLen} /> }
+          : {}),
         hint:
           h.rank === 1 ? (
             <span className="muted">
+              {home ? `${home} · ` : ""}
               <MatchText text={h.snippet} start={h.matchStart} len={h.matchLen} />
             </span>
           ) : (
-            <span className="muted">{folderName(h.folderId)}</span>
+            <span className="muted">{home}</span>
           ),
       };
     };
@@ -233,6 +251,30 @@ export function Palette({ onClose }: { onClose: () => void }) {
         .filter((n) => !hitIds.has(n.id) && (fuzzy(q, n.title) || fuzzy(q, n.snippet)))
         .map(noteRow),
     ].slice(0, 8);
+    // Files by NAME (audit F4) — the searchable universe excludes binaries, but
+    // a PDF/xlsx in Storage should be reachable by typing its name. The full
+    // index carries them; openSummary already routes kind "file" to its viewer.
+    const fileRows: Row[] = [];
+    for (const n of noteIndex.values()) {
+      if (n.kind !== "file" || !fuzzy(q, n.title)) continue;
+      fileRows.push(noteRow(n));
+      if (fileRows.length >= 4) break;
+    }
+    // Chats by TITLE (audit F3) — "everything has a chat", so a chat must at
+    // least be findable by name. Full-text chat search is a later Rust lane.
+    const chatRows: Row[] = chats
+      .filter((c) => fuzzy(q, c.title || c.slug))
+      .slice(0, 4)
+      .map((c) => ({
+        key: `chat:${c.slug}`,
+        label: c.title || c.slug,
+        icon: <ChatGlyph size={15} />,
+        hint: <span className="muted">Chat</span>,
+        run: () => {
+          openChat(c.slug);
+          onClose();
+        },
+      }));
     // capture-surface actions live in the other webview — their handle is
     // null here and dispatching them would silently no-op
     const actionRows = allActions()
@@ -242,6 +284,8 @@ export function Palette({ onClose }: { onClose: () => void }) {
     return [
       ...(tabRows.length > 0 ? [{ name: "Open tabs", rows: tabRows.slice(0, 6) }] : []),
       ...(noteRows.length > 0 ? [{ name: "Notes", rows: noteRows }] : []),
+      ...(fileRows.length > 0 ? [{ name: "Files", rows: fileRows }] : []),
+      ...(chatRows.length > 0 ? [{ name: "Chats", rows: chatRows }] : []),
       ...(actionRows.length > 0 ? [{ name: "Actions", rows: actionRows }] : []),
     ];
   }, [
@@ -249,6 +293,8 @@ export function Palette({ onClose }: { onClose: () => void }) {
     notes,
     hits,
     folders,
+    noteIndex,
+    chats,
     mruIds,
     overrides,
     root,
@@ -256,6 +302,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
     selectedFolderId,
     openNote,
     openSummary,
+    openChat,
     activateTab,
     onClose,
   ]);
@@ -294,7 +341,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
             autoFocus
             type="text"
             value={query}
-            placeholder="Search notes, actions…"
+            placeholder="Search notes, files, chats, actions…"
             aria-label="Search notes and actions"
             onChange={(e) => {
               setQuery(e.target.value);
@@ -326,7 +373,9 @@ export function Palette({ onClose }: { onClose: () => void }) {
               })}
             </div>
           ))}
-          {flat.length === 0 && <div className="pal-empty">Nothing matches — fewer letters?</div>}
+          {flat.length === 0 && (
+            <div className="pal-empty">Nothing matches — try different words?</div>
+          )}
         </div>
         <div className="pal-foot">
           <span>

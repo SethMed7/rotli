@@ -30,6 +30,7 @@ import {
 import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
 import { useMainStore } from "../state/main";
 import { MAIN_ROOT, addNoteToMainAt, mainFolderIds, mainParentOfNote } from "../services/mainTree";
+import { navigate } from "../state/navHistory";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { cycleQuick, removeQuickNote } from "../state/quick";
 import { ALL_NOTES, RECENT, SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
@@ -186,6 +187,22 @@ export function registerDefaultActions(): void {
   });
 
   // — the command layer —
+  // Back / Forward over opened notes (Seth #14 — the recorder ran since 0.24.x;
+  // this is the player: the titlebar ‹ › buttons + the browser chords). The
+  // Meta+Bracket chords are FREE on the main surface (quick.next/prev own them
+  // only inside the Quick window — chords scope per surface).
+  registerAction({
+    id: "nav.back",
+    title: "Back — previous note",
+    defaultChord: "Meta+BracketLeft",
+    run: () => navigate(-1, (id) => usePanesStore.getState().openNote(id)),
+  });
+  registerAction({
+    id: "nav.forward",
+    title: "Forward — next note",
+    defaultChord: "Meta+BracketRight",
+    run: () => navigate(1, (id) => usePanesStore.getState().openNote(id)),
+  });
   registerAction({
     id: "palette.toggle",
     title: "Search notes & actions",
