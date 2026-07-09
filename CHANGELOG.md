@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-07-09
+
 ### Added
 
 - **Slash: link a note.** `/Link note` (aliases `note` / `wiki` / `link`) opens
@@ -23,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The new spreadsheet engine IS the editor now.** The "New engine · beta"
+  toggle is gone — editable `.xlsx` / `.csv` files open straight into the
+  Univer engine (the full Excel grammar 0.27.0 introduced), and **⌘S saves
+  through the faithful bridge** — the file on disk stays the truth. The clay
+  brand theme, the themed ⇄ raw color toggle, and the quit/hide flush all ride
+  the new path, repackaged under `src/sheets/` (codec · engine · session ·
+  shell) so a future engine swap is a few-file change.
 - **Editor opens lighter.** KaTeX, Mermaid, and JSXGraph load only when a
   matching fence first renders; Excalidraw / Univer embed hosts load only when
   a ` ```board ` / ` ```sheet ` fence mounts; SheetJS (`xlsx`) loads only when
