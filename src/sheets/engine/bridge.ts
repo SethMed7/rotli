@@ -1,82 +1,30 @@
-// The exceljs ⇄ Univer bridge (Phase 1 of the engine adoption, 2026-07-09).
+// exceljs ⇄ SheetModel bridge — pure in both directions; NO engine runtime.
 //
-// rotli's law: THE FILE ON DISK IS THE TRUTH, and exceljs is the disk codec.
-// Univer (the free Apache-2.0 preset) is only the interaction surface — it gets
-// a JSON model (IWorkbookData) on load and hands back a snapshot on save. This
-// module is that boundary, pure in both directions:
+//   load:  workbookToModel(wb)           exceljs Workbook → SheetModel
+//   save:  applyModelToWorkbook(wb, m)  SheetModel → MUTATE retained Workbook
 //
-//   load:  workbookToUniverData(wb)          exceljs Workbook → snapshot JSON
-//   save:  applySnapshotToWorkbook(wb, snap) snapshot JSON → MUTATE the retained
-//                                            Workbook (never regenerate), then
-//                                            the caller writeBuffer()s it.
-//
-// Mutate-don't-regenerate is the fidelity trick: workbook-level features the
-// bridge doesn't model (pivots, charts, defined names, properties) survive
-// untouched because exceljs preserves what we don't touch. Cell-level content
-// is rewritten from the snapshot (values, formulas, styles, merges, sizes,
-// freeze, number formats — the modeled subset).
-//
-// The types below are STRUCTURAL mirrors of Univer's wire shapes (IWorkbookData
-// / IStyleData enums), kept local so this module + its tests never import the
-// Univer runtime and can't drift with its 0.x type churn; UniverSpike casts at
-// the createUniver boundary. Known P1 limits: cell comments/hyperlinks aren't
-// modeled (cleared cells lose them), rich text flattens to plain text, and
-// structural row/col moves rewrite content by position.
+// Mutate-don't-regenerate preserves unmodeled workbook features (pivots, charts…).
 
 import type { Borders, Cell, CellValue, Workbook, Worksheet } from "exceljs";
-import { hexFromArgb } from "./sheetEdit";
+import { hexFromArgb } from "../codec/colors";
+import type {
+  SheetBorderSide,
+  SheetModel,
+  SheetModelCell,
+  SheetModelMerge,
+  SheetModelStyle,
+  SheetModelTab,
+} from "./types";
 
-// ── Univer wire shapes (structural) ───────────────────────────────────────────
-
-export interface UBorderSide {
-  s: number; // BorderStyleTypes
-  cl?: { rgb: string };
-}
-export interface UStyle {
-  bl?: 0 | 1; // bold
-  it?: 0 | 1; // italic
-  ul?: { s: 0 | 1 }; // underline
-  fs?: number; // font size (pt)
-  ff?: string; // font family
-  cl?: { rgb: string } | null; // text color
-  bg?: { rgb: string } | null; // fill
-  ht?: 0 | 1 | 2 | 3; // horizontal: 1 left · 2 center · 3 right
-  vt?: 0 | 1 | 2 | 3; // vertical: 1 top · 2 middle · 3 bottom
-  tb?: 1 | 2 | 3; // wrap strategy: 3 = wrap
-  bd?: { t?: UBorderSide; b?: UBorderSide; l?: UBorderSide; r?: UBorderSide };
-  n?: { pattern: string }; // number format
-}
-export interface UCell {
-  v?: string | number | boolean;
-  f?: string; // formula WITH the leading "="
-  s?: string | UStyle | null; // style id (into snapshot.styles) or inline
-  t?: number; // CellValueType (1 string · 2 number · 3 boolean)
-}
-export interface UMerge {
-  startRow: number;
-  startColumn: number;
-  endRow: number;
-  endColumn: number;
-}
-export interface USheet {
-  id: string;
-  name: string;
-  cellData?: Record<number, Record<number, UCell>>;
-  rowCount?: number;
-  columnCount?: number;
-  columnData?: Record<number, { w?: number }>;
-  rowData?: Record<number, { h?: number }>;
-  mergeData?: UMerge[];
-  freeze?: { xSplit: number; ySplit: number; startRow: number; startColumn: number };
-}
-export interface USnapshot {
-  id: string;
-  name: string;
-  sheetOrder: string[];
-  sheets: Record<string, USheet>;
-  styles?: Record<string, UStyle>;
-  locale?: string;
-}
+export type {
+  SheetBorderSide,
+  SheetModel,
+  SheetModelCell,
+  SheetModelMerge,
+  SheetModelStyle,
+  SheetModelTab,
+  SheetThemeMode,
+} from "./types";
 
 // ── unit + enum maps ──────────────────────────────────────────────────────────
 
@@ -132,7 +80,7 @@ function argbOf(rgb: string | undefined): string | undefined {
 
 // ── load: exceljs → snapshot ─────────────────────────────────────────────────
 
-function borderSideToU(side: Partial<Borders>[keyof Borders] | undefined): UBorderSide | undefined {
+function borderSideToU(side: Partial<Borders>[keyof Borders] | undefined): SheetBorderSide | undefined {
   if (!side?.style) return undefined;
   const s = BORDER_TO_U[side.style] ?? 1;
   const cl = rgbOf(side.color?.argb);
@@ -140,8 +88,8 @@ function borderSideToU(side: Partial<Borders>[keyof Borders] | undefined): UBord
 }
 
 /** The full modeled style of one exceljs cell as an inline Univer style. */
-function styleToU(cell: Cell): UStyle | null {
-  const st: UStyle = {};
+function styleToU(cell: Cell): SheetModelStyle | null {
+  const st: SheetModelStyle = {};
   const f = cell.font;
   if (f?.bold) st.bl = 1;
   if (f?.italic) st.it = 1;
@@ -166,7 +114,7 @@ function styleToU(cell: Cell): UStyle | null {
   if (al?.wrapText) st.tb = 3;
   const b = cell.border;
   if (b) {
-    const bd: NonNullable<UStyle["bd"]> = {};
+    const bd: NonNullable<SheetModelStyle["bd"]> = {};
     const t = borderSideToU(b.top);
     const bo = borderSideToU(b.bottom);
     const l = borderSideToU(b.left);
@@ -184,7 +132,7 @@ function styleToU(cell: Cell): UStyle | null {
 /** One Univer cell from an exceljs value. Dates become Excel SERIALS (+ a date
  * numFmt if the cell has none) so they stay real dates in both worlds. Formula
  * cells carry the formula AND the cached result. */
-function valueToU(cell: Cell): UCell | null {
+function valueToU(cell: Cell): SheetModelCell | null {
   const v = cell.value as CellValue;
   if (v === null || v === undefined) return null;
   if (typeof v === "number" || typeof v === "boolean") return { v };
@@ -211,14 +159,14 @@ function valueToU(cell: Cell): UCell | null {
 }
 
 /** exceljs Workbook → a Univer workbook snapshot (the modeled subset). Sheet
- * ids are positional ("sheet-<i>") — applySnapshotToWorkbook keys off them. */
-export function workbookToUniverData(wb: Workbook, name: string): USnapshot {
-  const sheets: Record<string, USheet> = {};
+ * ids are positional ("sheet-<i>") — applyModelToWorkbook keys off them. */
+export function workbookToModel(wb: Workbook, name: string): SheetModel {
+  const sheets: Record<string, SheetModelTab> = {};
   const sheetOrder: string[] = [];
   wb.worksheets.forEach((ws, i) => {
     const id = `sheet-${i}`;
     sheetOrder.push(id);
-    const cellData: Record<number, Record<number, UCell>> = {};
+    const cellData: Record<number, Record<number, SheetModelCell>> = {};
     ws.eachRow({ includeEmpty: false }, (row, r) => {
       row.eachCell({ includeEmpty: false }, (cell, c) => {
         const val = valueToU(cell);
@@ -241,7 +189,7 @@ export function workbookToUniverData(wb: Workbook, name: string): USnapshot {
     ws.eachRow({ includeEmpty: true }, (row, r) => {
       if (row.height) rowData[r - 1] = { h: Math.round(row.height * PX_PER_PT) };
     });
-    const mergeData: UMerge[] = [];
+    const mergeData: SheetModelMerge[] = [];
     for (const ref of (ws.model?.merges ?? []) as string[]) {
       const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(ref);
       if (!m || !m[1] || !m[2] || !m[3] || !m[4]) continue;
@@ -252,6 +200,11 @@ export function workbookToUniverData(wb: Workbook, name: string): USnapshot {
         endColumn: colIndex(m[3]),
       });
     }
+    // pad just enough to add a few rows/cols — the old floor of 100×26 left a
+    // small sheet swimming in empty grid (Seth, 2026-07-09). Used extent from
+    // cellData, not exceljs's rowCount (which can inflate past real content).
+    const usedRows = extentOf(cellData, "row");
+    const usedCols = extentOf(cellData, "col");
     const view = ws.views?.[0];
     sheets[id] = {
       id,
@@ -260,8 +213,8 @@ export function workbookToUniverData(wb: Workbook, name: string): USnapshot {
       ...(Object.keys(columnData).length ? { columnData } : {}),
       ...(Object.keys(rowData).length ? { rowData } : {}),
       ...(mergeData.length ? { mergeData } : {}),
-      rowCount: Math.max(ws.rowCount + 40, 100),
-      columnCount: Math.max(ws.columnCount + 8, 26),
+      rowCount: Math.max(usedRows + GRID_ROW_PAD, usedRows > 0 ? usedRows + 1 : EMPTY_ROWS),
+      columnCount: Math.max(usedCols + GRID_COL_PAD, usedCols > 0 ? usedCols + 1 : EMPTY_COLS),
       ...(view?.state === "frozen"
         ? {
             freeze: {
@@ -277,7 +230,76 @@ export function workbookToUniverData(wb: Workbook, name: string): USnapshot {
   return { id: `rotli-${name}`, name, sheetOrder, sheets, styles: {} };
 }
 
-/** "A"→0, "Z"→25, "AA"→26 … (inverse of sheetEdit's colLabel). */
+/** How many empty rows/cols to leave past the last used cell — room to type,
+ * not a second spreadsheet of void. */
+const GRID_ROW_PAD = 8;
+const GRID_COL_PAD = 3;
+/** Floor only when the sheet is empty (a brand-new workbook). */
+const EMPTY_ROWS = 20;
+const EMPTY_COLS = 8;
+
+/** 1-based count of used rows or cols from a sparse cellData map (0 when empty). */
+function extentOf(
+  cellData: Record<number, Record<number, SheetModelCell>>,
+  axis: "row" | "col",
+): number {
+  let max = -1;
+  for (const rk of Object.keys(cellData)) {
+    const r = Number(rk);
+    if (axis === "row") {
+      if (r > max) max = r;
+      continue;
+    }
+    const row = cellData[r];
+    if (!row) continue;
+    for (const ck of Object.keys(row)) {
+      const c = Number(ck);
+      if (c > max) max = c;
+    }
+  }
+  return max + 1;
+}
+
+/** Pull the first sheet's values out of a Univer snapshot as plain string rows
+ * — the csv SAVE path. Trailing empty rows/cols are trimmed so the pad we add
+ * for editing never lands in the file. Styles/formulas are ignored (a csv
+ * can't hold them); a formula cell contributes its cached result. */
+export function csvRowsFromSnapshot(snap: SheetModel): string[][] {
+  const id = snap.sheetOrder[0];
+  if (!id) return [];
+  const sh = snap.sheets[id];
+  if (!sh?.cellData) return [];
+  const usedRows = extentOf(sh.cellData, "row");
+  const usedCols = extentOf(sh.cellData, "col");
+  if (usedRows === 0 || usedCols === 0) return [];
+  const rows: string[][] = [];
+  for (let r = 0; r < usedRows; r++) {
+    const row: string[] = [];
+    const src = sh.cellData[r];
+    for (let c = 0; c < usedCols; c++) {
+      const cell = src?.[c];
+      row.push(cellValueText(cell));
+    }
+    rows.push(row);
+  }
+  // drop trailing all-empty rows (Univer may keep cleared cells as {v:""})
+  while (rows.length > 0 && rows[rows.length - 1]?.every((v) => v === "")) rows.pop();
+  // drop trailing all-empty cols
+  while (rows.length > 0 && rows.every((r) => r[r.length - 1] === "")) {
+    for (const r of rows) r.pop();
+  }
+  return rows;
+}
+
+function cellValueText(cell: SheetModelCell | undefined): string {
+  if (!cell) return "";
+  const v = cell.v;
+  if (v === undefined || v === null) return "";
+  if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+  return String(v);
+}
+
+/** "A"→0, "Z"→25, "AA"→26 … */
 export function colIndex(label: string): number {
   let n = 0;
   for (const ch of label) n = n * 26 + (ch.charCodeAt(0) - 64);
@@ -287,13 +309,13 @@ export function colIndex(label: string): number {
 // ── save: snapshot → the retained exceljs Workbook ───────────────────────────
 
 /** Resolve a cell's style: an id into snapshot.styles, an inline object, or none. */
-function resolveStyle(cell: UCell, styles: Record<string, UStyle> | undefined): UStyle | null {
+function resolveStyle(cell: SheetModelCell, styles: Record<string, SheetModelStyle> | undefined): SheetModelStyle | null {
   if (!cell.s) return null;
   if (typeof cell.s === "string") return styles?.[cell.s] ?? null;
   return cell.s;
 }
 
-function borderSideFromU(side: UBorderSide | undefined):
+function borderSideFromU(side: SheetBorderSide | undefined):
   | { style: string; color?: { argb: string } }
   | undefined {
   if (!side) return undefined;
@@ -303,7 +325,7 @@ function borderSideFromU(side: UBorderSide | undefined):
 }
 
 /** Write one snapshot cell (value + style) onto an exceljs cell. */
-function applyCell(cell: Cell, u: UCell, styles: Record<string, UStyle> | undefined): void {
+function applyCell(cell: Cell, u: SheetModelCell, styles: Record<string, SheetModelStyle> | undefined): void {
   // value: formulas carry the cached result; plain values write typed
   if (u.f) {
     const formula = u.f.replace(/^=/, "");
@@ -364,7 +386,7 @@ function applyCell(cell: Cell, u: UCell, styles: Record<string, UStyle> | undefi
  * session must thread through repeated saves: positional "sheet-<i>" ids stop
  * matching the workbook's order the moment a save removes a sheet, so the
  * SECOND save would write onto the wrong worksheet. Build it at load time. */
-export function buildSheetIdMap(wb: Workbook, snap: USnapshot): Map<string, number> {
+export function buildSheetIdMap(wb: Workbook, snap: SheetModel): Map<string, number> {
   const map = new Map<string, number>();
   snap.sheetOrder.forEach((id, i) => {
     const ws = wb.worksheets[i];
@@ -381,9 +403,9 @@ export function buildSheetIdMap(wb: Workbook, snap: USnapshot): Map<string, numb
  * repeated saves in one session correct through sheet adds/removes; it is
  * UPDATED in place. Without it, resolution falls back to positional ids
  * (correct for the first apply after a fresh load). */
-export function applySnapshotToWorkbook(
+export function applyModelToWorkbook(
   wb: Workbook,
-  snap: USnapshot,
+  snap: SheetModel,
   idMap?: Map<string, number>,
 ): void {
   // STRUCTURAL GUARD before anything mutates (reviewer B2): the whole file's
@@ -438,7 +460,7 @@ export function applySnapshotToWorkbook(
   //   itself, so a case-only rename ("sheet1"→"Sheet1") or a two-sheet name
   //   swap threw and made the whole session unsaveable. Pass 1 parks every
   //   to-be-renamed sheet on a unique temp name; pass 2 lands the real names.
-  const resolved: { ws: Worksheet; usheet: USheet }[] = [];
+  const resolved: { ws: Worksheet; usheet: SheetModelTab }[] = [];
   for (const id of snap.sheetOrder) {
     const usheet = snap.sheets[id];
     if (!usheet) continue; // unreachable after the guard; belt + braces

@@ -9,7 +9,7 @@
 // side: always loaded (persist.ts imports it), so an idle quit acks in
 // milliseconds instead of riding out the Rust-side timeout.
 //
-// Register work with `onQuitFlush` — sheetSessions.ts parks its flush here.
+// Register work with `onQuitFlush` — SheetEditor parks its dirty-sheet flush here.
 // Flushers run in parallel and a throwing flusher never blocks the ack.
 
 import { invoke } from "@tauri-apps/api/core";

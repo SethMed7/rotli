@@ -7,13 +7,14 @@ import { describe, expect, test } from "bun:test";
 import ExcelJS from "exceljs";
 import type { Workbook } from "exceljs";
 import {
-  type USnapshot,
-  applySnapshotToWorkbook,
+  type SheetModel,
+  applyModelToWorkbook,
   buildSheetIdMap,
   colIndex,
+  csvRowsFromSnapshot,
   dateToSerial,
-  workbookToUniverData,
-} from "./univerBridge";
+  workbookToModel,
+} from "./bridge";
 
 const HASH = "#"; // built at runtime so no hex literal appears in source
 
@@ -53,7 +54,7 @@ async function reload(wb: Workbook): Promise<Workbook> {
   return wb2;
 }
 
-const sheetOf = (snap: USnapshot, i = 0) =>
+const sheetOf = (snap: SheetModel, i = 0) =>
   must(snap.sheets[must(snap.sheetOrder[i], "sheet id")], "sheet");
 
 describe("colIndex", () => {
@@ -65,8 +66,8 @@ describe("colIndex", () => {
   });
 });
 
-describe("load: workbookToUniverData", () => {
-  const snap = workbookToUniverData(richWorkbook(), "rich.xlsx");
+describe("load: workbookToModel", () => {
+  const snap = workbookToModel(richWorkbook(), "rich.xlsx");
   const sh = sheetOf(snap);
 
   test("values, formulas, booleans, and dates (as serials) project", () => {
@@ -109,15 +110,42 @@ describe("load: workbookToUniverData", () => {
     expect(sh.rowData?.[0]?.h).toBe(40); // 30pt × 4/3
     expect(sh.freeze).toEqual({ xSplit: 1, ySplit: 1, startRow: -1, startColumn: -1 });
   });
+
+  test("grid pads tightly past used cells (no 100×26 void)", () => {
+    // rich workbook uses A1..D4 + merge to B6 → used 6×4; pad is +8 rows / +3 cols
+    expect(sh.rowCount).toBe(6 + 8);
+    expect(sh.columnCount).toBe(4 + 3);
+  });
+});
+
+describe("csvRowsFromSnapshot", () => {
+  test("extracts values and trims the edit pad", () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Sales");
+    ws.getCell("A1").value = "Region";
+    ws.getCell("B1").value = "Q1";
+    ws.getCell("A2").value = "North";
+    ws.getCell("B2").value = 42;
+    ws.getCell("A3").value = "007"; // string must survive
+    const snap = workbookToModel(wb, "t.csv");
+    // the pad is in the snapshot's rowCount — but csvRowsFromSnapshot trims it
+    expect(sheetOf(snap).rowCount).toBeGreaterThan(3);
+    const rows = csvRowsFromSnapshot(snap);
+    expect(rows).toEqual([
+      ["Region", "Q1"],
+      ["North", "42"],
+      ["007", ""],
+    ]);
+  });
 });
 
 describe("apply ∘ load = identity (through real xlsx bytes)", () => {
   test("the modeled subset survives apply → write → reload unchanged", async () => {
     const wb = richWorkbook();
-    const before = workbookToUniverData(wb, "t");
-    applySnapshotToWorkbook(wb, before);
+    const before = workbookToModel(wb, "t");
+    applyModelToWorkbook(wb, before);
     const wb2 = await reload(wb);
-    const after = workbookToUniverData(wb2, "t");
+    const after = workbookToModel(wb2, "t");
     // sheet-level deep equality on everything the bridge models
     expect(sheetOf(after).cellData).toEqual(sheetOf(before).cellData);
     expect(sheetOf(after).mergeData).toEqual(sheetOf(before).mergeData);
@@ -131,7 +159,7 @@ describe("apply ∘ load = identity (through real xlsx bytes)", () => {
 describe("simulated Univer edits land in the reloaded file", () => {
   test("value change · new formula · new styled cell · cleared cell", async () => {
     const wb = richWorkbook();
-    const snap = workbookToUniverData(wb, "t");
+    const snap = workbookToModel(wb, "t");
     const sh = sheetOf(snap);
     const cells = must(sh.cellData, "cellData");
     (cells[0] ??= {})[0] = { v: "renamed" }; // A1: new value, style dropped
@@ -139,7 +167,7 @@ describe("simulated Univer edits land in the reloaded file", () => {
     (cells[6] ??= {})[2] = { v: "loud", s: { bl: 1, bg: { rgb: `${HASH}ff0000` } } }; // C7 styled
     delete must(cells[0], "row0")[1]; // B1 cleared in Univer
 
-    applySnapshotToWorkbook(wb, snap);
+    applyModelToWorkbook(wb, snap);
     const wb2 = await reload(wb);
     const ws = must(wb2.worksheets[0], "ws");
     expect(ws.getCell("A1").value).toBe("renamed");
@@ -154,7 +182,7 @@ describe("simulated Univer edits land in the reloaded file", () => {
   test("merge added · resize · rename · sheet added · sheet removed", async () => {
     const wb = richWorkbook();
     wb.addWorksheet("Doomed");
-    const snap = workbookToUniverData(wb, "t");
+    const snap = workbookToModel(wb, "t");
     expect(snap.sheetOrder).toHaveLength(2);
     const sh = sheetOf(snap);
     sh.name = "Numbers";
@@ -170,7 +198,7 @@ describe("simulated Univer edits land in the reloaded file", () => {
       cellData: { 0: { 0: { v: "hello" } } },
     };
 
-    applySnapshotToWorkbook(wb, snap);
+    applyModelToWorkbook(wb, snap);
     const wb2 = await reload(wb);
     expect(wb2.worksheets.map((w) => w.name)).toEqual(["Numbers", "Fresh"]);
     const ws = must(wb2.getWorksheet("Numbers"), "renamed sheet");
@@ -183,10 +211,10 @@ describe("simulated Univer edits land in the reloaded file", () => {
   test("style-dict references (snapshot.styles ids) resolve", async () => {
     const wb = new ExcelJS.Workbook();
     wb.addWorksheet("S").getCell("A1").value = "x";
-    const snap = workbookToUniverData(wb, "t");
+    const snap = workbookToModel(wb, "t");
     snap.styles = { st1: { bl: 1, cl: { rgb: `${HASH}00aa00` } } };
     must(sheetOf(snap).cellData, "cells")[0] = { 0: { v: "x", s: "st1" } };
-    applySnapshotToWorkbook(wb, snap);
+    applyModelToWorkbook(wb, snap);
     const ws = must((await reload(wb)).worksheets[0], "ws");
     expect(ws.getCell("A1").font?.bold).toBe(true);
     expect(ws.getCell("A1").font?.color?.argb).toBe("FF00AA00");
@@ -199,19 +227,19 @@ describe("live sessions: repeated saves through structural changes", () => {
     wb.addWorksheet("One").getCell("A1").value = "one";
     wb.addWorksheet("Two").getCell("A1").value = "two";
     wb.addWorksheet("Three").getCell("A1").value = "three";
-    const snap = workbookToUniverData(wb, "t");
+    const snap = workbookToModel(wb, "t");
     const idMap = buildSheetIdMap(wb, snap);
 
     // save 1 — the user deleted "One" in Univer
     snap.sheetOrder = snap.sheetOrder.slice(1); // ["sheet-1", "sheet-2"]
     delete snap.sheets["sheet-0"];
-    applySnapshotToWorkbook(wb, snap, idMap);
+    applyModelToWorkbook(wb, snap, idMap);
     expect(wb.worksheets.map((w) => w.name)).toEqual(["Two", "Three"]);
 
     // save 2 — an edit on "Three" (still id "sheet-2"); POSITIONAL resolution
     // would now miss (index 2 is gone) and mint a duplicate sheet
     must(must(snap.sheets["sheet-2"], "s2").cellData, "cells")[0] = { 0: { v: "three!" } };
-    applySnapshotToWorkbook(wb, snap, idMap);
+    applyModelToWorkbook(wb, snap, idMap);
 
     const wb2 = await reload(wb);
     expect(wb2.worksheets.map((w) => w.name)).toEqual(["Two", "Three"]);
@@ -224,10 +252,10 @@ describe("apply guards (reviewer B2/S3 — the file's fate hangs on these)", () 
   test("refuses an empty or inconsistent snapshot WITHOUT touching the workbook", () => {
     const wb = richWorkbook();
     expect(() =>
-      applySnapshotToWorkbook(wb, { id: "x", name: "x", sheetOrder: [], sheets: {} }),
+      applyModelToWorkbook(wb, { id: "x", name: "x", sheetOrder: [], sheets: {} }),
     ).toThrow(/refusing/);
     expect(() =>
-      applySnapshotToWorkbook(wb, { id: "x", name: "x", sheetOrder: ["ghost"], sheets: {} }),
+      applyModelToWorkbook(wb, { id: "x", name: "x", sheetOrder: ["ghost"], sheets: {} }),
     ).toThrow(/refusing/);
     // nothing was mutated by either refusal
     expect(wb.worksheets).toHaveLength(1);
@@ -237,9 +265,9 @@ describe("apply guards (reviewer B2/S3 — the file's fate hangs on these)", () 
   test("a case-only rename survives (exceljs's dup check includes the sheet itself)", async () => {
     const wb = new ExcelJS.Workbook();
     wb.addWorksheet("sheet1").getCell("A1").value = "x";
-    const snap = workbookToUniverData(wb, "t");
+    const snap = workbookToModel(wb, "t");
     must(snap.sheets["sheet-0"], "s0").name = "Sheet1";
-    applySnapshotToWorkbook(wb, snap);
+    applyModelToWorkbook(wb, snap);
     expect((await reload(wb)).worksheets.map((w) => w.name)).toEqual(["Sheet1"]);
   });
 
@@ -247,10 +275,10 @@ describe("apply guards (reviewer B2/S3 — the file's fate hangs on these)", () 
     const wb = new ExcelJS.Workbook();
     wb.addWorksheet("Alpha").getCell("A1").value = "a";
     wb.addWorksheet("Beta").getCell("A1").value = "b";
-    const snap = workbookToUniverData(wb, "t");
+    const snap = workbookToModel(wb, "t");
     must(snap.sheets["sheet-0"], "s0").name = "Beta";
     must(snap.sheets["sheet-1"], "s1").name = "Alpha";
-    applySnapshotToWorkbook(wb, snap);
+    applyModelToWorkbook(wb, snap);
     const wb2 = await reload(wb);
     expect(wb2.worksheets.map((w) => w.name)).toEqual(["Beta", "Alpha"]);
     expect(must(wb2.getWorksheet("Beta"), "beta").getCell("A1").value).toBe("a");
@@ -263,8 +291,8 @@ describe("mutate-don't-regenerate preserves unmodeled workbook features", () => 
     const wb = richWorkbook();
     wb.creator = "Seth Medina";
     wb.definedNames.add("Data!$B$1", "TheAnswer");
-    const snap = workbookToUniverData(wb, "t");
-    applySnapshotToWorkbook(wb, snap);
+    const snap = workbookToModel(wb, "t");
+    applyModelToWorkbook(wb, snap);
     const wb2 = await reload(wb);
     expect(wb2.creator).toBe("Seth Medina");
     expect(wb2.definedNames.getRanges("TheAnswer").ranges.length).toBeGreaterThan(0);

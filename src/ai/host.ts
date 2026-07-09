@@ -16,12 +16,13 @@ import {
   webFetch as tauriWebFetch,
   webSearch as tauriWebSearch,
 } from "../lib/tauri";
-import { workbookToCsv } from "../lib/sheets";
+import {
+  SHEET_BIN,
+  SHEET_TEXT,
+} from "../sheets/kinds";
+import { workbookToCsv } from "../sheets/view";
 import { buildIndex, rankNotes } from "./tools";
 import type { CompleteReq, Host } from "./types";
-
-const SHEET_BIN = new Set(["xlsx", "xls", "xlsm", "ods"]);
-const SHEET_TEXT = new Set(["csv", "tsv"]);
 
 /** Mirror of Rust `flatten_messages`: the loop sends ONE user message (the
  * whole rendered prompt) which passes verbatim; anything else gets labeled
