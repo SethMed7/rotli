@@ -14,65 +14,11 @@ import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
 import UniverPresetSheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US";
 import "@univerjs/preset-sheets-core/lib/index.css";
 import ExcelJS from "exceljs";
-import type { CellValue, Workbook } from "exceljs";
 import { corpusFileBytes } from "../lib/tauri";
 import { bytesFromB64 } from "../lib/sheetEdit";
-
-/** One Univer cell from an exceljs value — values only (styles are Phase 1).
- * Formula cells carry BOTH the formula and the cached result, so the engine
- * shows the value and can recalc live. */
-function cellOf(v: CellValue): Record<string, unknown> | null {
-  if (v === null || v === undefined) return null;
-  if (typeof v === "number" || typeof v === "boolean") return { v };
-  if (typeof v === "string") return v === "" ? null : { v };
-  if (v instanceof Date) return { v: v.toISOString().slice(0, 10) };
-  if (typeof v === "object") {
-    if ("richText" in v) return { v: v.richText.map((r) => r.text).join("") };
-    if ("formula" in v || "sharedFormula" in v) {
-      const f = "formula" in v ? v.formula : undefined;
-      const result = "result" in v ? cellOf(v.result as CellValue) : null;
-      return { ...(f ? { f: `=${f}` } : {}), ...(result ?? {}) };
-    }
-    if ("text" in v) return cellOf(v.text as CellValue);
-    if ("error" in v) return { v: String(v.error) };
-  }
-  return { v: String(v) };
-}
-
-/** Minimal exceljs → IWorkbookData projection (values + formulas + rough column
- * widths + frozen first rows). The FAITHFUL style/merge/numfmt bridge is Phase 1;
- * this is just enough for the spike to feel like the real file. */
-function workbookData(wb: Workbook, name: string): Record<string, unknown> {
-  const sheets: Record<string, unknown> = {};
-  const sheetOrder: string[] = [];
-  wb.worksheets.forEach((ws, i) => {
-    const id = `sheet-${i}`;
-    sheetOrder.push(id);
-    const cellData: Record<number, Record<number, unknown>> = {};
-    ws.eachRow({ includeEmpty: false }, (row, r) => {
-      row.eachCell({ includeEmpty: false }, (cell, c) => {
-        const out = cellOf(cell.value);
-        if (out) (cellData[r - 1] ??= {})[c - 1] = out;
-      });
-    });
-    const columnData: Record<number, { w: number }> = {};
-    ws.columns?.forEach((col, c) => {
-      if (col?.width) columnData[c] = { w: Math.round(col.width * 8) }; // chars → ~px
-    });
-    sheets[id] = {
-      id,
-      name: ws.name,
-      cellData,
-      columnData,
-      rowCount: Math.max(ws.rowCount + 40, 100),
-      columnCount: Math.max(ws.columnCount + 8, 26),
-      ...(ws.views?.[0]?.state === "frozen"
-        ? { freeze: { xSplit: ws.views[0].xSplit ?? 0, ySplit: ws.views[0].ySplit ?? 0, startRow: -1, startColumn: -1 } }
-        : {}),
-    };
-  });
-  return { id: `spike-${name}`, name, sheetOrder, sheets, locale: LocaleType.EN_US, styles: {} };
-}
+// the P1 bridge: the FULL modeled projection (values, formulas, styles, borders,
+// merges, sizes, freeze, numFmt) — the spike shows the real file faithfully
+import { workbookToUniverData } from "../lib/univerBridge";
 
 /** Is the CURRENT rotli theme a dark one? (data-theme on :root — same signal
  * the CSS color-scheme rule keys off.) */
@@ -105,7 +51,8 @@ export default function UniverSpike({ fileId }: { fileId: string }) {
           presets: [UniverSheetsCorePreset({ container: host })],
         });
         dispose = () => univer.dispose();
-        univerAPI.createWorkbook(workbookData(wb, fileId) as Parameters<typeof univerAPI.createWorkbook>[0]);
+        const data = { ...workbookToUniverData(wb, fileId), locale: LocaleType.EN_US };
+        univerAPI.createWorkbook(data as unknown as Parameters<typeof univerAPI.createWorkbook>[0]);
         setReady(true);
       } catch (e) {
         if (!disposed) setErr(e instanceof Error ? e.message : String(e));

@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A new spreadsheet engine, in beta.** Editable `.xlsx` files grew a
+  **"New engine · beta"** toggle: the full Excel grammar — row/column header
+  selection, ⇧-click ranges, a formula bar with live-calculating formulas,
+  fill handle, copy/paste, undo/redo, resize, merge, freeze — powered by
+  Univer's free Apache-2.0 engine. The file on disk stays the truth (rotli
+  keeps its own codec); edits in the beta don't save yet — the faithful save
+  bridge is built and round-trip-tested, and flips on after the soak.
+
+### Fixed
+
+- **The formula trap.** Typing `=SUM(…)` into the current editor used to be
+  silently saved as literal text; it now refuses loudly and saves nothing.
+
 ## [0.26.1] - 2026-07-08
 
 
