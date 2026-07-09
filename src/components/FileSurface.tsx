@@ -143,7 +143,7 @@ const imgZoomMemo = new Map<string, "fit" | number>();
 // the Univer spike toggle — session-sticky per file, same reasoning
 const univerMemo = new Map<string, boolean>();
 
-export function FileSurface({ fileId }: { paneId: string; fileId: string }) {
+export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string }) {
   const name = fileName(fileId);
   const kind = kindOf(name);
   const ext = extOf(name);
@@ -408,8 +408,8 @@ export function FileSurface({ fileId }: { paneId: string; fileId: string }) {
             aria-pressed={univerOn}
             title={
               univerOn
-                ? "Back to the current editor (your saves live there)"
-                : "Try the new spreadsheet engine — full Excel grammar; edits don't save yet (spike)"
+                ? "Back to the classic editor"
+                : "The new spreadsheet engine (beta) — full Excel grammar, ⌘S saves to your file"
             }
             onClick={() => setUniverOn((v) => !v)}
           >
@@ -527,7 +527,7 @@ export function FileSurface({ fileId }: { paneId: string; fileId: string }) {
         {!err && kind === "sheet" && probed && sheetEditable && (
           <Suspense fallback={<p className="file-loading">Loading…</p>}>
             {univerOn && ext === "xlsx" ? (
-              <UniverSpike key={fileId} fileId={fileId} />
+              <UniverSpike key={fileId} fileId={fileId} paneId={paneId} />
             ) : (
               <SheetEditor key={fileId} fileId={fileId} mode={ext === "csv" ? "csv" : "xlsx"} />
             )}

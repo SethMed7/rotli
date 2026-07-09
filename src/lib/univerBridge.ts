@@ -360,43 +360,99 @@ function applyCell(cell: Cell, u: UCell, styles: Record<string, UStyle> | undefi
   if (st.n?.pattern) cell.numFmt = st.n.pattern;
 }
 
+/** The persistent univer-sheet-id → exceljs worksheet-id registry a LIVE edit
+ * session must thread through repeated saves: positional "sheet-<i>" ids stop
+ * matching the workbook's order the moment a save removes a sheet, so the
+ * SECOND save would write onto the wrong worksheet. Build it at load time. */
+export function buildSheetIdMap(wb: Workbook, snap: USnapshot): Map<string, number> {
+  const map = new Map<string, number>();
+  snap.sheetOrder.forEach((id, i) => {
+    const ws = wb.worksheets[i];
+    if (ws) map.set(id, ws.id);
+  });
+  return map;
+}
+
 /** Apply a Univer snapshot back onto the RETAINED exceljs Workbook — mutate,
  * never regenerate, so unmodeled workbook features survive. Handles: cell
  * values/formulas/styles (incl. clearing cells the snapshot no longer has),
  * merges, column widths / row heights, freeze, sheet renames, sheets ADDED in
- * Univer, and sheets REMOVED in Univer. */
-export function applySnapshotToWorkbook(wb: Workbook, snap: USnapshot): void {
-  // — sheet resolution: positional ids ("sheet-<i>") map to the workbook's
-  //   original order; anything else was created in Univer → a new worksheet.
+ * Univer, and sheets REMOVED in Univer. `idMap` (from buildSheetIdMap) keeps
+ * repeated saves in one session correct through sheet adds/removes; it is
+ * UPDATED in place. Without it, resolution falls back to positional ids
+ * (correct for the first apply after a fresh load). */
+export function applySnapshotToWorkbook(
+  wb: Workbook,
+  snap: USnapshot,
+  idMap?: Map<string, number>,
+): void {
+  // STRUCTURAL GUARD before anything mutates (reviewer B2): the whole file's
+  // fate hangs on this snapshot — a null/empty/inconsistent one (a failed
+  // fwb.save(), a truncated park) must refuse loudly, never delete sheets.
+  if (!snap || !Array.isArray(snap.sheetOrder) || snap.sheetOrder.length === 0 || !snap.sheets) {
+    throw new Error("refusing to apply an empty or malformed snapshot — the file was not touched");
+  }
+  for (const id of snap.sheetOrder) {
+    if (!snap.sheets[id]) {
+      throw new Error(`refusing to apply: snapshot references a missing sheet (${id}) — the file was not touched`);
+    }
+  }
+
   const originals = [...wb.worksheets]; // capture BEFORE adds/removes
   const claimed = new Set<Worksheet>();
   const resolve = (id: string, name: string): Worksheet => {
-    const m = /^sheet-(\d+)$/.exec(id);
-    if (m) {
-      const ws = originals[Number(m[1])];
+    // 1. the live-session registry (survives structural changes)
+    const mapped = idMap?.get(id);
+    if (mapped !== undefined) {
+      const ws = originals.find((w) => w.id === mapped);
       if (ws) {
         claimed.add(ws);
         return ws;
       }
     }
-    // Univer-created sheet — add (suffix on a name collision, exceljs throws)
-    try {
-      const ws = wb.addWorksheet(name);
-      claimed.add(ws);
-      return ws;
-    } catch {
-      const ws = wb.addWorksheet(`${name} (2)`);
-      claimed.add(ws);
-      return ws;
+    // 2. positional fallback — a fresh load's "sheet-<i>" convention
+    if (!idMap) {
+      const m = /^sheet-(\d+)$/.exec(id);
+      if (m) {
+        const ws = originals[Number(m[1])];
+        if (ws) {
+          claimed.add(ws);
+          return ws;
+        }
+      }
     }
+    // 3. Univer-created sheet — add (suffix on a name collision, exceljs throws)
+    let ws: Worksheet;
+    try {
+      ws = wb.addWorksheet(name);
+    } catch {
+      ws = wb.addWorksheet(`${name} (2)`);
+    }
+    claimed.add(ws);
+    idMap?.set(id, ws.id);
+    return ws;
   };
 
+  // — resolve every sheet FIRST, then rename in TWO PASSES (reviewer S3):
+  //   exceljs's duplicate-name check is case-insensitive and includes the sheet
+  //   itself, so a case-only rename ("sheet1"→"Sheet1") or a two-sheet name
+  //   swap threw and made the whole session unsaveable. Pass 1 parks every
+  //   to-be-renamed sheet on a unique temp name; pass 2 lands the real names.
+  const resolved: { ws: Worksheet; usheet: USheet }[] = [];
   for (const id of snap.sheetOrder) {
     const usheet = snap.sheets[id];
-    if (!usheet) continue;
-    const ws = resolve(id, usheet.name);
+    if (!usheet) continue; // unreachable after the guard; belt + braces
+    resolved.push({ ws: resolve(id, usheet.name), usheet });
+  }
+  let tmp = 0;
+  for (const { ws, usheet } of resolved) {
+    if (ws.name !== usheet.name) ws.name = `~rotli-rename-${tmp++}~`;
+  }
+  for (const { ws, usheet } of resolved) {
     if (ws.name !== usheet.name) ws.name = usheet.name;
+  }
 
+  for (const { ws, usheet } of resolved) {
     // — merges: clear all, re-apply the snapshot's set
     for (const ref of [...((ws.model?.merges ?? []) as string[])]) {
       try {
@@ -455,6 +511,11 @@ export function applySnapshotToWorkbook(wb: Workbook, snap: USnapshot): void {
 
   // — sheets deleted in Univer: an original worksheet no snapshot id claimed
   for (const ws of originals) {
-    if (!claimed.has(ws)) wb.removeWorksheet(ws.id);
+    if (!claimed.has(ws)) {
+      wb.removeWorksheet(ws.id);
+      if (idMap) {
+        for (const [uid, wid] of idMap) if (wid === ws.id) idMap.delete(uid);
+      }
+    }
   }
 }

@@ -9,6 +9,7 @@ import type { Workbook } from "exceljs";
 import {
   type USnapshot,
   applySnapshotToWorkbook,
+  buildSheetIdMap,
   colIndex,
   dateToSerial,
   workbookToUniverData,
@@ -189,6 +190,71 @@ describe("simulated Univer edits land in the reloaded file", () => {
     const ws = must((await reload(wb)).worksheets[0], "ws");
     expect(ws.getCell("A1").font?.bold).toBe(true);
     expect(ws.getCell("A1").font?.color?.argb).toBe("FF00AA00");
+  });
+});
+
+describe("live sessions: repeated saves through structural changes", () => {
+  test("the idMap keeps the SECOND save correct after a sheet removal", async () => {
+    const wb = new ExcelJS.Workbook();
+    wb.addWorksheet("One").getCell("A1").value = "one";
+    wb.addWorksheet("Two").getCell("A1").value = "two";
+    wb.addWorksheet("Three").getCell("A1").value = "three";
+    const snap = workbookToUniverData(wb, "t");
+    const idMap = buildSheetIdMap(wb, snap);
+
+    // save 1 — the user deleted "One" in Univer
+    snap.sheetOrder = snap.sheetOrder.slice(1); // ["sheet-1", "sheet-2"]
+    delete snap.sheets["sheet-0"];
+    applySnapshotToWorkbook(wb, snap, idMap);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(["Two", "Three"]);
+
+    // save 2 — an edit on "Three" (still id "sheet-2"); POSITIONAL resolution
+    // would now miss (index 2 is gone) and mint a duplicate sheet
+    must(must(snap.sheets["sheet-2"], "s2").cellData, "cells")[0] = { 0: { v: "three!" } };
+    applySnapshotToWorkbook(wb, snap, idMap);
+
+    const wb2 = await reload(wb);
+    expect(wb2.worksheets.map((w) => w.name)).toEqual(["Two", "Three"]);
+    expect(must(wb2.getWorksheet("Three"), "three").getCell("A1").value).toBe("three!");
+    expect(must(wb2.getWorksheet("Two"), "two").getCell("A1").value).toBe("two");
+  });
+});
+
+describe("apply guards (reviewer B2/S3 — the file's fate hangs on these)", () => {
+  test("refuses an empty or inconsistent snapshot WITHOUT touching the workbook", () => {
+    const wb = richWorkbook();
+    expect(() =>
+      applySnapshotToWorkbook(wb, { id: "x", name: "x", sheetOrder: [], sheets: {} }),
+    ).toThrow(/refusing/);
+    expect(() =>
+      applySnapshotToWorkbook(wb, { id: "x", name: "x", sheetOrder: ["ghost"], sheets: {} }),
+    ).toThrow(/refusing/);
+    // nothing was mutated by either refusal
+    expect(wb.worksheets).toHaveLength(1);
+    expect(must(wb.worksheets[0], "ws").getCell("A1").value).toBe("title");
+  });
+
+  test("a case-only rename survives (exceljs's dup check includes the sheet itself)", async () => {
+    const wb = new ExcelJS.Workbook();
+    wb.addWorksheet("sheet1").getCell("A1").value = "x";
+    const snap = workbookToUniverData(wb, "t");
+    must(snap.sheets["sheet-0"], "s0").name = "Sheet1";
+    applySnapshotToWorkbook(wb, snap);
+    expect((await reload(wb)).worksheets.map((w) => w.name)).toEqual(["Sheet1"]);
+  });
+
+  test("a two-sheet name SWAP survives (two-pass temp renames)", async () => {
+    const wb = new ExcelJS.Workbook();
+    wb.addWorksheet("Alpha").getCell("A1").value = "a";
+    wb.addWorksheet("Beta").getCell("A1").value = "b";
+    const snap = workbookToUniverData(wb, "t");
+    must(snap.sheets["sheet-0"], "s0").name = "Beta";
+    must(snap.sheets["sheet-1"], "s1").name = "Alpha";
+    applySnapshotToWorkbook(wb, snap);
+    const wb2 = await reload(wb);
+    expect(wb2.worksheets.map((w) => w.name)).toEqual(["Beta", "Alpha"]);
+    expect(must(wb2.getWorksheet("Beta"), "beta").getCell("A1").value).toBe("a");
+    expect(must(wb2.getWorksheet("Alpha"), "alpha").getCell("A1").value).toBe("b");
   });
 });
 
