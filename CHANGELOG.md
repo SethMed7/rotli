@@ -24,6 +24,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The formula trap.** Typing `=SUM(…)` into the current editor used to be
   silently saved as literal text; it now refuses loudly and saves nothing.
+- **The context menu tells the truth now.** *Show in Finder* actually reveals
+  the note (its Rust command never learned that notes travel as ids, not
+  paths — it failed silently for months); *Pin to top* actually pins — pinned
+  notes **float** above your hand-arranged Main order and the Captures order
+  (the arrangement itself is never touched) with a quiet pin marker; *Open in
+  Brain* became **Show in Brain** and handles staged notes (a capture's brain
+  home is the Captures board, so that's what opens — the old reveal visibly
+  did nothing). And when any of these fails, the sidebar says so instead of
+  swallowing it.
+- **Images work inside bullets.** An image on a list line (`- ![…](…)`)
+  renders inline after the bullet/number/checkbox instead of staying raw
+  markdown forever.
+- **The phantom gap next to the star is gone.** Main rows reserved an
+  invisible hover-× slot that read as a broken hole; removing from Main lives
+  in the right-click menu.
 
 ## [0.26.1] - 2026-07-08
 

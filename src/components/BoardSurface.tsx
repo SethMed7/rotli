@@ -56,7 +56,13 @@ export function BoardSurface() {
   // newest-first spot from listNotes.
   const ordered = useMemo(() => {
     const pos = new Map(captureOrder.map((id, i) => [id, i] as const));
-    return [...captures].sort((a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity));
+    // pinned captures FLOAT above the manual order (Seth, 2026-07-09) — the
+    // saved order itself is untouched, same rule as Main
+    return [...captures].sort(
+      (a, b) =>
+        Number(b.pinned) - Number(a.pinned) ||
+        (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity),
+    );
   }, [captures, captureOrder]);
 
   // pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell). A move past

@@ -3692,7 +3692,14 @@ pub fn corpus_new_file_bytes(
 #[tauri::command]
 pub fn corpus_reveal_file(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
     let (root, rel) = split_root_id(&id);
-    let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
+    // a NOTE travels the wire as its frontmatter ULID — joining that to the root
+    // was never a file, so "Show in Finder" silently failed for every note
+    // (Seth, 2026-07-09; the same ULID→rel class as the v0.18.1 filing bug).
+    // resolve_note_rel passes real file paths through and maps ids via the index.
+    let abs = state.route(&root, |s| {
+        let resolved = s.resolve_note_rel(&rel)?;
+        Ok(s.root().join(resolved))
+    })?;
     if !abs.is_file() {
         return Err(format!("not a file: {}", abs.display()));
     }

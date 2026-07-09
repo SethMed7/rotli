@@ -89,6 +89,26 @@ const INLINE: InlineRule[] = [
 // a line that is JUST an image — ![alt](url) or ![caption|width](url)
 const IMG_LINE = /^\s*!\[([^\]]*)\]\(([^)]+)\)\s*$/;
 
+/** A list item whose CONTENT is exactly an image renders it inline after the
+ * bullet/number/checkbox (Seth, 2026-07-09 — an image inside a bullet used to
+ * stay raw markdown forever: IMG_LINE only matched image-ONLY lines). Returns
+ * true when it decorated, so the caller skips the normal inline scan. */
+function listItemImage(
+  content: string,
+  contentBase: number,
+  lineEnd: number,
+  lineTouched: boolean,
+  decos: Range<Decoration>[],
+  atomics: Range<Decoration>[],
+): boolean {
+  const m = IMG_LINE.exec(content);
+  if (!m || lineTouched || lineEnd <= contentBase) return false;
+  const d = Decoration.replace({ widget: new ImgWidget(m[1] ?? "", m[2] ?? "") });
+  decos.push(d.range(contentBase, lineEnd));
+  atomics.push(d.range(contentBase, lineEnd));
+  return true;
+}
+
 // a thematic break — ---, ***, ___ (frontmatter never reaches here: the Rust
 // corpus splits it off the body; table delimiter rows carry pipes so they miss)
 const HR_LINE = /^ {0,3}(-{3,}|\*{3,}|_{3,})\s*$/;
@@ -443,6 +463,7 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
             Decoration.line({ class: "rotli-li", attributes: { style: listStyle(depth) } }).range(ls),
           );
           hidePrefix(ls, prefixEnd, new BulletWidget(depth), decos, atomics);
+          if (listItemImage(content, contentBase, line.to, lineTouched, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);
           break;
         case "numbered":
@@ -450,6 +471,7 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
             Decoration.line({ class: "rotli-li", attributes: { style: listStyle(depth) } }).range(ls),
           );
           hidePrefix(ls, prefixEnd, new NumberWidget(block.marker ?? "1."), decos, atomics);
+          if (listItemImage(content, contentBase, line.to, lineTouched, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);
           break;
         case "task":
@@ -463,6 +485,7 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
           if (block.done && line.to > prefixEnd) {
             decos.push(Decoration.mark({ class: "rotli-done" }).range(prefixEnd, line.to));
           }
+          if (listItemImage(content, contentBase, line.to, lineTouched, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);
           break;
         case "quote":

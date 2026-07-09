@@ -13,6 +13,7 @@ import {
   corpusSetPinned,
   corpusSetSecure,
 } from "../lib/tauri";
+import { dispatch } from "../keys/registry";
 import { fileNoteToArea } from "../services/brainFiling";
 import { isEmptyNote } from "../services/mainDismiss";
 import { DEST, isSink } from "../services/destinations";
@@ -103,6 +104,19 @@ export function useNoteMenu() {
         // moved out of the metadata popover into this menu).
         const fm = isNote ? await corpusFrontmatter(note.id).catch(() => null) : null;
 
+        // frontmatter toggles surface failures in the sidebar's inline error
+        // note (the menu is gone by the time a write fails — #11 pattern)
+        const runFm = (verb: string, op: Promise<unknown>) => {
+          useUiStore.getState().setRowActionError(null);
+          void op.then(invalidateNotes).catch((err) =>
+            useUiStore
+              .getState()
+              .setRowActionError(
+                `Couldn't ${verb} — ${err instanceof Error ? err.message : String(err)}`,
+              ),
+          );
+        };
+
         const items: MenuSpec[] = [];
         items.push({
           kind: "action" as const,
@@ -111,11 +125,19 @@ export function useNoteMenu() {
         });
         items.push({
           kind: "action" as const,
-          label: "Open in Brain",
+          label: "Show in Brain",
           onClick: () => {
-            // everything lives in the Brain; Main is just a view. Open the note,
-            // then reveal it where it actually lives in the sidebar (Seth,
-            // 2026-07-07). A tick lets the open focus settle before the reveal.
+            // everything lives in the Brain; Main is just a view. A STAGED note's
+            // brain home is the Captures board (its wire folder is the hidden
+            // Board root — no sidebar row exists to reveal), so show THE BOARD
+            // it lives on (Seth, 2026-07-09: the old reveal visibly no-op'd).
+            if (note.folderId === DEST.board) {
+              dispatch("board.open");
+              return;
+            }
+            // a filed note: open it, then reveal its real Brain home in the
+            // sidebar (the "brain" mode bypasses Main-copy-wins). A tick lets
+            // the open focus settle before the reveal.
             openSummary(note);
             setTimeout(() => useUiStore.getState().revealFocusedNote("brain"), 0);
           },
@@ -123,7 +145,18 @@ export function useNoteMenu() {
         items.push({
           kind: "action" as const,
           label: "Show in Finder",
-          onClick: () => void corpusRevealFile(note.id),
+          onClick: () => {
+            // failures surfaced in the sidebar's inline error note — this
+            // silently no-op'd for months while the Rust side threw (Seth #63)
+            useUiStore.getState().setRowActionError(null);
+            void corpusRevealFile(note.id).catch((err) =>
+              useUiStore
+                .getState()
+                .setRowActionError(
+                  `Couldn't reveal in Finder — ${err instanceof Error ? err.message : String(err)}`,
+                ),
+            );
+          },
         });
         items.push({ kind: "sep" as const });
         if (!isBoard) {
@@ -156,19 +189,19 @@ export function useNoteMenu() {
             kind: "action" as const,
             label: fm?.pinned ? "Unpin from top" : "Pin to top",
             checked: !!fm?.pinned,
-            onClick: () => void corpusSetPinned(note.id, !fm?.pinned).then(invalidateNotes),
+            onClick: () => runFm("pin", corpusSetPinned(note.id, !fm?.pinned)),
           });
           items.push({
             kind: "action" as const,
             label: fm?.locked ? "Unlock — let the AI organize it" : "Lock from the AI",
             checked: !!fm?.locked,
-            onClick: () => void corpusSetLocked(note.id, !fm?.locked).then(invalidateNotes),
+            onClick: () => runFm("lock", corpusSetLocked(note.id, !fm?.locked)),
           });
           items.push({
             kind: "action" as const,
             label: fm?.secure ? "Unmark secure" : "Mark secure — keep off remote AI",
             checked: !!fm?.secure,
-            onClick: () => void corpusSetSecure(note.id, !fm?.secure).then(invalidateNotes),
+            onClick: () => runFm("mark secure", corpusSetSecure(note.id, !fm?.secure)),
           });
         }
       // file into a Brain area right here — the 0.17.0 fast-follow; same Filer

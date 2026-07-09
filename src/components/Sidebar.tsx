@@ -786,7 +786,9 @@ export function Sidebar() {
     // the one Seth curates by hand); MUST mirror mainRovingRows below
     const childNotes = mainProjection.notes
       .filter((n) => n.folderId === parentId && matches(n))
-      .sort((a, b) => a.mainOrder - b.mainOrder);
+      // pinned notes FLOAT above the hand-arranged order (Seth, 2026-07-09:
+      // "pin should float") — the manifest itself is never reordered
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || a.mainOrder - b.mainOrder);
     const dropCls = (rowId: string) => (mainDrop?.id === rowId ? ` mdrop-${mainDrop.pos}` : "");
     // Star = "quick access": pins a Main note into the capped set the ⌥ Quick
     // window cycles (Seth, 2026-07-01 — "anything starred opens with my hotkey").
@@ -862,8 +864,12 @@ export function Sidebar() {
           >
             {glyphForNote(n, { size: 14, className: "snicon" })}
             <span className="snt">{n.title || "Empty note"}</span>
+            {/* the floated pin's marker — same quiet glyph as pinned chats */}
+            {n.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
             {starBtn(n.id)}
-            <span className="snact">{removeBtn(n.id, "Remove from Main", true)}</span>
+            {/* the hover-× is GONE (Seth, 2026-07-09: its reserved slot read as
+                a broken gap next to the star) — the context menu owns
+                "Remove from Main"; folder rows keep their × below */}
           </button>
         ))}
         {childFolders.map((f) => {
