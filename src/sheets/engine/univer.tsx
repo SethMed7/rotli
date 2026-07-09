@@ -6,7 +6,7 @@ import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
 import UniverPresetSheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US";
 import "@univerjs/preset-sheets-core/lib/index.css";
 import type { SheetModel, SheetThemeMode } from "./types";
-import { rotliUniverTheme } from "./theme";
+import { rotliUniverTheme, univerNeutralForTheme } from "./theme";
 
 interface FWorkbookLike {
   save: () => unknown;
@@ -37,12 +37,16 @@ export interface SheetHandle {
   dispose(): void;
 }
 
+function liveTheme(): ReturnType<typeof rotliUniverTheme> {
+  return rotliUniverTheme(univerNeutralForTheme(document.documentElement.dataset.theme));
+}
+
 /** Mount the spreadsheet engine into a host element. */
 export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHandle {
   const { univer, univerAPI } = createUniver({
     locale: LocaleType.EN_US,
     locales: { [LocaleType.EN_US]: merge({}, UniverPresetSheetsCoreEnUS) },
-    theme: opts.themeMode === "raw" ? defaultTheme : rotliUniverTheme,
+    theme: opts.themeMode === "raw" ? defaultTheme : liveTheme(),
     darkMode: opts.themeMode === "raw" ? false : opts.darkMode,
     presets: [UniverSheetsCorePreset({ container: host })],
   });

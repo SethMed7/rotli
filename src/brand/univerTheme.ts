@@ -1,7 +1,10 @@
-// rotli's Univer theme — clay primary + warm cocoa grays, never the stock
+// rotli's Univer theme — clay primary + theme-aware neutrals, never the stock
 // clinical blue. Lives under src/brand/ so the hex literals are legal
 // (check:hex). Built from the frozen kit (tokens/colors.json) and shaped like
 // @univerjs/themes' Theme so createUniver({ theme }) accepts it as-is.
+//
+// Charcoal (and other cool mono darks) must NOT paint warm cocoa chrome — that
+// reads as a brown island inside the cool shell. Warm dark keeps cocoa.
 
 import type { Theme } from "@univerjs/presets";
 import { defaultTheme } from "@univerjs/presets";
@@ -20,8 +23,7 @@ const clay = {
   900: "#4A281C",
 } as const;
 
-/** Warm gray ramp — linen → cocoa, never cool slate. Dark mode paints from
- * the high end (800/900 = cocoa ground). */
+/** Warm gray ramp — linen → cocoa (warm light + warm dark themes). */
 const warmGray = {
   50: "#F8F2E9", // linen
   100: "#F1E7D8", // surface-2
@@ -35,11 +37,37 @@ const warmGray = {
   900: "#1A1512",
 } as const;
 
+/** Cool gray ramp — charcoal / paper mono (matches themes.css charcoal). */
+const coolGray = {
+  50: "#FAFAF9",
+  100: "#F5F5F4",
+  200: "#E7E5E4",
+  300: "#A8A49C",
+  400: "#78746C",
+  500: "#3F3D3A",
+  600: "#2A2825", // surface-2 charcoal
+  700: "#1F1E1C", // surface charcoal
+  800: "#161616", // ground charcoal
+  900: "#0F0F0F",
+} as const;
+
+export type UniverNeutral = "warm" | "cool";
+
+/** Pick neutrals from the live app theme (charcoal / paper / glass → cool). */
+export function univerNeutralForTheme(theme: string | undefined): UniverNeutral {
+  if (!theme) return "warm";
+  if (theme === "charcoal" || theme === "paper" || theme.startsWith("glass")) return "cool";
+  return "warm";
+}
+
 /** The theme Univer's chrome (toolbar · selection · sheet tabs) paints with. */
-export const rotliUniverTheme: Theme = {
-  ...defaultTheme,
-  white: "#F8F2E9",
-  black: "#3A3028",
-  primary: clay,
-  gray: warmGray,
-};
+export function rotliUniverTheme(neutral: UniverNeutral = "warm"): Theme {
+  const gray = neutral === "cool" ? coolGray : warmGray;
+  return {
+    ...defaultTheme,
+    white: gray[50],
+    black: gray[500],
+    primary: clay,
+    gray,
+  };
+}

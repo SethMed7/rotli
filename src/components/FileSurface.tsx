@@ -44,6 +44,8 @@ const SheetEditor = lazy(() => import("./SheetEditor"));
 
 export type FileKind = "audio" | "video" | "image" | "pdf" | "sheet" | "text" | "html" | "other";
 
+/** Slot in the file header for sheet chrome (Raw / Save) next to Open externally. */
+
 const AUDIO = new Set(["mp3", "m4a", "wav", "aac", "flac", "ogg", "oga", "opus"]);
 const VIDEO = new Set(["mp4", "mov", "webm", "m4v", "ogv"]);
 // the viewer can <img> svg/ico too, so it broadens the shared raster set.
@@ -163,6 +165,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   const [imgZoom, setImgZoom] = useState<"fit" | number>(() => imgZoomMemo.get(fileId) ?? "fit");
   const [bodySize, setBodySize] = useState<{ w: number; h: number } | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  const sheetChromeRef = useRef<HTMLDivElement | null>(null);
   const scaleRef = useRef(1);
   const openMenu = useContextMenu((s) => s.open);
 
@@ -388,6 +391,9 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
                   : "view only · too large"}
           </span>
         )}
+        {kind === "sheet" && sheetEditable && (
+          <div ref={sheetChromeRef} className="file-sheet-chrome" />
+        )}
         <button
           type="button"
           className="file-open-ext"
@@ -503,6 +509,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
               fileId={fileId}
               paneId={paneId}
               mode={ext === "csv" ? "csv" : "xlsx"}
+              chromeSlotRef={sheetChromeRef}
             />
           </Suspense>
         )}

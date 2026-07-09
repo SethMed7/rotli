@@ -44,6 +44,19 @@ export function ensureDocument(noteId: string, body: string): void {
   if (!docs.has(noteId)) docs.set(noteId, body.split("\n"));
 }
 
+/** Replace a CLEAN buffer with disk truth (external edit / agent write). No-op
+ * when the note has unsaved local edits — those win until flush. Seeds when
+ * the buffer doesn't exist yet. */
+export function reloadDocumentIfClean(noteId: string, body: string): void {
+  if (dirtyIds.has(noteId)) return;
+  const next = body.split("\n");
+  const cur = docs.get(noteId);
+  if (cur && cur.length === next.length && cur.every((l, i) => l === next[i])) return;
+  docs.set(noteId, next);
+  const set = subs.get(noteId);
+  if (set) for (const fn of set) fn();
+}
+
 /** Drop a note's buffer + pending sync. The hook for the future delete path,
  * and the unknown-note sync failure — a dead buffer must never keep shadowing
  * (or writing over) service state. */

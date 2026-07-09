@@ -19,7 +19,7 @@ import { noteLocationLabel } from "../lib/noteLocation";
 import { BottomSlot } from "./BottomSlot";
 import { CmEditor } from "./CmEditor";
 import { FormatBar } from "./FormatBar";
-import { ensureDocument, flushNote, useDocumentDirty, useDocumentLines } from "./model";
+import { ensureDocument, flushNote, reloadDocumentIfClean, useDocumentDirty, useDocumentLines } from "./model";
 
 /** Below this pane width the format bar collapses its end groups into ⋯. */
 const FORMAT_BAR_COLLAPSE_PX = 440;
@@ -153,9 +153,14 @@ export function EditorSurface({
     [noteId],
   );
 
-  // the buffer exists as soon as the note loads — edits always hit one buffer
+  // the buffer exists as soon as the note loads — edits always hit one buffer.
+  // When disk changes UNDER us (agent / another editor) and this buffer is
+  // clean, adopt the new body so Main and Captures never show two versions of
+  // the same file (Seth, 2026-07-09). Dirty local edits still win.
   useEffect(() => {
-    if (note) ensureDocument(note.id, note.body);
+    if (!note) return;
+    ensureDocument(note.id, note.body);
+    reloadDocumentIfClean(note.id, note.body);
   }, [note]);
 
   // leaving a note (tab switch, pane close, note switch) flushes its pending

@@ -10,7 +10,7 @@
 // (and no unhandled rejection) escapes the test.
 
 import { afterEach, describe, expect, it } from "bun:test";
-import { editDocument, ensureDocument, evictDocument } from "./model";
+import { editDocument, ensureDocument, evictDocument, reloadDocumentIfClean } from "./model";
 
 // Track buffer ids we create so cleanup can clear their pending sync timers.
 const touched = new Set<string>();
@@ -47,6 +47,28 @@ describe("ensureDocument", () => {
     editDocument("live", (lines) => [...lines, "beta"]);
     ensureDocument("live", "STALE FROM QUERY"); // must be ignored
     expect(read("live")).toEqual(["alpha", "beta"]);
+  });
+});
+
+describe("reloadDocumentIfClean", () => {
+  it("adopts disk truth when the buffer is clean", () => {
+    touched.add("clean");
+    ensureDocument("clean", "old");
+    reloadDocumentIfClean("clean", "from disk");
+    expect(read("clean")).toEqual(["from disk"]);
+  });
+
+  it("does NOT clobber a dirty buffer", () => {
+    buffer("dirty", "old");
+    editDocument("dirty", () => ["local edit"]);
+    reloadDocumentIfClean("dirty", "from disk");
+    expect(read("dirty")).toEqual(["local edit"]);
+  });
+
+  it("seeds when the buffer does not exist yet", () => {
+    touched.add("fresh");
+    reloadDocumentIfClean("fresh", "hello");
+    expect(read("fresh")).toEqual(["hello"]);
   });
 });
 

@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sheet chrome under charcoal.** Univer no longer paints warm cocoa chrome
+  when the app theme is charcoal (or paper/glass) — cool neutrals match the
+  shell. Raw / Save sit next to **Open externally** in the file header, and
+  the grid host fills the pane edge-to-edge (no side gutters).
+- **Show in Brain actually reveals.** Staged notes open Captures (forced, not
+  toggled) and highlight the card; Main-curated staging notes highlight in
+  Main. Filed notes expand the Brain chain. An open editor also adopts clean
+  disk reloads so an external/agent edit never looks like a second version.
+
 ## [0.28.0] - 2026-07-09
 
 ### Added

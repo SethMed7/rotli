@@ -7,15 +7,15 @@
 // stays); the registry's app.hide (Esc) closes it back to the panes via the
 // contentView model (setContentView("panes")).
 
-import { type PointerEvent as ReactPointerEvent, useMemo, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { relativeLabel } from "../lib/dateLabels";
 import { type DragGhost, createDragGhost } from "../lib/dragGhost";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
 import { mainNoteIds } from "../services/mainTree";
 import { notesService } from "../services/notes";
+import { useFocusedNoteId, usePanesStore } from "../state/panes";
 import { useMainStore } from "../state/main";
-import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { Character } from "./Character";
 import { ArchiveGlyph, CheckGlyph, glyphForNote } from "./glyphs";
@@ -29,6 +29,8 @@ export function BoardSurface() {
   // staging. Sidebar's Captures count applies the same rule.
   const mainTree = useMainStore((s) => s.manifest.tree);
   const quickIds = useUiStore((s) => s.quickNoteIds);
+  const focusedNoteId = useFocusedNoteId();
+  const revealNonce = useUiStore((s) => s.revealNonce);
   const captures = useMemo(() => {
     const curated = mainNoteIds(mainTree);
     return staged.filter((n) => !curated.has(n.id) && !quickIds.includes(n.id));
@@ -42,6 +44,19 @@ export function BoardSurface() {
   const openMenu = useNoteMenu();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+
+  // "Show in Brain" on a Captures note: select + scroll the card into view.
+  useEffect(() => {
+    if (!focusedNoteId || !captures.some((c) => c.id === focusedNoteId)) return;
+    setSelected(new Set([focusedNoteId]));
+    if (!revealNonce) return;
+    const raf = requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-cap-id="${CSS.escape(focusedNoteId)}"]`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [focusedNoteId, revealNonce, captures]);
 
   // only ids still on the board count as selected (a refetch drops archived ones)
   const chosen = captures.filter((c) => selected.has(c.id));

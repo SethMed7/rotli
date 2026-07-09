@@ -1,7 +1,8 @@
-// Thin React shell for editable spreadsheets — bar, themed/raw toggle, ⌘S.
+// Thin React shell for editable spreadsheets — bar chrome, themed/raw toggle, ⌘S.
 // Talks only to sheets/engine + sheets/session + sheets/codec; never @univerjs.
 
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import ExcelJS from "exceljs";
 import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
 import { fileName } from "../lib/fileKind";
@@ -40,10 +41,13 @@ export default function SheetEditor({
   fileId,
   paneId,
   mode,
+  chromeSlotRef,
 }: {
   fileId: string;
   paneId: string;
   mode: SheetFileMode;
+  /** Mount Raw / Save next to "Open externally" in the file header. */
+  chromeSlotRef?: RefObject<HTMLElement | null>;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -54,6 +58,7 @@ export default function SheetEditor({
   const [themeMode, setThemeMode] = useState<SheetThemeMode>(
     () => themeModeMemo.get(fileId) ?? "themed",
   );
+  const [chromeEl, setChromeEl] = useState<HTMLElement | null>(null);
 
   const wbRef = useRef<ExcelJS.Workbook | null>(null);
   const handleRef = useRef<SheetHandle | null>(null);
@@ -63,6 +68,10 @@ export default function SheetEditor({
   const diskLenRef = useRef(0);
   const dirtyGen = useRef(0);
   const armedRef = useRef(false);
+
+  useEffect(() => {
+    setChromeEl(chromeSlotRef?.current ?? null);
+  }, [chromeSlotRef]);
 
   useEffect(() => {
     themeModeMemo.set(fileId, themeMode);
@@ -256,37 +265,42 @@ export default function SheetEditor({
     setThemeMode((m) => (m === "themed" ? "raw" : "themed"));
   };
 
+  const chrome = (
+    <div className="sheet-chrome-actions">
+      {mode === "csv" && (
+        <span className="sheet-editor-hint" title="csv · values only — styles don't survive Save">
+          csv · values only
+        </span>
+      )}
+      <button
+        type="button"
+        className={themeMode === "raw" ? "sheet-view-toggle on" : "sheet-view-toggle"}
+        title={
+          themeMode === "raw"
+            ? "Show rotli-themed chrome"
+            : "Show the sheet on white paper, like Excel"
+        }
+        onClick={toggleThemeMode}
+      >
+        {themeMode === "raw" ? "Themed" : "Raw"}
+      </button>
+      {err && <span className="sheet-save-err">⚠ {err}</span>}
+      {!err && note && <span className="sheet-save-err">{note}</span>}
+      {dirty && !saving && <span className="sheet-dirty" title="Unsaved changes" />}
+      <button
+        type="button"
+        className="sheet-save"
+        disabled={saving || !ready}
+        onClick={() => void save()}
+      >
+        {saving ? "Saving…" : dirty ? "Save ⌘S" : "Saved"}
+      </button>
+    </div>
+  );
+
   return (
     <div className={`sheet-editor${themeMode === "raw" ? " sheet-raw" : ""}`}>
-      <div className="sheet-editor-bar" role="note">
-        {mode === "csv" && (
-          <span className="sheet-editor-hint">csv · values only — styles don't survive Save</span>
-        )}
-        <button
-          type="button"
-          className={themeMode === "raw" ? "sheet-view-toggle on" : "sheet-view-toggle"}
-          title={
-            themeMode === "raw"
-              ? "Show rotli-themed chrome"
-              : "Show the sheet on white paper, like Excel"
-          }
-          onClick={toggleThemeMode}
-        >
-          {themeMode === "raw" ? "Themed" : "Raw"}
-        </button>
-        <span className="sheet-editor-space" />
-        {err && <span className="sheet-save-err">⚠ {err}</span>}
-        {!err && note && <span className="sheet-save-err">{note}</span>}
-        {dirty && !saving && <span className="sheet-dirty" title="Unsaved changes" />}
-        <button
-          type="button"
-          className="sheet-save"
-          disabled={saving || !ready}
-          onClick={() => void save()}
-        >
-          {saving ? "Saving…" : dirty ? "Save ⌘S" : "Saved"}
-        </button>
-      </div>
+      {chromeEl ? createPortal(chrome, chromeEl) : <div className="sheet-editor-bar">{chrome}</div>}
       {!err && !ready && <p className="file-loading">Loading…</p>}
       <div ref={hostRef} className="sheet-editor-host" />
     </div>

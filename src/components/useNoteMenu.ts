@@ -13,7 +13,6 @@ import {
   corpusSetPinned,
   corpusSetSecure,
 } from "../lib/tauri";
-import { dispatch } from "../keys/registry";
 import { fileNoteToArea } from "../services/brainFiling";
 import { isEmptyNote } from "../services/mainDismiss";
 import { DEST, isSink } from "../services/destinations";
@@ -127,19 +126,36 @@ export function useNoteMenu() {
           kind: "action" as const,
           label: "Show in Brain",
           onClick: () => {
-            // everything lives in the Brain; Main is just a view. A STAGED note's
-            // brain home is the Captures board (its wire folder is the hidden
-            // Board root — no sidebar row exists to reveal), so show THE BOARD
-            // it lives on (Seth, 2026-07-09: the old reveal visibly no-op'd).
+            // One file, two views: Main is a shortcut over the Brain. Always
+            // open the note first so focus settles for the reveal.
+            openSummary(note);
+            const ui = useUiStore.getState();
+            ui.setFocusMode(false);
+            ui.setSettingsOpen(false);
             if (note.folderId === DEST.board) {
-              dispatch("board.open");
+              // Staging home = Captures (wiki/_inbox → Board). Curated notes
+              // (also in Main / starred) are filtered OFF the Captures grid —
+              // reveal their Main/sidebar row instead. Uncurated ones open
+              // Captures and highlight the card. FORCE the view open —
+              // board.open toggles, so a second click used to bounce back to
+              // panes and look like a no-op (Seth, 2026-07-09).
+              const curated =
+                mainHasNote(useMainStore.getState().manifest.tree, note.id) ||
+                ui.quickNoteIds.includes(note.id);
+              if (curated) {
+                ui.setContentView("panes");
+                setTimeout(() => ui.revealFocusedNote("auto"), 0);
+              } else {
+                ui.setContentView("board");
+                // BoardSurface highlights the focused note's card; a tick lets
+                // openNote settle focus before the scroll.
+                setTimeout(() => ui.revealFocusedNote("auto"), 0);
+              }
               return;
             }
-            // a filed note: open it, then reveal its real Brain home in the
-            // sidebar (the "brain" mode bypasses Main-copy-wins). A tick lets
-            // the open focus settle before the reveal.
-            openSummary(note);
-            setTimeout(() => useUiStore.getState().revealFocusedNote("brain"), 0);
+            // Filed note: panes + expand the Brain chain (bypass Main-wins).
+            ui.setContentView("panes");
+            setTimeout(() => ui.revealFocusedNote("brain"), 0);
           },
         });
         items.push({
