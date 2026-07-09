@@ -37,6 +37,9 @@ import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 // code-split the editor so it loads only when an editable sheet mounts
 // (same reasoning as the CanvasSurface split).
 const SheetEditor = lazy(() => import("./SheetEditor"));
+// the Univer engine spike (Phase 0, decision 2026-07-09) — a much bigger chunk
+// (~900KB gz), loaded ONLY when the spike toggle is flipped on an editable xlsx
+const UniverSpike = lazy(() => import("./UniverSpike"));
 
 export type FileKind = "audio" | "video" | "image" | "pdf" | "sheet" | "text" | "html" | "other";
 
@@ -137,6 +140,8 @@ export function htmlPreviewDoc(text: string, baseUrl: string): string {
 // snap back to Preview / fit on every tab switch. Session-scoped and tiny.
 const htmlModeMemo = new Map<string, "preview" | "code">();
 const imgZoomMemo = new Map<string, "fit" | number>();
+// the Univer spike toggle — session-sticky per file, same reasoning
+const univerMemo = new Map<string, boolean>();
 
 export function FileSurface({ fileId }: { paneId: string; fileId: string }) {
   const name = fileName(fileId);
@@ -156,6 +161,8 @@ export function FileSurface({ fileId }: { paneId: string; fileId: string }) {
   const [htmlMode, setHtmlMode] = useState<"preview" | "code">(
     () => htmlModeMemo.get(fileId) ?? "preview",
   );
+  // Univer spike (Phase 0): opt-in per file; xlsx only (csv keeps our editor)
+  const [univerOn, setUniverOn] = useState(() => univerMemo.get(fileId) ?? false);
   // a read-only sheet/html file past the byte cap: refuse honestly, never half-parse
   const [tooLarge, setTooLarge] = useState(false);
   // image zoom: natural px from onLoad, the body's size from a ResizeObserver,
@@ -183,6 +190,7 @@ export function FileSurface({ fileId }: { paneId: string; fileId: string }) {
     setProbed(false);
     setErr(null);
     setHtmlMode(htmlModeMemo.get(fileId) ?? "preview");
+    setUniverOn(univerMemo.get(fileId) ?? false);
     setTooLarge(false);
     setImgNat(null);
     setImgZoom(imgZoomMemo.get(fileId) ?? "fit");
@@ -255,6 +263,9 @@ export function FileSurface({ fileId }: { paneId: string; fileId: string }) {
   useEffect(() => {
     imgZoomMemo.set(fileId, imgZoom);
   }, [fileId, imgZoom]);
+  useEffect(() => {
+    univerMemo.set(fileId, univerOn);
+  }, [fileId, univerOn]);
 
   // image zoom: track the body's size so "fit" follows pane resizes
   useEffect(() => {
@@ -389,6 +400,22 @@ export function FileSurface({ fileId }: { paneId: string; fileId: string }) {
                   : "view only · too large"}
           </span>
         )}
+        {/* Univer engine spike (Phase 0) — editable xlsx only; edits don't save yet */}
+        {kind === "sheet" && sheetEditable && ext === "xlsx" && (
+          <button
+            type="button"
+            className={univerOn ? "file-univer-toggle on" : "file-univer-toggle"}
+            aria-pressed={univerOn}
+            title={
+              univerOn
+                ? "Back to the current editor (your saves live there)"
+                : "Try the new spreadsheet engine — full Excel grammar; edits don't save yet (spike)"
+            }
+            onClick={() => setUniverOn((v) => !v)}
+          >
+            {univerOn ? "Current editor" : "New engine · beta"}
+          </button>
+        )}
         <button
           type="button"
           className="file-open-ext"
@@ -499,7 +526,11 @@ export function FileSurface({ fileId }: { paneId: string; fileId: string }) {
 
         {!err && kind === "sheet" && probed && sheetEditable && (
           <Suspense fallback={<p className="file-loading">Loading…</p>}>
-            <SheetEditor key={fileId} fileId={fileId} mode={ext === "csv" ? "csv" : "xlsx"} />
+            {univerOn && ext === "xlsx" ? (
+              <UniverSpike key={fileId} fileId={fileId} />
+            ) : (
+              <SheetEditor key={fileId} fileId={fileId} mode={ext === "csv" ? "csv" : "xlsx"} />
+            )}
           </Suspense>
         )}
 

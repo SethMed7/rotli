@@ -258,6 +258,16 @@ describe("xlsx round-trip through exceljs", () => {
     expect(cell.style?.bold ?? false).toBe(false);
   });
 
+  test("typing =formula into a blank cell REFUSES instead of silently storing text", () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("F");
+    ws.addRow(["x"]);
+    expect(() => setCellValue(ws, 1, 2, "=SUM(A1:A10)")).toThrow(/formulas aren't supported/);
+    expect(ws.getRow(1).getCell(2).value).toBeNull(); // nothing written
+    // a lone "=" or "= " is just text someone typed — not a formula attempt
+    expect(setCellValue(ws, 1, 2, "=")).toBe("=");
+  });
+
   test("formula cells display the cached result and refuse value edits", () => {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("F");

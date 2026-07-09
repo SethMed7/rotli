@@ -262,6 +262,12 @@ export function setCellValue(ws: Worksheet, row: number, col: number, text: stri
   if (isFormulaValue(cell.value)) {
     throw new Error("formula cells are read-only in rotli");
   }
+  // The formula trap (audit 2026-07-09): "=SUM(A1:A10)" used to be SILENTLY
+  // stored as literal text — corruption of the user's intent. Refuse loudly
+  // until the real formula engine (Univer) lands; nothing is written.
+  if (/^=\S/.test(text.trim())) {
+    throw new Error("formulas aren't supported here yet — nothing was saved (a full formula engine is coming)");
+  }
   cell.value = coerceInput(text);
   return valueText(cell.value);
 }
