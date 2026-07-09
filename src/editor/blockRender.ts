@@ -17,17 +17,15 @@
 // applied to documentElement AFTER the store updates) and bumps a rebuild so
 // mermaid/jsxgraph re-bake their colors on a theme flip.
 
-import katex from "katex";
-import mermaid from "mermaid";
-import JXG from "jsxgraph";
 import { type EditorState, type Range, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, WidgetType } from "@codemirror/view";
 import { useUiStore } from "../state/ui";
+import { usePanesStore } from "../state/panes";
 import { type FenceBlock, type LangKey, innerCode, scanFences } from "./fences";
-import "katex/dist/katex.min.css";
-// jsxgraph's package "exports" map hides ./distrib/* — import the stylesheet by
-// a filesystem-relative path so Vite resolves it directly (bypassing exports).
-import "../../node_modules/jsxgraph/distrib/jsxgraph.css";
+import { mountBoardEmbed, mountSheetEmbed } from "./embedHosts";
+
+// Heavy fence libs (katex / mermaid / jsxgraph) load on first use — they used to
+// ride every note-editor open via a static import. CSS follows the same gate.
 
 // ——— theme resolution ———————————————————————————————————————————————
 
@@ -67,7 +65,7 @@ interface RenderCtx {
   id: string;
 }
 
-// ——— the renderer registry — one function per language, shared infra ————
+type StaticLangKey = Exclude<LangKey, "board" | "sheet">;
 
 function errorBox(message: string): HTMLElement {
   const box = document.createElement("div");
@@ -77,6 +75,29 @@ function errorBox(message: string): HTMLElement {
 }
 
 let mermaidThemeFor: "dark" | "default" | null = null;
+let katexCssReady: Promise<void> | null = null;
+let jsxgraphCssReady: Promise<void> | null = null;
+
+async function loadKatex() {
+  katexCssReady ??= import("katex/dist/katex.min.css").then(() => undefined);
+  const [{ default: katex }] = await Promise.all([import("katex"), katexCssReady]);
+  return katex;
+}
+
+async function loadMermaid() {
+  const { default: mermaid } = await import("mermaid");
+  return mermaid;
+}
+
+async function loadJsxgraph() {
+  // jsxgraph's package "exports" map hides ./distrib/* — import the stylesheet by
+  // a filesystem-relative path so Vite resolves it directly (bypassing exports).
+  jsxgraphCssReady ??= import("../../node_modules/jsxgraph/distrib/jsxgraph.css").then(
+    () => undefined,
+  );
+  const [{ default: JXG }] = await Promise.all([import("jsxgraph"), jsxgraphCssReady]);
+  return JXG;
+}
 
 /** mermaid throws "detailed errors" ({ str, hash }) for parse failures and plain
  * Errors otherwise — pull a human message from either shape. */
@@ -97,9 +118,12 @@ function cleanupMermaidOrphans(id: string): void {
   }
 }
 
-const RENDERERS: Record<LangKey, (code: string, ctx: RenderCtx) => HTMLElement | Promise<HTMLElement>> = {
+// ——— the renderer registry — one function per language, shared infra ————
+
+const RENDERERS: Record<StaticLangKey, (code: string, ctx: RenderCtx) => HTMLElement | Promise<HTMLElement>> = {
   // KaTeX inherits text color via currentColor — no theme injection needed.
-  math: (code) => {
+  math: async (code) => {
+    const katex = await loadKatex();
     const el = document.createElement("div");
     el.className = "rotli-render-math";
     try {
@@ -115,6 +139,7 @@ const RENDERERS: Record<LangKey, (code: string, ctx: RenderCtx) => HTMLElement |
   },
 
   mermaid: async (code, ctx) => {
+    const mermaid = await loadMermaid();
     const theme = ctx.dark ? "dark" : "default";
     if (mermaidThemeFor !== theme) {
       mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
@@ -138,11 +163,12 @@ const RENDERERS: Record<LangKey, (code: string, ctx: RenderCtx) => HTMLElement |
     }
   },
 
-  jsxgraph: (code, ctx) => {
+  jsxgraph: async (code, ctx) => {
     const el = document.createElement("div");
     el.className = "rotli-render-jsxgraph";
     const src = code.trim();
     if (!src) return el; // empty fence while live-typing — quiet placeholder
+    const JXG = await loadJsxgraph();
     try {
       const attrs: Record<string, unknown> = {
         boundingbox: [-8, 8, 8, -8],
@@ -157,7 +183,13 @@ const RENDERERS: Record<LangKey, (code: string, ctx: RenderCtx) => HTMLElement |
         grid: { strokeColor: ctx.tokens("--border") },
       };
       const board = JXG.JSXGraph.initBoard(el, attrs);
-      (el as RenderEl).__board = board;
+      (el as RenderEl).__freeBoard = () => {
+        try {
+          JXG.JSXGraph.freeBoard(board);
+        } catch {
+          /* ignore */
+        }
+      };
 
       // Theme the DEFAULT element colors so JessieCode-created objects read on
       // both light + dark. board.options is a per-board deepCopy, so this is local.
@@ -176,14 +208,8 @@ const RENDERERS: Record<LangKey, (code: string, ctx: RenderCtx) => HTMLElement |
 
       board.jc.parse(src);
     } catch (e) {
-      const partial = (el as RenderEl).__board;
-      if (partial) {
-        try {
-          JXG.JSXGraph.freeBoard(partial);
-        } catch {
-          /* ignore */
-        }
-      }
+      (el as RenderEl).__freeBoard?.();
+      delete (el as RenderEl).__freeBoard;
       return errorBox(`jsxgraph: ${(e as Error).message}`);
     }
     return el;
@@ -223,18 +249,13 @@ const RENDERERS: Record<LangKey, (code: string, ctx: RenderCtx) => HTMLElement |
   },
 };
 
-type RenderEl = HTMLElement & { __board?: ReturnType<typeof JXG.JSXGraph.initBoard> };
+type RenderEl = HTMLElement & { __freeBoard?: () => void };
 
 function freeIfBoard(node: HTMLElement | null): void {
-  const board = (node as RenderEl | null)?.__board;
-  if (board) {
-    try {
-      JXG.JSXGraph.freeBoard(board);
-    } catch {
-      /* ignore */
-    }
-    delete (node as RenderEl).__board;
-  }
+  const el = node as RenderEl | null;
+  if (!el?.__freeBoard) return;
+  el.__freeBoard();
+  delete el.__freeBoard;
 }
 
 // ——— render cache (LRU, capped) — keyed by lang + resolved colors + code ————
@@ -261,6 +282,76 @@ function cacheSet(key: string, el: HTMLElement): void {
   }
 }
 
+// ——— live embed widgets (board / sheet) ————————————————————————————————
+
+class EmbedBlockWidget extends WidgetType {
+  private cleanup: (() => void) | null = null;
+
+  constructor(
+    readonly kind: "board" | "sheet",
+    readonly fileId: string,
+    readonly themeSig: string,
+  ) {
+    super();
+  }
+
+  eq(o: EmbedBlockWidget): boolean {
+    return o.kind === this.kind && o.fileId === this.fileId && o.themeSig === this.themeSig;
+  }
+
+  toDOM(): HTMLElement {
+    const container = document.createElement("div");
+    container.className = "rotli-render-block rotli-render-embed";
+    container.dataset.lang = this.kind;
+
+    const body = document.createElement("div");
+    body.className = "rotli-render-body";
+    container.appendChild(body);
+
+    const expand = document.createElement("button");
+    expand.type = "button";
+    expand.className = "rotli-render-expand";
+    expand.textContent = "Expand";
+    expand.setAttribute("aria-label", "Expand to pane");
+    expand.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const panes = usePanesStore.getState();
+      if (this.kind === "board") panes.openCanvas(this.fileId, { newTab: true });
+      else panes.openFile(this.fileId, { newTab: true });
+    });
+    container.appendChild(expand);
+
+    const id = this.fileId.trim();
+    if (id) {
+      let cancelled = false;
+      const mount = this.kind === "board" ? mountBoardEmbed(body, id) : mountSheetEmbed(body, id);
+      void mount.then((cleanup) => {
+        if (cancelled) {
+          cleanup();
+          return;
+        }
+        this.cleanup = cleanup;
+      });
+      this.cleanup = () => {
+        cancelled = true;
+      };
+    } else {
+      body.textContent = "Pick a file path for this embed";
+    }
+    return container;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+
+  destroy(): void {
+    this.cleanup?.();
+    this.cleanup = null;
+  }
+}
+
 // ——— the block widget ————————————————————————————————————————————————
 
 class RenderBlockWidget extends WidgetType {
@@ -268,7 +359,7 @@ class RenderBlockWidget extends WidgetType {
   private dom: HTMLElement | null = null;
 
   constructor(
-    readonly lang: LangKey,
+    readonly lang: StaticLangKey,
     readonly code: string,
     /** The resolved-theme signature — part of identity so a theme/canvas/tint
      * flip makes eq() differ and CM re-renders the diagram with fresh colors. */
@@ -372,7 +463,7 @@ function closeAllOverlays(): void {
   for (const close of [...OPEN_OVERLAYS]) close();
 }
 
-function openExpandOverlay(lang: LangKey, code: string, anchor: HTMLElement): void {
+function openExpandOverlay(lang: StaticLangKey, code: string, anchor: HTMLElement): void {
   const overlay = document.createElement("div");
   overlay.className = "rotli-render-overlay";
   const card = document.createElement("div");
@@ -469,7 +560,14 @@ function buildFrom(state: EditorState, fences: FenceBlock[]): BlockState {
     if (touched) continue; // raw source shows (livePreview skips these lines too)
 
     const code = innerCode(state.doc, block.from, block.to);
-    const widget = new RenderBlockWidget(block.lang as LangKey, code, sig);
+    if (block.lang === "board" || block.lang === "sheet") {
+      const fileId = code.trim();
+      if (!fileId) continue;
+      const widget = new EmbedBlockWidget(block.lang, fileId, sig);
+      decos.push(Decoration.replace({ widget, block: true }).range(block.from, block.to));
+      continue;
+    }
+    const widget = new RenderBlockWidget(block.lang as StaticLangKey, code, sig);
     decos.push(Decoration.replace({ widget, block: true }).range(block.from, block.to));
   }
 

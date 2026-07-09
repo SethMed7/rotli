@@ -15,6 +15,20 @@ describe("scanFences", () => {
     expect(TARGET_LANGS.has("html")).toBe(true);
   });
 
+  test("board and sheet are target langs", () => {
+    expect(TARGET_LANGS.has("board")).toBe(true);
+    expect(TARGET_LANGS.has("sheet")).toBe(true);
+  });
+
+  test("finds a closed ```board fence", () => {
+    const d = doc("```board", "storage/foo.excalidraw", "```");
+    const fences = scanFences(d);
+    expect(fences.length).toBe(1);
+    expect(fences[0]?.lang).toBe("board");
+    expect(fences[0]?.target).toBe(true);
+    expect(innerCode(d, fences[0]!.from, fences[0]!.to)).toBe("storage/foo.excalidraw");
+  });
+
   test("finds a closed ```html fence", () => {
     const d = doc("intro", "```html", "<p>hi</p>", "```", "outro");
     const fences = scanFences(d);

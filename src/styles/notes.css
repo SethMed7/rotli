@@ -1152,6 +1152,25 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* the image variant (livePreview ImgWidget): the picked-up image itself, not a
+   chip — small, softly lifted, a hair of tilt so it reads as "in hand" */
+.drag-ghost.img {
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  transform: translate(12px, 10px) rotate(1.5deg);
+}
+.drag-ghost.img img {
+  display: block;
+  max-width: 180px;
+  max-height: 140px;
+  width: auto;
+  height: auto;
+  border-radius: var(--r-inner);
+  box-shadow: 0 14px 34px rgba(58, 48, 40, 0.35);
+  opacity: 0.92;
+}
 /* while a tab drags: a grabbing cursor everywhere, and no stray text selection */
 [data-tab-dragging],
 [data-tab-dragging] * {

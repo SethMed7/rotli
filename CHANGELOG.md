@@ -10,6 +10,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Slash: link a note.** `/Link note` (aliases `note` / `wiki` / `link`) opens
+  a searchable picker over the same note universe as ⌘K and inserts a
+  memex-native `[[Title]]` (or `[[id]]` when titles collide). Wikilinks render
+  as quiet dotted accent links; ⌘-click opens the target note.
+- **Slash: embed a board or sheet.** `/Board` and `/Sheet` insert a short fence
+  that points at a corpus `.excalidraw` / `.xlsx` (pick existing or create new).
+  The note holds the pointer only; a compact live Excalidraw / Univer surface
+  edits the file on disk, and **Expand** opens the full pane.
+
+### Changed
+
+- **Editor opens lighter.** KaTeX, Mermaid, and JSXGraph load only when a
+  matching fence first renders; Excalidraw / Univer embed hosts load only when
+  a ` ```board ` / ` ```sheet ` fence mounts; SheetJS (`xlsx`) loads only when
+  a read-only sheet or chat attachment needs it. Features unchanged — the
+  default note-editor path no longer pays for those libraries up front.
+
+### Fixed
+
+- **Clicking an image no longer turns it into text.** A click now selects the
+  image as an object — outlined, Backspace deletes it — instead of dissolving
+  it into raw markdown; arrow keys into the line remain the way to edit the
+  `![…](…)` source by hand.
+- **Moving an image shows where it's going — and comes with you.** Dragging an
+  image lifts a small ghost of it that rides the pointer (the original dims in
+  place — the same grammar as dragging tabs and board cards), and draws a live
+  drop-indicator line at the exact landing spot (upper half of a line = before
+  it, lower half = after; the blank space below the note = the end), the note
+  auto-scrolls near the edges, and Escape cancels the drag. Two silent bugs
+  died with it: a downward drag used to land one image-line *above* the drop
+  point, and a mid-drag redraw could scatter the image to the wrong place
+  entirely. Drops also snap out of tables and code fences instead of
+  splitting them.
+- **Resizing a bulleted image no longer eats the bullet.** The resize grip
+  used to rewrite the whole line and wipe the `- ` prefix.
+
 ## [0.27.0] - 2026-07-09
 
 

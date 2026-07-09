@@ -505,6 +505,32 @@
   border-top: 1px solid var(--border);
 }
 
+.slashpicker {
+  min-width: 260px;
+  max-width: min(360px, 92vw);
+}
+.slashpicker-input {
+  display: block;
+  width: calc(100% - 8px);
+  margin: 2px 4px 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.slashpicker-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.slashpicker-empty {
+  padding: 8px 12px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    The CodeMirror WYSIWYG surface (Phase 1d). CM edits the markdown text
    directly; livePreview.ts hides the syntax + styles the content, so this is
@@ -670,6 +696,12 @@
 .rotli-link {
   color: var(--accent-text);
   text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rotli-wikilink {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-decoration-style: dotted;
   text-underline-offset: 2px;
 }
 /* a generic/unknown code fence (```js, plain ```) — raw code voice, never
@@ -956,6 +988,20 @@
 }
 .rotli-img:hover .rotli-img-resize {
   opacity: 1;
+}
+/* click-selected image — the widget stays rendered; the outline marks the object */
+.rotli-img.sel img {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* the drag drop-target line (fixed-positioned on body, redrawn every mousemove) */
+.rotli-img-drop {
+  position: fixed;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 60;
 }
 /* while dragging a block, dim the body a touch so the drop target reads */
 .cm-block-dragging .cm-content {

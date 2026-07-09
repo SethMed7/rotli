@@ -1,11 +1,10 @@
 // The "/" slash menu (Seth 2026-06-13): type "/" at the start of an empty
 // active line in the editor to insert a block. A LOCAL editor affordance, not
-// a global key surface — EditorSurface owns the open/query/index state and
-// drives this purely as a presentational popover anchored under the active row
-// (anchorRef = rawRowRef). Each item carries a STRUCTURED op (heading/block/
-// code); EditorSurface clears the "/query" and applies it to the now-empty line
-// via the canonical applyHeading/applyBlockToggle — never through the stale
-// activeEditor() handle (which would compose "- /bul" instead of "- ").
+// a global key surface — CmEditor owns the open/query/index state and drives
+// this purely as a presentational popover anchored under the active row. Each
+// item carries a STRUCTURED op (heading/block/code/picker); CmEditor clears
+// the "/query" and applies it to the now-empty line via the canonical
+// applyHeading/applyBlockToggle — never through the stale activeEditor() handle.
 //
 // We mirror the format bar's popover grammar (the .fbmenu/.fbrow voice) but in
 // a dedicated .slashmenu block (positioned under, not above, the anchor) so the
@@ -26,22 +25,27 @@ function Heading({ level }: { level: 1 | 2 | 3 }) {
 // stays the inline-backticks primitive, and the multi-line kinds (table /
 // divider / fences) insert their scaffold with the caret placed inside
 // (CmEditor's pickSlash owns the caret math).
+export type SlashPickerMode = "linkNote" | "embedBoard" | "embedSheet";
+
 export type SlashOp =
   | { kind: "heading"; level: 1 | 2 | 3 }
   | { kind: "block"; block: BlockToggle }
   | { kind: "code" }
   | { kind: "table" }
   | { kind: "divider" }
-  | { kind: "fence"; lang: "" | "math" | "mermaid" };
+  | { kind: "fence"; lang: "" | "math" | "mermaid" }
+  | { kind: "picker"; mode: SlashPickerMode };
 
 export interface SlashItem {
   label: string;
   /** The Crepe-style section header this item files under. */
-  group: "Text" | "List" | "Insert";
+  group: "Text" | "List" | "Insert" | "Link";
   /** A muted one-line description (keeps the menu self-teaching). */
   hint: string;
   glyph: ReactNode;
   op: SlashOp;
+  /** Extra filter tokens (note, wiki, excalidraw, …). */
+  keywords?: string[];
 }
 
 // a minimal grid mark for Table + a thin rule for Divider (the shared Gl voice)
@@ -66,6 +70,25 @@ const mermaidGlyph = (
   </svg>
 );
 
+const linkGlyph = (
+  <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </svg>
+);
+const boardGlyph = (
+  <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M8 12h8M12 8v8" opacity="0.45" />
+  </svg>
+);
+const sheetGlyph = (
+  <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M3 9.5h18M9.5 9.5V20M15.5 9.5V20" />
+  </svg>
+);
+
 export const SLASH_ITEMS: SlashItem[] = [
   { label: "Heading 1", group: "Text", hint: "Big section heading", glyph: <Heading level={1} />, op: { kind: "heading", level: 1 } },
   { label: "Heading 2", group: "Text", hint: "Medium heading", glyph: <Heading level={2} />, op: { kind: "heading", level: 2 } },
@@ -80,14 +103,19 @@ export const SLASH_ITEMS: SlashItem[] = [
   { label: "Inline code", group: "Insert", hint: "Code inside a sentence", glyph: codeGlyph, op: { kind: "code" } },
   { label: "Math", group: "Insert", hint: "KaTeX block", glyph: mathGlyph, op: { kind: "fence", lang: "math" } },
   { label: "Mermaid", group: "Insert", hint: "Diagram from text", glyph: mermaidGlyph, op: { kind: "fence", lang: "mermaid" } },
+  { label: "Link note", group: "Link", hint: "Wikilink to another note", glyph: linkGlyph, op: { kind: "picker", mode: "linkNote" }, keywords: ["note", "wiki", "link"] },
+  { label: "Board", group: "Insert", hint: "Embed Excalidraw", glyph: boardGlyph, op: { kind: "picker", mode: "embedBoard" }, keywords: ["excalidraw", "canvas", "draw"] },
+  { label: "Sheet", group: "Insert", hint: "Embed spreadsheet", glyph: sheetGlyph, op: { kind: "picker", mode: "embedSheet" }, keywords: ["xlsx", "csv", "spreadsheet", "excel"] },
 ];
 
-/** Filter by an includes-match on the label (case-insensitive). Exported so
- * EditorSurface can keep its slashIndex inside the same filtered set. */
+/** Filter by label or optional keywords (case-insensitive). */
 export function filterSlashItems(query: string): SlashItem[] {
   const q = query.trim().toLowerCase();
   if (q === "") return SLASH_ITEMS;
-  return SLASH_ITEMS.filter((it) => it.label.toLowerCase().includes(q));
+  return SLASH_ITEMS.filter(
+    (it) =>
+      it.label.toLowerCase().includes(q) || it.keywords?.some((k) => k.includes(q)),
+  );
 }
 
 export function SlashMenu({

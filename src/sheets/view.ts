@@ -1,6 +1,7 @@
 // Read-only spreadsheet viewing + chat CSV-ify — SheetJS (Apache-2.0).
+// SheetJS is dynamic-imported so notes that never open a legacy sheet don't pay
+// for it; exceljs stays the edit-path codec.
 
-import * as XLSX from "xlsx";
 import { csvCell } from "./csv";
 
 export interface SheetTable {
@@ -10,11 +11,21 @@ export interface SheetTable {
   truncated: boolean;
 }
 
+type XlsxMod = typeof import("xlsx");
+
+let xlsxMod: Promise<XlsxMod> | null = null;
+
+function loadXlsx(): Promise<XlsxMod> {
+  xlsxMod ??= import("xlsx");
+  return xlsxMod;
+}
+
 /** Parse a workbook from CSV/TSV text OR base64 into plain string tables. */
-export function parseWorkbook(
+export async function parseWorkbook(
   input: { csv: string } | { base64: string },
   maxRows = 2000,
-): SheetTable[] {
+): Promise<SheetTable[]> {
+  const XLSX = await loadXlsx();
   const wb =
     "csv" in input
       ? XLSX.read(input.csv, { type: "string" })
@@ -35,8 +46,8 @@ export function parseWorkbook(
 }
 
 /** A workbook as plain CSV text — what the chat reads to answer questions. */
-export function workbookToCsv(input: { csv: string } | { base64: string }): string {
-  const tables = parseWorkbook(input, 5000);
+export async function workbookToCsv(input: { csv: string } | { base64: string }): Promise<string> {
+  const tables = await parseWorkbook(input, 5000);
   return tables
     .map((t) => {
       const csv = t.rows.map((r) => r.map(csvCell).join(",")).join("\n");

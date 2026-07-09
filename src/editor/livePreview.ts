@@ -27,7 +27,12 @@ import {
 import { parseBlock } from "./render";
 import { scanFences } from "./fences";
 import { lineInTable, scanTables } from "./tables";
+import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
+import { type DragGhost, createImageDragGhost } from "../lib/dragGhost";
 import { openUrl, resolveImageSrc } from "../lib/tauri";
+import { usePanesStore } from "../state/panes";
+import { WIKILINK_RE } from "./wikilink";
+import { resolveWikilinkTarget } from "./wikilinkIndex";
 
 interface Sel {
   from: number;
@@ -62,6 +67,12 @@ function fixed(open: number, close: number) {
 
 const INLINE: InlineRule[] = [
   { re: /`([^`]+)`/, cls: "rotli-code", parts: fixed(1, 1) },
+  {
+    re: /\[\[([^\]]+)\]\]/,
+    cls: "rotli-wikilink",
+    attrs: { title: "⌘-click to open note" },
+    parts: fixed(2, 2),
+  },
   { re: /\*\*((?:[^*]|\*(?!\*))+)\*\*/, cls: "rotli-strong", parts: fixed(2, 2) },
   { re: /==([^=]+)==/, cls: "rotli-hl", parts: fixed(2, 2) },
   { re: /~~([^~]+)~~/, cls: "rotli-strike", parts: fixed(2, 2) },
@@ -98,12 +109,17 @@ function listItemImage(
   contentBase: number,
   lineEnd: number,
   lineTouched: boolean,
+  sel: Sel,
   decos: Range<Decoration>[],
   atomics: Range<Decoration>[],
 ): boolean {
   const m = IMG_LINE.exec(content);
-  if (!m || lineTouched || lineEnd <= contentBase) return false;
-  const d = Decoration.replace({ widget: new ImgWidget(m[1] ?? "", m[2] ?? "") });
+  if (!m || lineEnd <= contentBase) return false;
+  // an exact full-span selection is the click-selected image — stays rendered;
+  // any other caret in the line reveals the source (the reveal-on-caret law)
+  const selExact = sel.from === contentBase && sel.to === lineEnd;
+  if (lineTouched && !selExact) return false;
+  const d = Decoration.replace({ widget: new ImgWidget(m[1] ?? "", m[2] ?? "", selExact) });
   decos.push(d.range(contentBase, lineEnd));
   atomics.push(d.range(contentBase, lineEnd));
   return true;
@@ -112,6 +128,9 @@ function listItemImage(
 // a thematic break — ---, ***, ___ (frontmatter never reaches here: the Rust
 // corpus splits it off the body; table delimiter rows carry pipes so they miss)
 const HR_LINE = /^ {0,3}(-{3,}|\*{3,}|_{3,})\s*$/;
+
+// resolved image urls, keyed by raw markdown src (see ImgWidget.toDOM)
+const IMG_SRC_CACHE = new Map<string, string>();
 
 // ——— widgets ———
 
@@ -184,21 +203,24 @@ class CheckboxWidget extends WidgetType {
 // An inline image: replaces a `![alt](src)` line with the rendered <img>. `storage:`
 // srcs resolve through the asset protocol. The alt may carry an Obsidian-style
 // width ("caption|420"); a corner grip resizes and rewrites that width into the
-// markdown (the .md stays the source of truth). Click the image → caret lands →
-// source reveals (click-to-edit), like the fenced render blocks.
+// markdown (the .md stays the source of truth). CLICK SELECTS the image as an
+// object (outline; Backspace deletes it) — it never reveals the source; arrow
+// keys into the line remain the raw-markdown escape hatch. Dragging the body
+// moves the line, with a live drop-indicator marking where it will land.
 class ImgWidget extends WidgetType {
   constructor(
     readonly alt: string,
     readonly src: string,
+    readonly selected: boolean,
   ) {
     super();
   }
   eq(o: ImgWidget) {
-    return o.alt === this.alt && o.src === this.src;
+    return o.alt === this.alt && o.src === this.src && o.selected === this.selected;
   }
   toDOM(view: EditorView) {
     const wrap = document.createElement("span");
-    wrap.className = "rotli-img";
+    wrap.className = this.selected ? "rotli-img sel" : "rotli-img";
     const bar = this.alt.lastIndexOf("|");
     const caption = bar >= 0 ? this.alt.slice(0, bar) : this.alt;
     const w = bar >= 0 ? Number.parseInt(this.alt.slice(bar + 1), 10) : Number.NaN;
@@ -207,51 +229,156 @@ class ImgWidget extends WidgetType {
     img.draggable = false;
     if (Number.isFinite(w) && w > 0) img.style.width = `${w}px`;
     wrap.appendChild(img);
-    void resolveImageSrc(this.src).then((url) => {
-      if (url) img.src = url;
-    });
-    // drag the image body to MOVE it: past the threshold, cut its line + re-insert
-    // at the drop point; no move falls through to reveal-source (click-to-edit).
+    // select/deselect recreates the widget DOM — cache resolved urls so the
+    // image doesn't blank-flash through the async resolve on every click
+    const cached = IMG_SRC_CACHE.get(this.src);
+    if (cached) img.src = cached;
+    else {
+      void resolveImageSrc(this.src).then((url) => {
+        if (url) {
+          IMG_SRC_CACHE.set(this.src, url);
+          img.src = url;
+        }
+      });
+    }
     img.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
       e.preventDefault();
+      // capture every doc position NOW — a mid-drag redraw detaches `wrap`, so
+      // nothing may resolve through posAtDOM at mouse-up (the old glitch). The
+      // doc itself is captured too: if anything rewrites it mid-gesture (another
+      // pane pushing this note in), every captured offset is void — bail.
+      const doc0 = view.state.doc;
+      const widgetFrom = view.posAtDOM(wrap);
+      const srcLine = view.state.doc.lineAt(widgetFrom);
+      const srcFrom = srcLine.from;
+      const srcTo = srcLine.to;
+      const lineText = view.state.doc.sliceString(srcFrom, srcTo);
+      const docLength = view.state.doc.length;
+      const cutTo = Math.min(docLength, srcTo + 1);
+      // tables + fenced code are opaque blocks a dropped line must not split
+      const blocks: LineSpan[] = [...scanFences(view.state.doc), ...scanTables(view.state.doc)];
       const sx = e.clientX;
       const sy = e.clientY;
       let moving = false;
+      let indicator: HTMLDivElement | null = null;
+      let ghost: DragGhost | null = null;
+
+      // where would this pointer drop the line? null = nowhere / a no-op spot
+      const resolveDrop = (ev: MouseEvent): { target: DropTarget; y: number } | null => {
+        if (view.state.doc !== doc0) return null; // doc changed mid-drag — void
+        const pos = view.posAtCoords({ x: ev.clientX, y: ev.clientY });
+        if (pos == null) {
+          // the blank space below the document = drop at the end
+          const endC = view.coordsAtPos(docLength);
+          if (!endC || ev.clientY <= endC.bottom || cutTo === docLength) return null;
+          return { target: "end", y: endC.bottom };
+        }
+        const line = view.state.doc.lineAt(pos);
+        const topC = view.coordsAtPos(line.from);
+        const botC = view.coordsAtPos(line.to);
+        if (!topC || !botC) return null;
+        // upper half → before this line; lower half → after it
+        const below = ev.clientY > (topC.top + botC.bottom) / 2;
+        let target: DropTarget = below
+          ? line.to + 1 > docLength
+            ? "end"
+            : line.to + 1
+          : line.from;
+        let y = below ? botC.bottom : topC.top;
+        if (target !== "end") {
+          const snapped = snapOutOfBlocks(target, blocks, docLength);
+          if (snapped !== target) {
+            target = snapped;
+            const yc = view.coordsAtPos(snapped === "end" ? docLength : snapped);
+            if (!yc) return null;
+            y = snapped === "end" ? yc.bottom : yc.top;
+          }
+        }
+        if (target === "end" ? cutTo === docLength : target >= srcFrom && target <= cutTo) {
+          return null; // dropping onto itself — hide the indicator, do nothing
+        }
+        return { target, y };
+      };
+
+      const clearIndicator = () => {
+        indicator?.remove();
+        indicator = null;
+      };
+      const drawIndicator = (y: number) => {
+        if (!indicator) {
+          indicator = document.createElement("div");
+          indicator.className = "rotli-img-drop";
+          document.body.appendChild(indicator);
+        }
+        const cr = view.contentDOM.getBoundingClientRect();
+        indicator.style.left = `${cr.left}px`;
+        indicator.style.width = `${cr.width}px`;
+        indicator.style.top = `${y - 1}px`;
+      };
+      const finish = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        window.removeEventListener("keydown", onKey, true);
+        wrap.classList.remove("rotli-img-moving");
+        ghost?.destroy();
+        ghost = null;
+        clearIndicator();
+      };
+      const onKey = (ev: KeyboardEvent) => {
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          ev.stopPropagation(); // the cancel is ours — overlays must not also close
+          moving = false;
+          finish(); // cancel the whole gesture — mouse-up now does nothing
+        }
+      };
       const onMove = (ev: MouseEvent) => {
         if (!moving && Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 5) {
           moving = true;
           wrap.classList.add("rotli-img-moving");
+          // the image comes WITH the pointer — a small lifted clone (the
+          // original dims in place); shared ghost grammar with tabs/boards
+          ghost = createImageDragGhost(img, ev.clientX, ev.clientY);
         }
+        if (!moving) return;
+        ghost?.move(ev.clientX, ev.clientY);
+        // nudge the scroller near its edges so long notes are reachable mid-drag
+        const sr = view.scrollDOM.getBoundingClientRect();
+        if (ev.clientY < sr.top + 36) view.scrollDOM.scrollTop -= 14;
+        else if (ev.clientY > sr.bottom - 36) view.scrollDOM.scrollTop += 14;
+        const drop = resolveDrop(ev);
+        if (drop) drawIndicator(drop.y);
+        else clearIndicator();
       };
       const onUp = (ev: MouseEvent) => {
-        window.removeEventListener("mousemove", onMove);
-        window.removeEventListener("mouseup", onUp);
-        wrap.classList.remove("rotli-img-moving");
-        const srcLine = view.state.doc.lineAt(view.posAtDOM(wrap));
-        if (!moving) {
-          view.dispatch({ selection: { anchor: srcLine.from } });
+        if (ev.button !== 0) return; // a stray right-up mid-drag must not commit
+        const wasMoving = moving;
+        finish();
+        if (view.state.doc !== doc0) return; // doc changed mid-gesture — offsets void
+        if (!wasMoving) {
+          // plain click = select the image as an object (widget stays rendered)
+          view.dispatch({ selection: { anchor: widgetFrom, head: srcTo } });
           view.focus();
           return;
         }
-        const dropPos = view.posAtCoords({ x: ev.clientX, y: ev.clientY });
-        if (dropPos == null) return;
-        const dropLine = view.state.doc.lineAt(dropPos);
-        if (dropLine.from === srcLine.from) return;
-        const imgText = view.state.doc.sliceString(srcLine.from, srcLine.to);
-        const cutTo = Math.min(view.state.doc.length, srcLine.to + 1);
-        const insertAt =
-          dropLine.from > srcLine.from ? dropLine.from - (cutTo - srcLine.from) : dropLine.from;
+        const drop = resolveDrop(ev);
+        if (!drop) return;
+        const plan = planLineMove({ from: srcFrom, to: srcTo }, drop.target, docLength, lineText);
+        if (!plan) return;
         view.dispatch({
-          changes: [
-            { from: srcLine.from, to: cutTo, insert: "" },
-            { from: insertAt, insert: `${imgText}\n` },
-          ],
+          changes: plan.changes,
+          // keep the moved image selected so the landing spot is unmistakable
+          selection: {
+            anchor: plan.insertedAt + (widgetFrom - srcFrom),
+            head: plan.insertedAt + lineText.length,
+          },
         });
         view.focus();
       };
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
+      window.addEventListener("keydown", onKey, true);
     });
     const grip = document.createElement("span");
     grip.className = "rotli-img-resize";
@@ -259,6 +386,11 @@ class ImgWidget extends WidgetType {
     grip.addEventListener("mousedown", (e) => {
       e.preventDefault();
       e.stopPropagation();
+      // capture at press (posAtDOM at mouse-up can see a detached node), and
+      // rewrite ONLY the image span — a bulleted image keeps its "- " prefix
+      const doc0 = view.state.doc;
+      const imgFrom = view.posAtDOM(wrap);
+      const lineTo = view.state.doc.lineAt(imgFrom).to;
       const startX = e.clientX;
       const startW = img.getBoundingClientRect().width;
       const onMove = (ev: MouseEvent) => {
@@ -267,12 +399,11 @@ class ImgWidget extends WidgetType {
       const onUp = () => {
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
+        if (view.state.doc !== doc0) return; // doc changed mid-resize — offsets void
         const width = Math.round(img.getBoundingClientRect().width);
-        const pos = view.posAtDOM(wrap);
-        const line = view.state.doc.lineAt(pos);
         const newAlt = caption ? `${caption}|${width}` : `|${width}`;
         view.dispatch({
-          changes: { from: line.from, to: line.to, insert: `![${newAlt}](${this.src})` },
+          changes: { from: imgFrom, to: lineTo, insert: `![${newAlt}](${this.src})` },
         });
       };
       window.addEventListener("mousemove", onMove);
@@ -281,8 +412,10 @@ class ImgWidget extends WidgetType {
     wrap.appendChild(grip);
     return wrap;
   }
-  ignoreEvent() {
-    return false;
+  ignoreEvent(event: Event) {
+    // we own the press/drag/release cycle — CM must not race a caret in on
+    // mousedown (that was the "click turns the image into text" bug)
+    return event.type === "mousedown";
   }
 }
 
@@ -431,14 +564,21 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
       const contentBase = prefixEnd;
       const content = text.slice(block.prefixLen);
 
-      // a line that is JUST an image renders inline; caret in the line reveals source
+      // a line that is JUST an image renders inline; a caret in the line reveals
+      // the source — EXCEPT an exact full-span selection, which is the
+      // click-selected image (stays rendered, outlined)
       const imgM = IMG_LINE.exec(text);
-      if (imgM && !lineTouched && line.to > ls) {
-        const d = Decoration.replace({ widget: new ImgWidget(imgM[1] ?? "", imgM[2] ?? "") });
-        decos.push(d.range(ls, line.to));
-        atomics.push(d.range(ls, line.to));
-        pos = line.to + 1;
-        continue;
+      if (imgM && line.to > ls) {
+        const selExact = sel.from === ls && sel.to === line.to;
+        if (!lineTouched || selExact) {
+          const d = Decoration.replace({
+            widget: new ImgWidget(imgM[1] ?? "", imgM[2] ?? "", selExact),
+          });
+          decos.push(d.range(ls, line.to));
+          atomics.push(d.range(ls, line.to));
+          pos = line.to + 1;
+          continue;
+        }
       }
 
       // a divider (--- / *** / ___) renders as a thin rule; caret reveals dashes
@@ -463,7 +603,7 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
             Decoration.line({ class: "rotli-li", attributes: { style: listStyle(depth) } }).range(ls),
           );
           hidePrefix(ls, prefixEnd, new BulletWidget(depth), decos, atomics);
-          if (listItemImage(content, contentBase, line.to, lineTouched, decos, atomics)) break;
+          if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);
           break;
         case "numbered":
@@ -471,7 +611,7 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
             Decoration.line({ class: "rotli-li", attributes: { style: listStyle(depth) } }).range(ls),
           );
           hidePrefix(ls, prefixEnd, new NumberWidget(block.marker ?? "1."), decos, atomics);
-          if (listItemImage(content, contentBase, line.to, lineTouched, decos, atomics)) break;
+          if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);
           break;
         case "task":
@@ -485,7 +625,7 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
           if (block.done && line.to > prefixEnd) {
             decos.push(Decoration.mark({ class: "rotli-done" }).range(prefixEnd, line.to));
           }
-          if (listItemImage(content, contentBase, line.to, lineTouched, decos, atomics)) break;
+          if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);
           break;
         case "quote":
@@ -513,25 +653,45 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
 
 const MD_LINK = /\[([^\]]+)\]\(([^)]*)\)/g;
 
+function tryOpenLinkAt(lineText: string, lineFrom: number, pos: number): boolean {
+  WIKILINK_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = WIKILINK_RE.exec(lineText)) !== null) {
+    const from = lineFrom + m.index;
+    const to = from + m[0].length;
+    if (pos >= from && pos <= to) {
+      const id = resolveWikilinkTarget(m[1] ?? "");
+      if (id) {
+        usePanesStore.getState().openNote(id);
+        return true;
+      }
+      return false;
+    }
+    if (from > pos) break;
+  }
+  MD_LINK.lastIndex = 0;
+  while ((m = MD_LINK.exec(lineText)) !== null) {
+    const from = lineFrom + m.index;
+    const to = from + m[0].length;
+    if (pos >= from && pos <= to) {
+      const url = (m[2] ?? "").trim();
+      if (url) void openUrl(url).catch(() => {});
+      return true;
+    }
+    if (from > pos) break;
+  }
+  return false;
+}
+
 export const linkOpener = EditorView.domEventHandlers({
   mousedown(e, view) {
     if (!e.metaKey || e.button !== 0) return false;
     const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
     if (pos == null) return false;
     const line = view.state.doc.lineAt(pos);
-    MD_LINK.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = MD_LINK.exec(line.text)) !== null) {
-      const from = line.from + m.index;
-      const to = from + m[0].length;
-      if (pos >= from && pos <= to) {
-        const url = (m[2] ?? "").trim();
-        // non-openable schemes just don't open — the guard lives in Rust
-        if (url) void openUrl(url).catch(() => {});
-        e.preventDefault();
-        return true;
-      }
-      if (from > pos) break; // matches walk left→right; past the click = done
+    if (tryOpenLinkAt(line.text, line.from, pos)) {
+      e.preventDefault();
+      return true;
     }
     return false;
   },

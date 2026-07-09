@@ -34,7 +34,12 @@ import { linkOpener, livePreview } from "./livePreview";
 import { stripMarkdown } from "./stripMarkdown";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import { cellSpansOf, insertTableText } from "./tables";
-import { type SlashItem, SlashMenu, filterSlashItems } from "./SlashMenu";
+import { type SlashItem, type SlashPickerMode, SlashMenu, filterSlashItems } from "./SlashMenu";
+import { SlashPicker } from "./SlashPicker";
+import { buildTitleCounts, wikilinkLabel } from "./wikilink";
+import { setWikilinkNotes } from "./wikilinkIndex";
+import { useSearchableNotes } from "../services/hooks";
+import type { NoteSummary } from "../types";
 
 interface SlashState {
   open: boolean;
@@ -42,6 +47,14 @@ interface SlashState {
   index: number;
   left: number;
   top: number;
+}
+
+interface PickerState {
+  mode: SlashPickerMode;
+  index: number;
+  left: number;
+  top: number;
+  insertAt: number;
 }
 
 /** The floating format bar (bottom-center, ~42px tall, sitting 16px up) covers
@@ -155,6 +168,14 @@ export function CmEditor({
   );
 
   const [slash, setSlash] = useState<SlashState>({ open: false, query: "", index: 0, left: 0, top: 0 });
+  const [picker, setPicker] = useState<PickerState | null>(null);
+  const pickerRef = useRef<PickerState | null>(null);
+  pickerRef.current = picker;
+  const { notes: searchableNotes } = useSearchableNotes();
+
+  useEffect(() => {
+    setWikilinkNotes(searchableNotes);
+  }, [searchableNotes]);
   // the slash key-handler reads live state through this ref (the CM dom handler
   // is created once, but it must see the current query/index)
   const slashRef = useRef<{ open: boolean; handle: (e: KeyboardEvent) => boolean }>({
@@ -210,41 +231,87 @@ export function CmEditor({
     },
   });
 
-  const pickSlash = useCallback((item: SlashItem) => {
-    const view = viewRef.current;
-    if (!view) return;
-    const line = view.state.doc.lineAt(view.state.selection.main.head);
-    let insert: string;
-    let caret: number;
-    if (item.op.kind === "code") {
-      insert = "``"; // inline code on the cleared line, caret between the ticks
-      caret = 1;
-    } else if (item.op.kind === "table") {
-      insert = insertTableText(3, 2); // scaffold; caret in the first header cell
-      caret = cellSpansOf(insert.split("\n")[0] ?? "")[0]?.start ?? 2;
-    } else if (item.op.kind === "divider") {
-      insert = "---\n\n"; // rule + a fresh line to keep writing on
-      caret = insert.length;
-    } else if (item.op.kind === "fence") {
-      // ``` / ```math / ```mermaid with the caret on the empty middle line
-      insert = `\`\`\`${item.op.lang}\n\n\`\`\``;
-      caret = 4 + item.op.lang.length;
-    } else if (item.op.kind === "heading") {
-      const r = applyHeading("", item.op.level);
-      insert = r.line;
-      caret = r.line.length;
-    } else {
-      const r = applyBlockToggle("", item.op.block);
-      insert = r.line;
-      caret = r.line.length;
-    }
-    view.dispatch({
-      changes: { from: line.from, to: line.to, insert },
-      selection: EditorSelection.cursor(line.from + caret),
-    });
+  const pickPicker = useCallback(
+    (mode: SlashPickerMode, note: NoteSummary) => {
+      const view = viewRef.current;
+      if (!view || picker == null) return;
+      const at = picker.insertAt;
+      let insert: string;
+      let caret: number;
+      if (mode === "linkNote") {
+        const label = wikilinkLabel(note, buildTitleCounts(searchableNotes));
+        insert = `[[${label}]]`;
+        caret = insert.length;
+      } else {
+        const lang = mode === "embedBoard" ? "board" : "sheet";
+        insert = `\`\`\`${lang}\n${note.id}\n\`\`\`\n\n`;
+        caret = insert.length;
+      }
+      view.dispatch({
+        changes: { from: at, to: at, insert },
+        selection: EditorSelection.cursor(at + caret),
+      });
+      setPicker(null);
+      view.focus();
+    },
+    [picker, searchableNotes],
+  );
+
+  const openPicker = useCallback((mode: SlashPickerMode, insertAt: number, left: number, top: number) => {
     setSlash((s) => ({ ...s, open: false }));
-    view.focus();
+    setPicker({ mode, index: 0, left, top, insertAt });
   }, []);
+
+  const pickSlash = useCallback(
+    (item: SlashItem) => {
+      const view = viewRef.current;
+      if (!view) return;
+      const line = view.state.doc.lineAt(view.state.selection.main.head);
+      if (item.op.kind === "picker") {
+        const coords = view.coordsAtPos(line.from);
+        const host = hostRef.current?.getBoundingClientRect();
+        const left = (coords?.left ?? 0) - (host?.left ?? 0);
+        const top = (coords?.bottom ?? 0) - (host?.top ?? 0) + 4;
+        view.dispatch({
+          changes: { from: line.from, to: line.to, insert: "" },
+          selection: EditorSelection.cursor(line.from),
+        });
+        openPicker(item.op.mode, line.from, left, top);
+        return;
+      }
+      let insert: string;
+      let caret: number;
+      if (item.op.kind === "code") {
+        insert = "``"; // inline code on the cleared line, caret between the ticks
+        caret = 1;
+      } else if (item.op.kind === "table") {
+        insert = insertTableText(3, 2); // scaffold; caret in the first header cell
+        caret = cellSpansOf(insert.split("\n")[0] ?? "")[0]?.start ?? 2;
+      } else if (item.op.kind === "divider") {
+        insert = "---\n\n"; // rule + a fresh line to keep writing on
+        caret = insert.length;
+      } else if (item.op.kind === "fence") {
+        // ``` / ```math / ```mermaid with the caret on the empty middle line
+        insert = `\`\`\`${item.op.lang}\n\n\`\`\``;
+        caret = 4 + item.op.lang.length;
+      } else if (item.op.kind === "heading") {
+        const r = applyHeading("", item.op.level);
+        insert = r.line;
+        caret = r.line.length;
+      } else {
+        const r = applyBlockToggle("", item.op.block);
+        insert = r.line;
+        caret = r.line.length;
+      }
+      view.dispatch({
+        changes: { from: line.from, to: line.to, insert },
+        selection: EditorSelection.cursor(line.from + caret),
+      });
+      setSlash((s) => ({ ...s, open: false }));
+      view.focus();
+    },
+    [openPicker],
+  );
 
   // create the view ONCE per note/pane
   useEffect(() => {
@@ -259,6 +326,7 @@ export function CmEditor({
       onContextRef.current(line.text, r.head - line.from);
     };
     const detectSlash = (view: EditorView) => {
+      if (pickerRef.current) return;
       const r = view.state.selection.main;
       if (!r.empty) {
         setSlash((s) => (s.open ? { ...s, open: false } : s));
@@ -474,7 +542,18 @@ export function CmEditor({
         ref={hostRef}
         style={{ "--cm-measure": `${measureWidth}px` } as CSSProperties}
       />
-      {slash.open && items.length > 0 && (
+      {picker && (
+        <div className="rotli-slash-anchor" style={{ left: picker.left, top: picker.top }}>
+          <SlashPicker
+            mode={picker.mode}
+            selectedIndex={picker.index}
+            onHover={(i) => setPicker((p) => (p ? { ...p, index: i } : p))}
+            onPick={(note) => pickPicker(picker.mode, note)}
+            onClose={() => setPicker(null)}
+          />
+        </div>
+      )}
+      {slash.open && items.length > 0 && !picker && (
         <div className="rotli-slash-anchor" style={{ left: slash.left, top: slash.top }}>
           <SlashMenu
             query={slash.query}
