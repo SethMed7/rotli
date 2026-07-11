@@ -13,6 +13,9 @@ import type { Extension } from "@codemirror/state";
 class FmBlockWidget extends WidgetType {
   constructor(
     readonly block: string,
+    /** Canonical absolute path, derived from the corpus router (never editable
+     * metadata, because filing and title renames change it). */
+    readonly path: string | null,
     /** Commit COUNTER — the owner bumps it after every write attempt. A refused
      * or no-op commit re-reads the SAME block string, so without this the eq()
      * below would keep the live textarea (and its unsaved typed text) as if it
@@ -33,7 +36,12 @@ class FmBlockWidget extends WidgetType {
     // same disk text AND same commit gen → keep the live DOM (and any
     // in-progress typing); a new disk truth OR a completed commit (even one
     // that changed nothing on disk) rebuilds the textarea from the file
-    return other.block === this.block && other.gen === this.gen && other.error === this.error;
+    return (
+      other.block === this.block &&
+      other.path === this.path &&
+      other.gen === this.gen &&
+      other.error === this.error
+    );
   }
 
   override toDOM(): HTMLElement {
@@ -42,6 +50,17 @@ class FmBlockWidget extends WidgetType {
     // the widget sits inside CM's contenteditable content DOM — fence it off so
     // the textarea is a real form control, never part of the editable tree
     wrap.contentEditable = "false";
+    if (this.path) {
+      const pathRow = document.createElement("div");
+      pathRow.className = "rotli-fm-path";
+      const label = document.createElement("span");
+      label.textContent = "File path";
+      const value = document.createElement("code");
+      value.textContent = this.path;
+      value.title = this.path;
+      pathRow.append(label, value);
+      wrap.appendChild(pathRow);
+    }
     const ta = document.createElement("textarea");
     ta.className = "rotli-fm-text";
     ta.value = this.block;
@@ -112,6 +131,7 @@ class FmBlockWidget extends WidgetType {
  * commit completes (`gen` bumps), or a refusal message arrives. */
 export function fmBlock(
   block: string,
+  path: string | null,
   gen: number,
   error: string | null,
   commit: (text: string) => void,
@@ -120,7 +140,7 @@ export function fmBlock(
   return EditorView.decorations.of(
     Decoration.set([
       Decoration.widget({
-        widget: new FmBlockWidget(block, gen, error, commit, read),
+        widget: new FmBlockWidget(block, path, gen, error, commit, read),
         side: -1,
         block: true,
       }).range(0),

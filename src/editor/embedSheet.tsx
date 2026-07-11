@@ -12,7 +12,7 @@ import { writeSheetModel, type SheetFileMode } from "../sheets/session";
 
 function isDarkTheme(): boolean {
   const t = document.documentElement.dataset.theme ?? "light";
-  return t === "dark" || t === "charcoal" || t === "glass-dark";
+  return t === "dark" || t === "charcoal";
 }
 
 function modeOf(fileId: string): SheetFileMode {

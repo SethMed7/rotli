@@ -640,6 +640,8 @@ export interface FileStat {
   len: number;
   /** Whether the USER write lane may save this file (false in a memex/linked library). */
   writable: boolean;
+  /** Whether an explicit user action may move this storage asset to recoverable Trash. */
+  trashable: boolean;
 }
 
 /** Size + writability probe for a surfaced file — the sheet editor decides
@@ -647,6 +649,12 @@ export interface FileStat {
 export async function corpusFileStat(id: string): Promise<FileStat | null> {
   if (!isTauri()) return null;
   return invoke<FileStat>("corpus_file_stat", { id });
+}
+
+/** Move a surfaced storage asset to the OS Trash (or the host fallback Trash). */
+export async function corpusTrashFile(id: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_trash_file", { id });
 }
 
 /** Save a surfaced FILE's bytes back to disk (base64) — the sheet editor's
@@ -768,6 +776,15 @@ export async function corpusFileNote(id: string): Promise<string> {
  * path passes through). Staged-detection and the filing journal use this. */
 export async function corpusNotePath(id: string): Promise<string> {
   return invoke<string>("corpus_note_path", { id });
+}
+
+/** Resolve a note's stable wire id all the way to its current ABSOLUTE file
+ * path. Derived from the corpus router each time — never duplicated into
+ * frontmatter, where a rename or filing move could make it stale. */
+export async function corpusNoteAbsolutePath(id: string): Promise<string> {
+  const wirePath = await corpusNotePath(id);
+  const { rootId, rel } = splitRootId(wirePath);
+  return corpusAbs(rootId, rel);
 }
 
 /** Move a note to a folder in the brain via the Filer lane (re-file / UNDO). */
@@ -958,14 +975,13 @@ export async function corpusSetBrainPerms(id: string, perms: MemexPerms): Promis
   await invoke("corpus_set_brain_perms", { id, perms });
 }
 
-/** The `.rotli/` dot-files — opaque JSON strings the frontend owns. Missing
- * file reads as "{}". `background` carries the custom glass wallpaper. */
-export type SettingsFile = "settings" | "viewstate" | "background" | "main";
+/** The `.rotli/` dot-files — opaque JSON strings the frontend owns. */
+export type SettingsFile = "settings" | "viewstate" | "main";
 
 /** The dot-files the app may WRITE through this lane. `main` goes through
  * corpusMainWrite (which also keeps it committable); `organizer` is the
  * daemon's own convergence state and is never webview-writable (#44). */
-export type WritableSettingsFile = "settings" | "viewstate" | "background";
+export type WritableSettingsFile = "settings" | "viewstate";
 
 export function corpusSettingsRead(file: SettingsFile): Promise<string> {
   return corpusInvoke("corpus_settings_read", { file });
@@ -1084,8 +1100,8 @@ export function memexDeleteChat(root: string, slug: string): Promise<void> {
 export function memexArchiveChat(root: string, slug: string): Promise<void> {
   return memexInvoke("memex_archive_chat", { root, slug });
 }
-/** Write a v3.5 note (full bytes composed by the contract codec) into wiki/_inbox/
- *  staging as `<stem>.md`. Returns the absolute path. */
+/** Write a v3.5 note into wiki/_inbox/, or wiki/_secure/ when its composed
+ * frontmatter carries secure:true. Returns the absolute path. */
 export function memexWriteNote(root: string, stem: string, contents: string): Promise<string> {
   return memexInvoke("memex_write_note", { root, stem, contents });
 }
@@ -1178,7 +1194,7 @@ export function onQuickSet(cb: (state: QuickStatePayload) => void): () => void {
   return () => void unlisten.then((fn) => fn());
 }
 
-/** Theme + glass settings, broadcast from the MAIN window so the quick + capture
+/** Theme settings, broadcast from the MAIN window so the quick + capture
  * webviews follow the chosen theme live (they each apply their own theme from
  * their store; without this they'd only pick it up from settings.json at launch
  * and go stale when you change it). Loose string types avoid a ui<->tauri import
@@ -1188,15 +1204,6 @@ export interface ThemePayload {
   themeFamily: "warm" | "mono";
   matchLightFamily: "warm" | "mono";
   matchDarkFamily: "warm" | "mono";
-  glassMode: boolean;
-  glassTint: string;
-  glassBackground: string;
-  glassClarity: string;
-  glassBlur: string;
-  glassCanvas: string;
-  /** The custom glass wallpaper data-URL (or null) — must ride along so a
-   * window picks up a wallpaper uploaded/changed AFTER it launched. */
-  customBackground: string | null;
 }
 
 export function emitThemeSet(payload: ThemePayload): void {

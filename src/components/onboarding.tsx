@@ -404,8 +404,6 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const setTheme = useUiStore((s) => s.setTheme);
   const themeFamily = useUiStore((s) => s.themeFamily);
   const setThemeFamily = useUiStore((s) => s.setThemeFamily);
-  const glassMode = useUiStore((s) => s.glassMode);
-  const setGlassMode = useUiStore((s) => s.setGlassMode);
 
   // Record the choice only; App applies the Dock policy + hide-on-blur when
   // onboarding FINISHES — changing either live can kill the frameless window (#1).
@@ -508,7 +506,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             </p>
             <div className="famrow">
               {SOLID_THEMES.map(({ family, mode, label }) => {
-                const selected = !glassMode && themeFamily === family && theme === mode;
+                const selected = themeFamily === family && theme === mode;
                 return (
                   <button
                     type="button"
@@ -516,11 +514,6 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                     className={selected ? "famcard sel" : "famcard"}
                     aria-pressed={selected}
                     onClick={() => {
-                      // Onboarding picks a SOLID base look — Liquid Glass is an
-                      // advanced mode discovered in Settings, never offered here
-                      // (Seth, 2026-07-07). Choosing a card also drops out of glass
-                      // so the preview never lies about what you picked.
-                      if (glassMode) setGlassMode(false);
                       setThemeFamily(family as ThemeFamily);
                       setTheme(mode);
                     }}

@@ -89,6 +89,7 @@ import { openNewItemMenu } from "../newItems/menu";
 import { longDateLabel } from "../lib/dateLabels";
 import { type DragGhost, createDragGhost } from "../lib/dragGhost";
 import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
+import { isSecureBrainFolder } from "../security/secureNotes";
 import {
   ArchiveGlyph,
   BoardGlyph as CanvasItemGlyph,
@@ -529,7 +530,10 @@ export function Sidebar() {
   // (Seth, 2026-06-30). It returns the moment a vault root has notes/folders.
   const showVault = vaultNotes.length > 0 || folders.some((f) => f.id.startsWith("vault:"));
   const visibleDestRows = useMemo(
-    () => DEST_ROWS.filter((d) => d.id !== DEST.vault || showVault),
+    () =>
+      DEST_ROWS.filter(
+        (d) => d.id !== DEST.secure && (d.id !== DEST.vault || showVault),
+      ),
     [showVault],
   );
   // the BRAIN — the AI-organized wiki areas (People · Projects · Research · …).
@@ -1192,7 +1196,8 @@ export function Sidebar() {
   const chatSecOpen = expandedDests[SEC_CHAT] ?? true;
   const notesSecOpen = expandedDests[SEC_NOTES] ?? true;
   const brainOpen = expandedDests.Brain ?? true;
-  const hasBrain = childrenOf("wiki").length > 0;
+  const secureOpen = expandedDests[DEST.secure] ?? false;
+  const hasBrain = childrenOf("wiki").length > 0 || brainNotes.length > 0 || secureNotes.length > 0;
 
   // Main rows in the roving order — mirrors renderMainTree's traversal exactly
   // (notes first, then folders + their open subtrees). Main notes reference the
@@ -1228,7 +1233,18 @@ export function Sidebar() {
         ...(hasBrain
           ? [
               { id: "Brain", kind: "folder" } as RovingRow,
-              ...(brainOpen ? subtreeRows("wiki", brainNotes) : []),
+              ...(brainOpen
+                ? [
+                    { id: DEST.secure, kind: "folder" } as RovingRow,
+                    ...(secureOpen
+                      ? [
+                          ...visibleNoteRows(secureNotes, DEST.secure),
+                          ...subtreeRows(DEST.secure, secureNotes),
+                        ]
+                      : []),
+                    ...subtreeRows("wiki", brainNotes),
+                  ]
+                : []),
             ]
           : []),
         ...visibleDestRows.flatMap(({ id }) => {
@@ -1324,13 +1340,16 @@ export function Sidebar() {
   // Expand the folder chain that holds the focused note (Main copy wins; a note
   // not in Main is revealed in the Brain). Reads the latest projections via the
   // ref so it never re-opens a folder the user just collapsed by hand.
-  const expandToFocusedNote = (mode: "auto" | "brain" = "auto") => {
-    if (!focusedNoteId) return;
+  const expandToFocusedNote = (
+    mode: "auto" | "brain" = "auto",
+    targetNoteId: string | null = focusedNoteId,
+  ) => {
+    if (!targetNoteId) return;
     const { mainProjection: proj, noteIndex: idx } = revealRef.current;
     // "brain" mode skips the Main-wins short-circuit so "Open in Brain" reveals the
     // note's REAL home in the Brain even when it's also pinned in Main (Seth #3,
     // 2026-07-08). "auto" keeps Main's copy winning on ordinary navigation.
-    const inMain = mode === "brain" ? undefined : proj.notes.find((n) => n.id === focusedNoteId);
+    const inMain = mode === "brain" ? undefined : proj.notes.find((n) => n.id === targetNoteId);
     if (inMain) {
       let parent: string | null = inMain.folderId;
       const seen = new Set<string>();
@@ -1341,10 +1360,17 @@ export function Sidebar() {
       }
       return;
     }
-    const note = idx.get(focusedNoteId);
+    const note = idx.get(targetNoteId);
     if (!note) return;
     const fid = noteDiskFolder(note);
-    if (fid === "wiki" || fid.startsWith("wiki/")) {
+    if (isSecureBrainFolder(fid)) {
+      setDestExpanded("Brain", true);
+      setDestExpanded(DEST.secure, true);
+      const shelfParts = note.folderId.split("/");
+      for (let i = 2; i <= shelfParts.length; i++) {
+        setDestExpanded(shelfParts.slice(0, i).join("/"), true);
+      }
+    } else if (fid === "wiki" || fid.startsWith("wiki/")) {
       setDestExpanded("Brain", true);
       // "wiki/projects/rotli" → open "wiki/projects" then "wiki/projects/rotli"
       const parts = fid.split("/");
@@ -1364,7 +1390,7 @@ export function Sidebar() {
   // #25 — auto-reveal on navigation: expand the holder, never scroll (a yanked
   // scroll on every click is jarring). Keyed on the note id, not the closure.
   useEffect(() => {
-    expandToFocusedNote();
+    expandToFocusedNote("auto", focusedNoteId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedNoteId, setDestExpanded]);
 
@@ -1372,8 +1398,9 @@ export function Sidebar() {
   // view. Fires ONLY on the nonce bump, so normal navigation never scroll-yanks.
   useEffect(() => {
     if (!revealNonce) return;
-    const mode = useUiStore.getState().revealMode;
-    expandToFocusedNote(mode);
+    const { revealMode: mode, revealNoteId } = useUiStore.getState();
+    const targetNoteId = revealNoteId ?? focusedNoteId;
+    expandToFocusedNote(mode, targetNoteId);
     // two frames: the first lets the just-expanded folder chain commit to the
     // DOM, the second scrolls the now-rendered row into view (pre-release review).
     // In "brain" mode, scroll to the BRAIN occurrence (not the Main copy, which
@@ -1387,7 +1414,7 @@ export function Sidebar() {
           ),
         );
         const sel =
-          candidates.find((row) => row.dataset.noteId === focusedNoteId) ?? candidates[0];
+          candidates.find((row) => row.dataset.noteId === targetNoteId) ?? candidates[0];
         sel?.scrollIntoView({ block: "center", behavior: "smooth" });
       });
     });
@@ -1965,7 +1992,7 @@ export function Sidebar() {
                   </span>
                   <NotesStackGlyph size={14} />
                   <span className="fname">Brain</span>
-                  <span className="count">{brainNotes.length}</span>
+                  <span className="count">{brainNotes.length + secureNotes.length}</span>
                 </button>
                 {brainOpen && (
                   <>
@@ -1984,6 +2011,36 @@ export function Sidebar() {
                       <span className="fname">Activity</span>
                       {pendingProposals > 0 && <span className="count">{pendingProposals}</span>}
                     </button>
+                    <button
+                      type="button"
+                      className={`frow child${destSelected(DEST.secure) ? " sel" : ""}`}
+                      style={{ paddingLeft: 42 }}
+                      onClick={() => {
+                        toggleDestExpanded(DEST.secure);
+                        setSelectedFolderId(DEST.secure);
+                        setContentView("panes");
+                      }}
+                      {...rowProps({ id: DEST.secure, kind: "folder" })}
+                    >
+                      <span className={`fchev${secureOpen ? " open" : ""}`} aria-hidden="true">
+                        <ChevronRight size={10} />
+                      </span>
+                      <ShieldGlyph size={14} />
+                      <span className="fname">Secure notes</span>
+                      {sectionAddBtn(DEST.secure)}
+                      <span className="count">{secureNotes.length}</span>
+                    </button>
+                    {secureOpen && (
+                      <>
+                        <p className="brain-hint secure-brain-hint">
+                          Stored inside your Brain, but never visible to remote AI. Local AI remains
+                          off until you allow it on an individual note.
+                        </p>
+                        {compactRows(secureNotes, DEST.secure, rowProps, 2)}
+                        {newFolderRow(DEST.secure, 60)}
+                        {renderFolderTree(DEST.secure, secureNotes, 1, rowProps)}
+                      </>
+                    )}
                     {renderFolderTree("wiki", brainNotes, 1, rowProps)}
                   </>
                 )}

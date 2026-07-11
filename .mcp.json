@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "rotli-carl": {
+      "command": "node",
+      "args": [
+        ".carl/mcpServer.mjs"
+      ],
+      "type": "stdio"
+    }
+  }
+}

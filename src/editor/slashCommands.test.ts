@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { NoteSummary } from "../types";
 import { filterPickerNotes, slashPickerCanCreate } from "./slashPicker";
-import { SLASH_ITEMS } from "./slashMenu";
+import { filterSlashItems, SLASH_ITEMS } from "./slashMenu";
 import { pickerFence, slashInsertion } from "./slashActions";
 
 const file = (id: string): NoteSummary => ({
@@ -81,6 +81,12 @@ describe("slash command catalog", () => {
     expect(slashPickerCanCreate("embedSheet", false)).toBe(false);
     expect(slashPickerCanCreate("embedDocument", true, false)).toBe(false);
   });
+
+  test("document discovery uses the editable DOCX vocabulary", () => {
+    expect(filterSlashItems("word").map((item) => item.label)).toEqual(["Document"]);
+    expect(filterSlashItems("docx").map((item) => item.label)).toEqual(["Document"]);
+    expect(filterSlashItems("rtf")).toEqual([]);
+  });
 });
 
 describe("slash target filtering", () => {
@@ -88,6 +94,8 @@ describe("slash target filtering", () => {
     file("storage/budget.xlsx"),
     file("storage/data.csv"),
     file("storage/brief.docx"),
+    file("storage/template.dotx"),
+    file("storage/macros.docm"),
     file("storage/legacy.doc"),
     file("storage/notes.rtf"),
     file("storage/report.pdf"),
@@ -100,11 +108,18 @@ describe("slash target filtering", () => {
     ]);
   });
 
-  test("document picker offers the managed Word/document family", () => {
+  test("document picker offers only formats the embedded editor can edit", () => {
     expect(filterPickerNotes(files, "embedDocument", "").map((note) => note.id)).toEqual([
       "storage/brief.docx",
-      "storage/legacy.doc",
-      "storage/notes.rtf",
+      "storage/template.dotx",
+      "storage/macros.docm",
     ]);
+  });
+
+  test("document picker search keeps fuzzy title/path matching inside the editable set", () => {
+    expect(filterPickerNotes(files, "embedDocument", "macro").map((note) => note.id)).toEqual([
+      "storage/macros.docm",
+    ]);
+    expect(filterPickerNotes(files, "embedDocument", "legacy")).toEqual([]);
   });
 });

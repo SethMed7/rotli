@@ -1,7 +1,7 @@
 // The file surface — renders a surfaced binary (kind "file") IN-APP, in a pane,
 // instead of shelling it to the OS. Covers audio/video (a real player), images
-// (fit / 100% / ⌘±-and-pinch zoom with scroll-pan), pdf, Word documents (safe
-// local preview + external editing), spreadsheets (xlsx/csv → EDITABLE grid
+// (fit / 100% / ⌘±-and-pinch zoom with scroll-pan), pdf, Word documents (local
+// DOCX editing with package-preserving saves), spreadsheets (xlsx/csv → EDITABLE grid
 // when the root is writable, a read-only table otherwise),
 // html (Preview in a sandboxed srcdoc iframe — scripts AND network egress
 // blocked ⇄ Code, the raw source), and text; ANY other type falls back to an
@@ -29,7 +29,12 @@ import {
   corpusRevealFile,
   fileAssetUrl,
 } from "../lib/tauri";
-import { DOCX_PREVIEW, DOCUMENT_EXTS, DOCUMENT_OPEN_WITH_APPS } from "../documents/kinds";
+import {
+  DOCX_EDITABLE,
+  DOCUMENT_EDIT_MAX_BYTES,
+  DOCUMENT_EXTS,
+  DOCUMENT_OPEN_WITH_APPS,
+} from "../documents/kinds";
 import { IMAGE_EXTS, extOf, fileName } from "../lib/fileKind";
 import {
   SHEET_BIN,
@@ -43,9 +48,7 @@ import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 // Univer + exceljs are heavy — code-split so they load only when an editable
 // sheet mounts (same reasoning as the CanvasSurface split).
 const SheetEditor = lazy(() => import("./sheetEditor"));
-const DocumentPreview = lazy(() =>
-  import("./documentPreview").then((module) => ({ default: module.DocumentPreview })),
-);
+const DocumentEditor = lazy(() => import("./documentEditor"));
 
 export type FileKind =
   | "audio"
@@ -182,6 +185,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   const [bodySize, setBodySize] = useState<{ w: number; h: number } | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const sheetChromeRef = useRef<HTMLDivElement | null>(null);
+  const documentChromeRef = useRef<HTMLDivElement | null>(null);
   const scaleRef = useRef(1);
   const openMenu = useContextMenu((s) => s.open);
 
@@ -190,6 +194,11 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
     SHEET_EDITABLE.has(ext) &&
     !!stat?.writable &&
     stat.len <= SHEET_EDIT_MAX_BYTES;
+  const documentEditable =
+    kind === "document" &&
+    DOCX_EDITABLE.has(ext) &&
+    !!stat?.writable &&
+    stat.len <= DOCUMENT_EDIT_MAX_BYTES;
 
   useEffect(() => {
     let cancelled = false;
@@ -254,9 +263,17 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             : corpusFileText(fileId, READ_MAX_BYTES).then((csv) => parseWorkbook({ csv }));
           load.then((t) => !cancelled && setTables(t)).catch(fail);
         });
-    } else if (kind === "document" && DOCX_PREVIEW.has(ext)) {
-      // DocumentPreview owns the byte/stat pipeline and is code-split with
-      // Mammoth; no eager binary read is needed here.
+    } else if (kind === "document" && DOCX_EDITABLE.has(ext)) {
+      // Probe before mounting the editor. Only Rotli-managed storage is a
+      // writable lane; linked and secure roots keep their existing policy.
+      corpusFileStat(fileId)
+        .catch(() => null)
+        .then((s) => {
+          if (cancelled) return;
+          setStat(s);
+          setProbed(true);
+          if (s && s.len > DOCUMENT_EDIT_MAX_BYTES) setTooLarge(true);
+        });
     } else {
       // audio / video / image / pdf / other → an asset:// URL for the tag
       fileAssetUrl(fileId)
@@ -326,8 +343,13 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   };
 
   const openExternally = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    const editingDocument = kind === "document";
     const items: MenuSpec[] = [
-      { kind: "action", label: "Open with default app", onClick: () => void corpusOpenFile(fileId) },
+      {
+        kind: "action",
+        label: editingDocument ? "Edit in default app" : "Open with default app",
+        onClick: () => void corpusOpenFile(fileId),
+      },
       { kind: "action", label: "Reveal in Finder", onClick: () => void corpusRevealFile(fileId) },
     ];
     const withApps = OPEN_WITH_BY_KIND[kind].filter((a) => apps.includes(a));
@@ -335,7 +357,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
     for (const app of withApps) {
       items.push({
         kind: "action",
-        label: `Open with ${app}`,
+        label: editingDocument ? `Edit in ${app}` : `Open with ${app}`,
         onClick: () => void corpusOpenFileWith(fileId, app),
       });
     }
@@ -349,7 +371,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
       kind === "image" ||
       kind === "pdf" ||
       kind === "other" ||
-      (kind === "document" && !DOCX_PREVIEW.has(ext))) &&
+      (kind === "document" && !DOCX_EDITABLE.has(ext))) &&
     !url &&
     !err;
   const loadingText = kind === "text" && text === null && !err;
@@ -358,6 +380,8 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
     kind === "html" && !err && !tooLarge && (text === null || (htmlMode === "preview" && !url));
   const loadingSheet =
     kind === "sheet" && !err && !tooLarge && (!probed || (!sheetEditable && tables === null));
+  const loadingDocument =
+    kind === "document" && DOCX_EDITABLE.has(ext) && !err && !tooLarge && !probed;
   const sheet = tables?.[activeSheet];
 
   return (
@@ -421,18 +445,26 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         {kind === "sheet" && sheetEditable && (
           <div ref={sheetChromeRef} className="file-sheet-chrome" />
         )}
-        {kind === "document" && (
-          <span className="file-readonly" title="Preview in Rotli; edit with your document app">
-            preview · edit externally
+        {kind === "document" && documentEditable && (
+          <div ref={documentChromeRef} className="file-document-chrome" />
+        )}
+        {kind === "document" && probed && DOCX_EDITABLE.has(ext) && !documentEditable && !tooLarge && (
+          <span className="file-readonly" title="Move this document into Rotli Storage to edit it locally.">
+            read-only location
           </span>
         )}
         <button
           type="button"
           className="file-open-ext"
-          title="Open in the default app / reveal in Finder / open with…"
+          title={
+            kind === "document"
+              ? "Open in another document app, choose an app, or reveal in Finder"
+              : "Open in the default app / reveal in Finder / open with…"
+          }
           onClick={openExternally}
         >
-          Open externally <span aria-hidden="true">▾</span>
+          Open externally{" "}
+          <span aria-hidden="true">▾</span>
         </button>
       </header>
 
@@ -456,7 +488,9 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         onMouseDown={kind === "image" ? (e) => e.currentTarget.focus() : undefined}
       >
         {err && <p className="file-err">⚠ {err}</p>}
-        {(loadingMedia || loadingText || loadingHtml || loadingSheet) && <p className="file-loading">Loading…</p>}
+        {(loadingMedia || loadingText || loadingHtml || loadingSheet || loadingDocument) && (
+          <p className="file-loading">Loading…</p>
+        )}
 
         {!err && kind === "audio" && url && (
           <div className="file-audio-wrap">
@@ -517,15 +551,25 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           <pre className="file-text">{text || "(empty file)"}</pre>
         )}
 
-        {!err && kind === "document" && DOCX_PREVIEW.has(ext) && (
-          <Suspense fallback={<p className="file-loading">Preparing document…</p>}>
-            <DocumentPreview fileId={fileId} />
+        {!err && kind === "document" && probed && documentEditable && (
+          <Suspense fallback={<p className="file-loading">Opening editor…</p>}>
+            <DocumentEditor
+              key={fileId}
+              fileId={fileId}
+              paneId={paneId}
+              chromeSlotRef={documentChromeRef}
+            />
           </Suspense>
         )}
-        {!err && kind === "document" && !DOCX_PREVIEW.has(ext) && url && (
+        {!err && kind === "document" && probed && DOCX_EDITABLE.has(ext) && !documentEditable && !tooLarge && (
+          <div className="file-document-fallback">
+            <p>This document is in a protected location. Move it into Rotli Storage to edit it.</p>
+          </div>
+        )}
+        {!err && kind === "document" && !DOCX_EDITABLE.has(ext) && url && (
           <div className="file-document-fallback">
             <iframe className="file-frame" title={name} src={url} />
-            <p>Rotli can manage this file, but this older document format needs its native app to edit.</p>
+            <p>Convert this older .{ext} file to DOCX to edit it in Rotli.</p>
           </div>
         )}
 
@@ -564,7 +608,9 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
 
         {!err && tooLarge && (
           <p className="file-loading">
-            this file is too large to view in rotli — Open externally shows the whole thing
+            {kind === "document"
+              ? "This document is too large to edit safely in Rotli — open it externally instead."
+              : "this file is too large to view in rotli — Open externally shows the whole thing"}
           </p>
         )}
 

@@ -167,7 +167,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  box-shadow: 0 24px 60px -16px rgba(36, 29, 24, 0.5);
+  box-shadow: var(--shadow-dialog);
   overflow: hidden;
   animation: qsearch-in var(--motion-enter) var(--motion-ease);
 }

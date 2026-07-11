@@ -28,6 +28,10 @@ describe("brainLocationLabel", () => {
     expect(brainLocationLabel("wiki/_inbox")).toBe("Captures");
     expect(brainLocationLabel("Board")).toBe("Captures");
   });
+  test("the protected lane is a real home inside the Brain", () => {
+    expect(brainLocationLabel("wiki/_secure")).toBe("Brain › Secure notes");
+    expect(brainLocationLabel("wiki/_secure/calls")).toBe("Brain › Secure notes");
+  });
   test("storage keeps its path", () => {
     expect(brainLocationLabel("Storage/Images")).toBe("Storage › Images");
     expect(brainLocationLabel("Storage")).toBe("Storage");

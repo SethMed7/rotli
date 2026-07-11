@@ -1,15 +1,14 @@
-import { DocumentPreview } from "../components/documentPreview";
-import { isDocxPreviewExt } from "../documents/kinds";
+import DocumentEditor from "../components/documentEditor";
+import { isEditableDocxExt } from "../documents/kinds";
 import { extOf, fileName } from "../lib/fileKind";
 
 export function DocumentEmbed({ fileId }: { fileId: string }) {
   const ext = extOf(fileName(fileId));
-  if (isDocxPreviewExt(ext)) return <DocumentPreview fileId={fileId} compact />;
+  if (isEditableDocxExt(ext)) return <DocumentEditor fileId={fileId} compact />;
   return (
     <div className="rotli-document-placeholder">
       <span>
-        {`.${ext || "document"}`} is managed by Rotli, but needs its native app to preview. Use Open
-        to view or edit it.
+        Convert this {`.${ext || "document"}`} file to DOCX to edit it here.
       </span>
     </div>
   );

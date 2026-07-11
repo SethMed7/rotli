@@ -4,16 +4,17 @@
 
 The new item, document, memex-map, and organizer-model work follows the enforced
 dependency direction. The repository now mechanically checks camelCase source
-filenames, denied database dependencies, domain/application imports, and the
-Markdown-only slash boundary.
+filenames, denied database dependencies, bundled Breve dependency parity,
+domain/application imports, the Tauri adapter boundary, frontend/Rust IPC
+parity, and the Markdown-only slash boundary.
 
 ## Stable seams
 
 - `src/newItems/`: item vocabulary, framework-free workflow, composition root,
   and menu adapter. Hotkeys, titlebar, sidebar, tab strip, and slash creation
   converge here.
-- `src/documents/`: document domain, ports, use cases, codecs/preview adapters,
-  and one composition root.
+- `src/documents/`: document domain, ports, create/edit use cases, package-
+  preserving DOCX codec, replaceable editor adapter, and one composition root.
 - `src/memex/modelMap.ts`: pure capability/priority projection consumed by the
   AI host; no storage or presentation dependencies.
 - `src/chatMemory/`: deterministic per-chat memory notes, master keyword
@@ -47,6 +48,9 @@ These are maintainability hotspots, not blockers for this workflow:
    retaining the existing shared Breve model and form primitives.
 4. `lib/tauri.ts` is a broad IPC façade. Split it by capability (corpus,
    provider, Breve, shell) without changing command names or Rust validation.
+
+The full system-level findings and recommended order are in
+[`system-audit-2026-07-11.md`](./system-audit-2026-07-11.md).
 
 These should be incremental refactors. File size alone is not a reason to add
 generic abstractions; each extraction should reduce one real responsibility and

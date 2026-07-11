@@ -144,6 +144,10 @@ fn is_writable(rel: &str) -> bool {
         // curated rest (wiki/note.md, wiki/projects/…) stays read-only.
         || p == "wiki/_inbox"
         || p.starts_with("wiki/_inbox/")
+        // secure notes have a real home INSIDE the Brain, but never enter the
+        // organizer's curated area lane. This user-owned path stays gitignored.
+        || p == "wiki/_secure"
+        || p.starts_with("wiki/_secure/")
 }
 
 fn assert_writable(rel: &str) -> Result<(), String> {
@@ -151,7 +155,7 @@ fn assert_writable(rel: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "rotli only writes chats and wiki/_inbox staging here — the rest of memex-vault's memory is read-only (refused: {rel})"
+            "rotli only writes chats, wiki/_inbox staging, and wiki/_secure here — the rest of memex-vault's memory is read-only (refused: {rel})"
         ))
     }
 }
@@ -648,6 +652,7 @@ pub fn scaffold_memex(root: &Path) -> Result<String, String> {
         "personality",
         "wiki",
         "wiki/_inbox",
+        "wiki/_secure",
         "history",
         "chats",
         "storage",
@@ -822,17 +827,18 @@ pub fn memex_write_note(
 
 fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, String> {
     let safe = safe_slug(stem)?;
-    let rel = format!("wiki/_inbox/{safe}.md");
-    assert_writable(&rel)?;
-    let dir = root.join("wiki").join("_inbox");
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let path = dir.join(format!("{safe}.md"));
     let secure = contents
         .strip_prefix("---\n")
         .and_then(|rest| rest.split_once("\n---"))
         .is_some_and(|(frontmatter, _)| {
             frontmatter.lines().any(|line| line.trim() == "secure: true")
         });
+    let lane = if secure { "_secure" } else { "_inbox" };
+    let rel = format!("wiki/{lane}/{safe}.md");
+    assert_writable(&rel)?;
+    let dir = root.join("wiki").join(lane);
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{safe}.md"));
     if secure {
         let ignore = root.join(".gitignore");
         let existing = fs::read_to_string(&ignore).unwrap_or_default();
@@ -979,7 +985,7 @@ mod tests {
     }
 
     #[test]
-    fn write_guard_allows_only_chats_and_wiki_inbox() {
+    fn write_guard_allows_owned_chat_staging_and_secure_lanes() {
         assert!(is_writable("chats/foo.md"));
         assert!(is_writable("chats"));
         // inbox.md is NOT a rotli write surface (#96, audit 2026-07) — nothing ever
@@ -988,6 +994,8 @@ mod tests {
         // wiki/_inbox staging (v3.5) is writable; the curated rest of wiki/ is not.
         assert!(is_writable("wiki/_inbox"));
         assert!(is_writable("wiki/_inbox/pricing-decision-01jtes.md"));
+        assert!(is_writable("wiki/_secure"));
+        assert!(is_writable("wiki/_secure/private-01secure.md"));
         assert!(!is_writable("wiki/note.md"));
         assert!(!is_writable("wiki/projects/x.md"));
         assert!(!is_writable("self/identity.md"));
@@ -1096,14 +1104,15 @@ mod tests {
     }
 
     #[test]
-    fn secure_staging_note_is_gitignored_at_birth() {
+    fn secure_note_lands_in_brain_secure_home_and_is_gitignored_at_birth() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         let body = "---\nid: 01SECURE\nsecure: true\n---\n\n# Private\n";
         let path = write_note_at(root, "private-01secure", body).unwrap();
         assert!(Path::new(&path).is_file());
+        assert!(path.ends_with("wiki/_secure/private-01secure.md"));
         let ignored = fs::read_to_string(root.join(".gitignore")).unwrap();
-        assert!(ignored.lines().any(|line| line.trim() == "wiki/_inbox/private-01secure.md"));
+        assert!(ignored.lines().any(|line| line.trim() == "wiki/_secure/private-01secure.md"));
     }
 
     #[test]

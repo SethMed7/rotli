@@ -48,7 +48,7 @@
 /* NOTE: the old `prefers-color-scheme: dark` media block was removed
    (2026-07-08). theme.ts implements the "system" setting explicitly and always
    lands a concrete data-theme, so the block was redundant — and it silently
-   re-declared these warm-dark tokens over paper/charcoal/glass on any dark-OS
+   re-declared these warm-dark tokens over paper/charcoal on any dark-OS
    Mac, held at bay only by cascade order. A latent theme-bleed trap. */
 
 /* Night Paper (future): amber-brown, near-zero blue. Derive from this palette when built —

@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-07-11
+
+### Changed
+
+- **Secure notes now live inside the Brain.** New and explicitly migrated secure
+  notes use the protected `wiki/_secure/` lane, preserve their previous physical
+  home for removal of protection, remain gitignored through moves, and are hard-
+  blocked from organizer writes and remote AI reads. “Show in Brain” now targets
+  the requested note directly, and file metadata shows its derived absolute path.
+- **Managed files have an honest lifecycle and editable document boundary.**
+  Storage files can move to recoverable Trash from their context menu, open
+  duplicate tabs are closed safely, and DOCX files now open in Rotli's local
+  document editor. Saves round-trip the Word package through a replaceable
+  codec, preserve unmodeled package parts, keep a one-time backup, and work from
+  both dedicated tabs and Markdown embeds.
+- **Rotli is explicitly a workspace, not a preview catalog.** Images and video
+  are the only preview-only surfaces. Other file formats must provide native
+  editing and saving or an explicit local conversion/import workflow before the
+  product describes them as supported. Document slash commands now list only
+  DOCX-family files that the embedded editor can actually edit.
+
 ## [0.30.0] - 2026-07-11
 
 ### Changed

@@ -12,7 +12,7 @@ inward toward stable business rules:
 - **Application** contains use cases and ports. It coordinates domain values
   through injected interfaces and remains executable with in-memory fakes.
 - **Adapters** translate a specific dependency into a port: Tauri storage,
-  Mammoth preview, JSZip/DOCX encoding, Univer, or a future replacement.
+  JSZip/DOCX encoding, Univer document/workbook editing, or a future replacement.
 - **Composition roots** choose concrete adapters. They are the only modules
   allowed to know both an application use case and infrastructure.
 - **Presentation** renders state and sends user intent to a use case. It never

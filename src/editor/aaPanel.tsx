@@ -12,7 +12,7 @@ import {
   useNoteStyle,
   useNoteStyleStore,
 } from "../state/noteStyle";
-import { GLASS_CANVASES, useUiStore } from "../state/ui";
+import { useUiStore } from "../state/ui";
 
 const MEASURES: { id: Measure; label: string }[] = [
   { id: "narrow", label: "Narrow" },
@@ -34,9 +34,6 @@ export function AaPanel({
   const style = useNoteStyle(noteId);
   const setSize = useNoteStyleStore((s) => s.setSize);
   const setMeasure = useNoteStyleStore((s) => s.setMeasure);
-  const glassMode = useUiStore((s) => s.glassMode);
-  const glassCanvas = useUiStore((s) => s.glassCanvas);
-  const setGlassCanvas = useUiStore((s) => s.setGlassCanvas);
   const rawEditor = useUiStore((s) => s.rawEditor);
   const setRawEditor = useUiStore((s) => s.setRawEditor);
   const blockHandles = useUiStore((s) => s.blockHandles);
@@ -115,23 +112,6 @@ export function AaPanel({
           Handles
         </button>
       </div>
-      {glassMode && (
-        <>
-          <div className="aalabel">Canvas · all notes</div>
-          <div className="aarow">
-            {GLASS_CANVASES.map((c) => (
-              <button
-                type="button"
-                key={c.value}
-                className={glassCanvas === c.value ? "aaseg sel" : "aaseg"}
-                onClick={() => setGlassCanvas(c.value)}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
       <div className="aanote">
         Text size &amp; measure are saved for this note; the &ldquo;all notes&rdquo; rows apply
         everywhere. Either way the note itself never changes — marks (bold, highlight…) are real

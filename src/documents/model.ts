@@ -13,15 +13,41 @@ export interface DocumentDraft {
   table?: string[][];
 }
 
+export type DocumentAlignment = "left" | "center" | "right" | "justify";
+export type DocumentNamedStyle = "normal" | "title" | "subtitle" | "heading1" | "heading2" | "heading3";
+
+/** The common, portable Word subset Rotli edits locally. Keeping this model
+ * framework-free lets Univer (or a future editor) remain a replaceable adapter. */
+export interface DocumentTextStyle {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strike?: boolean;
+  fontFamily?: string;
+  fontSize?: number;
+  color?: string;
+}
+
+export interface DocumentRun {
+  text: string;
+  style?: DocumentTextStyle;
+}
+
+export interface DocumentParagraph {
+  runs: DocumentRun[];
+  namedStyle?: DocumentNamedStyle;
+  alignment?: DocumentAlignment;
+  list?: "bullet" | "number";
+}
+
+export interface EditableDocument {
+  id: string;
+  title: string;
+  paragraphs: DocumentParagraph[];
+}
+
 export function blankDocumentDraft(): DocumentDraft {
   return {
-    title: "Untitled document",
-    subtitle: "Created in Rotli",
-    blocks: [
-      {
-        kind: "paragraph",
-        text: "Use Zoom in to work with this document without leaving the note, or Open in tab for a dedicated preview. Edit the source file in Word, Pages, or LibreOffice.",
-      },
-    ],
+    title: "",
   };
 }

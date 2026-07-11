@@ -1,7 +1,7 @@
 {
   "name": "rotli",
   "private": true,
-  "version": "0.30.0",
+  "version": "0.31.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,9 +15,11 @@
     "check:hex": "bun scripts/check-hex.mjs",
     "check:architecture": "bun scripts/check-architecture.mjs",
     "check:design-system": "bun scripts/check-design-system.mjs",
+    "check:ipc": "bun scripts/check-ipc-contract.mjs",
     "check:structure": "bun scripts/check-structure.mjs",
+    "check:docs": "bun scripts/check-documentation.mjs",
     "check:breve-runtime": "bun build breve-runtime/scripts/*.ts --target bun --outdir /tmp/rotli-breve-check && bash -n breve-runtime/scripts/morning-brief.sh && bash -n breve-runtime/scripts/lunch-brief.sh && bash -n breve-runtime/scripts/night-brief.sh",
-    "check": "tsc --noEmit && bun run test && bun run check:breve-runtime && bun run check:hex && bun run check:design-system && bun run check:architecture && bun run check:structure"
+    "check": "tsc --noEmit && bun run test && bun run check:breve-runtime && bun run check:hex && bun run check:design-system && bun run check:architecture && bun run check:ipc && bun run check:structure && bun run check:docs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -28,6 +30,7 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
+    "@univerjs/preset-docs-core": "^0.25.1",
     "@univerjs/preset-sheets-core": "^0.25.1",
     "@univerjs/presets": "^0.25.1",
     "exceljs": "^4.4.0",
@@ -36,7 +39,6 @@
     "jszip": "^3.10.1",
     "katex": "^0.17.0",
     "kokoro-js": "^1.2.1",
-    "mammoth": "^1.12.0",
     "mermaid": "^11.15.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

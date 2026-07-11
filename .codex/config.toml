@@ -1,0 +1,8 @@
+[mcp_servers.rotli_carl]
+command = "node"
+args = [".carl/mcpServer.mjs"]
+cwd = "."
+enabled = true
+required = false
+enabled_tools = ["carl_recall", "carl_list_domains", "carl_get_domain", "carl_search_decisions"]
+default_tools_approval_mode = "auto"

@@ -258,7 +258,7 @@
   border-radius: var(--r-control);
   padding: 5px 9px;
   white-space: nowrap;
-  box-shadow: 0 6px 18px rgba(58, 48, 40, 0.3);
+  box-shadow: var(--shadow-raised);
   z-index: 5;
   pointer-events: none;
   opacity: 0;
@@ -313,7 +313,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  box-shadow: 0 16px 44px rgba(58, 48, 40, 0.26);
+  box-shadow: var(--shadow-popover);
   padding: 6px;
   z-index: 6;
 }

@@ -8,10 +8,7 @@ import { create } from "zustand";
 
 export type ThemeSetting = "light" | "dark" | "system";
 
-/** Theme family (Seth, 2026-06-12): "warm" is the kit brand pair (Light/Dark,
- * the default); "mono" is the simple pair — Paper (white & black) and Charcoal
- * (the breve/SM-suite dark). Liquid glass is NOT a theme — it is a MODE layered
- * over whichever theme is active (glassMode below). */
+/** Theme family: Warm is the branded pair; Mono is Paper and Charcoal. */
 export type ThemeFamily = "warm" | "mono";
 
 /** The four solid themes, in the order the titlebar sun cycles them. */
@@ -20,52 +17,6 @@ export const SOLID_THEMES: { family: ThemeFamily; mode: "light" | "dark"; label:
   { family: "warm", mode: "dark", label: "Warm Dark" },
   { family: "mono", mode: "light", label: "Paper" },
   { family: "mono", mode: "dark", label: "Charcoal" },
-];
-
-/** The glass hue: Seth's sunset-edge blue · the same band in pink · the two
- * rotli colors. Cycled from the titlebar while glass is live. */
-export type GlassTint = "dusk" | "blush" | "clay" | "olive";
-
-export const GLASS_TINTS: { value: GlassTint; label: string }[] = [
-  { value: "dusk", label: "Dusk" },
-  { value: "blush", label: "Blush" },
-  { value: "clay", label: "Clay" },
-  { value: "olive", label: "Olive" },
-];
-
-/** What sits behind the glass: the tinted field, a bundled wallpaper, or the
- * user's own image (custom — a data URL, persisted to .rotli/background.json
- * in the shell). */
-export type GlassBackground = "field" | "dusk" | "blush" | "linen" | "cocoa" | "custom";
-
-export const GLASS_BACKGROUNDS: { value: Exclude<GlassBackground, "custom">; label: string }[] = [
-  { value: "field", label: "Tint field" },
-  { value: "dusk", label: "Dusk waves" },
-  { value: "blush", label: "Blush waves" },
-  { value: "linen", label: "Linen hills" },
-  { value: "cocoa", label: "Cocoa night" },
-];
-
-/** Frosted = the classic milky glass; clear = see the background through. */
-export type GlassClarity = "frosted" | "clear";
-
-/** Blur weight on the glass. */
-export type GlassBlur = "soft" | "standard" | "heavy";
-
-export const GLASS_BLURS: { value: GlassBlur; label: string }[] = [
-  { value: "soft", label: "Soft" },
-  { value: "standard", label: "Standard" },
-  { value: "heavy", label: "Heavy" },
-];
-
-/** What the notes canvas is made of while glass is live. */
-export type GlassCanvas = "glass" | "linen" | "white" | "cocoa";
-
-export const GLASS_CANVASES: { value: GlassCanvas; label: string }[] = [
-  { value: "glass", label: "Glass" },
-  { value: "linen", label: "Linen" },
-  { value: "white", label: "White" },
-  { value: "cocoa", label: "Cocoa" },
 ];
 
 /** The organizer daemon's §4.3 trust ladder, monotonic in risk. Off = dormant ·
@@ -165,31 +116,6 @@ interface UiState {
   matchDarkFamily: ThemeFamily;
   setMatchDarkFamily: (family: ThemeFamily) => void;
 
-  /** Liquid glass — a mode OVER the active theme, toggled in Settings. While
-   * on, the resolved light/dark of the chosen theme picks glass-light/dark
-   * and the titlebar sun becomes the tint cycler. */
-  glassMode: boolean;
-  setGlassMode: (on: boolean) => void;
-
-  /** Liquid-glass hue; meaningful while glassMode is on. */
-  glassTint: GlassTint;
-  setGlassTint: (tint: GlassTint) => void;
-  cycleGlassTint: () => void;
-
-  /** What sits behind the glass (glassMode only). */
-  glassBackground: GlassBackground;
-  setGlassBackground: (bg: GlassBackground) => void;
-  /** The uploaded image as a data URL — persist.ts keeps it across launches. */
-  customBackground: string | null;
-  setCustomBackground: (url: string | null) => void;
-
-  /** Frosted (default) or clear — clear glass shows the background through. */
-  glassClarity: GlassClarity;
-  setGlassClarity: (clarity: GlassClarity) => void;
-  /** How heavy the blur is. */
-  glassBlur: GlassBlur;
-  setGlassBlur: (blur: GlassBlur) => void;
-
   /** General: visitor (click-away hides, default) vs resident (stays open). */
   stayOpen: boolean;
   setStayOpen: (on: boolean) => void;
@@ -228,12 +154,6 @@ interface UiState {
   quickFolder: string;
   setQuickFolder: (folder: string) => void;
 
-  /** The writing canvas inside glass: glass like everything else, or a real
-   * paper surface (linen / white / cocoa) — write on paper, the rest stays
-   * glass. Toggled from the Aa panel. */
-  glassCanvas: GlassCanvas;
-  setGlassCanvas: (canvas: GlassCanvas) => void;
-
   /** The ONE sidebar — collapse state (remembered per window, persisted in the
    * shell) and width (px; drag the grip on its right edge). The two-rail era is
    * gone: folders + note-list collapse into a single navigator (Seth,
@@ -271,7 +191,11 @@ interface UiState {
    * "brain" forces the reveal to the note's REAL home in the Brain, bypassing the
    * Main short-circuit — the "Open in Brain" menu action (Seth, 2026-07-08). */
   revealMode: "auto" | "brain";
-  revealFocusedNote: (mode?: "auto" | "brain") => void;
+  /** Explicit target for a menu-triggered reveal. Keeping it beside the nonce
+   * avoids a render race where the sidebar still sees the previously focused
+   * tab when "Show in Brain" is invoked from another row. */
+  revealNoteId: string | null;
+  revealFocusedNote: (mode?: "auto" | "brain", noteId?: string) => void;
   /** Collapse every expanded destination + folder at once (the sidebar's
    * collapse-all toolbar button). `defaultOpenIds` are the rows that read the
    * map with an OPEN default (Main folders, the Brain header) — they get an
@@ -456,30 +380,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   matchDarkFamily: "warm",
   setMatchDarkFamily: (family) => set({ matchDarkFamily: family }),
 
-  glassMode: false,
-  setGlassMode: (on) => set({ glassMode: on }),
-
-  glassTint: "dusk",
-  setGlassTint: (tint) => set({ glassTint: tint }),
-
-  glassBackground: "field",
-  setGlassBackground: (bg) => set({ glassBackground: bg }),
-  customBackground: null,
-  setCustomBackground: (url) =>
-    set((s) => {
-      // uploads are data URLs now (persistable); revoke only a legacy blob —
-      // a leaked object URL would pin the decoded image for the session
-      if (s.customBackground?.startsWith("blob:") && s.customBackground !== url) {
-        URL.revokeObjectURL(s.customBackground);
-      }
-      return { customBackground: url };
-    }),
-
-  glassClarity: "frosted",
-  setGlassClarity: (clarity) => set({ glassClarity: clarity }),
-  glassBlur: "standard",
-  setGlassBlur: (blur) => set({ glassBlur: blur }),
-
   stayOpen: false,
   setStayOpen: (on) => set({ stayOpen: on }),
   showInDock: false,
@@ -501,15 +401,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   // "Inbox" on disk (fs mode); the seeded Inbox id in the browser
   quickFolder: inboxFolderId,
   setQuickFolder: (folder) => set({ quickFolder: folder }),
-
-  glassCanvas: "glass",
-  setGlassCanvas: (canvas) => set({ glassCanvas: canvas }),
-  cycleGlassTint: () =>
-    set((s) => {
-      const i = GLASS_TINTS.findIndex((t) => t.value === s.glassTint);
-      const next = GLASS_TINTS[(i + 1) % GLASS_TINTS.length];
-      return next ? { glassTint: next.value } : s;
-    }),
 
   sidebarCollapsed: false,
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
@@ -559,7 +450,13 @@ export const useUiStore = create<UiState>((set, get) => ({
     set((s) => ({ expandedDests: { ...s.expandedDests, [id]: open } })),
   revealNonce: 0,
   revealMode: "auto",
-  revealFocusedNote: (mode = "auto") => set((s) => ({ revealNonce: s.revealNonce + 1, revealMode: mode })),
+  revealNoteId: null,
+  revealFocusedNote: (mode = "auto", noteId) =>
+    set((s) => ({
+      revealNonce: s.revealNonce + 1,
+      revealMode: mode,
+      revealNoteId: noteId ?? null,
+    })),
   collapseAllDests: (defaultOpenIds = []) =>
     set({ expandedDests: Object.fromEntries(defaultOpenIds.map((id) => [id, false])) }),
 

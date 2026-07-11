@@ -127,3 +127,44 @@ describe("openNote — reuse-or-new-tab, never replace", () => {
     expect(activeNoteId("p1")).toBe("n-fresh");
   });
 });
+
+describe("closeFileTabs — remove a trashed asset from every pane", () => {
+  const fileTab = (id: string, fileId: string): Tab => ({
+    id,
+    surfaceKind: "file",
+    fileId,
+    viewState: { cursor: 0, scroll: 0 },
+  });
+
+  test("closes every matching file tab and preserves unrelated work", () => {
+    usePanesStore.setState({
+      root: {
+        kind: "leaf",
+        id: "p1",
+        tabs: [tab("A"), fileTab("doc-1", "storage/rotli/sample.docx"), fileTab("doc-2", "storage/rotli/sample.docx")],
+        activeTabId: "doc-2",
+      },
+      focusedPaneId: "p1",
+    });
+    usePanesStore.getState().closeFileTabs("storage/rotli/sample.docx");
+    const pane = findLeaf(usePanesStore.getState().root, "p1");
+    expect(pane?.tabs.map((item) => item.id)).toEqual(["A"]);
+    expect(pane?.activeTabId).toBe("A");
+  });
+
+  test("replaces the final file tab with a pristine note placeholder", () => {
+    usePanesStore.setState({
+      root: {
+        kind: "leaf",
+        id: "p1",
+        tabs: [fileTab("doc", "storage/rotli/sample.docx")],
+        activeTabId: "doc",
+      },
+      focusedPaneId: "p1",
+    });
+    usePanesStore.getState().closeFileTabs("storage/rotli/sample.docx");
+    const [remaining] = findLeaf(usePanesStore.getState().root, "p1")?.tabs ?? [];
+    expect(remaining?.surfaceKind).toBe("note");
+    if (remaining?.surfaceKind === "note") expect(remaining.noteId).toBe("");
+  });
+});

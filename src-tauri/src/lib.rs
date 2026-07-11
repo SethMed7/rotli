@@ -867,6 +867,7 @@ pub fn run() {
             corpus::corpus_file_text,
             corpus::corpus_file_bytes,
             corpus::corpus_file_stat,
+            corpus::corpus_trash_file,
             corpus::corpus_write_file_bytes,
             corpus::corpus_new_file_bytes,
             corpus::corpus_create_managed_file,

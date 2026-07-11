@@ -1,5 +1,11 @@
-import { blankDocumentDraft, type DocumentDraft } from "./model";
-import type { DocumentEncoder, DocumentFileReader, DocumentPreviewer, DocumentRepository } from "./ports";
+import { blankDocumentDraft, type DocumentDraft, type EditableDocument } from "./model";
+import type {
+  DocumentEditorCodec,
+  DocumentEncoder,
+  DocumentFileReader,
+  DocumentFileWriter,
+  DocumentRepository,
+} from "./ports";
 
 export interface CreateDocumentDependencies {
   encoder: DocumentEncoder;
@@ -22,23 +28,39 @@ export async function createDocument(
   return dependencies.repository.create(documentFileName(dependencies.encoder.extension, now), base64);
 }
 
-export type DocumentPreviewOutcome =
-  | { kind: "ready"; srcDoc: string; warnings: string[] }
-  | { kind: "too-large" };
-
-export interface PreviewDocumentDependencies {
+export interface EditDocumentDependencies<Source> {
   reader: DocumentFileReader;
-  previewer: DocumentPreviewer;
+  writer: DocumentFileWriter;
+  codec: DocumentEditorCodec<Source>;
   maxBytes: number;
 }
 
-/** Read/limit/preview orchestration kept outside both React and the parser adapter. */
-export async function previewDocument(
-  dependencies: PreviewDocumentDependencies,
+export type DocumentEditingOutcome =
+  | { kind: "too-large" }
+  | {
+      kind: "ready";
+      document: EditableDocument;
+      warnings: string[];
+      save(next: EditableDocument): Promise<void>;
+    };
+
+/** Open one local editing session around the ORIGINAL package. Save mutates the
+ * modeled Word body while the codec preserves unrelated OOXML package parts. */
+export async function editDocument<Source>(
+  dependencies: EditDocumentDependencies<Source>,
   fileId: string,
-): Promise<DocumentPreviewOutcome> {
+): Promise<DocumentEditingOutcome> {
   const stat = await dependencies.reader.stat(fileId);
   if (stat && stat.len > dependencies.maxBytes) return { kind: "too-large" };
   const base64 = await dependencies.reader.readBase64(fileId, dependencies.maxBytes + 1);
-  return { kind: "ready", ...(await dependencies.previewer.preview(base64)) };
+  const decoded = await dependencies.codec.decode(base64, fileId);
+  return {
+    kind: "ready",
+    document: decoded.document,
+    warnings: decoded.warnings,
+    save: async (next) => {
+      const encoded = await dependencies.codec.encode(decoded.source, next);
+      await dependencies.writer.writeBase64(fileId, encoded, true);
+    },
+  };
 }

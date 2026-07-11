@@ -135,6 +135,9 @@ describe("destContains — the sidebar's derived destination highlight", () => {
     expect(destContains(DEST.storage, "storage/samples")).toBe(true);
     expect(destContains(DEST.storage, "Storage/Work")).toBe(true);
     expect(destContains(DEST.storage, "wiki/projects")).toBe(false);
+    expect(destContains(DEST.secure, "wiki/_secure")).toBe(true);
+    expect(destContains(DEST.secure, "wiki/_secure/calls")).toBe(true);
+    expect(destContains(DEST.secure, "wiki/projects")).toBe(false);
   });
   it("uses a literal prefix for sinks, vault markers, and plain folders", () => {
     expect(destContains(DEST.archive, "Archive/2025")).toBe(true);

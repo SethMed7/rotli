@@ -339,6 +339,9 @@ export const SPINE = {
   wiki: "wiki",
   /** The note staging area (v3.5) — the ONLY part of wiki/ rotli writes. */
   wikiInbox: "wiki/_inbox",
+  /** Protected note home. It lives inside the Brain but is never an organizer
+   * area and is categorically unavailable to remote AI. */
+  wikiSecure: "wiki/_secure",
   history: "history",
   chats: "chats",
   inbox: "inbox.md",
@@ -363,6 +366,7 @@ export function canWrite(relPath: string, perms: Perms): boolean {
   if (p.includes("..")) return false;
   if (p === SPINE.chats || p.startsWith(`${SPINE.chats}/`)) return true;
   if (p === SPINE.wikiInbox || p.startsWith(`${SPINE.wikiInbox}/`)) return true;
+  if (p === SPINE.wikiSecure || p.startsWith(`${SPINE.wikiSecure}/`)) return true;
   return false;
 }
 
@@ -391,6 +395,7 @@ export const USER_KEYS = ["shelf", "reach"] as const;
 export function canFile(relPath: string): boolean {
   const p = relPath.replace(/^\/+/, "");
   if (p.includes("..")) return false;
+  if (p === SPINE.wikiSecure || p.startsWith(`${SPINE.wikiSecure}/`)) return false;
   return p === "wiki" || p.startsWith("wiki/");
 }
 

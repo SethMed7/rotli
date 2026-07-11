@@ -33,14 +33,15 @@ function table(rows: string[][]): string {
 }
 
 function documentXml(template: DocxTemplate): string {
-  const body = [
-    paragraph(template.title, "Title"),
+  const content = [
+    template.title ? paragraph(template.title, "Title") : "",
     template.subtitle ? paragraph(template.subtitle, "Subtitle") : "",
     ...(template.blocks ?? []).map((block) =>
       paragraph(block.text, block.kind === "heading" ? `Heading${block.level ?? 2}` : undefined),
     ),
     table(template.table ?? []),
   ].join("");
+  const body = content || paragraph("");
   const theme = GENERATED_DOCX_THEME;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="${theme.pageWidthTwips}" w:h="${theme.pageHeightTwips}"/><w:pgMar w:top="${theme.marginTwips}" w:right="${theme.marginTwips}" w:bottom="${theme.marginTwips}" w:left="${theme.marginTwips}"/></w:sectPr></w:body></w:document>`;
 }

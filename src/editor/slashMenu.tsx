@@ -113,7 +113,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   { label: "Link note", group: "Link", hint: "Wikilink to another note", glyph: linkGlyph, op: { kind: "picker", mode: "linkNote" }, keywords: ["note", "wiki", "link"] },
   { label: "Board", group: "Insert", hint: "Embed Excalidraw", glyph: boardGlyph, op: { kind: "picker", mode: "embedBoard" }, keywords: ["excalidraw", "canvas", "draw"] },
   { label: "Sheet", group: "Insert", hint: "Embed spreadsheet", glyph: sheetGlyph, op: { kind: "picker", mode: "embedSheet" }, keywords: ["xlsx", "csv", "spreadsheet", "excel"] },
-  { label: "Document", group: "Insert", hint: "Embed Word document", glyph: documentGlyph, op: { kind: "picker", mode: "embedDocument" }, keywords: [...DOCUMENT_SEARCH_KEYWORDS] },
+  { label: "Document", group: "Insert", hint: "Create or embed editable DOCX", glyph: documentGlyph, op: { kind: "picker", mode: "embedDocument" }, keywords: [...DOCUMENT_SEARCH_KEYWORDS] },
 ];
 
 /** Filter by label or optional keywords (case-insensitive). */

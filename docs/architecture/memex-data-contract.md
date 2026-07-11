@@ -19,13 +19,26 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
 
 ## Editing capabilities
 
+- **Workspace invariant:** images and video are the only preview-only file
+  surfaces. Every other format advertised as supported must have a native edit
+  and save path. A format without one remains unsupported and must lead to an
+  explicit local conversion/import workflow rather than a passive preview.
+- Audio is a work surface, not an exception: playback alone does not constitute
+  editable support. Its complete workflow must expose user-owned output such as
+  transcript, cuts, annotations, or metadata before Rotli calls it supported.
 - Markdown owns slash commands, typed embed fences, wikilinks, and note
   frontmatter.
 - Documents are conventional DOCX files. They do not host Markdown slash
-  commands or embed syntax.
+  commands or embed syntax. Rotli creates and edits them locally through a
+  structured document model. The DOCX codec round-trips supported OOXML while
+  preserving unknown package parts and opaque body nodes; the Rust corpus
+  boundary independently restricts writes to the managed binary lane.
 - Sheets use the workbook editor/codec boundary; boards use the canvas boundary.
+- Markdown document slash commands list only formats the embedded document
+  editor can edit. They may create a blank managed DOCX or embed an existing
+  editable DOCX-family file without leaving the parent Markdown tab.
 - File-format dependencies stay behind adapters and composition roots so a DOCX
-  encoder, preview parser, workbook codec, or canvas engine can be swapped
+  codec, document editor, workbook codec, or canvas engine can be swapped
   without changing creation commands or UI entry points.
 
 ## Metadata ownership
@@ -42,6 +55,9 @@ The Rust corpus boundary independently validates every write.
 - Unknown frontmatter is preserved byte-for-byte. Reserved provenance cannot be
   forged through the raw metadata editor.
 - Boards and binary files never receive Markdown frontmatter.
+- The metadata surface derives and displays the canonical absolute file path
+  from the corpus router. Paths are never copied into editable frontmatter,
+  where a title rename or Brain filing move could make them stale.
 
 ## Model capability and Model Mapping 0
 
@@ -88,9 +104,15 @@ but it must remain rebuildable, optional, and behind the retrieval port.
 
 ## Security and validation
 
-- `Secure notes` is a normal filesystem destination, not a database or opaque
-  vault. Protection is also stored on each Markdown file as `secure: true`, so
-  it survives moves and does not depend on the current view.
+- `Secure notes` is a protected filesystem lane inside the Brain
+  (`wiki/_secure/`), not a database or opaque vault. The underscore excludes it
+  from normal organizer areas while the sidebar exposes it deliberately.
+  Protection is also stored on each Markdown file as `secure: true`.
+- Marking an existing note secure records its prior physical folder, moves the
+  stable note id into `wiki/_secure/`, and updates its gitignore protection
+  before either path changes. Removing protection moves it back before dropping
+  the ignore rule. The organizer's Rust gate refuses this lane independently of
+  the remote-model read gate.
 - Quick captures and notes created from the Quick Note window are secure at
   birth. The user may deliberately remove protection from the note menu or the
   Quick Note shield control.
@@ -108,6 +130,9 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   prompt as a backstop. Local models may retrieve them on-device.
 - The frontend registry improves UX but never replaces Rust path, extension,
   root-permission, and write-lane validation.
+- Storage assets use a recoverable lifecycle: “Remove from Main” only removes a
+  reference, while “Move file to Trash” is a separately validated Rust action
+  that accepts mutable storage roots and closes stale file tabs.
 - `bun run check:architecture` guards inward dependencies and keeps slash
   commands out of non-Markdown surfaces.
 - `bun run check:structure` enforces camelCase source filenames and denies

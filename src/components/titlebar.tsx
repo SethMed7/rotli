@@ -13,7 +13,7 @@ import type { MouseEvent } from "react";
 import { dispatch } from "../keys/registry";
 import { openNewItemMenu } from "../newItems/menu";
 import { startWindowDrag, toggleMaximize } from "../lib/tauri";
-import { GLASS_TINTS, SOLID_THEMES, useUiStore } from "../state/ui";
+import { SOLID_THEMES, useUiStore } from "../state/ui";
 import { Icon } from "./icon";
 import { IconButton } from "./iconButton";
 import { QuokkaMark } from "./character";
@@ -52,9 +52,6 @@ export function Titlebar() {
   const breveActive = sidebarMode === "breve";
   const theme = useUiStore((s) => s.theme);
   const themeFamily = useUiStore((s) => s.themeFamily);
-  const glassMode = useUiStore((s) => s.glassMode);
-  const glassTint = useUiStore((s) => s.glassTint);
-  const tintLabel = GLASS_TINTS.find((t) => t.value === glassTint)?.label ?? glassTint;
   const themeLabel =
     theme === "system"
       ? "System"
@@ -169,18 +166,10 @@ export function Titlebar() {
             <span className="tb-sep" aria-hidden="true" />
           </>
         )}
-        {/* sun = theme, in every approved titlebar frame (r1 tip "Theme — light";
-            r2/r4/r5 frame A). The sun cycles the four solid themes; while glass
-            mode is on the slot becomes the tint cycler instead (Seth, 2026-06-12). */}
-        {glassMode ? (
-          <IconButton label={`Glass — ${tintLabel}`} onClick={() => dispatch("theme.cycleGlassTint")}>
-            <span className="tintdot" />
-          </IconButton>
-        ) : (
-          <IconButton label={`Theme — ${themeLabel}`} onClick={() => dispatch("theme.cycle")}>
-            <SunGlyph size={TB_ICON} />
-          </IconButton>
-        )}
+        {/* The sun cycles the four intentional work environments. */}
+        <IconButton label={`Theme — ${themeLabel}`} onClick={() => dispatch("theme.cycle")}>
+          <SunGlyph size={TB_ICON} />
+        </IconButton>
         <IconButton
           className="tb-trail"
           label={updateAvailable ? "Update available — open Settings · ⌘," : "Settings — ⌘,"}

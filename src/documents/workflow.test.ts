@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import type { DocumentEncoder, DocumentFileReader, DocumentPreviewer, DocumentRepository } from "./ports";
-import { createDocument, documentFileName, previewDocument } from "./workflow";
+import type {
+  DocumentEditorCodec,
+  DocumentEncoder,
+  DocumentFileReader,
+  DocumentFileWriter,
+  DocumentRepository,
+} from "./ports";
+import { createDocument, documentFileName, editDocument } from "./workflow";
 
 describe("document application workflows", () => {
   test("creation composes an encoder and repository without knowing either implementation", async () => {
@@ -26,9 +32,9 @@ describe("document application workflows", () => {
     expect(() => documentFileName("../", 42)).toThrow();
   });
 
-  test("preview refuses oversized files before reading or parsing bytes", async () => {
+  test("editing refuses oversized files before reading or decoding bytes", async () => {
     let reads = 0;
-    let previews = 0;
+    let decodes = 0;
     const reader: DocumentFileReader = {
       stat: async () => ({ len: 101 }),
       readBase64: async () => {
@@ -36,33 +42,46 @@ describe("document application workflows", () => {
         return "bytes";
       },
     };
-    const previewer: DocumentPreviewer = {
-      preview: async () => {
-        previews += 1;
-        return { srcDoc: "", warnings: [] };
+    const codec: DocumentEditorCodec<string> = {
+      decode: async () => {
+        decodes += 1;
+        return { source: "source", document: { id: "large.docx", title: "Large", paragraphs: [] }, warnings: [] };
       },
+      encode: async () => "encoded",
     };
+    const writer: DocumentFileWriter = { writeBase64: async () => {} };
 
-    expect(await previewDocument({ reader, previewer, maxBytes: 100 }, "large.docx")).toEqual({
+    expect(await editDocument({ reader, writer, codec, maxBytes: 100 }, "large.docx")).toEqual({
       kind: "too-large",
     });
     expect(reads).toBe(0);
-    expect(previews).toBe(0);
+    expect(decodes).toBe(0);
   });
 
-  test("preview passes bounded bytes through the selected adapter", async () => {
+  test("editing saves through the selected codec while retaining its source", async () => {
+    const writes: string[] = [];
     const reader: DocumentFileReader = {
       stat: async () => ({ len: 5 }),
       readBase64: async (_id, maxBytes) => `bytes:${maxBytes}`,
     };
-    const previewer: DocumentPreviewer = {
-      preview: async (base64) => ({ srcDoc: `<p>${base64}</p>`, warnings: [] }),
+    const writer: DocumentFileWriter = {
+      writeBase64: async (_id, base64, backup) => {
+        writes.push(`${base64}:${backup}`);
+      },
+    };
+    const codec: DocumentEditorCodec<string> = {
+      decode: async (base64) => ({
+        source: `source:${base64}`,
+        document: { id: "brief.docx", title: "Brief", paragraphs: [{ runs: [{ text: "before" }] }] },
+        warnings: [],
+      }),
+      encode: async (source, document) => `${source}:${document.paragraphs[0]?.runs[0]?.text}`,
     };
 
-    expect(await previewDocument({ reader, previewer, maxBytes: 100 }, "brief.docx")).toEqual({
-      kind: "ready",
-      srcDoc: "<p>bytes:101</p>",
-      warnings: [],
-    });
+    const result = await editDocument({ reader, writer, codec, maxBytes: 100 }, "brief.docx");
+    expect(result.kind).toBe("ready");
+    if (result.kind !== "ready") throw new Error("expected an editable document");
+    await result.save({ ...result.document, paragraphs: [{ runs: [{ text: "after" }] }] });
+    expect(writes).toEqual(["source:bytes:101:after:true"]);
   });
 });

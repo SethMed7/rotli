@@ -194,6 +194,13 @@ describe("unknownSettingsKeys — the round-trip remainder (#35)", () => {
     expect(unknownSettingsKeys('{"theme":"dark"}')).toEqual({});
     expect(unknownSettingsKeys("not json")).toEqual({});
   });
+
+  it("drops retired Glass keys instead of preserving them forever", () => {
+    const raw = '{"theme":"dark","themeFamily":"mono","glassMode":true,"glassTint":"dusk","futureKnob":1}';
+    expect(parseSettings(raw).theme).toBe("dark");
+    expect(parseSettings(raw).themeFamily).toBe("mono");
+    expect(unknownSettingsKeys(raw)).toEqual({ futureKnob: 1 });
+  });
 });
 
 describe("validTab — every surfaceKind survives a relaunch (#34)", () => {

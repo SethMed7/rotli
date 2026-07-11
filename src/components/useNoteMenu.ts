@@ -7,12 +7,14 @@
 
 import { useCallback } from "react";
 import {
+  corpusFileStat,
   corpusFrontmatter,
   corpusRevealFile,
   corpusSetLocalAiAccess,
   corpusSetLocked,
   corpusSetPinned,
   corpusSetSecure,
+  corpusTrashFile,
 } from "../lib/tauri";
 import { fileNoteToArea } from "../services/brainFiling";
 import { isEmptyNote } from "../services/mainDismiss";
@@ -27,6 +29,7 @@ import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { noteDiskFolder } from "../lib/noteLocation";
+import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
 
 /** What the opener hands us — a real MouseEvent qualifies, and a keyboard
  * opener passes a plain {clientX, clientY} built from its row's rect. */
@@ -104,6 +107,10 @@ export function useNoteMenu() {
         // menu shows the right toggle label + check (Seth #23, 2026-07-03: these
         // moved out of the metadata popover into this menu).
         const fm = isNote ? await corpusFrontmatter(note.id).catch(() => null) : null;
+        const fileStat = isFile ? await corpusFileStat(note.id).catch(() => null) : null;
+        const secureAtHome =
+          isNote &&
+          (isSecureBrainFolder(noteDiskFolder(note)) || isSecureNotesFolder(noteDiskFolder(note)));
 
         // frontmatter toggles surface failures in the sidebar's inline error
         // note (the menu is gone by the time a write fails — #11 pattern)
@@ -151,19 +158,19 @@ export function useNoteMenu() {
                 ui.quickNoteIds.includes(note.id);
               if (curated) {
                 ui.setContentView("panes");
-                setTimeout(() => ui.revealFocusedNote("auto"), 0);
+                setTimeout(() => ui.revealFocusedNote("auto", note.id), 0);
               } else {
                 ui.setContentView("board");
                 // BoardSurface highlights the focused note's card; a tick lets
                 // openNote settle focus before the scroll.
-                setTimeout(() => ui.revealFocusedNote("auto"), 0);
+                setTimeout(() => ui.revealFocusedNote("auto", note.id), 0);
               }
               return;
             }
             // Filed note: its shelf may still project to Captures or another
             // user folder, but diskFolder preserves the real wiki chain.
             ui.setContentView("panes");
-            setTimeout(() => ui.revealFocusedNote("brain"), 0);
+            setTimeout(() => ui.revealFocusedNote("brain", note.id), 0);
           },
         });
         items.push({
@@ -227,6 +234,13 @@ export function useNoteMenu() {
             checked: !!fm?.secure,
             onClick: () => runFm("mark secure", corpusSetSecure(note.id, !fm?.secure)),
           });
+          if (fm?.secure && !secureAtHome) {
+            items.push({
+              kind: "action" as const,
+              label: "Move into Brain › Secure notes",
+              onClick: () => runFm("move to Secure notes", corpusSetSecure(note.id, true)),
+            });
+          }
           if (fm?.secure) {
             items.push({
               kind: "action" as const,
@@ -299,11 +313,34 @@ export function useNoteMenu() {
           },
         });
       }
-      // Files (storage binaries) are ASSETS, not notes: no note-index entry and no
-      // writable Trash in a memex, so the old "Delete file" hit "note not found"
-      // (Seth #6, 2026-07-08). A pinned file is managed via "Remove from Main"
-      // above; hard-deleting the binary from disk is a separate feature.
-      if (!isFile) {
+      if (isFile) {
+        const trashable = fileStat?.trashable === true;
+        items.push({
+          kind: "action" as const,
+          label: trashable ? "Move file to Trash" : "Read-only — can’t move to Trash",
+          danger: trashable,
+          disabled: !trashable,
+          onClick: () => {
+            if (!trashable) return;
+            useUiStore.getState().setRowActionError(null);
+            void corpusTrashFile(note.id)
+              .then(async () => {
+                if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
+                usePanesStore.getState().closeFileTabs(note.id);
+                await invalidateNotes();
+              })
+              .catch((err) =>
+                useUiStore
+                  .getState()
+                  .setRowActionError(
+                    `Couldn’t move “${note.title || "this file"}” to Trash — ${
+                      err instanceof Error ? err.message : String(err)
+                    }`,
+                  ),
+              );
+          },
+        });
+      } else {
         items.push({
           kind: "action" as const,
           label: "Delete",

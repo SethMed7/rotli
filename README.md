@@ -71,9 +71,20 @@ They aren't copies. They're the **same file**, reached two ways. Rearrange Main 
 - **Autosave** — a quiet olive dot. No spinners, ever.
 - **Every hotkey rebindable** — one searchable registry in Settings.
 
-## Four themes — and Liquid Glass
+## A workspace, not a preview catalog
 
-Four base looks the titlebar sun cycles through — **Warm Light · Warm Dark · Paper · Charcoal** (Warm Light is the default). On top of any of them, turn on **Liquid Glass**: floating glass panels over a tint (Dusk · Blush · Clay · Olive) or your own wallpaper.
+Images and video are the only file types Rotli may treat as view-only media.
+Every other format shown as supported must be something you can work on and
+save in Rotli. When a format cannot yet be edited faithfully, Rotli should offer
+an explicit local conversion or import workflow and call the format unsupported
+until that workflow exists—never ship a passive “preview only” dead end.
+
+## Four work environments
+
+The titlebar sun cycles through **Warm Light · Warm Dark · Paper · Charcoal**.
+Paper and Charcoal are the calm defaults; the warm pair is there for people who
+prefer a softer environment. Every product surface shares the same semantic
+tokens, keyboard behavior, and readable hierarchy across all four.
 
 <div align="center">
 <img src="docs/media/rotli-warm-dark.png" alt="rotli in Warm Dark" width="405">
@@ -104,9 +115,13 @@ You work how you want in **Main**; the AI organizes the **brain** underneath —
 bun install
 bun run tauri dev   # the app (menu bar · ⌥Space opens · ⌥C captures)
 bun run dev         # frontend only, in a plain browser (in-memory demo memex)
-bun run check       # tsc strict + raw-hex lint
-cargo test          # the memex layer (run inside src-tauri/)
+bun run check       # TypeScript, tests, runtime, architecture, design, and docs
+cargo test --manifest-path src-tauri/Cargo.toml
 ```
+
+Contributing or working with an AI coding tool? Start with
+[`CONTRIBUTING.md`](CONTRIBUTING.md), [`AGENTS.md`](AGENTS.md), and the
+[`documentation map`](docs/README.md).
 
 **Stack** — Tauri v2 · React 18 · Vite · TypeScript strict · Bun · Zustand + TanStack Query · plain CSS driven entirely by the in-repo brand kit (`src/brand/`, v1.0.0 — the single source of truth for colors, type, and logo, enforced by `bun run check:hex`). Local-first is the architecture, not a feature: nothing phones home, nothing needs an account, offline is the default.
 
@@ -114,7 +129,7 @@ cargo test          # the memex layer (run inside src-tauri/)
 
 |  |  |
 |---|---|
-| ✅ | Shell · panes & tabs · hybrid editor · `⌘K` · four themes & Liquid Glass |
+| ✅ | Shell · panes & tabs · hybrid editor · `⌘K` · four work environments |
 | ✅ | **Your notes folder is a memex** — plain files, atomic writes, fs watcher, persistence |
 | ✅ | **Search** — full-text across your notes (titles + bodies), instant |
 | ✅ | **Chat** — on-device by default, or your own connected models; your notes are its knowledge base |

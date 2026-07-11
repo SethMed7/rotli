@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../src/brand/brevePdfThemes.ts";
 
@@ -9,6 +9,7 @@ const themes = read("src/styles/themes.css");
 const base = read("src/styles/base.css");
 const themeState = read("src/state/theme.ts");
 const uiState = read("src/state/ui.ts");
+const breveStyles = read("src/styles/breve.css");
 const violations = [];
 
 function blocks(css) {
@@ -31,8 +32,6 @@ const themeSelectors = {
   dark: ':root[data-theme="dark"]',
   paper: ':root[data-theme="paper"]',
   charcoal: ':root[data-theme="charcoal"]',
-  "glass-light": ':root[data-theme="glass-light"]',
-  "glass-dark": ':root[data-theme="glass-dark"]',
 };
 
 for (const [theme, selector] of Object.entries(themeSelectors)) {
@@ -43,8 +42,23 @@ for (const [theme, selector] of Object.entries(themeSelectors)) {
 }
 
 const rootBody = allBlocks.filter((block) => block.selectors.includes(":root")).map((block) => block.body).join("\n");
-for (const token of ["hov", "act", "scrim"]) {
+for (const token of [
+  "hov", "act", "scrim", "shadow-control", "shadow-raised", "shadow-popover",
+  "shadow-dialog", "shadow-accent",
+]) {
   if (!new RegExp(`--${token}\\s*:`).test(rootBody)) violations.push(`base state grammar: missing --${token}`);
+}
+
+// Product CSS consumes semantic colors/elevation. Literal functional colors
+// belong only in the token-definition files so every new surface works in all
+// four themes. Static document preview CSS is TypeScript and intentionally has
+// its own paper palette; this check covers the app chrome under src/styles/.
+for (const file of readdirSync(join(root, "src/styles")).filter((name) => name.endsWith(".css"))) {
+  if (file === "base.css" || file === "themes.css") continue;
+  const source = read(`src/styles/${file}`).replace(/\/\*[\s\S]*?\*\//g, "");
+  if (/\b(?:rgb|rgba|hsl|hsla)\s*\(/i.test(source)) {
+    violations.push(`src/styles/${file}: functional color bypasses semantic theme tokens`);
+  }
 }
 
 const expectedDataThemes = Object.keys(themeSelectors);
@@ -75,6 +89,12 @@ if (!/@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(base)) {
 }
 if (/@media\s*\(prefers-color-scheme:/.test(`${colors}\n${themes}`)) {
   violations.push("theme tokens must not follow the OS implicitly; state/theme.ts owns system mode");
+}
+
+for (const match of breveStyles.matchAll(/font-size:\s*([\d.]+)px/g)) {
+  if (Number(match[1]) < 10) {
+    violations.push(`breve.css: ${match[1]}px text is below the compact desktop floor`);
+  }
 }
 
 for (const [name, palette] of Object.entries(BREVE_PDF_PRESETS)) {

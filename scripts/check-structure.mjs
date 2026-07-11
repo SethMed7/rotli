@@ -36,6 +36,24 @@ const jsDependencies = { ...packageJson.dependencies, ...packageJson.devDependen
 for (const dependency of deniedDependencies) {
   if (dependency in jsDependencies) violations.push(`package.json: database dependency ${dependency}`);
 }
+
+// Breve is bundled from its own runtime package, while the root install supplies
+// those modules during development/build. Overlapping dependencies must stay on
+// the exact same range so dev validation cannot pass against a different API
+// than the packaged runtime installs.
+const brevePackage = JSON.parse(readFileSync(join(root, "breve-runtime/defaults/package.json"), "utf8"));
+for (const [dependency, version] of Object.entries(brevePackage.dependencies ?? {})) {
+  if (packageJson.dependencies?.[dependency] !== version) {
+    violations.push(
+      `Breve dependency ${dependency} must match: root=${packageJson.dependencies?.[dependency] ?? "missing"}, runtime=${version}`,
+    );
+  }
+}
+
+const blockRender = readFileSync(join(root, "src/editor/blockRender.ts"), "utf8");
+if (!/jc:\s*\{\s*compile:\s*false\s*\}/.test(blockRender)) {
+  violations.push("JSXGraph JessieCode must stay in interpreter mode; production CSP forbids unsafe-eval");
+}
 const cargo = readFileSync(join(root, "src-tauri/Cargo.toml"), "utf8");
 for (const dependency of deniedDependencies) {
   if (new RegExp(`^${dependency}\\s*=`, "m").test(cargo)) {
@@ -48,4 +66,4 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log("check:structure ok — camelCase source files; no database dependency");
+console.log("check:structure ok — camelCase source files; no database; Breve dependency ranges aligned");

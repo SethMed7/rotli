@@ -21,5 +21,5 @@ secrets.*
 # CARL ephemeral session state (runtime; the hook recreates it) — carl.json IS tracked
 .carl/sessions/
 
-# local MCP server wiring (machine-specific paths; not part of the app)
-.mcp.json
+# Project MCP wiring is tracked and portable. Machine-specific MCP overrides
+# belong in user-level Claude/Codex configuration, not this repository.

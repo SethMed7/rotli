@@ -269,9 +269,11 @@ describe("canWrite (mirror of the Rust write-guard)", () => {
     // the dead allowance was narrowed out (audit 2026-07 #96)
     expect(canWrite("inbox.md", "chats+inbox")).toBe(false);
   });
-  test("wiki/_inbox staging is writable (v3.5); the rest of wiki + identity/personality/history/MAP are not", () => {
+  test("staging and secure homes are writable; curated wiki + identity/personality/history/MAP are not", () => {
     expect(canWrite("wiki/_inbox/pricing-decision-01jtes.md", "chats+inbox")).toBe(true);
     expect(canWrite("wiki/_inbox", "chats+inbox")).toBe(true);
+    expect(canWrite("wiki/_secure/private.md", "chats+inbox")).toBe(true);
+    expect(canFile("wiki/_secure/private.md")).toBe(false);
     expect(canWrite("wiki/x.md", "chats+inbox")).toBe(false); // curated wiki — read-only
     expect(canWrite("wiki/projects/x.md", "chats+inbox")).toBe(false);
     expect(canWrite("identity/x.md", "chats+inbox")).toBe(false);
@@ -285,6 +287,7 @@ describe("canWrite (mirror of the Rust write-guard)", () => {
   test("read-only perms forbid everything", () => {
     expect(canWrite("chats/foo.md", "read-only")).toBe(false);
     expect(canWrite("wiki/_inbox/x.md", "read-only")).toBe(false);
+    expect(canWrite("wiki/_secure/x.md", "read-only")).toBe(false);
   });
 });
 

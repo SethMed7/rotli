@@ -25,7 +25,6 @@ import { WhichKey } from "./components/whichKey";
 import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
 import { useHeldModifier } from "./keys/useHeldModifier";
-import { GLASS_BG_SRC } from "./lib/glassBackgrounds";
 import {
   checkForUpdate,
   corpusImportFile,
@@ -61,14 +60,7 @@ import { notesService } from "./services/notes";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
 import { applyQuickState } from "./state/quick";
 import { applyTheme } from "./state/theme";
-import {
-  type GlassBackground,
-  type GlassBlur,
-  type GlassCanvas,
-  type GlassClarity,
-  type GlassTint,
-  useUiStore,
-} from "./state/ui";
+import { useUiStore } from "./state/ui";
 
 registerDefaultActions();
 
@@ -394,30 +386,16 @@ export default function App() {
   const themeFamily = useUiStore((s) => s.themeFamily);
   const matchLightFamily = useUiStore((s) => s.matchLightFamily);
   const matchDarkFamily = useUiStore((s) => s.matchDarkFamily);
-  const glassMode = useUiStore((s) => s.glassMode);
-  const glassTint = useUiStore((s) => s.glassTint);
-  const glassCanvas = useUiStore((s) => s.glassCanvas);
-  const glassBackground = useUiStore((s) => s.glassBackground);
-  const customBackground = useUiStore((s) => s.customBackground);
   const surface = surfaceFromUrl();
 
   useEffect(
     () =>
-      applyTheme(theme, themeFamily, glassMode, glassTint, {
+      applyTheme(theme, themeFamily, {
         light: matchLightFamily,
         dark: matchDarkFamily,
       }),
-    [theme, themeFamily, glassMode, glassTint, matchLightFamily, matchDarkFamily],
+    [theme, themeFamily, matchLightFamily, matchDarkFamily],
   );
-  useEffect(() => {
-    document.documentElement.dataset.glassCanvas = glassCanvas;
-  }, [glassCanvas]);
-  const glassClarity = useUiStore((s) => s.glassClarity);
-  const glassBlur = useUiStore((s) => s.glassBlur);
-  useEffect(() => {
-    document.documentElement.dataset.glassClarity = glassClarity;
-    document.documentElement.dataset.glassBlur = glassBlur;
-  }, [glassClarity, glassBlur]);
 
   // theme is broadcast from the MAIN window so the quick + capture webviews
   // follow it LIVE (each applies its own theme; without this they only read it
@@ -430,13 +408,6 @@ export default function App() {
       themeFamily,
       matchLightFamily,
       matchDarkFamily,
-      glassMode,
-      glassTint,
-      glassBackground,
-      glassClarity,
-      glassBlur,
-      glassCanvas,
-      customBackground,
     });
   }, [
     surface,
@@ -444,13 +415,6 @@ export default function App() {
     themeFamily,
     matchLightFamily,
     matchDarkFamily,
-    glassMode,
-    glassTint,
-    glassBackground,
-    glassClarity,
-    glassBlur,
-    glassCanvas,
-    customBackground,
   ]);
   useEffect(() => {
     if (surface === "main") return;
@@ -460,32 +424,9 @@ export default function App() {
         themeFamily: p.themeFamily,
         matchLightFamily: p.matchLightFamily,
         matchDarkFamily: p.matchDarkFamily,
-        glassMode: p.glassMode,
-        glassTint: p.glassTint as GlassTint,
-        glassBackground: p.glassBackground as GlassBackground,
-        glassClarity: p.glassClarity as GlassClarity,
-        glassBlur: p.glassBlur as GlassBlur,
-        glassCanvas: p.glassCanvas as GlassCanvas,
-        customBackground: p.customBackground,
       }),
     );
   }, [surface]);
-  useEffect(() => {
-    const root = document.documentElement;
-    const src =
-      glassBackground === "custom"
-        ? customBackground
-        : glassBackground === "field"
-          ? null
-          : GLASS_BG_SRC[glassBackground];
-    if (!glassMode || !src) {
-      root.dataset.glassBg = "field";
-      root.style.removeProperty("--glass-wallpaper");
-      return;
-    }
-    root.dataset.glassBg = "image";
-    root.style.setProperty("--glass-wallpaper", `url("${src}")`);
-  }, [glassMode, glassBackground, customBackground]);
 
   useEffect(() => {
     document.body.dataset.surface = surface;

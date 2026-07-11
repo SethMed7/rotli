@@ -495,7 +495,7 @@
   display: block;
   margin: 0 0 5px 1px;
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.035em;
   text-transform: uppercase;
@@ -1330,7 +1330,7 @@
   display: block;
   color: var(--pdf-preview-accent);
   font-family: var(--font-body);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }

@@ -1,11 +1,8 @@
 // Phase 2c — every preference survives relaunch. Two dot-files in the corpus
 // root, both owned by the frontend, both rebuildable from nothing:
 //
-//   .rotli/settings.json   — app settings: theme + glass, General toggles,
-//                            hotkey overrides, the per-note Aa map, rails.
-//   .rotli/viewstate.json  — UI state: the pane tree + tabs, focused pane,
-//                            selected folder, the ⌘K recents (MRU).
-//   .rotli/background.json — the custom glass wallpaper, as a data URL.
+//   .rotli/settings.json   — app settings, hotkeys and per-note preferences.
+//   .rotli/viewstate.json  — panes, tabs, selection and recent items.
 //
 // Hydration runs BEFORE the first render (main.tsx awaits it) so the first
 // paint is already in the right theme — no flash, no spinner, nothing to
@@ -25,7 +22,6 @@ import {
 import { useBindingsStore } from "../keys/bindings";
 import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
-import { GLASS_BG_SRC } from "../lib/glassBackgrounds";
 // the quit-flush ack listener must exist from first paint — an idle ⌘Q acks
 // instantly instead of riding out the Rust-side hold (#4).
 import { onQuitFlush } from "../lib/quitFlush";
@@ -60,15 +56,6 @@ import {
   clampChatSidebarLimit,
   clampSidebarWidth,
   clampSidebarZoom,
-  GLASS_BACKGROUNDS,
-  GLASS_BLURS,
-  GLASS_CANVASES,
-  GLASS_TINTS,
-  type GlassBackground,
-  type GlassBlur,
-  type GlassCanvas,
-  type GlassClarity,
-  type GlassTint,
   ORGANIZER_MODELS,
   ORGANIZER_TRUSTS,
   type OrganizerModel,
@@ -109,14 +96,6 @@ function asEnum<T extends string>(v: unknown, allowed: readonly T[], fallback: T
 
 const THEME_SETTINGS: readonly ThemeSetting[] = ["light", "dark", "system"];
 const THEME_FAMILIES: readonly ThemeFamily[] = ["warm", "mono"];
-const TINTS: readonly GlassTint[] = GLASS_TINTS.map((t) => t.value);
-const BACKGROUNDS: readonly GlassBackground[] = [
-  ...GLASS_BACKGROUNDS.map((b) => b.value),
-  "custom",
-];
-const CLARITIES: readonly GlassClarity[] = ["frosted", "clear"];
-const BLURS: readonly GlassBlur[] = GLASS_BLURS.map((b) => b.value);
-const CANVASES: readonly GlassCanvas[] = GLASS_CANVASES.map((c) => c.value);
 const MEASURES: readonly Measure[] = ["narrow", "comfort", "wide"];
 
 /** Drop the session-scoped per-chat keys — an unsaved chat's choice (globe,
@@ -167,12 +146,6 @@ interface PersistedSettings {
   themeFamily: ThemeFamily;
   matchLightFamily: ThemeFamily;
   matchDarkFamily: ThemeFamily;
-  glassMode: boolean;
-  glassTint: GlassTint;
-  glassBackground: GlassBackground;
-  glassClarity: GlassClarity;
-  glassBlur: GlassBlur;
-  glassCanvas: GlassCanvas;
   stayOpen: boolean;
   showInDock: boolean;
   /** What the generic New tab command creates. Markdown remains the safe default. */
@@ -319,12 +292,6 @@ export function parseSettings(raw: string): PersistedSettings {
     themeFamily: asEnum(data.themeFamily, THEME_FAMILIES, "warm"),
     matchLightFamily: asEnum(data.matchLightFamily, THEME_FAMILIES, "warm"),
     matchDarkFamily: asEnum(data.matchDarkFamily, THEME_FAMILIES, "warm"),
-    glassMode: asBool(data.glassMode, false),
-    glassTint: asEnum(data.glassTint, TINTS, "dusk"),
-    glassBackground: asEnum(data.glassBackground, BACKGROUNDS, "field"),
-    glassClarity: asEnum(data.glassClarity, CLARITIES, "frosted"),
-    glassBlur: asEnum(data.glassBlur, BLURS, "standard"),
-    glassCanvas: asEnum(data.glassCanvas, CANVASES, "glass"),
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
     newTabDefault: asEnum(data.newTabDefault, NEW_ITEM_KINDS, DEFAULT_NEW_ITEM_KIND),
@@ -434,7 +401,12 @@ export function unknownSettingsKeys(raw: string): Record<string, unknown> {
     return {};
   }
   const known = new Set(Object.keys(parseSettings("{}")));
-  return Object.fromEntries(Object.entries(data).filter(([k]) => !known.has(k)));
+  const retired = new Set([
+    "glassMode", "glassTint", "glassBackground", "glassClarity", "glassBlur", "glassCanvas",
+  ]);
+  return Object.fromEntries(
+    Object.entries(data).filter(([key]) => !known.has(key) && !retired.has(key)),
+  );
 }
 
 function applySettings(s: PersistedSettings): void {
@@ -443,12 +415,6 @@ function applySettings(s: PersistedSettings): void {
     themeFamily: s.themeFamily,
     matchLightFamily: s.matchLightFamily,
     matchDarkFamily: s.matchDarkFamily,
-    glassMode: s.glassMode,
-    glassTint: s.glassTint,
-    glassBackground: s.glassBackground,
-    glassClarity: s.glassClarity,
-    glassBlur: s.glassBlur,
-    glassCanvas: s.glassCanvas,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
     newTabDefault: s.newTabDefault,
@@ -485,22 +451,6 @@ function applySettings(s: PersistedSettings): void {
   });
   useBindingsStore.setState({ overrides: s.bindings });
   useNoteStyleStore.setState({ styles: s.noteStyles });
-}
-
-/** The custom glass wallpaper, stored as a data URL in background.json. When
- * "custom" is selected but the image is gone, fall back to the tint field. */
-async function loadCustomBackground(): Promise<void> {
-  let dataUrl: unknown;
-  try {
-    dataUrl = record(JSON.parse(await corpusSettingsRead("background"))).dataUrl;
-  } catch {
-    dataUrl = null;
-  }
-  if (typeof dataUrl === "string" && dataUrl.startsWith("data:image/")) {
-    useUiStore.setState({ customBackground: dataUrl });
-  } else {
-    useUiStore.setState({ glassBackground: "field" });
-  }
 }
 
 /** Settings that live OUTSIDE the webview: window behavior, Dock policy, and
@@ -736,29 +686,13 @@ async function gcPersistedMaps(): Promise<void> {
 
 // ─── first paint ─────────────────────────────────────────────────────────────
 
-/** Mirror App.tsx's theme effects BEFORE React renders — useEffect runs after
- * the first paint, so without this a restored dark/glass theme would flash the
- * index.html light pin for a frame. App re-applies identically on mount. */
+/** Apply the restored theme before React's first paint. */
 function prePaint(): void {
   const s = useUiStore.getState();
-  applyTheme(s.theme, s.themeFamily, s.glassMode, s.glassTint, {
+  applyTheme(s.theme, s.themeFamily, {
     light: s.matchLightFamily,
     dark: s.matchDarkFamily,
   });
-  const root = document.documentElement;
-  root.dataset.glassCanvas = s.glassCanvas;
-  root.dataset.glassClarity = s.glassClarity;
-  root.dataset.glassBlur = s.glassBlur;
-  const src =
-    s.glassBackground === "custom"
-      ? s.customBackground
-      : s.glassBackground === "field"
-        ? null
-        : GLASS_BG_SRC[s.glassBackground];
-  if (s.glassMode && src) {
-    root.dataset.glassBg = "image";
-    root.style.setProperty("--glass-wallpaper", `url("${src}")`);
-  }
 }
 
 // ─── hydrate (awaited by main.tsx before the first render) ───────────────────
@@ -774,7 +708,6 @@ export async function hydratePersistedState(): Promise<void> {
     // only would suffice (it's the one writer), but capturing here is harmless
     settingsPassthrough = unknownSettingsKeys(raw);
     applySettings(settings);
-    if (settings.glassBackground === "custom") await loadCustomBackground();
     if (isMainSurface()) {
       await hydrateViewstate();
       await hydrateMain();
@@ -797,12 +730,6 @@ function settingsSnapshot(): string {
     themeFamily: ui.themeFamily,
     matchLightFamily: ui.matchLightFamily,
     matchDarkFamily: ui.matchDarkFamily,
-    glassMode: ui.glassMode,
-    glassTint: ui.glassTint,
-    glassBackground: ui.glassBackground,
-    glassClarity: ui.glassClarity,
-    glassBlur: ui.glassBlur,
-    glassCanvas: ui.glassCanvas,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
     newTabDefault: ui.newTabDefault,
@@ -872,7 +799,6 @@ export function attachPersistence(): () => void {
   // seed from the just-hydrated state so hydration itself never writes back
   let lastSettings = settingsSnapshot();
   let lastViewstate = viewstateSnapshot();
-  let lastBackground = useUiStore.getState().customBackground;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const flush = (): void => {
@@ -887,14 +813,6 @@ export function attachPersistence(): () => void {
     if (viewstate !== lastViewstate) {
       lastViewstate = viewstate;
       void corpusSettingsWrite("viewstate", viewstate);
-    }
-    const background = useUiStore.getState().customBackground;
-    if (background !== lastBackground) {
-      lastBackground = background;
-      const contents = background?.startsWith("data:image/")
-        ? JSON.stringify({ v: 1, dataUrl: background })
-        : "{}";
-      void corpusSettingsWrite("background", contents);
     }
   };
 

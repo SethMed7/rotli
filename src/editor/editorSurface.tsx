@@ -6,7 +6,11 @@
 
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { relativeLabel } from "../lib/dateLabels";
-import { corpusNotePath, corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
+import {
+  corpusNoteAbsolutePath,
+  corpusRawFrontmatter,
+  corpusWriteFrontmatterRaw,
+} from "../lib/tauri";
 import { invalidateNotes, useNote } from "../services/hooks";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
@@ -89,7 +93,7 @@ export function EditorSurface({
   const [diskPath, setDiskPath] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
-    corpusNotePath(noteId)
+    corpusNoteAbsolutePath(noteId)
       .then((p) => alive && setDiskPath(p))
       .catch(() => alive && setDiskPath(null));
     return () => {
@@ -220,7 +224,7 @@ export function EditorSurface({
               title={`In the Brain: ${brainLocation}${
                 shelfLocation !== brainLocation ? `\nShelf: ${shelfLocation}` : ""
               }${diskPath ? `\nOn disk: ${diskPath}` : ""}\nClick to reveal in the Brain`}
-              onClick={() => revealFocusedNote("brain")}
+              onClick={() => revealFocusedNote("brain", noteId)}
             >
               {noteLocationLabel(brainFolder, inMain)}
             </button>
@@ -259,6 +263,7 @@ export function EditorSurface({
         initialText={note.body}
         onContext={(line, selStart) => setCtx({ line, selStart })}
         fmRaw={focusMode ? null : fmRaw}
+        fmPath={diskPath}
         fmGen={fmGen}
         fmErr={fmErr}
         onFmCommit={commitFm}

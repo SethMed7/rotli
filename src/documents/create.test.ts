@@ -1,33 +1,27 @@
 import { describe, expect, test } from "bun:test";
 import JSZip from "jszip";
 import { blankDocumentTemplate, createDocxBase64 } from "./create";
-import { convertDocxPreview } from "./preview";
+import { decodeDocx } from "./codec/docx";
 import { GENERATED_DOCX_THEME } from "./theme";
 import { documentFileName } from "./workflow";
 
 describe("local DOCX creation", () => {
-  test("creates an OOXML document that the local preview can read", async () => {
+  test("creates an OOXML document that the local editor codec can read", async () => {
     const base64 = await createDocxBase64({
       title: "Rotli document",
       subtitle: "Local and portable",
       blocks: [{ kind: "heading", level: 2, text: "Workflow" }, { kind: "paragraph", text: "Embedded in a note." }],
       table: [["Action", "Result"], ["Zoom in", "Stay in the note"]],
     });
-    const result = await convertDocxPreview(base64);
-    expect(result.srcDoc).toContain("Rotli document");
-    expect(result.srcDoc).toContain("Local and portable");
-    expect(result.srcDoc).toContain("Workflow");
-    expect(result.srcDoc).toContain("Embedded in a note.");
-    expect(result.srcDoc).toContain("<table>");
-    expect(result.srcDoc).toContain("Stay in the note");
-    expect(result.warnings).toEqual([]);
+    const result = await decodeDocx(base64, "storage/rotli/example.docx");
+    expect(result.document.paragraphs.map((paragraph) => paragraph.runs.map((run) => run.text).join("")))
+      .toEqual(["Rotli document", "Local and portable", "Workflow", "Embedded in a note."]);
+    expect(result.warnings).toEqual(["1 table is preserved but not editable yet"]);
   });
 
-  test("blank documents explain the two viewing modes", () => {
+  test("new documents start as a genuinely blank editable page", () => {
     const template = blankDocumentTemplate();
-    expect(template.title).toBe("Untitled document");
-    expect(template.blocks?.[0]?.text).toContain("Zoom in");
-    expect(template.blocks?.[0]?.text).toContain("Open in tab");
+    expect(template).toEqual({ title: "" });
   });
 
   test("generated typography and page geometry come from one theme", async () => {

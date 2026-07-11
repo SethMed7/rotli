@@ -74,6 +74,7 @@ export function CmEditor({
   initialText,
   onContext,
   fmRaw = null,
+  fmPath = null,
   fmGen = 0,
   fmErr = null,
   onFmCommit,
@@ -91,6 +92,8 @@ export function CmEditor({
   /** The note's RAW frontmatter block ("Show file metadata") — rendered as an
    * editable banner above the body; null hides it. Disk truth, verbatim. */
   fmRaw?: string | null;
+  /** Absolute disk truth shown read-only above editable frontmatter. */
+  fmPath?: string | null;
   /** Commit counter — bumped after every write attempt, so a refused/no-op
    * commit still rebuilds the banner from disk truth (same block string). */
   fmGen?: number;
@@ -159,12 +162,13 @@ export function CmEditor({
         ? []
         : fmBlock(
             block,
+            fmPath,
             gen,
             error,
             (text) => onFmCommitRef.current?.(text),
             () => onFmReadRef.current?.() ?? Promise.resolve(block),
           ),
-    [],
+    [fmPath],
   );
 
   const [slash, setSlash] = useState<SlashState>({ open: false, query: "", index: 0, left: 0, top: 0 });
@@ -404,7 +408,7 @@ export function CmEditor({
     });
     const view = new EditorView({ state, parent: host });
     viewRef.current = view;
-    // reuse the existing scroller styling + glass paper-canvas theming, which
+    // Reuse the existing scroller styling and shared paper-canvas theming, which
     // all targets .ed-scroll (themes.css) — the CM scroller becomes the canvas
     view.scrollDOM.classList.add("ed-scroll");
 

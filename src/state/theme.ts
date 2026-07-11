@@ -1,19 +1,16 @@
 // Theme application. The setting is explicit (light / dark / system) — the app
 // never silently follows the OS; "system" subscribes to matchMedia only while
 // it is the chosen setting. The family picks which token set the mode resolves
-// into (warm → light/dark, mono → paper/charcoal). Liquid glass is a MODE over
-// the active theme: while on, the resolved light/dark picks glass-light/dark
-// and data-glass-tint carries the hue (src/styles/themes.css).
+// into (warm → light/dark, mono → paper/charcoal).
 
-import type { GlassTint, ThemeFamily, ThemeSetting } from "./ui";
+import type { ThemeFamily, ThemeSetting } from "./ui";
 
-type DataTheme = "light" | "dark" | "paper" | "charcoal" | "glass-light" | "glass-dark";
+type DataTheme = "light" | "dark" | "paper" | "charcoal";
 
 let media: MediaQueryList | null = null;
 let onChange: ((event: MediaQueryListEvent) => void) | null = null;
 
-export function resolveTheme(family: ThemeFamily, glass: boolean, mode: "light" | "dark"): DataTheme {
-  if (glass) return mode === "light" ? "glass-light" : "glass-dark";
+export function resolveTheme(family: ThemeFamily, mode: "light" | "dark"): DataTheme {
   if (family === "mono") return mode === "light" ? "paper" : "charcoal";
   return mode;
 }
@@ -40,20 +37,17 @@ export interface MatchFamilies {
 export function applyTheme(
   setting: ThemeSetting,
   family: ThemeFamily,
-  glass: boolean,
-  tint: GlassTint,
   match: MatchFamilies = { light: family, dark: family },
 ): () => void {
   detachSystemListener();
-  document.documentElement.dataset.glassTint = tint;
   if (setting === "system") {
-    const forOs = (dark: boolean) => resolveTheme(dark ? match.dark : match.light, glass, dark ? "dark" : "light");
+    const forOs = (dark: boolean) => resolveTheme(dark ? match.dark : match.light, dark ? "dark" : "light");
     media = window.matchMedia("(prefers-color-scheme: dark)");
     onChange = (event) => setDataTheme(forOs(event.matches));
     setDataTheme(forOs(media.matches));
     media.addEventListener("change", onChange);
   } else {
-    setDataTheme(resolveTheme(family, glass, setting));
+    setDataTheme(resolveTheme(family, setting));
   }
   return detachSystemListener;
 }

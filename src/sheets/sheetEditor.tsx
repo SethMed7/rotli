@@ -38,7 +38,7 @@ function currentAppTheme(): string {
 
 function isDarkTheme(theme = currentAppTheme()): boolean {
   const t = theme;
-  return t === "dark" || t === "charcoal" || t === "glass-dark";
+  return t === "dark" || t === "charcoal";
 }
 
 export default function SheetEditor({
@@ -84,7 +84,7 @@ export default function SheetEditor({
 
   // Univer's palette is fixed when createUniver runs. Track the concrete app
   // theme so the mount effect below can rebuild from the preserved workbook
-  // snapshot when warm/paper/charcoal/glass changes.
+  // snapshot when warm/paper/charcoal changes.
   useEffect(() => {
     const sync = () => setAppTheme(currentAppTheme());
     sync();

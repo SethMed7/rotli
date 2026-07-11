@@ -30,17 +30,14 @@ import { installEmbedControls } from "./embedControls";
 
 // ——— theme resolution ———————————————————————————————————————————————
 
-/** Root-theme "is dark?" — for the Expand overlay, which lives on document.body
- * (outside the editor canvas) so it follows the root theme, not the glass canvas. */
+/** Root-theme "is dark?" — for the Expand overlay, which lives on document.body. */
 function isDarkRoot(): boolean {
   const t = document.documentElement.dataset.theme ?? "";
-  return t === "dark" || t === "charcoal" || t === "glass-dark";
+  return t === "dark" || t === "charcoal";
 }
 
-/** "Is dark?" for an IN-EDITOR node — resolved from the node's own computed text
- * color (light text ⇒ dark surface). This honors the glass paper-canvas override
- * (.ed-scroll can force e.g. a dark cocoa canvas even under a light root theme),
- * which a dataset.theme read would miss. */
+/** "Is dark?" for an IN-EDITOR node — resolved from the node's computed text
+ * color (light text ⇒ dark surface). */
 function isDarkNode(node: HTMLElement): boolean {
   const m = /rgba?\(([^)]+)\)/.exec(getComputedStyle(node).color);
   if (!m?.[1]) return isDarkRoot();
@@ -174,6 +171,10 @@ const RENDERERS: Record<StaticLangKey, (code: string, ctx: RenderCtx) => HTMLEle
       const attrs: Record<string, unknown> = {
         boundingbox: [-8, 8, 8, -8],
         axis: true,
+        // JSXGraph defaults JessieCode to an eval-based compiler. Production's
+        // CSP deliberately omits unsafe-eval, so use its interpreter path in
+        // every build; dev and release must execute the same grammar.
+        jc: { compile: false },
         showCopyright: false,
         showNavigation: false,
         keepAspectRatio: false,
@@ -404,8 +405,7 @@ class RenderBlockWidget extends WidgetType {
     });
     container.appendChild(expand);
 
-    // resolve dark + tokens off the live (in-editor) node so the glass canvas
-    // override is honored
+    // Resolve dark + tokens off the live in-editor node.
     const tokens = tokenReader(container);
     const ctx: RenderCtx = {
       dark: isDarkNode(container),
@@ -531,12 +531,9 @@ function openExpandOverlay(lang: StaticLangKey, code: string, anchor: HTMLElemen
 const bumpTheme = StateEffect.define<number>();
 let themeVersion = 0;
 
-/** The resolved-theme signature: dataset.theme + the glass canvas + the glass
- * tint (under glass themes --accent is var(--glass-hue), set by data-glass-tint,
- * so a tint flip really does change baked diagram colors). */
+/** The resolved-theme signature used to rebake diagram colors on a theme flip. */
 function themeSignature(): string {
-  const d = document.documentElement.dataset;
-  return `${d.theme ?? ""}|${d.glassCanvas ?? ""}|${d.glassTint ?? ""}`;
+  return document.documentElement.dataset.theme ?? "";
 }
 
 // ——— decoration build (mirror livePreview's reveal-on-caret) ——————————
@@ -618,7 +615,7 @@ const themeWatcher = ViewPlugin.fromClass(
       });
       this.obs.observe(document.documentElement, {
         attributes: true,
-        attributeFilter: ["data-theme", "data-glass-canvas", "data-glass-tint"],
+        attributeFilter: ["data-theme"],
       });
     }
     destroy() {

@@ -10,7 +10,7 @@ import { useNotes, useSearchableNotes } from "../services/hooks";
 import { DEST } from "../services/destinations";
 import { inboxFolderId } from "../services/notes";
 import { SHEET_EDITABLE } from "../sheets/kinds";
-import { DOCUMENT_EXTS } from "../documents/kinds";
+import { DOCX_EDITABLE } from "../documents/kinds";
 import type { NoteSummary } from "../types";
 import { PlusGlyph, glyphForNote } from "../components/glyphs";
 import { createManagedItem } from "../newItems/composition";
@@ -34,7 +34,7 @@ function filterNotes(notes: NoteSummary[], mode: SlashPickerMode, query: string)
   else if (mode === "embedSheet")
     pool = notes.filter((n) => n.kind === "file" && SHEET_EDITABLE.has(extOf(fileName(n.id))));
   else if (mode === "embedDocument")
-    pool = notes.filter((n) => n.kind === "file" && DOCUMENT_EXTS.has(extOf(fileName(n.id))));
+    pool = notes.filter((n) => n.kind === "file" && DOCX_EDITABLE.has(extOf(fileName(n.id))));
   return pool.filter((n) => fuzzy(q, n.title) || fuzzy(q, n.id));
 }
 
@@ -166,7 +166,7 @@ export function SlashPicker({
       {!ready && <div className="slashpicker-empty">Loading…</div>}
       {ready && rows === 0 && (
         <div className="slashpicker-empty">
-          {mode === "embedDocument" ? "No documents in Storage yet" : "No matches"}
+          {mode === "embedDocument" ? "No editable DOCX documents in Storage yet" : "No matches"}
         </div>
       )}
       {createError && <div className="slashpicker-empty is-error">{createError}</div>}

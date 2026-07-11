@@ -1,124 +1,352 @@
 {
   "version": 1,
-  "last_modified": "2026-06-22T00:00:00.000Z",
+  "last_modified": "2026-07-11T20:45:00.000Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
     "global_exclude": []
   },
   "domains": {
-    "ROTLI": {
+    "ROTLI_CORE": {
       "state": "active",
-      "always_on": true,
+      "always_on": false,
       "recall": [
-        "rotli",
-        "note",
-        "editor",
-        "menu bar",
-        "tauri",
-        "chat",
-        "sync"
+        "clean architecture",
+        "architecture",
+        "dependency",
+        "adapter",
+        "composition root",
+        "main view",
+        "database",
+        "file naming",
+        "documentation"
       ],
       "exclude": [],
       "rules": [
         {
           "id": 0,
-          "text": "rotli is a warm, local-first Mac menu-bar notes app — your NOTES FOLDER is a memex (one folder: notes · chats · knowledge · files). THREE fronts: Inbox (emails) · Chat (AI chats) · Notes (the note system — Capture · the AI-organized 'brain' areas · Storage · Boards). Stack: Tauri (Rust shell in src-tauri/) + React + Vite + TypeScript, Bun runtime (one bun.lock, bunfig.toml). The conceptual model + vocabulary lives in the MEMEX now — memex-vault wiki/projects/rotli/model.md — defer to it (rotli's docs moved into the memex; the repo keeps only the README).",
-          "added": "2026-06-22",
-          "last_reviewed": "2026-06-28",
-          "source": "manual"
+          "text": "Main is a reference view over one physical set of user files, never another content store. The memex is durable truth; .rotli/ contains rebuildable projections and explicit settings. Do not add a database for memex content.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/memex-data-contract.md"
         },
         {
           "id": 1,
-          "text": "The user's notes are PLAIN MARKDOWN files they own, in their notes folder — a memex by default (the plain-start default is ~/Documents/rotli); folders on disk = folders in the sidebar. The app's own state lives in a sibling `.rotli/` (settings · view state · index) — deletable with no data loss. The files are the source of truth; never lock notes into a proprietary store.",
-          "added": "2026-06-22",
-          "last_reviewed": "2026-06-28",
-          "source": "manual"
+          "text": "Dependencies point domain -> application -> adapters -> composition -> presentation. Vendor libraries and Tauri stay behind narrow adapters; a dependency swap should normally change one adapter, focused tests, and a composition root.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/clean-architecture.md"
         },
         {
           "id": 2,
-          "text": "Low-pulse by design: no dock icon, no ⌘Tab entry, no badges/pings; summon with ⌥Space, dismiss and it's gone. Formatting/typography (Aa) is a RENDER layer — never written into the user's markdown files.",
+          "text": "Repository contracts live in docs/ and code. CARL is compact recall, not a second specification. AGENTS.md owns AI process rules; docs/README.md routes deeper reading. Update the owning contract and CHANGELOG.md when applicable.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/README.md"
+        }
+      ],
+      "decisions": [
+        {
+          "id": "rotli-003",
+          "decision": "Code-facing architecture, development, brand, and runtime documentation lives in the repository.",
+          "rationale": "One versioned home prevents code/document drift. The memex retains broader product knowledge and model-readable protocols.",
+          "date": "2026-07-06",
+          "source": "manual",
+          "recall": ["docs", "brand", "source of truth"],
+          "status": "active"
+        }
+      ]
+    },
+    "ROTLI_MEMEX": {
+      "state": "active",
+      "always_on": false,
+      "recall": [
+        "memex",
+        "brain",
+        "secure note",
+        "private note",
+        "frontmatter",
+        "metadata",
+        "linked library",
+        "capture",
+        "organizer",
+        "storage lane"
+      ],
+      "exclude": [],
+      "rules": [
+        {
+          "id": 0,
+          "text": "A notes folder is one memex. Rotli may create chats, captures, and staged wiki notes through declared write lanes; it does not rewrite identity, personality, history, MAP.md, or curated wiki content through the interactive lane. TypeScript and Rust enforce the boundary independently.",
           "added": "2026-06-22",
-          "last_reviewed": null,
-          "source": "manual"
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/memex-data-contract.md"
         },
         {
-          "id": 3,
-          "text": "Stack discipline: Bun (one lockfile), TypeScript strict, React + Vite frontend, Tauri (Rust) shell. Dev: `bun run dev` (web) / `bun run tauri dev` (app). Run `bun run check` (and `bun run check:hex` for brand colors) before calling work done.",
-          "added": "2026-06-22",
-          "last_reviewed": null,
-          "source": "manual"
+          "id": 1,
+          "text": "Secure notes fail closed and live in the protected wiki/_secure lane inside the Brain. Remote/frontier models never receive their titles, snippets, bodies, or search results. Recognized on-device models require explicit local_ai_allowed permission; the organizer always skips secure and locked notes.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/memex-data-contract.md"
         },
         {
-          "id": 4,
-          "text": "rotli READS the whole memex and WRITES only its owned surfaces per the v3.7 contract: chats/ (AI chats), inbox.md (⌥C captures), and wiki/_inbox/ NOTE STAGING (new notes land there with frontmatter id/owner/created/updated/shelf/reach + blank AI metadata; a later local-LLM files them to wiki/<area>/ — the 'brain', via the v3.7 AI Filer lane). It NEVER writes history/ (Breve's), identity/ or personality/ (the former self/), MAP, or the curated rest of wiki/ — refused at both the TS canWrite gate and the Rust is_writable guard. Contract band [3.4, 3.7] (code truth: CONTRACT_VERSION 3.7, MIN_CONTRACT 3.4 in both src-tauri/src/memex.rs and src/memex/contract.ts; v3.7 adds the additive-only AI Filer lane). VOCAB (see memex-vault wiki/projects/rotli/model.md): your NOTES FOLDER is a memex (one corpus.json; one memex by default — 'corpus' is internal, never user-facing). The 'BRAIN' = the AI-organized wiki areas INSIDE Notes (filed by metadata), NOT a connected memex. A SECOND memex is a 'linked library' (advanced; the active one is writable per its perms). Storage = the memex storage/ (binaries via storage: links; a dropped file routes there). Access is metadata (note reach/owner + a per-note 'locked' flag the AI filer must respect + a per-note 'secure' flag — secrets auto-detected by a regex pass, never sent to a REMOTE model, gitignored — + the local/open/secure mode). Mirror-not-import the boundary, exactly like Breve. See memex-vault wiki/projects/rotli/model.md + ~/memex-vault/STRUCTURE.md (v3.6) + memex-vault wiki/projects/rotli/memex-integration.",
-          "added": "2026-06-22",
-          "last_reviewed": "2026-07-06",
-          "source": "manual"
-        },
-        {
-          "id": 5,
-          "text": "'Everything has a chat' — any object can carry a chat (chats/<slug>.md, attachedTo: [[note]]). The Convex + CRDT multi-device sync is a DESIGN (memex-vault wiki/projects/rotli/sync-design), NOT yet wired — today's build is local-first, single-device (Stage 1, Phases 0–1c).",
-          "added": "2026-06-22",
-          "last_reviewed": null,
-          "source": "manual"
-        },
-        {
-          "id": 6,
-          "text": "rotli's DOCS live in the MEMEX now (memex-vault wiki/projects/rotli/, + wiki/projects/memex/ for the memex project), NOT the repo — the repo keeps only the README (plus docs/media assets the README uses + docs/archive historical). To keep new project docs going to the memex, paste the Settings → Plugins 'Use rotli for your docs' command into Claude Code. The brand kit is IN-REPO — the app-embedded canonical kit at src/brand/ (single source of truth for colors/tokens/logo/fonts), enforced by `bun run check:hex` (no raw hex anywhere outside src/brand/). Brand provenance/history lives under brand/engine-history/. Change code that a doc describes → update that doc in the memex (+ a CHANGELOG entry for user-facing changes); the README + CHANGELOG stay in the repo.",
-          "added": "2026-06-22",
-          "last_reviewed": "2026-07-06",
-          "source": "manual"
+          "id": 2,
+          "text": "Unknown frontmatter survives byte-for-byte. Rotli owns provenance, the user owns explicit organization/security controls, and the Brain filer owns only declared enrichment fields. Boards and binaries never receive Markdown frontmatter.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/memex-data-contract.md"
         }
       ],
       "decisions": [
         {
           "id": "rotli-001",
-          "decision": "Notes are plain markdown files the user owns in ~/Documents/rotli/; the app keeps only derived state in a sibling .rotli/ (deletable without data loss).",
-          "rationale": "Local-first, no lock-in: files openable in any editor, backable-up, forever. The app is 'a warm window onto them,' not their owner.",
+          "decision": "User-owned files are durable truth; .rotli/ state must be deletable and rebuildable.",
+          "rationale": "Local-first ownership avoids lock-in and keeps files usable without Rotli.",
           "date": "2026-06-22",
           "source": "manual",
-          "recall": [
-            "local-first",
-            "markdown",
-            "ownership",
-            "files"
-          ],
+          "recall": ["local-first", "files", "ownership"],
           "status": "active"
         },
         {
           "id": "rotli-002",
-          "decision": "The Brain organizer's trust ladder DEFAULTS to Organize (was Suggest) — flipped in v0.24.1 across the UI default, the settings parse, and the Rust daemon fallback. An explicit settings choice always wins.",
-          "rationale": "Seth, after living with the shipped daemon: it only ever changes a note's LOCATION + METADATA (area/tags/summary) — journaled in Activity and undoable — never the words inside a note, so full auto-organize is the intended out-of-box behavior. Locked notes (metadata-panel lock = hands off entirely), secure notes, and Main stay untouchable at every rung. Design doc §4.3 amended, dated.",
+          "decision": "The Brain organizer defaults to Organize while remaining metadata/location-only, journaled, undoable, and blocked from secure or locked notes.",
+          "rationale": "Automatic organization is useful because it never rewrites note prose and every action remains reviewable.",
           "date": "2026-07-02",
           "source": "manual",
-          "recall": [
-            "organizer",
-            "trust",
-            "organize",
-            "suggest",
-            "default",
-            "brain",
-            "daemon"
-          ],
-          "status": "active"
-        },
-        {
-          "id": "rotli-003",
-          "decision": "2026-07-06 full cleanup: rotli's brand + docs now live IN-REPO — src/brand/ is the canonical app-embedded brand kit (enforced by `bun run check:hex`), brand/engine-history/ holds brand provenance/history, and docs/ holds the docs; smLab no longer hosts rotli.",
-          "rationale": "One home for code, brand, and docs kills cross-repo drift and makes the brand kit the app's single source of truth.",
-          "date": "2026-07-06",
-          "source": "manual",
-          "recall": [
-            "cleanup",
-            "brand",
-            "migration",
-            "smlab",
-            "in-repo"
-          ],
+          "recall": ["organizer", "trust", "brain"],
           "status": "active"
         }
       ]
+    },
+    "ROTLI_MEMORY": {
+      "state": "active",
+      "always_on": false,
+      "recall": [
+        "rag",
+        "retrieval",
+        "memory",
+        "past chat",
+        "chat summary",
+        "model mapping",
+        "table of contents",
+        "backlinks",
+        "findability"
+      ],
+      "exclude": [],
+      "rules": [
+        {
+          "id": 0,
+          "text": "Model Mapping 0 builds a fresh capability-sized table of contents per request. Compact models drill in from area maps; larger models receive more direct ids when budgets allow. Pinned and recent items are inspectable priority signals.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/memex-data-contract.md"
+        },
+        {
+          "id": 1,
+          "text": "Every persisted chat owns one linked background Markdown note with an idempotent managed summary block. Retrieval searches notes and chat transcripts, returns provenance and stable ids, then reads only selected sources before generation.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/memex-data-contract.md"
+        },
+        {
+          "id": 2,
+          "text": "Retrieval is local-first full text plus metadata and query refinement; no vector database is required. Embeddings may only be an optional rebuildable adapter. Secure content is excluded before mapping, search, read, and provider egress.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/memex-data-contract.md"
+        }
+      ],
+      "decisions": []
+    },
+    "ROTLI_DOCUMENTS": {
+      "state": "active",
+      "always_on": false,
+      "recall": [
+        "docx",
+        "word document",
+        "document editor",
+        "spreadsheet",
+        "sheet",
+        "xlsx",
+        "univer",
+        "embed",
+        "slash command",
+        "board",
+        "excalidraw"
+      ],
+      "exclude": [],
+      "rules": [
+        {
+          "id": 0,
+          "text": "Markdown alone owns slash commands, wikilinks, and typed embed fences. DOCX files remain conventional documents; sheets and boards use their native editor boundaries. Inline expansion keeps the parent Markdown tab active unless the user explicitly opens a new tab.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/memex-data-contract.md"
+        },
+        {
+          "id": 1,
+          "text": "Rotli-created documents and sheets use the managed storage lane; boards remain raw .excalidraw files. Format registries and application workflows are dependency-free, while JSZip, Univer, ExcelJS, and canvas engines stay behind adapters.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/clean-architecture.md"
+        },
+        {
+          "id": 2,
+          "text": "DOCX files are locally editable through a framework-free document model, a replaceable Univer adapter, and a Rotli-owned OOXML codec. Saves preserve unrelated package parts and opaque body nodes, create a one-time backup, and never mount Markdown slash or embed capabilities inside the document editor.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "src/documents/README.md"
+        },
+        {
+          "id": 3,
+          "text": "Rotli is a workspace, not a preview catalog. Images and video are the only preview-only surfaces. Every other format advertised as supported must provide native editing and saving; otherwise it remains unsupported and must offer an explicit local conversion/import workflow instead of a passive preview.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/memex-data-contract.md"
+        }
+      ],
+      "decisions": []
+    },
+    "ROTLI_BREVE": {
+      "state": "active",
+      "always_on": false,
+      "recall": [
+        "breve",
+        "brief",
+        "watchlist",
+        "routine",
+        "scheduler",
+        "signal",
+        "resend",
+        "pdf theme"
+      ],
+      "exclude": [],
+      "rules": [
+        {
+          "id": 0,
+          "text": "Breve is fully integrated into Rotli. Rotli owns its UI, versioned runtime, configuration surfaces, lifecycle, and scheduler integration. Runtime code is versioned under breve-runtime/; mutable private state remains under .rotli/breve/.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "breve-runtime/README.md"
+        },
+        {
+          "id": 1,
+          "text": "Development must not start the scheduler or write production configuration. Dev may display authorized read-only delivery/watchlist snapshots; dev saves remain temporary. Resend credentials stay write-only in Keychain.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "AGENTS.md"
+        }
+      ],
+      "decisions": []
+    },
+    "ROTLI_DESIGN": {
+      "state": "active",
+      "always_on": false,
+      "recall": [
+        "theme",
+        "design system",
+        "css",
+        "brand",
+        "paper",
+        "charcoal",
+        "warm light",
+        "warm dark",
+        "accessibility"
+      ],
+      "exclude": [],
+      "rules": [
+        {
+          "id": 0,
+          "text": "Rotli ships Warm Light, Warm Dark, Paper, and Charcoal. Paper and Charcoal are the calm defaults; the warm pair is intentional. All surfaces use shared semantic color, type, spacing, elevation, focus, and state tokens.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "src/brand/README.md"
+        },
+        {
+          "id": 1,
+          "text": "Preserve the quiet native-desktop language: readable text, clear hierarchy, restrained borders, keyboard safety, and complete loading/empty/error/saved/disabled/destructive states. Do not add another UI framework or raw colors outside src/brand/.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "AGENTS.md"
+        }
+      ],
+      "decisions": [
+        {
+          "id": "rotli-004",
+          "decision": "Keep four solid environments—Warm Light, Warm Dark, Paper, and Charcoal—and remove Liquid Glass.",
+          "rationale": "Multiple temperatures serve real preferences; Glass added complexity without strengthening the native desktop experience.",
+          "date": "2026-07-11",
+          "source": "manual",
+          "recall": ["themes", "warm", "paper", "charcoal", "glass"],
+          "status": "active"
+        }
+      ]
+    },
+    "ROTLI_MODELS": {
+      "state": "active",
+      "always_on": false,
+      "recall": [
+        "model catalog",
+        "model mapping",
+        "provider",
+        "claude",
+        "codex",
+        "gemini",
+        "local ai",
+        "frontier model",
+        "brain manager"
+      ],
+      "exclude": [],
+      "rules": [
+        {
+          "id": 0,
+          "text": "The memex stores model-readable protocols, prompts, metadata, and capability maps; it never executes provider calls. Rotli owns provider clients, model routing, retrieval execution, and agent orchestration behind application ports.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/clean-architecture.md"
+        },
+        {
+          "id": 1,
+          "text": "Model access is capability- and policy-based. Authenticated Breve models may remain available when hidden from the general chat picker, while intentionally blocked individual models stay blocked. Localhost transport does not make a frontier model local.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "docs/architecture/memex-data-contract.md"
+        }
+      ],
+      "decisions": []
+    },
+    "ROTLI_OPERATIONS": {
+      "state": "active",
+      "always_on": false,
+      "recall": [
+        "release",
+        "deploy",
+        "daemon",
+        "launch agent",
+        "tauri dev",
+        "production data",
+        "keychain",
+        "commit",
+        "push",
+        "updater"
+      ],
+      "exclude": [],
+      "rules": [
+        {
+          "id": 0,
+          "text": "Source edits do not authorize operational mutation. Starting or stopping persistent processes, touching live data or Keychain, installing an app, committing, pushing, deploying, or releasing requires explicit scope and authorization.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "AGENTS.md"
+        },
+        {
+          "id": 1,
+          "text": "Completion validation is bun run check, cargo test --manifest-path src-tauri/Cargo.toml, the production build, and focused tests. Native visual or scheduler claims require human-managed app evidence; browser fixtures are not equivalent.",
+          "added": "2026-07-11",
+          "last_reviewed": "2026-07-11",
+          "source": "AGENTS.md"
+        }
+      ],
+      "decisions": []
     }
   },
   "staging": []

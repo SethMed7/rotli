@@ -13,6 +13,7 @@ function titleCase(s: string): string {
 export function brainLocationLabel(folderId: string): string {
   const f = folderId || "";
   if (f === "wiki") return "Brain";
+  if (f === "wiki/_secure" || f.startsWith("wiki/_secure/")) return "Brain › Secure notes";
   if (f.startsWith("wiki/_")) return "Captures"; // _inbox note-staging etc.
   if (f.startsWith("wiki/")) return titleCase(f.slice("wiki/".length).replace(/\//g, " › "));
   if (f === "Board") return "Captures";

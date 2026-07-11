@@ -206,7 +206,7 @@ export async function writeNote(
   const id = ulid();
   const title = titleOf(input.body);
   const stem = noteStem(title, id);
-  const rel = `${SPINE.wikiInbox}/${stem}.md`;
+  const rel = `${input.secure ? SPINE.wikiSecure : SPINE.wikiInbox}/${stem}.md`;
   // TS gate first (the Rust assert_writable is the second layer).
   if (!canWrite(rel, instance.perms)) {
     throw new Error("This memex is read-only for rotli — connect it with write access first.");

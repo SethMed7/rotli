@@ -18,7 +18,6 @@ import {
   rebind,
   setDispatchSuspended,
 } from "../keys/registry";
-import { GLASS_BG_SRC } from "../lib/glassBackgrounds";
 import {
   type ChatModelInfo,
   type MemexValidateReport,
@@ -74,9 +73,6 @@ import { resetAndReonboard } from "../state/onboarding";
 import { setQuickFolderSynced } from "../state/quick";
 import {
   type AppIcon,
-  GLASS_BACKGROUNDS,
-  GLASS_BLURS,
-  GLASS_TINTS,
   type OrganizerTrust,
   SOLID_THEMES,
   useUiStore,
@@ -633,8 +629,7 @@ function GeneralPane() {
   );
 }
 
-// ——— Appearance: four solid theme cards + Liquid Glass as a MODE on top
-// (Seth, 2026-06-12: "the sun toggles the four themes; glass is a toggle") ———
+// ——— Appearance: four intentional working environments. ———
 
 const THEME_CAPTIONS: Record<string, string> = {
   "Warm Light": "The rotli default — paper under lamplight.",
@@ -648,13 +643,6 @@ const THEME_SWATCH: Record<string, string> = {
   "Warm Dark": "var(--swatch-warm-dark)",
   Paper: "var(--swatch-paper)",
   Charcoal: "var(--swatch-charcoal)",
-};
-
-const TINT_SWATCH: Record<string, string> = {
-  dusk: "var(--swatch-dusk)",
-  blush: "var(--swatch-blush)",
-  clay: "var(--swatch-clay)",
-  olive: "var(--swatch-olive)",
 };
 
 /** Dock/app icon options — the quokka re-tiled in a few palettes. "default" is
@@ -675,42 +663,23 @@ function AppearancePane() {
   const setMatchLightFamily = useUiStore((s) => s.setMatchLightFamily);
   const matchDarkFamily = useUiStore((s) => s.matchDarkFamily);
   const setMatchDarkFamily = useUiStore((s) => s.setMatchDarkFamily);
-  const glassMode = useUiStore((s) => s.glassMode);
-  const setGlassMode = useUiStore((s) => s.setGlassMode);
-  const glassTint = useUiStore((s) => s.glassTint);
-  const setGlassTint = useUiStore((s) => s.setGlassTint);
-  const glassBackground = useUiStore((s) => s.glassBackground);
-  const setGlassBackground = useUiStore((s) => s.setGlassBackground);
-  const setCustomBackground = useUiStore((s) => s.setCustomBackground);
-  const glassClarity = useUiStore((s) => s.glassClarity);
-  const setGlassClarity = useUiStore((s) => s.setGlassClarity);
-  const glassBlur = useUiStore((s) => s.glassBlur);
-  const setGlassBlur = useUiStore((s) => s.setGlassBlur);
   const appIcon = useUiStore((s) => s.appIcon);
   const setAppIconState = useUiStore((s) => s.setAppIcon);
   const followingSystem = theme === "system";
-  // Glass is shelved as "coming soon" — if it was enabled before, don't leave the
-  // app stuck in glass now that the toggle is disabled (Seth, 2026-07-07).
-  useEffect(() => {
-    if (glassMode) setGlassMode(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   return (
     <>
       <PaneHead title="Appearance" char="board" />
       <p className="lead">Pick a theme. The titlebar sun cycles through these four.</p>
-      <div className={glassMode ? "famrow off" : "famrow"}>
+      <div className="famrow">
         {SOLID_THEMES.map(({ family, mode, label }) => {
-          const selected = !glassMode && themeFamily === family && theme === mode;
+          const selected = themeFamily === family && theme === mode;
           return (
             <button
               type="button"
               key={label}
               className={selected ? "famcard sel" : "famcard"}
               aria-pressed={selected}
-              aria-disabled={glassMode}
               onClick={() => {
-                if (glassMode) return; // glass owns light/dark below
                 setThemeFamily(family);
                 setTheme(mode);
               }}
@@ -732,35 +701,32 @@ function AppearancePane() {
         desc="Follow macOS light / dark automatically."
         onChange={() => setTheme(followingSystem ? (prefersDark() ? "dark" : "light") : "system")}
       />
-      {followingSystem &&
-        (glassMode ? (
-          <p className="setnote">macOS picks Glass Light or Glass Dark while glass mode is on.</p>
-        ) : (
-          <div className="matchpick">
-            <div className="mprow">
-              <span className="mplabel">When light</span>
-              <Seg
-                value={matchLightFamily}
-                options={[
-                  ["warm", "Warm Light"],
-                  ["mono", "Paper"],
-                ]}
-                onPick={setMatchLightFamily}
-              />
-            </div>
-            <div className="mprow">
-              <span className="mplabel">When dark</span>
-              <Seg
-                value={matchDarkFamily}
-                options={[
-                  ["warm", "Warm Dark"],
-                  ["mono", "Charcoal"],
-                ]}
-                onPick={setMatchDarkFamily}
-              />
-            </div>
+      {followingSystem && (
+        <div className="matchpick">
+          <div className="mprow">
+            <span className="mplabel">When light</span>
+            <Seg
+              value={matchLightFamily}
+              options={[
+                ["warm", "Warm Light"],
+                ["mono", "Paper"],
+              ]}
+              onPick={setMatchLightFamily}
+            />
           </div>
-        ))}
+          <div className="mprow">
+            <span className="mplabel">When dark</span>
+            <Seg
+              value={matchDarkFamily}
+              options={[
+                ["warm", "Warm Dark"],
+                ["mono", "Charcoal"],
+              ]}
+              onPick={setMatchDarkFamily}
+            />
+          </div>
+        </div>
+      )}
 
       <h4 className="sethead">App icon</h4>
       <p className="lead">
@@ -786,121 +752,7 @@ function AppearancePane() {
         ))}
       </div>
 
-      <h4 className="sethead">
-        Liquid Glass <span className="soon-inline">Coming soon</span>
-      </h4>
-      <p className="lead">
-        A mode over your theme: floating glass panels on a background, with the titlebar sun becoming
-        a tint dot. It&rsquo;s on the way — here&rsquo;s a preview of what&rsquo;s coming.
-      </p>
-      <Toggle on={false} disabled title="Glass mode" onChange={() => {}} />
-      <div className="glassopts off" aria-hidden="true">
-        <>
-          <div className="glassrows">
-            <div className="glassrow">
-              <span className="glassrow-label">Mode</span>
-              {(["light", "dark"] as const).map((m) => (
-                <button
-                  type="button"
-                  key={m}
-                  className={theme === m ? "aaseg sel" : "aaseg"}
-                  aria-pressed={theme === m}
-                  onClick={() => setTheme(m)}
-                >
-                  {m === "light" ? "Glass Light" : "Glass Dark"}
-                </button>
-              ))}
-            </div>
-            <div className="glassrow">
-              <span className="glassrow-label">Clarity</span>
-              {(["frosted", "clear"] as const).map((c) => (
-                <button
-                  type="button"
-                  key={c}
-                  className={glassClarity === c ? "aaseg sel" : "aaseg"}
-                  aria-pressed={glassClarity === c}
-                  onClick={() => setGlassClarity(c)}
-                >
-                  {c === "frosted" ? "Frosted" : "Clear"}
-                </button>
-              ))}
-            </div>
-            <div className="glassrow">
-              <span className="glassrow-label">Blur</span>
-              {GLASS_BLURS.map(({ value, label }) => (
-                <button
-                  type="button"
-                  key={value}
-                  className={glassBlur === value ? "aaseg sel" : "aaseg"}
-                  aria-pressed={glassBlur === value}
-                  onClick={() => setGlassBlur(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="tintrow" role="radiogroup" aria-label="Glass tint">
-            {GLASS_TINTS.map(({ value, label }) => (
-              <button
-                type="button"
-                key={value}
-                className={glassTint === value ? "tintchip sel" : "tintchip"}
-                aria-pressed={glassTint === value}
-                onClick={() => setGlassTint(value)}
-              >
-                <i style={{ background: TINT_SWATCH[value] }} aria-hidden="true" />
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="aalabel bglabel">Background</div>
-          <div className="bgrow" role="radiogroup" aria-label="Glass background">
-            {GLASS_BACKGROUNDS.map(({ value, label }) => (
-              <button
-                type="button"
-                key={value}
-                className={glassBackground === value ? "bgchip sel" : "bgchip"}
-                aria-pressed={glassBackground === value}
-                onClick={() => setGlassBackground(value)}
-              >
-                {value === "field" ? (
-                  <span className="bgthumb bgthumb--field" aria-hidden="true" />
-                ) : (
-                  <img className="bgthumb" src={GLASS_BG_SRC[value]} alt="" />
-                )}
-                {label}
-              </button>
-            ))}
-            <label className={glassBackground === "custom" ? "bgchip sel" : "bgchip"}>
-              <span className="bgthumb bgthumb--upload" aria-hidden="true">+</span>
-              Your image
-              <input
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  // data URL (not an object URL) so the persistence layer can
-                  // write the image itself into .rotli/background.json
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    if (typeof reader.result !== "string") return;
-                    setCustomBackground(reader.result);
-                    setGlassBackground("custom");
-                  };
-                  reader.readAsDataURL(file);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-          </div>
-          <p className="setnote">
-            Your own image stays with your settings — quit and relaunch, it&rsquo;s still here.
-          </p>
-        </>
-      </div>
+
     </>
   );
 }

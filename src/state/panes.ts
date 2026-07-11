@@ -312,6 +312,10 @@ interface PanesState {
   openChat: (chatSlug: string | null, opts?: { newTab?: boolean }) => void;
   /** Open a surfaced binary FILE (audio/pdf/image/text) in-app — mirrors openCanvas. */
   openFile: (fileId: string, opts?: { newTab?: boolean }) => void;
+  /** Close every tab pointing at a file that left the corpus (for example after
+   * Move to Trash). The last remaining tab becomes the pristine note placeholder
+   * so the pane-tree invariant — every leaf owns at least one tab — still holds. */
+  closeFileTabs: (fileId: string) => void;
   /** Open the Brain Activity view (the AI-Filer change journal). Singleton per pane. */
   openActivity: () => void;
   /** Open a note/board/file by its summary — the ONE place open-by-kind lives.
@@ -499,6 +503,32 @@ export const usePanesStore = create<PanesState>((set, get) => {
           ),
         ),
       });
+    },
+
+    closeFileTabs: (fileId) => {
+      // Snapshot identities first: closeTabById can collapse leaves, so walking
+      // and mutating the live tree in one pass would skip tabs after a collapse.
+      const targets = leaves(get().root).flatMap((leaf) =>
+        leaf.tabs
+          .filter((tab) => tab.surfaceKind === "file" && tab.fileId === fileId)
+          .map((tab) => ({ paneId: leaf.id, tabId: tab.id })),
+      );
+      for (const target of targets) {
+        const leaf = findLeaf(get().root, target.paneId);
+        if (!leaf?.tabs.some((tab) => tab.id === target.tabId)) continue;
+        if (leaves(get().root).length === 1 && leaf.tabs.length === 1) {
+          const placeholder = makeTab("");
+          set({
+            root: updateLeaf(get().root, leaf.id, (current) => ({
+              ...current,
+              tabs: [placeholder],
+              activeTabId: placeholder.id,
+            })),
+          });
+        } else {
+          get().closeTabById(target.paneId, target.tabId);
+        }
+      }
     },
 
     openActivity: () => {

@@ -987,7 +987,7 @@ pub(crate) fn field_key(line: &str) -> Option<&str> {
 /// Keys rotli owns directly — the metadata-panel editor touches only OTHER
 /// (foreign) keys; `locked` goes through set_locked, the rest are derived.
 /// v3.7: `owner` promoted to RESERVED (provenance, immutable — not user-editable).
-const RESERVED_KEYS: [&str; 9] = [
+const RESERVED_KEYS: [&str; 10] = [
     "id",
     "created",
     "updated",
@@ -995,6 +995,7 @@ const RESERVED_KEYS: [&str; 9] = [
     "origin",
     "locked",
     "secure",
+    "secure_origin",
     "local_ai_allowed",
     "owner",
 ];
@@ -1028,6 +1029,13 @@ pub(crate) fn local_ai_allowed_field(line: &str) -> Option<bool> {
     (k.trim() == "local_ai_allowed").then(|| v.trim() == "true")
 }
 
+/// Physical home to restore when secure protection is removed. This is a
+/// Rotli-owned operational breadcrumb, not user or AI metadata.
+fn secure_origin_field(line: &str) -> Option<String> {
+    let (k, v) = line.split_once(':')?;
+    (k.trim() == "secure_origin").then(|| v.trim().to_string())
+}
+
 /// High-signal secret patterns — API keys, private keys, JWTs, SSNs, card numbers.
 /// ANY match → the note holds secrets: it's flagged `secure: true`, its content is
 /// never sent to a REMOTE model, and its path is gitignored (Seth, 2026-06-29).
@@ -1059,6 +1067,10 @@ pub struct FrontmatterView {
 pub struct FileStat {
     pub len: u64,
     pub writable: bool,
+    /// Whether an explicit user action may move this storage asset to the OS
+    /// Trash. Separate from `writable`: unsupported file formats still need a
+    /// lifecycle action even when Rotli cannot save their bytes in place.
+    pub trashable: bool,
 }
 
 /// What the editor sees: the raw body minus the single conventional blank line
@@ -1217,6 +1229,12 @@ fn project_folder(layout: Layout, disk_folder: &str, fm: &Frontmatter) -> String
         // storage/ binaries surface under the reserved "Storage" destination
         if disk_folder == "storage" || disk_folder.starts_with("storage/") {
             return "Storage".to_string();
+        }
+        if disk_folder == "wiki/_secure" || disk_folder.starts_with("wiki/_secure/") {
+            return shelf_of(fm)
+                .into_iter()
+                .find(|shelf| shelf == "Secure notes" || shelf.starts_with("Secure notes/"))
+                .unwrap_or_else(|| "Secure notes".to_string());
         }
         if disk_folder == "wiki" || disk_folder.starts_with("wiki/") {
             if let Some(primary) = shelf_of(fm).into_iter().next() {
@@ -1768,6 +1786,11 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
     if rel == "wiki/_inbox" || rel.starts_with("wiki/_inbox/") {
         return Surface::NoteRW;
     }
+    // wiki/_secure — protected USER content inside the Brain. It is writable
+    // for its owner, but never an organizer area and still model-gated on read.
+    if rel == "wiki/_secure" || rel.starts_with("wiki/_secure/") {
+        return Surface::NoteRW;
+    }
     // Archive/ + Trash/ — rotli's LIFECYCLE sinks (capitalized, matching the TS
     // destinations + is_hidden_root). A note the user archives/trashes lands in
     // these rotli-owned dirs at the memex root; they're never the curated
@@ -1985,26 +2008,65 @@ impl CorpusStore {
         }
         Ok(FileStat {
             len: meta.len(),
-            // an existing storage/ sheet is editable in place (storage_sheet_editable)
+            // an existing storage/ office file is editable in place
             // even though the contract's writable() refuses the storage lane at large
-            writable: self.writable(rel).is_ok() || self.storage_sheet_editable(rel),
+            writable: self.writable(rel).is_ok() || self.storage_office_editable(rel),
+            trashable: self.storage_file_trashable(rel),
         })
+    }
+
+    /// A surfaced storage asset can be explicitly trashed when the root itself
+    /// accepts mutations. This does not widen any content write lane: the file
+    /// must already exist under the binary storage root, Markdown and boards are
+    /// refused, and the operation always uses recoverable OS/fallback Trash.
+    fn storage_file_trashable(&self, rel: &str) -> bool {
+        if self.mutation_allowed().is_err() || !self.abs(rel).is_file() {
+            return false;
+        }
+        let in_storage = match self.layout {
+            Layout::Memex => rel.starts_with("storage/"),
+            Layout::LegacyRotli => rel.starts_with("Storage/"),
+        };
+        if !in_storage {
+            return false;
+        }
+        let ext = Path::new(rel)
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(str::to_ascii_lowercase);
+        !matches!(ext.as_deref(), Some("md" | "markdown" | "excalidraw"))
+    }
+
+    /// Move an existing storage asset out of the corpus without hard-deleting
+    /// it. Files have no Markdown Trash lane, so macOS Trash is their honest
+    /// reversible lifecycle; tests and OS failures use `.rotli/trash/`.
+    pub fn trash_file(&mut self, rel: &str) -> Result<(), String> {
+        validate_rel(rel)?;
+        if !self.storage_file_trashable(rel) {
+            return Err(format!("this file is read-only or outside Rotli storage: {rel}"));
+        }
+        let abs = self.abs(rel);
+        let name = Path::new(rel)
+            .file_name()
+            .map(|value| value.to_string_lossy().into_owned())
+            .ok_or_else(|| format!("file has no name: {rel}"))?;
+        self.trash_existing_path(&abs, &name, rel)
     }
 
     /// Overwrite a surfaced FILE's raw bytes — the spreadsheet editor's SAVE lane.
     /// Same per-store `writable()` gate as every user write, PLUS the sanctioned
-    /// storage-sheet exception (storage_sheet_editable): an existing `.xlsx`/`.csv`
+    /// storage-office exception (storage_office_editable): an existing sheet/DOCX
     /// in a memex's storage/ edits in place, the way storage/excalidraw already does.
     /// Overwrite ONLY — a missing file is an error, never a create (creation goes
     /// through import/new_file_bytes). `bak`: copy the original to `<name>.bak`
-    /// once, before the FIRST rotli save — exceljs rewrites the whole workbook and
-    /// can drop exotic features (pivots, charts), so the pre-rotli bytes survive.
+    /// once, before the FIRST Rotli save — office codecs can normalize modeled
+    /// content, so the exact pre-Rotli package remains recoverable.
     pub fn write_file_bytes(&mut self, rel: &str, bytes: &[u8], bak: bool) -> Result<(), String> {
         validate_rel(rel)?;
         // the contract gate — unless this is the sanctioned in-place edit of an
-        // existing storage/ sheet (storage_sheet_editable), which the note lanes
+        // existing storage office file, which the note lanes
         // still refuse. Overwrite-only is preserved by the is_file() check below.
-        if !self.storage_sheet_editable(rel) {
+        if !self.storage_office_editable(rel) {
             self.writable(rel)?;
         }
         let abs = self.abs(rel);
@@ -2079,8 +2141,8 @@ impl CorpusStore {
     /// wire as its frontmatter ULID, and reading "<root>/<ULID>" off disk was the
     /// metadata panel's "No such file or directory" (Seth, 2026-07-01).
     fn read_frontmatter(&mut self, id_or_rel: &str) -> Result<FrontmatterView, String> {
-        let rel = &self.resolve_note_rel(id_or_rel)?;
-        let path = self.abs(rel);
+        let rel = self.resolve_note_rel(id_or_rel)?;
+        let path = self.abs(&rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let (fm_opt, body) = parse_document(&text);
         let mut fm = fm_opt.unwrap_or_default();
@@ -2099,9 +2161,7 @@ impl CorpusStore {
         if !secure && looks_secure(body) {
             fm.foreign.push("secure: true".to_string());
             if self.mutation_allowed().is_ok() {
-                if let Err(e) = atomic_write(&path, &compose_document(&fm, body))
-                    .and_then(|()| self.gitignore_add(rel))
-                {
+                if let Err(e) = self.set_secure(&rel, true) {
                     eprintln!("auto-secure-flag (read) failed for {rel}: {e}");
                 }
             }
@@ -2328,8 +2388,11 @@ impl CorpusStore {
         Ok(())
     }
 
-    /// Toggle the per-note SECURE flag. When set, the note's path is gitignored so a
-    /// pushed vault never leaks it. Preserves the body + every other frontmatter line.
+    /// Toggle the per-note SECURE policy. Secure notes have a REAL protected home:
+    /// `wiki/_secure/` inside a memex Brain (`Secure notes/` in the legacy corpus).
+    /// The previous physical folder is kept as a Rotli-owned breadcrumb so removing
+    /// protection can move the same stable note id home again. Every move remains
+    /// gitignored until protection has been removed successfully.
     /// Takes a wire id OR a rel path (resolve_note_rel) — the gitignore line must be
     /// the note's PATH, never its ULID.
     /// SANCTIONED writable() exception (#22): `secure` is a rotli-managed CONTROL
@@ -2337,8 +2400,8 @@ impl CorpusStore {
     /// never be refused by the user-lane gate.
     fn set_secure(&mut self, id_or_rel: &str, secure: bool) -> Result<(), String> {
         self.mutation_allowed()?;
-        let rel = &self.resolve_note_rel(id_or_rel)?;
-        let path = self.abs(rel);
+        let rel = self.resolve_note_rel(id_or_rel)?;
+        let path = self.abs(&rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
         let mut fm = fm.unwrap_or_default();
@@ -2348,19 +2411,68 @@ impl CorpusStore {
                     .into(),
             );
         }
-        fm.foreign.retain(|l| secure_field(l).is_none());
-        if !secure {
-            fm.foreign.retain(|l| local_ai_allowed_field(l).is_none());
-        }
+        let note_id = fm
+            .id
+            .clone()
+            .filter(|id| !id.is_empty())
+            .ok_or_else(|| "secure notes require a stable frontmatter id".to_string())?;
+        let current_folder = folder_of(&rel);
+        let secure_home = match self.layout {
+            Layout::Memex => "wiki/_secure",
+            Layout::LegacyRotli => "Secure notes",
+        };
+        let in_secure_home = current_folder == secure_home
+            || current_folder.starts_with(&format!("{secure_home}/"));
+
         if secure {
+            if !in_secure_home && !fm.foreign.iter().any(|line| secure_origin_field(line).is_some()) {
+                fm.foreign.push(format!("secure_origin: {current_folder}"));
+            }
+            fm.foreign.retain(|line| secure_field(line).is_none());
             fm.foreign.push("secure: true".to_string());
+            // Protect the CURRENT path before any write or move. relocate adds
+            // the target ignore before moving and removes this old line after.
+            self.gitignore_add(&rel)?;
+            self.suppress.mark(&path);
+            atomic_write(&path, &compose_document(&fm, body))?;
+            if !in_secure_home {
+                self.relocate(&note_id, &rel, secure_home)?;
+            }
+            return Ok(());
         }
-        atomic_write(&path, &compose_document(&fm, body))?;
-        if secure {
-            self.gitignore_add(rel)?;
+
+        // Move while the secure flag + ignore are still active; only then drop
+        // protection at the destination. A failed move therefore never exposes
+        // the file at an unignored path.
+        let restore_home = fm
+            .foreign
+            .iter()
+            .find_map(|line| secure_origin_field(line))
+            .filter(|home| {
+                home != secure_home && !home.starts_with(&format!("{secure_home}/"))
+            })
+            .unwrap_or_else(|| match self.layout {
+                Layout::Memex => "wiki/_inbox".to_string(),
+                Layout::LegacyRotli => "Inbox".to_string(),
+            });
+        let final_rel = if in_secure_home {
+            self.relocate(&note_id, &rel, &restore_home)?;
+            self.resolve_note_rel(&note_id)?
         } else {
-            self.gitignore_remove(rel)?;
-        }
+            rel
+        };
+        let final_path = self.abs(&final_rel);
+        let final_text = fs::read_to_string(&final_path).map_err(|e| e.to_string())?;
+        let (final_fm, final_body) = parse_document(&final_text);
+        let mut final_fm = final_fm.unwrap_or_default();
+        final_fm.foreign.retain(|line| {
+            secure_field(line).is_none()
+                && local_ai_allowed_field(line).is_none()
+                && secure_origin_field(line).is_none()
+        });
+        self.suppress.mark(&final_path);
+        atomic_write(&final_path, &compose_document(&final_fm, final_body))?;
+        self.gitignore_remove(&final_rel)?;
         Ok(())
     }
 
@@ -2527,14 +2639,14 @@ impl CorpusStore {
 
     /// A memex `storage/` binary is contract-read-only (the note lanes never write
     /// it — foreign assets are mirrored, not owned). But a user editing an EXISTING
-    /// spreadsheet they dropped there is a deliberate, IN-PLACE overwrite — the same
+    /// spreadsheet or DOCX they dropped there is a deliberate, IN-PLACE overwrite — the same
     /// reasoning that already makes `storage/excalidraw` a writable board lane. This
-    /// SANCTIONED exception (Seth, 2026-07-08) lets the sheet editor's Save — and the
-    /// file_stat that gates edit mode — overwrite an existing `.xlsx`/`.csv` in
+    /// SANCTIONED exception lets the office editors' Save — and the file_stat
+    /// that gates edit mode — overwrite an existing `.xlsx`/`.csv`/DOCX-family file in
     /// storage. It NEVER widens to: new-file creation (new_file_bytes still refuses
-    /// storage), note writes, or any non-sheet file — and it still yields to a
+    /// storage), note writes, or any other binary — and it still yields to a
     /// band/perms read-only brain (checked in `writable`, mirrored here).
-    fn storage_sheet_editable(&self, rel: &str) -> bool {
+    fn storage_office_editable(&self, rel: &str) -> bool {
         if self.layout != Layout::Memex || self.band_read_only || self.perms_read_only {
             return false;
         }
@@ -2549,7 +2661,10 @@ impl CorpusStore {
             .extension()
             .and_then(|e| e.to_str())
             .map(str::to_ascii_lowercase);
-        matches!(ext.as_deref(), Some("xlsx") | Some("csv")) && self.abs(rel).is_file()
+        matches!(
+            ext.as_deref(),
+            Some("xlsx") | Some("csv") | Some("docx") | Some("docm") | Some("dotx") | Some("dotm")
+        ) && self.abs(rel).is_file()
     }
 
     /// Scan the disk (the truth), reconciling the id↔path index as we go:
@@ -2946,14 +3061,16 @@ impl CorpusStore {
         let abs = self.abs(rel);
         if abs.is_file() {
             let text = fs::read_to_string(&abs).map_err(|e| e.to_string())?;
-            let locked = parse_document(&text)
-                .0
-                .unwrap_or_default()
-                .foreign
-                .iter()
-                .any(|l| locked_field(l) == Some(true));
+            let fm = parse_document(&text).0.unwrap_or_default();
+            let locked = fm.foreign.iter().any(|l| locked_field(l) == Some(true));
             if locked {
                 return Err("note is locked — the filer must not touch it".into());
+            }
+            if fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+                || rel == "wiki/_secure"
+                || rel.starts_with("wiki/_secure/")
+            {
+                return Err("note is secure — the organizer must not touch it".into());
             }
         }
         Ok(())
@@ -3084,30 +3201,48 @@ impl CorpusStore {
         body: &str,
         secure: bool,
     ) -> Result<NoteMeta, String> {
-        self.writable(folder_id)?;
-        if !folder_id.is_empty() {
-            validate_rel(folder_id)?;
-            fs::create_dir_all(self.abs(folder_id))
-                .map_err(|e| format!("create folder {folder_id}: {e}"))?;
+        let secure = secure
+            || folder_id == "Secure notes"
+            || folder_id.starts_with("Secure notes/");
+        let disk_folder = if secure {
+            match self.layout {
+                Layout::Memex => "wiki/_secure",
+                Layout::LegacyRotli
+                    if folder_id != "Secure notes" && !folder_id.starts_with("Secure notes/") =>
+                {
+                    "Secure notes"
+                }
+                Layout::LegacyRotli => folder_id,
+            }
+        } else {
+            folder_id
+        };
+        self.writable(disk_folder)?;
+        if !disk_folder.is_empty() {
+            validate_rel(disk_folder)?;
+            fs::create_dir_all(self.abs(disk_folder))
+                .map_err(|e| format!("create folder {disk_folder}: {e}"))?;
         }
         let id = Ulid::new().to_string();
         let now = now_stamp();
         let title = title_of(body);
-        let rel = self.free_name(folder_id, &filename_for(&title, &id), None);
-        let secure = secure
-            || folder_id == "Secure notes"
-            || folder_id.starts_with("Secure notes/");
+        let rel = self.free_name(disk_folder, &filename_for(&title, &id), None);
+        let mut foreign = Vec::new();
+        if secure {
+            foreign.push("secure: true".to_string());
+            if self.layout == Layout::Memex
+                && (folder_id == "Secure notes" || folder_id.starts_with("Secure notes/"))
+            {
+                foreign.push(format!("shelf: [{folder_id}]"));
+            }
+        }
         let fm = Frontmatter {
             id: Some(id.clone()),
             created: Some(now.clone()),
             updated: Some(now.clone()),
             pinned: Some(false),
             origin: None,
-            foreign: if secure {
-                vec!["secure: true".to_string()]
-            } else {
-                Vec::new()
-            },
+            foreign,
         };
         let abs = self.abs(&rel);
         self.suppress.mark(&abs);
@@ -3122,8 +3257,8 @@ impl CorpusStore {
             id,
             title,
             snippet: snippet_of(body),
-            folder_id: folder_id.to_string(),
-            disk_folder_id: folder_id.to_string(),
+            folder_id: project_folder(self.layout, disk_folder, &fm),
+            disk_folder_id: disk_folder.to_string(),
             created_at: ms,
             updated_at: ms,
             pinned: false,
@@ -3326,26 +3461,31 @@ impl CorpusStore {
         let rel = self.path_of(id)?;
         self.writable(&rel)?;
         let abs = self.abs(&rel);
-        self.suppress.mark(&abs);
-        let trashed = self.os_trash && trash::delete(&abs).is_ok();
-        if !trashed {
-            let trash_dir = self.root.join(DOT_DIR).join("trash");
-            fs::create_dir_all(&trash_dir).map_err(|e| format!("create trash: {e}"))?;
-            let name = Path::new(&rel)
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_else(|| format!("{id}.md"));
-            let mut dest = trash_dir.join(&name);
-            let mut n = 2;
-            while dest.exists() {
-                dest = trash_dir.join(format!("{n}-{name}"));
-                n += 1;
-            }
-            fs::rename(&abs, &dest).map_err(|e| format!("trash {rel}: {e}"))?;
-        }
+        let name = Path::new(&rel)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| format!("{id}.md"));
+        self.trash_existing_path(&abs, &name, &rel)?;
         self.index.remove(id);
         self.persist_index();
         Ok(())
+    }
+
+    /// Shared recoverable file removal for note purge and storage assets.
+    fn trash_existing_path(&mut self, abs: &Path, fallback_name: &str, label: &str) -> Result<(), String> {
+        self.suppress.mark(abs);
+        if self.os_trash && trash::delete(abs).is_ok() {
+            return Ok(());
+        }
+        let trash_dir = self.root.join(DOT_DIR).join("trash");
+        fs::create_dir_all(&trash_dir).map_err(|e| format!("create trash: {e}"))?;
+        let mut dest = trash_dir.join(fallback_name);
+        let mut n = 2;
+        while dest.exists() {
+            dest = trash_dir.join(format!("{n}-{fallback_name}"));
+            n += 1;
+        }
+        fs::rename(abs, &dest).map_err(|e| format!("trash {label}: {e}"))
     }
 
     pub fn create_folder(&mut self, name: &str, parent_id: Option<&str>) -> Result<FolderMeta, String> {
@@ -3387,9 +3527,8 @@ impl CorpusStore {
         Ok(CorpusOverview { root, folders, files })
     }
 
-    /// settings.json / viewstate.json / background.json — opaque JSON strings
-    /// the frontend owns (background.json carries the custom glass wallpaper
-    /// as a data URL, so the uploaded image survives relaunch).
+    /// Opaque JSON dot-files. `background.json` remains a readable legacy slot
+    /// so removing the shelved Glass feature never deletes user data.
     pub fn dot_read(&self, which: &str) -> Result<String, String> {
         let path = self.root.join(DOT_DIR).join(dot_file(which)?);
         match fs::read_to_string(&path) {
@@ -3451,7 +3590,8 @@ fn dot_file(which: &str) -> Result<&'static str, String> {
 /// Internal writers (the daemon, corpus_main_write) call `dot_write` directly.
 fn user_dot_writable(which: &str) -> Result<(), String> {
     match which {
-        "settings" | "viewstate" | "background" => Ok(()),
+        "settings" | "viewstate" => Ok(()),
+        "background" => Err("the legacy background slot is read-only".into()),
         "main" => Err("write .rotli/main.json through corpus_main_write".into()),
         "organizer" => Err("`organizer` is the daemon's own state — not writable from the app".into()),
         other => Err(format!("unknown settings file: {other}")),
@@ -4023,6 +4163,15 @@ pub fn corpus_file_stat(state: tauri::State<'_, CorpusState>, id: String) -> Res
     state.route(&root, |s| s.file_stat(&rel))
 }
 
+/// Move a surfaced storage asset to recoverable Trash. This is deliberately a
+/// separate command from note deletion: binary files have no Markdown Trash
+/// lane and must pass the storage + root mutation gates independently.
+#[tauri::command]
+pub fn corpus_trash_file(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |store| store.trash_file(&rel))
+}
+
 /// Save a surfaced FILE's bytes back to disk (base64 in) — the spreadsheet
 /// editor's explicit Save. Gated by the same writable() lane as every user write.
 #[tauri::command]
@@ -4545,7 +4694,7 @@ pub fn corpus_overview(state: tauri::State<'_, CorpusState>) -> Result<CorpusOve
 
 /// Demo mode swaps the NOTES memex but must not touch per-machine chrome: the
 /// user's look and — crucially — the `onboarded` flag live in settings.json /
-/// viewstate.json / background.json, which we keep reading from and writing to the
+/// viewstate.json, which we keep reading from and writing to the
 /// REAL corpus's `.rotli/` so a demo never forces re-onboarding or resets the theme
 /// (Seth, 2026-07-07). `main.json` is per-MEMEX (it travels with the notes), so it
 /// is deliberately NOT redirected — it still routes to the active (demo) store.
@@ -4553,7 +4702,7 @@ fn demo_machine_dot_path(app: &tauri::AppHandle, file: &str) -> Option<PathBuf> 
     if !demo_active(app) {
         return None;
     }
-    if !matches!(file, "settings" | "viewstate" | "background") {
+    if !matches!(file, "settings" | "viewstate") {
         return None;
     }
     let real = read_corpus_config(app)?.corpus.abs_path;
@@ -4586,7 +4735,7 @@ pub fn corpus_settings_read(
             Err(e) => Err(format!("read {file}: {e}")),
         };
     }
-    // settings/viewstate/background live in the DEFAULT root's `.rotli/` — except in
+    // settings/viewstate live in the DEFAULT root's `.rotli/` — except in
     // demo mode, where per-machine chrome stays with the user's real corpus (#3).
     if let Some(path) = demo_machine_dot_path(&app, &file) {
         return match fs::read_to_string(&path) {
@@ -4955,6 +5104,28 @@ mod tests {
         assert!(!store.managed_file_creation_available());
         assert!(store.create_managed_file("blocked.docx", b"nope").is_err());
         assert!(!root.join("storage/rotli/blocked.docx").exists());
+    }
+
+    #[test]
+    fn storage_files_move_to_recoverable_trash_only_when_mutable() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+
+        let doc = store.create_managed_file("draft.docx", b"docx").unwrap();
+        let stat = store.file_stat(&doc).unwrap();
+        assert!(stat.writable, "DOCX files open in Rotli's local document editor");
+        assert!(stat.trashable, "managed files still need a lifecycle action");
+        store.trash_file(&doc).unwrap();
+        assert!(!root.join(&doc).exists());
+        assert!(root.join(".rotli/trash/draft.docx").is_file());
+
+        fs::create_dir_all(root.join("wiki/projects")).unwrap();
+        fs::write(root.join("wiki/projects/reference.pdf"), b"keep").unwrap();
+        assert!(store.trash_file("wiki/projects/reference.pdf").is_err());
+        assert!(root.join("wiki/projects/reference.pdf").is_file());
     }
 
     /// Fresh corpus (first run happens: Inbox + welcome note exist).
@@ -5990,10 +6161,10 @@ mod tests {
     }
 
     /// #1 (audit 2026-07, CRITICAL): a SECURE note's `.gitignore` line is its
-    /// PATH — a rename, a user move, and a filer move must all carry it along,
-    /// or the flagged secret becomes committable the moment the file moves.
+    /// PATH — a rename and a user move must carry it along, while the memex
+    /// secure-home transition must keep the organizer categorically outside.
     #[test]
-    fn gitignore_follows_a_secure_note_on_rename_move_and_filing() {
+    fn gitignore_follows_secure_moves_and_memex_secure_home_blocks_filing() {
         let ignored_lines = |root: &Path| -> Vec<String> {
             fs::read_to_string(root.join(".gitignore"))
                 .unwrap_or_default()
@@ -6033,23 +6204,25 @@ mod tests {
         let plain_rel = store.path_of(&plain.id).unwrap();
         assert!(!ignored_lines(&store.root).contains(&plain_rel));
 
-        // — memex corpus: the FILER lane (file_note) moves a secure note too —
+        // — memex corpus: marking secure moves the note into its protected
+        // Brain home; the filer cannot write or move it; removing protection
+        // restores its previous physical home with the same stable id. —
         let tmp2 = TempDir::new().unwrap();
         let brain = tmp2.path().join("brain");
         seed_memex(&brain);
         let mut mx = CorpusStore::open(brain).unwrap();
         mx.os_trash = false;
-        let staged = mx.create("wiki/_inbox", "# Card\n\n4242-4242-4242-4242").unwrap();
+        let staged = mx.create("wiki/_inbox", "# Private draft\n\nOwner-only notes").unwrap();
         mx.set_secure(&staged.id, true).unwrap();
-        let staged_rel = mx.path_of(&staged.id).unwrap();
-        assert!(ignored_lines(&mx.root).contains(&staged_rel));
-        mx.set_ai_field(&staged.id, "area", "Projects").unwrap();
-        mx.file_note(&staged.id).unwrap();
-        let filed_rel = mx.path_of(&staged.id).unwrap();
-        assert!(filed_rel.starts_with("wiki/Projects/"));
-        let lines = ignored_lines(&mx.root);
-        assert!(lines.contains(&filed_rel), "filed path must be ignored: {lines:?}");
-        assert!(!lines.contains(&staged_rel), "staging line must be gone: {lines:?}");
+        let secure_rel = mx.path_of(&staged.id).unwrap();
+        assert!(secure_rel.starts_with("wiki/_secure/"));
+        assert!(ignored_lines(&mx.root).contains(&secure_rel));
+        assert!(mx.set_ai_field(&staged.id, "area", "Projects").is_err());
+        assert!(mx.file_note(&staged.id).is_err());
+        mx.set_secure(&staged.id, false).unwrap();
+        let restored_rel = mx.path_of(&staged.id).unwrap();
+        assert!(restored_rel.starts_with("wiki/_inbox/"));
+        assert!(!ignored_lines(&mx.root).contains(&restored_rel));
     }
 
     /// Follow-up to #1 (review, 2026-07): the gitignore sync fires BEFORE the
@@ -6208,7 +6381,7 @@ mod tests {
     fn settings_write_whitelist_protects_daemon_and_main_files() {
         assert!(user_dot_writable("settings").is_ok());
         assert!(user_dot_writable("viewstate").is_ok());
-        assert!(user_dot_writable("background").is_ok());
+        assert!(user_dot_writable("background").is_err(), "legacy wallpaper is read-only");
         assert!(user_dot_writable("organizer").is_err(), "daemon-owned state");
         assert!(user_dot_writable("main").is_err(), "main goes through corpus_main_write");
         assert!(user_dot_writable("junk").is_err());

@@ -51,21 +51,18 @@ const coolGray = {
   900: "#0F0F0F",
 } as const;
 
-export type UniverNeutral = "warm" | "cool" | "mono";
+export type UniverNeutral = "warm" | "mono";
 
-/** Pick the chrome family from the live app theme. Paper/charcoal are mono;
- * glass uses cool neutrals; the branded light/dark pair stays warm. */
+/** Pick the chrome family from the live app theme. */
 export function univerNeutralForTheme(theme: string | undefined): UniverNeutral {
   if (!theme) return "warm";
   if (theme === "charcoal" || theme === "paper") return "mono";
-  if (theme.startsWith("glass")) return "cool";
   return "warm";
 }
 
 /** The theme Univer's chrome (toolbar · selection · sheet tabs) paints with. */
 export function rotliUniverTheme(neutral: UniverNeutral = "warm"): Theme {
-  const gray = neutral === "cool" ? coolGray : warmGray;
-  const resolvedGray = neutral === "mono" ? coolGray : gray;
+  const resolvedGray = neutral === "mono" ? coolGray : warmGray;
   return {
     ...defaultTheme,
     white: resolvedGray[50],

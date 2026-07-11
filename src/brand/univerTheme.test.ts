@@ -7,9 +7,8 @@ describe("Univer app-theme mapping", () => {
     expect(univerNeutralForTheme("charcoal")).toBe("mono");
   });
 
-  test("warm and glass themes keep their established families", () => {
+  test("the branded light/dark pair stays warm", () => {
     expect(univerNeutralForTheme("dark")).toBe("warm");
-    expect(univerNeutralForTheme("glass-dark")).toBe("cool");
   });
 
   test("charcoal removes clay from Univer primary chrome", () => {

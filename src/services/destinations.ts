@@ -95,6 +95,7 @@ export function destContains(destId: string, folderId: string): boolean {
   if (isRootMarker(destId)) return folderId.startsWith(destId);
   const under = (root: string) => folderId === root || folderId.startsWith(`${root}/`);
   if (destId === "Brain") return under("wiki");
+  if (destId === DEST.secure) return under("wiki/_secure") || under(DEST.secure);
   if (destId === DEST.storage) return under("storage") || under(DEST.storage);
   return under(destId);
 }

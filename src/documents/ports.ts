@@ -1,4 +1,4 @@
-import type { DocumentDraft } from "./model";
+import type { DocumentDraft, EditableDocument } from "./model";
 
 /** Output adapter for any shareable document encoding (DOCX today). */
 export interface DocumentEncoder {
@@ -16,12 +16,20 @@ export interface DocumentFileReader {
   readBase64(id: string, maxBytes: number): Promise<string>;
 }
 
-export interface DocumentPreviewContent {
-  srcDoc: string;
+export interface DocumentFileWriter {
+  writeBase64(id: string, base64: string, backup: boolean): Promise<void>;
+}
+
+export interface DecodedDocument<Source> {
+  source: Source;
+  document: EditableDocument;
   warnings: string[];
 }
 
-/** Replaceable local preview adapter (Mammoth today, never visible to the UI). */
-export interface DocumentPreviewer {
-  preview(base64: string): Promise<DocumentPreviewContent>;
+/** Local format adapter. Source remains adapter-owned (the original OOXML
+ * package for DOCX), while the application and editor exchange only the clean
+ * document model. */
+export interface DocumentEditorCodec<Source> {
+  decode(base64: string, fileId: string): Promise<DecodedDocument<Source>>;
+  encode(source: Source, document: EditableDocument): Promise<string>;
 }

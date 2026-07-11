@@ -256,13 +256,6 @@ export function registerDefaultActions(): void {
     run: () => useUiStore.getState().cycleTheme(),
   });
 
-  registerAction({
-    id: "theme.cycleGlassTint",
-    title: "Cycle glass tint",
-    defaultChord: null,
-    run: () => useUiStore.getState().cycleGlassTint(),
-  });
-
   // — notes —
   registerAction({
     id: "notes.new",
