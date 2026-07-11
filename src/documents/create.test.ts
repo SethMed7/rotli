@@ -14,9 +14,12 @@ describe("local DOCX creation", () => {
       table: [["Action", "Result"], ["Zoom in", "Stay in the note"]],
     });
     const result = await decodeDocx(base64, "storage/rotli/example.docx");
-    expect(result.document.paragraphs.map((paragraph) => paragraph.runs.map((run) => run.text).join("")))
+    expect(result.document.content
+      .filter((content) => content.kind === "paragraph")
+      .map((content) => content.kind === "paragraph" ? content.paragraph.runs.map((run) => run.text).join("") : ""))
       .toEqual(["Rotli document", "Local and portable", "Workflow", "Embedded in a note."]);
-    expect(result.warnings).toEqual(["1 table is preserved but not editable yet"]);
+    expect(result.document.content.some((content) => content.kind === "table")).toBe(true);
+    expect(result.warnings).toEqual([]);
   });
 
   test("new documents start as a genuinely blank editable page", () => {

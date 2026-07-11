@@ -30,9 +30,15 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   frontmatter.
 - Documents are conventional DOCX files. They do not host Markdown slash
   commands or embed syntax. Rotli creates and edits them locally through a
-  structured document model. The DOCX codec round-trips supported OOXML while
-  preserving unknown package parts and opaque body nodes; the Rust corpus
+  structured document model, including native Word tables. The DOCX codec
+  round-trips supported OOXML while preserving unknown package parts and
+  unsupported Word objects; the Rust corpus
   boundary independently restricts writes to the managed binary lane.
+- Legacy `.doc`, `.rtf`, and `.odt` conversion is local and copy-only: the fixed
+  macOS system converter produces a new managed DOCX, the original is never
+  overwritten, and the result is not added to Markdown slash results until it
+  exists as an editable DOCX. Formats without a faithful local route remain
+  explicitly unsupported.
 - Sheets use the workbook editor/codec boundary; boards use the canvas boundary.
 - Markdown document slash commands list only formats the embedded document
   editor can edit. They may create a blank managed DOCX or embed an existing

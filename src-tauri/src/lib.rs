@@ -871,6 +871,7 @@ pub fn run() {
             corpus::corpus_write_file_bytes,
             corpus::corpus_new_file_bytes,
             corpus::corpus_create_managed_file,
+            corpus::corpus_convert_document,
             corpus::corpus_managed_file_creation_available,
             corpus::corpus_reveal_file,
             corpus::corpus_open_with_apps,

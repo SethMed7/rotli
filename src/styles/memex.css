@@ -1005,27 +1005,6 @@
   border: none;
   background: var(--surface-2);
 }
-.file-document-fallback {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-.file-document-fallback > p {
-  position: absolute;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  width: min(520px, calc(100% - 36px));
-  margin: 0;
-  padding: 7px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  color: var(--text-muted);
-  font-size: 12px;
-  text-align: center;
-  box-shadow: var(--shadow-popover);
-}
 .file-sheet {
   display: flex;
   flex-direction: column;
@@ -1316,6 +1295,75 @@
 .document-save:disabled {
   opacity: 0.5;
   cursor: default;
+}
+.file-document-fallback {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  width: min(100%, 560px);
+  margin: 0 auto;
+  padding: 32px;
+  color: var(--text);
+}
+.file-document-fallback h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  line-height: 1.25;
+}
+.file-document-fallback p {
+  max-width: 58ch;
+  margin: 0 0 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.file-convert-document {
+  border: 1px solid var(--accent);
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.file-convert-document:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+.file-convert-document:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.file-convert-document:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.file-document-fallback .file-conversion-error {
+  margin: 12px 0 0;
+  color: var(--danger, var(--accent-text));
+}
+.file-document-fallback .file-conversion-note {
+  margin: 12px 0 0;
+  font-size: 11.5px;
+}
+
+@media (max-width: 800px) {
+  .file-head {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+  .document-preserved {
+    max-width: 112px;
+  }
+  .document-save {
+    padding-inline: 9px;
+  }
+  .file-document-fallback {
+    justify-content: flex-start;
+    padding: 24px 18px;
+  }
 }
 .chat-readonly {
   flex: 0 0 auto;

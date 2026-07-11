@@ -40,10 +40,32 @@ export interface DocumentParagraph {
   list?: "bullet" | "number";
 }
 
+export interface DocumentTableCell {
+  paragraphs: DocumentParagraph[];
+  /** A zero span is Univer's covered-cell marker for a merged neighbor. */
+  rowSpan?: number;
+  columnSpan?: number;
+}
+
+export interface DocumentTableRow {
+  cells: DocumentTableCell[];
+}
+
+export interface DocumentTable {
+  id: string;
+  rows: DocumentTableRow[];
+  /** Editor-space widths. The OOXML adapter converts these to and from twips. */
+  columnWidths?: number[];
+}
+
+export type DocumentContent =
+  | { kind: "paragraph"; paragraph: DocumentParagraph }
+  | { kind: "table"; table: DocumentTable };
+
 export interface EditableDocument {
   id: string;
   title: string;
-  paragraphs: DocumentParagraph[];
+  content: DocumentContent[];
 }
 
 export function blankDocumentDraft(): DocumentDraft {

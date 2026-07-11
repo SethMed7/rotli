@@ -3,11 +3,18 @@
  * storage with concrete DOCX adapters and application use cases.
  */
 import {
+  corpusConvertDocument,
   corpusCreateManagedFile,
   corpusFileBytes,
   corpusFileStat,
   corpusWriteFileBytes,
 } from "../lib/tauri";
+import { invalidateMemex } from "../memex/useMemex";
+import { MAIN_ROOT, addNoteToMainAt } from "../services/mainTree";
+import { invalidateNotes } from "../services/hooks";
+import { useMainStore } from "../state/main";
+import { usePanesStore } from "../state/panes";
+import { convertLegacyDocument } from "./conversion";
 import { DOCUMENT_EDIT_MAX_BYTES } from "./kinds";
 import { blankDocumentDraft } from "./model";
 import type { DocumentFileReader, DocumentFileWriter, DocumentRepository } from "./ports";
@@ -37,4 +44,13 @@ export async function editManagedDocument(fileId: string) {
     { reader, writer, codec: docxEditorCodec, maxBytes: DOCUMENT_EDIT_MAX_BYTES },
     fileId,
   );
+}
+
+export async function convertDocumentToManagedDocx(fileId: string): Promise<string> {
+  const id = await convertLegacyDocument({ convertToManagedDocx: corpusConvertDocument }, fileId);
+  await Promise.all([invalidateNotes(), invalidateMemex()]);
+  const { manifest, setTree } = useMainStore.getState();
+  setTree(addNoteToMainAt(manifest.tree, id, MAIN_ROOT));
+  usePanesStore.getState().openFile(id, { newTab: true });
+  return id;
 }

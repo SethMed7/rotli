@@ -45,7 +45,7 @@ describe("document application workflows", () => {
     const codec: DocumentEditorCodec<string> = {
       decode: async () => {
         decodes += 1;
-        return { source: "source", document: { id: "large.docx", title: "Large", paragraphs: [] }, warnings: [] };
+        return { source: "source", document: { id: "large.docx", title: "Large", content: [] }, warnings: [] };
       },
       encode: async () => "encoded",
     };
@@ -72,16 +72,24 @@ describe("document application workflows", () => {
     const codec: DocumentEditorCodec<string> = {
       decode: async (base64) => ({
         source: `source:${base64}`,
-        document: { id: "brief.docx", title: "Brief", paragraphs: [{ runs: [{ text: "before" }] }] },
+        document: {
+          id: "brief.docx",
+          title: "Brief",
+          content: [{ kind: "paragraph", paragraph: { runs: [{ text: "before" }] } }],
+        },
         warnings: [],
       }),
-      encode: async (source, document) => `${source}:${document.paragraphs[0]?.runs[0]?.text}`,
+      encode: async (source, document) =>
+        `${source}:${document.content[0]?.kind === "paragraph" ? document.content[0].paragraph.runs[0]?.text : ""}`,
     };
 
     const result = await editDocument({ reader, writer, codec, maxBytes: 100 }, "brief.docx");
     expect(result.kind).toBe("ready");
     if (result.kind !== "ready") throw new Error("expected an editable document");
-    await result.save({ ...result.document, paragraphs: [{ runs: [{ text: "after" }] }] });
+    await result.save({
+      ...result.document,
+      content: [{ kind: "paragraph", paragraph: { runs: [{ text: "after" }] } }],
+    });
     expect(writes).toEqual(["source:bytes:101:after:true"]);
   });
 });

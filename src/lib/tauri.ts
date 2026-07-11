@@ -677,6 +677,13 @@ export async function corpusCreateManagedFile(name: string, base64: string): Pro
   return invoke<string>("corpus_create_managed_file", { name, base64 });
 }
 
+/** Convert a legacy .doc/.rtf/.odt into a new managed DOCX with the macOS
+ * local converter. The source is never overwritten. */
+export async function corpusConvertDocument(id: string): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_convert_document", { id });
+}
+
 /** False for read-only roots, including the production snapshot mounted in dev. */
 export async function corpusManagedFileCreationAvailable(): Promise<boolean> {
   if (!isTauri()) return false;

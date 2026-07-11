@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-07-11
+
+### Added
+
+- **Word tables are editable in Rotli.** DOCX tables now travel through the
+  framework-free document model and Univer adapter, and cell edits, formatting,
+  rows, columns, widths, and supported merges round-trip through the OOXML codec.
+  Unrelated package parts and unsupported Word objects remain preserved.
+- **Legacy documents have a local copy-to-DOCX path.** `.doc`, `.rtf`, and
+  `.odt` files can create a new managed DOCX through the macOS system converter
+  without an account, cloud service, or overwrite of the source. Formats without
+  a faithful route are labeled unsupported rather than shown as document previews.
+
 ## [0.31.0] - 2026-07-11
 
 ### Changed

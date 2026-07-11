@@ -31,6 +31,7 @@ import {
 } from "../lib/tauri";
 import {
   DOCX_EDITABLE,
+  DOCUMENT_CONVERTIBLE,
   DOCUMENT_EDIT_MAX_BYTES,
   DOCUMENT_EXTS,
   DOCUMENT_OPEN_WITH_APPS,
@@ -178,6 +179,8 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   );
   // a read-only sheet/html file past the byte cap: refuse honestly, never half-parse
   const [tooLarge, setTooLarge] = useState(false);
+  const [converting, setConverting] = useState(false);
+  const [conversionError, setConversionError] = useState("");
   // image zoom: natural px from onLoad, the body's size from a ResizeObserver,
   // and the mode — "fit" (contain, never upscale) or an explicit scale
   const [imgNat, setImgNat] = useState<{ w: number; h: number } | null>(null);
@@ -211,6 +214,8 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
     setErr(null);
     setHtmlMode(htmlModeMemo.get(fileId) ?? "preview");
     setTooLarge(false);
+    setConverting(false);
+    setConversionError("");
     setImgNat(null);
     setImgZoom(imgZoomMemo.get(fileId) ?? "fit");
     const fail = (e: unknown) => !cancelled && setErr((e as Error)?.message ?? "couldn't load the file");
@@ -274,6 +279,11 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           setProbed(true);
           if (s && s.len > DOCUMENT_EDIT_MAX_BYTES) setTooLarge(true);
         });
+    } else if (kind === "document") {
+      // Legacy documents never enter a passive preview. The supported local
+      // conversion family gets an explicit copy-to-DOCX action; every other
+      // legacy format is labeled unsupported and stays untouched.
+      setProbed(true);
     } else {
       // audio / video / image / pdf / other → an asset:// URL for the tag
       fileAssetUrl(fileId)
@@ -365,13 +375,26 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
     openMenu(r.left, r.bottom + 4, items);
   };
 
+  const convertDocument = async () => {
+    if (converting || !DOCUMENT_CONVERTIBLE.has(ext)) return;
+    setConverting(true);
+    setConversionError("");
+    try {
+      const { convertDocumentToManagedDocx } = await import("../documents/composition");
+      await convertDocumentToManagedDocx(fileId);
+    } catch (error) {
+      setConversionError(error instanceof Error ? error.message : "Could not create an editable DOCX copy");
+    } finally {
+      setConverting(false);
+    }
+  };
+
   const loadingMedia =
     (kind === "audio" ||
       kind === "video" ||
       kind === "image" ||
       kind === "pdf" ||
-      kind === "other" ||
-      (kind === "document" && !DOCX_EDITABLE.has(ext))) &&
+      kind === "other") &&
     !url &&
     !err;
   const loadingText = kind === "text" && text === null && !err;
@@ -566,10 +589,41 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             <p>This document is in a protected location. Move it into Rotli Storage to edit it.</p>
           </div>
         )}
-        {!err && kind === "document" && !DOCX_EDITABLE.has(ext) && url && (
+        {!err && kind === "document" && probed && !DOCX_EDITABLE.has(ext) && (
           <div className="file-document-fallback">
-            <iframe className="file-frame" title={name} src={url} />
-            <p>Convert this older .{ext} file to DOCX to edit it in Rotli.</p>
+            {DOCUMENT_CONVERTIBLE.has(ext) ? (
+              <>
+                <h2>Convert a copy to edit here</h2>
+                <p>
+                  Rotli can use the local macOS document converter for .{ext}. It creates a new
+                  managed DOCX in Rotli Storage and leaves the original unchanged.
+                </p>
+                <button
+                  type="button"
+                  className="file-convert-document"
+                  disabled={converting}
+                  onClick={() => void convertDocument()}
+                >
+                  {converting ? "Converting…" : "Convert copy to DOCX"}
+                </button>
+                {conversionError && (
+                  <p className="file-conversion-error" role="alert">
+                    {conversionError}
+                  </p>
+                )}
+                <p className="file-conversion-note">
+                  Complex layout, embedded objects, and legacy fields may need review after conversion.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2>.{ext || "unknown"} is unsupported</h2>
+                <p>
+                  Rotli does not have a faithful local conversion path for this format. Open the
+                  original externally and export a DOCX copy to edit it in Rotli.
+                </p>
+              </>
+            )}
           </div>
         )}
 

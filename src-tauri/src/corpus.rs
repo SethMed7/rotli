@@ -4229,6 +4229,100 @@ pub fn corpus_create_managed_file(
     Ok(compose_root_id(&default_id, &rel))
 }
 
+const LOCAL_DOCUMENT_CONVERSION_EXTS: &[&str] = &["doc", "rtf", "odt"];
+const LOCAL_DOCUMENT_CONVERSION_MAX_BYTES: u64 = 32_000_000;
+
+fn converted_document_name(rel: &str) -> Result<String, String> {
+    let path = Path::new(rel);
+    let ext = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(str::to_ascii_lowercase)
+        .ok_or_else(|| "this file has no supported document extension".to_string())?;
+    if !LOCAL_DOCUMENT_CONVERSION_EXTS.contains(&ext.as_str()) {
+        return Err(format!(".{ext} has no faithful local DOCX conversion path"));
+    }
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("converted");
+    Ok(format!("{stem}.docx"))
+}
+
+/// Convert a legacy local document into a NEW managed DOCX. The source path is
+/// resolved by the corpus, the converter is the fixed macOS system binary, and
+/// the original is never opened for writing. The resulting bytes still pass
+/// the managed-file extension and mutation gates before entering the memex.
+#[tauri::command]
+pub fn corpus_convert_document(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+) -> Result<String, String> {
+    let (root, rel) = split_root_id(&id);
+    let output_name = converted_document_name(&rel)?;
+    let source = state.route(&root, |store| Ok(store.root().join(&rel)))?;
+    let metadata = fs::metadata(&source)
+        .map_err(|error| format!("read {}: {error}", source.display()))?;
+    if !metadata.is_file() {
+        return Err(format!("not a file: {}", source.display()));
+    }
+    if metadata.len() > LOCAL_DOCUMENT_CONVERSION_MAX_BYTES {
+        return Err("This document is too large for safe local conversion (32 MB maximum).".into());
+    }
+
+    let default_id = state.default_root_id()?;
+    state.route(&default_id, |store| {
+        if store.managed_file_creation_available() {
+            Ok(())
+        } else {
+            Err("Rotli Storage is read-only, so a converted copy cannot be created.".into())
+        }
+    })?;
+
+    #[cfg(target_os = "macos")]
+    let converted = {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let output = std::env::temp_dir().join(format!("rotli-document-{nonce}.docx"));
+        let command = std::process::Command::new("/usr/bin/textutil")
+            .args(["-convert", "docx", "-output"])
+            .arg(&output)
+            .arg("--")
+            .arg(&source)
+            .output()
+            .map_err(|error| format!("start the macOS document converter: {error}"))?;
+        if !command.status.success() {
+            let _ = fs::remove_file(&output);
+            let detail = String::from_utf8_lossy(&command.stderr).trim().to_string();
+            return Err(if detail.is_empty() {
+                "The macOS document converter could not create an editable DOCX copy.".into()
+            } else {
+                format!("The macOS document converter failed: {detail}")
+            });
+        }
+        let bytes = fs::read(&output).map_err(|error| format!("read converted DOCX: {error}"));
+        let _ = fs::remove_file(&output);
+        let bytes = bytes?;
+        if !bytes.starts_with(b"PK") {
+            return Err("The local converter did not produce a valid DOCX package.".into());
+        }
+        bytes
+    };
+    #[cfg(not(target_os = "macos"))]
+    return Err("Local legacy-document conversion is currently available only on macOS.".into());
+
+    #[cfg(target_os = "macos")]
+    {
+        let rel = state.route(&default_id, |store| {
+            store.create_managed_file(&output_name, &converted)
+        })?;
+        Ok(compose_root_id(&default_id, &rel))
+    }
+}
+
 #[tauri::command]
 pub fn corpus_managed_file_creation_available(
     state: tauri::State<'_, CorpusState>,
@@ -4828,6 +4922,15 @@ mod tests {
         }
         assert!(!OPEN_WITH_APPS.contains(&"Terminal"));
         assert!(!OPEN_WITH_APPS.contains(&"/bin/sh"));
+    }
+
+    #[test]
+    fn legacy_document_conversion_names_only_the_explicit_local_family() {
+        assert_eq!(converted_document_name("storage/Quarterly report.doc").unwrap(), "Quarterly report.docx");
+        assert_eq!(converted_document_name("storage/notes.rtf").unwrap(), "notes.docx");
+        assert_eq!(converted_document_name("storage/draft.odt").unwrap(), "draft.docx");
+        assert!(converted_document_name("storage/design.pages").is_err());
+        assert!(converted_document_name("storage/macro.docm").is_err());
     }
 
     #[test]

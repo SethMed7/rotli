@@ -2,9 +2,12 @@ import JSZip from "jszip";
 import { fileName } from "../../lib/fileKind";
 import type {
   DocumentAlignment,
+  DocumentContent,
   DocumentNamedStyle,
   DocumentParagraph,
   DocumentRun,
+  DocumentTable,
+  DocumentTableCell,
   DocumentTextStyle,
   EditableDocument,
 } from "../model";
@@ -12,6 +15,7 @@ import type { DocumentEditorCodec } from "../ports";
 
 type LayoutNode =
   | { kind: "paragraph"; xml: string; original: DocumentParagraph }
+  | { kind: "table"; xml: string; original: DocumentTable }
   | { kind: "opaque"; xml: string };
 
 export interface DocxSource {
@@ -161,6 +165,65 @@ function topLevelNodes(body: string): string[] {
   return nodes;
 }
 
+function innerXml(xml: string, tag: string): string {
+  return new RegExp(`<w:${tag}\\b[^>]*>([\\s\\S]*?)<\\/w:${tag}>`, "i").exec(xml)?.[1] ?? "";
+}
+
+function tableFromXml(xml: string, index: number): { table: DocumentTable; advancedParagraphs: number } {
+  const grid = /<w:tblGrid\b[^>]*>([\s\S]*?)<\/w:tblGrid>/i.exec(xml)?.[1] ?? "";
+  const columnWidths = [...grid.matchAll(/<w:gridCol\b[^>]*\bw:w=["'](\d+)["'][^>]*\/?\s*>/gi)]
+    .map((match) => Number.parseInt(match[1] ?? "", 10) / 15)
+    .filter((width) => Number.isFinite(width) && width > 0);
+  let advancedParagraphs = 0;
+  const rows = topLevelNodes(innerXml(xml, "tbl"))
+    .filter((node) => /^<w:tr\b/i.test(node))
+    .map((rowXml) => ({
+      cells: topLevelNodes(innerXml(rowXml, "tr"))
+        .filter((node) => /^<w:tc\b/i.test(node))
+        .map((cellXml): DocumentTableCell => {
+          const props = /<w:tcPr\b[^>]*>([\s\S]*?)<\/w:tcPr>|<w:tcPr\b[^>]*\/>/i.exec(cellXml)?.[1] ?? "";
+          const gridSpan = Number.parseInt(val(props, "gridSpan") ?? "", 10);
+          const merge = /<w:vMerge\b([^>]*)\/?\s*>/i.exec(props);
+          const mergeValue = merge ? /\bw:val=["']([^"']+)["']/i.exec(merge[1] ?? "")?.[1] : undefined;
+          const paragraphs = topLevelNodes(innerXml(cellXml, "tc"))
+            .filter((node) => /^<w:p\b/i.test(node))
+            .map((paragraphXml) => {
+              if (/<w:(?:drawing|object|pict|fldChar|commentReference|bookmarkStart|sdt)\b/i.test(paragraphXml)) {
+                advancedParagraphs += 1;
+              }
+              return parseParagraph(paragraphXml);
+            });
+          return {
+            paragraphs: paragraphs.length ? paragraphs : [{ runs: [{ text: "" }] }],
+            ...(Number.isFinite(gridSpan) && gridSpan > 1 ? { columnSpan: gridSpan } : {}),
+            ...(merge ? { rowSpan: mergeValue === "restart" ? 1 : 0 } : {}),
+          };
+        }),
+    }));
+  for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
+    const row = rows[rowIndex]!;
+    for (let cellIndex = 0; cellIndex < row.cells.length; cellIndex += 1) {
+      if (row.cells[cellIndex]?.rowSpan !== 0) continue;
+      for (let previous = rowIndex - 1; previous >= 0; previous -= 1) {
+        const anchor = rows[previous]?.cells[cellIndex];
+        if (!anchor) break;
+        if (anchor.rowSpan === 0) continue;
+        if (anchor.rowSpan === undefined) break;
+        anchor.rowSpan += 1;
+        break;
+      }
+    }
+  }
+  return {
+    table: {
+      id: `table-${index + 1}`,
+      rows,
+      ...(columnWidths.length ? { columnWidths } : {}),
+    },
+    advancedParagraphs,
+  };
+}
+
 function styleId(style?: DocumentNamedStyle): string | undefined {
   if (style === "title") return "Title";
   if (style === "subtitle") return "Subtitle";
@@ -198,7 +261,18 @@ function runXml(run: DocumentRun): string {
   return `<w:r>${props ? `<w:rPr>${props}</w:rPr>` : ""}${pieces.join("")}</w:r>`;
 }
 
-function paragraphXml(paragraph: DocumentParagraph): string {
+function preservedParagraphObjects(originalXml?: string): string {
+  if (!originalXml) return "";
+  return topLevelNodes(innerXml(originalXml, "p"))
+    .filter(
+      (node) =>
+        !/^<w:pPr\b/i.test(node) &&
+        /<w:(?:drawing|object|pict|fldChar|commentReference|bookmarkStart|bookmarkEnd|sdt)\b/i.test(node),
+    )
+    .join("");
+}
+
+function paragraphXml(paragraph: DocumentParagraph, originalXml?: string): string {
   const id = styleId(paragraph.namedStyle);
   const align = paragraphAlignment(paragraph.alignment);
   const props = [
@@ -207,11 +281,102 @@ function paragraphXml(paragraph: DocumentParagraph): string {
     paragraph.list ? '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>' : "",
   ].join("");
   const runs = paragraph.runs.length ? paragraph.runs : [{ text: "" }];
-  return `<w:p>${props ? `<w:pPr>${props}</w:pPr>` : ""}${runs.map(runXml).join("")}</w:p>`;
+  return `<w:p>${props ? `<w:pPr>${props}</w:pPr>` : ""}${runs.map(runXml).join("")}${preservedParagraphObjects(originalXml)}</w:p>`;
 }
 
 function sameParagraph(left: DocumentParagraph, right: DocumentParagraph): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function cellProperties(cell: DocumentTableCell, originalXml?: string): string {
+  const original = /<w:tcPr\b[^>]*>([\s\S]*?)<\/w:tcPr>|<w:tcPr\b[^>]*\/>/i.exec(originalXml ?? "")?.[1] ?? "";
+  const retained = original
+    .replace(/<w:gridSpan\b[^>]*\/?\s*>/gi, "")
+    .replace(/<w:vMerge\b[^>]*\/?\s*>/gi, "");
+  const owned = [
+    cell.columnSpan && cell.columnSpan > 1 ? `<w:gridSpan w:val="${cell.columnSpan}"/>` : "",
+    cell.rowSpan === 0 ? "<w:vMerge/>" : cell.rowSpan && cell.rowSpan > 1 ? '<w:vMerge w:val="restart"/>' : "",
+  ].join("");
+  return retained || owned ? `<w:tcPr>${retained}${owned}</w:tcPr>` : "<w:tcPr/>";
+}
+
+function cellXml(cell: DocumentTableCell, originalXml?: string): string {
+  if (!originalXml) {
+    return `<w:tc>${cellProperties(cell)}${cell.paragraphs.map((paragraph) => paragraphXml(paragraph)).join("")}</w:tc>`;
+  }
+  const open = /^<w:tc\b[^>]*>/i.exec(originalXml)?.[0] ?? "<w:tc>";
+  const children = topLevelNodes(innerXml(originalXml, "tc"));
+  const next: string[] = [];
+  let paragraphIndex = 0;
+  let sawProperties = false;
+  for (const child of children) {
+    if (/^<w:tcPr\b/i.test(child)) {
+      next.push(cellProperties(cell, child));
+      sawProperties = true;
+    } else if (/^<w:p\b/i.test(child)) {
+      const paragraph = cell.paragraphs[paragraphIndex++];
+      if (paragraph) next.push(paragraphXml(paragraph, child));
+    } else {
+      next.push(child);
+    }
+  }
+  if (!sawProperties) next.unshift(cellProperties(cell));
+  while (paragraphIndex < cell.paragraphs.length) next.push(paragraphXml(cell.paragraphs[paragraphIndex++]!));
+  if (!cell.paragraphs.length) next.push(paragraphXml({ runs: [{ text: "" }] }));
+  return `${open}${next.join("")}</w:tc>`;
+}
+
+function rowXml(cells: DocumentTableCell[], originalXml?: string): string {
+  if (!originalXml) return `<w:tr>${cells.map((cell) => cellXml(cell)).join("")}</w:tr>`;
+  const open = /^<w:tr\b[^>]*>/i.exec(originalXml)?.[0] ?? "<w:tr>";
+  const next: string[] = [];
+  let cellIndex = 0;
+  for (const child of topLevelNodes(innerXml(originalXml, "tr"))) {
+    if (/^<w:tc\b/i.test(child)) {
+      const cell = cells[cellIndex++];
+      if (cell) next.push(cellXml(cell, child));
+    } else {
+      next.push(child);
+    }
+  }
+  while (cellIndex < cells.length) next.push(cellXml(cells[cellIndex++]!));
+  return `${open}${next.join("")}</w:tr>`;
+}
+
+function tableXml(table: DocumentTable, originalXml?: string): string {
+  if (!originalXml) return `<w:tbl>${table.rows.map((row) => rowXml(row.cells)).join("")}</w:tbl>`;
+  const open = /^<w:tbl\b[^>]*>/i.exec(originalXml)?.[0] ?? "<w:tbl>";
+  const next: string[] = [];
+  let rowIndex = 0;
+  let sawGrid = false;
+  for (const child of topLevelNodes(innerXml(originalXml, "tbl"))) {
+    if (/^<w:tblGrid\b/i.test(child) && table.columnWidths?.length) {
+      next.push(`<w:tblGrid>${table.columnWidths.map((width) => `<w:gridCol w:w="${Math.max(1, Math.round(width * 15))}"/>`).join("")}</w:tblGrid>`);
+      sawGrid = true;
+    } else if (/^<w:tr\b/i.test(child)) {
+      const row = table.rows[rowIndex++];
+      if (row) next.push(rowXml(row.cells, child));
+    } else {
+      next.push(child);
+      if (/^<w:tblGrid\b/i.test(child)) sawGrid = true;
+    }
+  }
+  if (!sawGrid && table.columnWidths?.length) {
+    const at = next.findIndex((child) => !/^<w:tblPr\b/i.test(child));
+    const grid = `<w:tblGrid>${table.columnWidths.map((width) => `<w:gridCol w:w="${Math.max(1, Math.round(width * 15))}"/>`).join("")}</w:tblGrid>`;
+    next.splice(at < 0 ? next.length : at, 0, grid);
+  }
+  while (rowIndex < table.rows.length) next.push(rowXml(table.rows[rowIndex++]!.cells));
+  return `${open}${next.join("")}</w:tbl>`;
+}
+
+function contentXml(content: DocumentContent, template?: LayoutNode): string {
+  if (content.kind === "paragraph") {
+    if (template?.kind === "paragraph" && sameParagraph(content.paragraph, template.original)) return template.xml;
+    return paragraphXml(content.paragraph, template?.kind === "paragraph" ? template.xml : undefined);
+  }
+  if (template?.kind === "table" && JSON.stringify(content.table) === JSON.stringify(template.original)) return template.xml;
+  return tableXml(content.table, template?.kind === "table" ? template.xml : undefined);
 }
 
 export async function decodeDocx(base64: string, fileId: string): Promise<{
@@ -225,28 +390,31 @@ export async function decodeDocx(base64: string, fileId: string): Promise<{
   const body = /(<w:body\b[^>]*>)([\s\S]*?)(<\/w:body>)/i.exec(documentXml);
   if (!body) throw new Error("This DOCX has an unreadable Word document body");
   const children = topLevelNodes(body[2] ?? "");
-  const paragraphs: DocumentParagraph[] = [];
+  const content: DocumentContent[] = [];
   const layout: LayoutNode[] = [];
   const warnings: string[] = [];
   let advancedParagraphs = 0;
-  let tables = 0;
+  let tableIndex = 0;
   for (const child of children) {
     if (/^<w:p\b/i.test(child)) {
       const paragraph = parseParagraph(child);
-      paragraphs.push(paragraph);
+      content.push({ kind: "paragraph", paragraph });
       layout.push({ kind: "paragraph", xml: child, original: paragraph });
       if (/<w:(?:drawing|object|fldChar|commentReference|bookmarkStart|sdt)\b/i.test(child)) {
         advancedParagraphs += 1;
       }
+    } else if (/^<w:tbl\b/i.test(child)) {
+      const parsed = tableFromXml(child, tableIndex++);
+      content.push({ kind: "table", table: parsed.table });
+      layout.push({ kind: "table", xml: child, original: structuredClone(parsed.table) });
+      advancedParagraphs += parsed.advancedParagraphs;
     } else {
-      if (/^<w:tbl\b/i.test(child)) tables += 1;
       layout.push({ kind: "opaque", xml: child });
     }
   }
-  if (tables) warnings.push(`${tables} table${tables === 1 ? " is" : "s are"} preserved but not editable yet`);
   if (advancedParagraphs) {
     warnings.push(
-      `${advancedParagraphs} paragraph${advancedParagraphs === 1 ? " contains" : "s contain"} advanced Word objects that stay in the backup`,
+      `${advancedParagraphs} paragraph${advancedParagraphs === 1 ? " contains" : "s contain"} unsupported Word objects that remain preserved`,
     );
   }
   return {
@@ -260,33 +428,55 @@ export async function decodeDocx(base64: string, fileId: string): Promise<{
     document: {
       id: fileId,
       title: fileName(fileId).replace(/\.[^.]+$/, ""),
-      paragraphs: paragraphs.length ? paragraphs : [{ runs: [{ text: "" }] }],
+      content: content.length
+        ? content
+        : [{ kind: "paragraph", paragraph: { runs: [{ text: "" }] } }],
     },
     warnings,
   };
 }
 
 export async function encodeDocx(source: DocxSource, document: EditableDocument): Promise<string> {
-  const edited = [...document.paragraphs];
+  const edited = [...document.content];
   const children: string[] = [];
-  let paragraphIndex = 0;
+  let contentIndex = 0;
   let insertedExtras = false;
+  const sourceTableIds = new Set(
+    source.layout.flatMap((node) => node.kind === "table" ? [node.original.id] : []),
+  );
   for (const node of source.layout) {
     if (node.kind === "paragraph") {
-      const paragraph = edited[paragraphIndex++];
-      if (paragraph) {
-        children.push(sameParagraph(paragraph, node.original) ? node.xml : paragraphXml(paragraph));
+      // A newly inserted table can sit before an original paragraph. Emit it
+      // without consuming the paragraph template; a table id already present
+      // in the source belongs to its own later layout node.
+      while (edited[contentIndex]?.kind === "table") {
+        const insertedTable = edited[contentIndex];
+        if (!insertedTable || insertedTable.kind !== "table" || sourceTableIds.has(insertedTable.table.id)) break;
+        children.push(contentXml(edited[contentIndex++]!));
       }
+      const content = edited[contentIndex++];
+      if (content?.kind === "paragraph") children.push(contentXml(content, node));
+      else if (content) contentIndex -= 1;
+      continue;
+    }
+    if (node.kind === "table") {
+      const matchIndex = edited.findIndex(
+        (content, index) =>
+          index >= contentIndex && content.kind === "table" && content.table.id === node.original.id,
+      );
+      if (matchIndex < 0) continue;
+      while (contentIndex < matchIndex) children.push(contentXml(edited[contentIndex++]!));
+      children.push(contentXml(edited[contentIndex++]!, node));
       continue;
     }
     // New paragraphs belong before final section properties, never after them.
     if (!insertedExtras && /^<w:sectPr\b/i.test(node.xml)) {
-      while (paragraphIndex < edited.length) children.push(paragraphXml(edited[paragraphIndex++]!));
+      while (contentIndex < edited.length) children.push(contentXml(edited[contentIndex++]!));
       insertedExtras = true;
     }
     children.push(node.xml);
   }
-  while (paragraphIndex < edited.length) children.push(paragraphXml(edited[paragraphIndex++]!));
+  while (contentIndex < edited.length) children.push(contentXml(edited[contentIndex++]!));
   if (!edited.length) children.unshift(paragraphXml({ runs: [{ text: "" }] }));
   const bodyPattern = /<w:body\b[^>]*>[\s\S]*?<\/w:body>/i;
   const nextXml = source.documentXml.replace(
