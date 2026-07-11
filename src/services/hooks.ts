@@ -83,6 +83,9 @@ function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: bo
   const folderIds: (string | undefined)[] = [
     undefined,
     DEST.board,
+    // Binary files stay out of ordinary note search below, but belong in the
+    // identity universe so Main, tabs, and typed embed pickers can resolve them.
+    DEST.storage,
     DEST.archive,
     DEST.trash,
     ...markers,

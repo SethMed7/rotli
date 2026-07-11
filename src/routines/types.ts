@@ -1,9 +1,9 @@
 // Routines — the scheduled jobs rotli inherits from Breve (briefs, creator/page
 // watchers, the self-heal "doctor", and the always-on Signal listener). These
-// are PURE type shapes for the P0 foundation: the scheduler (P1) and the Bun
-// routines-engine sidecar consume them; nothing here touches the clock or IO.
+// are the pure frontend mirrors of the Rotli-managed runtime contract.
 //
-// Design notes are in memex-vault wiki/projects/rotli/breve-merge.md §4 (scheduler) and §9 (P0).
+// The live supervisor/runtime lives in src-tauri/src/routines.rs and
+// breve-runtime/scripts/rotli-scheduler.ts.
 
 /** Which Breve subsystem a routine drives. */
 export type RoutineKind = "brief" | "creators" | "watchers" | "doctor" | "signal";

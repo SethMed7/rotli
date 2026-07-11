@@ -191,6 +191,8 @@ export interface WriteNoteInput {
   shelf?: string[];
   /** Who may access it; default: the brain's primary user (owner-only). */
   reach?: string[];
+  /** Mark the file secure at birth; local-AI access remains denied by default. */
+  secure?: boolean;
 }
 
 /** Write a brand-new note into the active memex's `wiki/_inbox/` staging per the v3.5
@@ -217,7 +219,13 @@ export async function writeNote(
     const primary = parsePrimaryUser(usersJson);
     reach = primary ? [primary] : [];
   }
-  const meta: NoteMeta = { id, title, shelf: input.shelf ?? ["Inbox"], reach };
+  const meta: NoteMeta = {
+    id,
+    title,
+    shelf: input.shelf ?? ["Inbox"],
+    reach,
+    ...(input.secure ? { secure: true } : {}),
+  };
   const contents = composeNote(meta, input.body, today());
   const path = await memexWriteNote(instance.root, stem, contents);
   return { id, stem, path };

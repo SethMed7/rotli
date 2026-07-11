@@ -25,6 +25,7 @@ describe("DEST + the root sets", () => {
   it("names the six reserved roots by their own folder ids", () => {
     expect(DEST).toEqual({
       inbox: "Inbox",
+      secure: "Secure notes",
       vault: "vault:",
       storage: "Storage",
       board: "Board",

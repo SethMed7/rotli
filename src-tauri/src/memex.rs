@@ -2,7 +2,7 @@
 //! the shared `identity/ personality/ wiki/ history/ chats/ inbox.md MAP.md` spine that
 //! Breve also writes to (for Seth, `~/memex-vault`).
 //!
-//! MIRROR-NOT-IMPORT (the boundary law, see ~/breve/docs/memex-boundary.md): rotli
+//! MIRROR-NOT-IMPORT (the boundary law, see breve-runtime/docs/memex-boundary.md): rotli
 //! NEVER imports memex-vault's bun/node engine. It does file I/O here and only ever
 //! SHELLS OUT to the brain's own `scripts/validate.ts`. The byte-shape of the files
 //! it writes is mirrored in `src/memex/contract.ts` (TS) — this module just lays
@@ -405,6 +405,11 @@ pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<Path
 /// dirs that are a real memex (valid `mx_` memex.json) are returned.
 #[tauri::command]
 pub fn memex_detect(app: tauri::AppHandle) -> Result<Vec<DetectedMemex>, String> {
+    // A debug shell is an isolated review workspace. Never enumerate or offer
+    // the user's production brains from `tauri dev`.
+    if cfg!(debug_assertions) {
+        return Ok(Vec::new());
+    }
     let mut roots: Vec<PathBuf> = Vec::new();
     if let Ok(home) = std::env::var("HOME") {
         roots.push(PathBuf::from(&home).join("memex-vault"));
@@ -698,6 +703,9 @@ pub fn memex_write_chat(
     slug: String,
     contents: String,
 ) -> Result<String, String> {
+    if cfg!(debug_assertions) {
+        return Err("the production memex is mounted read-only in development".into());
+    }
     let root = registered_root(&app, &root)?;
     write_chat_at(&root, &slug, &contents)
 }
@@ -724,6 +732,9 @@ pub fn memex_rename_chat(
     old_slug: String,
     new_slug: String,
 ) -> Result<String, String> {
+    if cfg!(debug_assertions) {
+        return Err("the production memex is mounted read-only in development".into());
+    }
     let root = registered_root(&app, &root)?;
     let old_safe = safe_slug(&old_slug)?;
     let new_safe = safe_slug(&new_slug)?;
@@ -750,12 +761,18 @@ pub fn memex_rename_chat(
 /// rotli's writable `chats/` surface. Registered root (#20). (Seth #4, 2026-07-08.)
 #[tauri::command]
 pub fn memex_delete_chat(app: tauri::AppHandle, root: String, slug: String) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Err("the production memex is mounted read-only in development".into());
+    }
     move_chat_to_bucket(&app, &root, &slug, "trash")
 }
 
 /// Archive a chat: the same move, into `chats/archive/` — out of the way, still kept.
 #[tauri::command]
 pub fn memex_archive_chat(app: tauri::AppHandle, root: String, slug: String) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Err("the production memex is mounted read-only in development".into());
+    }
     move_chat_to_bucket(&app, &root, &slug, "archive")
 }
 
@@ -796,6 +813,9 @@ pub fn memex_write_note(
     stem: String,
     contents: String,
 ) -> Result<String, String> {
+    if cfg!(debug_assertions) {
+        return Err("the production memex is mounted read-only in development".into());
+    }
     let root = registered_root(&app, &root)?;
     write_note_at(&root, &stem, &contents)
 }
@@ -807,6 +827,25 @@ fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, Stri
     let dir = root.join("wiki").join("_inbox");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join(format!("{safe}.md"));
+    let secure = contents
+        .strip_prefix("---\n")
+        .and_then(|rest| rest.split_once("\n---"))
+        .is_some_and(|(frontmatter, _)| {
+            frontmatter.lines().any(|line| line.trim() == "secure: true")
+        });
+    if secure {
+        let ignore = root.join(".gitignore");
+        let existing = fs::read_to_string(&ignore).unwrap_or_default();
+        if !existing.lines().any(|line| line.trim() == rel) {
+            let mut next = existing;
+            if !next.is_empty() && !next.ends_with('\n') {
+                next.push('\n');
+            }
+            next.push_str(&rel);
+            next.push('\n');
+            atomic_write(&ignore, &next)?;
+        }
+    }
     with_file_lock(&path, || atomic_write(&path, contents))?;
     Ok(path.to_string_lossy().to_string())
 }
@@ -826,6 +865,15 @@ pub struct ValidateReport {
 /// The ROOT must be registered (#20) — this execs a script FROM the target tree.
 #[tauri::command]
 pub fn memex_validate(app: tauri::AppHandle, root: String) -> Result<ValidateReport, String> {
+    if cfg!(debug_assertions) {
+        return Ok(ValidateReport {
+            ok: true,
+            skipped: true,
+            stdout: "production memex validation is disabled in development".into(),
+            errors: 0,
+            warnings: 0,
+        });
+    }
     let root = registered_root(&app, &root)?;
     let script = root.join("scripts").join("validate.ts");
     if !script.exists() {
@@ -1045,6 +1093,17 @@ mod tests {
         assert!(write_note_at(root, "../escape", "x").is_err());
         assert!(write_note_at(root, "a/b", "x").is_err());
         assert!(write_note_at(root, "Caps", "x").is_err());
+    }
+
+    #[test]
+    fn secure_staging_note_is_gitignored_at_birth() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let body = "---\nid: 01SECURE\nsecure: true\n---\n\n# Private\n";
+        let path = write_note_at(root, "private-01secure", body).unwrap();
+        assert!(Path::new(&path).is_file());
+        let ignored = fs::read_to_string(root.join(".gitignore")).unwrap();
+        assert!(ignored.lines().any(|line| line.trim() == "wiki/_inbox/private-01secure.md"));
     }
 
     #[test]

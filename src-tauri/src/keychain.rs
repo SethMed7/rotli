@@ -8,15 +8,22 @@
 use security_framework::passwords::{
     delete_generic_password, get_generic_password, set_generic_password,
 };
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 
 /// The Keychain "service" every rotli secret lives under.
 const SERVICE: &str = "rotli";
 
 /// The only secret names the webview may address.
-const ALLOWED: &[&str] = &["gemini-api-key"];
+const ALLOWED: &[&str] = &["gemini-api-key", "breve-resend-api-key"];
 
 /// errSecItemNotFound — deleting a secret that isn't there is not an error.
 const NOT_FOUND: i32 = -25300;
+static DEV_SECRETS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+
+fn dev_secrets() -> &'static Mutex<HashMap<String, String>> {
+    DEV_SECRETS.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 fn allow(name: &str) -> Result<(), String> {
     if ALLOWED.contains(&name) {
@@ -29,6 +36,9 @@ fn allow(name: &str) -> Result<(), String> {
 /// Crate-internal read — the transport that needs the key (chat.rs) calls this;
 /// the webview never sees the value.
 pub(crate) fn get_secret(name: &str) -> Option<String> {
+    if cfg!(debug_assertions) {
+        return dev_secrets().lock().ok().and_then(|values| values.get(name).cloned());
+    }
     get_generic_password(SERVICE, name)
         .ok()
         .and_then(|bytes| String::from_utf8(bytes).ok())
@@ -36,14 +46,52 @@ pub(crate) fn get_secret(name: &str) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
-#[tauri::command]
-pub fn secret_store(name: String, value: String) -> Result<(), String> {
-    allow(&name)?;
+/// Debug review surfaces may report whether a production credential exists,
+/// but never receive its value. Writes still go to the isolated dev store.
+pub(crate) fn production_secret_exists_for_dev(name: &str) -> bool {
+    if allow(name).is_err() {
+        return false;
+    }
+    get_generic_password(SERVICE, name)
+        .ok()
+        .is_some_and(|bytes| bytes.iter().any(|byte| !byte.is_ascii_whitespace()))
+}
+
+pub(crate) fn store_secret(name: &str, value: &str) -> Result<(), String> {
+    allow(name)?;
     let value = value.trim();
     if value.is_empty() {
         return Err("the key is empty".into());
     }
-    set_generic_password(SERVICE, &name, value.as_bytes()).map_err(|e| e.to_string())
+    if cfg!(debug_assertions) {
+        dev_secrets()
+            .lock()
+            .map_err(|_| "dev keychain lock poisoned")?
+            .insert(name.to_string(), value.to_string());
+        return Ok(());
+    }
+    set_generic_password(SERVICE, name, value.as_bytes()).map_err(|e| e.to_string())
+}
+
+pub(crate) fn delete_secret(name: &str) -> Result<(), String> {
+    allow(name)?;
+    if cfg!(debug_assertions) {
+        dev_secrets()
+            .lock()
+            .map_err(|_| "dev keychain lock poisoned")?
+            .remove(name);
+        return Ok(());
+    }
+    match delete_generic_password(SERVICE, name) {
+        Ok(()) => Ok(()),
+        Err(e) if e.code() == NOT_FOUND => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn secret_store(name: String, value: String) -> Result<(), String> {
+    store_secret(&name, &value)
 }
 
 #[tauri::command]
@@ -54,12 +102,7 @@ pub fn secret_exists(name: String) -> Result<bool, String> {
 
 #[tauri::command]
 pub fn secret_delete(name: String) -> Result<(), String> {
-    allow(&name)?;
-    match delete_generic_password(SERVICE, &name) {
-        Ok(()) => Ok(()),
-        Err(e) if e.code() == NOT_FOUND => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+    delete_secret(&name)
 }
 
 #[cfg(test)]
@@ -69,6 +112,7 @@ mod tests {
     #[test]
     fn unknown_names_are_refused() {
         assert!(allow("gemini-api-key").is_ok());
+        assert!(allow("breve-resend-api-key").is_ok());
         assert!(allow("com.apple.anything").is_err());
         assert!(allow("").is_err());
     }

@@ -22,7 +22,8 @@ import { Decoration, type DecorationSet, EditorView, ViewPlugin, WidgetType } fr
 import { useUiStore } from "../state/ui";
 import { usePanesStore } from "../state/panes";
 import { type FenceBlock, type LangKey, innerCode, scanFences } from "./fences";
-import { mountBoardEmbed, mountSheetEmbed } from "./embedHosts";
+import { mountBoardEmbed, mountDocumentEmbed, mountSheetEmbed } from "./embedHosts";
+import { installEmbedControls } from "./embedControls";
 
 // Heavy fence libs (katex / mermaid / jsxgraph) load on first use — they used to
 // ride every note-editor open via a static import. CSS follows the same gate.
@@ -65,7 +66,7 @@ interface RenderCtx {
   id: string;
 }
 
-type StaticLangKey = Exclude<LangKey, "board" | "sheet">;
+type StaticLangKey = Exclude<LangKey, "board" | "sheet" | "document">;
 
 function errorBox(message: string): HTMLElement {
   const box = document.createElement("div");
@@ -286,9 +287,10 @@ function cacheSet(key: string, el: HTMLElement): void {
 
 class EmbedBlockWidget extends WidgetType {
   private cleanup: (() => void) | null = null;
+  private interactionCleanup: (() => void) | null = null;
 
   constructor(
-    readonly kind: "board" | "sheet",
+    readonly kind: "board" | "sheet" | "document",
     readonly fileId: string,
     readonly themeSig: string,
   ) {
@@ -306,26 +308,28 @@ class EmbedBlockWidget extends WidgetType {
 
     const body = document.createElement("div");
     body.className = "rotli-render-body";
+    body.id = `rotli-embed-${cryptoId()}`;
     container.appendChild(body);
 
-    const expand = document.createElement("button");
-    expand.type = "button";
-    expand.className = "rotli-render-expand";
-    expand.textContent = "Expand";
-    expand.setAttribute("aria-label", "Expand to pane");
-    expand.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const panes = usePanesStore.getState();
-      if (this.kind === "board") panes.openCanvas(this.fileId, { newTab: true });
-      else panes.openFile(this.fileId, { newTab: true });
+    this.interactionCleanup = installEmbedControls({
+      container,
+      body,
+      kind: this.kind,
+      onOpen: () => {
+        if (this.kind === "board") usePanesStore.getState().openCanvas(this.fileId, { newTab: true });
+        else usePanesStore.getState().openFile(this.fileId, { newTab: true });
+      },
     });
-    container.appendChild(expand);
 
     const id = this.fileId.trim();
     if (id) {
       let cancelled = false;
-      const mount = this.kind === "board" ? mountBoardEmbed(body, id) : mountSheetEmbed(body, id);
+      const mount =
+        this.kind === "board"
+          ? mountBoardEmbed(body, id)
+          : this.kind === "sheet"
+            ? mountSheetEmbed(body, id)
+            : mountDocumentEmbed(body, id);
       void mount.then((cleanup) => {
         if (cancelled) {
           cleanup();
@@ -349,6 +353,8 @@ class EmbedBlockWidget extends WidgetType {
   destroy(): void {
     this.cleanup?.();
     this.cleanup = null;
+    this.interactionCleanup?.();
+    this.interactionCleanup = null;
   }
 }
 
@@ -560,7 +566,7 @@ function buildFrom(state: EditorState, fences: FenceBlock[]): BlockState {
     if (touched) continue; // raw source shows (livePreview skips these lines too)
 
     const code = innerCode(state.doc, block.from, block.to);
-    if (block.lang === "board" || block.lang === "sheet") {
+    if (block.lang === "board" || block.lang === "sheet" || block.lang === "document") {
       const fileId = code.trim();
       if (!fileId) continue;
       const widget = new EmbedBlockWidget(block.lang, fileId, sig);

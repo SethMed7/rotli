@@ -1,0 +1,20 @@
+[
+  {
+    "name": "proton",
+    "host": "127.0.0.1",
+    "port": 1143,
+    "starttls": true,
+    "user": "you@yourdomain.com",
+    "keychain": "breve-mail-proton",
+    "_notes": "Proton via local Bridge (loopback only). Password lives ONLY in the macOS Keychain under the 'keychain' service name — never in this file."
+  },
+  {
+    "name": "gmail",
+    "host": "imap.gmail.com",
+    "port": 993,
+    "secure": true,
+    "user": "you@gmail.com",
+    "keychain": "breve-mail-gmail",
+    "_notes": "Gmail — app password over IMAP, stored in the Keychain. Read-only (EXAMINE-only enforced in mail.ts)."
+  }
+]

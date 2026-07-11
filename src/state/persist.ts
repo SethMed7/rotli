@@ -17,6 +17,11 @@
 // in-memory demo corpus stays exactly as it was (the seam's whole point).
 
 import { type HybridPreset, PROVIDER_IDS, type ProviderId } from "../ai/models";
+import {
+  DEFAULT_NEW_ITEM_KIND,
+  NEW_ITEM_KINDS,
+  type NewItemKind,
+} from "../newItems/model";
 import { useBindingsStore } from "../keys/bindings";
 import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
@@ -170,6 +175,8 @@ interface PersistedSettings {
   glassCanvas: GlassCanvas;
   stayOpen: boolean;
   showInDock: boolean;
+  /** What the generic New tab command creates. Markdown remains the safe default. */
+  newTabDefault: NewItemKind;
   /** Editor spell-check (red squiggles); on by default. */
   spellcheck: boolean;
   /** Editor view: raw markdown vs beautified (WYSIWYG); beautified by default. */
@@ -211,8 +218,7 @@ interface PersistedSettings {
   /** The organizer daemon's §4.3 trust rung; the Rust daemon re-reads this file
    * each cycle, so persisting here IS the durable knob. Default: suggest. */
   organizerTrust: OrganizerTrust;
-  /** Which model the organizer runs — `local` (on-device MLX, default) or
-   * `claude` (`claude -p` Sonnet). The Rust daemon re-reads this each cycle. */
+  /** Which model the organizer runs. Remote choices remain opt-in. */
   organizerModel: OrganizerModel;
   /** Idle delay (seconds) before the organizer scans a just-touched note. The
    * Rust daemon's `organizerQuietSecs` knob; default 300 (5 min). */
@@ -234,6 +240,9 @@ interface PersistedSettings {
   sidebarWidth: number;
   /** Sidebar tree zoom factor (⌘+/⌘− with focus in the sidebar). */
   sidebarZoom: number;
+  /** Which high-level sidebar lens and Breve section reopen on launch. */
+  sidebarMode: "notes" | "breve";
+  breveView: "briefs" | "watchlist" | "routines" | "models" | "configure";
   expandedDests: Record<string, boolean>;
   /** Hotkey overrides keyed by action id; null = explicitly unbound. */
   bindings: Record<string, string | null>;
@@ -318,6 +327,7 @@ export function parseSettings(raw: string): PersistedSettings {
     glassCanvas: asEnum(data.glassCanvas, CANVASES, "glass"),
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
+    newTabDefault: asEnum(data.newTabDefault, NEW_ITEM_KINDS, DEFAULT_NEW_ITEM_KIND),
     spellcheck: asBool(data.spellcheck, true),
     rawEditor: asBool(data.rawEditor, false),
     blockHandles2: asBool(data.blockHandles2, true),
@@ -399,6 +409,14 @@ export function parseSettings(raw: string): PersistedSettings {
     sidebarCollapsed: asBool(data.sidebarCollapsed, false),
     sidebarWidth: clampSidebarWidth(typeof data.sidebarWidth === "number" ? data.sidebarWidth : 240),
     sidebarZoom: clampSidebarZoom(typeof data.sidebarZoom === "number" ? data.sidebarZoom : 1),
+    sidebarMode: data.sidebarMode === "breve" ? "breve" : "notes",
+    breveView:
+      data.breveView === "watchlist" ||
+      data.breveView === "routines" ||
+      data.breveView === "models" ||
+      data.breveView === "configure"
+        ? data.breveView
+        : "briefs",
     expandedDests,
     bindings,
     noteStyles,
@@ -433,6 +451,7 @@ function applySettings(s: PersistedSettings): void {
     glassCanvas: s.glassCanvas,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
+    newTabDefault: s.newTabDefault,
     spellcheck: s.spellcheck,
     rawEditor: s.rawEditor,
     blockHandles: s.blockHandles2,
@@ -460,6 +479,8 @@ function applySettings(s: PersistedSettings): void {
     sidebarCollapsed: s.sidebarCollapsed,
     sidebarWidth: s.sidebarWidth,
     sidebarZoom: s.sidebarZoom,
+    sidebarMode: s.sidebarMode,
+    breveView: s.breveView,
     expandedDests: s.expandedDests,
   });
   useBindingsStore.setState({ overrides: s.bindings });
@@ -784,6 +805,7 @@ function settingsSnapshot(): string {
     glassCanvas: ui.glassCanvas,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
+    newTabDefault: ui.newTabDefault,
     spellcheck: ui.spellcheck,
     rawEditor: ui.rawEditor,
     blockHandles2: ui.blockHandles,
@@ -811,6 +833,8 @@ function settingsSnapshot(): string {
     sidebarCollapsed: ui.sidebarCollapsed,
     sidebarWidth: ui.sidebarWidth,
     sidebarZoom: ui.sidebarZoom,
+    sidebarMode: ui.sidebarMode,
+    breveView: ui.breveView,
     expandedDests: ui.expandedDests,
     bindings: useBindingsStore.getState().overrides,
     noteStyles: useNoteStyleStore.getState().styles,

@@ -1,0 +1,10 @@
+{
+  "name": "rotli-breve-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "imapflow": "^1.4.0",
+    "kokoro-js": "^1.2.1"
+  },
+  "trustedDependencies": ["esbuild", "onnxruntime-node", "protobufjs", "sharp"]
+}

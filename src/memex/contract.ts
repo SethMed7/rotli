@@ -3,7 +3,7 @@
 // rotli is a separate repo. The memex (memex-vault) is a SIBLING resolved by path at
 // runtime; it may be ABSENT or a DRIFTED copy, and its engine (mounts.ts /
 // conversations.ts / validate.ts) is bun/node — it CANNOT run in this webview at
-// all. So, exactly like Breve's scripts/config.ts (see ~/breve/docs/memex-boundary.md),
+// all. So, exactly like the embedded brief runtime's config.ts (see breve-runtime/docs/memex-boundary.md),
 // rotli RE-IMPLEMENTS the file-format contract here, by value, and performs the
 // actual bytes-to-disk through its own Rust commands. The brain's validate.ts is
 // only ever SHELLED OUT to (Rust), never imported.
@@ -280,6 +280,8 @@ export interface NoteMeta {
   area?: string;
   /** Provenance; rotli always writes "rotli". */
   owner?: string;
+  /** Corpus security policy. Remote AI is always blocked; local AI is opt-in. */
+  secure?: boolean;
 }
 
 /** `<slug>-<id6>` — the staging filename stem (home() = wiki/_inbox/<stem>.md).
@@ -310,6 +312,7 @@ export function composeNote(meta: NoteMeta, body: string, date: string): string 
     "links:", //  ”
     line("shelf", `[${meta.shelf.join(", ")}]`),
     line("reach", `[${meta.reach.join(", ")}]`),
+    ...(meta.secure ? ["secure: true"] : []),
     "---",
     "",
   ].join("\n");
@@ -379,7 +382,7 @@ export const AI_KEYS = [
 ] as const;
 
 /** Keys the USER owns on a note — disjoint from AI_KEYS and the Rust-reserved
- * id/created/updated/pinned/origin/locked/secure/owner. */
+ * id/created/updated/pinned/origin/locked/secure/local_ai_allowed/owner. */
 export const USER_KEYS = ["shelf", "reach"] as const;
 
 /** Whether the FILER may write this spine-relative path (the path gate, mirror of
@@ -392,9 +395,9 @@ export function canFile(relPath: string): boolean {
 }
 
 /** The FILER's per-note policy layer: never a `locked` note; the target `area` must
- * be in the brain's area vocabulary. (A `secure` note is NEVER sent to ANY model —
- * not even a local one: the daemon skips it entirely (Skip::Secure, constraint #1)
- * and it can only be filed by hand. Enforced in the daemon's secure lane, not here.) */
+ * be in the brain's area vocabulary. The organizer continues to skip secure
+ * notes entirely. Interactive local retrieval has its own explicit-permission
+ * gate at the corpus read boundary; remote retrieval can never cross it. */
 export function mayFile(
   fm: { locked?: boolean; area?: string },
   areaVocab: readonly string[],

@@ -41,6 +41,8 @@ const MODEL_TIMEOUT: Duration = Duration::from_secs(45);
 /// + Sonnet) is slower than the local server, so it gets a longer leash than the
 /// local MODEL_TIMEOUT. Still bounded so a hung CLI never camps the thread.
 const CLAUDE_TIMEOUT: Duration = Duration::from_secs(120);
+/// The authenticated Gemini/Antigravity CLI has the same remote latency class.
+const GEMINI_TIMEOUT: Duration = Duration::from_secs(120);
 /// Daemon replies are one small JSON object (classify: an area + confidence;
 /// enrich: a summary line + short tag/link arrays) — cap generation accordingly.
 const GEN_MAX_TOKENS: u32 = 512;
@@ -995,12 +997,14 @@ pub(crate) fn plan_wait(
 enum OrgModel {
     Local,
     Claude,
+    Gemini35,
 }
 
 impl OrgModel {
     fn parse(s: &str) -> Self {
         match s.trim().to_ascii_lowercase().as_str() {
             "claude" => OrgModel::Claude,
+            "gemini35" => OrgModel::Gemini35,
             _ => OrgModel::Local,
         }
     }
@@ -1978,6 +1982,7 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
             };
             let transport = |prompt: &str| match org_model {
                 OrgModel::Claude => crate::provider::organizer_claude_complete(prompt, CLAUDE_TIMEOUT),
+                OrgModel::Gemini35 => crate::provider::organizer_gemini_complete(prompt, GEMINI_TIMEOUT),
                 OrgModel::Local => {
                     let msgs = [WireMsg {
                         role: "user".to_string(),
@@ -2627,9 +2632,10 @@ mod tests {
         assert_eq!(k.threshold, DEFAULT_THRESHOLD);
         assert_eq!(k.quiet, DEFAULT_QUIET);
         assert_eq!(k.model, OrgModel::Local, "absent/garbage organizerModel → on-device");
-        // organizerModel: only "claude" (any case) opts into the remote lane
+        // recognized remote lanes are explicit; everything else stays local
         assert_eq!(parse_knobs("{\"organizerModel\":\"claude\"}").model, OrgModel::Claude);
         assert_eq!(parse_knobs("{\"organizerModel\":\"Claude\"}").model, OrgModel::Claude);
+        assert_eq!(parse_knobs("{\"organizerModel\":\"gemini35\"}").model, OrgModel::Gemini35);
         assert_eq!(parse_knobs("{\"organizerModel\":\"local\"}").model, OrgModel::Local);
         assert_eq!(parse_knobs("{\"organizerModel\":\"gpt\"}").model, OrgModel::Local);
     }

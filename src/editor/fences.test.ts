@@ -15,9 +15,10 @@ describe("scanFences", () => {
     expect(TARGET_LANGS.has("html")).toBe(true);
   });
 
-  test("board and sheet are target langs", () => {
+  test("board, sheet, and document are target langs", () => {
     expect(TARGET_LANGS.has("board")).toBe(true);
     expect(TARGET_LANGS.has("sheet")).toBe(true);
+    expect(TARGET_LANGS.has("document")).toBe(true);
   });
 
   test("finds a closed ```board fence", () => {

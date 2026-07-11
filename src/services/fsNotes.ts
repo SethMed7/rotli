@@ -19,6 +19,7 @@ import type { Folder, Note, NoteSummary, SearchHit } from "../types";
 import { DEST, isChats, isHidden, isRootMarker, isVault, memexMarkersOf } from "./destinations";
 import { snippetOf, titleOf } from "./derive";
 import type { NotesService } from "./notes";
+import type { NoteCreationPolicy } from "../security/secureNotes";
 
 /** corpus.rs says "note not found: <id>" for a stale/unknown id. */
 function isNotFound(err: unknown): boolean {
@@ -106,6 +107,7 @@ export class FsNotesService implements NotesService {
         title: titleOf(doc.body),
         snippet: snippetOf(doc.body),
         folderId: doc.folderId,
+        diskFolderId: doc.diskFolderId,
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt,
         pinned: doc.pinned,
@@ -117,8 +119,8 @@ export class FsNotesService implements NotesService {
     }
   }
 
-  async createNote(folderId: string, body: string): Promise<Note> {
-    const meta = await corpusCreate(folderId, body);
+  async createNote(folderId: string, body: string, policy?: NoteCreationPolicy): Promise<Note> {
+    const meta = await corpusCreate(folderId, body, policy);
     return { ...meta, body };
   }
 
@@ -152,6 +154,7 @@ export class FsNotesService implements NotesService {
       title: titleOf(body),
       snippet: snippetOf(body),
       folderId: meta.folderId,
+      diskFolderId: meta.diskFolderId,
       createdAt: meta.createdAt,
       updatedAt: meta.updatedAt,
       pinned: meta.pinned,

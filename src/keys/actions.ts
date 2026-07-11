@@ -11,14 +11,11 @@ import {
   activeEditor,
 } from "../editor/commands";
 import { summonChat } from "../services/chatSummon";
-import { createRoutedNote } from "../services/createNote";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
-import { inboxFolderId, notesService } from "../services/notes";
-import { invalidateMemex } from "../memex/useMemex";
+import { notesService } from "../services/notes";
 import { captureHandle } from "../lib/captureHandle";
 import { quickHandle } from "../lib/quickHandle";
 import {
-  corpusCreateBoard,
   corpusFrontmatter,
   corpusSetPinned,
   hideMainWindow,
@@ -28,13 +25,15 @@ import {
   toggleQuickWindow,
 } from "../lib/tauri";
 import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
-import { useMainStore } from "../state/main";
-import { MAIN_ROOT, addNoteToMainAt, mainFolderIds, mainParentOfNote } from "../services/mainTree";
+import { createManagedItem } from "../newItems/composition";
+import type { NewItemKind } from "../newItems/model";
 import { navigate } from "../state/navHistory";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { cycleQuick, removeQuickNote } from "../state/quick";
-import { ALL_NOTES, RECENT, SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
+import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
 import { registerAction } from "./registry";
+
+const notesWorkspaceActive = (): boolean => useUiStore.getState().sidebarMode !== "breve";
 
 /** The focused pane's active tab noteId, read imperatively for action runs
  * (the hook form useFocusedNoteId is for components). null when the pane has no
@@ -47,55 +46,18 @@ function focusedNoteIdNow(): string | null {
   return tab && tab.surfaceKind === "note" ? tab.noteId : null;
 }
 
-/** ⌘N / "+ New note": create where the memex-is-the-home model dictates — INTO the
- * connected memex's wiki/_inbox staging (v3.5) when a writable memex is active and no
- * explicit LOCAL folder is selected, else the local Inbox — then open it. A selected
- * shelf folder seeds the note's shelf; an explicit local folder is always respected —
- * except the hidden roots (Archive/Trash/Board), which routeDecision diverts to the
- * fallback so ⌘N can never birth a note inside a sink (#5, audit 2026-07). */
-async function newNote(opts?: { newTab?: boolean }): Promise<void> {
-  const { selectedFolderId } = useUiStore.getState();
-  // A Main folder ("main:<path>") is a VIEW, not a disk folder — never route
-  // physical creation into it (routeDecision would treat it as a real local
-  // folder and try to write to a path that doesn't exist). Route like a smart
-  // row, but remember the Main folder as the slot the new note lands in.
-  const inMainFolder = selectedFolderId.startsWith(MAIN_ROOT) && selectedFolderId !== MAIN_ROOT;
-  const routeFolderId = inMainFolder ? ALL_NOTES : selectedFolderId;
-  const isSmart = routeFolderId === ALL_NOTES || routeFolderId === RECENT;
-  const id = await createRoutedNote({
-    selectedFolderId: routeFolderId,
-    isSmart,
-    localFallback: inboxFolderId,
-    body: "",
-  });
-  await invalidateNotes();
-  await invalidateMemex(); // the memex-derived listing refreshes too
-  fileNewNoteIntoMain(id, inMainFolder ? selectedFolderId : null);
-  usePanesStore.getState().openNote(id, opts);
+function runCreate(kind: NewItemKind, newTab: boolean): void {
+  void createManagedItem(kind, { newTab }).catch((error) =>
+    useUiStore
+      .getState()
+      .setRowActionError(`Couldn’t create the item — ${error instanceof Error ? error.message : String(error)}`),
+  );
 }
 
-/** #15/#16 (Seth, 2026-07-03): every new note lands in Main, inside the folder
- * the user is working in — an explicitly selected Main folder, else the Main
- * folder of the currently-active note — else at the Main root. Main references
- * notes by id, so this is a pure manifest add (the physical file is untouched). */
-function fileNewNoteIntoMain(noteId: string, selectedMainFolder: string | null): void {
-  const { manifest, setTree } = useMainStore.getState();
-  let parent = MAIN_ROOT;
-  if (selectedMainFolder && mainFolderIds(manifest.tree).includes(selectedMainFolder)) {
-    parent = selectedMainFolder;
-  } else {
-    const active = focusedNoteIdNow();
-    const viaNote = active ? mainParentOfNote(manifest.tree, active) : null;
-    if (viaNote) parent = viaNote;
-  }
-  setTree(addNoteToMainAt(manifest.tree, noteId, parent));
-}
-
-/** ⌘T / the tab-strip "+": open a NEW blank note in a new tab — not a duplicate
- * of the current tab (Seth #8, 2026-07-03) — filed into Main like any new note,
- * inheriting the current note's Main folder (#16). */
-export function newNoteInTab(): void {
-  void newNote({ newTab: true });
+/** ⌘T / the tab-strip plus uses the persisted default; Markdown ships as the
+ * default, while explicit New actions remain stable and independently bindable. */
+export function newItemInTab(): void {
+  runCreate(useUiStore.getState().newTabDefault, true);
 }
 
 /** ⌘+/⌘− — CONTEXTUAL zoom (Seth, 2026-06-26: "zoom in and out but just where I
@@ -109,6 +71,7 @@ function zoomBy(delta: 1 | -1): void {
     ui.setSidebarZoom(ui.sidebarZoom + delta * SIDEBAR_ZOOM_STEP);
     return;
   }
+  if (!notesWorkspaceActive()) return;
   const noteId = focusedNoteIdNow();
   if (!noteId) return;
   const styles = useNoteStyleStore.getState();
@@ -121,18 +84,9 @@ function zoomReset(): void {
     useUiStore.getState().setSidebarZoom(1);
     return;
   }
+  if (!notesWorkspaceActive()) return;
   const noteId = focusedNoteIdNow();
   if (noteId) useNoteStyleStore.getState().setSize(noteId, DEFAULT_NOTE_STYLE.size);
-}
-
-/** ⌘⇧N / "+ New board": create an Excalidraw board in the local Inbox, open it,
- * and drop its sidebar row into rename mode so you name it first. Boards are
- * local (the memex is read-mostly), so this never routes into the Vault. */
-async function newBoard(): Promise<void> {
-  const meta = await corpusCreateBoard(inboxFolderId);
-  await invalidateNotes();
-  usePanesStore.getState().openCanvas(meta.id);
-  useUiStore.getState().setRenamingBoardId(meta.id);
 }
 
 export function registerDefaultActions(): void {
@@ -148,6 +102,10 @@ export function registerDefaultActions(): void {
       if (ui.closeTopTransient()) return;
       if (ui.settingsOpen) {
         ui.setSettingsOpen(false);
+        return;
+      }
+      if (ui.sidebarMode === "breve") {
+        ui.setSidebarMode("notes");
         return;
       }
       if (ui.contentView !== "panes") {
@@ -195,13 +153,19 @@ export function registerDefaultActions(): void {
     id: "nav.back",
     title: "Back — previous note",
     defaultChord: "Meta+BracketLeft",
-    run: () => navigate(-1, (id) => usePanesStore.getState().openNote(id)),
+    run: () => {
+      if (!notesWorkspaceActive()) return;
+      navigate(-1, (id) => usePanesStore.getState().openNote(id));
+    },
   });
   registerAction({
     id: "nav.forward",
     title: "Forward — next note",
     defaultChord: "Meta+BracketRight",
-    run: () => navigate(1, (id) => usePanesStore.getState().openNote(id)),
+    run: () => {
+      if (!notesWorkspaceActive()) return;
+      navigate(1, (id) => usePanesStore.getState().openNote(id));
+    },
   });
   registerAction({
     id: "palette.toggle",
@@ -218,8 +182,25 @@ export function registerDefaultActions(): void {
     defaultChord: "Alt+Meta+F",
     run: () => {
       const ui = useUiStore.getState();
+      if (ui.sidebarMode === "breve") return;
       ui.setSettingsOpen(false);
       ui.setFocusMode(!ui.focusMode);
+    },
+  });
+  registerAction({
+    id: "view.breve",
+    title: "Open or close Breve",
+    defaultChord: null,
+    run: () => {
+      const ui = useUiStore.getState();
+      ui.setSettingsOpen(false);
+      ui.setFocusMode(false);
+      if (ui.sidebarMode === "breve") {
+        ui.setSidebarMode("notes");
+        if (useUiStore.getState().sidebarMode === "notes") ui.setContentView("panes");
+      } else {
+        ui.setSidebarMode("breve");
+      }
     },
   });
   // Block handles — the Milkdown-style ⠿ drag/add/remove gutter (also an Aa toggle).
@@ -238,6 +219,14 @@ export function registerDefaultActions(): void {
     defaultChord: "Meta+Comma",
     run: () => {
       const ui = useUiStore.getState();
+      if (
+        !ui.settingsOpen &&
+        ui.sidebarMode === "breve" &&
+        ui.breveDirty &&
+        typeof window !== "undefined" &&
+        !window.confirm("Discard your unsaved Breve changes and open Settings?")
+      ) return;
+      if (!ui.settingsOpen && ui.sidebarMode === "breve") ui.setBreveDirty(false);
       ui.setFocusMode(false);
       ui.setContentView("panes");
       ui.setSettingsOpen(!ui.settingsOpen);
@@ -255,6 +244,7 @@ export function registerDefaultActions(): void {
       const ui = useUiStore.getState();
       ui.setFocusMode(false);
       ui.setSettingsOpen(false);
+      ui.setSidebarMode("notes");
       ui.setContentView(ui.contentView === "board" ? "panes" : "board");
     },
   });
@@ -278,20 +268,32 @@ export function registerDefaultActions(): void {
     id: "notes.new",
     title: "New note",
     defaultChord: "Meta+N",
-    run: () => void newNote(),
+    run: () => {
+      if (useUiStore.getState().sidebarMode !== "breve") runCreate("markdown", false);
+    },
   });
+  for (const [id, title, kind] of [
+    ["items.newMarkdown", "New Markdown note", "markdown"],
+    ["items.newDocument", "New document", "document"],
+    ["items.newSheet", "New sheet", "sheet"],
+  ] as const) {
+    registerAction({
+      id,
+      title,
+      defaultChord: null,
+      run: () => {
+        if (useUiStore.getState().sidebarMode !== "breve") runCreate(kind, true);
+      },
+    });
+  }
   registerAction({
     id: "boards.new",
     title: "New Excalidraw board",
     defaultChord: "Meta+Shift+N",
-    run: () =>
-      void newBoard().catch((e) =>
-        useUiStore
-          .getState()
-          .setRowActionError(
-            `Couldn’t create a board — ${e instanceof Error ? e.message : String(e)}`,
-          ),
-      ),
+    run: () => {
+      if (useUiStore.getState().sidebarMode === "breve") return;
+      runCreate("board", true);
+    },
   });
 
   // — note lifecycle (Seth, 2026-06-13): archive / trash / restore the FOCUSED
@@ -304,6 +306,7 @@ export function registerDefaultActions(): void {
     title: "Archive note",
     defaultChord: "Meta+Shift+A",
     run: () => {
+      if (!notesWorkspaceActive()) return;
       const id = focusedNoteIdNow();
       if (id) void notesService.archiveNote(id).then(invalidateNotes).catch(lifecycleError("archive"));
     },
@@ -313,6 +316,7 @@ export function registerDefaultActions(): void {
     title: "Move note to Trash",
     defaultChord: null,
     run: () => {
+      if (!notesWorkspaceActive()) return;
       const id = focusedNoteIdNow();
       if (id) void notesService.trashNote(id).then(invalidateNotes).catch(lifecycleError("delete"));
     },
@@ -322,6 +326,7 @@ export function registerDefaultActions(): void {
     title: "Restore note",
     defaultChord: null,
     run: () => {
+      if (!notesWorkspaceActive()) return;
       const id = focusedNoteIdNow();
       if (id) void notesService.restoreNote(id).then(invalidateNotes).catch(lifecycleError("restore"));
     },
@@ -335,6 +340,7 @@ export function registerDefaultActions(): void {
     title: "Pin / unpin note to top",
     defaultChord: "Meta+Shift+P",
     run: () => {
+      if (!notesWorkspaceActive()) return;
       const id = focusedNoteIdNow();
       if (!id) return;
       void corpusFrontmatter(id).then((fm) =>
@@ -350,33 +356,35 @@ export function registerDefaultActions(): void {
     id: "tabs.new",
     title: "New tab",
     defaultChord: "Meta+T",
-    run: () => newNoteInTab(),
+    run: () => {
+      if (useUiStore.getState().sidebarMode !== "breve") newItemInTab();
+    },
   });
   registerAction({
     id: "tabs.close",
     title: "Close tab",
     defaultChord: "Meta+W",
-    run: () => usePanesStore.getState().closeTab(),
+    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().closeTab(); },
   });
   registerAction({
     id: "tabs.cycle",
     title: "Next tab",
     defaultChord: "Ctrl+Tab",
-    run: () => usePanesStore.getState().cycleTab(),
+    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().cycleTab(); },
   });
   for (let n = 1; n <= 8; n++) {
     registerAction({
       id: `tabs.jump${n}`,
       title: `Go to tab ${n}`,
       defaultChord: `Meta+${n}`,
-      run: () => usePanesStore.getState().jumpTab(n - 1),
+      run: () => { if (notesWorkspaceActive()) usePanesStore.getState().jumpTab(n - 1); },
     });
   }
   registerAction({
     id: "tabs.last",
     title: "Go to last tab",
     defaultChord: "Meta+9",
-    run: () => usePanesStore.getState().lastTab(),
+    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().lastTab(); },
   });
 
   // — panes —
@@ -384,43 +392,47 @@ export function registerDefaultActions(): void {
     id: "panes.splitRight",
     title: "Split right",
     defaultChord: "Meta+D",
-    run: () => usePanesStore.getState().splitRight(),
+    run: () => {
+      if (useUiStore.getState().sidebarMode !== "breve") usePanesStore.getState().splitRight();
+    },
   });
   registerAction({
     id: "panes.splitDown",
     title: "Split down",
     defaultChord: "Meta+Shift+D",
-    run: () => usePanesStore.getState().splitDown(),
+    run: () => {
+      if (useUiStore.getState().sidebarMode !== "breve") usePanesStore.getState().splitDown();
+    },
   });
   registerAction({
     id: "panes.focusLeft",
     title: "Focus pane left",
     defaultChord: "Meta+Alt+ArrowLeft",
-    run: () => usePanesStore.getState().focusDir("left"),
+    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().focusDir("left"); },
   });
   registerAction({
     id: "panes.focusRight",
     title: "Focus pane right",
     defaultChord: "Meta+Alt+ArrowRight",
-    run: () => usePanesStore.getState().focusDir("right"),
+    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().focusDir("right"); },
   });
   registerAction({
     id: "panes.focusUp",
     title: "Focus pane up",
     defaultChord: "Meta+Alt+ArrowUp",
-    run: () => usePanesStore.getState().focusDir("up"),
+    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().focusDir("up"); },
   });
   registerAction({
     id: "panes.focusDown",
     title: "Focus pane down",
     defaultChord: "Meta+Alt+ArrowDown",
-    run: () => usePanesStore.getState().focusDir("down"),
+    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().focusDir("down"); },
   });
   registerAction({
     id: "panes.close",
     title: "Close pane",
     defaultChord: "Meta+Alt+W",
-    run: () => usePanesStore.getState().closePane(),
+    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().closePane(); },
   });
 
   // — chrome —
@@ -470,7 +482,7 @@ export function registerDefaultActions(): void {
   for (const [id, title, mark, defaultChord] of marks) {
     // shared: the format chords act on activeEditor(), which resolves per
     // webview — so they belong to the main AND the Quick Note window
-    registerAction({ id, title, defaultChord, shared: true, run: () => activeEditor()?.toggleMark(mark) });
+    registerAction({ id, title, defaultChord, shared: true, run: () => { if (notesWorkspaceActive()) activeEditor()?.toggleMark(mark); } });
   }
   for (const level of [1, 2, 3] as HeadingLevel[]) {
     registerAction({
@@ -478,7 +490,7 @@ export function registerDefaultActions(): void {
       title: `Heading ${level}`,
       defaultChord: null,
       shared: true,
-      run: () => activeEditor()?.setHeading(level),
+      run: () => { if (notesWorkspaceActive()) activeEditor()?.setHeading(level); },
     });
   }
   const blocks: [string, string, BlockToggle][] = [
@@ -493,7 +505,7 @@ export function registerDefaultActions(): void {
       title,
       defaultChord: null,
       shared: true,
-      run: () => activeEditor()?.toggleBlock(kind),
+      run: () => { if (notesWorkspaceActive()) activeEditor()?.toggleBlock(kind); },
     });
   }
 
@@ -504,6 +516,7 @@ export function registerDefaultActions(): void {
     run: () => {
       const ui = useUiStore.getState();
       ui.setSettingsOpen(false);
+      ui.setSidebarMode("notes");
       ui.setContentView("panes"); // back to the note panes
     },
   });
@@ -516,7 +529,9 @@ export function registerDefaultActions(): void {
     title: "New chat",
     defaultChord: "Ctrl+2",
     run: () => {
-      useUiStore.getState().setSettingsOpen(false);
+      const ui = useUiStore.getState();
+      ui.setSettingsOpen(false);
+      ui.setSidebarMode("notes");
       // chat is a PANE surface now — open a fresh chat pane. The old contentView
       // "chat" was retired and rendered nothing (Seth, 2026-06-30 — audit).
       usePanesStore.getState().openChat(null);
@@ -535,9 +550,11 @@ export function registerDefaultActions(): void {
     title: "All chats",
     defaultChord: null,
     run: () => {
-      useUiStore.getState().setSettingsOpen(false);
+      const ui = useUiStore.getState();
+      ui.setSettingsOpen(false);
+      ui.setSidebarMode("notes");
       // open the All-chats content view (the Chat-front twin of All notes)
-      useUiStore.getState().setContentView("allChats");
+      ui.setContentView("allChats");
     },
   });
 

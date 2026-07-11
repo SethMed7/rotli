@@ -8,6 +8,7 @@ import { CORPUS_INSTANCE_ID, activeInstance, isWritable } from "../memex/config"
 import { loadConfig, writeNote } from "../memex/service";
 import { VAULT_MARKER, isHidden, isVault } from "./destinations";
 import { notesService } from "./notes";
+import { creationIsSecure, isSecureNotesFolder } from "../security/secureNotes";
 
 export type Route =
   | { kind: "memex"; shelf?: string[] }
@@ -30,6 +31,9 @@ export function routeDecision(
   localFallback: string,
 ): Route {
   const sel = selectedFolderId;
+  if (isSecureNotesFolder(sel) && memexWritable) {
+    return { kind: "memex", shelf: [sel] };
+  }
   const explicitLocal = !isSmart && sel !== "" && !isVault(sel) && !isHidden(sel);
   if (!explicitLocal && memexWritable) {
     const sub = isVault(sel) ? sel.slice(VAULT_MARKER.length) : "";
@@ -52,21 +56,41 @@ export interface RoutedCreate {
   localFallback: string;
   /** Initial body (usually ""). */
   body?: string;
+  /** Quick/private entry points can force secure while keeping their normal home. */
+  secure?: boolean;
 }
 
 /** Create a new note per `routeDecision`, returning its WIRE id (for opening). */
 export async function createRoutedNote(opts: RoutedCreate): Promise<string> {
   const { selectedFolderId, isSmart, localFallback, body = "" } = opts;
   const active = activeInstance(await loadConfig());
-  const route = routeDecision(selectedFolderId, isSmart, !!(active && isWritable(active)), localFallback);
+  const secure = creationIsSecure(
+    selectedFolderId,
+    opts.secure === undefined ? undefined : { secure: opts.secure },
+  );
+  const route = routeDecision(
+    selectedFolderId,
+    isSmart,
+    !!(active && isWritable(active)),
+    localFallback,
+  );
 
   if (route.kind === "memex" && active) {
-    const { id } = await writeNote({ instance: active, body, ...(route.shelf ? { shelf: route.shelf } : {}) });
+    const { id } = await writeNote({
+      instance: active,
+      body,
+      secure,
+      ...(route.shelf ? { shelf: route.shelf } : {}),
+    });
     // open the new note via the active root's wire prefix: BARE for a memex CORPUS
     // (the default root), `<id>:` for a connected brain (e.g. `vault:`).
     const prefix = active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`;
     return `${prefix}${id}`;
   }
-  const note = await notesService.createNote(route.kind === "local" ? route.folder : localFallback, body);
+  const note = await notesService.createNote(
+    route.kind === "local" ? route.folder : localFallback,
+    body,
+    { secure },
+  );
   return note.id;
 }

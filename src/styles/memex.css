@@ -137,6 +137,8 @@
 .chat-modelpick {
   position: relative;
   display: inline-flex;
+  align-items: center;
+  gap: 6px;
   flex: 0 0 auto;
 }
 .chat-model-trigger {
@@ -178,8 +180,22 @@
   padding: 4px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-card);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 14%, transparent);
+  border-radius: var(--r-control);
+  box-shadow: none;
+}
+.chat-modelpop-notice {
+  margin: 4px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.chat-modelpop-notice b {
+  color: var(--text);
+  font-weight: 600;
 }
 .chat-modelpop-group {
   padding: 6px 4px 3px;
@@ -189,11 +205,18 @@
   margin-top: 3px;
 }
 .chat-modelpop-grouplabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 2px 8px;
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
+}
+.chat-modelpop-groupico {
+  display: inline-flex;
+  align-items: center;
 }
 .chat-modelpop-grouphint {
   padding: 0 8px 4px;
@@ -218,12 +241,16 @@
   cursor: pointer;
 }
 .chat-modelrow:hover {
-  background: var(--tint);
+  background: var(--surface-2);
 }
 .chat-modelrow.sel {
-  background: var(--tint);
-  color: var(--accent-text);
+  background: var(--surface-2);
+  color: var(--text);
   font-weight: 600;
+}
+.chat-modelrow:focus-visible {
+  outline: 1px solid var(--text-muted);
+  outline-offset: -1px;
 }
 .chat-modelrow-ico {
   flex: 0 0 auto;
@@ -244,6 +271,8 @@
 }
 .chat-modelrow-tag {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
   font-size: 11px;
   color: var(--text-muted);
 }
@@ -256,7 +285,24 @@
 }
 .chat-modelrow-check {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
   color: var(--accent-text);
+}
+.chat-model-fallback {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.chat-model-checking {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 /* "All chats" browse — a search box over a scrollable list of every chat. */
@@ -940,13 +986,41 @@
 /* spreadsheet (xlsx/csv) viewer + the universal iframe fallback */
 .file-body-sheet {
   align-items: stretch;
+  justify-content: flex-start;
+  overflow: hidden;
   padding: 0;
+}
+.file-body-sheet > .sheet-editor {
+  flex: 1 1 0;
+  align-self: stretch;
+  height: auto;
 }
 .file-frame {
   width: 100%;
   height: 100%;
   border: none;
   background: var(--surface-2);
+}
+.file-document-fallback {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.file-document-fallback > p {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: min(520px, calc(100% - 36px));
+  margin: 0;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  box-shadow: var(--shadow-popover);
 }
 .file-sheet {
   display: flex;
@@ -1047,6 +1121,7 @@
 .sheet-editor {
   display: flex;
   flex-direction: column;
+  flex: 1 1 0;
   height: 100%;
   min-height: 0;
   width: 100%;
@@ -1085,10 +1160,20 @@
   flex-direction: column;
 }
 .sheet-editor-host > * {
-  flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
   width: 100% !important;
+}
+.sheet-editor-host > :first-child {
+  flex: 1 1 0;
+  height: 100% !important;
+}
+/* Univer appends portal/a11y siblings beside its application root. Flexing all
+   of them split the available height in half. Its workbench also carries an
+   intrinsic pixel height, so pin the actual sheet layout to the root. */
+.sheet-editor-host [data-u-comp="workbench-layout"] {
+  flex: 1 1 0;
+  min-height: 0;
   height: 100% !important;
 }
 .sheet-save-err {
@@ -1364,12 +1449,17 @@
   color: var(--success);
 }
 .memex-badge {
+  width: max-content;
   font-size: 10.5px;
   font-weight: 600;
   padding: 1px 7px;
   border-radius: 999px;
   background: var(--surface-2);
   color: var(--text-muted);
+}
+.memex-badge.ro {
+  border: 1px solid var(--border);
+  background: transparent;
 }
 .memex-badge.write {
   background: var(--tint);

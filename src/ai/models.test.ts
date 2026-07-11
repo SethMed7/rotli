@@ -54,6 +54,21 @@ describe("mergedModels", () => {
     expect(g.connected.every((m) => m.api === "cli" && m.endpoint === "")).toBe(true);
   });
 
+  test("the chat can require an enabled lane to be detected ready", () => {
+    const enabled = { ...noneEnabled, claude: true, codex: true };
+    const ready = { claude: true, codex: false };
+    const g = mergedModels(local, enabled, [], [], ready);
+    expect(g.connected).toEqual(CLI_CATALOG.claude);
+    expect(g.connected.some((m) => m.provider === "codex")).toBe(false);
+  });
+
+  test("Antigravity contributes Gemini models, not duplicate Claude models", () => {
+    const models = CLI_CATALOG.agy;
+    expect(models.length).toBeGreaterThan(0);
+    expect(models.every((m) => m.provider === "agy" && m.label.startsWith("Gemini"))).toBe(true);
+    expect(models.every((m) => !m.label.includes("agy"))).toBe(true);
+  });
+
   test("gemini rides the openai wire with its remote base (never local)", () => {
     const g = mergedModels(local, { ...noneEnabled, gemini: true }, []);
     expect(g.connected.every((m) => m.api === "openai" && m.endpoint === GEMINI_OPENAI_BASE)).toBe(
@@ -145,6 +160,24 @@ describe("blocked models (per-lane model control)", () => {
     const g = mergedModels(local, noneEnabled, [p], ["gemma-3-12b-it-qat-4bit", "preset:p"]);
     expect(g.local).toHaveLength(1);
     expect(g.presets).toHaveLength(1);
+  });
+});
+
+describe("connected CLI catalog", () => {
+  test("includes every visible model advertised by the current Codex account", () => {
+    expect(CLI_CATALOG.codex.map((model) => model.id)).toEqual([
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+      "gpt-5.5",
+      "gpt-5.4",
+      "gpt-5.4-mini",
+      "gpt-5.3-codex-spark",
+    ]);
+  });
+
+  test("labels the rolling Claude alias with its current generation", () => {
+    expect(CLI_CATALOG.claude.find((model) => model.id === "sonnet")?.label).toBe("Claude Sonnet 5");
   });
 });
 

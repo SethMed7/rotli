@@ -50,6 +50,16 @@ pub fn looks_secure(text: &str) -> bool {
     pan.find_iter(text).any(|m| luhn_ok(m.as_str()))
 }
 
+/// Final remote-egress backstop. A secure note read includes its managed
+/// frontmatter marker, so a future read/send model mismatch still cannot
+/// forward ordinary (non-secret-shaped) private prose.
+pub fn protected_for_remote(text: &str) -> bool {
+    looks_secure(text)
+        || text.lines().any(|line| {
+            matches!(line.trim(), "secure: true" | "local_ai_allowed: true")
+        })
+}
+
 /// The Luhn checksum over an all-digit candidate — true when it checks out
 /// (i.e. the run is shaped like a real card number).
 fn luhn_ok(digits: &str) -> bool {
@@ -98,5 +108,12 @@ mod tests {
     #[test]
     fn plain_text_is_clean() {
         assert!(!looks_secure("a grocery list: eggs, milk, 12 apples"));
+    }
+
+    #[test]
+    fn secure_note_markers_are_protected_at_remote_egress() {
+        assert!(protected_for_remote("---\nsecure: true\n---\nCall notes"));
+        assert!(protected_for_remote("local_ai_allowed: true\nordinary prose"));
+        assert!(!protected_for_remote("ordinary prose about security"));
     }
 }

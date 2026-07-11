@@ -6,7 +6,7 @@ import {
   resolveWikilink,
   wikilinkLabel,
 } from "./wikilink";
-import { filterSlashItems } from "./SlashMenu";
+import { filterSlashItems, slashQueryAtCaret } from "./slashMenu";
 
 const note = (id: string, title: string): NoteSummary => ({
   id,
@@ -46,9 +46,22 @@ describe("wikilink", () => {
 });
 
 describe("filterSlashItems", () => {
-  test("matches keywords (wiki, excalidraw, xlsx)", () => {
+  test("matches keywords (wiki, excalidraw, xlsx, docx)", () => {
     expect(filterSlashItems("wiki").some((i) => i.label === "Link note")).toBe(true);
     expect(filterSlashItems("excalidraw").some((i) => i.label === "Board")).toBe(true);
     expect(filterSlashItems("xlsx").some((i) => i.label === "Sheet")).toBe(true);
+    expect(filterSlashItems("docx").some((i) => i.label === "Document")).toBe(true);
+  });
+
+  test("supports multi-word labels and keeps unmatched text editable", () => {
+    expect(filterSlashItems("code block").map((i) => i.label)).toEqual(["Code block"]);
+    expect(filterSlashItems("not a command")).toEqual([]);
+  });
+
+  test("a slash query must own the line and trail the caret", () => {
+    expect(slashQueryAtCaret("/code block", 11)).toBe("code block");
+    expect(slashQueryAtCaret("/code block", 5)).toBeNull();
+    expect(slashQueryAtCaret("prefix /code", 12)).toBeNull();
+    expect(slashQueryAtCaret("//code", 6)).toBeNull();
   });
 });

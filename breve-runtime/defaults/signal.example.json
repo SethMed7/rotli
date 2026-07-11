@@ -1,0 +1,6 @@
+{
+  "bot": "+1XXXXXXXXXX",
+  "owner": "+1XXXXXXXXXX",
+  "ownerUuid": "00000000-0000-0000-0000-000000000000",
+  "_notes": "Copy to signal.json (gitignored). bot = Breve's Signal/Twilio number; signal-cli identity keys live in ~/.local/share/signal-cli (back that up — the number is only for rare re-verification). owner = your personal Signal number, the hard allowlist: the daemon drops every other sender. ownerUuid = your Signal account UUID."
+}

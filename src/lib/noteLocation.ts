@@ -3,6 +3,8 @@
 // note's folderId + whether it's referenced in Main. Main is a shortcut, so a
 // note in Main ALSO has a Brain/disk home; the label shows both ("★ Main · …").
 
+import type { NoteSummary } from "../types";
+
 function titleCase(s: string): string {
   return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -28,4 +30,21 @@ export function brainLocationLabel(folderId: string): string {
 export function noteLocationLabel(folderId: string, inMain: boolean): string {
   const base = brainLocationLabel(folderId);
   return inMain ? `★ Main · ${base}` : base;
+}
+
+/** The physical folder wins for location/reveal; browser/demo notes created
+ * before the dual-location wire shape fall back to their projected folder. */
+export function noteDiskFolder(note: Pick<NoteSummary, "folderId" | "diskFolderId">): string {
+  return note.diskFolderId ?? note.folderId;
+}
+
+/** A Brain row is a second view of the same note, projected onto its physical
+ * wiki folder. Shelves keep owning `folderId` everywhere else. */
+export function projectNoteToBrain(note: NoteSummary): NoteSummary | null {
+  const folderId = noteDiskFolder(note);
+  const isBrainNote =
+    (note.kind === undefined || note.kind === "note") &&
+    (folderId === "wiki" || folderId.startsWith("wiki/")) &&
+    !folderId.startsWith("wiki/_");
+  return isBrainNote ? { ...note, folderId } : null;
 }

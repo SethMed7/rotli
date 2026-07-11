@@ -69,6 +69,13 @@ describe("buildMainTree", () => {
     const r = buildMainTree([{ note: "staged" }], index);
     expect(r.notes.map((n) => [n.id, n.folderId])).toEqual([["staged", "main:"]]);
   });
+  test("a Storage file can be arranged in Main when the identity index includes it", () => {
+    const file = { ...note("storage/rotli/sample.docx", "Storage"), kind: "file" as const };
+    const r = buildMainTree([{ note: file.id }], new Map([[file.id, file]]));
+    expect(r.notes.map((item) => [item.id, item.folderId, item.kind])).toEqual([
+      ["storage/rotli/sample.docx", "main:", "file"],
+    ]);
+  });
   test("a ref whose home is a sink (Archive/Trash) or the Vault is NOT rendered", () => {
     const index = new Map([
       ["trashed", note("trashed", "Trash")],

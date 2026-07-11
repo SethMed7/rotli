@@ -138,6 +138,7 @@ function fakeDeps(rel: string, fields: string[] = [], over: Partial<JournalDeps>
     updated: "",
     locked: false,
     secure: false,
+    localAiAllowed: false,
     pinned: false,
     fields,
   };

@@ -15,7 +15,12 @@ export interface NoteSummary {
   id: string; // ulid-style
   title: string;
   snippet: string;
+  /** User-facing shelf/folder projection. In a memex this can differ from the
+   * physical wiki folder that contains the note. */
   folderId: string;
+  /** Physical folder containing the file. Optional for browser/demo seeds;
+   * callers fall back to `folderId` when absent. */
+  diskFolderId?: string | undefined;
   createdAt: number;
   updatedAt: number;
   pinned: boolean;

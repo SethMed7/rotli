@@ -40,6 +40,7 @@ export function isRootMarker(folderId: string): boolean {
  * Trash are the never-delete sinks. Vault is a root marker, NOT a local folder. */
 export const DEST = {
   inbox: "Inbox",
+  secure: "Secure notes",
   vault: VAULT_MARKER,
   storage: "Storage",
   board: "Board",

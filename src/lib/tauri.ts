@@ -3,6 +3,7 @@
 
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
+import { DEFAULT_BREVE_PDF_THEME } from "../brand/brevePdfThemes";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { SearchHit } from "../types";
 
@@ -189,7 +190,10 @@ export interface CorpusNoteMeta {
   id: string;
   title: string;
   snippet: string;
+  /** User-facing shelf/folder projection. */
   folderId: string;
+  /** Physical folder containing the file (for Brain location/reveal). */
+  diskFolderId?: string | undefined;
   createdAt: number;
   updatedAt: number;
   pinned: boolean;
@@ -222,6 +226,8 @@ export interface CorpusListPayload {
 export interface CorpusNoteDoc {
   id: string;
   folderId: string;
+  /** Physical folder containing the file (for Brain location/reveal). */
+  diskFolderId?: string | undefined;
   /** Frontmatter stripped — exactly what the editor edits. */
   body: string;
   createdAt: number;
@@ -263,8 +269,12 @@ export function corpusWrite(id: string, body: string, pinned: boolean): Promise<
   return corpusInvoke("corpus_write", { id, body, pinned });
 }
 
-export function corpusCreate(folderId: string, body: string): Promise<CorpusNoteMeta> {
-  return corpusInvoke("corpus_create", { folderId, body });
+export function corpusCreate(
+  folderId: string,
+  body: string,
+  policy?: { secure?: boolean },
+): Promise<CorpusNoteMeta> {
+  return corpusInvoke("corpus_create", { folderId, body, secure: policy?.secure ?? false });
 }
 
 export function corpusDelete(id: string): Promise<void> {
@@ -653,13 +663,25 @@ export async function corpusNewFileBytes(folderId: string, name: string, base64:
   return invoke<string>("corpus_new_file_bytes", { folderId, name, base64 });
 }
 
+/** Create a Rotli-owned .xlsx/.docx in its managed storage lane. */
+export async function corpusCreateManagedFile(name: string, base64: string): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_create_managed_file", { name, base64 });
+}
+
+/** False for read-only roots, including the production snapshot mounted in dev. */
+export async function corpusManagedFileCreationAvailable(): Promise<boolean> {
+  if (!isTauri()) return false;
+  return invoke<boolean>("corpus_managed_file_creation_available");
+}
+
 /** Reveal a surfaced file in Finder. No-op outside Tauri. */
 export async function corpusRevealFile(id: string): Promise<void> {
   if (!isTauri()) return;
   await invoke("corpus_reveal_file", { id });
 }
 
-/** Which of the known "Open with …" apps (Numbers, Excel, …) are installed. */
+/** Which of the known "Open with …" apps (Numbers, Excel, Word, Pages, …) are installed. */
 export async function corpusOpenWithApps(): Promise<string[]> {
   if (!isTauri()) return [];
   return invoke<string[]>("corpus_open_with_apps");
@@ -678,6 +700,8 @@ export interface FrontmatterView {
   locked: boolean;
   /** Secrets detected (auto-flagged) → never sent to a remote model + gitignored. */
   secure: boolean;
+  /** Explicit opt-in for a secure note to be read by loopback-local AI. */
+  localAiAllowed: boolean;
   /** Pinned to the top of every list (pinned → updated → id sort). */
   pinned: boolean;
   /** the foreign frontmatter lines (shelf/reach/area/summary/tags/links/…). */
@@ -830,13 +854,22 @@ export async function corpusSetSecure(id: string, secure: boolean): Promise<void
   await invoke("corpus_set_secure", { id, secure });
 }
 
-/** Read a note for an AI model — REJECTS a secure note unless the model's
- * ENDPOINT is loopback-local. Rust derives locality from the endpoint itself
- * (#2, audit 2026-07): the webview passes WHERE the model lives, never a
- * "trust me, it's local" bit. */
-export async function corpusReadAi(id: string, endpoint: string): Promise<string> {
+/** Permit loopback-local AI to read a secure note. Remote providers remain
+ * categorically blocked regardless of this value. */
+export async function corpusSetLocalAiAccess(id: string, allowed: boolean): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_set_local_ai_access", { id, allowed });
+}
+
+/** Read a note for an AI model. Rust requires both a loopback endpoint and a
+ * matching registered on-device model; a localhost frontier proxy fails closed.
+ * Secure notes additionally require explicit per-note Local AI permission. */
+export async function corpusReadAi(
+  id: string,
+  model: Pick<ChatModelInfo, "id" | "endpoint">,
+): Promise<string> {
   if (!isTauri()) return "";
-  return invoke<string>("corpus_read_ai", { id, endpoint });
+  return invoke<string>("corpus_read_ai", { id, modelId: model.id, endpoint: model.endpoint });
 }
 
 // ——— the unified Location model (corpus.json) — ONE folder = your notes = your
@@ -1192,4 +1225,194 @@ export function onRebind(cb: (payload: RebindPayload) => void): () => void {
   if (!isTauri()) return () => {};
   const unlisten = listen<RebindPayload>("rotli:rebind", (event) => cb(event.payload));
   return () => void unlisten.then((fn) => fn());
+}
+
+// ——— Breve data seam — fixed-path snapshot, copy-only migration, and the
+// explicit legacy → Rotli scheduler takeover.
+
+export type BreveRoutineSchedule =
+  | { kind: "dailyAt"; hhmm: string; leadMinutes: number }
+  | { kind: "everySecs"; secs: number }
+  | { kind: "alwaysOn" };
+
+export interface BreveRoutine {
+  id: string;
+  label: string;
+  kind: "brief" | "creators" | "watchers" | "doctor" | "signal";
+  enabled: boolean;
+  schedule: BreveRoutineSchedule;
+  lanes: string[];
+}
+
+export type BrevePdfThemePreset = "charcoal" | "warmLight" | "warmDark" | "paper" | "custom";
+
+export interface BrevePdfPalette {
+  background: string;
+  surface: string;
+  text: string;
+  muted: string;
+  accent: string;
+  rule: string;
+}
+
+export interface BrevePdfTheme {
+  preset: BrevePdfThemePreset;
+  custom: BrevePdfPalette;
+}
+
+export interface BreveConfig {
+  version: 1;
+  timezone: string;
+  deliveryTimes: { morning: string; lunch: string; night: string };
+  leadMinutes: number;
+  leadOverrides: { morning?: number; lunch?: number; night?: number };
+  briefModel: string;
+  modelPolicy: { primary: string; fallbacks: string[]; localHelper: string | null };
+  pdfTheme: BrevePdfTheme;
+  routines: BreveRoutine[];
+  travel?: { start: string; end: string; tz: string } | null;
+}
+
+export interface BreveBrief {
+  stem: string;
+  title: string;
+  kind: "morning" | "lunch" | "night";
+  date: string;
+  imported: boolean;
+  path?: string;
+}
+
+export interface BreveSnapshot {
+  source: "rotli" | "legacy" | "empty";
+  legacyRoot: string | null;
+  config: BreveConfig;
+  watchlist: string;
+  counts: { sections: number; topics: number; creators: number; pages: number };
+  creators: Array<{ name: string; handle: string; channelId?: string }>;
+  pages: Array<{ id: number; url: string; condition: string }>;
+  briefs: BreveBrief[];
+  artifactCount: number;
+  imported: boolean;
+  scheduler: "rotli" | "legacy-launchd" | "none";
+}
+
+export interface BreveDeliverySettings {
+  emailFrom: string;
+  emailTo: string[];
+  signalBot: string;
+  signalOwner: string;
+  signalOwnerUuid: string;
+  resendKeyConfigured: boolean;
+}
+
+let browserBreveDelivery: BreveDeliverySettings = {
+  emailFrom: "Breve <briefs@example.com>",
+  emailTo: ["you@example.com"],
+  signalBot: "+14075550101",
+  signalOwner: "+14075550102",
+  signalOwnerUuid: "",
+  resendKeyConfigured: false,
+};
+
+function browserBreveSnapshot(): BreveSnapshot {
+  return {
+    source: "rotli",
+    legacyRoot: null,
+    config: {
+      version: 1,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      deliveryTimes: { morning: "07:00", lunch: "12:00", night: "18:00" },
+      leadMinutes: 30,
+      leadOverrides: { morning: 60 },
+      briefModel: "sonnet",
+      modelPolicy: {
+        primary: "sonnet",
+        fallbacks: ["haiku", "Gemini 3.5 Flash (Medium)", "gpt-5.4-mini"],
+        localHelper: "gemma-3-12b-it-qat-4bit",
+      },
+      pdfTheme: DEFAULT_BREVE_PDF_THEME,
+      routines: [],
+    },
+    watchlist: "",
+    counts: { sections: 6, topics: 34, creators: 4, pages: 3 },
+    creators: [],
+    pages: [],
+    briefs: [
+      { stem: "2026-07-10", title: "Breve — July 10, 2026", kind: "morning", date: "2026-07-10", imported: true },
+      { stem: "2026-07-10-lunch", title: "Breve — July 10, 2026 · Lunchtime", kind: "lunch", date: "2026-07-10", imported: true },
+      { stem: "2026-07-09-night", title: "Breve — July 9, 2026 · The Archive", kind: "night", date: "2026-07-09", imported: true },
+    ],
+    artifactCount: 208,
+    imported: true,
+    scheduler: "rotli",
+  };
+}
+
+export function breveSnapshot(): Promise<BreveSnapshot> {
+  if (!isTauri()) return Promise.resolve(browserBreveSnapshot());
+  return invoke<BreveSnapshot>("breve_snapshot");
+}
+
+export function breveImportLegacy(): Promise<BreveSnapshot> {
+  if (!isTauri()) return Promise.resolve(browserBreveSnapshot());
+  return invoke<BreveSnapshot>("breve_import_legacy");
+}
+
+export function breveTakeover(): Promise<BreveSnapshot> {
+  if (!isTauri()) return Promise.resolve({ ...browserBreveSnapshot(), source: "rotli", scheduler: "rotli" });
+  return invoke<BreveSnapshot>("breve_takeover");
+}
+
+export function breveRetireLegacy(): Promise<BreveSnapshot> {
+  if (!isTauri()) return Promise.resolve({ ...browserBreveSnapshot(), source: "rotli" });
+  return invoke<BreveSnapshot>("breve_retire_legacy");
+}
+
+export function breveWriteConfig(config: BreveConfig): Promise<BreveSnapshot> {
+  if (!isTauri()) return Promise.resolve({ ...browserBreveSnapshot(), source: "rotli", config });
+  return invoke<BreveSnapshot>("breve_write_config", { config });
+}
+
+export function breveWriteWatchlist(markdown: string): Promise<BreveSnapshot> {
+  if (!isTauri()) return Promise.resolve({ ...browserBreveSnapshot(), source: "rotli", watchlist: markdown });
+  return invoke<BreveSnapshot>("breve_write_watchlist", { markdown });
+}
+
+export function breveDeliverySettings(): Promise<BreveDeliverySettings> {
+  if (!isTauri()) return Promise.resolve({ ...browserBreveDelivery, emailTo: [...browserBreveDelivery.emailTo] });
+  return invoke<BreveDeliverySettings>("breve_delivery_settings");
+}
+
+export function breveWriteDeliverySettings(settings: BreveDeliverySettings): Promise<BreveDeliverySettings> {
+  if (!isTauri()) {
+    browserBreveDelivery = { ...settings, emailTo: [...settings.emailTo] };
+    return Promise.resolve({ ...browserBreveDelivery, emailTo: [...browserBreveDelivery.emailTo] });
+  }
+  return invoke<BreveDeliverySettings>("breve_write_delivery_settings", { settings });
+}
+
+export function breveTestEmail(): Promise<string> {
+  if (!isTauri()) return Promise.resolve("Test email simulated in browser dev mode");
+  return invoke<string>("breve_test_email");
+}
+
+export function breveTestSignal(): Promise<string> {
+  if (!isTauri()) return Promise.resolve("Test Signal simulated in browser dev mode");
+  return invoke<string>("breve_test_signal");
+}
+
+export function breveStoreResendKey(value: string): Promise<void> {
+  if (!isTauri()) {
+    browserBreveDelivery = { ...browserBreveDelivery, resendKeyConfigured: !!value.trim() };
+    return Promise.resolve();
+  }
+  return invoke<void>("breve_store_resend_key", { value });
+}
+
+export function breveRemoveResendKey(): Promise<void> {
+  if (!isTauri()) {
+    browserBreveDelivery = { ...browserBreveDelivery, resendKeyConfigured: false };
+    return Promise.resolve();
+  }
+  return invoke<void>("breve_remove_resend_key");
 }

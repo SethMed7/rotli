@@ -32,7 +32,7 @@ pub fn web_search(query: String, limit: Option<usize>) -> Result<Vec<WebResult>,
     if q.is_empty() {
         return Ok(vec![]);
     }
-    if crate::secret::looks_secure(q) {
+    if crate::secret::protected_for_remote(q) {
         return Err(
             "blocked: that query looks like it contains a secret — not sending it to the web.".into(),
         );
@@ -58,7 +58,7 @@ pub fn web_fetch(url: String, max_chars: Option<usize>) -> Result<String, String
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         return Err("web_fetch needs an http(s) URL.".into());
     }
-    if crate::secret::looks_secure(url) {
+    if crate::secret::protected_for_remote(url) {
         return Err("blocked: that URL looks like it contains a secret — not fetching it.".into());
     }
     let cap = max_chars.unwrap_or(8000).clamp(500, 20_000);

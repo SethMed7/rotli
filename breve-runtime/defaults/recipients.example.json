@@ -1,0 +1,5 @@
+{
+  "from": "breve@yourdomain.com",
+  "to": "you@example.com",
+  "_notes": "Copy to recipients.json (gitignored). from = a verified sender on your email provider (e.g. Resend); to = where briefs are emailed. The send API key lives in the macOS Keychain (service 'resend-breve'), never here."
+}

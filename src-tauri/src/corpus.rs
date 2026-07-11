@@ -130,6 +130,18 @@ impl RootRegistry {
 /// the unified `corpus.json`, migrating the four legacy files into it on first
 /// launch (idempotent, non-destructive).
 pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
+    if cfg!(debug_assertions) {
+        let cfg = ensure_corpus_config(app);
+        return vec![CorpusRoot {
+            id: DEFAULT_ROOT_ID.to_string(),
+            label: if is_memex_root(&cfg.corpus.abs_path) {
+                "Production memex · read-only".to_string()
+            } else {
+                "Production notes · read-only".to_string()
+            },
+            abs_path: cfg.corpus.abs_path,
+        }];
+    }
     // demo mode: a single isolated demo memex — the real brains/folders are
     // hidden and corpus.json is never touched (Seth, 2026-07-07).
     if demo_active(app) {
@@ -213,13 +225,68 @@ pub struct CorpusConfig {
 
 fn corpus_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
     use tauri::Manager;
+    app.path()
+        .app_config_dir()
+        .ok()
+        .map(|d| d.join(if cfg!(debug_assertions) { "corpus.dev.json" } else { "corpus.json" }))
+}
+
+fn production_corpus_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
+    use tauri::Manager;
     app.path().app_config_dir().ok().map(|d| d.join("corpus.json"))
 }
 
+fn read_config_path(path: &Path) -> Option<CorpusConfig> {
+    fs::read_to_string(path).ok().and_then(|t| serde_json::from_str(&t).ok())
+}
+
+/// Read a config without mutating it. A valid `.bak` is an emergency fallback:
+/// an older debug recovery bug could rename `corpus.json` while looking for
+/// `corpus.dev.json`. Reading the backup keeps the production binding intact
+/// until the release app next writes its config; dev never restores or edits it.
+fn read_config_path_or_backup(path: &Path) -> Option<CorpusConfig> {
+    read_config_path(path).or_else(|| read_config_path(&path.with_extension("json.bak")))
+}
+
 pub fn read_corpus_config(app: &tauri::AppHandle) -> Option<CorpusConfig> {
-    corpus_config_file(app)
-        .and_then(|f| fs::read_to_string(f).ok())
-        .and_then(|t| serde_json::from_str(&t).ok())
+    corpus_config_file(app).and_then(|f| read_config_path_or_backup(&f))
+}
+
+/// The development shell mirrors the production corpus as its single visible
+/// source. It does not copy, register, or write the live tree. If a production
+/// config predating the unified model is all that exists, promote the active
+/// memex from the isolated dev config snapshot instead of showing a second notes
+/// root beside it.
+fn dev_primary_from_config(cfg: CorpusConfig) -> Option<CorpusConfig> {
+    let source = if is_memex_root(&cfg.corpus.abs_path) {
+        cfg.corpus.abs_path.clone()
+    } else if let Some(brain) = cfg
+        .active_brain_id
+        .as_deref()
+        .and_then(|id| cfg.brains.iter().find(|b| b.id == id))
+        .filter(|b| is_memex_root(&b.abs_path))
+        .or_else(|| cfg.brains.iter().find(|b| is_memex_root(&b.abs_path)))
+    {
+        brain.abs_path.clone()
+    } else if cfg.corpus.abs_path.exists() {
+        cfg.corpus.abs_path.clone()
+    } else {
+        return None;
+    };
+    Some(CorpusConfig {
+        version: cfg.version,
+        corpus: CorpusRef { abs_path: source },
+        brains: Vec::new(),
+        folders: Vec::new(),
+        active_brain_id: None,
+    })
+}
+
+fn read_dev_source_config(app: &tauri::AppHandle) -> Option<CorpusConfig> {
+    production_corpus_config_file(app)
+        .and_then(|f| read_config_path_or_backup(&f))
+        .and_then(dev_primary_from_config)
+        .or_else(|| read_corpus_config(app).and_then(dev_primary_from_config))
 }
 
 pub fn write_corpus_config(app: &tauri::AppHandle, cfg: &CorpusConfig) -> Result<(), String> {
@@ -287,7 +354,10 @@ pub fn is_demo_memex(root: &Path) -> bool {
 
 fn demo_flag_file(app: &tauri::AppHandle) -> Option<PathBuf> {
     use tauri::Manager;
-    app.path().app_config_dir().ok().map(|d| d.join("demo.on"))
+    app.path()
+        .app_config_dir()
+        .ok()
+        .map(|d| d.join(if cfg!(debug_assertions) { "demo.dev.on" } else { "demo.on" }))
 }
 
 /// The demo memex folder — `memex-demo`, a sibling of the user's real corpus.
@@ -343,6 +413,9 @@ pub fn set_demo(app: &tauri::AppHandle, on: bool) -> Result<(), String> {
 /// no config yet) falls back so the app never opens a dead path. A blank/dead
 /// default is the white-screen failure mode — this guard is load-bearing.
 pub fn resolve_corpus(app: &tauri::AppHandle) -> PathBuf {
+    if cfg!(debug_assertions) {
+        return ensure_corpus_config(app).corpus.abs_path;
+    }
     // demo mode: the seeded demo memex, never the user's real corpus
     if demo_active(app) {
         if let Some(demo) = ensure_demo_memex(app) {
@@ -366,6 +439,11 @@ pub fn resolve_corpus(app: &tauri::AppHandle) -> PathBuf {
 /// (idempotent — a no-op once the config exists). Non-destructive: the legacy
 /// files are left in place until the retire step.
 pub fn ensure_corpus_config(app: &tauri::AppHandle) -> CorpusConfig {
+    if cfg!(debug_assertions) {
+        if let Some(cfg) = read_dev_source_config(app) {
+            return cfg;
+        }
+    }
     if let Some(cfg) = read_corpus_config(app) {
         return cfg;
     }
@@ -374,13 +452,18 @@ pub fn ensure_corpus_config(app: &tauri::AppHandle) -> CorpusConfig {
         .path()
         .app_config_dir()
         .unwrap_or_else(|_| PathBuf::from("."));
-    // A corpus.json that EXISTS but won't parse must NOT be silently re-migrated over
+    // The selected config that EXISTS but won't parse must NOT be silently re-migrated over
     // (that would drop added folders / re-add forgotten brains / reset the active
     // pick). Preserve the bad file as `.bak` + log, then re-derive from the legacy files.
-    let cfg_file = dir.join("corpus.json");
+    let cfg_file = corpus_config_file(app).unwrap_or_else(|| dir.join("corpus.json"));
     if cfg_file.exists() {
-        eprintln!("rotli: corpus.json is unreadable — preserving it as corpus.json.bak, re-deriving from legacy files");
-        let _ = fs::rename(&cfg_file, dir.join("corpus.json.bak"));
+        let backup = cfg_file.with_extension("json.bak");
+        eprintln!(
+            "rotli: {} is unreadable — preserving it as {}, re-deriving from legacy files",
+            cfg_file.display(),
+            backup.display()
+        );
+        let _ = fs::rename(&cfg_file, backup);
     }
     let cfg = migrate_config_at(&dir, &default_corpus_root(app));
     if let Err(e) = write_corpus_config(app, &cfg) {
@@ -848,6 +931,23 @@ fn parse_fields(head: &str) -> Frontmatter {
     fm
 }
 
+/// The clean, top-level metadata vocabulary retrieval may search. This makes
+/// organizer-generated keywords useful without exposing arbitrary nested or
+/// provenance/control frontmatter. Values stay plain text and are never an
+/// independent source of truth.
+fn searchable_metadata(fm: &Frontmatter) -> String {
+    const KEYS: [&str; 6] = ["area", "summary", "tags", "links", "shelf", "reach"];
+    fm.foreign
+        .iter()
+        .filter(|line| {
+            let Some((key, _)) = line.split_once(':') else { return false };
+            key == key.trim() && KEYS.contains(&key)
+        })
+        .cloned()
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Serialize: our four facts first, then every foreign line verbatim, then the
 /// raw body exactly as given (callers pass the separating blank line).
 pub fn compose_document(fm: &Frontmatter, raw_body: &str) -> String {
@@ -887,8 +987,17 @@ pub(crate) fn field_key(line: &str) -> Option<&str> {
 /// Keys rotli owns directly — the metadata-panel editor touches only OTHER
 /// (foreign) keys; `locked` goes through set_locked, the rest are derived.
 /// v3.7: `owner` promoted to RESERVED (provenance, immutable — not user-editable).
-const RESERVED_KEYS: [&str; 8] =
-    ["id", "created", "updated", "pinned", "origin", "locked", "secure", "owner"];
+const RESERVED_KEYS: [&str; 9] = [
+    "id",
+    "created",
+    "updated",
+    "pinned",
+    "origin",
+    "locked",
+    "secure",
+    "local_ai_allowed",
+    "owner",
+];
 
 /// The metadata keys the AI FILER owns (contract v3.7). Written ONLY via
 /// `set_ai_field` / `file_note`; the Filer refuses everything NOT in this set, and
@@ -912,6 +1021,13 @@ pub(crate) fn secure_field(line: &str) -> Option<bool> {
     (k.trim() == "secure").then(|| v.trim() == "true")
 }
 
+/// Explicit permission for a loopback-local model to read a secure note.
+/// Absence and malformed values fail closed. Remote models ignore this flag.
+pub(crate) fn local_ai_allowed_field(line: &str) -> Option<bool> {
+    let (k, v) = line.split_once(':')?;
+    (k.trim() == "local_ai_allowed").then(|| v.trim() == "true")
+}
+
 /// High-signal secret patterns — API keys, private keys, JWTs, SSNs, card numbers.
 /// ANY match → the note holds secrets: it's flagged `secure: true`, its content is
 /// never sent to a REMOTE model, and its path is gitignored (Seth, 2026-06-29).
@@ -930,6 +1046,7 @@ pub struct FrontmatterView {
     pub updated: String,
     pub locked: bool,
     pub secure: bool,
+    pub local_ai_allowed: bool,
     /// The typed pin fact — floats the note to the top of every list (the list
     /// sort is pinned → updated → id). Toggled from the row menu / a hotkey.
     pub pinned: bool,
@@ -965,9 +1082,10 @@ pub fn raw_frontmatter_block(text: &str) -> &str {
 }
 
 /// The reserved PROVENANCE keys the raw-metadata editor must never change —
-/// contract v3.7: id/owner/created are not user-editable. Everything else in
+/// contract v3.7: provenance plus the local-AI permission are not raw-editable.
+/// The permission must flow through its explicit command. Everything else in
 /// the typed block (updated/pinned/locked/secure/shelf/tags/…) lands as typed.
-const RAW_IMMUTABLE_KEYS: [&str; 3] = ["id", "created", "owner"];
+const RAW_IMMUTABLE_KEYS: [&str; 4] = ["id", "created", "owner", "local_ai_allowed"];
 
 /// Rebuild a document from a user-typed raw frontmatter block (the "Show file
 /// metadata" editor). The submitted text is taken VERBATIM — line order,
@@ -1428,8 +1546,12 @@ pub struct NoteMeta {
     pub id: String,
     pub title: String,
     pub snippet: String,
-    /// Relative folder path ("" = corpus root). Folder ids ARE paths.
+    /// User-facing folder path ("" = corpus root). In a memex this may be the
+    /// note's shelf projection rather than its physical wiki folder.
     pub folder_id: String,
+    /// Physical folder containing the file. Kept separate from `folder_id` so
+    /// shelf-projected notes can still be located and revealed in the Brain.
+    pub disk_folder_id: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub pinned: bool,
@@ -1470,6 +1592,8 @@ pub struct CorpusOverview {
 pub struct NoteDoc {
     pub id: String,
     pub folder_id: String,
+    /// Physical folder containing the file; see `NoteMeta::disk_folder_id`.
+    pub disk_folder_id: String,
     /// Frontmatter stripped — what the editor edits.
     pub body: String,
     pub created_at: i64,
@@ -1501,6 +1625,22 @@ const EMPTY_EXCALIDRAW: &str = "{\"type\":\"excalidraw\",\"version\":2,\"source\
 
 const SUPPRESS_TTL: Duration = Duration::from_secs(2);
 
+/// Resolve filesystem aliases for watcher comparisons. macOS commonly gives
+/// callers `/var/...` while FSEvents reports the same file as
+/// `/private/var/...`. For a path that does not exist yet (a pre-write
+/// suppression mark), resolve its existing parent and append the filename.
+fn normalized_watch_path(path: &Path) -> PathBuf {
+    if let Ok(canonical) = fs::canonicalize(path) {
+        return canonical;
+    }
+    match (path.parent(), path.file_name()) {
+        (Some(parent), Some(name)) => fs::canonicalize(parent)
+            .map(|canonical| canonical.join(name))
+            .unwrap_or_else(|_| path.to_path_buf()),
+        _ => path.to_path_buf(),
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct SuppressSet(Arc<Mutex<HashMap<PathBuf, Instant>>>);
 
@@ -1508,14 +1648,14 @@ impl SuppressSet {
     pub fn mark(&self, path: &Path) {
         let mut map = self.0.lock().unwrap();
         map.retain(|_, at| at.elapsed() < SUPPRESS_TTL);
-        map.insert(path.to_path_buf(), Instant::now());
+        map.insert(normalized_watch_path(path), Instant::now());
     }
 
     pub fn contains(&self, path: &Path) -> bool {
         self.0
             .lock()
             .unwrap()
-            .get(path)
+            .get(&normalized_watch_path(path))
             .is_some_and(|at| at.elapsed() < SUPPRESS_TTL)
     }
 }
@@ -1694,25 +1834,43 @@ impl CorpusStore {
     /// the spine, never scaffold), anything else to the legacy path (today,
     /// byte-identical).
     pub fn open(root: PathBuf) -> Result<Self, String> {
+        Self::open_with_mode(root, false)
+    }
+
+    /// Open an existing corpus as a view only. This is the development mount for
+    /// the production memex: no sidecar creation, seeding, index persistence, or
+    /// user/organizer write lane is allowed.
+    pub fn open_read_only(root: PathBuf) -> Result<Self, String> {
+        Self::open_with_mode(root, true)
+    }
+
+    fn open_with_mode(root: PathBuf, read_only: bool) -> Result<Self, String> {
         // Probe BEFORE create_dir_all so an absent dir reads as "not a memex"
         // (→ legacy first-run), never as a memex over an empty folder.
         if is_memex_root(&root) {
-            Self::open_memex(root)
+            Self::open_memex(root, read_only)
         } else {
-            Self::open_legacy(root)
+            Self::open_legacy(root, read_only)
         }
     }
 
     /// Today's behavior, unchanged: reserved folders + first-run seeding, every
     /// path writable. Layout::LegacyRotli.
-    fn open_legacy(root: PathBuf) -> Result<Self, String> {
+    fn open_legacy(root: PathBuf, read_only: bool) -> Result<Self, String> {
         let fresh = !root.exists()
             || fs::read_dir(&root).map(|mut d| d.next().is_none()).unwrap_or(false);
-        fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
+        if read_only && !root.is_dir() {
+            return Err(format!("read-only corpus does not exist: {}", root.display()));
+        }
+        if !read_only {
+            fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
+        }
         let root = fs::canonicalize(&root)
             .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
-        fs::create_dir_all(root.join(DOT_DIR))
-            .map_err(|e| format!("create {}: {e}", root.join(DOT_DIR).display()))?;
+        if !read_only {
+            fs::create_dir_all(root.join(DOT_DIR))
+                .map_err(|e| format!("create {}: {e}", root.join(DOT_DIR).display()))?;
+        }
 
         let mut store = Self {
             root,
@@ -1721,13 +1879,15 @@ impl CorpusStore {
             os_trash: true,
             layout: Layout::LegacyRotli,
             band_read_only: false,
-            perms_read_only: false,
+            perms_read_only: read_only,
         };
         store.load_index();
         // Scaffold the six reserved sidebar destinations every open (idempotent),
         // so existing corpora gain them too. (Seth, 2026-06-13)
-        store.ensure_reserved_folders()?;
-        if fresh {
+        if !read_only {
+            store.ensure_reserved_folders()?;
+        }
+        if fresh && !read_only {
             store.first_run()?;
         }
         Ok(store)
@@ -1739,11 +1899,13 @@ impl CorpusStore {
     /// SKIP `ensure_reserved_folders` and SKIP `first_run`: rotli must never
     /// scaffold its Inbox/Vault/Storage/… inside someone's memex-vault. Layout::Memex
     /// then keeps every write off self/history/wiki/MAP/inbox + control files.
-    fn open_memex(root: PathBuf) -> Result<Self, String> {
+    fn open_memex(root: PathBuf, read_only: bool) -> Result<Self, String> {
         let root = fs::canonicalize(&root)
             .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
-        fs::create_dir_all(root.join(DOT_DIR))
-            .map_err(|e| format!("create {}: {e}", root.join(DOT_DIR).display()))?;
+        if !read_only {
+            fs::create_dir_all(root.join(DOT_DIR))
+                .map_err(|e| format!("create {}: {e}", root.join(DOT_DIR).display()))?;
+        }
 
         // The contract band decides writability AT OPEN (#3): out-of-band ⇒ every
         // write refused in Rust, matching the TS read-only verdict (brain_view).
@@ -1755,7 +1917,7 @@ impl CorpusStore {
             os_trash: true,
             layout: Layout::Memex,
             band_read_only,
-            perms_read_only: false,
+            perms_read_only: read_only,
         };
         store.load_index();
         Ok(store)
@@ -1789,6 +1951,7 @@ impl CorpusStore {
     /// path. The sanctioned binary-asset write (model.md: a dropped file routes to
     /// storage/) — NOT a note write; it can only ever land in the binary area.
     pub fn import_file(&self, src: &Path) -> Result<String, String> {
+        self.mutation_allowed()?;
         let subdir = match self.layout {
             Layout::Memex => "storage",
             Layout::LegacyRotli => "Storage",
@@ -1880,6 +2043,36 @@ impl CorpusStore {
         Ok(rel)
     }
 
+    /// Create a file owned by Rotli's document/sheet commands. In a memex these
+    /// live in a dedicated storage/rotli lane, keeping the foreign storage tree
+    /// read-only while giving generated assets an explicit ownership boundary.
+    pub fn create_managed_file(&mut self, name: &str, bytes: &[u8]) -> Result<String, String> {
+        const GENERATED_FILE_EXTS: &[&str] = &["xlsx", "docx"];
+        self.mutation_allowed()?;
+        validate_component(name)?;
+        let ext = Path::new(name)
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(str::to_ascii_lowercase);
+        if !ext.as_deref().is_some_and(|value| GENERATED_FILE_EXTS.contains(&value)) {
+            return Err(format!("managed files must use one of: {}", GENERATED_FILE_EXTS.join(", ")));
+        }
+        let folder = match self.layout {
+            Layout::Memex => "storage/rotli",
+            Layout::LegacyRotli => "Storage",
+        };
+        let rel = self.free_name(folder, name, None);
+        fs::create_dir_all(self.abs(folder)).map_err(|e| format!("create {folder}: {e}"))?;
+        let abs = self.abs(&rel);
+        self.suppress.mark(&abs);
+        atomic_write_bytes(&abs, bytes)?;
+        Ok(rel)
+    }
+
+    pub fn managed_file_creation_available(&self) -> bool {
+        self.mutation_allowed().is_ok()
+    }
+
     /// Read a note's frontmatter for the metadata panel — the typed facts plus the
     /// lock state and every foreign line (shelf/reach/area/summary/tags/links/…).
     /// Takes a wire id OR a rel path (resolve_note_rel): a `.md` note travels the
@@ -1893,6 +2086,10 @@ impl CorpusStore {
         let mut fm = fm_opt.unwrap_or_default();
         let locked = fm.foreign.iter().any(|l| locked_field(l) == Some(true));
         let mut secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
+        let local_ai_allowed = fm
+            .foreign
+            .iter()
+            .any(|l| local_ai_allowed_field(l) == Some(true));
         // auto-flag: secrets detected + not yet marked → set secure:true + gitignore.
         // The detector is the regex pass today; the local LLM refines it later.
         // BEST-EFFORT on this READ path: persist + gitignore, but a write/gitignore
@@ -1901,10 +2098,12 @@ impl CorpusStore {
         // direction); the explicit set_secure path keeps hard-failing for the user.
         if !secure && looks_secure(body) {
             fm.foreign.push("secure: true".to_string());
-            if let Err(e) =
-                atomic_write(&path, &compose_document(&fm, body)).and_then(|()| self.gitignore_add(rel))
-            {
-                eprintln!("auto-secure-flag (read) failed for {rel}: {e}");
+            if self.mutation_allowed().is_ok() {
+                if let Err(e) = atomic_write(&path, &compose_document(&fm, body))
+                    .and_then(|()| self.gitignore_add(rel))
+                {
+                    eprintln!("auto-secure-flag (read) failed for {rel}: {e}");
+                }
             }
             secure = true;
         }
@@ -1922,6 +2121,7 @@ impl CorpusStore {
             updated: fm.updated.unwrap_or_default(),
             locked,
             secure,
+            local_ai_allowed,
             pinned: fm.pinned.unwrap_or(false),
             fields,
         })
@@ -1934,6 +2134,7 @@ impl CorpusStore {
     /// flag, and locking a curated wiki note against the filer must work even
     /// where the user can't edit the note itself.
     fn set_locked(&mut self, id_or_rel: &str, locked: bool) -> Result<(), String> {
+        self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
@@ -1955,6 +2156,7 @@ impl CorpusStore {
     /// note already carries, so pinning works even on curated notes the user
     /// can't body-edit.
     fn set_pinned(&mut self, id_or_rel: &str, pinned: bool) -> Result<(), String> {
+        self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
@@ -2032,6 +2234,13 @@ impl CorpusStore {
                 .any(|l| secure_field(l) == Some(true))
         };
         let (before, after) = (was_secure(&text), was_secure(&out));
+        let (_, out_body) = parse_document(&out);
+        if before && !after && looks_secure(out_body) {
+            return Err(
+                "Remove the detected secret from the note before removing secure protection"
+                    .into(),
+            );
+        }
         self.suppress.mark(&path);
         atomic_write(&path, &out)?;
         if after && !before {
@@ -2047,6 +2256,7 @@ impl CorpusStore {
     /// note marked secure whose `.gitignore` write failed would silently stay
     /// committable, so set_secure must learn about it (Seth, 2026-06-30 — audit).
     fn gitignore_add(&self, rel: &str) -> Result<(), String> {
+        self.mutation_allowed()?;
         let path = self.root.join(".gitignore");
         let existing = fs::read_to_string(&path).unwrap_or_default();
         if existing.lines().any(|l| l.trim() == rel) {
@@ -2065,6 +2275,7 @@ impl CorpusStore {
     /// is cleared, so it isn't left needlessly ignored (the symmetric counterpart of
     /// gitignore_add). No-op when there's no `.gitignore` or the line isn't present.
     fn gitignore_remove(&self, rel: &str) -> Result<(), String> {
+        self.mutation_allowed()?;
         let path = self.root.join(".gitignore");
         let Ok(existing) = fs::read_to_string(&path) else {
             return Ok(());
@@ -2087,6 +2298,7 @@ impl CorpusStore {
     /// under an ignored dir — so narrow it to `.rotli/*` and add `!.rotli/main.json`.
     /// Idempotent; a no-op outside a git corpus.
     fn ensure_main_committable(&self) -> Result<(), String> {
+        self.mutation_allowed()?;
         let path = self.root.join(".gitignore");
         if !path.exists() && !self.root.join(".git").exists() {
             return Ok(());
@@ -2124,12 +2336,22 @@ impl CorpusStore {
     /// flag (like the auto-flag on the read path) — marking a note secure must
     /// never be refused by the user-lane gate.
     fn set_secure(&mut self, id_or_rel: &str, secure: bool) -> Result<(), String> {
+        self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
         let mut fm = fm.unwrap_or_default();
+        if !secure && looks_secure(body) {
+            return Err(
+                "Remove the detected secret from the note before removing secure protection"
+                    .into(),
+            );
+        }
         fm.foreign.retain(|l| secure_field(l).is_none());
+        if !secure {
+            fm.foreign.retain(|l| local_ai_allowed_field(l).is_none());
+        }
         if secure {
             fm.foreign.push("secure: true".to_string());
         }
@@ -2142,8 +2364,34 @@ impl CorpusStore {
         Ok(())
     }
 
-    /// Read a note FOR an AI model. A SECURE note (secrets detected) is refused to a
-    /// REMOTE model — its content must never leave the device; a local model is fine.
+    /// Grant or revoke secure-note access for loopback-local AI. This is valid
+    /// only while the note is secure; remote endpoints remain blocked in
+    /// read_for_ai regardless of the flag.
+    fn set_local_ai_access(&mut self, id_or_rel: &str, allowed: bool) -> Result<(), String> {
+        self.mutation_allowed()?;
+        let rel = &self.resolve_note_rel(id_or_rel)?;
+        let path = self.abs(rel);
+        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let (fm, body) = parse_document(&text);
+        let mut fm = fm.unwrap_or_default();
+        let explicitly_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
+        let secure = explicitly_secure || looks_secure(body);
+        if allowed && !secure {
+            return Err("Local AI access is only meaningful for a secure note".into());
+        }
+        fm.foreign.retain(|l| local_ai_allowed_field(l).is_none());
+        if allowed {
+            if !explicitly_secure {
+                fm.foreign.push("secure: true".to_string());
+                self.gitignore_add(rel)?;
+            }
+            fm.foreign.push("local_ai_allowed: true".to_string());
+        }
+        atomic_write(&path, &compose_document(&fm, body))
+    }
+
+    /// Read a note FOR an AI model. A SECURE note is always refused remotely and
+    /// is refused locally unless `local_ai_allowed: true` was explicitly set.
     /// The `secure:` flag is checked first; when it's ABSENT the secret DETECTOR
     /// runs on the body too (#21, audit 2026-07) — the auto-flag only fires when
     /// the metadata panel is opened, so a never-inspected note with detectable
@@ -2153,16 +2401,24 @@ impl CorpusStore {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
-        let secure = fm
-            .unwrap_or_default()
-            .foreign
-            .iter()
-            .any(|l| secure_field(l) == Some(true))
+        let fm = fm.unwrap_or_default();
+        let secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
             || looks_secure(body);
-        if secure && !model_is_local {
-            return Err(
-                "This note is marked secure (it contains secrets) and can't be sent to a remote model — switch to a local model to read it.".into(),
-            );
+        if secure {
+            if !model_is_local {
+                return Err(
+                    "This note is secure and can never be sent to a remote model.".into(),
+                );
+            }
+            let allowed = fm
+                .foreign
+                .iter()
+                .any(|l| local_ai_allowed_field(l) == Some(true));
+            if !allowed {
+                return Err(
+                    "This secure note is private from AI. Explicitly allow Local AI access to use it on this Mac.".into(),
+                );
+            }
         }
         Ok(text)
     }
@@ -2176,8 +2432,8 @@ impl CorpusStore {
         Ok(())
     }
 
-    /// The six reserved top-level destinations the sidebar always offers —
-    /// Inbox, Vault, Storage, Board, Archive, Trash — scaffolded on disk so they
+    /// The reserved top-level destinations the sidebar always offers —
+    /// Inbox, Secure notes, Vault, Storage, Board, Archive, Trash — scaffolded on disk so they
     /// exist even on a corpus that predates them. Called unconditionally from
     /// `open` (LegacyRotli ONLY — `open_memex` skips it, so a memex root is never
     /// scaffolded); `create_dir_all` is a no-op when a dir is already there, so
@@ -2191,7 +2447,15 @@ impl CorpusStore {
     /// simply stops being scaffolded and surfaces as a plain folder via `walk`
     /// (Invariant 4 — no data loss). (Seth, 2026-06-13 / 2026-06-24)
     fn ensure_reserved_folders(&self) -> Result<(), String> {
-        for name in ["Inbox", "Vault", "Storage", "Board", "Archive", "Trash"] {
+        for name in [
+            "Inbox",
+            "Secure notes",
+            "Vault",
+            "Storage",
+            "Board",
+            "Archive",
+            "Trash",
+        ] {
             fs::create_dir_all(self.root.join(name))
                 .map_err(|e| format!("create reserved folder {name}: {e}"))?;
         }
@@ -2208,6 +2472,9 @@ impl CorpusStore {
     }
 
     fn persist_index(&self) {
+        if self.mutation_allowed().is_err() {
+            return;
+        }
         let file = IndexFile { version: 1, notes: self.index.clone() };
         if let Ok(json) = serde_json::to_string_pretty(&file) {
             let _ = atomic_write(&self.root.join(DOT_DIR).join("index.json"), &json);
@@ -2223,7 +2490,7 @@ impl CorpusStore {
     /// (today). Memex → Ok ONLY for `chats/**` (and creating the `chats/` dir);
     /// every other path returns a user-facing Err that the TS layer renders.
     /// `rel == ""` is the corpus root — writable only in LegacyRotli.
-    fn writable(&self, rel: &str) -> Result<(), String> {
+    fn mutation_allowed(&self) -> Result<(), String> {
         // #3 (audit 2026-07): perms + contract band are enforced HERE, not only in
         // the TS canWrite — a user-set read-only brain and an out-of-band contract
         // both refuse every user write.
@@ -2234,9 +2501,18 @@ impl CorpusStore {
         }
         if self.perms_read_only {
             return Err(
-                "this brain is connected read-only — allow writes in Settings → Location first".into(),
+                if cfg!(debug_assertions) {
+                    "the production memex is mounted read-only in development".into()
+                } else {
+                    "this brain is connected read-only — allow writes in Settings → Location first".into()
+                },
             );
         }
+        Ok(())
+    }
+
+    fn writable(&self, rel: &str) -> Result<(), String> {
+        self.mutation_allowed()?;
         if self.layout == Layout::LegacyRotli {
             return Ok(());
         }
@@ -2334,7 +2610,10 @@ impl CorpusStore {
                 Some(_) => editor_body(raw),
                 None => raw,
             };
-            if let Some(m) = search_match(query, &meta.title, body, &meta.snippet) {
+            let metadata = fm.as_ref().map(searchable_metadata).unwrap_or_default();
+            if let Some(m) = search_match(query, &meta.title, body, &meta.snippet)
+                .or_else(|| search_match(query, &meta.title, &metadata, &meta.snippet))
+            {
                 hits.push(SearchHit {
                     id: meta.id.clone(),
                     title: meta.title.clone(),
@@ -2404,6 +2683,7 @@ impl CorpusStore {
             id: id.to_string(),
             origin: if is_hidden_root(&disk_folder) { fm.origin.clone() } else { None },
             folder_id: folder,
+            disk_folder_id: disk_folder,
             body: body.to_string(),
             created_at: fm.created.as_deref().and_then(stamp_to_ms).unwrap_or(file_created),
             updated_at: fm.updated.as_deref().and_then(stamp_to_ms).unwrap_or(file_updated),
@@ -2492,6 +2772,7 @@ impl CorpusStore {
             title,
             snippet: snippet_of(body),
             folder_id: folder,
+            disk_folder_id: disk_folder.clone(),
             created_at: stamp_to_ms(&created).unwrap_or_else(now_ms),
             updated_at: stamp_to_ms(&updated).unwrap_or_else(now_ms),
             pinned,
@@ -2534,8 +2815,18 @@ impl CorpusStore {
             None => raw,
         }
         .to_string();
-        let old_fm = fm.unwrap_or_default();
+        let mut old_fm = fm.unwrap_or_default();
         let current_folder = folder_of(rel);
+
+        // The Secure notes destination is a secure-by-default filing action,
+        // not merely a visual label. Moving a normal note into it adds the same
+        // durable file policy as secure creation; moving it back out preserves
+        // that policy until the user deliberately removes protection.
+        if (target_folder == "Secure notes" || target_folder.starts_with("Secure notes/"))
+            && !old_fm.foreign.iter().any(|line| secure_field(line) == Some(true))
+        {
+            old_fm.foreign.push("secure: true".to_string());
+        }
 
         // ── the origin rule ──
         let into_hidden = is_hidden_root(target_folder);
@@ -2619,6 +2910,7 @@ impl CorpusStore {
             title,
             snippet: snippet_of(&body),
             folder_id: target_folder.to_string(),
+            disk_folder_id: target_folder.to_string(),
             created_at: stamp_to_ms(&created).unwrap_or(file_created),
             updated_at: stamp_to_ms(&updated).unwrap_or(file_updated),
             pinned,
@@ -2764,6 +3056,7 @@ impl CorpusStore {
     /// the frontend-owned audit + undo log. The frontend composes the JSON; Rust just
     /// does the append (in the deletable sidecar, per-machine).
     pub fn journal_append(&self, line: &str) -> Result<(), String> {
+        self.mutation_allowed()?;
         let dir = self.root.join(DOT_DIR);
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let path = dir.join("brain-journal.jsonl");
@@ -2782,6 +3075,15 @@ impl CorpusStore {
     }
 
     pub fn create(&mut self, folder_id: &str, body: &str) -> Result<NoteMeta, String> {
+        self.create_with_policy(folder_id, body, false)
+    }
+
+    pub fn create_with_policy(
+        &mut self,
+        folder_id: &str,
+        body: &str,
+        secure: bool,
+    ) -> Result<NoteMeta, String> {
         self.writable(folder_id)?;
         if !folder_id.is_empty() {
             validate_rel(folder_id)?;
@@ -2792,16 +3094,26 @@ impl CorpusStore {
         let now = now_stamp();
         let title = title_of(body);
         let rel = self.free_name(folder_id, &filename_for(&title, &id), None);
+        let secure = secure
+            || folder_id == "Secure notes"
+            || folder_id.starts_with("Secure notes/");
         let fm = Frontmatter {
             id: Some(id.clone()),
             created: Some(now.clone()),
             updated: Some(now.clone()),
             pinned: Some(false),
             origin: None,
-            foreign: Vec::new(),
+            foreign: if secure {
+                vec!["secure: true".to_string()]
+            } else {
+                Vec::new()
+            },
         };
         let abs = self.abs(&rel);
         self.suppress.mark(&abs);
+        if secure {
+            self.gitignore_add(&rel)?;
+        }
         atomic_write(&abs, &compose_document(&fm, &format!("\n{body}")))?;
         self.index.insert(id.clone(), rel.clone());
         self.persist_index();
@@ -2811,6 +3123,7 @@ impl CorpusStore {
             title,
             snippet: snippet_of(body),
             folder_id: folder_id.to_string(),
+            disk_folder_id: folder_id.to_string(),
             created_at: ms,
             updated_at: ms,
             pinned: false,
@@ -2876,6 +3189,7 @@ impl CorpusStore {
             title: board_title(id),
             snippet: String::new(),
             folder_id: folder_of(id),
+            disk_folder_id: folder_of(id),
             created_at,
             updated_at,
             pinned: false,
@@ -2914,6 +3228,7 @@ impl CorpusStore {
             title: board_title(&rel),
             snippet: String::new(),
             folder_id: folder_id.to_string(),
+            disk_folder_id: folder_id.to_string(),
             created_at,
             updated_at,
             pinned: false,
@@ -2956,7 +3271,8 @@ impl CorpusStore {
                 id: id.to_string(),
                 title: board_title(id),
                 snippet: String::new(),
-                folder_id: folder,
+                folder_id: folder.clone(),
+                disk_folder_id: folder,
                 created_at,
                 updated_at,
                 pinned: false,
@@ -2974,7 +3290,8 @@ impl CorpusStore {
             id: new_rel.clone(),
             title: board_title(&new_rel),
             snippet: String::new(),
-            folder_id: folder,
+            folder_id: folder.clone(),
+            disk_folder_id: folder,
             created_at,
             updated_at,
             pinned: false,
@@ -3083,6 +3400,7 @@ impl CorpusStore {
     }
 
     pub fn dot_write(&self, which: &str, contents: &str) -> Result<(), String> {
+        self.mutation_allowed()?;
         atomic_write(&self.root.join(DOT_DIR).join(dot_file(which)?), contents)
     }
 
@@ -3265,6 +3583,7 @@ fn walk(
                 title: title_of(body),
                 snippet: snippet_of(body),
                 folder_id,
+                disk_folder_id: prefix.to_string(),
                 created_at: fm.created.as_deref().and_then(stamp_to_ms).unwrap_or(file_created),
                 updated_at: fm.updated.as_deref().and_then(stamp_to_ms).unwrap_or(file_updated),
                 pinned: fm.pinned.unwrap_or(false),
@@ -3282,6 +3601,7 @@ fn walk(
                 title: board_title(&rel),
                 snippet: String::new(),
                 folder_id: prefix.to_string(),
+                disk_folder_id: prefix.to_string(),
                 created_at: file_created,
                 updated_at: file_updated,
                 pinned: false,
@@ -3301,6 +3621,7 @@ fn walk(
                 // a memex storage/ binary re-homes to the Storage destination; a
                 // plain-corpus file stays in its own folder.
                 folder_id: project_folder(layout, prefix, &Frontmatter::default()),
+                disk_folder_id: prefix.to_string(),
                 created_at: file_created,
                 updated_at: file_updated,
                 pinned: false,
@@ -3343,9 +3664,19 @@ pub fn spawn_watcher(
 ) -> notify::Result<()> {
     use notify::{RecursiveMode, Watcher};
     let (tx, rx) = std::sync::mpsc::channel();
-    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+    let handler = move |res: notify::Result<notify::Event>| {
         let _ = tx.send(res);
-    })?;
+    };
+    // Sandboxed macOS test processes do not receive FSEvents reliably. The
+    // polling backend exercises the same filter/debounce/suppression pipeline;
+    // production keeps the native recommended watcher.
+    #[cfg(test)]
+    let mut watcher = notify::PollWatcher::new(
+        handler,
+        notify::Config::default().with_poll_interval(Duration::from_millis(100)),
+    )?;
+    #[cfg(not(test))]
+    let mut watcher = notify::recommended_watcher(handler)?;
     watcher.watch(&root, RecursiveMode::Recursive)?;
     std::thread::spawn(move || {
         let _keep_alive = watcher;
@@ -3386,6 +3717,14 @@ fn relevant_paths(
     if matches!(event.kind, notify::EventKind::Access(_)) {
         return Vec::new();
     }
+    // A file create/remove updates its parent directory's mtime. Polling and
+    // some native backends emit that as a second event carrying only the
+    // directory; treating it as content bypasses the exact-file suppress set
+    // and makes every app-authored write echo as "external". Metadata-only
+    // changes contain no note bytes and never require a corpus refresh.
+    if matches!(event.kind, notify::EventKind::Modify(notify::event::ModifyKind::Metadata(_))) {
+        return Vec::new();
+    }
     event.paths.iter().filter(|p| path_relevant(root, suppress, p)).cloned().collect()
 }
 
@@ -3394,7 +3733,9 @@ pub fn path_relevant(root: &Path, suppress: &SuppressSet, path: &Path) -> bool {
     if suppress.contains(path) {
         return false;
     }
-    let Ok(rel) = path.strip_prefix(root) else {
+    let normalized_root = normalized_watch_path(root);
+    let normalized_path = normalized_watch_path(path);
+    let Ok(rel) = normalized_path.strip_prefix(&normalized_root) else {
         return false;
     };
     for comp in rel.components() {
@@ -3404,8 +3745,8 @@ pub fn path_relevant(root: &Path, suppress: &SuppressSet, path: &Path) -> bool {
     }
     // directories (a dropped folder), .md notes and .excalidraw boards matter;
     // foreign files don't
-    match path.extension() {
-        Some(ext) => ext == "md" || ext == "excalidraw" || path.is_dir(),
+    match normalized_path.extension() {
+        Some(ext) => ext == "md" || ext == "excalidraw" || normalized_path.is_dir(),
         None => true,
     }
 }
@@ -3452,6 +3793,33 @@ impl CorpusState {
             .clone())
     }
 
+    /// Absolute path of the active/default corpus for fixed-path companion
+    /// services (Breve migration). The path is owned by the registry; callers
+    /// never accept a path from the webview.
+    pub(crate) fn default_root_path(&self) -> Result<PathBuf, String> {
+        let reg = self.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+        let store = reg
+            .stores
+            .get(&reg.default_id)
+            .ok_or_else(|| format!("corpus root unavailable: {}", reg.default_id))?;
+        Ok(store.root().to_path_buf())
+    }
+
+    /// The Breve importer writes curated notes under `wiki/reference/**`, so it
+    /// rides the same memex-only, contract-band, user-permissions gate as the AI
+    /// filer. App-private `.rotli/routines` writes use `default_root_path` and
+    /// remain available even when the connected brain itself is read-only.
+    pub(crate) fn default_breve_memex_write_root(&self) -> Result<PathBuf, String> {
+        let mut reg = self.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+        let default_id = reg.default_id.clone();
+        let store = reg
+            .stores
+            .get_mut(&default_id)
+            .ok_or_else(|| format!("corpus root unavailable: {default_id}"))?;
+        store.filer_writable("wiki/reference")?;
+        Ok(store.root().to_path_buf())
+    }
+
     /// Run `f` against the store named by `root_id` (passing the bare `rel`).
     /// The router: `split_root_id` is applied by the caller; this picks the
     /// store. An unknown root id is a clean error (an UNBOUND vault, a stale
@@ -3476,6 +3844,7 @@ impl CorpusState {
 /// root id so the wire carries a routable id. Default root → bare (no-op).
 fn prefix_meta(root_id: &str, mut m: NoteMeta) -> NoteMeta {
     m.folder_id = compose_root_id(root_id, &m.folder_id);
+    m.disk_folder_id = compose_root_id(root_id, &m.disk_folder_id);
     if m.kind == NoteKind::Board || m.kind == NoteKind::File {
         // a board/file id IS its relative path — prefix it like a folder id so a
         // later read/open routes back to this store
@@ -3561,6 +3930,7 @@ pub fn corpus_read(state: tauri::State<'_, CorpusState>, id: String) -> Result<N
     state.route(&root, |s| s.read(&rel)).map(|mut doc| {
         doc.id = compose_root_id(&root, &doc.id);
         doc.folder_id = compose_root_id(&root, &doc.folder_id);
+        doc.disk_folder_id = compose_root_id(&root, &doc.disk_folder_id);
         doc
     })
 }
@@ -3688,6 +4058,41 @@ pub fn corpus_new_file_bytes(
     Ok(compose_root_id(&root, &new_rel))
 }
 
+/// Create a Rotli-owned workbook or DOCX in the managed binary lane. Unlike the
+/// generic import path this accepts only the two formats Rotli can generate.
+#[tauri::command]
+pub fn corpus_create_managed_file(
+    state: tauri::State<'_, CorpusState>,
+    name: String,
+    base64: String,
+) -> Result<String, String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64.as_bytes())
+        .map_err(|e| format!("bad file payload: {e}"))?;
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    let rel = state.route(&default_id, |store| store.create_managed_file(&name, &bytes))?;
+    Ok(compose_root_id(&default_id, &rel))
+}
+
+#[tauri::command]
+pub fn corpus_managed_file_creation_available(
+    state: tauri::State<'_, CorpusState>,
+) -> Result<bool, String> {
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |store| Ok(store.managed_file_creation_available()))
+}
+
 /// Reveal a surfaced file in Finder (`open -R`) — the file surface's dropdown.
 #[tauri::command]
 pub fn corpus_reveal_file(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
@@ -3717,7 +4122,16 @@ pub fn corpus_reveal_file(state: tauri::State<'_, CorpusState>, id: String) -> R
 /// The FIXED allowlist behind "Open with …" — never a caller-supplied binary
 /// name (`open -a` runs whatever it's handed). TextEdit/Preview live under
 /// /System/Applications on modern macOS, hence the two roots.
-const OPEN_WITH_APPS: &[&str] = &["Numbers", "Microsoft Excel", "TextEdit", "Preview", "Safari"];
+const OPEN_WITH_APPS: &[&str] = &[
+    "Numbers",
+    "Microsoft Excel",
+    "Microsoft Word",
+    "Pages",
+    "LibreOffice",
+    "TextEdit",
+    "Preview",
+    "Safari",
+];
 
 /// Which of the known "Open with …" apps are actually installed — a cheap
 /// exists-check so the dropdown only offers what's there.
@@ -3948,17 +4362,28 @@ pub fn corpus_set_secure(
     state.route(&root, |s| s.set_secure(&rel, secure))
 }
 
+/// Explicitly permit or deny loopback-local AI access to a secure note.
+#[tauri::command]
+pub fn corpus_set_local_ai_access(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    allowed: bool,
+) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.set_local_ai_access(&rel, allowed))
+}
+
 /// Read a note for an AI model — refused for a SECURE note unless the model is
-/// LOCAL. Locality is DERIVED here from the picked model's ENDPOINT (loopback
-/// check, #2 audit 2026-07) — the webview passes where the model lives, never a
-/// "trust me, it's local" bit.
+/// LOCAL. Rust verifies both the model registry identity and loopback endpoint,
+/// so a localhost proxy for a frontier provider remains remote.
 #[tauri::command]
 pub fn corpus_read_ai(
     state: tauri::State<'_, CorpusState>,
     id: String,
+    model_id: String,
     endpoint: String,
 ) -> Result<String, String> {
-    let model_is_local = crate::chat::endpoint_is_local(&endpoint);
+    let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| s.read_for_ai(&rel, model_is_local))
 }
@@ -3985,9 +4410,12 @@ pub fn corpus_create(
     state: tauri::State<'_, CorpusState>,
     folder_id: String,
     body: String,
+    secure: Option<bool>,
 ) -> Result<NoteMeta, String> {
     let (root, rel) = split_root_id(&folder_id);
-    state.route(&root, |s| s.create(&rel, &body)).map(|mut m| {
+    state
+        .route(&root, |s| s.create_with_policy(&rel, &body, secure.unwrap_or(false)))
+        .map(|mut m| {
         m = prefix_meta(&root, m);
         m.id = compose_root_id(&root, &m.id);
         m
@@ -4133,12 +4561,31 @@ fn demo_machine_dot_path(app: &tauri::AppHandle, file: &str) -> Option<PathBuf> 
     Some(real.join(DOT_DIR).join(name))
 }
 
+/// Per-machine UI state for a debug shell. The production memex is mounted as a
+/// view only, so settings, view state, wallpaper, and Main layout live in the app
+/// cache instead of creating or changing `<memex>/.rotli/*`.
+fn dev_machine_dot_path(app: &tauri::AppHandle, file: &str) -> Option<PathBuf> {
+    if !cfg!(debug_assertions) {
+        return None;
+    }
+    use tauri::Manager;
+    let name = dot_file(file).ok()?;
+    app.path().app_cache_dir().ok().map(|d| d.join("tauri-dev-state").join(name))
+}
+
 #[tauri::command]
 pub fn corpus_settings_read(
     app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
     file: String,
 ) -> Result<String, String> {
+    if let Some(path) = dev_machine_dot_path(&app, &file) {
+        return match fs::read_to_string(&path) {
+            Ok(s) => Ok(s),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),
+            Err(e) => Err(format!("read {file}: {e}")),
+        };
+    }
     // settings/viewstate/background live in the DEFAULT root's `.rotli/` — except in
     // demo mode, where per-machine chrome stays with the user's real corpus (#3).
     if let Some(path) = demo_machine_dot_path(&app, &file) {
@@ -4167,6 +4614,12 @@ pub fn corpus_settings_write(
     // #44: the write whitelist is NARROWER than the read table — `organizer`
     // (daemon-owned) and `main` (corpus_main_write's job) are refused here.
     user_dot_writable(&file)?;
+    if let Some(path) = dev_machine_dot_path(&app, &file) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        return atomic_write(&path, &contents);
+    }
     // demo mode: per-machine chrome writes land on the real corpus, never the demo
     // memex — so tweaking the look mid-demo persists to the user's real config (#3).
     if let Some(path) = demo_machine_dot_path(&app, &file) {
@@ -4189,9 +4642,16 @@ pub fn corpus_settings_write(
 /// per-machine (Seth, 2026-07-01). Read it back with `corpus_settings_read("main")`.
 #[tauri::command]
 pub fn corpus_main_write(
+    app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
     contents: String,
 ) -> Result<(), String> {
+    if let Some(path) = dev_machine_dot_path(&app, "main") {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        return atomic_write(&path, &contents);
+    }
     let default_id = state
         .0
         .lock()
@@ -4211,6 +4671,65 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tempfile::TempDir;
+
+    #[test]
+    fn open_with_allowlist_covers_office_apps_without_accepting_arbitrary_commands() {
+        for app in ["Microsoft Excel", "Numbers", "Microsoft Word", "Pages", "LibreOffice"] {
+            assert!(OPEN_WITH_APPS.contains(&app));
+        }
+        assert!(!OPEN_WITH_APPS.contains(&"Terminal"));
+        assert!(!OPEN_WITH_APPS.contains(&"/bin/sh"));
+    }
+
+    #[test]
+    fn config_reader_uses_backup_without_moving_or_rewriting_it() {
+        let tmp = TempDir::new().unwrap();
+        let selected = tmp.path().join("corpus.json");
+        let backup = tmp.path().join("corpus.json.bak");
+        let root = tmp.path().join("memex-vault");
+        fs::write(
+            &backup,
+            format!(
+                "{{\"version\":1,\"corpus\":{{\"absPath\":\"{}\"}},\"brains\":[],\"folders\":[],\"activeBrainId\":null}}",
+                root.display()
+            ),
+        )
+        .unwrap();
+
+        let cfg = read_config_path_or_backup(&selected).unwrap();
+        assert_eq!(cfg.corpus.abs_path, root);
+        assert!(!selected.exists(), "a read-only fallback must not restore or rewrite production config");
+        assert!(backup.exists(), "the recovery snapshot must remain untouched");
+    }
+
+    #[test]
+    fn dev_source_promotes_the_production_active_memex_to_the_single_root() {
+        let tmp = TempDir::new().unwrap();
+        let notes = tmp.path().join("notes");
+        let brain = tmp.path().join("memex-vault");
+        fs::create_dir_all(&notes).unwrap();
+        seed_memex(&brain);
+        let cfg = CorpusConfig {
+            version: 1,
+            corpus: CorpusRef { abs_path: notes },
+            brains: vec![ConnectedBrain {
+                id: "vault".into(),
+                label: "Vault".into(),
+                abs_path: brain.clone(),
+                memex_id: Some("mx_test123".into()),
+                mode: Some("secure".into()),
+                perms: "chats+inbox".into(),
+            }],
+            folders: Vec::new(),
+            active_brain_id: Some("vault".into()),
+        };
+
+        let dev = dev_primary_from_config(cfg).unwrap();
+        assert_eq!(dev.corpus.abs_path, brain);
+        assert!(dev.brains.is_empty());
+        assert!(dev.folders.is_empty());
+        assert!(dev.active_brain_id.is_none());
+    }
 
     /// The load-bearing migration: Seth's live shape (plain `~/Documents/rotli`
     /// corpus + `~/memex-vault` registered BOTH as the `vault` corpus root AND as
@@ -4411,6 +4930,31 @@ mod tests {
         assert_eq!(fs::read(store.root().join(&b)).unwrap(), b"two");
         // stat sees a legacy corpus as writable
         assert!(store.file_stat(&a).unwrap().writable);
+    }
+
+    #[test]
+    fn managed_office_files_use_an_owned_memex_lane_and_respect_read_only() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+
+        let doc = store.create_managed_file("untitled.docx", b"docx").unwrap();
+        let sheet = store.create_managed_file("untitled.xlsx", b"xlsx").unwrap();
+        assert_eq!(doc, "storage/rotli/untitled.docx");
+        assert_eq!(sheet, "storage/rotli/untitled.xlsx");
+        assert_eq!(fs::read(root.join(&doc)).unwrap(), b"docx");
+        let listed = store.list().unwrap();
+        assert!(listed.notes.iter().any(|note| note.id == doc && note.kind == NoteKind::File));
+        assert!(listed.notes.iter().any(|note| note.id == sheet && note.kind == NoteKind::File));
+        assert!(store.create_managed_file("script.sh", b"nope").is_err());
+        assert!(store.managed_file_creation_available());
+
+        store.set_perms_read_only(true);
+        assert!(!store.managed_file_creation_available());
+        assert!(store.create_managed_file("blocked.docx", b"nope").is_err());
+        assert!(!root.join("storage/rotli/blocked.docx").exists());
     }
 
     /// Fresh corpus (first run happens: Inbox + welcome note exist).
@@ -4915,6 +5459,24 @@ mod tests {
     }
 
     #[test]
+    fn search_uses_clean_brain_metadata_keywords() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("wiki/projects")).unwrap();
+        fs::write(
+            root.join("wiki/projects/launch.md"),
+            "---\nid: 01SEARCHMETA00000000000000\ntags: [cedar, launch]\nprivate_nested: cedar-hidden\n---\n# Launch\n\nOrdinary body.\n",
+        )
+        .unwrap();
+        let mut store = CorpusStore::open(root).unwrap();
+        let hits = store.search("cedar", 10).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert!(hits[0].snippet.contains("tags"));
+        assert!(store.search("cedar-hidden", 10).unwrap().is_empty());
+    }
+
+    #[test]
     fn title_change_renames_through_the_index() {
         let (_dir, mut store) = bare();
         let meta = store.create("Notes", "# First title\n\nBody.\n").unwrap();
@@ -5286,6 +5848,32 @@ mod tests {
         fs::write(root.join("chats/welcome.md"), "# Welcome chat\n").unwrap();
     }
 
+    #[test]
+    fn read_only_open_never_creates_sidecars_or_changes_the_memex() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        let staged = root.join("wiki/_inbox/draft.md");
+        fs::write(&staged, "# Draft\n").unwrap();
+
+        let mut store = CorpusStore::open_read_only(root.clone()).unwrap();
+        assert_eq!(store.layout, Layout::Memex);
+        assert!(!root.join(DOT_DIR).exists(), "opening a live memex must not create .rotli");
+
+        let list = store.list().unwrap();
+        assert!(!list.notes.is_empty(), "the production memex remains readable");
+        assert!(!root.join(DOT_DIR).exists(), "index reconciliation must remain in memory");
+        assert!(store.write("wiki/_inbox/draft.md", "changed", false).is_err());
+        assert!(store.set_locked("wiki/_inbox/draft.md", true).is_err());
+        assert!(store.set_pinned("wiki/_inbox/draft.md", true).is_err());
+        assert!(store.set_secure("wiki/_inbox/draft.md", true).is_err());
+        assert!(store.dot_write("settings", "{}").is_err());
+        assert!(store.journal_append("{}").is_err());
+        assert_eq!(fs::read_to_string(&staged).unwrap(), "# Draft\n");
+        assert!(!root.join(DOT_DIR).exists());
+    }
+
     // contract v3.7 — the FILER lane is disjoint from the USER lane: the user still
     // can't write the curated brain, and the filer can ONLY write the brain, only
     // AI keys, and never a locked note.
@@ -5380,9 +5968,15 @@ mod tests {
         let fm = store.read_frontmatter(&note.id).unwrap();
         assert!(fm.secure);
         assert_eq!(fm.id, note.id);
-        // read_for_ai by ULID: a secure note is refused remote, readable locally.
+        // Secure defaults private from every model. Local access is explicit;
+        // remote access remains impossible after the opt-in.
         assert!(store.read_for_ai(&note.id, false).is_err());
+        assert!(store.read_for_ai(&note.id, true).is_err());
+        store.set_local_ai_access(&note.id, true).unwrap();
         assert!(store.read_for_ai(&note.id, true).is_ok());
+        assert!(store.read_for_ai(&note.id, false).is_err());
+        store.set_local_ai_access(&note.id, false).unwrap();
+        assert!(store.read_for_ai(&note.id, true).is_err());
         store.set_secure(&note.id, false).unwrap();
 
         // write_index — the one file the filer overwrites wholesale.
@@ -5508,10 +6102,47 @@ mod tests {
         // detectable secret, NO secure: flag (the panel was never opened)
         let hot = store.create("Inbox", "# Stripe\n\ncard 4242424242424242").unwrap();
         assert!(store.read_for_ai(&hot.id, false).is_err(), "unflagged secret must refuse remote");
-        assert!(store.read_for_ai(&hot.id, true).is_ok(), "a local model may read it");
+        assert!(store.read_for_ai(&hot.id, true).is_err(), "local access is opt-in");
+        store.set_local_ai_access(&hot.id, true).unwrap();
+        assert!(store.read_for_ai(&hot.id, true).is_ok(), "explicitly allowed local access passes");
+        assert!(store.read_for_ai(&hot.id, false).is_err(), "remote stays blocked after local opt-in");
         // a clean note passes remote
         let clean = store.create("Inbox", "# Groceries\n\neggs, milk").unwrap();
         assert!(store.read_for_ai(&clean.id, false).is_ok());
+    }
+
+    #[test]
+    fn secure_notes_are_private_at_birth_and_remote_access_is_absolute() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+
+        let quick = store
+            .create_with_policy("Inbox", "# Call notes\n\nPrivate by default", true)
+            .unwrap();
+        let secure_folder = store
+            .create_with_policy("Secure notes", "# Passwords\n", false)
+            .unwrap();
+
+        for note in [&quick, &secure_folder] {
+            let fm = store.read_frontmatter(&note.id).unwrap();
+            assert!(fm.secure);
+            assert!(!fm.local_ai_allowed);
+            assert!(store.read_for_ai(&note.id, false).is_err());
+            assert!(store.read_for_ai(&note.id, true).is_err());
+            let rel = store.path_of(&note.id).unwrap();
+            let ignored = fs::read_to_string(store.root.join(".gitignore")).unwrap();
+            assert!(ignored.lines().any(|line| line.trim() == rel));
+        }
+
+        store.set_local_ai_access(&quick.id, true).unwrap();
+        assert!(store.read_for_ai(&quick.id, true).is_ok());
+        assert!(store.read_for_ai(&quick.id, false).is_err());
+
+        let moved = store.create("Inbox", "# Move me\n").unwrap();
+        store.move_note(&moved.id, "Secure notes/Calls").unwrap();
+        assert!(store.read_frontmatter(&moved.id).unwrap().secure);
+        assert!(store.read_for_ai(&moved.id, true).is_err());
     }
 
     /// #22 (audit 2026-07): set_field is the USER lane — it must refuse the AI
@@ -5676,6 +6307,15 @@ mod tests {
             "---\nid: 01DEF\nshelf: [Myela/Payments]\nreach: [seth]\n---\n# Q3\n\nbody\n",
         )
         .unwrap();
+        // Filing preserves the user's shelf. The wire therefore needs BOTH the
+        // Captures projection and the physical Brain home so "Show in Brain"
+        // can reveal this note under Projects.
+        fs::create_dir_all(root.join("wiki/projects")).unwrap();
+        fs::write(
+            root.join("wiki/projects/cross-project-tasks.md"),
+            "---\nid: 01GHI\nshelf: [Inbox]\narea: projects\n---\n# Cross-project tasks\n\nbody\n",
+        )
+        .unwrap();
 
         let mut store = CorpusStore::open(root).unwrap();
         store.os_trash = false;
@@ -5689,8 +6329,17 @@ mod tests {
         // "Inbox" shelf routes to the Captures surface ("Board"); a real shelf stays.
         assert_eq!(folder_of_note("Pricing"), "Board");
         assert_eq!(folder_of_note("Q3"), "Myela/Payments");
+        assert_eq!(folder_of_note("Cross-project tasks"), "Board");
         // the shelf-less curated note falls back to its disk folder
         assert_eq!(folder_of_note("A wiki note"), "wiki");
+
+        let filed = list.notes.iter().find(|n| n.title == "Cross-project tasks").unwrap();
+        assert_eq!(filed.disk_folder_id, "wiki/projects");
+        let staged = list.notes.iter().find(|n| n.title == "Pricing").unwrap();
+        assert_eq!(staged.disk_folder_id, "wiki/_inbox");
+        let read = store.read("01GHI").unwrap();
+        assert_eq!(read.folder_id, "Board");
+        assert_eq!(read.disk_folder_id, "wiki/projects");
 
         let has = |id: &str| list.folders.iter().any(|f| f.id == id);
         // the shelf folders (+ the nested ancestor) were synthesized — the default
@@ -6002,6 +6651,11 @@ mod tests {
         for n in &list.notes {
             assert!(!n.id.contains(':'), "default note id must be bare: {}", n.id);
             assert!(!n.folder_id.contains(':'), "default folder_id must be bare: {}", n.folder_id);
+            assert!(
+                !n.disk_folder_id.contains(':'),
+                "default disk_folder_id must be bare: {}",
+                n.disk_folder_id
+            );
         }
         assert!(list.folders.iter().any(|f| f.id == "Inbox/Work"));
     }
@@ -6044,6 +6698,11 @@ mod tests {
         );
         // every vault note lives under wiki/ or chats/ and its folder_id is prefixed
         for n in list.notes.iter().filter(|n| n.folder_id.starts_with("vault:")) {
+            assert!(
+                n.disk_folder_id.starts_with("vault:"),
+                "vault disk folder must be prefixed: {}",
+                n.disk_folder_id
+            );
             assert!(
                 n.folder_id == "vault:wiki" || n.folder_id == "vault:chats",
                 "vault note outside wiki/+chats/: {}",

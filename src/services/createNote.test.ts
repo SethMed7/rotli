@@ -39,6 +39,21 @@ describe("routeDecision (memex-vs-local)", () => {
     expect(routeDecision("Inbox", false, true, FALLBACK)).toEqual({ kind: "local", folder: "Inbox" });
   });
 
+  test("Secure notes remains a secure shelf when the corpus is a memex", () => {
+    expect(routeDecision("Secure notes", false, true, FALLBACK)).toEqual({
+      kind: "memex",
+      shelf: ["Secure notes"],
+    });
+    expect(routeDecision("Secure notes/Calls", false, true, FALLBACK)).toEqual({
+      kind: "memex",
+      shelf: ["Secure notes/Calls"],
+    });
+    expect(routeDecision("Secure notes", false, false, FALLBACK)).toEqual({
+      kind: "local",
+      folder: "Secure notes",
+    });
+  });
+
   test("a HIDDEN root selection (Archive/Trash/Board) never births a note there (#5)", () => {
     // no memex: the sink selection falls back to the local Inbox
     expect(routeDecision("Archive", false, false, FALLBACK)).toEqual({ kind: "local", folder: FALLBACK });

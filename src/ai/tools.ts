@@ -4,6 +4,7 @@
 // scan beats any index.
 
 import type { CorpusNoteMeta } from "../lib/tauri";
+export { buildIndex } from "../memex/modelMap";
 import type { Budget } from "./budget";
 import type { Host, NoteHit, ScratchStep, ToolName } from "./types";
 
@@ -42,48 +43,6 @@ export function rankNotes(notes: CorpusNoteMeta[], query: string, limit: number)
   return scored.slice(0, limit).map((s) => s.hit);
 }
 
-/** A bounded table-of-contents of the knowledge base, grouped by folder/area. If the
- * FULL per-note index (title + id) fits `maxChars`, the model gets it (small memex —
- * it can read_note by id directly). If it would overflow, the index degrades to an
- * AREAS MAP (area + note count + a few recent titles) so a huge memex never blows the
- * context — the model then drills in with search_notes. Boards/files are skipped. */
-export function buildIndex(notes: CorpusNoteMeta[], maxChars = 3500): string {
-  const groups = new Map<string, CorpusNoteMeta[]>();
-  for (const n of notes) {
-    if (n.kind === "board" || n.kind === "file") continue;
-    const key = n.folderId || "Notes";
-    const arr = groups.get(key);
-    if (arr) arr.push(n);
-    else groups.set(key, [n]);
-  }
-  const keys = [...groups.keys()].sort();
-
-  // 1) full per-note index, if it fits the budget
-  let full = "";
-  for (const key of keys) {
-    full += `\n## ${key}\n`;
-    for (const n of groups.get(key)!) full += `- ${n.title}  {id: ${n.id}}\n`;
-  }
-  full = full.trim();
-  if (full.length <= maxChars) return full;
-
-  // 2) too big → an areas map: area + count + a few recent titles (no ids → search)
-  let out = "";
-  for (const key of keys) {
-    const arr = groups.get(key)!;
-    const recent = [...arr]
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, 3)
-      .map((n) => `- ${n.title}`);
-    out += `\n## ${key} (${arr.length})\n${recent.join("\n")}\n`;
-    if (out.length > maxChars) {
-      out += "\n…(more areas — use search_notes)\n";
-      break;
-    }
-  }
-  return out.trim();
-}
-
 /** Keep the scratchpad under a char budget so it can't grow unbounded across steps.
  * Oldest results are trimmed first — the most recent (most relevant) stay intact. */
 export function pruneScratch(scratch: ScratchStep[], maxChars: number): ScratchStep[] {
@@ -107,8 +66,12 @@ export function statusFor(tool: ToolName): string {
   switch (tool) {
     case "search_notes":
       return "searching your notes…";
+    case "search_memory":
+      return "searching your memory…";
     case "read_note":
       return "reading a note…";
+    case "read_memory":
+      return "reading a memory…";
     case "read_file":
       return "reading a file…";
     case "web_search":
@@ -130,6 +93,31 @@ export async function runTool(
   budget: Budget,
 ): Promise<string> {
   switch (tool) {
+    case "search_memory": {
+      const q = String(args.query ?? "").trim();
+      if (q === "") return 'error: search_memory needs a non-empty "query".';
+      const hits = host.searchMemory
+        ? await host.searchMemory(q, budget.maxHits)
+        : (await host.searchNotes(q, budget.maxHits)).map((hit) => ({
+            id: hit.id,
+            title: hit.title,
+            snippet: hit.snippet,
+            source: "note" as const,
+          }));
+      return hits.length
+        ? JSON.stringify(hits.map((hit) => ({ ...hit, snippet: truncate(hit.snippet, budget.snippetChars) })))
+        : "no matching notes or chats — try fewer or different keywords.";
+    }
+    case "read_memory": {
+      const id = String(args.id ?? "").trim();
+      if (!id) return 'error: read_memory needs an "id" from search_memory.';
+      const body = host.readMemory
+        ? await host.readMemory(id)
+        : id.startsWith("chat:")
+          ? "error: this host cannot read prior chats."
+          : await host.readNote(id);
+      return truncate(body, budget.readNoteChars);
+    }
     case "search_notes": {
       const q = String(args.query ?? "").trim();
       if (q === "") return 'error: search_notes needs a non-empty "query".';

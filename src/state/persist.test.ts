@@ -33,6 +33,28 @@ describe("chatSidebarLimit (#17 — chat list cap)", () => {
   });
 });
 
+describe("parseSettings — Breve sidebar lens", () => {
+  it("defaults to Notes and the Briefs view", () => {
+    const s = parseSettings("{}");
+    expect(s.sidebarMode).toBe("notes");
+    expect(s.breveView).toBe("briefs");
+  });
+
+  it("keeps every valid Breve view", () => {
+    for (const view of ["briefs", "watchlist", "routines", "models", "configure"] as const) {
+      const s = parseSettings(JSON.stringify({ sidebarMode: "breve", breveView: view }));
+      expect(s.sidebarMode).toBe("breve");
+      expect(s.breveView).toBe(view);
+    }
+  });
+
+  it("coerces unknown values to the safe workspace defaults", () => {
+    const s = parseSettings('{"sidebarMode":"mail","breveView":"accounts"}');
+    expect(s.sidebarMode).toBe("notes");
+    expect(s.breveView).toBe("briefs");
+  });
+});
+
 describe("parseSettings — organizerTrust", () => {
   // Organize is the default rung (Seth, 2026-07-02): the daemon touches only
   // location + metadata (journaled, undoable), never a note's words.
@@ -53,6 +75,19 @@ describe("parseSettings — organizerTrust", () => {
 
   it("survives corrupt json entirely", () => {
     expect(parseSettings("not json").organizerTrust).toBe("organize");
+  });
+});
+
+describe("parseSettings — creation and Brain model", () => {
+  it("new tabs default to Markdown and only accept known item kinds", () => {
+    expect(parseSettings("{}").newTabDefault).toBe("markdown");
+    expect(parseSettings('{"newTabDefault":"document"}').newTabDefault).toBe("document");
+    expect(parseSettings('{"newTabDefault":"database"}').newTabDefault).toBe("markdown");
+  });
+
+  it("Gemini 3.5 is an explicit organizer choice; unknown values fail closed to local", () => {
+    expect(parseSettings('{"organizerModel":"gemini35"}').organizerModel).toBe("gemini35");
+    expect(parseSettings('{"organizerModel":"future"}').organizerModel).toBe("local");
   });
 });
 

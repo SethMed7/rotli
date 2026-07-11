@@ -84,6 +84,23 @@ pub(crate) fn endpoint_is_local(endpoint: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// A secure-note reader must be an actual registered on-device model, not just
+/// any service reachable through localhost (which could be a proxy to a remote
+/// provider). Both the registry identity and loopback endpoint must agree.
+pub(crate) fn model_is_local(model_id: &str, endpoint: &str) -> bool {
+    if !endpoint_is_local(endpoint) {
+        return false;
+    }
+    read_models()
+        .unwrap_or_else(default_models)
+        .iter()
+        .any(|model| {
+            model.id == model_id
+                && model.endpoint.trim_end_matches('/') == endpoint.trim_end_matches('/')
+                && matches!(model.provider.as_str(), "mlx" | "llamacpp" | "ollama")
+        })
+}
+
 /// The chat-capable models the memex-ai store declares (`kind: "llm-chat"`). Read
 /// from `~/.memex/ai/registry.json`; each model's provider supplies the endpoint +
 /// wire shape. If the store is missing or unreadable we fall back to the single
@@ -247,11 +264,11 @@ pub fn chat_messages(
     // the whole interactive surface to daemon contention (doc §2).
     let _interactive = state.0.interactive_guard();
     let endpoint = endpoint.unwrap_or_else(|| DEFAULT_ENDPOINT.to_string());
+    let model = model.unwrap_or_else(|| DEFAULT_MODEL.to_string());
     // #2's SEND-side backstop (review, 2026-07): corpus_read_ai refuses secure
     // text to a non-local endpoint, but THIS command is the transport that
     // actually ships bytes — so the invariant is re-derived at the egress too.
-    egress_allowed(&endpoint, &messages)?;
-    let model = model.unwrap_or_else(|| DEFAULT_MODEL.to_string());
+    egress_allowed(&endpoint, &model, &messages)?;
     let api = api.unwrap_or_else(|| DEFAULT_API.to_string());
     let base = endpoint.trim_end_matches('/');
     let temperature = temperature.unwrap_or(0.4);
@@ -272,13 +289,16 @@ pub fn chat_messages(
 /// legally ship it here. So the transport re-derives locality and scans the
 /// OUTGOING transcript itself: a non-local endpoint refuses secret-shaped
 /// content, symmetric with web.rs's `looks_secure` gate on search/fetch.
-/// Local endpoints are unrestricted (secure notes may always ride to a local
-/// model). Pure — `chat_messages` is otherwise untestable (tauri::State).
-fn egress_allowed(endpoint: &str, messages: &[WireMsg]) -> Result<(), String> {
-    if endpoint_is_local(endpoint) {
+/// Only a registered on-device model is unrestricted. A localhost frontier
+/// proxy is still remote for this policy.
+fn egress_allowed(endpoint: &str, model: &str, messages: &[WireMsg]) -> Result<(), String> {
+    if model_is_local(model, endpoint) {
         return Ok(());
     }
-    if messages.iter().any(|m| crate::secret::looks_secure(&m.content)) {
+    if messages
+        .iter()
+        .any(|m| crate::secret::protected_for_remote(&m.content))
+    {
         return Err(
             "This conversation carries secret-shaped content and can't be sent to a remote model — switch to a local model to continue.".into(),
         );
@@ -574,18 +594,20 @@ mod tests {
         }];
         let clean = vec![WireMsg { role: "user".into(), content: "hi there".into(), images: vec![] }];
         // local endpoint: secure content rides fine
-        assert!(egress_allowed("http://127.0.0.1:11435", &secret).is_ok());
+        assert!(egress_allowed(DEFAULT_ENDPOINT, DEFAULT_MODEL, &secret).is_ok());
         // remote endpoint: the secret refuses, clean text passes
-        assert!(egress_allowed("https://api.example.com/v1", &secret).is_err());
-        assert!(egress_allowed("https://api.example.com/v1", &clean).is_ok());
+        assert!(egress_allowed("https://api.example.com/v1", DEFAULT_MODEL, &secret).is_err());
+        assert!(egress_allowed("https://api.example.com/v1", DEFAULT_MODEL, &clean).is_ok());
+        // a frontier model behind localhost is still denied
+        assert!(egress_allowed(DEFAULT_ENDPOINT, "claude-proxy", &secret).is_err());
         // ANY turn carrying the secret trips it, not just the last
         let buried = vec![
             WireMsg { role: "assistant".into(), content: "ssn: 123-45-6789".into(), images: vec![] },
             WireMsg { role: "user".into(), content: "go on".into(), images: vec![] },
         ];
-        assert!(egress_allowed("https://api.example.com/v1", &buried).is_err());
+        assert!(egress_allowed("https://api.example.com/v1", DEFAULT_MODEL, &buried).is_err());
         // unparseable endpoint ⇒ NOT local ⇒ fail closed on secrets
-        assert!(egress_allowed("", &secret).is_err());
+        assert!(egress_allowed("", DEFAULT_MODEL, &secret).is_err());
     }
 
     #[test]

@@ -10,6 +10,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-07-11
+
+### Changed
+
+- **Secure notes are private by construction.** Quick captures and Quick Notes
+  are secure at birth; remote/frontier models can never receive their titles,
+  snippets, or bodies, while loopback-local AI requires an explicit per-note
+  permission. Secure files are also gitignored and have a dedicated destination.
+- **New item creation is one consistent workflow.** New menus offer Markdown,
+  DOCX documents, XLSX sheets, and boards; every entry point uses the same
+  memex routing, refresh, Main-reference, and tab-opening sequence. ⌘T remains
+  Markdown by default and its item type is configurable in General settings.
+- **The repository now enforces its structural rules.** Source modules use
+  camelCase filenames, domain/application boundaries are checked, database
+  dependencies are denied, and slash embeds are kept inside Markdown surfaces.
+- **Brain retrieval adapts to the selected model.** Model Mapping 0 generates a
+  bounded table of contents from context capability and transparent user
+  signals (pins and recency), without a database or duplicate knowledge files.
+- **Past notes and chats form one master memory.** Every persisted chat now
+  maintains a linked background Markdown summary note, while `search_memory`
+  expands keywords across organized notes and original chat transcripts before
+  `read_memory` grounds the answer in the selected source. Remote retrieval
+  skips secret-shaped chats and keeps the provider egress backstop.
+- **Gemini 3.5 Flash can manage the Brain.** The organizer can use the existing
+  authenticated, sandboxed Antigravity lane while retaining secure/locked-note
+  egress protection and the provider's process-wide concurrency gate.
+- **Rotli Documents now follows an enforced clean-architecture boundary.**
+  Framework-free document models and use cases depend on injected storage,
+  encoding, and preview ports; one composition root selects the Tauri, DOCX,
+  and Mammoth adapters. A build check prevents vendor or UI dependencies from
+  leaking back into the domain/application layers.
+- **Regression coverage now protects product behavior and visual consistency.**
+  Every push and pull request runs the frontend, Breve runtime, Rust, architecture,
+  structure, and production-build checks. A fast design lane additionally verifies
+  all six app themes, shared semantic tokens, focus and reduced-motion behavior,
+  theme resolution, Univer mapping, and WCAG contrast for every Breve PDF preset.
+
+## [0.29.0] - 2026-07-11
+
+### Added
+
+- **Breve is a first-class Rotli workspace.** The coffee control swaps the
+  sidebar into Briefs, Watchlist, Routines, and Models without disturbing open
+  note panes. The same control becomes the Rotli mark inside Breve and returns
+  to the main workspace; adjacent note controls remain visible but safely
+  disabled until the user switches back.
+- **A complete Breve product workspace.** Briefs is now an operational delivery
+  history instead of a passive landing page, while Watchlist, Routines, Models,
+  and Configure share one restrained desktop form system with readable guidance,
+  clear save state, compact status communication, and responsive layouts.
+- **Breve PDF appearance is user-controlled.** Choose a built-in restrained PDF
+  theme or customize its paper, ink, muted, rule, and accent colors. The same
+  versioned theme contract is used by preview and delivery rendering.
+- **Documents belong in the note workflow.** Rotli can create local DOCX files,
+  securely preview Word-compatible files, and embed documents and sheets inside
+  Markdown notes. Embedded files expand in place without changing the parent tab,
+  can be resized, and offer an explicit open-in-new-tab action.
+- **Document samples for hands-on validation.** A development-only seeder creates
+  representative DOCX and spreadsheet files in the active local corpus without
+  touching production content.
+- **Copy-only Breve migration.** Rotli can import the fixed `~/breve` library
+  into the active memex: Markdown briefs and watchlist become reference notes,
+  creators/pages become app-private routine data, and companion artifacts move
+  under `storage/breveBriefs`. The importer never deletes legacy files or edits
+  launchd and is safe to run again.
+- **Rotli can take complete ownership of Breve.** The explicit takeover moves
+  private configuration, watcher/creator state, Signal sessions and transcripts,
+  logs, the brief engine, TTS, mail, rendering, and provider fallback into the
+  active corpus's managed `.rotli/breve` runtime. One restartable Rotli
+  scheduler replaces the seven Breve launchd jobs, follows timezone/travel and
+  live routine edits, prevents overlapping or duplicate delivery, catches up
+  after sleep, and supervises the always-on Signal assistant. Once takeover is
+  verified, Rotli can move `~/breve` to Trash and discard migration-only backups.
+
+### Changed
+
+- **Breve now uses the active Rotli memex.** Development reads the configured
+  corpus instead of inventing a separate `tauri-dev-corpus`; production data
+  remains write-protected and Breve configuration edits remain temporary in dev.
+- **Model policy is explicit and provider-independent.** Breve exposes Claude
+  Sonnet 5 and the authenticated Codex catalog even when a model is hidden from
+  the general chat picker, while intentionally blocked models remain unavailable.
+- **Breve implementation seams are swappable.** Scheduling, document preview,
+  embedded-file controls, PDF theme resolution, and spreadsheet creation are
+  isolated behind small modules instead of accumulating inside surface components.
+- **The chat model picker reflects real connections.** Models are grouped by
+  local Mac, Claude Code, Codex, Antigravity, and the advanced Gemini API lane;
+  only enabled, installed, authenticated providers appear. The popover is now
+  border-only in Charcoal, has no pale glow, removes duplicate Claude models
+  from Antigravity, and supports complete arrow-key navigation.
+- **Embedded boards resize and expand in place.** Drag the bottom grip to make
+  a `/Board` embed taller or shorter. Its always-visible **Expand** control now
+  grows the board inside the current note tab, switches to **Collapse**, and
+  restores the prior dragged height instead of opening another tab.
+
+### Fixed
+
+- **Doctor alerts are edge-triggered.** An unresolved invariant failure is sent
+  once, suppressed on subsequent 30-minute checks, and reported again only if it
+  resolves and later returns. A stale `legacy-repo.bundle` is relocated from the
+  managed memex to Rotli's private app-data backups without weakening validation.
+- **Slash commands preserve the current note context.** Board, sheet, document,
+  and note-link commands create or select their own files, embed them in the active
+  note, and expand in place; tabs change only when Open in new tab is requested.
+- **Brain reveal follows the file, not only its shelf.** Notes now retain both
+  their shelf projection and physical Brain folder. A filed note whose shelf is
+  still Inbox therefore reports its real area in metadata and **Show in Brain**
+  expands and scrolls to the exact Brain row.
+- **Spreadsheets fully occupy Charcoal.** Univer's workbench now fills the file
+  pane to its bottom edge, and live theme changes rebuild its chrome with the
+  current palette so Charcoal stays neutral instead of inheriting warm clay.
+- **Corpus watcher writes stay quiet.** Watch paths are normalized across
+  macOS aliases and metadata-only events are ignored, preventing app-authored
+  writes from returning as false external-change notifications.
+
 ## [0.28.1] - 2026-07-09
 
 ### Fixed

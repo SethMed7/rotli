@@ -17,6 +17,7 @@ const MEMEX_MARKERS: ReadonlySet<string> = new Set([DEST.vault]);
 import { snippetOf, titleOf } from "./derive";
 import { FsNotesService } from "./fsNotes";
 import { searchMatch, sortHits } from "./search";
+import type { NoteCreationPolicy } from "../security/secureNotes";
 
 export interface NotesService {
   listFolders(): Promise<Folder[]>;
@@ -32,7 +33,7 @@ export interface NotesService {
    * stay findable (contract v3.7 gates AI reads, not the user's own eyes). */
   searchNotes(query: string, limit?: number): Promise<SearchHit[]>;
   getNote(id: string): Promise<Note | null>;
-  createNote(folderId: string, body: string): Promise<Note>;
+  createNote(folderId: string, body: string, policy?: NoteCreationPolicy): Promise<Note>;
   updateNote(id: string, body: string): Promise<Note>;
   deleteNote(id: string): Promise<void>;
   // ——— lifecycle (Phase 2c): the note keeps its id/index, only its home moves.
@@ -175,7 +176,7 @@ export class InMemoryNotesService implements NotesService {
     return this.notes.get(id) ?? null;
   }
 
-  async createNote(folderId: string, body: string): Promise<Note> {
+  async createNote(folderId: string, body: string, _policy?: NoteCreationPolicy): Promise<Note> {
     // mirror fs mode's safety ceiling: rotli never creates a note inside the
     // external Vault (the memex is read-mostly; corpus_create's writable() gate
     // refuses it in the shell). Keeps the browser preview honest.
@@ -331,6 +332,7 @@ if (!FS_MODE) {
   // path), so DEST.inbox === folder.id holds in the browser too.
   const inbox = svc.seedReserved(DEST.inbox, DEST.inbox);
   inboxId = inbox.id;
+  svc.seedReserved(DEST.secure, DEST.secure);
   svc.seedReserved(DEST.storage, DEST.storage);
   svc.seedReserved(DEST.board, DEST.board);
   svc.seedReserved(DEST.archive, DEST.archive);

@@ -12,6 +12,7 @@
 // so heavy use can keep the window resident.
 
 mod chat;
+mod breve;
 mod corpus;
 mod keychain;
 mod localmodel;
@@ -424,6 +425,9 @@ fn corpus_reveal(app: AppHandle) {
 /// Returns false when the picker is cancelled.
 #[tauri::command]
 fn corpus_add_folder(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+    if cfg!(debug_assertions) {
+        return Err("Location changes are disabled while the production memex is mounted read-only in development.".into());
+    }
     use tauri_plugin_dialog::DialogExt;
     let abs = match path {
         Some(p) => std::path::PathBuf::from(p),
@@ -452,6 +456,9 @@ fn corpus_add_folder(app: AppHandle, path: Option<String>) -> Result<bool, Strin
 /// on disk are NEVER touched — only the binding is dropped. Relaunches.
 #[tauri::command]
 fn corpus_forget_folder(app: AppHandle, id: String) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Err("Location changes are disabled while the production memex is mounted read-only in development.".into());
+    }
     if id == corpus::DEFAULT_ROOT_ID {
         return Err("That's your notes folder — it can't be removed.".into());
     }
@@ -489,10 +496,13 @@ struct CorpusConfigView {
 #[tauri::command]
 fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
     let cfg = corpus::ensure_corpus_config(&app);
-    let (is_memex, memex_id, perms) = match memex::brain_view(&cfg.corpus.abs_path) {
+    let (is_memex, memex_id, mut perms) = match memex::brain_view(&cfg.corpus.abs_path) {
         Some((id, p)) => (true, Some(id), Some(p)),
         None => (false, None, None),
     };
+    if cfg!(debug_assertions) {
+        perms = Some("read-only".to_string());
+    }
     CorpusConfigView {
         corpus: CorpusView {
             abs_path: cfg.corpus.abs_path,
@@ -514,6 +524,9 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
 /// corpus. Returns false when the picker is cancelled.
 #[tauri::command]
 fn corpus_choose_folder(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+    if cfg!(debug_assertions) {
+        return Err("The production memex is the fixed read-only source in development.".into());
+    }
     use tauri_plugin_dialog::DialogExt;
     let abs = match path {
         Some(p) => std::path::PathBuf::from(p),
@@ -551,6 +564,9 @@ fn corpus_choose_folder(app: AppHandle, path: Option<String>) -> Result<bool, St
 /// into it. `path` is an absolute folder (the native picker creates/names it).
 #[tauri::command]
 fn corpus_init_memex(app: AppHandle, path: String) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Err("Creating or replacing the primary memex is disabled in development.".into());
+    }
     let root = std::path::PathBuf::from(&path);
     memex::scaffold_memex(&root)?;
     corpus::set_corpus_path(&app, root)?;
@@ -562,6 +578,9 @@ fn corpus_init_memex(app: AppHandle, path: String) -> Result<(), String> {
 /// relaunches so its sidebar row appears. False when the picker is cancelled.
 #[tauri::command]
 fn corpus_connect_brain(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+    if cfg!(debug_assertions) {
+        return Err("The production memex is already mounted as the single read-only source in development.".into());
+    }
     use tauri_plugin_dialog::DialogExt;
     let abs = match path {
         Some(p) => std::path::PathBuf::from(p),
@@ -597,6 +616,9 @@ fn corpus_connect_brain(app: AppHandle, path: Option<String>) -> Result<bool, St
 /// Relaunches so its sidebar row disappears.
 #[tauri::command]
 fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Err("The production memex binding cannot be changed in development.".into());
+    }
     // forget_root is a superset of the old forget_brain (it also drops a folder by
     // id, a no-op for a brain id) — one path now handles brains + folders.
     corpus::forget_root(&app, &id)?;
@@ -607,6 +629,9 @@ fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
 /// refetches the config.
 #[tauri::command]
 fn corpus_set_active_brain(app: AppHandle, id: String) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Err("The production memex is the fixed read-only source in development.".into());
+    }
     corpus::set_active_brain(&app, &id)
 }
 
@@ -617,6 +642,9 @@ fn corpus_set_active_brain(app: AppHandle, id: String) -> Result<(), String> {
 /// re-apply the persisted perms whenever it binds again.
 #[tauri::command]
 fn corpus_set_brain_perms(app: AppHandle, id: String, perms: String) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Err("Production memex permissions cannot be changed in development.".into());
+    }
     corpus::set_brain_perms(&app, &id, &perms)?;
     let state = app.state::<corpus::CorpusState>();
     let _ = state.route(&id, |s| {
@@ -841,6 +869,8 @@ pub fn run() {
             corpus::corpus_file_stat,
             corpus::corpus_write_file_bytes,
             corpus::corpus_new_file_bytes,
+            corpus::corpus_create_managed_file,
+            corpus::corpus_managed_file_creation_available,
             corpus::corpus_reveal_file,
             corpus::corpus_open_with_apps,
             corpus::corpus_open_file_with,
@@ -860,12 +890,25 @@ pub fn run() {
             corpus::corpus_journal_append,
             corpus::corpus_journal_read,
             corpus::corpus_set_secure,
+            corpus::corpus_set_local_ai_access,
             corpus::corpus_read_ai,
             corpus::corpus_write,
             corpus::corpus_create,
             corpus::corpus_delete,
             corpus::corpus_move,
             corpus::corpus_rename_board,
+            breve::breve_snapshot,
+            breve::breve_import_legacy,
+            breve::breve_write_config,
+            breve::breve_write_watchlist,
+            breve::breve_delivery_settings,
+            breve::breve_write_delivery_settings,
+            breve::breve_store_resend_key,
+            breve::breve_remove_resend_key,
+            breve::breve_test_email,
+            breve::breve_test_signal,
+            breve::breve_takeover,
+            breve::breve_retire_legacy,
             chat::chat_models,
             chat::chat_messages,
             provider::cli_detect,
@@ -922,6 +965,8 @@ pub fn run() {
             // frontend invalidates on "rotli:corpus-changed". A disk error on any
             // single root must not kill the shell: that root is skipped and its
             // commands degrade to clean errors; the others still work.
+            let breve_supervisor = routines::BreveSupervisor::default();
+            app.manage(breve_supervisor.clone());
             let mut registry = corpus::CorpusRegistry::new(corpus::DEFAULT_ROOT_ID.to_string());
             // The organizer daemon (Phase 4): created BEFORE the root loop so the
             // memex root's watcher closure can feed its queue; the worker thread
@@ -938,9 +983,16 @@ pub fn run() {
                     .collect();
             let roots = corpus::startup_roots(app.handle());
             for root in roots {
-                match corpus::CorpusStore::open(root.abs_path.clone()) {
+                let opened = if cfg!(debug_assertions) {
+                    corpus::CorpusStore::open_read_only(root.abs_path.clone())
+                } else {
+                    corpus::CorpusStore::open(root.abs_path.clone())
+                };
+                match opened {
                     Ok(mut store) => {
-                        if brain_perms.get(&root.id).map(String::as_str) == Some("read-only") {
+                        if cfg!(debug_assertions)
+                            || brain_perms.get(&root.id).map(String::as_str) == Some("read-only")
+                        {
                             store.set_perms_read_only(true);
                         }
                         let suppress = store.suppress_set();
@@ -957,7 +1009,8 @@ pub fn run() {
                         // would split the §4.5 review loop across two corpora —
                         // proposals journaled where the UI never reads, approvals
                         // refused where the daemon never wrote.
-                        let is_target = root.id == corpus::DEFAULT_ROOT_ID
+                        let is_target = !cfg!(debug_assertions)
+                            && root.id == corpus::DEFAULT_ROOT_ID
                             && store.is_memex()
                             && daemon_target.is_none();
                         if is_target {
@@ -990,6 +1043,16 @@ pub fn run() {
                 }
             }
             app.manage(corpus::CorpusState(Mutex::new(registry)));
+            if let Ok(root) = app.state::<corpus::CorpusState>().default_root_path() {
+                if root.join(routines::MANAGED_MARKER).is_file() {
+                    if let Err(e) = breve::install_rotli_login_agent() {
+                        eprintln!("rotli: Breve login item unavailable ({e})");
+                    }
+                }
+                if let Err(e) = breve_supervisor.start(app.handle(), root) {
+                    eprintln!("rotli: Breve scheduler unavailable ({e})");
+                }
+            }
             // Manage the handle either way (the commands must answer), but only
             // spawn the worker when a memex root exists — organizer_status then
             // reports running:false on a plain corpus.
@@ -1109,6 +1172,9 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }) {
+                app.state::<routines::BreveSupervisor>().stop();
+            }
             // Clicking the Dock icon (when "Show in Dock" is on) of a running app
             // with no visible window must reopen it — macOS sends Reopen, and
             // without handling it the Dock icon does nothing (Seth, 2026-06-19).

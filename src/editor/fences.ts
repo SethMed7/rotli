@@ -6,7 +6,15 @@
 
 import type { Text } from "@codemirror/state";
 
-export type LangKey = "math" | "mermaid" | "jsxgraph" | "svg" | "html" | "board" | "sheet";
+export type LangKey =
+  | "math"
+  | "mermaid"
+  | "jsxgraph"
+  | "svg"
+  | "html"
+  | "board"
+  | "sheet"
+  | "document";
 
 export const TARGET_LANGS = new Set<string>([
   "math",
@@ -16,6 +24,7 @@ export const TARGET_LANGS = new Set<string>([
   "html",
   "board",
   "sheet",
+  "document",
 ]);
 
 export interface FenceBlock {

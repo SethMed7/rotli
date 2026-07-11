@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseWatchlist } from "./watchlist";
+import { legacyWatchUrl, parseWatchlist, serializeWatchlist } from "./watchlist";
 
 describe("parseWatchlist", () => {
   test("parses a section's watch/lens table", () => {
@@ -63,6 +63,7 @@ describe("parseWatchlist", () => {
     const wl = parseWatchlist(md);
     expect(wl.sections).toHaveLength(1);
     expect(wl.sections[0]!.items).toEqual([]);
+    expect(wl.sections[0]!.note).toBe("Tech-stock signal only — no day-trading content.");
   });
 
   test("an empty table (header + separator, no rows) yields no items", () => {
@@ -104,5 +105,77 @@ describe("parseWatchlist", () => {
       "|  | drop |",
     ].join("\n");
     expect(parseWatchlist(md).sections[0]!.items).toEqual([{ watch: "Bun", lens: "keep" }]);
+  });
+
+  test("native collection data serializes into the scheduler Markdown contract", () => {
+    const markdown = serializeWatchlist({
+      sections: [
+        {
+          title: "AI tools",
+          items: [
+            { watch: "Rotli", lens: "product changes" },
+            { watch: "Bun | Node", lens: "compatibility\\runtime" },
+          ],
+        },
+      ],
+      preferences: "- Keep it concise.",
+    });
+    expect(markdown).toContain("## AI tools");
+    expect(markdown).toContain("| Bun \\| Node | compatibility\\\\runtime |");
+    expect(parseWatchlist(markdown)).toEqual({
+      sections: [
+        {
+          title: "AI tools",
+          items: [
+            { watch: "Rotli", lens: "product changes" },
+            { watch: "Bun | Node", lens: "compatibility\\runtime" },
+          ],
+        },
+      ],
+      preferences: "- Keep it concise.",
+    });
+  });
+
+  test("empty groups remain editable after a save and reload", () => {
+    const markdown = serializeWatchlist({
+      sections: [{ title: "New group", items: [] }],
+      preferences: "",
+    });
+    expect(parseWatchlist(markdown).sections).toEqual([{ title: "New group", items: [] }]);
+  });
+
+  test("group-specific prose survives the native editor round trip", () => {
+    const original = {
+      sections: [{ title: "Markets", note: "Only material product and policy changes.", items: [] }],
+      preferences: "",
+    };
+    expect(parseWatchlist(serializeWatchlist(original))).toEqual(original);
+  });
+
+  test("website sources survive the native editor round trip", () => {
+    const original = {
+      sections: [{ title: "Runtimes", items: [{ watch: "Bun", lens: "Releases", url: "https://bun.sh/" }] }],
+      preferences: "",
+    };
+    const markdown = serializeWatchlist(original);
+    expect(markdown).toContain("| Watch | Lens | Website |");
+    expect(markdown).toContain("<https://bun.sh/>");
+    expect(parseWatchlist(markdown)).toEqual(original);
+  });
+
+  test("reads a source from either a website column or a linked topic", () => {
+    const withColumn = "## Tools\n| Watch | Lens | Website |\n|---|---|---|\n| Bun | releases | [Official](https://bun.sh/) |";
+    const linkedTopic = "## Tools\n| Watch | Lens |\n|---|---|\n| [**Bun**](https://bun.sh/) | releases |";
+    expect(parseWatchlist(withColumn).sections[0]!.items[0]!.url).toBe("https://bun.sh/");
+    expect(parseWatchlist(linkedTopic).sections[0]!.items[0]).toEqual({
+      watch: "Bun",
+      lens: "releases",
+      url: "https://bun.sh/",
+    });
+  });
+
+  test("legacy two-column topics receive canonical source suggestions", () => {
+    expect(legacyWatchUrl("OpenClaw")).toBe("https://openclaw.ai/");
+    expect(legacyWatchUrl("Unknown topic")).toBe("");
   });
 });

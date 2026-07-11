@@ -438,6 +438,21 @@
   padding: 5px;
   z-index: 7;
   animation: pop-in var(--motion-enter) var(--motion-ease);
+  max-height: min(440px, calc(100vh - 80px));
+  max-width: min(420px, calc(100vw - 24px));
+  overflow-y: auto;
+}
+.slashmenu-empty {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 9px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.slashmenu-empty span {
+  font-size: 10.5px;
+  white-space: nowrap;
 }
 .slashrow {
   display: flex;
@@ -457,6 +472,14 @@
 }
 .slashrow:hover {
   background: var(--hov);
+}
+.slashrow:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.68;
+}
+.slashrow:disabled:hover {
+  background: none;
 }
 .slashrow.sel {
   background: var(--tint);
@@ -529,6 +552,9 @@
   padding: 8px 12px 10px;
   font-size: 12px;
   color: var(--text-muted);
+}
+.slashpicker-empty.is-error {
+  color: var(--danger);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

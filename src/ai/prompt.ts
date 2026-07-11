@@ -84,6 +84,8 @@ areas (People, Projects, Research, …) with titles and summaries so you can fin
 the source of truth about the user and their work, and search it before answering from memory.
 
 TOOLS — to use one, reply with a SINGLE JSON object:
+- {"thought":"…","tool":"search_memory","args":{"query":"…"}} → search the master memory across notes and prior chats
+- {"thought":"…","tool":"read_memory","args":{"id":"…"}}     → read a note or original chat returned by search_memory
 - {"thought":"…","tool":"search_notes","args":{"query":"…"}}  → find notes (returns id, title, folder, snippet)
 - {"thought":"…","tool":"read_note","args":{"id":"…"}}        → read one note's full text by id
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} → read a file by name (text, or a spreadsheet as CSV)
@@ -93,6 +95,7 @@ When you can answer, reply: {"thought":"…","final":"your answer to the user"}
 RULES:
 - Output ONE JSON object and nothing else. No text outside the JSON. No code fences.
 - ${webRule}
+- For anything about the user's past, decisions, people, or prior conversations, search_memory before answering.
 - Never put secrets, API keys, or tokens into web_search or web_fetch.
 - Use at most ${ctx.maxSteps} steps. If unsure, give your best answer and note what you couldn't verify.
 
@@ -147,12 +150,14 @@ export const frontierAdapter: Adapter = {
 
 Reply with EXACTLY ONE JSON object on a single line — no prose around it, no markdown fences.
 Tools:
+- {"thought":"…","tool":"search_memory","args":{"query":"…"}} — search the master memory across notes and prior chats
+- {"thought":"…","tool":"read_memory","args":{"id":"…"}} — read the exact note or chat returned by search_memory
 - {"thought":"…","tool":"search_notes","args":{"query":"…"}} — find notes (id, title, folder, snippet)
 - {"thought":"…","tool":"read_note","args":{"id":"…"}} — read one note by id
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}
 To answer the user: {"thought":"…","final":"your answer"}
 
-Rules: ${webRule} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
+Rules: ${webRule} For past decisions, people, or conversations, search_memory first. Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
 
 KNOWLEDGE BASE INDEX:
 ${ctx.knowledge || "(no notes indexed yet — use search_notes)"}

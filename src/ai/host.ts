@@ -21,7 +21,13 @@ import {
   SHEET_TEXT,
 } from "../sheets/kinds";
 import { workbookToCsv } from "../sheets/view";
-import { buildIndex, rankNotes } from "./tools";
+import { rankNotes } from "./tools";
+import { contextWindowFor } from "./budget";
+import { buildModelMap } from "../memex/modelMap";
+import { activeInstance } from "../memex/config";
+import { listChats, loadConfig, readChat as readMemexChat } from "../memex/service";
+import { memoryKeywords, mergeKeywordHits, rankChatMemories } from "../chatMemory/retrieval";
+import { looksSecret, modelIsOnDevice } from "./guard";
 import type { CompleteReq, Host } from "./types";
 
 /** Mirror of Rust `flatten_messages`: the loop sends ONE user message (the
@@ -35,6 +41,37 @@ function flattenWire(messages: CompleteReq["messages"]): string {
     return `${label}: ${m.content}`;
   });
   return `${labeled.join("\n\n")}\n\nAssistant:`;
+}
+
+const chatBodyCache = new Map<string, { modifiedMs: number; body: string }>();
+
+async function cachedChatBody(
+  root: string,
+  slug: string,
+  modifiedMs: number,
+  read: () => Promise<string>,
+): Promise<string> {
+  const key = `${root}\0${slug}`;
+  const cached = chatBodyCache.get(key);
+  if (cached?.modifiedMs === modifiedMs) return cached.body;
+  const body = await read();
+  chatBodyCache.set(key, { modifiedMs, body });
+  if (chatBodyCache.size > 500) chatBodyCache.delete(chatBodyCache.keys().next().value ?? "");
+  return body;
+}
+
+async function aiReadableHits<T extends { id: string }>(hits: T[], model: ChatModelInfo): Promise<T[]> {
+  const allowed = await Promise.all(
+    hits.map(async (hit) => {
+      try {
+        await corpusReadAi(hit.id, model);
+        return true;
+      } catch {
+        return false;
+      }
+    }),
+  );
+  return hits.filter((_hit, index) => allowed[index] === true);
 }
 
 export interface HostImageCtx {
@@ -78,19 +115,75 @@ export function makeTauriHost(
       // (and a search error) still answer from the listing.
       try {
         const hits = await corpusSearch(query, limit);
-        return hits
-          .filter((h) => h.kind === "note")
+        const readable = await aiReadableHits(hits.filter((hit) => hit.kind === "note"), model);
+        return readable
           .map((h) => ({ id: h.id, title: h.title, snippet: h.snippet, folder: h.folderId }));
       } catch {
         const { notes } = await corpusList();
-        return rankNotes(notes, query, limit);
+        const ranked = rankNotes(notes, query, limit);
+        return aiReadableHits(ranked, model);
       }
     },
     readNote(id) {
-      // Locality is DERIVED from the picked model's endpoint (loopback check) —
-      // never asserted (#2, audit 2026-07). Rust re-derives it from the same
-      // endpoint inside corpus_read_ai, so the webview never sends a trust bit.
-      return corpusReadAi(id, model.endpoint);
+      // Rust verifies model id + provider registration + loopback endpoint.
+      // A localhost proxy for a frontier provider therefore remains remote.
+      return corpusReadAi(id, model);
+    },
+    async searchMemory(query, limit) {
+      const queries = [query, ...memoryKeywords(query)].slice(0, 7);
+      const noteResults = await Promise.all(
+        queries.map((part) => corpusSearch(part, limit).catch(() => [])),
+      );
+      const readableNoteHits = await aiReadableHits(
+        mergeKeywordHits(noteResults).filter((hit) => hit.kind === "note"),
+        model,
+      );
+      const noteHits = readableNoteHits
+        .map((hit) => ({
+          id: hit.id,
+          title: hit.title,
+          snippet: hit.snippet,
+          source: "note" as const,
+        }));
+      const instance = activeInstance(await loadConfig());
+      if (!instance) return noteHits.slice(0, limit);
+      const summaries = (await listChats(instance)).slice(0, 100);
+      const documents = await Promise.all(
+        summaries.map(async (summary) => ({
+          slug: summary.slug,
+          title: summary.title,
+          body: await cachedChatBody(
+            instance.root,
+            summary.slug,
+            summary.modifiedMs,
+            () => readMemexChat(instance, summary.slug),
+          ),
+          modifiedMs: summary.modifiedMs,
+        })),
+      );
+      // A remote model never receives a secret-shaped chat. The provider's
+      // Rust egress detector is the final backstop when observations are sent.
+      const safeDocuments = modelIsOnDevice(model)
+        ? documents
+        : documents.filter((document) => !looksSecret(document.body));
+      const chatHits = rankChatMemories(safeDocuments, query, limit).map(({ score: _score, ...hit }) => hit);
+      const chatQuota = Math.ceil(limit / 2);
+      const selected = [...chatHits.slice(0, chatQuota), ...noteHits.slice(0, limit - chatQuota)];
+      if (selected.length < limit) {
+        selected.push(...chatHits.slice(chatQuota, chatQuota + limit - selected.length));
+        selected.push(...noteHits.slice(limit - chatQuota, limit - chatQuota + limit - selected.length));
+      }
+      return selected.slice(0, limit);
+    },
+    async readMemory(id) {
+      if (!id.startsWith("chat:")) return corpusReadAi(id, model);
+      const instance = activeInstance(await loadConfig());
+      if (!instance) return "error: no active memory is connected.";
+      const body = await readMemexChat(instance, id.slice("chat:".length));
+      if (!modelIsOnDevice(model) && looksSecret(body)) {
+        return "blocked: this prior chat contains secret-shaped content and cannot be sent to a remote model.";
+      }
+      return body;
     },
     async readFile(query) {
       const { notes } = await corpusList();
@@ -126,7 +219,11 @@ export function makeTauriHost(
     },
     async knowledgeMap(maxChars) {
       const { notes } = await corpusList();
-      return buildIndex(notes, maxChars);
+      // Titles are knowledge too. Apply the same secure-note gate before the
+      // model sees the master map: remote models never see secure entries, and
+      // a local model sees them only after explicit per-note permission.
+      const readable = await aiReadableHits(notes, model);
+      return buildModelMap(readable, contextWindowFor(model), maxChars);
     },
   };
 }

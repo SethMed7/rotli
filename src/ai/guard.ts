@@ -66,3 +66,13 @@ export function endpointIsLocal(endpoint: string): boolean {
   const m = h.match(/^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   return m !== null && m.slice(1).every((o) => Number(o) <= 255);
 }
+
+/** Frontend fail-closed mirror for retrieval filtering. A localhost proxy for
+ * Claude/Codex/Gemini is still frontier AI, so endpoint locality alone is not
+ * enough. Rust validates the model against the registry at the read boundary. */
+export function modelIsOnDevice(model: { provider: string; endpoint: string }): boolean {
+  return (
+    endpointIsLocal(model.endpoint) &&
+    (model.provider === "mlx" || model.provider === "llamacpp" || model.provider === "ollama")
+  );
+}

@@ -7,6 +7,7 @@
 // sidebar already has per file (id relpath, title, updatedAt), so it's deterministic.
 
 import type { Folder, NoteSummary } from "../types";
+import { DOCUMENT_EXTS } from "../documents/kinds";
 
 export type StorageGrouping = "type" | "date" | "folder";
 
@@ -14,7 +15,7 @@ const TYPE_BUCKETS: [string, Set<string>][] = [
   ["Audio", new Set("mp3 m4a wav aac flac ogg oga opus aiff wma".split(" "))],
   ["Images", new Set("png jpg jpeg gif webp heic heif svg bmp tiff tif avif ico".split(" "))],
   ["PDFs", new Set(["pdf"])],
-  ["Documents", new Set("txt rtf doc docx odt html htm csv tsv json xml yaml yml md".split(" "))],
+  ["Documents", new Set([...DOCUMENT_EXTS, ..."txt html htm csv tsv json xml yaml yml md".split(" ")])],
 ];
 const TYPE_ORDER = ["Audio", "Images", "PDFs", "Documents", "Other"];
 

@@ -23,6 +23,7 @@ function modeOf(fileId: string): SheetFileMode {
 export function SheetEmbed({ fileId }: { fileId: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [readOnly, setReadOnly] = useState(false);
   const handleRef = useRef<SheetHandle | null>(null);
   const wbRef = useRef<ExcelJS.Workbook | null>(null);
   const idMapRef = useRef<Map<string, number>>(new Map());
@@ -43,6 +44,8 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
           if (!cancelled) setStatus("error");
           return;
         }
+        const writable = stat.writable;
+        if (!cancelled) setReadOnly(!writable);
         let wb: ExcelJS.Workbook;
         let model: ReturnType<typeof workbookToModel>;
         if (mode === "csv") {
@@ -66,22 +69,26 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
           model,
           darkMode: isDarkTheme(),
           themeMode: "themed",
+          readOnly: !writable,
         });
+        host.inert = !writable;
         handleRef.current = handle;
-        handle.onDirty(() => {
-          if (!armedRef.current) return;
-          dirtyGen.current += 1;
-          const gen = dirtyGen.current;
-          if (saveTimer.current) clearTimeout(saveTimer.current);
-          saveTimer.current = setTimeout(() => {
-            if (gen !== dirtyGen.current) return;
-            const snap = handle.save();
-            const wbLive = wbRef.current;
-            if (!wbLive) return;
-            void writeSheetModel(fileId, mode, wbLive, snap, idMapRef.current).catch(() => {});
-          }, 500);
-        });
-        armedRef.current = true;
+        if (writable) {
+          handle.onDirty(() => {
+            if (!armedRef.current) return;
+            dirtyGen.current += 1;
+            const gen = dirtyGen.current;
+            if (saveTimer.current) clearTimeout(saveTimer.current);
+            saveTimer.current = setTimeout(() => {
+              if (gen !== dirtyGen.current) return;
+              const snap = handle.save();
+              const wbLive = wbRef.current;
+              if (!wbLive) return;
+              void writeSheetModel(fileId, mode, wbLive, snap, idMapRef.current).catch(() => {});
+            }, 500);
+          });
+          armedRef.current = true;
+        }
         if (!cancelled) setStatus("ready");
       } catch {
         if (!cancelled) setStatus("error");
@@ -112,5 +119,10 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
     return <div className="rotli-embed-placeholder">Sheet unavailable</div>;
   }
 
-  return <div ref={hostRef} className="rotli-embed-sheet-inner" />;
+  return (
+    <div className={readOnly ? "rotli-embed-sheet-wrap is-readonly" : "rotli-embed-sheet-wrap"}>
+      <div ref={hostRef} className="rotli-embed-sheet-inner" />
+      {readOnly && <span className="rotli-embed-readonly">Read-only</span>}
+    </div>
+  );
 }

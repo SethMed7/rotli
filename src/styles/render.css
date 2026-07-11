@@ -63,14 +63,99 @@
 .rotli-render-embed .rotli-render-body {
   display: block;
   height: 240px;
-  min-height: 240px;
+  min-height: 180px;
   overflow: hidden;
   border-radius: var(--r-inner);
 }
+.rotli-render-embed {
+  isolation: isolate;
+}
+.rotli-render-embed.is-expanded {
+  z-index: 900;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: 0 18px 60px color-mix(in srgb, var(--text) 24%, transparent);
+}
+.rotli-render-embed.is-expanded .rotli-render-body {
+  height: 100% !important;
+  border-radius: 0;
+}
 .rotli-embed-board-inner,
-.rotli-embed-sheet-inner {
+.rotli-embed-sheet-inner,
+.rotli-document-preview {
   width: 100%;
   height: 100%;
+}
+.rotli-embed-sheet-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.rotli-embed-sheet-wrap.is-readonly .rotli-embed-sheet-inner {
+  cursor: default;
+  user-select: none;
+}
+.rotli-embed-readonly {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  z-index: 12;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  color: var(--text-muted);
+  font-size: 11px;
+  pointer-events: none;
+}
+.rotli-render-embed[data-lang="document"] .rotli-render-body {
+  height: 340px;
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--text));
+}
+.rotli-document-preview {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.rotli-document-preview iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: white;
+}
+.rotli-document-preview:not(.compact) {
+  min-height: 100%;
+}
+.rotli-document-warning {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  max-width: min(360px, calc(100% - 24px));
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  box-shadow: var(--shadow-popover);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rotli-document-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 160px;
+  padding: 24px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  text-align: center;
 }
 .rotli-embed-placeholder {
   display: grid;
@@ -105,6 +190,81 @@
 .rotli-render-expand:hover {
   background: var(--hov);
   color: var(--text);
+}
+
+/* Live embeds use one shared focus/open control group. Zoom fills the current
+   note pane; it never changes the active tab. */
+.rotli-render-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 13;
+  display: flex;
+  gap: 5px;
+}
+.rotli-render-action {
+  z-index: 12;
+  min-height: 28px;
+  padding: 4px 10px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--text) 14%, transparent);
+  cursor: pointer;
+  opacity: 0.92;
+  transition: opacity var(--motion-enter) var(--motion-ease),
+    background var(--motion-enter) var(--motion-ease);
+}
+.rotli-render-action:hover,
+.rotli-render-action:focus-visible {
+  background: var(--surface);
+  opacity: 1;
+}
+.rotli-render-embed.is-expanded .rotli-render-actions {
+  top: 12px;
+  right: 12px;
+}
+
+.rotli-render-resize {
+  position: absolute;
+  z-index: 12;
+  right: 16px;
+  bottom: 0;
+  left: 16px;
+  height: 14px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.rotli-render-resize::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 42px;
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: var(--text-muted);
+  opacity: 0.58;
+  transform: translateX(-50%);
+  transition: opacity var(--motion-enter) var(--motion-ease),
+    background var(--motion-enter) var(--motion-ease);
+}
+.rotli-render-resize:hover::after,
+.rotli-render-resize:focus-visible::after,
+.rotli-render-embed.is-resizing .rotli-render-resize::after {
+  background: var(--text);
+  opacity: 0.9;
+}
+.rotli-render-embed.is-resizing {
+  cursor: ns-resize;
+  user-select: none;
+}
+.rotli-render-embed.is-expanded .rotli-render-resize {
+  display: none;
 }
 
 /* a tidy inline error — never a crash, never a blank block */

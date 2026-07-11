@@ -1,0 +1,12 @@
+{
+  "_notes": "Breve's chat usage/escalation policy — which models Breve uses DIRECTLY vs must ASK Seth first, and the cost label shown on each reply. EDIT THIS (no code change); policy.ts is just the engine that reads it. Matched by substring on the lowercased model id; first match wins; no match → `default`. imageAlwaysDirect = image generation never asks (incl. Codex). Mirrors the client layer's clients/models.json pattern.",
+  "imageAlwaysDirect": true,
+  "rules": [
+    { "match": ["gemma", "qwen", "nemotron", "glm", "llama", "mistral", "deepseek", "phi", "local"], "action": "direct", "cost": "free", "label": "local · free" },
+    { "match": ["haiku"], "action": "direct", "cost": "subscription", "label": "Haiku · sub" },
+    { "match": ["gemini"], "action": "direct", "cost": "subscription", "label": "Gemini · sub" },
+    { "match": ["sonnet", "opus", "fable", "mythos"], "action": "ask", "cost": "subscription", "label": "Claude>Haiku · sub" },
+    { "match": ["codex", "gpt", "chatgpt", "o3", "o4"], "action": "ask", "cost": "subscription", "label": "Codex · sub" }
+  ],
+  "default": { "action": "ask", "cost": "subscription", "label": "unknown · sub" }
+}

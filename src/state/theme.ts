@@ -12,7 +12,7 @@ type DataTheme = "light" | "dark" | "paper" | "charcoal" | "glass-light" | "glas
 let media: MediaQueryList | null = null;
 let onChange: ((event: MediaQueryListEvent) => void) | null = null;
 
-function resolve(family: ThemeFamily, glass: boolean, mode: "light" | "dark"): DataTheme {
+export function resolveTheme(family: ThemeFamily, glass: boolean, mode: "light" | "dark"): DataTheme {
   if (glass) return mode === "light" ? "glass-light" : "glass-dark";
   if (family === "mono") return mode === "light" ? "paper" : "charcoal";
   return mode;
@@ -47,13 +47,13 @@ export function applyTheme(
   detachSystemListener();
   document.documentElement.dataset.glassTint = tint;
   if (setting === "system") {
-    const forOs = (dark: boolean) => resolve(dark ? match.dark : match.light, glass, dark ? "dark" : "light");
+    const forOs = (dark: boolean) => resolveTheme(dark ? match.dark : match.light, glass, dark ? "dark" : "light");
     media = window.matchMedia("(prefers-color-scheme: dark)");
     onChange = (event) => setDataTheme(forOs(event.matches));
     setDataTheme(forOs(media.matches));
     media.addEventListener("change", onChange);
   } else {
-    setDataTheme(resolve(family, glass, setting));
+    setDataTheme(resolveTheme(family, glass, setting));
   }
   return detachSystemListener;
 }

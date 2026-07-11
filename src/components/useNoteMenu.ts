@@ -9,6 +9,7 @@ import { useCallback } from "react";
 import {
   corpusFrontmatter,
   corpusRevealFile,
+  corpusSetLocalAiAccess,
   corpusSetLocked,
   corpusSetPinned,
   corpusSetSecure,
@@ -25,6 +26,7 @@ import { usePanesStore } from "../state/panes";
 import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
+import { noteDiskFolder } from "../lib/noteLocation";
 
 /** What the opener hands us — a real MouseEvent qualifies, and a keyboard
  * opener passes a plain {clientX, clientY} built from its row's rect. */
@@ -132,7 +134,12 @@ export function useNoteMenu() {
             const ui = useUiStore.getState();
             ui.setFocusMode(false);
             ui.setSettingsOpen(false);
-            if (note.folderId === DEST.board) {
+            const diskFolder = noteDiskFolder(note);
+            const staged =
+              diskFolder === "wiki/_inbox" ||
+              diskFolder.startsWith("wiki/_inbox/") ||
+              (diskFolder === note.folderId && note.folderId === DEST.board);
+            if (staged) {
               // Staging home = Captures (wiki/_inbox → Board). Curated notes
               // (also in Main / starred) are filtered OFF the Captures grid —
               // reveal their Main/sidebar row instead. Uncurated ones open
@@ -153,7 +160,8 @@ export function useNoteMenu() {
               }
               return;
             }
-            // Filed note: panes + expand the Brain chain (bypass Main-wins).
+            // Filed note: its shelf may still project to Captures or another
+            // user folder, but diskFolder preserves the real wiki chain.
             ui.setContentView("panes");
             setTimeout(() => ui.revealFocusedNote("brain"), 0);
           },
@@ -215,20 +223,35 @@ export function useNoteMenu() {
           });
           items.push({
             kind: "action" as const,
-            label: fm?.secure ? "Unmark secure" : "Mark secure — keep off remote AI",
+            label: fm?.secure ? "Remove secure protection" : "Mark secure — block remote AI",
             checked: !!fm?.secure,
             onClick: () => runFm("mark secure", corpusSetSecure(note.id, !fm?.secure)),
           });
+          if (fm?.secure) {
+            items.push({
+              kind: "action" as const,
+              label: fm.localAiAllowed
+                ? "Revoke Local AI access"
+                : "Allow Local AI on this Mac",
+              checked: fm.localAiAllowed,
+              onClick: () =>
+                runFm(
+                  "change Local AI access",
+                  corpusSetLocalAiAccess(note.id, !fm.localAiAllowed),
+                ),
+            });
+          }
         }
       // file into a Brain area right here — the 0.17.0 fast-follow; same Filer
       // path as the metadata panel. Offered for STAGED notes (they project to
       // the Captures "Board" folder on the wire — a .md note's id is a ULID, so
       // the folder is the sync-readable signal) and for notes already in an
       // area (re-file). fileNoteToArea resolves the ULID→rel bridge itself.
+      const diskFolder = noteDiskFolder(note);
       const fileable =
         note.folderId === DEST.board ||
-        note.folderId === "wiki" ||
-        note.folderId.startsWith("wiki/");
+        diskFolder === "wiki" ||
+        diskFolder.startsWith("wiki/");
       if (!isFile && !isBoard && fileable && areas.length > 0) {
         items.push({
           kind: "drill" as const,

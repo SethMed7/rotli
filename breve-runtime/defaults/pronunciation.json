@@ -1,0 +1,6 @@
+{
+  "_notes": "Pronunciation dictionary for Breve's on-device TTS (Kokoro). Each entry maps a word (matched case-insensitively, whole-word) to a RESPELLING the voice pronounces correctly — applied to the spoken text only, never the written brief. Tune by ear: regenerate any audio and adjust the respelling until it sounds right. 'Breve' → 'Brevay' gives brev-AY (the caffè breve sound); plain 'Breve' was read as 'breev'. Loaded by scripts/tts.ts.",
+  "words": {
+    "Breve": "Brevay"
+  }
+}

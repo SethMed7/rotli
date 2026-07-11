@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import type { CorpusNoteMeta } from "../lib/tauri";
 import { budgetFor, contextWindowFor } from "./budget";
-import { endpointIsLocal, looksSecret } from "./guard";
+import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
 import { runAgent } from "./loop";
 import { extractJsonObject, parseAction } from "./parse";
 import { trimHistory } from "./prompt";
@@ -19,6 +19,8 @@ function note(p: Partial<CorpusNoteMeta> & { id: string; title: string }): Corpu
 }
 
 interface Calls {
+  searchMemory: string[];
+  readMemory: string[];
   searchNotes: string[];
   readNote: string[];
   webSearch: string[];
@@ -28,7 +30,9 @@ interface Calls {
 
 function fakeHost(replies: string[], over: Partial<Host> = {}): { host: Host; calls: Calls } {
   let i = 0;
-  const calls: Calls = { searchNotes: [], readNote: [], webSearch: [], webFetch: [], generateImage: [] };
+  const calls: Calls = {
+    searchMemory: [], readMemory: [], searchNotes: [], readNote: [], webSearch: [], webFetch: [], generateImage: [],
+  };
   const host: Host = {
     complete: async () => replies[i++] ?? '{"final":"(script exhausted)"}',
     searchNotes: async (q) => {
@@ -38,6 +42,14 @@ function fakeHost(replies: string[], over: Partial<Host> = {}): { host: Host; ca
     readNote: async (id) => {
       calls.readNote.push(id);
       return `# Pricing\nMyela pricing is $99/mo (note ${id}).`;
+    },
+    searchMemory: async (q) => {
+      calls.searchMemory.push(q);
+      return [{ id: "chat:cedar", title: "Cedar launch", snippet: "July decision", source: "chat" }];
+    },
+    readMemory: async (id) => {
+      calls.readMemory.push(id);
+      return `# Cedar launch\nThe July decision came from ${id}.`;
     },
     readFile: async (q) => `csv,for,${q}\n1,2,3`,
     webSearch: async (q) => {
@@ -74,6 +86,8 @@ async function run(
 const ALL: ReadonlySet<ToolName> = new Set<ToolName>([
   "search_notes",
   "read_note",
+  "search_memory",
+  "read_memory",
   "web_search",
   "web_fetch",
 ]);
@@ -213,11 +227,30 @@ describe("guard", () => {
     expect(endpointIsLocal("")).toBe(false); // unparseable ⇒ fail closed
     expect(endpointIsLocal("not a url")).toBe(false);
   });
+
+  test("a localhost frontier proxy is not an on-device model", () => {
+    expect(modelIsOnDevice({ provider: "mlx", endpoint: "http://127.0.0.1:11435" })).toBe(true);
+    expect(modelIsOnDevice({ provider: "llamacpp", endpoint: "http://localhost:8080" })).toBe(true);
+    expect(modelIsOnDevice({ provider: "claude", endpoint: "http://127.0.0.1:9000" })).toBe(false);
+    expect(modelIsOnDevice({ provider: "mlx", endpoint: "https://models.example.com" })).toBe(false);
+  });
 });
 
 // ── the loop ──────────────────────────────────────────────────────────────────
 
 describe("runAgent", () => {
+  test("recalls prior chats through the master memory protocol", async () => {
+    const { host, calls } = fakeHost([
+      '{"tool":"search_memory","args":{"query":"cedar launch decision"}}',
+      '{"tool":"read_memory","args":{"id":"chat:cedar"}}',
+      '{"final":"The Cedar launch decision was set for July."}',
+    ]);
+    const { final } = await run(host, { history: [], userText: "What did we decide before?", web: false });
+    expect(final).toContain("July");
+    expect(calls.searchMemory).toEqual(["cedar launch decision"]);
+    expect(calls.readMemory).toEqual(["chat:cedar"]);
+  });
+
   test("answers from notes: search → read → final", async () => {
     const { host, calls } = fakeHost([
       '{"tool":"search_notes","args":{"query":"pricing"}}',

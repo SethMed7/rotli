@@ -1,0 +1,13 @@
+{
+  "knowledgePath": "~/memex",
+  "assetsPath": "~/memex-storage/assets",
+  "storagePath": "~/memex-storage",
+  "llm": {
+    "provider": "mlx",
+    "providers": {
+      "mlx": { "endpoint": "http://localhost:11435", "model": "gemma-3-12b-it-qat-4bit", "launchdLabel": "com.local.memex-mlx", "api": "generate" },
+      "llamacpp": { "endpoint": "http://localhost:11436", "model": "gemma4-12b-it-qat", "launchdLabel": "com.local.memex-llamacpp", "api": "openai" }
+    }
+  },
+  "_notes": "Copy to config.local.json (gitignored) and fill in the paths. knowledgePath = the memex / knowledge folder Breve reads and routes captures into. assetsPath = where binaries referenced from notes live (the 'storage:' root). storagePath = where Breve writes its own rendered output (briefs/audio/captures) — never inside this repo. llm = the provider-selectable on-device model tier (read via scripts/llm.ts). provider = the default backend. MLX (Apple-native, weights in a shared local model store; api='generate', /api/generate) is the Mac default. llamacpp (raw llama.cpp llama-server over a GGUF, e.g. Gemma 4; api='openai', /v1/chat/completions) is the on-demand BACKUP — lazy-started by its launchd job only when a call needs it (0 RAM idle). Opt a single request into it via localGenerate({provider:'llamacpp'}); switch the default here (or env BREVE_LLM_PROVIDER/ENDPOINT/MODEL/LAUNCHD/API). Secrets stay in the macOS Keychain; phone numbers + emails in signal.json / recipients.json / mail-accounts.json (copy each from its .example)."
+}

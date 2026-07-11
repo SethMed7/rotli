@@ -1,5 +1,22 @@
 import { describe, expect, test } from "bun:test";
-import { brainLocationLabel, noteLocationLabel } from "./noteLocation";
+import {
+  brainLocationLabel,
+  noteDiskFolder,
+  noteLocationLabel,
+  projectNoteToBrain,
+} from "./noteLocation";
+import type { NoteSummary } from "../types";
+
+const NOTE: NoteSummary = {
+  id: "note-1",
+  title: "Cross-project tasks",
+  snippet: "",
+  folderId: "Board",
+  diskFolderId: "wiki/projects",
+  createdAt: 1,
+  updatedAt: 1,
+  pinned: false,
+};
 
 describe("brainLocationLabel", () => {
   test("wiki area → title-cased area", () => {
@@ -32,5 +49,22 @@ describe("noteLocationLabel", () => {
   test("prefixes ★ Main when in Main", () => {
     expect(noteLocationLabel("wiki/projects", true)).toBe("★ Main · Projects");
     expect(noteLocationLabel("wiki/projects", false)).toBe("Projects");
+  });
+});
+
+describe("dual shelf + disk locations", () => {
+  test("physical Brain folder survives an Inbox/Captures shelf projection", () => {
+    expect(noteDiskFolder(NOTE)).toBe("wiki/projects");
+    expect(projectNoteToBrain(NOTE)).toEqual({ ...NOTE, folderId: "wiki/projects" });
+  });
+
+  test("staged notes stay in Captures and do not gain a Brain row", () => {
+    const staged = { ...NOTE, diskFolderId: "wiki/_inbox" };
+    expect(projectNoteToBrain(staged)).toBeNull();
+  });
+
+  test("older notes without diskFolderId keep their existing location", () => {
+    const { diskFolderId: _diskFolderId, ...legacy } = NOTE;
+    expect(noteDiskFolder(legacy)).toBe("Board");
   });
 });

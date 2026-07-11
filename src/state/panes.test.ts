@@ -101,6 +101,16 @@ describe("openNote — reuse-or-new-tab, never replace", () => {
     expect(activeNoteId("p1")).toBe("n-A");
   });
 
+  test("an embedded file's Open in tab action adds a file tab without replacing the note", () => {
+    usePanesStore.getState().openFile("storage/rotli/sample.docx", { newTab: true });
+    const pane = findLeaf(usePanesStore.getState().root, "p1");
+    expect(pane?.tabs).toHaveLength(2);
+    expect(pane?.tabs[0]?.surfaceKind).toBe("note");
+    const active = pane?.tabs.find((tab) => tab.id === pane.activeTabId);
+    expect(active?.surfaceKind).toBe("file");
+    if (active?.surfaceKind === "file") expect(active.fileId).toBe("storage/rotli/sample.docx");
+  });
+
   test("fills the pristine startup placeholder (empty noteId) — no ghost tab", () => {
     // the real fs app boots with one note tab whose target is "" (initialNoteId)
     usePanesStore.setState({

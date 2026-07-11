@@ -230,6 +230,8 @@
 :root[data-theme="glass-dark"] .sidebar,
 :root[data-theme="glass-light"] .pane,
 :root[data-theme="glass-dark"] .pane,
+:root[data-theme="glass-light"] .breve-surface,
+:root[data-theme="glass-dark"] .breve-surface,
 :root[data-theme="glass-light"] .set-nav,
 :root[data-theme="glass-dark"] .set-nav,
 :root[data-theme="glass-light"] .set-main,
@@ -261,6 +263,7 @@
 :root[data-theme="glass-light"] .titlebar,
 :root[data-theme="glass-light"] .sidebar,
 :root[data-theme="glass-light"] .pane,
+:root[data-theme="glass-light"] .breve-surface,
 :root[data-theme="glass-light"] .set-nav,
 :root[data-theme="glass-light"] .set-main,
 :root[data-theme="glass-light"] .fmtbar,
@@ -280,6 +283,7 @@
 :root[data-theme="glass-dark"] .titlebar,
 :root[data-theme="glass-dark"] .sidebar,
 :root[data-theme="glass-dark"] .pane,
+:root[data-theme="glass-dark"] .breve-surface,
 :root[data-theme="glass-dark"] .set-nav,
 :root[data-theme="glass-dark"] .set-main,
 :root[data-theme="glass-dark"] .fmtbar,
@@ -294,6 +298,14 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     0 14px 40px rgba(0, 0, 0, 0.45);
+}
+/* Breve is a long-form reading and configuration surface, so it needs a
+   stronger luminance floor than transient chrome over arbitrary wallpapers. */
+:root[data-theme="glass-light"] .breve-surface {
+  background: rgba(255, 255, 255, 0.9);
+}
+:root[data-theme="glass-dark"] .breve-surface {
+  background: rgba(18, 21, 26, 0.9);
 }
 /* panes carry the glass; everything inside them is transparent so glass never
    stacks on glass (the white-plate bug: pane glass + editor glass = opaque) */

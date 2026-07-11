@@ -11,6 +11,8 @@ import type { ModelMeta } from "./budget";
 export type ToolName =
   | "search_notes"
   | "read_note"
+  | "search_memory"
+  | "read_memory"
   | "read_file"
   | "web_search"
   | "web_fetch"
@@ -22,6 +24,14 @@ export interface NoteHit {
   title: string;
   snippet: string;
   folder: string;
+}
+
+export interface MemoryHit {
+  /** Note id, or a `chat:<slug>` reference. */
+  id: string;
+  title: string;
+  snippet: string;
+  source: "note" | "chat";
 }
 
 /** A web result surfaced by web_search. */
@@ -48,8 +58,13 @@ export interface Host {
   complete(req: CompleteReq): Promise<string>;
   /** Rank the user's notes for a query (their memex is the knowledge base). */
   searchNotes(query: string, limit: number): Promise<NoteHit[]>;
-  /** Read one note's full text by id (local model ⇒ secure notes are allowed). */
+  /** Read one note by id. Secure notes require explicit local-AI permission;
+   * remote models can never read them. */
   readNote(id: string): Promise<string>;
+  /** Master retrieval across organized notes and prior chats. Optional so a
+   * portable host can degrade to note search without implementing chat IO. */
+  searchMemory?(query: string, limit: number): Promise<MemoryHit[]>;
+  readMemory?(id: string): Promise<string>;
   /** Read a surfaced FILE by name (text, or a spreadsheet as CSV) so the model can
    * answer questions about it. Returns a not-found message if no file matches. */
   readFile(query: string): Promise<string>;

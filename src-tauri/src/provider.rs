@@ -41,10 +41,12 @@ pub struct ProviderState {
     /// disambiguates sequential steps that reuse one request id — a stale
     /// watchdog must never kill a newer child under the same id.
     children: Arc<Mutex<HashMap<String, Running>>>,
-    /// agy allows NO concurrent invocations (parallel `-p` runs hang) — every
-    /// agy child, chat or image, runs under this gate.
-    agy_gate: Arc<Mutex<()>>,
 }
+
+/// agy allows NO concurrent invocations (parallel `-p` runs hang). Process-wide
+/// because chat, image generation, and the Brain organizer use separate call
+/// paths but must still serialize against one another.
+static AGY_GATE: Mutex<()> = Mutex::new(());
 
 /// Process-global run token — unique across every spawn, so a finished step's
 /// watchdog can never shoot a successor that reused its request id.
@@ -68,7 +70,15 @@ const CLIS: &[CliSpec] = &[
     CliSpec {
         id: "codex",
         bins: &["/opt/homebrew/bin/codex", "~/.local/bin/codex", "/usr/local/bin/codex"],
-        models: &["gpt-5.5", "gpt-5.4", "gpt-5.4-mini"],
+        models: &[
+            "gpt-5.6-sol",
+            "gpt-5.6-terra",
+            "gpt-5.6-luna",
+            "gpt-5.5",
+            "gpt-5.4",
+            "gpt-5.4-mini",
+            "gpt-5.3-codex-spark",
+        ],
     },
     CliSpec {
         id: "agy",
@@ -76,8 +86,6 @@ const CLIS: &[CliSpec] = &[
         models: &[
             "Gemini 3.5 Flash (Medium)",
             "Gemini 3.1 Pro (High)",
-            "Claude Sonnet 4.6 (Thinking)",
-            "Claude Opus 4.6 (Thinking)",
         ],
     },
 ];
@@ -381,6 +389,26 @@ pub fn organizer_claude_complete(prompt: &str, timeout: Duration) -> Result<Stri
     parsed
 }
 
+/// The Brain organizer's authenticated Gemini lane. It shares the exact agy
+/// allowlist, sandbox argv, timeout runner, output parser, and global one-at-a-
+/// time gate used by chat; only the fixed model choice differs.
+pub fn organizer_gemini_complete(prompt: &str, timeout: Duration) -> Result<String, String> {
+    const MODEL: &str = "Gemini 3.5 Flash (Medium)";
+    let bin = resolve_bin(spec("agy")?).ok_or("the Antigravity CLI isn't installed")?;
+    let (args, via) = build_args("agy", MODEL, prompt, timeout.as_secs())?;
+    let mut cmd = Command::new(&bin);
+    cmd.args(&args);
+    let children: Arc<Mutex<HashMap<String, Running>>> = Arc::new(Mutex::new(HashMap::new()));
+    let _gate = AGY_GATE.lock().unwrap();
+    let payload = matches!(via, PromptVia::Stdin).then_some(prompt);
+    let (stdout, stderr, ok) = run_registered(&children, "organizer-gemini", cmd, payload, timeout)?;
+    match parse_agy_text(&stdout, &stderr) {
+        Ok(text) => Ok(text),
+        Err(error) if !ok => Err(error),
+        Err(error) => Err(error),
+    }
+}
+
 /// Try an ordered list of provider lanes and return the FIRST success — the
 /// brief-generation fallback chain (breve-merge.md §2.4: Claude→Gemini→Codex,
 /// stop at first success, independent auth per lane). `run` performs one lane's
@@ -422,7 +450,7 @@ pub async fn cli_complete(
     timeout_ms: Option<u64>,
 ) -> Result<String, String> {
     // the CLI lane is remote by definition — same egress law as chat.rs
-    if crate::secret::looks_secure(&prompt) {
+    if crate::secret::protected_for_remote(&prompt) {
         return Err(
             "This conversation carries secret-shaped content and can't be sent to a connected model — switch to a local model to continue."
                 .into(),
@@ -434,10 +462,9 @@ pub async fn cli_complete(
         .ok_or_else(|| format!("{provider} isn't installed (checked its usual homes)"))?;
 
     let children = Arc::clone(&state.children);
-    let agy_gate = Arc::clone(&state.agy_gate);
     tauri::async_runtime::spawn_blocking(move || {
         // agy: strictly one at a time (parallel runs hang) — hold the gate
-        let _agy = (provider == "agy").then(|| agy_gate.lock().unwrap());
+        let _agy = (provider == "agy").then(|| AGY_GATE.lock().unwrap());
         let mut cmd = Command::new(&bin);
         cmd.args(&args);
         let payload = matches!(via, PromptVia::Stdin).then_some(prompt.as_str());
@@ -487,7 +514,7 @@ pub async fn generate_image(
     prompt: String,
     engine: String,
 ) -> Result<String, String> {
-    if crate::secret::looks_secure(&prompt) {
+    if crate::secret::protected_for_remote(&prompt) {
         return Err("That prompt carries secret-shaped content — it won't be sent to an image engine.".into());
     }
     if engine != "codex" && engine != "agy" {
@@ -543,9 +570,8 @@ pub async fn generate_image(
     };
 
     let children = Arc::clone(&state.children);
-    let agy_gate = Arc::clone(&state.agy_gate);
     tauri::async_runtime::spawn_blocking(move || {
-        let _agy = (engine == "agy").then(|| agy_gate.lock().unwrap());
+        let _agy = (engine == "agy").then(|| AGY_GATE.lock().unwrap());
         let mut cmd = Command::new(&bin);
         cmd.args(&args);
         let (_stdout, stderr, _ok) =
@@ -656,6 +682,7 @@ mod tests {
         assert!(build_args("ollama", "x", "p", 60).is_err());
         assert!(build_args("claude", "gpt-5.5", "p", 60).is_err());
         assert!(build_args("codex", "sonnet", "p", 60).is_err());
+        assert!(build_args("agy", "Claude Sonnet 4.6 (Thinking)", "p", 60).is_err());
     }
 
     #[test]
@@ -670,7 +697,7 @@ mod tests {
 
     #[test]
     fn codex_args_are_sandboxed_jsonl_with_stdin_prompt() {
-        let (args, via) = build_args("codex", "gpt-5.5", "ignored", 60).unwrap();
+        let (args, via) = build_args("codex", "gpt-5.6-sol", "ignored", 60).unwrap();
         assert_eq!(via, PromptVia::Stdin);
         assert_eq!(args[0], "exec");
         assert!(args.contains(&"--json".to_string()));

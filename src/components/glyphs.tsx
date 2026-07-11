@@ -4,6 +4,7 @@
 
 import type { ReactNode } from "react";
 import { IMAGE_EXTS, extOf } from "../lib/fileKind";
+import { DOCUMENT_EXTS } from "../documents/kinds";
 
 interface GlyphProps {
   size?: number | undefined;
@@ -82,6 +83,17 @@ export function FileGlyph(props: GlyphProps) {
   );
 }
 
+/** Office-style document — a page with readable text lines, kept generic so
+ * DOCX, Pages, ODT, and RTF share one honest document family mark. */
+export function DocumentGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 2v6h6M8 12h8M8 16h8" />
+    </Glyph>
+  );
+}
+
 /** Vault — a book (the external knowledge base the Vault row browses). Reads as a
  * "knowledge collection," not a brain, matching the renamed destination. */
 export function VaultGlyph(props: GlyphProps) {
@@ -152,6 +164,28 @@ export function ImageGlyph(props: GlyphProps) {
   );
 }
 
+/** Vision capability — used where a model can inspect image attachments. */
+export function EyeGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M2.8 12s3.2-5.5 9.2-5.5 9.2 5.5 9.2 5.5-3.2 5.5-9.2 5.5S2.8 12 2.8 12Z" />
+      <circle cx="12" cy="12" r="2.4" />
+    </Glyph>
+  );
+}
+
+/** Breve workspace lens — the familiar coffee cup, kept in the same quiet
+ * currentColor/1.7-stroke grammar as every sidebar tool. */
+export function CoffeeGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M4 8h13v5a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6Z" />
+      <path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17" />
+      <path d="M7 2.5c-1 1-.8 2 .2 3M11 2.5c-1 1-.8 2 .2 3M4 21h15" />
+    </Glyph>
+  );
+}
+
 /** The row glyph for a note/board/file, by kind + filename extension: the REAL
  * format mark for files (svg/pdf/raster image) and the Excalidraw logo for
  * canvases; notes and unknown files stay the generic document. */
@@ -164,6 +198,7 @@ export function glyphForNote(
     const ext = extOf(note.title ?? "");
     if (ext === "svg") return <SvgFormatGlyph {...props} />;
     if (ext === "pdf") return <PdfGlyph {...props} />;
+    if (DOCUMENT_EXTS.has(ext)) return <DocumentGlyph {...props} />;
     if (IMAGE_EXTS.has(ext)) return <ImageGlyph {...props} />;
   }
   return <FileGlyph {...props} />;
@@ -228,6 +263,16 @@ export function SearchGlyph(props: GlyphProps) {
     <Glyph {...props}>
       <circle cx="11" cy="11" r="7" />
       <path d="m21 21-4.3-4.3" />
+    </Glyph>
+  );
+}
+
+/** Open an external website in the system browser. */
+export function ExternalLinkGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M14 5h5v5M19 5l-8 8" />
+      <path d="M17 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5" />
     </Glyph>
   );
 }

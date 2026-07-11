@@ -1,6 +1,7 @@
 // UI state only (the Zustand law). Data lives behind src/services/.
 
 import type { HybridPreset, ProviderId } from "../ai/models";
+import { DEFAULT_NEW_ITEM_KIND, type NewItemKind } from "../newItems/model";
 import { inboxFolderId } from "../services/notes";
 import type { Measure } from "./noteStyle";
 import { create } from "zustand";
@@ -79,9 +80,9 @@ export const ORGANIZER_TRUSTS: readonly OrganizerTrust[] = ["off", "suggest", "t
 /** Which model organizes the Brain: `local` = the on-device MLX server (default,
  * never leaves the Mac); `claude` = `claude -p` Sonnet (Seth's pick — non-secure
  * notes go remote, secure/locked never do). The Rust daemon re-reads this. */
-export type OrganizerModel = "local" | "claude";
+export type OrganizerModel = "local" | "claude" | "gemini35";
 
-export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local", "claude"];
+export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local", "claude", "gemini35"];
 
 /** Selectable idle-delay presets (seconds): how long a note must sit UNTOUCHED
  * before the organizer scans it. Default 5 min (Seth, 2026-07-03). */
@@ -112,6 +113,12 @@ export const RECENT = "recent";
  * Chat folded in from a full-surface front 2026-06-26). */
 // (the old "chat" contentView is retired — chat is a PANE surface now)
 export type ContentView = "panes" | "board" | "allNotes" | "allChats" | "recent";
+
+/** The sidebar's high-level lens. Breve is an operational view over the same
+ * corpus, not a separate window or a tab, so switching lenses must leave the
+ * current notes contentView and pane tree untouched. */
+export type SidebarMode = "notes" | "breve";
+export type BreveView = "briefs" | "watchlist" | "routines" | "models" | "configure";
 
 /** The three top-level left-menu sections (Seth's decided IA, 2026-06-26): Inbox
  * (email) · Chat · Notes. Each is a collapsible accordion; its open state lives in
@@ -190,6 +197,11 @@ interface UiState {
   showInDock: boolean;
   setShowInDock: (on: boolean) => void;
 
+  /** What the generic New tab command (⌘T by default) creates. Explicit New
+   * menu actions always keep their own kind. */
+  newTabDefault: NewItemKind;
+  setNewTabDefault: (kind: NewItemKind) => void;
+
   /** First-run gate: false until the user finishes (or skips) onboarding, or
    * after a manual "Reset & re-onboard". Persisted in settings.json; the
    * onboarding surface shows whenever this is false (Tauri only). */
@@ -235,6 +247,16 @@ interface UiState {
    * factor on the rows, clamped to a readable band. */
   sidebarZoom: number;
   setSidebarZoom: (z: number) => void;
+  /** Notes is the normal Inbox/Chat/Notes tree; Breve swaps only the sidebar
+   * navigation + right workspace while preserving the user's open panes. */
+  sidebarMode: SidebarMode;
+  setSidebarMode: (mode: SidebarMode) => void;
+  breveView: BreveView;
+  setBreveView: (view: BreveView) => void;
+  /** Transient edit guard for Breve forms. Never persisted: drafts live only
+   * for the mounted workspace and must be resolved before changing lenses. */
+  breveDirty: boolean;
+  setBreveDirty: (dirty: boolean) => void;
 
   /** Which destinations in the sidebar tree are expanded, keyed by dest id —
    * Inbox + Vault open by default (Seth, 2026-06-13). */
@@ -462,6 +484,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setStayOpen: (on) => set({ stayOpen: on }),
   showInDock: false,
   setShowInDock: (on) => set({ showInDock: on }),
+  newTabDefault: DEFAULT_NEW_ITEM_KIND,
+  setNewTabDefault: (kind) => set({ newTabDefault: kind }),
 
   onboarded: false,
   setOnboarded: (done) => set({ onboarded: done }),
@@ -494,6 +518,31 @@ export const useUiStore = create<UiState>((set, get) => ({
   setSidebarWidth: (px) => set({ sidebarWidth: clampSidebarWidth(px) }),
   sidebarZoom: 1,
   setSidebarZoom: (z) => set({ sidebarZoom: clampSidebarZoom(z) }),
+  sidebarMode: "notes",
+  setSidebarMode: (mode) => {
+    const current = get();
+    if (
+      current.sidebarMode === "breve" &&
+      mode !== "breve" &&
+      current.breveDirty &&
+      typeof window !== "undefined" &&
+      !window.confirm("Discard your unsaved Breve changes and return to Notes?")
+    ) return;
+    set({ sidebarMode: mode, ...(mode === "breve" ? {} : { breveDirty: false }) });
+  },
+  breveView: "briefs",
+  setBreveView: (view) => {
+    const current = get();
+    if (
+      current.breveView !== view &&
+      current.breveDirty &&
+      typeof window !== "undefined" &&
+      !window.confirm("Discard your unsaved changes and open another Breve section?")
+    ) return;
+    set({ breveView: view, breveDirty: false });
+  },
+  breveDirty: false,
+  setBreveDirty: (dirty) => set({ breveDirty: dirty }),
 
   // the three sections open by default, plus the Capture(Inbox) + Vault dests
   // inside Notes — so a fresh window shows the full three-section tree.

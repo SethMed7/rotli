@@ -232,9 +232,13 @@
   color: var(--text-muted);
   position: relative;
 }
-.icobtn:hover {
+.icobtn:hover:not(:disabled) {
   background: var(--hov);
   color: var(--text);
+}
+.icobtn:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
 }
 .icobtn.railon {
   background: var(--surface-2);

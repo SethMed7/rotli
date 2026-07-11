@@ -10,6 +10,7 @@ import { rotliUniverTheme, univerNeutralForTheme } from "./theme";
 
 interface FWorkbookLike {
   save: () => unknown;
+  setEditable?: (editable: boolean) => FWorkbookLike;
 }
 
 interface FUniverApiLike {
@@ -27,6 +28,7 @@ export interface MountSheetOptions {
   model: SheetModel;
   darkMode: boolean;
   themeMode: SheetThemeMode;
+  readOnly?: boolean;
 }
 
 export interface SheetHandle {
@@ -56,6 +58,7 @@ export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHan
     ...opts.model,
     locale: LocaleType.EN_US,
   }) as FWorkbookLike;
+  if (opts.readOnly) fwb.setEditable?.(false);
 
   let themeMode = opts.themeMode;
   let darkMode = opts.darkMode;

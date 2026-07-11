@@ -1,0 +1,45 @@
+name: Regression suite
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  design-system:
+    name: Themes and design system
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+      - run: bun install --frozen-lockfile
+      - run: bun run check:hex
+      - run: bun run check:design-system
+      - run: bun test src/state/theme.test.ts src/brand/brevePdfThemes.test.ts src/brand/univerTheme.test.ts
+
+  full-regression:
+    name: App, Breve, Rust, and production build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: bun run build

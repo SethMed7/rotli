@@ -324,6 +324,15 @@ describe("composeNote (v3.5 note contract — byte-exact)", () => {
     expect(out).toContain("reach: []\n");
     expect(out).toContain("area: projects/myela\n");
   });
+  test("secure creation writes policy metadata without granting local AI", () => {
+    const out = composeNote(
+      { id: ID, title: "Private", shelf: ["Secure notes"], reach: [], secure: true },
+      "# Private\n",
+      DATE,
+    );
+    expect(out).toContain("secure: true\n---\n");
+    expect(out).not.toContain("local_ai_allowed");
+  });
 });
 
 describe("noteStem (home() staging filename)", () => {

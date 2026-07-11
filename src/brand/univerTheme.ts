@@ -51,23 +51,28 @@ const coolGray = {
   900: "#0F0F0F",
 } as const;
 
-export type UniverNeutral = "warm" | "cool";
+export type UniverNeutral = "warm" | "cool" | "mono";
 
-/** Pick neutrals from the live app theme (charcoal / paper / glass → cool). */
+/** Pick the chrome family from the live app theme. Paper/charcoal are mono;
+ * glass uses cool neutrals; the branded light/dark pair stays warm. */
 export function univerNeutralForTheme(theme: string | undefined): UniverNeutral {
   if (!theme) return "warm";
-  if (theme === "charcoal" || theme === "paper" || theme.startsWith("glass")) return "cool";
+  if (theme === "charcoal" || theme === "paper") return "mono";
+  if (theme.startsWith("glass")) return "cool";
   return "warm";
 }
 
 /** The theme Univer's chrome (toolbar · selection · sheet tabs) paints with. */
 export function rotliUniverTheme(neutral: UniverNeutral = "warm"): Theme {
   const gray = neutral === "cool" ? coolGray : warmGray;
+  const resolvedGray = neutral === "mono" ? coolGray : gray;
   return {
     ...defaultTheme,
-    white: gray[50],
-    black: gray[500],
-    primary: clay,
-    gray,
+    white: resolvedGray[50],
+    black: resolvedGray[500],
+    // Paper/charcoal are deliberately monochrome. Keeping clay here made the
+    // spreadsheet look like warm-dark chrome pasted into the charcoal app.
+    primary: neutral === "mono" ? coolGray : clay,
+    gray: resolvedGray,
   };
 }

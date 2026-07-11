@@ -17,3 +17,10 @@ export async function mountSheetEmbed(host: HTMLElement, fileId: string): Promis
   root.render(<SheetEmbed fileId={fileId} />);
   return () => root.unmount();
 }
+
+export async function mountDocumentEmbed(host: HTMLElement, fileId: string): Promise<() => void> {
+  const { DocumentEmbed } = await import("./embedDocument");
+  const root = createRoot(host);
+  root.render(<DocumentEmbed fileId={fileId} />);
+  return () => root.unmount();
+}

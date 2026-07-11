@@ -19,7 +19,7 @@ export const PROVIDER_LABELS: Record<ProviderId, string> = {
   claude: "Claude Code",
   codex: "Codex",
   agy: "Antigravity",
-  gemini: "Gemini API",
+  gemini: "Gemini API · Advanced",
 };
 
 /** A hybrid preset (Settings → AI Models): an ORGANIZER model reads the prompt
@@ -138,21 +138,23 @@ const gemini = (id: string, label: string): ChatModelInfo => ({
  * curated handful per lane — the dropdown is a picker, not a registry dump. */
 export const CLI_CATALOG: Record<ProviderId, ChatModelInfo[]> = {
   claude: [
-    cli("claude", "sonnet", "Claude Sonnet"),
+    cli("claude", "sonnet", "Claude Sonnet 5"),
     cli("claude", "opus", "Claude Opus"),
     cli("claude", "haiku", "Claude Haiku"),
-    cli("claude", "fable", "Claude Fable"),
+    cli("claude", "fable", "Claude Fable 5"),
   ],
   codex: [
+    cli("codex", "gpt-5.6-sol", "GPT-5.6 Sol"),
+    cli("codex", "gpt-5.6-terra", "GPT-5.6 Terra"),
+    cli("codex", "gpt-5.6-luna", "GPT-5.6 Luna"),
     cli("codex", "gpt-5.5", "GPT-5.5"),
     cli("codex", "gpt-5.4", "GPT-5.4"),
     cli("codex", "gpt-5.4-mini", "GPT-5.4 mini"),
+    cli("codex", "gpt-5.3-codex-spark", "GPT-5.3 Codex Spark"),
   ],
   agy: [
-    cli("agy", "Gemini 3.5 Flash (Medium)", "Gemini 3.5 Flash · agy"),
-    cli("agy", "Gemini 3.1 Pro (High)", "Gemini 3.1 Pro · agy"),
-    cli("agy", "Claude Sonnet 4.6 (Thinking)", "Claude Sonnet 4.6 · agy"),
-    cli("agy", "Claude Opus 4.6 (Thinking)", "Claude Opus 4.6 · agy"),
+    cli("agy", "Gemini 3.5 Flash (Medium)", "Gemini 3.5 Flash"),
+    cli("agy", "Gemini 3.1 Pro (High)", "Gemini 3.1 Pro"),
   ],
   gemini: [
     gemini("gemini-3-pro", "Gemini 3 Pro"),
@@ -195,11 +197,16 @@ export function mergedModels(
   enabled: Record<ProviderId, boolean>,
   presets: HybridPreset[],
   blocked: readonly string[] = [],
+  ready?: Readonly<Partial<Record<ProviderId, boolean>>>,
 ): ModelGroups {
   const off = new Set(blocked);
   const connected: ChatModelInfo[] = [];
   for (const id of PROVIDER_IDS) {
-    if (enabled[id]) connected.push(...CLI_CATALOG[id].filter((m) => !off.has(m.id)));
+    // Settings can omit `ready` while editing a lane. The chat supplies it so
+    // an enabled-but-missing/expired CLI never masquerades as a usable model.
+    if (enabled[id] && (ready === undefined || ready[id] === true)) {
+      connected.push(...CLI_CATALOG[id].filter((m) => !off.has(m.id)));
+    }
   }
   return { local, connected, presets: presets.map(presetModel) };
 }
@@ -208,7 +215,7 @@ export function mergedModels(
  * one-line completion is the only honest "this lane works". */
 export const LANE_PING_MODEL: Record<ProviderId, string> = {
   claude: "haiku",
-  codex: "gpt-5.4-mini",
+  codex: "gpt-5.6-luna",
   agy: "Gemini 3.5 Flash (Medium)",
   gemini: "gemini-3-flash",
 };

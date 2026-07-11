@@ -1,0 +1,10 @@
+[
+  {
+    "name": "Example Creator",
+    "handle": "@examplehandle",
+    "channelId": "UCxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+    "_notes": "Copy to creators.json (gitignored). Each entry = a YouTube channel Breve watches via RSS; channelId is the UC… id from the channel page. Manage over Signal with /creators add @handle."
+  }
+]
