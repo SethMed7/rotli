@@ -43,3 +43,7 @@ jobs:
       - run: bun run check
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: bun run build
+        env:
+          # Vite's large Univer/Excalidraw graph exceeds Node's ~2 GB default
+          # heap on hosted macOS runners while rendering chunks.
+          NODE_OPTIONS: --max-old-space-size=4096
