@@ -26,8 +26,10 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
 - Audio is a work surface, not an exception: playback alone does not constitute
   editable support. Its complete workflow must expose user-owned output such as
   transcript, cuts, annotations, or metadata before Rotli calls it supported.
-- Markdown owns slash commands, typed embed fences, wikilinks, and note
-  frontmatter.
+- Markdown is the primary knowledge surface. It exclusively owns slash commands,
+  typed embed fences, wikilinks, note frontmatter, and note-native workflows.
+  DOCX documents, sheets, and Excalidraw boards are secondary bonus work
+  surfaces with conventional file behavior, not parallel note systems.
 - Documents are conventional DOCX files. They do not host Markdown slash
   commands or embed syntax. Rotli creates and edits them locally through a
   structured document model, including native Word tables. The DOCX codec

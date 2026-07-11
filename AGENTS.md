@@ -22,8 +22,10 @@ material—not current specifications.
   rebuildable projections and explicit settings.
 - One notes folder is one memex. Main is a reference view, never another store.
   Do not add a database for memex content.
-- Markdown alone owns slash commands, wikilinks, and embed fences. DOCX, sheets,
-  boards, and assets keep conventional formats behind adapters.
+- Markdown is Rotli's primary knowledge surface and alone owns slash commands,
+  wikilinks, embed fences, frontmatter, and note-native workflows. DOCX, sheets,
+  Excalidraw boards, and assets are secondary bonus work surfaces that keep
+  conventional formats behind adapters; they are not parallel note systems.
 - Rotli is a workspace, not a preview catalog. Images and video are the only
   preview-only file surfaces. Every other format presented as supported must be
   editable in Rotli; otherwise offer an explicit local conversion/import path
