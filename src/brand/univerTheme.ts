@@ -73,3 +73,15 @@ export function rotliUniverTheme(neutral: UniverNeutral = "warm"): Theme {
     gray: resolvedGray,
   };
 }
+
+/**
+ * Documents are conventional paper, not an app-environment canvas. Keep their
+ * editor light in every Rotli environment and make the page literal white so
+ * imported Word colors retain their expected contrast.
+ */
+export function documentUniverTheme(): Theme {
+  return {
+    ...rotliUniverTheme("mono"),
+    white: "#FFFFFF",
+  };
+}

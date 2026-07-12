@@ -18,10 +18,6 @@ import { corpusFileStat } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 
-function currentAppTheme(): string {
-  return document.documentElement.dataset.theme ?? "charcoal";
-}
-
 export default function DocumentEditor({
   fileId,
   paneId,
@@ -45,18 +41,10 @@ export default function DocumentEditor({
   const [err, setErr] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [chromeEl, setChromeEl] = useState<HTMLElement | null>(null);
-  const [appTheme, setAppTheme] = useState(currentAppTheme);
 
   useEffect(() => {
     setChromeEl(chromeSlotRef?.current ?? null);
   }, [chromeSlotRef]);
-
-  useEffect(() => {
-    const sync = () => setAppTheme(currentAppTheme());
-    const observer = new MutationObserver(sync);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => observer.disconnect();
-  }, []);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -142,7 +130,7 @@ export default function DocumentEditor({
       handleRef.current = null;
       sessionRef.current = null;
     };
-  }, [fileId, appTheme]);
+  }, [fileId]);
 
   useEffect(() => {
     const session = sessionRef.current;

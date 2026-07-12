@@ -18,6 +18,7 @@
   /* — semantic: LIGHT surfaces (default) — */
   --ground:#F8F2E9;        /* Linen */
   --surface:#FFFFFF;
+  --document-paper:#FFFFFF; /* fixed Word/PDF work surface; never theme-inverted */
   --surface-2:#F1E7D8;
   --tint:#F2D6C2;          /* Peach — selected/highlight backgrounds */
   --text:#3A3028;          /* Cocoa */

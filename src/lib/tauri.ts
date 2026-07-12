@@ -640,8 +640,8 @@ export interface FileStat {
   len: number;
   /** Whether the USER write lane may save this file (false in a memex/linked library). */
   writable: boolean;
-  /** Whether an explicit user action may move this storage asset to recoverable Trash. */
-  trashable: boolean;
+  /** Whether this storage asset may move into the memex Archive or Trash. */
+  lifecycleMutable: boolean;
 }
 
 /** Size + writability probe for a surfaced file — the sheet editor decides
@@ -651,10 +651,16 @@ export async function corpusFileStat(id: string): Promise<FileStat | null> {
   return invoke<FileStat>("corpus_file_stat", { id });
 }
 
-/** Move a surfaced storage asset to the OS Trash (or the host fallback Trash). */
-export async function corpusTrashFile(id: string): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("corpus_trash_file", { id });
+/** Move a surfaced storage asset into an in-memex lifecycle sink. */
+export async function corpusMoveFileToSink(id: string, sink: "Archive" | "Trash"): Promise<string> {
+  if (!isTauri()) return id;
+  return invoke<string>("corpus_move_file_to_sink", { id, sink });
+}
+
+/** Restore a surfaced file from Archive/Trash to its original storage path. */
+export async function corpusRestoreFile(id: string): Promise<string> {
+  if (!isTauri()) return id;
+  return invoke<string>("corpus_restore_file", { id });
 }
 
 /** Save a surfaced FILE's bytes back to disk (base64) — the sheet editor's

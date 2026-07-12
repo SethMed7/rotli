@@ -1578,7 +1578,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  box-shadow: var(--shadow-popover);
+  box-shadow: none;
   font-size: 13px;
   user-select: none;
 }

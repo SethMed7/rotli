@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Files now stay recoverable inside the memex.** Archive and Trash move
+  storage assets beneath the corresponding memex folder while retaining their
+  original storage path for collision-safe restore. These actions never invoke
+  macOS Trash, and stale file tabs/Main/Quick references are removed cleanly.
+- **DOCX is conventional paper in every environment.** The Word editor now uses
+  fixed light chrome and white pages, automatically fits a complete page to the
+  pane without horizontal panning, survives app-theme switches without remount,
+  and hides Univer’s Markdown-like paragraph/block handle. PDF frames likewise
+  request their normal light rendering. Context menus no longer cast a glow.
+
 ## [0.32.0] - 2026-07-11
 
 ### Added

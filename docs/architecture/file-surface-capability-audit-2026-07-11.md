@@ -43,16 +43,20 @@ The following paths are established in current code and focused tests:
   file tab.
 - **Save and remount:** the document shell scopes `⌘S` to the focused pane/embed,
   writes through the codec with a one-time backup, parks dirty snapshots on tab
-  or theme remount, and flushes dirty sessions on hide/quit.
+  remount, and flushes dirty sessions on hide/quit. Theme switches no longer
+  remount DOCX because document paper is intentionally independent of app theme.
 - **States:** source paths cover blank document, loading, dirty, saving, saved,
   save/load error, 12 MB refusal, read-only location, and an 800 px narrow
   layout adjustment. Error text is announced with `role="alert"` and opening
   status with `role="status"`.
 
-No document-workflow screenshots were present in the repository or supplied in
-the task, so visual fidelity remains a native desktop check rather than a
-claimed automated result. Browser mode cannot prove the filesystem write lane,
-native menu/titlebar behavior, or macOS conversion command.
+Post-release native screenshots exposed three visual contract failures: DOCX
+paper inherited dark mode, the page could overflow into horizontal panning, and
+Univer exposed a Markdown-like block handle/menu. The adapter now uses fixed
+light document chrome, literal white paper, responsive fit-width zoom, and a
+DOCX-scoped suppression of the paragraph handle. PDF frames also request the
+light color scheme. Native follow-up is still required because browser mode
+cannot prove WKWebView PDF rendering, filesystem writes, menus, or titlebars.
 
 ## Fidelity boundaries
 

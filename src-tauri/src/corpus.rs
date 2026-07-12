@@ -1067,10 +1067,10 @@ pub struct FrontmatterView {
 pub struct FileStat {
     pub len: u64,
     pub writable: bool,
-    /// Whether an explicit user action may move this storage asset to the OS
-    /// Trash. Separate from `writable`: unsupported file formats still need a
-    /// lifecycle action even when Rotli cannot save their bytes in place.
-    pub trashable: bool,
+    /// Whether an explicit user action may move this storage asset into the
+    /// memex Archive or Trash. Separate from `writable`: unsupported formats
+    /// still need a recoverable lifecycle action.
+    pub lifecycle_mutable: bool,
 }
 
 /// What the editor sees: the raw body minus the single conventional blank line
@@ -1226,6 +1226,10 @@ fn shelf_of(fm: &Frontmatter) -> Vec<String> {
 /// Everything outside a memex's wiki/, and the whole local corpus, is unaffected.
 fn project_folder(layout: Layout, disk_folder: &str, fm: &Frontmatter) -> String {
     if layout == Layout::Memex {
+        let lifecycle_folder = project_lifecycle_folder(layout, disk_folder);
+        if lifecycle_folder != disk_folder {
+            return lifecycle_folder;
+        }
         // storage/ binaries surface under the reserved "Storage" destination
         if disk_folder == "storage" || disk_folder.starts_with("storage/") {
             return "Storage".to_string();
@@ -1246,6 +1250,34 @@ fn project_folder(layout: Layout, disk_folder: &str, fm: &Frontmatter) -> String
         }
     }
     disk_folder.to_string()
+}
+
+/// Memex lifecycle folders are conventional lowercase disk structure while the
+/// workspace presents stable title-case destination labels.
+fn project_lifecycle_folder(layout: Layout, disk_folder: &str) -> String {
+    if layout != Layout::Memex {
+        return disk_folder.to_string();
+    }
+    if disk_folder == "archive" || disk_folder.starts_with("archive/") {
+        return format!("Archive{}", &disk_folder["archive".len()..]);
+    }
+    if disk_folder == "trash" || disk_folder.starts_with("trash/") {
+        return format!("Trash{}", &disk_folder["trash".len()..]);
+    }
+    disk_folder.to_string()
+}
+
+fn lifecycle_disk_folder(layout: Layout, folder: &str) -> String {
+    if layout != Layout::Memex {
+        return folder.to_string();
+    }
+    if folder == "Archive" || folder.starts_with("Archive/") {
+        return format!("archive{}", &folder["Archive".len()..]);
+    }
+    if folder == "Trash" || folder.starts_with("Trash/") {
+        return format!("trash{}", &folder["Trash".len()..]);
+    }
+    folder.to_string()
 }
 
 /// Synthesize a `FolderMeta` (and every ancestor) for any note `folder_id` that has
@@ -2011,15 +2043,13 @@ impl CorpusStore {
             // an existing storage/ office file is editable in place
             // even though the contract's writable() refuses the storage lane at large
             writable: self.writable(rel).is_ok() || self.storage_office_editable(rel),
-            trashable: self.storage_file_trashable(rel),
+            lifecycle_mutable: self.storage_file_lifecycle_mutable(rel),
         })
     }
 
-    /// A surfaced storage asset can be explicitly trashed when the root itself
-    /// accepts mutations. This does not widen any content write lane: the file
-    /// must already exist under the binary storage root, Markdown and boards are
-    /// refused, and the operation always uses recoverable OS/fallback Trash.
-    fn storage_file_trashable(&self, rel: &str) -> bool {
+    /// A surfaced storage asset can enter Rotli's in-memex Archive/Trash when
+    /// the root accepts mutations. Markdown and boards keep their own lifecycle.
+    fn storage_file_lifecycle_mutable(&self, rel: &str) -> bool {
         if self.mutation_allowed().is_err() || !self.abs(rel).is_file() {
             return false;
         }
@@ -2037,12 +2067,15 @@ impl CorpusStore {
         !matches!(ext.as_deref(), Some("md" | "markdown" | "excalidraw"))
     }
 
-    /// Move an existing storage asset out of the corpus without hard-deleting
-    /// it. Files have no Markdown Trash lane, so macOS Trash is their honest
-    /// reversible lifecycle; tests and OS failures use `.rotli/trash/`.
-    pub fn trash_file(&mut self, rel: &str) -> Result<(), String> {
+    /// Move an existing storage asset into Archive/Trash while preserving its
+    /// original relative path below that sink. The breadcrumb is therefore
+    /// durable user-visible structure, not `.rotli/` state.
+    pub fn move_file_to_sink(&mut self, rel: &str, sink: &str) -> Result<String, String> {
         validate_rel(rel)?;
-        if !self.storage_file_trashable(rel) {
+        if sink != "Archive" && sink != "Trash" {
+            return Err(format!("not a file lifecycle destination: {sink}"));
+        }
+        if !self.storage_file_lifecycle_mutable(rel) {
             return Err(format!("this file is read-only or outside Rotli storage: {rel}"));
         }
         let abs = self.abs(rel);
@@ -2050,7 +2083,56 @@ impl CorpusStore {
             .file_name()
             .map(|value| value.to_string_lossy().into_owned())
             .ok_or_else(|| format!("file has no name: {rel}"))?;
-        self.trash_existing_path(&abs, &name, rel)
+        let disk_sink = lifecycle_disk_folder(self.layout, sink);
+        let original_folder = folder_of(rel);
+        let sink_folder = if original_folder.is_empty() {
+            disk_sink
+        } else {
+            format!("{disk_sink}/{original_folder}")
+        };
+        validate_rel(&sink_folder)?;
+        fs::create_dir_all(self.abs(&sink_folder))
+            .map_err(|e| format!("create {sink_folder}: {e}"))?;
+        let target_rel = self.free_name(&sink_folder, &name, None);
+        let target_abs = self.abs(&target_rel);
+        self.suppress.mark(&abs);
+        self.suppress.mark(&target_abs);
+        fs::rename(&abs, &target_abs).map_err(|e| format!("move {rel} to {sink}: {e}"))?;
+        Ok(target_rel)
+    }
+
+    /// Restore a file from Archive/Trash to the storage path nested beneath the
+    /// sink. Collisions are renamed safely; no restore overwrites another file.
+    pub fn restore_file(&mut self, rel: &str) -> Result<String, String> {
+        validate_rel(rel)?;
+        self.mutation_allowed()?;
+        let original_rel = rel
+            .strip_prefix("Archive/")
+            .or_else(|| rel.strip_prefix("Trash/"))
+            .or_else(|| rel.strip_prefix("archive/"))
+            .or_else(|| rel.strip_prefix("trash/"))
+            .ok_or_else(|| format!("file is not in Archive or Trash: {rel}"))?;
+        let in_storage = match self.layout {
+            Layout::Memex => original_rel.starts_with("storage/"),
+            Layout::LegacyRotli => original_rel.starts_with("Storage/"),
+        };
+        if !in_storage || !self.abs(rel).is_file() {
+            return Err(format!("file has no restorable storage origin: {rel}"));
+        }
+        let name = Path::new(original_rel)
+            .file_name()
+            .map(|value| value.to_string_lossy().into_owned())
+            .ok_or_else(|| format!("file has no name: {rel}"))?;
+        let original_folder = folder_of(original_rel);
+        fs::create_dir_all(self.abs(&original_folder))
+            .map_err(|e| format!("create {original_folder}: {e}"))?;
+        let target_rel = self.free_name(&original_folder, &name, None);
+        let source_abs = self.abs(rel);
+        let target_abs = self.abs(&target_rel);
+        self.suppress.mark(&source_abs);
+        self.suppress.mark(&target_abs);
+        fs::rename(&source_abs, &target_abs).map_err(|e| format!("restore {rel}: {e}"))?;
+        Ok(target_rel)
     }
 
     /// Overwrite a surfaced FILE's raw bytes — the spreadsheet editor's SAVE lane.
@@ -2909,12 +2991,13 @@ impl CorpusStore {
     /// Filenames collide safely (free_name); the id is the through-line.
     pub fn move_note(&mut self, id: &str, target_folder: &str) -> Result<NoteMeta, String> {
         let rel = self.path_of(id)?;
+        let target_folder = lifecycle_disk_folder(self.layout, target_folder);
         // BOTH ends must be writable: the note's current file (a self/ note may
         // not leave) AND its destination folder (only chats/ accepts notes in a
         // memex). LegacyRotli waves both through.
         self.writable(&rel)?;
-        self.writable(target_folder)?;
-        self.relocate(id, &rel, target_folder)
+        self.writable(&target_folder)?;
+        self.relocate(id, &rel, &target_folder)
     }
 
     /// The shared move machinery behind `move_note` (USER gate) and `file_note`
@@ -3024,7 +3107,7 @@ impl CorpusStore {
             id: id.to_string(),
             title,
             snippet: snippet_of(&body),
-            folder_id: target_folder.to_string(),
+            folder_id: project_lifecycle_folder(self.layout, target_folder),
             disk_folder_id: target_folder.to_string(),
             created_at: stamp_to_ms(&created).unwrap_or(file_created),
             updated_at: stamp_to_ms(&updated).unwrap_or(file_updated),
@@ -3611,8 +3694,12 @@ pub(crate) fn folder_of(rel: &str) -> String {
 fn is_hidden_root(folder: &str) -> bool {
     folder == "Archive"
         || folder == "Trash"
+        || folder == "archive"
+        || folder == "trash"
         || folder.starts_with("Archive/")
         || folder.starts_with("Trash/")
+        || folder.starts_with("archive/")
+        || folder.starts_with("trash/")
 }
 
 /// Folder ids come from the frontend — keep them inside the corpus root.
@@ -3686,10 +3773,20 @@ fn walk(
             let staging =
                 layout == Layout::Memex && (rel == "wiki/_inbox" || rel == "storage");
             if !staging {
+                let folder_id = project_lifecycle_folder(layout, &rel);
+                let parent_id = if prefix.is_empty() {
+                    None
+                } else {
+                    Some(project_lifecycle_folder(layout, prefix))
+                };
+                let display_name = Path::new(&folder_id)
+                    .file_name()
+                    .map(|value| value.to_string_lossy().into_owned())
+                    .unwrap_or(name);
                 folders.push(FolderMeta {
-                    id: rel.clone(),
-                    name,
-                    parent_id: if prefix.is_empty() { None } else { Some(prefix.to_string()) },
+                    id: folder_id,
+                    name: display_name,
+                    parent_id,
                 });
             }
             walk(layout, root, &rel, reverse, new_index, folders, notes)?;
@@ -4163,13 +4260,28 @@ pub fn corpus_file_stat(state: tauri::State<'_, CorpusState>, id: String) -> Res
     state.route(&root, |s| s.file_stat(&rel))
 }
 
-/// Move a surfaced storage asset to recoverable Trash. This is deliberately a
-/// separate command from note deletion: binary files have no Markdown Trash
-/// lane and must pass the storage + root mutation gates independently.
+/// Move a surfaced storage asset into the memex Archive/Trash. Its original
+/// storage path is retained beneath the sink for durable, sidecar-free restore.
 #[tauri::command]
-pub fn corpus_trash_file(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
+pub fn corpus_move_file_to_sink(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    sink: String,
+) -> Result<String, String> {
     let (root, rel) = split_root_id(&id);
-    state.route(&root, |store| store.trash_file(&rel))
+    let moved = state.route(&root, |store| store.move_file_to_sink(&rel, &sink))?;
+    Ok(compose_root_id(&root, &moved))
+}
+
+/// Restore a surfaced file from Archive/Trash to its nested storage origin.
+#[tauri::command]
+pub fn corpus_restore_file(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+) -> Result<String, String> {
+    let (root, rel) = split_root_id(&id);
+    let restored = state.route(&root, |store| store.restore_file(&rel))?;
+    Ok(compose_root_id(&root, &restored))
 }
 
 /// Save a surfaced FILE's bytes back to disk (base64 in) — the spreadsheet
@@ -5210,7 +5322,7 @@ mod tests {
     }
 
     #[test]
-    fn storage_files_move_to_recoverable_trash_only_when_mutable() {
+    fn storage_files_move_to_memex_sinks_and_restore_only_when_mutable() {
         let dir = TempDir::new().unwrap();
         let root = dir.path().join("brain");
         seed_memex(&root);
@@ -5220,15 +5332,33 @@ mod tests {
         let doc = store.create_managed_file("draft.docx", b"docx").unwrap();
         let stat = store.file_stat(&doc).unwrap();
         assert!(stat.writable, "DOCX files open in Rotli's local document editor");
-        assert!(stat.trashable, "managed files still need a lifecycle action");
-        store.trash_file(&doc).unwrap();
+        assert!(stat.lifecycle_mutable, "managed files still need a lifecycle action");
+        let trashed = store.move_file_to_sink(&doc, "Trash").unwrap();
         assert!(!root.join(&doc).exists());
-        assert!(root.join(".rotli/trash/draft.docx").is_file());
+        assert_eq!(trashed, "trash/storage/rotli/draft.docx");
+        assert!(root.join(&trashed).is_file());
+        let listed = store.list().unwrap();
+        assert!(
+            listed.notes.iter().any(|note| {
+                note.id == trashed
+                    && note.folder_id == "Trash/storage/rotli"
+                    && note.kind == NoteKind::File
+            }),
+            "trashed file was not surfaced: {:?}",
+            listed.notes
+        );
+        assert_eq!(store.restore_file(&trashed).unwrap(), doc);
+        assert!(root.join(&doc).is_file());
+
+        let archived = store.move_file_to_sink(&doc, "Archive").unwrap();
+        assert_eq!(archived, "archive/storage/rotli/draft.docx");
+        assert_eq!(store.restore_file(&archived).unwrap(), doc);
 
         fs::create_dir_all(root.join("wiki/projects")).unwrap();
         fs::write(root.join("wiki/projects/reference.pdf"), b"keep").unwrap();
-        assert!(store.trash_file("wiki/projects/reference.pdf").is_err());
+        assert!(store.move_file_to_sink("wiki/projects/reference.pdf", "Trash").is_err());
         assert!(root.join("wiki/projects/reference.pdf").is_file());
+        assert!(store.move_file_to_sink(&doc, "Somewhere").is_err());
     }
 
     /// Fresh corpus (first run happens: Inbox + welcome note exist).
@@ -6646,9 +6776,11 @@ mod tests {
         // never writable via the note path (writable() refuses NoteRO, asserted below).
         assert_eq!(surfaced(m, "storage"), Surface::NoteRO);
         assert_eq!(surfaced(m, "storage/graph.png"), Surface::NoteRO);
-        // surfaced: chats writable, wiki read-only
+        // surfaced: chats + lifecycle sinks writable, wiki read-only
         assert_eq!(surfaced(m, "chats/x.md"), Surface::NoteRW);
         assert_eq!(surfaced(m, "chats"), Surface::NoteRW);
+        assert_eq!(surfaced(m, "archive"), Surface::NoteRW);
+        assert_eq!(surfaced(m, "trash/storage/file.pdf"), Surface::NoteRW);
         assert_eq!(surfaced(m, "wiki/x.md"), Surface::NoteRO);
         assert_eq!(surfaced(m, "wiki"), Surface::NoteRO);
         // LegacyRotli surfaces everything read-write (today)
@@ -6676,6 +6808,8 @@ mod tests {
         // allowed: chats and anything under it
         assert!(store.writable("chats").is_ok());
         assert!(store.writable("chats/new.md").is_ok());
+        assert!(store.writable("archive").is_ok());
+        assert!(store.writable("trash/storage/file.pdf").is_ok());
     }
 
     #[test]
@@ -6720,10 +6854,8 @@ mod tests {
         store.os_trash = false;
         assert_eq!(store.layout, Layout::Memex);
 
-        // NO rotli reserved folders scaffolded inside someone's memex-vault. (We omit
-        // Archive/Trash: the memex's own lowercase archive//trash/ sinks already
-        // exist and macOS's case-insensitive FS would match them — the scope test
-        // below proves they don't SURFACE, which is the real guarantee.)
+        // NO Rotli-only folders are scaffolded inside someone's memex. Archive
+        // and Trash already exist as lowercase durable memex lifecycle lanes.
         for name in ["Inbox", "Brain", "Storage", "Board"] {
             assert!(
                 !store.root().join(name).exists(),
@@ -6737,13 +6869,16 @@ mod tests {
             "first-run welcome note leaked into the memex"
         );
 
-        // the Notes tree shows ONLY wiki/ + chats/ — never self/history/STRUCTURE
+        // The tree shows content lanes plus title-cased lifecycle destinations,
+        // never self/history/control material.
         let folder_ids: Vec<&str> = list.folders.iter().map(|f| f.id.as_str()).collect();
         assert!(folder_ids.contains(&"wiki"), "wiki/ should surface as a folder");
         assert!(folder_ids.contains(&"chats"), "chats/ should surface as a folder");
         assert!(!folder_ids.iter().any(|f| f.starts_with("self")), "self/ must stay hidden");
         assert!(!folder_ids.iter().any(|f| f.starts_with("history")), "history/ must stay hidden");
-        assert!(!folder_ids.iter().any(|f| f.starts_with("archive")), "archive/ must stay hidden");
+        assert!(folder_ids.contains(&"Archive"), "archive/ should project to Archive");
+        assert!(folder_ids.contains(&"Trash"), "trash/ should project to Trash");
+        assert!(!folder_ids.iter().any(|f| f.starts_with("archive")), "lowercase disk id leaked");
         // STRUCTURE.md / inbox.md / MAP.md (root .md docs) never appear as notes
         let folders_of: Vec<&str> = list.notes.iter().map(|n| n.folder_id.as_str()).collect();
         assert!(

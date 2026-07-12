@@ -34,8 +34,10 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   commands or embed syntax. Rotli creates and edits them locally through a
   structured document model, including native Word tables. The DOCX codec
   round-trips supported OOXML while preserving unknown package parts and
-  unsupported Word objects; the Rust corpus
-  boundary independently restricts writes to the managed binary lane.
+  unsupported Word objects; the Rust corpus boundary independently restricts
+  writes to the managed binary lane. The document editor always presents light
+  Word-style chrome and literal white paper, fits the complete page to the pane,
+  and does not expose Markdown block handles.
 - Legacy `.doc`, `.rtf`, and `.odt` conversion is local and copy-only: the fixed
   macOS system converter produces a new managed DOCX, the original is never
   overwritten, and the result is not added to Markdown slash results until it
@@ -139,8 +141,10 @@ but it must remain rebuildable, optional, and behind the retrieval port.
 - The frontend registry improves UX but never replaces Rust path, extension,
   root-permission, and write-lane validation.
 - Storage assets use a recoverable lifecycle: “Remove from Main” only removes a
-  reference, while “Move file to Trash” is a separately validated Rust action
-  that accepts mutable storage roots and closes stale file tabs.
+  reference. Archive/Trash actions move the physical file under the memex sink
+  while nesting its original storage path (`trash/storage/rotli/file.docx`), so
+  restore remains possible without `.rotli/` state. File lifecycle actions never
+  invoke macOS Trash; the Rust boundary validates both moves and restores.
 - `bun run check:architecture` guards inward dependencies and keeps slash
   commands out of non-Markdown surfaces.
 - `bun run check:structure` enforces camelCase source filenames and denies

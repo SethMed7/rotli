@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { rotliUniverTheme, univerNeutralForTheme } from "./univerTheme";
+import { documentUniverTheme, rotliUniverTheme, univerNeutralForTheme } from "./univerTheme";
 
 describe("Univer app-theme mapping", () => {
   test("paper and charcoal use the monochrome family", () => {
@@ -16,5 +16,9 @@ describe("Univer app-theme mapping", () => {
     const warm = rotliUniverTheme(univerNeutralForTheme("dark"));
     expect(charcoal.primary[500]).toBe(charcoal.gray[500]);
     expect(charcoal.primary[500]).not.toBe(warm.primary[500]);
+  });
+
+  test("documents always use literal white paper", () => {
+    expect(documentUniverTheme().white).toBe("#FFFFFF");
   });
 });

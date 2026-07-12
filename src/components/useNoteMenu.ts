@@ -9,12 +9,13 @@ import { useCallback } from "react";
 import {
   corpusFileStat,
   corpusFrontmatter,
+  corpusMoveFileToSink,
   corpusRevealFile,
+  corpusRestoreFile,
   corpusSetLocalAiAccess,
   corpusSetLocked,
   corpusSetPinned,
   corpusSetSecure,
-  corpusTrashFile,
 } from "../lib/tauri";
 import { fileNoteToArea } from "../services/brainFiling";
 import { isEmptyNote } from "../services/mainDismiss";
@@ -69,6 +70,7 @@ export function useNoteMenu() {
       const y = e.clientY;
 
       void (async () => {
+        const isFile = note.kind === "file";
         // an archived/trashed note: open + Restore only — the lifecycle actions
         // don't apply until it's back (mirrors the retired RowMenu's split).
         // Gate on isSink (Archive/Trash), NOT isHidden: a STAGED capture lives
@@ -76,6 +78,33 @@ export function useNoteMenu() {
         // must get the full menu, not a dead "Restore" that no-ops (Seth,
         // 2026-07-06: "Restore does nothing but I can see it in All notes").
         if (isSink(note.folderId)) {
+          const restoreItem: MenuSpec = isFile
+            ? {
+                kind: "action" as const,
+                label: "Restore to original folder",
+                onClick: () => {
+                  useUiStore.getState().setRowActionError(null);
+                  void corpusRestoreFile(note.id)
+                    .then(async () => {
+                      usePanesStore.getState().closeFileTabs(note.id);
+                      await invalidateNotes();
+                    })
+                    .catch((err) =>
+                      useUiStore
+                        .getState()
+                        .setRowActionError(
+                          `Couldn’t restore “${note.title || "this file"}” — ${
+                            err instanceof Error ? err.message : String(err)
+                          }`,
+                        ),
+                    );
+                },
+              }
+            : {
+                kind: "action" as const,
+                label: "Restore",
+                onClick: () => restore.mutate(note.id),
+              };
           open(
             x,
             y,
@@ -85,19 +114,21 @@ export function useNoteMenu() {
                 label: "Open in new tab",
                 onClick: () => openSummary(note, { newTab: true }),
               },
+              ...(isFile
+                ? [{
+                    kind: "action" as const,
+                    label: "Show in Finder",
+                    onClick: () => void corpusRevealFile(note.id),
+                  } satisfies MenuSpec]
+                : []),
               { kind: "sep" as const },
-              {
-                kind: "action" as const,
-                label: "Restore",
-                onClick: () => restore.mutate(note.id),
-              },
+              restoreItem,
             ],
             opts,
           );
           return;
         }
 
-        const isFile = note.kind === "file";
         const isBoard = note.kind === "board";
         const isNote = !isFile && !isBoard;
         const inMain = mainHasNote(manifest.tree, note.id);
@@ -314,31 +345,39 @@ export function useNoteMenu() {
         });
       }
       if (isFile) {
-        const trashable = fileStat?.trashable === true;
+        const movable = fileStat?.lifecycleMutable === true;
+        const moveFile = (sink: "Archive" | "Trash") => {
+          if (!movable) return;
+          useUiStore.getState().setRowActionError(null);
+          void corpusMoveFileToSink(note.id, sink)
+            .then(async () => {
+              if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
+              if (starred) togglePinQuick(note.id);
+              usePanesStore.getState().closeFileTabs(note.id);
+              await invalidateNotes();
+            })
+            .catch((err) =>
+              useUiStore
+                .getState()
+                .setRowActionError(
+                  `Couldn’t move “${note.title || "this file"}” to ${sink} — ${
+                    err instanceof Error ? err.message : String(err)
+                  }`,
+                ),
+            );
+        };
         items.push({
           kind: "action" as const,
-          label: trashable ? "Move file to Trash" : "Read-only — can’t move to Trash",
-          danger: trashable,
-          disabled: !trashable,
-          onClick: () => {
-            if (!trashable) return;
-            useUiStore.getState().setRowActionError(null);
-            void corpusTrashFile(note.id)
-              .then(async () => {
-                if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
-                usePanesStore.getState().closeFileTabs(note.id);
-                await invalidateNotes();
-              })
-              .catch((err) =>
-                useUiStore
-                  .getState()
-                  .setRowActionError(
-                    `Couldn’t move “${note.title || "this file"}” to Trash — ${
-                      err instanceof Error ? err.message : String(err)
-                    }`,
-                  ),
-              );
-          },
+          label: movable ? "Move file to Archive" : "Read-only — can’t move file",
+          disabled: !movable,
+          onClick: () => moveFile("Archive"),
+        });
+        items.push({
+          kind: "action" as const,
+          label: movable ? "Move file to Trash" : "Read-only — can’t move file",
+          danger: movable,
+          disabled: !movable,
+          onClick: () => moveFile("Trash"),
         });
       } else {
         items.push({

@@ -15,10 +15,11 @@ import {
   type ITextRun,
   type ITextStyle,
 } from "@univerjs/presets";
-import { UniverDocsCorePreset } from "@univerjs/preset-docs-core";
+import { SetDocZoomRatioOperation, UniverDocsCorePreset } from "@univerjs/preset-docs-core";
 import UniverPresetDocsCoreEnUS from "@univerjs/preset-docs-core/locales/en-US";
 import "@univerjs/preset-docs-core/lib/index.css";
-import { rotliUniverTheme, univerNeutralForTheme } from "../../brand/univerTheme";
+import { documentUniverTheme } from "../../brand/univerTheme";
+import { documentFitZoom } from "../layout";
 import type {
   DocumentAlignment,
   DocumentContent,
@@ -40,6 +41,7 @@ interface CommandLike {
 
 interface UniverApiLike {
   createUniverDoc(data: Partial<IDocumentData>): FDocumentLike;
+  executeCommand?(id: string, params: object): Promise<boolean> | boolean;
   onCommandExecuted?(callback: (command: CommandLike) => void): { dispose?: () => void } | void;
 }
 
@@ -362,18 +364,14 @@ function tableInRange(snapshot: IDocumentData, range: ICustomTable): DocumentTab
   };
 }
 
-function isDarkTheme(): boolean {
-  const theme = document.documentElement.dataset.theme;
-  return theme === "dark" || theme === "charcoal";
-}
-
 export function mountDocumentEditor(host: HTMLElement, model: EditableDocument): DocumentEngineHandle {
-  const themeName = document.documentElement.dataset.theme;
+  const snapshot = documentToSnapshot(model);
+  snapshot.settings = { ...snapshot.settings, zoomRatio: documentFitZoom(host.clientWidth) };
   const { univer, univerAPI } = createUniver({
     locale: LocaleType.EN_US,
     locales: { [LocaleType.EN_US]: merge({}, UniverPresetDocsCoreEnUS) },
-    theme: rotliUniverTheme(univerNeutralForTheme(themeName)),
-    darkMode: isDarkTheme(),
+    theme: documentUniverTheme(),
+    darkMode: false,
     presets: [
       UniverDocsCorePreset({
         container: host,
@@ -385,13 +383,28 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
     ],
   });
   const api = univerAPI as unknown as UniverApiLike;
-  const editor = api.createUniverDoc(documentToSnapshot(model));
+  const editor = api.createUniverDoc(snapshot);
+  let lastZoom = snapshot.settings.zoomRatio ?? 1;
+  const fitToWidth = () => {
+    const zoomRatio = documentFitZoom(host.clientWidth);
+    if (Math.abs(zoomRatio - lastZoom) < 0.01) return;
+    lastZoom = zoomRatio;
+    void api.executeCommand?.(SetDocZoomRatioOperation.id, {
+      unitId: model.id,
+      zoomRatio,
+    });
+  };
+  const resizeObserver = new ResizeObserver(fitToWidth);
+  resizeObserver.observe(host);
   return {
     save: () => snapshotToDocument(editor.getSnapshot(), model),
     onDirty: (callback) =>
       api.onCommandExecuted?.((command) => {
         if (command.type === 1) callback();
       }),
-    dispose: () => univer.dispose(),
+    dispose: () => {
+      resizeObserver.disconnect();
+      univer.dispose();
+    },
   };
 }
