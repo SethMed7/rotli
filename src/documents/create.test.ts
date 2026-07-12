@@ -34,6 +34,8 @@ describe("local DOCX creation", () => {
     const document = await zip.file("word/document.xml")?.async("string");
     expect(styles).toContain(`w:ascii="${GENERATED_DOCX_THEME.bodyFont}"`);
     expect(styles).toContain(`w:ascii="${GENERATED_DOCX_THEME.headingFont}"`);
+    expect(GENERATED_DOCX_THEME.bodyFont).toBe("Arial");
+    expect(GENERATED_DOCX_THEME.bodyColor).toBe("000000");
     expect(document).toContain(`w:w="${GENERATED_DOCX_THEME.pageWidthTwips}"`);
     expect(document).toContain(`w:top="${GENERATED_DOCX_THEME.marginTwips}"`);
   });

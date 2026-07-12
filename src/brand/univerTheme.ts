@@ -83,5 +83,16 @@ export function documentUniverTheme(): Theme {
   return {
     ...rotliUniverTheme("mono"),
     white: "#FFFFFF",
+    black: "#000000",
   };
 }
+
+/** Fixed document-canvas colors. The app environment may change around them,
+ * but conventional Word paper and ink do not theme-invert. */
+export const DOCUMENT_CANVAS_COLORS = {
+  workspace: "#F7F7F7",
+  paper: "#FFFFFF",
+  border: "#C6C6C6",
+  ink: "#000000",
+  mutedInk: "#595959",
+} as const;

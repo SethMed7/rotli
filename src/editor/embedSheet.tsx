@@ -112,17 +112,12 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
     };
   }, [fileId]);
 
-  if (status === "loading") {
-    return <div className="rotli-embed-placeholder">Loading sheet…</div>;
-  }
-  if (status === "error") {
-    return <div className="rotli-embed-placeholder">Sheet unavailable</div>;
-  }
-
   return (
     <div className={readOnly ? "rotli-embed-sheet-wrap is-readonly" : "rotli-embed-sheet-wrap"}>
       <div ref={hostRef} className="rotli-embed-sheet-inner" />
-      {readOnly && <span className="rotli-embed-readonly">Read-only</span>}
+      {status === "loading" && <div className="rotli-embed-placeholder">Loading sheet…</div>}
+      {status === "error" && <div className="rotli-embed-placeholder">Sheet unavailable</div>}
+      {status === "ready" && readOnly && <span className="rotli-embed-readonly">Read-only</span>}
     </div>
   );
 }

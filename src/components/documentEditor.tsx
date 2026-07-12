@@ -41,6 +41,7 @@ export default function DocumentEditor({
   const [err, setErr] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [chromeEl, setChromeEl] = useState<HTMLElement | null>(null);
+  const [engineRevision, setEngineRevision] = useState(0);
 
   useEffect(() => {
     setChromeEl(chromeSlotRef?.current ?? null);
@@ -98,11 +99,17 @@ export default function DocumentEditor({
           dirtyGenRef.current += 1;
           setDirty(true);
         });
+        const structureSubscription = handle.onStructureChange(() => {
+          if (!disposed) setEngineRevision((revision) => revision + 1);
+        });
         armedRef.current = true;
         disposeEngine = () => {
           if (subscription && typeof subscription === "object") subscription.dispose?.();
+          structureSubscription.dispose();
           handle.dispose();
         };
+        await handle.ready;
+        if (disposed) return;
         setReady(true);
       } catch (error) {
         if (!disposed) setErr(error instanceof Error ? error.message : String(error));
@@ -130,7 +137,7 @@ export default function DocumentEditor({
       handleRef.current = null;
       sessionRef.current = null;
     };
-  }, [fileId]);
+  }, [engineRevision, fileId]);
 
   useEffect(() => {
     const session = sessionRef.current;
@@ -224,7 +231,11 @@ export default function DocumentEditor({
       {chromeEl ? createPortal(chrome, chromeEl) : <div className="document-editor-bar">{chrome}</div>}
       {!err && !ready && <p className="file-loading" role="status">Opening editor…</p>}
       {err && !ready && <p className="file-err" role="alert">{err}</p>}
-      <div ref={hostRef} className="document-editor-host" />
+      <div
+        ref={hostRef}
+        className={ready ? "document-editor-host is-ready" : "document-editor-host"}
+        aria-hidden={!ready}
+      />
     </div>
   );
 }

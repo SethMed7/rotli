@@ -1248,6 +1248,12 @@
   min-height: 0;
   overflow: hidden;
   background: var(--document-paper);
+  opacity: 0;
+  pointer-events: none;
+}
+.document-editor-host.is-ready {
+  opacity: 1;
+  pointer-events: auto;
 }
 .document-editor-host > * {
   width: 100% !important;
@@ -1264,6 +1270,25 @@
    selector is intentionally global. It exists only on the DOCX adapter. */
 [data-u-comp="paragraph-menu"] {
   display: none !important;
+}
+/* Univer portals document dialogs to <body>. Keep their labels and numeric
+   controls conventional and legible even when the app shell is dark. */
+body:has(.document-editor) [role="dialog"] {
+  background: var(--document-paper) !important;
+  color: var(--document-ink) !important;
+  font-family: Arial, sans-serif !important;
+}
+body:has(.document-editor) [role="dialog"] :where(h1, h2, h3, label, input) {
+  color: var(--document-ink) !important;
+}
+body:has(.document-editor) [role="dialog"] input {
+  background: var(--document-paper) !important;
+  caret-color: var(--document-ink);
+  -webkit-text-fill-color: var(--document-ink);
+}
+body:has(.document-editor) [role="dialog"] input:disabled {
+  color: var(--document-muted-ink) !important;
+  -webkit-text-fill-color: var(--document-muted-ink);
 }
 .document-preserved {
   max-width: 180px;

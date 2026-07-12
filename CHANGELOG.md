@@ -10,6 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.2] - 2026-07-12
+
+### Changed
+
+- **DOCX now opens as a predictable Word page.** Documents settle before they
+  become interactive, open at the top with one complete page fitted to the pane,
+  use white paper with black Arial defaults, and omit Univer’s margin-corner
+  guides. Table insertion retains the caret while its dialog is open, recovers
+  a dropped editor command into a real OOXML table, and remounts the structural
+  edit so the table appears immediately. Numeric fields remain legible in dark
+  app environments, content changes activate Save, and zooming alone no longer
+  marks a document dirty.
+- **Sheet embeds now finish loading.** The Markdown `sheet` fence keeps its
+  Univer host mounted beneath loading and error states, allowing an existing
+  workbook selected from the slash command to initialize and become editable.
+
 ## [0.32.1] - 2026-07-12
 
 ### Changed

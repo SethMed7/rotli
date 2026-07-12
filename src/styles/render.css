@@ -93,6 +93,12 @@
   width: 100%;
   height: 100%;
 }
+.rotli-embed-sheet-wrap > .rotli-embed-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  background: var(--surface-2);
+}
 .rotli-embed-sheet-wrap.is-readonly .rotli-embed-sheet-inner {
   cursor: default;
   user-select: none;

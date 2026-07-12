@@ -5,12 +5,12 @@
  * locally unavailable face. Rotli does not embed licensed font binaries.
  */
 export const GENERATED_DOCX_THEME = {
-  bodyFont: "Aptos",
-  headingFont: "Aptos Display",
-  bodyColor: "262523",
-  headingColor: "1B1A18",
-  mutedColor: "6A665F",
-  ruleColor: "CDC9C2",
+  bodyFont: "Arial",
+  headingFont: "Arial",
+  bodyColor: "000000",
+  headingColor: "000000",
+  mutedColor: "000000",
+  ruleColor: "C6C6C6",
   bodySizeHalfPoints: 22,
   subtitleSizeHalfPoints: 22,
   titleSizeHalfPoints: 40,

@@ -36,8 +36,11 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   round-trips supported OOXML while preserving unknown package parts and
   unsupported Word objects; the Rust corpus boundary independently restricts
   writes to the managed binary lane. The document editor always presents light
-  Word-style chrome and literal white paper, fits the complete page to the pane,
-  and does not expose Markdown block handles.
+  Word-style chrome, literal white paper, and black Arial defaults when the file
+  does not specify formatting. It settles at the document top with one complete
+  page fitted to the pane and does not expose Markdown block handles or canvas
+  margin-corner guides. Portaled controls retain the document insertion range,
+  and only content mutations—not viewport changes—activate Save.
 - Legacy `.doc`, `.rtf`, and `.odt` conversion is local and copy-only: the fixed
   macOS system converter produces a new managed DOCX, the original is never
   overwritten, and the result is not added to Markdown slash results until it

@@ -19,6 +19,8 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
   table cells.
 - `engine/univer.ts` is the only document module that imports Univer. Replacing
   the editor does not change storage, the OOXML codec, or application use cases.
+  Its narrow policy helper owns mutation classification and the insertion-range
+  bridge needed when a portaled table dialog takes focus.
 - `composition.ts` is the only module that joins concrete adapters to Tauri.
 - `documentEditor.tsx` owns editor lifecycle, scoped ⌘S, dirty parking, and save
   status. `embedDocument.tsx` and `fileSurface.tsx` are hosts; neither parses or
@@ -33,6 +35,12 @@ row/column structure through Univer. Unsupported Word objects remain preserved
 in their OOXML locations but are not editable; a one-time `.bak` protects the
 original before the first Rotli save. Markdown-only features such as slash
 commands and embed fences are never mounted in documents.
+
+The editor presents conventional document defaults independent of the app
+environment: white paper, black Arial text when the file does not specify a
+style, one complete page fitted at initial open, and no canvas margin-corner
+guides. Opening a modal must not discard the document insertion range. Only
+content mutations make a session dirty; viewport zoom and scroll never do.
 
 Legacy `.doc`, `.rtf`, and `.odt` files use an explicit macOS-local conversion
 workflow. `/usr/bin/textutil` writes a temporary DOCX, Rotli validates the
