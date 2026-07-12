@@ -63,6 +63,9 @@ page in both dimensions, uses white paper with black Arial defaults, suppresses
 the non-document controls, and preserves the caret through table insertion. A
 dropped table command is recovered as structured document content and remounted
 immediately so the canvas and eventual OOXML save agree.
+The fixed-light toolbar and every document-scoped portaled popup also override
+Univer's dark-mode text utilities so font labels, disabled options, hover, and
+keyboard focus remain visible in all four Rotli environments.
 Only content mutations activate Save; zoom operations do not. PDF frames also
 request the light color scheme. Native follow-up is still required because
 browser mode cannot prove WKWebView PDF rendering, filesystem writes, menus, or

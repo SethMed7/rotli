@@ -1266,13 +1266,56 @@
   height: 100% !important;
   min-height: 0;
 }
+.document-editor-host input[type="text"] {
+  color: var(--document-ink) !important;
+  caret-color: var(--document-ink);
+  -webkit-text-fill-color: var(--document-ink);
+}
 /* Univer portals this control outside the editor host, so the exact component
    selector is intentionally global. It exists only on the DOCX adapter. */
 [data-u-comp="paragraph-menu"] {
   display: none !important;
 }
-/* Univer portals document dialogs to <body>. Keep their labels and numeric
-   controls conventional and legible even when the app shell is dark. */
+/* Univer portals document dialogs and toolbar popups to <body>. Its dark-mode
+   utilities otherwise paint white option labels onto Rotli's fixed white
+   document chrome. Keep every portaled document control conventionally light
+   and keyboard-readable while a DOCX editor is mounted. */
+body:has(.document-editor) .univer-popup {
+  background: var(--document-paper) !important;
+  color: var(--document-ink) !important;
+  font-family: Arial, sans-serif !important;
+}
+body:has(.document-editor) .univer-popup :where(button, input) {
+  color: var(--document-ink) !important;
+  caret-color: var(--document-ink);
+  -webkit-text-fill-color: var(--document-ink);
+}
+body:has(.document-editor) .univer-popup button:hover {
+  background: var(--document-workspace) !important;
+}
+body:has(.document-editor) .univer-popup button:focus-visible {
+  outline: 2px solid var(--document-ink);
+  outline-offset: -2px;
+}
+body:has(.document-editor) .univer-popup :where(button, input):disabled {
+  color: var(--document-muted-ink) !important;
+  -webkit-text-fill-color: var(--document-muted-ink);
+}
+/* FontFamilyItem is the one Univer toolbar popup without a stable component
+   marker/wrapper in this preset. Each preview button does carry its selected
+   font as an inline style, which keeps this fallback exact without leaking
+   document ink into unrelated app menus. */
+.univer-list-none.univer-text-sm > li > button[style*="font-family"] {
+  color: var(--document-ink) !important;
+  -webkit-text-fill-color: var(--document-ink);
+}
+.univer-list-none.univer-text-sm > li > button[style*="font-family"]:hover {
+  background: var(--document-workspace) !important;
+}
+.univer-list-none.univer-text-sm > li > button[style*="font-family"]:focus-visible {
+  outline: 2px solid var(--document-ink);
+  outline-offset: -2px;
+}
 body:has(.document-editor) [role="dialog"] {
   background: var(--document-paper) !important;
   color: var(--document-ink) !important;
