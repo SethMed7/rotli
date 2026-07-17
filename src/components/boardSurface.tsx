@@ -9,7 +9,8 @@
 
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { relativeLabel } from "../lib/dateLabels";
-import { type DragGhost, createDragGhost } from "../lib/dragGhost";
+import { createDragGhost } from "../lib/dragGhost";
+import { createPointerDragSession } from "../lib/pointerDrag";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
 import { mainNoteIds } from "../services/mainTree";
@@ -86,70 +87,48 @@ export function BoardSurface() {
   // The card's title rides the cursor as a floating ghost (the shared
   // lib/dragGhost, same as tab drags); Esc / pointercancel abandons the drag.
   const startCardDrag = (e: ReactPointerEvent, id: string, label: string) => {
+    // button guard BEFORE the ref reset — a right-click must not clear the
+    // last drag's click suppression (the session guards again internally)
     if (e.button !== 0) return;
-    const sx = e.clientX;
-    const sy = e.clientY;
-    let dragging = false;
-    let ghost: DragGhost | null = null;
     let drop: { id: string; after: boolean } | null = null;
     didDragRef.current = false;
-    const onMove = (ev: PointerEvent) => {
-      if (!dragging) {
-        if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 5) return;
-        dragging = true;
+    createPointerDragSession(e, {
+      ghost: (x, y) => createDragGhost(label, x, y),
+      // didDragRef stays armed past onEnd so the trailing click is eaten
+      onStart: () => {
         didDragRef.current = true;
         setDragId(id);
-        ghost = createDragGhost(label, ev.clientX, ev.clientY);
-      }
-      ghost?.move(ev.clientX, ev.clientY);
-      const hit = (
-        document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
-      )?.closest("[data-cap-id]") as HTMLElement | null;
-      const tid = hit?.dataset.capId;
-      if (!hit || !tid || tid === id) {
-        drop = null;
-        setDropAt(null);
-        return;
-      }
-      const rect = hit.getBoundingClientRect();
-      drop = { id: tid, after: ev.clientX > rect.left + rect.width / 2 };
-      setDropAt(drop);
-    };
-    // every exit path (drop, Esc, pointercancel) tears the same things down;
-    // only onUp commits. didDragRef stays armed so the trailing click is eaten.
-    const cleanup = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", cleanup);
-      window.removeEventListener("keydown", onKey, true);
-      ghost?.destroy();
-      ghost = null;
-      setDragId(null);
-      setDropAt(null);
-    };
-    const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") {
-        ev.preventDefault();
-        ev.stopPropagation();
-        cleanup();
-      }
-    };
-    const onUp = () => {
-      cleanup();
-      if (dragging && drop) {
+      },
+      onMove: (x, y) => {
+        const hit = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest(
+          "[data-cap-id]",
+        ) as HTMLElement | null;
+        const tid = hit?.dataset.capId;
+        if (!hit || !tid || tid === id) {
+          drop = null;
+          setDropAt(null);
+          return;
+        }
+        const rect = hit.getBoundingClientRect();
+        drop = { id: tid, after: x > rect.left + rect.width / 2 };
+        setDropAt(drop);
+      },
+      onDrop: () => {
+        const d = drop;
+        if (!d) return;
         const ids = ordered.map((c) => c.id).filter((x) => x !== id);
-        let idx = ids.indexOf(drop.id);
+        let idx = ids.indexOf(d.id);
         if (idx >= 0) {
-          if (drop.after) idx += 1;
+          if (d.after) idx += 1;
           ids.splice(idx, 0, id);
           setCaptureOrder(ids);
         }
-      }
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", cleanup);
-    window.addEventListener("keydown", onKey, true);
+      },
+      onEnd: () => {
+        setDragId(null);
+        setDropAt(null);
+      },
+    });
   };
 
   const toggle = (id: string) =>
