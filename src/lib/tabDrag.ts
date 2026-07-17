@@ -11,8 +11,9 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { DropPos } from "../services/mainTree";
 import { type DropZone, leaves, usePanesStore } from "../state/panes";
-import { type DragGhost, createDragGhost } from "./dragGhost";
+import { createDragGhost } from "./dragGhost";
 import { commitMainAdd, mainDropAt } from "./mainAddDrag";
+import { createPointerDragSession } from "./pointerDrag";
 
 const THRESHOLD_PX = 5;
 const EDGE_BAND = 0.22; // mirror PaneTree's zoneAt
@@ -45,11 +46,6 @@ export function startTabDrag(
   tabId: string,
   label: string,
 ): void {
-  if (event.button !== 0) return;
-  const startX = event.clientX;
-  const startY = event.clientY;
-  let dragging = false;
-  let ghost: DragGhost | null = null;
   // a tab can also be dropped onto the sidebar's Main tree → add it to Main
   let mainDrop: { id: string; pos: DropPos } | null = null;
   let mainHover: HTMLElement | null = null;
@@ -59,13 +55,6 @@ export function startTabDrag(
   };
 
   const store = () => usePanesStore.getState();
-
-  const begin = (x: number, y: number) => {
-    dragging = true;
-    store().setDraggingTab({ paneId: fromPaneId, tabId });
-    document.documentElement.dataset.tabDragging = "true";
-    ghost = createDragGhost(label, x, y);
-  };
 
   const hitTest = (x: number, y: number) => {
     // reset the Main-drop candidate each move; the branches below re-set it
@@ -98,31 +87,6 @@ export function startTabDrag(
     store().setDropPreview(null);
   };
 
-  const onMove = (e: PointerEvent) => {
-    if (!dragging) {
-      if (Math.abs(e.clientX - startX) < THRESHOLD_PX && Math.abs(e.clientY - startY) < THRESHOLD_PX) {
-        return;
-      }
-      begin(e.clientX, e.clientY);
-    }
-    ghost?.move(e.clientX, e.clientY);
-    hitTest(e.clientX, e.clientY);
-  };
-
-  const cleanup = () => {
-    window.removeEventListener("pointermove", onMove);
-    window.removeEventListener("pointerup", onUp);
-    window.removeEventListener("pointercancel", cleanup);
-    window.removeEventListener("keydown", onKey, true);
-    ghost?.destroy();
-    ghost = null;
-    clearMainHover();
-    delete document.documentElement.dataset.tabDragging;
-    const s = store();
-    s.setDraggingTab(null);
-    s.setDropPreview(null);
-  };
-
   const commit = () => {
     const s = store();
     // dropped onto Main → add this tab's note/board to Main (a board too — you
@@ -150,31 +114,27 @@ export function startTabDrag(
     }
   };
 
-  const onUp = () => {
-    const wasDragging = dragging;
-    if (wasDragging) commit();
-    cleanup();
-    if (wasDragging) {
-      // swallow the click that fires after a drag so it doesn't re-activate a tab
-      const swallow = (ce: MouseEvent) => {
-        ce.stopPropagation();
-        ce.preventDefault();
-      };
-      window.addEventListener("click", swallow, { capture: true, once: true });
-      setTimeout(() => window.removeEventListener("click", swallow, true), 60);
-    }
-  };
-
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      cleanup();
-    }
-  };
-
-  window.addEventListener("pointermove", onMove);
-  window.addEventListener("pointerup", onUp);
-  window.addEventListener("pointercancel", cleanup);
-  window.addEventListener("keydown", onKey, true);
+  createPointerDragSession(event, {
+    // historical tab feel: EITHER axis clearing the threshold starts the drag
+    // (the shared default is the Manhattan sum)
+    passedThreshold: (dx, dy) => Math.abs(dx) >= THRESHOLD_PX || Math.abs(dy) >= THRESHOLD_PX,
+    ghost: (x, y) => createDragGhost(label, x, y),
+    onStart: () => {
+      store().setDraggingTab({ paneId: fromPaneId, tabId });
+      document.documentElement.dataset.tabDragging = "true";
+    },
+    onMove: hitTest,
+    // commit runs BEFORE onEnd (session contract) — it reads the store's
+    // dropPreview, which onEnd clears
+    onDrop: commit,
+    onEnd: () => {
+      clearMainHover();
+      delete document.documentElement.dataset.tabDragging;
+      const s = store();
+      s.setDraggingTab(null);
+      s.setDropPreview(null);
+    },
+    // swallow the click that fires after a drag so it doesn't re-activate a tab
+    swallowClick: true,
+  });
 }
