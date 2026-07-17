@@ -47,7 +47,7 @@ export function AllChatsSurface() {
       </div>
 
       {results.length === 0 ? (
-        <div className="board-empty">
+        <div className="list-empty">
           {chats.length === 0 && <Character name="chat" size={104} className="be-quokka" />}
           <p className="be-title">{chats.length === 0 ? "No chats yet" : "No matches"}</p>
           <p className="be-sub">

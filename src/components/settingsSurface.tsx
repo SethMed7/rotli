@@ -143,6 +143,16 @@ function PaneHead({ title, char }: { title: string; char: CharacterName }) {
 
 // ——— shared settings controls (Seth, 2026-06-15) ———
 
+/** The sliding track + knob every switch shares — state comes from the parent's
+ * .on class (`.swrow`/`.ailane-sw`), so this stays a dumb visual. */
+function SwitchKnob() {
+  return (
+    <span className="sw" aria-hidden="true">
+      <span className="swknob" />
+    </span>
+  );
+}
+
 /** A real on/off switch — label + description on the left, a sliding track on
  * the right. Replaces the old ambiguous dot-in-a-box "sysrow". */
 function Toggle({
@@ -172,9 +182,7 @@ function Toggle({
         <span className="swt">{title}</span>
         {desc && <span className="swd">{desc}</span>}
       </span>
-      <span className="sw" aria-hidden="true">
-        <span className="swknob" />
-      </span>
+      <SwitchKnob />
     </button>
   );
 }
@@ -1505,9 +1513,7 @@ function LaneSwitch({ on, onToggle, label }: { on: boolean; onToggle: () => void
       className={on ? "ailane-sw on" : "ailane-sw"}
       onClick={onToggle}
     >
-      <span className="sw" aria-hidden="true">
-        <span className="swknob" />
-      </span>
+      <SwitchKnob />
     </button>
   );
 }

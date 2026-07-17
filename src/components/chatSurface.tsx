@@ -973,12 +973,12 @@ export function ChatSurface({
       </header>
 
       {!isTauri() ? (
-        <div className="chat-empty">
+        <div className="list-empty chat-empty">
           <Character name="chat" size={120} />
           <p>The Chat surface talks to your memex — it runs in the app.</p>
         </div>
       ) : !active ? (
-        <div className="chat-empty">
+        <div className="list-empty chat-empty">
           <Character name="chat" size={120} />
           <p>No memex connected yet.</p>
           <button type="button" className="chat-cta" onClick={() => setSettingsOpen(true)}>

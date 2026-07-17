@@ -20,6 +20,7 @@ import { usePanesStore } from "../state/panes";
 import { pruneQuick, setQuickActive, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
+import { ContextMenu } from "./contextMenu";
 import { IconButton } from "./iconButton";
 import { PlusGlyph, SearchGlyph, ShieldGlyph, glyphForNote } from "./glyphs";
 
@@ -357,7 +358,7 @@ export function QuickNote() {
         // caret/scroll on switch, autoFocus re-lands the caret on every re-open
         <EditorSurface key={`${activeId}:${showNonce}`} noteId={activeId} paneId={QUICK_PANE_ID} autoFocus />
       ) : (
-        <div className="quick-empty">
+        <div className="list-empty">
           <p className="qe-title">No note open</p>
           <p className="qe-sub">Start a fresh note, or open any of your notes with ⌘P.</p>
           <div className="qe-actions">
@@ -384,6 +385,10 @@ export function QuickNote() {
           onClose={() => setPickerOpen(false)}
         />
       )}
+      {/* the editor's block-action menu goes through the shared host, and this
+          window has its own React root — without a mounted host the grips would
+          open nothing here (remediation Batch 3, F13) */}
+      <ContextMenu />
     </div>
   );
 }

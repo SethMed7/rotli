@@ -104,7 +104,7 @@ export function NoteListSurface({
       )}
 
       {rows.length === 0 ? (
-        <div className="board-empty">
+        <div className="list-empty">
           {notes.length === 0 && <Character name="notes" size={104} className="be-quokka" />}
           <p className="be-title">{notes.length === 0 ? "No notes yet" : "No matches"}</p>
           <p className="be-sub">

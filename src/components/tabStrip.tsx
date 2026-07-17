@@ -22,6 +22,7 @@ import {
   closeTabWithDraftCleanup,
 } from "../documents/draftComposition";
 import { fileName } from "../lib/fileKind";
+import { InlineRenameInput } from "./inlineRenameInput";
 import { startTabDrag } from "../lib/tabDrag";
 import { newItemInTab } from "../keys/actions";
 import { newItemDefinition } from "../newItems/model";
@@ -247,38 +248,20 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                     <FileGlyph size={13} className="tglyph" />
                   )}
                   {tab.surfaceKind === "canvas" && renamingBoardId === tab.boardId ? (
-                    <input
+                    <InlineRenameInput
                       className="tab-rename"
-                      autoFocus
                       defaultValue={tabLabel(tab, titles)}
-                      aria-label="Rename board"
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => event.stopPropagation()}
-                      onFocus={(event) => event.currentTarget.select()}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter")
-                          // eslint-disable-next-line @typescript-eslint/no-floating-promises -- removed in remediation Batch 3/4
-                          commitRename(tab.boardId, event.currentTarget.value);
-                        else if (event.key === "Escape") cancelRename();
-                      }}
-                      onBlur={() => cancelRename()}
+                      ariaLabel="Rename board"
+                      onCommit={(value) => commitRename(tab.boardId, value)}
+                      onCancel={cancelRename}
                     />
                   ) : tab.surfaceKind === "chat" && !!tab.chatSlug && renamingChatSlug === tab.chatSlug ? (
-                    <input
+                    <InlineRenameInput
                       className="tab-rename"
-                      autoFocus
                       defaultValue={tabLabel(tab, titles)}
-                      aria-label="Rename chat"
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => event.stopPropagation()}
-                      onFocus={(event) => event.currentTarget.select()}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter")
-                          // eslint-disable-next-line @typescript-eslint/no-floating-promises -- removed in remediation Batch 3/4
-                          commitChatRename(tab.chatSlug ?? "", event.currentTarget.value);
-                        else if (event.key === "Escape") cancelChatRename();
-                      }}
-                      onBlur={() => cancelChatRename()}
+                      ariaLabel="Rename chat"
+                      onCommit={(value) => commitChatRename(tab.chatSlug ?? "", value)}
+                      onCancel={cancelChatRename}
                     />
                   ) : (
                     <span

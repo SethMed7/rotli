@@ -395,3 +395,19 @@ kbd {
 body[data-surface="capture"] {
   background: transparent;
 }
+
+/* — the ONE empty-state container (remediation Batch 3, F20c): the centered
+   quokka + title + sub stage every surface's "nothing here" uses. Four surfaces
+   had retyped it under divergent names (.empty-stage / .board-empty /
+   .quick-empty / .chat-empty); surface files keep only their genuinely
+   divergent content voices (.et/.es, .be-*, .qe-*, .chat-empty text). — */
+.list-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  gap: 6px;
+}

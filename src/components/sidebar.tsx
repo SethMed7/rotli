@@ -40,6 +40,7 @@ import {
 import { useContextMenu } from "../state/contextMenu";
 import { renameMainRef, useMainStore } from "../state/main";
 import { QUICK_MAX, togglePinQuick } from "../state/quick";
+import { InlineRenameInput } from "./inlineRenameInput";
 import { useNoteMenu } from "./useNoteMenu";
 import { deriveJournal } from "../services/brainJournal";
 import {
@@ -386,18 +387,12 @@ function CompactBoardRow({
     return (
       <div className="sb-newfolder snrow" style={{ paddingLeft: padLeft }}>
         <ExcalidrawGlyph size={14} className="snicon" />
-        <input
-          autoFocus
-          type="text"
+        <InlineRenameInput
           defaultValue={board.title}
           placeholder="Board name…"
-          aria-label="Rename board"
-          onFocus={(e) => e.currentTarget.select()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onCommitRename(e.currentTarget.value);
-            else if (e.key === "Escape") onCancelRename();
-          }}
-          onBlur={() => onCancelRename()}
+          ariaLabel="Rename board"
+          onCommit={onCommitRename}
+          onCancel={onCancelRename}
         />
       </div>
     );
@@ -884,23 +879,15 @@ export function Sidebar() {
                 style={{ paddingLeft: 10 + (depth + 1) * 16 }}
               >
                 <FolderGlyph size={14} />
-                <input
-                  autoFocus
-                  type="text"
+                <InlineRenameInput
                   defaultValue={f.name}
                   placeholder="Folder name…"
-                  aria-label="Rename Main folder"
-                  onFocus={(e) => e.currentTarget.select()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      setRenamingMainId(null);
-                      setMainTree(
-                        renameFolderInMain(mainManifest.tree, f.id, e.currentTarget.value),
-                        liveIds,
-                      );
-                    } else if (e.key === "Escape") setRenamingMainId(null);
+                  ariaLabel="Rename Main folder"
+                  onCommit={(value) => {
+                    setRenamingMainId(null);
+                    setMainTree(renameFolderInMain(mainManifest.tree, f.id, value), liveIds);
                   }}
-                  onBlur={() => setRenamingMainId(null)}
+                  onCancel={() => setRenamingMainId(null)}
                 />
               </div>
             );
@@ -1759,19 +1746,13 @@ export function Sidebar() {
             ) : (
               chatList.slice(0, chatSidebarLimit).map((c) =>
                 chatRename.renamingChatSlug === c.slug ? (
-                  <input
+                  <InlineRenameInput
                     key={c.slug}
                     className="sb-chatrename"
-                    autoFocus
                     defaultValue={c.title || c.slug}
-                    aria-label="Rename chat"
-                    onFocus={(e) => e.currentTarget.select()}
-                    onKeyDown={(e) => {
-                      e.stopPropagation();
-                      if (e.key === "Enter") void chatRename.commit(c.slug, e.currentTarget.value);
-                      else if (e.key === "Escape") chatRename.cancel();
-                    }}
-                    onBlur={() => chatRename.cancel()}
+                    ariaLabel="Rename chat"
+                    onCommit={(value) => chatRename.commit(c.slug, value)}
+                    onCancel={chatRename.cancel}
                   />
                 ) : (
                   <button

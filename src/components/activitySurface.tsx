@@ -114,7 +114,7 @@ export function ActivitySurface() {
       {actions === null ? (
         <p className="main-empty">Loading…</p>
       ) : pending.length === 0 && history.length === 0 ? (
-        <div className="board-empty">
+        <div className="list-empty">
           <Character name="knowledge" size={104} className="be-quokka" />
           <p className="be-title">Nothing yet</p>
           <p className="be-sub">

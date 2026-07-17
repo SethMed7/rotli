@@ -35,9 +35,7 @@ import { linkOpener, livePreview } from "./livePreview";
 import { stripMarkdown } from "./stripMarkdown";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import { type SlashItem, type SlashPickerMode, SlashMenu, filterSlashItems, slashPlacement, slashQueryAtCaret } from "./slashMenu";
-
-/** Rough height of the 4-item block-action menu — the bottom-edge clamp bound. */
-const BLOCK_MENU_ESTIMATE = 160;
+import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { SlashPicker } from "./slashPicker";
 import { pickerFence, slashInsertion } from "./slashActions";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
@@ -138,17 +136,24 @@ export function CmEditor({
   const blockHandlesOn = useUiStore((s) => s.blockHandles);
   const blockHandlesRef = useRef(blockHandlesOn);
   blockHandlesRef.current = blockHandlesOn;
-  // the open block-action menu (anchored at a clicked handle), or null.
-  const [blockMenu, setBlockMenu] = useState<{ pos: number; x: number; y: number } | null>(null);
+  // a grip click opens the SHARED context-menu host (remediation Batch 3, F13):
+  // it clamps to the viewport itself (the short Quick Note window used to need
+  // manual bottom-edge math) and brings Esc + arrow-key nav for free. The item
+  // closures re-read viewRef at click time — the view can remount under an open
+  // menu — and every close path hands focus back to the editor.
   const openBlockMenu = useCallback((_view: EditorView, pos: number, rect: DOMRect) => {
-    const host = hostRef.current?.getBoundingClientRect();
-    // clamp so the 4-item menu never renders past the window's bottom edge
-    // (the short Quick Note window clipped it)
-    const maxY = window.innerHeight - (host?.top ?? 0) - BLOCK_MENU_ESTIMATE;
-    setBlockMenu({
-      pos,
-      x: rect.right - (host?.left ?? 0) + 4,
-      y: Math.min(rect.top - (host?.top ?? 0), maxY),
+    const run = (fn: (view: EditorView, pos: number) => unknown) => () => {
+      const view = viewRef.current;
+      if (view) fn(view, pos);
+    };
+    const items: MenuSpec[] = [
+      { kind: "action", label: "Add below", onClick: run(addBlockBelow) },
+      { kind: "action", label: "Move up", onClick: run((v, p) => moveBlock(v, p, -1)) },
+      { kind: "action", label: "Move down", onClick: run((v, p) => moveBlock(v, p, 1)) },
+      { kind: "action", label: "Delete", danger: true, onClick: run(deleteBlock) },
+    ];
+    useContextMenu.getState().open(rect.right + 4, rect.top, items, {
+      returnFocus: () => viewRef.current?.focus(),
     });
   }, []);
 
@@ -509,7 +514,6 @@ export function CmEditor({
     viewRef.current?.dispatch({
       effects: blockComp.reconfigure(blockHandlesOn ? blockHandles(openBlockMenu) : []),
     });
-    if (!blockHandlesOn) setBlockMenu(null);
   }, [blockHandlesOn, blockComp, openBlockMenu]);
 
   // keep the slash key-handler bound to the current query + index
@@ -584,34 +588,6 @@ export function CmEditor({
             onPick={pickSlash}
           />
         </div>
-      )}
-      {blockMenu && (
-        <>
-          <div className="rotli-block-backdrop" onMouseDown={() => setBlockMenu(null)} />
-          <div className="rotli-block-menu" style={{ left: blockMenu.x, top: blockMenu.y }} role="menu">
-            {(
-              [
-                ["Add below", () => addBlockBelow(viewRef.current!, blockMenu.pos)],
-                ["Move up", () => moveBlock(viewRef.current!, blockMenu.pos, -1)],
-                ["Move down", () => moveBlock(viewRef.current!, blockMenu.pos, 1)],
-                ["Delete", () => deleteBlock(viewRef.current!, blockMenu.pos)],
-              ] as const
-            ).map(([label, run]) => (
-              <button
-                type="button"
-                key={label}
-                role="menuitem"
-                className={label === "Delete" ? "rotli-block-item danger" : "rotli-block-item"}
-                onClick={() => {
-                  if (viewRef.current) run();
-                  setBlockMenu(null);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </>
       )}
     </div>
   );

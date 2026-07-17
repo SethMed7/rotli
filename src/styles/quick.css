@@ -112,37 +112,27 @@
   flex: 1;
 }
 
-/* — empty state — */
-.quick-empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 24px;
-  gap: 4px;
-}
-.quick-empty .qe-title {
+/* — empty-state voices (the container is the shared .list-empty) — */
+.qe-title {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 16px;
   color: var(--text);
 }
-.quick-empty .qe-sub {
+.qe-sub {
   font-size: 12.5px;
   color: var(--text-muted);
   max-width: 260px;
   line-height: 1.55;
   margin-bottom: 14px;
 }
-.quick-empty .qe-actions {
+.qe-actions {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
 }
-.quick-empty .qe-ghost {
+.qe-ghost {
   border: none;
   background: none;
   color: var(--text-muted);
@@ -150,7 +140,7 @@
   font-size: 12.5px;
   cursor: pointer;
 }
-.quick-empty .qe-ghost:hover {
+.qe-ghost:hover {
   color: var(--text);
 }
 

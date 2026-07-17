@@ -224,7 +224,7 @@ export function BoardSurface() {
       </header>
 
       {captures.length === 0 ? (
-        <div className="board-empty">
+        <div className="list-empty">
           <Character name="rest" size={104} className="be-quokka" />
           <p className="be-title">Nothing captured yet</p>
           <p className="be-sub">

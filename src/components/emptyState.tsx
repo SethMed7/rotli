@@ -19,7 +19,7 @@ export function EmptyState() {
     getAction("capture.summon")?.defaultChord ?? null,
   );
   return (
-    <div className="empty-stage">
+    <div className="list-empty empty-stage">
       <Character name="base" size={150} />
       <div className="et">Your island is ready</div>
       <div className="es">

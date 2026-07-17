@@ -1062,42 +1062,7 @@
   cursor: grabbing;
 }
 
-/* the block-action menu (click a handle) + its click-away backdrop */
-.rotli-block-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-}
-.rotli-block-menu {
-  position: absolute;
-  z-index: 41;
-  min-width: 140px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
-  box-shadow: none;
-  padding: 4px;
-  display: flex;
-  flex-direction: column;
-}
-.rotli-block-item {
-  text-align: left;
-  background: none;
-  border: none;
-  font: inherit;
-  font-size: 13px;
-  color: var(--text);
-  padding: 7px 10px;
-  border-radius: var(--r-inner);
-  cursor: pointer;
-}
-.rotli-block-item:hover {
-  background: var(--hov);
-}
-.rotli-block-item.danger:hover {
-  background: color-mix(in srgb, var(--accent-text) 14%, transparent);
-  color: var(--accent-text);
-}
+/* the block-action menu is the SHARED .ctxmenu host now (remediation Batch 3) */
 
 /* the drop line shown while a block is dragged (pointer-drag; position:fixed so it
    needs no scroll math) — a 2px accent rule at the target block's top. */
