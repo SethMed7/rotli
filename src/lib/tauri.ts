@@ -289,6 +289,12 @@ export function corpusDelete(id: string): Promise<void> {
   return corpusInvoke("corpus_delete", { id });
 }
 
+/** Hard-discard a BLANK note (ephemeral-note lifecycle) — bypasses the in-app
+ * Trash folder; Rust re-verifies blankness and refuses anything with content. */
+export function corpusDiscardBlank(id: string): Promise<void> {
+  return corpusInvoke("corpus_discard_blank", { id });
+}
+
 /** Move a note into target_folder, PRESERVING its id + index; Rust creates the
  * folder if needed and bakes the origin rule (record where it came from on the
  * way into Archive/Trash, clear it on the way out). Tauri maps JS targetFolder

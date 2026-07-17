@@ -12,6 +12,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **New notes are ephemeral until you write.** A note you create and close
+  without typing simply ceases to exist — no "Untitled" clutter in Main, and
+  nothing lands in the in-app Trash (it goes straight to the OS trash /
+  `.rotli/trash` fallback, recoverable but out of sight). Any keystroke,
+  frontmatter edit, or lock/secure toggle makes it permanent. Rust re-verifies
+  blankness before every discard, so content can never be destroyed. The same
+  lane now powers "dismiss an empty note from Main" — which had been silently
+  dead since 2026-07-07 (its emptiness check was unsatisfiable).
+
+### Fixed
+
+- **Clicking a new Main folder no longer deletes it.** Every Main folder row
+  rendered an always-visible remove-× with note-row-only styling, so it sat
+  unstyled mid-row — right where a click on the folder lands — and one click
+  silently rewrote `main.json` without the folder. Removal now lives only in
+  the right-click menu (like note rows), a freshly created folder scrolls into
+  view instead of being appended out of sight below every note, and
+  `main.json` writes are refused from the quick/capture webviews (which hold
+  an empty manifest and could have wiped it).
+- The Main header's "new folder" button now wears the IDE-style
+  folder-with-plus glyph (same as the toolbar) instead of an anonymous "+".
+
+### Added
+
 - **rotli knows your name.** Onboarding asks (optionally) what to call you —
   editable any time in Settings → General — and chat's local and connected
   models address you by it. The name lives in `.rotli/settings.json` inside

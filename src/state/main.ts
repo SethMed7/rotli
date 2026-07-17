@@ -23,9 +23,22 @@ interface MainState {
   setTree: (tree: MainNode[], liveIds?: Set<string>) => void;
 }
 
+/** Only the MAIN webview ever hydrates the manifest (persist.ts gates
+ * hydrateMain) — quick/capture hold EMPTY_MAIN, so a setTree from them would
+ * overwrite .rotli/main.json with a near-empty tree. Hard-refuse off-main.
+ * (Duplicated 2-line check, not imported from persist.ts — that would cycle.) */
+function isMainSurface(): boolean {
+  if (typeof window === "undefined") return true; // bun tests have no window
+  return (new URLSearchParams(window.location.search).get("window") ?? "main") === "main";
+}
+
 export const useMainStore = create<MainState>((set) => ({
   manifest: EMPTY_MAIN,
   setTree: (tree, liveIds) => {
+    if (!isMainSurface()) {
+      console.warn("main.json write refused off the main surface");
+      return;
+    }
     const cleaned = liveIds ? gcManifest(tree, liveIds) : tree;
     const manifest: MainManifest = { version: 1, tree: cleaned };
     set({ manifest });

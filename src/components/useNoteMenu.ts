@@ -17,7 +17,9 @@ import {
   corpusSetPinned,
   corpusSetSecure,
 } from "../lib/tauri";
+import { discardBlankNote } from "../documents/draftComposition";
 import { isEmptyNote } from "../services/mainDismiss";
+import { markNoteDraftChanged } from "../services/noteDrafts";
 import { DEST, isSink } from "../services/destinations";
 import { invalidateNotes, useArchiveNote, useRestoreNote, useTrashNote } from "../services/hooks";
 import { useMainGcIds } from "../services/hooks";
@@ -144,6 +146,9 @@ export function useNoteMenu() {
         // note (the menu is gone by the time a write fails — #11 pattern)
         const runFm = (verb: string, op: Promise<unknown>) => {
           useUiStore.getState().setRowActionError(null);
+          // an explicit lock/secure/fm mutation = intent to keep the note —
+          // it must never be discarded as an abandoned blank draft
+          markNoteDraftChanged(note.id);
           void op.then(invalidateNotes).catch((err) =>
             useUiStore
               .getState()
@@ -251,10 +256,11 @@ export function useNoteMenu() {
           onClick: () => {
             if (inMain) {
               setTree(removeFromMain(manifest.tree, note.id), liveIds);
-              // an empty note pulled into Main and never written in is deleted on
-              // dismiss (Seth, 2026-07-07) — otherwise just unlink from Main
+              // an empty note dismissed from Main shouldn't linger in the corpus
+              // (Seth, 2026-07-07) — hard-discard, never into the Trash folder
+              // (2026-07-17: Rust re-verifies blankness and refuses otherwise)
               void isEmptyNote(note.id).then((empty) => {
-                if (empty) trash.mutate(note.id);
+                if (empty) void discardBlankNote(note.id);
               });
             } else {
               setTree(addNoteToMain(manifest.tree, note.id), liveIds);

@@ -3,6 +3,7 @@ import type { NoteSummary } from "../types";
 import {
   type MainNode,
   addFolderToMain,
+  uniqueRootFolderName,
   addNoteToMain,
   addNoteToMainAt,
   buildMainTree,
@@ -184,6 +185,18 @@ describe("tree mutations", () => {
 
   test("addFolderToMain appends an empty folder", () => {
     expect(addFolderToMain([], "Read later")).toEqual([{ folder: "Read later", children: [] }]);
+  });
+  test("uniqueRootFolderName predicts EXACTLY what addFolderToMain will mint (the scroll-to-new-folder id)", () => {
+    const tree = addFolderToMain(addFolderToMain([], "inkling ai"), "inkling ai");
+    // spaces survive — the rendered id is raw-name-derived, never slugged
+    expect(uniqueRootFolderName([], "inkling ai")).toBe("inkling ai");
+    expect(uniqueRootFolderName(tree, "inkling ai")).toBe("inkling ai 3");
+    const committed = addFolderToMain(tree, "inkling ai");
+    expect(committed.flatMap((n) => ("folder" in n ? [n.folder] : []))).toEqual([
+      "inkling ai",
+      "inkling ai 2",
+      "inkling ai 3",
+    ]);
   });
   test("addFolderToMain uniquifies against root siblings (ids are name-derived)", () => {
     const one = addFolderToMain([], "New folder");

@@ -958,6 +958,7 @@ pub fn run() {
             corpus::corpus_write,
             corpus::corpus_create,
             corpus::corpus_delete,
+            corpus::corpus_discard_blank,
             corpus::corpus_move,
             corpus::corpus_rename_board,
             breve::breve_snapshot,

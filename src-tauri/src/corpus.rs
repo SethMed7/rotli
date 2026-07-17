@@ -3542,6 +3542,32 @@ impl CorpusStore {
         Ok(())
     }
 
+    /// Hard-remove a BLANK note — the ephemeral-note lifecycle ("a new note is
+    /// just a view until you write into it", Seth 2026-07-17). Never the in-app
+    /// Trash folder (no clutter): straight to the OS trash / `.rotli/trash`
+    /// fallback via the purge internals. Rust re-reads the file and REFUSES any
+    /// non-blank body, so this exposed command cannot destroy content even if
+    /// miscalled — the same rationale that keeps `corpus_purge` unregistered
+    /// (audit #68). Refusal is the SAFE outcome, not an error state.
+    pub fn discard_blank(&mut self, id: &str) -> Result<(), String> {
+        let rel = self.path_of(id)?;
+        self.writable(&rel)?;
+        let abs = self.abs(&rel);
+        let existing = fs::read_to_string(&abs).unwrap_or_default();
+        let (_fm, body) = parse_document(&existing);
+        if !body.trim().is_empty() {
+            return Err("the note isn't blank — refusing to discard".into());
+        }
+        let name = Path::new(&rel)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| format!("{id}.md"));
+        self.trash_existing_path(&abs, &name, &rel)?;
+        self.index.remove(id);
+        self.persist_index();
+        Ok(())
+    }
+
     /// Shared recoverable file removal for note purge and storage assets.
     fn trash_existing_path(&mut self, abs: &Path, fallback_name: &str, label: &str) -> Result<(), String> {
         self.suppress.mark(abs);
@@ -4768,6 +4794,14 @@ pub fn corpus_create(
 pub fn corpus_delete(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| s.delete(&rel))
+}
+
+/// The ephemeral-note lane: hard-discard a note ONLY if its body is blank
+/// (Rust re-verifies; see `Store::discard_blank`). Bypasses the in-app Trash.
+#[tauri::command]
+pub fn corpus_discard_blank(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.discard_blank(&rel))
 }
 
 /// Move a note to another folder, preserving its id (Tauri maps the JS
@@ -6108,6 +6142,32 @@ mod tests {
             .filter_map(|e| e.ok())
             .collect();
         assert_eq!(trashed.len(), 1);
+    }
+
+    #[test]
+    fn discard_blank_removes_only_truly_blank_notes_and_skips_the_trash_folder() {
+        let (_dir, mut store) = bare();
+
+        // a blank note discards for real — no Trash-folder detour
+        let blank = store.create("Inbox", "").unwrap();
+        store.discard_blank(&blank.id).unwrap();
+        assert!(store.read(&blank.id).is_err(), "blank note must leave the corpus");
+        assert!(
+            store.list().unwrap().notes.iter().all(|n| n.folder_id != "Trash"),
+            "discard must never route through the in-app Trash folder"
+        );
+        // recoverable: it landed in .rotli/trash (the test-path fallback)
+        assert!(fs::read_dir(store.root().join(DOT_DIR).join("trash")).unwrap().count() >= 1);
+
+        // whitespace-only still counts as blank
+        let spaces = store.create("Inbox", "  \n\n  ").unwrap();
+        store.discard_blank(&spaces.id).unwrap();
+        assert!(store.read(&spaces.id).is_err());
+
+        // ANY content refuses — the exposed command cannot destroy prose
+        let kept = store.create("Inbox", "# Real note\n").unwrap();
+        assert!(store.discard_blank(&kept.id).is_err(), "non-blank must refuse");
+        assert!(store.read(&kept.id).is_ok(), "refusal leaves the note untouched");
     }
 
     #[test]

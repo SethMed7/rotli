@@ -12,6 +12,7 @@ import {
   corpusWriteFrontmatterRaw,
 } from "../lib/tauri";
 import { invalidateNotes, useNote } from "../services/hooks";
+import { markNoteDraftChanged } from "../services/noteDrafts";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
 import { AaPanel } from "./aaPanel";
@@ -139,6 +140,7 @@ export function EditorSurface({
       void (async () => {
         try {
           await corpusWriteFrontmatterRaw(noteId, text);
+          markNoteDraftChanged(noteId); // an explicit fm edit = intent to keep
           setFmErr(null);
         } catch (e) {
           // refused (read-only note, stray --- line) — the re-read below

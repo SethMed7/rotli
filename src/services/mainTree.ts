@@ -275,14 +275,23 @@ export function mainParentOfNote(tree: MainNode[], noteId: string): string | nul
   return walk(tree, MAIN_ROOT);
 }
 
+/** The uniquified name a new root folder will take — the exact collision law
+ * addFolderToMain applies ("New folder" → "New folder 2"), exported so the UI
+ * can compute the folder's rendered id ("main:<name>") and scroll/focus the
+ * fresh row after the commit (it's appended after every root note, which made
+ * a new folder easy to lose). */
+export function uniqueRootFolderName(tree: MainNode[], name: string): string {
+  const taken = new Set(tree.flatMap((n) => ("folder" in n ? [n.folder] : [])));
+  let unique = name;
+  for (let i = 2; taken.has(unique); i++) unique = `${name} ${i}`;
+  return unique;
+}
+
 /** Append a new empty Main folder at the root. The name uniquifies against its
  * root siblings ("New folder" → "New folder 2") because a root folder's rendered
  * id IS "main:<name>" — twins would collide as React keys / drag targets. */
 export function addFolderToMain(tree: MainNode[], name: string): MainNode[] {
-  const taken = new Set(tree.flatMap((n) => ("folder" in n ? [n.folder] : [])));
-  let unique = name;
-  for (let i = 2; taken.has(unique); i++) unique = `${name} ${i}`;
-  return [...tree, { folder: unique, children: [] }];
+  return [...tree, { folder: uniqueRootFolderName(tree, name), children: [] }];
 }
 
 /** Remove a note/folder from Main by its rendered id (a folder takes its subtree). */

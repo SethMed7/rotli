@@ -26,12 +26,18 @@ import { isIP } from "node:net";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
 
+// Shared egress caps — mirrored (never imported) by src-tauri/src/web.rs; both sides assert
+// equality against scripts/fixtures/egress-fixtures.json (parity by fixture, not shared impl).
+export const MAX_FETCH_BYTES = 2_000_000;
+export const MAX_REDIRECT_HOPS = 3;
+
 export type SafeFetchResult =
   | { ok: true; host: string; finalUrl: string; title: string; text: string }
   | { ok: false; reason: string };
 
 // Private / loopback / link-local / ULA / CGNAT / unspecified — never fetch these from the Mac.
-function isPrivateIp(ip: string): boolean {
+// Exported for the shared egress fixture test (test-safe-fetch-fixtures.ts).
+export function isPrivateIp(ip: string): boolean {
   const v = isIP(ip);
   if (v === 4) {
     const p = ip.split(".").map(Number);
@@ -46,16 +52,42 @@ function isPrivateIp(ip: string): boolean {
     const a = ip.toLowerCase();
     if (a === "::1" || a === "::") return true;
     if (a.startsWith("fc") || a.startsWith("fd")) return true; // fc00::/7 ULA
-    if (a.startsWith("fe80")) return true;                      // link-local
-    const mapped = a.match(/(?:::ffff:)(\d+\.\d+\.\d+\.\d+)$/); // IPv4-mapped ::ffff:127.0.0.1
-    if (mapped) return isPrivateIp(mapped[1]);
+    const seg0 = parseInt(a.split(":")[0] || "0", 16) || 0;
+    if (seg0 >= 0xfe80 && seg0 <= 0xfebf) return true;          // link-local — the FULL fe80::/10, not just fe80:*
+    const mapped = ipv4Mapped(a);                               // ::ffff:a.b.c.d in ANY textual form (hex/compressed/uncompressed)
+    if (mapped) return isPrivateIp(mapped);
     return false;
   }
   return false;
 }
 
+// Return the embedded dotted IPv4 if `a` is an IPv4-mapped IPv6 address (::ffff:a.b.c.d), else null.
+// Works on the raw bytes, not a regex, so the hex form (::ffff:0a00:1) and uncompressed form
+// (0:0:0:0:0:ffff:10.0.0.1) can't dodge the private-range check the dotted form is subject to.
+// `a` is already a valid IPv6 literal (isIP === 6), so the expansion below is total.
+function ipv4Mapped(a: string): string | null {
+  // fold an embedded dotted tail (::ffff:10.0.0.1) into two hex groups so we have pure hextets
+  let s = a.replace(/(\d+)\.(\d+)\.(\d+)\.(\d+)$/, (_m, b1, b2, b3, b4) =>
+    `${((Number(b1) << 8) | Number(b2)).toString(16)}:${((Number(b3) << 8) | Number(b4)).toString(16)}`);
+  const halves = s.split("::");
+  let groups: string[];
+  if (halves.length === 2) {
+    const l = halves[0] ? halves[0].split(":") : [];
+    const r = halves[1] ? halves[1].split(":") : [];
+    groups = [...l, ...Array(8 - l.length - r.length).fill("0"), ...r];
+  } else {
+    groups = s.split(":");
+  }
+  if (groups.length !== 8) return null;
+  const h = groups.map((g) => parseInt(g || "0", 16));
+  if (h.slice(0, 5).every((x) => x === 0) && h[5] === 0xffff)
+    return `${(h[6] >> 8) & 0xff}.${h[6] & 0xff}.${(h[7] >> 8) & 0xff}.${h[7] & 0xff}`;
+  return null;
+}
+
 // Returns a rejection reason, or null if the host is safe to fetch.
-async function hostRejection(host: string): Promise<string | null> {
+// Exported for the shared egress fixture test (test-safe-fetch-fixtures.ts).
+export async function hostRejection(host: string): Promise<string | null> {
   const h = host.toLowerCase().replace(/^\[|\]$/g, "");
   if (!h || h === "localhost" || h.endsWith(".local") || h.endsWith(".internal")) return `blocked host: ${host}`;
   if (isIP(h)) return isPrivateIp(h) ? `private IP blocked: ${host}` : null; // literal IP — allow only if public
@@ -76,6 +108,17 @@ export async function checkUrl(raw: string): Promise<{ ok: true; url: URL } | { 
   const bad = await hostRejection(url.hostname);
   if (bad) return { ok: false, reason: bad };
   return { ok: true, url };
+}
+
+// Pure per-hop redirect vet: parseable target, https only, SAME host as the first request.
+// The loop below applies it before re-entering checkUrl (which re-vets creds + host privacy).
+// Exported for the shared egress fixture test (test-safe-fetch-fixtures.ts).
+export function redirectRejection(from: URL, location: string, firstHost: string): string | null {
+  let next: URL;
+  try { next = new URL(location, from); } catch { return "invalid redirect Location"; }
+  if (next.protocol !== "https:") return "https only (cleartext refused)";
+  if (next.hostname.toLowerCase() !== firstHost) return `cross-host redirect refused: ${next.hostname}`;
+  return null;
 }
 
 function strip(html: string, maxChars: number): { title: string; text: string } {
@@ -115,9 +158,9 @@ export async function safeFetchText(
   opts: { maxChars?: number; maxBytes?: number; timeoutMs?: number; maxRedirects?: number } = {},
 ): Promise<SafeFetchResult> {
   const maxChars = opts.maxChars ?? 14000;
-  const maxBytes = opts.maxBytes ?? 2_000_000;
+  const maxBytes = opts.maxBytes ?? MAX_FETCH_BYTES;
   const timeoutMs = opts.timeoutMs ?? 20000;
-  let hops = opts.maxRedirects ?? 3;
+  let hops = opts.maxRedirects ?? MAX_REDIRECT_HOPS;
   let current = raw;
   let firstHost = "";
   while (true) {
@@ -139,6 +182,8 @@ export async function safeFetchText(
       const loc = res.headers.get("location");
       if (!loc) return { ok: false, reason: `redirect with no Location (${res.status})` };
       if (hops-- <= 0) return { ok: false, reason: "too many redirects" };
+      const bad = redirectRejection(c.url, loc, firstHost);
+      if (bad) return { ok: false, reason: bad };
       current = new URL(loc, c.url).href;
       continue;
     }

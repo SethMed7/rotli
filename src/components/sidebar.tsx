@@ -29,6 +29,7 @@ import {
   MAIN_ROOT,
   addFolderToMain,
   addNoteToMain,
+  uniqueRootFolderName,
   buildMainTree,
   mainFolderIds,
   mainNoteIds,
@@ -56,7 +57,6 @@ import {
   useTrashNote,
 } from "../services/hooks";
 import { notesService } from "../services/notes";
-import { isEmptyNote } from "../services/mainDismiss";
 import {
   type CorpusRoot,
   corpusAddFolder,
@@ -835,27 +835,6 @@ export function Sidebar() {
         </span>
       );
     };
-    const removeBtn = (rowId: string, label: string, dismissEmpty = false) => (
-      <span
-        role="button"
-        tabIndex={0}
-        className="snactbtn mmx"
-        aria-label={label}
-        title={label}
-        onClick={(ev) => {
-          ev.stopPropagation();
-          setMainTree(removeFromMain(mainManifest.tree, rowId), liveIds);
-          // a note (not a folder) that's empty is deleted on dismiss (Seth, 2026-07-07)
-          if (dismissEmpty) {
-            void isEmptyNote(rowId).then((empty) => {
-              if (empty) trashNote.mutate(rowId);
-            });
-          }
-        }}
-      >
-        ×
-      </span>
-    );
     return (
       <>
         {childNotes.map((n) => (
@@ -963,7 +942,10 @@ export function Sidebar() {
                 </span>
                 <FolderGlyph size={14} />
                 <span className="fname">{f.name}</span>
-                {removeBtn(f.id, "Remove folder from Main")}
+                {/* NO inline remove-× here: it rendered unstyled mid-row on .frow
+                    (the .snactbtn hover/size grammar is .snrow-scoped), so
+                    "clicking the folder" silently deleted it from Main. Removal
+                    lives in the right-click menu, like note rows (2026-07-09). */}
               </button>
               {open && renderMainTree(f.id, depth + 1, rp)}
             </div>
@@ -1906,9 +1888,10 @@ export function Sidebar() {
             {/* — MAIN: your hand-picked notes, arranged your way. Star a row (★) to
                   put it in Quick access — the capped set the ⌥ Quick window cycles
                   (Seth, 2026-07-01). Add with the ⊕ on a note row or drag from the Brain. — */}
-            {/* the header carries a QUIET hover "+" (Seth, 2026-07-01: the always-
-                visible "+ New folder" row was too loud) — same grammar as the
-                per-section frow-add, but opacity-hidden so Tab still reaches it. */}
+            {/* the header carries a QUIET hover new-folder mark (Seth, 2026-07-01:
+                the always-visible "+ New folder" row was too loud; 2026-07-17: the
+                bare "+" said nothing — the IDE-style NewFolderGlyph, same as the
+                toolbar, is self-explanatory) — opacity-hidden so Tab still reaches it. */}
             <div className="fsec fsec-hdr">
               Main
               <button
@@ -1920,7 +1903,7 @@ export function Sidebar() {
                    permanent "New folder 2" the old flow could never rename */
                 onClick={() => setMainNewFolder(true)}
               >
-                <PlusGlyph size={12} />
+                <NewFolderGlyph size={13} />
               </button>
             </div>
             {mainNewFolder && (
@@ -1938,7 +1921,18 @@ export function Sidebar() {
                       mainNewFolderHandled.current = true; // the ensuing blur must not re-commit
                       const name = e.currentTarget.value.trim();
                       setMainNewFolder(false);
-                      if (name) setMainTree(addFolderToMain(mainManifest.tree, name), liveIds);
+                      if (name) {
+                        // compute the rendered id BEFORE the commit (same
+                        // uniquify law) so the fresh row — appended after every
+                        // root note — can be scrolled into view, not lost
+                        const folderId = `${MAIN_ROOT}${uniqueRootFolderName(mainManifest.tree, name)}`;
+                        setMainTree(addFolderToMain(mainManifest.tree, name), liveIds);
+                        requestAnimationFrame(() => {
+                          document
+                            .querySelector(`[data-main-id="${CSS.escape(folderId)}"]`)
+                            ?.scrollIntoView({ block: "nearest" });
+                        });
+                      }
                     } else if (e.key === "Escape") {
                       e.preventDefault();
                       e.stopPropagation();
@@ -1954,7 +1948,15 @@ export function Sidebar() {
                     // click-away commits a non-empty name (the corpus new-folder law)
                     const name = e.currentTarget.value.trim();
                     setMainNewFolder(false);
-                    if (name) setMainTree(addFolderToMain(mainManifest.tree, name), liveIds);
+                    if (name) {
+                      const folderId = `${MAIN_ROOT}${uniqueRootFolderName(mainManifest.tree, name)}`;
+                      setMainTree(addFolderToMain(mainManifest.tree, name), liveIds);
+                      requestAnimationFrame(() => {
+                        document
+                          .querySelector(`[data-main-id="${CSS.escape(folderId)}"]`)
+                          ?.scrollIntoView({ block: "nearest" });
+                      });
+                    }
                   }}
                 />
               </div>

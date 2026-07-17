@@ -7,6 +7,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { onQuitFlush } from "../lib/quitFlush";
 import { invalidateNotes } from "../services/hooks";
+import { markNoteDraftChanged } from "../services/noteDrafts";
 import { notesService } from "../services/notes";
 
 const SYNC_DEBOUNCE_MS = 400;
@@ -76,6 +77,9 @@ export function evictDocument(noteId: string): void {
 export function editDocument(noteId: string, edit: (lines: readonly string[]) => string[]): void {
   const current = docs.get(noteId);
   if (!current) return;
+  // the single funnel every real keystroke passes through — a session-created
+  // note stops being an ephemeral blank draft the moment it's written into
+  markNoteDraftChanged(noteId);
   docs.set(noteId, edit(current));
   const set = subs.get(noteId);
   if (set) for (const fn of set) fn();

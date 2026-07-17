@@ -3,12 +3,15 @@
  * explicit close intent and content mutations; this module joins that intent
  * to pane state, the managed-file lifecycle adapter, and Main's projection.
  */
-import { corpusMoveFileToSink } from "../lib/tauri";
+import { evictDocument } from "../editor/model";
+import { corpusDiscardBlank, corpusMoveFileToSink } from "../lib/tauri";
 import { invalidateMemex } from "../memex/useMemex";
 import { invalidateNotes } from "../services/hooks";
 import { removeFromMain } from "../services/mainTree";
+import { claimClosedNoteDrafts } from "../services/noteDrafts";
 import { useMainStore } from "../state/main";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
+import { removeQuickNote } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import type { Tab } from "../types";
 import { deleteParkedDocument, unregisterLiveDocument } from "./session";
@@ -28,10 +31,44 @@ function fileIdOf(tab: Tab | undefined): string | null {
   return tab?.surfaceKind === "file" ? tab.fileId : null;
 }
 
+function noteIdOf(tab: Tab | undefined): string | null {
+  return tab?.surfaceKind === "note" ? tab.noteId : null;
+}
+
 function openFileIds(): string[] {
   return leaves(usePanesStore.getState().root).flatMap((leaf) =>
     leaf.tabs.flatMap((tab) => (tab.surfaceKind === "file" ? [tab.fileId] : [])),
   );
+}
+
+function openNoteIds(): string[] {
+  return leaves(usePanesStore.getState().root).flatMap((leaf) =>
+    leaf.tabs.flatMap((tab) => (tab.surfaceKind === "note" ? [tab.noteId] : [])),
+  );
+}
+
+/** Hard-discard a blank note (the ephemeral-note lifecycle): evict the shared
+ * buffer FIRST so the pending 400 ms sync can't resurrect the file, then let
+ * Rust verify blankness and remove it — never into the in-app Trash. A Rust
+ * refusal means content exists somewhere this session didn't see: keeping the
+ * note is exactly right, so refusal is silent. */
+export async function discardBlankNote(noteId: string): Promise<void> {
+  evictDocument(noteId);
+  try {
+    await corpusDiscardBlank(noteId);
+  } catch {
+    return;
+  }
+  removeQuickNote(noteId);
+  const { manifest, setTree } = useMainStore.getState();
+  setTree(removeFromMain(manifest.tree, noteId));
+  await Promise.all([invalidateNotes(), invalidateMemex()]);
+}
+
+function discardClosedNoteCandidates(noteIds: string[]): void {
+  for (const noteId of claimClosedNoteDrafts(noteIds, openNoteIds())) {
+    void discardBlankNote(noteId);
+  }
 }
 
 async function discardDocument(fileId: string): Promise<void> {
@@ -59,13 +96,17 @@ function discardClosedCandidates(fileIds: string[]): void {
   }
 }
 
-/** Close one explicit tab and discard a session-created document only if this
- * close actually removed its final tab and no content mutation ever occurred. */
+/** Close one explicit tab and discard a session-created document/note only if
+ * this close actually removed its final tab and no content mutation ever
+ * occurred. */
 export function closeTabWithDraftCleanup(paneId: string, tabId: string): void {
   const panes = usePanesStore.getState();
-  const fileId = fileIdOf(findLeaf(panes.root, paneId)?.tabs.find((tab) => tab.id === tabId));
+  const tab = findLeaf(panes.root, paneId)?.tabs.find((t) => t.id === tabId);
+  const fileId = fileIdOf(tab);
+  const noteId = noteIdOf(tab);
   panes.closeTabById(paneId, tabId);
   if (fileId) discardClosedCandidates([fileId]);
+  if (noteId) discardClosedNoteCandidates([noteId]);
 }
 
 export function closeOtherTabsWithDraftCleanup(paneId: string, keepTabId: string): void {
@@ -87,6 +128,8 @@ export function closeFocusedPaneWithDraftCleanup(): void {
   const leaf = findLeaf(panes.root, panes.focusedPaneId) ?? leaves(panes.root)[0];
   if (!leaf) return;
   const fileIds = leaf.tabs.flatMap((tab) => (tab.surfaceKind === "file" ? [tab.fileId] : []));
+  const noteIds = leaf.tabs.flatMap((tab) => (tab.surfaceKind === "note" ? [tab.noteId] : []));
   panes.closePane();
   discardClosedCandidates(fileIds);
+  discardClosedNoteCandidates(noteIds);
 }

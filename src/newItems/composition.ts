@@ -15,6 +15,7 @@ import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
 import { trackNewDocumentDraft } from "../documents/draftComposition";
+import { trackNewNoteDraft } from "../services/noteDrafts";
 import type { NewItemKind } from "./model";
 import { createNewItem, type CreatedItem, type NewItemCreator, type NewItemPresenter } from "./workflow";
 
@@ -69,9 +70,7 @@ const creator: NewItemCreator = {
     }
     if (kind === "document") {
       const { createManagedDocument } = await import("../documents/composition");
-      const id = await createManagedDocument();
-      trackNewDocumentDraft(id);
-      return { id, kind };
+      return { id: await createManagedDocument(), kind };
     }
     if (kind === "sheet") {
       const { createBlankWorkbookBase64 } = await import("../sheets/create");
@@ -106,5 +105,14 @@ export async function createManagedItem(
   kind: NewItemKind,
   options: { newTab?: boolean; open?: boolean } = {},
 ): Promise<CreatedItem> {
-  return createNewItem({ creator, presenter }, kind, options);
+  const item = await createNewItem({ creator, presenter }, kind, options);
+  // Pristine-draft tracking lives HERE, where `open` is known: only an item the
+  // user actually opened can be abandoned-blank. `open:false` creations (slash
+  // embed targets) must never be tracked — a later open+close-unedited would
+  // discard a file something else already embeds.
+  if (options.open !== false) {
+    if (item.kind === "markdown") trackNewNoteDraft(item.id);
+    else if (item.kind === "document") trackNewDocumentDraft(item.id);
+  }
+  return item;
 }
