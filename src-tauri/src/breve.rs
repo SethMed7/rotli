@@ -276,7 +276,7 @@ fn production_roots_for_dev(app: &tauri::AppHandle) -> Vec<PathBuf> {
 }
 
 fn production_resend_configured_for_dev(home: &Path) -> bool {
-    if keychain::production_secret_exists_for_dev("breve-resend-api-key") {
+    if keychain::production_secret_exists_for_dev(keychain::BREVE_RESEND_ACCOUNT) {
         return true;
     }
     Command::new(find_bun())
@@ -921,7 +921,7 @@ fn validate_delivery_settings(settings: &BreveDeliverySettings) -> Result<(), St
 /// Move only the Resend credential from the retired Breve keychain into
 /// Rotli's allowlisted login-keychain entry. The value never crosses IPC.
 fn migrate_resend_key(home: &Path) -> bool {
-    const NAME: &str = "breve-resend-api-key";
+    const NAME: &str = keychain::BREVE_RESEND_ACCOUNT;
     if keychain::get_secret(NAME).is_some() {
         return true;
     }
@@ -990,7 +990,7 @@ pub fn breve_write_delivery_settings(
     }
     let root = active_memex_write_root(&state)?;
     let home = root.join(routines::MANAGED_DIR);
-    let before = delivery_settings_at(&home, keychain::get_secret("breve-resend-api-key").is_some());
+    let before = delivery_settings_at(&home, keychain::get_secret(keychain::BREVE_RESEND_ACCOUNT).is_some());
     let signal_changed = before.signal_bot != settings.signal_bot
         || before.signal_owner != settings.signal_owner
         || before.signal_owner_uuid != settings.signal_owner_uuid;
@@ -1011,7 +1011,7 @@ pub fn breve_write_delivery_settings(
             "_notes": "Managed by Rotli → Breve → Configure. Numbers use E.164 format."
         }),
     )?;
-    settings.resend_key_configured = keychain::get_secret("breve-resend-api-key").is_some();
+    settings.resend_key_configured = keychain::get_secret(keychain::BREVE_RESEND_ACCOUNT).is_some();
     // signal-daemon reads its identity allowlist once at process start. A saved
     // identity change therefore restarts Rotli's one supervisor so the new
     // values take effect immediately, without creating any launchd jobs.
@@ -1033,7 +1033,7 @@ pub fn breve_store_resend_key(value: String) -> Result<(), String> {
         DEV_RESEND_CONFIGURED.store(true, Ordering::SeqCst);
         return Ok(());
     }
-    keychain::store_secret("breve-resend-api-key", value)
+    keychain::store_secret(keychain::BREVE_RESEND_ACCOUNT, value)
 }
 
 #[tauri::command]
@@ -1042,7 +1042,7 @@ pub fn breve_remove_resend_key() -> Result<(), String> {
         DEV_RESEND_CONFIGURED.store(false, Ordering::SeqCst);
         return Ok(());
     }
-    keychain::delete_secret("breve-resend-api-key")
+    keychain::delete_secret(keychain::BREVE_RESEND_ACCOUNT)
 }
 
 #[tauri::command]
@@ -1052,9 +1052,9 @@ pub fn breve_test_email(state: tauri::State<'_, CorpusState>) -> Result<String, 
     }
     let root = active_root(&state)?;
     let home = root.join(routines::MANAGED_DIR);
-    let settings = delivery_settings_at(&home, keychain::get_secret("breve-resend-api-key").is_some());
+    let settings = delivery_settings_at(&home, keychain::get_secret(keychain::BREVE_RESEND_ACCOUNT).is_some());
     validate_delivery_settings(&settings)?;
-    let key = keychain::get_secret("breve-resend-api-key").ok_or("Add a Resend API key first")?;
+    let key = keychain::get_secret(keychain::BREVE_RESEND_ACCOUNT).ok_or("Add a Resend API key first")?;
     if settings.email_from.is_empty() || settings.email_to.is_empty() {
         return Err("Add a sender and at least one recipient first".into());
     }
@@ -1086,7 +1086,7 @@ pub fn breve_test_signal(state: tauri::State<'_, CorpusState>) -> Result<String,
     }
     let root = active_root(&state)?;
     let home = root.join(routines::MANAGED_DIR);
-    let settings = delivery_settings_at(&home, keychain::get_secret("breve-resend-api-key").is_some());
+    let settings = delivery_settings_at(&home, keychain::get_secret(keychain::BREVE_RESEND_ACCOUNT).is_some());
     validate_delivery_settings(&settings)?;
     if settings.signal_bot.is_empty() || settings.signal_owner.is_empty() {
         return Err("Add the Signal bot and owner numbers first".into());

@@ -11,11 +11,15 @@ use security_framework::passwords::{
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-/// The Keychain "service" every rotli secret lives under.
-const SERVICE: &str = "rotli";
+/// The Keychain "service" every rotli secret lives under. Byte-identical to
+/// ROTLI_KEYCHAIN_SERVICE in breve-runtime/scripts/keychainNames.ts (parity.json).
+pub(crate) const SERVICE: &str = "rotli";
 
-/// The only secret names the webview may address.
-const ALLOWED: &[&str] = &["gemini-api-key", "breve-resend-api-key"];
+/// The only secret names the webview may address — every literal site in the
+/// crate imports these (parity.json keychainAllowedAccounts).
+pub(crate) const GEMINI_API_KEY_ACCOUNT: &str = "gemini-api-key";
+pub(crate) const BREVE_RESEND_ACCOUNT: &str = "breve-resend-api-key";
+pub(crate) const ALLOWED: &[&str] = &[GEMINI_API_KEY_ACCOUNT, BREVE_RESEND_ACCOUNT];
 
 /// errSecItemNotFound — deleting a secret that isn't there is not an error.
 const NOT_FOUND: i32 = -25300;

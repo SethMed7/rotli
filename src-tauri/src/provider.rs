@@ -618,7 +618,7 @@ fn detect(provider: &str) -> Result<CliDetect, String> {
         "gemini" => Ok(CliDetect {
             installed: true,
             version: None,
-            authenticated: crate::keychain::get_secret("gemini-api-key").is_some(),
+            authenticated: crate::keychain::get_secret(crate::keychain::GEMINI_API_KEY_ACCOUNT).is_some(),
         }),
         "claude" => {
             let bin = resolve_bin(spec("claude")?);

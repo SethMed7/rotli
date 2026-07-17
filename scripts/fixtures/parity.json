@@ -1,0 +1,56 @@
+{
+  "_comment": "TS↔Rust shared constants — parity by fixture, never by codegen or source scraping. Each entry declares its source of truth; hand-written tests on BOTH sides (src-tauri/src/parity_tests.rs via include_str!, src/lib/parity.test.ts via the real TS modules) assert their named constants equal these values, so a one-sided edit fails cargo test or bun test. scripts/check-parity.mjs (in the lint chain) validates this file's shape and that every entry key is referenced by both suites. endpointLocality is behavioral: the two implementations stay independent (security policy is never shared across the boundary) and the fixture pins the agreed verdicts.",
+  "entries": {
+    "sheetEditMaxBytes": {
+      "sourceOfTruth": "src/sheets/kinds.ts SHEET_EDIT_MAX_BYTES ↔ src-tauri/src/corpus.rs SHEET_EDIT_MAX_BYTES",
+      "value": 8000000
+    },
+    "documentConvertibleExts": {
+      "sourceOfTruth": "src/documents/kinds.ts DOCUMENT_CONVERTIBLE_EXTS ↔ src-tauri/src/corpus.rs DOCUMENT_CONVERTIBLE_EXTS",
+      "value": ["doc", "rtf", "odt"]
+    },
+    "memexPerms": {
+      "sourceOfTruth": "src/lib/tauri.ts MemexPerms union ↔ src-tauri/src/memex.rs PERMS_CHATS_INBOX / PERMS_READ_ONLY",
+      "value": ["chats+inbox", "read-only"]
+    },
+    "keychainService": {
+      "sourceOfTruth": "src-tauri/src/keychain.rs SERVICE ↔ breve-runtime/scripts/keychainNames.ts ROTLI_KEYCHAIN_SERVICE",
+      "value": "rotli"
+    },
+    "keychainAllowedAccounts": {
+      "sourceOfTruth": "src-tauri/src/keychain.rs ALLOWED ↔ src/lib/tauri.ts SECRET_GEMINI_API_KEY + breve-runtime/scripts/keychainNames.ts ROTLI_RESEND_ACCOUNT",
+      "value": ["gemini-api-key", "breve-resend-api-key"]
+    },
+    "cliBinCandidates": {
+      "sourceOfTruth": "src-tauri/src/provider.rs CLIS bins ↔ breve-runtime/scripts/cliPaths.ts *_BIN_CANDIDATES",
+      "value": {
+        "claude": ["~/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"],
+        "codex": ["/opt/homebrew/bin/codex", "~/.local/bin/codex", "/usr/local/bin/codex"],
+        "agy": ["~/.local/bin/agy", "/opt/homebrew/bin/agy"]
+      }
+    },
+    "endpointLocality": {
+      "sourceOfTruth": "behavioral: src-tauri/src/chat.rs endpoint_is_local ↔ src/ai/guard.ts endpointIsLocal (independent implementations, fixture-aligned verdicts)",
+      "value": [
+        { "url": "http://localhost:11435", "local": true },
+        { "url": "http://LOCALHOST:11435/api", "local": true },
+        { "url": "http://127.0.0.1:11436/v1", "local": true },
+        { "url": "http://127.9.9.9/v1", "local": true },
+        { "url": "http://[::1]:11435", "local": true },
+        { "url": "https://localhost", "local": true },
+        { "url": "http://evil.com@127.0.0.1:11435", "local": true },
+        { "url": "https://api.openai.com/v1", "local": false },
+        { "url": "http://localhost.evil.com:11435", "local": false },
+        { "url": "http://127.0.0.1.evil.com", "local": false },
+        { "url": "http://127.0.0.1@evil.com:11435", "local": false },
+        { "url": "http://10.0.0.5:11435", "local": false },
+        { "url": "", "local": false },
+        { "url": "not a url", "local": false },
+        { "url": "localhost:11435", "local": false },
+        { "url": "file:///etc/hosts", "local": false },
+        { "url": "file://localhost/etc/hosts", "local": false },
+        { "url": "ftp://127.0.0.1/x", "local": false }
+      ]
+    }
+  }
+}

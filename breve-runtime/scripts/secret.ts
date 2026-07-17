@@ -11,10 +11,10 @@
  * CLI: `bun scripts/secret.ts get <service>` prints the raw value (exit 1 if empty).
  */
 import { $ } from "bun";
+import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "./keychainNames";
 
 const KEYCHAIN = `${process.env.HOME}/Library/Keychains/breve.keychain-db`;
 const PW_FILE = `${process.env.HOME}/.breve-secrets/keychain-pw`;
-const ROTLI_RESEND_ACCOUNT = "breve-resend-api-key";
 
 // Serialize all unlock/read/relock so concurrent reads don't race over the keychain.
 let mutex: Promise<unknown> = Promise.resolve();
@@ -35,7 +35,7 @@ export async function readSecret(service: string): Promise<string> {
     // migration fallback for installs upgraded from the standalone project.
     if (service === "resend-breve") {
       try {
-        const value = (await $`security find-generic-password -s rotli -a ${ROTLI_RESEND_ACCOUNT} -w`.text()).trim();
+        const value = (await $`security find-generic-password -s ${ROTLI_KEYCHAIN_SERVICE} -a ${ROTLI_RESEND_ACCOUNT} -w`.text()).trim();
         if (value) return value;
       } catch {}
     }

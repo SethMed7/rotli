@@ -19,6 +19,8 @@ mod keychain;
 mod localmodel;
 mod memex;
 mod organizer;
+#[cfg(test)]
+mod parity_tests;
 mod provider;
 mod routines;
 mod secret;

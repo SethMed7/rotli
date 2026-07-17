@@ -571,6 +571,11 @@ fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
 // into the corpus tree long ago and no TS caller remained. Re-add from git
 // history if a spine browser ever returns.
 
+/// The two access levels rotli grants a connected brain. Byte-identical to the
+/// `MemexPerms` union in src/lib/tauri.ts (parity.json memexPerms).
+pub(crate) const PERMS_CHATS_INBOX: &str = "chats+inbox";
+pub(crate) const PERMS_READ_ONLY: &str = "read-only";
+
 /// What `corpus.rs` needs to register a connected brain in `corpus.json` — the
 /// memex-specific half of connecting (validate it's a real memex, stamp
 /// `apps.rotli` when in-range, derive perms/mode). The unified model keeps brains
@@ -594,7 +599,7 @@ pub fn prepare_brain_connect(path: &Path) -> Result<BrainConnect, String> {
     let memex_id = card.memex_id.clone().ok_or("memex.json has no id")?;
     let in_range = contract_ok(card.contract.as_deref());
     let mode = card.users_json.as_deref().map(parse_mode_raw);
-    let perms = if in_range { "chats+inbox" } else { "read-only" };
+    let perms = if in_range { PERMS_CHATS_INBOX } else { PERMS_READ_ONLY };
     // additive stamp only when we're allowed to write (in-range contract)
     if in_range {
         stamp_rotli(&path.join("memex.json"))?;
@@ -617,9 +622,9 @@ pub fn brain_view(path: &Path) -> Option<(String, String)> {
     }
     let id = card.memex_id?;
     let perms = if contract_ok(card.contract.as_deref()) {
-        "chats+inbox"
+        PERMS_CHATS_INBOX
     } else {
-        "read-only"
+        PERMS_READ_ONLY
     };
     Some((id, perms.to_string()))
 }

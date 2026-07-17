@@ -1,0 +1,71 @@
+//! TS↔Rust parity assertions — hand-written, never generated. The contract is
+//! scripts/fixtures/parity.json; src/lib/parity.test.ts asserts the same
+//! entries against the real TS modules, and scripts/check-parity.mjs keeps
+//! every fixture entry referenced by BOTH suites. A one-sided constant edit
+//! fails here (or in bun test) before it ships.
+
+use serde_json::Value;
+
+fn entry(name: &str) -> Value {
+    let fixture: Value = serde_json::from_str(include_str!("../../scripts/fixtures/parity.json"))
+        .expect("parity.json parses");
+    let value = fixture["entries"][name]["value"].clone();
+    assert!(!value.is_null(), "parity.json entry \"{name}\" is missing");
+    value
+}
+
+fn string_list(value: &Value) -> Vec<String> {
+    value
+        .as_array()
+        .expect("fixture value is an array")
+        .iter()
+        .map(|item| item.as_str().expect("fixture item is a string").to_string())
+        .collect()
+}
+
+#[test]
+fn sheet_edit_max_bytes_matches_fixture() {
+    assert_eq!(entry("sheetEditMaxBytes").as_u64(), Some(crate::corpus::SHEET_EDIT_MAX_BYTES as u64));
+}
+
+#[test]
+fn document_convertible_exts_match_fixture() {
+    assert_eq!(string_list(&entry("documentConvertibleExts")), crate::corpus::DOCUMENT_CONVERTIBLE_EXTS);
+}
+
+#[test]
+fn memex_perms_match_fixture() {
+    assert_eq!(
+        string_list(&entry("memexPerms")),
+        [crate::memex::PERMS_CHATS_INBOX, crate::memex::PERMS_READ_ONLY],
+    );
+}
+
+#[test]
+fn keychain_service_matches_fixture() {
+    assert_eq!(entry("keychainService").as_str(), Some(crate::keychain::SERVICE));
+}
+
+#[test]
+fn keychain_allowed_accounts_match_fixture() {
+    assert_eq!(string_list(&entry("keychainAllowedAccounts")), crate::keychain::ALLOWED);
+}
+
+#[test]
+fn cli_bin_candidates_match_fixture() {
+    let fixture = entry("cliBinCandidates");
+    let map = fixture.as_object().expect("cliBinCandidates is an object");
+    assert_eq!(map.len(), crate::provider::CLIS.len(), "fixture and CLIS list different providers");
+    for spec in crate::provider::CLIS {
+        assert_eq!(string_list(&map[spec.id]), spec.bins, "candidate list drifted for {}", spec.id);
+    }
+}
+
+#[test]
+fn endpoint_locality_fixtures_agree() {
+    for case in entry("endpointLocality").as_array().expect("endpointLocality is an array") {
+        let url = case["url"].as_str().expect("url is a string");
+        let expected = case["local"].as_bool().expect("local is a bool");
+        assert_eq!(crate::chat::endpoint_is_local(url), expected, "endpoint_is_local({url:?})");
+    }
+}

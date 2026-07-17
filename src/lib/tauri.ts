@@ -501,6 +501,10 @@ export function generateImage(args: {
   return aiInvoke("generate_image", { ...args });
 }
 
+/** Keychain account for the Gemini API key — one of keychain.rs's ALLOWED
+ * names (parity.json keychainAllowedAccounts). */
+export const SECRET_GEMINI_API_KEY = "gemini-api-key";
+
 /** Keychain-backed secrets (Rust allowlists the names; a stored value never
  * crosses IPC back — only exists/absent does). */
 export function secretStore(name: string, value: string): Promise<void> {

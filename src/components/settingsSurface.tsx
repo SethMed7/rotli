@@ -38,6 +38,7 @@ import {
   organizerRunOnce,
   organizerSetTrust,
   revealCorpus,
+  SECRET_GEMINI_API_KEY,
   secretDelete,
   secretExists,
   secretStore,
@@ -1645,12 +1646,12 @@ function GeminiKeyRow({ onSaved }: { onSaved?: () => void }) {
   const [val, setVal] = useState("");
   const [note, setNote] = useState<{ text: string; err: boolean } | null>(null);
   const saved = useQuery({
-    queryKey: ["secret", "gemini-api-key"],
-    queryFn: () => secretExists("gemini-api-key"),
+    queryKey: ["secret", SECRET_GEMINI_API_KEY],
+    queryFn: () => secretExists(SECRET_GEMINI_API_KEY),
     enabled: isTauri(),
   });
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ["secret", "gemini-api-key"] });
+    void queryClient.invalidateQueries({ queryKey: ["secret", SECRET_GEMINI_API_KEY] });
     void queryClient.invalidateQueries({ queryKey: ["cli-detect", "gemini"] });
   };
   return (
@@ -1668,7 +1669,7 @@ function GeminiKeyRow({ onSaved }: { onSaved?: () => void }) {
         className="ghostbtn primary"
         disabled={!val.trim()}
         onClick={() => {
-          secretStore("gemini-api-key", val.trim())
+          secretStore(SECRET_GEMINI_API_KEY, val.trim())
             .then(() => {
               setVal("");
               setNote({ text: "Key saved to the Keychain.", err: false });
@@ -1685,7 +1686,7 @@ function GeminiKeyRow({ onSaved }: { onSaved?: () => void }) {
           type="button"
           className="ghostbtn quiet"
           onClick={() => {
-            secretDelete("gemini-api-key")
+            secretDelete(SECRET_GEMINI_API_KEY)
               .then(() => {
                 setNote({ text: "Key removed.", err: false });
                 refresh();

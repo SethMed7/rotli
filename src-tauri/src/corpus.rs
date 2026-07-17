@@ -4226,6 +4226,10 @@ pub fn corpus_file_text(
     Ok(String::from_utf8_lossy(&data[..end]).into_owned())
 }
 
+/// Default byte cap for `corpus_file_bytes` — the sheet editor's edit gate.
+/// Byte-identical to SHEET_EDIT_MAX_BYTES in src/sheets/kinds.ts (parity.json).
+pub(crate) const SHEET_EDIT_MAX_BYTES: usize = 8_000_000;
+
 /// Read a surfaced FILE as BASE64 — for the in-app viewer to parse a binary that
 /// can't ride a lossy UTF-8 read (a `.xlsx` spreadsheet). Capped at `max_bytes`
 /// (default 8 MB) so a giant workbook can't lock the UI.
@@ -4241,7 +4245,7 @@ pub fn corpus_file_bytes(
     if !abs.is_file() {
         return Err(format!("not a file: {}", abs.display()));
     }
-    let cap = max_bytes.unwrap_or(8_000_000);
+    let cap = max_bytes.unwrap_or(SHEET_EDIT_MAX_BYTES);
     let data = fs::read(&abs).map_err(|e| e.to_string())?;
     let end = data.len().min(cap);
     Ok(base64::engine::general_purpose::STANDARD.encode(&data[..end]))
@@ -4355,7 +4359,8 @@ pub fn corpus_create_managed_file(
     Ok(compose_root_id(&default_id, &rel))
 }
 
-const LOCAL_DOCUMENT_CONVERSION_EXTS: &[&str] = &["doc", "rtf", "odt"];
+/// Byte-identical to DOCUMENT_CONVERTIBLE_EXTS in src/documents/kinds.ts (parity.json).
+pub(crate) const DOCUMENT_CONVERTIBLE_EXTS: &[&str] = &["doc", "rtf", "odt"];
 const LOCAL_DOCUMENT_CONVERSION_MAX_BYTES: u64 = 32_000_000;
 
 fn converted_document_name(rel: &str) -> Result<String, String> {
@@ -4365,7 +4370,7 @@ fn converted_document_name(rel: &str) -> Result<String, String> {
         .and_then(|value| value.to_str())
         .map(str::to_ascii_lowercase)
         .ok_or_else(|| "this file has no supported document extension".to_string())?;
-    if !LOCAL_DOCUMENT_CONVERSION_EXTS.contains(&ext.as_str()) {
+    if !DOCUMENT_CONVERTIBLE_EXTS.contains(&ext.as_str()) {
         return Err(format!(".{ext} has no faithful local DOCX conversion path"));
     }
     let stem = path

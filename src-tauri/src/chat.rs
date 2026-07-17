@@ -480,7 +480,7 @@ fn openai_url(base: &str) -> String {
 /// local llama.cpp → the supervisor's 0600 file key, absent = no header.
 fn openai_bearer(base: &str) -> Result<Option<String>, String> {
     if base.starts_with(GEMINI_OPENAI_BASE) {
-        return crate::keychain::get_secret("gemini-api-key")
+        return crate::keychain::get_secret(crate::keychain::GEMINI_API_KEY_ACCOUNT)
             .map(Some)
             .ok_or_else(|| "Gemini needs its API key — add it in Settings → AI Models.".to_string());
     }
