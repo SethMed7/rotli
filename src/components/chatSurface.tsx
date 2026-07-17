@@ -46,6 +46,7 @@ import {
   fileAssetUrl,
   isTauri,
 } from "../lib/tauri";
+import { fileName } from "../lib/fileKind";
 import { useTransientPopover } from "../lib/popover";
 import { invalidateNotes, useNoteIndex } from "../services/hooks";
 import { type Measure } from "../state/noteStyle";
@@ -170,7 +171,7 @@ function AssetsGlyph() {
 /** One generated asset in the drawer — thumbnail via the asset protocol. */
 function AssetThumb({ id, onOpen }: { id: string; onOpen: () => void }) {
   const url = useQuery({ queryKey: ["asset-url", id], queryFn: () => fileAssetUrl(id) });
-  const name = id.split("/").pop() ?? id;
+  const name = fileName(id);
   return (
     <button type="button" className="chat-asset" title={name} onClick={onOpen}>
       {url.data ? <img src={url.data} alt={name} /> : <span className="chat-asset-wait">…</span>}

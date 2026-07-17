@@ -5,6 +5,7 @@
 // or more data rows — ending at a blank line or any non-`|` line.
 
 import type { Text } from "@codemirror/state";
+import { clamp } from "../lib/clamp";
 import { lineInFence, scanFences } from "./fences";
 
 export type Align = "left" | "right" | "center" | "";
@@ -178,7 +179,7 @@ const emptyRow = (cols: number) => Array.from({ length: cols }, () => "");
 /** Insert an empty data row below data row `i` (i = -1 → first data row). */
 export function addRowBelow(t: TableShape, i: number): TableShape {
   const rows = [...t.rows];
-  const at = Math.max(0, Math.min(rows.length, i + 1));
+  const at = clamp(i + 1, 0, rows.length);
   rows.splice(at, 0, emptyRow(t.header.length));
   return { ...t, rows };
 }
@@ -202,7 +203,7 @@ export function moveRow(t: TableShape, i: number, dir: -1 | 1): TableShape | nul
 
 /** Insert an empty column right of column `i` (i = -1 → leftmost). */
 export function addColRight(t: TableShape, i: number): TableShape {
-  const at = Math.max(0, Math.min(t.header.length, i + 1));
+  const at = clamp(i + 1, 0, t.header.length);
   const ins = <T,>(arr: T[], v: T): T[] => [...arr.slice(0, at), v, ...arr.slice(at)];
   return {
     header: ins(t.header, ""),

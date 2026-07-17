@@ -36,6 +36,7 @@ import {
   DOCUMENT_EXTS,
   DOCUMENT_OPEN_WITH_APPS,
 } from "../documents/kinds";
+import { clamp } from "../lib/clamp";
 import { IMAGE_EXTS, extOf, fileName } from "../lib/fileKind";
 import {
   SHEET_BIN,
@@ -48,7 +49,7 @@ import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 
 // Univer + exceljs are heavy — code-split so they load only when an editable
 // sheet mounts (same reasoning as the CanvasSurface split).
-const SheetEditor = lazy(() => import("./sheetEditor"));
+const SheetEditor = lazy(() => import("../sheets/sheetEditor"));
 const DocumentEditor = lazy(() => import("./documentEditor"));
 
 export type FileKind =
@@ -112,7 +113,7 @@ export const ZOOM_MAX = 8;
 /** Clamp a zoom scale into the sane band (garbage in → 1). */
 export function clampZoom(s: number): number {
   if (!Number.isFinite(s) || s <= 0) return 1;
-  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s));
+  return clamp(s, ZOOM_MIN, ZOOM_MAX);
 }
 
 /** The "fit" scale: contain the image in the body, but NEVER upscale past

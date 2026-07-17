@@ -1,3 +1,5 @@
+import { clamp } from "../lib/clamp";
+
 export const EMBED_DEFAULT_HEIGHT = 240;
 export const EMBED_MIN_HEIGHT = 180;
 export const EMBED_MAX_HEIGHT = 960;
@@ -10,14 +12,11 @@ export interface EmbedSizeState {
 }
 
 export function embedHeightLimit(viewportHeight: number): number {
-  return Math.max(
-    EMBED_MIN_HEIGHT,
-    Math.min(EMBED_MAX_HEIGHT, Math.round(viewportHeight - EMBED_VIEWPORT_GUTTER)),
-  );
+  return clamp(Math.round(viewportHeight - EMBED_VIEWPORT_GUTTER), EMBED_MIN_HEIGHT, EMBED_MAX_HEIGHT);
 }
 
 export function clampEmbedHeight(height: number, viewportHeight: number): number {
-  return Math.max(EMBED_MIN_HEIGHT, Math.min(embedHeightLimit(viewportHeight), Math.round(height)));
+  return clamp(Math.round(height), EMBED_MIN_HEIGHT, embedHeightLimit(viewportHeight));
 }
 
 export function createEmbedSizeState(height = EMBED_DEFAULT_HEIGHT): EmbedSizeState {

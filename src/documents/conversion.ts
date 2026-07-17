@@ -1,3 +1,4 @@
+import { extOf, fileName } from "../lib/fileKind";
 import { DOCUMENT_CONVERTIBLE } from "./kinds";
 
 export interface LocalDocumentConverter {
@@ -11,8 +12,7 @@ export async function convertLegacyDocument(
   converter: LocalDocumentConverter,
   id: string,
 ): Promise<string> {
-  const name = id.split("/").pop() ?? id;
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const ext = extOf(fileName(id));
   if (!DOCUMENT_CONVERTIBLE.has(ext)) {
     throw new Error(`.${ext || "unknown"} does not have a faithful local DOCX conversion path`);
   }

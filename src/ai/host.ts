@@ -20,6 +20,7 @@ import {
   SHEET_BIN,
   SHEET_TEXT,
 } from "../sheets/kinds";
+import { extOf } from "../lib/fileKind";
 import { workbookToCsv } from "../sheets/view";
 import { rankNotes } from "./tools";
 import { contextWindowFor } from "./budget";
@@ -193,7 +194,7 @@ export function makeTauriHost(
         files.find((n) => n.title.toLowerCase() === q) ??
         files.find((n) => n.title.toLowerCase().includes(q));
       if (!file) return `no file matching "${query}". Use the exact filename (e.g. report.csv).`;
-      const ext = (file.title.split(".").pop() ?? "").toLowerCase();
+      const ext = extOf(file.title);
       if (SHEET_BIN.has(ext)) return await workbookToCsv({ base64: await corpusFileBytes(file.id) });
       if (SHEET_TEXT.has(ext)) {
         return await workbookToCsv({

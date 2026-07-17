@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { breveSnapshot, isTauri } from "../../lib/tauri";
-import { EMPTY_BREVE_SNAPSHOT } from "./model";
+import { EMPTY_BREVE_SNAPSHOT } from "../../routines/briefs";
 
 export const BREVE_QUERY_KEY = ["breve", "snapshot"] as const;
 

@@ -15,6 +15,7 @@ import { type CSSProperties, useCallback, useEffect, useRef, useState } from "re
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { Compartment, EditorSelection, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, placeholder } from "@codemirror/view";
+import { clamp } from "../lib/clamp";
 import { useUiStore } from "../state/ui";
 import { rotliKeymap } from "./cmKeymap";
 import {
@@ -224,7 +225,7 @@ export function CmEditor({
       const r = view.state.selection.main;
       const line = view.state.doc.lineAt(r.head);
       const res = applyHeading(line.text, level);
-      const col = Math.max(0, Math.min(r.head - line.from + res.delta, res.line.length));
+      const col = clamp(r.head - line.from + res.delta, 0, res.line.length);
       view.dispatch({
         changes: { from: line.from, to: line.to, insert: res.line },
         selection: EditorSelection.cursor(line.from + col),
@@ -238,7 +239,7 @@ export function CmEditor({
       const r = view.state.selection.main;
       const line = view.state.doc.lineAt(r.head);
       const res = applyBlockToggle(line.text, kind);
-      const col = Math.max(0, Math.min(r.head - line.from + res.delta, res.line.length));
+      const col = clamp(r.head - line.from + res.delta, 0, res.line.length);
       view.dispatch({
         changes: { from: line.from, to: line.to, insert: res.line },
         selection: EditorSelection.cursor(line.from + col),

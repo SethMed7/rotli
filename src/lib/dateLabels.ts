@@ -5,14 +5,20 @@
 //   • relativeLabel — compact timestamps (Board cards / the editor's "updated"):
 //     a terse "since" reading (just now / 5m / 3h / 2d / "Jun 5").
 
-/** Today / Yesterday / weekday (this week) / "Mon 5" (older) — for note lists. */
-export function longDateLabel(ts: number): string {
-  const date = new Date(ts);
+/** Whole LOCAL calendar days between ts's day and today (0 = today) — midnight
+ * to midnight, so "yesterday 11pm" is 1 day ago even at 7am. */
+export function daysSinceMidnight(ts: number): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const dayStart = new Date(ts);
   dayStart.setHours(0, 0, 0, 0);
-  const days = Math.round((today.getTime() - dayStart.getTime()) / 86_400_000);
+  return Math.round((today.getTime() - dayStart.getTime()) / 86_400_000);
+}
+
+/** Today / Yesterday / weekday (this week) / "Mon 5" (older) — for note lists. */
+export function longDateLabel(ts: number): string {
+  const date = new Date(ts);
+  const days = daysSinceMidnight(ts);
   if (days <= 0) return "Today";
   if (days === 1) return "Yesterday";
   if (days < 7) return date.toLocaleDateString(undefined, { weekday: "short" });
@@ -27,11 +33,7 @@ export function relativeLabel(ts: number): string {
   if (mins < 60) return `${mins}m`;
   const hrs = Math.round(mins / 60);
   if (hrs < 24) return `${hrs}h`;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dayStart = new Date(ts);
-  dayStart.setHours(0, 0, 0, 0);
-  const days = Math.round((today.getTime() - dayStart.getTime()) / 86_400_000);
+  const days = daysSinceMidnight(ts);
   if (days < 7) return `${days}d`;
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }

@@ -15,8 +15,8 @@
 // its × (closing it is a no-op anyway).
 
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useBoardRename } from "../lib/boardRename";
-import { useChatRename } from "../lib/chatRename";
+import { useBoardRename } from "../services/boardRename";
+import { useChatRename } from "../services/chatRename";
 import {
   closeOtherTabsWithDraftCleanup,
   closeTabWithDraftCleanup,

@@ -15,6 +15,7 @@
 // three ride the same pure/total tree helpers — never mutate inputs.
 
 import { create } from "zustand";
+import { clamp } from "../lib/clamp";
 import { initialNoteId, ulid } from "../services/notes";
 import type { LeafNode, PaneNode, SplitDir, Tab } from "../types";
 import { touchMru } from "./mru";
@@ -677,7 +678,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
             const origIndex = l.tabs.findIndex((t) => t.id === tabId);
             const without = l.tabs.filter((t) => t.id !== tabId);
             const slot = origIndex !== -1 && origIndex < toIndex ? toIndex - 1 : toIndex;
-            const at = Math.max(0, Math.min(slot, without.length));
+            const at = clamp(slot, 0, without.length);
             const tabs = [...without.slice(0, at), tab, ...without.slice(at)];
             return { ...l, tabs };
           }),
@@ -688,7 +689,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
       // cross-pane: insert a copy into the target (active there), drop from the
       // source, collapse the source if it emptied — all in one tree walk
       let next = updateLeaf(root, toPaneId, (l) => {
-        const at = Math.max(0, Math.min(toIndex, l.tabs.length));
+        const at = clamp(toIndex, 0, l.tabs.length);
         const tabs = [...l.tabs.slice(0, at), tab, ...l.tabs.slice(at)];
         return { ...l, tabs, activeTabId: tab.id };
       });

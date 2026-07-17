@@ -48,7 +48,7 @@ import {
   modelPolicyOptions,
   nextRoutineEpoch,
   sortBriefs,
-} from "./model";
+} from "../../routines/briefs";
 import { BREVE_QUERY_KEY, useBreveSnapshot } from "./useBreve";
 
 type SaveState = "idle" | "saving" | "saved" | "error";

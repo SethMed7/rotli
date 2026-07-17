@@ -82,7 +82,7 @@ import { ALL_NOTES, RECENT, SEC_CHAT, SEC_INBOX, SEC_NOTES, useUiStore } from ".
 import { activeInstance } from "../memex/config";
 import { invalidateMemex, useInstanceChats, useMemexConfig } from "../memex/useMemex";
 import { archiveChat, deleteChat, pinChat } from "../memex/service";
-import { useChatRename } from "../lib/chatRename";
+import { useChatRename } from "../services/chatRename";
 import type { Folder, NoteSummary } from "../types";
 import { dispatch } from "../keys/registry";
 import { openNewItemMenu } from "../newItems/menu";

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
-import { fileName } from "../lib/fileKind";
+import { extOf, fileName } from "../lib/fileKind";
 import { parseCsvExact } from "../sheets/csv";
 import {
   type Workbook,
@@ -21,8 +21,7 @@ function isDarkTheme(): boolean {
 }
 
 function modeOf(fileId: string): SheetFileMode {
-  const ext = fileId.toLowerCase().split(".").pop() ?? "";
-  return ext === "csv" ? "csv" : "xlsx";
+  return extOf(fileId) === "csv" ? "csv" : "xlsx";
 }
 
 export function SheetEmbed({ fileId }: { fileId: string }) {

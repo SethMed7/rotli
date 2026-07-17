@@ -5,11 +5,11 @@
 // the new id so the board keeps showing.
 
 import { useCallback } from "react";
-import { invalidateNotes } from "../services/hooks";
+import { corpusRenameBoard } from "../lib/tauri";
 import { renameMainRef } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
-import { corpusRenameBoard } from "./tauri";
+import { invalidateNotes } from "./hooks";
 
 export function useBoardRename() {
   const renamingBoardId = useUiStore((s) => s.renamingBoardId);

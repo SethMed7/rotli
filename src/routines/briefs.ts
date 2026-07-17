@@ -1,6 +1,6 @@
-import type { BreveBrief, BreveConfig, BreveRoutine, BreveSnapshot } from "../../lib/tauri";
-import { DEFAULT_BREVE_PDF_THEME } from "../../brand/brevePdfThemes";
-import { nextRun } from "../../routines/schedule";
+import type { BreveBrief, BreveConfig, BreveRoutine, BreveSnapshot } from "../lib/tauri";
+import { DEFAULT_BREVE_PDF_THEME } from "../brand/brevePdfThemes";
+import { nextRun } from "./schedule";
 
 export const EMPTY_BREVE_CONFIG: BreveConfig = {
   version: 1,

@@ -19,6 +19,9 @@ const TYPE_BUCKETS: [string, Set<string>][] = [
 ];
 const TYPE_ORDER = ["Audio", "Images", "PDFs", "Documents", "Other"];
 
+// NOT lib/fileKind's extOf: an extensionless name must yield "" (→ the Other
+// bucket), while the shared helper returns the whole name — a file literally
+// named "png" must not land in Images.
 function extOf(name: string): string {
   const i = name.lastIndexOf(".");
   return i < 0 ? "" : name.slice(i + 1).toLowerCase();

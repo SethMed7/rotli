@@ -15,6 +15,7 @@ import {
   dismissProposal,
   undoAction,
 } from "../services/brainJournalComposition";
+import { daysSinceMidnight } from "../lib/dateLabels";
 import { organizerRunOnce } from "../lib/tauri";
 import { invalidateJournal, invalidateNotes, useJournal, useOrganizerStatus } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
@@ -22,9 +23,7 @@ import { Character } from "./character";
 
 function when(ts: number): string {
   const d = new Date(ts);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const days = Math.round((today.getTime() - new Date(ts).setHours(0, 0, 0, 0)) / 86_400_000);
+  const days = daysSinceMidnight(ts);
   const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   if (days <= 0) return time;
   if (days === 1) return `Yesterday ${time}`;
