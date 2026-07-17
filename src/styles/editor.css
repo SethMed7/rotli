@@ -1222,10 +1222,43 @@
   background: var(--hov);
 }
 
-/* the row/col mini menu — the block-menu voice, viewport-fixed at the chip */
+/* the row/col mini menu — viewport-fixed at the chip. Carries its own popover
+   voice: the block-action menu it used to borrow classes from moved to the
+   shared .ctxmenu host (remediation Batch 3), and this one stays imperative
+   DOM (a CodeMirror widget, no React root to host it). */
+.rotli-tblmenu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+}
 .rotli-tblmenu {
   position: fixed;
   z-index: 60;
+  min-width: 140px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.rotli-tblmenu-item {
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: var(--r-inner);
+  cursor: pointer;
+}
+.rotli-tblmenu-item:hover {
+  background: var(--hov);
+}
+.rotli-tblmenu-item.danger:hover {
+  background: color-mix(in srgb, var(--accent-text) 14%, transparent);
+  color: var(--accent-text);
 }
 .rotli-tblmenu-align {
   display: flex;

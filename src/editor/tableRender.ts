@@ -89,13 +89,13 @@ function openTableMenu(
 ): void {
   closeTableMenu();
   const backdrop = document.createElement("div");
-  backdrop.className = "rotli-block-backdrop";
+  backdrop.className = "rotli-tblmenu-backdrop";
   backdrop.addEventListener("mousedown", (e) => {
     e.preventDefault();
     closeTableMenu();
   });
   const menu = document.createElement("div");
-  menu.className = "rotli-block-menu rotli-tblmenu";
+  menu.className = "rotli-tblmenu";
   menu.setAttribute("role", "menu");
 
   const act = (fn: (t: TableBlock) => TableShape | null) => {
@@ -106,7 +106,7 @@ function openTableMenu(
   const item = (label: string, run: () => void, danger = false) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = danger ? "rotli-block-item danger" : "rotli-block-item";
+    b.className = danger ? "rotli-tblmenu-item danger" : "rotli-tblmenu-item";
     b.setAttribute("role", "menuitem");
     b.textContent = label;
     b.addEventListener("mousedown", (e) => e.preventDefault());
