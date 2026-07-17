@@ -1,0 +1,59 @@
+{
+  "2fde8ae2c5469c2793c58e2c27dfb13e6c5d4ebee75f0ba2b3111cd67b422c62": {
+    "fingerprint": "3fd8853767d767350bcf17f95fa118af0d7b9ccb13bb59837c7f2f2ff820daa3",
+    "signal": "literal",
+    "files": [
+      "src/editor/formatBar.tsx",
+      "src/keys/actions.ts"
+    ],
+    "promptVersion": "1",
+    "model": "haiku",
+    "judgment": {
+      "classification": "duplicated_policy",
+      "invariant": "Formatting action IDs (editor.bold, editor.bulletList, etc.) and their labels are constants that define the formatting command interface and must never drift between registration and dispatch.",
+      "differences": "formatBar.tsx uses these as UI button labels and dispatch targets; actions.ts registers them as action handlers with titles. The excerpt doesn't show the full action registration, but both sites reference the same action ID strings.",
+      "drift_risk": "high",
+      "owner": "src/editor/ (should own the canonical action ID and label definitions)",
+      "action": "shared_helper",
+      "rationale": "Extract formatting action IDs and labels to a shared constants module (e.g., src/editor/formatActions.ts) so both formatBar dispatch and actions registration import from one source of truth; prevents silent mismatch between UI buttons and registered handlers."
+    }
+  },
+  "4f2e1a07657a608d133662e880abe3f6a25a45e7ec66d22372aadf7ac85ef3bf": {
+    "fingerprint": "7cc66c3f41e8d0ddd146fd6beda020e882af72b50af24cc6fee1ea094ed9d731",
+    "signal": "shingle",
+    "files": [
+      "src/editor/cmEditor.tsx",
+      "src/editor/cmEditor.tsx"
+    ],
+    "promptVersion": "1",
+    "model": "haiku",
+    "judgment": {
+      "classification": "shared_mechanism",
+      "invariant": "Both apply a parameterized line-level transformation to editor state, update cursor position by delta, and maintain selection/scroll state.",
+      "differences": "The transformation function called (applyHeading vs applyBlockToggle) and its parameter type (level vs kind).",
+      "drift_risk": "high",
+      "owner": "src/editor/cmEditor.tsx",
+      "action": "shared_helper",
+      "rationale": "Identical mechanical pattern for line transformation + cursor repositioning in same file and language; extract as a generic helper to prevent cursor-positioning or selection-handling divergence."
+    }
+  },
+  "fa1ef2a3a7b5b4850bc99e6da123621905883370f6f32aed39a6bb7f48ba48dd": {
+    "fingerprint": "ae056a6449d89d1225ba8ab1708ccba19db9d313b5ff233e07e21fba69957ab5",
+    "signal": "literal",
+    "files": [
+      "src/components/allChatsSurface.tsx",
+      "src/components/noteListSurface.tsx"
+    ],
+    "promptVersion": "1",
+    "model": "haiku",
+    "judgment": {
+      "classification": "coincidental",
+      "invariant": "Both implement a filterable list surface with search input and empty-state messaging.",
+      "differences": "AllChatsSurface searches chats by title/slug with simple substring matching and alphabetic sorting; NoteListSurface is a generic component with debounced full-text API search, local filtering, and pinned-then-recency sorting.",
+      "drift_risk": "low",
+      "owner": "none",
+      "action": "leave_documented",
+      "rationale": "The sites use a common design-system vocabulary (CSS classes, size constants) but encode independent domain logic (chat vs. note semantics, different search/sort strategies); extracting a shared component would require excessive parameterization and obscure the distinct purposes."
+    }
+  }
+}
