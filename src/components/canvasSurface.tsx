@@ -5,7 +5,8 @@
 // (debounced) on every change. Outside the Tauri shell the corpus doesn't exist,
 // so we render a themed placeholder instead. Kit tokens only (styles/canvas.css).
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createCorpusBoardSaver, loadBoard } from "../boards/composition";
 import {
   type BoardChangeAppState,
   type BoardChangeElements,
@@ -13,27 +14,10 @@ import {
   type BoardInitialData,
   BoardCanvas,
 } from "../boards/engine/excalidraw";
-import { type CorpusBoardDoc, corpusReadBoard, corpusWriteBoard, isTauri } from "../lib/tauri";
+import { type BoardMeta, EMPTY_BOARD_META, serializeBoardScene } from "../boards/session";
+import { isTauri } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
 
-const SAVE_DEBOUNCE_MS = 500;
-
-/** A minimal valid empty Excalidraw scene (used when the file is empty/new or
- * the JSON fails to parse — never throw a blank board away). */
-const EMPTY_SCENE = {
-  type: "excalidraw" as const,
-  version: 2,
-  source: "rotli",
-  elements: [],
-  appState: {},
-  files: {},
-};
-
-interface BoardMeta {
-  description: string;
-  tags: string;
-}
-const EMPTY_META: BoardMeta = { description: "", tags: "" };
 /** The slice of Excalidraw's imperative API we use to re-serialize the scene on a
  * metadata save (a metadata edit isn't an Excalidraw change, so we rebuild it). */
 type ExcaliApi = {
@@ -69,33 +53,20 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
       : "light";
 
   const [state, setState] = useState<CanvasState>({ status: "loading", initialData: null });
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // serialize the latest scene; the debounced write picks up the freshest one.
-  const pending = useRef<string | null>(null);
   // a failed board write is the closest thing the shell has to data loss —
   // SAY so inline instead of a console.warn (#11, audit 2026-07). Cleared by
   // the next successful write (the debounced saves keep retrying naturally).
   const [saveErr, setSaveErr] = useState<string | null>(null);
 
-  // every save path (debounce, flush-on-unmount, metadata) funnels here so the
-  // failure/recovery surfacing can't drift between them
-  const writeBoard = useCallback(
-    (body: string) => {
-      if (!isTauri()) return;
-      corpusWriteBoard(boardId, body).then(
-        () => setSaveErr(null),
-        (e: unknown) => setSaveErr(e instanceof Error ? e.message : String(e)),
-      );
-    },
-    [boardId],
-  );
+  // every save path (debounce, flush-on-unmount, metadata) funnels through the
+  // shared saver so the failure/recovery surfacing can't drift between them
+  const saver = useMemo(() => createCorpusBoardSaver(boardId, setSaveErr), [boardId]);
 
-  // G — board metadata (Seth, 2026-06-26): a board is an image to a text LLM, so it
-  // carries a description + tags, stored TOP-LEVEL in the .excalidraw (NOT in
-  // appState, which Excalidraw would strip) so the AI can know + search it later.
+  // G — board metadata (Seth, 2026-06-26): description + tags ride top-level in
+  // the .excalidraw (see boards/session.ts BoardMeta).
   const apiRef = useRef<ExcaliApi | null>(null);
-  const metaRef = useRef<BoardMeta>(EMPTY_META);
-  const [meta, setMeta] = useState<BoardMeta>(EMPTY_META);
+  const metaRef = useRef<BoardMeta>(EMPTY_BOARD_META);
+  const [meta, setMeta] = useState<BoardMeta>(EMPTY_BOARD_META);
   const [metaOpen, setMetaOpen] = useState(false);
 
   // load the board once per boardId
@@ -103,20 +74,9 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
     if (!isTauri()) return;
     let cancelled = false;
     setState({ status: "loading", initialData: null });
-    corpusReadBoard(boardId)
-      .then((doc: CorpusBoardDoc) => {
+    loadBoard(boardId)
+      .then(({ scene, meta: loaded }) => {
         if (cancelled) return;
-        let scene: unknown = EMPTY_SCENE;
-        const raw = doc.body.trim();
-        if (raw) {
-          try {
-            scene = JSON.parse(raw);
-          } catch {
-            scene = EMPTY_SCENE; // corrupt JSON => start from a blank scene
-          }
-        }
-        const rm = (scene as { rotliMeta?: Partial<BoardMeta> }).rotliMeta;
-        const loaded: BoardMeta = { description: rm?.description ?? "", tags: rm?.tags ?? "" };
         metaRef.current = loaded;
         setMeta(loaded);
         setState({ status: "ready", initialData: scene as ExcalidrawInitialData });
@@ -135,17 +95,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   }, [boardId]);
 
   // flush any pending save when the board changes or the surface unmounts
-  const flush = useCallback(() => {
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current);
-      saveTimer.current = null;
-    }
-    const body = pending.current;
-    pending.current = null;
-    if (body !== null) writeBoard(body);
-  }, [writeBoard]);
-
-  useEffect(() => () => flush(), [flush]);
+  useEffect(() => () => saver.flush(), [saver]);
 
   const onChange = useCallback(
     (
@@ -155,30 +105,16 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
     ) => {
       // Don't write while still loading (the initialData render fires onChange).
       if (state.status !== "ready") return;
-      const scene = {
-        type: "excalidraw" as const,
-        version: 2,
-        source: "rotli",
-        elements,
-        // strip volatile UI cruft so saves stay diff-friendly
-        appState: {
-          ...appState,
-          collaborators: undefined,
-          // don't persist transient selection/dragging state
-        },
-        files,
-        rotliMeta: metaRef.current,
-      };
-      pending.current = JSON.stringify(scene);
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => {
-        const body = pending.current;
-        pending.current = null;
-        saveTimer.current = null;
-        if (body !== null) writeBoard(body);
-      }, SAVE_DEBOUNCE_MS);
+      saver.schedule(
+        serializeBoardScene({
+          elements,
+          appState: appState as unknown as Record<string, unknown>,
+          files: files as unknown as Record<string, unknown>,
+          meta: metaRef.current,
+        }),
+      );
     },
-    [state.status, writeBoard],
+    [state.status, saver],
   );
 
   // Persist a metadata edit right away (it doesn't ride the Excalidraw onChange
@@ -189,18 +125,16 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
       setMeta(next);
       const api = apiRef.current;
       if (!api || !isTauri()) return;
-      const scene = {
-        type: "excalidraw" as const,
-        version: 2,
-        source: "rotli",
-        elements: api.getSceneElements(),
-        appState: { ...api.getAppState(), collaborators: undefined },
-        files: api.getFiles(),
-        rotliMeta: next,
-      };
-      writeBoard(JSON.stringify(scene));
+      saver.saveNow(
+        serializeBoardScene({
+          elements: api.getSceneElements(),
+          appState: api.getAppState(),
+          files: api.getFiles(),
+          meta: next,
+        }),
+      );
     },
-    [writeBoard],
+    [saver],
   );
 
   if (!isTauri()) {
