@@ -114,7 +114,7 @@ function scheduleSync(noteId: string): void {
     noteId,
     setTimeout(() => {
       timers.delete(noteId);
-      syncNow(noteId);
+      void syncNow(noteId);
     }, SYNC_DEBOUNCE_MS),
   );
 }
@@ -127,7 +127,7 @@ export function flushNote(noteId: string): void {
   if (pending === undefined) return;
   clearTimeout(pending);
   timers.delete(noteId);
-  syncNow(noteId);
+  void syncNow(noteId);
 }
 
 /** Flush every pending debounced sync immediately — the quit/reload path. The

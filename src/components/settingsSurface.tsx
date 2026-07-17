@@ -1553,13 +1553,17 @@ function LaneCard({ id }: { id: ProviderId }) {
 
   const runVerify = () => {
     setVerify({ state: "running" });
-    verifyLane(id).then((r) =>
-      setVerify(
-        r.ok
-          ? { state: "ok", ms: r.ms, model: r.model }
-          : { state: "fail", error: r.error ?? "failed" },
-      ),
-    );
+    verifyLane(id)
+      .then((r) =>
+        setVerify(
+          r.ok
+            ? { state: "ok", ms: r.ms, model: r.model }
+            : { state: "fail", error: r.error ?? "failed" },
+        ),
+      )
+      .catch((e: unknown) =>
+        setVerify({ state: "fail", error: e instanceof Error ? e.message : "failed" }),
+      );
   };
 
   const onToggle = () => {
@@ -1746,7 +1750,6 @@ function PresetEditor({
       </label>
       {p.routes.map((r, i) => (
         // routes are positional (no stable id) — index keys are correct here
-        // eslint-disable-next-line react/no-array-index-key
         <div className="preset-route" key={i}>
           <input
             className="aikey-input"
@@ -1876,7 +1879,6 @@ function ModelsPane() {
       </span>
       {p.routes.map((r, i) => (
         // routes are positional — index keys are correct here
-        // eslint-disable-next-line react/no-array-index-key
         <span className="preset-step" key={i}>
           → {r.when || "everything else"} · <b>{pretty(r.model)}</b>
         </span>
@@ -1899,7 +1901,7 @@ function ModelsPane() {
 
       <LocalModelsSection
         installed={local.data ?? []}
-        onChanged={() => queryClient.invalidateQueries({ queryKey: ["chat", "models"] })}
+        onChanged={() => void queryClient.invalidateQueries({ queryKey: ["chat", "models"] })}
       />
 
       <section className="aisection">

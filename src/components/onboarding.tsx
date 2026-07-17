@@ -550,7 +550,6 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               type="text"
               placeholder="Your name"
               value={userName}
-              // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
               onChange={(e) => setUserName(e.target.value)}
               onKeyDown={(e) => {

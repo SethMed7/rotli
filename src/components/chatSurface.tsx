@@ -326,6 +326,14 @@ function ModelPicker({
     },
   ].filter((s) => s.items.length > 0);
   const flatItems = sections.flatMap((s) => s.items);
+  // the identity-picking effect below deliberately keys off flatKey/picked?.id
+  // (cheap primitives) rather than the flatItems/picked objects themselves —
+  // those are rebuilt every render, so depending on them directly would refocus
+  // on every keystroke elsewhere in the app. Refs carry the latest values in.
+  const flatItemsRef = useRef(flatItems);
+  flatItemsRef.current = flatItems;
+  const pickedRef = useRef(picked);
+  pickedRef.current = picked;
   const flatKey = flatItems.map((m) => `${m.provider}:${m.id}`).join("\u0000");
 
   const pickedKind: ModelKind = picked ? kindOf(picked) : "local";
@@ -338,8 +346,10 @@ function ModelPicker({
         : "On-device model — stays on your Mac";
 
   useEffect(() => {
-    if (!open || flatItems.length === 0) return;
-    const selected = picked ? flatItems.findIndex((m) => m.id === picked.id) : -1;
+    const items = flatItemsRef.current;
+    const current = pickedRef.current;
+    if (!open || items.length === 0) return;
+    const selected = current ? items.findIndex((m) => m.id === current.id) : -1;
     const next = selected >= 0 ? selected : 0;
     setActiveIndex(next);
     const frame = requestAnimationFrame(() => rowRefs.current[next]?.focus());

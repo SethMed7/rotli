@@ -34,12 +34,14 @@ export async function runQuitFlushers(): Promise<void> {
 // The listener exists only in the Tauri shell (bun tests / browser preview
 // have no IPC — and nothing to flush that survives them anyway).
 if (typeof window !== "undefined" && isTauri()) {
-  void listen("rotli:flush-before-quit", async () => {
-    try {
-      await runQuitFlushers();
-    } finally {
-      // the ack releases the exit; a failed invoke just rides out Rust's timeout
-      await invoke("quit_flush_done").catch(() => {});
-    }
+  void listen("rotli:flush-before-quit", () => {
+    void (async () => {
+      try {
+        await runQuitFlushers();
+      } finally {
+        // the ack releases the exit; a failed invoke just rides out Rust's timeout
+        await invoke("quit_flush_done").catch(() => {});
+      }
+    })();
   });
 }

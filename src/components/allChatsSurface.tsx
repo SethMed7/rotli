@@ -12,7 +12,8 @@ import { ChatGlyph, SearchGlyph } from "./glyphs";
 export function AllChatsSurface() {
   const memexCfg = useMemexConfig();
   const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
-  const chats = useInstanceChats(activeMemex).data ?? [];
+  const chatsData = useInstanceChats(activeMemex).data;
+  const chats = useMemo(() => chatsData ?? [], [chatsData]);
   const openChat = usePanesStore((s) => s.openChat);
   const [query, setQuery] = useState("");
 

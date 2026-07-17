@@ -198,7 +198,6 @@ export default function SheetEditor({
       handleRef.current = null;
       wbRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileId, mode, themeMode, appTheme]);
 
   useEffect(() => {

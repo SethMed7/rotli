@@ -90,13 +90,13 @@ export function Palette({ onClose }: { onClose: () => void }) {
   // length so a keepPreviousData placeholder can't ride under a cleared box.
   const searchData = useNoteSearch(query).data;
   const hits = query.trim().length >= 2 ? searchData : undefined;
-  const folders = useFolders().data ?? [];
+  const foldersData = useFolders().data;
   // the FULL index (files included) — the filename pass (audit F4); and the
   // active memex's chats for the chat-title pass (audit F3)
   const noteIndex = useNoteIndex();
   const memexCfg = useMemexConfig();
   const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
-  const chats = useInstanceChats(activeMemex).data ?? [];
+  const chatsData = useInstanceChats(activeMemex).data;
   const mruIds = useMruStore((s) => s.ids);
   const overrides = useBindingsStore((s) => s.overrides);
   const root = usePanesStore((s) => s.root);
@@ -108,6 +108,8 @@ export function Palette({ onClose }: { onClose: () => void }) {
   const selectedFolderId = useUiStore((s) => s.selectedFolderId);
 
   const groups = useMemo<Group[]>(() => {
+    const folders = foldersData ?? [];
+    const chats = chatsData ?? [];
     const folderName = (id: string) => folders.find((f) => f.id === id)?.name ?? "";
     const noteById = new Map(notes.map((n) => [n.id, n]));
     const q = query.trim();
@@ -296,9 +298,9 @@ export function Palette({ onClose }: { onClose: () => void }) {
     query,
     notes,
     hits,
-    folders,
+    foldersData,
     noteIndex,
-    chats,
+    chatsData,
     mruIds,
     overrides,
     root,

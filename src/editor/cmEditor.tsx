@@ -454,7 +454,11 @@ export function CmEditor({
       applyingExternal.current = false;
     });
 
-    registerEditor(paneId, handleRef.current);
+    // captured once here — handleRef.current is set at construction and never
+    // reassigned, but the cleanup below must read the SAME object it registered,
+    // not whatever handleRef.current happens to be by the time it runs
+    const handle = handleRef.current;
+    registerEditor(paneId, handle);
     reportContext(view);
 
     if (autoFocus) {
@@ -464,7 +468,7 @@ export function CmEditor({
 
     return () => {
       unsub();
-      unregisterEditor(paneId, handleRef.current);
+      unregisterEditor(paneId, handle);
       view.destroy();
       viewRef.current = null;
     };

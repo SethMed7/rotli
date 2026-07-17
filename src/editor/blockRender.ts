@@ -424,11 +424,13 @@ class RenderBlockWidget extends WidgetType {
 
     const out = RENDERERS[this.lang](this.code, ctx);
     if (out instanceof Promise) {
-      out.then((el) => {
-        if (this.destroyed) return; // widget gone — never touch its DOM
-        body.replaceChildren(el);
-        if (this.lang !== "jsxgraph") cacheSet(key, el);
-      });
+      out
+        .then((el) => {
+          if (this.destroyed) return; // widget gone — never touch its DOM
+          body.replaceChildren(el);
+          if (this.lang !== "jsxgraph") cacheSet(key, el);
+        })
+        .catch(() => {});
     } else {
       body.appendChild(out);
       if (this.lang !== "jsxgraph") cacheSet(key, out);
@@ -484,13 +486,15 @@ function openExpandOverlay(lang: StaticLangKey, code: string, anchor: HTMLElemen
   };
   const out = RENDERERS[lang](code, ctx);
   if (out instanceof Promise) {
-    out.then((el) => {
-      if (!card.isConnected) {
-        freeIfBoard(el.querySelector<HTMLElement>(".rotli-render-jsxgraph"));
-        return;
-      }
-      card.appendChild(el);
-    });
+    out
+      .then((el) => {
+        if (!card.isConnected) {
+          freeIfBoard(el.querySelector<HTMLElement>(".rotli-render-jsxgraph"));
+          return;
+        }
+        card.appendChild(el);
+      })
+      .catch(() => {});
   } else {
     card.appendChild(out);
   }

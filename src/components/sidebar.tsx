@@ -485,7 +485,7 @@ function AddedRootRow({ root }: { root: CorpusRoot }) {
 }
 
 export function Sidebar() {
-  const rawFolders = useFolders().data ?? [];
+  const foldersData = useFolders().data;
   // the COUNTS speak the same universe the All-notes surface renders
   // (useSearchableNotes — staged + Brain + Vault + added roots): counting the
   // plain useNotes VIEW made the sidebar and the surface disagree the moment
@@ -497,10 +497,10 @@ export function Sidebar() {
   const inboxNotes = useNotes(DEST.inbox).data ?? [];
   const secureNotes = useNotes(DEST.secure).data ?? [];
   const vaultNotes = useNotes(DEST.vault).data ?? [];
-  const storageNotesFlat = useNotes(DEST.storage).data ?? [];
+  const storageNotesFlatData = useNotes(DEST.storage).data;
   const archiveNotes = useNotes(DEST.archive).data ?? [];
   const trashNotes = useNotes(DEST.trash).data ?? [];
-  const boardNotes = useNotes(DEST.board).data ?? [];
+  const boardNotesData = useNotes(DEST.board).data;
   // Storage organization (Seth, 2026-06-30): regroup the flat binaries into a
   // synthetic tree (Type / Date / Folder, a Settings knob) IN THE FRONTEND. The
   // synthetic "Storage/<…>" folders merge into the folder list and the storage
@@ -508,13 +508,13 @@ export function Sidebar() {
   // no backend change, instant toggle.
   const storageGrouping = useUiStore((s) => s.storageGrouping);
   const storageTree = useMemo(
-    () => buildStorageTree(storageNotesFlat, storageGrouping),
-    [storageNotesFlat, storageGrouping],
+    () => buildStorageTree(storageNotesFlatData ?? [], storageGrouping),
+    [storageNotesFlatData, storageGrouping],
   );
   const storageNotes = storageTree.notes;
   const folders = useMemo(
     () => [
-      ...rawFolders.filter(
+      ...(foldersData ?? []).filter(
         (f) =>
           f.id !== "storage" &&
           !f.id.startsWith("storage/") &&
@@ -523,7 +523,7 @@ export function Sidebar() {
       ),
       ...storageTree.folders,
     ],
-    [rawFolders, storageTree.folders],
+    [foldersData, storageTree.folders],
   );
   // hide the "Vault" (linked-library) destination until one is actually connected —
   // an empty Vault row next to the user's own memex-vault folder just confuses
@@ -578,12 +578,12 @@ export function Sidebar() {
   // Chat surface reads), plus the chat-selection ui state the surface renders. —
   const memexCfg = useMemexConfig();
   const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
-  const rawChatList = useInstanceChats(activeMemex).data ?? [];
+  const rawChatListData = useInstanceChats(activeMemex).data;
   // pinned chats float to the top (stable sort keeps the slug order within each
   // group) — the pin lives in the chat's own frontmatter (Seth #4, 2026-07-08)
   const chatList = useMemo(
-    () => [...rawChatList].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
-    [rawChatList],
+    () => [...(rawChatListData ?? [])].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
+    [rawChatListData],
   );
   const chatRename = useChatRename();
   const quickNoteIds = useUiStore((s) => s.quickNoteIds);
@@ -593,9 +593,10 @@ export function Sidebar() {
   // Captures count mirrors BoardSurface's curated-note rule: a staged note
   // placed in Main or starred for Quick access is a full note, not a capture.
   const captureCount = useMemo(() => {
+    const boardNotes = boardNotesData ?? [];
     const curated = mainNoteIds(mainManifest.tree);
     return boardNotes.filter((n) => !curated.has(n.id) && !quickNoteIds.includes(n.id)).length;
-  }, [boardNotes, mainManifest.tree, quickNoteIds]);
+  }, [boardNotesData, mainManifest.tree, quickNoteIds]);
 
   const selectedFolderId = useUiStore((s) => s.selectedFolderId);
   const setSelectedFolderId = useUiStore((s) => s.setSelectedFolderId);

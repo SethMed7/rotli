@@ -79,9 +79,12 @@ export function SlashPicker({
   const searchable = useSearchableNotes();
   const storage = useNotes(DEST.storage);
   const usesStorage = mode === "embedSheet" || mode === "embedDocument";
-  const notes = usesStorage ? storage.data ?? [] : searchable.notes;
+  const storageData = storage.data;
   const ready = usesStorage ? storage.isSuccess : searchable.ready;
-  const items = useMemo(() => filterNotes(notes, mode, query), [notes, mode, query]);
+  const items = useMemo(() => {
+    const notes = usesStorage ? storageData ?? [] : searchable.notes;
+    return filterNotes(notes, mode, query);
+  }, [usesStorage, storageData, searchable.notes, mode, query]);
   useEffect(() => {
     let cancelled = false;
     if (mode === "linkNote" || !isTauri()) return;

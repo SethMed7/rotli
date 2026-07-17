@@ -22,7 +22,7 @@ import { ArchiveGlyph, CheckGlyph, glyphForNote } from "./glyphs";
 import { useNoteMenu } from "./useNoteMenu";
 
 export function BoardSurface() {
-  const staged = useNotes(DEST.board).data ?? [];
+  const stagedData = useNotes(DEST.board).data;
   // a CURATED note is a full note, not a passing capture (Seth, 2026-07-01: "my
   // main note should not be in Captures") — anything placed in Main or starred
   // for Quick access leaves the board, even while it still lives in _inbox
@@ -32,9 +32,10 @@ export function BoardSurface() {
   const focusedNoteId = useFocusedNoteId();
   const revealNonce = useUiStore((s) => s.revealNonce);
   const captures = useMemo(() => {
+    const staged = stagedData ?? [];
     const curated = mainNoteIds(mainTree);
     return staged.filter((n) => !curated.has(n.id) && !quickIds.includes(n.id));
-  }, [staged, mainTree, quickIds]);
+  }, [stagedData, mainTree, quickIds]);
   const setContentView = useUiStore((s) => s.setContentView);
   const openNote = usePanesStore((s) => s.openNote);
   const openSummary = usePanesStore((s) => s.openSummary);
@@ -289,11 +290,21 @@ export function BoardSurface() {
             {chosen.length} selected
           </span>
           <span className="board-bar-grow" />
-          <button type="button" className="board-btn" disabled={busy} onClick={archiveSelected}>
+          <button
+            type="button"
+            className="board-btn"
+            disabled={busy}
+            onClick={() => void archiveSelected()}
+          >
             <ArchiveGlyph size={14} />
             Archive
           </button>
-          <button type="button" className="board-btn primary" disabled={busy} onClick={merge}>
+          <button
+            type="button"
+            className="board-btn primary"
+            disabled={busy}
+            onClick={() => void merge()}
+          >
             {busy ? "Merging…" : chosen.length > 1 ? `Merge ${chosen.length} into a note` : "Make a note"}
           </button>
           <button type="button" className="board-btn ghost" disabled={busy} onClick={() => setSelected(new Set())}>

@@ -244,7 +244,8 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             return;
           }
           corpusFileText(fileId, READ_MAX_BYTES).then((t) => !cancelled && setText(t)).catch(fail);
-        });
+        })
+        .catch(fail);
     } else if (kind === "sheet") {
       // probe first: an editable sheet mounts the editor (which loads its own
       // data); everything else falls back to the read-only table
@@ -269,7 +270,8 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
                 parseWorkbook({ csv, delimiter: ext === "tsv" ? "\t" : "," }),
               );
           load.then((t) => !cancelled && setTables(t)).catch(fail);
-        });
+        })
+        .catch(fail);
     } else if (kind === "document" && DOCX_EDITABLE.has(ext)) {
       // Probe before mounting the editor. Only Rotli-managed storage is a
       // writable lane; linked and secure roots keep their existing policy.
@@ -280,7 +282,8 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           setStat(s);
           setProbed(true);
           if (s && s.len > DOCUMENT_EDIT_MAX_BYTES) setTooLarge(true);
-        });
+        })
+        .catch(fail);
     } else if (kind === "document") {
       // Legacy documents never enter a passive preview. The supported local
       // conversion family gets an explicit copy-to-DOCX action; every other

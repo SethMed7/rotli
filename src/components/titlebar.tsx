@@ -86,7 +86,7 @@ export function Titlebar() {
           </button>
         </div>
       )}
-      {/* global search (Seth, 2026-07-06): the wide top search field. The rotli
+      {/* Seth, 2026-07-06: the wide top global-search field. The rotli
           mark moved OFF the far left and INTO the field as a circular badge in
           place of the search glyph (Seth, 2026-07-07). Opens the ⌘K palette. The
           surrounding strip stays a window-drag region; the button stops its own

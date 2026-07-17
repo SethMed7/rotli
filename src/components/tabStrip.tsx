@@ -257,6 +257,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                       onFocus={(event) => event.currentTarget.select()}
                       onKeyDown={(event) => {
                         if (event.key === "Enter")
+                          // eslint-disable-next-line @typescript-eslint/no-floating-promises -- removed in remediation Batch 3/4
                           commitRename(tab.boardId, event.currentTarget.value);
                         else if (event.key === "Escape") cancelRename();
                       }}
@@ -273,6 +274,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                       onFocus={(event) => event.currentTarget.select()}
                       onKeyDown={(event) => {
                         if (event.key === "Enter")
+                          // eslint-disable-next-line @typescript-eslint/no-floating-promises -- removed in remediation Batch 3/4
                           commitChatRename(tab.chatSlug ?? "", event.currentTarget.value);
                         else if (event.key === "Escape") cancelChatRename();
                       }}
