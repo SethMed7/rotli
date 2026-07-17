@@ -208,7 +208,10 @@ function MemexStep() {
     const path = await pickFolder();
     if (path) setPendingChoice({ kind: "init", path });
   };
-  const usePlain = async () => {
+  // named without a "use" prefix on purpose — it's a plain async helper, not a
+  // hook, but eslint's rules-of-hooks treats any use[A-Z]-named function called
+  // from a callback as a hook-in-callback violation
+  const pickPlainFolder = async () => {
     const path = await pickFolder();
     if (path) setPendingChoice({ kind: "use", path, label: path.split("/").pop() ?? path });
   };
@@ -273,7 +276,7 @@ function MemexStep() {
             type="button"
             className={plainPath ? "onb-choice sel" : "onb-choice"}
             aria-pressed={!!plainPath}
-            onClick={() => void usePlain()}
+            onClick={() => void pickPlainFolder()}
           >
             <span className="onb-choice-title">Use a plain folder…</span>
             <span className="onb-choice-desc">
