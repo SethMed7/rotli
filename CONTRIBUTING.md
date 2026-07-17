@@ -63,6 +63,39 @@ Source filenames use camelCase. Product CSS uses semantic tokens from
 `src/brand/`; raw colors outside the brand definition layer fail CI. Markdown is
 the only surface with slash commands and embed syntax.
 
+Where a new surface, feature, vendor dependency, utility, Tauri command,
+TS↔Rust shared constant, or CARL domain belongs — and which mechanical check
+enforces each rule, including the dependency-conflict procedure — is defined in
+[`docs/development/adding-things.md`](docs/development/adding-things.md).
+
+## Formatting and linting
+
+Prettier at `printWidth` 110 is the adopted TypeScript formatter. The one-time
+repository-wide reformat commit is pending diff review; until it lands, match
+the surrounding style — wide lines are house style (~110-column soft limit) —
+and never mix format-only churn into behavioral commits. When the reformat
+lands, its SHA joins `.git-blame-ignore-revs` and `format:check` joins the
+`lint` chain; run `git config blame.ignoreRevsFile .git-blame-ignore-revs`
+once locally (GitHub honors the file automatically; local git does not).
+
+rustfmt is deliberately and permanently not used. Measured on this tree it
+rewrites 4,770–7,604 diff lines regardless of width configuration — the churn
+is structural rewrapping, not line width — while only 287 of 18,080 Rust lines
+exceed 100 columns. `cargo clippy --all-targets -- -D warnings` is the Rust
+gate; do not run `cargo fmt` or commit its output.
+
+ESLint rules live in `eslint.config.mjs` and are deliberately minimal
+(floating/misused promises, `no-explicit-any`, react-hooks). Propose additions
+in a PR; the config must not grow silently. TypeScript stays pinned `~5.8.3`
+because typescript-eslint 8.x crashes on TS 7. Biome remains the preferred
+long-term two-package footprint: re-benchmark when `noFloatingPromises` leaves
+its nursery (at adoption time it missed 3 of 8 real floating-promise sites).
+`breve-runtime/scripts/` is measured but deferred at 75 findings (71
+`no-explicit-any`, 4 `no-floating-promises`) — over the 15-site adoption
+threshold; revisit once the `any` debt shrinks. This repository has no git
+hooks: enforcement is the `lint` chain locally plus CI. If a pre-commit hook
+is ever added, measure eslint `projectService` per-commit latency first.
+
 ## Required validation
 
 Use these focused gates while iterating:
@@ -99,5 +132,8 @@ local conversion workflow before the UI describes them as supported.
 
 Keep commits scoped and explain behavior, not implementation trivia. Never
 include local `.rotli/` state, credentials, generated Carl sessions, personal
-memex content, or production configuration. Release tooling mutates external
+memex content, or production configuration. Generated, dependency,
+machine-local, and secret material is never tracked; a new tool that writes a
+cache or metadata ships its `.gitignore` entries in the same change (policy:
+[`docs/development/adding-things.md`](docs/development/adding-things.md)). Release tooling mutates external
 state and must only be used as part of an explicitly authorized release.

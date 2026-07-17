@@ -31,6 +31,21 @@ const testFiles = testRoots.flatMap((dir) => walkFiles(
   (path) => /(?:\.(?:test|spec)|\/test-[^/]+)\.tsx?$/.test(path),
 ));
 
+// Pane surfaces and modal dialogs have one home (docs/development/adding-things.md).
+// Feature-owned surfaces are enumerated exceptions; extending this set requires a
+// matching row in the adding-things contract table.
+const surfaceHomeExceptions = new Set([
+  "src/editor/editorSurface.tsx",
+  "src/components/breve/breveSurface.tsx",
+]);
+for (const file of productionFiles) {
+  if (!file.startsWith("src/") || !/(?:Surface|Dialog)\.tsx$/.test(file)) continue;
+  if (surfaceHomeExceptions.has(file)) continue;
+  if (dirname(file) !== "src/components") {
+    violations.push(`${file}: pane surfaces and dialogs live in src/components/ (docs/development/adding-things.md)`);
+  }
+}
+
 for (const file of [...productionFiles, ...testFiles]) {
   const source = readFileSync(join(root, file), "utf8");
   if (/\b(?:describe|test|it)\.(?:only|skip)\s*\(|\b(?:fdescribe|fit|xit|xdescribe)\s*\(/.test(source)) {

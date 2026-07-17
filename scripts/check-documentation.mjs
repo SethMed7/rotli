@@ -10,6 +10,7 @@ const required = [
   "docs/README.md",
   "docs/development/ai-workflow.md",
   "docs/development/testing.md",
+  "docs/development/adding-things.md",
   "docs/architecture/ai-context-architecture.md",
   ".github/copilot-instructions.md",
   ".github/pull_request_template.md",
@@ -44,6 +45,24 @@ if (existsSync(join(root, "docs/README.md"))) {
   const map = readFileSync(join(root, "docs/README.md"), "utf8");
   if (!map.includes("development/testing.md")) {
     failures.push("docs/README.md must route to the testing and regression contract");
+  }
+  if (!map.includes("development/adding-things.md")) {
+    failures.push("docs/README.md must route to the adding-things placement contract");
+  }
+}
+
+// The adding-things contract table must reference reality: every concrete
+// repository path in the document exists. Placeholders (<name>, globs) and
+// non-path code spans are skipped.
+if (existsSync(join(root, "docs/development/adding-things.md"))) {
+  const contract = readFileSync(join(root, "docs/development/adding-things.md"), "utf8");
+  for (const match of contract.matchAll(/`([^`\n]+)`/g)) {
+    const candidate = match[1];
+    if (!/^(?:src|src-tauri|scripts|docs|breve-runtime)\//.test(candidate)) continue;
+    if (/[<>*{}\s]/.test(candidate)) continue;
+    if (!existsSync(join(root, candidate))) {
+      failures.push(`docs/development/adding-things.md references missing path: ${candidate}`);
+    }
   }
 }
 
@@ -109,6 +128,62 @@ if (existsSync(join(root, ".carl/carl.json"))) {
       .find((decision) => decision.id === "rotli-004");
     if (!glassDecision || !/remove.*Liquid Glass|Liquid Glass.*remove/i.test(glassDecision.decision)) {
       failures.push("Carl must remember that Liquid Glass was removed");
+    }
+
+    // CARL coverage is measured, not vibes: every top-level src/ directory over
+    // the size threshold must appear in this dir→domain map or be exempted with
+    // a reason. The check enforces only that a mapping EXISTS — what a domain
+    // says stays in carl.json and its sources (CARL is recall, never a second
+    // spec). This mechanical form catches the F16 failure mode: a large area
+    // (src/editor was 6,700 lines) with no recall home and no recorded reason.
+    const carlDirDomainMap = {
+      ai: "ROTLI_MODELS",
+      boards: "ROTLI_DOCUMENTS",
+      brand: "ROTLI_DESIGN",
+      chatMemory: "ROTLI_MEMORY",
+      components: "ROTLI_DESIGN",
+      documents: "ROTLI_DOCUMENTS",
+      editor: "ROTLI_EDITOR",
+      keys: "ROTLI_KEYS",
+      memex: "ROTLI_MEMEX",
+      routines: "ROTLI_BREVE",
+      services: "ROTLI_CORE",
+      sheets: "ROTLI_DOCUMENTS",
+      state: "ROTLI_CORE",
+    };
+    const carlDirExemptions = {
+      lib: "pure dependency-free utilities with no distinct recall vocabulary — placement law lives in docs/development/adding-things.md",
+      newItems: "small creation workflow; covered by ROTLI_CORE architecture vocabulary — if it ever grows past the threshold, map it",
+      noteChat: "thin note↔chat seam below the threshold; its contract lives in the ROTLI_MEMORY chat-note rule",
+      security: "single secret-pattern module guarded by check:secret-parity",
+      styles: "CSS only; owned by the ROTLI_DESIGN token rules and check:design-system",
+    };
+    const carlDirThresholdLines = 2_000;
+    const domainNames = new Set(domains.map(([name]) => name));
+    const countLines = (dir) => {
+      let lines = 0;
+      for (const name of readdirSync(dir)) {
+        const abs = join(dir, name);
+        if (statSync(abs).isDirectory()) lines += countLines(abs);
+        else if (/\.tsx?$/.test(name)) lines += readFileSync(abs, "utf8").split("\n").length;
+      }
+      return lines;
+    };
+    const srcDirs = readdirSync(join(root, "src")).filter((name) => statSync(join(root, "src", name)).isDirectory());
+    for (const [dir, domain] of Object.entries(carlDirDomainMap)) {
+      if (!srcDirs.includes(dir)) failures.push(`CARL dir→domain map references missing directory src/${dir}`);
+      if (!domainNames.has(domain)) failures.push(`CARL dir→domain map: src/${dir} points at unknown domain ${domain}`);
+    }
+    for (const dir of Object.keys(carlDirExemptions)) {
+      if (!srcDirs.includes(dir)) failures.push(`CARL dir exemption references missing directory src/${dir}`);
+      if (dir in carlDirDomainMap) failures.push(`src/${dir} is both mapped and exempted — pick one`);
+    }
+    for (const dir of srcDirs) {
+      if (dir in carlDirDomainMap || dir in carlDirExemptions) continue;
+      const lines = countLines(join(root, "src", dir));
+      if (lines > carlDirThresholdLines) {
+        failures.push(`src/${dir} is ${lines} lines with no CARL dir→domain mapping or exemption (add one in check-documentation.mjs)`);
+      }
     }
   } catch (error) {
     failures.push(`.carl/carl.json is invalid JSON: ${error.message}`);

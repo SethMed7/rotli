@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Chat's `web_fetch` tool is SSRF-hardened** (remediation batch 0). Hostname
+  resolution now happens on a dedicated agent whose resolver rejects private,
+  loopback, link-local, and cloud-metadata address ranges — vetting the
+  connected IPs themselves, so DNS rebinding cannot slip past a pre-check.
+  Schemes are http(s)-only, redirects are followed manually (≤ 3 hops,
+  same-host only), and the response cap is one named 2 MB constant. TypeScript
+  (Breve's safe-fetch) and Rust enforce egress independently and are both held
+  to the same adversarial fixture suite
+  (`scripts/fixtures/egress-fixtures.json`). DDG search and local-model chat
+  traffic are unchanged.
+
 ### Added
 
 - **New notes are ephemeral until you write.** A note you create and close
@@ -45,6 +58,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   vendor seams (exceljs, Excalidraw, Univer, JSZip must stay behind their
   codec/engine adapters); `cargo clippy -D warnings` joins the CI regression
   lane; and `breve-runtime/` gets a strict TypeScript pass.
+- **TS↔Rust parity harness** (remediation batch 1). Values shared across the
+  language boundary — sheet byte cap, convertible document extensions,
+  keychain service/account literals, CLI binary candidate paths,
+  endpoint-locality verdicts, memex permission values — now live in named
+  constants asserted on BOTH sides against one fixture
+  (`scripts/fixtures/parity.json`) by hand-written cargo and bun parity
+  suites; `check:parity` guards the harness itself in the lint chain. Known
+  drift was reconciled first: the TS endpoint-locality check now requires
+  http(s) like Rust, the sheet editor passes its byte cap explicitly, and the
+  CLI candidate lists are byte-identical.
+- **ESLint joins the lint gate** (batch 2): floating/misused promises,
+  `no-explicit-any`, and react-hooks correctness on `src/`. Adoption caught a
+  real rules-of-hooks bug (onboarding called a hook inside a callback —
+  fixed). `breve-runtime/scripts/` was measured and deferred at 75 findings;
+  the rationale is recorded in CONTRIBUTING.md.
+- **A deterministic duplication miner** (batch 6, `bun run check:dup`):
+  within-language shingling plus rare-literal and lifecycle bundles over
+  TS + Rust, with a committed allowlist and an opt-in cached model judge for
+  triage. Validated one-time against the pre-remediation tree, where it
+  rediscovered every known duplicate cluster. Never a blocking gate.
+- **The adding-things placement contract** (batch 7,
+  `docs/development/adding-things.md`): one table for where new surfaces,
+  dialogs, overlays, features, vendor libraries, utilities, Tauri commands,
+  TS↔Rust shared values, Breve runtime code, and CARL domains go — and which
+  check enforces each row. New ROTLI_EDITOR and ROTLI_KEYS CARL domains close
+  the editor/hotkey recall gap; `check:docs` now measures CARL coverage
+  mechanically (every top-level `src/` dir over 2,000 lines needs a mapped
+  domain or a recorded exemption) and verifies every path the contract cites
+  exists; `check:code-shape` enforces the surface/dialog naming homes.
 
 ### Changed
 
@@ -52,6 +94,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   run on the same exceljs codec as the editor. The abandoned SheetJS (`xlsx`)
   dependency — CVE-2023-30533, unpatched on npm — is removed and banned by
   `check:structure`. TSV files now parse into real columns.
+- **Dedupe and re-homing sweep** (batch 3). One home each for ext/filename
+  parsing (`src/lib/fileKind.ts`), day-bucketing, clamp, the inline rename
+  input, the editor block menu (now on the shared context-menu host, gaining
+  keyboard nav), Breve's markdown→text strip (one imported helper inside
+  breve-runtime plus a cross-boundary behavioral fixture,
+  `scripts/fixtures/markdown-strip.json`), switch knobs, and empty-state CSS.
+  Misplaced modules moved to their owning layers (briefs model →
+  `src/routines/`, board/chat rename → `src/services/`).
+- **All four pointer-drag surfaces ride one shared drag session** (batch 4,
+  `src/lib/pointerDrag.ts`): threshold, ghost lifecycle, Esc/pointer-cancel,
+  click-swallow, and window-listener teardown are implemented once; drop
+  semantics stay in each caller. Migrated one surface per commit (main
+  add-drag, tab drag, board cards, sidebar tree).
+- **Structural seams** (batch 5): boards share one session core behind the
+  canvas surface and the Markdown embed; sheets/boards/noteChat/editor are
+  now *named* clean-architecture exemptions, so opt-in-by-file-presence is no
+  longer a silent state; `MemexPerms` is a real Rust enum end-to-end instead
+  of stringly-typed compares.
+- **Formatting decisions recorded** (batch 8, decision-gated): Prettier at
+  `printWidth` 110 is adopted for TypeScript — the one-time repo-wide
+  reformat commit lands after diff review and will be blame-ignored via
+  `.git-blame-ignore-revs`. `cargo fmt` is permanently out: measured at
+  4,770–7,604 structural diff lines regardless of width configuration while
+  only 287 of 18,080 Rust lines exceed 100 columns; clippy `-D warnings`
+  remains the Rust gate.
 
 ### Removed
 

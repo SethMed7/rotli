@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-07-11T20:45:00.000Z",
+  "last_modified": "2026-07-17T00:00:00.000Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -19,7 +19,13 @@
         "main view",
         "database",
         "file naming",
-        "documentation"
+        "documentation",
+        "placement",
+        "new module",
+        "where does",
+        "gitignore",
+        "shared constant",
+        "parity"
       ],
       "exclude": [],
       "rules": [
@@ -43,6 +49,13 @@
           "added": "2026-07-11",
           "last_reviewed": "2026-07-11",
           "source": "docs/README.md"
+        },
+        {
+          "id": 3,
+          "text": "docs/development/adding-things.md is the placement authority for new code: surfaces/dialogs in src/components (feature-owned exceptions enumerated), clean-feature split or a named check-architecture exemption, vendors behind allowlisted adapters, pure utilities in src/lib vs effectful src/services, and TS-Rust shared values through scripts/fixtures/parity.json asserted by both parity suites. New tool caches ship their .gitignore entries in the same change.",
+          "added": "2026-07-17",
+          "last_reviewed": "2026-07-17",
+          "source": "docs/development/adding-things.md"
         }
       ],
       "decisions": [
@@ -202,6 +215,75 @@
           "added": "2026-07-11",
           "last_reviewed": "2026-07-11",
           "source": "docs/architecture/memex-data-contract.md"
+        }
+      ],
+      "decisions": []
+    },
+    "ROTLI_EDITOR": {
+      "state": "active",
+      "always_on": false,
+      "recall": [
+        "editor",
+        "cmeditor",
+        "codemirror",
+        "live preview",
+        "markdown syntax",
+        "fence",
+        "block menu",
+        "wikilink",
+        "slash menu",
+        "image move",
+        "embed sizing",
+        "strip markdown"
+      ],
+      "exclude": [],
+      "rules": [
+        {
+          "id": 0,
+          "text": "The Markdown editor is a CodeMirror 6 inline WYSIWYG in src/editor/: livePreview hides syntax and reveals it at the caret; blockRender, tableRender, and fences own widget rendering; the slash menu, wikilinks, and typed embed fences are Markdown-only capabilities. editorSurface.tsx is the pane surface — an enumerated exception to the src/components surface home.",
+          "added": "2026-07-17",
+          "last_reviewed": "2026-07-17",
+          "source": "src/editor/editorSurface.tsx"
+        },
+        {
+          "id": 1,
+          "text": "src/editor/model.ts is the live shared text buffer (a state store), not a clean-feature domain model; src/editor sits on check-architecture's named exemption list. New editor capabilities join the existing seams (commands.ts actions, slashActions.ts, embed hosts) rather than introducing a model/ports/workflow split. Placement law: docs/development/adding-things.md.",
+          "added": "2026-07-17",
+          "last_reviewed": "2026-07-17",
+          "source": "scripts/check-architecture.mjs"
+        }
+      ],
+      "decisions": []
+    },
+    "ROTLI_KEYS": {
+      "state": "active",
+      "always_on": false,
+      "recall": [
+        "hotkey",
+        "keybinding",
+        "shortcut",
+        "chord",
+        "keymap",
+        "rebind",
+        "which-key",
+        "key registry",
+        "held modifier"
+      ],
+      "exclude": [],
+      "rules": [
+        {
+          "id": 0,
+          "text": "Every user-invocable action registers in src/keys/actions.ts so the palette and Settings -> Hotkeys can list and rebind all of it. One dispatcher per webview and no ad-hoc keydown listeners anywhere else; both webviews register the full set while the dispatcher fires only its own surface's actions.",
+          "added": "2026-07-17",
+          "last_reviewed": "2026-07-17",
+          "source": "src/keys/actions.ts"
+        },
+        {
+          "id": 1,
+          "text": "Every command is user-remappable: src/keys/bindings.ts persists user keymaps, chords.ts parses chord sequences, useHeldModifier.ts powers hold-modifier discoverability, and whichKey.tsx renders the key HUD (an overlay, not a dialog — see docs/development/adding-things.md). New shortcuts go through the registry, never raw listeners.",
+          "added": "2026-07-17",
+          "last_reviewed": "2026-07-17",
+          "source": "src/keys/bindings.ts"
         }
       ],
       "decisions": []
