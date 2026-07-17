@@ -16,6 +16,7 @@
     "test:breve": "bun breve-runtime/tests/test-actions.ts && bun breve-runtime/tests/test-intents.ts && bun breve-runtime/tests/test-timectx.ts && bun breve-runtime/tests/test-retention.ts && bun breve-runtime/tests/test-pdf-theme.ts && bun breve-runtime/tests/test-doctor-findings.ts && bun test ./breve-runtime/tests/test-process-lock.ts ./breve-runtime/tests/test-delivery-claim.ts ./breve-runtime/tests/test-watcher-failure.ts ./breve-runtime/tests/test-safe-fetch-fixtures.ts",
     "test:regression": "bun run test && bun run check:breve-runtime && bun run check:design-system",
     "lint": "tsc --noEmit && bun run check:code-shape && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:docs",
+    "lint:eslint": "eslint src",
     "check:code-shape": "bun scripts/check-code-shape.mjs",
     "check:hex": "bun scripts/check-hex.mjs",
     "check:architecture": "bun scripts/check-architecture.mjs",
@@ -59,7 +60,10 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.6.0",
     "bun-types": "^1.3.14",
+    "eslint": "^10.7.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "typescript": "~5.8.3",
+    "typescript-eslint": "^8.64.0",
     "vite": "^7.0.4"
   },
   "trustedDependencies": ["esbuild", "onnxruntime-node", "protobufjs", "sharp"]
