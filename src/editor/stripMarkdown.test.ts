@@ -2,6 +2,7 @@
 // a copy should read like what you SEE, with no stray ** around bold.
 
 import { describe, expect, test } from "bun:test";
+import fixture from "../../scripts/fixtures/markdown-strip.json";
 import { stripMarkdown } from "./stripMarkdown";
 
 describe("stripMarkdown (beautified copy)", () => {
@@ -26,4 +27,16 @@ describe("stripMarkdown (beautified copy)", () => {
   test("plain text is untouched", () => {
     expect(stripMarkdown("just words")).toBe("just words");
   });
+});
+
+// The cross-boundary behavioral contract (remediation Batch 3): Breve's
+// markdownText.ts renders the SAME inline grammar to HTML and asserts the same
+// fixture — behavior parity without sharing an implementation across the
+// app/runtime boundary (MIRROR-NOT-IMPORT).
+describe("markdown-strip.json fixture (Breve parity)", () => {
+  for (const c of fixture.cases) {
+    test(c.name, () => {
+      expect(stripMarkdown(c.input)).toBe(c.text);
+    });
+  }
 });

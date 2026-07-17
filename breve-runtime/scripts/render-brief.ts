@@ -8,6 +8,7 @@
  */
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
+import { inlineHtml as inline } from "./markdownText";
 import { BRIEFS, PDFS } from "./paths";
 import { pdfThemeVariables, readPdfTheme } from "./pdf-theme";
 
@@ -25,15 +26,7 @@ const longDate = d.toLocaleDateString("en-US", { month: "long", day: "numeric", 
 const slot = kind === "morning" ? "Morning" : kind === "lunch" ? "Midday" : "Evening";
 const pdfTheme = readPdfTheme();
 
-// ── Markdown → readable HTML ─────────────────────────────────────────────────
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-function inline(s: string): string {
-  return esc(s)
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
-}
+// ── Markdown → readable HTML (inline voice lives in markdownText.ts) ─────────
 function mdToBody(src: string): string {
   const out: string[] = [];
   let para: string[] = [];

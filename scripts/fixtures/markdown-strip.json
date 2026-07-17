@@ -1,0 +1,12 @@
+{
+  "$comment": "Behavioral parity for inline markdown handling across the app/breve boundary (MIRROR-NOT-IMPORT: src/editor/stripMarkdown.ts stays independently implemented; breve-runtime/scripts/markdownText.ts is Breve's home). Per case: `text` = the marker-stripped reading, asserted by src/editor/stripMarkdown.test.ts; `html` = the rendered reading, asserted by breve-runtime/tests/test-markdown-text.ts (which also cross-checks that html minus tags equals text). The starred cases pin the canonical italic rule — emphasis opens/closes only against non-space content — that render-brief had drifted from (it used to italicize '2 * 3 * 4').",
+  "cases": [
+    { "name": "bold", "input": "a **bold** word", "text": "a bold word", "html": "a <strong>bold</strong> word" },
+    { "name": "italic", "input": "an *italic* word", "text": "an italic word", "html": "an <em>italic</em> word" },
+    { "name": "code", "input": "run `bun test` now", "text": "run bun test now", "html": "run <code>bun test</code> now" },
+    { "name": "link", "input": "see [the docs](https://x.com)", "text": "see the docs", "html": "see <a href=\"https://x.com\">the docs</a>" },
+    { "name": "bold-italic-nested", "input": "***both***", "text": "both", "html": "<em><strong>both</strong></em>" },
+    { "name": "spaced-stars-are-arithmetic", "input": "2 * 3 * 4", "text": "2 * 3 * 4", "html": "2 * 3 * 4" },
+    { "name": "space-flanked-star-stays-literal", "input": "x * y*", "text": "x * y*", "html": "x * y*" }
+  ]
+}
