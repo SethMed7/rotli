@@ -23,3 +23,9 @@ secrets.*
 
 # Project MCP wiring is tracked and portable. Machine-specific MCP overrides
 # belong in user-level Claude/Codex configuration, not this repository.
+
+# tool caches + build metadata — generated, never tracked (new tools bring their
+# ignore entries with them; policy: docs/development/adding-things.md)
+.eslintcache
+*.tsbuildinfo
+coverage/
