@@ -1,0 +1,31 @@
+{
+  "comment": "Suppresses known-good duplication from check-duplication.mjs. Two matcher forms: `fingerprint` (exact cluster — churns on edit, which deliberately resurfaces the cluster for re-triage) or `files` (every site of the cluster must live in the listed files — for permanent do-not-fix decisions that must survive edits). Optional `signal` narrows a files matcher.",
+  "entries": [
+    {
+      "id": "organizer-vs-breve-retry",
+      "files": [
+        "src-tauri/src/organizer.rs",
+        "breve-runtime/scripts/rotli-scheduler.ts",
+        "breve-runtime/scripts/scheduler-core.ts",
+        "breve-runtime/scripts/signal-daemon.ts"
+      ],
+      "reason": "Synthesis verdict: do not fix. The organizer daemon's model-offline backoff (BACKOFF_MIN/MAX ladder) and Breve's restart/lock retry are independently tuned policies for different failure domains; converging them would couple an in-app daemon to a launchd runtime."
+    },
+    {
+      "id": "egress-policy-mirror",
+      "signal": "literal",
+      "files": ["breve-runtime/scripts/safe-fetch.ts", "src-tauri/src/web.rs"],
+      "reason": "Batch 0 independent_security_enforcement: the egress policy is deliberately implemented on both sides of the process boundary and held in parity by scripts/fixtures/egress-fixtures.json — shared literals (private ranges, redirect caps) are the fixture working as designed."
+    },
+    {
+      "id": "endpoint-locality-parity",
+      "fingerprint": "ad1b9951a56985f95f18daa18c1312788f287accc2855495e02d207a352667a1",
+      "reason": "Batch 1 fixture-guarded mirror: endpoint_is_local (chat.rs) vs endpointIsLocal tests share the scripts/fixtures/parity.json endpoint fixture URLs by design."
+    },
+    {
+      "id": "secret-detector-parity",
+      "fingerprint": "034db125d60b7860efa1b594515cc830d2860dbb0dce0a7c338307bd14d237b6",
+      "reason": "Fixture-guarded mirror: secret.rs detector tests and loop.test.ts share the same red-team card/SSN vectors; check-secret-parity.mjs holds the two detectors aligned."
+    }
+  ]
+}
