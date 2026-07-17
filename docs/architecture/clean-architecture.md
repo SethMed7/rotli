@@ -57,7 +57,17 @@ inward toward stable business rules:
 
 `bun run check:architecture` discovers clean feature roles and enforces their
 inward imports, pure ports/policies, the Tauri adapter boundary, the
-Markdown-only slash boundary, and the vendor seams: `exceljs`, `@excalidraw`,
+Markdown-only slash boundary, and the vendor seams. Discovery is never a silent
+opt-in: a `src/` dir carrying role files without the full
+`workflow.ts + composition.ts` split must appear in the script's named exemption
+list — today `src/sheets` (a live Univer editing session; its boundaries are the
+codec/engine adapters, `kinds.ts` policy constants, and the vendor seams — a
+forced split would be empty wrappers), `src/boards` (the board model is
+Excalidraw's vendor scene JSON behind `boards/engine`; `session.ts` +
+`composition.ts` share the corpus round-trip), `src/noteChat` (no workflow
+layer; its pure `model.ts` is covered by colocated tests), and `src/editor`
+(`model.ts` is the live text buffer, a role-vocabulary filename collision) —
+and a stale exemption fails the check. The vendor seams: `exceljs`, `@excalidraw`,
 `@univerjs`, and `jszip` import only inside their codec/engine adapters
 (`src/sheets/codec` + `src/sheets/engine`, `src/boards/engine`,
 `src/documents/engine` + `src/brand/univerTheme.ts`, `src/documents/codec` +

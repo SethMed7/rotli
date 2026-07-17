@@ -54,6 +54,12 @@ These are maintainability hotspots, not blockers for this workflow:
    retaining the existing shared Breve model and form primitives.
 4. `lib/tauri.ts` is a broad IPC façade. Split it by capability (corpus,
    provider, Breve, shell) without changing command names or Rust validation.
+5. `state/persist.ts` (~850 LOC) is the single persistence chokepoint for every
+   store. Split along its settings/viewstate seam (the two registration blocks
+   around `:239`/`:416`) once the regression safety net exists.
+6. `src-tauri/src/corpus.rs` concentrates store, gates, and command surface.
+   Any split must preserve the command facade and the write-gate invariants
+   verbatim; sequence it behind the regression layer, never casually.
 
 The full system-level findings and recommended order are in
 [`system-audit-2026-07-11.md`](./system-audit-2026-07-11.md).

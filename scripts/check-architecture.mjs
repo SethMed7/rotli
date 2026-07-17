@@ -15,6 +15,17 @@ const discoveredCleanFiles = cleanFeatureDirs.flatMap((dir) => readdirSync(dir)
     .filter((name) => cleanFeatureRoles.has(name))
     .map((name) => relative(root, join(dir, name))));
 
+// Opt-in-by-file-presence must never be a silent third state: a feature dir that
+// carries clean-feature role files without the workflow.ts + composition.ts
+// trigger pair is either fully split or named here with its reason. A listed dir
+// that gains the full split (or vanishes) fails the check until its entry goes.
+const cleanFeatureExemptions = {
+  "src/sheets": "live Univer editing session — codec/engine adapters, kinds.ts policy constants, and the vendor seams below carry the boundaries; a model/ports/workflow split would be empty wrappers around the stateful engine handle",
+  "src/boards": "session.ts + composition.ts share the corpus round-trip; the board model is Excalidraw's vendor scene JSON behind boards/engine — no domain layer to split",
+  "src/noteChat": "model/composition/session mirror the seam shape without a workflow layer; model.ts stays pure (contract-only imports) under its colocated tests — a workflow.ts would be an empty trigger file",
+  "src/editor": "model.ts is the live shared text buffer (a state store), not a clean-feature domain model — the filename collides with the role vocabulary; the editor's real boundaries are the slash + vendor seams",
+};
+
 const allowedLocalRoleImports = {
   "model.ts": [],
   "ports.ts": ["./model"],
@@ -98,6 +109,28 @@ const protectedLayers = [
 ];
 
 const violations = [];
+
+// F7: a partial split (any role file or composition.ts without BOTH trigger
+// files) gets no protection above — that state must be exempt-by-name, and an
+// exemption must go stale loudly, never linger past a real split.
+const partialSplitSignals = new Set([...cleanFeatureRoles, "composition.ts"]);
+for (const entry of readdirSync(join(root, "src"), { withFileTypes: true })) {
+  if (!entry.isDirectory()) continue;
+  const dir = join(root, "src", entry.name);
+  const rel = `src/${entry.name}`;
+  const hasTriggerPair = existsSync(join(dir, "workflow.ts")) && existsSync(join(dir, "composition.ts"));
+  const hasRoleFile = readdirSync(dir).some((name) => partialSplitSignals.has(name));
+  if (hasRoleFile && !hasTriggerPair && !(rel in cleanFeatureExemptions)) {
+    violations.push(`${rel}: carries clean-feature role files without workflow.ts + composition.ts — add the full split or an exemption entry`);
+  }
+  if (hasTriggerPair && rel in cleanFeatureExemptions) {
+    violations.push(`${rel}: has the full clean-feature split — remove its stale exemption entry`);
+  }
+}
+for (const dir of Object.keys(cleanFeatureExemptions)) {
+  if (!existsSync(join(root, dir))) violations.push(`${dir}: exempt dir no longer exists — remove its exemption entry`);
+}
+
 function importsOf(source) {
   return [
     ...source.matchAll(/(?:from\s+|import\s*\()(["'])([^"']+)\1/g),
@@ -190,4 +223,4 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log(`check:architecture ok — ${discoveredCleanFiles.length} clean-feature files point inward; ports and pure policies stay adapter-free; Tauri stays behind its adapter`);
+console.log(`check:architecture ok — ${discoveredCleanFiles.length} clean-feature files point inward (${Object.keys(cleanFeatureExemptions).length} dirs exempt by name); ports and pure policies stay adapter-free; Tauri stays behind its adapter`);
