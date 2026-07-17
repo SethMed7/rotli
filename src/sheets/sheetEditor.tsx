@@ -139,8 +139,11 @@ export default function SheetEditor({
           model = workbookToModel(wb, fileId);
           idMapRef.current = buildSheetIdMap(wb, model);
         } else {
-          const b64 = await corpusFileBytes(fileId);
+          const b64 = await corpusFileBytes(fileId, SHEET_EDIT_MAX_BYTES + 1);
           const bytes = bytesFromB64(b64);
+          if (bytes.length > SHEET_EDIT_MAX_BYTES) {
+            throw new Error("this file is too large to edit in rotli — opening read-only is fine");
+          }
           diskLenRef.current = bytes.length;
           wb = await loadXlsx(bytes.buffer as ArrayBuffer);
           model = workbookToModel(wb, fileId);

@@ -54,14 +54,16 @@ static NEXT_TOKEN: AtomicU64 = AtomicU64::new(1);
 
 // ── the allowlist ─────────────────────────────────────────────────────────────
 
-struct CliSpec {
-    id: &'static str,
+pub(crate) struct CliSpec {
+    pub(crate) id: &'static str,
     /// Absolute candidate paths; "~/" expands to $HOME. First hit wins.
-    bins: &'static [&'static str],
+    pub(crate) bins: &'static [&'static str],
     models: &'static [&'static str],
 }
 
-const CLIS: &[CliSpec] = &[
+// `bins` lists are byte-identical to breve-runtime/scripts/cliPaths.ts (F10) —
+// guarded by scripts/fixtures/parity.json via parity_tests.rs; change both sides.
+pub(crate) const CLIS: &[CliSpec] = &[
     CliSpec {
         id: "claude",
         bins: &["~/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"],

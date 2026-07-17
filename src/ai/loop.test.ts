@@ -226,6 +226,9 @@ describe("guard", () => {
     expect(endpointIsLocal("http://10.0.0.5:11435")).toBe(false);
     expect(endpointIsLocal("")).toBe(false); // unparseable ⇒ fail closed
     expect(endpointIsLocal("not a url")).toBe(false);
+    // http(s) only — chat.rs accepts exactly those schemes (F2)
+    expect(endpointIsLocal("file://localhost/etc/hosts")).toBe(false);
+    expect(endpointIsLocal("ftp://127.0.0.1/x")).toBe(false);
   });
 
   test("a localhost frontier proxy is not an on-device model", () => {

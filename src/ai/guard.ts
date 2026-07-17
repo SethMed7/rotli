@@ -54,13 +54,16 @@ export function looksSecret(text: string): boolean {
  * `chat_messages` (the send — a non-local endpoint refuses a secret-shaped
  * transcript even if a TS path read it locally first). */
 export function endpointIsLocal(endpoint: string): boolean {
-  let host: string;
+  let url: URL;
   try {
-    host = new URL(endpoint).hostname;
+    url = new URL(endpoint);
   } catch {
     return false;
   }
-  const h = host.replace(/^\[|\]$/g, "").toLowerCase();
+  // http(s) only — chat.rs strips exactly these two schemes, so a non-http URL
+  // ("file://localhost/x") is non-local on BOTH sides (F2)
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  const h = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
   if (h === "localhost" || h === "::1") return true;
   // a REAL loopback IPv4 only ("127.0.0.1.evil.com" is a DNS name, not an IP)
   const m = h.match(/^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
