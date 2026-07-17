@@ -20,6 +20,7 @@ fix both in the same change.
 | Managed Breve runtime | [`../breve-runtime/README.md`](../breve-runtime/README.md) |
 | Brand implementation | [`../src/brand/README.md`](../src/brand/README.md) |
 | AI-assisted development workflow | [`development/ai-workflow.md`](development/ai-workflow.md) |
+| Testing, linting, and regression evidence | [`development/testing.md`](development/testing.md) |
 | Token-efficient AI context and project CARL | [`architecture/ai-context-architecture.md`](architecture/ai-context-architecture.md) |
 
 ## Source-of-truth boundaries

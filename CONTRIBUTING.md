@@ -65,6 +65,21 @@ the only surface with slash commands and embed syntax.
 
 ## Required validation
 
+Use these focused gates while iterating:
+
+```sh
+bun run lint             # types, code shape, architecture, IPC, structure, docs
+bun run test:unit        # src/ behavior
+bun run test:breve       # Breve policy and concurrency regressions
+bun run test:tooling     # linter/checker fixtures
+bun run test:regression  # complete Bun/runtime/design regression suite
+```
+
+The command ownership, evidence levels, and CI lanes are defined in
+[`docs/development/testing.md`](docs/development/testing.md).
+
+Before handoff, run:
+
 ```sh
 bun run check
 cargo test --manifest-path src-tauri/Cargo.toml

@@ -14,6 +14,7 @@
 mod chat;
 mod breve;
 mod corpus;
+mod fsutil;
 mod keychain;
 mod localmodel;
 mod memex;
@@ -50,7 +51,52 @@ const BLUR_TOGGLE_GRACE: Duration = Duration::from_millis(300);
 /// Summoning a floating panel (Quick Note / capture card) calls set_focus, which
 /// activates the app and makes macOS fire a Reopen. Within this grace after a
 /// summon, that Reopen is the spurious one — never reopen main (Seth, 2026-06-30).
-const PANEL_SUMMON_GRACE: Duration = Duration::from_millis(700);
+/// Generous on purpose (2s, was 700ms): under startup load (corpus watchers,
+/// organizer, Breve supervisor) the Reopen can arrive late and used to escape
+/// the old time-box, surfacing main alongside the panel. Safe to be generous
+/// because the latch is CONSUMED by the first Reopen (`reopen_should_show_main`)
+/// — a stale latch can never eat a later genuine Dock-click Reopen.
+const PANEL_SUMMON_GRACE: Duration = Duration::from_secs(2);
+
+/// Decide whether a macOS Reopen should surface the main window. `summoned` is
+/// the panel-summon latch, already `take()`n by the caller: a recent summon
+/// means THIS Reopen is the panel's own app-activation echo — swallow it.
+/// Pure so the suppression law is unit-tested (the race here shipped twice).
+fn reopen_should_show_main(
+    has_visible_windows: bool,
+    ours_up: bool,
+    summoned: Option<Instant>,
+) -> bool {
+    let just_summoned = summoned.is_some_and(|t| t.elapsed() < PANEL_SUMMON_GRACE);
+    !has_visible_windows && !ours_up && !just_summoned
+}
+
+#[cfg(test)]
+mod reopen_tests {
+    use super::*;
+
+    #[test]
+    fn a_recent_panel_summon_swallows_the_reopen() {
+        assert!(!reopen_should_show_main(false, false, Some(Instant::now())));
+    }
+
+    #[test]
+    fn a_stale_latch_never_blocks_a_genuine_reopen() {
+        let stale = Instant::now().checked_sub(PANEL_SUMMON_GRACE * 2).unwrap();
+        assert!(reopen_should_show_main(false, false, Some(stale)));
+    }
+
+    #[test]
+    fn nothing_visible_and_no_latch_opens_main() {
+        assert!(reopen_should_show_main(false, false, None));
+    }
+
+    #[test]
+    fn any_visible_window_suppresses() {
+        assert!(!reopen_should_show_main(true, false, None));
+        assert!(!reopen_should_show_main(false, true, None));
+    }
+}
 
 /// The OS-registered accelerators, per global registry action (rebindable
 /// from the frontend via the `set_summon_shortcut` command).
@@ -107,7 +153,11 @@ struct QuickReturn(Mutex<bool>);
 /// and exit anyway after `QUIT_FLUSH_MAX` — quit can never hang on a wedged
 /// webview.
 struct QuitFlush {
-    acked: Mutex<bool>,
+    /// Webviews still owing a `quit_flush_done` ack. Every live webview (main,
+    /// quick, capture) gets the flush event — the quick window keeps its OWN
+    /// editor buffer in its own module instance, so main's ack alone never
+    /// proved the quick note's last keystrokes were on disk.
+    pending: Mutex<usize>,
     cv: Condvar,
 }
 
@@ -116,37 +166,47 @@ struct QuitFlush {
 /// bound only matters when a big workbook is mid-serialize or the webview hung.
 const QUIT_FLUSH_MAX: Duration = Duration::from_secs(2);
 
-/// The webview finished its pre-quit flush — release `graceful_quit`'s wait.
+/// One webview finished its pre-quit flush — release `graceful_quit`'s wait
+/// once EVERY emitted webview has acked (saturating: a double ack never wraps).
 #[tauri::command]
 fn quit_flush_done(app: AppHandle) {
     let state = app.state::<QuitFlush>();
-    *state.acked.lock().unwrap() = true;
+    let mut pending = state.pending.lock().unwrap();
+    *pending = pending.saturating_sub(1);
     state.cv.notify_all();
 }
 
-/// Quit, but let the main webview flush dirty state first (see QuitFlush).
-/// Called by the tray's Quit item and the app menu's ⌘Q replacement.
+/// Quit, but let every live webview flush dirty state first (see QuitFlush).
+/// Called by the tray's Quit item and the app menu's ⌘Q replacement. Hidden
+/// panels ack in milliseconds (nothing dirty), so this adds no quit latency.
 fn graceful_quit(app: &AppHandle) {
-    if app.get_webview_window("main").is_none()
-        || app.emit_to("main", "rotli:flush-before-quit", ()).is_err()
-    {
+    let mut expected = 0usize;
+    for label in ["main", "quick", "capture"] {
+        if app.get_webview_window(label).is_some()
+            && app.emit_to(label, "rotli:flush-before-quit", ()).is_ok()
+        {
+            expected += 1;
+        }
+    }
+    if expected == 0 {
         app.exit(0); // nothing to flush / nothing reachable — just go
         return;
     }
+    *app.state::<QuitFlush>().pending.lock().unwrap() = expected;
     let handle = app.clone();
     std::thread::spawn(move || {
         let state = handle.state::<QuitFlush>();
         let deadline = Instant::now() + QUIT_FLUSH_MAX;
-        let mut acked = state.acked.lock().unwrap();
-        while !*acked {
+        let mut pending = state.pending.lock().unwrap();
+        while *pending > 0 {
             let now = Instant::now();
             if now >= deadline {
                 break; // wedged webview — quit anyway, bounded
             }
-            let (guard, _timeout) = state.cv.wait_timeout(acked, deadline - now).unwrap();
-            acked = guard;
+            let (guard, _timeout) = state.cv.wait_timeout(pending, deadline - now).unwrap();
+            pending = guard;
         }
-        drop(acked);
+        drop(pending);
         handle.exit(0);
     });
 }
@@ -824,7 +884,7 @@ pub fn run() {
         .manage(CaptureReturn(Mutex::new(false)))
         .manage(QuickPlaced(Mutex::new(false)))
         .manage(QuickReturn(Mutex::new(false)))
-        .manage(QuitFlush { acked: Mutex::new(false), cv: Condvar::new() })
+        .manage(QuitFlush { pending: Mutex::new(0), cv: Condvar::new() })
         .manage(provider::ProviderState::default())
         .manage(localmodel::LocalModelState::default())
         // the app-menu ⌘Q replacement (see setup) — tray menu events have their
@@ -1068,14 +1128,20 @@ pub fn run() {
             // Best-effort: another app owning a chord (launchers love ⌥Space)
             // must DEGRADE — the app still launches, the chord stays rebindable
             // in Settings → Hotkeys — never abort startup.
-            for chord in [
-                DEFAULT_MAIN_TOGGLE,
-                DEFAULT_CAPTURE,
-                DEFAULT_QUICK,
-                DEFAULT_CHAT_SUMMON,
-            ] {
-                if let Err(e) = app.global_shortcut().register(chord) {
-                    eprintln!("rotli: global shortcut {chord} unavailable ({e}) — rebind it in Settings");
+            {
+                let chords = app.state::<GlobalChords>();
+                for (chord, slot) in [
+                    (DEFAULT_MAIN_TOGGLE, &chords.main_toggle),
+                    (DEFAULT_CAPTURE, &chords.capture),
+                    (DEFAULT_QUICK, &chords.quick),
+                    (DEFAULT_CHAT_SUMMON, &chords.chat),
+                ] {
+                    if let Err(e) = app.global_shortcut().register(chord) {
+                        eprintln!("rotli: global shortcut {chord} unavailable ({e}) — rebind it in Settings");
+                        // the OS refused it — never CLAIM a chord that won't fire,
+                        // so Settings → Hotkeys shows it unbound instead of lying.
+                        *slot.lock().unwrap() = None;
+                    }
                 }
             }
 
@@ -1198,15 +1264,12 @@ pub fn run() {
                     let ours_up = is_visible(app, "quick")
                         || is_visible(app, "capture")
                         || is_visible(app, "main");
-                    // deterministic backstop for the show→focus race: if a panel was
-                    // just summoned, this Reopen IS its spurious app-activation event.
-                    let just_summoned = app
-                        .state::<LastPanelSummon>()
-                        .0
-                        .lock()
-                        .unwrap()
-                        .is_some_and(|t| t.elapsed() < PANEL_SUMMON_GRACE);
-                    if !has_visible_windows && !ours_up && !just_summoned {
+                    // backstop for the show→focus race: if a panel was just
+                    // summoned, this Reopen IS its spurious app-activation event.
+                    // take() consumes the latch — one summon swallows exactly one
+                    // Reopen, so a later genuine Dock click always gets through.
+                    let summoned = app.state::<LastPanelSummon>().0.lock().unwrap().take();
+                    if reopen_should_show_main(has_visible_windows, ours_up, summoned) {
                         show_main(app);
                     }
                 }

@@ -8,11 +8,13 @@
 import { useState } from "react";
 import {
   type BrainAction,
-  approveProposal,
   deriveJournal,
+} from "../services/brainJournal";
+import {
+  approveProposal,
   dismissProposal,
   undoAction,
-} from "../services/brainJournal";
+} from "../services/brainJournalComposition";
 import { organizerRunOnce } from "../lib/tauri";
 import { invalidateJournal, invalidateNotes, useJournal, useOrganizerStatus } from "../services/hooks";
 import { usePanesStore } from "../state/panes";

@@ -1,11 +1,16 @@
 // Compact Univer host for ```sheet fences — the corpus file stays truth.
 
-import ExcelJS from "exceljs";
 import { useEffect, useRef, useState } from "react";
 import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
 import { fileName } from "../lib/fileKind";
 import { parseCsvExact } from "../sheets/csv";
-import { bytesFromB64, fillFromCsvRows, loadXlsx } from "../sheets/codec/xlsx";
+import {
+  type Workbook,
+  bytesFromB64,
+  fillFromCsvRows,
+  loadXlsx,
+  newWorkbook,
+} from "../sheets/codec/xlsx";
 import { type SheetHandle, buildSheetIdMap, mountSheet, workbookToModel } from "../sheets/engine";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { writeSheetModel, type SheetFileMode } from "../sheets/session";
@@ -25,7 +30,7 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [readOnly, setReadOnly] = useState(false);
   const handleRef = useRef<SheetHandle | null>(null);
-  const wbRef = useRef<ExcelJS.Workbook | null>(null);
+  const wbRef = useRef<Workbook | null>(null);
   const idMapRef = useRef<Map<string, number>>(new Map());
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyGen = useRef(0);
@@ -46,12 +51,12 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
         }
         const writable = stat.writable;
         if (!cancelled) setReadOnly(!writable);
-        let wb: ExcelJS.Workbook;
+        let wb: Workbook;
         let model: ReturnType<typeof workbookToModel>;
         if (mode === "csv") {
           const csv = await corpusFileText(fileId, SHEET_EDIT_MAX_BYTES + 1);
           wb = fillFromCsvRows(
-            new ExcelJS.Workbook(),
+            newWorkbook(),
             fileName(fileId).replace(/\.csv$/i, "") || "Sheet1",
             parseCsvExact(csv),
           );

@@ -135,20 +135,11 @@ fn read_registry() -> Result<serde_json::Value, String> {
     serde_json::from_str(&raw).map_err(|e| format!("the registry isn't valid JSON: {e}"))
 }
 
-/// Atomic write of the registry (tmp + rename in the same dir), preserving
-/// pretty 2-space indent. Mirrors memex.rs `atomic_write`.
+/// Atomic write of the registry (shared fsutil discipline), preserving
+/// pretty 2-space indent.
 fn write_registry(reg: &serde_json::Value) -> Result<(), String> {
     let body = serde_json::to_string_pretty(reg).map_err(|e| e.to_string())?;
-    let path = registry_path();
-    let dir = path.parent().ok_or("registry has no parent dir")?;
-    let mut tmp = tempfile::Builder::new()
-        .prefix(".rotli-registry-")
-        .tempfile_in(dir)
-        .map_err(|e| format!("temp file: {e}"))?;
-    std::io::Write::write_all(&mut tmp, body.as_bytes()).map_err(|e| e.to_string())?;
-    tmp.as_file().sync_all().map_err(|e| e.to_string())?;
-    tmp.persist(&path).map_err(|e| format!("rename into place: {e}"))?;
-    Ok(())
+    crate::fsutil::atomic_write(&registry_path(), &body, ".rotli-registry-")
 }
 
 fn registry_has_id(reg: &serde_json::Value, id: &str) -> bool {
@@ -497,7 +488,7 @@ pub fn local_model_uninstall(id: String) -> Result<(), String> {
         .ok_or("that model has no path on disk.")?;
 
     if let Some(default) = local_model_default() {
-        if PathBuf::from(&default) == path {
+        if path == std::path::Path::new(&default) {
             return Err("that's the default local model — make another one the default first.".into());
         }
     }

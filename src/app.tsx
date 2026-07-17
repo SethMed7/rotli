@@ -442,9 +442,12 @@ export default function App() {
   // the quick window emits its edits, the main window records + persists them
   useEffect(() => onQuickSet(applyQuickState), []);
 
-  // apply the persisted Dock/app icon on startup (macOS; no-op elsewhere)
+  // apply the persisted Dock/app icon on startup (macOS; no-op elsewhere) —
+  // main only: the quick/capture webviews would each repeat the same
+  // main-thread NSApp icon call at boot for nothing
   useEffect(() => {
-    if (isTauri()) void setAppIcon(useUiStore.getState().appIcon);
+    if (isTauri() && surface === "main") void setAppIcon(useUiStore.getState().appIcon);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (surface === "capture") return <CaptureCard />;

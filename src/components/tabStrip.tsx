@@ -17,6 +17,10 @@
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBoardRename } from "../lib/boardRename";
 import { useChatRename } from "../lib/chatRename";
+import {
+  closeOtherTabsWithDraftCleanup,
+  closeTabWithDraftCleanup,
+} from "../documents/draftComposition";
 import { fileName } from "../lib/fileKind";
 import { startTabDrag } from "../lib/tabDrag";
 import { newItemInTab } from "../keys/actions";
@@ -62,7 +66,6 @@ function tabLabel(tab: Tab, titles: Map<string, string>): string {
 export function TabStrip({ pane }: { pane: LeafNode }) {
   const newTabDefault = useUiStore((s) => s.newTabDefault);
   const activateTab = usePanesStore((s) => s.activateTab);
-  const closeTabById = usePanesStore((s) => s.closeTabById);
   const draggingTab = usePanesStore((s) => s.draggingTab);
   // Main lives here too — a tab is a note (or board) you're looking at, so
   // right-click → Add to Main mirrors the note-row menu (Seth, 2026-07-07).
@@ -182,15 +185,13 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
       kind: "action",
       label: "Close tab",
       disabled: loneInLonePane,
-      onClick: () => closeTabById(pane.id, tab.id),
+      onClick: () => closeTabWithDraftCleanup(pane.id, tab.id),
     });
     items.push({
       kind: "action",
       label: "Close other tabs",
       disabled: pane.tabs.length <= 1,
-      onClick: () => {
-        for (const t of pane.tabs) if (t.id !== tab.id) closeTabById(pane.id, t.id);
-      },
+      onClick: () => closeOtherTabsWithDraftCleanup(pane.id, tab.id),
     });
     useContextMenu.getState().open(event.clientX, event.clientY, items);
   };
@@ -224,7 +225,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                     // click-opens grammar (#81, audit 2026-07)
                     if (event.button === 1 && !loneInLonePane) {
                       event.preventDefault();
-                      closeTabById(pane.id, tab.id);
+                      closeTabWithDraftCleanup(pane.id, tab.id);
                     }
                   }}
                   onPointerDown={(event) =>
@@ -298,7 +299,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => {
                         event.stopPropagation();
-                        closeTabById(pane.id, tab.id);
+                        closeTabWithDraftCleanup(pane.id, tab.id);
                       }}
                     >
                       <XGlyph size={9} />

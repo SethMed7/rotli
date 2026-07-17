@@ -5,6 +5,7 @@
 // updatedAt moves and the list/snippets refresh. Tabs hold only view state.
 
 import { useCallback, useSyncExternalStore } from "react";
+import { onQuitFlush } from "../lib/quitFlush";
 import { invalidateNotes } from "../services/hooks";
 import { notesService } from "../services/notes";
 
@@ -81,10 +82,10 @@ export function editDocument(noteId: string, edit: (lines: readonly string[]) =>
   scheduleSync(noteId);
 }
 
-function syncNow(noteId: string): void {
+function syncNow(noteId: string): Promise<void> {
   const lines = docs.get(noteId);
-  if (!lines) return;
-  notesService
+  if (!lines) return Promise.resolve();
+  return notesService
     .updateNote(noteId, lines.join("\n"))
     .then(() => {
       // saved — unless newer keystrokes already queued the next sync
@@ -127,23 +128,29 @@ export function flushNote(noteId: string): void {
 
 /** Flush every pending debounced sync immediately — the quit/reload path. The
  * 400ms window must never eat the last keystrokes once the disk-backed service
- * lands (and it costs nothing to be correct now). */
-export function flushSyncs(): void {
+ * lands. Resolves when every write settles, so the quit handshake can hold the
+ * exit until the IPC lands. */
+export function flushSyncs(): Promise<void> {
+  const pending: Array<Promise<void>> = [];
   for (const [noteId, timer] of timers) {
     clearTimeout(timer);
-    syncNow(noteId);
+    pending.push(syncNow(noteId));
   }
   timers.clear();
+  return Promise.allSettled(pending).then(() => undefined);
 }
 
 // Keystrokes are never lost: quit/reload (pagehide), the window hiding under
 // ⌥Space / click-away (visibilitychange → hidden), and plain focus loss (blur)
-// all flush the debounce window immediately.
-window.addEventListener("pagehide", flushSyncs);
-window.addEventListener("blur", flushSyncs);
+// all flush the debounce window immediately. ⌘Q/tray-Quit can fire with the
+// window still focused (no hide, no blur), so the quit handshake awaits the
+// same flush before the process exits.
+window.addEventListener("pagehide", () => void flushSyncs());
+window.addEventListener("blur", () => void flushSyncs());
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) flushSyncs();
+  if (document.hidden) void flushSyncs();
 });
+onQuitFlush(flushSyncs);
 
 function subscribeDocument(noteId: string, fn: () => void): () => void {
   let set = subs.get(noteId);

@@ -3,6 +3,14 @@
 import ExcelJS from "exceljs";
 import type { Workbook } from "exceljs";
 
+// Surfaces never touch the vendor — the codec is the ONE exceljs seam.
+export type { Workbook } from "exceljs";
+
+/** A fresh empty workbook — so surfaces can build one without importing exceljs. */
+export function newWorkbook(): Workbook {
+  return new ExcelJS.Workbook();
+}
+
 /** Load an xlsx from raw bytes. */
 export async function loadXlsx(bytes: ArrayBuffer): Promise<Workbook> {
   const wb = new ExcelJS.Workbook();
@@ -14,6 +22,35 @@ export async function loadXlsx(bytes: ArrayBuffer): Promise<Workbook> {
 export async function saveXlsx(wb: Workbook): Promise<Uint8Array> {
   const buffer = await wb.xlsx.writeBuffer();
   return new Uint8Array(buffer);
+}
+
+/** Plain string tables from workbook bytes — the read-only viewer + chat path.
+ * `cell.text` is exceljs' display text (formula results, rich text, dates),
+ * blank rows are dropped, rows past `maxRows` only count toward `truncated`. */
+export async function tablesFromXlsx(
+  bytes: ArrayBuffer,
+  maxRows: number,
+): Promise<Array<{ name: string; rows: string[][]; truncated: boolean }>> {
+  const wb = await loadXlsx(bytes);
+  return wb.worksheets.map((ws) => {
+    const rows: string[][] = [];
+    let kept = 0;
+    let total = 0;
+    ws.eachRow({ includeEmpty: false }, (row) => {
+      const sparse: string[] = [];
+      row.eachCell({ includeEmpty: true }, (cell, col) => {
+        sparse[col - 1] = String(cell.text ?? "");
+      });
+      const vals = Array.from(sparse, (c) => c ?? "");
+      if (vals.every((c) => c === "")) return;
+      total += 1;
+      if (kept < maxRows) {
+        rows.push(vals);
+        kept += 1;
+      }
+    });
+    return { name: ws.name, rows, truncated: total > kept };
+  });
 }
 
 /** Fill an EMPTY workbook keeping every field as the typed STRING — csv LOAD. */

@@ -1,5 +1,5 @@
 // Quick capture — the one-breath card (r2 frame C, CSS transfers): r-mark +
-// one field; first line becomes the title; footer = '→ Inbox' chip · ⏎ save ·
+// one field; first line becomes the title; footer = '→ Captures' chip · ⏎ save ·
 // Esc dismiss (⌘⏎ save-and-open still works but is demoted to the palette —
 // the r2 dedup call). Lives in its own frameless always-on-top
 // transparent-edged window (?window=capture); renders standalone in a plain

@@ -22,6 +22,7 @@ import {
   type ChatModelInfo,
   type MemexValidateReport,
   type SystemProfile,
+  appVersion,
   chatModels,
   checkForUpdate,
   cliDetect,
@@ -384,10 +385,9 @@ function UpdatesSection() {
   useEffect(() => {
     if (!isTauri()) return;
     let alive = true;
-    void import("@tauri-apps/api/app")
-      .then(({ getVersion }) => getVersion())
+    void appVersion()
       .then((v) => {
-        if (alive) setVersion(v);
+        if (alive && v) setVersion(v);
       })
       .catch(() => {});
     return () => {
@@ -481,6 +481,8 @@ function GeneralPane() {
   const setFileMetadata = useUiStore((s) => s.setFileMetadata);
   const newTabDefault = useUiStore((s) => s.newTabDefault);
   const setNewTabDefault = useUiStore((s) => s.setNewTabDefault);
+  const userName = useUiStore((s) => s.userName);
+  const setUserName = useUiStore((s) => s.setUserName);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const [confirmReset, setConfirmReset] = useState(false);
   const [demo, setDemo] = useState(false);
@@ -530,6 +532,23 @@ function GeneralPane() {
         the app, and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture —
         all rebindable in Hotkeys.
       </p>
+
+      <h4 className="sethead">Your name</h4>
+      <p className="lead">
+        Chat uses it to address you like a person. It lives in your settings file on this Mac —
+        never sent anywhere on its own.
+      </p>
+      <label className="setselect-row">
+        <span>Name</span>
+        <input
+          className="aikey-input"
+          type="text"
+          placeholder="How should rotli address you?"
+          value={userName}
+          onChange={(e) => setUserName(e.target.value)}
+          onKeyDown={(e) => e.stopPropagation()}
+        />
+      </label>
 
       <h4 className="sethead">New tabs</h4>
       <p className="lead">

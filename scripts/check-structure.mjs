@@ -37,6 +37,12 @@ for (const dependency of deniedDependencies) {
   if (dependency in jsDependencies) violations.push(`package.json: database dependency ${dependency}`);
 }
 
+// Removed 2026-07 for CVE-2023-30533 + npm abandonment — exceljs owns every
+// spreadsheet path. Never let it creep back.
+if ("xlsx" in jsDependencies) {
+  violations.push("package.json: xlsx (SheetJS) is banned — use the exceljs codec (src/sheets/codec)");
+}
+
 // Breve is bundled from its own runtime package, while the root install supplies
 // those modules during development/build. Overlapping dependencies must stay on
 // the exact same range so dev validation cannot pass against a different API

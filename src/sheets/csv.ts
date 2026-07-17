@@ -6,8 +6,9 @@ export function csvCell(s: string): string {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-/** Parse CSV text EXACTLY — the sheet editor's load path. */
-export function parseCsvExact(csv: string): string[][] {
+/** Parse CSV text EXACTLY — the sheet editor's load path. `delimiter` lets the
+ * read-only viewer reuse the same exact parser for TSV. */
+export function parseCsvExact(csv: string, delimiter = ","): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -41,7 +42,7 @@ export function parseCsvExact(csv: string): string[][] {
     }
     if (ch === '"' && field === "") {
       quoted = true;
-    } else if (ch === ",") {
+    } else if (ch === delimiter) {
       endField();
     } else if (ch === "\n") {
       endRow();

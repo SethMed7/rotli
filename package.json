@@ -10,16 +10,23 @@
     "tauri": "tauri",
     "build:mac": "bash scripts/predmg-clean.sh && bun run tauri build --bundles app",
     "release": "bash scripts/release.sh",
-    "test": "bun test src && bun run test:breve",
-    "test:breve": "bun breve-runtime/tests/test-actions.ts && bun breve-runtime/tests/test-intents.ts && bun breve-runtime/tests/test-timectx.ts && bun breve-runtime/tests/test-retention.ts && bun breve-runtime/tests/test-pdf-theme.ts && bun breve-runtime/tests/test-doctor-findings.ts",
+    "test": "bun run test:unit && bun run test:breve && bun run test:tooling",
+    "test:unit": "bun test src",
+    "test:tooling": "bun test scripts/*.test.ts",
+    "test:breve": "bun breve-runtime/tests/test-actions.ts && bun breve-runtime/tests/test-intents.ts && bun breve-runtime/tests/test-timectx.ts && bun breve-runtime/tests/test-retention.ts && bun breve-runtime/tests/test-pdf-theme.ts && bun breve-runtime/tests/test-doctor-findings.ts && bun test ./breve-runtime/tests/test-process-lock.ts ./breve-runtime/tests/test-delivery-claim.ts ./breve-runtime/tests/test-watcher-failure.ts",
+    "test:regression": "bun run test && bun run check:breve-runtime && bun run check:design-system",
+    "lint": "tsc --noEmit && bun run check:code-shape && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:structure && bun run check:docs",
+    "check:code-shape": "bun scripts/check-code-shape.mjs",
     "check:hex": "bun scripts/check-hex.mjs",
     "check:architecture": "bun scripts/check-architecture.mjs",
     "check:design-system": "bun scripts/check-design-system.mjs",
     "check:ipc": "bun scripts/check-ipc-contract.mjs",
+    "check:secret-parity": "bun scripts/check-secret-parity.mjs",
     "check:structure": "bun scripts/check-structure.mjs",
     "check:docs": "bun scripts/check-documentation.mjs",
-    "check:breve-runtime": "bun build breve-runtime/scripts/*.ts --target bun --outdir /tmp/rotli-breve-check && bash -n breve-runtime/scripts/morning-brief.sh && bash -n breve-runtime/scripts/lunch-brief.sh && bash -n breve-runtime/scripts/night-brief.sh",
-    "check": "tsc --noEmit && bun run test && bun run check:breve-runtime && bun run check:hex && bun run check:design-system && bun run check:architecture && bun run check:ipc && bun run check:structure && bun run check:docs"
+    "check:breve-contract": "bun scripts/check-breve-contract.mjs",
+    "check:breve-runtime": "bun build breve-runtime/scripts/*.ts --target bun --outdir $(mktemp -d) && tsc --noEmit -p breve-runtime && bash -n breve-runtime/scripts/morning-brief.sh && bash -n breve-runtime/scripts/lunch-brief.sh && bash -n breve-runtime/scripts/night-brief.sh && bun run check:breve-contract",
+    "check": "bun run lint && bun run test:regression"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -42,7 +49,6 @@
     "mermaid": "^11.15.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "xlsx": "^0.18.5",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

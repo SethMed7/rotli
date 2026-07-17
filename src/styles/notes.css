@@ -662,8 +662,8 @@
 }
 
 /* — the sidebar row context menu (the "m" popover): same surface grammar as the
-   format bar's .fbmenu — warm surface, hairline border, cocoa drop shadow — but
-   anchored under a row. position:fixed so it escapes the sidebar's
+   format bar's .fbmenu — quiet surface + hairline border, with no decorative
+   lift. position:fixed so it escapes the sidebar's
    overflow-y:auto clip; the JS sets top/left from the row's box. — */
 .rowmenu {
   position: fixed;
@@ -671,7 +671,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  box-shadow: var(--shadow-popover);
+  box-shadow: none;
   padding: 5px;
   z-index: 9;
   animation: pop-in var(--motion-enter) var(--motion-ease);

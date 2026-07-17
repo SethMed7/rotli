@@ -4,6 +4,7 @@
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { editManagedDocument } from "../documents/composition";
+import { markDocumentDraftChanged } from "../documents/draftComposition";
 import {
   deleteParkedDocument,
   getParkedDocument,
@@ -96,13 +97,13 @@ export default function DocumentEditor({
         handleRef.current = handle;
         const subscription = handle.onDirty(() => {
           if (!armedRef.current) return;
+          markDocumentDraftChanged(fileId);
           dirtyGenRef.current += 1;
           setDirty(true);
         });
         const structureSubscription = handle.onStructureChange(() => {
           if (!disposed) setEngineRevision((revision) => revision + 1);
         });
-        armedRef.current = true;
         disposeEngine = () => {
           if (subscription && typeof subscription === "object") subscription.dispose?.();
           structureSubscription.dispose();
@@ -110,6 +111,9 @@ export default function DocumentEditor({
         };
         await handle.ready;
         if (disposed) return;
+        // Univer can emit setup mutations while mounting. Only user-visible
+        // edits after ready make a new document durable.
+        armedRef.current = true;
         setReady(true);
       } catch (error) {
         if (!disposed) setErr(error instanceof Error ? error.message : String(error));

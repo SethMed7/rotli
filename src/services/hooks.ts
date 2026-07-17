@@ -5,7 +5,7 @@ import { keepPreviousData, useMutation, useQueries, useQuery } from "@tanstack/r
 import { useEffect, useMemo, useState } from "react";
 import { replaceTitleLine } from "../lib/noteTitle";
 import { type CorpusRoot, corpusListConfig, isTauri, organizerStatus } from "../lib/tauri";
-import { readJournal } from "./brainJournal";
+import { readJournal } from "./brainJournalStore";
 import { DEST, isChats, isChatsPath, isSink } from "./destinations";
 import { memexRootMarkers } from "./fsNotes";
 import { notesService } from "./notes";
@@ -237,18 +237,6 @@ export function useOrganizerStatus() {
 export async function invalidateJournal(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: keys.journal });
   await queryClient.invalidateQueries({ queryKey: keys.organizer });
-}
-
-/** The Brain's area vocabulary (People/Projects/…): the wiki areas minus the
- * internal underscore folders — the ONE derivation every filing surface
- * (metadata panel, right-click drill, the Phase-4 daemon UI) shares. */
-export function useBrainAreas(): string[] {
-  const folders = useFolders().data ?? [];
-  return useMemo(
-    () =>
-      folders.filter((f) => f.parentId === "wiki" && !f.name.startsWith("_")).map((f) => f.name),
-    [folders],
-  );
 }
 
 // ——— lifecycle (Phase 2c): a note's home changes (archive/trash/restore).

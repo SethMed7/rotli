@@ -5,8 +5,14 @@
 // (debounced) on every change. Outside the Tauri shell the corpus doesn't exist,
 // so we render a themed placeholder instead. Kit tokens only (styles/canvas.css).
 
-import { Excalidraw } from "@excalidraw/excalidraw";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type BoardChangeAppState,
+  type BoardChangeElements,
+  type BoardChangeFiles,
+  type BoardInitialData,
+  BoardCanvas,
+} from "../boards/engine/excalidraw";
 import { type CorpusBoardDoc, corpusReadBoard, corpusWriteBoard, isTauri } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
 
@@ -39,7 +45,7 @@ type ExcaliApi = {
 // Excalidraw's initialData prop is optional (`| undefined`); we never pass
 // undefined — we hold `null` until loaded, then the parsed scene — so strip the
 // undefined to satisfy exactOptionalPropertyTypes at the call site.
-type ExcalidrawInitialData = NonNullable<Parameters<typeof Excalidraw>[0]["initialData"]> | null;
+type ExcalidrawInitialData = BoardInitialData;
 
 interface CanvasState {
   status: "loading" | "ready" | "error";
@@ -143,9 +149,9 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
 
   const onChange = useCallback(
     (
-      elements: Parameters<NonNullable<Parameters<typeof Excalidraw>[0]["onChange"]>>[0],
-      appState: Parameters<NonNullable<Parameters<typeof Excalidraw>[0]["onChange"]>>[1],
-      files: Parameters<NonNullable<Parameters<typeof Excalidraw>[0]["onChange"]>>[2],
+      elements: BoardChangeElements,
+      appState: BoardChangeAppState,
+      files: BoardChangeFiles,
     ) => {
       // Don't write while still loading (the initialData render fires onChange).
       if (state.status !== "ready") return;
@@ -231,7 +237,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
 
   return (
     <div className="canvas-surface">
-      <Excalidraw
+      <BoardCanvas
         initialData={state.initialData}
         onChange={onChange}
         theme={excaliTheme}

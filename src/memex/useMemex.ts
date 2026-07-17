@@ -77,6 +77,7 @@ export function useWriteChat() {
     mutationFn: (input: {
       instance: MemexInstance;
       title: string;
+      slug?: string;
       attachedTo?: string;
       messages: ChatMsg[];
       existingSlug?: string;

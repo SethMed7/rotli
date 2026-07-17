@@ -40,7 +40,8 @@ require translating the project into a new set of duplicated rules.
 3. **Change:** implement the smallest complete vertical slice. Keep policies
    centralized and dependencies pointed inward.
 4. **Prove:** add focused tests, run the relevant guard, then run the full
-   validation matrix before declaring completion.
+   validation matrix before declaring completion. The evidence levels and
+   command ownership are defined in [`testing.md`](testing.md).
 5. **Handoff:** summarize changes, exact validation results, remaining warnings,
    and native visual checks. Clearly state whether anything was committed,
    published, installed, or restarted.

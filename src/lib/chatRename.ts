@@ -5,19 +5,13 @@
 
 import { useCallback } from "react";
 import { activeInstance } from "../memex/config";
+// the ONE chat-slug generator — same law as chat creation (60-cap included),
+// and every output passes the Rust safe_slug wire validator.
+import { slugify } from "../memex/contract";
 import { renameChat } from "../memex/service";
 import { invalidateMemex, useMemexConfig } from "../memex/useMemex";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
-
-/** Display name → chat slug (lowercase-alnum-dash), matching the Rust safe_slug. */
-function slugify(name: string): string {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 export function useChatRename() {
   const renamingChatSlug = useUiStore((s) => s.renamingChatSlug);

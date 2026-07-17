@@ -22,7 +22,6 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -59,21 +58,7 @@ fn now_iso() -> String {
 
 /// Temp file in the SAME dir + rename — a concurrent reader never sees a torn file.
 fn atomic_write(path: &Path, contents: &str) -> Result<(), String> {
-    let dir = path
-        .parent()
-        .ok_or_else(|| format!("no parent dir for {}", path.display()))?;
-    let mut tmp = tempfile::Builder::new()
-        .prefix(".rotli-memex-")
-        .tempfile_in(dir)
-        .map_err(|e| format!("temp file in {}: {e}", dir.display()))?;
-    tmp.write_all(contents.as_bytes())
-        .map_err(|e| format!("write {}: {e}", path.display()))?;
-    tmp.as_file()
-        .sync_all()
-        .map_err(|e| format!("sync {}: {e}", path.display()))?;
-    tmp.persist(path)
-        .map_err(|e| format!("rename into {}: {e}", path.display()))?;
-    Ok(())
+    crate::fsutil::atomic_write(path, contents, ".rotli-memex-")
 }
 
 /// How long a lockfile must sit untouched before it counts as STALE and is

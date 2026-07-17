@@ -10,6 +10,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **rotli knows your name.** Onboarding asks (optionally) what to call you —
+  editable any time in Settings → General — and chat's local and connected
+  models address you by it. The name lives in `.rotli/settings.json` inside
+  your memex, on this Mac only.
+- **New mechanical guards.** `check:secret-parity` fails CI the moment the
+  TS/Rust secret-pattern mirrors drift; `check:architecture` now walks the
+  vendor seams (exceljs, Excalidraw, Univer, JSZip must stay behind their
+  codec/engine adapters); `cargo clippy -D warnings` joins the CI regression
+  lane; and `breve-runtime/` gets a strict TypeScript pass.
+
+### Changed
+
+- **One spreadsheet library.** Read-only sheet viewing and chat file-reads now
+  run on the same exceljs codec as the editor. The abandoned SheetJS (`xlsx`)
+  dependency — CVE-2023-30533, unpatched on npm — is removed and banned by
+  `check:structure`. TSV files now parse into real columns.
+
+### Removed
+
+- **`.xls` and `.ods` passive previews.** They rendered through SheetJS only —
+  no editor, no save — which the workspace-not-preview-catalog rule forbids.
+  Open them externally, or convert to `.xlsx`.
+- **Dead code sweep.** Nine unused exports, three unwired scripts, a duplicate
+  slugify (chat renames now share the canonical slug law with chat creation),
+  and two duplicate Rust atomic-write helpers.
+
+### Fixed
+
+- **⌥Q / ⌥C no longer surface the main window uninvited.** Summoning a
+  floating panel makes macOS fire a spurious Reopen; the suppression was a
+  700 ms time-box that could lose the race under startup load, opening main
+  alongside the panel (the old "⌥. also opened main" bug, back). The latch is
+  now consumed by the first Reopen and the grace is 2 s — one summon swallows
+  exactly one Reopen, and a genuine Dock click always gets through
+  (unit-tested).
+- **Slash and block menus flip upward near the window's bottom edge** instead
+  of being clipped — in the short Quick Note window a bottom-row `/` menu was
+  cut off, which read as "slash doesn't work". (Quick notes have always had
+  the full editor: slash commands, wikilinks, and embeds included.)
+- **The quit flush now covers the Quick Note and capture webviews.** The
+  handshake only reached the main window, so ⌘Q with the Quick Note focused
+  could drop its last half-second of typing; Rust now waits for every live
+  webview's ack (still bounded — quit can never hang).
+- **Settings → Hotkeys tells the truth when the OS refuses a chord.** If a
+  launcher owns a default (⌥Space lovers), the chord now shows unbound
+  instead of claiming a shortcut that silently never fires.
+- Keyboard focus is visible on the capture card and the Quick Note search
+  (accent hairline on focus), and the app-icon call no longer runs three
+  times at boot (once per webview).
+- **⌘Q can no longer eat your last keystrokes.** The note editor's debounced
+  save and the settings/viewstate writer are now registered with — and actually
+  awaited by — the quit handshake; previously a quit with the window focused
+  could drop up to 400 ms of typing and in-flight settings writes.
+- **A body save can't resurrect a stale pin.** Rust preserves `pinned` from
+  disk on every write (like `origin`), closing the read-modify-write race and
+  removing one IPC round-trip per save.
+- **Atomic writes survive power loss.** The shared write helper fsyncs the
+  parent directory after the rename; before, a crash was safe but a power cut
+  could drop the final save.
+- **Breve datestamps respect your timezone.** Five runtime scripts stamped
+  "today" in UTC, so late-evening briefs, transcripts, and generated files
+  carried tomorrow's date; all now flow through the timezone-aware helper.
+  The strict typecheck also caught `audio-topic.ts` crashing on start (an
+  unimported constant) and an unread-mail scan crash when an IMAP search
+  fails.
+
+- **Breve no longer multiplies after Rotli restarts.** Its scheduler now has a
+  crash-recoverable singleton lock, exits with its owning app even after an
+  ungraceful parent death, and claims each job across processes before running.
+  Signal/email delivery, provider fallback warnings, creator alerts, and watcher
+  failure notices are concurrency-safe, preventing duplicate briefs and alert
+  floods while preserving retries and durable receipts.
+- Untouched DOCX drafts now disappear when their final tab is closed, note
+  headers and menus expose a direct secure-gated “Chat with this note” flow, the
+  obsolete “File to the Brain” menu is gone, and editor popovers use quiet
+  borders instead of glow shadows.
+
 ## [0.32.3] - 2026-07-12
 
 ### Fixed

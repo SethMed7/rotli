@@ -1160,8 +1160,9 @@ pub fn breve_write_watchlist(
     let path = root.join(WATCHLIST_FILE);
     let body = strip_frontmatter(&markdown);
     let doc = if let Some(existing) = read_text(&path) {
-        if existing.starts_with("---\n") {
-            let front_end = existing[4..].find("\n---\n").map(|at| at + 9);
+        if let Some(after_fence) = existing.strip_prefix("---\n") {
+            // offsets into `existing`: 4 (opening fence) + match + 5 ("\n---\n")
+            let front_end = after_fence.find("\n---\n").map(|at| at + 9);
             front_end
                 .map(|end| format!("{}{}", &existing[..end], body.trim_start_matches(['\r', '\n'])))
                 .unwrap_or_else(|| note_document("Breve watchlist topics and lenses", "breve, watchlist", &now_date(), body))

@@ -204,6 +204,10 @@
 .qsearch-in input:focus-visible {
   outline: none;
 }
+/* keyboard safety: the row's hairline shows focus instead of an input ring */
+.qsearch-in:focus-within {
+  border-bottom-color: var(--accent);
+}
 .qsearch-list {
   flex: 1;
   min-height: 0;

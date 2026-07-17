@@ -22,6 +22,7 @@ import {
 } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { makeTauriHost } from "../ai/host";
+import { modelIsOnDevice } from "../ai/guard";
 import { presetFor, runHybrid } from "../ai/hybrid";
 import { runAgent } from "../ai/loop";
 import {
@@ -41,6 +42,7 @@ import {
   chatModels,
   cliCancel,
   cliDetect,
+  corpusFrontmatter,
   fileAssetUrl,
   isTauri,
 } from "../lib/tauri";
@@ -53,6 +55,7 @@ import { renderInline } from "../editor/render";
 import { CheckGlyph, CloudGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
 import { Character } from "./character";
 import { syncManagedChatMemory } from "../chatMemory/composition";
+import { rememberedChatNote, rememberChatNote } from "../noteChat/session";
 
 interface Msg {
   speaker: string;
@@ -536,6 +539,20 @@ export function ChatSurface({
   const active = cfg.data ? activeInstance(cfg.data) : null;
   const chats = useInstanceChats(active);
   const write = useWriteChat();
+  // The stored title is presentation; attachment identity is the note stem.
+  // A session mapping makes a just-created note chat immediately resolvable,
+  // while the stable stem tail restores that link after relaunch.
+  const summary = chatSlug ? chats.data?.find((chat) => chat.slug === chatSlug) : undefined;
+  const storedTitle = summary?.title ?? null;
+  const attachedStem = (summary?.attachedTo ?? "").replace(/^\[\[|\]\]$/g, "").trim();
+  const attachedNoteId =
+    rememberedChatNote(chatSlug) ??
+    (attachedStem
+      ? ([...noteIndex.keys()].find(
+          (id) => id.slice(-6).toLowerCase() === attachedStem.slice(-6).toLowerCase(),
+        ) ?? null)
+      : null);
+  const secureAttachmentHint = attachedStem.startsWith("secure-note-");
 
   // the on-device models the memex-ai store offers; non-Tauri has no bridge.
   const models = useQuery({
@@ -569,13 +586,18 @@ export function ChatSurface({
     (id, index) => !aiProviders[id] || providerChecks[index]?.isFetched,
   );
   const catalogSettled = models.isFetched && providerChecksSettled;
-  const groups = mergedModels(
+  const allGroups = mergedModels(
     models.data ?? [],
     aiProviders,
     hybridPresets,
     blockedModels,
     providerReady,
   );
+  // A secure-note chat never offers a connected or routing model. The exact
+  // frontmatter is rechecked on send as the authoritative backstop.
+  const groups: ModelGroups = secureAttachmentHint
+    ? { ...allGroups, connected: [], presets: [] }
+    : allGroups;
   const modelList = flattenModels(groups);
   const savedPick = modelList.find((m) => m.id === chatModelId);
   const fallbackPick = modelList.find((m) => m.isDefault) ?? modelList[0] ?? null;
@@ -616,7 +638,7 @@ export function ChatSurface({
   // rides a PANE-scoped key (session-only, never persisted): a shared "" key leaked
   // one globe click into every future fresh chat across relaunches (#7, audit 2026-07)
   const webKey = chatSlug ?? `unsaved:${paneId}`;
-  const globeOn = chatWeb[webKey] ?? false;
+  const globeOn = secureAttachmentHint ? false : (chatWeb[webKey] ?? false);
   // per-chat measure rides the same key; missing = the tuned comfort column
   const measure: Measure = chatMeasure[webKey] ?? "comfort";
   // image attach is gated on the picked model's vision capability
@@ -653,6 +675,33 @@ export function ChatSurface({
       ]);
       return;
     }
+    let attachedSecure = secureAttachmentHint;
+    if (attachedNoteId) {
+      try {
+        const frontmatter = await corpusFrontmatter(attachedNoteId);
+        if (!frontmatter) throw new Error("missing note security metadata");
+        attachedSecure = attachedSecure || frontmatter.secure === true;
+      } catch {
+        setMessages((previous) => [
+          ...previous,
+          {
+            speaker: "rotli",
+            text: "⚠ Rotli couldn’t verify this attached note’s security state, so nothing was sent to a model.",
+          },
+        ]);
+        return;
+      }
+    }
+    if (attachedSecure && !modelIsOnDevice(picked)) {
+      setMessages((previous) => [
+        ...previous,
+        {
+          speaker: "rotli",
+          text: "⚠ This chat is attached to a secure note. Choose an on-device model to continue.",
+        },
+      ]);
+      return;
+    }
     const userText = message.trim();
     const imgs = images;
     setMessage("");
@@ -672,16 +721,19 @@ export function ChatSurface({
     // the image tool needs a pinned assets dir — a SAVED chat only — and its
     // engine's lane enabled; the globe doesn't gate it
     const image =
-      chatSlug && aiProviders[imageEngine]
+      !attachedSecure && chatSlug && aiProviders[imageEngine]
         ? { root: active.root, slug: chatSlug, engine: imageEngine }
         : undefined;
+    const userName = useUiStore.getState().userName.trim();
     const runInput: RunInput = {
       history,
       userText,
-      web: globeOn,
+      web: attachedSecure ? false : globeOn,
       model,
+      ...(attachedNoteId ? { noteId: attachedNoteId } : {}),
       ...(imgs.length > 0 ? { images: imgs } : {}),
       ...(image ? { imageTool: true } : {}),
+      ...(userName ? { userName } : {}),
     };
 
     // a preset pick routes through the hybrid layer; everything else is the
@@ -777,15 +829,6 @@ export function ChatSurface({
     if (datas.length > 0) setImages((prev) => [...prev, ...datas]);
   };
 
-  // the STORED title, not the de-dashed slug (#87, audit 2026-07): the slug is
-  // truncated + date/ulid-suffixed wire plumbing; the frontmatter `title` is
-  // what the user named it (the sidebar/All-chats already show it). Slug stays
-  // the fallback while the listing loads or for a title-less foreign chat.
-  const summary = chatSlug ? chats.data?.find((c) => c.slug === chatSlug) : undefined;
-  const storedTitle = summary?.title ?? null;
-  // the chat's attached note, as its staging stem ("[[<slug>-<id6>]]" stripped)
-  const attachedStem = (summary?.attachedTo ?? "").replace(/^\[\[|\]\]$/g, "").trim();
-
   // this chat's generated assets: everything under storage/chats/<slug>/ in the
   // active root (wire ids are bare for the corpus, "<rootid>:rel" otherwise)
   const assetPrefix =
@@ -836,7 +879,9 @@ export function ChatSurface({
       await setAttached.mutateAsync({ instance: active, slug: chatSlug, stem });
       await invalidateNotes();
       const prefix = active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`;
-      openAttachedNote(`${prefix}${id}`);
+      const noteId = `${prefix}${id}`;
+      rememberChatNote(chatSlug, noteId);
+      openAttachedNote(noteId);
     } catch (e) {
       setNoteErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1076,8 +1121,11 @@ export function ChatSurface({
                       type="button"
                       className={globeOn ? "chat-tool on" : "chat-tool"}
                       aria-pressed={globeOn}
+                      disabled={secureAttachmentHint}
                       title={
-                        globeOn
+                        secureAttachmentHint
+                          ? "Web search is unavailable for a secure-note chat"
+                          : globeOn
                           ? "Web search is ON for this chat"
                           : "Web search — let this chat reach the internet"
                       }

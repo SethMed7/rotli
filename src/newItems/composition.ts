@@ -14,6 +14,7 @@ import { useMainStore } from "../state/main";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
+import { trackNewDocumentDraft } from "../documents/draftComposition";
 import type { NewItemKind } from "./model";
 import { createNewItem, type CreatedItem, type NewItemCreator, type NewItemPresenter } from "./workflow";
 
@@ -68,7 +69,9 @@ const creator: NewItemCreator = {
     }
     if (kind === "document") {
       const { createManagedDocument } = await import("../documents/composition");
-      return { id: await createManagedDocument(), kind };
+      const id = await createManagedDocument();
+      trackNewDocumentDraft(id);
+      return { id, kind };
     }
     if (kind === "sheet") {
       const { createBlankWorkbookBase64 } = await import("../sheets/create");

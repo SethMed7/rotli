@@ -17,10 +17,9 @@ import {
   corpusSetPinned,
   corpusSetSecure,
 } from "../lib/tauri";
-import { fileNoteToArea } from "../services/brainFiling";
 import { isEmptyNote } from "../services/mainDismiss";
 import { DEST, isSink } from "../services/destinations";
-import { invalidateNotes, useArchiveNote, useBrainAreas, useRestoreNote, useTrashNote } from "../services/hooks";
+import { invalidateNotes, useArchiveNote, useRestoreNote, useTrashNote } from "../services/hooks";
 import { useMainGcIds } from "../services/hooks";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
@@ -31,6 +30,7 @@ import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { noteDiskFolder } from "../lib/noteLocation";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
+import { openChatForNote } from "../noteChat/composition";
 
 /** What the opener hands us — a real MouseEvent qualifies, and a keyboard
  * opener passes a plain {clientX, clientY} built from its row's rect. */
@@ -57,9 +57,6 @@ export function useNoteMenu() {
   const archive = useArchiveNote();
   const trash = useTrashNote();
   const restore = useRestoreNote();
-  // the Brain's area vocabulary for the filing drill — shared with MetaPanel
-  const areas = useBrainAreas();
-
   return useCallback(
     (e: MenuAnchor, note: NoteSummary, opts?: { returnFocus?: () => void }) => {
       // preventDefault MUST be synchronous (suppress the native menu before any
@@ -162,6 +159,24 @@ export function useNoteMenu() {
           label: "Open in new tab",
           onClick: () => openSummary(note, { newTab: true }),
         });
+        if (isNote) {
+          items.push({
+            kind: "action" as const,
+            label: "Chat with this note",
+            onClick: () => {
+              useUiStore.getState().setRowActionError(null);
+              void openChatForNote(note).catch((err) =>
+                useUiStore
+                  .getState()
+                  .setRowActionError(
+                    `Couldn’t open a chat for “${note.title || "this note"}” — ${
+                      err instanceof Error ? err.message : String(err)
+                    }`,
+                  ),
+              );
+            },
+          });
+        }
         items.push({
           kind: "action" as const,
           label: "Show in Brain",
@@ -287,40 +302,6 @@ export function useNoteMenu() {
             });
           }
         }
-      // file into a Brain area right here — the 0.17.0 fast-follow; same Filer
-      // path as the metadata panel. Offered for STAGED notes (they project to
-      // the Captures "Board" folder on the wire — a .md note's id is a ULID, so
-      // the folder is the sync-readable signal) and for notes already in an
-      // area (re-file). fileNoteToArea resolves the ULID→rel bridge itself.
-      const diskFolder = noteDiskFolder(note);
-      const fileable =
-        note.folderId === DEST.board ||
-        diskFolder === "wiki" ||
-        diskFolder.startsWith("wiki/");
-      if (!isFile && !isBoard && fileable && areas.length > 0) {
-        items.push({
-          kind: "drill" as const,
-          label: "File to the Brain",
-          items: areas.map((area) => ({
-            kind: "action" as const,
-            label: area.charAt(0).toUpperCase() + area.slice(1),
-            onClick: () => {
-              // failures surface as the sidebar's inline error note — the menu
-              // is closed by the time the write fails (#11, audit 2026-07)
-              useUiStore.getState().setRowActionError(null);
-              void fileNoteToArea(note.id, area).catch((err) =>
-                useUiStore
-                  .getState()
-                  .setRowActionError(
-                    `Couldn’t file “${note.title || "this note"}” to the Brain — ${
-                      err instanceof Error ? err.message : String(err)
-                    }`,
-                  ),
-              );
-            },
-          })),
-        });
-      }
       if (!isFile) {
         items.push({ kind: "sep" as const });
         items.push({
@@ -394,6 +375,6 @@ export function useNoteMenu() {
         open(x, y, items, opts);
       })();
     },
-    [open, openSummary, quickIds, manifest, setTree, liveIds, archive, trash, restore, setRenameTarget, areas],
+    [open, openSummary, quickIds, manifest, setTree, liveIds, archive, trash, restore, setRenameTarget],
   );
 }

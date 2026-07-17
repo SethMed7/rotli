@@ -7,6 +7,18 @@ import type { Tab } from "../types";
 import { parseHybridPresets, parseSettings, pruneMap, unknownSettingsKeys, validTab } from "./persist";
 import { clampChatSidebarLimit } from "./ui";
 
+describe("userName", () => {
+  it("defaults to empty and survives a round-trip", () => {
+    expect(parseSettings("{}").userName).toBe("");
+    expect(parseSettings('{"userName":"Seth"}').userName).toBe("Seth");
+  });
+
+  it("falls back to empty on a non-string value", () => {
+    expect(parseSettings('{"userName":42}').userName).toBe("");
+    expect(parseSettings('{"userName":null}').userName).toBe("");
+  });
+});
+
 describe("chatSidebarLimit (#17 — chat list cap)", () => {
   it("defaults a missing key to 5", () => {
     expect(parseSettings("{}").chatSidebarLimit).toBe(5);

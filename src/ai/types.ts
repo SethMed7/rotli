@@ -107,6 +107,9 @@ export interface RunInput {
   web: boolean;
   /** The picked model — drives the context budget (index size, caps, steps). */
   model: ModelMeta;
+  /** A note explicitly attached to this chat. The host's independent read gate
+   * still decides whether the picked model may receive its contents. */
+  noteId?: string;
   /** Base64 images attached to this turn (vision models only). */
   images?: string[];
   /** Tool-use step cap (default: the model's budget). */
@@ -114,4 +117,6 @@ export interface RunInput {
   /** Offer the generate_image tool (a connected engine is set up + the chat is
    * saved, so its assets dir is well-defined). Independent of the web globe. */
   imageTool?: boolean;
+  /** The user's name for prompt personalization — omit when unset. */
+  userName?: string;
 }

@@ -250,6 +250,7 @@ pub struct WireMsg {
 /// step. MLX flattens to one prompt (+ optional `format:"json"` coercion); llama.cpp
 /// gets a real messages array, the Bearer key (fixes the 401), and image parts.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // the wire command mirrors the chat request shape 1:1
 pub fn chat_messages(
     state: tauri::State<crate::organizer::OrganizerState>,
     messages: Vec<WireMsg>,
@@ -323,6 +324,7 @@ pub fn complete_local(
 
 /// MLX `/api/generate` — flatten the transcript to one prompt; optionally force a
 /// JSON object (the server appends its JSON guard + extracts the first object).
+#[allow(clippy::too_many_arguments)] // carries the full request shape to the MLX lane
 fn messages_generate(
     base: &str,
     model: &str,

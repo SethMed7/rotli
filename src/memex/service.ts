@@ -90,6 +90,8 @@ export async function setPerms(id: string, perms: Perms): Promise<MemexConfig> {
 export interface WriteChatInput {
   instance: MemexInstance;
   title: string;
+  /** Optional caller-owned safe filename identity; the displayed title stays separate. */
+  slug?: string;
   attachedTo?: string;
   messages: ChatMsg[];
   /** Append to this existing chat instead of creating a new one. */
@@ -98,7 +100,7 @@ export interface WriteChatInput {
 
 export async function writeChat(input: WriteChatInput): Promise<{ slug: string; path: string }> {
   const { instance } = input;
-  const slug = input.existingSlug ?? chatSlug({ title: input.title, source: ROTLI_SOURCE });
+  const slug = input.existingSlug ?? input.slug ?? chatSlug({ title: input.title, source: ROTLI_SOURCE });
   const rel = `chats/${slug}.md`;
   if (!canWrite(rel, instance.perms)) {
     throw new Error("This memex is read-only for rotli — connect it with write access first.");

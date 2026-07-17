@@ -35,10 +35,6 @@ export type OrganizerModel = "local" | "claude" | "gemini35";
 
 export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local", "claude", "gemini35"];
 
-/** Selectable idle-delay presets (seconds): how long a note must sit UNTOUCHED
- * before the organizer scans it. Default 5 min (Seth, 2026-07-03). */
-export const ORGANIZER_QUIET_PRESETS: readonly number[] = [60, 120, 300, 600, 900];
-
 /** How many recent chats the sidebar Chat section shows before "All chats" takes
  * over — the accordion is a LIMITED view. 5 (default) / 10 / 15 (Seth's decision
  * 2026-07-03: the old flat 12 was too much). */
@@ -264,6 +260,11 @@ interface UiState {
    * persisted (transient); dismissed by the × or replaced by the next failure. */
   rowActionError: string | null;
   setRowActionError: (e: string | null) => void;
+
+  /** The user's name — onboarding's "What should rotli call you?" / Settings →
+   * General. Personalizes AI chat (the prompt persona line). Persisted; "" = unset. */
+  userName: string;
+  setUserName: (name: string) => void;
 
   /** The on-device model id the Chat surface sends to, picked from the memex-ai
    * store (~/.memex/ai/registry.json). null = use the store's default. Persisted. */
@@ -492,6 +493,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   setRenamingChatSlug: (slug) => set({ renamingChatSlug: slug }),
   rowActionError: null,
   setRowActionError: (e) => set({ rowActionError: e }),
+
+  userName: "",
+  setUserName: (name) => set({ userName: name }),
 
   chatModelId: null,
   setChatModelId: (id) => set({ chatModelId: id }),

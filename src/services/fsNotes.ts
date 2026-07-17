@@ -18,7 +18,7 @@ import {
 import type { Folder, Note, NoteSummary, SearchHit } from "../types";
 import { DEST, isChats, isHidden, isRootMarker, isVault, memexMarkersOf } from "./destinations";
 import { snippetOf, titleOf } from "./derive";
-import type { NotesService } from "./notes";
+import type { NotesService } from "./notesPort";
 import type { NoteCreationPolicy } from "../security/secureNotes";
 
 /** corpus.rs says "note not found: <id>" for a stale/unknown id. */
@@ -126,10 +126,9 @@ export class FsNotesService implements NotesService {
 
   async updateNote(id: string, body: string): Promise<Note> {
     try {
-      // pinned is not part of the editor's write — read the disk truth so the
-      // four-fact frontmatter never loses it under an external pin/unpin
-      const { pinned } = await corpusRead(id);
-      const meta = await corpusWrite(id, body, pinned);
+      // pinned is not part of the editor's write — Rust preserves the disk
+      // truth itself, so no read-modify-write round-trip (or race) here
+      const meta = await corpusWrite(id, body);
       return { ...meta, body };
     } catch (err) {
       // the editor model evicts dead buffers on this exact message shape

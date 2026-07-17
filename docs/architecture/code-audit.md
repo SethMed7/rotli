@@ -5,8 +5,9 @@
 The new item, document, memex-map, and organizer-model work follows the enforced
 dependency direction. The repository now mechanically checks camelCase source
 filenames, denied database dependencies, bundled Breve dependency parity,
-domain/application imports, the Tauri adapter boundary, frontend/Rust IPC
-parity, and the Markdown-only slash boundary.
+domain/application imports, production module cycles, focused/skipped tests,
+the Tauri adapter boundary, frontend/Rust IPC parity, and the Markdown-only
+slash boundary.
 
 ## Stable seams
 
@@ -19,6 +20,11 @@ parity, and the Markdown-only slash boundary.
   AI host; no storage or presentation dependencies.
 - `src/chatMemory/`: deterministic per-chat memory notes, master keyword
   retrieval, framework-free workflow, and one Tauri/memex composition root.
+- `src/services/notesPort.ts`: the application-facing note port, independent of
+  both the browser and filesystem implementations.
+- Brain journal transitions remain pure in `brainJournal.ts`; Tauri persistence
+  and live dependency selection live in `brainJournalStore.ts` and
+  `brainJournalComposition.ts`. The production import graph is cycle-free.
 - `src/ai/budget.ts`: capability-derived retrieval budgets.
 - Rust corpus and provider modules remain independent security boundaries.
 

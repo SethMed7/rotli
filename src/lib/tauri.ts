@@ -131,6 +131,14 @@ export interface UpdateStatus {
   notes?: string;
 }
 
+/** Read the installed bundle version without exposing the Tauri app plugin to
+ * presentation. Browser review has no bundle and returns null. */
+export async function appVersion(): Promise<string | null> {
+  if (!isTauri()) return null;
+  const { getVersion } = await import("@tauri-apps/api/app");
+  return getVersion();
+}
+
 /** Ask the feed once whether a newer signed build exists. Resolves
  * { available:false } outside Tauri, or when the feed says we're current. */
 export async function checkForUpdate(): Promise<UpdateStatus> {
@@ -265,8 +273,8 @@ export function corpusRead(id: string): Promise<CorpusNoteDoc> {
   return corpusInvoke("corpus_read", { id });
 }
 
-export function corpusWrite(id: string, body: string, pinned: boolean): Promise<CorpusNoteMeta> {
-  return corpusInvoke("corpus_write", { id, body, pinned });
+export function corpusWrite(id: string, body: string): Promise<CorpusNoteMeta> {
+  return corpusInvoke("corpus_write", { id, body });
 }
 
 export function corpusCreate(
@@ -457,10 +465,6 @@ export function localModelInstallCancel(requestId: string): Promise<void> {
  * like Breve get) — per-chat picks don't need this; any installed model serves. */
 export function localModelSetDefault(id: string): Promise<void> {
   return aiInvoke("local_model_set_default", { id });
-}
-/** The path the shared MLX server's default is pinned to (null if none/no server). */
-export function localModelDefault(): Promise<string | null> {
-  return aiInvoke("local_model_default");
 }
 /** Remove an installed model (registry entry + trashed dir). Refuses the default one. */
 export function localModelUninstall(id: string): Promise<void> {

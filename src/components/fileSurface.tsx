@@ -265,7 +265,9 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           }
           const load = SHEET_BIN.has(ext)
             ? corpusFileBytes(fileId).then((b64) => parseWorkbook({ base64: b64 }))
-            : corpusFileText(fileId, READ_MAX_BYTES).then((csv) => parseWorkbook({ csv }));
+            : corpusFileText(fileId, READ_MAX_BYTES).then((csv) =>
+                parseWorkbook({ csv, delimiter: ext === "tsv" ? "\t" : "," }),
+              );
           load.then((t) => !cancelled && setTables(t)).catch(fail);
         });
     } else if (kind === "document" && DOCX_EDITABLE.has(ext)) {

@@ -20,7 +20,8 @@ Images and video remain the only accepted view-only surfaces.
 | shipped | `.doc`, `.rtf`, `.odt` | Explicit local copy conversion | convert locally | Create a managed DOCX, preserve the original, then edit the result. Never add legacy extensions to slash results. |
 | P0 | `.dot`, `.pages` | Explicit unsupported state | mark unsupported | Add a tested local converter only if it can produce an editable DOCX with clear fidelity disclosure. |
 | shipped | `.xlsx`, `.csv` in writable lanes | Univer workbook editor with save | edit natively | Keep codec/engine boundaries replaceable. |
-| P0 | `.xls`, `.xlsm`, `.ods`, `.tsv` | Passive table rendering | unsupported today | Prefer copy conversion to managed `.xlsx`; preserve formulas, sheets, types, and styles or refuse conversion. |
+| P0 | `.xlsm`, `.tsv` | Table rendering + chat reads (exceljs codec / exact CSV parser) | read today, edit later | Prefer copy conversion to managed `.xlsx` for editing. |
+| P0 | `.xls`, `.ods` | none (SheetJS preview removed 2026-07 with the `xlsx` dependency) | unsupported | Open externally, or add an explicit conversion workflow — never a passive preview. |
 | P0 | plain text, logs, JSON, YAML, XML, subtitles | Read-only `<pre>` | unsupported today | Add a native text editor with encoding-aware atomic save, dirty state, errors, size limits, and narrow-window behavior. Route `.md` back to the Markdown note surface where applicable. |
 | P0 | HTML/XHTML | Sandboxed preview plus read-only code | unsupported today | Add native source editing and save; keep preview sandboxed and derived from the same dirty buffer. |
 | P0 | unknown files | WKWebView iframe fallback | unsupported today | Replace generic preview claims with an explicit unsupported state and external-open/reveal actions. Add format-specific workflows only as complete slices. |

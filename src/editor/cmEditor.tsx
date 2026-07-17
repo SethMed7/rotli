@@ -33,7 +33,10 @@ import { focusDim } from "./focusMode";
 import { linkOpener, livePreview } from "./livePreview";
 import { stripMarkdown } from "./stripMarkdown";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
-import { type SlashItem, type SlashPickerMode, SlashMenu, filterSlashItems, slashQueryAtCaret } from "./slashMenu";
+import { type SlashItem, type SlashPickerMode, SlashMenu, filterSlashItems, slashPlacement, slashQueryAtCaret } from "./slashMenu";
+
+/** Rough height of the 4-item block-action menu — the bottom-edge clamp bound. */
+const BLOCK_MENU_ESTIMATE = 160;
 import { SlashPicker } from "./slashPicker";
 import { pickerFence, slashInsertion } from "./slashActions";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
@@ -47,6 +50,8 @@ interface SlashState {
   index: number;
   left: number;
   top: number;
+  /** Opens upward when the caret row is too close to the window's bottom edge. */
+  up: boolean;
 }
 
 interface PickerState {
@@ -54,6 +59,7 @@ interface PickerState {
   index: number;
   left: number;
   top: number;
+  up: boolean;
   insertAt: number;
 }
 
@@ -135,7 +141,14 @@ export function CmEditor({
   const [blockMenu, setBlockMenu] = useState<{ pos: number; x: number; y: number } | null>(null);
   const openBlockMenu = useCallback((_view: EditorView, pos: number, rect: DOMRect) => {
     const host = hostRef.current?.getBoundingClientRect();
-    setBlockMenu({ pos, x: rect.right - (host?.left ?? 0) + 4, y: rect.top - (host?.top ?? 0) });
+    // clamp so the 4-item menu never renders past the window's bottom edge
+    // (the short Quick Note window clipped it)
+    const maxY = window.innerHeight - (host?.top ?? 0) - BLOCK_MENU_ESTIMATE;
+    setBlockMenu({
+      pos,
+      x: rect.right - (host?.left ?? 0) + 4,
+      y: Math.min(rect.top - (host?.top ?? 0), maxY),
+    });
   }, []);
 
   const spellComp = useRef(new Compartment()).current;
@@ -171,7 +184,7 @@ export function CmEditor({
     [fmPath],
   );
 
-  const [slash, setSlash] = useState<SlashState>({ open: false, query: "", index: 0, left: 0, top: 0 });
+  const [slash, setSlash] = useState<SlashState>({ open: false, query: "", index: 0, left: 0, top: 0, up: false });
   const [picker, setPicker] = useState<PickerState | null>(null);
   const pickerRef = useRef<PickerState | null>(null);
   pickerRef.current = picker;
@@ -260,10 +273,13 @@ export function CmEditor({
     [picker, searchableNotes],
   );
 
-  const openPicker = useCallback((mode: SlashPickerMode, insertAt: number, left: number, top: number) => {
-    setSlash((s) => ({ ...s, open: false }));
-    setPicker({ mode, index: 0, left, top, insertAt });
-  }, []);
+  const openPicker = useCallback(
+    (mode: SlashPickerMode, insertAt: number, left: number, top: number, up: boolean) => {
+      setSlash((s) => ({ ...s, open: false }));
+      setPicker({ mode, index: 0, left, top, up, insertAt });
+    },
+    [],
+  );
 
   const pickSlash = useCallback(
     (item: SlashItem) => {
@@ -273,13 +289,18 @@ export function CmEditor({
       if (item.op.kind === "picker") {
         const coords = view.coordsAtPos(line.from);
         const host = hostRef.current?.getBoundingClientRect();
+        const up =
+          coords != null &&
+          slashPlacement(coords.top, window.innerHeight - coords.bottom) === "up";
         const left = (coords?.left ?? 0) - (host?.left ?? 0);
-        const top = (coords?.bottom ?? 0) - (host?.top ?? 0) + 4;
+        const top = up
+          ? (coords?.top ?? 0) - (host?.top ?? 0) - 4
+          : (coords?.bottom ?? 0) - (host?.top ?? 0) + 4;
         view.dispatch({
           changes: { from: line.from, to: line.to, insert: "" },
           selection: EditorSelection.cursor(line.from),
         });
-        openPicker(item.op.mode, line.from, left, top);
+        openPicker(item.op.mode, line.from, left, top, up);
         return;
       }
       const insertion = slashInsertion(item.op);
@@ -321,12 +342,18 @@ export function CmEditor({
       }
       const coords = view.coordsAtPos(line.from);
       const rect = view.dom.getBoundingClientRect();
+      const up =
+        coords != null &&
+        slashPlacement(coords.top, window.innerHeight - coords.bottom) === "up";
       setSlash({
         open: true,
         query,
         index: 0,
         left: coords ? coords.left - rect.left : 0,
-        top: coords ? coords.bottom - rect.top : 0,
+        // anchored under the row when down, at the row's top edge when up —
+        // the CSS `.up` variant opens the menu bottom-up from that anchor
+        top: coords ? (up ? coords.top - rect.top : coords.bottom - rect.top) : 0,
+        up,
       });
     };
     let typewriterQueued = false;
@@ -527,7 +554,10 @@ export function CmEditor({
         style={{ "--cm-measure": `${measureWidth}px` } as CSSProperties}
       />
       {picker && (
-        <div className="rotli-slash-anchor" style={{ left: picker.left, top: picker.top }}>
+        <div
+          className={picker.up ? "rotli-slash-anchor up" : "rotli-slash-anchor"}
+          style={{ left: picker.left, top: picker.top }}
+        >
           <SlashPicker
             mode={picker.mode}
             selectedIndex={picker.index}
@@ -538,7 +568,10 @@ export function CmEditor({
         </div>
       )}
       {slash.open && !picker && (
-        <div className="rotli-slash-anchor" style={{ left: slash.left, top: slash.top }}>
+        <div
+          className={slash.up ? "rotli-slash-anchor up" : "rotli-slash-anchor"}
+          style={{ left: slash.left, top: slash.top }}
+        >
           <SlashMenu
             query={slash.query}
             selectedIndex={Math.min(slash.index, items.length - 1)}

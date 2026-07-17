@@ -28,7 +28,7 @@ import { SOLID_THEMES, type ThemeFamily, useUiStore } from "../state/ui";
 
 // Appearance FIRST (right after the greeting) so you pick a theme before walking the
 // rest of setup — never trudge through the flow in a theme that hurts your eyes (Seth).
-const STEPS = ["welcome", "appearance", "hotkeys", "dock", "behavior", "memory", "models", "done"] as const;
+const STEPS = ["welcome", "appearance", "name", "hotkeys", "dock", "behavior", "memory", "models", "done"] as const;
 type Step = (typeof STEPS)[number];
 
 const GLOBAL_HOTKEYS: { id: string; label: string; hint: string }[] = [
@@ -404,6 +404,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const setTheme = useUiStore((s) => s.setTheme);
   const themeFamily = useUiStore((s) => s.themeFamily);
   const setThemeFamily = useUiStore((s) => s.setThemeFamily);
+  const userName = useUiStore((s) => s.userName);
+  const setUserName = useUiStore((s) => s.setUserName);
 
   // Record the choice only; App applies the Dock policy + hide-on-blur when
   // onboarding FINISHES — changing either live can kill the frameless window (#1).
@@ -529,6 +531,31 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {step === "name" && (
+          <div className="onb-step">
+            <h1 className="onb-title">What should rotli call you?</h1>
+            <p className="onb-sub">
+              Chat uses your name to talk to you like a person. It stays on this Mac — saved into
+              your own settings file, never sent anywhere. Optional; change it any time in
+              Settings → General.
+            </p>
+            <input
+              className="onb-name"
+              type="text"
+              placeholder="Your name"
+              value={userName}
+              // eslint-disable-next-line jsx-a11y/no-autofocus
+              autoFocus
+              onChange={(e) => setUserName(e.target.value)}
+              onKeyDown={(e) => {
+                // global chords stay live everywhere — never let keystrokes escape an input
+                e.stopPropagation();
+                if (e.key === "Enter") go(1);
+              }}
+            />
           </div>
         )}
 

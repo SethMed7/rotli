@@ -24,6 +24,7 @@ import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
 // the quit-flush ack listener must exist from first paint — an idle ⌘Q acks
 // instantly instead of riding out the Rust-side hold (#4).
+import { createDebouncedTask } from "../lib/debouncedTask";
 import { onQuitFlush } from "../lib/quitFlush";
 import {
   corpusSettingsRead,
@@ -160,6 +161,8 @@ interface PersistedSettings {
    * handle hidden forever — this one-time reset lands everyone on the new
    * default; an explicit Off re-persists here. */
   blockHandles2: boolean;
+  /** The user's name (onboarding / Settings → General); "" = unset. */
+  userName: string;
   /** The on-device model the Chat surface uses (id from ~/.memex/ai); null = default. */
   chatModelId: string | null;
   /** Per-chat web-search toggle (the composer globe), keyed by chat slug. The
@@ -298,6 +301,7 @@ export function parseSettings(raw: string): PersistedSettings {
     spellcheck: asBool(data.spellcheck, true),
     rawEditor: asBool(data.rawEditor, false),
     blockHandles2: asBool(data.blockHandles2, true),
+    userName: typeof data.userName === "string" ? data.userName : "",
     chatModelId: typeof data.chatModelId === "string" ? data.chatModelId : null,
     chatWeb: (() => {
       const out: Record<string, boolean> = {};
@@ -421,6 +425,7 @@ function applySettings(s: PersistedSettings): void {
     spellcheck: s.spellcheck,
     rawEditor: s.rawEditor,
     blockHandles: s.blockHandles2,
+    userName: s.userName,
     chatModelId: s.chatModelId,
     chatWeb: s.chatWeb,
     chatMeasure: s.chatMeasure,
@@ -736,6 +741,7 @@ function settingsSnapshot(): string {
     spellcheck: ui.spellcheck,
     rawEditor: ui.rawEditor,
     blockHandles2: ui.blockHandles,
+    userName: ui.userName,
     chatModelId: ui.chatModelId,
     chatWeb: persistableChatMap(ui.chatWeb),
     chatMeasure: persistableChatMap(ui.chatMeasure),
@@ -799,48 +805,46 @@ export function attachPersistence(): () => void {
   // seed from the just-hydrated state so hydration itself never writes back
   let lastSettings = settingsSnapshot();
   let lastViewstate = viewstateSnapshot();
-  let timer: ReturnType<typeof setTimeout> | null = null;
 
-  const flush = (): void => {
-    if (timer !== null) clearTimeout(timer);
-    timer = null;
+  const saver = createDebouncedTask(SAVE_DEBOUNCE_MS, (): Promise<void> => {
+    const writes: Array<Promise<void>> = [];
     const settings = settingsSnapshot();
     if (settings !== lastSettings) {
       lastSettings = settings;
-      void corpusSettingsWrite("settings", settings);
+      writes.push(corpusSettingsWrite("settings", settings));
     }
     const viewstate = viewstateSnapshot();
     if (viewstate !== lastViewstate) {
       lastViewstate = viewstate;
-      void corpusSettingsWrite("viewstate", viewstate);
+      writes.push(corpusSettingsWrite("viewstate", viewstate));
     }
-  };
-
-  const schedule = (): void => {
-    if (timer !== null) clearTimeout(timer);
-    timer = setTimeout(flush, SAVE_DEBOUNCE_MS);
-  };
+    return Promise.allSettled(writes).then(() => undefined);
+  });
 
   const unsubs = [
-    useUiStore.subscribe(schedule),
-    useBindingsStore.subscribe(schedule),
-    useNoteStyleStore.subscribe(schedule),
-    usePanesStore.subscribe(schedule),
-    useMruStore.subscribe(schedule),
+    useUiStore.subscribe(saver.schedule),
+    useBindingsStore.subscribe(saver.schedule),
+    useNoteStyleStore.subscribe(saver.schedule),
+    usePanesStore.subscribe(saver.schedule),
+    useMruStore.subscribe(saver.schedule),
   ];
   const onVisibility = (): void => {
-    if (document.hidden) flush();
+    if (document.hidden) void saver.flush();
+  };
+  const onPageHide = (): void => {
+    void saver.flush();
   };
   document.addEventListener("visibilitychange", onVisibility);
-  window.addEventListener("pagehide", flush);
+  window.addEventListener("pagehide", onPageHide);
   // ⌘Q / tray-Quit with the window still up fires neither of the above —
-  // the quit handshake (#4) holds the exit until this settles too.
-  onQuitFlush(flush);
+  // the quit handshake (#4) holds the exit until the write actually lands,
+  // so it must receive the flush PROMISE, not a fire-and-forget call.
+  onQuitFlush(() => saver.flush());
 
   return () => {
-    flush();
+    void saver.flush();
     for (const unsub of unsubs) unsub();
     document.removeEventListener("visibilitychange", onVisibility);
-    window.removeEventListener("pagehide", flush);
+    window.removeEventListener("pagehide", onPageHide);
   };
 }

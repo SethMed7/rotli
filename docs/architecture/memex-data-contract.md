@@ -16,6 +16,10 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   Excalidraw lane for a memex and a selected writable folder for legacy storage.
 - Creating any item adds its one stable id/path to Main. Refiling the physical
   item does not duplicate or invalidate the Main arrangement.
+- A newly created DOCX remains a session-pristine draft until its first content
+  mutation. Explicitly closing its final tab while it is still pristine moves
+  the managed file to Rotli's recoverable Trash and removes its Main reference.
+  Rotli never infers that a pre-existing blank document is disposable.
 
 ## Editing capabilities
 
@@ -109,6 +113,14 @@ notes and prior chat transcripts.
 5. **Generate:** tool observations, current conversation history, and the model-
    specific budget form the answer context. The existing step, history, scratch,
    note, and snippet caps prevent context overflow.
+
+Starting a chat from a Markdown note reuses the chat already attached to that
+note or creates one durable chat with a stable note-derived identity. Each turn
+preloads the attached note through the same host read gate as `read_note`, so a
+remote model still cannot receive secure content and local access still requires
+the note's explicit permission. Secure-note chats use opaque attachment metadata,
+offer only on-device models, and disable web/image egress; an unreadable security
+state blocks the turn rather than guessing.
 
 This is deliberately hybrid and local-first: filesystem full-text retrieval,
 metadata/priority signals, rolling chat notes, and model-driven query refinement.

@@ -195,7 +195,12 @@ export function makeTauriHost(
       if (!file) return `no file matching "${query}". Use the exact filename (e.g. report.csv).`;
       const ext = (file.title.split(".").pop() ?? "").toLowerCase();
       if (SHEET_BIN.has(ext)) return await workbookToCsv({ base64: await corpusFileBytes(file.id) });
-      if (SHEET_TEXT.has(ext)) return await workbookToCsv({ csv: await corpusFileText(file.id) });
+      if (SHEET_TEXT.has(ext)) {
+        return await workbookToCsv({
+          csv: await corpusFileText(file.id),
+          delimiter: ext === "tsv" ? "\t" : ",",
+        });
+      }
       return corpusFileText(file.id);
     },
     webSearch(query, limit) {

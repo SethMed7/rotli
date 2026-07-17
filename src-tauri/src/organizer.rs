@@ -37,8 +37,8 @@ use crate::corpus::{self, CorpusState};
 /// The daemon's model timeout — deliberately far below chat's 120s so a stuck
 /// server never camps a background thread (doc §2: "shorter timeout than chat").
 const MODEL_TIMEOUT: Duration = Duration::from_secs(45);
-/// The Claude lane's timeout — a remote `claude -p` round-trip (spawn + network
-/// + Sonnet) is slower than the local server, so it gets a longer leash than the
+/// The Claude lane's timeout — a remote `claude -p` round-trip (spawn, network,
+/// Sonnet) is slower than the local server, so it gets a longer leash than the
 /// local MODEL_TIMEOUT. Still bounded so a hung CLI never camps the thread.
 const CLAUDE_TIMEOUT: Duration = Duration::from_secs(120);
 /// The authenticated Gemini/Antigravity CLI has the same remote latency class.
@@ -943,6 +943,7 @@ pub(crate) enum Wait {
 ///                   (a bare boolean floor starved the pipeline forever — every
 ///                   re-plan re-waited the full leash and the flag only cleared
 ///                   after a Run that could never come).
+#[allow(clippy::too_many_arguments)] // pure planner over every gate input — tested as one table
 pub(crate) fn plan_wait(
     trust_off: bool,
     run_now: bool,
@@ -3196,16 +3197,14 @@ mod tests {
         let latest = |id: &str| {
             journal_rows(&state)
                 .iter()
-                .filter(|r| r["id"].as_str().unwrap() == id)
-                .last()
+                .rfind(|r| r["id"].as_str().unwrap() == id)
                 .map(|r| r["status"].as_str().unwrap().to_string())
                 .unwrap()
         };
         assert_eq!(latest(&p1), "dismissed", "the stale index proposal retires (#26)");
         let p2 = journal_rows(&state)
             .iter()
-            .filter(|r| r["action"] == "index")
-            .last()
+            .rfind(|r| r["action"] == "index")
             .map(|r| r["id"].as_str().unwrap().to_string())
             .expect("a fresh proposal replaced it");
         assert_ne!(p2, p1);

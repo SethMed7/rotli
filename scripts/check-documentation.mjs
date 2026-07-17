@@ -9,6 +9,7 @@ const required = [
   "CONTRIBUTING.md",
   "docs/README.md",
   "docs/development/ai-workflow.md",
+  "docs/development/testing.md",
   "docs/architecture/ai-context-architecture.md",
   ".github/copilot-instructions.md",
   ".github/pull_request_template.md",
@@ -37,6 +38,20 @@ for (const rel of ["README.md", "AGENTS.md", "CONTRIBUTING.md", "docs/README.md"
   if (!existsSync(join(root, rel))) continue;
   const text = readFileSync(join(root, rel), "utf8");
   if (/Liquid Glass/i.test(text)) failures.push(`${rel} advertises retired Liquid Glass`);
+}
+
+if (existsSync(join(root, "docs/README.md"))) {
+  const map = readFileSync(join(root, "docs/README.md"), "utf8");
+  if (!map.includes("development/testing.md")) {
+    failures.push("docs/README.md must route to the testing and regression contract");
+  }
+}
+
+if (existsSync(join(root, "package.json"))) {
+  const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  for (const script of ["lint", "test:unit", "test:breve", "test:tooling", "test:regression", "check"]) {
+    if (!packageJson.scripts?.[script]) failures.push(`package.json is missing documented script: ${script}`);
+  }
 }
 
 for (const rel of ["AGENTS.md", "docs/architecture/memex-data-contract.md"]) {

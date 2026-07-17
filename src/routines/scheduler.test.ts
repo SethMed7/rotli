@@ -4,6 +4,7 @@ import {
   dailySlot,
   intervalDue,
   parseHm,
+  schedulerParentGone,
 } from "../../breve-runtime/scripts/scheduler-core";
 
 describe("Rotli Breve scheduler", () => {
@@ -33,5 +34,12 @@ describe("Rotli Breve scheduler", () => {
     expect(intervalDue(now, 1800, undefined)).toBe(false);
     expect(intervalDue(now, 1800, "2026-07-10T11:29:59Z")).toBe(true);
     expect(intervalDue(now, 1800, "2026-07-10T11:45:00Z")).toBe(false);
+  });
+
+  test("a managed scheduler exits when its Rotli parent disappears", () => {
+    expect(schedulerParentGone(42, 42, () => true)).toBe(false);
+    expect(schedulerParentGone(42, 1, () => false)).toBe(true);
+    expect(schedulerParentGone(42, 42, () => false)).toBe(true);
+    expect(schedulerParentGone(0, 1, () => false)).toBe(false);
   });
 });

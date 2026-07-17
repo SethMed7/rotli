@@ -18,32 +18,7 @@ import { snippetOf, titleOf } from "./derive";
 import { FsNotesService } from "./fsNotes";
 import { searchMatch, sortHits } from "./search";
 import type { NoteCreationPolicy } from "../security/secureNotes";
-
-export interface NotesService {
-  listFolders(): Promise<Folder[]>;
-  createFolder(name: string, parentId?: string | null): Promise<Folder>;
-  updateFolder(id: string, name: string): Promise<Folder>;
-  deleteFolder(id: string): Promise<void>;
-  /** No folderId = all notes. With a folderId, includes descendant folders
-   * (one mental model: a folder holds everything under it). */
-  listNotes(folderId?: string): Promise<NoteSummary[]>;
-  /** FULL-TEXT search (title > body ranking, highlighted-match snippet, capped).
-   * Covers staged + Brain + Vault + added roots + Archive; never Trash, never
-   * chats/ transcripts, never boards/binaries. A LOCAL user read — secure notes
-   * stay findable (contract v3.7 gates AI reads, not the user's own eyes). */
-  searchNotes(query: string, limit?: number): Promise<SearchHit[]>;
-  getNote(id: string): Promise<Note | null>;
-  createNote(folderId: string, body: string, policy?: NoteCreationPolicy): Promise<Note>;
-  updateNote(id: string, body: string): Promise<Note>;
-  deleteNote(id: string): Promise<void>;
-  // ——— lifecycle (Phase 2c): the note keeps its id/index, only its home moves.
-  // archive/trash/restore are move with the origin rule applied; restore reads
-  // the recorded origin and falls back to Inbox if it's gone (Seth, 2026-06-13).
-  moveNote(id: string, targetFolder: string): Promise<Note>;
-  archiveNote(id: string): Promise<Note>;
-  trashNote(id: string): Promise<Note>;
-  restoreNote(id: string): Promise<Note>;
-}
+import type { NotesService } from "./notesPort";
 
 /** Ulid-style id: time-sortable prefix + random tail (Crockford base32). */
 const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";

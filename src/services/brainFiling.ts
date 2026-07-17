@@ -9,14 +9,8 @@
 
 import { corpusFileNote, corpusNotePath, corpusSetAiField } from "../lib/tauri";
 import { usePanesStore } from "../state/panes";
-import { logAction } from "./brainJournal";
+import { logAction } from "./brainJournalStore";
 import { invalidateJournal, invalidateNotes } from "./hooks";
-
-/** True when this REL PATH is a STAGED note (wiki/_inbox) — resolve a wire id
- * through corpusNotePath first; a ULID never matches. */
-export function isStagedNote(relPath: string): boolean {
-  return relPath.includes("wiki/_inbox");
-}
 
 /** File a note (by wire id or rel path) into `wiki/<area>`: set the AI area
  * field, move through the Filer gate, retarget open panes, journal it, refresh.

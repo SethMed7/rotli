@@ -17,7 +17,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::RecvTimeoutError;
 use std::sync::{Arc, Mutex};
@@ -1710,32 +1709,18 @@ impl SuppressSet {
     }
 }
 
-// ─── atomic write ────────────────────────────────────────────────────────────
+// ─── atomic write (shared discipline lives in fsutil.rs) ────────────────────
 
 /// Temp file in the SAME directory + rename: a reader never sees a truncated
 /// note, and a crash mid-write leaves the old file intact.
 fn atomic_write(path: &Path, contents: &str) -> Result<(), String> {
-    atomic_write_bytes(path, contents.as_bytes())
+    crate::fsutil::atomic_write(path, contents, ".rotli-write-")
 }
 
 /// The bytes flavor — the spreadsheet editor saves a binary (.xlsx) through the
 /// same tempfile+rename discipline, so a crash mid-save never corrupts the workbook.
 fn atomic_write_bytes(path: &Path, contents: &[u8]) -> Result<(), String> {
-    let dir = path
-        .parent()
-        .ok_or_else(|| format!("no parent dir for {}", path.display()))?;
-    let mut tmp = tempfile::Builder::new()
-        .prefix(".rotli-write-")
-        .tempfile_in(dir)
-        .map_err(|e| format!("temp file in {}: {e}", dir.display()))?;
-    tmp.write_all(contents)
-        .map_err(|e| format!("write {}: {e}", path.display()))?;
-    tmp.as_file()
-        .sync_all()
-        .map_err(|e| format!("sync {}: {e}", path.display()))?;
-    tmp.persist(path)
-        .map_err(|e| format!("rename into {}: {e}", path.display()))?;
-    Ok(())
+    crate::fsutil::atomic_write_bytes(path, contents, ".rotli-write-")
 }
 
 // ─── the id↔path index (.rotli/index.json — authoritative, rebuildable) ─────
@@ -2254,7 +2239,7 @@ impl CorpusStore {
             .iter()
             // hide RESERVED keys (locked/secure/owner/…) from the user's editor —
             // they're managed by rotli, not hand-edited (v3.7).
-            .filter(|l| !l.trim().is_empty() && field_key(l).map_or(true, |k| !RESERVED_KEYS.contains(&k)))
+            .filter(|l| !l.trim().is_empty() && field_key(l).is_none_or(|k| !RESERVED_KEYS.contains(&k)))
             .cloned()
             .collect();
         Ok(FrontmatterView {
@@ -2890,8 +2875,10 @@ impl CorpusStore {
 
     /// Atomic save. Mints/keeps the four facts (foreign keys ride along
     /// untouched), bumps `updated`, and renames the file — through the index —
-    /// when the title moved.
-    pub fn write(&mut self, id: &str, body: &str, pinned: bool) -> Result<NoteMeta, String> {
+    /// when the title moved. `pinned` is preserved from disk (like origin) —
+    /// pin toggles have their own path (`set_pinned`), so a body save can
+    /// never reassert a stale pin (the old read-modify-write race).
+    pub fn write(&mut self, id: &str, body: &str) -> Result<NoteMeta, String> {
         let rel = self.path_of(id)?;
         self.writable(&rel)?;
         let abs = self.abs(&rel);
@@ -2912,8 +2899,9 @@ impl CorpusStore {
             id: Some(id.to_string()),
             created: Some(created.clone()),
             updated: Some(updated.clone()),
-            pinned: Some(pinned),
-            // an edit never changes WHERE a note belongs — carry origin through.
+            // an edit never changes pin state or WHERE a note belongs —
+            // carry both through from disk.
+            pinned: old_fm.pinned,
             origin: old_fm.origin,
             foreign: old_fm.foreign,
         };
@@ -2972,7 +2960,7 @@ impl CorpusStore {
             disk_folder_id: disk_folder.clone(),
             created_at: stamp_to_ms(&created).unwrap_or_else(now_ms),
             updated_at: stamp_to_ms(&updated).unwrap_or_else(now_ms),
-            pinned,
+            pinned: fm.pinned.unwrap_or(false),
             origin: if is_hidden_root(&disk_folder) { fm.origin } else { None },
             kind: NoteKind::Note,
         })
@@ -4748,10 +4736,9 @@ pub fn corpus_write(
     state: tauri::State<'_, CorpusState>,
     id: String,
     body: String,
-    pinned: bool,
 ) -> Result<NoteMeta, String> {
     let (root, rel) = split_root_id(&id);
-    state.route(&root, |s| s.write(&rel, &body, pinned)).map(|mut m| {
+    state.route(&root, |s| s.write(&rel, &body)).map(|mut m| {
         m = prefix_meta(&root, m);
         if m.kind == NoteKind::Note {
             m.id = compose_root_id(&root, &m.id);
@@ -5472,10 +5459,11 @@ mod tests {
         )
         .unwrap();
         store.list().unwrap();
+        store.set_pinned("01TESTID000000000000ABCDEF", true).unwrap();
         let meta = store
-            .write("01TESTID000000000000ABCDEF", "# Kept\n\nEdited.\n", true)
+            .write("01TESTID000000000000ABCDEF", "# Kept\n\nEdited.\n")
             .unwrap();
-        assert!(meta.pinned);
+        assert!(meta.pinned, "body save must preserve the on-disk pin");
         let on_disk = fs::read_to_string(store.root().join(store.index.get("01TESTID000000000000ABCDEF").unwrap())).unwrap();
         assert!(on_disk.contains("aliases: [old-name]"), "foreign key destroyed:\n{on_disk}");
         assert!(on_disk.contains("created: 2026-06-01T00:00:00Z"), "created not preserved");
@@ -5887,7 +5875,7 @@ mod tests {
         let before = store.index.get(&meta.id).unwrap().clone();
         assert!(before.contains("first-title-"));
 
-        store.write(&meta.id, "# Second title\n\nBody.\n", false).unwrap();
+        store.write(&meta.id, "# Second title\n\nBody.\n").unwrap();
         let after = store.index.get(&meta.id).unwrap().clone();
         assert!(after.contains("second-title-"), "file not renamed: {after}");
         assert!(!store.root().join(&before).exists(), "old file left behind");
@@ -5941,8 +5929,11 @@ mod tests {
         assert_eq!(doc.folder_id, "Inbox");
         assert_eq!(doc.created_at, meta.created_at);
 
-        let updated = store.write(&meta.id, "# Groceries\n\nOlive oil, the good butter.\n", true).unwrap();
-        assert!(updated.pinned);
+        // pin through the real pin path, then confirm a body save PRESERVES it
+        // (write() carries pinned through from disk — the race-fix contract).
+        store.set_pinned(&meta.id, true).unwrap();
+        let updated = store.write(&meta.id, "# Groceries\n\nOlive oil, the good butter.\n").unwrap();
+        assert!(updated.pinned, "body save must preserve the on-disk pin");
         assert!(updated.updated_at >= meta.updated_at);
         let doc = store.read(&meta.id).unwrap();
         assert!(doc.pinned);
@@ -6149,7 +6140,8 @@ mod tests {
         let (_dir, mut store) = bare();
         let root = store.root().to_path_buf();
         let meta = store.create("Inbox", "# Keep me up top\n").unwrap();
-        store.write(&meta.id, "# Keep me up top\n", true).unwrap();
+        store.set_pinned(&meta.id, true).unwrap();
+        store.write(&meta.id, "# Keep me up top\n").unwrap();
         drop(store);
 
         let mut again = CorpusStore::open(root).unwrap();
@@ -6268,7 +6260,7 @@ mod tests {
         let list = store.list().unwrap();
         assert!(!list.notes.is_empty(), "the production memex remains readable");
         assert!(!root.join(DOT_DIR).exists(), "index reconciliation must remain in memory");
-        assert!(store.write("wiki/_inbox/draft.md", "changed", false).is_err());
+        assert!(store.write("wiki/_inbox/draft.md", "changed").is_err());
         assert!(store.set_locked("wiki/_inbox/draft.md", true).is_err());
         assert!(store.set_pinned("wiki/_inbox/draft.md", true).is_err());
         assert!(store.set_secure("wiki/_inbox/draft.md", true).is_err());
@@ -6416,7 +6408,7 @@ mod tests {
         assert!(ignored_lines(&store.root).contains(&old_rel));
 
         // retitle → the file renames; the gitignore line must follow
-        store.write(&note.id, "# Rotated key\n\nsk-ant-abcdefghijklmnop123", false).unwrap();
+        store.write(&note.id, "# Rotated key\n\nsk-ant-abcdefghijklmnop123").unwrap();
         let renamed_rel = store.path_of(&note.id).unwrap();
         assert_ne!(renamed_rel, old_rel, "the title change renames the file");
         let lines = ignored_lines(&store.root);
@@ -6486,7 +6478,7 @@ mod tests {
         assert!(store.read(&note.id).is_ok());
 
         // the title-rename branch of write() holds the same line
-        assert!(store.write(&note.id, "# Rotated key\n\nsk-ant-abcdefghijklmnop123", false).is_err());
+        assert!(store.write(&note.id, "# Rotated key\n\nsk-ant-abcdefghijklmnop123").is_err());
         assert_eq!(store.path_of(&note.id).unwrap(), old_rel);
         assert!(store.root.join(&old_rel).is_file());
 
@@ -6652,7 +6644,7 @@ mod tests {
         store.os_trash = false;
         // the note is reachable by its frontmatter id (indexed via list)
         let _ = store.list().unwrap();
-        let meta = store.write("01ABC", "# Pricing\n\nedited body", false).unwrap();
+        let meta = store.write("01ABC", "# Pricing\n\nedited body").unwrap();
         // the default "Inbox" shelf projects onto the Captures surface ("Board"), not wiki/_inbox
         assert_eq!(meta.folder_id, "Board");
 

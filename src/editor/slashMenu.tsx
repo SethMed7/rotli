@@ -116,6 +116,21 @@ export const SLASH_ITEMS: SlashItem[] = [
   { label: "Document", group: "Insert", hint: "Create or embed editable DOCX", glyph: documentGlyph, op: { kind: "picker", mode: "embedDocument" }, keywords: [...DOCUMENT_SEARCH_KEYWORDS] },
 ];
 
+/** How much room a slash popover wants below the caret row before it prefers
+ * flipping upward — roughly the menu's comfortable height. */
+export const SLASH_FLIP_THRESHOLD = 300;
+
+/** Popover direction: downward by default; flip up only when the space below
+ * can't fit the menu AND above has more room (a short Quick Note window used
+ * to clip the menu at its bottom edge — reading as "slash doesn't work"). */
+export function slashPlacement(
+  spaceAbove: number,
+  spaceBelow: number,
+  needed = SLASH_FLIP_THRESHOLD,
+): "up" | "down" {
+  return spaceBelow < needed && spaceAbove > spaceBelow ? "up" : "down";
+}
+
 /** Filter by label or optional keywords (case-insensitive). */
 export function filterSlashItems(query: string): SlashItem[] {
   const q = query.trim().toLowerCase();

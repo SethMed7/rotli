@@ -3,13 +3,12 @@
 
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import ExcelJS from "exceljs";
 import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
 import { fileName } from "../lib/fileKind";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import { parseCsvExact } from "./csv";
-import { bytesFromB64, fillFromCsvRows, loadXlsx } from "./codec/xlsx";
+import { type Workbook, bytesFromB64, fillFromCsvRows, loadXlsx, newWorkbook } from "./codec/xlsx";
 import {
   type SheetHandle,
   type SheetModel,
@@ -65,7 +64,7 @@ export default function SheetEditor({
   const [appTheme, setAppTheme] = useState(currentAppTheme);
   const [chromeEl, setChromeEl] = useState<HTMLElement | null>(null);
 
-  const wbRef = useRef<ExcelJS.Workbook | null>(null);
+  const wbRef = useRef<Workbook | null>(null);
   const handleRef = useRef<SheetHandle | null>(null);
   const idMapRef = useRef<Map<string, number>>(new Map());
   const modeRef = useRef(mode);
@@ -116,7 +115,7 @@ export default function SheetEditor({
           }
         }
 
-        let wb: ExcelJS.Workbook;
+        let wb: Workbook;
         let model: SheetModel;
         if (park) {
           wb = park.wb;
@@ -133,7 +132,7 @@ export default function SheetEditor({
           diskLenRef.current = new TextEncoder().encode(csv).length;
           const rows = parseCsvExact(csv);
           wb = fillFromCsvRows(
-            new ExcelJS.Workbook(),
+            newWorkbook(),
             fileName(fileId).replace(/\.csv$/i, "") || "Sheet1",
             rows,
           );

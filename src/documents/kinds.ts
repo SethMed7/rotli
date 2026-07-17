@@ -19,10 +19,6 @@ export const DOCUMENT_SEARCH_KEYWORDS = ["word", "document", ...DOCX_EDITABLE_EX
 
 export const DOCUMENT_EDIT_MAX_BYTES = 12_000_000;
 
-export function isDocumentExt(ext: string): boolean {
-  return DOCUMENT_EXTS.has(ext.toLowerCase());
-}
-
 export function isEditableDocxExt(ext: string): boolean {
   return DOCX_EDITABLE.has(ext.toLowerCase());
 }

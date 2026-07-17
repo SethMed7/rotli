@@ -55,6 +55,13 @@ inward toward stable business rules:
 - Does the security boundary validate independently?
 - Did the change reduce concepts as well as lines of code?
 
-`bun run check:architecture` enforces the import boundaries that can be checked
-mechanically. Architecture changes should extend that guard instead of relying
-only on reviewer memory.
+`bun run check:architecture` discovers clean feature roles and enforces their
+inward imports, pure ports/policies, the Tauri adapter boundary, the
+Markdown-only slash boundary, and the vendor seams: `exceljs`, `@excalidraw`,
+`@univerjs`, and `jszip` import only inside their codec/engine adapters
+(`src/sheets/codec` + `src/sheets/engine`, `src/boards/engine`,
+`src/documents/engine` + `src/brand/univerTheme.ts`, `src/documents/codec` +
+`src/documents/create.ts`). `bun run check:code-shape` rejects production
+module cycles and imports of test code. Architecture changes should extend these
+guards instead of relying only on reviewer memory. See the
+[testing contract](../development/testing.md) for the complete evidence matrix.

@@ -18,12 +18,20 @@ export interface PromptCtx {
   maxSteps: number;
   /** Offer the generate_image tool (a connected engine is configured). */
   imageTool?: boolean;
+  /** The user's name (Settings → General / onboarding) — omit when unset. */
+  userName?: string;
 }
 
 export interface Adapter {
   wantsFormatJson: boolean;
   renderPrompt(ctx: PromptCtx): string;
-  renderForceFinal(ctx: Pick<PromptCtx, "history" | "userText" | "scratch">): string;
+  renderForceFinal(ctx: Pick<PromptCtx, "history" | "userText" | "scratch" | "userName">): string;
+}
+
+/** The persona line naming the user — "" when no name is set, so the prompt
+ * shape is untouched for existing users. */
+function namedLine(userName?: string): string {
+  return userName ? `\nThe user's name is ${userName} — address them by name when it feels natural.` : "";
 }
 
 function renderConversation(history: ChatTurn[], userText: string): string {
@@ -77,7 +85,7 @@ export const gemmaAdapter: Adapter = {
       ? `\n- {"thought":"…","tool":"generate_image","args":{"prompt":"…"}}  → create an image (saved into this chat's assets) — describe the IMAGE, never a file path`
       : "";
 
-    return `You are rotli, a warm, concise assistant running entirely on the user's Mac.
+    return `You are rotli, a warm, concise assistant running entirely on the user's Mac.${namedLine(ctx.userName)}
 
 The user's memex — their personal notes folder — is YOUR KNOWLEDGE BASE. It is organized into
 areas (People, Projects, Research, …) with titles and summaries so you can find things. Treat it as
@@ -112,7 +120,7 @@ Respond with the next single JSON object now.`;
   },
 
   renderForceFinal(ctx) {
-    return `You are rotli. Give your FINAL answer to the user now, in plain prose — no JSON, no tools.
+    return `You are rotli.${namedLine(ctx.userName)} Give your FINAL answer to the user now, in plain prose — no JSON, no tools.
 Base it only on the conversation and your findings below. If they're not enough, answer what you can
 and say plainly what you couldn't verify.
 
@@ -146,7 +154,7 @@ export const frontierAdapter: Adapter = {
       ? `\n- {"thought":"…","tool":"generate_image","args":{"prompt":"…"}} — create an image (saved into this chat's assets); describe the IMAGE, never a file path`
       : "";
 
-    return `You are rotli's reasoning engine. The user's memex — their personal notes folder, indexed below — is your knowledge base; search it before answering from memory.
+    return `You are rotli's reasoning engine. The user's memex — their personal notes folder, indexed below — is your knowledge base; search it before answering from memory.${namedLine(ctx.userName)}
 
 Reply with EXACTLY ONE JSON object on a single line — no prose around it, no markdown fences.
 Tools:
@@ -172,7 +180,7 @@ The next single JSON object:`;
   },
 
   renderForceFinal(ctx) {
-    return `Give your FINAL answer to the user now, in plain prose — no JSON, no tools. Base it on the conversation and findings below; say plainly what you couldn't verify.
+    return `Give your FINAL answer to the user now, in plain prose — no JSON, no tools.${namedLine(ctx.userName)} Base it on the conversation and findings below; say plainly what you couldn't verify.
 
 CONVERSATION:
 ${renderConversation(ctx.history, ctx.userText)}

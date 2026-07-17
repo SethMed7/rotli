@@ -51,6 +51,21 @@ export async function* runAgent(
   const history = trimHistory(input.history, budget.maxHistoryChars);
 
   const scratch: ScratchStep[] = [];
+  if (input.noteId) {
+    yield { type: "status", text: "reading the attached note…" };
+    let result: string;
+    try {
+      // This goes through Host.readNote, which independently enforces local vs
+      // remote access and secure-note permission before returning any bytes.
+      result = await host.readNote(input.noteId);
+    } catch (e) {
+      result = `error: ${errMsg(e, "couldn't read the attached note")}`;
+    }
+    scratch.push({
+      action: `read_note ${JSON.stringify({ id: input.noteId })}`,
+      result,
+    });
+  }
   let consecutiveBad = 0;
 
   for (let step = 1; step <= maxSteps; step++) {
@@ -64,6 +79,7 @@ export async function* runAgent(
       scratch: pruneScratch(scratch, budget.maxScratchChars),
       maxSteps,
       ...(input.imageTool ? { imageTool: true } : {}),
+      ...(input.userName ? { userName: input.userName } : {}),
     });
 
     const imgs = step === 1 ? input.images : undefined;
@@ -154,6 +170,7 @@ async function forceFinal(host: Host, input: RunInput, scratch: ScratchStep[]): 
     history: input.history,
     userText: input.userText,
     scratch,
+    ...(input.userName ? { userName: input.userName } : {}),
   });
   try {
     const raw = await host.complete({ messages: [{ role: "user", content: prompt }] });

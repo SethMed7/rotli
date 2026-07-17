@@ -265,6 +265,19 @@ describe("runAgent", () => {
     expect(tools).toEqual(["search_notes", "read_note"]);
   });
 
+  test("preloads an explicitly attached note through the host access gate", async () => {
+    const { host, calls } = fakeHost(['{"final":"I used the attached note."}']);
+    const { events } = await run(host, {
+      history: [],
+      userText: "What should I change?",
+      web: false,
+      noteId: "secure-or-local-note-id",
+    });
+
+    expect(calls.readNote).toEqual(["secure-or-local-note-id"]);
+    expect(events).toContainEqual({ type: "status", text: "reading the attached note…" });
+  });
+
   test("web tools are not callable when the globe is off", async () => {
     const { host, calls } = fakeHost([
       '{"tool":"web_search","args":{"query":"weather"}}', // invalid (web off) → observation

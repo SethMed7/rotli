@@ -15,7 +15,7 @@ import { invalidateNotes, useNote } from "../services/hooks";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
 import { AaPanel } from "./aaPanel";
-import { MetaGlyph } from "../components/glyphs";
+import { ChatGlyph, MetaGlyph } from "../components/glyphs";
 import { useNoteMenu } from "../components/useNoteMenu";
 import { useMainStore } from "../state/main";
 import { mainHasNote } from "../services/mainTree";
@@ -24,6 +24,7 @@ import { BottomSlot } from "./bottomSlot";
 import { CmEditor } from "./cmEditor";
 import { FormatBar } from "./formatBar";
 import { ensureDocument, flushNote, reloadDocumentIfClean, useDocumentDirty, useDocumentLines } from "./model";
+import { openChatForNote } from "../noteChat/composition";
 
 /** Below this pane width the format bar collapses its end groups into ⋯. */
 const FORMAT_BAR_COLLAPSE_PX = 440;
@@ -69,6 +70,7 @@ export function EditorSurface({
   const lines = docLines ?? queryLines;
 
   const [aaOpen, setAaOpen] = useState(false);
+  const [chatBusy, setChatBusy] = useState(false);
   const [narrow, setNarrow] = useState(false);
   // the caret's line + column, reported by CmEditor — the format bar's active
   // states read it (bold-on, heading level, list-on)
@@ -83,8 +85,8 @@ export function EditorSurface({
   const setFileMetadata = useUiStore((s) => s.setFileMetadata);
   const revealFocusedNote = useUiStore((s) => s.revealFocusedNote);
   // "In Main" indicator + the note's right-click menu (Seth #23, 2026-07-03: the
-  // metadata popover is gone — the ≡ chip toggles metadata instantly, and Lock /
-  // Secure / File-to-Brain / Add-to-Main live in the right-click menu).
+  // metadata popover is gone — the ≡ chip toggles metadata instantly, while
+  // lifecycle and security actions live in the right-click menu.
   const inMain = useMainStore((s) => mainHasNote(s.manifest.tree, noteId));
   const openNoteMenu = useNoteMenu();
 
@@ -196,8 +198,8 @@ export function EditorSurface({
       style={{ "--cm-measure": `${measureWidth}px` } as CSSProperties}
     >
       {/* right-click the header chrome (never the text body — that keeps
-          selection/spellcheck) → the note's menu: Lock · Secure · File to Brain ·
-          Add to Main · … (Seth #23). Gated to the main editor: the Quick window
+          selection/spellcheck) → the note's lifecycle/security menu. Gated to
+          the main editor: the Quick window
           has no context-menu host, so it keeps its native menu. */}
       <div
         className="ed-head"
@@ -229,6 +231,30 @@ export function EditorSurface({
               {noteLocationLabel(brainFolder, inMain)}
             </button>
           </div>
+          <button
+            type="button"
+            className="aachip"
+            disabled={chatBusy}
+            aria-label="Chat with this note"
+            title="Chat with this note"
+            onClick={() => {
+              setChatBusy(true);
+              useUiStore.getState().setRowActionError(null);
+              void openChatForNote(note)
+                .catch((error) =>
+                  useUiStore
+                    .getState()
+                    .setRowActionError(
+                      `Couldn’t open a chat for “${note.title || "this note"}” — ${
+                        error instanceof Error ? error.message : String(error)
+                      }`,
+                    ),
+                )
+                .finally(() => setChatBusy(false));
+            }}
+          >
+            <ChatGlyph size={15} />
+          </button>
           <button
             type="button"
             ref={aaChipRef}

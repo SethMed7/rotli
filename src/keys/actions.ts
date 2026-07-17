@@ -26,6 +26,10 @@ import {
 } from "../lib/tauri";
 import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
 import { createManagedItem } from "../newItems/composition";
+import {
+  closeFocusedPaneWithDraftCleanup,
+  closeFocusedTabWithDraftCleanup,
+} from "../documents/draftComposition";
 import type { NewItemKind } from "../newItems/model";
 import { navigate } from "../state/navHistory";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
@@ -357,7 +361,7 @@ export function registerDefaultActions(): void {
     id: "tabs.close",
     title: "Close tab",
     defaultChord: "Meta+W",
-    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().closeTab(); },
+    run: () => { if (notesWorkspaceActive()) closeFocusedTabWithDraftCleanup(); },
   });
   registerAction({
     id: "tabs.cycle",
@@ -425,7 +429,7 @@ export function registerDefaultActions(): void {
     id: "panes.close",
     title: "Close pane",
     defaultChord: "Meta+Alt+W",
-    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().closePane(); },
+    run: () => { if (notesWorkspaceActive()) closeFocusedPaneWithDraftCleanup(); },
   });
 
   // — chrome —

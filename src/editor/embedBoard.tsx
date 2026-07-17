@@ -1,7 +1,8 @@
 // Compact Excalidraw host for ```board fences — the corpus file stays truth.
 
-import { Excalidraw } from "@excalidraw/excalidraw";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type BoardInitialData, BoardCanvas } from "../boards/engine/excalidraw";
+import { createDebouncedTask } from "../lib/debouncedTask";
 import { type CorpusBoardDoc, corpusReadBoard, corpusWriteBoard, isTauri } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
 
@@ -16,7 +17,7 @@ const EMPTY_SCENE = {
   files: {},
 };
 
-type ExcalidrawInitialData = NonNullable<Parameters<typeof Excalidraw>[0]["initialData"]> | null;
+type ExcalidrawInitialData = BoardInitialData;
 
 export function BoardEmbed({ boardId }: { boardId: string }) {
   const themeMode = useUiStore((s) => s.theme);
@@ -28,15 +29,18 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
 
   const [initialData, setInitialData] = useState<ExcalidrawInitialData>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<string | null>(null);
 
-  const flush = useCallback(() => {
-    if (!isTauri() || pending.current == null) return;
-    const body = pending.current;
-    pending.current = null;
-    void corpusWriteBoard(boardId, body).catch(() => {});
-  }, [boardId]);
+  const saver = useMemo(
+    () =>
+      createDebouncedTask(SAVE_DEBOUNCE_MS, () => {
+        if (!isTauri() || pending.current == null) return;
+        const body = pending.current;
+        pending.current = null;
+        return corpusWriteBoard(boardId, body).then(() => undefined);
+      }),
+    [boardId],
+  );
 
   useEffect(() => {
     if (!isTauri()) {
@@ -65,10 +69,9 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
       });
     return () => {
       cancelled = true;
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      flush();
+      void saver.flush();
     };
-  }, [boardId, flush]);
+  }, [boardId, saver]);
 
   const onChange = useCallback(
     (elements: readonly unknown[], appState: Record<string, unknown>, files: Record<string, unknown>) => {
@@ -82,10 +85,9 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
         files,
       });
       pending.current = body;
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
+      saver.schedule();
     },
-    [flush],
+    [saver],
   );
 
   if (status === "loading") {
@@ -97,7 +99,7 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
 
   return (
     <div className="rotli-embed-board-inner">
-      <Excalidraw
+      <BoardCanvas
         initialData={initialData ?? EMPTY_SCENE}
         theme={excaliTheme}
         onChange={(els, state, fls) =>

@@ -67,6 +67,21 @@
   color: var(--text);
   font-weight: 600;
 }
+.onb-name {
+  align-self: flex-start;
+  width: min(320px, 100%);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 9px 12px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.onb-name:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
 
 /* — hotkey rows — */
 .onb-hks {

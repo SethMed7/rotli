@@ -6,19 +6,6 @@
 // works off `before`/`after` (no git dependency) — see and reverse every AI write
 // before anything becomes automatic.
 
-import {
-  corpusFileText,
-  corpusFilerMove,
-  corpusFrontmatter,
-  corpusJournalAppend,
-  corpusJournalRead,
-  corpusNotePath,
-  corpusSetAiField,
-  corpusWriteIndex,
-  organizerLearnField,
-} from "../lib/tauri";
-import { fileNoteToArea } from "./brainFiling";
-
 export interface BrainAction {
   id: string;
   ts: number;
@@ -49,20 +36,6 @@ export interface BrainAction {
   status: "proposed" | "applied" | "reverted" | "dismissed";
 }
 
-export async function readJournal(): Promise<BrainAction[]> {
-  const raw = await corpusJournalRead();
-  return raw
-    .split("\n")
-    .filter((l) => l.trim())
-    .flatMap((l) => {
-      try {
-        return [JSON.parse(l) as BrainAction];
-      } catch {
-        return [];
-      }
-    });
-}
-
 // ─── the ONE derivation every consumer shares (Activity pane, sidebar badge) ──
 
 export interface JournalView {
@@ -89,43 +62,25 @@ export function deriveJournal(actions: BrainAction[]): JournalView {
   };
 }
 
-let counter = 0;
-function actionId(ts: number): string {
-  return `${ts.toString(36)}-${(counter++).toString(36)}`;
-}
-
 /** The corpus calls the transitions ride — injectable so the transition
  * grammar (same-id re-append, journal:false, freshness guards) is testable
- * without a Tauri shell. Default: the live wrappers. */
+ * without a Tauri shell. The live adapter is chosen in
+ * brainJournalComposition.ts. */
 export interface JournalDeps {
-  fileNote: typeof fileNoteToArea;
-  setAiField: typeof corpusSetAiField;
-  writeIndex: typeof corpusWriteIndex;
-  filerMove: typeof corpusFilerMove;
-  notePath: typeof corpusNotePath;
-  frontmatter: typeof corpusFrontmatter;
-  append: typeof corpusJournalAppend;
+  fileNote: (noteId: string, area: string, opts?: { journal?: boolean }) => Promise<string>;
+  setAiField: (id: string, key: string, value: string) => Promise<void>;
+  writeIndex: (area: string, body: string) => Promise<void>;
+  filerMove: (id: string, targetFolder: string) => Promise<unknown>;
+  notePath: (id: string) => Promise<string>;
+  frontmatter: (id: string) => Promise<{ fields: string[] } | null>;
+  append: (line: string) => Promise<void>;
   /** The current on-disk `wiki/<area>/_index.md` body ("" when none) — the
    * index branch's freshness read (#26, audit 2026-07). */
   readIndex: (area: string) => Promise<string>;
   /** Teach the daemon an approved field value (#28) — best-effort; the caller
    * swallows a failure (the field stays user-owned until the next Approve). */
-  learnField: typeof organizerLearnField;
+  learnField: (note: string, key: string, value: string) => Promise<void>;
 }
-
-const live: JournalDeps = {
-  fileNote: fileNoteToArea,
-  setAiField: corpusSetAiField,
-  writeIndex: corpusWriteIndex,
-  filerMove: corpusFilerMove,
-  notePath: corpusNotePath,
-  frontmatter: corpusFrontmatter,
-  append: corpusJournalAppend,
-  // a missing overview reads as "" — exactly the shape a first proposal's
-  // `before` carries, so freshness compares clean either way
-  readIndex: (area) => corpusFileText(`wiki/${area}/_index.md`).catch(() => ""),
-  learnField: organizerLearnField,
-};
 
 /** The stable handle for a row's note: the ULID when the daemon recorded one
  * (survives filings/renames), else the rel path (Phase-3 rows, external drops). */
@@ -143,14 +98,6 @@ function fieldValue(lines: string[], key: string): string {
   return "";
 }
 
-/** Record an applied Filer action. */
-export async function logAction(a: Omit<BrainAction, "id" | "ts" | "status">): Promise<BrainAction> {
-  const ts = Date.now();
-  const entry: BrainAction = { ...a, id: actionId(ts), ts, status: "applied" };
-  await corpusJournalAppend(JSON.stringify(entry));
-  return entry;
-}
-
 /** Apply a daemon PROPOSAL (the explicit-click path — the frontend never
  * auto-applies). The write rides the same v3.7 Filer gates the daemon uses
  * (locked is re-checked fresh inside them), then the proposal's own id is
@@ -158,7 +105,7 @@ export async function logAction(a: Omit<BrainAction, "id" | "ts" | "status">): P
  * §4.8 freshness: the row's `before` must still match disk — a note that moved
  * or a field the user changed since the proposal REFUSES rather than applying
  * a stale decision (the daemon re-proposes for the new state on its next pass). */
-export async function approveProposal(p: BrainAction, deps: JournalDeps = live): Promise<void> {
+export async function approveProposal(p: BrainAction, deps: JournalDeps): Promise<void> {
   const marker: BrainAction = { ...p, status: "applied", ts: Date.now() };
   if (p.action === "file") {
     if (!p.area) throw new Error("file proposal without an area");
@@ -221,7 +168,7 @@ export async function approveProposal(p: BrainAction, deps: JournalDeps = live):
 
 /** Decline a proposal — journal-only, nothing touches the corpus. The daemon's
  * hash state keeps it from re-proposing until the note actually changes. */
-export async function dismissProposal(p: BrainAction, deps: JournalDeps = live): Promise<void> {
+export async function dismissProposal(p: BrainAction, deps: JournalDeps): Promise<void> {
   await deps.append(JSON.stringify({ ...p, status: "dismissed", ts: Date.now() }));
 }
 
@@ -230,7 +177,7 @@ export async function dismissProposal(p: BrainAction, deps: JournalDeps = live):
  * its `before` body — or, when no `_index.md` existed before the first apply
  * (`before` is ""), Rust removes the file so undo restores "no file", not a
  * 0-byte husk. (The daemon re-proposes on its next sweep if members differ.) */
-export async function undoAction(a: BrainAction, deps: JournalDeps = live): Promise<void> {
+export async function undoAction(a: BrainAction, deps: JournalDeps): Promise<void> {
   if (a.action === "file") {
     await deps.filerMove(handleOf(a), a.before);
   } else if (a.action === "field" && a.field) {

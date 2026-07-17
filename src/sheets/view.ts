@@ -1,8 +1,9 @@
-// Read-only spreadsheet viewing + chat CSV-ify — SheetJS (Apache-2.0).
-// SheetJS is dynamic-imported so notes that never open a legacy sheet don't pay
-// for it; exceljs stays the edit-path codec.
+// Read-only spreadsheet viewing + chat CSV-ify — the SAME exceljs codec as the
+// edit path plus the exact CSV parser; no second spreadsheet library. The
+// codec is dynamic-imported so notes that never open a workbook don't pay for
+// exceljs. (SheetJS was removed 2026-07: abandoned on npm, CVE-2023-30533.)
 
-import { csvCell } from "./csv";
+import { csvCell, parseCsvExact } from "./csv";
 
 export interface SheetTable {
   name: string;
@@ -11,42 +12,31 @@ export interface SheetTable {
   truncated: boolean;
 }
 
-type XlsxMod = typeof import("xlsx");
+export type WorkbookInput =
+  | { csv: string; delimiter?: string }
+  | { base64: string };
 
-let xlsxMod: Promise<XlsxMod> | null = null;
-
-function loadXlsx(): Promise<XlsxMod> {
-  xlsxMod ??= import("xlsx");
-  return xlsxMod;
-}
-
-/** Parse a workbook from CSV/TSV text OR base64 into plain string tables. */
-export async function parseWorkbook(
-  input: { csv: string } | { base64: string },
-  maxRows = 2000,
-): Promise<SheetTable[]> {
-  const XLSX = await loadXlsx();
-  const wb =
-    "csv" in input
-      ? XLSX.read(input.csv, { type: "string" })
-      : XLSX.read(input.base64, { type: "base64" });
-  return wb.SheetNames.map((name) => {
-    const ws = wb.Sheets[name];
-    if (!ws) return { name, rows: [], truncated: false };
-    const raw = XLSX.utils.sheet_to_json(ws, {
-      header: 1,
-      blankrows: false,
-      defval: "",
-    }) as unknown[][];
-    const rows = raw
-      .slice(0, maxRows)
-      .map((r) => r.map((c) => (c === null || c === undefined ? "" : String(c))));
-    return { name, rows, truncated: raw.length > maxRows };
-  });
+/** Parse a workbook from CSV/TSV text OR base64 bytes into plain string tables. */
+export async function parseWorkbook(input: WorkbookInput, maxRows = 2000): Promise<SheetTable[]> {
+  if ("csv" in input) {
+    const raw = parseCsvExact(input.csv, input.delimiter ?? ",").filter((r) =>
+      r.some((c) => c !== ""),
+    );
+    return [
+      {
+        name: "Sheet1",
+        rows: raw.slice(0, maxRows),
+        truncated: raw.length > maxRows,
+      },
+    ];
+  }
+  const { bytesFromB64, tablesFromXlsx } = await import("./codec/xlsx");
+  const bytes = bytesFromB64(input.base64);
+  return tablesFromXlsx(bytes.buffer as ArrayBuffer, maxRows);
 }
 
 /** A workbook as plain CSV text — what the chat reads to answer questions. */
-export async function workbookToCsv(input: { csv: string } | { base64: string }): Promise<string> {
+export async function workbookToCsv(input: WorkbookInput): Promise<string> {
   const tables = await parseWorkbook(input, 5000);
   return tables
     .map((t) => {

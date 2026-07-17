@@ -25,4 +25,16 @@ describe("runQuitFlushers", () => {
     await runQuitFlushers();
     expect(ran.sort()).toEqual(["async", "rejector", "sync", "thrower"]);
   });
+
+  it("holds the ack until a SLOW async flusher's write actually lands", async () => {
+    // the data-safety contract behind the editor/persist registrations: the
+    // returned promise must be awaited, not fire-and-forgotten
+    let landed = false;
+    onQuitFlush(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+      landed = true;
+    });
+    await runQuitFlushers();
+    expect(landed).toBe(true);
+  });
 });

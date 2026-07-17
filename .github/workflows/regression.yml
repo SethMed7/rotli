@@ -14,6 +14,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  static-contracts:
+    name: Types, lint, and architecture contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+
   design-system:
     name: Themes and design system
     runs-on: ubuntu-latest
@@ -36,11 +47,14 @@ jobs:
         with:
           bun-version: 1.3.3
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
       - run: bun install --frozen-lockfile
-      - run: bun run check
+      - run: bun run test:regression
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: bun run build
         env:

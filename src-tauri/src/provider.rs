@@ -237,12 +237,14 @@ fn parse_codex_jsonl(stdout: &str) -> Result<String, String> {
             continue;
         };
         match v.get("type").and_then(|s| s.as_str()).unwrap_or("") {
-            "item.completed" => {
-                if v.pointer("/item/type").and_then(|s| s.as_str()) == Some("agent_message") {
-                    if let Some(text) = v.pointer("/item/text").and_then(|s| s.as_str()) {
-                        last = Some(text.to_string());
-                    }
-                }
+            "item.completed"
+                if v.pointer("/item/type").and_then(|s| s.as_str()) == Some("agent_message") =>
+            {
+                last = v
+                    .pointer("/item/text")
+                    .and_then(|s| s.as_str())
+                    .map(String::from)
+                    .or(last);
             }
             "turn.failed" => {
                 let msg = v
@@ -401,12 +403,8 @@ pub fn organizer_gemini_complete(prompt: &str, timeout: Duration) -> Result<Stri
     let children: Arc<Mutex<HashMap<String, Running>>> = Arc::new(Mutex::new(HashMap::new()));
     let _gate = AGY_GATE.lock().unwrap();
     let payload = matches!(via, PromptVia::Stdin).then_some(prompt);
-    let (stdout, stderr, ok) = run_registered(&children, "organizer-gemini", cmd, payload, timeout)?;
-    match parse_agy_text(&stdout, &stderr) {
-        Ok(text) => Ok(text),
-        Err(error) if !ok => Err(error),
-        Err(error) => Err(error),
-    }
+    let (stdout, stderr, _ok) = run_registered(&children, "organizer-gemini", cmd, payload, timeout)?;
+    parse_agy_text(&stdout, &stderr)
 }
 
 /// Try an ordered list of provider lanes and return the FIRST success — the
@@ -419,6 +417,7 @@ pub fn organizer_gemini_complete(prompt: &str, timeout: Duration) -> Result<Stri
 ///
 /// Pure over `run` — no IO of its own — so it unit-tests with a mock closure.
 /// P0 foundation: nothing wires it into the live daemon yet (P1 does that).
+#[allow(dead_code)] // dormant until the P1 daemon wiring lands
 pub fn provider_chain(
     lanes: &[&str],
     run: impl Fn(&str) -> Result<String, String>,

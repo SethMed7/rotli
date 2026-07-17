@@ -217,6 +217,11 @@
   border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
   overflow: hidden;
 }
+/* keyboard safety: the card's hairline warms while its field holds focus, so
+   keyboard-only focus is never invisible (the textarea itself stays unringed) */
+.capture:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
 .cap-in {
   padding: 20px 22px 14px;
   display: flex;
