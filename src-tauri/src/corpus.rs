@@ -202,8 +202,11 @@ pub struct ConnectedBrain {
     pub memex_id: Option<String>,
     #[serde(default)]
     pub mode: Option<String>,
-    /// "chats+inbox" | "read-only"
-    pub perms: String,
+    /// Strict on read: a corrupt perms value fails the config parse (and takes
+    /// the existing .bak + re-derive recovery) instead of the old fail-open
+    /// behavior where any unknown string compared unequal to "read-only" and
+    /// left the brain writable.
+    pub perms: crate::memex::MemexPerms,
 }
 
 /// The unified on-disk config (`corpus.json` in the app config dir).
@@ -585,7 +588,7 @@ fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
                     abs_path: r.abs_path,
                     memex_id: None,
                     mode: None,
-                    perms: "read-only".to_string(),
+                    perms: crate::memex::MemexPerms::ReadOnly,
                 });
             } else {
                 folders.push(r);
@@ -604,10 +607,14 @@ fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
             continue;
         }
         let mxid = inst.memex_id.clone().or_else(|| Some(inst.id.clone()));
+        // legacy string input parses fail-closed: an unrecognized value becomes
+        // read-only instead of dropping the instance (or opening a write lane)
+        let perms = crate::memex::MemexPerms::parse(&inst.perms)
+            .unwrap_or(crate::memex::MemexPerms::ReadOnly);
         if let Some(b) = brains.iter_mut().find(|b| canon(&b.abs_path) == pcanon) {
             b.memex_id = mxid;
             b.mode = inst.mode.clone();
-            b.perms = inst.perms.clone();
+            b.perms = perms;
         } else {
             let id = unique_brain_id(&brains, &inst.label);
             brains.push(ConnectedBrain {
@@ -616,7 +623,7 @@ fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
                 abs_path: path,
                 memex_id: mxid,
                 mode: inst.mode.clone(),
-                perms: inst.perms.clone(),
+                perms,
             });
         }
     }
@@ -715,17 +722,16 @@ pub fn set_active_brain(app: &tauri::AppHandle, id: &str) -> Result<(), String> 
     write_corpus_config(app, &cfg)
 }
 
-pub fn set_brain_perms(app: &tauri::AppHandle, id: &str, perms: &str) -> Result<(), String> {
-    if perms != "chats+inbox" && perms != "read-only" {
-        return Err(format!("bad perms: {perms}"));
-    }
+pub fn set_brain_perms(app: &tauri::AppHandle, id: &str, perms: crate::memex::MemexPerms) -> Result<(), String> {
+    // no string validation here anymore — serde on MemexPerms already rejected
+    // anything but the two wire values at the IPC boundary
     let mut cfg = ensure_corpus_config(app);
     let b = cfg
         .brains
         .iter_mut()
         .find(|b| b.id == id)
         .ok_or("no such brain")?;
-    b.perms = perms.to_string();
+    b.perms = perms;
     write_corpus_config(app, &cfg)
 }
 
@@ -5108,7 +5114,7 @@ mod tests {
                 abs_path: brain.clone(),
                 memex_id: Some("mx_test123".into()),
                 mode: Some("secure".into()),
-                perms: "chats+inbox".into(),
+                perms: crate::memex::MemexPerms::ChatsInbox,
             }],
             folders: Vec::new(),
             active_brain_id: Some("vault".into()),
@@ -5165,7 +5171,7 @@ mod tests {
         let b = &cfg.brains[0];
         assert_eq!(b.id, "vault", "keeps the vault id so the sidebar prefix stays valid");
         assert_eq!(canon(&b.abs_path), canon(&brain));
-        assert_eq!(b.perms, "chats+inbox", "carries write perms from the instance, not read-only");
+        assert_eq!(b.perms, crate::memex::MemexPerms::ChatsInbox, "carries write perms from the instance, not read-only");
         assert_eq!(b.memex_id.as_deref(), Some(mxid));
         assert_eq!(b.mode.as_deref(), Some("secure"));
         assert_eq!(cfg.active_brain_id.as_deref(), Some("vault"), "active mapped via memexId");

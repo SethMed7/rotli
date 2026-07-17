@@ -35,10 +35,12 @@ fn document_convertible_exts_match_fixture() {
 
 #[test]
 fn memex_perms_match_fixture() {
-    assert_eq!(
-        string_list(&entry("memexPerms")),
-        [crate::memex::PERMS_CHATS_INBOX, crate::memex::PERMS_READ_ONLY],
-    );
+    // the enum's serde wire strings ARE the contract — a variant rename fails here
+    let wire: Vec<String> = [crate::memex::MemexPerms::ChatsInbox, crate::memex::MemexPerms::ReadOnly]
+        .iter()
+        .map(|p| serde_json::to_value(p).unwrap().as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(string_list(&entry("memexPerms")), wire);
 }
 
 #[test]

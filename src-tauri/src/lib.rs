@@ -539,8 +539,8 @@ struct CorpusView {
     abs_path: std::path::PathBuf,
     is_memex: bool,
     memex_id: Option<String>,
-    /// when is_memex: "chats+inbox" | "read-only"; else null
-    perms: Option<String>,
+    /// when is_memex: the brain's write perms; else null
+    perms: Option<memex::MemexPerms>,
 }
 
 /// The whole Location config — the one folder (+ whether it's a brain) + connected
@@ -563,7 +563,7 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
         None => (false, None, None),
     };
     if cfg!(debug_assertions) {
-        perms = Some("read-only".to_string());
+        perms = Some(memex::MemexPerms::ReadOnly);
     }
     CorpusConfigView {
         corpus: CorpusView {
@@ -697,20 +697,21 @@ fn corpus_set_active_brain(app: AppHandle, id: String) -> Result<(), String> {
     corpus::set_active_brain(&app, &id)
 }
 
-/// Set a brain's write perms ("chats+inbox" | "read-only"). No relaunch — the
-/// LIVE store's Rust write gate is updated in the same breath (#3, audit
-/// 2026-07), so the perms hold immediately, not only after the next launch.
-/// The store may be unbound (its folder vanished) — that's fine, startup will
-/// re-apply the persisted perms whenever it binds again.
+/// Set a brain's write perms. Typed as MemexPerms so serde rejects anything but
+/// the two wire values at the IPC boundary. No relaunch — the LIVE store's Rust
+/// write gate is updated in the same breath (#3, audit 2026-07), so the perms
+/// hold immediately, not only after the next launch. The store may be unbound
+/// (its folder vanished) — that's fine, startup will re-apply the persisted
+/// perms whenever it binds again.
 #[tauri::command]
-fn corpus_set_brain_perms(app: AppHandle, id: String, perms: String) -> Result<(), String> {
+fn corpus_set_brain_perms(app: AppHandle, id: String, perms: memex::MemexPerms) -> Result<(), String> {
     if cfg!(debug_assertions) {
         return Err("Production memex permissions cannot be changed in development.".into());
     }
-    corpus::set_brain_perms(&app, &id, &perms)?;
+    corpus::set_brain_perms(&app, &id, perms)?;
     let state = app.state::<corpus::CorpusState>();
     let _ = state.route(&id, |s| {
-        s.set_perms_read_only(perms == "read-only");
+        s.set_perms_read_only(perms.read_only());
         Ok(())
     });
     Ok(())
@@ -1041,7 +1042,7 @@ pub fn run() {
             let mut daemon_target: Option<(String, std::path::PathBuf)> = None;
             // #3 (audit 2026-07): a connected brain's USER-SET perms must reach the
             // Rust write gates, not only the TS canWrite — carry them by root id.
-            let brain_perms: std::collections::HashMap<String, String> =
+            let brain_perms: std::collections::HashMap<String, memex::MemexPerms> =
                 corpus::ensure_corpus_config(app.handle())
                     .brains
                     .into_iter()
@@ -1057,7 +1058,7 @@ pub fn run() {
                 match opened {
                     Ok(mut store) => {
                         if cfg!(debug_assertions)
-                            || brain_perms.get(&root.id).map(String::as_str) == Some("read-only")
+                            || brain_perms.get(&root.id).is_some_and(|p| p.read_only())
                         {
                             store.set_perms_read_only(true);
                         }

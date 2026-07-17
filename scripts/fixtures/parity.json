@@ -10,7 +10,7 @@
       "value": ["doc", "rtf", "odt"]
     },
     "memexPerms": {
-      "sourceOfTruth": "src/lib/tauri.ts MemexPerms union ↔ src-tauri/src/memex.rs PERMS_CHATS_INBOX / PERMS_READ_ONLY",
+      "sourceOfTruth": "src/lib/tauri.ts MemexPerms union ↔ src-tauri/src/memex.rs MemexPerms enum serde wire strings",
       "value": ["chats+inbox", "read-only"]
     },
     "keychainService": {

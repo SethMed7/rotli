@@ -292,7 +292,9 @@ pub struct InstanceEntry {
     pub role: String,
     pub memex_id: Option<String>,
     pub mode: Option<String>,
-    /// "chats+inbox" | "read-only"
+    /// Stays a raw String (not MemexPerms): this is the read-only LEGACY
+    /// registry — only abs_path is ever consumed, and a strict enum here could
+    /// drop the whole file from memex_detect over one bad value.
     pub perms: String,
 }
 
@@ -571,10 +573,34 @@ fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
 // into the corpus tree long ago and no TS caller remained. Re-add from git
 // history if a spine browser ever returns.
 
-/// The two access levels rotli grants a connected brain. Byte-identical to the
-/// `MemexPerms` union in src/lib/tauri.ts (parity.json memexPerms).
-pub(crate) const PERMS_CHATS_INBOX: &str = "chats+inbox";
-pub(crate) const PERMS_READ_ONLY: &str = "read-only";
+/// The two access levels rotli grants a connected brain. The serde wire strings
+/// are byte-identical to the `MemexPerms` union in src/lib/tauri.ts (parity.json
+/// memexPerms) — corpus.json, IPC views, and the set-perms command all carry
+/// them. Deserialization is strict: an unknown string is a parse error, never a
+/// silently-writable brain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MemexPerms {
+    #[serde(rename = "chats+inbox")]
+    ChatsInbox,
+    #[serde(rename = "read-only")]
+    ReadOnly,
+}
+
+impl MemexPerms {
+    pub fn read_only(self) -> bool {
+        self == MemexPerms::ReadOnly
+    }
+
+    /// The one place the wire strings are matched by hand — legacy migration
+    /// inputs parse through here, fail-closed at the call site.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "chats+inbox" => Some(MemexPerms::ChatsInbox),
+            "read-only" => Some(MemexPerms::ReadOnly),
+            _ => None,
+        }
+    }
+}
 
 /// What `corpus.rs` needs to register a connected brain in `corpus.json` — the
 /// memex-specific half of connecting (validate it's a real memex, stamp
@@ -584,8 +610,7 @@ pub struct BrainConnect {
     pub memex_id: String,
     pub label: String,
     pub mode: Option<String>,
-    /// "chats+inbox" | "read-only"
-    pub perms: String,
+    pub perms: MemexPerms,
 }
 
 /// Validate + stamp a folder for use as a connected brain. Mirrors `memex_connect`
@@ -599,7 +624,7 @@ pub fn prepare_brain_connect(path: &Path) -> Result<BrainConnect, String> {
     let memex_id = card.memex_id.clone().ok_or("memex.json has no id")?;
     let in_range = contract_ok(card.contract.as_deref());
     let mode = card.users_json.as_deref().map(parse_mode_raw);
-    let perms = if in_range { PERMS_CHATS_INBOX } else { PERMS_READ_ONLY };
+    let perms = if in_range { MemexPerms::ChatsInbox } else { MemexPerms::ReadOnly };
     // additive stamp only when we're allowed to write (in-range contract)
     if in_range {
         stamp_rotli(&path.join("memex.json"))?;
@@ -608,25 +633,25 @@ pub fn prepare_brain_connect(path: &Path) -> Result<BrainConnect, String> {
         memex_id,
         label: card.label,
         mode,
-        perms: perms.to_string(),
+        perms,
     })
 }
 
 /// Read-only view of a folder AS a brain (no stamp, no side effects):
 /// `Some((memex_id, perms))` when it's a memex, else `None`. Lets the corpus
 /// module tell the UI whether the corpus itself is a brain and with what perms.
-pub fn brain_view(path: &Path) -> Option<(String, String)> {
+pub fn brain_view(path: &Path) -> Option<(String, MemexPerms)> {
     let card = detect_one(path);
     if card.kind != "memex" {
         return None;
     }
     let id = card.memex_id?;
     let perms = if contract_ok(card.contract.as_deref()) {
-        PERMS_CHATS_INBOX
+        MemexPerms::ChatsInbox
     } else {
-        PERMS_READ_ONLY
+        MemexPerms::ReadOnly
     };
-    Some((id, perms.to_string()))
+    Some((id, perms))
 }
 
 /// Scaffold a FRESH memex at `root` (empty/fresh only) — the v3.6 spine + a new
@@ -939,6 +964,21 @@ pub fn memex_pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn memex_perms_round_trip_their_wire_strings() {
+        for (perms, wire) in [(MemexPerms::ChatsInbox, "chats+inbox"), (MemexPerms::ReadOnly, "read-only")] {
+            let json = serde_json::to_string(&perms).unwrap();
+            assert_eq!(json, format!("\"{wire}\""));
+            assert_eq!(serde_json::from_str::<MemexPerms>(&json).unwrap(), perms);
+            assert_eq!(MemexPerms::parse(wire), Some(perms));
+        }
+        // strict: an unknown value is a parse error, never a writable brain
+        assert!(serde_json::from_str::<MemexPerms>("\"admin\"").is_err());
+        assert_eq!(MemexPerms::parse("admin"), None);
+        assert!(MemexPerms::ReadOnly.read_only());
+        assert!(!MemexPerms::ChatsInbox.read_only());
+    }
 
     #[test]
     fn scaffold_memex_makes_a_valid_brain_on_the_current_contract() {
