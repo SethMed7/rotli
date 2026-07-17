@@ -88,7 +88,8 @@ import type { Folder, NoteSummary } from "../types";
 import { dispatch } from "../keys/registry";
 import { openNewItemMenu } from "../newItems/menu";
 import { longDateLabel } from "../lib/dateLabels";
-import { type DragGhost, createDragGhost } from "../lib/dragGhost";
+import { createDragGhost } from "../lib/dragGhost";
+import { createPointerDragSession } from "../lib/pointerDrag";
 import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
 import { isSecureBrainFolder } from "../security/secureNotes";
 import {
@@ -711,78 +712,55 @@ export function Sidebar() {
     mode: "move" | "add",
     label: string,
   ) => {
+    // button guard BEFORE the ref reset — a right-click must not clear the
+    // last drag's click suppression (the session guards again internally)
     if (e.button !== 0) return;
-    const sx = e.clientX;
-    const sy = e.clientY;
-    let dragging = false;
-    let ghost: DragGhost | null = null;
     let drop: { id: string; pos: DropPos } | null = null;
     const dragFlag = mode === "move" ? didMainDragRef : crossDragRef;
     dragFlag.current = false;
-    const onMove = (ev: PointerEvent) => {
-      if (!dragging) {
-        if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 5) return;
-        dragging = true;
+    createPointerDragSession(e, {
+      ghost: (x, y) => createDragGhost(label, x, y),
+      // dragFlag stays armed past onEnd so the trailing click is eaten
+      onStart: () => {
         dragFlag.current = true;
         if (mode === "move") setMainDragId(id);
-        ghost = createDragGhost(label, ev.clientX, ev.clientY);
-      }
-      ghost?.move(ev.clientX, ev.clientY);
-      const hit = (
-        document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
-      )?.closest("[data-main-id]") as HTMLElement | null;
-      const tid = hit?.dataset.mainId;
-      if (!hit || !tid || (mode === "move" && tid === id)) {
-        drop = null;
-        setMainDrop(null);
-        return;
-      }
-      const rect = hit.getBoundingClientRect();
-      const rel = rect.height > 0 ? (ev.clientY - rect.top) / rect.height : 0.5;
-      // a folder's middle third = drop INTO it; otherwise before/after by half
-      let pos: DropPos = rel < 0.5 ? "before" : "after";
-      if (hit.dataset.mainFolder === "1" && rel > 0.33 && rel < 0.67) pos = "into";
-      if (tid === MAIN_ROOT) pos = "into"; // the whole Main zone → land at root
-      drop = { id: tid, pos };
-      setMainDrop(drop);
-    };
-    // every exit path (drop, Esc, pointercancel) tears the same things down;
-    // only onUp commits. dragFlag stays armed so the trailing click is eaten.
-    const cleanup = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", cleanup);
-      window.removeEventListener("keydown", onKey, true);
-      ghost?.destroy();
-      ghost = null;
-      if (mode === "move") setMainDragId(null);
-      setMainDrop(null);
-    };
-    // globalThis.: React's KeyboardEvent type shadows the DOM one in this file
-    const onKey = (ev: globalThis.KeyboardEvent) => {
-      if (ev.key === "Escape") {
-        ev.preventDefault();
-        ev.stopPropagation();
-        cleanup();
-      }
-    };
-    const onUp = () => {
-      cleanup();
-      if (dragging && drop) {
+      },
+      onMove: (x, y) => {
+        const hit = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest(
+          "[data-main-id]",
+        ) as HTMLElement | null;
+        const tid = hit?.dataset.mainId;
+        if (!hit || !tid || (mode === "move" && tid === id)) {
+          drop = null;
+          setMainDrop(null);
+          return;
+        }
+        const rect = hit.getBoundingClientRect();
+        const rel = rect.height > 0 ? (y - rect.top) / rect.height : 0.5;
+        // a folder's middle third = drop INTO it; otherwise before/after by half
+        let pos: DropPos = rel < 0.5 ? "before" : "after";
+        if (hit.dataset.mainFolder === "1" && rel > 0.33 && rel < 0.67) pos = "into";
+        if (tid === MAIN_ROOT) pos = "into"; // the whole Main zone → land at root
+        drop = { id: tid, pos };
+        setMainDrop(drop);
+      },
+      onDrop: () => {
+        const d = drop;
+        if (!d) return;
         if (mode === "add") {
           // add the note to Main, then place it at the drop (root add if the zone)
           let tree = addNoteToMain(mainManifest.tree, id);
-          if (drop.id !== MAIN_ROOT) tree = moveInTree(tree, id, drop.id, drop.pos);
+          if (d.id !== MAIN_ROOT) tree = moveInTree(tree, id, d.id, d.pos);
           setMainTree(tree, liveIds);
         } else {
-          setMainTree(moveInTree(mainManifest.tree, id, drop.id, drop.pos), liveIds);
+          setMainTree(moveInTree(mainManifest.tree, id, d.id, d.pos), liveIds);
         }
-      }
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", cleanup);
-    window.addEventListener("keydown", onKey, true);
+      },
+      onEnd: () => {
+        if (mode === "move") setMainDragId(null);
+        setMainDrop(null);
+      },
+    });
   };
 
   // recursive render of the Main tree — mouse + drag + roving j/k (Seth follow-up,
