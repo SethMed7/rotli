@@ -13,7 +13,8 @@ import { rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { BREVE, BRIEFS } from "./paths";
 import { effectiveTz, minutesNowIn, todayIn } from "./timectx";
-import { dailyDue, dailySlot, intervalDue, parseHm } from "./scheduler-core";
+import { dailyDue, dailySlot, intervalDue, parseHm, schedulerParentGone } from "./scheduler-core";
+import { processIsAlive, tryAcquireProcessLock, type ProcessLock } from "./processLock";
 
 type DailySchedule = { kind: "dailyAt"; hhmm: string; leadMinutes: number };
 type IntervalSchedule = { kind: "everySecs"; secs: number };
@@ -41,11 +42,19 @@ const CONFIG = process.env.ROTLI_BREVE_CONFIG ?? join(BREVE, "settings.json");
 const STATE = join(BREVE, "scheduler-state.json");
 const LOG = join(BREVE, "logs", "rotli-scheduler.log");
 const POLL_MS = 15_000;
+const PARENT_POLL_MS = 2_000;
+const LOCK_RETRY_MS = 2_000;
+// New Rotli builds pass this explicitly. Falling back to the launch-time PPID
+// lets an older Rotli supervisor pick up a synced runtime fix immediately.
+const expectedParent = Number(process.env.ROTLI_PARENT_PID ?? process.ppid);
 const running = new Map<string, Bun.Subprocess>();
 let stopping = false;
 let signalRestarts = 0;
 let signalRetryAt = 0;
 let saveChain: Promise<unknown> = Promise.resolve();
+let schedulerLock: ProcessLock | null = null;
+let tickTimer: ReturnType<typeof setInterval> | null = null;
+let parentTimer: ReturnType<typeof setInterval> | null = null;
 
 mkdirSync(join(BREVE, "logs"), { recursive: true });
 mkdirSync(BRIEFS, { recursive: true });
@@ -113,45 +122,55 @@ function commandFor(routine: Routine): string[] | null {
 
 async function runOne(routine: Routine, state: State, slot?: string) {
   if (running.has(routine.id)) return;
+  const jobLock = tryAcquireProcessLock(BREVE, `job-${routine.id}`);
+  if (!jobLock) {
+    log(`[${routine.id}] skipped: another process owns the job lock`);
+    return;
+  }
   const command = commandFor(routine);
-  if (!command) return;
+  if (!command) { jobLock.release(); return; }
   const started = new Date().toISOString();
-  state.jobs[routine.id] = { ...state.jobs[routine.id], lastStarted: started, ...(slot ? { pendingSlot: slot } : {}), lastError: undefined };
-  await saveState(state);
-  log(`[${routine.id}] start: ${command.join(" ")}`);
-  const proc = Bun.spawn(command, {
-    cwd: BREVE,
-    env: {
-      ...process.env,
-      ROTLI_BREVE_HOME: BREVE,
-      ROTLI_BREVE_CONFIG: CONFIG,
-      ROTLI_BREVE_LANES: routine.lanes.join(","),
-      ROTLI_SCHEDULED: "1",
-    },
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  running.set(routine.id, proc);
-  const [stdout, stderr, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  running.delete(routine.id);
-  const verificationError = await verifyRun(routine, slot, code);
-  const error = verificationError
-    ? `${verificationError}${stderr || stdout ? `: ${stderr || stdout}` : ""}`.slice(-1000)
-    : undefined;
-  const ok = !error;
-  state.jobs[routine.id] = {
-    ...state.jobs[routine.id],
-    ...(ok && slot ? { lastSlot: slot, pendingSlot: undefined } : {}),
-    lastFinished: new Date().toISOString(),
-    lastOk: ok,
-    lastError: error,
-  };
-  await saveState(state);
-  log(`[${routine.id}] ${ok ? "complete" : "failed"}${error ? `: ${error.replace(/\s+/g, " ")}` : ""}`);
+  try {
+    state.jobs[routine.id] = { ...state.jobs[routine.id], lastStarted: started, ...(slot ? { pendingSlot: slot } : {}), lastError: undefined };
+    await saveState(state);
+    log(`[${routine.id}] start: ${command.join(" ")}`);
+    const proc = Bun.spawn(command, {
+      cwd: BREVE,
+      env: {
+        ...process.env,
+        ROTLI_BREVE_HOME: BREVE,
+        ROTLI_BREVE_CONFIG: CONFIG,
+        ROTLI_BREVE_LANES: routine.lanes.join(","),
+        ROTLI_SCHEDULED: "1",
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    running.set(routine.id, proc);
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    running.delete(routine.id);
+    const verificationError = await verifyRun(routine, slot, code);
+    const error = verificationError
+      ? `${verificationError}${stderr || stdout ? `: ${stderr || stdout}` : ""}`.slice(-1000)
+      : undefined;
+    const ok = !error;
+    state.jobs[routine.id] = {
+      ...state.jobs[routine.id],
+      ...(ok && slot ? { lastSlot: slot, pendingSlot: undefined } : {}),
+      lastFinished: new Date().toISOString(),
+      lastOk: ok,
+      lastError: error,
+    };
+    await saveState(state);
+    log(`[${routine.id}] ${ok ? "complete" : "failed"}${error ? `: ${error.replace(/\s+/g, " ")}` : ""}`);
+  } finally {
+    running.delete(routine.id);
+    jobLock.release();
+  }
 }
 
 function stopChild(id: string) {
@@ -223,6 +242,19 @@ async function tick(state: State) {
       if (delivery == null) continue;
       const fire = (delivery - routine.schedule.leadMinutes + 1440) % 1440;
       const slot = dailySlot(today, nowMinutes, delivery, fire);
+      if (job.lastSlot !== slot && await verifyRun(routine, slot, 0) === undefined) {
+        state.jobs[routine.id] = {
+          ...job,
+          lastSlot: slot,
+          pendingSlot: undefined,
+          lastFinished: new Date().toISOString(),
+          lastOk: true,
+          lastError: undefined,
+        };
+        await saveState(state);
+        log(`[${routine.id}] adopted completed slot ${slot}`);
+        continue;
+      }
       if (dailyDue(nowMinutes, fire, slot, job.lastSlot)) {
         void runOne(routine, state, slot).catch((error) => log(`[${routine.id}] run error: ${error}`));
       }
@@ -237,21 +269,63 @@ async function tick(state: State) {
   }
 }
 
+function parentIsGone(): boolean {
+  return schedulerParentGone(expectedParent, process.ppid, processIsAlive);
+}
+
+function stop(terminateGroup = false) {
+  if (stopping) return;
+  stopping = true;
+  if (tickTimer) clearInterval(tickTimer);
+  if (parentTimer) clearInterval(parentTimer);
+  for (const id of [...running.keys()]) stopChild(id);
+  // On owner death, leave the lock record in place until this PID exits. A
+  // standby can then recover it as stale without overlapping the old group.
+  if (!terminateGroup) schedulerLock?.release();
+  schedulerLock = null;
+  log(terminateGroup ? "Rotli scheduler owner disappeared; stopping process group" : "Rotli scheduler stopped");
+  if (terminateGroup) {
+    // The scheduler is the group leader. This also reaches grandchildren of
+    // shell jobs that a direct Child.kill cannot reliably reap.
+    try { process.kill(-process.pid, "SIGTERM"); } catch {}
+  }
+  setTimeout(() => process.exit(0), 250);
+}
+
+async function waitForSchedulerLock(): Promise<ProcessLock | null> {
+  let announced = false;
+  while (!stopping) {
+    const lock = tryAcquireProcessLock(BREVE, "scheduler");
+    if (lock) return lock;
+    if (!announced) {
+      log("another Breve scheduler owns the singleton lock; standing by");
+      announced = true;
+    }
+    if (parentIsGone()) return null;
+    await Bun.sleep(LOCK_RETRY_MS);
+  }
+  return null;
+}
+
 async function main() {
+  process.on("SIGINT", () => stop());
+  process.on("SIGTERM", () => stop());
+  parentTimer = setInterval(() => {
+    if (parentIsGone()) stop(true);
+  }, PARENT_POLL_MS);
+
+  schedulerLock = await waitForSchedulerLock();
+  if (!schedulerLock || stopping || parentIsGone()) {
+    stop(parentIsGone());
+    return;
+  }
+
+  // Load only after winning the singleton so a standby process never carries
+  // stale state into a later takeover.
   const state = await loadState();
   log(`Rotli scheduler online; config=${CONFIG}`);
   await tick(state);
-  const timer = setInterval(() => void tick(state).catch((e) => log(`tick error: ${e}`)), POLL_MS);
-  const stop = () => {
-    if (stopping) return;
-    stopping = true;
-    clearInterval(timer);
-    for (const id of [...running.keys()]) stopChild(id);
-    log("Rotli scheduler stopped");
-    setTimeout(() => process.exit(0), 250);
-  };
-  process.on("SIGINT", stop);
-  process.on("SIGTERM", stop);
+  tickTimer = setInterval(() => void tick(state).catch((e) => log(`tick error: ${e}`)), POLL_MS);
 }
 
 if (import.meta.main) void main().catch((e) => { log(`fatal: ${e}`); process.exit(1); });

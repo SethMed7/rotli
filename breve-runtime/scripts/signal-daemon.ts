@@ -25,6 +25,7 @@ import { loadSettings, saveSettings, effectiveTz, travelExpired, todayIn, minute
 import { normalizeAmPm, mealOf, briefAsk, briefRegenMatch, briefQueueMatch, bareFollowup, wantsLastAsText, topicBriefMatch, urlRequest, watchIntentMatch, parseWhen, schedulePairs, scheduleChangeGate, audioResearchAsk, inboxAsk, accountOf, inboxScope, mailSearchAsk, modelDirective, saveAttachmentIntent, folderFromCaption, slugifyTopic, stripStepNarration, type ModelTier, type Meal, type BriefFormat } from "./intents";
 import { validateAction, describeAction, previewScript } from "./actions";
 import { rotate } from "./logrotate";
+import { acquireProcessLock } from "./processLock";
 
 // The owner's time context (home tz + travel mode) — cached, refreshed every 5 min.
 let CFG: Settings = await loadSettings();
@@ -795,6 +796,11 @@ async function sendBrief(kind: "view" | "pdf" | "audio", dateArg?: string) {
   if (!dateArg) {
     const today = todayLocal();
     if (!(await Bun.file(join(BRIEFS, `${today}.md`)).exists())) {
+      const generationLock = await acquireProcessLock(BREVE, "job-morning", { waitMs: 0 });
+      if (!generationLock) {
+        await send("☕ Today's brief is already being made. I’ll send it as soon as that run finishes.");
+        return;
+      }
       await send(`☕ Today's brief isn't generated yet (scheduled to arrive ${CFG.deliveryTimes.morning}). Making it now — audio lands here, PDF in your email, ~10-15 min.`);
       const stopProg = progressEvery("brewing", 240000);
       try {
@@ -814,6 +820,7 @@ async function sendBrief(kind: "view" | "pdf" | "audio", dateArg?: string) {
         }
       } finally {
         stopProg();
+        generationLock.release();
       }
       return;
     }
@@ -1004,6 +1011,11 @@ async function handleBriefRegenerate(text: string): Promise<boolean> {
   const claudeTier = m.model === "haiku" ? "haiku"
     : (m.model === "sonnet" || m.model === "opus" || m.model === "fable") ? "sonnet" : null;
   const today = todayLocal();
+  const generationLock = await acquireProcessLock(BREVE, "job-morning", { waitMs: 0 });
+  if (!generationLock) {
+    await send("🔄 A morning brief run is already in progress. I won’t start a competing regeneration.");
+    return true;
+  }
   await send(`🔄 Regenerating today's brief${claudeTier ? ` with ${claudeTier}` : ""} — fresh audio lands here, PDF in your email, ~10-15 min.`);
   const stopProg = progressEvery("brewing", 240000);
   try {
@@ -1017,6 +1029,7 @@ async function handleBriefRegenerate(text: string): Promise<boolean> {
     }
   } finally {
     stopProg();
+    generationLock.release();
   }
   return true;
 }

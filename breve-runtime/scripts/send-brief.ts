@@ -7,10 +7,11 @@
  *
  * Resend key lives in Breve's isolated keychain (never in a file); see scripts/secret.ts.
  */
-import { mkdirSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { BREVE as BREVE_DIR, BRIEFS, PDFS } from "./paths";
 import { readSecret } from "./secret";
+import { claimDelivery } from "./deliveryClaim";
 
 // 1. Resolve which issue to send — from the markdown (the content source).
 const dateArg = process.argv[2];
@@ -90,18 +91,26 @@ const text = [
 const emoji = kind === "morning" ? "☕" : kind === "lunch" ? "🥪" : "🌙";
 const shortHead = headline.length > 72 ? headline.slice(0, 72).replace(/\s+\S*$/, "") + "…" : headline;
 const subject = kind === "morning" ? `${emoji} BREVE #${Number(issueNo)} · ${shortHead || date}` : `${emoji} BREVE ${label} · ${date}`;
-const receipts = join(BREVE_DIR, "delivery-receipts");
-const receipt = join(receipts, `${stem}.email`);
-if (process.env.ROTLI_SCHEDULED === "1" && !process.env.BREVE_REGEN && await Bun.file(receipt).exists()) {
-  console.log(`OK ${stem} email delivery already recorded`);
-  process.exit(0);
-}
 
 // Dry run: preview the plain-text body without sending (BREVE_DRYRUN=1).
 if (process.env.BREVE_DRYRUN === "1") {
   console.log(`DRY subject: ${subject}\n--- body ---\n${text}\n--- end (pdf: ${hasPdf}) ---`);
   process.exit(0);
 }
+
+const dedupeCompleted = process.env.ROTLI_SCHEDULED === "1" && !process.env.BREVE_REGEN;
+const delivery = await claimDelivery(BREVE_DIR, `${stem}.email`, { force: !dedupeCompleted });
+if (delivery.status === "delivered") {
+  console.log(`OK ${stem} email delivery already recorded`);
+  process.exit(0);
+}
+if (delivery.status === "busy") {
+  console.error(`ERR ${stem} email delivery is already in progress`);
+  process.exit(75);
+}
+process.on("exit", () => {
+  if (delivery.status === "claimed") delivery.release();
+});
 
 // 4. Send: plain-text body + the full newsletter PDF attached.
 const pdf = Bun.file(join(PDFS, `${stem}.pdf`));
@@ -115,6 +124,5 @@ const res = await fetch("https://api.resend.com/emails", {
 });
 const body = await res.json();
 if (!res.ok) { console.error(`Resend error ${res.status}:`, body); process.exit(1); }
-mkdirSync(receipts, { recursive: true });
-await Bun.write(receipt, `${new Date().toISOString()} ${String(body.id ?? "")}\n`);
+if (delivery.status === "claimed") await delivery.complete(String(body.id ?? ""));
 console.log(`Sent ${kind} (${stem}) to ${config.to.join(", ")} — id ${body.id} (${attachments.length ? "pdf attached" : "no pdf"})`);

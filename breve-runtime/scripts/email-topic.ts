@@ -10,6 +10,7 @@ import { TOPICS, PDFS } from "./paths";
 import { readSecret } from "./secret";
 import { runModel, STRICT_MCP, CLAUDE_BIN } from "./run-model";
 import { pdfThemeVariables, readPdfTheme } from "./pdf-theme";
+import { effectiveTz, loadSettings, todayIn } from "./timectx";
 
 const [format, recipient, ...topicParts] = process.argv.slice(2);
 const topic = topicParts.join(" ").trim();
@@ -37,7 +38,7 @@ if (!body) { console.log("ERR research produced nothing"); process.exit(1); }
 
 const subject = `☕ BREVE · ${topic.slice(0, 60)}`;
 const kicker = `<div style="font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:4px;color:${palette.accent};border-bottom:1px solid ${palette.rule};padding-bottom:10px;margin-bottom:16px">BREVE · ON-DEMAND BRIEF</div>`;
-const foot = `<p style="color:${palette.muted};font-size:11px;margin-top:24px;font-family:Helvetica,Arial,sans-serif">Requested via Signal · ${new Date().toISOString().slice(0, 10)}</p>`;
+const foot = `<p style="color:${palette.muted};font-size:11px;margin-top:24px;font-family:Helvetica,Arial,sans-serif">Requested via Signal · ${todayIn(effectiveTz(await loadSettings()))}</p>`;
 
 let html: string;
 let attachments: any[] = [];

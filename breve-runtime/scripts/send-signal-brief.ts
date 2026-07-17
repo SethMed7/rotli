@@ -11,16 +11,25 @@ import { join } from "node:path";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { BREVE, BRIEFS, AUDIOS } from "./paths";
 import { loadSettings, effectiveTz, todayIn } from "./timectx";
+import { claimDelivery } from "./deliveryClaim";
 
 const { bot, owner } = await Bun.file(join(BREVE, "signal.json")).json();
 
-const stem = process.argv[2] ?? todayIn(effectiveTz(await loadSettings()));
-const receipts = join(BREVE, "delivery-receipts");
-const receipt = join(receipts, `${stem}.signal`);
-if (process.env.ROTLI_SCHEDULED === "1" && !process.env.BREVE_REGEN && await Bun.file(receipt).exists()) {
+const today = todayIn(effectiveTz(await loadSettings()));
+const stem = process.argv[2] ?? today;
+const dedupeCompleted = process.env.ROTLI_SCHEDULED === "1" && !process.env.BREVE_REGEN;
+const delivery = await claimDelivery(BREVE, `${stem}.signal`, { force: !dedupeCompleted });
+if (delivery.status === "delivered") {
   console.log(`OK ${stem} Signal delivery already recorded`);
   process.exit(0);
 }
+if (delivery.status === "busy") {
+  console.error(`ERR ${stem} Signal delivery is already in progress`);
+  process.exit(75);
+}
+process.on("exit", () => {
+  if (delivery.status === "claimed") delivery.release();
+});
 const kind = stem.endsWith("-lunch") ? "lunch" : stem.endsWith("-night") ? "night" : "morning";
 const date = stem.slice(0, 10);
 const mp3 = join(AUDIOS, `${stem}.mp3`);
@@ -56,7 +65,7 @@ function logToTranscript() {
   try {
     const dir = join(BREVE, "signal", "transcripts");
     mkdirSync(dir, { recursive: true });
-    appendFileSync(join(dir, `${new Date().toISOString().slice(0, 10)}.log`),
+    appendFileSync(join(dir, `${today}.log`),
       `Breve: ${text.replace(/\n/g, " ")} [delivered ${kind} audio brief ${stem}]\n`);
   } catch {}
 }
@@ -68,8 +77,7 @@ for (let i = 0; i < 4; i++) {
   const err = await new Response(p.stderr).text();
   if ((await p.exited) === 0) {
     logToTranscript();
-    mkdirSync(receipts, { recursive: true });
-    await Bun.write(receipt, `${new Date().toISOString()}\n`);
+    if (delivery.status === "claimed") await delivery.complete();
     console.log(`OK sent ${stem} audio to Signal`);
     process.exit(0);
   }

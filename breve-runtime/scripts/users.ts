@@ -94,7 +94,7 @@ export function resolvePrincipal(sourceNumber: string | null, sourceUuid: string
       const entry = reg.users.find((u) => u.name === name);
       if (entry) {
         const role: Role = entry.role === "admin" ? "admin" : "member";
-        const powers = (entry.powers as Power[] | undefined)?.length ? (entry.powers as Power[]) : (role === "admin" ? ["knowledge", "email", "briefs", "actions"] : ["knowledge"]);
+        const powers: Power[] = (entry.powers as Power[] | undefined)?.length ? (entry.powers as Power[]) : (role === "admin" ? ["knowledge", "email", "briefs", "actions"] : ["knowledge"]);
         const allowedUsers = role === "admin" ? reg.users.map((u) => u.name) : [name];
         return { phone: ids[name].phone ?? null, uuid: ids[name].uuid ?? null, role, allowedUsers, primaryUser: name, powers };
       }

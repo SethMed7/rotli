@@ -65,9 +65,11 @@ brief_exists() { [ "$1" = "--test" ] || [ -f "$BREVE/briefs/${TODAY}-night.md" ]
     run_model "$FALLBACK"
     echo "=== claude ($FALLBACK) exit $? at $(date) ==="
     if brief_exists "$1"; then
-      bun "$BREVE/scripts/notify.ts" "⚠ Your brief model ($BREVE_MODEL) was unavailable tonight, so I generated The Archive with $FALLBACK instead. On its way." || true
+      bun "$BREVE/scripts/notify.ts" --idempotency-key "night-model-fallback-$TODAY" \
+        "⚠ Your brief model ($BREVE_MODEL) was unavailable tonight, so I generated The Archive with $FALLBACK instead. On its way." || true
     else
-      bun "$BREVE/scripts/notify.ts" "⚠ Couldn't generate your night brief — both $BREVE_MODEL and $FALLBACK look unavailable (Claude sub may be down). Reply \"brief\" to retry, or check the Mac." || true
+      bun "$BREVE/scripts/notify.ts" --idempotency-key "night-generation-failure-$TODAY" \
+        "⚠ Couldn't generate your night brief — both $BREVE_MODEL and $FALLBACK look unavailable (Claude sub may be down). Reply \"brief\" to retry, or check the Mac." || true
       echo "=== self-heal exhausted: notified the owner ==="
     fi
   fi

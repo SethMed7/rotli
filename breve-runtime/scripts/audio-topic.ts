@@ -11,7 +11,8 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderMp3, parseSegments } from "./tts";
-import { TOPICS, AUDIOS } from "./paths";
+import { BREVE, TOPICS, AUDIOS } from "./paths";
+import { effectiveTz, loadSettings, todayIn } from "./timectx";
 import { sandboxed } from "./sandbox";
 import { readSecret } from "./secret";
 
@@ -23,7 +24,7 @@ const GH_PAT = await readSecret("breve-gh-readonly").catch(() => "");
 const request = process.argv.slice(2).join(" ").trim();
 if (!request) { console.error("ERR usage: bun audio-topic.ts \"<request>\""); process.exit(1); }
 
-const date = new Date().toISOString().slice(0, 10);
+const date = todayIn(effectiveTz(await loadSettings()));
 const slug = request.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").split("-").slice(0, 6).join("-") || "topic";
 const stem = `${slug}-${date}`;
 

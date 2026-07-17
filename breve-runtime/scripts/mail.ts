@@ -73,7 +73,8 @@ if (cmd === "unread") {
       try {
         // READ-ONLY open: imapflow issues EXAMINE, so the server itself refuses mutations.
         await client.mailboxOpen("INBOX", { readOnly: true });
-        const uids = await client.search({ seen: false }, { uid: true });
+        // imapflow returns `false` on a failed SEARCH — `|| []` strips it (`?? []` would not)
+        const uids = (await client.search({ seen: false }, { uid: true })) || [];
         result.accounts[acc.name] = (uids ?? []).length;
         result.unread += (uids ?? []).length;
         const pick = (uids ?? []).slice(-LIMIT);
@@ -105,7 +106,7 @@ try {
     const q = args.filter((a) => !accounts.some((acc) => acc.name === a)).join(" ");
     if (!q) { console.error("ERR search needs a query"); process.exit(1); }
     const since = new Date(Date.now() - 30 * 86400_000);
-    const uids = await client.search({ or: [{ subject: q }, { from: q }, { body: q }], since }, { uid: true });
+    const uids = (await client.search({ or: [{ subject: q }, { from: q }, { body: q }], since }, { uid: true })) || [];
     const out: any[] = [];
     const pick = (uids ?? []).slice(-LIMIT);
     if (pick.length) {
@@ -116,7 +117,7 @@ try {
     const uid = parseInt(args[0]);
     if (!uid) { console.error("ERR read needs a uid"); process.exit(1); }
     const msg = await client.fetchOne(String(uid), { uid: true, envelope: true, bodyStructure: true, source: true }, { uid: true });
-    const raw = msg?.source?.toString() ?? "";
+    const raw = (msg && msg.source ? msg.source : "").toString();
     // crude text extraction: prefer text/plain part; fall back to stripped html
     let body = raw.split(/\r?\n\r?\n/).slice(1).join("\n\n");
     body = body

@@ -47,7 +47,8 @@ All providers are confined to your memex + your storage + Breve's own folder (th
 
 - Worked on the configured model → silent (no noise).
 - Fell back to another provider → a notification: *"Today's brief was generated with `<provider>` —
-  your usual model (`<briefModel>`) was unavailable."* (so a silent outage is still visible).
+  your usual model (`<briefModel>`) was unavailable."* (so a silent outage is still visible). The
+  warning has a per-day delivery claim and receipt, so retries or overlapping callers cannot repeat it.
 - All three exhausted → a warning to reply "brief" to retry (very rare — network or all three down).
 
 ## Worked example (2026-06-21)

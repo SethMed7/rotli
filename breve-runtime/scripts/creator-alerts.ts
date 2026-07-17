@@ -12,12 +12,19 @@
 import { join } from "node:path";
 import { BREVE } from "./paths";
 import { sendSignal as sendSig } from "./bin";
+import { tryAcquireProcessLock } from "./processLock";
 
 const DRY = process.env.BREVE_DRY === "1";
 const SIGNAL_ENABLED = (process.env.ROTLI_BREVE_LANES ?? "signal").split(",").includes("signal");
 
 const { bot, owner } = await Bun.file(join(BREVE, "signal.json")).json();
 const STATE_PATH = join(BREVE, "logs", ".creators-state.json");
+const producerLock = tryAcquireProcessLock(BREVE, "producer-creators");
+if (!producerLock) {
+  console.log("[creators] another creator check is already running");
+  process.exit(0);
+}
+process.on("exit", () => producerLock.release());
 
 type State = { seen: Record<string, number>; baselined: Record<string, boolean> };
 const state: State = (await Bun.file(STATE_PATH).json().catch(() => null)) ?? { seen: {}, baselined: {} };
@@ -77,4 +84,5 @@ function decodeEntities(s: string): string {
 const cutoff = Date.now() - 30 * 86400_000;
 for (const [id, ts] of Object.entries(state.seen)) if (ts < cutoff) delete state.seen[id];
 if (!DRY) await Bun.write(STATE_PATH, JSON.stringify(state)); // dry runs don't persist — re-runnable
+producerLock.release();
 console.log(`[creators] done — ${alerts} ${DRY ? "would-be " : ""}alert(s)`);

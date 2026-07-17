@@ -25,6 +25,11 @@ Cadence: Rotli's managed doctor routine every 30 min. **Quiet when healthy** —
 the absence of 🩺 messages is the health signal. One proposal at a time, once per
 artifact per day: an assistant that nags is worse than one that's occasionally late.
 
+Scheduler recovery is single-owner: an atomic runtime lock admits one active
+scheduler, job locks prevent cross-process overlap, and the scheduler exits its
+process group if its Rotli parent dies. Delivery claims are acquired before Signal
+or email, then converted to receipts only after success.
+
 ### Why proposals instead of full autonomy
 Reruns produce sends (email, Signal drops). Auto-rerunning a "missed" morning brief
 that actually half-ran would double-send. The Rule of Two (OWASP, in Issue 002):

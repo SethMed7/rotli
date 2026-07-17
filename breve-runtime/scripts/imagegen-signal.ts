@@ -8,10 +8,12 @@
  * Usage: bun imagegen-signal.ts "<description>"   (--gemini / --codex to force)
  */
 import { join } from "node:path";
-import { runModel, findAgy, findCodex } from "./run-model";
 import { storagePath } from "./config";
+import { runModel, findAgy, findCodex } from "./run-model";
+import { effectiveTz, loadSettings, todayIn } from "./timectx";
 
 const STORE = storagePath();
+const today = todayIn(effectiveTz(await loadSettings()));
 
 const argv = process.argv.slice(2);
 const forceGemini = argv.includes("--gemini");
@@ -23,7 +25,7 @@ const ILLUSTRATive = /\b(illustration|illustrated|cartoon|anime|logo|icon|sticke
 const engine = forceCodex ? "codex" : forceGemini || ILLUSTRATive.test(desc) ? "gemini" : "codex";
 
 const slug = desc.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").split("-").slice(0, 6).join("-") || "image";
-const DEST = join(STORE, `${slug}-${new Date().toISOString().slice(0, 10)}.png`);
+const DEST = join(STORE, `${slug}-${today}.png`);
 
 let code = 1;
 if (engine === "codex") {

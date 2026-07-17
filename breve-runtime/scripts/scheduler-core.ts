@@ -24,6 +24,14 @@ export function intervalDue(now: number, seconds: number, lastStarted: string | 
   return Number.isFinite(then) && now - then >= seconds * 1000;
 }
 
+export function schedulerParentGone(
+  expectedParent: number,
+  actualParent: number,
+  isAlive: (pid: number) => boolean,
+): boolean {
+  return expectedParent > 0 && (actualParent !== expectedParent || !isAlive(expectedParent));
+}
+
 function nextDate(date: string): string {
   const [year, month, day] = date.split("-").map(Number);
   const next = new Date(Date.UTC(year!, month! - 1, day! + 1));

@@ -17,8 +17,10 @@ import { sandboxed } from "./sandbox";
 const HOME = process.env.HOME!;
 
 /** Spawn a model subprocess under the write+read sandbox. argv[0] must be an absolute program path. */
-export function runModel(argv: string[], opts?: any): Bun.Subprocess {
-  return Bun.spawn(sandboxed(argv), opts);
+// Callers always pipe the stdio they touch, so pin the piped shape (FileSink
+// stdin, ReadableStream stdout/stderr) instead of the loose default unions.
+export function runModel(argv: string[], opts?: any): Bun.Subprocess<"pipe", "pipe", "pipe"> {
+  return Bun.spawn(sandboxed(argv), opts) as Bun.Subprocess<"pipe", "pipe", "pipe">;
 }
 
 /** Flags that stop a `claude -p` run from loading ambient MCP servers (injection-to-side-effect defense). */

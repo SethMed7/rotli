@@ -117,15 +117,18 @@ gen() {
         case "$USED" in
           claude*)
             # Still on Claude, just a smaller model — a soft note is enough.
-            bun "$BREVE/scripts/notify.ts" "ℹ️ Today's brief was generated with $USED — your usual model ($BREVE_MODEL) was unavailable. It's on its way." || true
+            bun "$BREVE/scripts/notify.ts" --idempotency-key "morning-model-fallback-$TODAY" \
+              "ℹ️ Today's brief was generated with $USED — your usual model ($BREVE_MODEL) was unavailable. It's on its way." || true
             ;;
           *)
             # Fell OFF Claude entirely (gemini/codex) — almost always a Claude auth failure (401).
             # Make this UNMISTAKABLE so a degraded brief never slips by unnoticed. Fully defensive:
             # try the Signal text path, then notify.ts, and never let an alert failure break the run.
             PROV="${USED%% *}"
-            bun "$BREVE/scripts/send-signal-text.ts" --message "⚠ Heads up — this morning's brief fell back to $PROV because Claude auth failed (likely an expired login / 401). The brief still went out, but re-auth Claude when you get a moment." \
-              || bun "$BREVE/scripts/notify.ts" "⚠⚠ MORNING BRIEF DEGRADED — fell back to $PROV; Claude auth failed (401). Re-auth Claude when you can." \
+            bun "$BREVE/scripts/send-signal-text.ts" --idempotency-key "morning-provider-fallback-$TODAY" \
+              --message "⚠ Heads up — this morning's brief fell back to $PROV because Claude auth failed (likely an expired login / 401). The brief still went out, but re-auth Claude when you get a moment." \
+              || bun "$BREVE/scripts/notify.ts" --idempotency-key "morning-provider-fallback-$TODAY" \
+                "⚠⚠ MORNING BRIEF DEGRADED — fell back to $PROV; Claude auth failed (401). Re-auth Claude when you can." \
               || true
             ;;
         esac
@@ -135,7 +138,8 @@ gen() {
       [ -f "$BREVE/briefs/$TODAY.md.prev" ]   && mv -f "$BREVE/briefs/$TODAY.md.prev"   "$BREVE/briefs/$TODAY.md"
       [ -f "$BREVE/briefs/$TODAY.html.prev" ] && mv -f "$BREVE/briefs/$TODAY.html.prev" "$BREVE/briefs/$TODAY.html"
       # On-demand runs let the daemon relay (richer ask + latest-issue pointer); scheduled runs relay here.
-      [ -z "$BREVE_ONDEMAND" ] && bun "$BREVE/scripts/notify.ts" "⚠ I couldn't generate your brief — Claude, Gemini AND Codex all look unavailable this morning (very rare — could be your network or all three providers). Reply \"brief\" to retry." || true
+      [ -z "$BREVE_ONDEMAND" ] && bun "$BREVE/scripts/notify.ts" --idempotency-key "morning-generation-failure-$TODAY" \
+        "⚠ I couldn't generate your brief — Claude, Gemini AND Codex all look unavailable this morning (very rare — could be your network or all three providers). Reply \"brief\" to retry." || true
       echo "=== all providers exhausted — skipping downstream ==="
     fi
   fi
