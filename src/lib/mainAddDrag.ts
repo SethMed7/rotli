@@ -11,9 +11,8 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { MAIN_ROOT, addNoteToMain, type DropPos, moveInTree } from "../services/mainTree";
 import { useMainStore } from "../state/main";
-import { type DragGhost, createDragGhost } from "./dragGhost";
-
-const THRESHOLD_PX = 5;
+import { createDragGhost } from "./dragGhost";
+import { createPointerDragSession } from "./pointerDrag";
 
 /** Resolve the Main drop under a point: which row (`data-main-id`) and where
  * (before/after, or `into` a folder / the whole-Main zone). Null if not over Main.
@@ -44,11 +43,6 @@ export function commitMainAdd(noteId: string, drop: { id: string; pos: DropPos }
 /** Begin a possible Main-add drag from a row's pointerdown. `id` is the note or
  * board id to add. A plain click falls through; real travel starts the drag. */
 export function startMainAddDrag(event: ReactPointerEvent, id: string, label: string): void {
-  if (event.button !== 0) return;
-  const sx = event.clientX;
-  const sy = event.clientY;
-  let dragging = false;
-  let ghost: DragGhost | null = null;
   let drop: { id: string; pos: DropPos } | null = null;
   let hovered: HTMLElement | null = null;
 
@@ -57,62 +51,27 @@ export function startMainAddDrag(event: ReactPointerEvent, id: string, label: st
     hovered = null;
   };
 
-  const onMove = (ev: PointerEvent) => {
-    if (!dragging) {
-      if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < THRESHOLD_PX) return;
-      dragging = true;
-      ghost = createDragGhost(label, ev.clientX, ev.clientY);
-    }
-    ghost?.move(ev.clientX, ev.clientY);
-    const at = mainDropAt(ev.clientX, ev.clientY);
-    if (!at) {
-      drop = null;
-      clearHover();
-      return;
-    }
-    if (hovered !== at.el) {
-      clearHover();
-      hovered = at.el;
-      at.el.classList.add("main-dropover");
-    }
-    drop = { id: at.id, pos: at.pos };
-  };
-
-  const cleanup = () => {
-    window.removeEventListener("pointermove", onMove);
-    window.removeEventListener("pointerup", onUp);
-    window.removeEventListener("pointercancel", cleanup);
-    window.removeEventListener("keydown", onKey, true);
-    ghost?.destroy();
-    ghost = null;
-    clearHover();
-  };
-
-  const onUp = () => {
-    const was = dragging;
-    if (was && drop) commitMainAdd(id, drop);
-    cleanup();
-    if (was) {
-      // swallow the trailing click so the row doesn't also open on drop
-      const swallow = (ce: MouseEvent) => {
-        ce.stopPropagation();
-        ce.preventDefault();
-      };
-      window.addEventListener("click", swallow, { capture: true, once: true });
-      setTimeout(() => window.removeEventListener("click", swallow, true), 60);
-    }
-  };
-
-  const onKey = (ev: KeyboardEvent) => {
-    if (ev.key === "Escape") {
-      ev.preventDefault();
-      ev.stopPropagation();
-      cleanup();
-    }
-  };
-
-  window.addEventListener("pointermove", onMove);
-  window.addEventListener("pointerup", onUp);
-  window.addEventListener("pointercancel", cleanup);
-  window.addEventListener("keydown", onKey, true);
+  createPointerDragSession(event, {
+    ghost: (x, y) => createDragGhost(label, x, y),
+    onMove: (x, y) => {
+      const at = mainDropAt(x, y);
+      if (!at) {
+        drop = null;
+        clearHover();
+        return;
+      }
+      if (hovered !== at.el) {
+        clearHover();
+        hovered = at.el;
+        at.el.classList.add("main-dropover");
+      }
+      drop = { id: at.id, pos: at.pos };
+    },
+    onDrop: () => {
+      if (drop) commitMainAdd(id, drop);
+    },
+    onEnd: clearHover,
+    // swallow the trailing click so the row doesn't also open on drop
+    swallowClick: true,
+  });
 }
