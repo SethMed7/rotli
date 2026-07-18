@@ -12,16 +12,12 @@ export interface SheetTable {
   truncated: boolean;
 }
 
-export type WorkbookInput =
-  | { csv: string; delimiter?: string }
-  | { base64: string };
+export type WorkbookInput = { csv: string; delimiter?: string } | { base64: string };
 
 /** Parse a workbook from CSV/TSV text OR base64 bytes into plain string tables. */
 export async function parseWorkbook(input: WorkbookInput, maxRows = 2000): Promise<SheetTable[]> {
   if ("csv" in input) {
-    const raw = parseCsvExact(input.csv, input.delimiter ?? ",").filter((r) =>
-      r.some((c) => c !== ""),
-    );
+    const raw = parseCsvExact(input.csv, input.delimiter ?? ",").filter((r) => r.some((c) => c !== ""));
     return [
       {
         name: "Sheet1",

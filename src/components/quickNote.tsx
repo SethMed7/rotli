@@ -166,10 +166,7 @@ export function QuickNote() {
   // an image/pdf must never be pickable (corpus_read on one fails or renders
   // garbage). useNotes() alone missed staged notes (the search audit's P0).
   const universe = useSearchableNotes();
-  const notes = useMemo(
-    () => universe.notes.filter((n) => n.kind !== "board"),
-    [universe.notes],
-  );
+  const notes = useMemo(() => universe.notes.filter((n) => n.kind !== "board"), [universe.notes]);
   const byId = useMemo(() => new Map(notes.map((n) => [n.id, n])), [notes]);
   const [pickerOpen, setPickerOpen] = useState(false);
   // a failed new-note create, surfaced in the window (#6 — never silent)
@@ -253,8 +250,7 @@ export function QuickNote() {
     // a stored quickFolder pointing at any of those (a stale Settings pick)
     // redirects to the local Inbox instead of leaving ⌥Q dead (#6, audit 2026-07).
     const stored = useUiStore.getState().quickFolder;
-    const folder =
-      isVault(stored) || isWikiPath(stored) || isChatsPath(stored) ? inboxFolderId : stored;
+    const folder = isVault(stored) || isWikiPath(stored) || isChatsPath(stored) ? inboxFolderId : stored;
     creatingRef.current = true;
     void createRoutedNote({
       selectedFolderId: folder,
@@ -320,7 +316,17 @@ export function QuickNote() {
               onClick={openPicker}
             >
               <span className="quick-pick-name">{activeTitle}</span>
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="13"
+                height="13"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </button>

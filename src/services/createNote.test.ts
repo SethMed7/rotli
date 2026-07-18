@@ -10,7 +10,10 @@ const FALLBACK = "Inbox";
 describe("routeDecision (memex-vs-local)", () => {
   test("no writable memex ⇒ always local", () => {
     expect(routeDecision("All notes", true, false, FALLBACK)).toEqual({ kind: "local", folder: FALLBACK });
-    expect(routeDecision("Storage/Work", false, false, FALLBACK)).toEqual({ kind: "local", folder: "Storage/Work" });
+    expect(routeDecision("Storage/Work", false, false, FALLBACK)).toEqual({
+      kind: "local",
+      folder: "Storage/Work",
+    });
     // a vault selection with no writable memex still can't write the memex ⇒ local inbox
     expect(routeDecision("vault:Inbox", false, false, FALLBACK)).toEqual({ kind: "local", folder: FALLBACK });
   });
@@ -35,7 +38,10 @@ describe("routeDecision (memex-vs-local)", () => {
   });
 
   test("an EXPLICIT local folder is ALWAYS respected, even with a writable memex", () => {
-    expect(routeDecision("Storage/Work", false, true, FALLBACK)).toEqual({ kind: "local", folder: "Storage/Work" });
+    expect(routeDecision("Storage/Work", false, true, FALLBACK)).toEqual({
+      kind: "local",
+      folder: "Storage/Work",
+    });
     expect(routeDecision("Inbox", false, true, FALLBACK)).toEqual({ kind: "local", folder: "Inbox" });
   });
 

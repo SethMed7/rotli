@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { NoteSummary } from "../types";
-import {
-  buildTitleCounts,
-  buildWikilinkIndex,
-  resolveWikilink,
-  wikilinkLabel,
-} from "./wikilink";
+import { buildTitleCounts, buildWikilinkIndex, resolveWikilink, wikilinkLabel } from "./wikilink";
 import { filterSlashItems, slashQueryAtCaret } from "./slashMenu";
 
 const note = (id: string, title: string): NoteSummary => ({

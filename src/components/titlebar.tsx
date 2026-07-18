@@ -18,14 +18,7 @@ import { Icon } from "./icon";
 import { IconButton } from "./iconButton";
 import { QuokkaMark } from "./character";
 import { canBack, canForward, useNavHistory } from "../state/navHistory";
-import {
-  ChevronRight,
-  PlusGlyph,
-  SidebarGlyph,
-  SplitDownGlyph,
-  SplitRightGlyph,
-  SunGlyph,
-} from "./glyphs";
+import { ChevronRight, PlusGlyph, SidebarGlyph, SplitDownGlyph, SplitRightGlyph, SunGlyph } from "./glyphs";
 
 /** One size for every titlebar icon so the bar reads as one cohesive row
  * (Seth, 2026-06-15). */
@@ -59,11 +52,7 @@ export function Titlebar() {
 
   return (
     <header className="titlebar">
-      <div
-        className="tb-inset"
-        onMouseDown={onDragRegionMouseDown}
-        onDoubleClick={onDragRegionDoubleClick}
-      />
+      <div className="tb-inset" onMouseDown={onDragRegionMouseDown} onDoubleClick={onDragRegionDoubleClick} />
       {/* always-visible sidebar toggle (Seth, 2026-06-15): the clear way to
           reopen a collapsed left menu — replaces the subtle warm-edge strip.
           .tb-lead left-aligns its tooltip so the label never clips off-window. */}
@@ -91,38 +80,36 @@ export function Titlebar() {
           place of the search glyph (Seth, 2026-07-07). Opens the ⌘K palette. The
           surrounding strip stays a window-drag region; the button stops its own
           mousedown so a click never starts a drag. */}
-      <div
-        className="tb-mid"
-        onMouseDown={onDragRegionMouseDown}
-        onDoubleClick={onDragRegionDoubleClick}
-      >
+      <div className="tb-mid" onMouseDown={onDragRegionMouseDown} onDoubleClick={onDragRegionDoubleClick}>
         {!settingsOpen && (
           <>
             {/* ‹ › — walk the opened-notes trail (Seth #14; ⌘[ / ⌘]) */}
-            {!breveActive && <>
-            <button
-              type="button"
-              className="tb-nav"
-              aria-label="Back — previous note (⌘[)"
-              title="Back — previous note ⌘["
-              disabled={!navBack}
-              onMouseDown={(event) => event.stopPropagation()}
-              onClick={() => dispatch("nav.back")}
-            >
-              <ChevronRight size={12} className="tb-nav-back" />
-            </button>
-            <button
-              type="button"
-              className="tb-nav"
-              aria-label="Forward — next note (⌘])"
-              title="Forward — next note ⌘]"
-              disabled={!navForward}
-              onMouseDown={(event) => event.stopPropagation()}
-              onClick={() => dispatch("nav.forward")}
-            >
-              <ChevronRight size={12} />
-            </button>
-            </>}
+            {!breveActive && (
+              <>
+                <button
+                  type="button"
+                  className="tb-nav"
+                  aria-label="Back — previous note (⌘[)"
+                  title="Back — previous note ⌘["
+                  disabled={!navBack}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onClick={() => dispatch("nav.back")}
+                >
+                  <ChevronRight size={12} className="tb-nav-back" />
+                </button>
+                <button
+                  type="button"
+                  className="tb-nav"
+                  aria-label="Forward — next note (⌘])"
+                  title="Forward — next note ⌘]"
+                  disabled={!navForward}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onClick={() => dispatch("nav.forward")}
+                >
+                  <ChevronRight size={12} />
+                </button>
+              </>
+            )}
             <button
               type="button"
               className="tb-search"
@@ -143,24 +130,15 @@ export function Titlebar() {
         {/* panes & tabs, visible (Seth 2026-06-12: keyboard-only is not discoverable) */}
         {!settingsOpen && !breveActive && (
           <>
-            <IconButton
-              label="New… — ⌘T creates your default"
-              onClick={openNewItemMenu}
-            >
+            <IconButton label="New… — ⌘T creates your default" onClick={openNewItemMenu}>
               <PlusGlyph size={TB_ICON} />
             </IconButton>
             {/* two distinct split buttons (Seth, 2026-06-13): right = vertical
                 divider (columns), down = horizontal divider (rows) */}
-            <IconButton
-              label="Split right — ⌘D"
-              onClick={() => dispatch("panes.splitRight")}
-            >
+            <IconButton label="Split right — ⌘D" onClick={() => dispatch("panes.splitRight")}>
               <SplitRightGlyph size={TB_ICON} />
             </IconButton>
-            <IconButton
-              label="Split down — ⌘⇧D"
-              onClick={() => dispatch("panes.splitDown")}
-            >
+            <IconButton label="Split down — ⌘⇧D" onClick={() => dispatch("panes.splitDown")}>
               <SplitDownGlyph size={TB_ICON} />
             </IconButton>
             <span className="tb-sep" aria-hidden="true" />

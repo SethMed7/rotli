@@ -49,7 +49,8 @@ export function contextWindowFor(model: ModelMeta): number {
     return 200_000;
   }
   if (id.includes("gemma-3") || id.includes("gemma3") || id.includes("gemma4")) return 128_000;
-  if (id.includes("qwen2.5") || id.includes("qwen3") || id.includes("1.5b") || id.includes("3b")) return 32_000;
+  if (id.includes("qwen2.5") || id.includes("qwen3") || id.includes("1.5b") || id.includes("3b"))
+    return 32_000;
   return 8_000;
 }
 

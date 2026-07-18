@@ -80,9 +80,6 @@ export function searchMatch(
  * exact Rust `sort_hits` order. Returns a new array. */
 export function sortHits(hits: SearchHit[]): SearchHit[] {
   return [...hits].sort(
-    (a, b) =>
-      a.rank - b.rank ||
-      b.updatedAt - a.updatedAt ||
-      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    (a, b) => a.rank - b.rank || b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
 }

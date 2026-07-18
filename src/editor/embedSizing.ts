@@ -24,10 +24,7 @@ export function createEmbedSizeState(height = EMBED_DEFAULT_HEIGHT): EmbedSizeSt
   return { height: safeHeight, collapsedHeight: safeHeight, expanded: false };
 }
 
-export function toggleEmbedExpanded(
-  state: EmbedSizeState,
-  viewportHeight: number,
-): EmbedSizeState {
+export function toggleEmbedExpanded(state: EmbedSizeState, viewportHeight: number): EmbedSizeState {
   if (state.expanded) {
     const height = clampEmbedHeight(state.collapsedHeight, viewportHeight);
     return { height, collapsedHeight: height, expanded: false };
@@ -39,19 +36,12 @@ export function toggleEmbedExpanded(
   };
 }
 
-export function resizeEmbed(
-  state: EmbedSizeState,
-  height: number,
-  viewportHeight: number,
-): EmbedSizeState {
+export function resizeEmbed(state: EmbedSizeState, height: number, viewportHeight: number): EmbedSizeState {
   const nextHeight = clampEmbedHeight(height, viewportHeight);
   return { ...state, height: nextHeight, collapsedHeight: nextHeight, expanded: false };
 }
 
-export function fitExpandedEmbed(
-  state: EmbedSizeState,
-  viewportHeight: number,
-): EmbedSizeState {
+export function fitExpandedEmbed(state: EmbedSizeState, viewportHeight: number): EmbedSizeState {
   if (!state.expanded) return state;
   return { ...state, height: embedHeightLimit(viewportHeight) };
 }

@@ -60,9 +60,7 @@ export function CaptureCard() {
     } else {
       // browser review: save through the local service (onto the Board)
       setText("");
-      void notesService
-        .createNote(DEST.board, body, { secure: true })
-        .then(() => invalidateNotes());
+      void notesService.createNote(DEST.board, body, { secure: true }).then(() => invalidateNotes());
     }
   };
 

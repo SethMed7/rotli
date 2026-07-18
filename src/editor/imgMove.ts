@@ -19,11 +19,7 @@ export type DropTarget = number | "end";
 /** Snap an insertion point out of an opaque block (table / fenced code) — a
  * line inserted mid-block would corrupt it, so the target moves to the block's
  * nearest edge. `target` must be a line-start offset. */
-export function snapOutOfBlocks(
-  target: number,
-  blocks: LineSpan[],
-  docLength: number,
-): DropTarget {
+export function snapOutOfBlocks(target: number, blocks: LineSpan[], docLength: number): DropTarget {
   for (const b of blocks) {
     // a line-start strictly inside the block (b.from itself = "before" = fine)
     if (target > b.from && target <= b.to) {

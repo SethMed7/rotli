@@ -48,8 +48,11 @@ describe("DOCX editor codec", () => {
       style: { bold: true, fontFamily: "Aptos", fontSize: 18 },
     });
     const reopenedTable = reopened.document.content.find((content) => content.kind === "table");
-    expect(reopenedTable?.kind === "table" ? reopenedTable.table.rows[1]?.cells[1]?.paragraphs[0]?.runs[0]?.text : undefined)
-      .toBe("Edited table");
+    expect(
+      reopenedTable?.kind === "table"
+        ? reopenedTable.table.rows[1]?.cells[1]?.paragraphs[0]?.runs[0]?.text
+        : undefined,
+    ).toBe("Edited table");
   });
 
   test("decodes Word tables as native editable document content", async () => {
@@ -62,10 +65,14 @@ describe("DOCX editor codec", () => {
         kind: "table",
         table: {
           id: "table-1",
-          rows: [{ cells: [
-            { paragraphs: [{ runs: [{ text: "A" }] }] },
-            { paragraphs: [{ runs: [{ text: "B" }] }] },
-          ] }],
+          rows: [
+            {
+              cells: [
+                { paragraphs: [{ runs: [{ text: "A" }] }] },
+                { paragraphs: [{ runs: [{ text: "B" }] }] },
+              ],
+            },
+          ],
         },
       },
     ]);
@@ -126,7 +133,10 @@ describe("DOCX editor codec", () => {
     if (!xml) throw new Error("fixture has no document.xml");
     const object = '<w:r><w:object><w:control xmlns:w="urn:test"/></w:object></w:r>';
     zip.file("word/document.xml", xml.replace("Original</w:t></w:r>", `Original</w:t></w:r>${object}`));
-    const decoded = await decodeDocx(await zip.generateAsync({ type: "base64" }), "storage/rotli/insert.docx");
+    const decoded = await decodeDocx(
+      await zip.generateAsync({ type: "base64" }),
+      "storage/rotli/insert.docx",
+    );
     decoded.document.content.unshift({
       kind: "table",
       table: {

@@ -78,16 +78,12 @@ export class FsNotesService implements NotesService {
     // Asking for a hidden root (Archive/Trash) is the ONLY way to see it:
     // scope to that root's subtree and nothing leaks elsewhere.
     if (isHidden(folderId)) {
-      return notes.filter(
-        (n) => n.folderId === folderId || n.folderId.startsWith(`${folderId}/`),
-      );
+      return notes.filter((n) => n.folderId === folderId || n.folderId.startsWith(`${folderId}/`));
     }
     // Any normal folder: everything under it, minus hidden (defensive — a note
     // can't sit under both, but the exclusion is the single source of truth).
     return notes.filter(
-      (n) =>
-        !isHidden(n.folderId) &&
-        (n.folderId === folderId || n.folderId.startsWith(`${folderId}/`)),
+      (n) => !isHidden(n.folderId) && (n.folderId === folderId || n.folderId.startsWith(`${folderId}/`)),
     );
   }
 

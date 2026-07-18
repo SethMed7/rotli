@@ -6,13 +6,7 @@
 // 5-region split-detach overlay: drop on the center to move the tab here, on
 // an edge band to carve a split. Splits/focus/tabs/drag all live in the store.
 
-import {
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-  Suspense,
-  lazy,
-  useRef,
-} from "react";
+import { type PointerEvent as ReactPointerEvent, type ReactNode, Suspense, lazy, useRef } from "react";
 import { EditorSurface } from "../editor/editorSurface";
 import { ChatSurface } from "./chatSurface";
 import { ActivitySurface } from "./activitySurface";
@@ -24,9 +18,7 @@ import { TabStrip } from "./tabStrip";
 // Excalidraw is heavy (~3.5MB with its mermaid/katex deps) and most sessions
 // never open a board — code-split it so it loads only when a canvas tab mounts,
 // keeping the main bundle lean (Seth, 2026-06-24).
-const CanvasSurface = lazy(() =>
-  import("./canvasSurface").then((m) => ({ default: m.CanvasSurface })),
-);
+const CanvasSurface = lazy(() => import("./canvasSurface").then((m) => ({ default: m.CanvasSurface })));
 
 function LeafView({ node }: { node: LeafNode }) {
   const focusedPaneId = usePanesStore((s) => s.focusedPaneId);
@@ -48,20 +40,14 @@ function LeafView({ node }: { node: LeafNode }) {
           never bleeds from the previously active tab. data-pane-body lets the
           pointer-drag controller (lib/tabDrag) find this leaf via elementFromPoint. */}
       <div className="pane-body" data-pane-body data-leaf-id={node.id}>
-        {tab.surfaceKind === "note" && (
-          <EditorSurface key={tab.id} paneId={node.id} noteId={tab.noteId} />
-        )}
+        {tab.surfaceKind === "note" && <EditorSurface key={tab.id} paneId={node.id} noteId={tab.noteId} />}
         {tab.surfaceKind === "canvas" && (
           <Suspense fallback={<div className="canvas-surface" />}>
             <CanvasSurface key={tab.id} paneId={node.id} boardId={tab.boardId} />
           </Suspense>
         )}
-        {tab.surfaceKind === "chat" && (
-          <ChatSurface key={tab.id} paneId={node.id} chatSlug={tab.chatSlug} />
-        )}
-        {tab.surfaceKind === "file" && (
-          <FileSurface key={tab.id} paneId={node.id} fileId={tab.fileId} />
-        )}
+        {tab.surfaceKind === "chat" && <ChatSurface key={tab.id} paneId={node.id} chatSlug={tab.chatSlug} />}
+        {tab.surfaceKind === "file" && <FileSurface key={tab.id} paneId={node.id} fileId={tab.fileId} />}
         {tab.surfaceKind === "activity" && <ActivitySurface key={tab.id} />}
         {/* split-detach preview — mounted only mid-drag, pointer-events:none
             (the controller hit-tests the pane body, not this overlay) */}

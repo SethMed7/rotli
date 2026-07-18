@@ -16,10 +16,7 @@ import {
   webFetch as tauriWebFetch,
   webSearch as tauriWebSearch,
 } from "../lib/tauri";
-import {
-  SHEET_BIN,
-  SHEET_TEXT,
-} from "../sheets/kinds";
+import { SHEET_BIN, SHEET_TEXT } from "../sheets/kinds";
 import { extOf } from "../lib/fileKind";
 import { workbookToCsv } from "../sheets/view";
 import { rankNotes } from "./tools";
@@ -116,9 +113,11 @@ export function makeTauriHost(
       // (and a search error) still answer from the listing.
       try {
         const hits = await corpusSearch(query, limit);
-        const readable = await aiReadableHits(hits.filter((hit) => hit.kind === "note"), model);
-        return readable
-          .map((h) => ({ id: h.id, title: h.title, snippet: h.snippet, folder: h.folderId }));
+        const readable = await aiReadableHits(
+          hits.filter((hit) => hit.kind === "note"),
+          model,
+        );
+        return readable.map((h) => ({ id: h.id, title: h.title, snippet: h.snippet, folder: h.folderId }));
       } catch {
         const { notes } = await corpusList();
         const ranked = rankNotes(notes, query, limit);
@@ -132,20 +131,17 @@ export function makeTauriHost(
     },
     async searchMemory(query, limit) {
       const queries = [query, ...memoryKeywords(query)].slice(0, 7);
-      const noteResults = await Promise.all(
-        queries.map((part) => corpusSearch(part, limit).catch(() => [])),
-      );
+      const noteResults = await Promise.all(queries.map((part) => corpusSearch(part, limit).catch(() => [])));
       const readableNoteHits = await aiReadableHits(
         mergeKeywordHits(noteResults).filter((hit) => hit.kind === "note"),
         model,
       );
-      const noteHits = readableNoteHits
-        .map((hit) => ({
-          id: hit.id,
-          title: hit.title,
-          snippet: hit.snippet,
-          source: "note" as const,
-        }));
+      const noteHits = readableNoteHits.map((hit) => ({
+        id: hit.id,
+        title: hit.title,
+        snippet: hit.snippet,
+        source: "note" as const,
+      }));
       const instance = activeInstance(await loadConfig());
       if (!instance) return noteHits.slice(0, limit);
       const summaries = (await listChats(instance)).slice(0, 100);
@@ -153,11 +149,8 @@ export function makeTauriHost(
         summaries.map(async (summary) => ({
           slug: summary.slug,
           title: summary.title,
-          body: await cachedChatBody(
-            instance.root,
-            summary.slug,
-            summary.modifiedMs,
-            () => readMemexChat(instance, summary.slug),
+          body: await cachedChatBody(instance.root, summary.slug, summary.modifiedMs, () =>
+            readMemexChat(instance, summary.slug),
           ),
           modifiedMs: summary.modifiedMs,
         })),
@@ -188,7 +181,10 @@ export function makeTauriHost(
     },
     async readFile(query) {
       const { notes } = await corpusList();
-      const q = query.toLowerCase().trim().replace(/^["']|["']$/g, "");
+      const q = query
+        .toLowerCase()
+        .trim()
+        .replace(/^["']|["']$/g, "");
       const files = notes.filter((n) => n.kind === "file");
       const file =
         files.find((n) => n.title.toLowerCase() === q) ??

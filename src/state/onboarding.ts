@@ -19,10 +19,9 @@ export async function resetAndReonboard(): Promise<void> {
   useBindingsStore.setState({ overrides: {} });
   for (const action of allActions()) {
     if (!action.global) continue;
-    await setGlobalShortcut(
-      action.id,
-      action.defaultChord ? toAccelerator(action.defaultChord) : null,
-    ).catch(() => {});
+    await setGlobalShortcut(action.id, action.defaultChord ? toAccelerator(action.defaultChord) : null).catch(
+      () => {},
+    );
   }
 
   // window behavior + Dock → defaults (visitor, menu-bar-only)

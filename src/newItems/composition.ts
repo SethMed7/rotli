@@ -3,12 +3,7 @@ import { invalidateMemex } from "../memex/useMemex";
 import { createRoutedNote } from "../services/createNote";
 import { DEST, isHidden, isVault } from "../services/destinations";
 import { invalidateNotes } from "../services/hooks";
-import {
-  MAIN_ROOT,
-  addNoteToMainAt,
-  mainFolderIds,
-  mainParentOfNote,
-} from "../services/mainTree";
+import { MAIN_ROOT, addNoteToMainAt, mainFolderIds, mainParentOfNote } from "../services/mainTree";
 import { inboxFolderId } from "../services/notes";
 import { useMainStore } from "../state/main";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";

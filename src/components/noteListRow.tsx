@@ -44,9 +44,7 @@ export function NoteListRow({
         title={board ? "Open board" : file ? "Open file" : "Open note"}
       >
         {glyphForNote(note, { size: 14, className: "rr-icon" })}
-        <span className="rr-title">
-          {note.title || (board ? "Untitled board" : "Empty note")}
-        </span>
+        <span className="rr-title">{note.title || (board ? "Untitled board" : "Empty note")}</span>
         {snippetNode ? (
           <span className="rr-snippet">{snippetNode}</span>
         ) : (

@@ -43,11 +43,7 @@ export function buildIndex(notes: ModelMapNote[], maxChars = 3500): string {
 
 /** A bounded, model-specific table of contents generated on demand. Nothing is
  * duplicated on disk: every run projects the current memex and its priorities. */
-export function buildModelMap(
-  notes: ModelMapNote[],
-  contextWindow: number,
-  maxChars = 3500,
-): string {
+export function buildModelMap(notes: ModelMapNote[], contextWindow: number, maxChars = 3500): string {
   return buildMap(notes, modelMapPolicy(contextWindow), maxChars);
 }
 
@@ -65,8 +61,9 @@ function buildMap(notes: ModelMapNote[], policy: ModelMapPolicy, maxChars: numbe
 
   if (policy.profile === "expansive") {
     const full = entries
-      .map(([area, areaNotes]) =>
-        `## ${area}\n${areaNotes.map((note) => `- ${note.pinned ? "★ " : ""}${note.title}  {id: ${note.id}}`).join("\n")}`,
+      .map(
+        ([area, areaNotes]) =>
+          `## ${area}\n${areaNotes.map((note) => `- ${note.pinned ? "★ " : ""}${note.title}  {id: ${note.id}}`).join("\n")}`,
       )
       .join("\n\n");
     if (full.length <= maxChars) return full;

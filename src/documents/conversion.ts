@@ -8,10 +8,7 @@ export interface LocalDocumentConverter {
 /** Application workflow for legacy local documents. The host performs the
  * conversion; this layer owns the honest format gate and never overwrites the
  * source file. */
-export async function convertLegacyDocument(
-  converter: LocalDocumentConverter,
-  id: string,
-): Promise<string> {
+export async function convertLegacyDocument(converter: LocalDocumentConverter, id: string): Promise<string> {
   const ext = extOf(fileName(id));
   if (!DOCUMENT_CONVERTIBLE.has(ext)) {
     throw new Error(`.${ext || "unknown"} does not have a faithful local DOCX conversion path`);

@@ -93,7 +93,10 @@ export const slugify = (s: string): string =>
 
 // ── contract-version handshake (mirror mounts.ts verNum/requireContract) ─────
 const verNum = (v: string): number =>
-  v.split(".").map(Number).reduce((a, n, i) => a + n / Math.pow(1000, i), 0);
+  v
+    .split(".")
+    .map(Number)
+    .reduce((a, n, i) => a + n / Math.pow(1000, i), 0);
 
 /** Whether a brain's contract is within the band rotli supports (inclusive).
  *  Out of range ⇒ the caller opens the brain READ-ONLY (never silently writes a
@@ -140,9 +143,7 @@ export const isMemexId = (id: string | null | undefined): boolean =>
 // ── the chats surface (byte-identical to conversations.ts writeChat) ─────────
 function assertChatSource(source: string): void {
   if (!(CHAT_SOURCES as readonly string[]).includes(source)) {
-    throw new Error(
-      `chat source "${source}" not allowed on the chats surface (${CHAT_SOURCES.join("/")})`,
-    );
+    throw new Error(`chat source "${source}" not allowed on the chats surface (${CHAT_SOURCES.join("/")})`);
   }
 }
 
@@ -210,9 +211,7 @@ export function setAttachedTo(contents: string, stem: string): string {
   const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
   if (!fm || fm[1] === undefined) return contents; // no frontmatter — leave the file alone
   const block = fm[1];
-  const next = /^attachedTo:.*$/m.test(block)
-    ? block.replace(/^attachedTo:.*$/m, line)
-    : `${block}\n${line}`;
+  const next = /^attachedTo:.*$/m.test(block) ? block.replace(/^attachedTo:.*$/m, line) : `${block}\n${line}`;
   return `${contents.slice(0, fm.index)}---\n${next}\n---${contents.slice(fm.index + fm[0].length)}`;
 }
 
@@ -239,7 +238,6 @@ export function ensureChatBacklink(noteBody: string, slug: string): string {
     ? noteBody.replace(/(\n## Chat\b[^\n]*\n)/, `$1- [[${slug}]]\n`)
     : noteBody.replace(/\s*$/, "") + `\n\n## Chat\n- [[${slug}]]\n`;
 }
-
 
 // ── the note surface (v3.5 note contract — wiki/_inbox staging) ───────────────
 // A rotli note is a plain-markdown body the user owns, wrapped in the v3.5 frontmatter
@@ -403,10 +401,7 @@ export function canFile(relPath: string): boolean {
  * be in the brain's area vocabulary. The organizer continues to skip secure
  * notes entirely. Interactive local retrieval has its own explicit-permission
  * gate at the corpus read boundary; remote retrieval can never cross it. */
-export function mayFile(
-  fm: { locked?: boolean; area?: string },
-  areaVocab: readonly string[],
-): boolean {
+export function mayFile(fm: { locked?: boolean; area?: string }, areaVocab: readonly string[]): boolean {
   if (fm.locked) return false;
   if (fm.area && !areaVocab.includes(fm.area)) return false;
   return true;

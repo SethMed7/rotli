@@ -28,7 +28,17 @@ import { SOLID_THEMES, type ThemeFamily, useUiStore } from "../state/ui";
 
 // Appearance FIRST (right after the greeting) so you pick a theme before walking the
 // rest of setup — never trudge through the flow in a theme that hurts your eyes (Seth).
-const STEPS = ["welcome", "appearance", "name", "hotkeys", "dock", "behavior", "memory", "models", "done"] as const;
+const STEPS = [
+  "welcome",
+  "appearance",
+  "name",
+  "hotkeys",
+  "dock",
+  "behavior",
+  "memory",
+  "models",
+  "done",
+] as const;
 type Step = (typeof STEPS)[number];
 
 const GLOBAL_HOTKEYS: { id: string; label: string; hint: string }[] = [
@@ -194,9 +204,7 @@ function MemexStep() {
   // 2026-07-03). Compare path-normalized (tolerate a trailing slash).
   const samePath = (a: string | null, b: string | null): boolean =>
     !!a && !!b && a.replace(/\/+$/, "") === b.replace(/\/+$/, "");
-  const found = (detect.data ?? []).filter(
-    (d) => d.kind === "memex" && !samePath(d.root, currentRoot),
-  );
+  const found = (detect.data ?? []).filter((d) => d.kind === "memex" && !samePath(d.root, currentRoot));
   const isKeep = pending?.kind === "keep";
   const isUse = (root: string) => pending?.kind === "use" && pending.path === root;
   const isInit = pending?.kind === "init";
@@ -220,9 +228,8 @@ function MemexStep() {
     <div className="onb-step">
       <h1 className="onb-title">Your brain</h1>
       <p className="onb-sub">
-        rotli keeps your notes in <b>one folder</b> — and that folder is your <b>brain</b> (a memex):
-        notes, chats, and knowledge together, organized by AI but always yours to arrange. Pick where
-        it lives.
+        rotli keeps your notes in <b>one folder</b> — and that folder is your <b>brain</b> (a memex): notes,
+        chats, and knowledge together, organized by AI but always yours to arrange. Pick where it lives.
       </p>
       {detect.isLoading ? (
         <p className="onb-sub">Looking for an existing brain…</p>
@@ -267,9 +274,7 @@ function MemexStep() {
           >
             <span className="onb-choice-title">Create a new brain…</span>
             <span className="onb-choice-desc">
-              {isInit && pending?.path
-                ? pending.path
-                : "Choose a folder — rotli starts a fresh memex there."}
+              {isInit && pending?.path ? pending.path : "Choose a folder — rotli starts a fresh memex there."}
             </span>
           </button>
           <button
@@ -280,8 +285,7 @@ function MemexStep() {
           >
             <span className="onb-choice-title">Use a plain folder…</span>
             <span className="onb-choice-desc">
-              {plainPath ??
-                "Choose a folder — rotli uses the .md files there as-is (make it a brain later)."}
+              {plainPath ?? "Choose a folder — rotli uses the .md files there as-is (make it a brain later)."}
             </span>
           </button>
         </div>
@@ -310,8 +314,7 @@ function ModelsStep() {
 
   const progress = useQuery({
     queryKey: ["onb-install", starter?.name],
-    queryFn: () =>
-      installing && starter ? localModelInstallProgress(starter.name) : Promise.resolve(null),
+    queryFn: () => (installing && starter ? localModelInstallProgress(starter.name) : Promise.resolve(null)),
     enabled: installing && !!starter,
     refetchInterval: 1000,
   });
@@ -343,11 +346,8 @@ function ModelsStep() {
     <div className="onb-step">
       <h1 className="onb-title">Its mind</h1>
       <p className="onb-sub">
-        rotli’s chat runs a model right on your Mac — private, no account, nothing leaves your
-        machine.{" "}
-        {ready
-          ? "You’re all set."
-          : "Grab a small one to start, or connect a subscription later."}
+        rotli’s chat runs a model right on your Mac — private, no account, nothing leaves your machine.{" "}
+        {ready ? "You’re all set." : "Grab a small one to start, or connect a subscription later."}
       </p>
 
       {ready ? (
@@ -384,8 +384,8 @@ function ModelsStep() {
 
       {err && <p className="onb-sub small onb-model-err">{err}</p>}
       <p className="onb-sub small">
-        Prefer your own subscription? Connect Claude, ChatGPT, or Gemini any time in Settings → AI
-        Models — you can skip this and set it up later.
+        Prefer your own subscription? Connect Claude, ChatGPT, or Gemini any time in Settings → AI Models —
+        you can skip this and set it up later.
       </p>
     </div>
   );
@@ -431,9 +431,9 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             <Character name="waving" size={132} className="onb-mark" />
             <h1 className="onb-title">Welcome to rotli</h1>
             <p className="onb-sub">
-              A warm, local-first notes app that lives in your menu bar. Let’s set up the few
-              things that make it yours — your shortcuts, where it lives, and how it looks. Two
-              minutes, and everything here is changeable later in Settings.
+              A warm, local-first notes app that lives in your menu bar. Let’s set up the few things that make
+              it yours — your shortcuts, where it lives, and how it looks. Two minutes, and everything here is
+              changeable later in Settings.
             </p>
           </div>
         )}
@@ -442,8 +442,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           <div className="onb-step">
             <h1 className="onb-title">Your shortcuts</h1>
             <p className="onb-sub">
-              These three work from anywhere on your Mac. Keep the defaults, or click a chord and
-              press your own.
+              These three work from anywhere on your Mac. Keep the defaults, or click a chord and press your
+              own.
             </p>
             <div className="onb-hks">
               {GLOBAL_HOTKEYS.map((h) => (
@@ -457,8 +457,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           <div className="onb-step">
             <h1 className="onb-title">Where rotli lives</h1>
             <p className="onb-sub">
-              The menu-bar icon stays either way — this is just whether rotli also gets a Dock
-              icon and a ⌘Tab entry.
+              The menu-bar icon stays either way — this is just whether rotli also gets a Dock icon and a ⌘Tab
+              entry.
             </p>
             <Choice
               value={showInDock ? "dock" : "menu"}
@@ -506,8 +506,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           <div className="onb-step">
             <h1 className="onb-title">Pick a look</h1>
             <p className="onb-sub">
-              Four base themes — the titlebar sun cycles between them. Pick the one that feels
-              right; you can change it any time in Settings.
+              Four base themes — the titlebar sun cycles between them. Pick the one that feels right; you can
+              change it any time in Settings.
             </p>
             <div className="famrow">
               {SOLID_THEMES.map(({ family, mode, label }) => {
@@ -541,9 +541,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           <div className="onb-step">
             <h1 className="onb-title">What should rotli call you?</h1>
             <p className="onb-sub">
-              Chat uses your name to talk to you like a person. It stays on this Mac — saved into
-              your own settings file, never sent anywhere. Optional; change it any time in
-              Settings → General.
+              Chat uses your name to talk to you like a person. It stays on this Mac — saved into your own
+              settings file, never sent anywhere. Optional; change it any time in Settings → General.
             </p>
             <input
               className="onb-name"
@@ -570,9 +569,9 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             <Character name="celebrating" size={132} className="onb-mark" />
             <h1 className="onb-title">You’re set</h1>
             <p className="onb-sub">
-              Press your <b>Open</b> shortcut any time to summon rotli, and <b>Quick capture</b> to
-              jot without breaking stride. Hold <kbd>⌘</kbd> in the window to see every shortcut.
-              Change anything in Settings (<kbd>⌘,</kbd>).
+              Press your <b>Open</b> shortcut any time to summon rotli, and <b>Quick capture</b> to jot
+              without breaking stride. Hold <kbd>⌘</kbd> in the window to see every shortcut. Change anything
+              in Settings (<kbd>⌘,</kbd>).
             </p>
           </div>
         )}

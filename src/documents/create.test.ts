@@ -10,14 +10,23 @@ describe("local DOCX creation", () => {
     const base64 = await createDocxBase64({
       title: "Rotli document",
       subtitle: "Local and portable",
-      blocks: [{ kind: "heading", level: 2, text: "Workflow" }, { kind: "paragraph", text: "Embedded in a note." }],
-      table: [["Action", "Result"], ["Zoom in", "Stay in the note"]],
+      blocks: [
+        { kind: "heading", level: 2, text: "Workflow" },
+        { kind: "paragraph", text: "Embedded in a note." },
+      ],
+      table: [
+        ["Action", "Result"],
+        ["Zoom in", "Stay in the note"],
+      ],
     });
     const result = await decodeDocx(base64, "storage/rotli/example.docx");
-    expect(result.document.content
-      .filter((content) => content.kind === "paragraph")
-      .map((content) => content.kind === "paragraph" ? content.paragraph.runs.map((run) => run.text).join("") : ""))
-      .toEqual(["Rotli document", "Local and portable", "Workflow", "Embedded in a note."]);
+    expect(
+      result.document.content
+        .filter((content) => content.kind === "paragraph")
+        .map((content) =>
+          content.kind === "paragraph" ? content.paragraph.runs.map((run) => run.text).join("") : "",
+        ),
+    ).toEqual(["Rotli document", "Local and portable", "Workflow", "Embedded in a note."]);
     expect(result.document.content.some((content) => content.kind === "table")).toBe(true);
     expect(result.warnings).toEqual([]);
   });

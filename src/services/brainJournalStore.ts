@@ -22,9 +22,7 @@ export async function readJournal(): Promise<BrainAction[]> {
     });
 }
 
-export async function logAction(
-  action: Omit<BrainAction, "id" | "ts" | "status">,
-): Promise<BrainAction> {
+export async function logAction(action: Omit<BrainAction, "id" | "ts" | "status">): Promise<BrainAction> {
   const ts = Date.now();
   const entry: BrainAction = { ...action, id: actionId(ts), ts, status: "applied" };
   await corpusJournalAppend(JSON.stringify(entry));

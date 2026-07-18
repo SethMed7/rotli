@@ -1,14 +1,7 @@
 import type { ComponentType, KeyboardEvent } from "react";
 import type { BreveView } from "../../state/ui";
 import { useUiStore } from "../../state/ui";
-import {
-  ClockGlyph,
-  CloudGlyph,
-  CoffeeGlyph,
-  EyeGlyph,
-  FileGlyph,
-  MailGlyph,
-} from "../glyphs";
+import { ClockGlyph, CloudGlyph, CoffeeGlyph, EyeGlyph, FileGlyph, MailGlyph } from "../glyphs";
 import { useBreveSnapshot } from "./useBreve";
 
 type NavItem = {
@@ -42,10 +35,10 @@ export function BreveSidebar({ zoom }: { zoom: number }) {
     : snapshot.scheduler === "rotli"
       ? "Managed by Rotli"
       : snapshot.source === "legacy"
-      ? "Legacy active"
-      : snapshot.source === "rotli"
-        ? "Imported"
-        : "Not configured";
+        ? "Legacy active"
+        : snapshot.source === "rotli"
+          ? "Imported"
+          : "Not configured";
 
   const onNavKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
@@ -54,11 +47,12 @@ export function BreveSidebar({ zoom }: { zoom: number }) {
       event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("button[data-breve-view]") ?? [],
     );
     const current = buttons.indexOf(event.currentTarget);
-    const nextIndex = event.key === "Home"
-      ? 0
-      : event.key === "End"
-        ? buttons.length - 1
-        : (current + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? buttons.length - 1
+          : (current + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
     const next = buttons[nextIndex];
     if (!next) return;
     const nextView = next.dataset.breveView as BreveView;

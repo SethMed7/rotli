@@ -35,10 +35,7 @@ import {
 /** Escape HTML, then apply a minimal inline render (bold · italic · code) so cell
  * text reads beautified without opening an HTML-injection hole. */
 function inlineCell(raw: string): string {
-  let s = raw
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  let s = raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   s = s.replace(/`([^`]+)`/g, '<code class="md-code">$1</code>');
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
@@ -65,11 +62,7 @@ function closeTableMenu(): void {
 
 /** Resolve the table containing the widget NOW (offsets go stale; posAtDOM at
  * action time is the truth) and replace its source with the transformed text. */
-function applyOp(
-  view: EditorView,
-  wrap: HTMLElement,
-  fn: (t: TableBlock) => TableShape | null,
-): void {
+function applyOp(view: EditorView, wrap: HTMLElement, fn: (t: TableBlock) => TableShape | null): void {
   if (!wrap.isConnected) return; // the widget was rebuilt/unmounted under the menu
   const pos = view.posAtDOM(wrap);
   const t = scanTables(view.state.doc).find((x) => pos >= x.from && pos <= x.to);
@@ -316,14 +309,7 @@ class TableWidget extends WidgetType {
       chip.addEventListener("click", () => {
         const index = kind === "row" ? chipRow : chipCol;
         if (index < 0) return;
-        openTableMenu(
-          view,
-          wrap,
-          kind,
-          index,
-          this.align[index] ?? "",
-          chip.getBoundingClientRect(),
-        );
+        openTableMenu(view, wrap, kind, index, this.align[index] ?? "", chip.getBoundingClientRect());
       });
     }
 
@@ -336,9 +322,7 @@ class TableWidget extends WidgetType {
       addRow.setAttribute("aria-label", "Add row");
       addRow.textContent = "+";
       addRow.addEventListener("mousedown", (e) => e.preventDefault());
-      addRow.addEventListener("click", () =>
-        applyOp(view, wrap, (t) => addRowBelow(t, t.rows.length - 1)),
-      );
+      addRow.addEventListener("click", () => applyOp(view, wrap, (t) => addRowBelow(t, t.rows.length - 1)));
       wrap.appendChild(addRow);
 
       const addCol = document.createElement("button");
@@ -348,9 +332,7 @@ class TableWidget extends WidgetType {
       addCol.setAttribute("aria-label", "Add column");
       addCol.textContent = "+";
       addCol.addEventListener("mousedown", (e) => e.preventDefault());
-      addCol.addEventListener("click", () =>
-        applyOp(view, wrap, (t) => addColRight(t, t.header.length - 1)),
-      );
+      addCol.addEventListener("click", () => applyOp(view, wrap, (t) => addColRight(t, t.header.length - 1)));
       wrap.appendChild(addCol);
 
       const rawChip = document.createElement("button");

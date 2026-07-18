@@ -45,9 +45,7 @@ function reparse(t: TableShape): TableShape {
 describe("tableToText", () => {
   it("pads columns to their widest cell so raw mode reads aligned", () => {
     const text = tableToText(shape());
-    expect(text).toBe(
-      ["| Name | Age |", "| ---- | ---: |", "| Ada  | 36  |", "| Bo   | 7   |"].join("\n"),
-    );
+    expect(text).toBe(["| Name | Age |", "| ---- | ---: |", "| Ada  | 36  |", "| Bo   | 7   |"].join("\n"));
   });
 
   it("round-trips through scanTables (cells + alignment preserved)", () => {

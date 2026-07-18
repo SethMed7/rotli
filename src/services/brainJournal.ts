@@ -157,9 +157,7 @@ export async function approveProposal(p: BrainAction, deps: JournalDeps): Promis
     // FROM must still be on disk — a filing or a sibling approve rewrote it
     // since, and applying this row would roll the overview back.
     if ((await deps.readIndex(p.area)) !== p.before) {
-      throw new Error(
-        "The overview changed since this was proposed — dismiss it; the AI will re-evaluate.",
-      );
+      throw new Error("The overview changed since this was proposed — dismiss it; the AI will re-evaluate.");
     }
     await deps.writeIndex(p.area, p.after);
   }

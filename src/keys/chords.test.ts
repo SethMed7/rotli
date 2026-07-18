@@ -4,13 +4,7 @@
 // all depend on.
 
 import { describe, expect, it } from "bun:test";
-import {
-  chordFromEvent,
-  formatChord,
-  keyFromCode,
-  normalizeChord,
-  toAccelerator,
-} from "./chords";
+import { chordFromEvent, formatChord, keyFromCode, normalizeChord, toAccelerator } from "./chords";
 
 // A minimal KeyboardEvent stand-in — chordFromEvent only reads .code and the
 // four modifier booleans, never any DOM behaviour.
@@ -54,12 +48,10 @@ describe("keyFromCode", () => {
 
 describe("chordFromEvent", () => {
   it("emits modifiers in canonical Ctrl→Alt→Shift→Meta order", () => {
-    expect(
-      chordFromEvent(evt("KeyF", { metaKey: true, altKey: true })),
-    ).toBe("Alt+Meta+F");
-    expect(
-      chordFromEvent(evt("KeyK", { ctrlKey: true, altKey: true, shiftKey: true, metaKey: true })),
-    ).toBe("Ctrl+Alt+Shift+Meta+K");
+    expect(chordFromEvent(evt("KeyF", { metaKey: true, altKey: true }))).toBe("Alt+Meta+F");
+    expect(chordFromEvent(evt("KeyK", { ctrlKey: true, altKey: true, shiftKey: true, metaKey: true }))).toBe(
+      "Ctrl+Alt+Shift+Meta+K",
+    );
   });
 
   it("is null when only modifiers are down", () => {

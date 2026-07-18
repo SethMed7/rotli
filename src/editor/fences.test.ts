@@ -83,11 +83,21 @@ describe("scanFences", () => {
 
   test("all five target langs scan with target:true", () => {
     const d = doc(
-      "```math", "x", "```",
-      "```mermaid", "x", "```",
-      "```jsxgraph", "x", "```",
-      "```svg", "x", "```",
-      "```html", "x", "```",
+      "```math",
+      "x",
+      "```",
+      "```mermaid",
+      "x",
+      "```",
+      "```jsxgraph",
+      "x",
+      "```",
+      "```svg",
+      "x",
+      "```",
+      "```html",
+      "x",
+      "```",
     );
     const fences = scanFences(d);
     expect(fences.map((f) => f.lang)).toEqual(["math", "mermaid", "jsxgraph", "svg", "html"]);

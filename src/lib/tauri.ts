@@ -63,10 +63,7 @@ export async function summon(): Promise<void> {
  * null unregisters it. actionId ∈ { "capture.summon", "app.toggleWindow" }.
  * Rejects when the OS refuses the chord — the caller must NOT have committed
  * the rebind yet. */
-export async function setGlobalShortcut(
-  actionId: string,
-  accelerator: string | null,
-): Promise<void> {
+export async function setGlobalShortcut(actionId: string, accelerator: string | null): Promise<void> {
   if (!isTauri()) return;
   await invoke("set_summon_shortcut", { actionId, accelerator });
 }
@@ -157,9 +154,7 @@ export async function checkForUpdate(): Promise<UpdateStatus> {
 /** Download + install the pending update (re-checks so we hold a fresh handle),
  * reporting 0–100% progress, then relaunch into the new build. No-op outside
  * Tauri or when nothing is available. */
-export async function downloadAndInstallUpdate(
-  onProgress?: (pct: number) => void,
-): Promise<void> {
+export async function downloadAndInstallUpdate(onProgress?: (pct: number) => void): Promise<void> {
   if (!isTauri()) return;
   const { check } = await import("@tauri-apps/plugin-updater");
   const update = await check();
@@ -303,10 +298,7 @@ export function corpusMove(id: string, targetFolder: string): Promise<CorpusNote
   return corpusInvoke("corpus_move", { id, targetFolder });
 }
 
-export function corpusCreateFolder(
-  name: string,
-  parentId: string | null,
-): Promise<CorpusFolder> {
+export function corpusCreateFolder(name: string, parentId: string | null): Promise<CorpusFolder> {
   return corpusInvoke("corpus_create_folder", { name, parentId });
 }
 
@@ -1372,9 +1364,27 @@ function browserBreveSnapshot(): BreveSnapshot {
     creators: [],
     pages: [],
     briefs: [
-      { stem: "2026-07-10", title: "Breve — July 10, 2026", kind: "morning", date: "2026-07-10", imported: true },
-      { stem: "2026-07-10-lunch", title: "Breve — July 10, 2026 · Lunchtime", kind: "lunch", date: "2026-07-10", imported: true },
-      { stem: "2026-07-09-night", title: "Breve — July 9, 2026 · The Archive", kind: "night", date: "2026-07-09", imported: true },
+      {
+        stem: "2026-07-10",
+        title: "Breve — July 10, 2026",
+        kind: "morning",
+        date: "2026-07-10",
+        imported: true,
+      },
+      {
+        stem: "2026-07-10-lunch",
+        title: "Breve — July 10, 2026 · Lunchtime",
+        kind: "lunch",
+        date: "2026-07-10",
+        imported: true,
+      },
+      {
+        stem: "2026-07-09-night",
+        title: "Breve — July 9, 2026 · The Archive",
+        kind: "night",
+        date: "2026-07-09",
+        imported: true,
+      },
     ],
     artifactCount: 208,
     imported: true,
@@ -1413,7 +1423,8 @@ export function breveWriteWatchlist(markdown: string): Promise<BreveSnapshot> {
 }
 
 export function breveDeliverySettings(): Promise<BreveDeliverySettings> {
-  if (!isTauri()) return Promise.resolve({ ...browserBreveDelivery, emailTo: [...browserBreveDelivery.emailTo] });
+  if (!isTauri())
+    return Promise.resolve({ ...browserBreveDelivery, emailTo: [...browserBreveDelivery.emailTo] });
   return invoke<BreveDeliverySettings>("breve_delivery_settings");
 }
 

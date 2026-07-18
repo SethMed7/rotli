@@ -188,7 +188,9 @@ function tableFromXml(xml: string, index: number): { table: DocumentTable; advan
           const paragraphs = topLevelNodes(innerXml(cellXml, "tc"))
             .filter((node) => /^<w:p\b/i.test(node))
             .map((paragraphXml) => {
-              if (/<w:(?:drawing|object|pict|fldChar|commentReference|bookmarkStart|sdt)\b/i.test(paragraphXml)) {
+              if (
+                /<w:(?:drawing|object|pict|fldChar|commentReference|bookmarkStart|sdt)\b/i.test(paragraphXml)
+              ) {
                 advancedParagraphs += 1;
               }
               return parseParagraph(paragraphXml);
@@ -250,7 +252,9 @@ function runXml(run: DocumentRun): string {
         style.underline ? '<w:u w:val="single"/>' : "",
         style.strike ? "<w:strike/>" : "",
         style.color ? `<w:color w:val="${style.color.replace(/^#/, "").toUpperCase()}"/>` : "",
-        style.fontSize ? `<w:sz w:val="${Math.round(style.fontSize * 2)}"/><w:szCs w:val="${Math.round(style.fontSize * 2)}"/>` : "",
+        style.fontSize
+          ? `<w:sz w:val="${Math.round(style.fontSize * 2)}"/><w:szCs w:val="${Math.round(style.fontSize * 2)}"/>`
+          : "",
       ].join("")
     : "";
   const pieces = run.text.split(/(\t|\n)/).map((piece) => {
@@ -289,13 +293,18 @@ function sameParagraph(left: DocumentParagraph, right: DocumentParagraph): boole
 }
 
 function cellProperties(cell: DocumentTableCell, originalXml?: string): string {
-  const original = /<w:tcPr\b[^>]*>([\s\S]*?)<\/w:tcPr>|<w:tcPr\b[^>]*\/>/i.exec(originalXml ?? "")?.[1] ?? "";
+  const original =
+    /<w:tcPr\b[^>]*>([\s\S]*?)<\/w:tcPr>|<w:tcPr\b[^>]*\/>/i.exec(originalXml ?? "")?.[1] ?? "";
   const retained = original
     .replace(/<w:gridSpan\b[^>]*\/?\s*>/gi, "")
     .replace(/<w:vMerge\b[^>]*\/?\s*>/gi, "");
   const owned = [
     cell.columnSpan && cell.columnSpan > 1 ? `<w:gridSpan w:val="${cell.columnSpan}"/>` : "",
-    cell.rowSpan === 0 ? "<w:vMerge/>" : cell.rowSpan && cell.rowSpan > 1 ? '<w:vMerge w:val="restart"/>' : "",
+    cell.rowSpan === 0
+      ? "<w:vMerge/>"
+      : cell.rowSpan && cell.rowSpan > 1
+        ? '<w:vMerge w:val="restart"/>'
+        : "",
   ].join("");
   return retained || owned ? `<w:tcPr>${retained}${owned}</w:tcPr>` : "<w:tcPr/>";
 }
@@ -351,7 +360,9 @@ function tableXml(table: DocumentTable, originalXml?: string): string {
   let sawGrid = false;
   for (const child of topLevelNodes(innerXml(originalXml, "tbl"))) {
     if (/^<w:tblGrid\b/i.test(child) && table.columnWidths?.length) {
-      next.push(`<w:tblGrid>${table.columnWidths.map((width) => `<w:gridCol w:w="${Math.max(1, Math.round(width * 15))}"/>`).join("")}</w:tblGrid>`);
+      next.push(
+        `<w:tblGrid>${table.columnWidths.map((width) => `<w:gridCol w:w="${Math.max(1, Math.round(width * 15))}"/>`).join("")}</w:tblGrid>`,
+      );
       sawGrid = true;
     } else if (/^<w:tr\b/i.test(child)) {
       const row = table.rows[rowIndex++];
@@ -372,14 +383,19 @@ function tableXml(table: DocumentTable, originalXml?: string): string {
 
 function contentXml(content: DocumentContent, template?: LayoutNode): string {
   if (content.kind === "paragraph") {
-    if (template?.kind === "paragraph" && sameParagraph(content.paragraph, template.original)) return template.xml;
+    if (template?.kind === "paragraph" && sameParagraph(content.paragraph, template.original))
+      return template.xml;
     return paragraphXml(content.paragraph, template?.kind === "paragraph" ? template.xml : undefined);
   }
-  if (template?.kind === "table" && JSON.stringify(content.table) === JSON.stringify(template.original)) return template.xml;
+  if (template?.kind === "table" && JSON.stringify(content.table) === JSON.stringify(template.original))
+    return template.xml;
   return tableXml(content.table, template?.kind === "table" ? template.xml : undefined);
 }
 
-export async function decodeDocx(base64: string, fileId: string): Promise<{
+export async function decodeDocx(
+  base64: string,
+  fileId: string,
+): Promise<{
   source: DocxSource;
   document: EditableDocument;
   warnings: string[];
@@ -428,9 +444,7 @@ export async function decodeDocx(base64: string, fileId: string): Promise<{
     document: {
       id: fileId,
       title: fileName(fileId).replace(/\.[^.]+$/, ""),
-      content: content.length
-        ? content
-        : [{ kind: "paragraph", paragraph: { runs: [{ text: "" }] } }],
+      content: content.length ? content : [{ kind: "paragraph", paragraph: { runs: [{ text: "" }] } }],
     },
     warnings,
   };
@@ -442,7 +456,7 @@ export async function encodeDocx(source: DocxSource, document: EditableDocument)
   let contentIndex = 0;
   let insertedExtras = false;
   const sourceTableIds = new Set(
-    source.layout.flatMap((node) => node.kind === "table" ? [node.original.id] : []),
+    source.layout.flatMap((node) => (node.kind === "table" ? [node.original.id] : [])),
   );
   for (const node of source.layout) {
     if (node.kind === "paragraph") {
@@ -451,7 +465,8 @@ export async function encodeDocx(source: DocxSource, document: EditableDocument)
       // in the source belongs to its own later layout node.
       while (edited[contentIndex]?.kind === "table") {
         const insertedTable = edited[contentIndex];
-        if (!insertedTable || insertedTable.kind !== "table" || sourceTableIds.has(insertedTable.table.id)) break;
+        if (!insertedTable || insertedTable.kind !== "table" || sourceTableIds.has(insertedTable.table.id))
+          break;
         children.push(contentXml(edited[contentIndex++]!));
       }
       const content = edited[contentIndex++];

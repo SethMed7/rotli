@@ -86,9 +86,7 @@ export async function* runHybrid(
     yield { type: "status", text: `routing via ${organizer.label}…` };
     try {
       const raw = await makeHost(organizer, requestId ? { requestId } : undefined).complete({
-        messages: [
-          { role: "user", content: routingPrompt(preset.routes, input.userText) },
-        ],
+        messages: [{ role: "user", content: routingPrompt(preset.routes, input.userText) }],
         // local generate models get the server-side JSON coercion; the rest
         // follow the instruction
         formatJson: organizer.api === "generate",
@@ -191,8 +189,7 @@ export function parseSuggestions(raw: string, allowed: ReadonlySet<string>): Hyb
       routes.push({ when: typeof route.when === "string" ? route.when : "", model: route.model });
     }
     if (routes.length === 0) continue;
-    const fallback =
-      typeof p.fallback === "string" && allowed.has(p.fallback) ? p.fallback : undefined;
+    const fallback = typeof p.fallback === "string" && allowed.has(p.fallback) ? p.fallback : undefined;
     out.push({
       id: crypto.randomUUID(),
       name: p.name.trim(),

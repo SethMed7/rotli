@@ -9,9 +9,7 @@ export function newItemMenuItems(): MenuSpec[] {
     label: item.label,
     onClick: () =>
       dispatch(
-        item.kind === "board"
-          ? "boards.new"
-          : `items.new${item.kind[0]!.toUpperCase()}${item.kind.slice(1)}`,
+        item.kind === "board" ? "boards.new" : `items.new${item.kind[0]!.toUpperCase()}${item.kind.slice(1)}`,
       ),
   }));
 }

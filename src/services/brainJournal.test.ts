@@ -49,10 +49,7 @@ describe("deriveJournal — last line per id wins", () => {
   });
 
   it("applied → reverted stays in history as the undone marker", () => {
-    const v = deriveJournal([
-      row({ status: "applied" }),
-      row({ ts: 2, status: "reverted" }),
-    ]);
+    const v = deriveJournal([row({ status: "applied" }), row({ ts: 2, status: "reverted" })]);
     expect(v.pending).toEqual([]);
     expect(v.history.map((a) => a.status)).toEqual(["reverted"]);
   });

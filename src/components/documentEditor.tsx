@@ -217,7 +217,11 @@ export default function DocumentEditor({
           Complex content preserved
         </span>
       )}
-      {err && <span className="document-save-error" role="alert">{err}</span>}
+      {err && (
+        <span className="document-save-error" role="alert">
+          {err}
+        </span>
+      )}
       {dirty && !saving && <span className="document-dirty" title="Unsaved changes" />}
       <button
         type="button"
@@ -233,8 +237,16 @@ export default function DocumentEditor({
   return (
     <div className={compact ? "document-editor compact" : "document-editor"}>
       {chromeEl ? createPortal(chrome, chromeEl) : <div className="document-editor-bar">{chrome}</div>}
-      {!err && !ready && <p className="file-loading" role="status">Opening editor…</p>}
-      {err && !ready && <p className="file-err" role="alert">{err}</p>}
+      {!err && !ready && (
+        <p className="file-loading" role="status">
+          Opening editor…
+        </p>
+      )}
+      {err && !ready && (
+        <p className="file-err" role="alert">
+          {err}
+        </p>
+      )}
       <div
         ref={hostRef}
         className={ready ? "document-editor-host is-ready" : "document-editor-host"}

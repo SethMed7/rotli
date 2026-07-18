@@ -14,11 +14,7 @@
 // in-memory demo corpus stays exactly as it was (the seam's whole point).
 
 import { type HybridPreset, PROVIDER_IDS, type ProviderId } from "../ai/models";
-import {
-  DEFAULT_NEW_ITEM_KIND,
-  NEW_ITEM_KINDS,
-  type NewItemKind,
-} from "../newItems/model";
+import { DEFAULT_NEW_ITEM_KIND, NEW_ITEM_KINDS, type NewItemKind } from "../newItems/model";
 import { useBindingsStore } from "../keys/bindings";
 import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
@@ -104,9 +100,7 @@ const MEASURES: readonly Measure[] = ["narrow", "comfort", "wide"];
  * (#7). Shared by the parse (heals a poisoned config) and the snapshot (never
  * writes one again). */
 function persistableChatMap<T>(m: Record<string, T>): Record<string, T> {
-  return Object.fromEntries(
-    Object.entries(m).filter(([k]) => k !== "" && !k.startsWith("unsaved:")),
-  );
+  return Object.fromEntries(Object.entries(m).filter(([k]) => k !== "" && !k.startsWith("unsaved:")));
 }
 
 /** Shape-validate the persisted hybrid presets — a hand-edited or future-build
@@ -340,9 +334,7 @@ export function parseSettings(raw: string): PersistedSettings {
       : [],
     imageEngine: data.imageEngine === "agy" ? "agy" : "codex",
     storageGrouping:
-      data.storageGrouping === "date" || data.storageGrouping === "folder"
-        ? data.storageGrouping
-        : "type",
+      data.storageGrouping === "date" || data.storageGrouping === "folder" ? data.storageGrouping : "type",
     appIcon:
       data.appIcon === "warm" ||
       data.appIcon === "paper" ||
@@ -369,8 +361,7 @@ export function parseSettings(raw: string): PersistedSettings {
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
     // not this one — treat that as already-onboarded so we don't re-run first-run
     // onboarding on existing users (same migration shape as expandedDests above)
-    onboarded:
-      typeof data.onboarded === "boolean" ? data.onboarded : Object.keys(data).length > 0,
+    onboarded: typeof data.onboarded === "boolean" ? data.onboarded : Object.keys(data).length > 0,
     onboardingVersion: typeof data.onboardingVersion === "string" ? data.onboardingVersion : "",
     quickNoteIds,
     captureOrder,
@@ -406,11 +397,14 @@ export function unknownSettingsKeys(raw: string): Record<string, unknown> {
   }
   const known = new Set(Object.keys(parseSettings("{}")));
   const retired = new Set([
-    "glassMode", "glassTint", "glassBackground", "glassClarity", "glassBlur", "glassCanvas",
+    "glassMode",
+    "glassTint",
+    "glassBackground",
+    "glassClarity",
+    "glassBlur",
+    "glassCanvas",
   ]);
-  return Object.fromEntries(
-    Object.entries(data).filter(([key]) => !known.has(key) && !retired.has(key)),
-  );
+  return Object.fromEntries(Object.entries(data).filter(([key]) => !known.has(key) && !retired.has(key)));
 }
 
 function applySettings(s: PersistedSettings): void {
@@ -563,7 +557,7 @@ function validPane(v: unknown, alive: Set<string>): PaneNode | null {
     if (!only) return null;
     if (children.length === 1) return only;
     const total = sizes.reduce((a, b) => a + b, 0) || 1;
-    return { kind: "split", id: o.id, dir: o.dir, children, sizes: sizes.map(x => x / total) };
+    return { kind: "split", id: o.id, dir: o.dir, children, sizes: sizes.map((x) => x / total) };
   }
   return null;
 }
@@ -576,10 +570,7 @@ async function hydrateViewstate(): Promise<void> {
     return; // first run / corrupted file → the default pristine pane
   }
   // the disk truth gates everything id-shaped: tabs, MRU, the folder selection
-  const [notes, folders] = await Promise.all([
-    notesService.listNotes(),
-    notesService.listFolders(),
-  ]);
+  const [notes, folders] = await Promise.all([notesService.listNotes(), notesService.listFolders()]);
   const alive = new Set(notes.map((n) => n.id));
 
   // the Aa map is keyed by note id — drop entries whose notes are gone, so
@@ -605,12 +596,7 @@ async function hydrateViewstate(): Promise<void> {
   // (Seth, 2026-06-13). A stored "Brain" id from before the rename is no longer
   // reserved — it's restored only if "Brain" is still a real folder, else
   // ignored (falls back to ALL_NOTES), never a crash (Invariant 6).
-  const folderIds = new Set<string>([
-    ALL_NOTES,
-    RECENT,
-    ...RESERVED_DESTS,
-    ...folders.map((f) => f.id),
-  ]);
+  const folderIds = new Set<string>([ALL_NOTES, RECENT, ...RESERVED_DESTS, ...folders.map((f) => f.id)]);
   if (typeof data.selectedFolderId === "string" && folderIds.has(data.selectedFolderId)) {
     useUiStore.setState({ selectedFolderId: data.selectedFolderId });
   }
@@ -627,10 +613,7 @@ async function hydrateViewstate(): Promise<void> {
 
 /** Keep only entries whose key passes `keep`. Returns the SAME object when
  * nothing was dropped (no pointless store write). Pure — exported for tests. */
-export function pruneMap<T>(
-  m: Record<string, T>,
-  keep: (k: string) => boolean,
-): Record<string, T> {
+export function pruneMap<T>(m: Record<string, T>, keep: (k: string) => boolean): Record<string, T> {
   const kept = Object.entries(m).filter(([k]) => keep(k));
   return kept.length === Object.keys(m).length ? m : Object.fromEntries(kept);
 }

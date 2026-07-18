@@ -6,11 +6,7 @@ import { onQuitFlush } from "../lib/quitFlush";
 import { corpusWriteFileBytes } from "../lib/tauri";
 import { csvTextFromRows } from "./csv";
 import { b64FromBytes, b64FromText, saveXlsx } from "./codec/xlsx";
-import {
-  type SheetModel,
-  applyModelToWorkbook,
-  csvRowsFromSnapshot,
-} from "./engine";
+import { type SheetModel, applyModelToWorkbook, csvRowsFromSnapshot } from "./engine";
 
 export type SheetFileMode = "xlsx" | "csv";
 
@@ -80,13 +76,7 @@ export async function flushDirtySheets(): Promise<void> {
     for (const [fileId, session] of [...parked]) {
       try {
         const genBefore = liveDirty.get(fileId)?.dirtyGen() ?? 0;
-        const len = await writeSheetModel(
-          fileId,
-          session.mode,
-          session.wb,
-          session.model,
-          session.idMap,
-        );
+        const len = await writeSheetModel(fileId, session.mode, session.wb, session.model, session.idMap);
         const still = parked.get(fileId);
         if (still === session) parked.delete(fileId);
         const live = liveDirty.get(fileId);

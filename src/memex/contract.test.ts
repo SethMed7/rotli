@@ -137,8 +137,7 @@ describe("setAttachedTo (the lazy chat↔note link)", () => {
   });
 
   test("never touches an attachedTo-shaped line in the BODY", () => {
-    const base =
-      composeChatFile({ title: "T", source: "rotli" }, DATE) + "attachedTo: [[decoy]]\n";
+    const base = composeChatFile({ title: "T", source: "rotli" }, DATE) + "attachedTo: [[decoy]]\n";
     const out = setAttachedTo(base, "real-stem-abc123");
     expect(out).toContain("attachedTo: [[decoy]]"); // the body line survives untouched
     expect(out).toContain("attachedTo: [[real-stem-abc123]]"); // the frontmatter one is set

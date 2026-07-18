@@ -28,9 +28,19 @@ function richWorkbook(): Workbook {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Data");
   ws.getCell("A1").value = "title";
-  ws.getCell("A1").font = { bold: true, italic: true, underline: true, size: 14, name: "Georgia", color: { argb: "FF112233" } };
+  ws.getCell("A1").font = {
+    bold: true,
+    italic: true,
+    underline: true,
+    size: 14,
+    name: "Georgia",
+    color: { argb: "FF112233" },
+  };
   ws.getCell("A1").alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-  ws.getCell("A1").border = { bottom: { style: "thin", color: { argb: "FF445566" } }, right: { style: "thick" } };
+  ws.getCell("A1").border = {
+    bottom: { style: "thin", color: { argb: "FF445566" } },
+    right: { style: "thick" },
+  };
   ws.getCell("B1").value = 42;
   ws.getCell("B1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFEE00" } };
   ws.getCell("B2").value = 1234.5;
@@ -54,8 +64,7 @@ async function reload(wb: Workbook): Promise<Workbook> {
   return wb2;
 }
 
-const sheetOf = (snap: SheetModel, i = 0) =>
-  must(snap.sheets[must(snap.sheetOrder[i], "sheet id")], "sheet");
+const sheetOf = (snap: SheetModel, i = 0) => must(snap.sheets[must(snap.sheetOrder[i], "sheet id")], "sheet");
 
 describe("colIndex", () => {
   test("inverts column labels", () => {
@@ -175,7 +184,11 @@ describe("simulated Univer edits land in the reloaded file", () => {
     const f = ws.getCell("A7").value;
     expect(typeof f === "object" && f !== null && "formula" in f && f.formula).toBe("B1*2");
     expect(ws.getCell("C7").font?.bold).toBe(true);
-    expect(ws.getCell("C7").fill && "fgColor" in ws.getCell("C7").fill! ? (ws.getCell("C7").fill as { fgColor?: { argb?: string } }).fgColor?.argb : null).toBe("FFFF0000");
+    expect(
+      ws.getCell("C7").fill && "fgColor" in ws.getCell("C7").fill!
+        ? (ws.getCell("C7").fill as { fgColor?: { argb?: string } }).fgColor?.argb
+        : null,
+    ).toBe("FFFF0000");
     expect(ws.getCell("B1").value ?? null).toBeNull(); // cleared
   });
 
@@ -251,12 +264,12 @@ describe("live sessions: repeated saves through structural changes", () => {
 describe("apply guards (reviewer B2/S3 — the file's fate hangs on these)", () => {
   test("refuses an empty or inconsistent snapshot WITHOUT touching the workbook", () => {
     const wb = richWorkbook();
-    expect(() =>
-      applyModelToWorkbook(wb, { id: "x", name: "x", sheetOrder: [], sheets: {} }),
-    ).toThrow(/refusing/);
-    expect(() =>
-      applyModelToWorkbook(wb, { id: "x", name: "x", sheetOrder: ["ghost"], sheets: {} }),
-    ).toThrow(/refusing/);
+    expect(() => applyModelToWorkbook(wb, { id: "x", name: "x", sheetOrder: [], sheets: {} })).toThrow(
+      /refusing/,
+    );
+    expect(() => applyModelToWorkbook(wb, { id: "x", name: "x", sheetOrder: ["ghost"], sheets: {} })).toThrow(
+      /refusing/,
+    );
     // nothing was mutated by either refusal
     expect(wb.worksheets).toHaveLength(1);
     expect(must(wb.worksheets[0], "ws").getCell("A1").value).toBe("title");

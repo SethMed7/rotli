@@ -55,11 +55,9 @@ describe("parseWatchlist", () => {
   });
 
   test("a prose-only section yields an empty items array", () => {
-    const md = [
-      "## Markets (light touch)",
-      "",
-      "Tech-stock signal only — no day-trading content.",
-    ].join("\n");
+    const md = ["## Markets (light touch)", "", "Tech-stock signal only — no day-trading content."].join(
+      "\n",
+    );
     const wl = parseWatchlist(md);
     expect(wl.sections).toHaveLength(1);
     expect(wl.sections[0]!.items).toEqual([]);
@@ -82,7 +80,7 @@ describe("parseWatchlist", () => {
       "## Brief preferences",
       "",
       "- **Length:** a 5–10 minute read.",
-      "- **Always end with:** a \"worth your time\" shortlist.",
+      '- **Always end with:** a "worth your time" shortlist.',
     ].join("\n");
     const wl = parseWatchlist(md);
     expect(wl.sections.map((s) => s.title)).toEqual(["Runtimes"]);
@@ -97,13 +95,7 @@ describe("parseWatchlist", () => {
   });
 
   test("skips rows with an empty watch cell", () => {
-    const md = [
-      "## S",
-      "| Watch | Lens |",
-      "|---|---|",
-      "| Bun | keep |",
-      "|  | drop |",
-    ].join("\n");
+    const md = ["## S", "| Watch | Lens |", "|---|---|", "| Bun | keep |", "|  | drop |"].join("\n");
     expect(parseWatchlist(md).sections[0]!.items).toEqual([{ watch: "Bun", lens: "keep" }]);
   });
 
@@ -164,7 +156,8 @@ describe("parseWatchlist", () => {
   });
 
   test("reads a source from either a website column or a linked topic", () => {
-    const withColumn = "## Tools\n| Watch | Lens | Website |\n|---|---|---|\n| Bun | releases | [Official](https://bun.sh/) |";
+    const withColumn =
+      "## Tools\n| Watch | Lens | Website |\n|---|---|---|\n| Bun | releases | [Official](https://bun.sh/) |";
     const linkedTopic = "## Tools\n| Watch | Lens |\n|---|---|\n| [**Bun**](https://bun.sh/) | releases |";
     expect(parseWatchlist(withColumn).sections[0]!.items[0]!.url).toBe("https://bun.sh/");
     expect(parseWatchlist(linkedTopic).sections[0]!.items[0]).toEqual({

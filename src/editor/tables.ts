@@ -39,7 +39,10 @@ function parseDelimiter(s: string): Align[] | null {
 /** Split a `| a | b |` row into trimmed cells, dropping the empty edges that the
  * optional leading/trailing pipes produce. */
 export function splitRow(s: string): string[] {
-  const cells = s.trim().split("|").map((c) => c.trim());
+  const cells = s
+    .trim()
+    .split("|")
+    .map((c) => c.trim());
   if (cells.length && cells[0] === "") cells.shift();
   if (cells.length && cells[cells.length - 1] === "") cells.pop();
   return cells;
@@ -158,8 +161,7 @@ export function tableToText(t: TableShape): string {
   const widths = Array.from({ length: cols }, (_, i) =>
     Math.max(3, header[i]?.length ?? 0, ...rows.map((r) => r[i]?.length ?? 0)),
   );
-  const line = (cells: string[]) =>
-    `| ${cells.map((c, i) => c.padEnd(widths[i] ?? 3)).join(" | ")} |`;
+  const line = (cells: string[]) => `| ${cells.map((c, i) => c.padEnd(widths[i] ?? 3)).join(" | ")} |`;
   const delim = `| ${widths.map((w, i) => delimCell(t.align[i] ?? "", w)).join(" | ")} |`;
   return [line(header), delim, ...rows.map(line)].join("\n");
 }
@@ -204,7 +206,7 @@ export function moveRow(t: TableShape, i: number, dir: -1 | 1): TableShape | nul
 /** Insert an empty column right of column `i` (i = -1 → leftmost). */
 export function addColRight(t: TableShape, i: number): TableShape {
   const at = clamp(i + 1, 0, t.header.length);
-  const ins = <T,>(arr: T[], v: T): T[] => [...arr.slice(0, at), v, ...arr.slice(at)];
+  const ins = <T>(arr: T[], v: T): T[] => [...arr.slice(0, at), v, ...arr.slice(at)];
   return {
     header: ins(t.header, ""),
     align: ins(t.align, "" as Align),
@@ -215,7 +217,7 @@ export function addColRight(t: TableShape, i: number): TableShape {
 /** Delete column `i`; null when it's the only column (that would kill the table). */
 export function deleteCol(t: TableShape, i: number): TableShape | null {
   if (i < 0 || i >= t.header.length || t.header.length <= 1) return null;
-  const cut = <T,>(arr: T[]): T[] => arr.filter((_, c) => c !== i);
+  const cut = <T>(arr: T[]): T[] => arr.filter((_, c) => c !== i);
   return { header: cut(t.header), align: cut(t.align), rows: t.rows.map(cut) };
 }
 
@@ -223,7 +225,7 @@ export function deleteCol(t: TableShape, i: number): TableShape | null {
 export function moveCol(t: TableShape, i: number, dir: -1 | 1): TableShape | null {
   const j = i + dir;
   if (i < 0 || i >= t.header.length || j < 0 || j >= t.header.length) return null;
-  const swap = <T,>(arr: T[]): T[] => {
+  const swap = <T>(arr: T[]): T[] => {
     const out = [...arr];
     const a = out[i] as T;
     out[i] = out[j] as T;

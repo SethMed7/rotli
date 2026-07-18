@@ -20,7 +20,8 @@ let savedWindow: unknown;
 let listeners: Map<string, Listener[]>;
 
 const captureOf = (opts: unknown): boolean =>
-  opts === true || (typeof opts === "object" && opts !== null && (opts as { capture?: boolean }).capture === true);
+  opts === true ||
+  (typeof opts === "object" && opts !== null && (opts as { capture?: boolean }).capture === true);
 
 beforeEach(() => {
   savedWindow = g.window;
@@ -66,7 +67,13 @@ const press = (x = 100, y = 100, button = 0): ReactPointerEvent =>
 const move = (x: number, y: number) => dispatch("pointermove", { clientX: x, clientY: y });
 const up = () => dispatch("pointerup", {});
 
-function escEvent(): { key: string; preventDefault: () => void; stopPropagation: () => void; prevented: boolean; stopped: boolean } {
+function escEvent(): {
+  key: string;
+  preventDefault: () => void;
+  stopPropagation: () => void;
+  prevented: boolean;
+  stopped: boolean;
+} {
   const e = {
     key: "Escape",
     prevented: false,

@@ -113,9 +113,9 @@ export function AaPanel({
         </button>
       </div>
       <div className="aanote">
-        Text size &amp; measure are saved for this note; the &ldquo;all notes&rdquo; rows apply
-        everywhere. Either way the note itself never changes — marks (bold, highlight…) are real
-        markdown via the format bar.
+        Text size &amp; measure are saved for this note; the &ldquo;all notes&rdquo; rows apply everywhere.
+        Either way the note itself never changes — marks (bold, highlight…) are real markdown via the format
+        bar.
       </div>
     </div>
   );

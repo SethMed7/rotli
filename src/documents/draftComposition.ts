@@ -83,9 +83,7 @@ async function discardDocument(fileId: string): Promise<void> {
     useUiStore
       .getState()
       .setRowActionError(
-        `Couldn’t discard the untouched document — ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Couldn’t discard the untouched document — ${error instanceof Error ? error.message : String(error)}`,
       );
   }
 }

@@ -1,10 +1,7 @@
 // Picker sub-mode for slash ops that need a note/board/sheet target before insert.
 
 import { type KeyboardEvent, useEffect, useMemo, useState } from "react";
-import {
-  corpusManagedFileCreationAvailable,
-  isTauri,
-} from "../lib/tauri";
+import { corpusManagedFileCreationAvailable, isTauri } from "../lib/tauri";
 import { extOf, fileName } from "../lib/fileKind";
 import { useNotes, useSearchableNotes } from "../services/hooks";
 import { DEST } from "../services/destinations";
@@ -52,11 +49,7 @@ const MODE_LABEL: Record<SlashPickerMode, string> = {
   embedDocument: "Document",
 };
 
-export function slashPickerCanCreate(
-  mode: SlashPickerMode,
-  tauri = isTauri(),
-  writable = true,
-): boolean {
+export function slashPickerCanCreate(mode: SlashPickerMode, tauri = isTauri(), writable = true): boolean {
   return tauri && writable && (mode === "embedBoard" || mode === "embedSheet" || mode === "embedDocument");
 }
 
@@ -82,7 +75,7 @@ export function SlashPicker({
   const storageData = storage.data;
   const ready = usesStorage ? storage.isSuccess : searchable.ready;
   const items = useMemo(() => {
-    const notes = usesStorage ? storageData ?? [] : searchable.notes;
+    const notes = usesStorage ? (storageData ?? []) : searchable.notes;
     return filterNotes(notes, mode, query);
   }, [usesStorage, storageData, searchable.notes, mode, query]);
   useEffect(() => {

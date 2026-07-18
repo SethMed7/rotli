@@ -217,7 +217,11 @@ describe("tree mutations", () => {
     expect(out[out.length - 1]).toEqual({ folder: "New folder", children: [] });
   });
   test("removeFromMain drops a nested note", () => {
-    expect(removeFromMain(base, "c")).toEqual([{ note: "a" }, { note: "b" }, { folder: "Today", children: [] }]);
+    expect(removeFromMain(base, "c")).toEqual([
+      { note: "a" },
+      { note: "b" },
+      { folder: "Today", children: [] },
+    ]);
   });
 });
 
@@ -303,7 +307,7 @@ describe("renameFolderInMain — Main folders are renameable (#16)", () => {
 });
 
 describe("mainFolderIds — the collapse-all / GC id grammar (#83/#78)", () => {
-  test("collects every folder id in buildMainTree's exact \"main:<path>\" shape", () => {
+  test('collects every folder id in buildMainTree\'s exact "main:<path>" shape', () => {
     const tree: MainNode[] = [
       { note: "a" },
       {

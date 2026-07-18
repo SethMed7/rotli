@@ -252,10 +252,15 @@ function tableCellSource(cell: DocumentTableCell): ITableCell {
 }
 
 function documentTableSource(table: DocumentTable): ITable {
-  const columnCount = Math.max(1, table.columnWidths?.length ?? 0, ...table.rows.map((row) => row.cells.length));
-  const widths = table.columnWidths?.length === columnCount
-    ? table.columnWidths
-    : Array.from({ length: columnCount }, () => 648 / columnCount);
+  const columnCount = Math.max(
+    1,
+    table.columnWidths?.length ?? 0,
+    ...table.rows.map((row) => row.cells.length),
+  );
+  const widths =
+    table.columnWidths?.length === columnCount
+      ? table.columnWidths
+      : Array.from({ length: columnCount }, () => 648 / columnCount);
   return {
     tableId: table.id,
     tableRows: table.rows.map((row) => ({
@@ -302,8 +307,9 @@ function insertTableAfterSelection(
   columnCount: number,
 ) {
   const document = snapshotToDocument(snapshot, fallback);
-  const paragraphMarks = [...(snapshot.body?.paragraphs ?? [])]
-    .sort((left, right) => left.startIndex - right.startIndex);
+  const paragraphMarks = [...(snapshot.body?.paragraphs ?? [])].sort(
+    (left, right) => left.startIndex - right.startIndex,
+  );
   let selectedParagraph = paragraphMarks.findIndex((mark) => mark.startIndex >= insertionOffset);
   if (selectedParagraph < 0) selectedParagraph = Math.max(0, paragraphMarks.length - 1);
 
@@ -372,9 +378,7 @@ export function snapshotToDocument(snapshot: IDocumentData, fallback: EditableDo
   return {
     id: fallback.id,
     title: snapshot.title ?? fallback.title,
-    content: content.length
-      ? content
-      : [{ kind: "paragraph", paragraph: { runs: [{ text: "" }] } }],
+    content: content.length ? content : [{ kind: "paragraph", paragraph: { runs: [{ text: "" }] } }],
   };
 }
 
@@ -593,10 +597,12 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
         window.clearTimeout(tableConfirmTimer);
         tableConfirmTimer = window.setTimeout(recoverPendingTable, 300);
         selectionManager.replaceDocRanges(
-          [{
-            startOffset: insertionRange.startOffset,
-            endOffset: insertionRange.endOffset,
-          }],
+          [
+            {
+              startOffset: insertionRange.startOffset,
+              endOffset: insertionRange.endOffset,
+            },
+          ],
           { unitId: model.id, subUnitId: model.id },
           true,
         );
@@ -622,10 +628,7 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
       if (disposed) return;
       styleCanvas();
       const engine = renderManager.getRenderById(model.id)?.engine;
-      engine?.resizeBySize(
-        Math.max(1, host.clientWidth - 1),
-        Math.max(1, host.clientHeight - 1),
-      );
+      engine?.resizeBySize(Math.max(1, host.clientWidth - 1), Math.max(1, host.clientHeight - 1));
       cancelAnimationFrame(mutationFrame);
       mutationFrame = requestAnimationFrame(() => {
         if (disposed) return;
@@ -673,16 +676,10 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
         // dimensions. This reproduces the real window-resize path that recovers
         // a page from the off-canvas sentinel without visibly moving the UI.
         const engine = renderManager.getRenderById(model.id)?.engine;
-        engine?.resizeBySize(
-          Math.max(1, host.clientWidth - 1),
-          Math.max(1, host.clientHeight - 1),
-        );
+        engine?.resizeBySize(Math.max(1, host.clientWidth - 1), Math.max(1, host.clientHeight - 1));
         secondFrame = requestAnimationFrame(() => {
           if (readySettled || disposed) return;
-          engine?.resizeBySize(
-            Math.max(1, host.clientWidth),
-            Math.max(1, host.clientHeight),
-          );
+          engine?.resizeBySize(Math.max(1, host.clientWidth), Math.max(1, host.clientHeight));
           // Univer can create its canvas before its document skeleton has a page.
           // Force the zoom operation after skeleton layout so the page-position
           // service reruns even when the desired ratio matches an earlier,

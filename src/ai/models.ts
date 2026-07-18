@@ -57,13 +57,55 @@ export interface LocalCatalogEntry {
 }
 
 export const LOCAL_CATALOG: LocalCatalogEntry[] = [
-  { repo: "mlx-community/Qwen2.5-3B-Instruct-4bit", name: "qwen2.5-3b-instruct-4bit", label: "Qwen2.5 3B Instruct", approxMb: 1800, vision: false },
-  { repo: "mlx-community/Llama-3.2-3B-Instruct-4bit", name: "llama-3.2-3b-instruct-4bit", label: "Llama 3.2 3B Instruct", approxMb: 1800, vision: false },
-  { repo: "mlx-community/Phi-3.5-mini-instruct-4bit", name: "phi-3.5-mini-instruct-4bit", label: "Phi-3.5 mini Instruct", approxMb: 2200, vision: false },
-  { repo: "mlx-community/Qwen2.5-7B-Instruct-4bit", name: "qwen2.5-7b-instruct-4bit", label: "Qwen2.5 7B Instruct", approxMb: 4300, vision: false },
-  { repo: "mlx-community/Ministral-8B-Instruct-2410-4bit", name: "ministral-8b-instruct-4bit", label: "Ministral 8B Instruct", approxMb: 4500, vision: false },
-  { repo: "mlx-community/Qwen2.5-14B-Instruct-4bit", name: "qwen2.5-14b-instruct-4bit", label: "Qwen2.5 14B Instruct", approxMb: 8500, vision: false },
-  { repo: "mlx-community/Qwen2.5-32B-Instruct-4bit", name: "qwen2.5-32b-instruct-4bit", label: "Qwen2.5 32B Instruct", approxMb: 18500, vision: false },
+  {
+    repo: "mlx-community/Qwen2.5-3B-Instruct-4bit",
+    name: "qwen2.5-3b-instruct-4bit",
+    label: "Qwen2.5 3B Instruct",
+    approxMb: 1800,
+    vision: false,
+  },
+  {
+    repo: "mlx-community/Llama-3.2-3B-Instruct-4bit",
+    name: "llama-3.2-3b-instruct-4bit",
+    label: "Llama 3.2 3B Instruct",
+    approxMb: 1800,
+    vision: false,
+  },
+  {
+    repo: "mlx-community/Phi-3.5-mini-instruct-4bit",
+    name: "phi-3.5-mini-instruct-4bit",
+    label: "Phi-3.5 mini Instruct",
+    approxMb: 2200,
+    vision: false,
+  },
+  {
+    repo: "mlx-community/Qwen2.5-7B-Instruct-4bit",
+    name: "qwen2.5-7b-instruct-4bit",
+    label: "Qwen2.5 7B Instruct",
+    approxMb: 4300,
+    vision: false,
+  },
+  {
+    repo: "mlx-community/Ministral-8B-Instruct-2410-4bit",
+    name: "ministral-8b-instruct-4bit",
+    label: "Ministral 8B Instruct",
+    approxMb: 4500,
+    vision: false,
+  },
+  {
+    repo: "mlx-community/Qwen2.5-14B-Instruct-4bit",
+    name: "qwen2.5-14b-instruct-4bit",
+    label: "Qwen2.5 14B Instruct",
+    approxMb: 8500,
+    vision: false,
+  },
+  {
+    repo: "mlx-community/Qwen2.5-32B-Instruct-4bit",
+    name: "qwen2.5-32b-instruct-4bit",
+    label: "Qwen2.5 32B Instruct",
+    approxMb: 18500,
+    vision: false,
+  },
 ];
 
 // ── "Scan my Mac" comfort tiers (pure — the Rust command supplies raw facts) ──
@@ -96,7 +138,11 @@ export function scanVerdict(ramGb: number): string {
  * lowercased, non-slug chars → dashes. Matches the Rust `valid_name` law. */
 export function nameFromRepo(repo: string): string {
   const last = repo.split("/").pop() ?? repo;
-  return last.toLowerCase().replace(/[^a-z0-9.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 96);
+  return last
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 96);
 }
 
 /** A pasted repo id is `owner/name` (mirror of the Rust `valid_repo` gate). */

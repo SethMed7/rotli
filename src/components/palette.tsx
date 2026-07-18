@@ -7,14 +7,7 @@
 // the focused pane's active tab; ⌘⏎ opens in a new tab. Esc closes through
 // the transient stack (the registry's app.hide), not an ad-hoc listener.
 
-import {
-  type KeyboardEvent,
-  type ReactNode,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useBindingsStore, resolveChord } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
 import { type KeyAction, allActions, dispatch, getAction } from "../keys/registry";
@@ -252,9 +245,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
     const hitIds = new Set((hits ?? []).map((h) => h.id));
     const noteRows = [
       ...(hits ?? []).map(hitRow),
-      ...notes
-        .filter((n) => !hitIds.has(n.id) && (fuzzy(q, n.title) || fuzzy(q, n.snippet)))
-        .map(noteRow),
+      ...notes.filter((n) => !hitIds.has(n.id) && (fuzzy(q, n.title) || fuzzy(q, n.snippet))).map(noteRow),
     ].slice(0, 8);
     // Files by NAME (audit F4) — the searchable universe excludes binaries, but
     // a PDF/xlsx in Storage should be reachable by typing its name. The full
@@ -379,9 +370,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
               })}
             </div>
           ))}
-          {flat.length === 0 && (
-            <div className="pal-empty">Nothing matches — try different words?</div>
-          )}
+          {flat.length === 0 && <div className="pal-empty">Nothing matches — try different words?</div>}
         </div>
         <div className="pal-foot">
           <span>

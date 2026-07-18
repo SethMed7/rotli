@@ -55,10 +55,7 @@ export function ContextMenu() {
       ref.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [],
     );
     const index = buttons.findIndex((b) => b === document.activeElement);
-    const next =
-      event.key === "ArrowDown"
-        ? Math.min(index + 1, buttons.length - 1)
-        : Math.max(index - 1, 0);
+    const next = event.key === "ArrowDown" ? Math.min(index + 1, buttons.length - 1) : Math.max(index - 1, 0);
     buttons[next]?.focus();
   };
 
@@ -76,7 +73,9 @@ export function ContextMenu() {
     >
       {top && (
         <button type="button" className="ctxmenu-back" onClick={() => setStack((s) => s.slice(0, -1))}>
-          <span className="ctxmenu-back-chev" aria-hidden="true">‹</span>
+          <span className="ctxmenu-back-chev" aria-hidden="true">
+            ‹
+          </span>
           {top.label}
         </button>
       )}
@@ -107,7 +106,9 @@ export function ContextMenu() {
               close();
             }}
           >
-            <span className="ctxmenu-check" aria-hidden="true">{item.checked ? "★" : ""}</span>
+            <span className="ctxmenu-check" aria-hidden="true">
+              {item.checked ? "★" : ""}
+            </span>
             <span className="ctxmenu-label">{item.label}</span>
           </button>
         );

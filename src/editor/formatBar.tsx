@@ -97,8 +97,7 @@ export function FormatBar({ ctx, narrow }: { ctx: FormatContext; narrow: boolean
   const level = ctx.line === null ? 0 : headingLevelOf(ctx.line);
   const markOn = (mark: InlineMark): boolean =>
     ctx.line !== null && isMarkActive(ctx.line, ctx.selStart, mark);
-  const blockOn = (kind: BlockToggle): boolean =>
-    ctx.line !== null && blockToggleActive(ctx.line, kind);
+  const blockOn = (kind: BlockToggle): boolean => ctx.line !== null && blockToggleActive(ctx.line, kind);
 
   const run = (actionId: string) => () => {
     dispatch(actionId);

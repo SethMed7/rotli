@@ -21,9 +21,7 @@ export function AllChatsSurface() {
   const results = useMemo(
     () =>
       chats
-        .filter(
-          (c) => !q || c.title.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q),
-        )
+        .filter((c) => !q || c.title.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q))
         .sort((a, b) => (a.title || a.slug).localeCompare(b.title || b.slug)),
     [chats, q],
   );

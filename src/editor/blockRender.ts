@@ -90,9 +90,7 @@ async function loadMermaid() {
 async function loadJsxgraph() {
   // jsxgraph's package "exports" map hides ./distrib/* — import the stylesheet by
   // a filesystem-relative path so Vite resolves it directly (bypassing exports).
-  jsxgraphCssReady ??= import("../../node_modules/jsxgraph/distrib/jsxgraph.css").then(
-    () => undefined,
-  );
+  jsxgraphCssReady ??= import("../../node_modules/jsxgraph/distrib/jsxgraph.css").then(() => undefined);
   const [{ default: JXG }] = await Promise.all([import("jsxgraph"), jsxgraphCssReady]);
   return JXG;
 }
@@ -118,138 +116,139 @@ function cleanupMermaidOrphans(id: string): void {
 
 // ——— the renderer registry — one function per language, shared infra ————
 
-const RENDERERS: Record<StaticLangKey, (code: string, ctx: RenderCtx) => HTMLElement | Promise<HTMLElement>> = {
-  // KaTeX inherits text color via currentColor — no theme injection needed.
-  math: async (code) => {
-    const katex = await loadKatex();
-    const el = document.createElement("div");
-    el.className = "rotli-render-math";
-    try {
-      el.innerHTML = katex.renderToString(code, {
-        displayMode: true,
-        throwOnError: false,
-        errorColor: "currentColor",
-      });
-    } catch (e) {
-      return errorBox(`math: ${(e as Error).message}`);
-    }
-    return el;
-  },
-
-  mermaid: async (code, ctx) => {
-    const mermaid = await loadMermaid();
-    const theme = ctx.dark ? "dark" : "default";
-    if (mermaidThemeFor !== theme) {
-      mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
-      mermaidThemeFor = theme;
-    }
-    if (!code.trim()) {
+const RENDERERS: Record<StaticLangKey, (code: string, ctx: RenderCtx) => HTMLElement | Promise<HTMLElement>> =
+  {
+    // KaTeX inherits text color via currentColor — no theme injection needed.
+    math: async (code) => {
+      const katex = await loadKatex();
       const el = document.createElement("div");
-      el.className = "rotli-render-mermaid";
-      return el;
-    }
-    try {
-      const { svg } = await mermaid.render(ctx.id, code);
-      const el = document.createElement("div");
-      el.className = "rotli-render-mermaid";
-      el.innerHTML = svg;
-      return el;
-    } catch (e) {
-      return errorBox(`mermaid: ${mermaidMessage(e)}`);
-    } finally {
-      cleanupMermaidOrphans(ctx.id);
-    }
-  },
-
-  jsxgraph: async (code, ctx) => {
-    const el = document.createElement("div");
-    el.className = "rotli-render-jsxgraph";
-    const src = code.trim();
-    if (!src) return el; // empty fence while live-typing — quiet placeholder
-    const JXG = await loadJsxgraph();
-    try {
-      const attrs: Record<string, unknown> = {
-        boundingbox: [-8, 8, 8, -8],
-        axis: true,
-        // JSXGraph defaults JessieCode to an eval-based compiler. Production's
-        // CSP deliberately omits unsafe-eval, so use its interpreter path in
-        // every build; dev and release must execute the same grammar.
-        jc: { compile: false },
-        showCopyright: false,
-        showNavigation: false,
-        keepAspectRatio: false,
-        defaultAxes: {
-          x: { strokeColor: ctx.tokens("--text-muted"), ticks: { strokeColor: ctx.tokens("--border") } },
-          y: { strokeColor: ctx.tokens("--text-muted"), ticks: { strokeColor: ctx.tokens("--border") } },
-        },
-        grid: { strokeColor: ctx.tokens("--border") },
-      };
-      const board = JXG.JSXGraph.initBoard(el, attrs);
-      (el as RenderEl).__freeBoard = () => {
-        try {
-          JXG.JSXGraph.freeBoard(board);
-        } catch {
-          /* ignore */
-        }
-      };
-
-      // Theme the DEFAULT element colors so JessieCode-created objects read on
-      // both light + dark. board.options is a per-board deepCopy, so this is local.
-      const accent = ctx.tokens("--accent");
-      const text = ctx.tokens("--text");
-      const opt = board.options as unknown as Record<string, Record<string, unknown>>;
-      for (const kind of ["point", "line", "curve", "functiongraph", "circle", "polygon", "arc"]) {
-        const o = opt[kind];
-        if (o) {
-          o.strokeColor = accent;
-          o.highlightStrokeColor = accent;
-          if (kind === "point" || kind === "circle" || kind === "polygon") o.fillColor = accent;
-        }
+      el.className = "rotli-render-math";
+      try {
+        el.innerHTML = katex.renderToString(code, {
+          displayMode: true,
+          throwOnError: false,
+          errorColor: "currentColor",
+        });
+      } catch (e) {
+        return errorBox(`math: ${(e as Error).message}`);
       }
-      if (opt.text) opt.text.strokeColor = text;
+      return el;
+    },
 
-      board.jc.parse(src);
-    } catch (e) {
-      (el as RenderEl).__freeBoard?.();
-      delete (el as RenderEl).__freeBoard;
-      return errorBox(`jsxgraph: ${(e as Error).message}`);
-    }
-    return el;
-  },
+    mermaid: async (code, ctx) => {
+      const mermaid = await loadMermaid();
+      const theme = ctx.dark ? "dark" : "default";
+      if (mermaidThemeFor !== theme) {
+        mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
+        mermaidThemeFor = theme;
+      }
+      if (!code.trim()) {
+        const el = document.createElement("div");
+        el.className = "rotli-render-mermaid";
+        return el;
+      }
+      try {
+        const { svg } = await mermaid.render(ctx.id, code);
+        const el = document.createElement("div");
+        el.className = "rotli-render-mermaid";
+        el.innerHTML = svg;
+        return el;
+      } catch (e) {
+        return errorBox(`mermaid: ${mermaidMessage(e)}`);
+      } finally {
+        cleanupMermaidOrphans(ctx.id);
+      }
+    },
 
-  // a ```svg fence renders the vector inline; click-to-edit reveals the source
-  // (the code ⇄ preview toggle). User content, so strip <script> before injecting
-  // (the CSP blocks it too).
-  svg: (code) => {
-    const el = document.createElement("div");
-    el.className = "rotli-render-svg";
-    const src = code.trim();
-    if (!src) return el; // empty fence while live-typing — quiet placeholder
-    el.innerHTML = src.replace(/<script[\s\S]*?<\/script>/gi, "");
-    return el;
-  },
+    jsxgraph: async (code, ctx) => {
+      const el = document.createElement("div");
+      el.className = "rotli-render-jsxgraph";
+      const src = code.trim();
+      if (!src) return el; // empty fence while live-typing — quiet placeholder
+      const JXG = await loadJsxgraph();
+      try {
+        const attrs: Record<string, unknown> = {
+          boundingbox: [-8, 8, 8, -8],
+          axis: true,
+          // JSXGraph defaults JessieCode to an eval-based compiler. Production's
+          // CSP deliberately omits unsafe-eval, so use its interpreter path in
+          // every build; dev and release must execute the same grammar.
+          jc: { compile: false },
+          showCopyright: false,
+          showNavigation: false,
+          keepAspectRatio: false,
+          defaultAxes: {
+            x: { strokeColor: ctx.tokens("--text-muted"), ticks: { strokeColor: ctx.tokens("--border") } },
+            y: { strokeColor: ctx.tokens("--text-muted"), ticks: { strokeColor: ctx.tokens("--border") } },
+          },
+          grid: { strokeColor: ctx.tokens("--border") },
+        };
+        const board = JXG.JSXGraph.initBoard(el, attrs);
+        (el as RenderEl).__freeBoard = () => {
+          try {
+            JXG.JSXGraph.freeBoard(board);
+          } catch {
+            /* ignore */
+          }
+        };
 
-  // a ```html fence renders the markup in a SANDBOXED srcdoc iframe (same
-  // code ⇄ preview model as svg: click the block to reveal/edit the source).
-  // Verified against the shipped CSP in WebKit: frame-src doesn't block
-  // about:srcdoc, and `sandbox` WITHOUT allow-scripts refuses to run any
-  // <script> in the fence ("Blocked script execution … 'allow-scripts'
-  // permission is not set"). The srcdoc document also inherits the app CSP
-  // (script-src 'self'), so scripts are doubly off. Never loosen the sandbox
-  // for note content — fences are untrusted the moment a note is shared.
-  html: (code) => {
-    const el = document.createElement("div");
-    el.className = "rotli-render-html";
-    const src = code.trim();
-    if (!src) return el; // empty fence while live-typing — quiet placeholder
-    const frame = document.createElement("iframe");
-    frame.setAttribute("sandbox", ""); // opaque origin, no scripts
-    frame.title = "html preview";
-    frame.srcdoc = src;
-    el.appendChild(frame);
-    return el;
-  },
-};
+        // Theme the DEFAULT element colors so JessieCode-created objects read on
+        // both light + dark. board.options is a per-board deepCopy, so this is local.
+        const accent = ctx.tokens("--accent");
+        const text = ctx.tokens("--text");
+        const opt = board.options as unknown as Record<string, Record<string, unknown>>;
+        for (const kind of ["point", "line", "curve", "functiongraph", "circle", "polygon", "arc"]) {
+          const o = opt[kind];
+          if (o) {
+            o.strokeColor = accent;
+            o.highlightStrokeColor = accent;
+            if (kind === "point" || kind === "circle" || kind === "polygon") o.fillColor = accent;
+          }
+        }
+        if (opt.text) opt.text.strokeColor = text;
+
+        board.jc.parse(src);
+      } catch (e) {
+        (el as RenderEl).__freeBoard?.();
+        delete (el as RenderEl).__freeBoard;
+        return errorBox(`jsxgraph: ${(e as Error).message}`);
+      }
+      return el;
+    },
+
+    // a ```svg fence renders the vector inline; click-to-edit reveals the source
+    // (the code ⇄ preview toggle). User content, so strip <script> before injecting
+    // (the CSP blocks it too).
+    svg: (code) => {
+      const el = document.createElement("div");
+      el.className = "rotli-render-svg";
+      const src = code.trim();
+      if (!src) return el; // empty fence while live-typing — quiet placeholder
+      el.innerHTML = src.replace(/<script[\s\S]*?<\/script>/gi, "");
+      return el;
+    },
+
+    // a ```html fence renders the markup in a SANDBOXED srcdoc iframe (same
+    // code ⇄ preview model as svg: click the block to reveal/edit the source).
+    // Verified against the shipped CSP in WebKit: frame-src doesn't block
+    // about:srcdoc, and `sandbox` WITHOUT allow-scripts refuses to run any
+    // <script> in the fence ("Blocked script execution … 'allow-scripts'
+    // permission is not set"). The srcdoc document also inherits the app CSP
+    // (script-src 'self'), so scripts are doubly off. Never loosen the sandbox
+    // for note content — fences are untrusted the moment a note is shared.
+    html: (code) => {
+      const el = document.createElement("div");
+      el.className = "rotli-render-html";
+      const src = code.trim();
+      if (!src) return el; // empty fence while live-typing — quiet placeholder
+      const frame = document.createElement("iframe");
+      frame.setAttribute("sandbox", ""); // opaque origin, no scripts
+      frame.title = "html preview";
+      frame.srcdoc = src;
+      el.appendChild(frame);
+      return el;
+    },
+  };
 
 type RenderEl = HTMLElement & { __freeBoard?: () => void };
 

@@ -59,8 +59,7 @@ export interface DocumentTable {
 }
 
 export type DocumentContent =
-  | { kind: "paragraph"; paragraph: DocumentParagraph }
-  | { kind: "table"; table: DocumentTable };
+  { kind: "paragraph"; paragraph: DocumentParagraph } | { kind: "table"; table: DocumentTable };
 
 export interface EditableDocument {
   id: string;

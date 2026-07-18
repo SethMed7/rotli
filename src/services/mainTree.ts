@@ -316,16 +316,12 @@ export function renameFolderInMain(tree: MainNode[], folderId: string, name: str
       );
     }
     const taken = new Set(
-      nodes.flatMap((n) =>
-        "folder" in n && idOf(n, parentId) !== folderId ? [n.folder] : [],
-      ),
+      nodes.flatMap((n) => ("folder" in n && idOf(n, parentId) !== folderId ? [n.folder] : [])),
     );
     let unique = trimmed;
     for (let i = 2; taken.has(unique); i++) unique = `${trimmed} ${i}`;
     return nodes.map((n) =>
-      "folder" in n && idOf(n, parentId) === folderId
-        ? { folder: unique, children: n.children }
-        : n,
+      "folder" in n && idOf(n, parentId) === folderId ? { folder: unique, children: n.children } : n,
     );
   };
   return walk(tree, MAIN_ROOT);

@@ -73,12 +73,7 @@ import { useFolders } from "../services/hooks";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
 import { resetAndReonboard } from "../state/onboarding";
 import { setQuickFolderSynced } from "../state/quick";
-import {
-  type AppIcon,
-  type OrganizerTrust,
-  SOLID_THEMES,
-  useUiStore,
-} from "../state/ui";
+import { type AppIcon, type OrganizerTrust, SOLID_THEMES, useUiStore } from "../state/ui";
 import {
   CheckGlyph,
   CloudGlyph,
@@ -103,14 +98,7 @@ import {
 import { CORPUS_INSTANCE_ID, type MemexInstance, type Perms } from "../memex/config";
 import { NEW_ITEM_DEFINITIONS } from "../newItems/model";
 
-type SettingsPane =
-  | "general"
-  | "hotkeys"
-  | "appearance"
-  | "brain"
-  | "models"
-  | "location"
-  | "plugins";
+type SettingsPane = "general" | "hotkeys" | "appearance" | "brain" | "models" | "location" | "plugins";
 
 const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = [
   { id: "general", label: "General", glyph: LaptopGlyph },
@@ -335,9 +323,7 @@ function HotkeysPane() {
   return (
     <>
       <PaneHead title="Hotkeys" char="notes" />
-      <p className="lead">
-        Every shortcut in rotli is yours to rebind. Click a chord, press the new keys.
-      </p>
+      <p className="lead">Every shortcut in rotli is yours to rebind. Click a chord, press the new keys.</p>
       <input
         type="search"
         className="hksearch"
@@ -428,11 +414,9 @@ function UpdatesSection() {
     setState({ kind: "installing", pct: 0 });
     // resolves only if the relaunch doesn't happen (it normally does) — on any
     // error surface it; the app stays on the current build
-    void downloadAndInstallUpdate((pct) => setState({ kind: "installing", pct })).catch(
-      (err: unknown) => {
-        setState({ kind: "error", message: err instanceof Error ? err.message : String(err) });
-      },
-    );
+    void downloadAndInstallUpdate((pct) => setState({ kind: "installing", pct })).catch((err: unknown) => {
+      setState({ kind: "error", message: err instanceof Error ? err.message : String(err) });
+    });
   };
 
   const installing = state.kind === "installing";
@@ -444,27 +428,19 @@ function UpdatesSection() {
         <span>
           rotli {version}
           {state.kind === "current" && " — up to date"}
-          {state.kind === "available" &&
-            ` — update available${state.version ? ` (v${state.version})` : ""}`}
+          {state.kind === "available" && ` — update available${state.version ? ` (v${state.version})` : ""}`}
         </span>
         {state.kind === "available" || installing ? (
           <button type="button" className="ghostbtn" onClick={install} disabled={installing}>
             {installing ? `Updating… ${state.pct}%` : "Install & relaunch"}
           </button>
         ) : (
-          <button
-            type="button"
-            className="ghostbtn"
-            onClick={check}
-            disabled={state.kind === "checking"}
-          >
+          <button type="button" className="ghostbtn" onClick={check} disabled={state.kind === "checking"}>
             {state.kind === "checking" ? "Checking…" : "Check for updates"}
           </button>
         )}
       </div>
-      {state.kind === "error" && (
-        <p className="setnote err">Couldn’t check for updates: {state.message}</p>
-      )}
+      {state.kind === "error" && <p className="setnote err">Couldn’t check for updates: {state.message}</p>}
     </>
   );
 }
@@ -511,8 +487,8 @@ function GeneralPane() {
     <>
       <PaneHead title="General" char="base" />
       <p className="lead">
-        rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when
-        you&rsquo;re living in it.
+        rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when you&rsquo;re
+        living in it.
       </p>
       <div className="swgroup">
         <Toggle
@@ -537,15 +513,15 @@ function GeneralPane() {
         />
       </div>
       <p className="setnote">
-        Either way the menu-bar icon stays, {chordLabel(bindingOverrides, "app.toggleWindow")} opens
-        the app, and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture —
-        all rebindable in Hotkeys.
+        Either way the menu-bar icon stays, {chordLabel(bindingOverrides, "app.toggleWindow")} opens the app,
+        and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture — all rebindable in
+        Hotkeys.
       </p>
 
       <h4 className="sethead">Your name</h4>
       <p className="lead">
-        Chat uses it to address you like a person. It lives in your settings file on this Mac —
-        never sent anywhere on its own.
+        Chat uses it to address you like a person. It lives in your settings file on this Mac — never sent
+        anywhere on its own.
       </p>
       <label className="setselect-row">
         <span>Name</span>
@@ -561,8 +537,8 @@ function GeneralPane() {
 
       <h4 className="sethead">New tabs</h4>
       <p className="lead">
-        Choose what {chordLabel(bindingOverrides, "tabs.new")} and the tab-strip plus create. The New
-        menu always offers every type.
+        Choose what {chordLabel(bindingOverrides, "tabs.new")} and the tab-strip plus create. The New menu
+        always offers every type.
       </p>
       <label className="setselect-row">
         <span>New tab creates</span>
@@ -572,20 +548,22 @@ function GeneralPane() {
           onChange={(event) => setNewTabDefault(event.target.value as typeof newTabDefault)}
         >
           {NEW_ITEM_DEFINITIONS.map((item) => (
-            <option key={item.kind} value={item.kind}>{item.label}</option>
+            <option key={item.kind} value={item.kind}>
+              {item.label}
+            </option>
           ))}
         </select>
       </label>
       <p className="setnote">
-        Markdown notes support slash commands and embeds. Documents stay conventional documents;
-        sheets and boards use their own focused editors.
+        Markdown notes support slash commands and embeds. Documents stay conventional documents; sheets and
+        boards use their own focused editors.
       </p>
 
       <h4 className="sethead">Quick note</h4>
       <p className="lead">
-        A floating note you summon with {chordLabel(bindingOverrides, "quick.summon")} — pin up to
-        five notes in it, cycle them with ‹ ›, and ⌘K searches every note to swap one in. It always
-        reopens where you left off and closes when you click away.
+        A floating note you summon with {chordLabel(bindingOverrides, "quick.summon")} — pin up to five notes
+        in it, cycle them with ‹ ›, and ⌘K searches every note to swap one in. It always reopens where you
+        left off and closes when you click away.
       </p>
       <label className="setselect-row">
         <span>New quick notes go to</span>
@@ -624,8 +602,8 @@ function GeneralPane() {
 
       <h4 className="sethead">Demo mode</h4>
       <p className="lead">
-        Switch to a separate demo library with sample content — for screenshots or trying things out.
-        Your real notes are never touched; toggling relaunches rotli.
+        Switch to a separate demo library with sample content — for screenshots or trying things out. Your
+        real notes are never touched; toggling relaunches rotli.
       </p>
       <Toggle
         on={demo}
@@ -636,8 +614,8 @@ function GeneralPane() {
 
       <h4 className="sethead">Start fresh</h4>
       <p className="lead">
-        Reset your hotkeys, window behavior, and theme back to the defaults and run first-time
-        setup again. Your notes are never touched.
+        Reset your hotkeys, window behavior, and theme back to the defaults and run first-time setup again.
+        Your notes are never touched.
       </p>
       <button
         type="button"
@@ -712,11 +690,7 @@ function AppearancePane() {
                 setTheme(mode);
               }}
             >
-              <span
-                className="famswatch"
-                style={{ background: THEME_SWATCH[label] }}
-                aria-hidden="true"
-              />
+              <span className="famswatch" style={{ background: THEME_SWATCH[label] }} aria-hidden="true" />
               <span className="famlabel">{label}</span>
               <span className="famcaption">{THEME_CAPTIONS[label]}</span>
             </button>
@@ -779,8 +753,6 @@ function AppearancePane() {
           </button>
         ))}
       </div>
-
-
     </>
   );
 }
@@ -890,9 +862,7 @@ function LocationPane() {
   const validateMut = useRunValidate();
   // validate result keyed by instance id — so checking an Other brain shows on ITS
   // card, never misattributed under "Your brain".
-  const [validation, setValidation] = useState<{ id: string; report: MemexValidateReport } | null>(
-    null,
-  );
+  const [validation, setValidation] = useState<{ id: string; report: MemexValidateReport } | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const storageGrouping = useUiStore((s) => s.storageGrouping);
@@ -933,9 +903,9 @@ function LocationPane() {
     <>
       <PaneHead title="Location" char="local" />
       <p className="lead">
-        Your notes are plain Markdown files in <b>one folder</b> on this Mac — and that folder can be
-        your <b>brain</b> (a memex): notes, chats, and knowledge together, kept tidy by AI but always
-        yours to arrange. rotli never holds your notes hostage.
+        Your notes are plain Markdown files in <b>one folder</b> on this Mac — and that folder can be your{" "}
+        <b>brain</b> (a memex): notes, chats, and knowledge together, kept tidy by AI but always yours to
+        arrange. rotli never holds your notes hostage.
       </p>
 
       {/* —— the one folder —— */}
@@ -990,10 +960,9 @@ function LocationPane() {
       </div>
       {isDev && (
         <p className="setnote">
-          This is the same memex used by production Rotli. Development reads it directly, but
-          cannot change notes, chats, inbox, boards, metadata, permissions, or its{" "}
-          <code>.rotli/</code> sidecar. Development-only appearance and window state stay in the app
-          cache.
+          This is the same memex used by production Rotli. Development reads it directly, but cannot change
+          notes, chats, inbox, boards, metadata, permissions, or its <code>.rotli/</code> sidecar.
+          Development-only appearance and window state stay in the app cache.
         </p>
       )}
 
@@ -1017,9 +986,9 @@ function LocationPane() {
 
       {!isDev && (
         <p className="setnote">
-          <b>Choose folder…</b> takes a memex (rotli uses it as your notes folder), an empty folder
-          (your notes move there), or any folder (used as-is). The hidden <code>.rotli/</code> is just
-          an index — deleting it loses nothing but a rebuild.
+          <b>Choose folder…</b> takes a memex (rotli uses it as your notes folder), an empty folder (your
+          notes move there), or any folder (used as-is). The hidden <code>.rotli/</code> is just an index —
+          deleting it loses nothing but a rebuild.
         </p>
       )}
 
@@ -1028,11 +997,11 @@ function LocationPane() {
         <>
           <h4 className="sethead">Linked libraries</h4>
           <p className="lead">
-            A <b>linked library</b> is a <em>second</em> memex you reference alongside your notes — a
-            shared or team brain, a reference vault. <b>Most people never need one</b> (your notes
-            folder is already your memex). rotli reads the whole library and, per its perms, writes
-            only <b>chats</b>, <b>inbox</b>, and new notes; it never touches its history or identity,
-            and its curated wiki is read-only.
+            A <b>linked library</b> is a <em>second</em> memex you reference alongside your notes — a shared
+            or team brain, a reference vault. <b>Most people never need one</b> (your notes folder is already
+            your memex). rotli reads the whole library and, per its perms, writes only <b>chats</b>,{" "}
+            <b>inbox</b>, and new notes; it never touches its history or identity, and its curated wiki is
+            read-only.
           </p>
           {candidates.length > 0 && (
             <>
@@ -1060,8 +1029,8 @@ function LocationPane() {
           )}
           {linkedLibraries.length === 0 ? (
             <p className="setnote">
-              No linked libraries. Link one only if you want a second, shared memex — otherwise your
-              notes folder is all you need.
+              No linked libraries. Link one only if you want a second, shared memex — otherwise your notes
+              folder is all you need.
             </p>
           ) : (
             linkedLibraries.map((inst) => (
@@ -1073,17 +1042,13 @@ function LocationPane() {
                 busy={busy}
                 lastValidate={validation?.id === inst.id ? validation.report : null}
                 onMakeActive={
-                  inst.id === activeId
-                    ? undefined
-                    : () => run(() => setActiveMut.mutateAsync(inst.id))
+                  inst.id === activeId ? undefined : () => run(() => setActiveMut.mutateAsync(inst.id))
                 }
                 onUseAsFolder={() => run(() => chooseMut.mutateAsync(inst.root))}
                 onPerms={(p) => run(() => permsMut.mutateAsync({ id: inst.id, perms: p }))}
                 onValidate={() =>
                   run(() =>
-                    validateMut
-                      .mutateAsync(inst)
-                      .then((r) => setValidation({ id: inst.id, report: r })),
+                    validateMut.mutateAsync(inst).then((r) => setValidation({ id: inst.id, report: r })),
                   )
                 }
                 onForget={() => run(() => forgetMut.mutateAsync(inst.id))}
@@ -1137,9 +1102,9 @@ function BrainPane() {
     <>
       <PaneHead title="Brain" char="knowledge" />
       <p className="lead">
-        The organizing model you choose keeps the Brain tidy: it files notes into the right areas and
-        fills in their metadata (area, tags, a one-line summary). It only ever changes <b>where a
-        note lives</b> and its <b>metadata</b> — the words inside your notes are never touched.
+        The organizing model you choose keeps the Brain tidy: it files notes into the right areas and fills in
+        their metadata (area, tags, a one-line summary). It only ever changes <b>where a note lives</b> and
+        its <b>metadata</b> — the words inside your notes are never touched.
       </p>
       <Seg
         value={trust}
@@ -1158,11 +1123,9 @@ function BrainPane() {
       />
       <p className="setnote">{TRUST_CAPTIONS[trust]}</p>
       <p className="setnote">
-        It always skips: <b>locked notes</b> (lock a note in its metadata panel and the organizer
-        won&rsquo;t touch it at all — not even its metadata) · <b>secure notes</b> · your hand-arranged{" "}
-        <b>Main</b>.
+        It always skips: <b>locked notes</b> (lock a note in its metadata panel and the organizer won&rsquo;t
+        touch it at all — not even its metadata) · <b>secure notes</b> · your hand-arranged <b>Main</b>.
       </p>
-
       <span className="mplabel">Organizing model</span>
       <Seg
         value={model}
@@ -1176,9 +1139,9 @@ function BrainPane() {
       <p className="setnote">
         {model === "claude" ? (
           <>
-            <b>Claude Sonnet 5</b> (via <code>claude -p</code>) does the organizing — your{" "}
-            <b>non-secure</b> notes are sent to Anthropic to file. <b>Secure</b> and <b>locked</b>{" "}
-            notes are never sent anywhere.
+            <b>Claude Sonnet 5</b> (via <code>claude -p</code>) does the organizing — your <b>non-secure</b>{" "}
+            notes are sent to Anthropic to file. <b>Secure</b> and <b>locked</b> notes are never sent
+            anywhere.
           </>
         ) : model === "gemini35" ? (
           <>
@@ -1189,7 +1152,6 @@ function BrainPane() {
           <>A local model on this Mac organizes — nothing ever leaves your machine.</>
         )}
       </p>
-
       <span className="mplabel">Wait before organizing</span>
       <Seg
         value={String(quiet)}
@@ -1206,8 +1168,8 @@ function BrainPane() {
         After you stop touching a note, the organizer waits this long before it scans it.
       </p>
       <p className="setnote">
-        It waits for its moment: only when you&rsquo;re away, plugged in, and the machine is cool —
-        never on battery, never over a chat. <b>Run now</b> does one pass immediately.
+        It waits for its moment: only when you&rsquo;re away, plugged in, and the machine is cool — never on
+        battery, never over a chat. <b>Run now</b> does one pass immediately.
       </p>
       <button
         type="button"
@@ -1221,9 +1183,7 @@ function BrainPane() {
                 err: false,
               }),
             )
-            .catch((e) =>
-              setRanNote({ text: e instanceof Error ? e.message : String(e), err: true }),
-            );
+            .catch((e) => setRanNote({ text: e instanceof Error ? e.message : String(e), err: true }));
         }}
       >
         Run now
@@ -1262,13 +1222,7 @@ interface Installing {
 /** "On this Mac" — installed local models + the installer. Every installed model
  * is pickable per chat (the shared server swaps on demand, loads lazily, and
  * idle-unloads); "default" marks what no-model callers (Breve) get. */
-function LocalModelsSection({
-  installed,
-  onChanged,
-}: {
-  installed: ChatModelInfo[];
-  onChanged: () => void;
-}) {
+function LocalModelsSection({ installed, onChanged }: { installed: ChatModelInfo[]; onChanged: () => void }) {
   const [installing, setInstalling] = useState<Installing | null>(null);
   const [repo, setRepo] = useState("");
   const [note, setNote] = useState<{ text: string; err: boolean } | null>(null);
@@ -1292,7 +1246,13 @@ function LocalModelsSection({
     const requestId = crypto.randomUUID();
     setInstalling({ requestId, name, label, ...(approxMb ? { approxMb } : {}) });
     setNote(null);
-    localModelInstall({ requestId, repo: repoId, name, ...(approxMb ? { approxMb } : {}), ...(vision ? { vision } : {}) })
+    localModelInstall({
+      requestId,
+      repo: repoId,
+      name,
+      ...(approxMb ? { approxMb } : {}),
+      ...(vision ? { vision } : {}),
+    })
       .then(() => {
         setNote({ text: `${label} installed.`, err: false });
         onChanged();
@@ -1354,8 +1314,8 @@ function LocalModelsSection({
     <section className="aisection">
       <h4 className="set-subhead">On this Mac</h4>
       <p className="setnote">
-        Models that run entirely on your Mac. Pick any of them per chat — a model loads when
-        asked and unloads after a few idle minutes, so nothing runs around the clock. The
+        Models that run entirely on your Mac. Pick any of them per chat — a model loads when asked and unloads
+        after a few idle minutes, so nothing runs around the clock. The
         <b> default</b> is what your other memex apps (like Breve) use.
       </p>
 
@@ -1374,15 +1334,12 @@ function LocalModelsSection({
         </button>
         {scan && (
           <span className="aiscan-fact">
-            {scan.chip} · {Math.round(scan.ramGb)} GB memory · {Math.round(scan.freeDiskGb)} GB
-            free
+            {scan.chip} · {Math.round(scan.ramGb)} GB memory · {Math.round(scan.freeDiskGb)} GB free
           </span>
         )}
       </div>
       {scan && (
-        <p className="setnote">
-          This Mac {scanVerdict(scan.ramGb)} The picks below are badged accordingly.
-        </p>
+        <p className="setnote">This Mac {scanVerdict(scan.ramGb)} The picks below are badged accordingly.</p>
       )}
       {scanErr && <p className="setnote err">{scanErr}</p>}
       {installed.length > 0 && (
@@ -1416,9 +1373,7 @@ function LocalModelsSection({
         <div className="localmodel-progress">
           <div className="localmodel-prog-head">
             <span>Downloading {installing.label}…</span>
-            <span>
-              {pct !== null ? `${pct}%` : formatSize(Math.round(bytes / 1_000_000))}
-            </span>
+            <span>{pct !== null ? `${pct}%` : formatSize(Math.round(bytes / 1_000_000))}</span>
           </div>
           <div className="localmodel-track">
             <div className="localmodel-fill" style={{ width: pct !== null ? `${pct}%` : "40%" }} />
@@ -1470,7 +1425,6 @@ function LocalModelsSection({
     </section>
   );
 }
-
 
 const PROVIDER_DESC: Record<ProviderId, string> = {
   claude: "Claude Code CLI — rides your Claude Pro/Max subscription.",
@@ -1562,14 +1516,10 @@ function LaneCard({ id }: { id: ProviderId }) {
     verifyLane(id)
       .then((r) =>
         setVerify(
-          r.ok
-            ? { state: "ok", ms: r.ms, model: r.model }
-            : { state: "fail", error: r.error ?? "failed" },
+          r.ok ? { state: "ok", ms: r.ms, model: r.model } : { state: "fail", error: r.error ?? "failed" },
         ),
       )
-      .catch((e: unknown) =>
-        setVerify({ state: "fail", error: e instanceof Error ? e.message : "failed" }),
-      );
+      .catch((e: unknown) => setVerify({ state: "fail", error: e instanceof Error ? e.message : "failed" }));
   };
 
   const onToggle = () => {
@@ -1771,9 +1721,7 @@ function PresetEditor({
             type="button"
             className="ghostbtn"
             disabled={p.routes.length <= 1}
-            onClick={() =>
-              setP((prev) => ({ ...prev, routes: prev.routes.filter((_, j) => j !== i) }))
-            }
+            onClick={() => setP((prev) => ({ ...prev, routes: prev.routes.filter((_, j) => j !== i) }))}
           >
             ×
           </button>
@@ -1890,7 +1838,9 @@ function ModelsPane() {
         </span>
       ))}
       {p.fallback && (
-        <span className="preset-step">↩ if a route fails, <b>{pretty(p.fallback)}</b> takes over</span>
+        <span className="preset-step">
+          ↩ if a route fails, <b>{pretty(p.fallback)}</b> takes over
+        </span>
       )}
     </div>
   );
@@ -1899,10 +1849,9 @@ function ModelsPane() {
     <>
       <PaneHead title="AI Models" char="knowledge" />
       <p className="lead">
-        Chat runs on your Mac by default. Install more on-device models below, or connect the
-        subscriptions you already have — their models join the picker, and rotli drives the official
-        CLI on this machine. A connected model runs remotely: the conversation leaves your Mac,
-        secure notes never do.
+        Chat runs on your Mac by default. Install more on-device models below, or connect the subscriptions
+        you already have — their models join the picker, and rotli drives the official CLI on this machine. A
+        connected model runs remotely: the conversation leaves your Mac, secure notes never do.
       </p>
 
       <LocalModelsSection
@@ -1913,8 +1862,8 @@ function ModelsPane() {
       <section className="aisection">
         <h4 className="set-subhead">Connected models</h4>
         <p className="setnote">
-          Turning a lane on runs one tiny test reply in the background — the honest &ldquo;it
-          works&rdquo;. Inside a lane, click a model to block or allow it in the picker.
+          Turning a lane on runs one tiny test reply in the background — the honest &ldquo;it works&rdquo;.
+          Inside a lane, click a model to block or allow it in the picker.
         </p>
         {PROVIDER_IDS.map((id) => (
           <LaneCard key={id} id={id} />
@@ -1922,18 +1871,16 @@ function ModelsPane() {
       </section>
 
       <section className="aisection">
-      <h4 className="set-subhead">Hybrid presets</h4>
-      <p className="setnote">
-        A preset lets one model ORGANIZE each message and route it to the model best suited — e.g.
-        gemma routes, Gemini executes, Claude catches failures. Presets show up in the chat&rsquo;s
-        model picker.
-      </p>
-      {STARTER_PRESETS.some((sp) => !hybridPresets.some((p) => p.id === sp.id)) && (
-        <>
-          <p className="setnote">Ready-made — add one and tweak it to taste:</p>
-          <div className="preset-list">
-            {STARTER_PRESETS.filter((sp) => !hybridPresets.some((p) => p.id === sp.id)).map(
-              (sp) => (
+        <h4 className="set-subhead">Hybrid presets</h4>
+        <p className="setnote">
+          A preset lets one model ORGANIZE each message and route it to the model best suited — e.g. gemma
+          routes, Gemini executes, Claude catches failures. Presets show up in the chat&rsquo;s model picker.
+        </p>
+        {STARTER_PRESETS.some((sp) => !hybridPresets.some((p) => p.id === sp.id)) && (
+          <>
+            <p className="setnote">Ready-made — add one and tweak it to taste:</p>
+            <div className="preset-list">
+              {STARTER_PRESETS.filter((sp) => !hybridPresets.some((p) => p.id === sp.id)).map((sp) => (
                 <div className="preset-row" key={sp.id}>
                   <div className="preset-rowhead">
                     <span className="preset-name">{sp.name}</span>
@@ -1948,103 +1895,101 @@ function ModelsPane() {
                   </div>
                   {breakdown(sp)}
                 </div>
-              ),
-            )}
+              ))}
+            </div>
+          </>
+        )}
+        {hybridPresets.length > 0 && (
+          <div className="preset-list">
+            {hybridPresets.map((p) => (
+              <div className="preset-row" key={p.id}>
+                <div className="preset-rowhead">
+                  <span className="preset-name">{p.name}</span>
+                  <span className="chat-box-grow" />
+                  <button type="button" className="ghostbtn" onClick={() => setDraft(p)}>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="ghostbtn quiet"
+                    onClick={() => setHybridPresets(hybridPresets.filter((x) => x.id !== p.id))}
+                  >
+                    Delete
+                  </button>
+                </div>
+                {breakdown(p)}
+              </div>
+            ))}
           </div>
-        </>
-      )}
-      {hybridPresets.length > 0 && (
-        <div className="preset-list">
-          {hybridPresets.map((p) => (
-            <div className="preset-row" key={p.id}>
-              <div className="preset-rowhead">
-                <span className="preset-name">{p.name}</span>
-                <span className="chat-box-grow" />
-                <button type="button" className="ghostbtn" onClick={() => setDraft(p)}>
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="ghostbtn quiet"
-                  onClick={() => setHybridPresets(hybridPresets.filter((x) => x.id !== p.id))}
-                >
-                  Delete
-                </button>
-              </div>
-              {breakdown(p)}
-            </div>
-          ))}
-        </div>
-      )}
-      {draft ? (
-        <PresetEditor
-          draft={draft}
-          models={available}
-          onSave={savePreset}
-          onCancel={() => setDraft(null)}
-        />
-      ) : (
-        <button
-          type="button"
-          className="ghostbtn primary"
-          disabled={available.length === 0}
-          onClick={() =>
-            setDraft({
-              id: crypto.randomUUID(),
-              name: "",
-              organizer: (local.data ?? []).find((m) => m.isDefault)?.id ?? available[0]?.id ?? "",
-              routes: [{ when: "", model: available[0]?.id ?? "" }],
-            })
-          }
-        >
-          New preset
-        </button>
-      )}
+        )}
+        {draft ? (
+          <PresetEditor
+            draft={draft}
+            models={available}
+            onSave={savePreset}
+            onCancel={() => setDraft(null)}
+          />
+        ) : (
+          <button
+            type="button"
+            className="ghostbtn primary"
+            disabled={available.length === 0}
+            onClick={() =>
+              setDraft({
+                id: crypto.randomUUID(),
+                name: "",
+                organizer: (local.data ?? []).find((m) => m.isDefault)?.id ?? available[0]?.id ?? "",
+                routes: [{ when: "", model: available[0]?.id ?? "" }],
+              })
+            }
+          >
+            New preset
+          </button>
+        )}
 
-      <p className="setnote">Not sure where to start? Say what you mostly use chat for:</p>
-      <div className="aikey">
-        <input
-          className="aikey-input"
-          placeholder="e.g. research + summarizing my notes, some coding questions…"
-          value={usage}
-          onChange={(e) => setUsage(e.target.value)}
-          onKeyDown={(e) => e.stopPropagation()}
-        />
-        <button type="button" className="ghostbtn" disabled={suggesting} onClick={generate}>
-          {suggesting ? "Generating…" : "Generate templates"}
-        </button>
-      </div>
-      {genNote && <p className={genNote.err ? "setnote err" : "setnote"}>{genNote.text}</p>}
-      {suggestions.length > 0 && (
-        <div className="preset-list">
-          {suggestions.map((p) => (
-            <div className="preset-row" key={p.id}>
-              <div className="preset-rowhead">
-                <span className="preset-name">{p.name}</span>
-                <span className="chat-box-grow" />
-                <button
-                  type="button"
-                  className="ghostbtn primary"
-                  onClick={() => {
-                    setHybridPresets([...hybridPresets, p]);
-                    setSuggestions(suggestions.filter((x) => x.id !== p.id));
-                  }}
-                >
-                  Save
-                </button>
-              </div>
-              {breakdown(p)}
-            </div>
-          ))}
+        <p className="setnote">Not sure where to start? Say what you mostly use chat for:</p>
+        <div className="aikey">
+          <input
+            className="aikey-input"
+            placeholder="e.g. research + summarizing my notes, some coding questions…"
+            value={usage}
+            onChange={(e) => setUsage(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+          />
+          <button type="button" className="ghostbtn" disabled={suggesting} onClick={generate}>
+            {suggesting ? "Generating…" : "Generate templates"}
+          </button>
         </div>
-      )}
+        {genNote && <p className={genNote.err ? "setnote err" : "setnote"}>{genNote.text}</p>}
+        {suggestions.length > 0 && (
+          <div className="preset-list">
+            {suggestions.map((p) => (
+              <div className="preset-row" key={p.id}>
+                <div className="preset-rowhead">
+                  <span className="preset-name">{p.name}</span>
+                  <span className="chat-box-grow" />
+                  <button
+                    type="button"
+                    className="ghostbtn primary"
+                    onClick={() => {
+                      setHybridPresets([...hybridPresets, p]);
+                      setSuggestions(suggestions.filter((x) => x.id !== p.id));
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+                {breakdown(p)}
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="aisection">
         <h4 className="set-subhead">Images in chat</h4>
         <p className="setnote">
-          Which connected engine draws when a chat generates an image (saved into this
-          chat&rsquo;s assets).
+          Which connected engine draws when a chat generates an image (saved into this chat&rsquo;s assets).
         </p>
         <Seg
           value={imageEngine}
@@ -2116,9 +2061,7 @@ function PluginsPane() {
   return (
     <>
       <PaneHead title="Plugins" char="chat" />
-      <p className="lead">
-        Plugins extend rotli over the same corpus.
-      </p>
+      <p className="lead">Plugins extend rotli over the same corpus.</p>
 
       {/* Use rotli for your docs — a prompt you paste into Claude Code so a
           project's docs live in rotli, not the repo (Seth, 2026-07-07). */}
@@ -2130,8 +2073,8 @@ function PluginsPane() {
           </button>
         </div>
         <p className="plugdesc">
-          Paste this into Claude Code in any project and your planning + docs land in rotli
-          instead of the repo — everything but the README.
+          Paste this into Claude Code in any project and your planning + docs land in rotli instead of the
+          repo — everything but the README.
         </p>
         <pre className="claudecmd-block">{CLAUDE_DOCS_COMMAND}</pre>
       </div>

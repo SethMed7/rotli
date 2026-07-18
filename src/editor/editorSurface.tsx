@@ -6,11 +6,7 @@
 
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { relativeLabel } from "../lib/dateLabels";
-import {
-  corpusNoteAbsolutePath,
-  corpusRawFrontmatter,
-  corpusWriteFrontmatterRaw,
-} from "../lib/tauri";
+import { corpusNoteAbsolutePath, corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
 import { invalidateNotes, useNote } from "../services/hooks";
 import { markNoteDraftChanged } from "../services/noteDrafts";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
@@ -24,7 +20,13 @@ import { brainLocationLabel, noteDiskFolder, noteLocationLabel } from "../lib/no
 import { BottomSlot } from "./bottomSlot";
 import { CmEditor } from "./cmEditor";
 import { FormatBar } from "./formatBar";
-import { ensureDocument, flushNote, reloadDocumentIfClean, useDocumentDirty, useDocumentLines } from "./model";
+import {
+  ensureDocument,
+  flushNote,
+  reloadDocumentIfClean,
+  useDocumentDirty,
+  useDocumentLines,
+} from "./model";
 import { openChatForNote } from "../noteChat/composition";
 
 /** Below this pane width the format bar collapses its end groups into ⋯. */
@@ -194,19 +196,12 @@ export function EditorSurface({
   const shelfLocation = brainLocationLabel(note.folderId);
 
   return (
-    <div
-      className="editor"
-      ref={rootRef}
-      style={{ "--cm-measure": `${measureWidth}px` } as CSSProperties}
-    >
+    <div className="editor" ref={rootRef} style={{ "--cm-measure": `${measureWidth}px` } as CSSProperties}>
       {/* right-click the header chrome (never the text body — that keeps
           selection/spellcheck) → the note's lifecycle/security menu. Gated to
           the main editor: the Quick window
           has no context-menu host, so it keeps its native menu. */}
-      <div
-        className="ed-head"
-        onContextMenu={autoFocus ? undefined : (e) => openNoteMenu(e, note)}
-      >
+      <div className="ed-head" onContextMenu={autoFocus ? undefined : (e) => openNoteMenu(e, note)}>
         {createdLabel(note.createdAt)}
         <div className="slot">
           {/* header-inline status (r5): dot · chars · updated · where · Main. The

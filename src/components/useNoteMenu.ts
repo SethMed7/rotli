@@ -114,11 +114,13 @@ export function useNoteMenu() {
                 onClick: () => openSummary(note, { newTab: true }),
               },
               ...(isFile
-                ? [{
-                    kind: "action" as const,
-                    label: "Show in Finder",
-                    onClick: () => void corpusRevealFile(note.id),
-                  } satisfies MenuSpec]
+                ? [
+                    {
+                      kind: "action" as const,
+                      label: "Show in Finder",
+                      onClick: () => void corpusRevealFile(note.id),
+                    } satisfies MenuSpec,
+                  ]
                 : []),
               { kind: "sep" as const },
               restoreItem,
@@ -139,8 +141,7 @@ export function useNoteMenu() {
         const fm = isNote ? await corpusFrontmatter(note.id).catch(() => null) : null;
         const fileStat = isFile ? await corpusFileStat(note.id).catch(() => null) : null;
         const secureAtHome =
-          isNote &&
-          (isSecureBrainFolder(noteDiskFolder(note)) || isSecureNotesFolder(noteDiskFolder(note)));
+          isNote && (isSecureBrainFolder(noteDiskFolder(note)) || isSecureNotesFolder(noteDiskFolder(note)));
 
         // frontmatter toggles surface failures in the sidebar's inline error
         // note (the menu is gone by the time a write fails — #11 pattern)
@@ -149,13 +150,13 @@ export function useNoteMenu() {
           // an explicit lock/secure/fm mutation = intent to keep the note —
           // it must never be discarded as an abandoned blank draft
           markNoteDraftChanged(note.id);
-          void op.then(invalidateNotes).catch((err) =>
-            useUiStore
-              .getState()
-              .setRowActionError(
-                `Couldn't ${verb} — ${err instanceof Error ? err.message : String(err)}`,
-              ),
-          );
+          void op
+            .then(invalidateNotes)
+            .catch((err) =>
+              useUiStore
+                .getState()
+                .setRowActionError(`Couldn't ${verb} — ${err instanceof Error ? err.message : String(err)}`),
+            );
         };
 
         const items: MenuSpec[] = [];
@@ -296,87 +297,82 @@ export function useNoteMenu() {
           if (fm?.secure) {
             items.push({
               kind: "action" as const,
-              label: fm.localAiAllowed
-                ? "Revoke Local AI access"
-                : "Allow Local AI on this Mac",
+              label: fm.localAiAllowed ? "Revoke Local AI access" : "Allow Local AI on this Mac",
               checked: fm.localAiAllowed,
               onClick: () =>
-                runFm(
-                  "change Local AI access",
-                  corpusSetLocalAiAccess(note.id, !fm.localAiAllowed),
-                ),
+                runFm("change Local AI access", corpusSetLocalAiAccess(note.id, !fm.localAiAllowed)),
             });
           }
         }
-      if (!isFile) {
+        if (!isFile) {
+          items.push({ kind: "sep" as const });
+          items.push({
+            kind: "action" as const,
+            label: "Rename…",
+            onClick: () =>
+              isBoard
+                ? useUiStore.getState().setRenamingBoardId(note.id)
+                : setRenameTarget({ id: note.id, current: note.title }),
+          });
+        }
         items.push({ kind: "sep" as const });
-        items.push({
-          kind: "action" as const,
-          label: "Rename…",
-          onClick: () =>
-            isBoard
-              ? useUiStore.getState().setRenamingBoardId(note.id)
-              : setRenameTarget({ id: note.id, current: note.title }),
-        });
-      }
-      items.push({ kind: "sep" as const });
-      if (!isFile) {
-        items.push({
-          kind: "action" as const,
-          label: "Archive",
-          onClick: () => {
-            // a note leaving for a sink also leaves Main (Seth #5, 2026-07-08)
-            if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
-            archive.mutate(note.id);
-          },
-        });
-      }
-      if (isFile) {
-        const movable = fileStat?.lifecycleMutable === true;
-        const moveFile = (sink: "Archive" | "Trash") => {
-          if (!movable) return;
-          useUiStore.getState().setRowActionError(null);
-          void corpusMoveFileToSink(note.id, sink)
-            .then(async () => {
+        if (!isFile) {
+          items.push({
+            kind: "action" as const,
+            label: "Archive",
+            onClick: () => {
+              // a note leaving for a sink also leaves Main (Seth #5, 2026-07-08)
               if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
-              if (starred) togglePinQuick(note.id);
-              usePanesStore.getState().closeFileTabs(note.id);
-              await invalidateNotes();
-            })
-            .catch((err) =>
-              useUiStore
-                .getState()
-                .setRowActionError(
-                  `Couldn’t move “${note.title || "this file"}” to ${sink} — ${
-                    err instanceof Error ? err.message : String(err)
-                  }`,
-                ),
-            );
-        };
-        items.push({
-          kind: "action" as const,
-          label: movable ? "Move file to Archive" : "Read-only — can’t move file",
-          disabled: !movable,
-          onClick: () => moveFile("Archive"),
-        });
-        items.push({
-          kind: "action" as const,
-          label: movable ? "Move file to Trash" : "Read-only — can’t move file",
-          danger: movable,
-          disabled: !movable,
-          onClick: () => moveFile("Trash"),
-        });
-      } else {
-        items.push({
-          kind: "action" as const,
-          label: "Delete",
-          danger: true,
-          onClick: () => {
-            if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
-            trash.mutate(note.id);
-          },
-        });
-      }
+              archive.mutate(note.id);
+            },
+          });
+        }
+        if (isFile) {
+          const movable = fileStat?.lifecycleMutable === true;
+          const moveFile = (sink: "Archive" | "Trash") => {
+            if (!movable) return;
+            useUiStore.getState().setRowActionError(null);
+            void corpusMoveFileToSink(note.id, sink)
+              .then(async () => {
+                if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
+                if (starred) togglePinQuick(note.id);
+                usePanesStore.getState().closeFileTabs(note.id);
+                await invalidateNotes();
+              })
+              .catch((err) =>
+                useUiStore
+                  .getState()
+                  .setRowActionError(
+                    `Couldn’t move “${note.title || "this file"}” to ${sink} — ${
+                      err instanceof Error ? err.message : String(err)
+                    }`,
+                  ),
+              );
+          };
+          items.push({
+            kind: "action" as const,
+            label: movable ? "Move file to Archive" : "Read-only — can’t move file",
+            disabled: !movable,
+            onClick: () => moveFile("Archive"),
+          });
+          items.push({
+            kind: "action" as const,
+            label: movable ? "Move file to Trash" : "Read-only — can’t move file",
+            danger: movable,
+            disabled: !movable,
+            onClick: () => moveFile("Trash"),
+          });
+        } else {
+          items.push({
+            kind: "action" as const,
+            label: "Delete",
+            danger: true,
+            onClick: () => {
+              if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
+              trash.mutate(note.id);
+            },
+          });
+        }
 
         open(x, y, items, opts);
       })();

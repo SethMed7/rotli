@@ -95,11 +95,7 @@ export function startTabDrag(
       const pane = leaves(s.root).find((p) => p.id === fromPaneId);
       const tab = pane?.tabs.find((t) => t.id === tabId);
       const mainId =
-        tab?.surfaceKind === "note"
-          ? tab.noteId
-          : tab?.surfaceKind === "canvas"
-            ? tab.boardId
-            : null;
+        tab?.surfaceKind === "note" ? tab.noteId : tab?.surfaceKind === "canvas" ? tab.boardId : null;
       if (mainId) commitMainAdd(mainId, mainDrop);
       return;
     }

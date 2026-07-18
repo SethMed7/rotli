@@ -32,30 +32,67 @@ export function mergeKeywordHits<T extends KeywordSearchHit>(resultSets: readonl
     }
   });
   return [...merged.values()]
-    .sort((a, b) => b.score - a.score || b.hit.updatedAt - a.hit.updatedAt || a.hit.id.localeCompare(b.hit.id))
+    .sort(
+      (a, b) => b.score - a.score || b.hit.updatedAt - a.hit.updatedAt || a.hit.id.localeCompare(b.hit.id),
+    )
     .map((entry) => entry.hit);
 }
 
 const STOP_WORDS = new Set([
-  "about", "after", "again", "also", "and", "are", "before", "can", "did",
-  "for", "from", "have", "how", "into", "its", "notes", "past", "that", "the",
-  "their", "this", "was", "we", "what", "when", "where", "with", "you", "your",
-  "in", "chat", "chats", "conversation", "conversations",
+  "about",
+  "after",
+  "again",
+  "also",
+  "and",
+  "are",
+  "before",
+  "can",
+  "did",
+  "for",
+  "from",
+  "have",
+  "how",
+  "into",
+  "its",
+  "notes",
+  "past",
+  "that",
+  "the",
+  "their",
+  "this",
+  "was",
+  "we",
+  "what",
+  "when",
+  "where",
+  "with",
+  "you",
+  "your",
+  "in",
+  "chat",
+  "chats",
+  "conversation",
+  "conversations",
 ]);
 
 /** Transparent keyword extraction for the master memory search. No embeddings
  * or hidden index: the same words can be inspected and reproduced. */
 export function memoryKeywords(query: string): string[] {
-  return [...new Set(
-    query
-      .toLowerCase()
-      .split(/[^\p{L}\p{N}]+/u)
-      .filter((word) => word.length > 1 && !STOP_WORDS.has(word)),
-  )];
+  return [
+    ...new Set(
+      query
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter((word) => word.length > 1 && !STOP_WORDS.has(word)),
+    ),
+  ];
 }
 
 function snippetAround(body: string, keywords: readonly string[], max = 260): string {
-  const compact = body.replace(/^---[\s\S]*?---\s*/m, "").replace(/\s+/g, " ").trim();
+  const compact = body
+    .replace(/^---[\s\S]*?---\s*/m, "")
+    .replace(/\s+/g, " ")
+    .trim();
   const lower = compact.toLowerCase();
   const positions = keywords.map((word) => lower.indexOf(word)).filter((at) => at >= 0);
   const at = positions.length ? Math.min(...positions) : 0;

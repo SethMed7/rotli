@@ -63,8 +63,7 @@ describe("moveTab — same-pane reorder (visual-slot semantics)", () => {
 // sidebar ACTIVATES its open tab if there is one, else opens a NEW tab — it must
 // never REPLACE the tab you're working in. ⌘-click / ⌘T force a fresh tab.
 describe("openNote — reuse-or-new-tab, never replace", () => {
-  const count = (paneId: string): number =>
-    findLeaf(usePanesStore.getState().root, paneId)?.tabs.length ?? 0;
+  const count = (paneId: string): number => findLeaf(usePanesStore.getState().root, paneId)?.tabs.length ?? 0;
   const activeNoteId = (paneId: string): string | null => {
     const l = findLeaf(usePanesStore.getState().root, paneId);
     const t = l?.tabs.find((x) => x.id === l.activeTabId);
@@ -141,7 +140,11 @@ describe("closeFileTabs — remove a trashed asset from every pane", () => {
       root: {
         kind: "leaf",
         id: "p1",
-        tabs: [tab("A"), fileTab("doc-1", "storage/rotli/sample.docx"), fileTab("doc-2", "storage/rotli/sample.docx")],
+        tabs: [
+          tab("A"),
+          fileTab("doc-1", "storage/rotli/sample.docx"),
+          fileTab("doc-2", "storage/rotli/sample.docx"),
+        ],
         activeTabId: "doc-2",
       },
       focusedPaneId: "p1",

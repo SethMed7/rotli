@@ -208,8 +208,9 @@ export function serializeWatchlist(watchlist: Watchlist): string {
         ...(note ? [note, ""] : []),
         "| Watch | Lens | Website |",
         "|---|---|---|",
-        ...section.items.map((item) =>
-          `| ${tableCell(item.watch)} | ${tableCell(item.lens)} | ${item.url?.trim() ? `<${tableCell(item.url)}>` : ""} |`,
+        ...section.items.map(
+          (item) =>
+            `| ${tableCell(item.watch)} | ${tableCell(item.lens)} | ${item.url?.trim() ? `<${tableCell(item.url)}>` : ""} |`,
         ),
       ].join("\n"),
     );

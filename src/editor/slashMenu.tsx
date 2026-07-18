@@ -51,20 +51,49 @@ export interface SlashItem {
 
 // a minimal grid mark for Table + a thin rule for Divider (the shared Gl voice)
 const tableGlyph = (
-  <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    viewBox="0 0 24 24"
+    width={15}
+    height={15}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <rect x="3" y="4" width="18" height="16" rx="2" />
     <path d="M3 9.5h18M9.5 9.5V20M15.5 9.5V20" />
   </svg>
 );
 const dividerGlyph = (
-  <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" aria-hidden="true">
+  <svg
+    viewBox="0 0 24 24"
+    width={15}
+    height={15}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
     <path d="M3 12h18" />
     <path d="M7 5h10M7 19h10" opacity="0.35" />
   </svg>
 );
 const mathGlyph = <span className="slashglyph-h">∑</span>;
 const mermaidGlyph = (
-  <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    viewBox="0 0 24 24"
+    width={15}
+    height={15}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <rect x="3" y="3" width="7" height="6" rx="1.5" />
     <rect x="14" y="15" width="7" height="6" rx="1.5" />
     <path d="M6.5 9v4a2 2 0 0 0 2 2h5.5" />
@@ -72,48 +101,194 @@ const mermaidGlyph = (
 );
 
 const linkGlyph = (
-  <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    viewBox="0 0 24 24"
+    width={15}
+    height={15}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
   </svg>
 );
 const boardGlyph = (
-  <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    viewBox="0 0 24 24"
+    width={15}
+    height={15}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <rect x="3" y="3" width="18" height="18" rx="2" />
     <path d="M8 12h8M12 8v8" opacity="0.45" />
   </svg>
 );
 const sheetGlyph = (
-  <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    viewBox="0 0 24 24"
+    width={15}
+    height={15}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <rect x="3" y="4" width="18" height="16" rx="2" />
     <path d="M3 9.5h18M9.5 9.5V20M15.5 9.5V20" />
   </svg>
 );
 const documentGlyph = (
-  <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    viewBox="0 0 24 24"
+    width={15}
+    height={15}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M6 3h8l4 4v14H6z" />
     <path d="M14 3v5h5M9 12h6M9 16h6" />
   </svg>
 );
 
 export const SLASH_ITEMS: SlashItem[] = [
-  { label: "Heading 1", group: "Text", hint: "Big section heading", glyph: <Heading level={1} />, op: { kind: "heading", level: 1 } },
-  { label: "Heading 2", group: "Text", hint: "Medium heading", glyph: <Heading level={2} />, op: { kind: "heading", level: 2 } },
-  { label: "Heading 3", group: "Text", hint: "Small heading", glyph: <Heading level={3} />, op: { kind: "heading", level: 3 } },
-  { label: "Quote", group: "Text", hint: "Pulled-aside passage", glyph: quoteGlyph, op: { kind: "block", block: "quote" } },
-  { label: "Bullet", group: "List", hint: "Plain bulleted list", glyph: bulletGlyph, op: { kind: "block", block: "bullet" } },
-  { label: "Numbered", group: "List", hint: "Ordered list", glyph: numberedGlyph, op: { kind: "block", block: "numbered" } },
-  { label: "Checklist", group: "List", hint: "Tasks with checkboxes", glyph: checklistGlyph, op: { kind: "block", block: "checklist" } },
-  { label: "Table", group: "Insert", hint: "3×2 grid, Tab hops cells", glyph: tableGlyph, op: { kind: "table" } },
-  { label: "Divider", group: "Insert", hint: "Horizontal rule", glyph: dividerGlyph, op: { kind: "divider" } },
-  { label: "Code block", group: "Insert", hint: "Fenced code", glyph: codeGlyph, op: { kind: "fence", lang: "" } },
-  { label: "Inline code", group: "Insert", hint: "Code inside a sentence", glyph: codeGlyph, op: { kind: "code" } },
-  { label: "Math", group: "Insert", hint: "KaTeX block", glyph: mathGlyph, op: { kind: "fence", lang: "math" } },
-  { label: "Mermaid", group: "Insert", hint: "Diagram from text", glyph: mermaidGlyph, op: { kind: "fence", lang: "mermaid" } },
-  { label: "Link note", group: "Link", hint: "Wikilink to another note", glyph: linkGlyph, op: { kind: "picker", mode: "linkNote" }, keywords: ["note", "wiki", "link"] },
-  { label: "Board", group: "Insert", hint: "Embed Excalidraw", glyph: boardGlyph, op: { kind: "picker", mode: "embedBoard" }, keywords: ["excalidraw", "canvas", "draw"] },
-  { label: "Sheet", group: "Insert", hint: "Embed spreadsheet", glyph: sheetGlyph, op: { kind: "picker", mode: "embedSheet" }, keywords: ["xlsx", "csv", "spreadsheet", "excel"] },
-  { label: "Document", group: "Insert", hint: "Create or embed editable DOCX", glyph: documentGlyph, op: { kind: "picker", mode: "embedDocument" }, keywords: [...DOCUMENT_SEARCH_KEYWORDS] },
+  {
+    label: "Heading 1",
+    group: "Text",
+    hint: "Big section heading",
+    glyph: <Heading level={1} />,
+    op: { kind: "heading", level: 1 },
+  },
+  {
+    label: "Heading 2",
+    group: "Text",
+    hint: "Medium heading",
+    glyph: <Heading level={2} />,
+    op: { kind: "heading", level: 2 },
+  },
+  {
+    label: "Heading 3",
+    group: "Text",
+    hint: "Small heading",
+    glyph: <Heading level={3} />,
+    op: { kind: "heading", level: 3 },
+  },
+  {
+    label: "Quote",
+    group: "Text",
+    hint: "Pulled-aside passage",
+    glyph: quoteGlyph,
+    op: { kind: "block", block: "quote" },
+  },
+  {
+    label: "Bullet",
+    group: "List",
+    hint: "Plain bulleted list",
+    glyph: bulletGlyph,
+    op: { kind: "block", block: "bullet" },
+  },
+  {
+    label: "Numbered",
+    group: "List",
+    hint: "Ordered list",
+    glyph: numberedGlyph,
+    op: { kind: "block", block: "numbered" },
+  },
+  {
+    label: "Checklist",
+    group: "List",
+    hint: "Tasks with checkboxes",
+    glyph: checklistGlyph,
+    op: { kind: "block", block: "checklist" },
+  },
+  {
+    label: "Table",
+    group: "Insert",
+    hint: "3×2 grid, Tab hops cells",
+    glyph: tableGlyph,
+    op: { kind: "table" },
+  },
+  {
+    label: "Divider",
+    group: "Insert",
+    hint: "Horizontal rule",
+    glyph: dividerGlyph,
+    op: { kind: "divider" },
+  },
+  {
+    label: "Code block",
+    group: "Insert",
+    hint: "Fenced code",
+    glyph: codeGlyph,
+    op: { kind: "fence", lang: "" },
+  },
+  {
+    label: "Inline code",
+    group: "Insert",
+    hint: "Code inside a sentence",
+    glyph: codeGlyph,
+    op: { kind: "code" },
+  },
+  {
+    label: "Math",
+    group: "Insert",
+    hint: "KaTeX block",
+    glyph: mathGlyph,
+    op: { kind: "fence", lang: "math" },
+  },
+  {
+    label: "Mermaid",
+    group: "Insert",
+    hint: "Diagram from text",
+    glyph: mermaidGlyph,
+    op: { kind: "fence", lang: "mermaid" },
+  },
+  {
+    label: "Link note",
+    group: "Link",
+    hint: "Wikilink to another note",
+    glyph: linkGlyph,
+    op: { kind: "picker", mode: "linkNote" },
+    keywords: ["note", "wiki", "link"],
+  },
+  {
+    label: "Board",
+    group: "Insert",
+    hint: "Embed Excalidraw",
+    glyph: boardGlyph,
+    op: { kind: "picker", mode: "embedBoard" },
+    keywords: ["excalidraw", "canvas", "draw"],
+  },
+  {
+    label: "Sheet",
+    group: "Insert",
+    hint: "Embed spreadsheet",
+    glyph: sheetGlyph,
+    op: { kind: "picker", mode: "embedSheet" },
+    keywords: ["xlsx", "csv", "spreadsheet", "excel"],
+  },
+  {
+    label: "Document",
+    group: "Insert",
+    hint: "Create or embed editable DOCX",
+    glyph: documentGlyph,
+    op: { kind: "picker", mode: "embedDocument" },
+    keywords: [...DOCUMENT_SEARCH_KEYWORDS],
+  },
 ];
 
 /** How much room a slash popover wants below the caret row before it prefers
@@ -136,8 +311,7 @@ export function filterSlashItems(query: string): SlashItem[] {
   const q = query.trim().toLowerCase();
   if (q === "") return SLASH_ITEMS;
   return SLASH_ITEMS.filter(
-    (it) =>
-      it.label.toLowerCase().includes(q) || it.keywords?.some((k) => k.includes(q)),
+    (it) => it.label.toLowerCase().includes(q) || it.keywords?.some((k) => k.includes(q)),
   );
 }
 

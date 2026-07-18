@@ -239,10 +239,7 @@ const EMPTY_ROWS = 20;
 const EMPTY_COLS = 8;
 
 /** 1-based count of used rows or cols from a sparse cellData map (0 when empty). */
-function extentOf(
-  cellData: Record<number, Record<number, SheetModelCell>>,
-  axis: "row" | "col",
-): number {
+function extentOf(cellData: Record<number, Record<number, SheetModelCell>>, axis: "row" | "col"): number {
   let max = -1;
   for (const rk of Object.keys(cellData)) {
     const r = Number(rk);
@@ -309,15 +306,18 @@ export function colIndex(label: string): number {
 // ── save: snapshot → the retained exceljs Workbook ───────────────────────────
 
 /** Resolve a cell's style: an id into snapshot.styles, an inline object, or none. */
-function resolveStyle(cell: SheetModelCell, styles: Record<string, SheetModelStyle> | undefined): SheetModelStyle | null {
+function resolveStyle(
+  cell: SheetModelCell,
+  styles: Record<string, SheetModelStyle> | undefined,
+): SheetModelStyle | null {
   if (!cell.s) return null;
   if (typeof cell.s === "string") return styles?.[cell.s] ?? null;
   return cell.s;
 }
 
-function borderSideFromU(side: SheetBorderSide | undefined):
-  | { style: string; color?: { argb: string } }
-  | undefined {
+function borderSideFromU(
+  side: SheetBorderSide | undefined,
+): { style: string; color?: { argb: string } } | undefined {
   if (!side) return undefined;
   const style = BORDER_FROM_U[side.s] ?? "thin";
   const argb = argbOf(side.cl?.rgb);
@@ -330,10 +330,7 @@ function applyCell(cell: Cell, u: SheetModelCell, styles: Record<string, SheetMo
   if (u.f) {
     const formula = u.f.replace(/^=/, "");
     const result = u.v;
-    cell.value =
-      result === undefined
-        ? ({ formula } as CellValue)
-        : ({ formula, result } as CellValue);
+    cell.value = result === undefined ? ({ formula } as CellValue) : ({ formula, result } as CellValue);
   } else if (u.v !== undefined) {
     cell.value = u.v;
   } else {
@@ -403,11 +400,7 @@ export function buildSheetIdMap(wb: Workbook, snap: SheetModel): Map<string, num
  * repeated saves in one session correct through sheet adds/removes; it is
  * UPDATED in place. Without it, resolution falls back to positional ids
  * (correct for the first apply after a fresh load). */
-export function applyModelToWorkbook(
-  wb: Workbook,
-  snap: SheetModel,
-  idMap?: Map<string, number>,
-): void {
+export function applyModelToWorkbook(wb: Workbook, snap: SheetModel, idMap?: Map<string, number>): void {
   // STRUCTURAL GUARD before anything mutates (reviewer B2): the whole file's
   // fate hangs on this snapshot — a null/empty/inconsistent one (a failed
   // fwb.save(), a truncated park) must refuse loudly, never delete sheets.
@@ -416,7 +409,9 @@ export function applyModelToWorkbook(
   }
   for (const id of snap.sheetOrder) {
     if (!snap.sheets[id]) {
-      throw new Error(`refusing to apply: snapshot references a missing sheet (${id}) — the file was not touched`);
+      throw new Error(
+        `refusing to apply: snapshot references a missing sheet (${id}) — the file was not touched`,
+      );
     }
   }
 

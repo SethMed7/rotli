@@ -7,9 +7,7 @@ export function DocumentEmbed({ fileId }: { fileId: string }) {
   if (isEditableDocxExt(ext)) return <DocumentEditor fileId={fileId} compact />;
   return (
     <div className="rotli-document-placeholder">
-      <span>
-        Convert this {`.${ext || "document"}`} file to DOCX to edit it here.
-      </span>
+      <span>Convert this {`.${ext || "document"}`} file to DOCX to edit it here.</span>
     </div>
   );
 }

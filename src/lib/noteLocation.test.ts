@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  brainLocationLabel,
-  noteDiskFolder,
-  noteLocationLabel,
-  projectNoteToBrain,
-} from "./noteLocation";
+import { brainLocationLabel, noteDiskFolder, noteLocationLabel, projectNoteToBrain } from "./noteLocation";
 import type { NoteSummary } from "../types";
 
 const NOTE: NoteSummary = {

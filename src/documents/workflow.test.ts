@@ -45,7 +45,11 @@ describe("document application workflows", () => {
     const codec: DocumentEditorCodec<string> = {
       decode: async () => {
         decodes += 1;
-        return { source: "source", document: { id: "large.docx", title: "Large", content: [] }, warnings: [] };
+        return {
+          source: "source",
+          document: { id: "large.docx", title: "Large", content: [] },
+          warnings: [],
+        };
       },
       encode: async () => "encoded",
     };

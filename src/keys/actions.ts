@@ -4,12 +4,7 @@
 // dispatcher only fires the actions for its own surface, and the Settings
 // list shows everything.
 
-import {
-  type BlockToggle,
-  type HeadingLevel,
-  type InlineMark,
-  activeEditor,
-} from "../editor/commands";
+import { type BlockToggle, type HeadingLevel, type InlineMark, activeEditor } from "../editor/commands";
 import { summonChat } from "../services/chatSummon";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
 import { notesService } from "../services/notes";
@@ -54,7 +49,9 @@ function runCreate(kind: NewItemKind, newTab: boolean): void {
   void createManagedItem(kind, { newTab }).catch((error) =>
     useUiStore
       .getState()
-      .setRowActionError(`Couldn’t create the item — ${error instanceof Error ? error.message : String(error)}`),
+      .setRowActionError(
+        `Couldn’t create the item — ${error instanceof Error ? error.message : String(error)}`,
+      ),
   );
 }
 
@@ -229,7 +226,8 @@ export function registerDefaultActions(): void {
         ui.breveDirty &&
         typeof window !== "undefined" &&
         !window.confirm("Discard your unsaved Breve changes and open Settings?")
-      ) return;
+      )
+        return;
       if (!ui.settingsOpen && ui.sidebarMode === "breve") ui.setBreveDirty(false);
       ui.setFocusMode(false);
       ui.setContentView("panes");
@@ -340,9 +338,7 @@ export function registerDefaultActions(): void {
       if (!notesWorkspaceActive()) return;
       const id = focusedNoteIdNow();
       if (!id) return;
-      void corpusFrontmatter(id).then((fm) =>
-        corpusSetPinned(id, !fm?.pinned).then(invalidateNotes),
-      );
+      void corpusFrontmatter(id).then((fm) => corpusSetPinned(id, !fm?.pinned).then(invalidateNotes));
     },
   });
 
@@ -361,27 +357,35 @@ export function registerDefaultActions(): void {
     id: "tabs.close",
     title: "Close tab",
     defaultChord: "Meta+W",
-    run: () => { if (notesWorkspaceActive()) closeFocusedTabWithDraftCleanup(); },
+    run: () => {
+      if (notesWorkspaceActive()) closeFocusedTabWithDraftCleanup();
+    },
   });
   registerAction({
     id: "tabs.cycle",
     title: "Next tab",
     defaultChord: "Ctrl+Tab",
-    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().cycleTab(); },
+    run: () => {
+      if (notesWorkspaceActive()) usePanesStore.getState().cycleTab();
+    },
   });
   for (let n = 1; n <= 8; n++) {
     registerAction({
       id: `tabs.jump${n}`,
       title: `Go to tab ${n}`,
       defaultChord: `Meta+${n}`,
-      run: () => { if (notesWorkspaceActive()) usePanesStore.getState().jumpTab(n - 1); },
+      run: () => {
+        if (notesWorkspaceActive()) usePanesStore.getState().jumpTab(n - 1);
+      },
     });
   }
   registerAction({
     id: "tabs.last",
     title: "Go to last tab",
     defaultChord: "Meta+9",
-    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().lastTab(); },
+    run: () => {
+      if (notesWorkspaceActive()) usePanesStore.getState().lastTab();
+    },
   });
 
   // — panes —
@@ -405,31 +409,41 @@ export function registerDefaultActions(): void {
     id: "panes.focusLeft",
     title: "Focus pane left",
     defaultChord: "Meta+Alt+ArrowLeft",
-    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().focusDir("left"); },
+    run: () => {
+      if (notesWorkspaceActive()) usePanesStore.getState().focusDir("left");
+    },
   });
   registerAction({
     id: "panes.focusRight",
     title: "Focus pane right",
     defaultChord: "Meta+Alt+ArrowRight",
-    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().focusDir("right"); },
+    run: () => {
+      if (notesWorkspaceActive()) usePanesStore.getState().focusDir("right");
+    },
   });
   registerAction({
     id: "panes.focusUp",
     title: "Focus pane up",
     defaultChord: "Meta+Alt+ArrowUp",
-    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().focusDir("up"); },
+    run: () => {
+      if (notesWorkspaceActive()) usePanesStore.getState().focusDir("up");
+    },
   });
   registerAction({
     id: "panes.focusDown",
     title: "Focus pane down",
     defaultChord: "Meta+Alt+ArrowDown",
-    run: () => { if (notesWorkspaceActive()) usePanesStore.getState().focusDir("down"); },
+    run: () => {
+      if (notesWorkspaceActive()) usePanesStore.getState().focusDir("down");
+    },
   });
   registerAction({
     id: "panes.close",
     title: "Close pane",
     defaultChord: "Meta+Alt+W",
-    run: () => { if (notesWorkspaceActive()) closeFocusedPaneWithDraftCleanup(); },
+    run: () => {
+      if (notesWorkspaceActive()) closeFocusedPaneWithDraftCleanup();
+    },
   });
 
   // — chrome —
@@ -479,7 +493,15 @@ export function registerDefaultActions(): void {
   for (const [id, title, mark, defaultChord] of marks) {
     // shared: the format chords act on activeEditor(), which resolves per
     // webview — so they belong to the main AND the Quick Note window
-    registerAction({ id, title, defaultChord, shared: true, run: () => { if (notesWorkspaceActive()) activeEditor()?.toggleMark(mark); } });
+    registerAction({
+      id,
+      title,
+      defaultChord,
+      shared: true,
+      run: () => {
+        if (notesWorkspaceActive()) activeEditor()?.toggleMark(mark);
+      },
+    });
   }
   for (const level of [1, 2, 3] as HeadingLevel[]) {
     registerAction({
@@ -487,7 +509,9 @@ export function registerDefaultActions(): void {
       title: `Heading ${level}`,
       defaultChord: null,
       shared: true,
-      run: () => { if (notesWorkspaceActive()) activeEditor()?.setHeading(level); },
+      run: () => {
+        if (notesWorkspaceActive()) activeEditor()?.setHeading(level);
+      },
     });
   }
   const blocks: [string, string, BlockToggle][] = [
@@ -502,7 +526,9 @@ export function registerDefaultActions(): void {
       title,
       defaultChord: null,
       shared: true,
-      run: () => { if (notesWorkspaceActive()) activeEditor()?.toggleBlock(kind); },
+      run: () => {
+        if (notesWorkspaceActive()) activeEditor()?.toggleBlock(kind);
+      },
     });
   }
 

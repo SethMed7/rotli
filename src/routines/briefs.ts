@@ -31,16 +31,10 @@ export const EMPTY_BREVE_SNAPSHOT: BreveSnapshot = {
 /** A stable display order independent of filesystem enumeration. */
 export function sortBriefs(briefs: readonly BreveBrief[]): BreveBrief[] {
   const kindOrder = { morning: 0, lunch: 1, night: 2 } as const;
-  return [...briefs].sort(
-    (a, b) => b.date.localeCompare(a.date) || kindOrder[a.kind] - kindOrder[b.kind],
-  );
+  return [...briefs].sort((a, b) => b.date.localeCompare(a.date) || kindOrder[a.kind] - kindOrder[b.kind]);
 }
 
-export function nextRoutineEpoch(
-  routine: BreveRoutine,
-  nowMs: number,
-  timezone: string,
-): number | null {
+export function nextRoutineEpoch(routine: BreveRoutine, nowMs: number, timezone: string): number | null {
   if (!routine.enabled || routine.schedule.kind === "alwaysOn") return null;
   try {
     return nextRun(routine.schedule, nowMs, timezone);
@@ -49,11 +43,7 @@ export function nextRoutineEpoch(
   }
 }
 
-export function formatNextRoutine(
-  routine: BreveRoutine,
-  nowMs: number,
-  timezone: string,
-): string {
+export function formatNextRoutine(routine: BreveRoutine, nowMs: number, timezone: string): string {
   if (!routine.enabled) return "Off";
   if (routine.schedule.kind === "alwaysOn") return "Always on";
   const epoch = nextRoutineEpoch(routine, nowMs, timezone);

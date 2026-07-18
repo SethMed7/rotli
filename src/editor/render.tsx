@@ -7,16 +7,7 @@
 import type { MouseEvent, ReactNode } from "react";
 import { openUrl } from "../lib/tauri";
 
-export type BlockKind =
-  | "h1"
-  | "h2"
-  | "h3"
-  | "bullet"
-  | "numbered"
-  | "task"
-  | "quote"
-  | "para"
-  | "blank";
+export type BlockKind = "h1" | "h2" | "h3" | "bullet" | "numbered" | "task" | "quote" | "para" | "blank";
 
 export interface Block {
   kind: BlockKind;
@@ -39,17 +30,31 @@ export function parseBlock(line: string): Block {
   // headings are never indented (markdown nests lists, not headings)
   const h = HEADING_RE.exec(line);
   if (h?.[1]) {
-    const kind = (`h${h[1].length}`) as "h1" | "h2" | "h3";
+    const kind = `h${h[1].length}` as "h1" | "h2" | "h3";
     return { kind, prefixLen: h[0].length, text: line.slice(h[0].length) };
   }
   // list kinds may carry a leading indent → nesting depth (2 spaces per level)
   const indent = /^( +)/.exec(line)?.[1]?.length ?? 0;
   const body = indent > 0 ? line.slice(indent) : line;
   const t = TASK_RE.exec(body);
-  if (t) return { kind: "task", prefixLen: indent + t[0].length, text: body.slice(t[0].length), done: t[1] !== " ", indent };
+  if (t)
+    return {
+      kind: "task",
+      prefixLen: indent + t[0].length,
+      text: body.slice(t[0].length),
+      done: t[1] !== " ",
+      indent,
+    };
   if (body.startsWith("- ")) return { kind: "bullet", prefixLen: indent + 2, text: body.slice(2), indent };
   const n = NUMBERED_RE.exec(body);
-  if (n) return { kind: "numbered", prefixLen: indent + n[0].length, text: body.slice(n[0].length), marker: `${n[1]}.`, indent };
+  if (n)
+    return {
+      kind: "numbered",
+      prefixLen: indent + n[0].length,
+      text: body.slice(n[0].length),
+      marker: `${n[1]}.`,
+      indent,
+    };
   // quotes de-indent like the other list kinds so a Tab-nested quote ("  > x")
   // stays a quote (and nests) instead of falling through to a literal paragraph
   if (body.startsWith("> ")) return { kind: "quote", prefixLen: indent + 2, text: body.slice(2), indent };
@@ -139,5 +144,3 @@ export function renderInline(text: string): ReactNode[] {
   }
   return out;
 }
-
-

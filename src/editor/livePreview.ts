@@ -280,11 +280,7 @@ class ImgWidget extends WidgetType {
         if (!topC || !botC) return null;
         // upper half → before this line; lower half → after it
         const below = ev.clientY > (topC.top + botC.bottom) / 2;
-        let target: DropTarget = below
-          ? line.to + 1 > docLength
-            ? "end"
-            : line.to + 1
-          : line.from;
+        let target: DropTarget = below ? (line.to + 1 > docLength ? "end" : line.to + 1) : line.from;
         let y = below ? botC.bottom : topC.top;
         if (target !== "end") {
           const snapped = snapOutOfBlocks(target, blocks, docLength);
@@ -465,9 +461,10 @@ function scanInline(
     const ce = matchStart + cr[1];
     if (ce > cs) {
       decos.push(
-        Decoration.mark(
-          rule.attrs ? { class: rule.cls, attributes: rule.attrs } : { class: rule.cls },
-        ).range(cs, ce),
+        Decoration.mark(rule.attrs ? { class: rule.cls, attributes: rule.attrs } : { class: rule.cls }).range(
+          cs,
+          ce,
+        ),
       );
     }
     const touched = sel.from <= spanEnd && sel.to >= spanStart;
@@ -716,7 +713,6 @@ export const livePreview = ViewPlugin.fromClass(
   },
   {
     decorations: (v) => v.decorations,
-    provide: (plugin) =>
-      EditorView.atomicRanges.of((view) => view.plugin(plugin)?.atomic ?? RangeSet.empty),
+    provide: (plugin) => EditorView.atomicRanges.of((view) => view.plugin(plugin)?.atomic ?? RangeSet.empty),
   },
 );

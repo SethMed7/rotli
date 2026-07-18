@@ -16,14 +16,19 @@ export interface ManagedChatMemoryInput {
 
 export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Promise<ChatMemoryNote> {
   const prefix = input.instance.id === CORPUS_INSTANCE_ID ? "" : `${input.instance.id}:`;
-  const attachedStem = input.attachedStem || (await listChats(input.instance))
-    .find((chat) => chat.slug === input.chatSlug)
-    ?.attachedTo.replace(/^\[\[|\]\]$/g, "")
-    .trim();
+  const attachedStem =
+    input.attachedStem ||
+    (await listChats(input.instance))
+      .find((chat) => chat.slug === input.chatSlug)
+      ?.attachedTo.replace(/^\[\[|\]\]$/g, "")
+      .trim();
   const repository = {
     async findByStem(stem: string): Promise<ChatMemoryNote | null> {
       const summaries = await notesService.listNotes();
-      const id = attachedNoteId(stem, summaries.map((note) => note.id));
+      const id = attachedNoteId(
+        stem,
+        summaries.map((note) => note.id),
+      );
       if (!id) return null;
       const note = await notesService.getNote(id);
       return note ? { id, stem, body: note.body } : null;

@@ -5,13 +5,7 @@
 // centering lives in CmEditor (it scrolls, it doesn't decorate).
 
 import type { Range } from "@codemirror/state";
-import {
-  Decoration,
-  type DecorationSet,
-  EditorView,
-  ViewPlugin,
-  type ViewUpdate,
-} from "@codemirror/view";
+import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 
 function buildDim(view: EditorView): DecorationSet {
   const decos: Range<Decoration>[] = [];

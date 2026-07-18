@@ -12,8 +12,7 @@ interface BindingsState {
 
 export const useBindingsStore = create<BindingsState>((set) => ({
   overrides: {},
-  setOverride: (actionId, chord) =>
-    set((s) => ({ overrides: { ...s.overrides, [actionId]: chord } })),
+  setOverride: (actionId, chord) => set((s) => ({ overrides: { ...s.overrides, [actionId]: chord } })),
 }));
 
 /** Resolve an action's current chord from an overrides snapshot. */

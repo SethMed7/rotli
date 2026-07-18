@@ -50,12 +50,7 @@ export interface LineEdit {
   selEnd: number;
 }
 
-export function toggleInlineMark(
-  line: string,
-  selStart: number,
-  selEnd: number,
-  mark: InlineMark,
-): LineEdit {
+export function toggleInlineMark(line: string, selStart: number, selEnd: number, mark: InlineMark): LineEdit {
   if (mark === "link") return toggleLink(line, selStart, selEnd);
   const { open, close } = MARKS[mark];
   const sel = line.slice(selStart, selEnd);

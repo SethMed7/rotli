@@ -31,7 +31,13 @@ interface Calls {
 function fakeHost(replies: string[], over: Partial<Host> = {}): { host: Host; calls: Calls } {
   let i = 0;
   const calls: Calls = {
-    searchMemory: [], readMemory: [], searchNotes: [], readNote: [], webSearch: [], webFetch: [], generateImage: [],
+    searchMemory: [],
+    readMemory: [],
+    searchNotes: [],
+    readNote: [],
+    webSearch: [],
+    webFetch: [],
+    generateImage: [],
   };
   const host: Host = {
     complete: async () => replies[i++] ?? '{"final":"(script exhausted)"}',
@@ -97,9 +103,7 @@ const ALL: ReadonlySet<ToolName> = new Set<ToolName>([
 describe("parse", () => {
   test("extracts a balanced object from prose + fences", () => {
     expect(extractJsonObject('```json\n{"final":"hi"}\n```')).toBe('{"final":"hi"}');
-    expect(extractJsonObject('sure: {"tool":"x","args":{"a":1}} ok')).toBe(
-      '{"tool":"x","args":{"a":1}}',
-    );
+    expect(extractJsonObject('sure: {"tool":"x","args":{"a":1}} ok')).toBe('{"tool":"x","args":{"a":1}}');
     expect(extractJsonObject("no json here")).toBeNull();
     // braces inside strings don't confuse the scanner
     expect(extractJsonObject('{"final":"a } b"}')).toBe('{"final":"a } b"}');
@@ -147,7 +151,12 @@ describe("retrieval", () => {
 
   test("buildIndex degrades to an areas map when the full list overflows the budget", () => {
     const many = Array.from({ length: 50 }, (_, i) =>
-      note({ id: `01IDENTIFIER${i}`, title: `Note number ${i} with a long title`, folderId: "Projects", updatedAt: i }),
+      note({
+        id: `01IDENTIFIER${i}`,
+        title: `Note number ${i} with a long title`,
+        folderId: "Projects",
+        updatedAt: i,
+      }),
     );
     const idx = buildIndex(many, 300); // tiny budget → must collapse
     expect(idx).toContain("## Projects (50)"); // area + count
@@ -315,7 +324,12 @@ describe("runAgent", () => {
       '{"tool":"generate_image","args":{"prompt":"a warm quokka sticker"}}',
       '{"final":"your image is ready"}',
     ]);
-    const { final } = await run(host, { history: [], userText: "draw me a quokka", web: false, imageTool: true });
+    const { final } = await run(host, {
+      history: [],
+      userText: "draw me a quokka",
+      web: false,
+      imageTool: true,
+    });
     expect(final).toBe("your image is ready");
     expect(calls.generateImage).toEqual(["a warm quokka sticker"]);
   });

@@ -210,9 +210,7 @@ describe("suggestPresets / parseSuggestions", () => {
 
   test("suggestPresets feeds the allowed ids and parses the reply", async () => {
     const { makeHost, prompts } = makeHosts({
-      "gemma-3": [
-        '[{"name":"Everyday","organizer":"gemma-3","routes":[{"when":"quick","model":"sonnet"}]}]',
-      ],
+      "gemma-3": ['[{"name":"Everyday","organizer":"gemma-3","routes":[{"when":"quick","model":"sonnet"}]}]'],
     });
     const out = await suggestPresets(makeHost(gemma), MODELS, "mostly note-taking + research");
     expect(out).toHaveLength(1);

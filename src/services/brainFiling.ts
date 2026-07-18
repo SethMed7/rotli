@@ -25,9 +25,7 @@ export async function fileNoteToArea(
 ): Promise<string> {
   const rel = await corpusNotePath(noteId);
   const before = rel.slice(0, rel.lastIndexOf("/"));
-  const title = (rel.split("/").pop() ?? rel)
-    .replace(/-[a-z0-9]{6}\.md$/i, "")
-    .replace(/\.md$/, "");
+  const title = (rel.split("/").pop() ?? rel).replace(/-[a-z0-9]{6}\.md$/i, "").replace(/\.md$/, "");
   await corpusSetAiField(rel, "area", area);
   const newRel = await corpusFileNote(rel);
   // a .md note's wire id is its ULID and survives the move — only a tab that was

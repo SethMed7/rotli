@@ -50,8 +50,13 @@ export type BrevePdfPaletteLike = {
 };
 
 function colorLuminance(value: string): number {
-  const channels = value.slice(1).match(/.{2}/g)?.map((channel) => Number.parseInt(channel, 16) / 255) ?? [0, 0, 0];
-  const linear = channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  const channels = value
+    .slice(1)
+    .match(/.{2}/g)
+    ?.map((channel) => Number.parseInt(channel, 16) / 255) ?? [0, 0, 0];
+  const linear = channels.map((channel) =>
+    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
+  );
   return 0.2126 * (linear[0] ?? 0) + 0.7152 * (linear[1] ?? 0) + 0.0722 * (linear[2] ?? 0);
 }
 
@@ -63,8 +68,11 @@ export function contrastRatio(a: string, b: string): number {
 
 /** One shared accessibility gate for presets and custom PDF palettes. */
 export function validateBrevePdfPalette(palette: BrevePdfPaletteLike): string {
-  if (contrastRatio(palette.text, palette.background) < 4.5) return "Text needs more contrast against the PDF page.";
-  if (contrastRatio(palette.muted, palette.background) < 4.5) return "Secondary text needs more contrast against the PDF page.";
-  if (contrastRatio(palette.accent, palette.background) < 3) return "The accent needs more contrast against the PDF page.";
+  if (contrastRatio(palette.text, palette.background) < 4.5)
+    return "Text needs more contrast against the PDF page.";
+  if (contrastRatio(palette.muted, palette.background) < 4.5)
+    return "Secondary text needs more contrast against the PDF page.";
+  if (contrastRatio(palette.accent, palette.background) < 3)
+    return "The accent needs more contrast against the PDF page.";
   return "";
 }

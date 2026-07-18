@@ -8,11 +8,13 @@ describe("DOCX Univer adapter policy", () => {
   });
 
   test("captures a stable insertion range before a table dialog takes focus", () => {
-    expect(documentInsertionRange("doc-1", {
-      startOffset: 8,
-      endOffset: 8,
-      segmentId: "body",
-    })).toEqual({
+    expect(
+      documentInsertionRange("doc-1", {
+        startOffset: 8,
+        endOffset: 8,
+        segmentId: "body",
+      }),
+    ).toEqual({
       unitId: "doc-1",
       startOffset: 8,
       endOffset: 8,
@@ -22,7 +24,8 @@ describe("DOCX Univer adapter policy", () => {
   });
 
   test("recovers table ranges when Univer omits body.tables", () => {
-    expect(documentTableRanges("before\r\x1a\x1b\x1c\r\n\x1d\x0e\x0fafter\r\n", [], ["table-1"]))
-      .toEqual([{ startIndex: 7, endIndex: 15, tableId: "table-1" }]);
+    expect(documentTableRanges("before\r\x1a\x1b\x1c\r\n\x1d\x0e\x0fafter\r\n", [], ["table-1"])).toEqual([
+      { startIndex: 7, endIndex: 15, tableId: "table-1" },
+    ]);
   });
 });

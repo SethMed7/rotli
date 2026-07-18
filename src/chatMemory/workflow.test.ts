@@ -24,11 +24,21 @@ describe("syncChatMemory", () => {
     let updates = 0;
     const repository: ChatMemoryRepository = {
       findByStem: async () => ({ id: "n", stem: "chat-abc123", body }),
-      create: async () => { throw new Error("should not create"); },
-      update: async (_id, next) => { body = next; updates += 1; },
+      create: async () => {
+        throw new Error("should not create");
+      },
+      update: async (_id, next) => {
+        body = next;
+        updates += 1;
+      },
       attach: async () => {},
     };
-    const input = { title: "Chat", chatSlug: "chat", attachedStem: "chat-abc123", turns: [{ speaker: "you", text: "fact" }] };
+    const input = {
+      title: "Chat",
+      chatSlug: "chat",
+      attachedStem: "chat-abc123",
+      turns: [{ speaker: "you", text: "fact" }],
+    };
     await syncChatMemory(repository, input);
     await syncChatMemory(repository, input);
     expect(updates).toBe(1);

@@ -8,10 +8,7 @@ export const DOCUMENT_CONVERTIBLE_EXTS = ["doc", "rtf", "odt"] as const;
 
 export const DOCX_EDITABLE = new Set<string>(DOCX_EDITABLE_EXTS);
 export const DOCUMENT_CONVERTIBLE = new Set<string>(DOCUMENT_CONVERTIBLE_EXTS);
-export const DOCUMENT_EXTS = new Set<string>([
-  ...DOCX_EDITABLE_EXTS,
-  ...DOCUMENT_NATIVE_ONLY_EXTS,
-]);
+export const DOCUMENT_EXTS = new Set<string>([...DOCX_EDITABLE_EXTS, ...DOCUMENT_NATIVE_ONLY_EXTS]);
 
 export const DOCUMENT_CREATE_EXTENSION = "docx";
 export const DOCUMENT_OPEN_WITH_APPS = ["Microsoft Word", "Pages", "LibreOffice"] as const;

@@ -23,7 +23,11 @@ describe("createNewItem", () => {
     await createNewItem(
       {
         creator: { create: async () => ({ id: "n", kind: "markdown" }) },
-        presenter: { refresh: async () => {}, fileInMain: () => {}, open: (_item, o) => void opened.push(o.newTab) },
+        presenter: {
+          refresh: async () => {},
+          fileInMain: () => {},
+          open: (_item, o) => void opened.push(o.newTab),
+        },
       },
       "markdown",
     );

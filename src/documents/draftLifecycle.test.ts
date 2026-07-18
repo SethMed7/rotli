@@ -6,9 +6,7 @@ describe("PristineDocumentDrafts", () => {
     const drafts = new PristineDocumentDrafts();
     drafts.track("storage/rotli/untitled.docx");
 
-    expect(drafts.claimClosed(["storage/rotli/untitled.docx"], [])).toEqual([
-      "storage/rotli/untitled.docx",
-    ]);
+    expect(drafts.claimClosed(["storage/rotli/untitled.docx"], [])).toEqual(["storage/rotli/untitled.docx"]);
     expect(drafts.has("storage/rotli/untitled.docx")).toBe(false);
     expect(drafts.claimClosed(["storage/rotli/untitled.docx"], [])).toEqual([]);
   });

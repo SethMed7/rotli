@@ -23,8 +23,8 @@ export function EmptyState() {
       <Character name="base" size={150} />
       <div className="et">Your island is ready</div>
       <div className="es">
-        Press <kbd>{formatChord(captureChord ?? "Alt+C")}</kbd> anywhere on your Mac and the first
-        thought lands here — as a plain file, on this Mac, yours.
+        Press <kbd>{formatChord(captureChord ?? "Alt+C")}</kbd> anywhere on your Mac and the first thought
+        lands here — as a plain file, on this Mac, yours.
       </div>
       <button type="button" className="btn" onClick={() => dispatch("notes.new")}>
         <PlusGlyph size={14} />

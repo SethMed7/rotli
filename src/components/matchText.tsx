@@ -6,15 +6,7 @@
 
 import type { ReactNode } from "react";
 
-export function MatchText({
-  text,
-  start,
-  len,
-}: {
-  text: string;
-  start: number;
-  len: number;
-}): ReactNode {
+export function MatchText({ text, start, len }: { text: string; start: number; len: number }): ReactNode {
   const chars = [...text];
   if (len <= 0 || start < 0 || start + len > chars.length) return text;
   return (

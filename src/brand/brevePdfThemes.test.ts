@@ -12,9 +12,11 @@ describe("Breve PDF design system", () => {
   });
 
   test("rejects custom palettes that make body text unreadable", () => {
-    expect(validateBrevePdfPalette({
-      ...BREVE_PDF_PRESETS.paper,
-      text: "#eeeeee",
-    })).toContain("Text needs more contrast");
+    expect(
+      validateBrevePdfPalette({
+        ...BREVE_PDF_PRESETS.paper,
+        text: "#eeeeee",
+      }),
+    ).toContain("Text needs more contrast");
   });
 });

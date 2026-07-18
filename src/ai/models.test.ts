@@ -71,9 +71,7 @@ describe("mergedModels", () => {
 
   test("gemini rides the openai wire with its remote base (never local)", () => {
     const g = mergedModels(local, { ...noneEnabled, gemini: true }, []);
-    expect(g.connected.every((m) => m.api === "openai" && m.endpoint === GEMINI_OPENAI_BASE)).toBe(
-      true,
-    );
+    expect(g.connected.every((m) => m.api === "openai" && m.endpoint === GEMINI_OPENAI_BASE)).toBe(true);
   });
 
   test("presets become pseudo-models the transports can never receive", () => {

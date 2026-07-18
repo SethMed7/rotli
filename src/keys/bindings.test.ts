@@ -11,9 +11,7 @@ describe("resolveChord", () => {
   });
 
   it("returns the override when one is present", () => {
-    expect(resolveChord({ "note.new": "Meta+Shift+N" }, "note.new", "Meta+N")).toBe(
-      "Meta+Shift+N",
-    );
+    expect(resolveChord({ "note.new": "Meta+Shift+N" }, "note.new", "Meta+N")).toBe("Meta+Shift+N");
   });
 
   it("treats an explicit null override as UNBOUND (not 'fall back to default')", () => {

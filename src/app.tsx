@@ -45,12 +45,7 @@ import {
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { EditorView } from "@codemirror/view";
 import { activeInstance, isWritable } from "./memex/config";
-import {
-  chooseFolder,
-  initMemexAsCorpus,
-  loadConfig as memexLoadConfig,
-  writeNote,
-} from "./memex/service";
+import { chooseFolder, initMemexAsCorpus, loadConfig as memexLoadConfig, writeNote } from "./memex/service";
 import { summonChat } from "./services/chatSummon";
 import { flushSettingsNow } from "./state/persist";
 import { useMemexStore } from "./state/memex";
@@ -252,11 +247,9 @@ function MainShell() {
     void getCurrentWebview()
       .onDragDropEvent((event) => {
         if (event.payload.type === "drop" && event.payload.paths.length > 0) {
-          void handleDrop(
-            event.payload.paths,
-            event.payload.position.x,
-            event.payload.position.y,
-          ).catch(() => {});
+          void handleDrop(event.payload.paths, event.payload.position.x, event.payload.position.y).catch(
+            () => {},
+          );
         }
       })
       .then((un) => {
@@ -278,10 +271,7 @@ function MainShell() {
       const only = panes[0];
       const onlyTab = only && only.tabs.length === 1 ? activeTabOf(only) : null;
       const pristine =
-        panes.length === 1 &&
-        !!onlyTab &&
-        onlyTab.surfaceKind === "note" &&
-        onlyTab.noteId === "";
+        panes.length === 1 && !!onlyTab && onlyTab.surfaceKind === "note" && onlyTab.noteId === "";
       if (pristine) openNote(freshest.id);
     });
   }, []);
@@ -409,13 +399,7 @@ export default function App() {
       matchLightFamily,
       matchDarkFamily,
     });
-  }, [
-    surface,
-    theme,
-    themeFamily,
-    matchLightFamily,
-    matchDarkFamily,
-  ]);
+  }, [surface, theme, themeFamily, matchLightFamily, matchDarkFamily]);
   useEffect(() => {
     if (surface === "main") return;
     return onThemeSet((p) =>

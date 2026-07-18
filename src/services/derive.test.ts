@@ -48,9 +48,7 @@ describe("snippetOf — lines after the title, stripped + joined (mirrors Rust s
     // Rust strip_markdown removes * _ ` globally, yet only peels #/> at the
     // START of a line — so a mid-line '>' or '#' survives (the TSP-2 fix: the
     // old TS regex wrongly stripped them everywhere).
-    expect(snippetOf("# T\n\n**bold** _ital_ `code` > quote # h")).toBe(
-      "bold ital code > quote # h",
-    );
+    expect(snippetOf("# T\n\n**bold** _ital_ `code` > quote # h")).toBe("bold ital code > quote # h");
   });
 
   it("strips checkbox + list markers on EVERY line (Rust parity — was the TSP-2 bug)", () => {

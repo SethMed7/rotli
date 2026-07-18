@@ -91,7 +91,15 @@ function readAsDataURL(file: File): Promise<string> {
 /** Composer affordance glyphs — line-art, theme-aware (currentColor). */
 function GlobeGlyph() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      aria-hidden="true"
+    >
       <circle cx="8" cy="8" r="6.2" />
       <ellipse cx="8" cy="8" rx="2.6" ry="6.2" />
       <path d="M2 8h12M3.2 5h9.6M3.2 11h9.6" />
@@ -100,7 +108,17 @@ function GlobeGlyph() {
 }
 function ClipGlyph() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M11.7 5.6 6.4 10.9a2 2 0 0 1-2.8-2.8l5.4-5.4a3 3 0 0 1 4.3 4.3l-5.4 5.4" />
     </svg>
   );
@@ -108,7 +126,17 @@ function ClipGlyph() {
 
 function NoteGlyph() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M4 1.8h5.5L13 5.3v8.9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.8a1 1 0 0 1 1-1z" />
       <path d="M9.5 1.8v3.5H13M5.5 8.5h5M5.5 11h5" />
     </svg>
@@ -116,7 +144,17 @@ function NoteGlyph() {
 }
 function WidthGlyph() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M2.2 2.5v11M13.8 2.5v11" />
       <path d="M4.6 8h6.8M4.6 8l1.8-1.8M4.6 8l1.8 1.8M11.4 8l-1.8-1.8M11.4 8l-1.8 1.8" />
     </svg>
@@ -124,14 +162,34 @@ function WidthGlyph() {
 }
 function SendGlyph() {
   return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M8 12.5v-9M4 7l4-3.5L12 7" />
     </svg>
   );
 }
 function SpinGlyph() {
   return (
-    <svg className="chat-send-spin" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+    <svg
+      className="chat-send-spin"
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
       <path d="M8 1.8a6.2 6.2 0 1 1-6.2 6.2" />
     </svg>
   );
@@ -160,7 +218,17 @@ const MEASURE_LABELS: { id: Measure; label: string }[] = [
 
 function AssetsGlyph() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <rect x="2" y="2.8" width="12" height="10.4" rx="1.5" />
       <circle cx="5.6" cy="6.4" r="1.1" />
       <path d="M2.5 12 6.7 8.2l2.6 2.4 2.3-2 1.9 1.7" />
@@ -421,17 +489,11 @@ function ModelPicker({
         </span>
       )}
       {open && (
-        <div
-          className="chat-modelpop"
-          ref={popRef}
-          role="menu"
-          aria-label="Model"
-          onKeyDown={onMenuKeyDown}
-        >
+        <div className="chat-modelpop" ref={popRef} role="menu" aria-label="Model" onKeyDown={onMenuKeyDown}>
           {fallbackFrom && (
             <div className="chat-modelpop-notice">
-              Saved model <b>{shortModelLabel(fallbackFrom)}</b> is unavailable. Using the fallback
-              shown in the composer.
+              Saved model <b>{shortModelLabel(fallbackFrom)}</b> is unavailable. Using the fallback shown in
+              the composer.
             </div>
           )}
           {sections.map((s) => (
@@ -472,9 +534,7 @@ function ModelPicker({
                     {(m.localDefault || m.isDefault) && (
                       <span className="chat-modelrow-tag def">default</span>
                     )}
-                    <span className="chat-modelrow-check">
-                      {sel && <CheckGlyph size={13} />}
-                    </span>
+                    <span className="chat-modelrow-check">{sel && <CheckGlyph size={13} />}</span>
                   </button>
                 );
               })}
@@ -521,13 +581,7 @@ function renderMessage(text: string): ReactNode {
   return out;
 }
 
-export function ChatSurface({
-  paneId,
-  chatSlug,
-}: {
-  paneId: string;
-  chatSlug: string | null;
-}) {
+export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: string | null }) {
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const chatModelId = useUiStore((s) => s.chatModelId);
   const setChatModelId = useUiStore((s) => s.setChatModelId);
@@ -597,28 +651,18 @@ export function ChatSurface({
     (id, index) => !aiProviders[id] || providerChecks[index]?.isFetched,
   );
   const catalogSettled = models.isFetched && providerChecksSettled;
-  const allGroups = mergedModels(
-    models.data ?? [],
-    aiProviders,
-    hybridPresets,
-    blockedModels,
-    providerReady,
-  );
+  const allGroups = mergedModels(models.data ?? [], aiProviders, hybridPresets, blockedModels, providerReady);
   // A secure-note chat never offers a connected or routing model. The exact
   // frontmatter is rechecked on send as the authoritative backstop.
-  const groups: ModelGroups = secureAttachmentHint
-    ? { ...allGroups, connected: [], presets: [] }
-    : allGroups;
+  const groups: ModelGroups = secureAttachmentHint ? { ...allGroups, connected: [], presets: [] } : allGroups;
   const modelList = flattenModels(groups);
   const savedPick = modelList.find((m) => m.id === chatModelId);
   const fallbackPick = modelList.find((m) => m.isDefault) ?? modelList[0] ?? null;
   // A persisted remote choice must not silently become the local default while
   // its account probe is still resolving on a fresh launch.
-  const waitingForSavedPick =
-    !!chatModelId && !catalogSettled && (!savedPick || savedPick.api === "preset");
+  const waitingForSavedPick = !!chatModelId && !catalogSettled && (!savedPick || savedPick.api === "preset");
   const picked = waitingForSavedPick ? null : (savedPick ?? fallbackPick);
-  const fallbackFrom =
-    catalogSettled && chatModelId && !savedPick && fallbackPick ? chatModelId : null;
+  const fallbackFrom = catalogSettled && chatModelId && !savedPick && fallbackPick ? chatModelId : null;
 
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -846,9 +890,7 @@ export function ChatSurface({
     active && chatSlug
       ? `${active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`}storage/chats/${chatSlug}/`
       : null;
-  const assetIds = assetPrefix
-    ? [...noteIndex.keys()].filter((id) => id.startsWith(assetPrefix)).sort()
-    : [];
+  const assetIds = assetPrefix ? [...noteIndex.keys()].filter((id) => id.startsWith(assetPrefix)).sort() : [];
 
   /** Open the attached note per the Settings choice: a new tab here, or a
    * right split beside the chat (split() focuses the new pane, so openNote
@@ -906,9 +948,7 @@ export function ChatSurface({
       style={{ "--chat-measure": `${CHAT_MEASURE_PX[measure]}px` } as CSSProperties}
     >
       <header className="chat-head">
-        <h2 className="chat-title-h">
-          {chatSlug ? storedTitle || chatSlug.replace(/-/g, " ") : "New chat"}
-        </h2>
+        <h2 className="chat-title-h">{chatSlug ? storedTitle || chatSlug.replace(/-/g, " ") : "New chat"}</h2>
         {active && <span className="chat-inst">· {active.label}</span>}
         {active && (
           <div className="chat-head-tools">
@@ -1018,8 +1058,8 @@ export function ChatSurface({
               )}
               {saveErr && (
                 <p className="file-err chat-save-err" role="alert">
-                  ⚠ This conversation couldn’t be saved — it stays for this session but won’t
-                  survive a reload. {saveErr}
+                  ⚠ This conversation couldn’t be saved — it stays for this session but won’t survive a
+                  reload. {saveErr}
                 </p>
               )}
               {noteErr && (
@@ -1137,8 +1177,8 @@ export function ChatSurface({
                         secureAttachmentHint
                           ? "Web search is unavailable for a secure-note chat"
                           : globeOn
-                          ? "Web search is ON for this chat"
-                          : "Web search — let this chat reach the internet"
+                            ? "Web search is ON for this chat"
+                            : "Web search — let this chat reach the internet"
                       }
                       onClick={() => setChatWeb(webKey, !globeOn)}
                     >
@@ -1147,7 +1187,9 @@ export function ChatSurface({
                     <button
                       type="button"
                       className={images.length > 0 ? "chat-tool on" : "chat-tool"}
-                      title={canVision ? "Attach an image" : "This model can’t see images — pick a vision model"}
+                      title={
+                        canVision ? "Attach an image" : "This model can’t see images — pick a vision model"
+                      }
                       onClick={onAttachClick}
                     >
                       <ClipGlyph />

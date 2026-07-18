@@ -17,10 +17,7 @@
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBoardRename } from "../services/boardRename";
 import { useChatRename } from "../services/chatRename";
-import {
-  closeOtherTabsWithDraftCleanup,
-  closeTabWithDraftCleanup,
-} from "../documents/draftComposition";
+import { closeOtherTabsWithDraftCleanup, closeTabWithDraftCleanup } from "../documents/draftComposition";
 import { fileName } from "../lib/fileKind";
 import { InlineRenameInput } from "./inlineRenameInput";
 import { startTabDrag } from "../lib/tabDrag";
@@ -33,15 +30,7 @@ import { useMainStore } from "../state/main";
 import { leaves, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { LeafNode, Tab } from "../types";
-import {
-  ChatGlyph,
-  ClockGlyph,
-  ExcalidrawGlyph,
-  FileGlyph,
-  PlusGlyph,
-  XGlyph,
-  glyphForNote,
-} from "./glyphs";
+import { ChatGlyph, ClockGlyph, ExcalidrawGlyph, FileGlyph, PlusGlyph, XGlyph, glyphForNote } from "./glyphs";
 
 /** A board's display label = its filename minus the .excalidraw extension. */
 function boardLabel(boardId: string): string {
@@ -73,8 +62,12 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   const mainManifest = useMainStore((s) => s.manifest);
   const setMainTree = useMainStore((s) => s.setTree);
   // double-click a board tab to rename it in place (shares the sidebar's flow)
-  const { renamingBoardId, start: startRename, commit: commitRename, cancel: cancelRename } =
-    useBoardRename();
+  const {
+    renamingBoardId,
+    start: startRename,
+    commit: commitRename,
+    cancel: cancelRename,
+  } = useBoardRename();
   // double-click / right-click a chat tab to rename it (renames chats/<slug>.md)
   const {
     renamingChatSlug,
@@ -84,15 +77,11 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   } = useChatRename();
   // the insertion index previewed for THIS strip (2px line), or null
   const dropAt = usePanesStore((s) =>
-    s.dropPreview?.kind === "strip" && s.dropPreview.paneId === pane.id
-      ? s.dropPreview.index
-      : null,
+    s.dropPreview?.kind === "strip" && s.dropPreview.paneId === pane.id ? s.dropPreview.index : null,
   );
   // the only tab of the only pane: closing it is a no-op, so hide its × — the
   // strip stays for the new always-visible law (Seth, 2026-06-13)
-  const loneInLonePane = usePanesStore(
-    (s) => leaves(s.root).length === 1 && pane.tabs.length === 1,
-  );
+  const loneInLonePane = usePanesStore((s) => leaves(s.root).length === 1 && pane.tabs.length === 1);
   // the FULL note index — a tab can hold a STAGED note (wiki/_inbox → the
   // hidden "Board" root) or an archived/trashed one; useNotes() alone read
   // those tabs as "Untitled".
@@ -156,9 +145,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
         label: inMain ? "Remove from Main" : "Add to Main",
         onClick: () =>
           setMainTree(
-            inMain
-              ? removeFromMain(mainManifest.tree, mainId)
-              : addNoteToMain(mainManifest.tree, mainId),
+            inMain ? removeFromMain(mainManifest.tree, mainId) : addNoteToMain(mainManifest.tree, mainId),
             new Set(noteIndex.keys()),
           ),
       });
@@ -172,9 +159,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
         kind: "action",
         label: "Rename…",
         onClick: () =>
-          useUiStore
-            .getState()
-            .setRenameTarget({ id: tab.noteId, current: titles.get(tab.noteId) ?? "" }),
+          useUiStore.getState().setRenameTarget({ id: tab.noteId, current: titles.get(tab.noteId) ?? "" }),
       });
       items.push({ kind: "sep" });
     } else if (tab.surfaceKind === "chat" && tab.chatSlug) {
@@ -199,15 +184,16 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
 
   return (
     <div className="tabstrip" role="tablist">
-      <div
-        className="tabscroll-wrap"
-        data-fade-left={fade.left}
-        data-fade-right={fade.right}
-      >
-        <div className="tabscroll" data-tabscroll data-pane-id={pane.id} ref={scrollRef} onScroll={updateFade}>
+      <div className="tabscroll-wrap" data-fade-left={fade.left} data-fade-right={fade.right}>
+        <div
+          className="tabscroll"
+          data-tabscroll
+          data-pane-id={pane.id}
+          ref={scrollRef}
+          onScroll={updateFade}
+        >
           {pane.tabs.map((tab, i) => {
-            const dragging =
-              draggingTab?.paneId === pane.id && draggingTab.tabId === tab.id;
+            const dragging = draggingTab?.paneId === pane.id && draggingTab.tabId === tab.id;
             return (
               <div key={tab.id} className="tabslot">
                 {dropAt === i && <span className="tab-ins" aria-hidden="true" />}
@@ -229,9 +215,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                       closeTabWithDraftCleanup(pane.id, tab.id);
                     }
                   }}
-                  onPointerDown={(event) =>
-                    startTabDrag(event, pane.id, tab.id, tabLabel(tab, titles))
-                  }
+                  onPointerDown={(event) => startTabDrag(event, pane.id, tab.id, tabLabel(tab, titles))}
                 >
                   {tab.surfaceKind === "canvas" ? (
                     <ExcalidrawGlyph size={13} className="tglyph" />

@@ -55,12 +55,7 @@ interface IconProps {
 export function Icon({ name, size = 15, className }: IconProps) {
   ensureSprite();
   return (
-    <svg
-      className={className ? `icon ${className}` : "icon"}
-      width={size}
-      height={size}
-      aria-hidden="true"
-    >
+    <svg className={className ? `icon ${className}` : "icon"} width={size} height={size} aria-hidden="true">
       <use href={`#${name}`} />
     </svg>
   );

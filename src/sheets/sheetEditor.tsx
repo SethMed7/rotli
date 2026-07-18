@@ -58,9 +58,7 @@ export default function SheetEditor({
   const [ready, setReady] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [themeMode, setThemeMode] = useState<SheetThemeMode>(
-    () => themeModeMemo.get(fileId) ?? "themed",
-  );
+  const [themeMode, setThemeMode] = useState<SheetThemeMode>(() => themeModeMemo.get(fileId) ?? "themed");
   const [appTheme, setAppTheme] = useState(currentAppTheme);
   const [chromeEl, setChromeEl] = useState<HTMLElement | null>(null);
 
@@ -131,11 +129,7 @@ export default function SheetEditor({
           }
           diskLenRef.current = new TextEncoder().encode(csv).length;
           const rows = parseCsvExact(csv);
-          wb = fillFromCsvRows(
-            newWorkbook(),
-            fileName(fileId).replace(/\.csv$/i, "") || "Sheet1",
-            rows,
-          );
+          wb = fillFromCsvRows(newWorkbook(), fileName(fileId).replace(/\.csv$/i, "") || "Sheet1", rows);
           model = workbookToModel(wb, fileId);
           idMapRef.current = buildSheetIdMap(wb, model);
         } else {
@@ -282,11 +276,7 @@ export default function SheetEditor({
       <button
         type="button"
         className={themeMode === "raw" ? "sheet-view-toggle on" : "sheet-view-toggle"}
-        title={
-          themeMode === "raw"
-            ? "Show rotli-themed chrome"
-            : "Show the sheet on white paper, like Excel"
-        }
+        title={themeMode === "raw" ? "Show rotli-themed chrome" : "Show the sheet on white paper, like Excel"}
         onClick={toggleThemeMode}
       >
         {themeMode === "raw" ? "Themed" : "Raw"}
@@ -294,12 +284,7 @@ export default function SheetEditor({
       {err && <span className="sheet-save-err">⚠ {err}</span>}
       {!err && note && <span className="sheet-save-err">{note}</span>}
       {dirty && !saving && <span className="sheet-dirty" title="Unsaved changes" />}
-      <button
-        type="button"
-        className="sheet-save"
-        disabled={saving || !ready}
-        onClick={() => void save()}
-      >
+      <button type="button" className="sheet-save" disabled={saving || !ready} onClick={() => void save()}>
         {saving ? "Saving…" : dirty ? "Save ⌘S" : "Saved"}
       </button>
     </div>

@@ -10,9 +10,7 @@ import { VAULT_MARKER, isHidden, isVault } from "./destinations";
 import { notesService } from "./notes";
 import { creationIsSecure, isSecureNotesFolder } from "../security/secureNotes";
 
-export type Route =
-  | { kind: "memex"; shelf?: string[] }
-  | { kind: "local"; folder: string };
+export type Route = { kind: "memex"; shelf?: string[] } | { kind: "local"; folder: string };
 
 /** The PURE routing decision (no I/O, so it unit-tests): given the selection, whether
  *  a smart row is selected, and whether a writable memex is active, decide whether a
@@ -38,9 +36,7 @@ export function routeDecision(
   if (!explicitLocal && memexWritable) {
     const sub = isVault(sel) ? sel.slice(VAULT_MARKER.length) : "";
     const shelf =
-      sub && !sub.startsWith("wiki") && sub !== "chats" && !sub.startsWith("chats/")
-        ? [sub]
-        : undefined;
+      sub && !sub.startsWith("wiki") && sub !== "chats" && !sub.startsWith("chats/") ? [sub] : undefined;
     return shelf ? { kind: "memex", shelf } : { kind: "memex" };
   }
   const folder = isSmart || isVault(sel) || isHidden(sel) || sel === "" ? localFallback : sel;
@@ -68,12 +64,7 @@ export async function createRoutedNote(opts: RoutedCreate): Promise<string> {
     selectedFolderId,
     opts.secure === undefined ? undefined : { secure: opts.secure },
   );
-  const route = routeDecision(
-    selectedFolderId,
-    isSmart,
-    !!(active && isWritable(active)),
-    localFallback,
-  );
+  const route = routeDecision(selectedFolderId, isSmart, !!(active && isWritable(active)), localFallback);
 
   if (route.kind === "memex" && active) {
     const { id } = await writeNote({
@@ -87,10 +78,8 @@ export async function createRoutedNote(opts: RoutedCreate): Promise<string> {
     const prefix = active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`;
     return `${prefix}${id}`;
   }
-  const note = await notesService.createNote(
-    route.kind === "local" ? route.folder : localFallback,
-    body,
-    { secure },
-  );
+  const note = await notesService.createNote(route.kind === "local" ? route.folder : localFallback, body, {
+    secure,
+  });
   return note.id;
 }

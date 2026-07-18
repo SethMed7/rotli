@@ -33,7 +33,6 @@ export function slashInsertion(op: SlashOp): SlashInsertion | null {
 }
 
 export function pickerFence(mode: Exclude<SlashPickerMode, "linkNote">, fileId: string): string {
-  const lang =
-    mode === "embedBoard" ? "board" : mode === "embedSheet" ? "sheet" : "document";
+  const lang = mode === "embedBoard" ? "board" : mode === "embedSheet" ? "sheet" : "document";
   return `\`\`\`${lang}\n${fileId}\n\`\`\`\n\n`;
 }

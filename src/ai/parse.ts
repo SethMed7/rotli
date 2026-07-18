@@ -55,9 +55,7 @@ export function parseAction(raw: string, allowed: ReadonlySet<ToolName>): Parsed
     const tool = obj.tool as ToolName;
     if (!allowed.has(tool)) return { kind: "invalid", reason: `unknown tool "${obj.tool}"` };
     const args =
-      obj.args !== null && typeof obj.args === "object"
-        ? (obj.args as Record<string, unknown>)
-        : {};
+      obj.args !== null && typeof obj.args === "object" ? (obj.args as Record<string, unknown>) : {};
     return { kind: "call", tool, args };
   }
   return { kind: "invalid", reason: 'reply had neither a known "tool" nor a "final"' };

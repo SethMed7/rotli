@@ -4,13 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
 import { extOf, fileName } from "../lib/fileKind";
 import { parseCsvExact } from "../sheets/csv";
-import {
-  type Workbook,
-  bytesFromB64,
-  fillFromCsvRows,
-  loadXlsx,
-  newWorkbook,
-} from "../sheets/codec/xlsx";
+import { type Workbook, bytesFromB64, fillFromCsvRows, loadXlsx, newWorkbook } from "../sheets/codec/xlsx";
 import { type SheetHandle, buildSheetIdMap, mountSheet, workbookToModel } from "../sheets/engine";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { writeSheetModel, type SheetFileMode } from "../sheets/session";

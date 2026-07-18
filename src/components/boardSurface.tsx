@@ -77,8 +77,7 @@ export function BoardSurface() {
     // saved order itself is untouched, same rule as Main
     return [...captures].sort(
       (a, b) =>
-        Number(b.pinned) - Number(a.pinned) ||
-        (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity),
+        Number(b.pinned) - Number(a.pinned) || (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity),
     );
   }, [captures, captureOrder]);
 
@@ -207,8 +206,8 @@ export function BoardSurface() {
           <Character name="rest" size={104} className="be-quokka" />
           <p className="be-title">Nothing captured yet</p>
           <p className="be-sub">
-            Press your Quick capture shortcut (⌥C) from anywhere — each thought lands here as a
-            card. Select a few and merge them into one note.
+            Press your Quick capture shortcut (⌥C) from anywhere — each thought lands here as a card. Select a
+            few and merge them into one note.
           </p>
         </div>
       ) : (
@@ -216,8 +215,8 @@ export function BoardSurface() {
           {/* curating a card GRADUATES it — say so, or the instant vanish reads
               as data loss (#56, audit 2026-07) */}
           <p className="board-foot-hint">
-            A card added to Main or starred for Quick access graduates — it leaves this board and
-            lives with your notes.
+            A card added to Main or starred for Quick access graduates — it leaves this board and lives with
+            your notes.
           </p>
           <div className="board-grid">
             {ordered.map((c) => {
@@ -265,28 +264,21 @@ export function BoardSurface() {
 
       {chosen.length > 0 && (
         <div className="board-bar" role="toolbar" aria-label="Selected captures">
-          <span className="board-bar-count">
-            {chosen.length} selected
-          </span>
+          <span className="board-bar-count">{chosen.length} selected</span>
           <span className="board-bar-grow" />
-          <button
-            type="button"
-            className="board-btn"
-            disabled={busy}
-            onClick={() => void archiveSelected()}
-          >
+          <button type="button" className="board-btn" disabled={busy} onClick={() => void archiveSelected()}>
             <ArchiveGlyph size={14} />
             Archive
           </button>
-          <button
-            type="button"
-            className="board-btn primary"
-            disabled={busy}
-            onClick={() => void merge()}
-          >
+          <button type="button" className="board-btn primary" disabled={busy} onClick={() => void merge()}>
             {busy ? "Merging…" : chosen.length > 1 ? `Merge ${chosen.length} into a note` : "Make a note"}
           </button>
-          <button type="button" className="board-btn ghost" disabled={busy} onClick={() => setSelected(new Set())}>
+          <button
+            type="button"
+            className="board-btn ghost"
+            disabled={busy}
+            onClick={() => setSelected(new Set())}
+          >
             Clear
           </button>
         </div>

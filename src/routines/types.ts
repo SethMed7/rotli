@@ -28,8 +28,7 @@ export type Lane = "signal" | "email" | "inApp";
  *   simply `now + secs`.
  */
 export type Schedule =
-  | { kind: "dailyAt"; hhmm: string; leadMinutes: number }
-  | { kind: "everySecs"; secs: number };
+  { kind: "dailyAt"; hhmm: string; leadMinutes: number } | { kind: "everySecs"; secs: number };
 
 /** One scheduled job. */
 export interface Routine {

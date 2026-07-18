@@ -6,15 +6,8 @@
 // see everything the AI wants to do or has done, and undo any of it.
 
 import { useState } from "react";
-import {
-  type BrainAction,
-  deriveJournal,
-} from "../services/brainJournal";
-import {
-  approveProposal,
-  dismissProposal,
-  undoAction,
-} from "../services/brainJournalComposition";
+import { type BrainAction, deriveJournal } from "../services/brainJournal";
+import { approveProposal, dismissProposal, undoAction } from "../services/brainJournalComposition";
 import { daysSinceMidnight } from "../lib/dateLabels";
 import { organizerRunOnce } from "../lib/tauri";
 import { invalidateJournal, invalidateNotes, useJournal, useOrganizerStatus } from "../services/hooks";
@@ -40,8 +33,7 @@ function describe(a: BrainAction, proposed: boolean): string {
         : `Set ${a.field} on “${a.noteTitle}”`;
   if (proposed) {
     // labeled, not a bare number (#84, audit 2026-07)
-    const pct =
-      typeof a.confidence === "number" ? ` · ${Math.round(a.confidence * 100)}% sure` : "";
+    const pct = typeof a.confidence === "number" ? ` · ${Math.round(a.confidence * 100)}% sure` : "";
     return `Proposes: ${verb}${pct}`;
   }
   return a.action === "file" ? `Filed “${a.noteTitle}” → ${a.after.replace(/^wiki\//, "")}` : verb;
@@ -98,7 +90,11 @@ export function ActivitySurface() {
           </button>
         )}
       </header>
-      {err && <p className="file-err" style={{ padding: "0 22px 8px" }}>⚠ {err}</p>}
+      {err && (
+        <p className="file-err" style={{ padding: "0 22px 8px" }}>
+          ⚠ {err}
+        </p>
+      )}
       {/* quiet daemon-status lines — show, never nag (§4.8) */}
       {status?.modelOffline && (
         <p className="brain-hint" style={{ padding: "0 22px 8px" }}>
@@ -107,8 +103,8 @@ export function ActivitySurface() {
       )}
       {(status?.secureSkipped ?? 0) > 0 && (
         <p className="brain-hint" style={{ padding: "0 22px 8px" }}>
-          {status?.secureSkipped} {status?.secureSkipped === 1 ? "capture looks" : "captures look"}{" "}
-          like they contain secrets — review them yourself. The AI won’t read or move them.
+          {status?.secureSkipped} {status?.secureSkipped === 1 ? "capture looks" : "captures look"} like they
+          contain secrets — review them yourself. The AI won’t read or move them.
         </p>
       )}
       {actions === null ? (

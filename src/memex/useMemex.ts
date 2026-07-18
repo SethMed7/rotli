@@ -82,8 +82,7 @@ export function useWriteChat() {
       messages: ChatMsg[];
       existingSlug?: string;
     }) => svc.writeChat(input),
-    onSuccess: (_res, vars) =>
-      queryClient.invalidateQueries({ queryKey: memexKeys.chats(vars.instance.id) }),
+    onSuccess: (_res, vars) => queryClient.invalidateQueries({ queryKey: memexKeys.chats(vars.instance.id) }),
   });
 }
 
@@ -92,8 +91,7 @@ export function useSetChatAttachedTo() {
   return useMutation({
     mutationFn: ({ instance, slug, stem }: { instance: MemexInstance; slug: string; stem: string }) =>
       svc.setChatAttachedTo(instance, slug, stem),
-    onSuccess: (_res, vars) =>
-      queryClient.invalidateQueries({ queryKey: memexKeys.chats(vars.instance.id) }),
+    onSuccess: (_res, vars) => queryClient.invalidateQueries({ queryKey: memexKeys.chats(vars.instance.id) }),
   });
 }
 

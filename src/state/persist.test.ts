@@ -244,8 +244,9 @@ describe("pruneMap — the persisted-map GC primitive (#78)", () => {
   it("drops entries whose key fails the predicate", () => {
     const live = new Set(["kept-chat"]);
     expect(
-      pruneMap({ "kept-chat": true, "deleted-chat": false, "unsaved:p1": true }, (k) =>
-        live.has(k) || k.startsWith("unsaved:"),
+      pruneMap(
+        { "kept-chat": true, "deleted-chat": false, "unsaved:p1": true },
+        (k) => live.has(k) || k.startsWith("unsaved:"),
       ),
     ).toEqual({ "kept-chat": true, "unsaved:p1": true });
   });

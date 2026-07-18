@@ -98,11 +98,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   useEffect(() => () => saver.flush(), [saver]);
 
   const onChange = useCallback(
-    (
-      elements: BoardChangeElements,
-      appState: BoardChangeAppState,
-      files: BoardChangeFiles,
-    ) => {
+    (elements: BoardChangeElements, appState: BoardChangeAppState, files: BoardChangeFiles) => {
       // Don't write while still loading (the initialData render fires onChange).
       if (state.status !== "ready") return;
       saver.schedule(

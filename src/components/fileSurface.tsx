@@ -38,12 +38,7 @@ import {
 } from "../documents/kinds";
 import { clamp } from "../lib/clamp";
 import { IMAGE_EXTS, extOf, fileName } from "../lib/fileKind";
-import {
-  SHEET_BIN,
-  SHEET_EDITABLE,
-  SHEET_EDIT_MAX_BYTES,
-  SHEET_TEXT,
-} from "../sheets/kinds";
+import { SHEET_BIN, SHEET_EDITABLE, SHEET_EDIT_MAX_BYTES, SHEET_TEXT } from "../sheets/kinds";
 import { type SheetTable, parseWorkbook } from "../sheets/view";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 
@@ -52,16 +47,7 @@ import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 const SheetEditor = lazy(() => import("../sheets/sheetEditor"));
 const DocumentEditor = lazy(() => import("./documentEditor"));
 
-export type FileKind =
-  | "audio"
-  | "video"
-  | "image"
-  | "pdf"
-  | "sheet"
-  | "document"
-  | "text"
-  | "html"
-  | "other";
+export type FileKind = "audio" | "video" | "image" | "pdf" | "sheet" | "document" | "text" | "html" | "other";
 
 /** Slot in the file header for sheet chrome (Raw / Save) next to Open externally. */
 
@@ -147,8 +133,7 @@ const READ_MAX_BYTES = 8_000_000;
  * which would flip the document into quirks mode. Exported for tests. */
 export function htmlPreviewDoc(text: string, baseUrl: string): string {
   const base = `<base href="${baseUrl.replace(/"/g, "%22")}">`;
-  const m =
-    /<head[^>]*>/i.exec(text) ?? /<html[^>]*>/i.exec(text) ?? /^\s*<!doctype[^>]*>/i.exec(text);
+  const m = /<head[^>]*>/i.exec(text) ?? /<html[^>]*>/i.exec(text) ?? /^\s*<!doctype[^>]*>/i.exec(text);
   if (!m) return base + text;
   const at = m.index + m[0].length;
   return text.slice(0, at) + base + text.slice(at);
@@ -175,9 +160,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   const [err, setErr] = useState<string | null>(null);
   // html files: Preview (sandboxed srcdoc iframe) ⇄ Code (the raw source) —
   // Preview first, and the pick survives tab switches (the session memo)
-  const [htmlMode, setHtmlMode] = useState<"preview" | "code">(
-    () => htmlModeMemo.get(fileId) ?? "preview",
-  );
+  const [htmlMode, setHtmlMode] = useState<"preview" | "code">(() => htmlModeMemo.get(fileId) ?? "preview");
   // a read-only sheet/html file past the byte cap: refuse honestly, never half-parse
   const [tooLarge, setTooLarge] = useState(false);
   const [converting, setConverting] = useState(false);
@@ -194,15 +177,9 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   const openMenu = useContextMenu((s) => s.open);
 
   const sheetEditable =
-    kind === "sheet" &&
-    SHEET_EDITABLE.has(ext) &&
-    !!stat?.writable &&
-    stat.len <= SHEET_EDIT_MAX_BYTES;
+    kind === "sheet" && SHEET_EDITABLE.has(ext) && !!stat?.writable && stat.len <= SHEET_EDIT_MAX_BYTES;
   const documentEditable =
-    kind === "document" &&
-    DOCX_EDITABLE.has(ext) &&
-    !!stat?.writable &&
-    stat.len <= DOCUMENT_EDIT_MAX_BYTES;
+    kind === "document" && DOCX_EDITABLE.has(ext) && !!stat?.writable && stat.len <= DOCUMENT_EDIT_MAX_BYTES;
 
   useEffect(() => {
     let cancelled = false;
@@ -227,7 +204,9 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
       .catch(() => {});
 
     if (kind === "text") {
-      corpusFileText(fileId).then((t) => !cancelled && setText(t)).catch(fail);
+      corpusFileText(fileId)
+        .then((t) => !cancelled && setText(t))
+        .catch(fail);
     } else if (kind === "html") {
       // both modes render the SAME full text (Preview = srcdoc, Code = <pre>),
       // so stat first and refuse past the cap honestly — a capped read would
@@ -244,7 +223,9 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             setTooLarge(true);
             return;
           }
-          corpusFileText(fileId, READ_MAX_BYTES).then((t) => !cancelled && setText(t)).catch(fail);
+          corpusFileText(fileId, READ_MAX_BYTES)
+            .then((t) => !cancelled && setText(t))
+            .catch(fail);
         })
         .catch(fail);
     } else if (kind === "sheet") {
@@ -256,8 +237,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           if (cancelled) return;
           setStat(s);
           setProbed(true);
-          const editable =
-            SHEET_EDITABLE.has(ext) && !!s?.writable && s.len <= SHEET_EDIT_MAX_BYTES;
+          const editable = SHEET_EDITABLE.has(ext) && !!s?.writable && s.len <= SHEET_EDIT_MAX_BYTES;
           if (editable) return;
           // past the read cap the bytes arrive truncated — an xlsx dies with a
           // cryptic zip-parse error, a csv shows a silent cut. Refuse up front.
@@ -396,11 +376,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   };
 
   const loadingMedia =
-    (kind === "audio" ||
-      kind === "video" ||
-      kind === "image" ||
-      kind === "pdf" ||
-      kind === "other") &&
+    (kind === "audio" || kind === "video" || kind === "image" || kind === "pdf" || kind === "other") &&
     !url &&
     !err;
   const loadingText = kind === "text" && text === null && !err;
@@ -409,8 +385,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
     kind === "html" && !err && !tooLarge && (text === null || (htmlMode === "preview" && !url));
   const loadingSheet =
     kind === "sheet" && !err && !tooLarge && (!probed || (!sheetEditable && tables === null));
-  const loadingDocument =
-    kind === "document" && DOCX_EDITABLE.has(ext) && !err && !tooLarge && !probed;
+  const loadingDocument = kind === "document" && DOCX_EDITABLE.has(ext) && !err && !tooLarge && !probed;
   const sheet = tables?.[activeSheet];
 
   return (
@@ -471,9 +446,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
                   : "view only · too large"}
           </span>
         )}
-        {kind === "sheet" && sheetEditable && (
-          <div ref={sheetChromeRef} className="file-sheet-chrome" />
-        )}
+        {kind === "sheet" && sheetEditable && <div ref={sheetChromeRef} className="file-sheet-chrome" />}
         {kind === "document" && documentEditable && (
           <div ref={documentChromeRef} className="file-document-chrome" />
         )}
@@ -492,8 +465,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           }
           onClick={openExternally}
         >
-          Open externally{" "}
-          <span aria-hidden="true">▾</span>
+          Open externally <span aria-hidden="true">▾</span>
         </button>
       </header>
 
@@ -582,27 +554,27 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
 
         {!err && kind === "document" && probed && documentEditable && (
           <Suspense fallback={<p className="file-loading">Opening editor…</p>}>
-            <DocumentEditor
-              key={fileId}
-              fileId={fileId}
-              paneId={paneId}
-              chromeSlotRef={documentChromeRef}
-            />
+            <DocumentEditor key={fileId} fileId={fileId} paneId={paneId} chromeSlotRef={documentChromeRef} />
           </Suspense>
         )}
-        {!err && kind === "document" && probed && DOCX_EDITABLE.has(ext) && !documentEditable && !tooLarge && (
-          <div className="file-document-fallback">
-            <p>This document is in a protected location. Move it into Rotli Storage to edit it.</p>
-          </div>
-        )}
+        {!err &&
+          kind === "document" &&
+          probed &&
+          DOCX_EDITABLE.has(ext) &&
+          !documentEditable &&
+          !tooLarge && (
+            <div className="file-document-fallback">
+              <p>This document is in a protected location. Move it into Rotli Storage to edit it.</p>
+            </div>
+          )}
         {!err && kind === "document" && probed && !DOCX_EDITABLE.has(ext) && (
           <div className="file-document-fallback">
             {DOCUMENT_CONVERTIBLE.has(ext) ? (
               <>
                 <h2>Convert a copy to edit here</h2>
                 <p>
-                  Rotli can use the local macOS document converter for .{ext}. It creates a new
-                  managed DOCX in Rotli Storage and leaves the original unchanged.
+                  Rotli can use the local macOS document converter for .{ext}. It creates a new managed DOCX
+                  in Rotli Storage and leaves the original unchanged.
                 </p>
                 <button
                   type="button"
@@ -625,8 +597,8 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
               <>
                 <h2>.{ext || "unknown"} is unsupported</h2>
                 <p>
-                  Rotli does not have a faithful local conversion path for this format. Open the
-                  original externally and export a DOCX copy to edit it in Rotli.
+                  Rotli does not have a faithful local conversion path for this format. Open the original
+                  externally and export a DOCX copy to edit it in Rotli.
                 </p>
               </>
             )}
@@ -643,12 +615,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             frame did (htmlPreviewDoc). Never loosen the sandbox — a .html in
             the notes folder is untrusted the moment anything is shared. */}
         {!err && kind === "html" && !tooLarge && htmlMode === "preview" && text !== null && url && (
-          <iframe
-            className="file-html"
-            title={name}
-            sandbox=""
-            srcDoc={htmlPreviewDoc(text, url)}
-          />
+          <iframe className="file-html" title={name} sandbox="" srcDoc={htmlPreviewDoc(text, url)} />
         )}
         {!err && kind === "html" && !tooLarge && htmlMode === "code" && text !== null && (
           <pre className="file-text">{text || "(empty file)"}</pre>
@@ -692,8 +659,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             )}
             {sheet?.truncated && (
               <div className="file-sheet-note">
-                showing the first {sheet.rows.length.toLocaleString()} rows — Open externally for
-                the rest
+                showing the first {sheet.rows.length.toLocaleString()} rows — Open externally for the rest
               </div>
             )}
             <div className="file-sheet-scroll">
@@ -703,9 +669,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
                     {sheet.rows.map((row, ri) => (
                       <tr key={ri}>
                         {/* the header row's rownum is the CORNER — pinned on both axes */}
-                        <td className={ri === 0 ? "fsh-rownum fsh-corner" : "fsh-rownum"}>
-                          {ri + 1}
-                        </td>
+                        <td className={ri === 0 ? "fsh-rownum fsh-corner" : "fsh-rownum"}>{ri + 1}</td>
                         {row.map((cell, ci) =>
                           // title: clipped cells (nowrap + ellipsis) reveal on hover —
                           // the read-only grid has no edit mode to peek into

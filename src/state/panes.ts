@@ -148,9 +148,7 @@ function splitLeaf(
     const children = before ? [newLeaf, node] : [node, newLeaf];
     return { kind: "split", id: ulid(), dir, children, sizes: [0.5, 0.5] };
   }
-  const index = node.children.findIndex(
-    (c) => c.kind === "leaf" && c.id === leafId,
-  );
+  const index = node.children.findIndex((c) => c.kind === "leaf" && c.id === leafId);
   if (index !== -1 && node.dir === dir) {
     const children = [...node.children];
     const sizes = [...node.sizes];
@@ -213,11 +211,7 @@ interface LeafRect {
   h: number;
 }
 
-function leafRects(
-  node: PaneNode,
-  rect = { x: 0, y: 0, w: 1, h: 1 },
-  out: LeafRect[] = [],
-): LeafRect[] {
+function leafRects(node: PaneNode, rect = { x: 0, y: 0, w: 1, h: 1 }, out: LeafRect[] = []): LeafRect[] {
   if (node.kind === "leaf") {
     out.push({ id: node.id, ...rect });
     return out;
@@ -282,9 +276,7 @@ export type DropZone = DetachDir | "center";
  * insertion line and the pane-body zone highlight (Seth, 2026-06-15: the tab
  * drag is pointer-based, not HTML5, so it fires in the macOS WKWebView shell). */
 export type DropPreview =
-  | { kind: "strip"; paneId: string; index: number }
-  | { kind: "zone"; leafId: string; zone: DropZone }
-  | null;
+  { kind: "strip"; paneId: string; index: number } | { kind: "zone"; leafId: string; zone: DropZone } | null;
 
 interface PanesState {
   root: PaneNode;
@@ -586,8 +578,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
         const focus = neighbor && findLeaf(remaining, neighbor) ? neighbor : fallback.id;
         set({
           root: remaining,
-          focusedPaneId:
-            get().focusedPaneId === leaf.id ? focus : get().focusedPaneId,
+          focusedPaneId: get().focusedPaneId === leaf.id ? focus : get().focusedPaneId,
         });
         return;
       }

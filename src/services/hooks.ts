@@ -43,10 +43,7 @@ export function useCorpusRoots() {
     queryFn: async (): Promise<CorpusRoot[]> => {
       if (!isTauri()) return [];
       const cfg = await corpusListConfig();
-      return [
-        ...cfg.brains.map((b) => ({ id: b.id, label: b.label, absPath: b.absPath })),
-        ...cfg.folders,
-      ];
+      return [...cfg.brains.map((b) => ({ id: b.id, label: b.label, absPath: b.absPath })), ...cfg.folders];
     },
     staleTime: Infinity,
   });

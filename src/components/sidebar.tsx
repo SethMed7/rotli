@@ -58,12 +58,7 @@ import {
   useTrashNote,
 } from "../services/hooks";
 import { notesService } from "../services/notes";
-import {
-  type CorpusRoot,
-  corpusAddFolder,
-  corpusForgetFolder,
-  corpusRenameBoard,
-} from "../lib/tauri";
+import { type CorpusRoot, corpusAddFolder, corpusForgetFolder, corpusRenameBoard } from "../lib/tauri";
 import {
   DEST,
   type Destination,
@@ -450,7 +445,8 @@ function AddedRootRow({ root }: { root: CorpusRoot }) {
           title="Remove this folder from rotli (the files are kept)"
           onClick={(e) => {
             e.stopPropagation();
-            if (confirming) void corpusForgetFolder(root.id); // relaunches
+            if (confirming)
+              void corpusForgetFolder(root.id); // relaunches
             else setConfirming(true);
           }}
         >
@@ -526,10 +522,7 @@ export function Sidebar() {
   // (Seth, 2026-06-30). It returns the moment a vault root has notes/folders.
   const showVault = vaultNotes.length > 0 || folders.some((f) => f.id.startsWith("vault:"));
   const visibleDestRows = useMemo(
-    () =>
-      DEST_ROWS.filter(
-        (d) => d.id !== DEST.secure && (d.id !== DEST.vault || showVault),
-      ),
+    () => DEST_ROWS.filter((d) => d.id !== DEST.secure && (d.id !== DEST.vault || showVault)),
     [showVault],
   );
   // the BRAIN — the AI-organized wiki areas (People · Projects · Research · …).
@@ -566,9 +559,7 @@ export function Sidebar() {
   );
   // added external folders (Seth, 2026-06-27): roots the user pointed rotli at,
   // not in the memex — every registered root except the built-in default + vault.
-  const addedRoots = (useCorpusRoots().data ?? []).filter(
-    (r) => r.id !== "default" && r.id !== "vault",
-  );
+  const addedRoots = (useCorpusRoots().data ?? []).filter((r) => r.id !== "default" && r.id !== "vault");
 
   // — the Chat section: the active memex's chats/ history (the same source the
   // Chat surface reads), plus the chat-selection ui state the surface renders. —
@@ -626,8 +617,7 @@ export function Sidebar() {
       // wiki/_inbox is internal staging; its user-facing home is Captures.
       return diskFolder.startsWith("wiki/_") ? note.folderId : diskFolder;
     }
-    if (focusedTab.surfaceKind === "canvas")
-      return noteIndex.get(focusedTab.boardId)?.folderId ?? null;
+    if (focusedTab.surfaceKind === "canvas") return noteIndex.get(focusedTab.boardId)?.folderId ?? null;
     if (focusedTab.surfaceKind === "file") {
       const slash = focusedTab.fileId.lastIndexOf("/");
       if (slash >= 0) return focusedTab.fileId.slice(0, slash);
@@ -706,12 +696,7 @@ export function Sidebar() {
   // arm. (HTML5 DnD stays dead in the WKWebView shell — pointer events only.)
   // The dragged row rides the cursor as a floating ghost (the shared
   // lib/dragGhost, same as tab drags); Esc / pointercancel abandons the drag.
-  const startMainDrag = (
-    e: ReactPointerEvent,
-    id: string,
-    mode: "move" | "add",
-    label: string,
-  ) => {
+  const startMainDrag = (e: ReactPointerEvent, id: string, mode: "move" | "add", label: string) => {
     // button guard BEFORE the ref reset — a right-click must not clear the
     // last drag's click suppression (the session guards again internally)
     if (e.button !== 0) return;
@@ -851,11 +836,7 @@ export function Sidebar() {
           // (the CompactBoardRow grammar).
           if (renamingMainId === f.id) {
             return (
-              <div
-                key={f.id}
-                className="sb-newfolder"
-                style={{ paddingLeft: 10 + (depth + 1) * 16 }}
-              >
+              <div key={f.id} className="sb-newfolder" style={{ paddingLeft: 10 + (depth + 1) * 16 }}>
                 <FolderGlyph size={14} />
                 <InlineRenameInput
                   defaultValue={f.name}
@@ -942,10 +923,7 @@ export function Sidebar() {
   const childrenOf = (parentId: string) => {
     if (isRootMarker(parentId)) {
       return folders.filter(
-        (f) =>
-          f.parentId == null &&
-          f.id.startsWith(parentId) &&
-          !f.id.slice(parentId.length).includes("/"),
+        (f) => f.parentId == null && f.id.startsWith(parentId) && !f.id.slice(parentId.length).includes("/"),
       );
     }
     return folders.filter((f) => f.parentId === parentId);
@@ -1016,22 +994,20 @@ export function Sidebar() {
               onContextMenu={(e) => openNoteMenu(e, note)}
             />
           ))}
-        {own
-          .filter(isBoard)
-          .map((board) => (
-            <CompactBoardRow
-              key={board.id}
-              board={board}
-              selected={board.id === focusedBoardId}
-              padLeft={28 + level * 16}
-              onOpen={openBoardRow(board.id)}
-              renaming={renamingBoardId === board.id}
-              onCommitRename={(name) => void commitBoardRename(board.id, name)}
-              onCancelRename={() => setRenamingBoardId(null)}
-              rowProps={rp({ id: board.id, kind: "note" })}
-              onContextMenu={(e) => openNoteMenu(e, board)}
-            />
-          ))}
+        {own.filter(isBoard).map((board) => (
+          <CompactBoardRow
+            key={board.id}
+            board={board}
+            selected={board.id === focusedBoardId}
+            padLeft={28 + level * 16}
+            onOpen={openBoardRow(board.id)}
+            renaming={renamingBoardId === board.id}
+            onCommitRename={(name) => void commitBoardRename(board.id, name)}
+            onCancelRename={() => setRenamingBoardId(null)}
+            rowProps={rp({ id: board.id, kind: "note" })}
+            onContextMenu={(e) => openNoteMenu(e, board)}
+          />
+        ))}
       </>
     );
   };
@@ -1053,54 +1029,56 @@ export function Sidebar() {
     childrenOf(parentId)
       .filter((folder) => !isPlumbingFolder(folder))
       .map((folder) => {
-      const open = expandedDests[folder.id] ?? false;
-      const selected = destSelected(folder.id);
-      // the memex "wiki" is the AI's filing structure — surface it as "Knowledge"
-      // with a plain-language note that the AI organizes it (transparency without
-      // the wiki jargon the average user wouldn't know what to do with)
-      const isVaultWiki = folder.id === "vault:wiki";
-      // a Brain area (wiki/<area> in the corpus) reads with a capitalized label —
-      // "people" → "People", "projects" → "Projects" (Seth, 2026-06-30)
-      const isWikiArea = folder.id.startsWith("wiki/") && folder.parentId === "wiki";
-      const label = isVaultWiki
-        ? "Knowledge"
-        : isWikiArea
-          ? folder.name.charAt(0).toUpperCase() + folder.name.slice(1)
-          : folder.name;
-      const hint = isVaultWiki
-        ? "Organized by AI so anything you save here stays findable — your folders are how you see your notes; this is how the AI files them underneath."
-        : undefined;
-      return (
-        <div key={folder.id}>
-          <button
-            type="button"
-            className={`frow child${selected ? " sel" : ""}`}
-            style={{ paddingLeft: 10 + (depth + 1) * 16 }}
-            onClick={() => {
-              toggleDestExpanded(folder.id);
-              setSelectedFolderId(folder.id);
-              setContentView("panes");
-            }}
-            {...rp({ id: folder.id, kind: "folder" })}
-          >
-            <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
-              <ChevronRight size={10} />
-            </span>
-            <FolderGlyph size={14} />
-            <span className="fname" title={hint}>{label}</span>
-            {!isVault(folder.id) && sectionAddBtn(folder.id)}
-            <span className="count">{countFor(folder, destNotes)}</span>
-          </button>
-          {open && (
-            <>
-              {compactRows(destNotes, folder.id, rp, depth + 2)}
-              {!isVault(folder.id) && newFolderRow(folder.id, 28 + (depth + 2) * 16)}
-              {renderFolderTree(folder.id, destNotes, depth + 1, rp)}
-            </>
-          )}
-        </div>
-      );
-    });
+        const open = expandedDests[folder.id] ?? false;
+        const selected = destSelected(folder.id);
+        // the memex "wiki" is the AI's filing structure — surface it as "Knowledge"
+        // with a plain-language note that the AI organizes it (transparency without
+        // the wiki jargon the average user wouldn't know what to do with)
+        const isVaultWiki = folder.id === "vault:wiki";
+        // a Brain area (wiki/<area> in the corpus) reads with a capitalized label —
+        // "people" → "People", "projects" → "Projects" (Seth, 2026-06-30)
+        const isWikiArea = folder.id.startsWith("wiki/") && folder.parentId === "wiki";
+        const label = isVaultWiki
+          ? "Knowledge"
+          : isWikiArea
+            ? folder.name.charAt(0).toUpperCase() + folder.name.slice(1)
+            : folder.name;
+        const hint = isVaultWiki
+          ? "Organized by AI so anything you save here stays findable — your folders are how you see your notes; this is how the AI files them underneath."
+          : undefined;
+        return (
+          <div key={folder.id}>
+            <button
+              type="button"
+              className={`frow child${selected ? " sel" : ""}`}
+              style={{ paddingLeft: 10 + (depth + 1) * 16 }}
+              onClick={() => {
+                toggleDestExpanded(folder.id);
+                setSelectedFolderId(folder.id);
+                setContentView("panes");
+              }}
+              {...rp({ id: folder.id, kind: "folder" })}
+            >
+              <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
+                <ChevronRight size={10} />
+              </span>
+              <FolderGlyph size={14} />
+              <span className="fname" title={hint}>
+                {label}
+              </span>
+              {!isVault(folder.id) && sectionAddBtn(folder.id)}
+              <span className="count">{countFor(folder, destNotes)}</span>
+            </button>
+            {open && (
+              <>
+                {compactRows(destNotes, folder.id, rp, depth + 2)}
+                {!isVault(folder.id) && newFolderRow(folder.id, 28 + (depth + 2) * 16)}
+                {renderFolderTree(folder.id, destNotes, depth + 1, rp)}
+              </>
+            )}
+          </div>
+        );
+      });
 
   // —— the flat, in-render-order list the roving j/k cursor walks (Seth,
   // 2026-06-13). One pure pass that mirrors the JSX traversal exactly: the two
@@ -1113,16 +1091,13 @@ export function Sidebar() {
   // onOpen/onOpenMenu disambiguate via the boardIds Set).
   const visibleNoteRows = (notes: NoteSummary[], folderId: string): RovingRow[] => {
     const own = notes.filter((n) => n.folderId === folderId && matches(n));
-    return [
-      ...own.filter((n) => !isBoard(n)),
-      ...own.filter(isBoard),
-    ].map((n) => ({ id: n.id, kind: "note" as const }));
+    return [...own.filter((n) => !isBoard(n)), ...own.filter(isBoard)].map((n) => ({
+      id: n.id,
+      kind: "note" as const,
+    }));
   };
 
-  const subtreeRows = (
-    parentId: string,
-    destNotes: NoteSummary[],
-  ): RovingRow[] =>
+  const subtreeRows = (parentId: string, destNotes: NoteSummary[]): RovingRow[] =>
     childrenOf(parentId)
       // MUST mirror renderFolderTree's plumbing filter — a folder the JSX hides
       // must never become a roving row (#45: j/k wedged on the phantom)
@@ -1131,11 +1106,7 @@ export function Sidebar() {
         const open = expandedDests[folder.id] ?? false;
         const row: RovingRow = { id: folder.id, kind: "folder" };
         if (!open) return [row];
-        return [
-          row,
-          ...visibleNoteRows(destNotes, folder.id),
-          ...subtreeRows(folder.id, destNotes),
-        ];
+        return [row, ...visibleNoteRows(destNotes, folder.id), ...subtreeRows(folder.id, destNotes)];
       });
 
   // the three top-level sections' open state (Seth's IA, 2026-06-26). Default
@@ -1200,11 +1171,7 @@ export function Sidebar() {
           const open = expandedDests[id] ?? false;
           const row: RovingRow = { id, kind: "folder" };
           if (!open) return [row];
-          return [
-            row,
-            ...visibleNoteRows(destNotes, id),
-            ...subtreeRows(id, destNotes),
-          ];
+          return [row, ...visibleNoteRows(destNotes, id), ...subtreeRows(id, destNotes)];
         }),
       ]
     : [];
@@ -1262,9 +1229,7 @@ export function Sidebar() {
     // (the RowMenu unification, 2026-07-01). A Main row maps to its note.
     onOpenMenu: (row, anchor) => {
       if (row.kind !== "note") return;
-      const bare = row.id.startsWith(MAIN_ROW_PREFIX)
-        ? row.id.slice(MAIN_ROW_PREFIX.length)
-        : row.id;
+      const bare = row.id.startsWith(MAIN_ROW_PREFIX) ? row.id.slice(MAIN_ROW_PREFIX.length) : row.id;
       // the FULL index — the menu's hidden-root branch needs archived/trashed
       // (and staged Main) rows to resolve, not just the default listing
       const note = noteIndex.get(bare);
@@ -1361,8 +1326,7 @@ export function Sidebar() {
             mode === "brain" ? ".sidebar .snrow.sel:not(.main-row)" : ".sidebar .snrow.sel",
           ),
         );
-        const sel =
-          candidates.find((row) => row.dataset.noteId === targetNoteId) ?? candidates[0];
+        const sel = candidates.find((row) => row.dataset.noteId === targetNoteId) ?? candidates[0];
         sel?.scrollIntoView({ block: "center", behavior: "smooth" });
       });
     });
@@ -1402,9 +1366,7 @@ export function Sidebar() {
     } catch (e) {
       // board is read-only or gone — leave it as is, and SAY why: the inline
       // sidebar error note, not a console.warn (#11, audit 2026-07)
-      setRowActionError(
-        `Couldn’t rename the board — ${e instanceof Error ? e.message : String(e)}`,
-      );
+      setRowActionError(`Couldn’t rename the board — ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -1541,12 +1503,7 @@ export function Sidebar() {
     open: boolean,
     count?: number,
   ): ReactNode => (
-    <button
-      type="button"
-      className="sb-section"
-      aria-expanded={open}
-      onClick={() => toggleDestExpanded(id)}
-    >
+    <button type="button" className="sb-section" aria-expanded={open} onClick={() => toggleDestExpanded(id)}>
       <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
         <ChevronRight size={11} />
       </span>
@@ -1627,7 +1584,9 @@ export function Sidebar() {
         <button
           type="button"
           className="icobtn"
-          aria-label={sidebarMode === "breve" ? "Collapse all is unavailable in Breve" : "Collapse all folders"}
+          aria-label={
+            sidebarMode === "breve" ? "Collapse all is unavailable in Breve" : "Collapse all folders"
+          }
           disabled={sidebarMode === "breve"}
           /* default-OPEN rows (Main folders, the Brain header) need an explicit
              false — wiping the map alone re-EXPANDED them (#83, audit 2026-07) */
@@ -1666,225 +1625,249 @@ export function Sidebar() {
       {sidebarMode === "breve" ? (
         <BreveSidebar zoom={sidebarZoom} />
       ) : (
-      <div className="sb-rows" aria-label="Sections" style={{ zoom: sidebarZoom }}>
-        {/* ── INBOX = email. The mail integration is a LATER increment; this is a
+        <div className="sb-rows" aria-label="Sections" style={{ zoom: sidebarZoom }}>
+          {/* ── INBOX = email. The mail integration is a LATER increment; this is a
             clear placeholder of the intended account → thread structure and rotli
             writes nothing for it. ── */}
-        {sectionHeader(SEC_INBOX, "Inbox", MailGlyph, inboxSecOpen)}
-        {inboxSecOpen && (
-          <div className="sb-inbox-stub">
-            <div className="sb-stub-row" aria-disabled="true">
-              <SearchGlyph size={13} />
-              <span className="fname">All</span>
-            </div>
-            {STUB_EMAIL_ACCOUNTS.map((addr) => (
-              <div key={addr} className="sb-stub-row acct" aria-disabled="true">
-                <span className="fchev" aria-hidden="true">
-                  <ChevronRight size={10} />
-                </span>
-                <MailGlyph size={13} />
-                <span className="fname">{addr}</span>
+          {sectionHeader(SEC_INBOX, "Inbox", MailGlyph, inboxSecOpen)}
+          {inboxSecOpen && (
+            <div className="sb-inbox-stub">
+              <div className="sb-stub-row" aria-disabled="true">
+                <SearchGlyph size={13} />
+                <span className="fname">All</span>
               </div>
-            ))}
-            <p className="sb-stub-note">
-              Connect email — coming. Your mailboxes (account → thread) will live here.
-            </p>
-          </div>
-        )}
+              {STUB_EMAIL_ACCOUNTS.map((addr) => (
+                <div key={addr} className="sb-stub-row acct" aria-disabled="true">
+                  <span className="fchev" aria-hidden="true">
+                    <ChevronRight size={10} />
+                  </span>
+                  <MailGlyph size={13} />
+                  <span className="fname">{addr}</span>
+                </div>
+              ))}
+              <p className="sb-stub-note">
+                Connect email — coming. Your mailboxes (account → thread) will live here.
+              </p>
+            </div>
+          )}
 
-        {/* ── CHAT — a ChatGPT-style front over the memex chats/: New chat, a
+          {/* ── CHAT — a ChatGPT-style front over the memex chats/: New chat, a
             searchable All, and the recent history (a LIMITED view). ── */}
-        {sectionHeader(SEC_CHAT, "Chat", ChatGlyph, chatSecOpen, chatList.length)}
-        {chatSecOpen && (
-          <div className="sb-chat">
-            <button type="button" className="sb-chatnew" onClick={openNewChat}>
-              <PlusGlyph size={13} />
-              <span>New chat</span>
-            </button>
-            <button
-              type="button"
-              /* highlight "All chats" only when its content view is active — so it
-                 never lights up alongside an open chat row (Seth, 2026-07-01) */
-              className={`sb-chatrow all${contentView === "allChats" ? " sel" : ""}`}
-              onClick={openAllChats}
-            >
-              <SearchGlyph size={13} />
-              <span className="fname">All chats</span>
-            </button>
-            {!activeMemex ? (
+          {sectionHeader(SEC_CHAT, "Chat", ChatGlyph, chatSecOpen, chatList.length)}
+          {chatSecOpen && (
+            <div className="sb-chat">
+              <button type="button" className="sb-chatnew" onClick={openNewChat}>
+                <PlusGlyph size={13} />
+                <span>New chat</span>
+              </button>
               <button
                 type="button"
-                className="sb-chat-empty"
-                onClick={() => dispatch("app.settings")}
+                /* highlight "All chats" only when its content view is active — so it
+                 never lights up alongside an open chat row (Seth, 2026-07-01) */
+                className={`sb-chatrow all${contentView === "allChats" ? " sel" : ""}`}
+                onClick={openAllChats}
               >
-                Connect a memex in Settings → Location
+                <SearchGlyph size={13} />
+                <span className="fname">All chats</span>
               </button>
-            ) : chatList.length === 0 ? (
-              <p className="sb-chat-empty">No chats yet.</p>
-            ) : (
-              chatList.slice(0, chatSidebarLimit).map((c) =>
-                chatRename.renamingChatSlug === c.slug ? (
-                  <InlineRenameInput
-                    key={c.slug}
-                    className="sb-chatrename"
-                    defaultValue={c.title || c.slug}
-                    ariaLabel="Rename chat"
-                    onCommit={(value) => chatRename.commit(c.slug, value)}
-                    onCancel={chatRename.cancel}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    key={c.slug}
-                    className={`sb-chatrow${focusedChatSlug === c.slug ? " sel" : ""}`}
-                    onClick={() => openChatRow(c.slug)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      // failures (e.g. a read-only brain) land in the sidebar's
-                      // inline error note — the menu is gone by the time they
-                      // reject (#11 pattern; reviewer, 2026-07-08)
-                      const runChatOp = (verb: string, op: Promise<void>) => {
-                        setRowActionError(null);
-                        void op
-                          .then(() => invalidateMemex())
-                          .catch((err) =>
-                            setRowActionError(
-                              `Couldn't ${verb} this chat — ${err instanceof Error ? err.message : String(err)}`,
-                            ),
-                          );
-                      };
-                      openContextMenu(e.clientX, e.clientY, [
-                        {
-                          kind: "action" as const,
-                          label: c.pinned ? "Unpin from top" : "Pin to top",
-                          checked: c.pinned,
-                          onClick: () => {
-                            if (activeMemex) runChatOp("pin", pinChat(activeMemex, c.slug, !c.pinned));
+              {!activeMemex ? (
+                <button type="button" className="sb-chat-empty" onClick={() => dispatch("app.settings")}>
+                  Connect a memex in Settings → Location
+                </button>
+              ) : chatList.length === 0 ? (
+                <p className="sb-chat-empty">No chats yet.</p>
+              ) : (
+                chatList.slice(0, chatSidebarLimit).map((c) =>
+                  chatRename.renamingChatSlug === c.slug ? (
+                    <InlineRenameInput
+                      key={c.slug}
+                      className="sb-chatrename"
+                      defaultValue={c.title || c.slug}
+                      ariaLabel="Rename chat"
+                      onCommit={(value) => chatRename.commit(c.slug, value)}
+                      onCancel={chatRename.cancel}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      key={c.slug}
+                      className={`sb-chatrow${focusedChatSlug === c.slug ? " sel" : ""}`}
+                      onClick={() => openChatRow(c.slug)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // failures (e.g. a read-only brain) land in the sidebar's
+                        // inline error note — the menu is gone by the time they
+                        // reject (#11 pattern; reviewer, 2026-07-08)
+                        const runChatOp = (verb: string, op: Promise<void>) => {
+                          setRowActionError(null);
+                          void op
+                            .then(() => invalidateMemex())
+                            .catch((err) =>
+                              setRowActionError(
+                                `Couldn't ${verb} this chat — ${err instanceof Error ? err.message : String(err)}`,
+                              ),
+                            );
+                        };
+                        openContextMenu(e.clientX, e.clientY, [
+                          {
+                            kind: "action" as const,
+                            label: c.pinned ? "Unpin from top" : "Pin to top",
+                            checked: c.pinned,
+                            onClick: () => {
+                              if (activeMemex) runChatOp("pin", pinChat(activeMemex, c.slug, !c.pinned));
+                            },
                           },
-                        },
-                        { kind: "action" as const, label: "Rename…", onClick: () => chatRename.start(c.slug) },
-                        { kind: "sep" as const },
-                        {
-                          kind: "action" as const,
-                          label: "Archive",
-                          onClick: () => {
-                            if (activeMemex) runChatOp("archive", archiveChat(activeMemex, c.slug));
+                          {
+                            kind: "action" as const,
+                            label: "Rename…",
+                            onClick: () => chatRename.start(c.slug),
                           },
-                        },
-                        {
-                          kind: "action" as const,
-                          label: "Delete",
-                          danger: true,
-                          onClick: () => {
-                            if (activeMemex) runChatOp("delete", deleteChat(activeMemex, c.slug));
+                          { kind: "sep" as const },
+                          {
+                            kind: "action" as const,
+                            label: "Archive",
+                            onClick: () => {
+                              if (activeMemex) runChatOp("archive", archiveChat(activeMemex, c.slug));
+                            },
                           },
-                        },
-                      ]);
-                    }}
-                    title={c.title || c.slug}
-                  >
-                    <ChatGlyph size={13} />
-                    <span className="fname">{c.title || c.slug}</span>
-                    {c.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
-                  </button>
-                ),
-              )
-            )}
-            {chatList.length > chatSidebarLimit && (
-              <button type="button" className="sb-chat-more" onClick={openAllChats}>
-                +{chatList.length - chatSidebarLimit} more
-              </button>
-            )}
-          </div>
-        )}
+                          {
+                            kind: "action" as const,
+                            label: "Delete",
+                            danger: true,
+                            onClick: () => {
+                              if (activeMemex) runChatOp("delete", deleteChat(activeMemex, c.slug));
+                            },
+                          },
+                        ]);
+                      }}
+                      title={c.title || c.slug}
+                    >
+                      <ChatGlyph size={13} />
+                      <span className="fname">{c.title || c.slug}</span>
+                      {c.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
+                    </button>
+                  ),
+                )
+              )}
+              {chatList.length > chatSidebarLimit && (
+                <button type="button" className="sb-chat-more" onClick={openAllChats}>
+                  +{chatList.length - chatSidebarLimit} more
+                </button>
+              )}
+            </div>
+          )}
 
-        {/* ── NOTES — the corpus (the deepest tree). All notes · Board · Recent ·
+          {/* ── NOTES — the corpus (the deepest tree). All notes · Board · Recent ·
             the local destinations + Vault/Knowledge + nested folders. This wrapper
             is the roving listbox: Tab enters at the one tabIndex=0 row, j/k walk
             it; the keyboard highlight is :focus-visible. ── */}
-        {sectionHeader(SEC_NOTES, "Notes", NotesStackGlyph, notesSecOpen, searchableCount)}
-        {notesSecOpen && (
-          <div className="sb-notes-tree" role="listbox" aria-label="Notes tree">
-            <button
-              type="button"
-              className={`frow${contentView === "allNotes" ? " sel" : ""}`}
-              onClick={() => {
-                setSelectedFolderId(ALL_NOTES);
-                setContentView("allNotes");
-              }}
-              {...rowProps({ id: ALL_NOTES, kind: "smart" })}
-            >
-              <FileGlyph size={14.5} />
-              <span className="fname">All notes</span>
-              <span className="count">{searchableCount}</span>
-            </button>
-            {/* Board — quick captures collected as cards; opens its grid in the
+          {sectionHeader(SEC_NOTES, "Notes", NotesStackGlyph, notesSecOpen, searchableCount)}
+          {notesSecOpen && (
+            <div className="sb-notes-tree" role="listbox" aria-label="Notes tree">
+              <button
+                type="button"
+                className={`frow${contentView === "allNotes" ? " sel" : ""}`}
+                onClick={() => {
+                  setSelectedFolderId(ALL_NOTES);
+                  setContentView("allNotes");
+                }}
+                {...rowProps({ id: ALL_NOTES, kind: "smart" })}
+              >
+                <FileGlyph size={14.5} />
+                <span className="fname">All notes</span>
+                <span className="count">{searchableCount}</span>
+              </button>
+              {/* Board — quick captures collected as cards; opens its grid in the
                 content area (an action row, not a roving folder). */}
-            <button
-              type="button"
-              className={`frow${contentView === "board" ? " sel" : ""}`}
-              onClick={() => dispatch("board.open")}
-            >
-              <CaptureBoardGlyph size={14.5} />
-              <span className="fname">Captures</span>
-              <span className="count">{captureCount}</span>
-            </button>
-            <button
-              type="button"
-              className={`frow${contentView === "recent" ? " sel" : ""}`}
-              onClick={() => {
-                setSelectedFolderId(RECENT);
-                setContentView("recent");
-              }}
-              {...rowProps({ id: RECENT, kind: "smart" })}
-            >
-              <ClockGlyph size={14.5} />
-              {/* no count: "how many notes exist" says nothing about RECENCY —
+              <button
+                type="button"
+                className={`frow${contentView === "board" ? " sel" : ""}`}
+                onClick={() => dispatch("board.open")}
+              >
+                <CaptureBoardGlyph size={14.5} />
+                <span className="fname">Captures</span>
+                <span className="count">{captureCount}</span>
+              </button>
+              <button
+                type="button"
+                className={`frow${contentView === "recent" ? " sel" : ""}`}
+                onClick={() => {
+                  setSelectedFolderId(RECENT);
+                  setContentView("recent");
+                }}
+                {...rowProps({ id: RECENT, kind: "smart" })}
+              >
+                <ClockGlyph size={14.5} />
+                {/* no count: "how many notes exist" says nothing about RECENCY —
                   the total lives on All notes (#60, audit 2026-07) */}
-              <span className="fname">Recent</span>
-            </button>
+                <span className="fname">Recent</span>
+              </button>
 
-            {/* — MAIN: your hand-picked notes, arranged your way. Star a row (★) to
+              {/* — MAIN: your hand-picked notes, arranged your way. Star a row (★) to
                   put it in Quick access — the capped set the ⌥ Quick window cycles
                   (Seth, 2026-07-01). Add with the ⊕ on a note row or drag from the Brain. — */}
-            {/* the header carries a QUIET hover new-folder mark (Seth, 2026-07-01:
+              {/* the header carries a QUIET hover new-folder mark (Seth, 2026-07-01:
                 the always-visible "+ New folder" row was too loud; 2026-07-17: the
                 bare "+" said nothing — the IDE-style NewFolderGlyph, same as the
                 toolbar, is self-explanatory) — opacity-hidden so Tab still reaches it. */}
-            <div className="fsec fsec-hdr">
-              Main
-              <button
-                type="button"
-                className="fsec-add"
-                aria-label="New folder in Main"
-                title="New folder in Main"
-                /* name-FIRST (#16): open the inline input instead of minting a
-                   permanent "New folder 2" the old flow could never rename */
-                onClick={() => setMainNewFolder(true)}
-              >
-                <NewFolderGlyph size={13} />
-              </button>
-            </div>
-            {mainNewFolder && (
-              <div className="sb-newfolder" style={{ paddingLeft: 26 }}>
-                <FolderGlyph size={14} />
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Folder name…"
+              <div className="fsec fsec-hdr">
+                Main
+                <button
+                  type="button"
+                  className="fsec-add"
                   aria-label="New folder in Main"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      mainNewFolderHandled.current = true; // the ensuing blur must not re-commit
+                  title="New folder in Main"
+                  /* name-FIRST (#16): open the inline input instead of minting a
+                   permanent "New folder 2" the old flow could never rename */
+                  onClick={() => setMainNewFolder(true)}
+                >
+                  <NewFolderGlyph size={13} />
+                </button>
+              </div>
+              {mainNewFolder && (
+                <div className="sb-newfolder" style={{ paddingLeft: 26 }}>
+                  <FolderGlyph size={14} />
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Folder name…"
+                    aria-label="New folder in Main"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        mainNewFolderHandled.current = true; // the ensuing blur must not re-commit
+                        const name = e.currentTarget.value.trim();
+                        setMainNewFolder(false);
+                        if (name) {
+                          // compute the rendered id BEFORE the commit (same
+                          // uniquify law) so the fresh row — appended after every
+                          // root note — can be scrolled into view, not lost
+                          const folderId = `${MAIN_ROOT}${uniqueRootFolderName(mainManifest.tree, name)}`;
+                          setMainTree(addFolderToMain(mainManifest.tree, name), liveIds);
+                          requestAnimationFrame(() => {
+                            document
+                              .querySelector(`[data-main-id="${CSS.escape(folderId)}"]`)
+                              ?.scrollIntoView({ block: "nearest" });
+                          });
+                        }
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        mainNewFolderHandled.current = true; // …nor override the cancel
+                        setMainNewFolder(false);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (mainNewFolderHandled.current) {
+                        mainNewFolderHandled.current = false;
+                        return;
+                      }
+                      // click-away commits a non-empty name (the corpus new-folder law)
                       const name = e.currentTarget.value.trim();
                       setMainNewFolder(false);
                       if (name) {
-                        // compute the rendered id BEFORE the commit (same
-                        // uniquify law) so the fresh row — appended after every
-                        // root note — can be scrolled into view, not lost
                         const folderId = `${MAIN_ROOT}${uniqueRootFolderName(mainManifest.tree, name)}`;
                         setMainTree(addFolderToMain(mainManifest.tree, name), liveIds);
                         requestAnimationFrame(() => {
@@ -1893,186 +1876,161 @@ export function Sidebar() {
                             ?.scrollIntoView({ block: "nearest" });
                         });
                       }
-                    } else if (e.key === "Escape") {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      mainNewFolderHandled.current = true; // …nor override the cancel
-                      setMainNewFolder(false);
-                    }
-                  }}
-                  onBlur={(e) => {
-                    if (mainNewFolderHandled.current) {
-                      mainNewFolderHandled.current = false;
-                      return;
-                    }
-                    // click-away commits a non-empty name (the corpus new-folder law)
-                    const name = e.currentTarget.value.trim();
-                    setMainNewFolder(false);
-                    if (name) {
-                      const folderId = `${MAIN_ROOT}${uniqueRootFolderName(mainManifest.tree, name)}`;
-                      setMainTree(addFolderToMain(mainManifest.tree, name), liveIds);
-                      requestAnimationFrame(() => {
-                        document
-                          .querySelector(`[data-main-id="${CSS.escape(folderId)}"]`)
-                          ?.scrollIntoView({ block: "nearest" });
-                      });
-                    }
-                  }}
-                />
-              </div>
-            )}
-            {mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
-              <p className="main-empty" data-main-id="main:">
-                {/* the Brain section may not exist yet — only promise a drag
+                    }}
+                  />
+                </div>
+              )}
+              {mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
+                <p className="main-empty" data-main-id="main:">
+                  {/* the Brain section may not exist yet — only promise a drag
                     source that's actually on screen (#82, audit 2026-07) */}
-                The notes you reach for, arranged your way. Add one with the <b>⊕</b> on a note row
-                {hasBrain ? " (or drag it here from the Brain)" : ""} — then <b>★</b> your top{" "}
-                {QUICK_MAX} for Quick access (the ⌥ Quick window).
-              </p>
-            ) : (
-              <div data-main-id="main:" className="main-tree">
-                {renderMainTree(MAIN_ROOT, 0, rowProps)}
-              </div>
-            )}
+                  The notes you reach for, arranged your way. Add one with the <b>⊕</b> on a note row
+                  {hasBrain ? " (or drag it here from the Brain)" : ""} — then <b>★</b> your top {QUICK_MAX}{" "}
+                  for Quick access (the ⌥ Quick window).
+                </p>
+              ) : (
+                <div data-main-id="main:" className="main-tree">
+                  {renderMainTree(MAIN_ROOT, 0, rowProps)}
+                </div>
+              )}
 
-            <div className="fsec">Destinations</div>
+              <div className="fsec">Destinations</div>
 
-            {/* — the Brain: AI-organized areas, now a COLLAPSIBLE destination (Seth) — */}
-            {hasBrain && (
-              <div>
-                <button
-                  type="button"
-                  className={`frow${destSelected("Brain") ? " sel" : ""}`}
-                  onClick={() => {
-                    toggleDestExpanded("Brain");
-                    setSelectedFolderId("Brain");
-                  }}
-                  {...rowProps({ id: "Brain", kind: "folder" })}
-                >
-                  <span className={`fchev${brainOpen ? " open" : ""}`} aria-hidden="true">
-                    <ChevronRight size={10} />
-                  </span>
-                  <NotesStackGlyph size={14} />
-                  <span className="fname">Brain</span>
-                  <span className="count">{brainNotes.length + secureNotes.length}</span>
-                </button>
-                {brainOpen && (
-                  <>
-                    <p className="brain-hint">
-                      Organized by AI so anything you save stays findable. Your <b>Main</b> above is
-                      yours — same notes, your order.
-                    </p>
-                    <button
-                      type="button"
-                      className="frow child brain-activity-link"
-                      style={{ paddingLeft: 42 }}
-                      onClick={() => usePanesStore.getState().openActivity()}
-                      title="See and undo what the AI has done"
-                    >
-                      <ClockGlyph size={13} />
-                      <span className="fname">Activity</span>
-                      {pendingProposals > 0 && <span className="count">{pendingProposals}</span>}
-                    </button>
-                    <button
-                      type="button"
-                      className={`frow child${destSelected(DEST.secure) ? " sel" : ""}`}
-                      style={{ paddingLeft: 42 }}
-                      onClick={() => {
-                        toggleDestExpanded(DEST.secure);
-                        setSelectedFolderId(DEST.secure);
-                        setContentView("panes");
-                      }}
-                      {...rowProps({ id: DEST.secure, kind: "folder" })}
-                    >
-                      <span className={`fchev${secureOpen ? " open" : ""}`} aria-hidden="true">
-                        <ChevronRight size={10} />
-                      </span>
-                      <ShieldGlyph size={14} />
-                      <span className="fname">Secure notes</span>
-                      {sectionAddBtn(DEST.secure)}
-                      <span className="count">{secureNotes.length}</span>
-                    </button>
-                    {secureOpen && (
-                      <>
-                        <p className="brain-hint secure-brain-hint">
-                          Stored inside your Brain, but never visible to remote AI. Local AI remains
-                          off until you allow it on an individual note.
-                        </p>
-                        {compactRows(secureNotes, DEST.secure, rowProps, 2)}
-                        {newFolderRow(DEST.secure, 60)}
-                        {renderFolderTree(DEST.secure, secureNotes, 1, rowProps)}
-                      </>
-                    )}
-                    {renderFolderTree("wiki", brainNotes, 1, rowProps)}
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* — destination rows: each toggles expansion AND selects (⌘N target) — */}
-            {visibleDestRows.map(({ id, label, Glyph }) => {
-              const destNotes = notesByDest[id] ?? [];
-              const open = expandedDests[id] ?? false;
-              const selected = destSelected(id);
-              return (
-                <div key={id}>
+              {/* — the Brain: AI-organized areas, now a COLLAPSIBLE destination (Seth) — */}
+              {hasBrain && (
+                <div>
                   <button
                     type="button"
-                    className={`frow${selected ? " sel" : ""}`}
+                    className={`frow${destSelected("Brain") ? " sel" : ""}`}
                     onClick={() => {
-                      toggleDestExpanded(id);
-                      setSelectedFolderId(id);
-                      setContentView("panes");
+                      toggleDestExpanded("Brain");
+                      setSelectedFolderId("Brain");
                     }}
-                    {...rowProps({ id, kind: "folder" })}
+                    {...rowProps({ id: "Brain", kind: "folder" })}
                   >
-                    <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
+                    <span className={`fchev${brainOpen ? " open" : ""}`} aria-hidden="true">
                       <ChevronRight size={10} />
                     </span>
-                    <Glyph size={14.5} />
-                    <span className="fname">{label}</span>
-                    {/* the external Vault is read-mostly — no "+ new note/folder" */}
-                    {!isHidden(id) && !isVault(id) && sectionAddBtn(id)}
-                    <span className="count">{destNotes.length}</span>
+                    <NotesStackGlyph size={14} />
+                    <span className="fname">Brain</span>
+                    <span className="count">{brainNotes.length + secureNotes.length}</span>
                   </button>
-                  {open && (
+                  {brainOpen && (
                     <>
-                      {id === DEST.secure && (
-                        <p className="brain-hint">
-                          Remote AI never sees these notes. Local AI is off until you allow it on
-                          an individual note.
-                        </p>
+                      <p className="brain-hint">
+                        Organized by AI so anything you save stays findable. Your <b>Main</b> above is yours —
+                        same notes, your order.
+                      </p>
+                      <button
+                        type="button"
+                        className="frow child brain-activity-link"
+                        style={{ paddingLeft: 42 }}
+                        onClick={() => usePanesStore.getState().openActivity()}
+                        title="See and undo what the AI has done"
+                      >
+                        <ClockGlyph size={13} />
+                        <span className="fname">Activity</span>
+                        {pendingProposals > 0 && <span className="count">{pendingProposals}</span>}
+                      </button>
+                      <button
+                        type="button"
+                        className={`frow child${destSelected(DEST.secure) ? " sel" : ""}`}
+                        style={{ paddingLeft: 42 }}
+                        onClick={() => {
+                          toggleDestExpanded(DEST.secure);
+                          setSelectedFolderId(DEST.secure);
+                          setContentView("panes");
+                        }}
+                        {...rowProps({ id: DEST.secure, kind: "folder" })}
+                      >
+                        <span className={`fchev${secureOpen ? " open" : ""}`} aria-hidden="true">
+                          <ChevronRight size={10} />
+                        </span>
+                        <ShieldGlyph size={14} />
+                        <span className="fname">Secure notes</span>
+                        {sectionAddBtn(DEST.secure)}
+                        <span className="count">{secureNotes.length}</span>
+                      </button>
+                      {secureOpen && (
+                        <>
+                          <p className="brain-hint secure-brain-hint">
+                            Stored inside your Brain, but never visible to remote AI. Local AI remains off
+                            until you allow it on an individual note.
+                          </p>
+                          {compactRows(secureNotes, DEST.secure, rowProps, 2)}
+                          {newFolderRow(DEST.secure, 60)}
+                          {renderFolderTree(DEST.secure, secureNotes, 1, rowProps)}
+                        </>
                       )}
-                      {compactRows(destNotes, id, rowProps, 1)}
-                      {!isVault(id) && newFolderRow(id, 44)}
-                      {renderFolderTree(id, destNotes, 0, rowProps)}
+                      {renderFolderTree("wiki", brainNotes, 1, rowProps)}
                     </>
                   )}
                 </div>
-              );
-            })}
+              )}
 
-            {/* added external folders (Seth, 2026-06-27): folders you point rotli at
+              {/* — destination rows: each toggles expansion AND selects (⌘N target) — */}
+              {visibleDestRows.map(({ id, label, Glyph }) => {
+                const destNotes = notesByDest[id] ?? [];
+                const open = expandedDests[id] ?? false;
+                const selected = destSelected(id);
+                return (
+                  <div key={id}>
+                    <button
+                      type="button"
+                      className={`frow${selected ? " sel" : ""}`}
+                      onClick={() => {
+                        toggleDestExpanded(id);
+                        setSelectedFolderId(id);
+                        setContentView("panes");
+                      }}
+                      {...rowProps({ id, kind: "folder" })}
+                    >
+                      <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
+                        <ChevronRight size={10} />
+                      </span>
+                      <Glyph size={14.5} />
+                      <span className="fname">{label}</span>
+                      {/* the external Vault is read-mostly — no "+ new note/folder" */}
+                      {!isHidden(id) && !isVault(id) && sectionAddBtn(id)}
+                      <span className="count">{destNotes.length}</span>
+                    </button>
+                    {open && (
+                      <>
+                        {id === DEST.secure && (
+                          <p className="brain-hint">
+                            Remote AI never sees these notes. Local AI is off until you allow it on an
+                            individual note.
+                          </p>
+                        )}
+                        {compactRows(destNotes, id, rowProps, 1)}
+                        {!isVault(id) && newFolderRow(id, 44)}
+                        {renderFolderTree(id, destNotes, 0, rowProps)}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* added external folders (Seth, 2026-06-27): folders you point rotli at
                 without moving them into the memex — browse + edit in place. The
                 "Add a folder…" row picks one (relaunches to surface it). */}
-            {addedRoots.length > 0 && <div className="fsec">Folders</div>}
-            {addedRoots.map((r) => (
-              <AddedRootRow key={r.id} root={r} />
-            ))}
-            <button
-              type="button"
-              className="frow sb-addfolder"
-              title="Add a folder to browse + edit in place (not moved into your memex)"
-              onClick={() => void corpusAddFolder()}
-            >
-              <PlusGlyph size={13} />
-              <span className="fname">Add a folder…</span>
-            </button>
-          </div>
-        )}
-      </div>
+              {addedRoots.length > 0 && <div className="fsec">Folders</div>}
+              {addedRoots.map((r) => (
+                <AddedRootRow key={r.id} root={r} />
+              ))}
+              <button
+                type="button"
+                className="frow sb-addfolder"
+                title="Add a folder to browse + edit in place (not moved into your memex)"
+                onClick={() => void corpusAddFolder()}
+              >
+                <PlusGlyph size={13} />
+                <span className="fname">Add a folder…</span>
+              </button>
+            </div>
+          )}
+        </div>
       )}
-
     </aside>
   );
 }

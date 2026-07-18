@@ -44,9 +44,7 @@ export const DEFAULT_CHAT_SIDEBAR_LIMIT = 5;
 /** Coerce any stored / hand-set value to an allowed chat cap; unknown → default.
  * Pure (exported for the persist parse + its tests). */
 export function clampChatSidebarLimit(n: unknown): number {
-  return typeof n === "number" && CHAT_SIDEBAR_LIMITS.includes(n)
-    ? n
-    : DEFAULT_CHAT_SIDEBAR_LIMIT;
+  return typeof n === "number" && CHAT_SIDEBAR_LIMITS.includes(n) ? n : DEFAULT_CHAT_SIDEBAR_LIMIT;
 }
 
 /** The folders rail selection: the two smart rows or a real folder id. */
@@ -76,14 +74,12 @@ export const SEC_NOTES = "sec:notes";
 
 /** Sidebar width clamp — small enough to tuck away, never wide enough to eat
  * the editor (one rail now, not two — Seth, 2026-06-13). */
-export const clampSidebarWidth = (px: number): number =>
-  Math.min(460, Math.max(190, Math.round(px)));
+export const clampSidebarWidth = (px: number): number => Math.min(460, Math.max(190, Math.round(px)));
 
 /** Sidebar zoom clamp + step (⌘+/⌘− with focus in the sidebar). Rounded to one
  * decimal so repeated steps never drift on float error. */
 export const SIDEBAR_ZOOM_STEP = 0.1;
-export const clampSidebarZoom = (z: number): number =>
-  Math.min(1.4, Math.max(0.8, Math.round(z * 10) / 10));
+export const clampSidebarZoom = (z: number): number => Math.min(1.4, Math.max(0.8, Math.round(z * 10) / 10));
 
 /** The reserved destination ids the sidebar seeds open (Inbox + Vault) and the
  * persistence layer trusts as a valid folder selection before the first list
@@ -419,7 +415,8 @@ export const useUiStore = create<UiState>((set, get) => ({
       current.breveDirty &&
       typeof window !== "undefined" &&
       !window.confirm("Discard your unsaved Breve changes and return to Notes?")
-    ) return;
+    )
+      return;
     set({ sidebarMode: mode, ...(mode === "breve" ? {} : { breveDirty: false }) });
   },
   breveView: "briefs",
@@ -430,7 +427,8 @@ export const useUiStore = create<UiState>((set, get) => ({
       current.breveDirty &&
       typeof window !== "undefined" &&
       !window.confirm("Discard your unsaved changes and open another Breve section?")
-    ) return;
+    )
+      return;
     set({ breveView: view, breveDirty: false });
   },
   breveDirty: false,
@@ -447,8 +445,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   toggleDestExpanded: (id) =>
     set((s) => ({ expandedDests: { ...s.expandedDests, [id]: !s.expandedDests[id] } })),
-  setDestExpanded: (id, open) =>
-    set((s) => ({ expandedDests: { ...s.expandedDests, [id]: open } })),
+  setDestExpanded: (id, open) => set((s) => ({ expandedDests: { ...s.expandedDests, [id]: open } })),
   revealNonce: 0,
   revealMode: "auto",
   revealNoteId: null,

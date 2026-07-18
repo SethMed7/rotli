@@ -35,5 +35,4 @@ export const approveProposal = (action: BrainAction): Promise<void> =>
 export const dismissProposal = (action: BrainAction): Promise<void> =>
   dismissWithDeps(action, liveJournalDeps);
 
-export const undoAction = (action: BrainAction): Promise<void> =>
-  undoWithDeps(action, liveJournalDeps);
+export const undoAction = (action: BrainAction): Promise<void> => undoWithDeps(action, liveJournalDeps);

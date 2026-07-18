@@ -51,9 +51,7 @@ describe("htmlPreviewDoc — <base> injection for the sandboxed srcdoc Preview",
   });
 
   test("falls back to after <html>, then after the doctype — NEVER before it", () => {
-    expect(htmlPreviewDoc("<html><body>b</body></html>", URL)).toBe(
-      `<html>${BASE}<body>b</body></html>`,
-    );
+    expect(htmlPreviewDoc("<html><body>b</body></html>", URL)).toBe(`<html>${BASE}<body>b</body></html>`);
     const doc = htmlPreviewDoc("<!DOCTYPE html>\n<p>hi</p>", URL);
     expect(doc.startsWith("<!DOCTYPE html>")).toBe(true); // quirks mode never triggered
     expect(doc).toBe(`<!DOCTYPE html>${BASE}\n<p>hi</p>`);
@@ -65,9 +63,7 @@ describe("htmlPreviewDoc — <base> injection for the sandboxed srcdoc Preview",
   });
 
   test("a quote in the URL can't break out of the href attribute", () => {
-    expect(htmlPreviewDoc("x", 'a"><script>1</script>')).toBe(
-      '<base href="a%22><script>1</script>">x',
-    );
+    expect(htmlPreviewDoc("x", 'a"><script>1</script>')).toBe('<base href="a%22><script>1</script>">x');
   });
 });
 

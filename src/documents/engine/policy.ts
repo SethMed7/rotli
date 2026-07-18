@@ -19,10 +19,7 @@ interface TableRangeLike {
  * policy can be tested without importing the DOM-heavy editor runtime. */
 const UNIVER_MUTATION_COMMAND_TYPE = 2;
 
-export function documentInsertionRange(
-  unitId: string,
-  range: TextRangeLike | null | undefined | void,
-) {
+export function documentInsertionRange(unitId: string, range: TextRangeLike | null | undefined | void) {
   if (!range || !Number.isFinite(range.startOffset) || !Number.isFinite(range.endOffset)) return null;
   return {
     unitId,

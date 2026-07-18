@@ -34,7 +34,14 @@ import { focusDim } from "./focusMode";
 import { linkOpener, livePreview } from "./livePreview";
 import { stripMarkdown } from "./stripMarkdown";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
-import { type SlashItem, type SlashPickerMode, SlashMenu, filterSlashItems, slashPlacement, slashQueryAtCaret } from "./slashMenu";
+import {
+  type SlashItem,
+  type SlashPickerMode,
+  SlashMenu,
+  filterSlashItems,
+  slashPlacement,
+  slashQueryAtCaret,
+} from "./slashMenu";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { SlashPicker } from "./slashPicker";
 import { pickerFence, slashInsertion } from "./slashActions";
@@ -190,7 +197,14 @@ export function CmEditor({
     [fmPath],
   );
 
-  const [slash, setSlash] = useState<SlashState>({ open: false, query: "", index: 0, left: 0, top: 0, up: false });
+  const [slash, setSlash] = useState<SlashState>({
+    open: false,
+    query: "",
+    index: 0,
+    left: 0,
+    top: 0,
+    up: false,
+  });
   const [picker, setPicker] = useState<PickerState | null>(null);
   const pickerRef = useRef<PickerState | null>(null);
   pickerRef.current = picker;
@@ -295,9 +309,7 @@ export function CmEditor({
       if (item.op.kind === "picker") {
         const coords = view.coordsAtPos(line.from);
         const host = hostRef.current?.getBoundingClientRect();
-        const up =
-          coords != null &&
-          slashPlacement(coords.top, window.innerHeight - coords.bottom) === "up";
+        const up = coords != null && slashPlacement(coords.top, window.innerHeight - coords.bottom) === "up";
         const left = (coords?.left ?? 0) - (host?.left ?? 0);
         const top = up
           ? (coords?.top ?? 0) - (host?.top ?? 0) - 4
@@ -348,9 +360,7 @@ export function CmEditor({
       }
       const coords = view.coordsAtPos(line.from);
       const rect = view.dom.getBoundingClientRect();
-      const up =
-        coords != null &&
-        slashPlacement(coords.top, window.innerHeight - coords.bottom) === "up";
+      const up = coords != null && slashPlacement(coords.top, window.innerHeight - coords.bottom) === "up";
       setSlash({
         open: true,
         query,

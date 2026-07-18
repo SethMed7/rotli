@@ -107,8 +107,7 @@ export class InMemoryNotesService implements NotesService {
       scoped = all.filter(
         (n) => !isHidden(n.folderId) && !isVault(n.folderId) && !isChats(n.folderId, MEMEX_MARKERS),
       );
-    else if (folderId && isHidden(folderId))
-      scoped = all.filter((n) => within.has(n.folderId));
+    else if (folderId && isHidden(folderId)) scoped = all.filter((n) => within.has(n.folderId));
     else scoped = all.filter((n) => within.has(n.folderId) && !isHidden(n.folderId));
     return scoped
       .map(({ body: _body, ...summary }) => summary)
@@ -227,11 +226,7 @@ export class InMemoryNotesService implements NotesService {
     // so the root case must be matched explicitly.
     const origin = this.origins.get(id);
     const target =
-      origin === undefined
-        ? DEST.inbox
-        : origin === "" || this.folders.has(origin)
-          ? origin
-          : DEST.inbox;
+      origin === undefined ? DEST.inbox : origin === "" || this.folders.has(origin) ? origin : DEST.inbox;
     return this.moveNote(id, target);
   }
 
@@ -285,8 +280,7 @@ const FS_MODE = isTauri();
 // Dev-only review affordance: ?empty skips note seeding so the r1 frame E
 // empty state ("Your island is ready") can be looked at. Folders still exist —
 // Inbox is the capture target either way.
-const SEED_EMPTY =
-  import.meta.env.DEV && new URLSearchParams(window.location.search).has("empty");
+const SEED_EMPTY = import.meta.env.DEV && new URLSearchParams(window.location.search).has("empty");
 
 const svc = new InMemoryNotesService();
 
@@ -349,11 +343,10 @@ Later: breve plugs into the same corpus and the Wiki answers from it. Nothing ch
     );
     firstNoteId = welcome.id;
 
-    svc.seedNote(
-      inbox.id,
-      `# Call the bank about the wire limit before Friday`,
-      { createdAt: now - 2 * DAY, updatedAt: now - 2 * DAY },
-    );
+    svc.seedNote(inbox.id, `# Call the bank about the wire limit before Friday`, {
+      createdAt: now - 2 * DAY,
+      updatedAt: now - 2 * DAY,
+    });
 
     // —— Storage: a pinned decision + nested Work/Myela notes ——
     svc.seedNote(

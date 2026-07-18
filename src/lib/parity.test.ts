@@ -6,7 +6,11 @@
 // through their own independent implementation.
 
 import { describe, expect, test } from "bun:test";
-import { AGY_BIN_CANDIDATES, CLAUDE_BIN_CANDIDATES, CODEX_BIN_CANDIDATES } from "../../breve-runtime/scripts/cliPaths";
+import {
+  AGY_BIN_CANDIDATES,
+  CLAUDE_BIN_CANDIDATES,
+  CODEX_BIN_CANDIDATES,
+} from "../../breve-runtime/scripts/cliPaths";
 import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "../../breve-runtime/scripts/keychainNames";
 import fixture from "../../scripts/fixtures/parity.json";
 import { endpointIsLocal } from "../ai/guard";

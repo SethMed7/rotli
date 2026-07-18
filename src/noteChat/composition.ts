@@ -2,23 +2,13 @@
 import { corpusFrontmatter, corpusNotePath } from "../lib/tauri";
 import { activeInstance } from "../memex/config";
 import { invalidateMemex } from "../memex/useMemex";
-import {
-  listChats,
-  loadConfig,
-  setChatAttachedTo,
-  writeChat,
-} from "../memex/service";
+import { listChats, loadConfig, setChatAttachedTo, writeChat } from "../memex/service";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { noteDiskFolder } from "../lib/noteLocation";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
-import {
-  findAttachedChatSlug,
-  noteChatSlug,
-  noteStemFromPath,
-  secureNoteStem,
-} from "./model";
+import { findAttachedChatSlug, noteChatSlug, noteStemFromPath, secureNoteStem } from "./model";
 import { rememberChatNote } from "./session";
 
 export async function openChatForNote(note: NoteSummary): Promise<void> {
@@ -37,9 +27,7 @@ export async function openChatForNote(note: NoteSummary): Promise<void> {
     isSecureBrainFolder(folder) ||
     isSecureNotesFolder(folder) ||
     /(?:^|\/)wiki\/_secure(?:\/|$)/.test(notePath.replace(/^[^:]+:/, ""));
-  const stem = secure
-    ? secureNoteStem(note.id)
-    : noteStemFromPath(notePath);
+  const stem = secure ? secureNoteStem(note.id) : noteStemFromPath(notePath);
   if (!stem) throw new Error("Rotli couldn’t resolve this note in the brain.");
 
   const chats = await listChats(instance);

@@ -40,10 +40,7 @@ export async function createManagedDocument(now = Date.now()): Promise<string> {
 
 export async function editManagedDocument(fileId: string) {
   const { docxEditorCodec } = await import("./codec/docx");
-  return editDocument(
-    { reader, writer, codec: docxEditorCodec, maxBytes: DOCUMENT_EDIT_MAX_BYTES },
-    fileId,
-  );
+  return editDocument({ reader, writer, codec: docxEditorCodec, maxBytes: DOCUMENT_EDIT_MAX_BYTES }, fileId);
 }
 
 export async function convertDocumentToManagedDocx(fileId: string): Promise<string> {

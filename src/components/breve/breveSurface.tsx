@@ -26,12 +26,7 @@ import {
   type BrevePdfThemePreset,
 } from "../../lib/tauri";
 import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../../brand/brevePdfThemes";
-import {
-  CLI_CATALOG,
-  PROVIDER_IDS,
-  PROVIDER_LABELS,
-  type ProviderId,
-} from "../../ai/models";
+import { CLI_CATALOG, PROVIDER_IDS, PROVIDER_LABELS, type ProviderId } from "../../ai/models";
 import {
   parseWatchlist,
   serializeWatchlist,
@@ -41,7 +36,16 @@ import {
 } from "../../routines/watchlist";
 import { useUiStore } from "../../state/ui";
 import { usePanesStore } from "../../state/panes";
-import { CheckGlyph, ChevronRight, ClockGlyph, ExternalLinkGlyph, LockGlyph, PlusGlyph, SearchGlyph, XGlyph } from "../glyphs";
+import {
+  CheckGlyph,
+  ChevronRight,
+  ClockGlyph,
+  ExternalLinkGlyph,
+  LockGlyph,
+  PlusGlyph,
+  SearchGlyph,
+  XGlyph,
+} from "../glyphs";
 import {
   EMPTY_BREVE_SNAPSHOT,
   formatNextRoutine,
@@ -66,13 +70,14 @@ function PageHead({ title, detail }: { title: string; detail: string }) {
 
 function SaveNote({ state, error, dirty = false }: { state: SaveState; error?: string; dirty?: boolean }) {
   if (state === "idle" && !dirty) return null;
-  const message = state === "saving"
-    ? "Saving…"
-    : state === "saved"
-      ? "Saved"
-      : state === "error"
-        ? error || "Could not save"
-        : "Unsaved changes";
+  const message =
+    state === "saving"
+      ? "Saving…"
+      : state === "saved"
+        ? "Saved"
+        : state === "error"
+          ? error || "Could not save"
+          : "Unsaved changes";
   return (
     <span
       className={state === "error" ? "breve-save-note err" : "breve-save-note"}
@@ -93,15 +98,7 @@ function useBreveDraftGuard(dirty: boolean) {
   }, [dirty, setBreveDirty]);
 }
 
-function EmptyMessage({
-  title,
-  detail,
-  action,
-}: {
-  title: string;
-  detail: string;
-  action?: ReactNode;
-}) {
+function EmptyMessage({ title, detail, action }: { title: string; detail: string; action?: ReactNode }) {
   return (
     <div className="breve-empty-state">
       <strong>{title}</strong>
@@ -155,9 +152,11 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
   const [briefKind, setBriefKind] = useState<"all" | "morning" | "lunch" | "night">("all");
   const briefs = useMemo(() => sortBriefs(snapshot.briefs), [snapshot.briefs]);
   const normalizedBriefQuery = briefQuery.trim().toLowerCase();
-  const visibleBriefs = briefs.filter((brief) =>
-    (briefKind === "all" || brief.kind === briefKind) &&
-    (!normalizedBriefQuery || `${brief.title} ${brief.date} ${brief.kind}`.toLowerCase().includes(normalizedBriefQuery)),
+  const visibleBriefs = briefs.filter(
+    (brief) =>
+      (briefKind === "all" || brief.kind === briefKind) &&
+      (!normalizedBriefQuery ||
+        `${brief.title} ${brief.date} ${brief.kind}`.toLowerCase().includes(normalizedBriefQuery)),
   );
   const now = Date.now();
   const nextBriefRoutine = snapshot.config.routines
@@ -165,11 +164,13 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
     .map((routine) => ({ routine, epoch: nextRoutineEpoch(routine, now, snapshot.config.timezone) }))
     .filter((entry): entry is { routine: BreveRoutine; epoch: number } => entry.epoch !== null)
     .sort((a, b) => a.epoch - b.epoch)[0]?.routine;
-  const deliveryLanes = [...new Set(
-    snapshot.config.routines
-      .filter((routine) => routine.enabled && routine.kind === "brief")
-      .flatMap((routine) => routine.lanes),
-  )].map((lane) => lane === "inApp" ? "Rotli" : lane.charAt(0).toUpperCase() + lane.slice(1));
+  const deliveryLanes = [
+    ...new Set(
+      snapshot.config.routines
+        .filter((routine) => routine.enabled && routine.kind === "brief")
+        .flatMap((routine) => routine.lanes),
+    ),
+  ].map((lane) => (lane === "inApp" ? "Rotli" : lane.charAt(0).toUpperCase() + lane.slice(1)));
 
   const importLegacy = async () => {
     setImportState("saving");
@@ -238,8 +239,8 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
           <div>
             <h3 id="breve-takeover-title">Move scheduling into Rotli</h3>
             <p>
-              Copies private runtime state, disables Breve&rsquo;s seven legacy launchd jobs,
-              and starts the Rotli-managed scheduler. The legacy folder is kept as a backup.
+              Copies private runtime state, disables Breve&rsquo;s seven legacy launchd jobs, and starts the
+              Rotli-managed scheduler. The legacy folder is kept as a backup.
             </p>
           </div>
           <button
@@ -264,17 +265,21 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
             </p>
           </div>
           <div className="breve-confirm-actions">
-            {retireArmed ? <>
-              <button type="button" className="ghostbtn" onClick={() => setRetireArmed(false)}>Keep project</button>
-              <button
-                type="button"
-                className="ghostbtn primary"
-                disabled={retireState === "saving"}
-                onClick={() => void retireLegacy()}
-              >
-                {retireState === "saving" ? "Verifying…" : "Confirm move to Trash"}
-              </button>
-            </> : (
+            {retireArmed ? (
+              <>
+                <button type="button" className="ghostbtn" onClick={() => setRetireArmed(false)}>
+                  Keep project
+                </button>
+                <button
+                  type="button"
+                  className="ghostbtn primary"
+                  disabled={retireState === "saving"}
+                  onClick={() => void retireLegacy()}
+                >
+                  {retireState === "saving" ? "Verifying…" : "Confirm move to Trash"}
+                </button>
+              </>
+            ) : (
               <button type="button" className="ghostbtn quiet" onClick={() => setRetireArmed(true)}>
                 Review retirement
               </button>
@@ -288,30 +293,56 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
         <div className="breve-next-brief">
           <span>Next scheduled run</span>
           <strong>{nextBriefRoutine?.label ?? "No brief is scheduled"}</strong>
-          <p>{nextBriefRoutine
-            ? formatNextRoutine(nextBriefRoutine, now, snapshot.config.timezone)
-            : "Turn on a briefing routine to resume delivery."}</p>
-          <button type="button" className="ghostbtn" onClick={() => setView("routines")}>Adjust schedule</button>
+          <p>
+            {nextBriefRoutine
+              ? formatNextRoutine(nextBriefRoutine, now, snapshot.config.timezone)
+              : "Turn on a briefing routine to resume delivery."}
+          </p>
+          <button type="button" className="ghostbtn" onClick={() => setView("routines")}>
+            Adjust schedule
+          </button>
         </div>
         <dl className="breve-readiness-list">
           <div>
             <dt>Watchlist</dt>
-            <dd>{snapshot.counts.topics
-              ? `${snapshot.counts.topics} topics in ${snapshot.counts.sections} groups`
-              : "No topics yet"}</dd>
-            <button type="button" onClick={() => setView("watchlist")}>{snapshot.counts.topics ? "Review" : "Add topics"}</button>
+            <dd>
+              {snapshot.counts.topics
+                ? `${snapshot.counts.topics} topics in ${snapshot.counts.sections} groups`
+                : "No topics yet"}
+            </dd>
+            <button type="button" onClick={() => setView("watchlist")}>
+              {snapshot.counts.topics ? "Review" : "Add topics"}
+            </button>
           </div>
           <div>
             <dt>Delivery</dt>
             <dd>{deliveryLanes.length ? deliveryLanes.join(" · ") : "No delivery lanes enabled"}</dd>
-            <button type="button" onClick={() => setView("configure")}>Configure</button>
+            <button type="button" onClick={() => setView("configure")}>
+              Configure
+            </button>
           </div>
           <div>
             <dt>Latest brief</dt>
             <dd>{briefs[0] ? briefs[0].title : "Nothing generated yet"}</dd>
-            {briefs[0]?.path
-              ? <button type="button" onClick={() => { setSidebarMode("notes"); openNote(briefs[0]!.path!); }}>Open</button>
-              : <span>{briefs.length ? (import.meta.env.DEV ? "Read-only snapshot" : "Stored outside Rotli") : "Waiting"}</span>}
+            {briefs[0]?.path ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSidebarMode("notes");
+                  openNote(briefs[0]!.path!);
+                }}
+              >
+                Open
+              </button>
+            ) : (
+              <span>
+                {briefs.length
+                  ? import.meta.env.DEV
+                    ? "Read-only snapshot"
+                    : "Stored outside Rotli"
+                  : "Waiting"}
+              </span>
+            )}
           </div>
         </dl>
       </section>
@@ -322,7 +353,11 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
             <h3 id="breve-recent-title">Brief library</h3>
             <p>Find a past briefing by title, date, or delivery period.</p>
           </div>
-          {snapshot.imported && <span className="breve-inline-status"><CheckGlyph size={12} /> In Rotli</span>}
+          {snapshot.imported && (
+            <span className="breve-inline-status">
+              <CheckGlyph size={12} /> In Rotli
+            </span>
+          )}
         </div>
         {briefs.length > 0 && (
           <div className="breve-brief-toolbar">
@@ -338,22 +373,29 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
             </label>
             <label>
               <span className="sr-only">Filter briefs by period</span>
-              <select value={briefKind} onChange={(event) => setBriefKind(event.target.value as typeof briefKind)}>
+              <select
+                value={briefKind}
+                onChange={(event) => setBriefKind(event.target.value as typeof briefKind)}
+              >
                 <option value="all">All periods</option>
                 <option value="morning">Morning</option>
                 <option value="lunch">Lunch</option>
                 <option value="night">Night</option>
               </select>
             </label>
-            <span className="breve-watch-count">{visibleBriefs.length} of {briefs.length}</span>
+            <span className="breve-watch-count">
+              {visibleBriefs.length} of {briefs.length}
+            </span>
           </div>
         )}
         {briefs.length === 0 ? (
           <EmptyMessage
             title="Your first brief has not arrived yet."
-            detail={snapshot.counts.topics > 0
-              ? "Your watchlist is ready. Review the routine schedule to choose when Breve should arrive."
-              : "Add the topics you care about, then choose when each briefing should arrive."}
+            detail={
+              snapshot.counts.topics > 0
+                ? "Your watchlist is ready. Review the routine schedule to choose when Breve should arrive."
+                : "Add the topics you care about, then choose when each briefing should arrive."
+            }
             action={
               <button
                 type="button"
@@ -368,17 +410,38 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
           <EmptyMessage
             title="No briefs match this view."
             detail="Try another period or clear the search phrase."
-            action={<button type="button" className="ghostbtn" onClick={() => { setBriefQuery(""); setBriefKind("all"); }}>Clear filters</button>}
+            action={
+              <button
+                type="button"
+                className="ghostbtn"
+                onClick={() => {
+                  setBriefQuery("");
+                  setBriefKind("all");
+                }}
+              >
+                Clear filters
+              </button>
+            }
           />
         ) : (
           <div className="breve-brief-list">
             {visibleBriefs.map((brief) => {
-              const content = <>
-                <span className={`breve-kind ${brief.kind}`}>{brief.kind}</span>
-                <span className="breve-brief-title" title={brief.title}>{brief.title}</span>
-                <time dateTime={brief.date}>{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${brief.date}T12:00:00`))}</time>
-                <span className="breve-brief-state">{brief.imported ? "In Rotli" : "Legacy"}</span>
-              </>;
+              const content = (
+                <>
+                  <span className={`breve-kind ${brief.kind}`}>{brief.kind}</span>
+                  <span className="breve-brief-title" title={brief.title}>
+                    {brief.title}
+                  </span>
+                  <time dateTime={brief.date}>
+                    {new Intl.DateTimeFormat(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    }).format(new Date(`${brief.date}T12:00:00`))}
+                  </time>
+                  <span className="breve-brief-state">{brief.imported ? "In Rotli" : "Legacy"}</span>
+                </>
+              );
               return brief.path ? (
                 <button
                   type="button"
@@ -393,7 +456,9 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
                   {content}
                 </button>
               ) : (
-                <div className="breve-brief-row" key={brief.stem}>{content}</div>
+                <div className="breve-brief-row" key={brief.stem}>
+                  {content}
+                </div>
               );
             })}
           </div>
@@ -419,13 +484,7 @@ function normalizedWebsite(value: string): string | null {
   }
 }
 
-function WatchGuidanceInput({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
+function WatchGuidanceInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     if (!ref.current) return;
@@ -460,7 +519,11 @@ function editableWatchlist(markdown: string): { sections: EditableWatchSection[]
       ...section,
       note: section.note ?? "",
       id: editId(),
-      items: section.items.map((item) => ({ ...item, url: item.url ?? legacyWatchUrl(item.watch), id: editId() })),
+      items: section.items.map((item) => ({
+        ...item,
+        url: item.url ?? legacyWatchUrl(item.watch),
+        id: editId(),
+      })),
     })),
   };
 }
@@ -471,7 +534,11 @@ function watchlistDocument(sections: EditableWatchSection[], preferences: string
     sections: sections.map(({ title, note, items }) => ({
       title,
       ...(note ? { note } : {}),
-      items: items.map(({ watch, lens, url }) => ({ watch, lens, ...(url?.trim() ? { url: url.trim() } : {}) })),
+      items: items.map(({ watch, lens, url }) => ({
+        watch,
+        lens,
+        ...(url?.trim() ? { url: url.trim() } : {}),
+      })),
     })),
   });
 }
@@ -493,9 +560,13 @@ function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
   const duplicateGroup = sections.find(
     (section, index) =>
       !!section.title.trim() &&
-      sections.findIndex((candidate) => candidate.title.trim().toLowerCase() === section.title.trim().toLowerCase()) !== index,
+      sections.findIndex(
+        (candidate) => candidate.title.trim().toLowerCase() === section.title.trim().toLowerCase(),
+      ) !== index,
   );
-  const invalid = sections.some((section) => !section.title.trim() || section.items.some((item) => !item.watch.trim()));
+  const invalid = sections.some(
+    (section) => !section.title.trim() || section.items.some((item) => !item.watch.trim()),
+  );
   const invalidWebsite = sections
     .flatMap((section) => section.items)
     .find((item) => item.url?.trim() && !normalizedWebsite(item.url));
@@ -505,14 +576,16 @@ function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
       ? "Every group and topic needs a name. Complete or remove the empty row before saving."
       : invalidWebsite
         ? `“${invalidWebsite.url}” is not a valid website. Use a domain or an http/https URL.`
-      : "";
+        : "";
   const normalizedQuery = query.trim().toLowerCase();
   const visibleSections = normalizedQuery
     ? sections.flatMap((section) => {
         const groupMatches = section.title.toLowerCase().includes(normalizedQuery);
         const items = groupMatches
           ? section.items
-          : section.items.filter((item) => `${item.watch} ${item.lens} ${item.url ?? ""}`.toLowerCase().includes(normalizedQuery));
+          : section.items.filter((item) =>
+              `${item.watch} ${item.lens} ${item.url ?? ""}`.toLowerCase().includes(normalizedQuery),
+            );
         return items.length || groupMatches ? [{ ...section, items }] : [];
       })
     : sections;
@@ -527,26 +600,35 @@ function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
   }, [dirty, snapshot.watchlist]);
 
   const updateSection = (sectionId: string, patch: Partial<Pick<EditableWatchSection, "title" | "note">>) => {
-    setSections((current) => current.map((section) => section.id === sectionId ? { ...section, ...patch } : section));
+    setSections((current) =>
+      current.map((section) => (section.id === sectionId ? { ...section, ...patch } : section)),
+    );
     setSaveState("idle");
   };
 
   const updateItem = (sectionId: string, itemId: string, patch: Partial<WatchItem>) => {
-    setSections((current) => current.map((section) =>
-      section.id === sectionId
-        ? { ...section, items: section.items.map((item) => item.id === itemId ? { ...item, ...patch } : item) }
-        : section,
-    ));
+    setSections((current) =>
+      current.map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              items: section.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
+            }
+          : section,
+      ),
+    );
     setSaveState("idle");
   };
 
   const addTopic = (sectionId: string) => {
     setQuery("");
-    setSections((current) => current.map((section) =>
-      section.id === sectionId
-        ? { ...section, items: [...section.items, { id: editId(), watch: "", lens: "", url: "" }] }
-        : section,
-    ));
+    setSections((current) =>
+      current.map((section) =>
+        section.id === sectionId
+          ? { ...section, items: [...section.items, { id: editId(), watch: "", lens: "", url: "" }] }
+          : section,
+      ),
+    );
     setSaveState("idle");
   };
 
@@ -576,7 +658,10 @@ function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
 
   return (
     <div className="breve-page">
-      <PageHead title="Watchlist" detail="Tell Breve what to follow and what kind of change matters to you." />
+      <PageHead
+        title="Watchlist"
+        detail="Tell Breve what to follow and what kind of change matters to you."
+      />
       <div className="breve-watch-manager-bar">
         <label className="breve-watch-search" htmlFor="breve-watch-search">
           <SearchGlyph size={14} />
@@ -589,167 +674,216 @@ function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
             onKeyDown={(event) => event.stopPropagation()}
           />
         </label>
-        <span className="breve-watch-count">{topicCount} {topicCount === 1 ? "topic" : "topics"} in {sections.length} {sections.length === 1 ? "group" : "groups"}</span>
+        <span className="breve-watch-count">
+          {topicCount} {topicCount === 1 ? "topic" : "topics"} in {sections.length}{" "}
+          {sections.length === 1 ? "group" : "groups"}
+        </span>
         <span className="breve-toolbar-grow" />
         <SaveNote state={saveState} error={error} dirty={dirty} />
         <button type="button" className="ghostbtn" onClick={addGroup}>
           <PlusGlyph size={13} /> Add group
         </button>
-        <button type="button" className="ghostbtn primary" disabled={!dirty || !!validation || saveState === "saving"} onClick={() => void save()}>
+        <button
+          type="button"
+          className="ghostbtn primary"
+          disabled={!dirty || !!validation || saveState === "saving"}
+          onClick={() => void save()}
+        >
           {saveState === "saving" ? "Saving…" : "Save watchlist"}
         </button>
       </div>
-      {validation && <p id="breve-watch-validation" className="breve-watch-validation" role="alert">{validation}</p>}
+      {validation && (
+        <p id="breve-watch-validation" className="breve-watch-validation" role="alert">
+          {validation}
+        </p>
+      )}
 
       <div className="breve-watch-groups">
         {visibleSections.map((section) => {
           const expanded = !!normalizedQuery || !collapsedGroups.has(section.id);
-          const duplicate = !!section.title.trim() && sections.filter(
-            (candidate) => candidate.title.trim().toLowerCase() === section.title.trim().toLowerCase(),
-          ).length > 1;
+          const duplicate =
+            !!section.title.trim() &&
+            sections.filter(
+              (candidate) => candidate.title.trim().toLowerCase() === section.title.trim().toLowerCase(),
+            ).length > 1;
           return (
-          <section className="breve-watch-group" key={section.id} aria-label={`${section.title || "Untitled"} watch group`}>
-            <div className="breve-watch-group-head">
-              <button
-                type="button"
-                className="breve-watch-disclosure"
-                aria-label={`${expanded ? "Collapse" : "Expand"} ${section.title || "watch group"}`}
-                aria-expanded={expanded}
-                onClick={() => setCollapsedGroups((current) => {
-                  const next = new Set(current);
-                  if (next.has(section.id)) next.delete(section.id);
-                  else next.add(section.id);
-                  return next;
-                })}
-              >
-                <ChevronRight size={12} className={expanded ? "open" : undefined} />
-              </button>
-              <label>
-                <span className="sr-only">Group name</span>
-                <input
-                  value={section.title}
-                  aria-label="Group name"
-                  aria-invalid={!section.title.trim() || duplicate}
-                  aria-describedby={validation ? "breve-watch-validation" : undefined}
-                  onChange={(event) => updateSection(section.id, { title: event.target.value })}
-                  onKeyDown={(event) => event.stopPropagation()}
-                />
-              </label>
-              <span>{section.items.length} {section.items.length === 1 ? "topic" : "topics"}</span>
-              <button
-                type="button"
-                className="breve-watch-remove"
-                aria-label={`Remove ${section.title || "group"}`}
-                title={section.items.length ? "Remove the topics first" : "Remove group"}
-                disabled={section.items.length > 0}
-                onClick={() => {
-                  setSections((current) => current.filter((candidate) => candidate.id !== section.id));
-                  setSaveState("idle");
-                }}
-              >
-                <XGlyph size={13} />
-              </button>
-            </div>
+            <section
+              className="breve-watch-group"
+              key={section.id}
+              aria-label={`${section.title || "Untitled"} watch group`}
+            >
+              <div className="breve-watch-group-head">
+                <button
+                  type="button"
+                  className="breve-watch-disclosure"
+                  aria-label={`${expanded ? "Collapse" : "Expand"} ${section.title || "watch group"}`}
+                  aria-expanded={expanded}
+                  onClick={() =>
+                    setCollapsedGroups((current) => {
+                      const next = new Set(current);
+                      if (next.has(section.id)) next.delete(section.id);
+                      else next.add(section.id);
+                      return next;
+                    })
+                  }
+                >
+                  <ChevronRight size={12} className={expanded ? "open" : undefined} />
+                </button>
+                <label>
+                  <span className="sr-only">Group name</span>
+                  <input
+                    value={section.title}
+                    aria-label="Group name"
+                    aria-invalid={!section.title.trim() || duplicate}
+                    aria-describedby={validation ? "breve-watch-validation" : undefined}
+                    onChange={(event) => updateSection(section.id, { title: event.target.value })}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  />
+                </label>
+                <span>
+                  {section.items.length} {section.items.length === 1 ? "topic" : "topics"}
+                </span>
+                <button
+                  type="button"
+                  className="breve-watch-remove"
+                  aria-label={`Remove ${section.title || "group"}`}
+                  title={section.items.length ? "Remove the topics first" : "Remove group"}
+                  disabled={section.items.length > 0}
+                  onClick={() => {
+                    setSections((current) => current.filter((candidate) => candidate.id !== section.id));
+                    setSaveState("idle");
+                  }}
+                >
+                  <XGlyph size={13} />
+                </button>
+              </div>
 
-            {expanded && <>
-            <label className="breve-watch-group-note">
-              <span className="sr-only">Optional group guidance</span>
-              <input
-                value={section.note ?? ""}
-                placeholder="Optional guidance for this group"
-                onChange={(event) => updateSection(section.id, { note: event.target.value })}
-                onKeyDown={(event) => event.stopPropagation()}
-              />
-            </label>
-
-            <div className="breve-watch-items">
-              {section.items.map((item) => (
-                <div className="breve-watch-item" key={item.id}>
-                  <label className="breve-watch-topic-field">
-                    <span className="breve-watch-field-label">Topic</span>
+              {expanded && (
+                <>
+                  <label className="breve-watch-group-note">
+                    <span className="sr-only">Optional group guidance</span>
                     <input
-                      value={item.watch}
-                      placeholder="Company, person, product, or theme"
-                      aria-invalid={!item.watch.trim()}
-                      aria-describedby={validation ? "breve-watch-validation" : undefined}
-                      onChange={(event) => updateItem(section.id, item.id, { watch: event.target.value })}
+                      value={section.note ?? ""}
+                      placeholder="Optional guidance for this group"
+                      onChange={(event) => updateSection(section.id, { note: event.target.value })}
                       onKeyDown={(event) => event.stopPropagation()}
                     />
                   </label>
-                  <label className="breve-watch-website-field">
-                    <span className="breve-watch-field-label">Website or source</span>
-                    <span className="breve-watch-link-control">
-                      <input
-                        type="url"
-                        inputMode="url"
-                        value={item.url ?? ""}
-                        placeholder="company.com"
-                        aria-invalid={!!item.url?.trim() && !normalizedWebsite(item.url)}
-                        aria-describedby={validation ? "breve-watch-validation" : undefined}
-                        onChange={(event) => updateItem(section.id, item.id, { url: event.target.value })}
-                        onBlur={() => {
-                          const normalized = normalizedWebsite(item.url ?? "");
-                          if (normalized) updateItem(section.id, item.id, { url: normalized });
-                        }}
-                        onKeyDown={(event) => event.stopPropagation()}
-                      />
-                      <button
-                        type="button"
-                        className="breve-watch-open-link"
-                        disabled={!normalizedWebsite(item.url ?? "")}
-                        aria-label={`Open website for ${item.watch || "topic"}`}
-                        title={normalizedWebsite(item.url ?? "") ? "Open website" : "Add a valid website first"}
-                        onClick={() => {
-                          const url = normalizedWebsite(item.url ?? "");
-                          if (url) void openUrl(url);
-                        }}
-                      >
-                        <ExternalLinkGlyph size={13} />
-                      </button>
-                    </span>
-                  </label>
-                  <button
-                    type="button"
-                    className="breve-watch-remove"
-                    aria-label={`Remove ${item.watch || "empty topic"}`}
-                    title="Remove topic"
-                    onClick={() => {
-                      setSections((current) => current.map((candidate) =>
-                        candidate.id === section.id
-                          ? { ...candidate, items: candidate.items.filter((candidateItem) => candidateItem.id !== item.id) }
-                          : candidate,
-                      ));
-                      setSaveState("idle");
-                    }}
-                  >
-                    <XGlyph size={13} />
+
+                  <div className="breve-watch-items">
+                    {section.items.map((item) => (
+                      <div className="breve-watch-item" key={item.id}>
+                        <label className="breve-watch-topic-field">
+                          <span className="breve-watch-field-label">Topic</span>
+                          <input
+                            value={item.watch}
+                            placeholder="Company, person, product, or theme"
+                            aria-invalid={!item.watch.trim()}
+                            aria-describedby={validation ? "breve-watch-validation" : undefined}
+                            onChange={(event) =>
+                              updateItem(section.id, item.id, { watch: event.target.value })
+                            }
+                            onKeyDown={(event) => event.stopPropagation()}
+                          />
+                        </label>
+                        <label className="breve-watch-website-field">
+                          <span className="breve-watch-field-label">Website or source</span>
+                          <span className="breve-watch-link-control">
+                            <input
+                              type="url"
+                              inputMode="url"
+                              value={item.url ?? ""}
+                              placeholder="company.com"
+                              aria-invalid={!!item.url?.trim() && !normalizedWebsite(item.url)}
+                              aria-describedby={validation ? "breve-watch-validation" : undefined}
+                              onChange={(event) =>
+                                updateItem(section.id, item.id, { url: event.target.value })
+                              }
+                              onBlur={() => {
+                                const normalized = normalizedWebsite(item.url ?? "");
+                                if (normalized) updateItem(section.id, item.id, { url: normalized });
+                              }}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            />
+                            <button
+                              type="button"
+                              className="breve-watch-open-link"
+                              disabled={!normalizedWebsite(item.url ?? "")}
+                              aria-label={`Open website for ${item.watch || "topic"}`}
+                              title={
+                                normalizedWebsite(item.url ?? "")
+                                  ? "Open website"
+                                  : "Add a valid website first"
+                              }
+                              onClick={() => {
+                                const url = normalizedWebsite(item.url ?? "");
+                                if (url) void openUrl(url);
+                              }}
+                            >
+                              <ExternalLinkGlyph size={13} />
+                            </button>
+                          </span>
+                        </label>
+                        <button
+                          type="button"
+                          className="breve-watch-remove"
+                          aria-label={`Remove ${item.watch || "empty topic"}`}
+                          title="Remove topic"
+                          onClick={() => {
+                            setSections((current) =>
+                              current.map((candidate) =>
+                                candidate.id === section.id
+                                  ? {
+                                      ...candidate,
+                                      items: candidate.items.filter(
+                                        (candidateItem) => candidateItem.id !== item.id,
+                                      ),
+                                    }
+                                  : candidate,
+                              ),
+                            );
+                            setSaveState("idle");
+                          }}
+                        >
+                          <XGlyph size={13} />
+                        </button>
+                        <label className="breve-watch-guidance-field">
+                          <span className="breve-watch-field-label">What should Breve look for?</span>
+                          <WatchGuidanceInput
+                            value={item.lens}
+                            onChange={(lens) => updateItem(section.id, item.id, { lens })}
+                          />
+                        </label>
+                      </div>
+                    ))}
+                    {section.items.length === 0 && (
+                      <p className="breve-watch-group-empty">No topics in this group yet.</p>
+                    )}
+                  </div>
+                  <button type="button" className="breve-watch-add" onClick={() => addTopic(section.id)}>
+                    <PlusGlyph size={13} /> Add topic
                   </button>
-                  <label className="breve-watch-guidance-field">
-                    <span className="breve-watch-field-label">What should Breve look for?</span>
-                    <WatchGuidanceInput
-                      value={item.lens}
-                      onChange={(lens) => updateItem(section.id, item.id, { lens })}
-                    />
-                  </label>
-                </div>
-              ))}
-              {section.items.length === 0 && <p className="breve-watch-group-empty">No topics in this group yet.</p>}
-            </div>
-            <button type="button" className="breve-watch-add" onClick={() => addTopic(section.id)}>
-              <PlusGlyph size={13} /> Add topic
-            </button>
-            </>}
-          </section>
-        )})}
+                </>
+              )}
+            </section>
+          );
+        })}
         {sections.length === 0 && (
           <div className="breve-watch-empty">
             <p>Your watchlist is empty.</p>
             <span>Add a group, then add the topics Breve should follow.</span>
-            <button type="button" className="ghostbtn primary" onClick={addGroup}>Add first group</button>
+            <button type="button" className="ghostbtn primary" onClick={addGroup}>
+              Add first group
+            </button>
           </div>
         )}
         {sections.length > 0 && visibleSections.length === 0 && (
-          <div className="breve-watch-empty"><p>No topics match “{query}”.</p><button type="button" className="ghostbtn" onClick={() => setQuery("")}>Clear search</button></div>
+          <div className="breve-watch-empty">
+            <p>No topics match “{query}”.</p>
+            <button type="button" className="ghostbtn" onClick={() => setQuery("")}>
+              Clear search
+            </button>
+          </div>
         )}
       </div>
 
@@ -765,7 +899,10 @@ function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
             rows={4}
             aria-labelledby="breve-watch-preferences-title"
             placeholder="For example: Keep each brief concise and prioritize meaningful product changes."
-            onChange={(event) => { setPreferences(event.target.value); setSaveState("idle"); }}
+            onChange={(event) => {
+              setPreferences(event.target.value);
+              setSaveState("idle");
+            }}
             onKeyDown={(event) => event.stopPropagation()}
           />
         </label>
@@ -806,9 +943,7 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
   const patchRoutine = (id: string, patch: Partial<BreveRoutine>) =>
     setConfig((current) => ({
       ...current,
-      routines: current.routines.map((routine) =>
-        routine.id === id ? { ...routine, ...patch } : routine,
-      ),
+      routines: current.routines.map((routine) => (routine.id === id ? { ...routine, ...patch } : routine)),
     }));
 
   const setDelivery = (slot: BriefSlot, hhmm: string) => {
@@ -849,26 +984,37 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
 
   return (
     <div className="breve-page">
-      <PageHead title="Routines" detail="Arrival times, recurring checks, and the jobs that build each brief." />
+      <PageHead
+        title="Routines"
+        detail="Arrival times, recurring checks, and the jobs that build each brief."
+      />
       <div className="breve-honesty" role="status">
         <ClockGlyph size={15} />
         <p>
           {snapshot.scheduler === "rotli"
             ? "Rotli is actively managing these routines and the always-on Signal assistant. Saved changes are adopted automatically."
             : snapshot.scheduler === "legacy-launchd"
-            ? "The previous Breve scheduler is still in charge. Changes are preserved here, but Rotli does not deliver scheduled briefs yet."
-            : "Rotli stores these routines, but its delivery scheduler is not active yet."}
+              ? "The previous Breve scheduler is still in charge. Changes are preserved here, but Rotli does not deliver scheduled briefs yet."
+              : "Rotli stores these routines, but its delivery scheduler is not active yet."}
         </p>
       </div>
 
       <div className="breve-config-toolbar">
         <label>
           <span>Timezone</span>
-          <input value={config.timezone} onChange={(e) => setConfig({ ...config, timezone: e.target.value })} />
+          <input
+            value={config.timezone}
+            onChange={(e) => setConfig({ ...config, timezone: e.target.value })}
+          />
         </label>
         <span className="breve-toolbar-grow" />
         <SaveNote state={saveState} error={error} dirty={dirty} />
-        <button type="button" className="ghostbtn primary" disabled={!dirty || saveState === "saving"} onClick={() => void save()}>
+        <button
+          type="button"
+          className="ghostbtn primary"
+          disabled={!dirty || saveState === "saving"}
+          onClick={() => void save()}
+        >
           {saveState === "saving" ? "Saving…" : "Save routines"}
         </button>
       </div>
@@ -890,12 +1036,20 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
             <div className="breve-arrival-row" key={slot}>
               <span className={`breve-kind ${slot}`}>{slot}</span>
               <label>
-                <span className="breve-mobile-field-label" aria-hidden="true">Delivery time</span>
+                <span className="breve-mobile-field-label" aria-hidden="true">
+                  Delivery time
+                </span>
                 <span className="sr-only">{slot} delivery time</span>
-                <input type="time" value={config.deliveryTimes[slot]} onChange={(e) => setDelivery(slot, e.target.value)} />
+                <input
+                  type="time"
+                  value={config.deliveryTimes[slot]}
+                  onChange={(e) => setDelivery(slot, e.target.value)}
+                />
               </label>
               <label>
-                <span className="breve-mobile-field-label" aria-hidden="true">Start preparing</span>
+                <span className="breve-mobile-field-label" aria-hidden="true">
+                  Start preparing
+                </span>
                 <span className="sr-only">Minutes to start preparing before {slot}</span>
                 <input
                   type="number"
@@ -917,7 +1071,9 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
             <h3 id="breve-jobs-title">Automations</h3>
             <p>Control what Breve runs and where each result should appear.</p>
           </div>
-          <span className="breve-inline-status">{config.routines.filter((routine) => routine.enabled).length} of {config.routines.length} active</span>
+          <span className="breve-inline-status">
+            {config.routines.filter((routine) => routine.enabled).length} of {config.routines.length} active
+          </span>
         </div>
         <div className="breve-routine-columns" aria-hidden="true">
           <span>Automation</span>
@@ -929,7 +1085,10 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
             const lanes = [...new Set(["inApp", "signal", "email", ...routine.lanes])];
             const slot = routineBriefSlot(routine);
             return (
-              <div className={routine.enabled ? "breve-routine-row" : "breve-routine-row off"} key={routine.id}>
+              <div
+                className={routine.enabled ? "breve-routine-row" : "breve-routine-row off"}
+                key={routine.id}
+              >
                 <button
                   type="button"
                   role="switch"
@@ -957,7 +1116,14 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
                         min="1"
                         aria-label={`${routine.label} interval in minutes`}
                         value={Math.max(1, Math.round(routine.schedule.secs / 60))}
-                        onChange={(e) => patchRoutine(routine.id, { schedule: { kind: "everySecs", secs: Math.max(60, Number(e.target.value) * 60 || 60) } })}
+                        onChange={(e) =>
+                          patchRoutine(routine.id, {
+                            schedule: {
+                              kind: "everySecs",
+                              secs: Math.max(60, Number(e.target.value) * 60 || 60),
+                            },
+                          })
+                        }
                       />
                       min
                     </label>
@@ -996,7 +1162,9 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
   );
 }
 
-type DetectMap = Partial<Record<ProviderId, { installed: boolean; authenticated: boolean; version: string | null }>>;
+type DetectMap = Partial<
+  Record<ProviderId, { installed: boolean; authenticated: boolean; version: string | null }>
+>;
 
 function ModelsView({ snapshot }: { snapshot: BreveSnapshot }) {
   const queryClient = useQueryClient();
@@ -1007,7 +1175,8 @@ function ModelsView({ snapshot }: { snapshot: BreveSnapshot }) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState("");
   const dirty = JSON.stringify(config.modelPolicy) !== JSON.stringify(base.modelPolicy);
-  const duplicateFallback = new Set(config.modelPolicy.fallbacks).size !== config.modelPolicy.fallbacks.length;
+  const duplicateFallback =
+    new Set(config.modelPolicy.fallbacks).size !== config.modelPolicy.fallbacks.length;
   const modelValidation = config.modelPolicy.fallbacks.includes(config.modelPolicy.primary)
     ? "The primary writer cannot also be a fallback."
     : duplicateFallback
@@ -1056,7 +1225,10 @@ function ModelsView({ snapshot }: { snapshot: BreveSnapshot }) {
   });
   const allModels = [...(local.data ?? []), ...connected];
   const catalogModels = PROVIDER_IDS.flatMap((id) => CLI_CATALOG[id]);
-  const options = modelPolicyOptions(config, allModels.map((model) => model.id));
+  const options = modelPolicyOptions(
+    config,
+    allModels.map((model) => model.id),
+  );
   const labelFor = (id: string) =>
     allModels.find((model) => model.id === id)?.label ??
     catalogModels.find((model) => model.id === id)?.label ??
@@ -1087,21 +1259,36 @@ function ModelsView({ snapshot }: { snapshot: BreveSnapshot }) {
 
   return (
     <div className="breve-page">
-      <PageHead title="Models" detail="Choose the writer, ordered fallbacks, and the local helper used by briefs." />
+      <PageHead
+        title="Models"
+        detail="Choose the writer, ordered fallbacks, and the local helper used by briefs."
+      />
       <div className="breve-config-toolbar">
         <span className="breve-toolbar-grow" />
         <SaveNote state={saveState} error={error} dirty={dirty} />
-        <button type="button" className="ghostbtn primary" disabled={!dirty || !!modelValidation || saveState === "saving"} onClick={() => void save()}>
+        <button
+          type="button"
+          className="ghostbtn primary"
+          disabled={!dirty || !!modelValidation || saveState === "saving"}
+          onClick={() => void save()}
+        >
           {saveState === "saving" ? "Saving…" : "Save model policy"}
         </button>
       </div>
-      {modelValidation && <p id="breve-model-validation" className="breve-watch-validation" role="alert">{modelValidation}</p>}
+      {modelValidation && (
+        <p id="breve-model-validation" className="breve-watch-validation" role="alert">
+          {modelValidation}
+        </p>
+      )}
 
       <section className="breve-section" aria-labelledby="breve-policy-title">
         <div className="breve-section-head copy">
           <div>
             <h3 id="breve-policy-title">Brief policy</h3>
-            <p>Authenticated models stay available to Breve even when hidden from Chat. Individually blocked models remain excluded.</p>
+            <p>
+              Authenticated models stay available to Breve even when hidden from Chat. Individually blocked
+              models remain excluded.
+            </p>
           </div>
         </div>
         <div className="breve-policy-grid">
@@ -1117,7 +1304,11 @@ function ModelsView({ snapshot }: { snapshot: BreveSnapshot }) {
                 })
               }
             >
-              {options.map((id) => <option key={id} value={id}>{labelFor(id)}</option>)}
+              {options.map((id) => (
+                <option key={id} value={id}>
+                  {labelFor(id)}
+                </option>
+              ))}
             </select>
           </label>
           <label>
@@ -1132,13 +1323,19 @@ function ModelsView({ snapshot }: { snapshot: BreveSnapshot }) {
               }
             >
               <option value="">None</option>
-              {(local.data ?? []).map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
+              {(local.data ?? []).map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.label}
+                </option>
+              ))}
             </select>
           </label>
         </div>
 
         <div className="breve-fallbacks">
-          <div className="breve-section-head"><h4>Fallback order</h4></div>
+          <div className="breve-section-head">
+            <h4>Fallback order</h4>
+          </div>
           {config.modelPolicy.fallbacks.map((id, index) => (
             <div className="breve-fallback-row" key={`${id}-${index}`}>
               <span>{index + 1}</span>
@@ -1154,20 +1351,54 @@ function ModelsView({ snapshot }: { snapshot: BreveSnapshot }) {
                 }}
               >
                 {options
-                  .filter((option) => option === id || (
-                    option !== config.modelPolicy.primary &&
-                    !config.modelPolicy.fallbacks.some((fallback, fallbackIndex) => fallbackIndex !== index && fallback === option)
-                  ))
-                  .map((option) => <option key={option} value={option}>{labelFor(option)}</option>)}
+                  .filter(
+                    (option) =>
+                      option === id ||
+                      (option !== config.modelPolicy.primary &&
+                        !config.modelPolicy.fallbacks.some(
+                          (fallback, fallbackIndex) => fallbackIndex !== index && fallback === option,
+                        )),
+                  )
+                  .map((option) => (
+                    <option key={option} value={option}>
+                      {labelFor(option)}
+                    </option>
+                  ))}
               </select>
-              <button type="button" className="breve-icon-action" aria-label={`Move ${labelFor(id)} earlier`} disabled={index === 0} onClick={() => moveFallback(index, -1)}><ChevronRight size={12} className="up" /></button>
-              <button type="button" className="breve-icon-action" aria-label={`Move ${labelFor(id)} later`} disabled={index === config.modelPolicy.fallbacks.length - 1} onClick={() => moveFallback(index, 1)}><ChevronRight size={12} className="down" /></button>
+              <button
+                type="button"
+                className="breve-icon-action"
+                aria-label={`Move ${labelFor(id)} earlier`}
+                disabled={index === 0}
+                onClick={() => moveFallback(index, -1)}
+              >
+                <ChevronRight size={12} className="up" />
+              </button>
+              <button
+                type="button"
+                className="breve-icon-action"
+                aria-label={`Move ${labelFor(id)} later`}
+                disabled={index === config.modelPolicy.fallbacks.length - 1}
+                onClick={() => moveFallback(index, 1)}
+              >
+                <ChevronRight size={12} className="down" />
+              </button>
               <button
                 type="button"
                 className="breve-icon-action"
                 aria-label={`Remove ${labelFor(id)}`}
-                onClick={() => setConfig({ ...config, modelPolicy: { ...config.modelPolicy, fallbacks: config.modelPolicy.fallbacks.filter((_, i) => i !== index) } })}
-              ><XGlyph size={12} /></button>
+                onClick={() =>
+                  setConfig({
+                    ...config,
+                    modelPolicy: {
+                      ...config.modelPolicy,
+                      fallbacks: config.modelPolicy.fallbacks.filter((_, i) => i !== index),
+                    },
+                  })
+                }
+              >
+                <XGlyph size={12} />
+              </button>
             </div>
           ))}
           <select
@@ -1176,39 +1407,78 @@ function ModelsView({ snapshot }: { snapshot: BreveSnapshot }) {
             value=""
             onChange={(e) => {
               if (!e.target.value || config.modelPolicy.fallbacks.includes(e.target.value)) return;
-              setConfig({ ...config, modelPolicy: { ...config.modelPolicy, fallbacks: [...config.modelPolicy.fallbacks, e.target.value] } });
+              setConfig({
+                ...config,
+                modelPolicy: {
+                  ...config.modelPolicy,
+                  fallbacks: [...config.modelPolicy.fallbacks, e.target.value],
+                },
+              });
             }}
           >
             <option value="">Add fallback…</option>
-            {options.filter((id) => id !== config.modelPolicy.primary && !config.modelPolicy.fallbacks.includes(id)).map((id) => (
-              <option key={id} value={id}>{labelFor(id)}</option>
-            ))}
+            {options
+              .filter((id) => id !== config.modelPolicy.primary && !config.modelPolicy.fallbacks.includes(id))
+              .map((id) => (
+                <option key={id} value={id}>
+                  {labelFor(id)}
+                </option>
+              ))}
           </select>
         </div>
       </section>
 
       <section className="breve-section" aria-labelledby="breve-connections-title">
         <div className="breve-section-head copy">
-          <div><h3 id="breve-connections-title">Connections</h3><p>Breve checks model access on this Mac without changing your Chat picker.</p></div>
-          {(local.isError || detects.isError) && <button type="button" className="ghostbtn" onClick={() => { void local.refetch(); void detects.refetch(); }}>Check again</button>}
+          <div>
+            <h3 id="breve-connections-title">Connections</h3>
+            <p>Breve checks model access on this Mac without changing your Chat picker.</p>
+          </div>
+          {(local.isError || detects.isError) && (
+            <button
+              type="button"
+              className="ghostbtn"
+              onClick={() => {
+                void local.refetch();
+                void detects.refetch();
+              }}
+            >
+              Check again
+            </button>
+          )}
         </div>
         <div className="breve-connection-list" aria-busy={local.isLoading || detects.isLoading}>
           <div className="breve-connection-row">
             <span>On this Mac</span>
-            <span>{local.isLoading ? "Checking…" : local.isError ? "Check failed" : `${local.data?.length ?? 0} models`}</span>
-            <strong>{local.isLoading ? "Checking" : local.isError ? "Needs attention" : (local.data?.length ?? 0) > 0 ? "Ready" : "Unavailable"}</strong>
+            <span>
+              {local.isLoading
+                ? "Checking…"
+                : local.isError
+                  ? "Check failed"
+                  : `${local.data?.length ?? 0} models`}
+            </span>
+            <strong>
+              {local.isLoading
+                ? "Checking"
+                : local.isError
+                  ? "Needs attention"
+                  : (local.data?.length ?? 0) > 0
+                    ? "Ready"
+                    : "Unavailable"}
+            </strong>
           </div>
           {PROVIDER_IDS.map((id) => {
             const detected = detects.data?.[id];
-            const status = detects.isLoading && !detected
-              ? "Checking"
-              : !detected?.installed
-              ? "Not installed"
-              : !detected.authenticated
-                ? "Sign in required"
-                : aiProviders[id]
-                  ? "Ready"
-                  : "Ready for Breve";
+            const status =
+              detects.isLoading && !detected
+                ? "Checking"
+                : !detected?.installed
+                  ? "Not installed"
+                  : !detected.authenticated
+                    ? "Sign in required"
+                    : aiProviders[id]
+                      ? "Ready"
+                      : "Ready for Breve";
             return (
               <div className="breve-connection-row" key={id}>
                 <span>{PROVIDER_LABELS[id]}</span>
@@ -1250,7 +1520,13 @@ function pdfThemeValidation(theme: BrevePdfTheme): string {
   return validateBrevePdfPalette(resolvedPdfPalette(theme));
 }
 
-function PdfThemeEditor({ theme, onChange }: { theme: BrevePdfTheme; onChange: (theme: BrevePdfTheme) => void }) {
+function PdfThemeEditor({
+  theme,
+  onChange,
+}: {
+  theme: BrevePdfTheme;
+  onChange: (theme: BrevePdfTheme) => void;
+}) {
   const palette = resolvedPdfPalette(theme);
   const validation = pdfThemeValidation(theme);
   const style = {
@@ -1279,9 +1555,15 @@ function PdfThemeEditor({ theme, onChange }: { theme: BrevePdfTheme; onChange: (
               aria-describedby="breve-pdf-theme-help"
               onChange={(event) => onChange({ ...theme, preset: event.target.value as BrevePdfThemePreset })}
             >
-              {PDF_THEME_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {PDF_THEME_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
-            <small id="breve-pdf-theme-help">{PDF_THEME_OPTIONS.find((option) => option.value === theme.preset)?.detail}</small>
+            <small id="breve-pdf-theme-help">
+              {PDF_THEME_OPTIONS.find((option) => option.value === theme.preset)?.detail}
+            </small>
           </label>
           {theme.preset === "custom" && (
             <div className="breve-color-grid" aria-label="Custom PDF colors">
@@ -1293,7 +1575,9 @@ function PdfThemeEditor({ theme, onChange }: { theme: BrevePdfTheme; onChange: (
                       type="color"
                       value={theme.custom[key]}
                       aria-label={`${label} color`}
-                      onChange={(event) => onChange({ ...theme, custom: { ...theme.custom, [key]: event.target.value } })}
+                      onChange={(event) =>
+                        onChange({ ...theme, custom: { ...theme.custom, [key]: event.target.value } })
+                      }
                     />
                     <code>{theme.custom[key].toUpperCase()}</code>
                   </span>
@@ -1301,9 +1585,17 @@ function PdfThemeEditor({ theme, onChange }: { theme: BrevePdfTheme; onChange: (
               ))}
             </div>
           )}
-          {validation && <p id="breve-pdf-theme-error" className="breve-field-error" role="alert">{validation}</p>}
+          {validation && (
+            <p id="breve-pdf-theme-error" className="breve-field-error" role="alert">
+              {validation}
+            </p>
+          )}
         </div>
-        <div className="breve-pdf-preview" style={style} aria-label={`${PDF_THEME_OPTIONS.find((option) => option.value === theme.preset)?.label} PDF preview`}>
+        <div
+          className="breve-pdf-preview"
+          style={style}
+          aria-label={`${PDF_THEME_OPTIONS.find((option) => option.value === theme.preset)?.label} PDF preview`}
+        >
           <span className="breve-pdf-preview-kicker">Your personal wire</span>
           <strong>BREVE</strong>
           <span className="breve-pdf-preview-date">Morning · Friday</span>
@@ -1343,7 +1635,8 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
   const [test, setTest] = useState<DeliveryTest>(null);
   const [removeKeyArmed, setRemoveKeyArmed] = useState(false);
 
-  const deliveryDirty = !!draft && !!base && (JSON.stringify(draft) !== JSON.stringify(base) || !!apiKey.trim());
+  const deliveryDirty =
+    !!draft && !!base && (JSON.stringify(draft) !== JSON.stringify(base) || !!apiKey.trim());
   const configDirty = JSON.stringify(config.pdfTheme) !== JSON.stringify(configBase.pdfTheme);
   const dirty = deliveryDirty || configDirty;
   const themeValidation = pdfThemeValidation(config.pdfTheme);
@@ -1365,14 +1658,16 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
 
   const recipients = draft?.emailTo.join("\n") ?? "";
   const invalidRecipient = draft?.emailTo.find((value) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
-  const invalidSignal = [draft?.signalBot, draft?.signalOwner]
-    .find((value) => !!value && !/^\+[1-9]\d{7,14}$/.test(value));
+  const invalidSignal = [draft?.signalBot, draft?.signalOwner].find(
+    (value) => !!value && !/^\+[1-9]\d{7,14}$/.test(value),
+  );
   const deliveryValidation = invalidRecipient
     ? `“${invalidRecipient}” is not a valid email address.`
     : invalidSignal
       ? "Signal numbers must use international format, such as +14075551234."
       : "";
-  const emailReady = !!draft?.resendKeyConfigured && !!draft.emailFrom && draft.emailTo.length > 0 && !invalidRecipient;
+  const emailReady =
+    !!draft?.resendKeyConfigured && !!draft.emailFrom && draft.emailTo.length > 0 && !invalidRecipient;
   const signalReady = !!draft?.signalBot && !!draft.signalOwner && !invalidSignal;
 
   const save = async () => {
@@ -1425,7 +1720,11 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
   };
 
   const runTest = async (target: "email" | "signal") => {
-    setTest({ target, state: "saving", message: target === "email" ? "Sending test email…" : "Sending test Signal…" });
+    setTest({
+      target,
+      state: "saving",
+      message: target === "email" ? "Sending test email…" : "Sending test Signal…",
+    });
     try {
       const message = await (target === "email" ? breveTestEmail() : breveTestSignal());
       setTest({ target, state: "saved", message });
@@ -1441,34 +1740,62 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
         <EmptyMessage
           title="Delivery settings could not be loaded."
           detail="Your saved configuration was not changed. Try reading the snapshot again."
-          action={<button type="button" className="ghostbtn" onClick={() => void settingsQuery.refetch()}>Try again</button>}
+          action={
+            <button type="button" className="ghostbtn" onClick={() => void settingsQuery.refetch()}>
+              Try again
+            </button>
+          }
         />
       </div>
     );
   }
   if (settingsQuery.isLoading || !draft) {
-    return <div className="breve-page"><PageHead title="Configure" detail="Connect the services Breve uses to deliver for you." /><BreveSkeleton label="Loading delivery settings" /></div>;
+    return (
+      <div className="breve-page">
+        <PageHead title="Configure" detail="Connect the services Breve uses to deliver for you." />
+        <BreveSkeleton label="Loading delivery settings" />
+      </div>
+    );
   }
 
   return (
     <div className="breve-page">
-      <PageHead title="Configure" detail="Choose how Breve looks and where it sends email and Signal messages." />
+      <PageHead
+        title="Configure"
+        detail="Choose how Breve looks and where it sends email and Signal messages."
+      />
 
       <div className="breve-config-savebar">
-        <p>{import.meta.env.DEV ? "Loaded from your current setup. Changes made in dev stay temporary." : "Changes apply to the Rotli-managed scheduler after you save."}</p>
+        <p>
+          {import.meta.env.DEV
+            ? "Loaded from your current setup. Changes made in dev stay temporary."
+            : "Changes apply to the Rotli-managed scheduler after you save."}
+        </p>
         <span className="breve-toolbar-grow" />
         <SaveNote state={saveState} error={error} dirty={dirty} />
-        <button type="button" className="ghostbtn primary" disabled={!dirty || !!themeValidation || !!deliveryValidation || saveState === "saving"} onClick={() => void save()}>
+        <button
+          type="button"
+          className="ghostbtn primary"
+          disabled={!dirty || !!themeValidation || !!deliveryValidation || saveState === "saving"}
+          onClick={() => void save()}
+        >
           {saveState === "saving" ? "Saving…" : "Save configuration"}
         </button>
       </div>
-      {deliveryValidation && <p id="breve-delivery-validation" className="breve-watch-validation" role="alert">{deliveryValidation}</p>}
+      {deliveryValidation && (
+        <p id="breve-delivery-validation" className="breve-watch-validation" role="alert">
+          {deliveryValidation}
+        </p>
+      )}
 
       <aside className="breve-keychain-note" aria-label="Credential storage">
         <LockGlyph size={14} />
         <div>
           <strong>Secrets are saved in your Mac Keychain.</strong>
-          <span>Rotli never displays your Resend API key. Delivery addresses and Signal routing stay in Rotli&rsquo;s managed Breve configuration.</span>
+          <span>
+            Rotli never displays your Resend API key. Delivery addresses and Signal routing stay in
+            Rotli&rsquo;s managed Breve configuration.
+          </span>
         </div>
       </aside>
 
@@ -1496,8 +1823,13 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
               type="password"
               autoComplete="off"
               value={apiKey}
-              placeholder={draft.resendKeyConfigured ? "Saved in Keychain — enter a new key to replace it" : "re_…"}
-              onChange={(event) => { setApiKey(event.target.value); setSaveState("idle"); }}
+              placeholder={
+                draft.resendKeyConfigured ? "Saved in Keychain — enter a new key to replace it" : "re_…"
+              }
+              onChange={(event) => {
+                setApiKey(event.target.value);
+                setSaveState("idle");
+              }}
               onKeyDown={(event) => event.stopPropagation()}
             />
             <small>The key is write-only. Rotli can check whether it exists but never displays it.</small>
@@ -1508,7 +1840,10 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
               id="breve-email-from"
               value={draft.emailFrom}
               placeholder="Breve <briefs@yourdomain.com>"
-              onChange={(event) => { setDraft({ ...draft, emailFrom: event.target.value }); setSaveState("idle"); }}
+              onChange={(event) => {
+                setDraft({ ...draft, emailFrom: event.target.value });
+                setSaveState("idle");
+              }}
               onKeyDown={(event) => event.stopPropagation()}
             />
             <small>Must be a sender verified in your Resend account.</small>
@@ -1523,7 +1858,13 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
               aria-describedby={invalidRecipient ? "breve-delivery-validation" : undefined}
               placeholder="you@example.com"
               onChange={(event) => {
-                setDraft({ ...draft, emailTo: event.target.value.split(/[\n,]/).map((value) => value.trim()).filter(Boolean) });
+                setDraft({
+                  ...draft,
+                  emailTo: event.target.value
+                    .split(/[\n,]/)
+                    .map((value) => value.trim())
+                    .filter(Boolean),
+                });
                 setSaveState("idle");
               }}
               onKeyDown={(event) => event.stopPropagation()}
@@ -1532,16 +1873,52 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
           </label>
         </div>
         <div className="breve-delivery-actions">
-          <button type="button" className="ghostbtn" title={dirty ? "Save your changes before sending a test" : undefined} disabled={!emailReady || dirty || test?.state === "saving"} onClick={() => void runTest("email")}>Send test email</button>
-          {draft.resendKeyConfigured && (removeKeyArmed ? (
-            <span className="breve-confirm-actions inline" role="group" aria-label="Confirm API key removal">
-              <button type="button" className="ghostbtn" onClick={() => setRemoveKeyArmed(false)}>Keep key</button>
-              <button type="button" className="ghostbtn quiet" disabled={saveState === "saving"} onClick={() => void removeKey()}>Confirm removal</button>
+          <button
+            type="button"
+            className="ghostbtn"
+            title={dirty ? "Save your changes before sending a test" : undefined}
+            disabled={!emailReady || dirty || test?.state === "saving"}
+            onClick={() => void runTest("email")}
+          >
+            Send test email
+          </button>
+          {draft.resendKeyConfigured &&
+            (removeKeyArmed ? (
+              <span
+                className="breve-confirm-actions inline"
+                role="group"
+                aria-label="Confirm API key removal"
+              >
+                <button type="button" className="ghostbtn" onClick={() => setRemoveKeyArmed(false)}>
+                  Keep key
+                </button>
+                <button
+                  type="button"
+                  className="ghostbtn quiet"
+                  disabled={saveState === "saving"}
+                  onClick={() => void removeKey()}
+                >
+                  Confirm removal
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="ghostbtn quiet"
+                disabled={saveState === "saving"}
+                onClick={() => setRemoveKeyArmed(true)}
+              >
+                Remove API key
+              </button>
+            ))}
+          {test?.target === "email" && (
+            <span
+              className={test.state === "error" ? "breve-save-note err" : "breve-save-note"}
+              role={test.state === "error" ? "alert" : "status"}
+            >
+              {test.message}
             </span>
-          ) : (
-            <button type="button" className="ghostbtn quiet" disabled={saveState === "saving"} onClick={() => setRemoveKeyArmed(true)}>Remove API key</button>
-          ))}
-          {test?.target === "email" && <span className={test.state === "error" ? "breve-save-note err" : "breve-save-note"} role={test.state === "error" ? "alert" : "status"}>{test.message}</span>}
+          )}
         </div>
       </section>
 
@@ -1563,7 +1940,10 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
               aria-invalid={!!draft.signalBot && !/^\+[1-9]\d{7,14}$/.test(draft.signalBot)}
               aria-describedby={invalidSignal ? "breve-delivery-validation" : undefined}
               placeholder="+14075551234"
-              onChange={(event) => { setDraft({ ...draft, signalBot: event.target.value }); setSaveState("idle"); }}
+              onChange={(event) => {
+                setDraft({ ...draft, signalBot: event.target.value });
+                setSaveState("idle");
+              }}
               onKeyDown={(event) => event.stopPropagation()}
             />
             <small>The sending number connected to Signal on this Mac.</small>
@@ -1577,26 +1957,49 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
               aria-invalid={!!draft.signalOwner && !/^\+[1-9]\d{7,14}$/.test(draft.signalOwner)}
               aria-describedby={invalidSignal ? "breve-delivery-validation" : undefined}
               placeholder="+14075551234"
-              onChange={(event) => { setDraft({ ...draft, signalOwner: event.target.value }); setSaveState("idle"); }}
+              onChange={(event) => {
+                setDraft({ ...draft, signalOwner: event.target.value });
+                setSaveState("idle");
+              }}
               onKeyDown={(event) => event.stopPropagation()}
             />
             <small>Only this number can use the Breve assistant.</small>
           </label>
           <label className="breve-field wide" htmlFor="breve-signal-owner-uuid">
-            <span>Owner UUID <em>optional</em></span>
+            <span>
+              Owner UUID <em>optional</em>
+            </span>
             <input
               id="breve-signal-owner-uuid"
               value={draft.signalOwnerUuid}
               placeholder="Signal account UUID"
-              onChange={(event) => { setDraft({ ...draft, signalOwnerUuid: event.target.value }); setSaveState("idle"); }}
+              onChange={(event) => {
+                setDraft({ ...draft, signalOwnerUuid: event.target.value });
+                setSaveState("idle");
+              }}
               onKeyDown={(event) => event.stopPropagation()}
             />
             <small>Add this if Signal resolves the owner by UUID instead of phone number.</small>
           </label>
         </div>
         <div className="breve-delivery-actions">
-          <button type="button" className="ghostbtn" title={dirty ? "Save your changes before sending a test" : undefined} disabled={!signalReady || dirty || test?.state === "saving"} onClick={() => void runTest("signal")}>Send test Signal</button>
-          {test?.target === "signal" && <span className={test.state === "error" ? "breve-save-note err" : "breve-save-note"} role={test.state === "error" ? "alert" : "status"}>{test.message}</span>}
+          <button
+            type="button"
+            className="ghostbtn"
+            title={dirty ? "Save your changes before sending a test" : undefined}
+            disabled={!signalReady || dirty || test?.state === "saving"}
+            onClick={() => void runTest("signal")}
+          >
+            Send test Signal
+          </button>
+          {test?.target === "signal" && (
+            <span
+              className={test.state === "error" ? "breve-save-note err" : "breve-save-note"}
+              role={test.state === "error" ? "alert" : "status"}
+            >
+              {test.message}
+            </span>
+          )}
         </div>
       </section>
     </div>
@@ -1609,13 +2012,27 @@ export function BreveSurface() {
   const snapshot = query.data ?? EMPTY_BREVE_SNAPSHOT;
 
   if (query.isLoading) {
-    return <main className="breve-surface" aria-label="Breve"><div className="breve-page"><BreveSkeleton label="Loading Breve" /></div></main>;
+    return (
+      <main className="breve-surface" aria-label="Breve">
+        <div className="breve-page">
+          <BreveSkeleton label="Loading Breve" />
+        </div>
+      </main>
+    );
   }
   if (query.isError) {
     return (
       <main className="breve-surface" aria-label="Breve">
         <div className="breve-page">
-          <EmptyMessage title="Breve could not be loaded." detail="Your Rotli data was not changed." action={<button type="button" className="ghostbtn" onClick={() => void query.refetch()}>Try again</button>} />
+          <EmptyMessage
+            title="Breve could not be loaded."
+            detail="Your Rotli data was not changed."
+            action={
+              <button type="button" className="ghostbtn" onClick={() => void query.refetch()}>
+                Try again
+              </button>
+            }
+          />
         </div>
       </main>
     );

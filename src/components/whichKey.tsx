@@ -67,8 +67,7 @@ export function WhichKey({ onClose: _onClose }: { onClose: () => void }) {
         // representative: the friendly title + the ⌘1–⌘8 range as the hint
         const first = currentChord("tabs.jump1");
         const last = currentChord(`tabs.jump${jumps.length}`);
-        const range =
-          first && last ? `${formatChord(first)}–${formatChord(last)}` : "⌘1–⌘8";
+        const range = first && last ? `${formatChord(first)}–${formatChord(last)}` : "⌘1–⌘8";
         rows.push({ key: "tabs.jump", title: "Go to tab 1–8", chord: range });
       }
 

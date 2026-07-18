@@ -112,7 +112,12 @@ export async function writeChat(input: WriteChatInput): Promise<{ slug: string; 
     contents = appendMessages(existing, input.messages, date);
   } else {
     contents = composeNewChat(
-      { title: input.title, source: ROTLI_SOURCE, slug, ...(input.attachedTo ? { attachedTo: input.attachedTo } : {}) },
+      {
+        title: input.title,
+        source: ROTLI_SOURCE,
+        slug,
+        ...(input.attachedTo ? { attachedTo: input.attachedTo } : {}),
+      },
       input.messages,
       date,
     ).contents;
@@ -123,11 +128,7 @@ export async function writeChat(input: WriteChatInput): Promise<{ slug: string; 
 
 /** Point an EXISTING chat at its attached note (`attachedTo: [[<stem>]]`) —
  * the header note-toggle's lazy link, written after the note materializes. */
-export async function setChatAttachedTo(
-  instance: MemexInstance,
-  slug: string,
-  stem: string,
-): Promise<void> {
+export async function setChatAttachedTo(instance: MemexInstance, slug: string, stem: string): Promise<void> {
   const rel = `chats/${slug}.md`;
   if (!canWrite(rel, instance.perms)) {
     throw new Error("This memex is read-only for rotli — connect it with write access first.");
@@ -145,11 +146,7 @@ export const readChat = (instance: MemexInstance, slug: string): Promise<string>
 
 /** Rename a chat (chats/<old>.md → chats/<new>.md). Returns the new slug. Refused
  * unless the chats surface is writable for this instance. */
-export async function renameChat(
-  instance: MemexInstance,
-  oldSlug: string,
-  newSlug: string,
-): Promise<string> {
+export async function renameChat(instance: MemexInstance, oldSlug: string, newSlug: string): Promise<string> {
   if (!canWrite(`chats/${newSlug}.md`, instance.perms)) {
     throw new Error("this brain is read-only — can't rename a chat here");
   }
@@ -201,9 +198,7 @@ export interface WriteNoteInput {
  *  contract. AI metadata (area/summary/tags/links) is left blank — a later phase's
  *  local LLM classifies + files it to `wiki/<area>/`. The `id` is set once and never
  *  changes. Returns the new note's id, staging stem, and absolute path. */
-export async function writeNote(
-  input: WriteNoteInput,
-): Promise<{ id: string; stem: string; path: string }> {
+export async function writeNote(input: WriteNoteInput): Promise<{ id: string; stem: string; path: string }> {
   const { instance } = input;
   const id = ulid();
   const title = titleOf(input.body);

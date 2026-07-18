@@ -12,23 +12,14 @@ import { adapterFor, trimHistory } from "./prompt";
 import { pruneScratch, runTool, statusFor } from "./tools";
 import type { AgentEvent, Host, RunInput, ScratchStep, ToolName } from "./types";
 
-const NOTE_TOOLS: ToolName[] = [
-  "search_memory",
-  "read_memory",
-  "search_notes",
-  "read_note",
-  "read_file",
-];
+const NOTE_TOOLS: ToolName[] = ["search_memory", "read_memory", "search_notes", "read_note", "read_file"];
 const WEB_TOOLS: ToolName[] = ["web_search", "web_fetch"];
 const IMAGE_TOOLS: ToolName[] = ["generate_image"];
 // every tool whose ARGS leave the device — the secret guard covers them all
 // (an image prompt ships to a remote engine exactly like a web query)
 const EGRESS_TOOLS: ToolName[] = [...WEB_TOOLS, ...IMAGE_TOOLS];
 
-export async function* runAgent(
-  host: Host,
-  input: RunInput,
-): AsyncGenerator<AgentEvent, void, void> {
+export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<AgentEvent, void, void> {
   const budget = budgetFor(input.model); // the client's rules, sized to THIS model
   const adapter = adapterFor(input.model); // gemma (local default) or frontier
   const maxSteps = input.maxSteps ?? budget.maxSteps;
