@@ -76,8 +76,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A deterministic duplication miner** (batch 6, `bun run check:dup`):
   within-language shingling plus rare-literal and lifecycle bundles over
   TS + Rust, with a committed allowlist and an opt-in cached model judge for
-  triage. Validated one-time against the pre-remediation tree, where it
-  rediscovered every known duplicate cluster. Never a blocking gate.
+  triage. Validated one-time against the pre-remediation tree: it rediscovered
+  the pointer-drag and clamp clusters exactly and the rename-input cluster
+  indirectly; the two sub-30-token fragment findings sit below the
+  function-level mining floor by design (the full record is pinned in the
+  miner's header comment). Never a blocking gate.
 - **The adding-things placement contract** (batch 7,
   `docs/development/adding-things.md`): one table for where new surfaces,
   dialogs, overlays, features, vendor libraries, utilities, Tauri commands,

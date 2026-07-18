@@ -61,6 +61,18 @@ These are maintainability hotspots, not blockers for this workflow:
    Any split must preserve the command facade and the write-gate invariants
    verbatim; sequence it behind the regression layer, never casually.
 
+## Regression-layer handoff: pointer-drag E2E smoke list
+
+Playwright drag E2E was deferred from the pointer-drag session extraction;
+unit lifecycle coverage lives in `src/lib/pointerDrag.test.ts`. The four
+surfaces the regression layer must automate:
+
+1. Tab drag — re-test the CMP-1 off-by-one explicitly (`src/state/panes.test.ts`
+   guards the moveTab visual-index math).
+2. Sidebar cross-section drag.
+3. Board object drag.
+4. Main add-drag.
+
 The full system-level findings and recommended order are in
 [`system-audit-2026-07-11.md`](./system-audit-2026-07-11.md).
 

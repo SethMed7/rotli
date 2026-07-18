@@ -69,7 +69,8 @@ layer; its pure `model.ts` is covered by colocated tests), and `src/editor`
 (`model.ts` is the live text buffer, a role-vocabulary filename collision) —
 and a stale exemption fails the check. The vendor seams: `exceljs`, `@excalidraw`,
 `@univerjs`, and `jszip` import only inside their codec/engine adapters
-(`src/sheets/codec` + `src/sheets/engine`, `src/boards/engine`,
+(`src/sheets/codec` + `src/sheets/engine`, `src/boards/engine` — plus
+`src/app.tsx`, allowed solely for Excalidraw's theme CSS import,
 `src/documents/engine` + `src/brand/univerTheme.ts`, `src/documents/codec` +
 `src/documents/create.ts`). `bun run check:code-shape` rejects production
 module cycles and imports of test code. Architecture changes should extend these

@@ -78,9 +78,10 @@ lands, its SHA joins `.git-blame-ignore-revs` and `format:check` joins the
 `lint` chain; run `git config blame.ignoreRevsFile .git-blame-ignore-revs`
 once locally (GitHub honors the file automatically; local git does not).
 
-rustfmt is deliberately and permanently not used. Measured on this tree it
-rewrites 4,770–7,604 diff lines regardless of width configuration — the churn
-is structural rewrapping, not line width — while only 287 of 18,080 Rust lines
+rustfmt is deliberately and permanently not used. Re-measured 2026-07-17
+(rustfmt 1.9.0): a full reformat rewrites thousands of diff lines at any width
+configuration (~3,200–4,900 across `max_width` 90–110) — the churn is
+structural rewrapping, not line width — while only ~300 of ~18,500 Rust lines
 exceed 100 columns. `cargo clippy --all-targets -- -D warnings` is the Rust
 gate; do not run `cargo fmt` or commit its output.
 
@@ -90,9 +91,10 @@ in a PR; the config must not grow silently. TypeScript stays pinned `~5.8.3`
 because typescript-eslint 8.x crashes on TS 7. Biome remains the preferred
 long-term two-package footprint: re-benchmark when `noFloatingPromises` leaves
 its nursery (at adoption time it missed 3 of 8 real floating-promise sites).
-`breve-runtime/scripts/` is measured but deferred at 75 findings (71
-`no-explicit-any`, 4 `no-floating-promises`) — over the 15-site adoption
-threshold; revisit once the `any` debt shrinks. This repository has no git
+`breve-runtime/scripts/` is measured but deferred at 76 findings (71
+`no-explicit-any`, 4 `no-floating-promises`, 1 `no-misused-promises`;
+re-measured 2026-07-17) — over the 15-site adoption threshold; revisit once
+the `any` debt shrinks. This repository has no git
 hooks: enforcement is the `lint` chain locally plus CI. If a pre-commit hook
 is ever added, measure eslint `projectService` per-commit latency first.
 

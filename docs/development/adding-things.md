@@ -26,6 +26,12 @@ concrete path referenced in this document exists.
 | CSS | Per-surface file in `src/styles/` on semantic tokens; raw colors only inside `src/brand/` | `bun run check:design-system`, `bun run check:hex` |
 | CARL domain | Only when the recall vocabulary is genuinely distinct — see `docs/architecture/ai-context-architecture.md`. Coverage is measured mechanically: every top-level `src/` directory over 2,000 lines must appear in the dir→domain map (or its exemption list) in `scripts/check-documentation.mjs` | `bun run check:docs` |
 
+**CARL surfacing (recorded decision):** this document is pointed to by one
+compact placement rule in `ROTLI_CORE`, plus references in the editor/keys
+domains where placement is load-bearing. It is deliberately **not** copied into
+every domain: CARL law is compact recall pointing at owning docs, never a
+second spec, and a per-domain copy would be exactly that.
+
 ## Adding a vendor library, step by step
 
 1. Confirm it is not on the denylist in `scripts/check-structure.mjs` (no

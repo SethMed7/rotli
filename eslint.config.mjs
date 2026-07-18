@@ -3,8 +3,9 @@ import reactHooks from "eslint-plugin-react-hooks";
 
 // Wired into `bun run lint` (Batch 2 commit 3 of the Stage-3 remediation plan).
 // Scoped to src/**/*.{ts,tsx} only — scripts/ and src-tauri/ are untouched.
-// breve-runtime/scripts/**/*.ts was measured (plan 2.5) at 75 findings against
-// this same rule set minus react-hooks (71 no-explicit-any, 4 no-floating-promises)
+// breve-runtime/scripts/**/*.ts was measured (plan 2.5; re-measured 2026-07-17)
+// at 76 findings against this same rule set minus react-hooks (71 no-explicit-any,
+// 4 no-floating-promises, 1 no-misused-promises)
 // — over the 15-site adoption threshold, so it is DEFERRED, not silently skipped;
 // the count + rationale are recorded in CONTRIBUTING.md's lint paragraph.
 //
