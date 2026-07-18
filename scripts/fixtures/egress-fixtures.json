@@ -2,6 +2,7 @@
   "_comment": "Shared adversarial egress fixtures — parity by fixture, NOT shared impl. Consumed by src-tauri/src/web.rs #[cfg(test)] (include_str!) and breve-runtime/tests/test-safe-fetch-fixtures.ts. Both sides implement the block policy independently (independent_security_enforcement); this file holds the agreed verdicts + caps so drift fails a test. `rust`/`ts` verdicts differ only where policy legitimately diverges: Breve's safe-fetch is https-only, the app's web_fetch permits cleartext http.",
   "byteCap": 2000000,
   "maxRedirectHops": 3,
+  "maxUrlChars": 2048,
   "ips": [
     { "ip": "10.0.0.1", "private": true, "why": "10/8" },
     { "ip": "10.255.255.254", "private": true, "why": "10/8 upper edge" },
@@ -57,6 +58,10 @@
     { "url": "https://192.168.1.1/admin", "rust": "block", "ts": "block", "why": "private literal" },
     { "url": "https://printer.local/status", "rust": "block", "ts": "block", "why": ".local by name" },
     { "url": "http://localhost:11435/v1/models", "rust": "block", "ts": "block", "why": "the local model server must not be reachable through the fetch tool — chat.rs talks to it directly" },
+    { "url": "https://0x7f000001/", "rust": "block", "ts": "block", "why": "hex IPv4 literal — WHATWG host parsing normalizes to 127.0.0.1; must not dodge the dotted-form check" },
+    { "url": "https://2130706433/", "rust": "block", "ts": "block", "why": "decimal IPv4 literal → 127.0.0.1" },
+    { "url": "https://017700000001/", "rust": "block", "ts": "block", "why": "octal IPv4 literal → 127.0.0.1" },
+    { "url": "https://%6c%6f%63%61%6c%68%6f%73%74/", "rust": "block", "ts": "block", "why": "percent-encoded hostname decodes to localhost — the name policy must see the decoded host" },
     { "url": "https://8.8.8.8/", "rust": "allow", "ts": "allow", "why": "public literal IP — decidable without DNS" },
     { "url": "http://example.com/x", "rust": "allow", "ts": "block", "why": "documented divergence: Breve is https-only; the app's web_fetch permits cleartext http pages" }
   ],
@@ -66,6 +71,8 @@
     { "from": "https://a.example.com/start", "location": "https://b.example.com/next", "verdict": "block", "why": "cross-host (sibling domain)" },
     { "from": "https://a.example.com/start", "location": "https://evil.example.net/", "verdict": "block", "why": "cross-host" },
     { "from": "https://8.8.8.8/start", "location": "http://169.254.169.254/latest/meta-data", "verdict": "block", "why": "redirect into metadata space (also cross-host; TS also blocks the scheme)" },
-    { "from": "https://a.example.com/start", "location": "ftp://a.example.com/file", "verdict": "block", "why": "scheme change on redirect" }
+    { "from": "https://a.example.com/start", "location": "ftp://a.example.com/file", "verdict": "block", "why": "scheme change on redirect" },
+    { "from": "https://a.example.com/start", "location": "//evil.example.net/x", "verdict": "block", "why": "protocol-relative Location resolves cross-host" },
+    { "from": "https://a.example.com/start", "location": "https://user:pass@a.example.com/next", "verdict": "block", "why": "redirect must not introduce URL credentials" }
   ]
 }

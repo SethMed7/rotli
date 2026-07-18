@@ -12,6 +12,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **New security layer (`check:security`) + audit remediations.** A mechanical
+  guard now pins the whole egress surface: every ureq / raw-`fetch` /
+  network-CLI call site must be declared in a tracked allowlist
+  (`scripts/fixtures/egress-allowlist.json`), no second HTTP-client crate can
+  enter Cargo.toml, keychain account names may only appear via their named
+  constants, and the `tauri.conf.json` CSP / `assetProtocol` scope / updater
+  endpoints / granted capabilities are snapshotted so any widening fails the
+  lint. Alongside it, several audit findings are fixed: the chat transport now
+  **clamps its destination** to registered loopback model servers or the pinned
+  Gemini base (an arbitrary webview-supplied endpoint is refused), the local
+  llama.cpp Bearer **never rides to a remote base**, the file-read IPC lanes
+  (`corpus_file_text/_bytes/open_file`) now run the same `../`-traversal guard
+  as the write lanes, the AI `read_file` tool applies the secret screen before
+  sending file contents to a remote model, tool results are fenced as untrusted
+  **data (never instructions)** with framing-keyword neutralization, the
+  `generate_image` prompt is framed as data to the nested agent, `web_fetch`
+  gained a URL-length exfil cap, and Breve's local-model tier now **fails closed
+  on a non-loopback endpoint** unless `llm.allowRemote` is set. CI gained an
+  advisory dependency-audit lane (`bun audit` + rustsec). Threat model, egress
+  map, and the reported-not-fixed list live in `docs/development/security.md`.
+
 - **Chat's `web_fetch` tool is SSRF-hardened** (remediation batch 0). Hostname
   resolution now happens on a dedicated agent whose resolver rejects private,
   loopback, link-local, and cloud-metadata address ranges — vetting the

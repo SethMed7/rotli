@@ -21,6 +21,7 @@ fix both in the same change.
 | Brand implementation | [`../src/brand/README.md`](../src/brand/README.md) |
 | AI-assisted development workflow | [`development/ai-workflow.md`](development/ai-workflow.md) |
 | Testing, linting, and regression evidence | [`development/testing.md`](development/testing.md) |
+| Egress map, security checks, and the threat model | [`development/security.md`](development/security.md) |
 | Where new code, dependencies, and shared constants go | [`development/adding-things.md`](development/adding-things.md) |
 | Token-efficient AI context and project CARL | [`architecture/ai-context-architecture.md`](architecture/ai-context-architecture.md) |
 

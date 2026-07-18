@@ -1,0 +1,75 @@
+{
+  "_comment": "The tracked egress inventory — every sanctioned OFF-DEVICE (or loopback-model) network call site, plus the pinned platform-security snapshot. scripts/check-security.mjs enforces it: a NEW ureq/fetch/network-CLI call site, a new HTTP-client crate, a keychain literal outside the named constants, or a widened CSP/capability/assetProtocol/updater field fails `check:security` until this file is deliberately updated. Adding a network call is a reviewed change (docs/development/security.md → 'Adding a network call'). Destination class + guard document WHY each site is safe; they are read by humans, not asserted byte-for-byte.",
+
+  "rust": {
+    "deniedHttpCrates": ["reqwest", "hyper", "isahc", "surf", "curl", "attohttpc", "hyper-tls", "native-tls-client"],
+    "httpClient": "ureq",
+    "ureqFiles": {
+      "web.rs": "web_search (DuckDuckGo lite/html — query only, secret-scanned) + web_fetch (arbitrary public web via the vetted_resolve SSRF-blocked agent, same-host redirects, byte+URL caps)",
+      "chat.rs": "the on-device / Gemini model bridge — endpoint_permitted clamps the destination to registered loopback model servers or the pinned Gemini base; egress_allowed refuses secret-shaped transcripts to non-local endpoints",
+      "breve.rs": "breve_test_email — Resend send to the literal https://api.resend.com/emails host, Keychain Bearer, configured recipients only"
+    }
+  },
+
+  "breveRuntime": {
+    "rawFetchFiles": {
+      "safe-fetch.ts": "the ONE hardened public-web reader (SSRF/redirect/cap guards) — the sanctioned raw fetch; every other web read must route through it",
+      "llm.ts": "local-model tier POSTs (generate / chat-completions / health / warmup) — llmConfig endpoint, loopback by policy (guarded by requireLocalEndpoint before every fetch)",
+      "config.ts": "no fetch — declared here only so a future edit that adds one is a conscious allowlist change",
+      "audio-brief.ts": "local-model /api/generate probe — LLM.endpoint (loopback tier)",
+      "breve-doctor.ts": "local-model /api/version health probe — LLM.endpoint (loopback tier)",
+      "summarize-url.ts": "local-model /api/generate — LLM.endpoint (loopback tier); the page text it summarizes arrives via safe-fetch.ts",
+      "watcher-check.ts": "local-model /api/generate — LLM.endpoint (loopback tier); watched pages arrive via safe-fetch.ts",
+      "signal-daemon.ts": "local-model /api/generate lanes (loopback) + ONE host-pinned https://www.youtube.com/<handle> channel-resolve probe (literal host, interpolation steers the PATH only, checkUrl-gated)",
+      "creator-alerts.ts": "host-pinned https://www.youtube.com/feeds/videos.xml RSS poll (literal host, channelId steers the query only)",
+      "auth.ts": "Resend send — literal https://api.resend.com/emails, Keychain Bearer",
+      "email-topic.ts": "Resend send — literal https://api.resend.com/emails, Keychain Bearer",
+      "send-brief.ts": "Resend send — literal https://api.resend.com/emails, Keychain Bearer"
+    },
+    "imapFlowFiles": {
+      "mail.ts": "ImapFlow client.fetch — configured mail hosts, TLS strict except loopback; not a raw fetch"
+    },
+    "nodeNetModules": {
+      "safe-fetch.ts": ["node:dns/promises", "node:net"]
+    }
+  },
+
+  "keychain": {
+    "_comment": "The two allowlisted account names may appear ONLY at their named-constant declaration sites + the parity fixture + tests. Any other literal occurrence (a hand-typed 'gemini-api-key' at a call site) fails the check — callers must import the constant.",
+    "accounts": ["gemini-api-key", "breve-resend-api-key"],
+    "constantSites": [
+      "src-tauri/src/keychain.rs",
+      "src/lib/tauri.ts",
+      "breve-runtime/scripts/keychainNames.ts",
+      "scripts/fixtures/parity.json"
+    ]
+  },
+
+  "tauriConf": {
+    "_comment": "Snapshot of the security-load-bearing tauri.conf.json fields. Widening any of these (a remote connect-src/img-src host, a second updater endpoint, a broader assetProtocol scope) fails the check until this snapshot is deliberately updated in the same change.",
+    "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost blob: data:; font-src 'self' data:; media-src 'self' asset: http://asset.localhost blob: data:; frame-src 'self' asset: http://asset.localhost; connect-src ipc: http://ipc.localhost",
+    "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost blob: data:; font-src 'self' data:; media-src 'self' asset: http://asset.localhost blob: data:; frame-src 'self' asset: http://asset.localhost; connect-src ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420",
+    "assetProtocolScope": ["$HOME/**"],
+    "updaterEndpoints": ["https://github.com/SethMed7/rotli-releases/releases/latest/download/latest.json"]
+  },
+
+  "capabilities": {
+    "_comment": "The default capability's granted permissions. A new fs/shell/http plugin permission (a real attack-surface widening) fails the check until pinned here.",
+    "default": ["core:default", "core:window:allow-start-dragging", "updater:default", "process:allow-restart"]
+  },
+
+  "sensitiveLogging": {
+    "_comment": "Heuristic (documented limits in docs/development/security.md): flags a println!/eprintln!/console.log in an egress-adjacent file whose argument names a body/secret/prompt/transcript variable. It catches the obvious regression (logging a note body next to a network call); it CANNOT prove the absence of a leak — a renamed variable or an interpolated helper slips it. It is a tripwire, not a proof.",
+    "egressAdjacentFiles": [
+      "src-tauri/src/web.rs",
+      "src-tauri/src/chat.rs",
+      "src-tauri/src/provider.rs",
+      "src-tauri/src/breve.rs",
+      "src/ai/host.ts",
+      "src/ai/loop.ts",
+      "breve-runtime/scripts/llm.ts",
+      "breve-runtime/scripts/safe-fetch.ts"
+    ],
+    "forbiddenLogArgPattern": "\\b(?:body|secret|prompt|transcript|apiKey|api_key|bearer|password|noteBody|note_body|content)\\b"
+  }
+}

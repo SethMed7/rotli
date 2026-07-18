@@ -57,6 +57,31 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  dependency-audit:
+    name: Dependency vulnerability audit (advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+      - run: bun install --frozen-lockfile
+      # NON-BLOCKING (|| true): the current advisories are all transitive-only
+      # (Univer/Excalidraw/Mermaid/vite), tracked in docs/development/security.md
+      # under "reported, not fixed". This lane surfaces NEW advisories in the PR
+      # log without failing the merge on upstream churn we don't control. Promote
+      # to blocking once the tree is clean.
+      - name: bun audit (JS/TS)
+        run: bun audit || true
+      # rustsec/audit-check installs and runs cargo-audit inside the runner — no
+      # local cargo-audit install needed by any contributor. Advisory for now
+      # (same rationale); flip `ignore`/failure policy when the Rust tree is clean.
+      - name: cargo audit (Rust)
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: src-tauri
+
   full-regression:
     name: App, Breve, Rust, and production build
     runs-on: macos-latest

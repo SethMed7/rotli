@@ -191,14 +191,21 @@ export function makeTauriHost(
         files.find((n) => n.title.toLowerCase().includes(q));
       if (!file) return `no file matching "${query}". Use the exact filename (e.g. report.csv).`;
       const ext = extOf(file.title);
-      if (SHEET_BIN.has(ext)) return await workbookToCsv({ base64: await corpusFileBytes(file.id) });
-      if (SHEET_TEXT.has(ext)) {
-        return await workbookToCsv({
-          csv: await corpusFileText(file.id),
-          delimiter: ext === "tsv" ? "\t" : ",",
-        });
+      const text = SHEET_BIN.has(ext)
+        ? await workbookToCsv({ base64: await corpusFileBytes(file.id) })
+        : SHEET_TEXT.has(ext)
+          ? await workbookToCsv({
+              csv: await corpusFileText(file.id),
+              delimiter: ext === "tsv" ? "\t" : ",",
+            })
+          : await corpusFileText(file.id);
+      // Storage files carry no frontmatter, so they skip corpus_read_ai's
+      // secure gate — apply the same policy prior chats get (audit 2026-07):
+      // a remote model never receives secret-shaped file contents.
+      if (!modelIsOnDevice(model) && looksSecret(text)) {
+        return "blocked: this file contains secret-shaped content and cannot be sent to a remote model.";
       }
-      return corpusFileText(file.id);
+      return text;
     },
     webSearch(query, limit) {
       return tauriWebSearch(query, limit);

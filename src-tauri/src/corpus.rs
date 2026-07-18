@@ -4198,6 +4198,9 @@ pub fn corpus_read(state: tauri::State<'_, CorpusState>, id: String) -> Result<N
 #[tauri::command]
 pub fn corpus_open_file(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
     let (root, rel) = split_root_id(&id);
+    // The webview-supplied rel joins the root directly — validate like every
+    // write lane so "../…" can never reach outside it (audit 2026-07).
+    validate_rel(&rel)?;
     let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
     if !abs.is_file() {
         return Err(format!("not a file: {}", abs.display()));
@@ -4222,6 +4225,9 @@ pub fn corpus_file_text(
     max_bytes: Option<usize>,
 ) -> Result<String, String> {
     let (root, rel) = split_root_id(&id);
+    // Same traversal guard as the write lanes (audit 2026-07): a raw "../…"
+    // from the webview must never read a file outside the corpus root.
+    validate_rel(&rel)?;
     let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
     if !abs.is_file() {
         return Err(format!("not a file: {}", abs.display()));
@@ -4247,6 +4253,8 @@ pub fn corpus_file_bytes(
 ) -> Result<String, String> {
     use base64::Engine;
     let (root, rel) = split_root_id(&id);
+    // Same traversal guard as the write lanes (audit 2026-07).
+    validate_rel(&rel)?;
     let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
     if !abs.is_file() {
         return Err(format!("not a file: {}", abs.display()));
@@ -7014,6 +7022,12 @@ mod tests {
         assert!(store.create("a:b", "# nope\n").is_err(), "colon folder must be rejected");
         assert!(validate_component("plain").is_ok());
         assert!(validate_component("has:colon").is_err());
+        // the file read/open lanes (corpus_file_text/_bytes/open_file) now run
+        // this on the webview-supplied rel — a traversal escape must be rejected
+        // (audit 2026-07). Mirrors the write lanes.
+        assert!(validate_rel("../../.ssh/id_rsa").is_err());
+        assert!(validate_rel("/etc/passwd").is_err());
+        assert!(validate_rel("wiki/notes/ok.md").is_ok());
     }
 
     #[test]

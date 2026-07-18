@@ -30,6 +30,9 @@ const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
 // equality against scripts/fixtures/egress-fixtures.json (parity by fixture, not shared impl).
 export const MAX_FETCH_BYTES = 2_000_000;
 export const MAX_REDIRECT_HOPS = 3;
+/** URL length cap — an over-long URL (prose stuffed into query params) is an
+ *  exfil channel, not a page address (audit 2026-07). `maxUrlChars` in the fixture. */
+export const MAX_URL_CHARS = 2048;
 
 export type SafeFetchResult =
   | { ok: true; host: string; finalUrl: string; title: string; text: string }
@@ -101,6 +104,7 @@ export async function hostRejection(host: string): Promise<string | null> {
 
 /** Validate a single URL (scheme, no creds, public host). Exported for callers that only gate (e.g. the agy/YouTube path). */
 export async function checkUrl(raw: string): Promise<{ ok: true; url: URL } | { ok: false; reason: string }> {
+  if (raw.length > MAX_URL_CHARS) return { ok: false, reason: "URL too long" };
   let url: URL;
   try { url = new URL(raw); } catch { return { ok: false, reason: "invalid URL" }; }
   if (url.protocol !== "https:") return { ok: false, reason: "https only (cleartext refused)" };
@@ -117,6 +121,7 @@ export function redirectRejection(from: URL, location: string, firstHost: string
   let next: URL;
   try { next = new URL(location, from); } catch { return "invalid redirect Location"; }
   if (next.protocol !== "https:") return "https only (cleartext refused)";
+  if (next.username || next.password) return "credentials in URL refused"; // checkUrl re-vets too — this keeps the pure hop-vet fixture-aligned with Rust
   if (next.hostname.toLowerCase() !== firstHost) return `cross-host redirect refused: ${next.hostname}`;
   return null;
 }

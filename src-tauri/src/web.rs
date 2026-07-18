@@ -70,6 +70,11 @@ pub fn web_search(query: String, limit: Option<usize>) -> Result<Vec<WebResult>,
 const WEB_FETCH_MAX_BYTES: u64 = 2_000_000;
 /// Manual redirect hop cap, same-host only (`maxRedirectHops` in egress-fixtures.json).
 const WEB_FETCH_MAX_REDIRECTS: u32 = 3;
+/// URL length cap (`maxUrlChars` in egress-fixtures.json). A model-authored URL
+/// is the loop's highest-bandwidth egress channel — an injected instruction can
+/// stuff read-note prose into query params — so an over-long URL is refused
+/// outright (audit 2026-07). 2048 matches the classic interoperable limit.
+const WEB_FETCH_MAX_URL_CHARS: usize = 2048;
 
 /// Private / loopback / link-local / ULA / CGNAT / unspecified — never connect.
 fn ip_is_private(ip: IpAddr) -> bool {
@@ -106,6 +111,9 @@ fn host_name_blocked(host: &str) -> bool {
 /// Pure pre-dispatch vet: scheme, no credentials, name policy, literal-IP privacy.
 /// DNS-resolved hosts are vetted again inside the connection path (`vetted_resolve`).
 fn vet_fetch_url(raw: &str) -> Result<Url, String> {
+    if raw.chars().count() > WEB_FETCH_MAX_URL_CHARS {
+        return Err("blocked: that URL is too long to fetch.".into());
+    }
     let url = Url::parse(raw).map_err(|e| format!("bad URL ({e})"))?;
     if !matches!(url.scheme(), "http" | "https") {
         return Err("web_fetch needs an http(s) URL.".into());
@@ -553,6 +561,17 @@ mod tests {
         let f = egress_fixtures();
         assert_eq!(f["byteCap"].as_u64().unwrap(), WEB_FETCH_MAX_BYTES);
         assert_eq!(f["maxRedirectHops"].as_u64().unwrap(), u64::from(WEB_FETCH_MAX_REDIRECTS));
+        assert_eq!(f["maxUrlChars"].as_u64().unwrap() as usize, WEB_FETCH_MAX_URL_CHARS);
+    }
+
+    /// The exfil-bandwidth cap (audit 2026-07): a URL stuffed past the cap is
+    /// refused on the first vet — including on a redirect hop.
+    #[test]
+    fn over_long_urls_are_refused() {
+        let long = format!("https://example.com/?q={}", "a".repeat(WEB_FETCH_MAX_URL_CHARS));
+        assert!(vet_fetch_url(&long).is_err());
+        let fine = format!("https://example.com/?q={}", "a".repeat(500));
+        assert!(vet_fetch_url(&fine).is_ok());
     }
 
     #[test]

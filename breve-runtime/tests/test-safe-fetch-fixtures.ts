@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { MAX_FETCH_BYTES, MAX_REDIRECT_HOPS, checkUrl, hostRejection, isPrivateIp, redirectRejection } from "../scripts/safe-fetch";
+import { MAX_FETCH_BYTES, MAX_REDIRECT_HOPS, MAX_URL_CHARS, checkUrl, hostRejection, isPrivateIp, redirectRejection } from "../scripts/safe-fetch";
 
 // Shared adversarial egress fixtures — the SAME file drives the Rust tests in
 // src-tauri/src/web.rs (include_str!). Parity by fixture, not shared impl: each
@@ -11,6 +11,7 @@ import { MAX_FETCH_BYTES, MAX_REDIRECT_HOPS, checkUrl, hostRejection, isPrivateI
 type Fixtures = {
   byteCap: number;
   maxRedirectHops: number;
+  maxUrlChars: number;
   ips: Array<{ ip: string; private: boolean; why?: string }>;
   hosts: Array<{ host: string; blocked: boolean; why?: string }>;
   urls: Array<{ url: string; rust: "allow" | "block"; ts: "allow" | "block"; why?: string }>;
@@ -22,6 +23,14 @@ describe("egress fixtures — Breve safe-fetch side", () => {
   test("caps match the exported policy constants", () => {
     expect(fixtures.byteCap).toBe(MAX_FETCH_BYTES);
     expect(fixtures.maxRedirectHops).toBe(MAX_REDIRECT_HOPS);
+    expect(fixtures.maxUrlChars).toBe(MAX_URL_CHARS);
+  });
+
+  test("over-long URLs are refused (exfil bandwidth cap)", async () => {
+    const long = await checkUrl(`https://example.com/?q=${"a".repeat(MAX_URL_CHARS)}`);
+    expect(long.ok).toBe(false);
+    const fine = await checkUrl(`https://8.8.8.8/?q=${"a".repeat(500)}`);
+    expect(fine.ok).toBe(true);
   });
 
   test("IPs classify private vs public", () => {

@@ -26,6 +26,7 @@ type LocalConfig = {
     provider?: string;
     providers?: Record<string, { endpoint?: string; model?: string; launchdLabel?: string; api?: string }>;
     endpoint?: string; model?: string; launchdLabel?: string; // legacy flat fallback (pre-provider)
+    allowRemote?: boolean; // explicit opt-out of the loopback-only local-tier gate
   };
 };
 
@@ -49,17 +50,45 @@ const LLM_PROVIDER_DEFAULTS: Record<string, { endpoint: string; model: string; l
   ollama:   { endpoint: "http://localhost:11434", model: "gemma4:12b-it-qat",       launchdLabel: "com.local.ollama-serve",    api: "generate" },
 };
 
+/** Is a model ENDPOINT loopback-local? The Breve local-model tier promises page text, Signal
+ *  conversation text, and memex-derived prompts stay on the machine — so its endpoint MUST be
+ *  loopback. Mirrors src/ai/guard.ts endpointIsLocal + Rust chat.rs endpoint_is_local (independent
+ *  implementations, parity.json endpointLocality verdicts). Unparseable ⇒ false (fail closed). */
+export function llmEndpointIsLocal(endpoint: string): boolean {
+  let url: URL;
+  try { url = new URL(endpoint); } catch { return false; }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  const h = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (h === "localhost" || h === "::1") return true;
+  const m = h.match(/^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  return m !== null && m.slice(1).every((o) => Number(o) <= 255);
+}
+
 /** Resolve the local-model wiring for a provider. `provider` (or env BREVE_LLM_PROVIDER, or config
  *  "llm.provider", default "mlx") selects the backend, so a use case can opt into Ollama for Gemma 4
- *  while everything else uses the Mac default (MLX). Switching the default is a config edit, not code. */
+ *  while everything else uses the Mac default (MLX). Switching the default is a config edit, not code.
+ *
+ *  LOCALITY GATE (audit 2026-07): the endpoint must be loopback. A config/env edit pointing this
+ *  tier at a remote host would silently ship local-tier content off-machine — the Rust side pinned
+ *  this invariant (endpoint_is_local); the Bun runtime now fails closed too. The escape hatch is the
+ *  explicit knob `llm.allowRemote: true` (or env BREVE_LLM_ALLOW_REMOTE=1) per the memex Configuration
+ *  Rule (knob-not-constant, safe default = loopback-only). */
 export function llmConfig(provider?: string): { provider: string; endpoint: string; model: string; launchdLabel: string; api: string } {
   const llm = local.llm ?? {};
   const active = (provider ?? process.env.BREVE_LLM_PROVIDER ?? llm.provider ?? "mlx").toLowerCase();
   const p = (llm.providers ?? {})[active] ?? {};
   const d = LLM_PROVIDER_DEFAULTS[active] ?? LLM_PROVIDER_DEFAULTS.mlx;
+  const endpoint = (process.env.BREVE_LLM_ENDPOINT ?? p.endpoint ?? llm.endpoint ?? d.endpoint).replace(/\/+$/, "");
+  const allowRemote = process.env.BREVE_LLM_ALLOW_REMOTE === "1" || llm.allowRemote === true;
+  if (!allowRemote && !llmEndpointIsLocal(endpoint)) {
+    throw new Error(
+      `Breve local-model endpoint "${endpoint}" is not loopback — local-tier content stays on the machine. ` +
+        `Set llm.allowRemote:true (or BREVE_LLM_ALLOW_REMOTE=1) to deliberately override.`,
+    );
+  }
   return {
     provider: active,
-    endpoint: (process.env.BREVE_LLM_ENDPOINT ?? p.endpoint ?? llm.endpoint ?? d.endpoint).replace(/\/+$/, ""),
+    endpoint,
     model: process.env.BREVE_LLM_MODEL ?? p.model ?? llm.model ?? d.model,
     launchdLabel: process.env.BREVE_LLM_LAUNCHD ?? p.launchdLabel ?? llm.launchdLabel ?? d.launchdLabel,
     api: (process.env.BREVE_LLM_API ?? p.api ?? d.api ?? "generate"),
