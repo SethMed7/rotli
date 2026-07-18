@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
-## [Unreleased]
+## [0.33.1] - 2026-07-18
 
 ### Security
 
@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   protocol's static scope is now empty; the only grants are the runtime
   per-corpus-root allows, so `asset:` URLs resolve inside registered memex
   roots and nowhere else (decision 1, docs/development/security.md).
+  Deliberate consequence: a note embedding an image by ABSOLUTE path outside
+  your memex (e.g. `![](/Users/you/Desktop/x.png)`) no longer renders — move
+  the file into the memex (drag it in) to show it.
 - **The agy image job is OS-sandboxed.** It ran with
   `--dangerously-skip-permissions`; it now runs under a `sandbox-exec` profile
   that denies `$HOME` except the chat's assets dir and the CLI's own state

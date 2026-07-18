@@ -637,10 +637,15 @@ pub async fn generate_image(
         // its job runs under sandbox-exec with the assets-dir-only profile
         let mut cmd = if engine == "agy" && image_sandbox_enabled() {
             let home = std::env::var("HOME").unwrap_or_default();
+            // resolve_bin only returns absolute candidates today; if that ever
+            // changed, an empty parent would become (subpath "") / (subpath "/")
+            // — which re-allows everything under the later-rules-win SBPL
+            // semantics. Fail SAFE instead: /var/empty allows nothing.
             let bin_dir = std::path::Path::new(&bin)
                 .parent()
                 .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or_else(|| "/".into());
+                .filter(|p| !p.is_empty() && p != "/")
+                .unwrap_or_else(|| "/var/empty".into());
             let mut c = Command::new("/usr/bin/sandbox-exec");
             c.arg("-p").arg(agy_sandbox_profile(&home, &dir_str, &bin_dir)).arg(&bin);
             c
