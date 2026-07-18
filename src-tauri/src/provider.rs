@@ -500,6 +500,62 @@ pub fn cli_cancel(state: tauri::State<'_, ProviderState>, request_id: String) ->
 /// Deadline for an image job — generation + save runs minutes, not seconds.
 const IMAGE_TIMEOUT: Duration = Duration::from_secs(300);
 
+/// macOS sandbox profile for the agy image lane. agy's own `--sandbox` flag
+/// blocks the file WRITE the job exists to make, so the lane must run with
+/// `--dangerously-skip-permissions` — this OS-level profile is what actually
+/// contains it (security decision 2026-07-18). Mirrors breve-runtime/scripts/
+/// sandbox.ts's POLICY as independent enforcement, never a shared impl:
+/// allow-by-default (network + system reads, so the CLI runs) but $HOME
+/// reads/writes are denied EXCEPT the pinned assets dir, the CLI's own state
+/// (~/.gemini, ~/.antigravity), the login Keychain (its auth token), and the
+/// binary's own directory (agy may live in ~/.local/bin). SBPL: later rules
+/// win, so the narrow allows override the broad HOME deny.
+fn agy_sandbox_profile(home: &str, write_dir: &str, bin_dir: &str) -> String {
+    format!(
+        r#"(version 1)
+(allow default)
+(deny file-read* (subpath "{home}"))
+(allow file-read*
+  (subpath "{write_dir}")
+  (subpath "{home}/.gemini")
+  (subpath "{home}/.antigravity")
+  (subpath "{home}/Library/Keychains")
+  (subpath "{bin_dir}"))
+(deny file-write* (subpath "{home}"))
+(allow file-write*
+  (subpath "{write_dir}")
+  (subpath "{home}/.gemini")
+  (subpath "{home}/.antigravity"))
+"#
+    )
+}
+
+/// Knob (Configuration Rule): ROTLI_IMAGE_SANDBOX=0 disables the agy image
+/// sandbox — the safe fallback if a future agy version needs a path the
+/// profile denies. Non-macOS has no sandbox-exec; the wrapper is a no-op.
+fn image_sandbox_enabled() -> bool {
+    cfg!(target_os = "macos") && std::env::var("ROTLI_IMAGE_SANDBOX").as_deref() != Ok("0")
+}
+
+#[cfg(test)]
+mod image_sandbox_tests {
+    use super::*;
+
+    #[test]
+    fn profile_denies_home_and_allows_only_the_job_paths() {
+        let p = agy_sandbox_profile("/Users/x", "/Users/x/memex/storage/chats/s", "/Users/x/.local/bin");
+        assert!(p.contains("(deny file-read* (subpath \"/Users/x\"))"));
+        assert!(p.contains("(deny file-write* (subpath \"/Users/x\"))"));
+        assert!(p.contains("(subpath \"/Users/x/memex/storage/chats/s\")"));
+        assert!(p.contains("(subpath \"/Users/x/.gemini\")"));
+        assert!(p.contains("(subpath \"/Users/x/.antigravity\")"));
+        assert!(p.contains("(subpath \"/Users/x/.local/bin\")"), "the CLI's own dir must stay readable");
+        // the write-allow list must NOT include the Keychain (read-only there)
+        let write_allow = p.split("(deny file-write*").nth(1).expect("write section");
+        assert!(!write_allow.contains("Keychains"));
+    }
+}
+
 /// Generate an image into the CHAT'S assets — `<root>/storage/chats/<slug>/`
 /// — via the chosen connected engine (the proven /imagegen recipes). The
 /// destination is pinned by Rust from a REGISTERED root + a safe slug; the
@@ -554,7 +610,7 @@ pub async fn generate_image(
                 "--color".into(),
                 "never".into(),
                 "--cd".into(),
-                dir_str,
+                dir_str.clone(),
                 "-".into(),
             ],
             Some(instruction),
@@ -565,7 +621,7 @@ pub async fn generate_image(
                 "-p".into(),
                 instruction,
                 "--add-dir".into(),
-                dir_str,
+                dir_str.clone(),
                 "--dangerously-skip-permissions".into(),
                 "--print-timeout".into(),
                 "5m".into(),
@@ -577,7 +633,20 @@ pub async fn generate_image(
     let children = Arc::clone(&state.children);
     tauri::async_runtime::spawn_blocking(move || {
         let _agy = (engine == "agy").then(|| AGY_GATE.lock().unwrap());
-        let mut cmd = Command::new(&bin);
+        // codex contains itself (`--sandbox workspace-write`); agy cannot, so
+        // its job runs under sandbox-exec with the assets-dir-only profile
+        let mut cmd = if engine == "agy" && image_sandbox_enabled() {
+            let home = std::env::var("HOME").unwrap_or_default();
+            let bin_dir = std::path::Path::new(&bin)
+                .parent()
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "/".into());
+            let mut c = Command::new("/usr/bin/sandbox-exec");
+            c.arg("-p").arg(agy_sandbox_profile(&home, &dir_str, &bin_dir)).arg(&bin);
+            c
+        } else {
+            Command::new(&bin)
+        };
         cmd.args(&args);
         let (_stdout, stderr, _ok) =
             run_registered(&children, &request_id, cmd, payload.as_deref(), IMAGE_TIMEOUT)?;

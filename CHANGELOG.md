@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [Unreleased]
+
+### Security
+
+- **The webview can no longer be served arbitrary `$HOME` files.** The asset
+  protocol's static scope is now empty; the only grants are the runtime
+  per-corpus-root allows, so `asset:` URLs resolve inside registered memex
+  roots and nowhere else (decision 1, docs/development/security.md).
+- **The agy image job is OS-sandboxed.** It ran with
+  `--dangerously-skip-permissions`; it now runs under a `sandbox-exec` profile
+  that denies `$HOME` except the chat's assets dir and the CLI's own state
+  (`ROTLI_IMAGE_SANDBOX=0` opts out). Decisions 2/3/5 (safe-fetch rebinding
+  residual, image-attachment scanning, prose-overlap egress) are recorded as
+  deferred/accepted with rationale in docs/development/security.md.
+
+### Added
+
+- **Drift guards, so the repo reads like one author.** Per-tree filename law
+  (src camelCase; scripts/e2e/docs/breve-runtime kebab-case — six breve files
+  renamed to comply), tsconfig strictness parity across the three compilers
+  (with measured, dated divergence entries), orphan-script and orphan-check
+  guards, testing.md command-map completeness, minimal identifier
+  naming-convention linting, CSS kebab-case + functional-color bans, and
+  snake_case IPC command naming — every rule mechanical, all mutation-tested.
+
 ## [0.33.0] - 2026-07-18
 
 ### Security

@@ -1065,8 +1065,11 @@ pub fn run() {
                         let suppress = store.suppress_set();
                         let watch_root = store.root().to_path_buf();
                         // let the asset protocol serve this corpus's files, so
-                        // storage/ images render via convertFileSrc — robust even if
-                        // the config scope glob doesn't cover the corpus location.
+                        // storage/ images render via convertFileSrc. This runtime
+                        // allow is the ONLY asset grant: the static config scope is
+                        // deliberately EMPTY (security decision 2026-07-18 — the old
+                        // $HOME/** exposed ~/.ssh etc. to the webview), so every
+                        // servable path is a registered corpus root, nothing else.
                         let _ = app.asset_protocol_scope().allow_directory(store.root(), true);
                         let handle = app.handle().clone();
                         // The daemon runs over the DEFAULT root, and only when it is

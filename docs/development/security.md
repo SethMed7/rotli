@@ -85,42 +85,39 @@ against [`../../scripts/fixtures/egress-fixtures.json`](../../scripts/fixtures/e
    `cargo test --manifest-path src-tauri/Cargo.toml --lib web`.
 4. Run `bun run check:security` and `bun run check`.
 
-## Reported, not fixed — maintainer decisions
+## Maintainer decisions — DECIDED 2026-07-18
 
-These findings from the 2026-07 audit are **product-behavior-changing** or need
-a design project, so they are documented here rather than silently changed:
+The 2026-07 audit escalated five product-behavior findings. Disposition:
 
-1. **`assetProtocol.scope` is `$HOME/**`** (high). Any file under `$HOME`
-   (`~/.ssh`, other apps' data, the gitignored memex `storage/`) is servable into
-   the webview; `frame-src asset:` even renders local files in an iframe. The
-   runtime `allow_directory(store.root())` already scopes the active root at
-   connect, so the static `$HOME/**` is redundant breadth. **Recommended fix:**
-   narrow the static scope to empty (or a corpus-agnostic minimum) and rely on the
-   runtime allow, and consider dropping `asset:` from `frame-src` if boards/viewers
-   don't iframe local files. Left as a decision because it can affect asset
-   rendering; `check:security` pins the current scope so it can't widen unnoticed.
-2. **safe-fetch DNS-rebinding TOCTOU residual** (medium). The TS side resolves +
-   vets the host, then Bun's `fetch()` re-resolves at connect — a hostile low-TTL
-   record could differ. Rust closed the identical gap with `vetted_resolve`. The
-   fix needs a custom Bun dispatcher / connect-by-IP with Host+SNI handling — a
-   build project, not a check. Narrow window on a single-user Mac; the realistic
-   vector is a poisoned user-configured watchlist entry.
-3. **Send-seam secret scan is text-only** (low). `egress_allowed` scans message
-   text but not base64 image attachments; a screenshot of a secure note attached
-   in the composer would ride to the Gemini lane unscanned. Images are
-   user-attached (an explicit act), so this is a consented gap. Options: refuse
-   image attachments to non-local endpoints, or scan EXIF/text chunks only. The
-   promise is precisely "**text-shaped** secure content never leaves."
-4. **generate_image nested-agent privilege** (partially mitigated). The agy lane
-   runs `--dangerously-skip-permissions`; the prompt is now framed as data, but a
-   fuller fix is per-chat opt-in + a sandboxed/no-network agy profile matching
-   codex's `workspace-write`. Tracked for a build phase.
-5. **Non-secret private prose via web tool args** (partially mitigated). The
-   only egress gate on web args is the secret detector; ordinary private prose can
-   still ride a model-authored URL. Bounded by globe-default-off, the URL length
-   cap, secure-note exclusion, and step caps. A content-overlap egress check
-   (web args vs recently-read notes) belongs next to `looksSecret` in `guard.ts`
-   with a `secret.rs` mirror — a build project.
+1. **`assetProtocol.scope` — FIXED (narrowed to empty).** The static scope was
+   `$HOME/**` (any file under `$HOME` servable into the webview). It is now
+   `[]`: the runtime `allow_directory(store.root(), true)` grant at corpus
+   registration is the ONLY asset grant, so every servable path is a registered
+   corpus root. `frame-src asset:` stays — the PDF viewer genuinely renders
+   via an asset iframe. `check:security` pins the empty scope. *App-smoke on
+   next run: images/PDF/video inside notes must still render (they live under
+   corpus roots, which the runtime allow covers).*
+2. **safe-fetch DNS-rebinding TOCTOU residual — DEFERRED to the quarterly
+   review.** The prompt-injectable path (Rust `web_fetch`) is closed with
+   `vetted_resolve`; the residual affects only Breve's owner-configured
+   watchlist fetches on a single-user Mac, and the fix (a Bun connect-by-IP
+   dispatcher with Host+SNI handling) is a build project. Revisit next quarter
+   or when Bun ships a dispatcher API.
+3. **Send-seam secret scan is text-only — ACCEPTED as a consented gap.**
+   Attaching an image is an explicit user act; the product promise is precisely
+   "**text-shaped** secure content never leaves" and that promise holds.
+4. **`generate_image` agy privilege — FIXED (OS-sandboxed).** The agy image
+   job now runs under `sandbox-exec` with a profile mirroring Breve's policy
+   as independent enforcement: `$HOME` reads/writes denied except the pinned
+   chat-assets dir, the CLI's own state (`~/.gemini`, `~/.antigravity`), the
+   login Keychain (read-only, its auth token), and the binary's directory.
+   Knob: `ROTLI_IMAGE_SANDBOX=0` disables (Configuration Rule safe fallback).
+   *App-smoke on next run: agy image generation still saves its PNG.*
+5. **Non-secret private prose via web tool args — DEFERRED, designated next
+   security build.** Bounded today by globe-default-off, the URL-length cap,
+   secure-note exclusion, and step caps. The content-overlap egress check
+   (web args vs recently-read note content) is the next `guard.ts`/`secret.rs`
+   pair to build, scheduled with the quarterly review.
 
 ### Supply-chain advisories (transitive-only, tracked)
 
