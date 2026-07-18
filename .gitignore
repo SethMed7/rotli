@@ -29,3 +29,5 @@ secrets.*
 .eslintcache
 *.tsbuildinfo
 coverage/
+playwright-report/
+test-results/

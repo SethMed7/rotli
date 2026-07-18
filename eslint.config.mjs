@@ -16,24 +16,51 @@ import reactHooks from "eslint-plugin-react-hooks";
 // that range without re-validating typescript-eslint compatibility first. (A
 // comment can't live inline in package.json: scripts/check-structure.mjs and
 // scripts/check-documentation.mjs both JSON.parse it directly.)
-export default tseslint.config({
-  files: ["src/**/*.{ts,tsx}"],
-  languageOptions: {
-    parser: tseslint.parser,
-    parserOptions: {
-      projectService: { allowDefaultProject: [] },
-      tsconfigRootDir: import.meta.dirname,
+export default tseslint.config(
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        projectService: { allowDefaultProject: [] },
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    plugins: { "@typescript-eslint": tseslint.plugin, "react-hooks": reactHooks },
+    linterOptions: {
+      reportUnusedDisableDirectives: "error",
+    },
+    rules: {
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-misused-promises": "error",
+      "@typescript-eslint/no-explicit-any": "error",
+      "react-hooks/exhaustive-deps": "error",
+      "react-hooks/rules-of-hooks": "error",
     },
   },
-  plugins: { "@typescript-eslint": tseslint.plugin, "react-hooks": reactHooks },
-  linterOptions: {
-    reportUnusedDisableDirectives: "error",
+  // The Playwright regression layer (e2e/ + its config) — same typed rule set,
+  // minus react-hooks (no React here). These files typecheck against
+  // tsconfig.e2e.json (not the root tsconfig, whose include is src only), so
+  // they get an explicit `project` instead of the projectService lookup.
+  // no-floating-promises matters most in this layer: an unawaited expect() is
+  // a spec that can pass before its assertion runs.
+  {
+    files: ["e2e/**/*.ts", "playwright.config.ts"],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        project: ["./tsconfig.e2e.json"],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    plugins: { "@typescript-eslint": tseslint.plugin },
+    linterOptions: {
+      reportUnusedDisableDirectives: "error",
+    },
+    rules: {
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-misused-promises": "error",
+      "@typescript-eslint/no-explicit-any": "error",
+    },
   },
-  rules: {
-    "@typescript-eslint/no-floating-promises": "error",
-    "@typescript-eslint/no-misused-promises": "error",
-    "@typescript-eslint/no-explicit-any": "error",
-    "react-hooks/exhaustive-deps": "error",
-    "react-hooks/rules-of-hooks": "error",
-  },
-});
+);
