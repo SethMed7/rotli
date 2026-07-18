@@ -12,7 +12,7 @@ import fixture from "../../scripts/fixtures/parity.json";
 import { endpointIsLocal } from "../ai/guard";
 import { DOCUMENT_CONVERTIBLE_EXTS } from "../documents/kinds";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
-import { type MemexPerms, SECRET_GEMINI_API_KEY } from "./tauri";
+import { type FrontmatterView, type MemexPerms, SECRET_GEMINI_API_KEY } from "./tauri";
 
 const entries = fixture.entries;
 
@@ -30,6 +30,22 @@ describe("parity.json ↔ TS constants", () => {
     // compile-time half: adding/removing a MemexPerms member breaks this literal
     const perms: Record<MemexPerms, true> = { "chats+inbox": true, "read-only": true };
     expect(Object.keys(perms).sort()).toEqual([...entries.memexPerms.value].sort());
+  });
+
+  test("frontmatterView", () => {
+    // compile-time half: a FrontmatterView field change breaks this literal;
+    // the Rust twin asserts the struct's serde wire keys against the same fixture
+    const keys: Record<keyof FrontmatterView, true> = {
+      id: true,
+      created: true,
+      updated: true,
+      locked: true,
+      secure: true,
+      localAiAllowed: true,
+      pinned: true,
+      fields: true,
+    };
+    expect(Object.keys(keys).sort()).toEqual([...entries.frontmatterView.value].sort());
   });
 
   test("keychainService", () => {

@@ -44,6 +44,28 @@ fn memex_perms_match_fixture() {
 }
 
 #[test]
+fn frontmatter_view_matches_fixture() {
+    // the IPC payload-shape half of Batch 5.3: these serde wire keys ARE the
+    // contract the TS side's blind `invoke::<FrontmatterView>` cast trusts
+    let sample = crate::corpus::FrontmatterView {
+        id: String::new(),
+        created: String::new(),
+        updated: String::new(),
+        locked: false,
+        secure: false,
+        local_ai_allowed: false,
+        pinned: false,
+        fields: Vec::new(),
+    };
+    let json = serde_json::to_value(&sample).expect("FrontmatterView serializes");
+    let mut keys: Vec<String> = json.as_object().expect("object").keys().cloned().collect();
+    keys.sort();
+    let mut expected = string_list(&entry("frontmatterView"));
+    expected.sort();
+    assert_eq!(keys, expected);
+}
+
+#[test]
 fn keychain_service_matches_fixture() {
     assert_eq!(entry("keychainService").as_str(), Some(crate::keychain::SERVICE));
 }

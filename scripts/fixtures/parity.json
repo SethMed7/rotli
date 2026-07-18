@@ -13,6 +13,10 @@
       "sourceOfTruth": "src/lib/tauri.ts MemexPerms union ↔ src-tauri/src/memex.rs MemexPerms enum serde wire strings",
       "value": ["chats+inbox", "read-only"]
     },
+    "frontmatterView": {
+      "sourceOfTruth": "src/lib/tauri.ts FrontmatterView interface ↔ src-tauri/src/corpus.rs FrontmatterView serde wire keys",
+      "value": ["id", "created", "updated", "locked", "secure", "localAiAllowed", "pinned", "fields"]
+    },
     "keychainService": {
       "sourceOfTruth": "src-tauri/src/keychain.rs SERVICE ↔ breve-runtime/scripts/keychainNames.ts ROTLI_KEYCHAIN_SERVICE",
       "value": "rotli"
