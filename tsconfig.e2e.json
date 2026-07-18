@@ -8,6 +8,11 @@
     "isolatedModules": true,
     "noEmit": true,
     "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
     "skipLibCheck": true
   },
   "include": ["playwright.config.ts", "e2e/**/*.ts"]

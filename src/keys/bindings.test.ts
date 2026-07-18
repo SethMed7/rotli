@@ -2,25 +2,25 @@
 // An entry present with null = explicitly UNBOUND (distinct from "no override,
 // use the default"). resolveChord is the one place that distinction is read.
 
-import { beforeEach, describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { resolveChord, useBindingsStore } from "./bindings";
 
 describe("resolveChord", () => {
-  it("returns the default when the action has no override", () => {
+  test("returns the default when the action has no override", () => {
     expect(resolveChord({}, "note.new", "Meta+N")).toBe("Meta+N");
   });
 
-  it("returns the override when one is present", () => {
+  test("returns the override when one is present", () => {
     expect(resolveChord({ "note.new": "Meta+Shift+N" }, "note.new", "Meta+N")).toBe("Meta+Shift+N");
   });
 
-  it("treats an explicit null override as UNBOUND (not 'fall back to default')", () => {
+  test("treats an explicit null override as UNBOUND (not 'fall back to default')", () => {
     // the action id IS in overrides with value null → the chord is removed,
     // even though a default exists. This is the load-bearing distinction.
     expect(resolveChord({ "note.new": null }, "note.new", "Meta+N")).toBeNull();
   });
 
-  it("passes a null default straight through when there is no override", () => {
+  test("passes a null default straight through when there is no override", () => {
     expect(resolveChord({}, "some.unbound.action", null)).toBeNull();
   });
 });
@@ -30,16 +30,16 @@ describe("useBindingsStore", () => {
     useBindingsStore.setState({ overrides: {} });
   });
 
-  it("starts with no overrides", () => {
+  test("starts with no overrides", () => {
     expect(useBindingsStore.getState().overrides).toEqual({});
   });
 
-  it("setOverride records a remap", () => {
+  test("setOverride records a remap", () => {
     useBindingsStore.getState().setOverride("note.new", "Meta+Shift+N");
     expect(useBindingsStore.getState().overrides["note.new"]).toBe("Meta+Shift+N");
   });
 
-  it("setOverride with null records an explicit unbind (key present, value null)", () => {
+  test("setOverride with null records an explicit unbind (key present, value null)", () => {
     useBindingsStore.getState().setOverride("note.new", null);
     const { overrides } = useBindingsStore.getState();
     expect("note.new" in overrides).toBe(true);
@@ -48,7 +48,7 @@ describe("useBindingsStore", () => {
     expect(resolveChord(overrides, "note.new", "Meta+N")).toBeNull();
   });
 
-  it("setOverride merges without dropping earlier entries", () => {
+  test("setOverride merges without dropping earlier entries", () => {
     const store = useBindingsStore.getState();
     store.setOverride("a", "Meta+A");
     store.setOverride("b", "Meta+B");

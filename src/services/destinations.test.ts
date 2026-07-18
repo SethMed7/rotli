@@ -3,7 +3,7 @@
 // isSink (Archive/Trash only) is the origin-rule predicate and MUST mirror
 // corpus.rs is_hidden_root. Board is hidden from listings but is NOT a sink.
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import {
   DEST,
   destContains,
@@ -22,7 +22,7 @@ import {
 } from "./destinations";
 
 describe("DEST + the root sets", () => {
-  it("names the six reserved roots by their own folder ids", () => {
+  test("names the six reserved roots by their own folder ids", () => {
     expect(DEST).toEqual({
       inbox: "Inbox",
       secure: "Secure notes",
@@ -34,17 +34,17 @@ describe("DEST + the root sets", () => {
     });
   });
 
-  it("hides Archive, Trash, and Board from listings", () => {
+  test("hides Archive, Trash, and Board from listings", () => {
     expect(HIDDEN_ROOTS).toEqual([DEST.archive, DEST.trash, DEST.board]);
   });
 
-  it("treats only Archive and Trash as never-delete sinks", () => {
+  test("treats only Archive and Trash as never-delete sinks", () => {
     expect(SINK_ROOTS).toEqual([DEST.archive, DEST.trash]);
   });
 });
 
 describe("isHidden", () => {
-  it("is true for each hidden root and its descendants (ids are paths)", () => {
+  test("is true for each hidden root and its descendants (ids are paths)", () => {
     expect(isHidden("Archive")).toBe(true);
     expect(isHidden("Trash")).toBe(true);
     expect(isHidden("Board")).toBe(true);
@@ -52,7 +52,7 @@ describe("isHidden", () => {
     expect(isHidden("Board/2026")).toBe(true);
   });
 
-  it("is false for the everyday destinations and their subtrees", () => {
+  test("is false for the everyday destinations and their subtrees", () => {
     expect(isHidden("Inbox")).toBe(false);
     expect(isHidden("Storage")).toBe(false);
     expect(isHidden("Storage/Work")).toBe(false);
@@ -62,7 +62,7 @@ describe("isHidden", () => {
     expect(isHidden("vault:wiki")).toBe(false);
   });
 
-  it("is false for the corpus root and for mere prefix lookalikes", () => {
+  test("is false for the corpus root and for mere prefix lookalikes", () => {
     expect(isHidden("")).toBe(false);
     expect(isHidden("Archived")).toBe(false);
     expect(isHidden("Boardroom")).toBe(false);
@@ -70,18 +70,18 @@ describe("isHidden", () => {
 });
 
 describe("isSink — the origin-rule predicate (mirrors Rust is_hidden_root)", () => {
-  it("is true for Archive and Trash and their subtrees", () => {
+  test("is true for Archive and Trash and their subtrees", () => {
     expect(isSink("Archive")).toBe(true);
     expect(isSink("Trash")).toBe(true);
     expect(isSink("Trash/2024/q1")).toBe(true);
   });
 
-  it("is FALSE for Board (hidden from listings, but not a sink)", () => {
+  test("is FALSE for Board (hidden from listings, but not a sink)", () => {
     expect(isSink("Board")).toBe(false);
     expect(isSink("Board/x")).toBe(false);
   });
 
-  it("is false for the everyday destinations and the root", () => {
+  test("is false for the everyday destinations and the root", () => {
     expect(isSink("Inbox")).toBe(false);
     expect(isSink("Storage")).toBe(false);
     expect(isSink("vault:wiki")).toBe(false);
@@ -90,14 +90,14 @@ describe("isSink — the origin-rule predicate (mirrors Rust is_hidden_root)", (
 });
 
 describe("isVault — the external-root predicate (Brain→Vault rename)", () => {
-  it("is true for the marker and anything inside the Vault root", () => {
+  test("is true for the marker and anything inside the Vault root", () => {
     expect(isVault(VAULT_MARKER)).toBe(true);
     expect(isVault("vault:")).toBe(true);
     expect(isVault("vault:wiki")).toBe(true);
     expect(isVault("vault:chats/x.md")).toBe(true);
   });
 
-  it("is false for every LOCAL (bare, default-root) id", () => {
+  test("is false for every LOCAL (bare, default-root) id", () => {
     expect(isVault("Inbox")).toBe(false);
     expect(isVault("Storage/Work")).toBe(false);
     expect(isVault("Brain")).toBe(false); // a plain local folder after the rename
@@ -112,14 +112,14 @@ describe("the WRITE MODEL redirect — note-creation never lands in the Vault", 
   // selection/quickFolder could carry, and passes through every local target.
   const redirect = (target: string, inbox = "Inbox") => (isVault(target) ? inbox : target);
 
-  it("redirects the Vault marker and any folder/note inside it to the local Inbox", () => {
+  test("redirects the Vault marker and any folder/note inside it to the local Inbox", () => {
     expect(redirect("vault:")).toBe("Inbox");
     expect(redirect("vault:wiki")).toBe("Inbox");
     expect(redirect("vault:chats")).toBe("Inbox");
     expect(redirect("vault:chats/x.md")).toBe("Inbox");
   });
 
-  it("leaves every LOCAL destination untouched (no redirect)", () => {
+  test("leaves every LOCAL destination untouched (no redirect)", () => {
     expect(redirect("Inbox")).toBe("Inbox");
     expect(redirect("Storage")).toBe("Storage");
     expect(redirect("Storage/Work")).toBe("Storage/Work");
@@ -128,7 +128,7 @@ describe("the WRITE MODEL redirect — note-creation never lands in the Vault", 
 });
 
 describe("destContains — the sidebar's derived destination highlight", () => {
-  it("maps Brain ⇔ wiki/* and Storage ⇔ storage/* + legacy Storage/*", () => {
+  test("maps Brain ⇔ wiki/* and Storage ⇔ storage/* + legacy Storage/*", () => {
     expect(destContains("Brain", "wiki")).toBe(true);
     expect(destContains("Brain", "wiki/projects/rotli")).toBe(true);
     expect(destContains("Brain", "storage/samples")).toBe(false);
@@ -139,7 +139,7 @@ describe("destContains — the sidebar's derived destination highlight", () => {
     expect(destContains(DEST.secure, "wiki/_secure/calls")).toBe(true);
     expect(destContains(DEST.secure, "wiki/projects")).toBe(false);
   });
-  it("uses a literal prefix for sinks, vault markers, and plain folders", () => {
+  test("uses a literal prefix for sinks, vault markers, and plain folders", () => {
     expect(destContains(DEST.archive, "Archive/2025")).toBe(true);
     expect(destContains(DEST.trash, "Trash")).toBe(true);
     expect(destContains(DEST.trash, "Trashy")).toBe(false); // prefix, not substring
@@ -147,7 +147,7 @@ describe("destContains — the sidebar's derived destination highlight", () => {
     expect(destContains("Projects", "Projects/rotli")).toBe(true);
     expect(destContains("Projects", "Other")).toBe(false);
   });
-  it("a BARE root marker contains everything inside that root (colon-joined, no slash)", () => {
+  test("a BARE root marker contains everything inside that root (colon-joined, no slash)", () => {
     expect(destContains(DEST.vault, "vault:wiki/foo")).toBe(true);
     expect(destContains(DEST.vault, "vault:")).toBe(true);
     expect(destContains(DEST.vault, "wiki/foo")).toBe(false);
@@ -156,7 +156,7 @@ describe("destContains — the sidebar's derived destination highlight", () => {
 });
 
 describe("isTrash — the one root search never surfaces", () => {
-  it("is true for Trash and its subtree, false for Archive (findable)", () => {
+  test("is true for Trash and its subtree, false for Archive (findable)", () => {
     expect(isTrash(DEST.trash)).toBe(true);
     expect(isTrash("Trash/Old")).toBe(true);
     expect(isTrash(DEST.archive)).toBe(false);
@@ -165,14 +165,14 @@ describe("isTrash — the one root search never surfaces", () => {
 });
 
 describe("isChatsPath — the pure chats/ shape test", () => {
-  it("matches bare and prefixed chats paths", () => {
+  test("matches bare and prefixed chats paths", () => {
     expect(isChatsPath("chats")).toBe(true);
     expect(isChatsPath("chats/2026")).toBe(true);
     expect(isChatsPath("vault:chats")).toBe(true);
     expect(isChatsPath("vault:chats/x")).toBe(true);
   });
 
-  it("never matches notes folders or lookalikes", () => {
+  test("never matches notes folders or lookalikes", () => {
     expect(isChatsPath("Inbox")).toBe(false);
     expect(isChatsPath("wiki/projects")).toBe(false);
     expect(isChatsPath("chatscript")).toBe(false); // prefix must be a path segment
@@ -181,14 +181,14 @@ describe("isChatsPath — the pure chats/ shape test", () => {
 });
 
 describe("isWikiPath — the pure curated-wiki shape test (#6)", () => {
-  it("matches bare and prefixed wiki paths", () => {
+  test("matches bare and prefixed wiki paths", () => {
     expect(isWikiPath("wiki")).toBe(true);
     expect(isWikiPath("wiki/projects")).toBe(true);
     expect(isWikiPath("vault:wiki")).toBe(true);
     expect(isWikiPath("vault:wiki/people")).toBe(true);
   });
 
-  it("never matches notes folders or lookalikes", () => {
+  test("never matches notes folders or lookalikes", () => {
     expect(isWikiPath("Inbox")).toBe(false);
     expect(isWikiPath("chats")).toBe(false);
     expect(isWikiPath("wikipedia")).toBe(false); // prefix must be a path segment
@@ -202,26 +202,26 @@ describe("isChats — transcripts stay with the Chat front, in MEMEX roots only"
   // a plain corpus + the same brain — only the brain's chats/ is transcripts
   const plainCorpus = memexMarkersOf({ corpus: { isMemex: false }, brains: [{ id: "vault" }] });
 
-  it("memexMarkersOf derives '' for a memex corpus + '<id>:' per brain", () => {
+  test("memexMarkersOf derives '' for a memex corpus + '<id>:' per brain", () => {
     expect([...memexCorpus].sort()).toEqual(["", "vault:"]);
     expect([...plainCorpus]).toEqual(["vault:"]);
   });
 
-  it("matches chats paths only inside memex roots", () => {
+  test("matches chats paths only inside memex roots", () => {
     expect(isChats("chats", memexCorpus)).toBe(true);
     expect(isChats("chats/2026", memexCorpus)).toBe(true);
     expect(isChats("vault:chats/x", memexCorpus)).toBe(true);
     expect(isChats("vault:chats/x", plainCorpus)).toBe(true);
   });
 
-  it("a PLAIN root's folder named 'chats' is just a folder (the search/All-notes fix)", () => {
+  test("a PLAIN root's folder named 'chats' is just a folder (the search/All-notes fix)", () => {
     expect(isChats("chats", plainCorpus)).toBe(false);
     expect(isChats("chats/ideas", plainCorpus)).toBe(false);
     // an added plain folder root ("notes:") has no Chat front either
     expect(isChats("notes:chats/x", memexCorpus)).toBe(false);
   });
 
-  it("never matches notes folders or lookalikes, in any layout", () => {
+  test("never matches notes folders or lookalikes, in any layout", () => {
     expect(isChats("Inbox", memexCorpus)).toBe(false);
     expect(isChats("wiki/projects", memexCorpus)).toBe(false);
     expect(isChats("chatscript", memexCorpus)).toBe(false);
@@ -230,11 +230,11 @@ describe("isChats — transcripts stay with the Chat front, in MEMEX roots only"
 });
 
 describe("isRootMarker — a bare non-default root '<rootid>:'", () => {
-  it("is true only for an id that is a rootid followed by a single trailing colon", () => {
+  test("is true only for an id that is a rootid followed by a single trailing colon", () => {
     expect(isRootMarker("vault:")).toBe(true);
   });
 
-  it("is false for bare default ids, in-root paths, and lookalikes", () => {
+  test("is false for bare default ids, in-root paths, and lookalikes", () => {
     expect(isRootMarker("Inbox")).toBe(false); // bare default → no marker
     expect(isRootMarker("vault:wiki")).toBe(false); // a folder inside the root
     expect(isRootMarker(":")).toBe(false); // empty rootid

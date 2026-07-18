@@ -5,32 +5,32 @@
 // (TS-derived) always agree. These cases mirror the Rust test vectors
 // (corpus.rs) and MUST stay in lockstep with them.
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { snippetOf, titleOf } from "./derive";
 
 describe("titleOf — first non-empty line, markdown stripped (mirrors Rust title_of)", () => {
-  it("strips a leading #-run", () => {
+  test("strips a leading #-run", () => {
     expect(titleOf("# Hello world\nrest")).toBe("Hello world");
     expect(titleOf("### Deep\nbody")).toBe("Deep");
   });
 
-  it("keeps a plain first line untouched", () => {
+  test("keeps a plain first line untouched", () => {
     expect(titleOf("Plain line\nmore")).toBe("Plain line");
   });
 
-  it("falls back to Untitled only when NOTHING is non-empty", () => {
+  test("falls back to Untitled only when NOTHING is non-empty", () => {
     expect(titleOf("")).toBe("Untitled");
     expect(titleOf("   \n\t\n")).toBe("Untitled");
   });
 
-  it("skips blank/whitespace leading lines (Rust parity — was the TSP-1 bug)", () => {
+  test("skips blank/whitespace leading lines (Rust parity — was the TSP-1 bug)", () => {
     // the TS path used to read only line 0 and return "Untitled"; Rust scans to
     // the first non-empty line. These now agree.
     expect(titleOf("   \nsecond")).toBe("second");
     expect(titleOf("\n# Second line is a heading")).toBe("Second line is a heading");
   });
 
-  it("strips list/checkbox markers and emphasis (the Rust corpus vectors)", () => {
+  test("strips list/checkbox markers and emphasis (the Rust corpus vectors)", () => {
     expect(titleOf("- [x] ship it\n")).toBe("ship it");
     expect(titleOf("\n\n## **Bold** _title_\nrest")).toBe("Bold title");
     expect(titleOf("> quoted heading")).toBe("quoted heading");
@@ -38,35 +38,35 @@ describe("titleOf — first non-empty line, markdown stripped (mirrors Rust titl
 });
 
 describe("snippetOf — lines after the title, stripped + joined (mirrors Rust snippet_of)", () => {
-  it("joins the lines after the title with single spaces", () => {
+  test("joins the lines after the title with single spaces", () => {
     expect(snippetOf("# Title\n\nFirst body line here.\nSecond line.")).toBe(
       "First body line here. Second line.",
     );
   });
 
-  it("strips emphasis chars (* _ `) anywhere, but # and > only when leading", () => {
+  test("strips emphasis chars (* _ `) anywhere, but # and > only when leading", () => {
     // Rust strip_markdown removes * _ ` globally, yet only peels #/> at the
     // START of a line — so a mid-line '>' or '#' survives (the TSP-2 fix: the
     // old TS regex wrongly stripped them everywhere).
     expect(snippetOf("# T\n\n**bold** _ital_ `code` > quote # h")).toBe("bold ital code > quote # h");
   });
 
-  it("strips checkbox + list markers on EVERY line (Rust parity — was the TSP-2 bug)", () => {
+  test("strips checkbox + list markers on EVERY line (Rust parity — was the TSP-2 bug)", () => {
     // every body line is stripped, not just the first, so both dashes go.
     expect(snippetOf("# T\n- [x] done\n- [ ] todo")).toBe("done todo");
     expect(snippetOf("# T\n- only item")).toBe("only item");
   });
 
-  it("preserves internal whitespace within a line (Rust does not collapse it)", () => {
+  test("preserves internal whitespace within a line (Rust does not collapse it)", () => {
     expect(snippetOf("# T\n\n   spaced    out   \n")).toBe("spaced    out");
   });
 
-  it("returns empty when there is nothing past the title", () => {
+  test("returns empty when there is nothing past the title", () => {
     expect(snippetOf("# Only title")).toBe("");
     expect(snippetOf("")).toBe("");
   });
 
-  it("caps the snippet at 140 code points", () => {
+  test("caps the snippet at 140 code points", () => {
     expect(snippetOf("# T\n" + "a".repeat(200))).toHaveLength(140);
     // code-point aware: astral chars are not split mid-surrogate
     expect([...snippetOf("# T\n" + "😀".repeat(200))]).toHaveLength(140);
@@ -74,19 +74,19 @@ describe("snippetOf — lines after the title, stripped + joined (mirrors Rust s
 });
 
 describe("image/link reduction — `![alt](url)` → alt, `[text](url)` → text (mirrors Rust reduce_md_links)", () => {
-  it("reduces an image to its alt so raw markdown never reads as a title", () => {
+  test("reduces an image to its alt so raw markdown never reads as a title", () => {
     // the "images in All notes" leak: a note starting with an image used to show
     // the literal `![photo](storage:abc.png)` as its title row
     expect(titleOf("![photo](storage:abc.png)\nrest")).toBe("photo");
     expect(titleOf("![](storage:abc.png)\nrest")).toBe("Image");
   });
 
-  it("reduces a link to its text and handles both inside snippets", () => {
+  test("reduces a link to its text and handles both inside snippets", () => {
     expect(titleOf("[the doc](https://x.y/z)")).toBe("the doc");
     expect(snippetOf("# T\nsee ![chart](a.png) and [spec](b)")).toBe("see chart and spec");
   });
 
-  it("leaves malformed spans untouched (Rust parity)", () => {
+  test("leaves malformed spans untouched (Rust parity)", () => {
     expect(titleOf("[not a link] (gap)")).toBe("[not a link] (gap)");
     expect(titleOf("![dangling](no close")).toBe("![dangling](no close");
   });
@@ -97,11 +97,11 @@ describe("whitespace alphabet matches Rust char::is_whitespace (not JS trim)", (
   // U+FEFF (BOM) and keeps U+0085 (NEL); Rust does the opposite. derive.ts must
   // follow Rust so a BOM-prefixed note (external editors emit one) derives the
   // SAME title in a list row (Rust) and an opened tab (TS).
-  it("trims a leading NEL (U+0085) like Rust, so the heading still resolves", () => {
+  test("trims a leading NEL (U+0085) like Rust, so the heading still resolves", () => {
     expect(titleOf("# Real heading\nbody")).toBe("Real heading");
   });
 
-  it("does NOT trim a leading BOM (U+FEFF) — matches Rust, which keeps it", () => {
+  test("does NOT trim a leading BOM (U+FEFF) — matches Rust, which keeps it", () => {
     expect(titleOf("﻿Title from BOM\nbody")).toBe("﻿Title from BOM");
   });
 });

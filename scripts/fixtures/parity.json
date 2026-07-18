@@ -18,15 +18,15 @@
       "value": ["id", "created", "updated", "locked", "secure", "localAiAllowed", "pinned", "fields"]
     },
     "keychainService": {
-      "sourceOfTruth": "src-tauri/src/keychain.rs SERVICE ↔ breve-runtime/scripts/keychainNames.ts ROTLI_KEYCHAIN_SERVICE",
+      "sourceOfTruth": "src-tauri/src/keychain.rs SERVICE ↔ breve-runtime/scripts/keychain-names.ts ROTLI_KEYCHAIN_SERVICE",
       "value": "rotli"
     },
     "keychainAllowedAccounts": {
-      "sourceOfTruth": "src-tauri/src/keychain.rs ALLOWED ↔ src/lib/tauri.ts SECRET_GEMINI_API_KEY + breve-runtime/scripts/keychainNames.ts ROTLI_RESEND_ACCOUNT",
+      "sourceOfTruth": "src-tauri/src/keychain.rs ALLOWED ↔ src/lib/tauri.ts SECRET_GEMINI_API_KEY + breve-runtime/scripts/keychain-names.ts ROTLI_RESEND_ACCOUNT",
       "value": ["gemini-api-key", "breve-resend-api-key"]
     },
     "cliBinCandidates": {
-      "sourceOfTruth": "src-tauri/src/provider.rs CLIS bins ↔ breve-runtime/scripts/cliPaths.ts *_BIN_CANDIDATES",
+      "sourceOfTruth": "src-tauri/src/provider.rs CLIS bins ↔ breve-runtime/scripts/cli-paths.ts *_BIN_CANDIDATES",
       "value": {
         "claude": ["~/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"],
         "codex": ["/opt/homebrew/bin/codex", "~/.local/bin/codex", "/usr/local/bin/codex"],

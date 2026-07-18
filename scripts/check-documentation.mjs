@@ -71,6 +71,59 @@ if (existsSync(join(root, "package.json"))) {
   for (const script of ["lint", "test:unit", "test:breve", "test:tooling", "test:regression", "check"]) {
     if (!packageJson.scripts?.[script]) failures.push(`package.json is missing documented script: ${script}`);
   }
+
+  // ── no orphan tooling (added 2026-07-18; this failure mode recurred) ──────
+  // (1) Every executable under scripts/ must be invoked from somewhere real:
+  // a package.json script, a sibling script, or a CI workflow. A checker that
+  // exists but is never run is a silent third state.
+  const scriptEntries = Object.entries(packageJson.scripts ?? {});
+  const packageScriptText = scriptEntries.map(([, value]) => value).join("\n");
+  const workflowsDir = join(root, ".github/workflows");
+  const workflowText = existsSync(workflowsDir)
+    ? readdirSync(workflowsDir)
+        .filter((name) => /\.ya?ml$/.test(name))
+        .map((name) => readFileSync(join(workflowsDir, name), "utf8"))
+        .join("\n")
+    : "";
+  const orphanExemptions = {
+    "bump-version.sh": "manual release helper — run by hand per its usage header; release.sh reads the result",
+  };
+  const executables = readdirSync(join(root, "scripts")).filter((name) => /\.(mjs|sh)$/.test(name));
+  const siblingText = (self) =>
+    executables
+      .filter((name) => name !== self)
+      .map((name) => readFileSync(join(root, "scripts", name), "utf8"))
+      .join("\n");
+  for (const name of executables) {
+    if (name in orphanExemptions) continue;
+    if (!packageScriptText.includes(name) && !workflowText.includes(name) && !siblingText(name).includes(name)) {
+      failures.push(`scripts/${name} is an orphan — wire it into package.json/a workflow, or exempt it with a reason`);
+    }
+  }
+  // (2) Every check:* script key must actually run somewhere — referenced by
+  // another package.json script (the lint/check/test chains) or a CI workflow.
+  // Defined-but-never-run checks are how conventions rot while looking enforced.
+  const chainExemptions = {
+    "check:dup": "advisory duplication miner — run on demand against dup-judgments.json, deliberately not a gate",
+  };
+  for (const [key] of scriptEntries) {
+    if (!key.startsWith("check:") || key in chainExemptions) continue;
+    const referencedElsewhere = scriptEntries.some(([other, value]) => other !== key && new RegExp(`\\b${key}\\b`).test(value));
+    if (!referencedElsewhere && !new RegExp(`\\b${key}\\b`).test(workflowText)) {
+      failures.push(`package.json script ${key} is defined but never run by any chain or workflow`);
+    }
+  }
+  // (3) Every package.json script appears (backticked) in the testing
+  // contract, so the command map cannot silently fall behind reality.
+  if (existsSync(join(root, "docs/development/testing.md"))) {
+    const testingDoc = readFileSync(join(root, "docs/development/testing.md"), "utf8");
+    const backtickSpans = [...testingDoc.matchAll(/`([^`\n]+)`/g)].map((match) => match[1]).join("\n");
+    for (const [key] of scriptEntries) {
+      if (!new RegExp(`(^|[^-\\w:])${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^-\\w:])`, "m").test(backtickSpans)) {
+        failures.push(`package.json script ${key} is not documented in docs/development/testing.md's command map`);
+      }
+    }
+  }
 }
 
 for (const rel of ["AGENTS.md", "docs/architecture/memex-data-contract.md"]) {

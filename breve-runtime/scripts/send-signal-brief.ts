@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { BREVE, BRIEFS, AUDIOS } from "./paths";
 import { loadSettings, effectiveTz, todayIn } from "./timectx";
-import { claimDelivery } from "./deliveryClaim";
+import { claimDelivery } from "./delivery-claim";
 
 const { bot, owner } = await Bun.file(join(BREVE, "signal.json")).json();
 

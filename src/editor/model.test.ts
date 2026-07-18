@@ -9,7 +9,7 @@
 // buffers in cleanup, which clears the pending 400ms timer, so no stray sync
 // (and no unhandled rejection) escapes the test.
 
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { editDocument, ensureDocument, evictDocument, reloadDocumentIfClean } from "./model";
 
 // Track buffer ids we create so cleanup can clear their pending sync timers.
@@ -37,12 +37,12 @@ afterEach(() => {
 });
 
 describe("ensureDocument", () => {
-  it("seeds a buffer by splitting the body on newlines", () => {
+  test("seeds a buffer by splitting the body on newlines", () => {
     buffer("seed", "line one\nline two");
     expect(read("seed")).toEqual(["line one", "line two"]);
   });
 
-  it("does NOT clobber an existing live buffer (the live buffer is the truth)", () => {
+  test("does NOT clobber an existing live buffer (the live buffer is the truth)", () => {
     buffer("live", "alpha");
     editDocument("live", (lines) => [...lines, "beta"]);
     ensureDocument("live", "STALE FROM QUERY"); // must be ignored
@@ -51,21 +51,21 @@ describe("ensureDocument", () => {
 });
 
 describe("reloadDocumentIfClean", () => {
-  it("adopts disk truth when the buffer is clean", () => {
+  test("adopts disk truth when the buffer is clean", () => {
     touched.add("clean");
     ensureDocument("clean", "old");
     reloadDocumentIfClean("clean", "from disk");
     expect(read("clean")).toEqual(["from disk"]);
   });
 
-  it("does NOT clobber a dirty buffer", () => {
+  test("does NOT clobber a dirty buffer", () => {
     buffer("dirty", "old");
     editDocument("dirty", () => ["local edit"]);
     reloadDocumentIfClean("dirty", "from disk");
     expect(read("dirty")).toEqual(["local edit"]);
   });
 
-  it("seeds when the buffer does not exist yet", () => {
+  test("seeds when the buffer does not exist yet", () => {
     touched.add("fresh");
     reloadDocumentIfClean("fresh", "hello");
     expect(read("fresh")).toEqual(["hello"]);
@@ -73,7 +73,7 @@ describe("reloadDocumentIfClean", () => {
 });
 
 describe("editDocument", () => {
-  it("applies the edit and feeds the updated buffer to the next edit", () => {
+  test("applies the edit and feeds the updated buffer to the next edit", () => {
     buffer("edit", "x");
     editDocument("edit", (lines) => [...lines, "y"]);
     let next: readonly string[] = [];
@@ -84,7 +84,7 @@ describe("editDocument", () => {
     expect(next).toEqual(["x", "y"]);
   });
 
-  it("is a no-op on an unknown buffer (callback never runs)", () => {
+  test("is a no-op on an unknown buffer (callback never runs)", () => {
     let ran = false;
     editDocument("ghost", () => {
       ran = true;
@@ -95,13 +95,13 @@ describe("editDocument", () => {
 });
 
 describe("evictDocument", () => {
-  it("drops the buffer so later edits are no-ops", () => {
+  test("drops the buffer so later edits are no-ops", () => {
     buffer("evictme", "data");
     evictDocument("evictme");
     expect(read("evictme")).toBeUndefined();
   });
 
-  it("is safe to call on a buffer that never existed", () => {
+  test("is safe to call on a buffer that never existed", () => {
     expect(() => evictDocument("never")).not.toThrow();
   });
 });

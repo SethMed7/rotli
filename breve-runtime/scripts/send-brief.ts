@@ -11,7 +11,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { BREVE as BREVE_DIR, BRIEFS, PDFS } from "./paths";
 import { readSecret } from "./secret";
-import { claimDelivery } from "./deliveryClaim";
+import { claimDelivery } from "./delivery-claim";
 
 // 1. Resolve which issue to send — from the markdown (the content source).
 const dateArg = process.argv[2];

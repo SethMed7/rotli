@@ -2,7 +2,7 @@
 // Rust tests (corpus.rs search_match_* / sort_hits) — a drift here means the
 // browser twin ranks/frames a hit differently than the shell.
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { SearchHit } from "../types";
 import { searchMatch, sortHits } from "./search";
 
@@ -20,12 +20,12 @@ const hit = (over: Partial<SearchHit>): SearchHit => ({
 });
 
 describe("searchMatch — title > body ranking with char offsets (mirrors Rust)", () => {
-  it("ranks a title hit 0, offsets index the TITLE, stored snippet rides through", () => {
+  test("ranks a title hit 0, offsets index the TITLE, stored snippet rides through", () => {
     const m = searchMatch("groc", "Groceries", "# Groceries\n\nOlive oil.\n", "Olive oil.");
     expect(m).toEqual({ rank: 0, snippet: "Olive oil.", matchStart: 0, matchLen: 4 });
   });
 
-  it("ranks a body hit 1 and frames the match inside the returned snippet", () => {
+  test("ranks a body hit 1 and frames the match inside the returned snippet", () => {
     const m = searchMatch(
       "sourdough",
       "Groceries",
@@ -37,14 +37,14 @@ describe("searchMatch — title > body ranking with char offsets (mirrors Rust)"
     expect(chars.slice(m!.matchStart, m!.matchStart + m!.matchLen).join("")).toBe("sourdough");
   });
 
-  it("matches case-insensitively both directions; no match / blank query → null", () => {
+  test("matches case-insensitively both directions; no match / blank query → null", () => {
     expect(searchMatch("OLIVE", "Groceries", "olive oil", "")).not.toBeNull();
     expect(searchMatch("olive", "Groceries", "OLIVE OIL", "")).not.toBeNull();
     expect(searchMatch("zebra", "Groceries", "olive oil", "")).toBeNull();
     expect(searchMatch("   ", "Groceries", "olive oil", "")).toBeNull();
   });
 
-  it("clips a deep body match to ±60 chars with … on both edges (Rust vector)", () => {
+  test("clips a deep body match to ±60 chars with … on both edges (Rust vector)", () => {
     const long = "a".repeat(100) + "NEEDLE" + "b".repeat(100);
     const m = searchMatch("needle", "T", long, "");
     expect(m?.snippet.startsWith("…")).toBe(true);
@@ -54,7 +54,7 @@ describe("searchMatch — title > body ranking with char offsets (mirrors Rust)"
     expect(chars).toHaveLength(1 + 60 + 6 + 60 + 1);
   });
 
-  it("strips emphasis OUTSIDE the match and flattens newlines — offsets stay true", () => {
+  test("strips emphasis OUTSIDE the match and flattens newlines — offsets stay true", () => {
     const m = searchMatch("needle", "T", "**bold**\nneedle `x`", "");
     const chars = [...(m?.snippet ?? "")];
     expect(chars.slice(m!.matchStart, m!.matchStart + m!.matchLen).join("")).toBe("needle");
@@ -63,7 +63,7 @@ describe("searchMatch — title > body ranking with char offsets (mirrors Rust)"
     expect(m?.snippet).not.toContain("\n");
   });
 
-  it("offsets are code points, not UTF-16 units (astral chars before the match)", () => {
+  test("offsets are code points, not UTF-16 units (astral chars before the match)", () => {
     const m = searchMatch("needle", "T", "😀😀 needle", "");
     const chars = [...(m?.snippet ?? "")];
     expect(chars.slice(m!.matchStart, m!.matchStart + m!.matchLen).join("")).toBe("needle");
@@ -71,7 +71,7 @@ describe("searchMatch — title > body ranking with char offsets (mirrors Rust)"
 });
 
 describe("sortHits — rank asc, then recency desc, then id (mirrors Rust sort_hits)", () => {
-  it("puts title hits first, newest first inside a rank", () => {
+  test("puts title hits first, newest first inside a rank", () => {
     const sorted = sortHits([
       hit({ id: "old-body", rank: 1, updatedAt: 10 }),
       hit({ id: "new-body", rank: 1, updatedAt: 20 }),

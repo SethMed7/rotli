@@ -12,7 +12,7 @@
  * findAgy() / findCodex() to resolve them (same lookups already used across the daemon).
  */
 import { existsSync } from "node:fs";
-import { AGY_BIN_CANDIDATES, CLAUDE_BIN_CANDIDATES, CODEX_BIN_CANDIDATES, expandHome } from "./cliPaths";
+import { AGY_BIN_CANDIDATES, CLAUDE_BIN_CANDIDATES, CODEX_BIN_CANDIDATES, expandHome } from "./cli-paths";
 import { sandboxed } from "./sandbox";
 
 const HOME = process.env.HOME!;

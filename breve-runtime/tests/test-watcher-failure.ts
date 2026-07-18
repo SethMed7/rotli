@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { nextWatcherFailure, resetWatcherFailure } from "../scripts/watcherFailure";
+import { nextWatcherFailure, resetWatcherFailure } from "../scripts/watcher-failure";
 
 describe("Breve watcher failure notifications", () => {
   test("alerts exactly when a fresh streak reaches five", () => {

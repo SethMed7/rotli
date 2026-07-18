@@ -1,11 +1,11 @@
 // The quit-flush registry (#4 follow-up): every registered flusher runs, and a
 // rejecting flusher never blocks the rest (or the ack — quit must not hang).
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { onQuitFlush, runQuitFlushers } from "./quitFlush";
 
 describe("runQuitFlushers", () => {
-  it("runs every registered flusher and settles even when one throws", async () => {
+  test("runs every registered flusher and settles even when one throws", async () => {
     const ran: string[] = [];
     onQuitFlush(() => {
       ran.push("sync");
@@ -26,7 +26,7 @@ describe("runQuitFlushers", () => {
     expect(ran.sort()).toEqual(["async", "rejector", "sync", "thrower"]);
   });
 
-  it("holds the ack until a SLOW async flusher's write actually lands", async () => {
+  test("holds the ack until a SLOW async flusher's write actually lands", async () => {
     // the data-safety contract behind the editor/persist registrations: the
     // returned promise must be awaited, not fire-and-forgotten
     let landed = false;

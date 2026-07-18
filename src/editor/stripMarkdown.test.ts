@@ -30,7 +30,7 @@ describe("stripMarkdown (beautified copy)", () => {
 });
 
 // The cross-boundary behavioral contract (remediation Batch 3): Breve's
-// markdownText.ts renders the SAME inline grammar to HTML and asserts the same
+// markdown-text.ts renders the SAME inline grammar to HTML and asserts the same
 // fixture — behavior parity without sharing an implementation across the
 // app/runtime boundary (MIRROR-NOT-IMPORT).
 describe("markdown-strip.json fixture (Breve parity)", () => {

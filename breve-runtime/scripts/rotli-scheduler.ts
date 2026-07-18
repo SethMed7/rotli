@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { BREVE, BRIEFS } from "./paths";
 import { effectiveTz, minutesNowIn, todayIn } from "./timectx";
 import { dailyDue, dailySlot, intervalDue, parseHm, schedulerParentGone } from "./scheduler-core";
-import { processIsAlive, tryAcquireProcessLock, type ProcessLock } from "./processLock";
+import { processIsAlive, tryAcquireProcessLock, type ProcessLock } from "./process-lock";
 
 type DailySchedule = { kind: "dailyAt"; hhmm: string; leadMinutes: number };
 type IntervalSchedule = { kind: "everySecs"; secs: number };

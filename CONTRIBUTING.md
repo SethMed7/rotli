@@ -59,9 +59,11 @@ only after the repository is trusted.
 6. Update the document that owns the changed contract.
 7. Add a changelog entry when users will notice the change.
 
-Source filenames use camelCase. Product CSS uses semantic tokens from
-`src/brand/`; raw colors outside the brand definition layer fail CI. Markdown is
-the only surface with slash commands and embed syntax.
+Filenames follow one convention per tree, enforced by `check:structure`:
+camelCase under `src/`; kebab-case under `scripts/`, `e2e/`, `docs/`, and
+`breve-runtime/`. Product CSS uses semantic tokens from `src/brand/`; raw
+colors (hex or `rgb()`/`hsl()`) outside the token-definition layer fail CI.
+Markdown is the only surface with slash commands and embed syntax.
 
 Where a new surface, feature, vendor dependency, utility, Tauri command,
 TS↔Rust shared constant, or CARL domain belongs — and which mechanical check
@@ -86,7 +88,10 @@ exceed 100 columns. `cargo clippy --all-targets -- -D warnings` is the Rust
 gate; do not run `cargo fmt` or commit its output.
 
 ESLint rules live in `eslint.config.mjs` and are deliberately minimal
-(floating/misused promises, `no-explicit-any`, react-hooks). Propose additions
+(floating/misused promises, `no-explicit-any`, react-hooks, identifier casing
+via `naming-convention` — adopted 2026-07-18 at a measured 0 real violations —
+and a ban on bun:test's `it` alias: the suite spells every test `test(...)`).
+Propose additions
 in a PR; the config must not grow silently. TypeScript stays pinned `~5.8.3`
 because typescript-eslint 8.x crashes on TS 7. Biome remains the preferred
 long-term two-package footprint: re-benchmark when `noFloatingPromises` leaves

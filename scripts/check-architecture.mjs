@@ -88,7 +88,7 @@ const protectedLayers = [
       "breve-runtime/scripts/doctor-findings.ts",
       "breve-runtime/scripts/intents.ts",
       "breve-runtime/scripts/scheduler-core.ts",
-      "breve-runtime/scripts/watcherFailure.ts",
+      "breve-runtime/scripts/watcher-failure.ts",
     ],
     forbidden: ["node:", "./paths", "./bin", "./llm", "./config"],
   },

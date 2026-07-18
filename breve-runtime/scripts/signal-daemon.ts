@@ -25,7 +25,7 @@ import { loadSettings, saveSettings, effectiveTz, travelExpired, todayIn, minute
 import { normalizeAmPm, mealOf, briefAsk, briefRegenMatch, briefQueueMatch, bareFollowup, wantsLastAsText, topicBriefMatch, urlRequest, watchIntentMatch, parseWhen, schedulePairs, scheduleChangeGate, audioResearchAsk, inboxAsk, accountOf, inboxScope, mailSearchAsk, modelDirective, saveAttachmentIntent, folderFromCaption, slugifyTopic, stripStepNarration, type ModelTier, type Meal, type BriefFormat } from "./intents";
 import { validateAction, describeAction, previewScript } from "./actions";
 import { rotate } from "./logrotate";
-import { acquireProcessLock } from "./processLock";
+import { acquireProcessLock } from "./process-lock";
 
 // The owner's time context (home tz + travel mode) — cached, refreshed every 5 min.
 let CFG: Settings = await loadSettings();

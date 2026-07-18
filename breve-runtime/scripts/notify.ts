@@ -8,8 +8,8 @@
  * signal-cli takes a per-account lock; the daemon usually holds it, so we retry a few times.
  */
 import { join } from "node:path";
-import { claimDelivery, type DeliveryClaim } from "./deliveryClaim";
-import { safeLockKey } from "./processLock";
+import { claimDelivery, type DeliveryClaim } from "./delivery-claim";
+import { safeLockKey } from "./process-lock";
 
 const BREVE = process.env.ROTLI_BREVE_HOME ?? join(import.meta.dir, "..");
 const argv = process.argv.slice(2);

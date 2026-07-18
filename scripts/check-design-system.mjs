@@ -61,6 +61,25 @@ for (const file of readdirSync(join(root, "src/styles")).filter((name) => name.e
   }
 }
 
+// Class naming is one dialect: kebab-case (BEM `--modifier` allowed — e.g.
+// .appicon-tile--paper), component/feature-prefixed (rotli-*, cm-*, chat-*,
+// mem-*, …). Measured 2026-07-18 at ~950 class selectors across all 13 files
+// with zero camelCase/snake_case — this locks that in without adding a
+// stylelint toolchain. Strings, url() bodies, and comments are stripped first
+// so a data-URI or content string never trips it.
+const CLASS_KEBAB = /^[a-z0-9]+(-{1,2}[a-z0-9]+)*$/;
+for (const file of readdirSync(join(root, "src/styles")).filter((name) => name.endsWith(".css"))) {
+  const source = read(`src/styles/${file}`)
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '""')
+    .replace(/url\([^)]*\)/g, "url()");
+  for (const match of source.matchAll(/\.([A-Za-z_][A-Za-z0-9_-]*)/g)) {
+    if (!CLASS_KEBAB.test(match[1])) {
+      violations.push(`src/styles/${file}: class selector .${match[1]} must be kebab-case`);
+    }
+  }
+}
+
 const expectedDataThemes = Object.keys(themeSelectors);
 for (const theme of expectedDataThemes) {
   if (!themeState.includes(`"${theme}"`)) violations.push(`theme.ts: DataTheme omits ${theme}`);

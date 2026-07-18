@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
 /// The Keychain "service" every rotli secret lives under. Byte-identical to
-/// ROTLI_KEYCHAIN_SERVICE in breve-runtime/scripts/keychainNames.ts (parity.json).
+/// ROTLI_KEYCHAIN_SERVICE in breve-runtime/scripts/keychain-names.ts (parity.json).
 pub(crate) const SERVICE: &str = "rotli";
 
 /// The only secret names the webview may address — every literal site in the

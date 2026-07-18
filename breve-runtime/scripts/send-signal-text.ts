@@ -9,8 +9,8 @@
 import { join } from "node:path";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { BREVE } from "./paths";
-import { claimDelivery, type DeliveryClaim } from "./deliveryClaim";
-import { safeLockKey } from "./processLock";
+import { claimDelivery, type DeliveryClaim } from "./delivery-claim";
+import { safeLockKey } from "./process-lock";
 import { effectiveTz, loadSettings, todayIn } from "./timectx";
 
 const { bot, owner } = await Bun.file(join(BREVE, "signal.json")).json();

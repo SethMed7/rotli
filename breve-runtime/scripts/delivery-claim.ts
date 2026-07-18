@@ -5,7 +5,7 @@
  */
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { acquireProcessLock, safeLockKey } from "./processLock";
+import { acquireProcessLock, safeLockKey } from "./process-lock";
 
 export type DeliveryClaim =
   | { status: "delivered" | "busy"; receipt: string }

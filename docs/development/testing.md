@@ -22,6 +22,19 @@ direction, runtime wiring, and owning documentation must agree.
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Rust host, filesystem, security, scheduler, and IPC behavior |
 | `NODE_OPTIONS=--max-old-space-size=4096 bun run build` | Production bundling and final TypeScript/runtime validation |
 
+Development, formatting, and release commands (`check:docs` verifies this map
+stays complete — every `package.json` script must appear in this document):
+
+| Command | Purpose |
+|---|---|
+| `bun run dev` / `bun run preview` | Vite dev server against the seeded demo corpus / preview of the built bundle |
+| `bun run tauri dev` | The native desktop app (`bun run tauri` is the Tauri CLI passthrough) |
+| `bun run format` / `bun run format:check` | Prettier write / verify (`format:check` rides the `lint` chain) |
+| `bun run lint:eslint` | The ESLint layer alone (`src`, `e2e`, `playwright.config.ts`) — part of `lint` |
+| `bun run check:dup` | Advisory duplication miner over `scripts/dup-judgments.json` — run on demand, deliberately not a gate |
+| `bun run build:mac` | Local signed `.app` bundle (predmg clean + `tauri build`) |
+| `bun run release` | `scripts/release.sh` — gate, sign, notarize, staple, publish; only under an explicitly authorized release |
+
 Use the smallest focused command while iterating, then run the three required
 handoff commands from `AGENTS.md`. Never point an automated test at a live memex,
 Keychain, scheduler, daemon, or production delivery account.
@@ -107,7 +120,21 @@ covered separately.
   Markdown-only slash-command boundary.
 - `check:structure` enforces filename and dependency invariants (including the
   SheetJS/`xlsx` ban — the exceljs codec owns every spreadsheet path).
-- `check:ipc` keeps TypeScript invocations and registered Rust handlers aligned.
+- `check:ipc` keeps TypeScript invocations and registered Rust handlers aligned,
+  and requires multi-segment snake_case command names.
+- `check:hex` bans raw color literals (hex and `rgb()`/`hsl()` functional forms)
+  everywhere under `src/` outside the token-definition layer (`src/brand/`,
+  `src/styles/themes.css`; `base.css` may hold functional state tokens).
+- `check:design-system` proves the four themes define every semantic token, that
+  product CSS consumes tokens rather than literal colors, and that class
+  selectors stay kebab-case (BEM `--modifier` allowed).
+- `check:parity` guards the TS↔Rust shared-constant fixture harness itself.
+- `check:security` is the egress/CSP/keychain/capability tripwire layer
+  ([`security.md`](security.md)).
+- `check:docs` keeps the AI-context files, CARL wiring, doc links, this command
+  map, and the no-orphan-tooling rule (every `scripts/*.mjs`/`.sh` is invoked by
+  a package script, sibling script, or workflow; every `check:*` script actually
+  runs in some chain) all honest.
 - `check:secret-parity` extracts the secret-pattern lists from `src/ai/guard.ts`
   and `src-tauri/src/secret.rs` and fails the moment the hand-synced mirror
   drifts.

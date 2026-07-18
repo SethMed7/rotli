@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { claimDelivery } from "../scripts/deliveryClaim";
+import { claimDelivery } from "../scripts/delivery-claim";
 
 const root = () => mkdtempSync(join(tmpdir(), "breve-delivery-"));
 

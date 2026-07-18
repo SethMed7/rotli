@@ -14,7 +14,7 @@
 import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderMp3, parseSegments } from "./tts";
-import { stripMarkdown } from "./markdownText";
+import { stripMarkdown } from "./markdown-text";
 import { BRIEFS, AUDIOS } from "./paths";
 import { LLM } from "./llm";
 
@@ -29,7 +29,7 @@ const mdPath = join(BRIEFS, `${stem}.md`);
 const md = await Bun.file(mdPath).text().catch(() => null);
 if (!md) { console.error(`ERR no brief markdown at ${mdPath}`); process.exit(1); }
 
-// 2. Spoken script — local Gemma rewrite, stripMarkdown (markdownText.ts) fallback
+// 2. Spoken script — local Gemma rewrite, stripMarkdown (markdown-text.ts) fallback
 const niceDate = new Date(date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
 // Shared handoff protocol — prevents hosts referring to themselves in the third person or thanking

@@ -1,16 +1,16 @@
 // The pure half of ⌥A summon-chat: picking the chat to land in. The summon
 // flow itself (window show, pane wiring) is Tauri-bound and smoke-tested live.
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 import { newestChatSlug } from "./chatSummon";
 
 describe("newestChatSlug", () => {
-  it("returns null for no chats", () => {
+  test("returns null for no chats", () => {
     expect(newestChatSlug([])).toBeNull();
   });
 
-  it("picks the most recently touched chat", () => {
+  test("picks the most recently touched chat", () => {
     expect(
       newestChatSlug([
         { slug: "alpha", modifiedMs: 100 },
@@ -20,7 +20,7 @@ describe("newestChatSlug", () => {
     ).toBe("zeta");
   });
 
-  it("keeps the list order on ties (slug-sorted Rust-side ⇒ deterministic)", () => {
+  test("keeps the list order on ties (slug-sorted Rust-side ⇒ deterministic)", () => {
     expect(
       newestChatSlug([
         { slug: "a-first", modifiedMs: 100 },
@@ -29,7 +29,7 @@ describe("newestChatSlug", () => {
     ).toBe("a-first");
   });
 
-  it("tolerates the mtime-unreadable sentinel (0)", () => {
+  test("tolerates the mtime-unreadable sentinel (0)", () => {
     expect(
       newestChatSlug([
         { slug: "broken", modifiedMs: 0 },

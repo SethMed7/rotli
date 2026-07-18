@@ -34,6 +34,26 @@ export default tseslint.config(
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-misused-promises": "error",
       "@typescript-eslint/no-explicit-any": "error",
+      // Identifier casing, measured before adoption (2026-07-18): a one-off run of
+      // exactly this config found 5 hits in all of src, every one a leading-underscore
+      // discard or the dunder build global — i.e. the codebase already satisfies it.
+      // This locks in an existing invariant; it is not a restyling campaign.
+      "@typescript-eslint/naming-convention": [
+        "error",
+        // Vite `define`-injected build globals (declare const __APP_VERSION__ —
+        // vite.config.ts) use the conventional dunder shape; exempt by shape.
+        { selector: "variable", filter: { regex: "^__[A-Z0-9_]+__$", match: true }, format: null },
+        { selector: "variable", format: ["camelCase", "UPPER_CASE", "PascalCase"], leadingUnderscore: "allow" },
+        { selector: "typeLike", format: ["PascalCase"] },
+        { selector: "interface", format: ["PascalCase"], custom: { regex: "^I[A-Z]", match: false } },
+      ],
+      // bun:test exposes test() and it() as aliases; the suite standardized on
+      // test() (2026-07-18 sweep — 14 it()-only files converted, 0 mixed). One
+      // spelling, mechanically held.
+      "no-restricted-imports": [
+        "error",
+        { paths: [{ name: "bun:test", importNames: ["it"], message: "use test(), not it() — the suite's one spelling" }] },
+      ],
       "react-hooks/exhaustive-deps": "error",
       "react-hooks/rules-of-hooks": "error",
     },

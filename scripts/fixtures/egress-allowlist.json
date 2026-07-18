@@ -40,7 +40,7 @@
     "constantSites": [
       "src-tauri/src/keychain.rs",
       "src/lib/tauri.ts",
-      "breve-runtime/scripts/keychainNames.ts",
+      "breve-runtime/scripts/keychain-names.ts",
       "scripts/fixtures/parity.json"
     ]
   },

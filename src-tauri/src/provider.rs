@@ -61,7 +61,7 @@ pub(crate) struct CliSpec {
     models: &'static [&'static str],
 }
 
-// `bins` lists are byte-identical to breve-runtime/scripts/cliPaths.ts (F10) —
+// `bins` lists are byte-identical to breve-runtime/scripts/cli-paths.ts (F10) —
 // guarded by scripts/fixtures/parity.json via parity_tests.rs; change both sides.
 pub(crate) const CLIS: &[CliSpec] = &[
     CliSpec {

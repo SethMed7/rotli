@@ -4,7 +4,7 @@
 // SP-2/TSP-4 id tiebreak), and the origin breadcrumb rule across the
 // archive/trash/restore lifecycle.
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { DEST } from "./destinations";
 import { InMemoryNotesService, ulid } from "./notes";
 
@@ -25,19 +25,19 @@ function freshService(): InMemoryNotesService {
 }
 
 describe("ulid", () => {
-  it("is 26 chars of Crockford base32", () => {
+  test("is 26 chars of Crockford base32", () => {
     const id = ulid();
     expect(id).toHaveLength(26);
     expect(id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
   });
 
-  it("sorts lexicographically by the time prefix (later time → larger id)", () => {
+  test("sorts lexicographically by the time prefix (later time → larger id)", () => {
     const early = ulid(1_000_000_000_000);
     const late = ulid(2_000_000_000_000);
     expect(early < late).toBe(true);
   });
 
-  it("differs in the random tail for the same timestamp", () => {
+  test("differs in the random tail for the same timestamp", () => {
     const t = 1_700_000_000_000;
     // sharing a prefix, the 16-char random tail makes collisions effectively nil
     expect(ulid(t)).not.toBe(ulid(t));
@@ -45,7 +45,7 @@ describe("ulid", () => {
 });
 
 describe("createNote / getNote / updateNote", () => {
-  it("derives title + snippet, stamps created==updated, defaults unpinned", async () => {
+  test("derives title + snippet, stamps created==updated, defaults unpinned", async () => {
     const svc = freshService();
     const note = await svc.createNote(DEST.inbox, "# Hello\n\nFirst body line.");
     expect(note.title).toBe("Hello");
@@ -56,14 +56,14 @@ describe("createNote / getNote / updateNote", () => {
     expect(note.body).toBe("# Hello\n\nFirst body line.");
   });
 
-  it("round-trips through getNote, returns null for a miss", async () => {
+  test("round-trips through getNote, returns null for a miss", async () => {
     const svc = freshService();
     const note = await svc.createNote(DEST.inbox, "# Hi");
     expect(await svc.getNote(note.id)).toEqual(note);
     expect(await svc.getNote("nope")).toBeNull();
   });
 
-  it("re-derives title/snippet and bumps updatedAt on update", async () => {
+  test("re-derives title/snippet and bumps updatedAt on update", async () => {
     const svc = freshService();
     const note = await svc.createNote(DEST.inbox, "# Before");
     const updated = await svc.updateNote(note.id, "# After\n\nnew body");
@@ -74,14 +74,14 @@ describe("createNote / getNote / updateNote", () => {
     expect(updated.id).toBe(note.id); // id is the through-line
   });
 
-  it("throws a recognizable 'unknown note' error on a missing update", async () => {
+  test("throws a recognizable 'unknown note' error on a missing update", async () => {
     const svc = freshService();
     expect(svc.updateNote("ghost", "x")).rejects.toThrow("unknown note: ghost");
   });
 });
 
 describe("listNotes — three-case descendant scoping", () => {
-  it("All Notes (no folderId) excludes the hidden roots", async () => {
+  test("All Notes (no folderId) excludes the hidden roots", async () => {
     const svc = freshService();
     await svc.createNote(DEST.inbox, "# visible inbox");
     await svc.createNote(`${DEST.storage}/Work`, "# visible nested");
@@ -93,7 +93,7 @@ describe("listNotes — three-case descendant scoping", () => {
     expect(titles).toEqual(["visible inbox", "visible nested"]);
   });
 
-  it("a normal folder includes its descendants (a folder holds everything under it)", async () => {
+  test("a normal folder includes its descendants (a folder holds everything under it)", async () => {
     const svc = freshService();
     await svc.createNote(DEST.storage, "# top brain");
     await svc.createNote(`${DEST.storage}/Work`, "# under work");
@@ -105,7 +105,7 @@ describe("listNotes — three-case descendant scoping", () => {
     expect(titles).toEqual(["top brain", "under myela", "under work"]);
   });
 
-  it("a hidden root shows ONLY its own subtree (and is allowed to)", async () => {
+  test("a hidden root shows ONLY its own subtree (and is allowed to)", async () => {
     const svc = freshService();
     await svc.createNote(DEST.archive, "# archived note");
     await svc.createNote(DEST.inbox, "# normal note");
@@ -114,7 +114,7 @@ describe("listNotes — three-case descendant scoping", () => {
     expect(archived.map((n) => n.title)).toEqual(["archived note"]);
   });
 
-  it("scopes by the folder TREE (a note's folder must be a real descendant)", async () => {
+  test("scopes by the folder TREE (a note's folder must be a real descendant)", async () => {
     // descendants walks parentId — only a seeded child counts. A note in an
     // unseeded "Storage/x" path is NOT reachable from Storage and stays out.
     const svc = freshService();
@@ -128,7 +128,7 @@ describe("listNotes — three-case descendant scoping", () => {
 });
 
 describe("listNotes — pinned → updatedAt → id sort (SP-2/TSP-4 tiebreak)", () => {
-  it("pins float to the top, then newest, then id ascending on a tie", async () => {
+  test("pins float to the top, then newest, then id ascending on a tie", async () => {
     const svc = freshService();
     // two notes with the SAME updatedAt to force the id tiebreak; explicit,
     // controlled ids make the lock DETERMINISTIC (a random ulid tail would make
@@ -153,7 +153,7 @@ describe("listNotes — pinned → updatedAt → id sort (SP-2/TSP-4 tiebreak)",
     expect(ia).toBeLessThan(ib);
   });
 
-  it("summaries carry no body field", async () => {
+  test("summaries carry no body field", async () => {
     const svc = freshService();
     await svc.createNote(DEST.inbox, "# has body\n\nsecret");
     const [row] = await svc.listNotes(DEST.inbox);
@@ -163,7 +163,7 @@ describe("listNotes — pinned → updatedAt → id sort (SP-2/TSP-4 tiebreak)",
 });
 
 describe("moveNote + the origin breadcrumb rule", () => {
-  it("entering a hidden root from a normal folder records the origin", async () => {
+  test("entering a hidden root from a normal folder records the origin", async () => {
     const svc = freshService();
     const note = await svc.createNote(`${DEST.storage}/Work`, "# a thought");
     expect(svc.origins.has(note.id)).toBe(false);
@@ -174,7 +174,7 @@ describe("moveNote + the origin breadcrumb rule", () => {
     expect(svc.origins.get(note.id)).toBe(`${DEST.storage}/Work`);
   });
 
-  it("restore reads the breadcrumb, lands the note home, and CLEARS the origin", async () => {
+  test("restore reads the breadcrumb, lands the note home, and CLEARS the origin", async () => {
     const svc = freshService();
     const note = await svc.createNote(DEST.storage, "# keep this");
     await svc.archiveNote(note.id);
@@ -185,7 +185,7 @@ describe("moveNote + the origin breadcrumb rule", () => {
     expect(svc.origins.has(note.id)).toBe(false); // breadcrumb dropped — it's home now
   });
 
-  it("restore falls back to Inbox when the origin folder is gone", async () => {
+  test("restore falls back to Inbox when the origin folder is gone", async () => {
     const svc = freshService();
     const note = await svc.createNote(`${DEST.storage}/Work`, "# orphan");
     await svc.trashNote(note.id);
@@ -194,7 +194,7 @@ describe("moveNote + the origin breadcrumb rule", () => {
     expect(restored.folderId).toBe(DEST.inbox);
   });
 
-  it("restore falls back to Inbox when there is no breadcrumb at all", async () => {
+  test("restore falls back to Inbox when there is no breadcrumb at all", async () => {
     const svc = freshService();
     // a note that lives directly in Trash with no recorded origin
     const note = svc.seedNote(DEST.trash, "# no origin", { createdAt: 1, updatedAt: 1 });
@@ -203,7 +203,7 @@ describe("moveNote + the origin breadcrumb rule", () => {
     expect(restored.folderId).toBe(DEST.inbox);
   });
 
-  it("restore of a root-origin note returns it to the corpus root, not Inbox (TSP-3)", async () => {
+  test("restore of a root-origin note returns it to the corpus root, not Inbox (TSP-3)", async () => {
     // a note that lived at the bare corpus root (folderId "") records origin ""
     // when archived — a value DISTINCT from "no breadcrumb" (corpus.rs:162-167).
     const svc = freshService();
@@ -215,7 +215,7 @@ describe("moveNote + the origin breadcrumb rule", () => {
     expect(svc.origins.has(note.id)).toBe(false); // breadcrumb cleared — it's home
   });
 
-  it("an archived note still EXISTS via getNote (the pruneQuick premise — SP-1)", async () => {
+  test("an archived note still EXISTS via getNote (the pruneQuick premise — SP-1)", async () => {
     // archive/trash are id-preserving MOVES, not deletions: getNote must still
     // find the note, so Quick-note pruning never treats an archived note as gone
     // even though All-Notes hides it.
@@ -227,7 +227,7 @@ describe("moveNote + the origin breadcrumb rule", () => {
     expect(allIds).not.toContain(note.id); // hidden from All Notes — why prune can't use it
   });
 
-  it("a plain visible→visible move never stamps an origin", async () => {
+  test("a plain visible→visible move never stamps an origin", async () => {
     const svc = freshService();
     const note = await svc.createNote(DEST.inbox, "# moving around");
     await svc.moveNote(note.id, DEST.storage);
@@ -235,7 +235,7 @@ describe("moveNote + the origin breadcrumb rule", () => {
     expect((await svc.getNote(note.id))?.folderId).toBe(DEST.storage);
   });
 
-  it("hidden→hidden keeps the existing breadcrumb untouched", async () => {
+  test("hidden→hidden keeps the existing breadcrumb untouched", async () => {
     const svc = freshService();
     const note = await svc.createNote(DEST.storage, "# from brain");
     await svc.trashNote(note.id); // origin = Brain
@@ -244,7 +244,7 @@ describe("moveNote + the origin breadcrumb rule", () => {
     expect(svc.origins.get(note.id)).toBe(DEST.storage); // unchanged
   });
 
-  it("archiveNote/trashNote land in their reserved roots", async () => {
+  test("archiveNote/trashNote land in their reserved roots", async () => {
     const svc = freshService();
     const a = await svc.createNote(DEST.inbox, "# one");
     const b = await svc.createNote(DEST.inbox, "# two");
@@ -252,7 +252,7 @@ describe("moveNote + the origin breadcrumb rule", () => {
     expect((await svc.trashNote(b.id)).folderId).toBe(DEST.trash);
   });
 
-  it("throws on moving an unknown note", async () => {
+  test("throws on moving an unknown note", async () => {
     const svc = freshService();
     expect(svc.moveNote("ghost", DEST.storage)).rejects.toThrow("unknown note: ghost");
   });
@@ -275,7 +275,7 @@ describe("the external Vault root (Track 2) — browse-only, prefix-scoped", () 
   const seedVault = (svc: InMemoryNotesService, folderId: string, body: string) =>
     svc.seedNote(folderId, body, { createdAt: TS, updatedAt: TS });
 
-  it("the ROOT MARKER 'vault:' scopes to everything under the external root", async () => {
+  test("the ROOT MARKER 'vault:' scopes to everything under the external root", async () => {
     const svc = withVault();
     seedVault(svc, "vault:wiki", "# a wiki note");
     seedVault(svc, "vault:wiki/projects", "# a project note");
@@ -287,7 +287,7 @@ describe("the external Vault root (Track 2) — browse-only, prefix-scoped", () 
     expect(titles).toEqual(["a chat note", "a project note", "a wiki note"]);
   });
 
-  it("All Notes EXCLUDES the Vault — it's browsed only via its own row", async () => {
+  test("All Notes EXCLUDES the Vault — it's browsed only via its own row", async () => {
     const svc = withVault();
     await svc.createNote(DEST.inbox, "# local visible");
     seedVault(svc, "vault:wiki", "# vault hidden from all-notes");
@@ -296,7 +296,7 @@ describe("the external Vault root (Track 2) — browse-only, prefix-scoped", () 
     expect(titles).toEqual(["local visible"]);
   });
 
-  it("refuses to create or move a note into the Vault (the write ceiling)", async () => {
+  test("refuses to create or move a note into the Vault (the write ceiling)", async () => {
     const svc = withVault();
     expect(svc.createNote("vault:wiki", "# nope")).rejects.toThrow();
     const local = await svc.createNote(DEST.inbox, "# local");

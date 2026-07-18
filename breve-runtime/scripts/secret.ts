@@ -11,7 +11,7 @@
  * CLI: `bun scripts/secret.ts get <service>` prints the raw value (exit 1 if empty).
  */
 import { $ } from "bun";
-import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "./keychainNames";
+import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "./keychain-names";
 
 const KEYCHAIN = `${process.env.HOME}/Library/Keychains/breve.keychain-db`;
 const PW_FILE = `${process.env.HOME}/.breve-secrets/keychain-pw`;

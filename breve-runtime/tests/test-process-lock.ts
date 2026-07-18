@@ -8,7 +8,7 @@ import {
   acquireProcessLock,
   safeLockKey,
   tryAcquireProcessLock,
-} from "../scripts/processLock";
+} from "../scripts/process-lock";
 
 const root = () => mkdtempSync(join(tmpdir(), "breve-lock-"));
 
@@ -63,7 +63,7 @@ describe("Breve cross-process locks", () => {
 
   test("serializes real OS processes and recovers after a crashed owner", async () => {
     const dir = root();
-    const moduleUrl = pathToFileURL(join(import.meta.dir, "../scripts/processLock.ts")).href;
+    const moduleUrl = pathToFileURL(join(import.meta.dir, "../scripts/process-lock.ts")).href;
     const worker = `
       import { tryAcquireProcessLock } from ${JSON.stringify(moduleUrl)};
       const lock = tryAcquireProcessLock(process.env.LOCK_ROOT, "integration");

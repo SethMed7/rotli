@@ -8,7 +8,7 @@
  */
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { inlineHtml as inline } from "./markdownText";
+import { inlineHtml as inline } from "./markdown-text";
 import { BRIEFS, PDFS } from "./paths";
 import { pdfThemeVariables, readPdfTheme } from "./pdf-theme";
 
@@ -26,7 +26,7 @@ const longDate = d.toLocaleDateString("en-US", { month: "long", day: "numeric", 
 const slot = kind === "morning" ? "Morning" : kind === "lunch" ? "Midday" : "Evening";
 const pdfTheme = readPdfTheme();
 
-// ── Markdown → readable HTML (inline voice lives in markdownText.ts) ─────────
+// ── Markdown → readable HTML (inline voice lives in markdown-text.ts) ─────────
 function mdToBody(src: string): string {
   const out: string[] = [];
   let para: string[] = [];

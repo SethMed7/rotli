@@ -5,7 +5,7 @@
 // grammar itself (approve/dismiss/undo re-append the proposal's OWN id) via
 // the injectable deps seam — no Tauri shell needed.
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { CorpusNoteMeta, FrontmatterView } from "../lib/tauri";
 import {
   type BrainAction,
@@ -30,31 +30,31 @@ const row = (over: Partial<BrainAction>): BrainAction => ({
 });
 
 describe("deriveJournal — last line per id wins", () => {
-  it("a lone proposal is pending, not history", () => {
+  test("a lone proposal is pending, not history", () => {
     const v = deriveJournal([row({})]);
     expect(v.pending.map((a) => a.id)).toEqual(["a1"]);
     expect(v.history).toEqual([]);
   });
 
-  it("proposed → applied resolves out of pending into history", () => {
+  test("proposed → applied resolves out of pending into history", () => {
     const v = deriveJournal([row({}), row({ ts: 2, status: "applied" })]);
     expect(v.pending).toEqual([]);
     expect(v.history.map((a) => a.status)).toEqual(["applied"]);
   });
 
-  it("proposed → dismissed disappears from both lanes", () => {
+  test("proposed → dismissed disappears from both lanes", () => {
     const v = deriveJournal([row({}), row({ ts: 2, status: "dismissed" })]);
     expect(v.pending).toEqual([]);
     expect(v.history).toEqual([]);
   });
 
-  it("applied → reverted stays in history as the undone marker", () => {
+  test("applied → reverted stays in history as the undone marker", () => {
     const v = deriveJournal([row({ status: "applied" }), row({ ts: 2, status: "reverted" })]);
     expect(v.pending).toEqual([]);
     expect(v.history.map((a) => a.status)).toEqual(["reverted"]);
   });
 
-  it("orders both lanes newest first", () => {
+  test("orders both lanes newest first", () => {
     const v = deriveJournal([
       row({ id: "old", ts: 1 }),
       row({ id: "new", ts: 3 }),
@@ -65,7 +65,7 @@ describe("deriveJournal — last line per id wins", () => {
     expect(v.history.map((a) => a.id)).toEqual(["done-new", "done-old"]);
   });
 
-  it("daemon ULID ids and TS ts36-counter36 ids coexist without folding", () => {
+  test("daemon ULID ids and TS ts36-counter36 ids coexist without folding", () => {
     const v = deriveJournal([
       row({ id: "01J9XYZABCDEFGHJKMNPQRSTVW", ts: 5 }), // Rust ULID
       row({ id: "mbk3x9-0", ts: 6, status: "applied" }), // TS actionId
@@ -74,7 +74,7 @@ describe("deriveJournal — last line per id wins", () => {
     expect(v.history).toHaveLength(1);
   });
 
-  it("tolerates unknown statuses and extra fields (a future writer), no crash", () => {
+  test("tolerates unknown statuses and extra fields (a future writer), no crash", () => {
     const alien = {
       ...row({ id: "z9", ts: 9 }),
       status: "quarantined" as BrainAction["status"],
@@ -85,13 +85,13 @@ describe("deriveJournal — last line per id wins", () => {
     expect(v.history).toEqual([]);
   });
 
-  it("drops rows without a usable id (a torn/foreign line)", () => {
+  test("drops rows without a usable id (a torn/foreign line)", () => {
     const broken = { ...row({}), id: "" } as BrainAction;
     const v = deriveJournal([broken, row({ id: "good", ts: 2 })]);
     expect(v.pending.map((a) => a.id)).toEqual(["good"]);
   });
 
-  it("daemon index rows (empty model, no confidence/field) fold like any other", () => {
+  test("daemon index rows (empty model, no confidence/field) fold like any other", () => {
     const idx = row({
       id: "01JIDX",
       action: "index",
@@ -169,7 +169,7 @@ function fakeDeps(rel: string, fields: string[] = [], over: Partial<JournalDeps>
 }
 
 describe("approveProposal — the same-id transition", () => {
-  it("files via the proposal's ULID with journal:false and re-appends its OWN id", async () => {
+  test("files via the proposal's ULID with journal:false and re-appends its OWN id", async () => {
     const p = row({ id: "01JPROP", noteUlid: "01ULID" });
     const { deps, calls } = fakeDeps("wiki/_inbox/foo-a1b2c3.md");
     await approveProposal(p, deps);
@@ -188,7 +188,7 @@ describe("approveProposal — the same-id transition", () => {
     expect(v.history.map((a) => a.id)).toEqual(["01JPROP"]);
   });
 
-  it("refuses a file proposal whose note has MOVED since (stale decision, §4.8)", async () => {
+  test("refuses a file proposal whose note has MOVED since (stale decision, §4.8)", async () => {
     const p = row({ id: "01JPROP", noteUlid: "01ULID" });
     const { deps, calls } = fakeDeps("wiki/Research/foo-a1b2c3.md"); // already elsewhere
     await expect(approveProposal(p, deps)).rejects.toThrow(/moved since/);
@@ -196,7 +196,7 @@ describe("approveProposal — the same-id transition", () => {
     expect(calls.appended).toEqual([]); // still pending — Dismiss is the way out
   });
 
-  it("applies a field proposal at the note's CURRENT rel (survives a sibling filing)", async () => {
+  test("applies a field proposal at the note's CURRENT rel (survives a sibling filing)", async () => {
     const p = row({
       id: "01JFIELD",
       action: "field",
@@ -214,7 +214,7 @@ describe("approveProposal — the same-id transition", () => {
     expect(calls.appended[0]?.noteId).toBe("wiki/Projects/foo-a1b2c3.md");
   });
 
-  it("persists area_confidence beside an approved suggested_area", async () => {
+  test("persists area_confidence beside an approved suggested_area", async () => {
     const p = row({
       id: "01JSUGG",
       action: "field",
@@ -232,7 +232,7 @@ describe("approveProposal — the same-id transition", () => {
     ]);
   });
 
-  it("refuses a field proposal the user has since edited over (never clobber)", async () => {
+  test("refuses a field proposal the user has since edited over (never clobber)", async () => {
     const p = row({
       id: "01JFIELD",
       action: "field",
@@ -248,7 +248,7 @@ describe("approveProposal — the same-id transition", () => {
     expect(calls.learned).toEqual([]);
   });
 
-  it("an approved filing records filed_by/filed_at like an auto-apply (#90)", async () => {
+  test("an approved filing records filed_by/filed_at like an auto-apply (#90)", async () => {
     const p = row({ id: "01JPROP", noteUlid: "01ULID", model: "gemma-3-12b-it-qat-4bit" });
     const { deps, calls } = fakeDeps("wiki/_inbox/foo-a1b2c3.md");
     await approveProposal(p, deps);
@@ -264,7 +264,7 @@ describe("approveProposal — the same-id transition", () => {
     ]);
   });
 
-  it("a refused filing stamps NOTHING — no filed_by on an unfiled note (review, 2026-07)", async () => {
+  test("a refused filing stamps NOTHING — no filed_by on an unfiled note (review, 2026-07)", async () => {
     const p = row({ id: "01JPROP", noteUlid: "01ULID", model: "gemma-3-12b-it-qat-4bit" });
     const { deps, calls } = fakeDeps("wiki/_inbox/foo-a1b2c3.md", [], {
       // the filer gate refuses (the user locked the note mid-flight)
@@ -277,7 +277,7 @@ describe("approveProposal — the same-id transition", () => {
     expect(calls.appended).toEqual([]); // still pending — retry or Dismiss
   });
 
-  it("a failed stamp does NOT fail an approve whose filing already landed", async () => {
+  test("a failed stamp does NOT fail an approve whose filing already landed", async () => {
     const p = row({ id: "01JPROP", noteUlid: "01ULID" });
     const { deps, calls } = fakeDeps("wiki/_inbox/foo-a1b2c3.md", [], {
       setAiField: async () => {
@@ -289,7 +289,7 @@ describe("approveProposal — the same-id transition", () => {
     expect(calls.appended[0]?.status).toBe("applied"); // the journal transition lands
   });
 
-  it("an approved field teaches the daemon's never-clobber baseline (#28)", async () => {
+  test("an approved field teaches the daemon's never-clobber baseline (#28)", async () => {
     const p = row({
       id: "01JFIELD",
       action: "field",
@@ -311,7 +311,7 @@ describe("approveProposal — the same-id transition", () => {
     expect(calls2.appended[0]?.status).toBe("applied");
   });
 
-  it("teaches area_confidence beside an approved suggested_area (#28)", async () => {
+  test("teaches area_confidence beside an approved suggested_area (#28)", async () => {
     const p = row({
       id: "01JSUGG",
       action: "field",
@@ -329,7 +329,7 @@ describe("approveProposal — the same-id transition", () => {
     ]);
   });
 
-  it("refuses an index proposal whose overview changed since (§4.8, #26)", async () => {
+  test("refuses an index proposal whose overview changed since (§4.8, #26)", async () => {
     const p = row({
       id: "01JIDX",
       action: "index",
@@ -357,7 +357,7 @@ describe("approveProposal — the same-id transition", () => {
 });
 
 describe("dismissProposal / undoAction — same-id re-appends", () => {
-  it("dismiss appends the proposal's own id with status dismissed, corpus untouched", async () => {
+  test("dismiss appends the proposal's own id with status dismissed, corpus untouched", async () => {
     const p = row({ id: "01JPROP" });
     const { deps, calls } = fakeDeps("wiki/_inbox/foo-a1b2c3.md");
     await dismissProposal(p, deps);
@@ -367,7 +367,7 @@ describe("dismissProposal / undoAction — same-id re-appends", () => {
     expect(deriveJournal([p, ...calls.appended]).pending).toEqual([]);
   });
 
-  it("undo moves back via the ULID and re-appends the id as reverted", async () => {
+  test("undo moves back via the ULID and re-appends the id as reverted", async () => {
     const a = row({
       id: "01JDONE",
       status: "applied",
@@ -380,7 +380,7 @@ describe("dismissProposal / undoAction — same-id re-appends", () => {
     expect(calls.appended.map((x) => [x.id, x.status])).toEqual([["01JDONE", "reverted"]]);
   });
 
-  it("undo of a FIRST index apply writes the empty before-body (Rust removes the file)", async () => {
+  test("undo of a FIRST index apply writes the empty before-body (Rust removes the file)", async () => {
     const a = row({
       id: "01JIDX",
       action: "index",

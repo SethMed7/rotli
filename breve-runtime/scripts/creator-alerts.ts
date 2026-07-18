@@ -12,7 +12,7 @@
 import { join } from "node:path";
 import { BREVE } from "./paths";
 import { sendSignal as sendSig } from "./bin";
-import { tryAcquireProcessLock } from "./processLock";
+import { tryAcquireProcessLock } from "./process-lock";
 
 const DRY = process.env.BREVE_DRY === "1";
 const SIGNAL_ENABLED = (process.env.ROTLI_BREVE_LANES ?? "signal").split(",").includes("signal");

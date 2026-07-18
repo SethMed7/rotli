@@ -2,7 +2,7 @@
 // prompt is byte-identical to the nameless shape when unset (existing users'
 // prompts must not move).
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { frontierAdapter, gemmaAdapter } from "./prompt";
 
 const base = {
@@ -15,14 +15,14 @@ const base = {
 };
 
 describe("userName in the prompt", () => {
-  it("names the user in both adapters' main prompts", () => {
+  test("names the user in both adapters' main prompts", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
       const named = adapter.renderPrompt({ ...base, userName: "Seth" });
       expect(named).toContain("The user's name is Seth");
     }
   });
 
-  it("names the user in both force-final prompts", () => {
+  test("names the user in both force-final prompts", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
       const named = adapter.renderForceFinal({
         history: [],
@@ -34,7 +34,7 @@ describe("userName in the prompt", () => {
     }
   });
 
-  it("omits the line entirely when unset — prompt shape untouched", () => {
+  test("omits the line entirely when unset — prompt shape untouched", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
       expect(adapter.renderPrompt({ ...base })).not.toContain("The user's name");
       expect(adapter.renderPrompt({ ...base })).toBe(adapter.renderPrompt({ ...base, userName: "" }));

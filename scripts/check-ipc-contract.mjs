@@ -18,6 +18,27 @@ const registered = new Set(
     .map((entry) => entry.split("::").at(-1)),
 );
 
+// Command naming: multi-segment snake_case (`corpus_read`, `local_model_start`,
+// `open_url`). 90/90 already complied when adopted (2026-07-18) — this blocks a
+// camelCase or bare single-word command from entering the registry. The stricter
+// known-domain-prefix variant was rejected: a curated domain list is a
+// maintenance knob that must be edited for every new domain (see
+// docs/development/adding-things.md, "Considered and rejected").
+const IPC_COMMAND_NAME = /^[a-z0-9]+(_[a-z0-9]+)+$/;
+// Grandfathered pre-rule names only — never add to this list for new commands.
+const IPC_NAME_GRANDFATHERED = new Set([
+  "summon", // the ⌥. quick-chat summon; shipped single-word before this rule
+]);
+const misnamed = [...registered].filter(
+  (command) => !IPC_COMMAND_NAME.test(command) && !IPC_NAME_GRANDFATHERED.has(command),
+);
+if (misnamed.length) {
+  console.error(
+    `IPC contract check failed — command names must be multi-segment snake_case:\n${misnamed.map((name) => `  - ${name}`).join("\n")}`,
+  );
+  process.exit(1);
+}
+
 const sourceFiles = [];
 function walk(dir) {
   for (const name of readdirSync(dir)) {

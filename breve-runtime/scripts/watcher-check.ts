@@ -12,8 +12,8 @@ import { BREVE } from "./paths";
 import { safeFetchText } from "./safe-fetch";
 import { sendSignal as sendSig } from "./bin";
 import { LLM } from "./llm";
-import { tryAcquireProcessLock } from "./processLock";
-import { nextWatcherFailure, resetWatcherFailure } from "./watcherFailure";
+import { tryAcquireProcessLock } from "./process-lock";
+import { nextWatcherFailure, resetWatcherFailure } from "./watcher-failure";
 
 const { bot, owner } = await Bun.file(join(BREVE, "signal.json")).json();
 const WATCHERS = join(BREVE, "watchers.json");
