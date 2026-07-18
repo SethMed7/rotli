@@ -29,7 +29,9 @@
     "check:breve-contract": "bun scripts/check-breve-contract.mjs",
     "check:dup": "bun scripts/check-duplication.mjs",
     "check:breve-runtime": "bun build breve-runtime/scripts/*.ts --target bun --outdir $(mktemp -d) && tsc --noEmit -p breve-runtime && bash -n breve-runtime/scripts/morning-brief.sh && bash -n breve-runtime/scripts/lunch-brief.sh && bash -n breve-runtime/scripts/night-brief.sh && bun run check:breve-contract",
-    "check": "bun run lint && bun run test:regression"
+    "check": "bun run lint && bun run test:regression",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -63,6 +65,7 @@
     "bun-types": "^1.3.14",
     "eslint": "^10.7.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier": "^3.6.2",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.64.0",
     "vite": "^7.0.4"
