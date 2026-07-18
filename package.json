@@ -15,7 +15,7 @@
     "test:tooling": "bun test scripts/*.test.ts",
     "test:breve": "bun breve-runtime/tests/test-actions.ts && bun breve-runtime/tests/test-intents.ts && bun breve-runtime/tests/test-timectx.ts && bun breve-runtime/tests/test-retention.ts && bun breve-runtime/tests/test-pdf-theme.ts && bun breve-runtime/tests/test-doctor-findings.ts && bun test ./breve-runtime/tests/test-process-lock.ts ./breve-runtime/tests/test-delivery-claim.ts ./breve-runtime/tests/test-watcher-failure.ts ./breve-runtime/tests/test-safe-fetch-fixtures.ts ./breve-runtime/tests/test-markdown-text.ts",
     "test:regression": "bun run test && bun run check:breve-runtime && bun run check:design-system",
-    "lint": "tsc --noEmit && bun run check:code-shape && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:docs && bun run lint:eslint",
+    "lint": "tsc --noEmit && bun run format:check && bun run check:code-shape && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:docs && bun run lint:eslint",
     "lint:eslint": "eslint src",
     "check:code-shape": "bun scripts/check-code-shape.mjs",
     "check:hex": "bun scripts/check-hex.mjs",
