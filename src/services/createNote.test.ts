@@ -23,6 +23,20 @@ describe("routeDecision (memex-vs-local)", () => {
     expect(routeDecision("vault:", false, true, FALLBACK)).toEqual({ kind: "memex" });
   });
 
+  test("a writable memex routes the Brain view and curated wiki areas through Brain intake", () => {
+    expect(routeDecision("Brain", false, true, FALLBACK)).toEqual({ kind: "memex" });
+    expect(routeDecision("wiki", false, true, FALLBACK)).toEqual({ kind: "memex" });
+    expect(routeDecision("wiki/projects", false, true, FALLBACK)).toEqual({ kind: "memex" });
+
+    // Without a memex these names can still be ordinary folders in a legacy
+    // corpus, so the router preserves their explicit local meaning.
+    expect(routeDecision("Brain", false, false, FALLBACK)).toEqual({ kind: "local", folder: "Brain" });
+    expect(routeDecision("wiki/projects", false, false, FALLBACK)).toEqual({
+      kind: "local",
+      folder: "wiki/projects",
+    });
+  });
+
   test("writable memex + a selected SHELF folder ⇒ memex with that shelf", () => {
     expect(routeDecision("vault:Inbox", false, true, FALLBACK)).toEqual({ kind: "memex", shelf: ["Inbox"] });
     expect(routeDecision("vault:Myela/Payments", false, true, FALLBACK)).toEqual({

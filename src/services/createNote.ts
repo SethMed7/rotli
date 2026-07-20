@@ -6,11 +6,16 @@
 
 import { CORPUS_INSTANCE_ID, activeInstance, isWritable } from "../memex/config";
 import { loadConfig, writeNote } from "../memex/service";
-import { VAULT_MARKER, isHidden, isVault } from "./destinations";
+import { VAULT_MARKER, isHidden, isVault, isWikiPath } from "./destinations";
 import { notesService } from "./notes";
 import { creationIsSecure, isSecureNotesFolder } from "../security/secureNotes";
 
 export type Route = { kind: "memex"; shelf?: string[] } | { kind: "local"; folder: string };
+
+/** The Brain header is a virtual view over the default memex's `wiki/` tree,
+ * not a physical folder named "Brain". Its id intentionally stays human-readable
+ * in sidebar state, so creation routing must recognize it explicitly. */
+const BRAIN_VIEW_ID = "Brain";
 
 /** The PURE routing decision (no I/O, so it unit-tests): given the selection, whether
  *  a smart row is selected, and whether a writable memex is active, decide whether a
@@ -19,7 +24,9 @@ export type Route = { kind: "memex"; shelf?: string[] } | { kind: "local"; folde
  *    except the hidden roots (Archive/Trash/Board): a note must never be BORN into
  *    a sink or the capture board (#5, audit 2026-07), so those route like a smart
  *    row (the memex staging when writable, else the local fallback).
- *  - A smart row / a vault selection with a writable memex ⇒ the memex.
+ *  - A smart row / Main / Brain selection with a writable memex ⇒ Brain intake.
+ *    The Brain header and its `wiki/**` areas are views over curated AI-owned
+ *    locations, never direct interactive write targets.
  *  - A selected SHELF folder (vault:<shelf>) seeds the note's shelf; the memex's
  *    structural folders (wiki/chats) and the bare marker fall back to the default. */
 export function routeDecision(
@@ -32,7 +39,9 @@ export function routeDecision(
   if (isSecureNotesFolder(sel) && memexWritable) {
     return { kind: "memex", shelf: [sel] };
   }
-  const explicitLocal = !isSmart && sel !== "" && !isVault(sel) && !isHidden(sel);
+  const brainView = sel === BRAIN_VIEW_ID || isWikiPath(sel);
+  const explicitLocal =
+    !isSmart && sel !== "" && !isVault(sel) && !isHidden(sel) && !(memexWritable && brainView);
   if (!explicitLocal && memexWritable) {
     const sub = isVault(sel) ? sel.slice(VAULT_MARKER.length) : "";
     const shelf =

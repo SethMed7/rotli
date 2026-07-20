@@ -7,15 +7,21 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
 
 - **Main is a view.** `.rotli/main.json` stores ordered item references and
   Main-only folder structure. It never owns or copies content.
-- **Markdown notes** are plain `.md` files. A smart/Main selection routes a new
-  note through the configured memex staging rule; an explicit writable local
-  folder remains the physical home.
+- **Markdown notes** are plain `.md` files. A smart, Main, or Brain selection
+  routes a new note through **Brain intake**: the portable staging lane currently
+  stored at `wiki/_inbox/`. An explicit writable local folder remains the
+  physical home.
 - **Documents and sheets** created by Rotli live in the managed binary lane:
   `storage/rotli/` in a memex or `Storage/` in the legacy layout.
 - **Boards** are raw `.excalidraw` files. The corpus adapter chooses the writable
   Excalidraw lane for a memex and a selected writable folder for legacy storage.
-- Creating any item adds its one stable id/path to Main. Refiling the physical
-  item does not duplicate or invalidate the Main arrangement.
+- Creating any item adds its one stable id/path to Main immediately, before the
+  item is opened. A Brain-intake note therefore appears in Main while the same
+  file still lives in staging. Refiling the physical item does not duplicate or
+  invalidate the Main arrangement.
+- The Brain organizer waits for the configured quiet window after the note's
+  latest edit (five minutes by default) before classifying or refiling it. New
+  edits reset that window; filing changes location/metadata, never note prose.
 - A newly created DOCX remains a session-pristine draft until its first content
   mutation. Explicitly closing its final tab while it is still pristine moves
   the managed file to Rotli's recoverable Trash and removes its Main reference.

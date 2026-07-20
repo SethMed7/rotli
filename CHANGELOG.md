@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [Unreleased]
+
+### Fixed
+
+- **New notes now work from Main and the Brain view.** `⌘T`, New Note, and the
+  tab-strip plus route Markdown notes through Brain intake (`wiki/_inbox`) even
+  when the virtual Brain header or a curated Brain area was the last selection.
+  Opening a note from Main also makes its Main folder the active creation
+  context, so a stale physical-folder selection can no longer steal the next
+  note. The new file is referenced in Main immediately; the organizer still
+  waits for its quiet window before filing the same file into a Brain area.
+
 ## [0.33.1] - 2026-07-18
 
 ### Security

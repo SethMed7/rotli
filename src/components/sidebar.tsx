@@ -33,6 +33,7 @@ import {
   buildMainTree,
   mainFolderIds,
   mainNoteIds,
+  mainParentOfNote,
   moveInTree,
   removeFromMain,
   renameFolderInMain,
@@ -808,11 +809,20 @@ export function Sidebar() {
             style={{ paddingLeft: 10 + (depth + 1) * 16 }}
             onPointerDown={(e) => startMainDrag(e, n.id, "move", n.title || "Empty note")}
             onClick={() => {
-              if (!didMainDragRef.current) usePanesStore.getState().openSummary(n);
+              if (!didMainDragRef.current) {
+                // Main is the creation context as well as the visible projection:
+                // ⌘T / New note must not inherit a stale Brain/Storage selection
+                // from before this row was opened.
+                setSelectedFolderId(parentId);
+                setContentView("panes");
+                usePanesStore.getState().openSummary(n);
+              }
             }}
             onAuxClick={(e) => {
               if (e.button === 1) {
                 e.preventDefault();
+                setSelectedFolderId(parentId);
+                setContentView("panes");
                 usePanesStore.getState().openSummary(n, { newTab: true });
               }
             }}
@@ -1184,8 +1194,13 @@ export function Sidebar() {
         // a Main row references its Brain twin by id — strip the prefix, open
         // the same file ("one file, two views")
         if (row.id.startsWith(MAIN_ROW_PREFIX)) {
-          const n = noteIndex.get(row.id.slice(MAIN_ROW_PREFIX.length));
-          if (n) usePanesStore.getState().openSummary(n, { newTab });
+          const noteId = row.id.slice(MAIN_ROW_PREFIX.length);
+          const n = noteIndex.get(noteId);
+          if (n) {
+            setSelectedFolderId(mainParentOfNote(mainManifest.tree, noteId) ?? MAIN_ROOT);
+            setContentView("panes");
+            usePanesStore.getState().openSummary(n, { newTab });
+          }
           return;
         }
         // board rows ride kind:"note" in the roving list — the Set tells them
