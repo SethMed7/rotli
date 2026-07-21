@@ -145,7 +145,7 @@
 }
 .md-quote {
   /* Peach in the warm family; mono re-points --quote-bar. */
-  border-left: 3px solid var(--quote-bar, var(--rotli-peach));
+  border-left: 3px solid var(--quote-bar);
   padding: 2px 0 2px 14px;
   color: var(--text-muted);
   margin: 0;
@@ -176,7 +176,7 @@
 .task .box svg {
   width: 10px;
   height: 10px;
-  stroke: var(--check-ink, var(--rotli-cocoa)); /* cocoa check on olive; mono re-points */
+  stroke: var(--check-ink); /* cocoa check on olive; mono re-points */
   stroke-width: 2.4;
   fill: none;
   stroke-linecap: round;
@@ -296,7 +296,6 @@
   border: 1px solid var(--border);
   border-radius: var(--r-card);
   padding: 5px 7px;
-  box-shadow: none;
   white-space: nowrap;
 }
 .fbwrap {
@@ -360,7 +359,6 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  box-shadow: none;
   padding: 5px;
   z-index: 7;
   animation: pop-in var(--motion-enter) var(--motion-ease);
@@ -434,7 +432,6 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  box-shadow: none;
   padding: 5px;
   z-index: 7;
   animation: pop-in var(--motion-enter) var(--motion-ease);
@@ -643,7 +640,7 @@
   padding: 6px 0 2px;
 }
 .rotli-cm-host .cm-line.rotli-quote {
-  border-left: 3px solid var(--quote-bar, var(--rotli-peach));
+  border-left: 3px solid var(--quote-bar);
   padding-left: 14px;
   color: var(--text-muted);
 }
@@ -686,7 +683,7 @@
 .rotli-check.done::after {
   content: "✓";
   font-size: 11px;
-  color: var(--check-ink, var(--rotli-cocoa));
+  color: var(--check-ink);
 }
 .rotli-done {
   color: var(--text-muted);
@@ -820,7 +817,6 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  box-shadow: none;
   padding: 14px;
   font-size: 12px;
   z-index: 8;
@@ -906,7 +902,7 @@
 }
 .aaseg.sel {
   background: var(--tint);
-  border-color: color-mix(in srgb, var(--seg-accent, var(--rotli-clay)) 40%, transparent);
+  border-color: color-mix(in srgb, var(--seg-accent) 40%, transparent);
   font-weight: 600;
 }
 .stepper {

@@ -64,7 +64,7 @@
   },
   "shape": {
     "boubaKiki": "bouba (rounded/warm)",
-    "language": ["rounded pill buttons", "12px rounded cards", "soft/curled wordmark", "rounded tag/chip shapes", "gentle warm shadows over hard borders"],
+    "language": ["rounded pill buttons", "12px flat cards", "soft/curled wordmark", "rounded tag/chip shapes", "solid surfaces with one-pixel borders"],
     "radii": { "structural": 12, "interactive": 8, "accent": 4, "full": 9999 },
     "note": "Rounded + soft throughout — nothing sharp or clinical. The wordmark's roundness sets the tone."
   },

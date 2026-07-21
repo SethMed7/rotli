@@ -27,6 +27,7 @@ fix both in the same change.
 | Egress map, security checks, and the threat model | [`development/security.md`](development/security.md) |
 | Where new code, dependencies, and shared constants go | [`development/adding-things.md`](development/adding-things.md) |
 | Token-efficient AI context and project CARL | [`architecture/ai-context-architecture.md`](architecture/ai-context-architecture.md) |
+| Claude/Codex workspace CLI and MCP | [`architecture/agent-workspace.md`](architecture/agent-workspace.md) |
 
 ## Source-of-truth boundaries
 

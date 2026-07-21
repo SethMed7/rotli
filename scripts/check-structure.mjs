@@ -137,6 +137,17 @@ const blockRender = readFileSync(join(root, "src/editor/blockRender.ts"), "utf8"
 if (!/jc:\s*\{\s*compile:\s*false\s*\}/.test(blockRender)) {
   violations.push("JSXGraph JessieCode must stay in interpreter mode; production CSP forbids unsafe-eval");
 }
+const viteConfig = readFileSync(join(root, "vite.config.ts"), "utf8");
+for (const token of [
+  "./scripts/build-policy.mjs",
+  "shouldIgnoreBuildWarning",
+  "bundleBudgetViolations",
+  "chunkSizeWarningLimit",
+]) {
+  if (!viteConfig.includes(token)) {
+    violations.push(`vite.config.ts must wire the tested production build policy (${token})`);
+  }
+}
 const cargo = readFileSync(join(root, "src-tauri/Cargo.toml"), "utf8");
 for (const dependency of deniedDependencies) {
   if (new RegExp(`^${dependency}\\s*=`, "m").test(cargo)) {

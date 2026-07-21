@@ -25,6 +25,7 @@ mod provider;
 mod routines;
 mod secret;
 mod web;
+mod workspace;
 
 use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
@@ -1007,6 +1008,7 @@ pub fn run() {
             corpus::corpus_settings_read,
             corpus::corpus_settings_write,
             corpus::corpus_main_write,
+            workspace::workspace_take_open_request,
             memex::memex_detect,
             memex::memex_read_contract,
             memex::memex_read,
@@ -1284,4 +1286,10 @@ pub fn run() {
             #[cfg(not(target_os = "macos"))]
             let _ = (app, event);
         });
+}
+
+/// Entry point used by the packaged binary before Tauri starts. Recognized
+/// headless commands return an exit status; ordinary launches return `None`.
+pub fn run_headless_if_requested(args: &[String]) -> Option<i32> {
+    workspace::run_if_requested(args)
 }

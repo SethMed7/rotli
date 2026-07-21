@@ -32,3 +32,17 @@ self-hosted fonts, no CDN). Open it in a browser; that's where the freeze call h
 Never edit a frozen kit in place — re-enter Stage 1, bump `kit.json`, re-pull into `apps/rotli`.
 
 Brief: `../../engine/BRANDS/rotli/brief.md` · Board source: `../../engine/BRANDS/rotli/_reference/`.
+
+## Product token boundary
+
+`tokens/colors.css` and `tokens/type.css` are the fixed brand inputs. The app's
+`styles/base.css` composes them into semantic product roles (`--surface`,
+`--border-strong`, `--danger`, focus/state roles, and semantic icon roles), while
+`styles/themes.css` supplies Paper and Charcoal values. Component styles consume
+those roles; they never read a fixed `--rotli-*` palette value directly.
+
+The product material is flat. Glows, halos, box/text/drop shadows, backdrop blur,
+and decorative filters are not part of the kit. Popovers and dialogs separate
+with a solid surface, semantic border, spacing, and the flat scrim. Focus and
+selection use outlines or borders. `bun run check:design-system` enforces both
+the effect ban and the fixed-palette boundary across `src/styles/`.

@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../src/brand/brevePdfThemes.ts";
+import { flatCssViolations } from "./design-system-policy.mjs";
 
 const root = process.cwd();
 const read = (path) => readFileSync(join(root, path), "utf8");
@@ -10,6 +11,8 @@ const base = read("src/styles/base.css");
 const themeState = read("src/state/theme.ts");
 const uiState = read("src/state/ui.ts");
 const breveStyles = read("src/styles/breve.css");
+const brandBoard = read("src/brand/board.html");
+const brandDefinition = JSON.parse(read("src/brand/brand.json"));
 const violations = [];
 
 function blocks(css) {
@@ -43,8 +46,16 @@ for (const [theme, selector] of Object.entries(themeSelectors)) {
 
 const rootBody = allBlocks.filter((block) => block.selectors.includes(":root")).map((block) => block.body).join("\n");
 for (const token of [
-  "hov", "act", "scrim", "shadow-control", "shadow-raised", "shadow-popover",
-  "shadow-dialog", "shadow-accent",
+  "hov",
+  "act",
+  "scrim",
+  "border-strong",
+  "danger",
+  "quote-bar",
+  "check-ink",
+  "seg-accent",
+  "icon-clay",
+  "icon-olive",
 ]) {
   if (!new RegExp(`--${token}\\s*:`).test(rootBody)) violations.push(`base state grammar: missing --${token}`);
 }
@@ -54,11 +65,16 @@ for (const token of [
 // four themes. Static document preview CSS is TypeScript and intentionally has
 // its own paper palette; this check covers the app chrome under src/styles/.
 for (const file of readdirSync(join(root, "src/styles")).filter((name) => name.endsWith(".css"))) {
-  if (file === "base.css" || file === "themes.css") continue;
-  const source = read(`src/styles/${file}`).replace(/\/\*[\s\S]*?\*\//g, "");
-  if (/\b(?:rgb|rgba|hsl|hsla)\s*\(/i.test(source)) {
+  const path = `src/styles/${file}`;
+  const source = read(path).replace(/\/\*[\s\S]*?\*\//g, "");
+  violations.push(...flatCssViolations(source, path));
+  if (file !== "base.css" && file !== "themes.css" && /\b(?:rgb|rgba|hsl|hsla)\s*\(/i.test(source)) {
     violations.push(`src/styles/${file}: functional color bypasses semantic theme tokens`);
   }
+}
+violations.push(...flatCssViolations(brandBoard, "src/brand/board.html"));
+if (/\b(?:glow|halo|shadow)s?\b/i.test(brandDefinition.shape.language.join(" "))) {
+  violations.push("src/brand/brand.json: shape language contradicts Rotli's flat material policy");
 }
 
 // Class naming is one dialect: kebab-case (BEM `--modifier` allowed — e.g.

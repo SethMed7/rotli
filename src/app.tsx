@@ -41,6 +41,7 @@ import {
   setAppIcon,
   setDockVisible,
   setHideOnBlur,
+  workspaceTakeOpenRequest,
 } from "./lib/tauri";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { EditorView } from "@codemirror/view";
@@ -194,6 +195,36 @@ function MainShell() {
       }),
     [],
   );
+
+  // `rotli open <id>` (CLI/MCP) writes one tiny request beside the corpus
+  // sidecars, then activates the app. Consume it at startup and while Rotli is
+  // resident so an agent-opened item lands in the same pane flow as a user
+  // click. Polling is intentionally slow and local; no daemon or network port.
+  useEffect(() => {
+    if (!isTauri()) return;
+    let stopped = false;
+    let reading = false;
+    const consume = () => {
+      if (reading || stopped) return;
+      reading = true;
+      void workspaceTakeOpenRequest()
+        .then((request) => {
+          if (!request || stopped) return;
+          useUiStore.getState().setContentView("panes");
+          usePanesStore.getState().openSummary(request);
+        })
+        .catch(() => {})
+        .finally(() => {
+          reading = false;
+        });
+    };
+    consume();
+    const timer = window.setInterval(consume, 750);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   // the daemon journaled (a proposal or an auto-applied action) — refetch the
   // journal (Activity + the sidebar badge) AND the notes an apply may have moved

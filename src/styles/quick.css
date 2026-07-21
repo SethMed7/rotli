@@ -155,9 +155,8 @@
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-card);
-  box-shadow: var(--shadow-dialog);
   overflow: hidden;
   animation: qsearch-in var(--motion-enter) var(--motion-ease);
 }

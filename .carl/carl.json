@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-07-20T00:00:00.000Z",
+  "last_modified": "2026-07-21T00:00:00.000Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -31,7 +31,11 @@
         "where does",
         "gitignore",
         "shared constant",
-        "parity"
+        "parity",
+        "workspace cli",
+        "mcp",
+        "claude workspace",
+        "codex workspace"
       ],
       "exclude": [],
       "rules": [
@@ -76,6 +80,13 @@
           "added": "2026-07-20",
           "last_reviewed": "2026-07-20",
           "source": "SYNTAX.md"
+        },
+        {
+          "id": 6,
+          "text": "Claude, Codex, scripts, and humans use the packaged rotli JSON CLI or rotli-workspace stdio MCP over one Rust workspace service. Note reads are text/markdown editor bodies without managed frontmatter and include metrics. Secure/secret-shaped notes are omitted; secure/locked writes are refused; every write needs a fresh revision. New notes enter wiki/_inbox and Main. agent doctor is read-only; agent self-test uses a temporary memex.",
+          "added": "2026-07-21",
+          "last_reviewed": "2026-07-21",
+          "source": "docs/architecture/agent-workspace.md"
         }
       ],
       "decisions": [
@@ -358,16 +369,16 @@
       "rules": [
         {
           "id": 0,
-          "text": "Rotli ships Warm Light, Warm Dark, Paper, and Charcoal. Paper and Charcoal are the calm defaults; the warm pair is intentional. All surfaces use shared semantic color, type, spacing, elevation, focus, and state tokens.",
+          "text": "Rotli ships Warm Light, Warm Dark, Paper, and Charcoal. Paper and Charcoal are the calm defaults; the warm pair is intentional. All surfaces use shared semantic color, type, spacing, focus, and state roles.",
           "added": "2026-07-11",
-          "last_reviewed": "2026-07-11",
+          "last_reviewed": "2026-07-21",
           "source": "DESIGN.md"
         },
         {
           "id": 1,
-          "text": "Preserve the quiet native-desktop language: readable text, clear hierarchy, restrained borders, keyboard safety, and complete loading/empty/error/saved/disabled/destructive states. Do not add another UI framework or raw colors outside src/brand/.",
+          "text": "Preserve the quiet native-desktop language: readable text, clear hierarchy, semantic surfaces/borders, keyboard safety, and complete states. Product CSS never uses glows, halos, shadows, backdrop blur, decorative filters, fixed --rotli-* palette values, or raw colors; check:design-system enforces the boundary.",
           "added": "2026-07-11",
-          "last_reviewed": "2026-07-11",
+          "last_reviewed": "2026-07-21",
           "source": "DESIGN.md"
         }
       ],

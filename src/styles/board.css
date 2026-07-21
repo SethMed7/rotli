@@ -151,8 +151,8 @@
   opacity: 0.85;
 }
 
-/* sticky-note cards: a softly-raised paper that lifts on hover; pointer-drag to
-   reorder (Seth, 2026-06-29). */
+/* Sticky-note cards use a warm fill and outline, without simulated elevation;
+   pointer-drag reorders them (Seth, 2026-06-29). */
 .board-card {
   position: relative;
   display: flex;
@@ -162,16 +162,13 @@
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  /* a warm paper fill + real lift so captures read as STICKY NOTES on a board,
-     not flat dark panels (Seth, 2026-07-01). */
+  /* A warm paper fill keeps captures distinct from ordinary panels. */
   background: color-mix(in srgb, var(--accent) 7%, var(--surface));
-  box-shadow: var(--shadow-raised);
   cursor: pointer;
   text-align: left;
   touch-action: none;
   transition:
     transform var(--motion-exit) var(--motion-ease),
-    box-shadow var(--motion-exit) var(--motion-ease),
     border-color var(--motion-exit) var(--motion-ease),
     background var(--motion-exit) var(--motion-ease);
 }
@@ -187,14 +184,13 @@
 }
 .board-card:hover {
   background: color-mix(in srgb, var(--accent) 11%, var(--surface));
-  transform: translateY(-3px) rotate(0deg);
-  box-shadow: var(--shadow-popover);
+  border-color: var(--border-strong);
+  transform: rotate(0deg);
 }
 /* the card being dragged to reorder */
 .board-card.dragging {
   opacity: 0.5;
   cursor: grabbing;
-  box-shadow: var(--shadow-raised);
 }
 /* the insertion marker on the card the drop will land before/after */
 .board-card.drop-before::before,
@@ -333,8 +329,8 @@
   border-color: transparent;
 }
 .board-btn.primary:hover:not(:disabled) {
-  filter: brightness(1.04);
   background: var(--accent);
+  background-image: linear-gradient(var(--hov), var(--hov));
 }
 .board-btn.ghost {
   border-color: transparent;

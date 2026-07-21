@@ -37,10 +37,20 @@ tripwire that keeps a future change from silently widening any of these.
 | Updater | GitHub releases | — | minisign-signed feed, single pinned HTTPS endpoint |
 | ImapFlow (`mail.ts`) | configured mail hosts | — | TLS strict except loopback |
 | Webview | nothing | — | CSP `connect-src ipc:` only; no fetch/XHR/WebSocket in `src/` |
+| `rotli` CLI / `rotli-workspace` MCP | local Claude/Codex process | requested non-secure note text or compact board data | registered-root discovery + remote-AI secure detector + locked-note refusal + optimistic revision check; stdio only, no network listener |
 
 The full inventory — every ureq / fetch / network-CLI call site with its
 destination class and guard — is tracked in
 [`../../scripts/fixtures/egress-allowlist.json`](../../scripts/fixtures/egress-allowlist.json).
+
+The workspace MCP server itself performs no network request, but a connected
+Claude or Codex process may be remote. It therefore treats every agent as remote:
+secure flags and secret-shaped bodies are omitted/refused even when a provider
+CLI happens to run on localhost. Board metadata/scenes currently have no secure
+classification; users must not place secrets on an agent-managed board.
+Agent-visible workspace metrics are computed only after that same note filter and
+do not disclose a count of withheld secure notes. `rotli agent doctor` forces a
+read-only store, while `rotli agent self-test` uses only a temporary memex.
 
 ## The checks and how to run them
 
@@ -119,21 +129,33 @@ The 2026-07 audit escalated five product-behavior findings. Disposition:
    (web args vs recently-read note content) is the next `guard.ts`/`secret.rs`
    pair to build, scheduled with the quarterly review.
 
-### Supply-chain advisories (transitive-only, tracked)
+### Supply-chain advisories (transitive-only, tracked; reviewed 2026-07-21)
 
-All from `bun audit` / rustsec, none in rotli's own `src/`:
+All are outside Rotli's own `src/`. The current `bun audit` reports nine findings:
 
-- **lodash-es** ≤ 4.17.22 (high, code injection via `_.template`) — via Univer,
-  Mermaid, Excalidraw. Reachable only if those libs call the vulnerable APIs on
-  attacker-influenced input (plausible for Mermaid diagram source).
-- **nanoid** < 3.3.8, **uuid** < 11.1.1 (moderate) — library-internal ID gen via
-  Excalidraw/Univer/exceljs/Mermaid.
-- **esbuild** dev-server file read (low, Windows-only, build-time) — via vite.
-- **onnxruntime-web** pinned to a dated dev-prerelease tag (availability risk).
+- **lodash-es** ≤ 4.17.22 (two high/moderate families: template-key code
+  injection and prototype pollution) — through Univer, Mermaid, and Excalidraw.
+- **brace-expansion** 2.0.0–2.1.1 (high exponential-expansion DoS) — through
+  ESLint/typescript-eslint build tooling and exceljs's archive path.
+- **nanoid** < 3.3.8 and **uuid** < 11.1.1 (moderate) — library-internal ID
+  generation through Excalidraw, Univer, Vite, exceljs, and Mermaid.
+- **esbuild** 0.27.3–0.28.0 (low, Windows dev-server arbitrary file read) —
+  through Vite; Rotli's shipped macOS bundle does not expose the dev server.
 
-Pick these up on the next bump of Univer / Excalidraw / Mermaid / exceljs / vite.
-The `dependency-audit` CI lane is **advisory** (`|| true`) so upstream churn we
-don't control doesn't block merges; promote it to blocking once the tree is clean.
+RustSec found two unsound dependencies in the July 21 run. **anyhow 1.0.102** is
+fixed in Rotli's lockfile at 1.0.103. **glib 0.18.5**
+(`RUSTSEC-2024-0429`) exists only in Tauri 2.11's Linux GTK3 target graph
+(`tauri → tray-icon/webkit2gtk → gtk/glib`); it is absent from the shipped macOS
+graph and has no compatible patched GTK3 release. The audit ignores that exact
+ID while retaining the dependency path here; Tauri's eventual Linux GTK4 move
+is the removal path. RustSec also reports 16 unmaintained warnings in that Linux
+GTK3/UNIC graph.
+
+The `dependency-audit` CI job is deliberately advisory. `continue-on-error` is
+set on both scanners, while `checks: write` lets RustSec publish its check report;
+the missing permission—not an audit finding—was what made regression runs fail
+through 0.33.2. Promote the lane to blocking after upstream updates clear the
+tracked tree.
 
 ## Quarterly AI security review
 

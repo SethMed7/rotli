@@ -3,18 +3,8 @@
    rows + copy) module-switcher popover, r3 frame G shape & state grammar.
    No raw hex — kit tokens + the base.css grammar vars only. */
 
-/* — icon accent plumbing (icons README context rules, hex-free) —
-   Icon.tsx rewrites the sprite's fixed clay/olive attributes to these vars,
-   reading the values from the kit's own tokens. */
-:root {
-  --icon-clay: var(--rotli-clay);
-  --icon-olive: var(--rotli-olive);
-}
-:root[data-theme="dark"] {
-  /* dark grounds: lift olive strokes/fills (reads muddy at 1.8px otherwise) */
-  --icon-olive: var(--rotli-olive-bright);
-}
-/* mono contexts force accents to ink */
+/* Icon.tsx reads the semantic icon roles defined by base.css. Mono contexts
+   force both roles to the current ink. */
 .icon-mono {
   --icon-clay: currentColor;
   --icon-olive: currentColor;
@@ -251,29 +241,18 @@
   top: 34px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--rotli-cocoa);
-  color: var(--rotli-linen);
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
   font-size: 11px;
   font-weight: 500;
   border-radius: var(--r-control);
   padding: 5px 9px;
   white-space: nowrap;
-  box-shadow: var(--shadow-raised);
   z-index: 5;
   pointer-events: none;
   opacity: 0;
   transition: opacity 120ms var(--motion-ease);
-}
-.tip::after {
-  content: "";
-  position: absolute;
-  top: -4px;
-  left: 50%;
-  margin-left: -4px;
-  width: 8px;
-  height: 8px;
-  background: var(--rotli-cocoa);
-  transform: rotate(45deg);
 }
 .icobtn:hover .tip {
   opacity: 1;
@@ -287,23 +266,12 @@
   left: 0;
   transform: none;
 }
-.tb-lead .tip::after {
-  left: 12px;
-  margin-left: 0;
-}
 .tb-trail .tip,
 .nl-top .icobtn .tip {
   left: auto;
   right: 0;
   transform: none;
 }
-.tb-trail .tip::after,
-.nl-top .icobtn .tip::after {
-  left: auto;
-  right: 12px;
-  margin-left: 0;
-}
-
 /* — module switcher popover (r5 approved; r7 final) — */
 .modpop {
   position: absolute;
@@ -311,9 +279,8 @@
   left: 0;
   width: 232px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-card);
-  box-shadow: var(--shadow-popover);
   padding: 6px;
   z-index: 6;
 }

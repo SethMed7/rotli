@@ -1,0 +1,2335 @@
+//! Headless Rotli workspace application service.
+//!
+//! The CLI and MCP server are adapters over this module. They never reach into
+//! arbitrary paths: corpus discovery comes from Rotli's production config (or
+//! an explicit test override), and every note/board mutation passes through the
+//! same `CorpusStore` policy used by the Tauri shell.
+
+use std::collections::HashSet;
+use std::fs;
+use std::io::{self, BufRead, Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::time::Instant;
+
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+
+use crate::corpus::{
+    ConnectedBrain, CorpusBoardDoc, CorpusConfig, CorpusList, CorpusRoot, CorpusStore, FolderMeta,
+    NoteDoc, NoteKind, NoteMeta, SearchHit, DEFAULT_ROOT_ID, DOT_DIR,
+};
+
+const MCP_PROTOCOL: &str = "2025-03-26";
+const MAIN_ROOT: &str = "main:";
+const OPEN_REQUEST_FILE: &str = "workspace-open.json";
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RootInfo {
+    id: String,
+    label: String,
+    path: String,
+    is_memex: bool,
+    read_only: bool,
+    is_default: bool,
+}
+
+#[derive(Debug, Clone)]
+struct RootTarget {
+    id: String,
+    label: String,
+    path: PathBuf,
+    read_only: bool,
+    is_default: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NoteReadResult {
+    note: NoteDoc,
+    revision: String,
+    document: MarkdownDocument,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct MarkdownDocument {
+    content_type: &'static str,
+    managed_frontmatter: &'static str,
+    title_rule: &'static str,
+    metrics: MarkdownMetrics,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct MarkdownMetrics {
+    characters: usize,
+    words: usize,
+    lines: usize,
+    headings: usize,
+    links: usize,
+    wikilinks: usize,
+    tasks: usize,
+    open_tasks: usize,
+    fenced_code_blocks: usize,
+    estimated_reading_minutes: usize,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct WorkspaceMetrics {
+    visible_notes: usize,
+    boards: usize,
+    files: usize,
+    physical_folders: usize,
+    intake_notes: usize,
+    main_references: usize,
+    main_folders: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BoardReadResult {
+    board: CorpusBoardDoc,
+    revision: String,
+    outline: Vec<BoardOutlineItem>,
+    description: String,
+    tags: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BoardOutlineItem {
+    id: String,
+    kind: String,
+    text: Option<String>,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+enum MainNode {
+    Folder {
+        folder: String,
+        children: Vec<MainNode>,
+    },
+    Note {
+        note: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MainManifest {
+    version: u8,
+    tree: Vec<MainNode>,
+}
+
+impl Default for MainManifest {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            tree: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WorkspaceOpenRequest {
+    pub id: String,
+    pub kind: String,
+}
+
+struct Workspace {
+    root: RootTarget,
+    store: CorpusStore,
+}
+
+impl Workspace {
+    fn open(root_id: Option<&str>) -> Result<Self, String> {
+        let targets = root_targets()?;
+        let id = root_id.unwrap_or(DEFAULT_ROOT_ID);
+        let root = targets
+            .into_iter()
+            .find(|root| root.id == id)
+            .ok_or_else(|| format!("unknown Rotli root: {id}"))?;
+        Self::open_target(root)
+    }
+
+    fn open_target(root: RootTarget) -> Result<Self, String> {
+        if !root.path.is_dir() {
+            return Err(format!(
+                "Rotli root is unavailable: {}",
+                root.path.display()
+            ));
+        }
+        let mut store = if root.read_only {
+            CorpusStore::open_read_only(root.path.clone())?
+        } else {
+            CorpusStore::open(root.path.clone())?
+        };
+        store.set_perms_read_only(root.read_only);
+        Ok(Self { root, store })
+    }
+
+    fn open_for_item(
+        item_id: &str,
+        requested_root: Option<&str>,
+    ) -> Result<(Self, String), String> {
+        if let Some(root_id) = requested_root {
+            let workspace = Self::open(Some(root_id))?;
+            let local = workspace.local_id(item_id)?;
+            return Ok((workspace, local));
+        }
+        if let Some((prefix, local)) = item_id.split_once(':') {
+            if prefix != MAIN_ROOT.trim_end_matches(':')
+                && root_targets()?.iter().any(|root| root.id == prefix)
+            {
+                return Ok((Self::open(Some(prefix))?, local.to_string()));
+            }
+        }
+        Ok((Self::open(None)?, item_id.to_string()))
+    }
+
+    fn local_id(&self, wire_id: &str) -> Result<String, String> {
+        if self.root.is_default {
+            if let Some((prefix, _)) = wire_id.split_once(':') {
+                if root_targets()?.iter().any(|root| root.id == prefix) {
+                    return Err(format!("{wire_id} belongs to root {prefix}, not default"));
+                }
+            }
+            return Ok(wire_id.to_string());
+        }
+        let prefix = format!("{}:", self.root.id);
+        Ok(wire_id.strip_prefix(&prefix).unwrap_or(wire_id).to_string())
+    }
+
+    fn wire(&self, local: &str) -> String {
+        if self.root.is_default || local.is_empty() {
+            local.to_string()
+        } else {
+            format!("{}:{local}", self.root.id)
+        }
+    }
+
+    fn prefix_meta(&self, mut meta: NoteMeta) -> NoteMeta {
+        meta.folder_id = self.wire(&meta.folder_id);
+        meta.disk_folder_id = self.wire(&meta.disk_folder_id);
+        if !self.root.is_default {
+            meta.id = self.wire(&meta.id);
+        }
+        meta
+    }
+
+    fn prefix_folder(&self, mut folder: FolderMeta) -> FolderMeta {
+        folder.parent_id = folder.parent_id.map(|parent| self.wire(&parent));
+        folder.id = self.wire(&folder.id);
+        folder
+    }
+
+    fn list_remote(&mut self, limit: usize) -> Result<CorpusList, String> {
+        let mut list = self.store.list()?;
+        list.notes.retain(|meta| {
+            meta.kind != NoteKind::Note || self.store.read_for_ai(&meta.id, false).is_ok()
+        });
+        list.notes.truncate(limit.min(500));
+        list.notes = list
+            .notes
+            .into_iter()
+            .map(|meta| self.prefix_meta(meta))
+            .collect();
+        list.folders = list
+            .folders
+            .into_iter()
+            .map(|folder| self.prefix_folder(folder))
+            .collect();
+        Ok(list)
+    }
+
+    fn search_remote(&mut self, query: &str, limit: usize) -> Result<Vec<SearchHit>, String> {
+        let mut hits = self
+            .store
+            .search(query, limit.saturating_mul(4).max(limit))?;
+        hits.retain(|hit| self.store.read_for_ai(&hit.id, false).is_ok());
+        hits.truncate(limit.min(100));
+        for hit in &mut hits {
+            hit.id = self.wire(&hit.id);
+            hit.folder_id = self.wire(&hit.folder_id);
+        }
+        Ok(hits)
+    }
+
+    fn read_note(&mut self, local_id: &str) -> Result<NoteReadResult, String> {
+        self.store.read_for_ai(local_id, false)?;
+        let rel = self.store.resolve_note_rel(local_id)?;
+        let bytes =
+            fs::read(self.store.root().join(&rel)).map_err(|e| format!("read {rel}: {e}"))?;
+        let mut note = self.store.read(local_id)?;
+        note.id = self.wire(&note.id);
+        note.folder_id = self.wire(&note.folder_id);
+        note.disk_folder_id = self.wire(&note.disk_folder_id);
+        Ok(NoteReadResult {
+            document: markdown_document(&note.body),
+            note,
+            revision: revision(&bytes),
+        })
+    }
+
+    fn update_note(
+        &mut self,
+        local_id: &str,
+        body: &str,
+        expected_revision: &str,
+    ) -> Result<NoteMeta, String> {
+        validate_editor_markdown(body)?;
+        require_revision(expected_revision)?;
+        let rel = self.store.resolve_note_rel(local_id)?;
+        let current =
+            fs::read(self.store.root().join(&rel)).map_err(|e| format!("read {rel}: {e}"))?;
+        compare_revision(expected_revision, &current)?;
+        let meta = self.store.write_for_remote_agent(local_id, body)?;
+        Ok(self.prefix_meta(meta))
+    }
+
+    fn patch_note(
+        &mut self,
+        local_id: &str,
+        old_text: &str,
+        new_text: &str,
+        expected_revision: &str,
+    ) -> Result<NoteMeta, String> {
+        if old_text.is_empty() {
+            return Err("oldText must not be empty".into());
+        }
+        let current = self.read_note(local_id)?;
+        if current.revision != expected_revision {
+            return Err(format!(
+                "revision conflict: expected {expected_revision}, found {}; read the item again before editing",
+                current.revision
+            ));
+        }
+        let matches = current.note.body.match_indices(old_text).count();
+        if matches != 1 {
+            return Err(format!(
+                "oldText must match exactly once; found {matches} matches"
+            ));
+        }
+        let body = current.note.body.replacen(old_text, new_text, 1);
+        self.update_note(local_id, &body, expected_revision)
+    }
+
+    fn create_note(
+        &mut self,
+        title: &str,
+        body: &str,
+        main_parent: &str,
+    ) -> Result<NoteMeta, String> {
+        let title = validate_note_title(title)?;
+        let folder = if self.store.is_memex() {
+            "wiki/_inbox"
+        } else {
+            "Inbox"
+        };
+        let markdown = note_markdown(title, body)?;
+        let meta = self.store.create_for_remote_agent(folder, &markdown)?;
+        if self.root.is_default {
+            self.main_add(&meta.id, main_parent)?;
+        }
+        Ok(self.prefix_meta(meta))
+    }
+
+    fn metrics(&mut self) -> Result<WorkspaceMetrics, String> {
+        let mut list = self.store.list()?;
+        list.notes.retain(|meta| {
+            meta.kind != NoteKind::Note || self.store.read_for_ai(&meta.id, false).is_ok()
+        });
+        let visible_notes = list
+            .notes
+            .iter()
+            .filter(|meta| meta.kind == NoteKind::Note)
+            .count();
+        let boards = list
+            .notes
+            .iter()
+            .filter(|meta| meta.kind == NoteKind::Board)
+            .count();
+        let files = list
+            .notes
+            .iter()
+            .filter(|meta| meta.kind == NoteKind::File)
+            .count();
+        let intake_folder = if self.store.is_memex() {
+            "wiki/_inbox"
+        } else {
+            "Inbox"
+        };
+        let intake_notes = list
+            .notes
+            .iter()
+            .filter(|meta| meta.kind == NoteKind::Note && meta.disk_folder_id == intake_folder)
+            .count();
+        let (main_references, main_folders) = if self.root.is_default {
+            count_main_nodes(&self.read_main()?.tree)
+        } else {
+            (0, 0)
+        };
+        Ok(WorkspaceMetrics {
+            visible_notes,
+            boards,
+            files,
+            physical_folders: list.folders.len(),
+            intake_notes,
+            main_references,
+            main_folders,
+        })
+    }
+
+    fn move_note(&mut self, local_id: &str, folder: &str) -> Result<NoteMeta, String> {
+        let meta = self.store.move_for_remote_agent(local_id, folder)?;
+        Ok(self.prefix_meta(meta))
+    }
+
+    fn create_disk_folder(
+        &mut self,
+        name: &str,
+        parent: Option<&str>,
+    ) -> Result<FolderMeta, String> {
+        self.store
+            .create_folder(name, parent)
+            .map(|folder| self.prefix_folder(folder))
+    }
+
+    fn read_main(&self) -> Result<MainManifest, String> {
+        if !self.root.is_default {
+            return Err("Main belongs to the default Rotli root".into());
+        }
+        let raw = self.store.main_read()?;
+        Ok(serde_json::from_str::<MainManifest>(&raw).unwrap_or_default())
+    }
+
+    fn write_main(&self, manifest: &MainManifest) -> Result<(), String> {
+        let raw = serde_json::to_string_pretty(manifest).map_err(|e| e.to_string())? + "\n";
+        self.store.main_write(&raw)
+    }
+
+    fn main_add(&self, item_id: &str, parent_id: &str) -> Result<(), String> {
+        let mut manifest = self.read_main()?;
+        if main_contains(&manifest.tree, item_id) {
+            return Ok(());
+        }
+        let node = MainNode::Note {
+            note: item_id.to_string(),
+        };
+        if parent_id == MAIN_ROOT
+            || !main_insert(&mut manifest.tree, parent_id, node.clone(), MAIN_ROOT)
+        {
+            manifest.tree.push(node);
+        }
+        self.write_main(&manifest)
+    }
+
+    fn main_create_folder(&self, name: &str, parent_id: &str) -> Result<String, String> {
+        let name = name.trim();
+        if name.is_empty() || name.contains('/') || name.contains(':') {
+            return Err("a Main folder name must be one non-empty path component".into());
+        }
+        let mut manifest = self.read_main()?;
+        let unique = unique_folder_name(&manifest.tree, parent_id, name);
+        let node = MainNode::Folder {
+            folder: unique.clone(),
+            children: Vec::new(),
+        };
+        let inserted = parent_id != MAIN_ROOT
+            && main_insert(&mut manifest.tree, parent_id, node.clone(), MAIN_ROOT);
+        if !inserted {
+            manifest.tree.push(node);
+        }
+        self.write_main(&manifest)?;
+        Ok(if parent_id == MAIN_ROOT {
+            format!("{MAIN_ROOT}{unique}")
+        } else {
+            format!("{parent_id}/{unique}")
+        })
+    }
+
+    fn main_move(&self, item_id: &str, parent_id: &str) -> Result<(), String> {
+        if item_id == parent_id || parent_id.starts_with(&format!("{item_id}/")) {
+            return Err("a Main folder cannot move into itself".into());
+        }
+        let mut manifest = self.read_main()?;
+        let node = main_remove(&mut manifest.tree, item_id, MAIN_ROOT)
+            .ok_or_else(|| format!("Main item not found: {item_id}"))?;
+        if parent_id == MAIN_ROOT
+            || !main_insert(&mut manifest.tree, parent_id, node.clone(), MAIN_ROOT)
+        {
+            manifest.tree.push(node);
+        }
+        self.write_main(&manifest)
+    }
+
+    fn main_remove(&self, item_id: &str) -> Result<(), String> {
+        let mut manifest = self.read_main()?;
+        main_remove(&mut manifest.tree, item_id, MAIN_ROOT)
+            .ok_or_else(|| format!("Main item not found: {item_id}"))?;
+        self.write_main(&manifest)
+    }
+
+    fn create_board(
+        &mut self,
+        name: &str,
+        description: &str,
+        tags: &str,
+        main_parent: &str,
+    ) -> Result<NoteMeta, String> {
+        let folder = if self.store.is_memex() {
+            "storage/excalidraw"
+        } else {
+            "Board"
+        };
+        let scene = empty_board(description, tags);
+        let created = self.store.create_board(folder, Some(&scene))?;
+        let meta = if name.trim().is_empty() {
+            created
+        } else {
+            self.store.rename_board(&created.id, name)?
+        };
+        if self.root.is_default {
+            self.main_add(&meta.id, main_parent)?;
+        }
+        Ok(self.prefix_meta(meta))
+    }
+
+    fn read_board(&mut self, local_id: &str) -> Result<BoardReadResult, String> {
+        let mut board = self.store.read_board(local_id)?;
+        let revision = revision(board.body.as_bytes());
+        let scene: Value = serde_json::from_str(&board.body)
+            .map_err(|e| format!("board contains invalid Excalidraw JSON: {e}"))?;
+        let outline = board_outline(&scene);
+        let meta = scene.get("rotliMeta").and_then(Value::as_object);
+        let description = meta
+            .and_then(|value| value.get("description"))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        let tags = meta
+            .and_then(|value| value.get("tags"))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        board.id = self.wire(&board.id);
+        board.folder_id = self.wire(&board.folder_id);
+        Ok(BoardReadResult {
+            board,
+            revision,
+            outline,
+            description,
+            tags,
+        })
+    }
+
+    fn update_board(
+        &mut self,
+        local_id: &str,
+        scene_body: &str,
+        expected_revision: &str,
+    ) -> Result<NoteMeta, String> {
+        require_revision(expected_revision)?;
+        let current = self.store.read_board(local_id)?;
+        compare_revision(expected_revision, current.body.as_bytes())?;
+        validate_board(scene_body)?;
+        self.store
+            .write_board(local_id, scene_body)
+            .map(|meta| self.prefix_meta(meta))
+    }
+
+    fn apply_board(
+        &mut self,
+        local_id: &str,
+        actions: &[Value],
+        expected_revision: &str,
+        description: Option<&str>,
+        tags: Option<&str>,
+    ) -> Result<NoteMeta, String> {
+        require_revision(expected_revision)?;
+        let current = self.store.read_board(local_id)?;
+        compare_revision(expected_revision, current.body.as_bytes())?;
+        let mut scene: Value = serde_json::from_str(&current.body)
+            .map_err(|e| format!("board contains invalid Excalidraw JSON: {e}"))?;
+        apply_board_actions(&mut scene, actions)?;
+        let root = scene
+            .as_object_mut()
+            .ok_or("board root must be an object")?;
+        let rotli_meta = root.entry("rotliMeta").or_insert_with(|| json!({}));
+        let meta = rotli_meta
+            .as_object_mut()
+            .ok_or("rotliMeta must be an object")?;
+        if let Some(value) = description {
+            meta.insert("description".into(), Value::String(value.to_string()));
+        }
+        if let Some(value) = tags {
+            meta.insert("tags".into(), Value::String(value.to_string()));
+        }
+        let body = serde_json::to_string(&scene).map_err(|e| e.to_string())?;
+        self.store
+            .write_board(local_id, &body)
+            .map(|meta| self.prefix_meta(meta))
+    }
+
+    fn queue_open(&self, local_id: &str, kind: &str) -> Result<Value, String> {
+        if !self.root.is_default {
+            return Err(
+                "opening a connected root is not available yet; use the default workspace".into(),
+            );
+        }
+        let kind = match kind {
+            "note" | "board" | "file" => kind,
+            _ => return Err("kind must be note, board, or file".into()),
+        };
+        let request = WorkspaceOpenRequest {
+            id: local_id.to_string(),
+            kind: kind.to_string(),
+        };
+        let path = self.store.root().join(DOT_DIR).join(OPEN_REQUEST_FILE);
+        fs::create_dir_all(path.parent().ok_or("open request has no parent")?)
+            .map_err(|e| e.to_string())?;
+        let body = serde_json::to_string(&request).map_err(|e| e.to_string())?;
+        crate::fsutil::atomic_write(&path, &body, ".rotli-open-")?;
+        #[cfg(target_os = "macos")]
+        {
+            let status = Command::new("open")
+                .args(["-a", "rotli"])
+                .status()
+                .map_err(|e| format!("launch Rotli: {e}"))?;
+            if !status.success() {
+                return Err("macOS could not open the Rotli app".into());
+            }
+        }
+        Ok(json!({ "queued": true, "id": local_id, "kind": kind }))
+    }
+}
+
+fn root_targets() -> Result<Vec<RootTarget>, String> {
+    if let Ok(path) = std::env::var("ROTLI_CORPUS_ROOT") {
+        if path.trim().is_empty() {
+            return Err("ROTLI_CORPUS_ROOT is empty".into());
+        }
+        return Ok(vec![RootTarget {
+            id: DEFAULT_ROOT_ID.to_string(),
+            label: "Notes".into(),
+            path: PathBuf::from(path),
+            read_only: false,
+            is_default: true,
+        }]);
+    }
+    let path = production_config_path()?;
+    let config = read_config(&path)
+        .or_else(|| read_config(&path.with_extension("json.bak")))
+        .ok_or_else(|| {
+            format!(
+                "Rotli corpus config is missing or invalid: {}",
+                path.display()
+            )
+        })?;
+    Ok(targets_from_config(config))
+}
+
+fn production_config_path() -> Result<PathBuf, String> {
+    if let Ok(path) = std::env::var("ROTLI_CORPUS_CONFIG") {
+        return Ok(PathBuf::from(path));
+    }
+    let home = std::env::var("HOME").map_err(|_| "HOME is unavailable")?;
+    #[cfg(target_os = "macos")]
+    return Ok(PathBuf::from(home).join("Library/Application Support/com.rotli.app/corpus.json"));
+    #[cfg(not(target_os = "macos"))]
+    Ok(PathBuf::from(home).join(".config/com.rotli.app/corpus.json"))
+}
+
+fn read_config(path: &Path) -> Option<CorpusConfig> {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<CorpusConfig>(&raw).ok())
+}
+
+fn targets_from_config(config: CorpusConfig) -> Vec<RootTarget> {
+    let mut targets = vec![RootTarget {
+        id: DEFAULT_ROOT_ID.to_string(),
+        label: "Notes".into(),
+        path: config.corpus.abs_path,
+        read_only: false,
+        is_default: true,
+    }];
+    targets.extend(config.brains.into_iter().map(target_from_brain));
+    targets.extend(config.folders.into_iter().map(target_from_folder));
+    targets
+}
+
+fn target_from_brain(brain: ConnectedBrain) -> RootTarget {
+    RootTarget {
+        id: brain.id,
+        label: brain.label,
+        path: brain.abs_path,
+        read_only: brain.perms.read_only(),
+        is_default: false,
+    }
+}
+
+fn target_from_folder(folder: CorpusRoot) -> RootTarget {
+    RootTarget {
+        id: folder.id,
+        label: folder.label,
+        path: folder.abs_path,
+        read_only: false,
+        is_default: false,
+    }
+}
+
+fn roots_info() -> Result<Vec<RootInfo>, String> {
+    root_targets()?
+        .into_iter()
+        .map(|root| {
+            let is_memex = root.path.join("memex.json").is_file();
+            Ok(RootInfo {
+                id: root.id,
+                label: root.label,
+                path: root.path.display().to_string(),
+                is_memex,
+                read_only: root.read_only,
+                is_default: root.is_default,
+            })
+        })
+        .collect()
+}
+
+fn revision(bytes: &[u8]) -> String {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("fnv1a64:{hash:016x}")
+}
+
+fn require_revision(value: &str) -> Result<(), String> {
+    if value.trim().is_empty() {
+        Err("expectedRevision is required; read the item immediately before editing it".into())
+    } else {
+        Ok(())
+    }
+}
+
+fn compare_revision(expected: &str, current: &[u8]) -> Result<(), String> {
+    let actual = revision(current);
+    if expected == actual {
+        Ok(())
+    } else {
+        Err(format!(
+            "revision conflict: expected {expected}, found {actual}; read the item again before editing"
+        ))
+    }
+}
+
+fn validate_note_title(title: &str) -> Result<&str, String> {
+    let title = title.trim();
+    if title.is_empty() {
+        return Err("a note needs a title".into());
+    }
+    if title.contains(['\n', '\r']) {
+        return Err("a note title must be one line".into());
+    }
+    if title.chars().any(char::is_control) {
+        return Err("a note title must not contain control characters".into());
+    }
+    if title.starts_with('#') {
+        return Err("pass the title text without Markdown heading markers".into());
+    }
+    Ok(title)
+}
+
+fn validate_editor_markdown(body: &str) -> Result<(), String> {
+    if body
+        .trim_start_matches([' ', '\t', '\r', '\n'])
+        .lines()
+        .next()
+        .map(str::trim_end)
+        == Some("---")
+    {
+        return Err(
+            "note bodies are editor Markdown without YAML frontmatter; Rotli preserves managed frontmatter"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn note_markdown<'a>(title: &'a str, body: &'a str) -> Result<String, String> {
+    validate_editor_markdown(body)?;
+    let body = body.trim();
+    if body.is_empty() {
+        return Ok(format!("# {title}\n"));
+    }
+    if let Some(heading) = body.lines().next().and_then(|line| line.strip_prefix("# ")) {
+        if heading.trim() != title {
+            return Err(format!(
+                "body H1 {:?} conflicts with title {:?}; use one matching H1 or omit it",
+                heading.trim(),
+                title
+            ));
+        }
+        return Ok(format!("{}\n", body.trim_end()));
+    }
+    Ok(format!("# {title}\n\n{}\n", body.trim_end()))
+}
+
+fn markdown_document(body: &str) -> MarkdownDocument {
+    MarkdownDocument {
+        content_type: "text/markdown",
+        managed_frontmatter: "preserved by Rotli; omitted from editor body",
+        title_rule: "first non-empty Markdown line",
+        metrics: markdown_metrics(body),
+    }
+}
+
+fn markdown_metrics(body: &str) -> MarkdownMetrics {
+    let mut headings = 0;
+    let mut tasks = 0;
+    let mut open_tasks = 0;
+    let mut fenced_code_blocks = 0;
+    let mut in_fence = false;
+    for line in body.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            if !in_fence {
+                fenced_code_blocks += 1;
+            }
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        let heading_marks = trimmed.chars().take_while(|value| *value == '#').count();
+        if (1..=6).contains(&heading_marks)
+            && trimmed
+                .chars()
+                .nth(heading_marks)
+                .is_some_and(char::is_whitespace)
+        {
+            headings += 1;
+        }
+        let task = trimmed
+            .strip_prefix("- ")
+            .or_else(|| trimmed.strip_prefix("* "))
+            .or_else(|| trimmed.strip_prefix("+ "));
+        if let Some(task) = task {
+            let lower = task.to_ascii_lowercase();
+            if lower.starts_with("[ ] ") {
+                tasks += 1;
+                open_tasks += 1;
+            } else if lower.starts_with("[x] ") {
+                tasks += 1;
+            }
+        }
+    }
+    let words = body.split_whitespace().count();
+    let wikilinks = body.match_indices("[[").count();
+    let markdown_links = body.match_indices("](").count();
+    MarkdownMetrics {
+        characters: body.chars().count(),
+        words,
+        lines: if body.is_empty() {
+            0
+        } else {
+            body.chars().filter(|value| *value == '\n').count() + 1
+        },
+        headings,
+        links: markdown_links + wikilinks,
+        wikilinks,
+        tasks,
+        open_tasks,
+        fenced_code_blocks,
+        estimated_reading_minutes: if words == 0 { 0 } else { words.div_ceil(225) },
+    }
+}
+
+fn main_contains(nodes: &[MainNode], item_id: &str) -> bool {
+    nodes.iter().any(|node| match node {
+        MainNode::Note { note } => note == item_id,
+        MainNode::Folder { children, .. } => main_contains(children, item_id),
+    })
+}
+
+fn count_main_nodes(nodes: &[MainNode]) -> (usize, usize) {
+    nodes
+        .iter()
+        .fold((0, 0), |(references, folders), node| match node {
+            MainNode::Note { .. } => (references + 1, folders),
+            MainNode::Folder { children, .. } => {
+                let (child_references, child_folders) = count_main_nodes(children);
+                (references + child_references, folders + child_folders + 1)
+            }
+        })
+}
+
+fn main_node_id(node: &MainNode, parent_id: &str) -> String {
+    match node {
+        MainNode::Note { note } => note.clone(),
+        MainNode::Folder { folder, .. } if parent_id == MAIN_ROOT => format!("{MAIN_ROOT}{folder}"),
+        MainNode::Folder { folder, .. } => format!("{parent_id}/{folder}"),
+    }
+}
+
+fn main_insert(nodes: &mut [MainNode], parent_id: &str, node: MainNode, current: &str) -> bool {
+    for child in nodes {
+        let id = main_node_id(child, current);
+        if let MainNode::Folder { children, .. } = child {
+            if id == parent_id {
+                children.push(node);
+                return true;
+            }
+            if main_insert(children, parent_id, node.clone(), &id) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn main_remove(nodes: &mut Vec<MainNode>, item_id: &str, current: &str) -> Option<MainNode> {
+    if let Some(index) = nodes
+        .iter()
+        .position(|node| main_node_id(node, current) == item_id)
+    {
+        return Some(nodes.remove(index));
+    }
+    for node in nodes {
+        let id = main_node_id(node, current);
+        if let MainNode::Folder { children, .. } = node {
+            if let Some(found) = main_remove(children, item_id, &id) {
+                return Some(found);
+            }
+        }
+    }
+    None
+}
+
+fn sibling_names<'a>(
+    nodes: &'a [MainNode],
+    parent_id: &str,
+    current: &str,
+) -> Option<&'a [MainNode]> {
+    if parent_id == current {
+        return Some(nodes);
+    }
+    for node in nodes {
+        let id = main_node_id(node, current);
+        if let MainNode::Folder { children, .. } = node {
+            if id == parent_id {
+                return Some(children);
+            }
+            if let Some(found) = sibling_names(children, parent_id, &id) {
+                return Some(found);
+            }
+        }
+    }
+    None
+}
+
+fn unique_folder_name(nodes: &[MainNode], parent_id: &str, requested: &str) -> String {
+    let siblings = sibling_names(nodes, parent_id, MAIN_ROOT).unwrap_or(nodes);
+    let taken: HashSet<&str> = siblings
+        .iter()
+        .filter_map(|node| match node {
+            MainNode::Folder { folder, .. } => Some(folder.as_str()),
+            MainNode::Note { .. } => None,
+        })
+        .collect();
+    if !taken.contains(requested) {
+        return requested.to_string();
+    }
+    for suffix in 2.. {
+        let candidate = format!("{requested} {suffix}");
+        if !taken.contains(candidate.as_str()) {
+            return candidate;
+        }
+    }
+    unreachable!()
+}
+
+fn empty_board(description: &str, tags: &str) -> String {
+    json!({
+        "type": "excalidraw",
+        "version": 2,
+        "source": "rotli",
+        "elements": [],
+        "appState": {},
+        "files": {},
+        "rotliMeta": { "description": description, "tags": tags }
+    })
+    .to_string()
+}
+
+fn validate_board(raw: &str) -> Result<Value, String> {
+    let value: Value = serde_json::from_str(raw).map_err(|e| format!("invalid board JSON: {e}"))?;
+    let object = value.as_object().ok_or("board root must be an object")?;
+    if object.get("type").and_then(Value::as_str) != Some("excalidraw") {
+        return Err("board type must be excalidraw".into());
+    }
+    if !object.get("elements").is_some_and(Value::is_array) {
+        return Err("board elements must be an array".into());
+    }
+    Ok(value)
+}
+
+fn board_outline(scene: &Value) -> Vec<BoardOutlineItem> {
+    scene
+        .get("elements")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|element| {
+            !element
+                .get("isDeleted")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+        .map(|element| BoardOutlineItem {
+            id: agent_element_id(element),
+            kind: string_field(element, "type"),
+            text: element
+                .get("text")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            x: number_field(element, "x"),
+            y: number_field(element, "y"),
+            width: number_field(element, "width"),
+            height: number_field(element, "height"),
+        })
+        .collect()
+}
+
+fn string_field(value: &Value, key: &str) -> String {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn number_field(value: &Value, key: &str) -> f64 {
+    value.get(key).and_then(Value::as_f64).unwrap_or_default()
+}
+
+fn agent_element_id(element: &Value) -> String {
+    element
+        .get("customData")
+        .and_then(|value| value.get("rotliAgentId"))
+        .and_then(Value::as_str)
+        .or_else(|| element.get("id").and_then(Value::as_str))
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn apply_board_actions(scene: &mut Value, actions: &[Value]) -> Result<(), String> {
+    let object = scene
+        .as_object_mut()
+        .ok_or("board root must be an object")?;
+    let elements = object
+        .entry("elements")
+        .or_insert_with(|| Value::Array(Vec::new()))
+        .as_array_mut()
+        .ok_or("board elements must be an array")?;
+    for action in actions {
+        let op = action
+            .get("op")
+            .and_then(Value::as_str)
+            .ok_or("board action needs op")?;
+        match op {
+            "add" => elements.push(new_board_element(action)?),
+            "update" => update_board_element(elements, action)?,
+            "remove" => remove_board_element(elements, action)?,
+            other => return Err(format!("unsupported board action: {other}")),
+        }
+    }
+    Ok(())
+}
+
+fn new_board_element(action: &Value) -> Result<Value, String> {
+    let logical_id = action
+        .get("id")
+        .and_then(Value::as_str)
+        .ok_or("add action needs id")?;
+    let kind = action
+        .get("kind")
+        .and_then(Value::as_str)
+        .unwrap_or("rectangle");
+    if !matches!(kind, "rectangle" | "ellipse" | "diamond" | "text" | "arrow") {
+        return Err("kind must be rectangle, ellipse, diamond, text, or arrow".into());
+    }
+    let x = action.get("x").and_then(Value::as_f64).unwrap_or(0.0);
+    let y = action.get("y").and_then(Value::as_f64).unwrap_or(0.0);
+    let width = action
+        .get("width")
+        .and_then(Value::as_f64)
+        .unwrap_or(180.0)
+        .max(1.0);
+    let height = action
+        .get("height")
+        .and_then(Value::as_f64)
+        .unwrap_or(80.0)
+        .max(1.0);
+    let text = action
+        .get("text")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let id = format!("rotli-{:016x}", stable_hash(logical_id.as_bytes()));
+    let now = now_millis();
+    let mut element = json!({
+        "id": id,
+        "type": kind,
+        "x": x,
+        "y": y,
+        "width": width,
+        "height": height,
+        "angle": 0,
+        "strokeColor": "#1b1b1f",
+        "backgroundColor": "transparent",
+        "fillStyle": "solid",
+        "strokeWidth": 2,
+        "strokeStyle": "solid",
+        "roughness": 1,
+        "opacity": 100,
+        "groupIds": [],
+        "frameId": null,
+        "index": null,
+        "roundness": if kind == "rectangle" { json!({"type": 3}) } else { Value::Null },
+        "seed": (stable_hash(format!("{logical_id}:seed").as_bytes()) & 0x7fffffff) as i64,
+        "version": 1,
+        "versionNonce": (stable_hash(format!("{logical_id}:nonce").as_bytes()) & 0x7fffffff) as i64,
+        "isDeleted": false,
+        "boundElements": null,
+        "updated": now,
+        "link": null,
+        "locked": false,
+        "customData": { "rotliAgentId": logical_id }
+    });
+    if kind == "text" {
+        let object = element.as_object_mut().expect("element object");
+        object.insert("text".into(), Value::String(text.to_string()));
+        object.insert("originalText".into(), Value::String(text.to_string()));
+        object.insert(
+            "fontSize".into(),
+            json!(action
+                .get("fontSize")
+                .and_then(Value::as_f64)
+                .unwrap_or(20.0)),
+        );
+        object.insert("fontFamily".into(), json!(5));
+        object.insert("textAlign".into(), json!("left"));
+        object.insert("verticalAlign".into(), json!("top"));
+        object.insert("containerId".into(), Value::Null);
+        object.insert("autoResize".into(), json!(true));
+        object.insert("lineHeight".into(), json!(1.25));
+    } else if kind == "arrow" {
+        let object = element.as_object_mut().expect("element object");
+        object.insert("points".into(), json!([[0, 0], [width, height]]));
+        object.insert("lastCommittedPoint".into(), Value::Null);
+        object.insert("startBinding".into(), Value::Null);
+        object.insert("endBinding".into(), Value::Null);
+        object.insert("startArrowhead".into(), Value::Null);
+        object.insert("endArrowhead".into(), json!("arrow"));
+        object.insert("elbowed".into(), json!(false));
+    }
+    Ok(element)
+}
+
+fn update_board_element(elements: &mut [Value], action: &Value) -> Result<(), String> {
+    let id = action
+        .get("id")
+        .and_then(Value::as_str)
+        .ok_or("update action needs id")?;
+    let element = elements
+        .iter_mut()
+        .find(|element| agent_element_id(element) == id)
+        .ok_or_else(|| format!("board element not found: {id}"))?;
+    let object = element
+        .as_object_mut()
+        .ok_or("board element must be an object")?;
+    for key in [
+        "x",
+        "y",
+        "width",
+        "height",
+        "text",
+        "strokeColor",
+        "backgroundColor",
+    ] {
+        if let Some(value) = action.get(key) {
+            object.insert(key.to_string(), value.clone());
+            if key == "text" {
+                object.insert("originalText".into(), value.clone());
+            }
+        }
+    }
+    let version = object.get("version").and_then(Value::as_u64).unwrap_or(1) + 1;
+    object.insert("version".into(), json!(version));
+    object.insert("updated".into(), json!(now_millis()));
+    Ok(())
+}
+
+fn remove_board_element(elements: &mut [Value], action: &Value) -> Result<(), String> {
+    let id = action
+        .get("id")
+        .and_then(Value::as_str)
+        .ok_or("remove action needs id")?;
+    let element = elements
+        .iter_mut()
+        .find(|element| agent_element_id(element) == id)
+        .ok_or_else(|| format!("board element not found: {id}"))?;
+    let object = element
+        .as_object_mut()
+        .ok_or("board element must be an object")?;
+    object.insert("isDeleted".into(), json!(true));
+    object.insert("updated".into(), json!(now_millis()));
+    Ok(())
+}
+
+fn stable_hash(bytes: &[u8]) -> u64 {
+    revision(bytes)
+        .strip_prefix("fnv1a64:")
+        .and_then(|value| u64::from_str_radix(value, 16).ok())
+        .unwrap_or_default()
+}
+
+fn now_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or_default()
+}
+
+/// Consume a pending `rotli open` request. The frontend polls this small runtime
+/// mailbox while the main surface is mounted; deleting after a successful parse
+/// gives each request at-most-once delivery without introducing a daemon/socket.
+#[tauri::command]
+pub(crate) fn workspace_take_open_request(
+    state: tauri::State<'_, crate::corpus::CorpusState>,
+) -> Result<Option<WorkspaceOpenRequest>, String> {
+    let path = state
+        .default_root_path()?
+        .join(DOT_DIR)
+        .join(OPEN_REQUEST_FILE);
+    let raw = match fs::read_to_string(&path) {
+        Ok(raw) => raw,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("read open request: {error}")),
+    };
+    let request = serde_json::from_str::<WorkspaceOpenRequest>(&raw)
+        .map_err(|error| format!("invalid open request: {error}"))?;
+    fs::remove_file(&path).map_err(|error| format!("consume open request: {error}"))?;
+    Ok(Some(request))
+}
+
+/// Return an exit status when argv names a headless command; `None` means this
+/// is a normal app launch and Tauri should start.
+pub(crate) fn run_if_requested(args: &[String]) -> Option<i32> {
+    let command = args.get(1).map(String::as_str)?;
+    let recognized = matches!(
+        command,
+        "help"
+            | "--help"
+            | "-h"
+            | "roots"
+            | "status"
+            | "notes"
+            | "folders"
+            | "main"
+            | "boards"
+            | "open"
+            | "agent"
+            | "mcp"
+    );
+    if !recognized {
+        return None;
+    }
+    let result = run_cli(&args[1..]);
+    match result {
+        Ok(value) => {
+            if !value.is_null() {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&value).unwrap_or_else(|_| "null".into())
+                );
+            }
+            Some(0)
+        }
+        Err(error) => {
+            eprintln!("{}", json!({ "ok": false, "error": error }));
+            Some(1)
+        }
+    }
+}
+
+fn run_cli(args: &[String]) -> Result<Value, String> {
+    let command = args.first().map(String::as_str).unwrap_or("help");
+    if matches!(command, "help" | "--help" | "-h") {
+        return Ok(json!({ "help": CLI_HELP }));
+    }
+    if command == "mcp" {
+        if args.get(1).map(String::as_str) == Some("config") {
+            return mcp_config();
+        }
+        run_mcp()?;
+        return Ok(Value::Null);
+    }
+    if command == "roots" || command == "status" {
+        return Ok(json!({ "roots": roots_info()? }));
+    }
+    let root_id = option(args, "--root");
+    match command {
+        "agent" => run_agent_cli(args, root_id),
+        "notes" => run_notes_cli(args, root_id),
+        "folders" => run_folders_cli(args, root_id),
+        "main" => run_main_cli(args),
+        "boards" => run_boards_cli(args, root_id),
+        "open" => {
+            let id = positional(args, 1, "open needs an item id")?;
+            let kind = option(args, "--kind").unwrap_or("note");
+            let (workspace, local) = Workspace::open_for_item(id, root_id)?;
+            workspace.queue_open(&local, kind)
+        }
+        _ => Err(format!("unknown command: {command}")),
+    }
+}
+
+fn run_agent_cli(args: &[String], root_id: Option<&str>) -> Result<Value, String> {
+    match args.get(1).map(String::as_str).unwrap_or("doctor") {
+        "doctor" | "status" => agent_doctor(root_id),
+        "config" | "setup" => mcp_config(),
+        "self-test" | "test" => agent_self_test(),
+        command => Err(format!("unknown agent command: {command}")),
+    }
+}
+
+fn run_notes_cli(args: &[String], root_id: Option<&str>) -> Result<Value, String> {
+    let sub = args.get(1).map(String::as_str).unwrap_or("list");
+    match sub {
+        "list" => {
+            let mut workspace = Workspace::open(root_id)?;
+            let limit = usize_option(args, "--limit", 100)?;
+            json_value(workspace.list_remote(limit)?)
+        }
+        "search" => {
+            let query = positional(args, 2, "notes search needs a query")?;
+            let mut workspace = Workspace::open(root_id)?;
+            json_value(workspace.search_remote(query, usize_option(args, "--limit", 30)?)?)
+        }
+        "read" => {
+            let id = positional(args, 2, "notes read needs an id")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            json_value(workspace.read_note(&local)?)
+        }
+        "create" => {
+            let title = required_option(args, "--title")?;
+            let body = input_text(args, "--body")?;
+            let parent = option(args, "--main").unwrap_or(MAIN_ROOT);
+            let mut workspace = Workspace::open(root_id)?;
+            let meta = workspace.create_note(title, &body, parent)?;
+            let local = workspace.local_id(&meta.id)?;
+            json_value(workspace.read_note(&local)?)
+        }
+        "update" => {
+            let id = positional(args, 2, "notes update needs an id")?;
+            let body = input_text(args, "--body")?;
+            let expected = required_option(args, "--revision")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            workspace.update_note(&local, &body, expected)?;
+            json_value(workspace.read_note(&local)?)
+        }
+        "patch" => {
+            let id = positional(args, 2, "notes patch needs an id")?;
+            let old_text = required_option(args, "--old")?;
+            let new_text = required_option(args, "--new")?;
+            let expected = required_option(args, "--revision")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            workspace.patch_note(&local, old_text, new_text, expected)?;
+            json_value(workspace.read_note(&local)?)
+        }
+        "move" => {
+            let id = positional(args, 2, "notes move needs an id")?;
+            let folder = required_option(args, "--folder")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            json_value(workspace.move_note(&local, folder)?)
+        }
+        _ => Err(format!("unknown notes command: {sub}")),
+    }
+}
+
+fn run_folders_cli(args: &[String], root_id: Option<&str>) -> Result<Value, String> {
+    let sub = args.get(1).map(String::as_str).unwrap_or("list");
+    match sub {
+        "list" => {
+            let mut workspace = Workspace::open(root_id)?;
+            let list = workspace.list_remote(1)?;
+            json_value(list.folders)
+        }
+        "create" => {
+            let name = required_option(args, "--name")?;
+            if flag(args, "--disk") {
+                let mut workspace = Workspace::open(root_id)?;
+                json_value(workspace.create_disk_folder(name, option(args, "--parent"))?)
+            } else {
+                let workspace = Workspace::open(None)?;
+                Ok(json!({
+                    "id": workspace.main_create_folder(name, option(args, "--parent").unwrap_or(MAIN_ROOT))?,
+                    "scope": "main"
+                }))
+            }
+        }
+        _ => Err(format!("unknown folders command: {sub}")),
+    }
+}
+
+fn run_main_cli(args: &[String]) -> Result<Value, String> {
+    let sub = args.get(1).map(String::as_str).unwrap_or("list");
+    let workspace = Workspace::open(None)?;
+    match sub {
+        "list" => json_value(workspace.read_main()?),
+        "add" => {
+            let id = positional(args, 2, "main add needs an item id")?;
+            workspace.main_add(id, option(args, "--parent").unwrap_or(MAIN_ROOT))?;
+            json_value(workspace.read_main()?)
+        }
+        "move" => {
+            let id = positional(args, 2, "main move needs an item id")?;
+            workspace.main_move(id, required_option(args, "--parent")?)?;
+            json_value(workspace.read_main()?)
+        }
+        "remove" => {
+            let id = positional(args, 2, "main remove needs an item id")?;
+            workspace.main_remove(id)?;
+            json_value(workspace.read_main()?)
+        }
+        "create-folder" => Ok(json!({
+            "id": workspace.main_create_folder(
+                required_option(args, "--name")?,
+                option(args, "--parent").unwrap_or(MAIN_ROOT),
+            )?
+        })),
+        _ => Err(format!("unknown main command: {sub}")),
+    }
+}
+
+fn run_boards_cli(args: &[String], root_id: Option<&str>) -> Result<Value, String> {
+    let sub = args.get(1).map(String::as_str).unwrap_or("list");
+    match sub {
+        "list" => {
+            let mut workspace = Workspace::open(root_id)?;
+            let mut list = workspace.list_remote(usize_option(args, "--limit", 100)?)?;
+            list.notes.retain(|meta| meta.kind == NoteKind::Board);
+            json_value(list.notes)
+        }
+        "read" => {
+            let id = positional(args, 2, "boards read needs an id")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            json_value(workspace.read_board(&local)?)
+        }
+        "create" => {
+            let mut workspace = Workspace::open(root_id)?;
+            let meta = workspace.create_board(
+                option(args, "--name").unwrap_or("Board"),
+                option(args, "--description").unwrap_or_default(),
+                option(args, "--tags").unwrap_or_default(),
+                option(args, "--main").unwrap_or(MAIN_ROOT),
+            )?;
+            let local = workspace.local_id(&meta.id)?;
+            json_value(workspace.read_board(&local)?)
+        }
+        "update" => {
+            let id = positional(args, 2, "boards update needs an id")?;
+            let body = input_text(args, "--body")?;
+            let revision = required_option(args, "--revision")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            workspace.update_board(&local, &body, revision)?;
+            json_value(workspace.read_board(&local)?)
+        }
+        "apply" => {
+            let id = positional(args, 2, "boards apply needs an id")?;
+            let actions_raw = input_text(args, "--actions")?;
+            let actions: Vec<Value> = serde_json::from_str(&actions_raw)
+                .map_err(|error| format!("actions must be a JSON array: {error}"))?;
+            let revision = required_option(args, "--revision")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            workspace.apply_board(
+                &local,
+                &actions,
+                revision,
+                option(args, "--description"),
+                option(args, "--tags"),
+            )?;
+            json_value(workspace.read_board(&local)?)
+        }
+        _ => Err(format!("unknown boards command: {sub}")),
+    }
+}
+
+fn json_value<T: Serialize>(value: T) -> Result<Value, String> {
+    serde_json::to_value(value).map_err(|error| error.to_string())
+}
+
+fn positional<'a>(args: &'a [String], index: usize, error: &str) -> Result<&'a str, String> {
+    args.get(index)
+        .filter(|value| !value.starts_with('-'))
+        .map(String::as_str)
+        .ok_or_else(|| error.to_string())
+}
+
+fn option<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
+    args.iter()
+        .position(|value| value == name)
+        .and_then(|index| args.get(index + 1))
+        .map(String::as_str)
+}
+
+fn required_option<'a>(args: &'a [String], name: &str) -> Result<&'a str, String> {
+    option(args, name).ok_or_else(|| format!("{name} is required"))
+}
+
+fn flag(args: &[String], name: &str) -> bool {
+    args.iter().any(|value| value == name)
+}
+
+fn usize_option(args: &[String], name: &str, fallback: usize) -> Result<usize, String> {
+    match option(args, name) {
+        Some(value) => value
+            .parse::<usize>()
+            .map_err(|_| format!("{name} must be an integer")),
+        None => Ok(fallback),
+    }
+}
+
+fn input_text(args: &[String], direct_name: &str) -> Result<String, String> {
+    if let Some(value) = option(args, direct_name) {
+        return Ok(value.to_string());
+    }
+    if let Some(path) = option(args, &format!("{direct_name}-file")) {
+        return fs::read_to_string(path).map_err(|error| format!("read {path}: {error}"));
+    }
+    if flag(args, "--stdin") {
+        let mut value = String::new();
+        io::stdin()
+            .read_to_string(&mut value)
+            .map_err(|error| error.to_string())?;
+        return Ok(value);
+    }
+    Ok(String::new())
+}
+
+fn mcp_config() -> Result<Value, String> {
+    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+    let command = executable.display().to_string();
+    let quoted = shell_quote(&command);
+    Ok(json!({
+        "server": "rotli-workspace",
+        "transport": "stdio",
+        "command": command,
+        "args": ["mcp"],
+        "claudeCode": format!("claude mcp add --transport stdio --scope user rotli-workspace -- {quoted} mcp"),
+        "codex": format!("codex mcp add rotli-workspace -- {quoted} mcp"),
+        "codexToml": format!("[mcp_servers.rotli-workspace]\ncommand = {:?}\nargs = [\"mcp\"]\ndefault_tools_approval_mode = \"writes\"", command),
+        "verify": {
+            "rotli": format!("{quoted} agent doctor"),
+            "isolatedSelfTest": format!("{quoted} agent self-test"),
+            "claude": "claude mcp get rotli-workspace",
+            "codex": "codex mcp get rotli-workspace"
+        },
+        "boundary": "Rotli prints setup instructions but never edits Claude or Codex global configuration itself. Use the installed app binary, not a temporary target/debug build."
+    }))
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+fn workspace_policy() -> Value {
+    json!({
+        "content": "Markdown notes are text/markdown editor bodies; Rotli owns and preserves YAML frontmatter.",
+        "creation": "New notes enter wiki/_inbox (or legacy Inbox) and are referenced in Main immediately.",
+        "organization": "Main folders are virtual. Physical folders and moves require an explicit disk operation and corpus policy approval.",
+        "concurrency": "Every note or board write requires the revision from an immediately preceding read.",
+        "privacy": "Secure, locked, and secret-shaped Markdown is omitted or refused. Board scenes have no secure classification and must not contain secrets.",
+        "transport": "The MCP server uses local stdio only and opens no network listener."
+    })
+}
+
+fn agent_doctor(root_id: Option<&str>) -> Result<Value, String> {
+    let targets = root_targets()?;
+    let id = root_id.unwrap_or(DEFAULT_ROOT_ID);
+    let mut target = targets
+        .into_iter()
+        .find(|target| target.id == id)
+        .ok_or_else(|| format!("unknown Rotli root: {id}"))?;
+    let configured_read_only = target.read_only;
+    target.read_only = true;
+    let mut workspace = Workspace::open_target(target)?;
+    let metrics = workspace.metrics()?;
+    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+    let tools = mcp_tools();
+    let tool_names: HashSet<&str> = tools
+        .iter()
+        .filter_map(|tool| tool.get("name").and_then(Value::as_str))
+        .collect();
+    let tool_schema_ok = tool_names.len() == tools.len()
+        && tool_names.contains("rotli_read_note")
+        && tool_names.contains("rotli_metrics")
+        && tool_names.contains("rotli_apply_board");
+    Ok(json!({
+        "ok": true,
+        "mode": "read-only diagnostics",
+        "liveWorkspaceMutated": false,
+        "root": {
+            "id": workspace.root.id,
+            "label": workspace.root.label,
+            "path": workspace.root.path,
+            "isMemex": workspace.store.is_memex(),
+            "configuredReadOnly": configured_read_only
+        },
+        "metrics": metrics,
+        "checks": [
+            { "name": "registered root", "ok": true },
+            { "name": "read-only open", "ok": true },
+            { "name": "agent-visible metrics", "ok": true },
+            { "name": "executable available", "ok": executable.is_file() },
+            { "name": "MCP tool schemas unique and complete", "ok": tool_schema_ok, "toolCount": tools.len() }
+        ],
+        "policy": workspace_policy(),
+        "configuration": mcp_config()?,
+        "next": "Run `rotli agent self-test` for behavioral proof in a disposable memex."
+    }))
+}
+
+fn agent_self_test() -> Result<Value, String> {
+    let started = Instant::now();
+    let temp = tempfile::Builder::new()
+        .prefix("rotli-agent-self-test-")
+        .tempdir()
+        .map_err(|error| format!("create isolated self-test root: {error}"))?;
+    let root = temp.path().join("memex");
+    fs::create_dir_all(root.join("wiki/_inbox")).map_err(|error| error.to_string())?;
+    fs::create_dir_all(root.join("storage/excalidraw")).map_err(|error| error.to_string())?;
+    fs::write(
+        root.join("memex.json"),
+        r#"{"id":"mx_agent_self_test","contract":"3.4","apps":{}}"#,
+    )
+    .map_err(|error| error.to_string())?;
+    let mut workspace = Workspace::open_target(RootTarget {
+        id: DEFAULT_ROOT_ID.into(),
+        label: "Isolated agent self-test".into(),
+        path: root,
+        read_only: false,
+        is_default: true,
+    })?;
+    let mut checks = Vec::new();
+
+    let created = workspace.create_note(
+        "Agent self-test",
+        "## Checklist\n\n- [ ] verify Markdown\n\nSee [[Reference]] and [Rotli](https://example.test).",
+        MAIN_ROOT,
+    )?;
+    checks.push("create Markdown note in intake and Main");
+    let read = workspace.read_note(&created.id)?;
+    if read.document.content_type != "text/markdown"
+        || read.document.metrics.headings != 2
+        || read.document.metrics.open_tasks != 1
+        || read.document.metrics.links != 2
+    {
+        return Err("Markdown document metadata or metrics self-test failed".into());
+    }
+    checks.push("read typed Markdown plus document metrics");
+    if !workspace
+        .search_remote("verify Markdown", 10)?
+        .iter()
+        .any(|hit| hit.id == created.id)
+    {
+        return Err("search self-test did not find the created note".into());
+    }
+    checks.push("search agent-readable Markdown");
+    workspace.patch_note(
+        &created.id,
+        "- [ ] verify Markdown",
+        "- [x] verify Markdown",
+        &read.revision,
+    )?;
+    checks.push("patch one exact span with revision protection");
+    if workspace
+        .update_note(&created.id, "# stale", &read.revision)
+        .is_ok()
+    {
+        return Err("stale revision self-test unexpectedly succeeded".into());
+    }
+    checks.push("refuse a stale write");
+    if workspace
+        .create_note("Unsafe", "sk-ant-abcdefghijklmnop", MAIN_ROOT)
+        .is_ok()
+    {
+        return Err("secret-shaped Markdown self-test unexpectedly succeeded".into());
+    }
+    checks.push("refuse secret-shaped Markdown");
+    let board = workspace.create_board("Agent map", "Self-test", "agent", MAIN_ROOT)?;
+    let board_read = workspace.read_board(&board.id)?;
+    workspace.apply_board(
+        &board.id,
+        &[json!({"op":"add","id":"result","kind":"text","text":"Passed","x":20,"y":20})],
+        &board_read.revision,
+        None,
+        None,
+    )?;
+    if workspace.read_board(&board.id)?.outline.len() != 1 {
+        return Err("semantic board action self-test failed".into());
+    }
+    checks.push("create and semantically edit an Excalidraw board");
+    let metrics = workspace.metrics()?;
+    checks.push("calculate agent-visible workspace metrics");
+    let initialized = handle_mcp_request(&json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": { "protocolVersion": MCP_PROTOCOL }
+    }))
+    .and_then(|response| response.pointer("/result/serverInfo/name").cloned())
+        == Some(json!("rotli-workspace"));
+    if !initialized {
+        return Err("MCP initialization self-test failed".into());
+    }
+    let listed_tools = handle_mcp_request(&json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list"
+    }))
+    .and_then(|response| response.pointer("/result/tools").cloned())
+    .and_then(|tools| tools.as_array().map(Vec::len))
+    .is_some_and(|count| count >= 18);
+    if !listed_tools {
+        return Err("MCP tool discovery self-test failed".into());
+    }
+    checks.push("initialize the MCP protocol and discover tools");
+    Ok(json!({
+        "ok": true,
+        "scope": "isolated temporary memex",
+        "liveWorkspaceMutated": false,
+        "temporaryWorkspaceRemovedOnExit": true,
+        "checks": checks,
+        "metrics": {
+            "passed": checks.len(),
+            "durationMs": started.elapsed().as_millis(),
+            "workspace": metrics
+        }
+    }))
+}
+
+const CLI_HELP: &str = r#"Rotli headless workspace (JSON output)
+
+rotli roots
+rotli notes list [--root ID] [--limit N]
+rotli notes search QUERY [--root ID] [--limit N]
+rotli notes read ID [--root ID]
+rotli notes create --title TITLE [--body TEXT|--body-file PATH|--stdin] [--main main:FOLDER]
+rotli notes update ID --revision REV [--body TEXT|--body-file PATH|--stdin]
+rotli notes patch ID --revision REV --old EXACT_TEXT --new REPLACEMENT
+rotli notes move ID --folder PATH
+rotli folders list [--root ID]
+rotli folders create --name NAME [--parent main:FOLDER]          # Main folder
+rotli folders create --disk --name NAME [--parent PATH]         # physical folder, policy-gated
+rotli main list|add|move|remove|create-folder ...
+rotli boards list|read|create|update|apply ...
+rotli open ID [--kind note|board|file]
+rotli agent doctor [--root ID]                                  # read-only boundary + metrics
+rotli agent config                                              # copy-ready Claude/Codex setup
+rotli agent self-test                                           # disposable end-to-end validation
+rotli mcp                                                        # stdio MCP server
+rotli mcp config                                                 # Claude/Codex config snippets
+
+Note bodies are text/markdown without YAML frontmatter; Rotli owns frontmatter.
+Every update requires the revision returned by read. Notes created in a memex
+land in wiki/_inbox and are referenced from Main immediately."#;
+
+fn run_mcp() -> Result<(), String> {
+    let stdin = io::stdin();
+    let mut stdout = io::stdout().lock();
+    for line in stdin.lock().lines() {
+        let line = line.map_err(|error| error.to_string())?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let response = match serde_json::from_str::<Value>(&line) {
+            Ok(request) => handle_mcp_request(&request),
+            Err(error) => Some(mcp_failure(
+                Value::Null,
+                -32700,
+                &format!("parse error: {error}"),
+            )),
+        };
+        if let Some(response) = response {
+            writeln!(stdout, "{}", response).map_err(|error| error.to_string())?;
+            stdout.flush().map_err(|error| error.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+fn handle_mcp_request(request: &Value) -> Option<Value> {
+    let method = request
+        .get("method")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let id = request.get("id").cloned().unwrap_or(Value::Null);
+    match method {
+        "initialize" => Some(mcp_success(
+            id,
+            json!({
+                "protocolVersion": request.pointer("/params/protocolVersion").and_then(Value::as_str).unwrap_or(MCP_PROTOCOL),
+                "capabilities": { "tools": { "listChanged": false } },
+                "serverInfo": { "name": "rotli-workspace", "version": env!("CARGO_PKG_VERSION") },
+                "instructions": "Rotli is a local-first Markdown workspace. Note bodies are text/markdown without YAML frontmatter; Rotli manages frontmatter. Read immediately before editing and pass expectedRevision. New notes enter intake and appear in Main. Main folders are virtual; disk moves are explicit. Secure/locked content is refused. Prefer exact patches and semantic board actions."
+            }),
+        )),
+        "ping" => Some(mcp_success(id, json!({}))),
+        "tools/list" => Some(mcp_success(id, json!({ "tools": mcp_tools() }))),
+        "tools/call" => {
+            let name = request
+                .pointer("/params/name")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let arguments = request
+                .pointer("/params/arguments")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
+            let result = call_mcp_tool(name, &arguments);
+            Some(mcp_success(
+                id,
+                match result {
+                    Ok(value) => {
+                        json!({ "content": [{ "type": "text", "text": serde_json::to_string_pretty(&value).unwrap_or_default() }], "structuredContent": value, "isError": false })
+                    }
+                    Err(error) => {
+                        json!({ "content": [{ "type": "text", "text": format!("Error: {error}") }], "isError": true })
+                    }
+                },
+            ))
+        }
+        method if method.starts_with("notifications/") => None,
+        _ => Some(mcp_failure(id, -32601, "method not found")),
+    }
+}
+
+fn mcp_success(id: Value, result: Value) -> Value {
+    json!({ "jsonrpc": "2.0", "id": id, "result": result })
+}
+
+fn mcp_failure(id: Value, code: i64, message: &str) -> Value {
+    json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
+}
+
+fn mcp_tools() -> Vec<Value> {
+    vec![
+        tool("rotli_status", "List configured Rotli roots and the agent safety contract.", json!({"type":"object","properties":{},"additionalProperties":false}), true),
+        tool("rotli_metrics", "Count only agent-visible notes, boards, files, intake items, physical folders, and Main references. Secure note counts are not exposed.", json!({"type":"object","properties":{"rootId":{"type":"string"}},"additionalProperties":false}), true),
+        tool("rotli_list", "List agent-readable notes, boards, and folders. Secure content is omitted.", root_limit_schema(), true),
+        tool("rotli_search", "Full-text search agent-readable notes. Secure content is omitted.", json!({"type":"object","properties":{"query":{"type":"string"},"rootId":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":100}},"required":["query"],"additionalProperties":false}), true),
+        tool("rotli_read_note", "Read a paged text/markdown editor body, full-document Markdown metrics, and revision. Managed YAML frontmatter is intentionally omitted. Read again immediately before every update.", json!({"type":"object","properties":{"id":{"type":"string"},"rootId":{"type":"string"},"offset":{"type":"integer","minimum":0},"maxChars":{"type":"integer","minimum":1,"maximum":50000}},"required":["id"],"additionalProperties":false}), true),
+        tool("rotli_create_note", "Create a text/markdown note in intake and place it in Main. Pass a one-line title without '#'. Body may omit H1 or begin with an H1 exactly matching title; never pass YAML frontmatter.", json!({"type":"object","properties":{"title":{"type":"string","description":"One line of title text without Markdown heading markers."},"body":{"type":"string","description":"Markdown editor body without YAML frontmatter. An optional leading H1 must exactly match title."},"mainParent":{"type":"string","description":"main: or a Main folder id"},"rootId":{"type":"string"}},"required":["title"],"additionalProperties":false}), false),
+        tool("rotli_update_note", "Replace the complete text/markdown editor body using optimistic revision protection. Do not include YAML frontmatter; Rotli preserves it. Secure and locked notes are refused.", json!({"type":"object","properties":{"id":{"type":"string"},"body":{"type":"string","description":"Complete Markdown editor body without YAML frontmatter."},"expectedRevision":{"type":"string"},"rootId":{"type":"string"}},"required":["id","body","expectedRevision"],"additionalProperties":false}), false),
+        tool("rotli_patch_note", "Replace one exact text span locally without resending the full note. Refuses zero or ambiguous matches and stale revisions.", json!({"type":"object","properties":{"id":{"type":"string"},"oldText":{"type":"string"},"newText":{"type":"string"},"expectedRevision":{"type":"string"},"rootId":{"type":"string"}},"required":["id","oldText","newText","expectedRevision"],"additionalProperties":false}), false),
+        tool("rotli_move_note", "Move a note to a policy-allowed physical folder.", json!({"type":"object","properties":{"id":{"type":"string"},"folder":{"type":"string"},"rootId":{"type":"string"}},"required":["id","folder"],"additionalProperties":false}), false),
+        tool("rotli_list_main", "Read the hand-arranged Main reference tree.", json!({"type":"object","properties":{},"additionalProperties":false}), true),
+        tool("rotli_create_folder", "Create a Main-only organization folder, or an explicitly requested policy-gated disk folder.", json!({"type":"object","properties":{"name":{"type":"string"},"parent":{"type":"string"},"scope":{"type":"string","enum":["main","disk"]},"rootId":{"type":"string"}},"required":["name"],"additionalProperties":false}), false),
+        tool("rotli_place_in_main", "Place a note or board reference in Main.", main_item_schema(false), false),
+        tool("rotli_move_in_main", "Move a Main note, board, or folder into another Main folder.", main_item_schema(true), false),
+        tool("rotli_remove_from_main", "Remove a reference/folder from Main without deleting the underlying file.", json!({"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false}), false),
+        tool("rotli_read_board", "Read compact Excalidraw metadata, outline, and revision without loading raw scene JSON.", item_schema(), true),
+        tool("rotli_create_board", "Create an Excalidraw board and place it in Main.", json!({"type":"object","properties":{"name":{"type":"string"},"description":{"type":"string"},"tags":{"type":"string"},"mainParent":{"type":"string"},"rootId":{"type":"string"}},"required":["name"],"additionalProperties":false}), false),
+        tool("rotli_apply_board", "Edit a board with compact actions. Actions: {op:add,id,kind,x,y,width,height,text}; {op:update,id,...}; {op:remove,id}.", json!({"type":"object","properties":{"id":{"type":"string"},"expectedRevision":{"type":"string"},"actions":{"type":"array","items":{"type":"object"}},"description":{"type":"string"},"tags":{"type":"string"},"rootId":{"type":"string"}},"required":["id","expectedRevision","actions"],"additionalProperties":false}), false),
+        tool("rotli_open", "Open a note, board, or file in the Rotli app.", json!({"type":"object","properties":{"id":{"type":"string"},"kind":{"type":"string","enum":["note","board","file"]},"rootId":{"type":"string"}},"required":["id"],"additionalProperties":false}), false),
+    ]
+}
+
+fn tool(name: &str, description: &str, input_schema: Value, read_only: bool) -> Value {
+    json!({
+        "name": name,
+        "description": description,
+        "inputSchema": input_schema,
+        "annotations": { "readOnlyHint": read_only, "destructiveHint": false, "idempotentHint": read_only, "openWorldHint": false }
+    })
+}
+
+fn root_limit_schema() -> Value {
+    json!({"type":"object","properties":{"rootId":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":500}},"additionalProperties":false})
+}
+
+fn item_schema() -> Value {
+    json!({"type":"object","properties":{"id":{"type":"string"},"rootId":{"type":"string"}},"required":["id"],"additionalProperties":false})
+}
+
+fn main_item_schema(parent_required: bool) -> Value {
+    let required = if parent_required {
+        json!(["id", "parent"])
+    } else {
+        json!(["id"])
+    };
+    json!({"type":"object","properties":{"id":{"type":"string"},"parent":{"type":"string"}},"required":required,"additionalProperties":false})
+}
+
+fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
+    let root = arg_string(args, "rootId");
+    match name {
+        "rotli_status" => Ok(json!({ "roots": roots_info()?, "policy": workspace_policy() })),
+        "rotli_metrics" => {
+            let mut workspace = Workspace::open(root)?;
+            json_value(workspace.metrics()?)
+        }
+        "rotli_list" => {
+            let mut workspace = Workspace::open(root)?;
+            json_value(workspace.list_remote(arg_usize(args, "limit", 100).min(500))?)
+        }
+        "rotli_search" => {
+            let mut workspace = Workspace::open(root)?;
+            json_value(workspace.search_remote(
+                arg_required(args, "query")?,
+                arg_usize(args, "limit", 30).min(100),
+            )?)
+        }
+        "rotli_read_note" => {
+            let id = arg_required(args, "id")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            let result = workspace.read_note(&local)?;
+            paged_note(
+                result,
+                arg_usize(args, "offset", 0),
+                arg_usize(args, "maxChars", 20_000).min(50_000),
+            )
+        }
+        "rotli_create_note" => {
+            let mut workspace = Workspace::open(root)?;
+            let meta = workspace.create_note(
+                arg_required(args, "title")?,
+                arg_string(args, "body").unwrap_or_default(),
+                arg_string(args, "mainParent").unwrap_or(MAIN_ROOT),
+            )?;
+            let local = workspace.local_id(&meta.id)?;
+            json_value(workspace.read_note(&local)?)
+        }
+        "rotli_update_note" => {
+            let id = arg_required(args, "id")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            workspace.update_note(
+                &local,
+                arg_required(args, "body")?,
+                arg_required(args, "expectedRevision")?,
+            )?;
+            json_value(workspace.read_note(&local)?)
+        }
+        "rotli_patch_note" => {
+            let id = arg_required(args, "id")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            workspace.patch_note(
+                &local,
+                arg_required(args, "oldText")?,
+                arg_required(args, "newText")?,
+                arg_required(args, "expectedRevision")?,
+            )?;
+            json_value(workspace.read_note(&local)?)
+        }
+        "rotli_move_note" => {
+            let id = arg_required(args, "id")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            json_value(workspace.move_note(&local, arg_required(args, "folder")?)?)
+        }
+        "rotli_list_main" => json_value(Workspace::open(None)?.read_main()?),
+        "rotli_create_folder" => {
+            let name = arg_required(args, "name")?;
+            if arg_string(args, "scope") == Some("disk") {
+                let mut workspace = Workspace::open(root)?;
+                json_value(workspace.create_disk_folder(name, arg_string(args, "parent"))?)
+            } else {
+                let workspace = Workspace::open(None)?;
+                Ok(
+                    json!({ "id": workspace.main_create_folder(name, arg_string(args, "parent").unwrap_or(MAIN_ROOT))?, "scope": "main" }),
+                )
+            }
+        }
+        "rotli_place_in_main" => {
+            let workspace = Workspace::open(None)?;
+            workspace.main_add(
+                arg_required(args, "id")?,
+                arg_string(args, "parent").unwrap_or(MAIN_ROOT),
+            )?;
+            json_value(workspace.read_main()?)
+        }
+        "rotli_move_in_main" => {
+            let workspace = Workspace::open(None)?;
+            workspace.main_move(arg_required(args, "id")?, arg_required(args, "parent")?)?;
+            json_value(workspace.read_main()?)
+        }
+        "rotli_remove_from_main" => {
+            let workspace = Workspace::open(None)?;
+            workspace.main_remove(arg_required(args, "id")?)?;
+            json_value(workspace.read_main()?)
+        }
+        "rotli_read_board" => {
+            let id = arg_required(args, "id")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            let mut value = json_value(workspace.read_board(&local)?)?;
+            if let Some(board) = value.get_mut("board").and_then(Value::as_object_mut) {
+                board.remove("body");
+            }
+            Ok(value)
+        }
+        "rotli_create_board" => {
+            let mut workspace = Workspace::open(root)?;
+            let meta = workspace.create_board(
+                arg_required(args, "name")?,
+                arg_string(args, "description").unwrap_or_default(),
+                arg_string(args, "tags").unwrap_or_default(),
+                arg_string(args, "mainParent").unwrap_or(MAIN_ROOT),
+            )?;
+            let local = workspace.local_id(&meta.id)?;
+            let mut value = json_value(workspace.read_board(&local)?)?;
+            if let Some(board) = value.get_mut("board").and_then(Value::as_object_mut) {
+                board.remove("body");
+            }
+            Ok(value)
+        }
+        "rotli_apply_board" => {
+            let id = arg_required(args, "id")?;
+            let actions = args
+                .get("actions")
+                .and_then(Value::as_array)
+                .ok_or("actions must be an array")?;
+            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            workspace.apply_board(
+                &local,
+                actions,
+                arg_required(args, "expectedRevision")?,
+                arg_string(args, "description"),
+                arg_string(args, "tags"),
+            )?;
+            let mut value = json_value(workspace.read_board(&local)?)?;
+            if let Some(board) = value.get_mut("board").and_then(Value::as_object_mut) {
+                board.remove("body");
+            }
+            Ok(value)
+        }
+        "rotli_open" => {
+            let id = arg_required(args, "id")?;
+            let (workspace, local) = Workspace::open_for_item(id, root)?;
+            workspace.queue_open(&local, arg_string(args, "kind").unwrap_or("note"))
+        }
+        _ => Err(format!("unknown tool: {name}")),
+    }
+}
+
+fn arg_string<'a>(args: &'a Value, name: &str) -> Option<&'a str> {
+    args.get(name).and_then(Value::as_str)
+}
+
+fn arg_required<'a>(args: &'a Value, name: &str) -> Result<&'a str, String> {
+    arg_string(args, name).ok_or_else(|| format!("{name} is required"))
+}
+
+fn arg_usize(args: &Value, name: &str, fallback: usize) -> usize {
+    args.get(name)
+        .and_then(Value::as_u64)
+        .map(|value| value as usize)
+        .unwrap_or(fallback)
+}
+
+fn paged_note(result: NoteReadResult, offset: usize, max_chars: usize) -> Result<Value, String> {
+    let chars: Vec<char> = result.note.body.chars().collect();
+    let end = offset.saturating_add(max_chars).min(chars.len());
+    let page: String = if offset < chars.len() {
+        chars[offset..end].iter().collect()
+    } else {
+        String::new()
+    };
+    Ok(json!({
+        "note": {
+            "id": result.note.id,
+            "folderId": result.note.folder_id,
+            "diskFolderId": result.note.disk_folder_id,
+            "body": page,
+            "createdAt": result.note.created_at,
+            "updatedAt": result.note.updated_at,
+            "pinned": result.note.pinned,
+            "origin": result.note.origin,
+        },
+        "revision": result.revision,
+        "document": result.document,
+        "page": { "offset": offset, "nextOffset": if end < chars.len() { Some(end) } else { None }, "totalChars": chars.len() }
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn test_workspace(temp: &TempDir) -> Workspace {
+        Workspace::open_target(RootTarget {
+            id: DEFAULT_ROOT_ID.into(),
+            label: "Test".into(),
+            path: temp.path().to_path_buf(),
+            read_only: false,
+            is_default: true,
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn revision_changes_with_content_and_is_stable() {
+        assert_eq!(revision(b"same"), revision(b"same"));
+        assert_ne!(revision(b"same"), revision(b"changed"));
+    }
+
+    #[test]
+    fn markdown_creation_has_one_title_and_rejects_managed_frontmatter() {
+        assert_eq!(
+            note_markdown("Plan", "# Plan\n\nBody").unwrap(),
+            "# Plan\n\nBody\n"
+        );
+        assert_eq!(note_markdown("Plan", "Body").unwrap(), "# Plan\n\nBody\n");
+        assert!(note_markdown("Plan", "# Other\n\nBody")
+            .unwrap_err()
+            .contains("conflicts"));
+        assert!(note_markdown("Plan", "---\nsecure: false\n---\nBody")
+            .unwrap_err()
+            .contains("without YAML frontmatter"));
+        assert!(validate_note_title("two\nlines").is_err());
+        assert!(validate_note_title("tab\ttitle").is_err());
+        assert!(validate_note_title("# Already marked").is_err());
+    }
+
+    #[test]
+    fn markdown_metrics_describe_the_full_editor_document() {
+        let metrics = markdown_metrics(
+            "# Plan\n\n## Work\n\n- [ ] First\n- [x] Second\n\n[[Note]] [Site](https://example.test)\n\n```ts\n# not a heading\n```\n",
+        );
+        assert_eq!(metrics.headings, 2);
+        assert_eq!(metrics.tasks, 2);
+        assert_eq!(metrics.open_tasks, 1);
+        assert_eq!(metrics.links, 2);
+        assert_eq!(metrics.wikilinks, 1);
+        assert_eq!(metrics.fenced_code_blocks, 1);
+        assert!(metrics.characters > metrics.words);
+    }
+
+    #[test]
+    fn main_folders_are_nested_and_unique() {
+        let mut manifest = MainManifest::default();
+        manifest.tree.push(MainNode::Folder {
+            folder: "Projects".into(),
+            children: vec![],
+        });
+        assert_eq!(
+            unique_folder_name(&manifest.tree, MAIN_ROOT, "Projects"),
+            "Projects 2"
+        );
+        assert!(main_insert(
+            &mut manifest.tree,
+            "main:Projects",
+            MainNode::Note { note: "n1".into() },
+            MAIN_ROOT,
+        ));
+        assert!(main_contains(&manifest.tree, "n1"));
+        assert!(main_remove(&mut manifest.tree, "n1", MAIN_ROOT).is_some());
+    }
+
+    #[test]
+    fn workspace_create_read_update_and_main_round_trip() {
+        let temp = TempDir::new().unwrap();
+        let mut workspace = test_workspace(&temp);
+        let created = workspace
+            .create_note("CLI note", "hello", MAIN_ROOT)
+            .unwrap();
+        let read = workspace.read_note(&created.id).unwrap();
+        assert!(read.note.body.contains("CLI note"));
+        workspace
+            .update_note(&created.id, "# CLI note\n\nupdated", &read.revision)
+            .unwrap();
+        let updated = workspace.read_note(&created.id).unwrap();
+        assert!(updated.note.body.contains("updated"));
+        assert!(main_contains(
+            &workspace.read_main().unwrap().tree,
+            &created.id
+        ));
+    }
+
+    #[test]
+    fn memex_creation_lands_in_intake_and_main() {
+        let temp = TempDir::new().unwrap();
+        let root = temp.path().join("brain");
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        fs::create_dir_all(root.join("storage/excalidraw")).unwrap();
+        fs::write(
+            root.join("memex.json"),
+            r#"{"id":"mx_workspace_test","contract":"3.4","apps":{}}"#,
+        )
+        .unwrap();
+        let mut workspace = Workspace::open_target(RootTarget {
+            id: DEFAULT_ROOT_ID.into(),
+            label: "Test brain".into(),
+            path: root.clone(),
+            read_only: false,
+            is_default: true,
+        })
+        .unwrap();
+        let created = workspace
+            .create_note("Intake note", "waiting to be filed", MAIN_ROOT)
+            .unwrap();
+        assert_eq!(created.disk_folder_id, "wiki/_inbox");
+        let rel = workspace.store.resolve_note_rel(&created.id).unwrap();
+        assert!(rel.starts_with("wiki/_inbox/"));
+        let first = workspace.read_note(&created.id).unwrap();
+        workspace
+            .update_note(
+                &created.id,
+                "# Intake note\n\nagent-directed edit",
+                &first.revision,
+            )
+            .unwrap();
+        let filed = workspace.move_note(&created.id, "wiki/projects").unwrap();
+        assert_eq!(filed.disk_folder_id, "wiki/projects");
+        assert!(main_contains(
+            &workspace.read_main().unwrap().tree,
+            &created.id
+        ));
+    }
+
+    #[test]
+    fn stale_revision_is_refused() {
+        let temp = TempDir::new().unwrap();
+        let mut workspace = test_workspace(&temp);
+        let created = workspace
+            .create_note("Conflict", "first", MAIN_ROOT)
+            .unwrap();
+        let read = workspace.read_note(&created.id).unwrap();
+        workspace
+            .update_note(&created.id, "# Conflict\n\nsecond", &read.revision)
+            .unwrap();
+        let error = workspace
+            .update_note(&created.id, "# Conflict\n\nstale", &read.revision)
+            .unwrap_err();
+        assert!(error.contains("revision conflict"));
+    }
+
+    #[test]
+    fn note_patch_requires_one_exact_match() {
+        let temp = TempDir::new().unwrap();
+        let mut workspace = test_workspace(&temp);
+        let created = workspace
+            .create_note("Patch", "alpha beta", MAIN_ROOT)
+            .unwrap();
+        let read = workspace.read_note(&created.id).unwrap();
+        workspace
+            .patch_note(&created.id, "alpha", "gamma", &read.revision)
+            .unwrap();
+        let updated = workspace.read_note(&created.id).unwrap();
+        assert!(updated.note.body.contains("gamma beta"));
+        let error = workspace
+            .patch_note(&created.id, "missing", "x", &updated.revision)
+            .unwrap_err();
+        assert!(error.contains("found 0 matches"));
+    }
+
+    #[test]
+    fn board_actions_create_compact_agent_elements() {
+        let mut scene: Value = serde_json::from_str(&empty_board("", "")).unwrap();
+        apply_board_actions(
+            &mut scene,
+            &[json!({"op":"add","id":"idea","kind":"text","text":"Hello","x":10,"y":20})],
+        )
+        .unwrap();
+        let outline = board_outline(&scene);
+        assert_eq!(outline[0].id, "idea");
+        assert_eq!(outline[0].text.as_deref(), Some("Hello"));
+    }
+
+    #[test]
+    fn mcp_initializes_and_advertises_unique_tools() {
+        let response = handle_mcp_request(&json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": { "protocolVersion": MCP_PROTOCOL }
+        }))
+        .unwrap();
+        assert_eq!(
+            response
+                .pointer("/result/serverInfo/name")
+                .and_then(Value::as_str),
+            Some("rotli-workspace")
+        );
+        let tools = mcp_tools();
+        let names: HashSet<&str> = tools
+            .iter()
+            .filter_map(|tool| tool.get("name").and_then(Value::as_str))
+            .collect();
+        assert_eq!(names.len(), tools.len());
+        assert!(names.contains("rotli_update_note"));
+        assert!(names.contains("rotli_patch_note"));
+        assert!(names.contains("rotli_apply_board"));
+        assert!(names.contains("rotli_metrics"));
+    }
+
+    #[test]
+    fn agent_self_test_is_isolated_and_complete() {
+        let report = agent_self_test().unwrap();
+        assert_eq!(report.get("ok"), Some(&json!(true)));
+        assert_eq!(report.get("liveWorkspaceMutated"), Some(&json!(false)));
+        assert!(report
+            .pointer("/metrics/passed")
+            .and_then(Value::as_u64)
+            .is_some_and(|passed| passed >= 9));
+    }
+
+    #[test]
+    fn secure_notes_are_omitted_and_cannot_be_read() {
+        let temp = TempDir::new().unwrap();
+        let mut workspace = test_workspace(&temp);
+        let secure = workspace
+            .store
+            .create_with_policy("Secure notes", "# Private\n\nsecret", true)
+            .unwrap();
+        let visible = workspace.list_remote(100).unwrap();
+        assert!(!visible.notes.iter().any(|note| note.id == secure.id));
+        assert!(workspace.read_note(&secure.id).is_err());
+        assert!(workspace
+            .create_note("Token", "sk-ant-abcdefghijklmnop", MAIN_ROOT)
+            .is_err());
+    }
+
+    #[test]
+    fn locked_notes_refuse_agent_edits() {
+        let temp = TempDir::new().unwrap();
+        let mut workspace = test_workspace(&temp);
+        let note = workspace.create_note("Locked", "body", MAIN_ROOT).unwrap();
+        let read = workspace.read_note(&note.id).unwrap();
+        let rel = workspace.store.resolve_note_rel(&note.id).unwrap();
+        let path = workspace.store.root().join(rel);
+        let raw = fs::read_to_string(&path)
+            .unwrap()
+            .replace("---\n\n", "locked: true\n---\n\n");
+        fs::write(path, raw).unwrap();
+        let error = workspace
+            .update_note(&note.id, "# Locked\n\nchanged", &read.revision)
+            .unwrap_err();
+        assert!(error.contains("revision conflict") || error.contains("locked"));
+        let fresh = workspace.read_note(&note.id).unwrap();
+        let error = workspace
+            .update_note(&note.id, "# Locked\n\nchanged", &fresh.revision)
+            .unwrap_err();
+        assert!(error.contains("locked"));
+    }
+}

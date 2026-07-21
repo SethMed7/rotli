@@ -65,7 +65,7 @@
   bottom: 0;
   left: 3px;
   width: 2px;
-  background: color-mix(in srgb, var(--rotli-cocoa) 24%, transparent);
+  background: var(--accent);
 }
 
 /* — the unified sidebar (Seth, 2026-06-13): ONE scrollable column with the
@@ -207,11 +207,11 @@
 .frow.child {
   padding-left: 26px;
 }
-/* the active drop target while a note is dragged onto a destination/folder row
-   (Seth, 2026-06-13): a 1.5px inset clay ring — the same accent the pane-detach
-   center fill uses, so "drop here" reads as one grammar across the app. */
+/* The active drop target while a note is dragged onto a destination/folder row
+   uses the same inset accent outline as pane detach. */
 .frow.drop-over {
-  box-shadow: inset 0 0 0 1.5px var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 /* — Main: the user's hand-arranged view over the Brain (Seth, 2026-07-01) — */
@@ -247,10 +247,10 @@
   opacity: 0.4;
 }
 .mdrop-before {
-  box-shadow: inset 0 2px 0 var(--accent);
+  border-top: 2px solid var(--accent);
 }
 .mdrop-after {
-  box-shadow: inset 0 -2px 0 var(--accent);
+  border-bottom: 2px solid var(--accent);
 }
 .mdrop-into {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
@@ -259,7 +259,8 @@
    the Main row/zone it will land on (startMainAddDrag + tabDrag paint this). */
 .main-dropover {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
   border-radius: 6px;
 }
 /* the section-header hover "+" (Seth, 2026-07-01: "new folder can be a lot more
@@ -671,7 +672,6 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  box-shadow: none;
   padding: 5px;
   z-index: 9;
   animation: pop-in var(--motion-enter) var(--motion-ease);
@@ -913,7 +913,7 @@
 .divider.dragging::before {
   content: "";
   position: absolute;
-  background: color-mix(in srgb, var(--rotli-cocoa) 24%, transparent);
+  background: var(--accent);
   z-index: 1;
 }
 .split.row > .divider.dragging::before {
@@ -1018,7 +1018,8 @@
 .dz.center.over {
   background: var(--tint);
   border-radius: var(--r-card);
-  box-shadow: inset 0 0 0 1.5px var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 /* — tab strip (r2 frame A2; EVERY pane renders it now — Seth 2026-06-13) — */
@@ -1145,9 +1146,8 @@
   max-width: 220px;
   padding: 5px 11px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-control);
-  box-shadow: var(--shadow-raised);
   font-family: var(--font-body);
   font-size: 12.5px;
   color: var(--text);
@@ -1161,7 +1161,6 @@
   padding: 0;
   background: none;
   border: none;
-  box-shadow: none;
   transform: translate(12px, 10px) rotate(1.5deg);
 }
 .drag-ghost.img img {
@@ -1171,7 +1170,7 @@
   width: auto;
   height: auto;
   border-radius: var(--r-inner);
-  box-shadow: var(--shadow-popover);
+  border: 1px solid var(--border-strong);
   opacity: 0.92;
 }
 /* while a tab drags: a grabbing cursor everywhere, and no stray text selection */
@@ -1355,7 +1354,6 @@
   display: flex;
   background: var(--ground);
   border-right: 1px solid var(--border);
-  box-shadow: var(--shadow-popover);
   animation: rail-in var(--motion-enter) var(--motion-ease);
   z-index: 8;
 }

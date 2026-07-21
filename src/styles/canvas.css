@@ -99,8 +99,7 @@
   padding: 12px 14px;
   border-radius: 12px;
   background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  box-shadow: 0 8px 28px color-mix(in srgb, var(--text) 18%, transparent);
+  border: 1px solid var(--border-strong);
 }
 .cmp-title {
   font-weight: 600;

@@ -1017,6 +1017,19 @@ export function corpusMainWrite(contents: string): Promise<void> {
   return corpusInvoke("corpus_main_write", { contents });
 }
 
+export interface WorkspaceOpenRequest {
+  id: string;
+  kind: "note" | "board" | "file";
+}
+
+/** Consume the small local mailbox written by `rotli open`. The request holds
+ * only a corpus id + kind; the app still resolves and reads through its normal
+ * service path. */
+export function workspaceTakeOpenRequest(): Promise<WorkspaceOpenRequest | null> {
+  if (!isTauri()) return Promise.resolve(null);
+  return invoke<WorkspaceOpenRequest | null>("workspace_take_open_request");
+}
+
 /** Rust → main window: the corpus changed UNDER the app (a folder dropped in,
  * a note edited in another editor). Debounced Rust-side; the frontend just
  * invalidates and refetches — content appears when ready, no spinners. */

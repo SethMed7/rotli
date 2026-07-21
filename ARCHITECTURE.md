@@ -39,6 +39,7 @@ by directory folklore.
 |---|---|
 | `src/` | React presentation, frontend capability modules, application workflows, and browser/Tauri adapters |
 | `src-tauri/src/` | Trusted Rust host: filesystem, security, IPC, process, updater, and scheduler edges |
+| `src-tauri/src/workspace.rs` | Headless application service plus CLI/MCP adapters over the same corpus policy; no provider calls |
 | `breve-runtime/` | Versioned runtime that Rotli configures, installs, and supervises |
 | `src/brand/` | Semantic visual tokens, typography, icons, and embedded brand assets |
 | `scripts/` | Deterministic architecture, security, syntax, documentation, build, and release checks |
@@ -55,6 +56,10 @@ by directory folklore.
   scheduler, or process behavior.
 - Tests never target a live memex, Keychain, daemon, scheduler, or production
   delivery account.
+- CLI and MCP reads use the remote-AI secure-content gate; external-agent
+  writes additionally require a fresh revision, refuse locked notes, and use
+  the existing user/filer ownership gates. See the
+  [`agent workspace contract`](docs/architecture/agent-workspace.md).
 
 ## Complete change slice
 
@@ -69,4 +74,3 @@ The executable gates are defined in
 [`docs/development/testing.md`](docs/development/testing.md). Placement rules are
 in [`docs/development/adding-things.md`](docs/development/adding-things.md), and
 the naming contract is [`SYNTAX.md`](SYNTAX.md).
-

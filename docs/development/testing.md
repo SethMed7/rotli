@@ -21,7 +21,7 @@ direction, runtime wiring, and owning documentation must agree.
 | `bun run test:regression` | All Bun behavior tests plus Breve runtime and design-system checks |
 | `bun run check` | Required JavaScript/TypeScript gate: lint plus the regression suite |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Rust host, filesystem, security, scheduler, and IPC behavior |
-| `NODE_OPTIONS=--max-old-space-size=4096 bun run build` | Production bundling and final TypeScript/runtime validation |
+| `NODE_OPTIONS=--max-old-space-size=4096 bun run build` | Production bundling, final TypeScript/runtime validation, and tested startup/lazy chunk budgets |
 
 Development, formatting, and release commands (`check:docs` verifies this map
 stays complete — every `package.json` script must appear in this document):
@@ -39,6 +39,15 @@ stays complete — every `package.json` script must appear in this document):
 Use the smallest focused command while iterating, then run the three required
 handoff commands from `AGENTS.md`. Never point an automated test at a live memex,
 Keychain, scheduler, daemon, or production delivery account.
+
+The headless workspace suite lives under `workspace::tests` in the Rust host.
+It uses a fresh temporary corpus—not production `corpus.json`—and covers note
+creation/read/update, Main references, secure and locked refusals, stale
+revision conflicts, Markdown title/frontmatter rules and document metrics, and
+compact Excalidraw actions. `rotli agent self-test` is the supported manual
+CLI/MCP smoke: it creates and removes its own temporary memex and reports
+`liveWorkspaceMutated: false`. Any ad hoc smoke must still set
+`ROTLI_CORPUS_ROOT` to a disposable directory.
 
 ## Evidence by layer
 
@@ -150,8 +159,9 @@ regressions.
   everywhere under `src/` outside the token-definition layer (`src/brand/`,
   `src/styles/themes.css`; `base.css` may hold functional state tokens).
 - `check:design-system` proves the four themes define every semantic token, that
-  product CSS consumes tokens rather than literal colors, and that class
-  selectors stay kebab-case (BEM `--modifier` allowed).
+  product CSS consumes semantic roles rather than literal or fixed-palette
+  colors, that first-party CSS contains no glow/shadow/filter/backdrop effects,
+  and that class selectors stay kebab-case (BEM `--modifier` allowed).
 - `check:parity` guards the TS↔Rust shared-constant fixture harness itself.
 - `check:security` is the egress/CSP/keychain/capability tripwire layer
   ([`security.md`](security.md)).
@@ -176,6 +186,10 @@ checker. Do not add a convention that only exists in prose.
   regressions.
 - **Browser E2E (Linux):** `bun run check:e2e-types` plus the Playwright suite
   (chromium) against `vite dev`'s seeded demo corpus.
+- **Dependency audit (Linux, advisory):** `bun audit` plus RustSec. Findings stay
+  visible without failing the workflow while the tracked transitive-only debt
+  remains; the Rust action receives the narrow `checks: write` permission it
+  needs to publish its report.
 - **Full regression (macOS):** Bun behavior tests, deterministic AI evals,
   Breve runtime checks, Rust tests, and the production build.
 

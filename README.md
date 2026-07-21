@@ -125,6 +125,30 @@ bun run check       # TypeScript, tests, runtime, architecture, design, and docs
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
+## Use your workspace from Claude, Codex, or the shell
+
+The installed Rotli executable is also a JSON CLI and a local stdio MCP server.
+Both use the same corpus policy as the app: new notes enter intake and appear in
+Main, secure notes stay unavailable to remote agents, locked notes refuse agent
+edits, and updates require a fresh revision.
+
+```sh
+/Applications/rotli.app/Contents/MacOS/rotli notes list
+/Applications/rotli.app/Contents/MacOS/rotli notes search "launch plan"
+/Applications/rotli.app/Contents/MacOS/rotli notes create --title "Launch plan" --body "First draft"
+/Applications/rotli.app/Contents/MacOS/rotli agent doctor
+/Applications/rotli.app/Contents/MacOS/rotli agent self-test
+/Applications/rotli.app/Contents/MacOS/rotli agent config
+```
+
+The doctor is read-only, the self-test uses a disposable memex, and the final
+command prints copy-ready Claude Code and Codex MCP configuration for that exact
+installed binary. Note results identify themselves as Markdown and include
+document metrics; Rotli keeps YAML frontmatter outside the agent-editable body.
+The server is stdio-only and loads tools on demand; it does not open a local
+network port or silently change global agent settings. Full commands and policy
+live in the [`agent workspace contract`](docs/architecture/agent-workspace.md).
+
 Contributing or working with an AI coding tool? Start with
 [`CONTRIBUTING.md`](CONTRIBUTING.md), [`AGENTS.md`](AGENTS.md), and the
 [`documentation map`](docs/README.md).

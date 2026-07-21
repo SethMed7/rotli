@@ -11,11 +11,31 @@ Rotli ships four complete environments: Warm Light, Warm Dark, Paper, and
 Charcoal. Paper and Charcoal are the calm defaults; the warm pair is
 intentional. Every product surface must work in all four.
 
-- Consume semantic color, typography, spacing, elevation, focus, and state
-  tokens from `src/brand/`.
+- Consume semantic color, typography, spacing, focus, and state roles exposed by
+  the shared foundation. Fixed `--rotli-*` palette values are foundation inputs,
+  not component-level tokens.
 - Do not add raw colors outside the token-definition layer.
 - Do not add a UI framework or a competing token system.
-- Use restrained borders and elevation to explain hierarchy, not decoration.
+- Use surface contrast, one-pixel borders, spacing, and typography to explain
+  hierarchy.
+
+## Flat material
+
+Rotli does not simulate light or depth. Product-owned CSS must not use ambient
+glows, halos, `box-shadow`, `text-shadow`, `drop-shadow`, backdrop blur, or
+decorative filter effects. This includes tooltips, dialogs, popovers, cards,
+drag previews, selected controls, and focus states—there is no "small" shadow
+exception.
+
+- Floating surfaces use a solid semantic surface, `--border-strong`, and, when
+  needed, the shared flat scrim.
+- Selection and keyboard focus use borders or outlines. Hover and press use the
+  shared semantic state layers.
+- Gradients are allowed only when they communicate a functional transition such
+  as loading progress or a scroll edge. They must use semantic tokens and must
+  never imitate illumination.
+- `check:design-system` enforces the forbidden effect properties and fixed-palette
+  boundary; its fixtures prove the guard fails on a regression.
 
 ## Interaction language
 
@@ -55,4 +75,3 @@ titlebar, menu, filesystem, Keychain, updater, scheduler, or OS drag behavior.
 
 Use [`docs/development/testing.md`](docs/development/testing.md) for the evidence
 ladder and [`SYNTAX.md`](SYNTAX.md) for CSS and component naming.
-

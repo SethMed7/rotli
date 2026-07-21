@@ -221,7 +221,7 @@
   cursor: pointer;
 }
 .onb-btn:hover {
-  filter: brightness(1.04);
+  background-image: linear-gradient(var(--hov), var(--hov));
 }
 .onb-btn.ghost {
   background: none;
@@ -230,7 +230,7 @@
 }
 .onb-btn.ghost:hover {
   background: var(--hov);
-  filter: none;
+  background-image: none;
 }
 
 /* footer buttons share ONE baseline: every control is the same height, centered,

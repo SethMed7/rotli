@@ -2582,7 +2582,11 @@ impl CorpusStore {
     /// the metadata panel is opened, so a never-inspected note with detectable
     /// secrets must not slip through on the flag alone.
     /// Takes a wire id OR a rel path (resolve_note_rel — same bridge as the filer lane).
-    fn read_for_ai(&mut self, id_or_rel: &str, model_is_local: bool) -> Result<String, String> {
+    pub(crate) fn read_for_ai(
+        &mut self,
+        id_or_rel: &str,
+        model_is_local: bool,
+    ) -> Result<String, String> {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
@@ -2606,6 +2610,64 @@ impl CorpusStore {
             }
         }
         Ok(text)
+    }
+
+    /// The headless workspace adapters are remote-agent surfaces. They share the
+    /// same fail-closed secure-content gate as Chat and add the organizer's lock
+    /// rule before any body write. Keeping this check beside `writable()` means
+    /// the CLI and MCP cannot accidentally invent a broader write policy.
+    pub(crate) fn write_for_remote_agent(
+        &mut self,
+        id: &str,
+        body: &str,
+    ) -> Result<NoteMeta, String> {
+        let rel = self.resolve_note_rel(id)?;
+        let text = self.read_for_ai(&rel, false)?;
+        let fm = parse_document(&text).0.unwrap_or_default();
+        if fm.foreign.iter().any(|line| locked_field(line) == Some(true)) {
+            return Err("note is locked — an external agent may not edit it".into());
+        }
+        if self.layout == Layout::Memex && (rel == "wiki" || rel.starts_with("wiki/")) {
+            self.filer_writable(&rel)?;
+        } else {
+            self.writable(&rel)?;
+        }
+        self.write_resolved(id, body, rel)
+    }
+
+    pub(crate) fn move_for_remote_agent(
+        &mut self,
+        id: &str,
+        target_folder: &str,
+    ) -> Result<NoteMeta, String> {
+        let rel = self.resolve_note_rel(id)?;
+        let text = self.read_for_ai(&rel, false)?;
+        let fm = parse_document(&text).0.unwrap_or_default();
+        if fm.foreign.iter().any(|line| locked_field(line) == Some(true)) {
+            return Err("note is locked — an external agent may not move it".into());
+        }
+        if self.layout == Layout::Memex
+            && (rel == "wiki" || rel.starts_with("wiki/"))
+            && (target_folder == "wiki" || target_folder.starts_with("wiki/"))
+        {
+            self.filer_move(id, target_folder)
+        } else {
+            self.move_note(id, target_folder)
+        }
+    }
+
+    pub(crate) fn create_for_remote_agent(
+        &mut self,
+        folder_id: &str,
+        body: &str,
+    ) -> Result<NoteMeta, String> {
+        if looks_secure(body) {
+            return Err(
+                "the new note looks sensitive — a remote agent may not create or retain it"
+                    .into(),
+            );
+        }
+        self.create(folder_id, body)
     }
 
     /// First run: the corpus is born with Inbox and ONE warm welcome note.
@@ -2887,6 +2949,15 @@ impl CorpusStore {
     pub fn write(&mut self, id: &str, body: &str) -> Result<NoteMeta, String> {
         let rel = self.path_of(id)?;
         self.writable(&rel)?;
+        self.write_resolved(id, body, rel)
+    }
+
+    fn write_resolved(
+        &mut self,
+        id: &str,
+        body: &str,
+        rel: String,
+    ) -> Result<NoteMeta, String> {
         let abs = self.abs(&rel);
 
         let existing = fs::read_to_string(&abs).unwrap_or_default();
@@ -3266,6 +3337,18 @@ impl CorpusStore {
     /// Read the whole brain journal (`""` when none yet).
     pub fn journal_read(&self) -> Result<String, String> {
         Ok(fs::read_to_string(self.root.join(DOT_DIR).join("brain-journal.jsonl")).unwrap_or_default())
+    }
+
+    /// Shared Main-manifest seam for the GUI and headless workspace adapters.
+    /// Main is durable user work, so every writer also preserves the `.gitignore`
+    /// exception that keeps `.rotli/main.json` committable.
+    pub(crate) fn main_read(&self) -> Result<String, String> {
+        self.dot_read("main")
+    }
+
+    pub(crate) fn main_write(&self, contents: &str) -> Result<(), String> {
+        self.dot_write("main", contents)?;
+        self.ensure_main_committable()
     }
 
     pub fn create(&mut self, folder_id: &str, body: &str) -> Result<NoteMeta, String> {

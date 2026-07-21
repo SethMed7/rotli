@@ -18,6 +18,18 @@
      to a neutral scrim so charcoal doesn't read warm-brown (Seth, 2026-07-06). */
   --scrim: rgba(58, 48, 40, 0.4);
 
+  /* — semantic color roles —
+     Components consume these roles rather than reaching into the fixed brand
+     palette. Flat hierarchy comes from surface contrast and hairlines; the
+     stronger border is reserved for floating/overlay boundaries. */
+  --border-strong: color-mix(in srgb, var(--text) 24%, var(--border));
+  --danger: var(--accent-text);
+  --quote-bar: var(--rotli-peach);
+  --check-ink: var(--rotli-cocoa);
+  --seg-accent: var(--rotli-clay);
+  --icon-clay: var(--rotli-clay);
+  --icon-olive: var(--rotli-olive);
+
   /* — radius scale, one family (r3 gate) —
      4 inner elements · 8 controls/rows · 10 tabs/bubbles · 12 cards/panels ·
      14 windows · 999 pills/chips. Nested radius = outer − padding. */
@@ -33,17 +45,6 @@
   --motion-enter: 160ms;
   --motion-exit: 120ms;
   --motion-ease: ease-out;
-
-  /* — elevation — shadows derive from the active theme's ink, never from a
-     fixed warm or black color. Components choose an elevation role; themes
-     supply the ink through --text/--accent. */
-  --shadow-control: 0 2px 6px color-mix(in srgb, var(--text) 12%, transparent);
-  --shadow-raised:
-    0 2px 4px color-mix(in srgb, var(--text) 12%, transparent),
-    0 10px 22px color-mix(in srgb, var(--text) 16%, transparent);
-  --shadow-popover: 0 16px 44px color-mix(in srgb, var(--text) 26%, transparent);
-  --shadow-dialog: 0 30px 80px -16px color-mix(in srgb, var(--text) 45%, transparent);
-  --shadow-accent: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 /* dark: same formula, paper overlay (8% / 13%) on the warm cocoa ground
@@ -52,6 +53,7 @@
 :root[data-theme="dark"] {
   --hov: rgba(241, 231, 218, 0.08);
   --act: rgba(241, 231, 218, 0.13);
+  --icon-olive: var(--rotli-olive-bright);
 }
 
 /* — base — */

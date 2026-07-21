@@ -8,7 +8,7 @@
   margin: 0.4em 0;
   padding: 14px 16px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-card);
   color: var(--text);
   overflow-x: auto;
@@ -76,7 +76,6 @@
   border: 1px solid var(--border);
   border-radius: 0;
   background: var(--surface);
-  box-shadow: 0 18px 60px color-mix(in srgb, var(--text) 24%, transparent);
 }
 .rotli-render-embed.is-expanded .rotli-render-body {
   height: 100% !important;
@@ -187,10 +186,9 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--text);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-control);
-  box-shadow: 0 2px 10px color-mix(in srgb, var(--text) 14%, transparent);
   cursor: pointer;
   opacity: 0.92;
   transition: opacity var(--motion-enter) var(--motion-ease),
@@ -287,9 +285,8 @@
   overflow: auto;
   padding: 28px 32px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-window);
-  box-shadow: 0 24px 64px color-mix(in srgb, var(--text) 24%, transparent);
   color: var(--text);
 }
 

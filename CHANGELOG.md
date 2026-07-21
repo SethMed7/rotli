@@ -10,6 +10,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Rotli's product surfaces are flat across all four environments.** Tooltips,
+  dialogs, popovers, cards, drag previews, canvas/render overlays, and selection
+  states no longer use glowing backdrops, blur, decorative filters, or drop
+  shadows. Hierarchy now comes from semantic surfaces, borders, outlines, and
+  state layers; component CSS can no longer bypass those roles for fixed brand
+  colors.
+
+### Added
+
+- **Rotli now has one agent-safe headless workspace surface.** The packaged app
+  binary provides a structured JSON CLI and a local stdio MCP server for Claude,
+  Codex, and scripts: list/search/read/create/update/move notes, manage Main and
+  folders, create and semantically edit Excalidraw boards, and open an item in
+  Rotli. New memex notes still land in intake and appear in Main immediately;
+  secure/secret-shaped notes are omitted, locked notes refuse external-agent
+  writes, and every edit requires a fresh revision to prevent stale overwrites.
+  A grouped `agent` surface now prints copy-ready Claude/Codex setup, validates
+  the configured root read-only, and runs an isolated end-to-end self-test.
+  Note results explicitly declare Markdown/frontmatter semantics and provide
+  readable document and agent-visible workspace metrics.
+
+### Fixed
+
+- **Production builds and regression emails are clean and actionable.** Vite's
+  generic chunk warning is replaced by tested startup/lazy bundle budgets, and
+  only JSXGraph's exact unreachable compiler warning is suppressed while the
+  interpreter-only CSP guard remains enforced. The advisory RustSec job now has
+  permission to publish its report and cannot fail the workflow merely because
+  tracked upstream advisories remain.
+
+### Security
+
+- The Rust lockfile now uses patched `anyhow` 1.0.103. The remaining RustSec
+  unsoundness is explicitly scoped to Tauri's Linux-only GTK3 dependency graph;
+  current JS and Rust transitive findings and their removal paths are refreshed
+  in `docs/development/security.md`.
+
 ## [0.33.2] - 2026-07-20
 
 ### Added
