@@ -44,10 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- The Rust lockfile now uses patched `anyhow` 1.0.103. The remaining RustSec
-  unsoundness is explicitly scoped to Tauri's Linux-only GTK3 dependency graph;
-  current JS and Rust transitive findings and their removal paths are refreshed
-  in `docs/development/security.md`.
+- The Rust lockfile now uses patched `anyhow` 1.0.103 and `quick-xml` 0.41.0
+  (through `plist` 1.10.0). The remaining RustSec unsoundness is explicitly
+  scoped to Tauri's Linux-only GTK3 dependency graph; current JS and Rust
+  transitive findings and their removal paths are refreshed in
+  `docs/development/security.md`.
 
 ## [0.33.2] - 2026-07-20
 

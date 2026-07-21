@@ -142,14 +142,16 @@ All are outside Rotli's own `src/`. The current `bun audit` reports nine finding
 - **esbuild** 0.27.3–0.28.0 (low, Windows dev-server arbitrary file read) —
   through Vite; Rotli's shipped macOS bundle does not expose the dev server.
 
-RustSec found two unsound dependencies in the July 21 run. **anyhow 1.0.102** is
-fixed in Rotli's lockfile at 1.0.103. **glib 0.18.5**
-(`RUSTSEC-2024-0429`) exists only in Tauri 2.11's Linux GTK3 target graph
-(`tauri → tray-icon/webkit2gtk → gtk/glib`); it is absent from the shipped macOS
-graph and has no compatible patched GTK3 release. The audit ignores that exact
-ID while retaining the dependency path here; Tauri's eventual Linux GTK4 move
-is the removal path. RustSec also reports 16 unmaintained warnings in that Linux
-GTK3/UNIC graph.
+RustSec found two `quick-xml 0.39.4` denial-of-service advisories
+(`RUSTSEC-2026-0194` and `RUSTSEC-2026-0195`) in the July 21 pushed run. They are
+fixed in Rotli's lockfile by upgrading Tauri's compatible `plist` dependency to
+1.10.0, which selects patched `quick-xml 0.41.0`. **anyhow 1.0.102** is likewise
+fixed at 1.0.103. **glib 0.18.5** (`RUSTSEC-2024-0429`) exists only in Tauri
+2.11's Linux GTK3 target graph (`tauri → tray-icon/webkit2gtk → gtk/glib`); it
+is absent from the shipped macOS graph and has no compatible patched GTK3
+release. The audit ignores that exact ID while retaining the dependency path
+here; Tauri's eventual Linux GTK4 move is the removal path. RustSec also reports
+16 unmaintained warnings in that Linux GTK3/UNIC graph.
 
 The `dependency-audit` CI job is deliberately advisory. `continue-on-error` is
 set on both scanners, while `checks: write` lets RustSec publish its check report;
