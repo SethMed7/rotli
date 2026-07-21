@@ -37,6 +37,9 @@ operation has been reviewed and authorized.
 - `src/brand/`: canonical embedded colors, typography, icons, and logo assets
 - `scripts/`: deterministic checks, build support, release tooling, and audits
 - `docs/architecture/`: current architectural contracts and audit reports
+- `docs/security/`: threat boundaries, assets, abuse cases, and residual risk
+- `docs/operations/`: release, supply-chain, support, and diagnostic contracts
+- `docs/decisions/`: cross-boundary architecture decision records
 - `docs/archive/`: historical material, not implementation authority
 
 Start at `docs/README.md` for the complete source-of-truth map.
@@ -60,6 +63,12 @@ only after the repository is trusted.
    interactions when applicable.
 6. Update the document that owns the changed contract.
 7. Add a changelog entry when users will notice the change.
+
+Changes to a persistent format, CLI/MCP response, runtime protocol, or migration
+must also follow
+[`docs/architecture/compatibility-and-migrations.md`](docs/architecture/compatibility-and-migrations.md).
+Cross-boundary decisions that are expensive to reverse use the lightweight ADR
+process in [`docs/decisions/README.md`](docs/decisions/README.md).
 
 [`SYNTAX.md`](SYNTAX.md) defines file, folder, identifier, Rust, IPC, CSS, and
 test naming. [`DESIGN.md`](DESIGN.md) defines the product interaction contract.
@@ -144,4 +153,6 @@ memex content, or production configuration. Generated, dependency,
 machine-local, and secret material is never tracked; a new tool that writes a
 cache or metadata ships its `.gitignore` entries in the same change (policy:
 [`docs/development/adding-things.md`](docs/development/adding-things.md)). Release tooling mutates external
-state and must only be used as part of an explicitly authorized release.
+state and must only be used as part of an explicitly authorized release. Release
+integrity, provenance, dependency exceptions, key custody, and rollback follow
+[`docs/operations/release-and-supply-chain.md`](docs/operations/release-and-supply-chain.md).

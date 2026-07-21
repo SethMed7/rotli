@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.3] - 2026-07-21
+
 ### Changed
 
 - **Rotli's product surfaces are flat across all four environments.** Tooltips,
@@ -20,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   colors.
 
 ### Added
+
+- **Main now opens focused named views without becoming another store.** Main
+  remains the global reference tree; uniquely named views add their own virtual
+  folders and subset arrangement through a compact header switcher. `⌘T`, new
+  items, and new folders follow the active view, while right-click menus move
+  notes, boards, files, and folders between views without removing their Main
+  reference. Markdown membership is synchronized as managed `view_tag`
+  metadata; boards/binaries stay frontmatter-free. The JSON CLI, stdio MCP,
+  workspace metrics, live external-write refresh, compatibility refusal, unit,
+  Rust, and browser regressions cover the same workflow.
 
 - **Rotli now has one agent-safe headless workspace surface.** The packaged app
   binary provides a structured JSON CLI and a local stdio MCP server for Claude,
@@ -35,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The workspace MCP server now negotiates only a protocol version it actually
+  implements.** An initialize request carrying an unknown future version no
+  longer gets that value echoed back as a false compatibility claim; Rotli
+  returns its supported protocol and lets the client accept it or disconnect.
 - **Production builds and regression emails are clean and actionable.** Vite's
   generic chunk warning is replaced by tested startup/lazy bundle budgets, and
   only JSXGraph's exact unreachable compiler warning is suppressed while the

@@ -5,7 +5,11 @@ models never see secret-shaped content, and secrets live only in the Keychain.
 This document is the map of how data leaves the machine, the mechanical guards
 that keep it that way, and the residual risks a maintainer still owns.
 
-## Threat model in five sentences
+## Threat model summary
+
+The canonical asset, actor, boundary, abuse-case, and residual-risk model lives
+in [`../security/threat-model.md`](../security/threat-model.md). This summary
+keeps the egress procedure usable without duplicating that contract.
 
 The adversary is untrusted **content** — a note, an imported capture, a fetched
 web page, or a chat memory — that reaches the on-device model and tries to steer
@@ -156,7 +160,7 @@ here; Tauri's eventual Linux GTK4 move is the removal path. RustSec also reports
 The `dependency-audit` CI job is deliberately advisory. `continue-on-error` is
 set on both scanners, while `checks: write` lets RustSec publish its check report;
 the missing permission—not an audit finding—was what made regression runs fail
-through 0.33.2. Promote the lane to blocking after upstream updates clear the
+through 0.33.3. Promote the lane to blocking after upstream updates clear the
 tracked tree.
 
 ## Quarterly AI security review

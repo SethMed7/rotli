@@ -200,6 +200,11 @@ interface UiState {
   selectedFolderId: string;
   setSelectedFolderId: (id: string) => void;
 
+  /** null is Main, the all-items reference view. A string is the exact unique
+   * name of the active additional view from `.rotli/views.json`. */
+  activeView: string | null;
+  setActiveView: (name: string | null) => void;
+
   /** The bottom-center resident slot's visibility — 1c's focus mode hides
    * the format bar through this flag. */
   formatBarVisible: boolean;
@@ -460,6 +465,8 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   selectedFolderId: ALL_NOTES,
   setSelectedFolderId: (id) => set({ selectedFolderId: id }),
+  activeView: null,
+  setActiveView: (name) => set({ activeView: name, selectedFolderId: "main:" }),
 
   formatBarVisible: true,
   setFormatBarVisible: (visible) => set({ formatBarVisible: visible }),

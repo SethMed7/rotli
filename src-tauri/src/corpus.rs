@@ -7,13 +7,15 @@
 //! never stored. Foreign frontmatter keys pass through untouched: a note must
 //! open cleanly in any other editor, forever.
 //!
-//! `.rotli/` inside the corpus root holds settings.json, viewstate.json and
-//! the id↔path index — all rebuildable. Deleting `.rotli/` loses nothing.
+//! `.rotli/` inside the corpus root holds machine-local settings/view state,
+//! rebuildable indexes, and the portable Main/named-view reference manifests.
+//! Deleting it never deletes content, but does remove explicit view layout.
 //!
 //! Writes are atomic (temp file in the same dir + rename). Deletes go to the
 //! OS trash (fallback: `.rotli/trash/`) — never a hard delete. A `notify`
 //! watcher (debounced) tells the frontend when the corpus changes under it,
-//! ignoring `.rotli/` and our own in-flight writes.
+//! ignoring private `.rotli/` runtime files and our own in-flight writes while
+//! observing external Main/named-view manifest edits.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -34,6 +36,57 @@ use ulid::Ulid;
 pub const CORPUS_DIR_NAME: &str = "rotli";
 /// The app-owned, fully rebuildable sidecar folder inside the corpus root.
 pub const DOT_DIR: &str = ".rotli";
+
+/// One reference node shared by Main and named workspace views. These trees
+/// never own content; they point at the same stable note/path identities the
+/// corpus already exposes.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub(crate) enum ReferenceNode {
+    Folder {
+        folder: String,
+        children: Vec<ReferenceNode>,
+    },
+    Note {
+        note: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct ReferenceManifest {
+    pub version: u8,
+    pub tree: Vec<ReferenceNode>,
+}
+
+impl Default for ReferenceManifest {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            tree: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct NamedView {
+    pub name: String,
+    pub tree: Vec<ReferenceNode>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct ViewsManifest {
+    pub version: u8,
+    pub views: Vec<NamedView>,
+}
+
+impl Default for ViewsManifest {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            views: Vec::new(),
+        }
+    }
+}
 
 pub fn default_corpus_root(app: &tauri::AppHandle) -> PathBuf {
     use tauri::Manager;
@@ -941,7 +994,15 @@ fn parse_fields(head: &str) -> Frontmatter {
 /// provenance/control frontmatter. Values stay plain text and are never an
 /// independent source of truth.
 fn searchable_metadata(fm: &Frontmatter) -> String {
-    const KEYS: [&str; 6] = ["area", "summary", "tags", "links", "shelf", "reach"];
+    const KEYS: [&str; 7] = [
+        "area",
+        "summary",
+        "tags",
+        "links",
+        "shelf",
+        "reach",
+        "view_tag",
+    ];
     fm.foreign
         .iter()
         .filter(|line| {
@@ -992,7 +1053,7 @@ pub(crate) fn field_key(line: &str) -> Option<&str> {
 /// Keys rotli owns directly — the metadata-panel editor touches only OTHER
 /// (foreign) keys; `locked` goes through set_locked, the rest are derived.
 /// v3.7: `owner` promoted to RESERVED (provenance, immutable — not user-editable).
-const RESERVED_KEYS: [&str; 10] = [
+const RESERVED_KEYS: [&str; 11] = [
     "id",
     "created",
     "updated",
@@ -1003,6 +1064,7 @@ const RESERVED_KEYS: [&str; 10] = [
     "secure_origin",
     "local_ai_allowed",
     "owner",
+    "view_tag",
 ];
 
 /// The metadata keys the AI FILER owns (contract v3.7). Written ONLY via
@@ -1102,12 +1164,12 @@ pub fn raw_frontmatter_block(text: &str) -> &str {
 /// contract v3.7: provenance plus the local-AI permission are not raw-editable.
 /// The permission must flow through its explicit command. Everything else in
 /// the typed block (updated/pinned/locked/secure/shelf/tags/…) lands as typed.
-const RAW_IMMUTABLE_KEYS: [&str; 4] = ["id", "created", "owner", "local_ai_allowed"];
+const RAW_IMMUTABLE_KEYS: [&str; 5] = ["id", "created", "owner", "local_ai_allowed", "view_tag"];
 
 /// Rebuild a document from a user-typed raw frontmatter block (the "Show file
 /// metadata" editor). The submitted text is taken VERBATIM — line order,
 /// spacing, everything — with exactly one correction: the reserved provenance
-/// lines (id/owner/created) must match the ORIGINAL file exactly (changed →
+/// lines (id/owner/created/local permission/view tag) must match the ORIGINAL file exactly (changed →
 /// restored, dropped → re-inserted at the top, invented → removed). The body
 /// is byte-exact from disk; only the block between the fences is rebuilt.
 /// Tolerant input: with or without the `---` fences, surrounding blank noise
@@ -1874,6 +1936,87 @@ pub struct CorpusStore {
     perms_read_only: bool,
 }
 
+fn valid_view_name(name: &str) -> bool {
+    let trimmed = name.trim();
+    !trimmed.is_empty()
+        && trimmed == name
+        && trimmed.chars().count() <= 64
+        && !trimmed.eq_ignore_ascii_case("main")
+        && trimmed.chars().next().is_some_and(char::is_alphanumeric)
+        && trimmed
+            .chars()
+            .all(|ch| ch.is_alphanumeric() || matches!(ch, ' ' | '.' | '_' | '-'))
+}
+
+fn collect_view_membership(
+    nodes: &[ReferenceNode],
+    view: &str,
+    membership: &mut HashMap<String, String>,
+) -> Result<(), String> {
+    for node in nodes {
+        match node {
+            ReferenceNode::Folder { folder, children } => {
+                if folder.trim().is_empty() || folder != folder.trim() || folder.contains(['/', ':']) {
+                    return Err(format!("invalid folder name in view {view}: {folder}"));
+                }
+                collect_view_membership(children, view, membership)?;
+            }
+            ReferenceNode::Note { note } => {
+                if note.trim().is_empty() {
+                    return Err(format!("view {view} contains an empty item reference"));
+                }
+                if let Some(previous) = membership.insert(note.clone(), view.to_string()) {
+                    return Err(format!(
+                        "item {note} appears more than once across named views ({previous}, {view})"
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn reference_contains(nodes: &[ReferenceNode], item_id: &str) -> bool {
+    nodes.iter().any(|node| match node {
+        ReferenceNode::Note { note } => note == item_id,
+        ReferenceNode::Folder { children, .. } => reference_contains(children, item_id),
+    })
+}
+
+fn validated_view_membership(manifest: &ViewsManifest) -> Result<HashMap<String, String>, String> {
+    if manifest.version != 1 {
+        return Err(format!(
+            "views format v{} is not writable by this Rotli build",
+            manifest.version
+        ));
+    }
+    let mut names = HashSet::new();
+    let mut membership = HashMap::new();
+    for view in &manifest.views {
+        if !valid_view_name(&view.name) {
+            return Err(format!("invalid view name: {}", view.name));
+        }
+        if !names.insert(view.name.to_lowercase()) {
+            return Err(format!("view names must be unique: {}", view.name));
+        }
+        collect_view_membership(&view.tree, &view.name, &mut membership)?;
+    }
+    Ok(membership)
+}
+
+fn with_view_tag(text: &str, tag: Option<&str>) -> String {
+    let (frontmatter, body) = parse_document(text);
+    let mut frontmatter = frontmatter.unwrap_or_default();
+    frontmatter.foreign.retain(|line| {
+        line.split_once(':')
+            .is_none_or(|(key, _)| key != key.trim() || key != "view_tag")
+    });
+    if let Some(tag) = tag {
+        frontmatter.foreign.push(format!("view_tag: {tag}"));
+    }
+    compose_document(&frontmatter, body)
+}
+
 impl CorpusStore {
     /// Open (or first-run-initialize) a corpus at `root`. The dispatcher: probe
     /// `root/memex.json` once — a valid `mx_` id routes to the memex path (browse
@@ -2424,9 +2567,9 @@ impl CorpusStore {
         atomic_write(&path, &out)
     }
 
-    /// Make `.rotli/main.json` git-committable while the rest of `.rotli/` stays
-    /// ignored. Unlike the deletable index/settings sidecar, the Main arrangement is
-    /// hand-organized user work that should travel with the memex (Seth, 2026-07-01).
+    /// Make the hand-arranged Main and named-view manifests git-committable while
+    /// the rest of `.rotli/` stays ignored. Unlike index/settings sidecars, these
+    /// arrangements are user work that should travel with the memex.
     /// A bare `.rotli/` line ignores the whole dir — and git CANNOT re-include a file
     /// under an ignored dir — so narrow it to `.rotli/*` and add `!.rotli/main.json`.
     /// Idempotent; a no-op outside a git corpus.
@@ -2451,6 +2594,10 @@ impl CorpusStore {
         }
         if !lines.iter().any(|l| l.trim() == "!.rotli/main.json") {
             lines.push("!.rotli/main.json".to_string());
+            changed = true;
+        }
+        if !lines.iter().any(|l| l.trim() == "!.rotli/views.json") {
+            lines.push("!.rotli/views.json".to_string());
             changed = true;
         }
         if changed {
@@ -3347,8 +3494,113 @@ impl CorpusStore {
     }
 
     pub(crate) fn main_write(&self, contents: &str) -> Result<(), String> {
+        self.suppress.mark(&self.root.join(DOT_DIR).join("main.json"));
         self.dot_write("main", contents)?;
         self.ensure_main_committable()
+    }
+
+    pub(crate) fn views_read(&self) -> Result<String, String> {
+        self.dot_read("views")
+    }
+
+    /// Validate and persist a named-view manifest while synchronizing singular
+    /// Markdown membership into `view_tag`. The prepared writes are rolled back
+    /// if any later write fails, so a CLI/UI operation cannot leave half-tagged
+    /// notes. Boards and binary files are intentionally skipped.
+    pub(crate) fn views_write(&mut self, contents: &str) -> Result<(), String> {
+        self.mutation_allowed()?;
+        let next: ViewsManifest = serde_json::from_str(contents)
+            .map_err(|error| format!("invalid views manifest: {error}"))?;
+        let next_membership = validated_view_membership(&next)?;
+        let current = serde_json::from_str::<ViewsManifest>(&self.views_read()?).unwrap_or_default();
+        let current_membership = validated_view_membership(&current).unwrap_or_default();
+
+        // Rust independently enforces the product law that named views are
+        // subsets of global Main—even if a future presentation caller forgets.
+        let main_raw = self.main_read()?;
+        let mut main = if main_raw.trim().is_empty() || main_raw.trim() == "{}" {
+            ReferenceManifest::default()
+        } else {
+            serde_json::from_str::<ReferenceManifest>(&main_raw)
+                .map_err(|error| format!("invalid Main manifest: {error}"))?
+        };
+        if main.version != 1 {
+            return Err(format!("Main format v{} is not writable by this Rotli build", main.version));
+        }
+        let mut main_changed = false;
+        for item_id in next_membership.keys() {
+            if !reference_contains(&main.tree, item_id) {
+                main.tree.push(ReferenceNode::Note {
+                    note: item_id.clone(),
+                });
+                main_changed = true;
+            }
+        }
+        if main_changed {
+            let raw = serde_json::to_string_pretty(&main).map_err(|error| error.to_string())? + "\n";
+            self.main_write(&raw)?;
+        }
+
+        let changed_ids: HashSet<String> = current_membership
+            .keys()
+            .chain(next_membership.keys())
+            .filter(|id| current_membership.get(*id) != next_membership.get(*id))
+            .cloned()
+            .collect();
+        let mut prepared: Vec<(PathBuf, String, String)> = Vec::new();
+        for id in changed_ids {
+            let Ok(rel) = self.resolve_note_rel(&id) else {
+                continue; // an orphan reference is retained until normal view GC
+            };
+            if Path::new(&rel).extension().and_then(|ext| ext.to_str()) != Some("md") {
+                continue; // boards and binaries never receive Markdown metadata
+            }
+            let path = self.abs(&rel);
+            let original = fs::read_to_string(&path).map_err(|error| format!("read {rel}: {error}"))?;
+            let updated = with_view_tag(&original, next_membership.get(&id).map(String::as_str));
+            if updated != original {
+                prepared.push((path, original, updated));
+            }
+        }
+
+        let manifest_path = self.root.join(DOT_DIR).join("views.json");
+        let previous_manifest = fs::read_to_string(&manifest_path).ok();
+        let mut written: Vec<(PathBuf, String)> = Vec::new();
+        for (path, original, updated) in &prepared {
+            self.suppress.mark(path);
+            if let Err(error) = atomic_write(path, updated) {
+                for (written_path, prior) in written.iter().rev() {
+                    self.suppress.mark(written_path);
+                    let _ = atomic_write(written_path, prior);
+                }
+                return Err(error);
+            }
+            written.push((path.clone(), original.clone()));
+        }
+        self.suppress.mark(&manifest_path);
+        if let Err(error) = self.dot_write("views", contents) {
+            for (path, prior) in written.iter().rev() {
+                self.suppress.mark(path);
+                let _ = atomic_write(path, prior);
+            }
+            return Err(error);
+        }
+        if let Err(error) = self.ensure_main_committable() {
+            for (path, prior) in written.iter().rev() {
+                self.suppress.mark(path);
+                let _ = atomic_write(path, prior);
+            }
+            match previous_manifest {
+                Some(raw) => {
+                    let _ = atomic_write(&manifest_path, &raw);
+                }
+                None => {
+                    let _ = fs::remove_file(&manifest_path);
+                }
+            }
+            return Err(error);
+        }
+        Ok(())
     }
 
     pub fn create(&mut self, folder_id: &str, body: &str) -> Result<NoteMeta, String> {
@@ -3763,6 +4015,7 @@ fn dot_file(which: &str) -> Result<&'static str, String> {
         "viewstate" => Ok("viewstate.json"),
         "background" => Ok("background.json"),
         "main" => Ok("main.json"), // the Main arrangement (committed, unlike the others)
+        "views" => Ok("views.json"), // named reference views (committed + metadata-synchronized)
         // Rust-daemon-owned hash state — the frontend never writes it.
         "organizer" => Ok("organizer.json"),
         other => Err(format!("unknown settings file: {other}")),
@@ -3779,6 +4032,7 @@ fn user_dot_writable(which: &str) -> Result<(), String> {
         "settings" | "viewstate" => Ok(()),
         "background" => Err("the legacy background slot is read-only".into()),
         "main" => Err("write .rotli/main.json through corpus_main_write".into()),
+        "views" => Err("write .rotli/views.json through corpus_views_write".into()),
         "organizer" => Err("`organizer` is the daemon's own state — not writable from the app".into()),
         other => Err(format!("unknown settings file: {other}")),
     }
@@ -4078,6 +4332,12 @@ pub fn path_relevant(root: &Path, suppress: &SuppressSet, path: &Path) -> bool {
     let Ok(rel) = normalized_path.strip_prefix(&normalized_root) else {
         return false;
     };
+    // Main and named views are the two portable hand-arranged sidecars. CLI/MCP
+    // writes happen in another process, so the resident app must observe them;
+    // every other dot-file remains private runtime state and stays ignored.
+    if rel == Path::new(".rotli/main.json") || rel == Path::new(".rotli/views.json") {
+        return true;
+    }
     for comp in rel.components() {
         if comp.as_os_str().to_string_lossy().starts_with('.') {
             return false; // .rotli/, .DS_Store, .rotli-write-* temp files
@@ -5142,6 +5402,30 @@ pub fn corpus_main_write(
     })
 }
 
+/// Write `.rotli/views.json` through the schema + Markdown metadata sync gate.
+/// Debug mounts remain read-only against the live corpus, so their view layout
+/// stays in the same app-cache lane as debug Main.
+#[tauri::command]
+pub fn corpus_views_write(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, CorpusState>,
+    contents: String,
+) -> Result<(), String> {
+    if let Some(path) = dev_machine_dot_path(&app, "views") {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        return atomic_write(&path, &contents);
+    }
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |store| store.views_write(&contents))
+}
+
 // ─── tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -5627,10 +5911,10 @@ mod tests {
 
     #[test]
     fn raw_frontmatter_restores_reserved_keeps_typed() {
-        let text = "---\nid: 01RAW0000000000000000000B\ncreated: 2026-06-12T10:00:00Z\nupdated: 2026-06-12T11:00:00Z\npinned: false\nowner: breve\nshelf: Inbox\n---\n\nBody.\n";
+        let text = "---\nid: 01RAW0000000000000000000B\ncreated: 2026-06-12T10:00:00Z\nupdated: 2026-06-12T11:00:00Z\npinned: false\nowner: breve\nview_tag: OpenSource\nshelf: Inbox\n---\n\nBody.\n";
         // the user retypes the id, drops created + owner, flips pinned, adds
         // locked/secure/tags — provenance comes back, everything else as typed
-        let submitted = "---\nid: HACKED\npinned: true\nlocked: true\nsecure: true\ntags: [x]\nshelf: Projects\n---\n";
+        let submitted = "---\nid: HACKED\npinned: true\nlocked: true\nsecure: true\nview_tag: Myela\ntags: [x]\nshelf: Projects\n---\n";
         let out = merge_raw_frontmatter(text, submitted).unwrap();
         let (fm, body) = parse_document(&out);
         let fm = fm.unwrap();
@@ -5638,6 +5922,7 @@ mod tests {
         assert_eq!(fm.id.as_deref(), Some("01RAW0000000000000000000B"), "id restored");
         assert_eq!(fm.created.as_deref(), Some("2026-06-12T10:00:00Z"), "created restored");
         assert!(out.contains("owner: breve"), "dropped owner restored:\n{out}");
+        assert!(out.contains("view_tag: OpenSource") && !out.contains("view_tag: Myela"));
         assert_eq!(fm.pinned, Some(true), "pinned lands as typed");
         assert!(out.contains("locked: true") && out.contains("secure: true"));
         assert!(out.contains("shelf: Projects") && !out.contains("shelf: Inbox"));
@@ -6374,6 +6659,8 @@ mod tests {
         assert!(path_relevant(&root, &s, Path::new("/corpus/Work/note.md")));
         assert!(path_relevant(&root, &s, Path::new("/corpus/Inbox/excalidraw/ideas.excalidraw"))); // a board
         assert!(path_relevant(&root, &s, Path::new("/corpus/Dropped"))); // a folder
+        assert!(path_relevant(&root, &s, Path::new("/corpus/.rotli/main.json")));
+        assert!(path_relevant(&root, &s, Path::new("/corpus/.rotli/views.json")));
         assert!(!path_relevant(&root, &s, Path::new("/corpus/.rotli/index.json")));
         assert!(!path_relevant(&root, &s, Path::new("/corpus/.rotli-write-abc")));
         assert!(!path_relevant(&root, &s, Path::new("/corpus/.DS_Store")));
@@ -6771,6 +7058,7 @@ mod tests {
         assert!(user_dot_writable("background").is_err(), "legacy wallpaper is read-only");
         assert!(user_dot_writable("organizer").is_err(), "daemon-owned state");
         assert!(user_dot_writable("main").is_err(), "main goes through corpus_main_write");
+        assert!(user_dot_writable("views").is_err(), "views go through corpus_views_write");
         assert!(user_dot_writable("junk").is_err());
         // the READ table still serves all five
         for f in ["settings", "viewstate", "background", "main", "organizer"] {

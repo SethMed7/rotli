@@ -32,6 +32,7 @@ the current behavior.
 - `ROTLI_BREVE`: integrated runtime and dev/production isolation
 - `ROTLI_DESIGN`: brand, themes, accessibility, and state design
 - `ROTLI_MODELS`: provider boundaries and capability policy
+- `ROTLI_SECURITY`: assets, trust boundaries, privacy, vulnerabilities, and residual risk
 - `ROTLI_OPERATIONS`: release, daemon, Keychain, and process safety
 
 All domains are `always_on: false`. Claude's installed CARL hook walks upward

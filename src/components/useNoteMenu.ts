@@ -26,6 +26,8 @@ import { useMainGcIds } from "../services/hooks";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useMainStore } from "../state/main";
+import { useViewsStore } from "../state/views";
+import { assignItemToView, assignedView } from "../services/viewTree";
 import { usePanesStore } from "../state/panes";
 import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
@@ -50,6 +52,8 @@ export function useNoteMenu() {
   const setRenameTarget = useUiStore((s) => s.setRenameTarget);
   const manifest = useMainStore((s) => s.manifest);
   const setTree = useMainStore((s) => s.setTree);
+  const viewsManifest = useViewsStore((s) => s.manifest);
+  const setViewsManifest = useViewsStore((s) => s.setManifest);
   // GC liveIds MUST be the FULL note index (staged/archived/trashed included):
   // setTree prunes any Main ref not in this set, so building it from useNotes()
   // alone made "Add to Main" on a STAGED note a silent no-op — the add and the
@@ -133,6 +137,7 @@ export function useNoteMenu() {
         const isBoard = note.kind === "board";
         const isNote = !isFile && !isBoard;
         const inMain = mainHasNote(manifest.tree, note.id);
+        const currentView = assignedView(viewsManifest, note.id);
         const starred = quickIds.includes(note.id);
         const full = !starred && quickIds.length >= QUICK_MAX;
         // lock/secure aren't on NoteSummary — read them from frontmatter so the
@@ -242,6 +247,31 @@ export function useNoteMenu() {
           },
         });
         items.push({ kind: "sep" as const });
+        if (viewsManifest.views.length > 0) {
+          items.push({
+            kind: "drill" as const,
+            label: "Move to view",
+            items: [
+              {
+                kind: "action" as const,
+                label: "Main only",
+                checked: currentView === null,
+                checkedMark: "check" as const,
+                onClick: () => setViewsManifest(assignItemToView(viewsManifest, note.id, null)),
+              },
+              ...viewsManifest.views.map((view) => ({
+                kind: "action" as const,
+                label: view.name,
+                checked: currentView === view.name,
+                checkedMark: "check" as const,
+                onClick: () => {
+                  setTree(addNoteToMain(manifest.tree, note.id), liveIds);
+                  setViewsManifest(assignItemToView(viewsManifest, note.id, view.name));
+                },
+              })),
+            ],
+          });
+        }
         if (!isBoard) {
           items.push({
             kind: "action" as const,
@@ -257,6 +287,9 @@ export function useNoteMenu() {
           onClick: () => {
             if (inMain) {
               setTree(removeFromMain(manifest.tree, note.id), liveIds);
+              if (currentView) {
+                setViewsManifest(assignItemToView(viewsManifest, note.id, null));
+              }
               // an empty note dismissed from Main shouldn't linger in the corpus
               // (Seth, 2026-07-07) — hard-discard, never into the Trash folder
               // (2026-07-17: Rust re-verifies blankness and refuses otherwise)
@@ -377,6 +410,19 @@ export function useNoteMenu() {
         open(x, y, items, opts);
       })();
     },
-    [open, openSummary, quickIds, manifest, setTree, liveIds, archive, trash, restore, setRenameTarget],
+    [
+      open,
+      openSummary,
+      quickIds,
+      manifest,
+      setTree,
+      liveIds,
+      archive,
+      trash,
+      restore,
+      setRenameTarget,
+      setViewsManifest,
+      viewsManifest,
+    ],
   );
 }

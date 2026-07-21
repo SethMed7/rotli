@@ -7,6 +7,16 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
 
 - **Main is a view.** `.rotli/main.json` stores ordered item references and
   Main-only folder structure. It never owns or copies content.
+- **Named views are subsets of Main.** `.rotli/views.json` version 1 stores
+  uniquely named reference trees with their own virtual folders. Main retains
+  every item assigned to a named view; switching views changes navigation and
+  creation context, never physical storage.
+- A Markdown note may belong to one named view. Rotli synchronizes the exact
+  view name into managed `view_tag` metadata on assignment, rename, deletion,
+  UI, CLI, and MCP writes. View names are unique case-insensitively and use
+  letters, numbers, spaces, periods, underscores, or hyphens; `Main` is
+  reserved. Boards and binary files remain frontmatter-free, so their view
+  membership exists only as an explicit reference in `.rotli/views.json`.
 - **Markdown notes** are plain `.md` files. A smart, Main, or Brain selection
   routes a new note through **Brain intake**: the portable staging lane currently
   stored at `wiki/_inbox/`. An explicit writable local folder remains the
@@ -19,6 +29,9 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   item is opened. A Brain-intake note therefore appears in Main while the same
   file still lives in staging. Refiling the physical item does not duplicate or
   invalidate the Main arrangement.
+- Creation from a named view also adds the item to that view and its current
+  virtual folder. Creation from Main adds no `view_tag`. Removing a named-view
+  assignment never deletes content or its Main reference.
 - The Brain organizer waits for the configured quiet window after the note's
   latest edit (five minutes by default) before classifying or refiling it. New
   edits reset that window; filing changes location/metadata, never note prose.
@@ -71,8 +84,10 @@ The Rust corpus boundary independently validates every write.
 - Rotli owns identity/provenance facts such as `id`, `created`, `updated`, and
   `pinned`.
 - The user owns explicit organizational metadata such as `shelf`, `reach`,
-  `locked`, and the secure-note controls. `local_ai_allowed` is a Rotli-managed
-  permission bit, never a provider-owned field.
+  `view_tag`, `locked`, and the secure-note controls. Rotli manages `view_tag`
+  through the named-view workflow so the Markdown and reference tree cannot
+  drift. `local_ai_allowed` is a Rotli-managed permission bit, never a
+  provider-owned field.
 - The Brain filer owns only its declared enrichment fields: `area`, `summary`,
   `tags`, and `links`.
 - Unknown frontmatter is preserved byte-for-byte. Reserved provenance cannot be

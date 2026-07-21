@@ -107,7 +107,7 @@ export function ContextMenu() {
             }}
           >
             <span className="ctxmenu-check" aria-hidden="true">
-              {item.checked ? "★" : ""}
+              {item.checked ? (item.checkedMark === "check" ? "✓" : "★") : ""}
             </span>
             <span className="ctxmenu-label">{item.label}</span>
           </button>

@@ -16,11 +16,14 @@ maintaining separate file-manipulation implementations.
   starting the GUI. A normal app launch is unchanged.
 - `rotli mcp` is a newline-delimited JSON-RPC stdio server. It opens no socket,
   calls no model, and performs no provider orchestration.
+- MCP initialization advertises only the protocol version Rotli implements. An
+  unsupported client request is answered with Rotli's supported version for the
+  client to accept or reject; it is never echoed as a false compatibility claim.
 - CARL's `rotli-carl` server remains project-development recall. The product
   server is separately named `rotli-workspace` and operates on the user's
   registered Rotli workspace.
 
-## Note and Main behavior
+## Note, Main, and named-view behavior
 
 - Listing and full-text search omit every Markdown note refused by the existing
   remote-AI secure-content gate. The gate checks both durable metadata and the
@@ -46,6 +49,14 @@ maintaining separate file-manipulation implementations.
   `disk` scope and remain subject to corpus ownership rules.
 - Removing an item from Main removes only its reference. It never deletes the
   underlying note or board.
+- `rotli views` and the matching MCP tools list, create, rename, delete, assign,
+  unassign, and add virtual folders to named views. Assigning is singular and
+  never removes the item from Main. Markdown receives the exact managed
+  `view_tag`; boards and binary files remain frontmatter-free.
+- `notes create --view NAME` and `rotli_create_note.view` make the named view the
+  additional creation context while retaining the ordinary intake and Main
+  behavior. Workspace metrics report named-view, reference, and virtual-folder
+  counts separately from Main.
 
 The on-device organizer still changes only location and metadata. A Claude or
 Codex body edit is a separate, user-directed workspace action with an explicit
@@ -84,6 +95,8 @@ contains note content.
   board actions for routine edits.
 - Tool schemas are discoverable through standard MCP `tools/list`, so clients
   with deferred tool search need not preload every schema into the prompt.
+- The CLI/MCP compatibility and migration law is
+  [`compatibility-and-migrations.md`](compatibility-and-migrations.md).
 
 ## Configuration
 
@@ -93,6 +106,7 @@ The agent surface is deliberately grouped and discoverable:
 rotli agent doctor      # read-only root, boundary, policy, and visible metrics
 rotli agent config      # copy-ready Claude/Codex commands and Codex TOML
 rotli agent self-test   # full workflow in a disposable temporary memex
+rotli views list        # named reference trees (Main remains global)
 rotli mcp               # stdio protocol process used by either client
 ```
 
@@ -111,4 +125,5 @@ configured live workspace.
 
 The CLI and MCP never mutate a live workspace during automated tests. Rust tests
 open isolated temporary corpora and prove success, secure/locked refusal,
-revision conflicts, Main reference behavior, and board action round trips.
+revision conflicts, Main/named-view reference and `view_tag` behavior, and board
+action round trips.

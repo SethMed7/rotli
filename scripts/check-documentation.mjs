@@ -10,13 +10,22 @@ const required = [
   "CLAUDE.md",
   "CONTRIBUTING.md",
   "DESIGN.md",
+  "PRIVACY.md",
+  "SECURITY.md",
+  "SUPPORT.md",
   "SYNTAX.md",
   "docs/README.md",
+  "docs/security/threat-model.md",
+  "docs/architecture/compatibility-and-migrations.md",
+  "docs/operations/release-and-supply-chain.md",
+  "docs/operations/support-and-diagnostics.md",
+  "docs/decisions/README.md",
   "docs/development/ai-workflow.md",
   "docs/development/testing.md",
   "docs/development/adding-things.md",
   "docs/architecture/ai-context-architecture.md",
   ".github/copilot-instructions.md",
+  ".github/CODEOWNERS",
   ".github/pull_request_template.md",
   ".github/workflows/regression.yml",
   ".carl/carl.json",
@@ -53,7 +62,19 @@ for (const rel of ["README.md", "AGENTS.md", "CONTRIBUTING.md", "docs/README.md"
 
 if (existsSync(join(root, "docs/README.md"))) {
   const map = readFileSync(join(root, "docs/README.md"), "utf8");
-  for (const token of missingTokens(map, ["../ARCHITECTURE.md", "../DESIGN.md", "../SYNTAX.md"])) {
+  for (const token of missingTokens(map, [
+    "../ARCHITECTURE.md",
+    "../DESIGN.md",
+    "../PRIVACY.md",
+    "../SECURITY.md",
+    "../SUPPORT.md",
+    "../SYNTAX.md",
+    "security/threat-model.md",
+    "architecture/compatibility-and-migrations.md",
+    "operations/release-and-supply-chain.md",
+    "operations/support-and-diagnostics.md",
+    "decisions/README.md",
+  ])) {
     failures.push(`docs/README.md must route to ${token}`);
   }
   if (!map.includes("development/testing.md")) {
@@ -204,6 +225,9 @@ const linkedDocs = [
   "CONTRIBUTING.md",
   "CLAUDE.md",
   "DESIGN.md",
+  "PRIVACY.md",
+  "SECURITY.md",
+  "SUPPORT.md",
   "SYNTAX.md",
   ...markdownFiles(join(root, "docs")),
 ];
@@ -276,6 +300,7 @@ if (existsSync(join(root, ".carl/carl.json"))) {
       memex: "ROTLI_MEMEX",
       routines: "ROTLI_BREVE",
       services: "ROTLI_CORE",
+      security: "ROTLI_SECURITY",
       sheets: "ROTLI_DOCUMENTS",
       state: "ROTLI_CORE",
     };
@@ -283,7 +308,6 @@ if (existsSync(join(root, ".carl/carl.json"))) {
       lib: "pure dependency-free utilities with no distinct recall vocabulary — placement law lives in docs/development/adding-things.md",
       newItems: "small creation workflow; covered by ROTLI_CORE architecture vocabulary — if it ever grows past the threshold, map it",
       noteChat: "thin note↔chat seam below the threshold; its contract lives in the ROTLI_MEMORY chat-note rule",
-      security: "single secret-pattern module guarded by check:secret-parity",
       styles: "CSS only; owned by the ROTLI_DESIGN token rules and check:design-system",
     };
     const carlDirThresholdLines = 2_000;

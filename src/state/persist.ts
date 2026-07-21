@@ -46,6 +46,7 @@ import {
   useNoteStyleStore,
 } from "./noteStyle";
 import { hydrateMain, useMainStore } from "./main";
+import { hydrateViews, useViewsStore } from "./views";
 import { findLeaf, leaves, usePanesStore } from "./panes";
 import { applyTheme } from "./theme";
 import {
@@ -481,6 +482,7 @@ interface PersistedViewstate {
   root: PaneNode;
   focusedPaneId: string;
   selectedFolderId: string;
+  activeView: string | null;
   mru: string[];
 }
 
@@ -597,6 +599,16 @@ async function hydrateViewstate(): Promise<void> {
   // reserved — it's restored only if "Brain" is still a real folder, else
   // ignored (falls back to ALL_NOTES), never a crash (Invariant 6).
   const folderIds = new Set<string>([ALL_NOTES, RECENT, ...RESERVED_DESTS, ...folders.map((f) => f.id)]);
+  const storedActive = typeof data.activeView === "string" ? data.activeView : null;
+  const activeView = useViewsStore.getState().manifest.views.some((view) => view.name === storedActive)
+    ? storedActive
+    : null;
+  useUiStore.setState({ activeView });
+  const activeTree = activeView
+    ? (useViewsStore.getState().manifest.views.find((view) => view.name === activeView)?.tree ?? [])
+    : useMainStore.getState().manifest.tree;
+  for (const id of mainFolderIds(activeTree)) folderIds.add(id);
+  folderIds.add("main:");
   if (typeof data.selectedFolderId === "string" && folderIds.has(data.selectedFolderId)) {
     useUiStore.setState({ selectedFolderId: data.selectedFolderId });
   }
@@ -697,8 +709,9 @@ export async function hydratePersistedState(): Promise<void> {
     settingsPassthrough = unknownSettingsKeys(raw);
     applySettings(settings);
     if (isMainSurface()) {
-      await hydrateViewstate();
       await hydrateMain();
+      await hydrateViews();
+      await hydrateViewstate();
       await gcPersistedMaps(); // needs the hydrated Main manifest (#78)
       applyShellSideEffects(settings);
     }
@@ -766,6 +779,7 @@ function viewstateSnapshot(): string {
     root: panes.root,
     focusedPaneId: panes.focusedPaneId,
     selectedFolderId: useUiStore.getState().selectedFolderId,
+    activeView: useUiStore.getState().activeView,
     mru: useMruStore.getState().ids,
   };
   return JSON.stringify(snapshot);

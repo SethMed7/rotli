@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-07-21T00:00:00.000Z",
+  "last_modified": "2026-07-21T17:00:00.000Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -35,15 +35,22 @@
         "workspace cli",
         "mcp",
         "claude workspace",
-        "codex workspace"
+        "codex workspace",
+        "compatibility",
+        "migration",
+        "schema version",
+        "downgrade",
+        "protocol version",
+        "ADR",
+        "decision record"
       ],
       "exclude": [],
       "rules": [
         {
           "id": 0,
-          "text": "Main is a reference view over one physical set of user files, never another content store. The memex is durable truth; .rotli/ contains rebuildable projections and explicit settings. Do not add a database for memex content.",
+          "text": "Main is the global reference view over one physical set of user files; named views are subset projections, never content stores. .rotli/main.json and version-1 views.json hold portable reference trees. Named-view writes synchronize singular Markdown view_tag metadata while boards/binaries stay frontmatter-free. The memex remains durable truth; do not add a content database.",
           "added": "2026-07-11",
-          "last_reviewed": "2026-07-11",
+          "last_reviewed": "2026-07-21",
           "source": "docs/architecture/memex-data-contract.md"
         },
         {
@@ -83,10 +90,24 @@
         },
         {
           "id": 6,
-          "text": "Claude, Codex, scripts, and humans use the packaged rotli JSON CLI or rotli-workspace stdio MCP over one Rust workspace service. Note reads are text/markdown editor bodies without managed frontmatter and include metrics. Secure/secret-shaped notes are omitted; secure/locked writes are refused; every write needs a fresh revision. New notes enter wiki/_inbox and Main. agent doctor is read-only; agent self-test uses a temporary memex.",
+          "text": "Claude, Codex, scripts, and humans use the packaged rotli JSON CLI or rotli-workspace stdio MCP over one Rust workspace service. Note reads are text/markdown editor bodies without managed frontmatter and include metrics. Secure/secret-shaped notes are omitted; secure/locked writes are refused; every body write needs a fresh revision. New notes enter wiki/_inbox and Main; optional named-view creation/assignment keeps Main global and synchronizes view_tag. agent doctor is read-only; agent self-test uses a temporary memex.",
           "added": "2026-07-21",
           "last_reviewed": "2026-07-21",
           "source": "docs/architecture/agent-workspace.md"
+        },
+        {
+          "id": 7,
+          "text": "Durable files and public CLI/MCP surfaces evolve additively or through an explicit versioned migration. Preserve unknown user data, make migrations idempotent and atomic, test downgrade behavior, and open unsupported newer writable contracts read-only rather than stamping them down.",
+          "added": "2026-07-21",
+          "last_reviewed": "2026-07-21",
+          "source": "docs/architecture/compatibility-and-migrations.md"
+        },
+        {
+          "id": 8,
+          "text": "Use an ADR only for a cross-boundary decision that is expensive to reverse or easy to re-litigate. Current contracts own normative rules; code/tests prove behavior; CARL stores only a compact accepted-decision summary linked to the ADR.",
+          "added": "2026-07-21",
+          "last_reviewed": "2026-07-21",
+          "source": "docs/decisions/README.md"
         }
       ],
       "decisions": [
@@ -427,6 +448,48 @@
       ],
       "decisions": []
     },
+    "ROTLI_SECURITY": {
+      "state": "active",
+      "always_on": false,
+      "recall": [
+        "threat model",
+        "security boundary",
+        "vulnerability",
+        "security report",
+        "data classification",
+        "encryption at rest",
+        "hostile local process",
+        "privacy",
+        "telemetry",
+        "support bundle",
+        "risk acceptance"
+      ],
+      "exclude": [],
+      "rules": [
+        {
+          "id": 0,
+          "text": "The canonical threat model owns assets, actors, trust boundaries, abuse cases, out-of-scope assumptions, residual risk, and review triggers. Adding an account, telemetry, crash upload, sync, destination, writable surface, credential, or broader capability requires updating it before implementation.",
+          "added": "2026-07-21",
+          "last_reviewed": "2026-07-21",
+          "source": "docs/security/threat-model.md"
+        },
+        {
+          "id": 1,
+          "text": "Secure notes are an AI-egress and organizer-access classification, not an encrypted vault. They remain plain local files; macOS account isolation and FileVault provide at-rest protection. Do not place secrets on agent-managed boards because board scenes have no secure classification.",
+          "added": "2026-07-21",
+          "last_reviewed": "2026-07-21",
+          "source": "docs/security/threat-model.md"
+        },
+        {
+          "id": 2,
+          "text": "docs/development/security.md owns the executable egress inventory, destination guards, security check procedure, current dependency findings, and dated risk exceptions. New network paths update its allowlist and adversarial fixtures in the same change.",
+          "added": "2026-07-21",
+          "last_reviewed": "2026-07-21",
+          "source": "docs/development/security.md"
+        }
+      ],
+      "decisions": []
+    },
     "ROTLI_OPERATIONS": {
       "state": "active",
       "always_on": false,
@@ -440,7 +503,17 @@
         "keychain",
         "commit",
         "push",
-        "updater"
+        "updater",
+        "supply chain",
+        "SBOM",
+        "provenance",
+        "rollback",
+        "release channel",
+        "support",
+        "diagnostics",
+        "incident",
+        "backup",
+        "restore"
       ],
       "exclude": [],
       "rules": [
@@ -457,6 +530,20 @@
           "added": "2026-07-11",
           "last_reviewed": "2026-07-11",
           "source": "AGENTS.md"
+        },
+        {
+          "id": 2,
+          "text": "A production release must trace to a clean reviewed commit with exact-commit CI evidence, matching versions/tags, signed and notarized artifacts, checksums, SBOM/provenance, visible publication failures, key-custody records, and a tested superseding-release or rollback path.",
+          "added": "2026-07-21",
+          "last_reviewed": "2026-07-21",
+          "source": "docs/operations/release-and-supply-chain.md"
+        },
+        {
+          "id": 3,
+          "text": "Support diagnostics are local, user-directed, content-free by default, and never automatically uploaded. Reports omit note content/titles/paths, Keychain values, credentials, full memexes, and raw logs; future bundles require an allowlist, secret scan, path normalization, preview, and explicit export.",
+          "added": "2026-07-21",
+          "last_reviewed": "2026-07-21",
+          "source": "docs/operations/support-and-diagnostics.md"
         }
       ],
       "decisions": []

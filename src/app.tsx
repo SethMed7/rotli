@@ -49,6 +49,8 @@ import { activeInstance, isWritable } from "./memex/config";
 import { chooseFolder, initMemexAsCorpus, loadConfig as memexLoadConfig, writeNote } from "./memex/service";
 import { summonChat } from "./services/chatSummon";
 import { flushSettingsNow } from "./state/persist";
+import { hydrateMain } from "./state/main";
+import { hydrateViews } from "./state/views";
 import { useMemexStore } from "./state/memex";
 import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateJournal, invalidateNotes } from "./services/hooks";
@@ -192,6 +194,8 @@ function MainShell() {
       onCorpusChanged(() => {
         void invalidateFolders();
         void invalidateNotes();
+        void hydrateMain();
+        void hydrateViews();
       }),
     [],
   );

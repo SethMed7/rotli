@@ -17,7 +17,8 @@ use serde_json::{json, Value};
 
 use crate::corpus::{
     ConnectedBrain, CorpusBoardDoc, CorpusConfig, CorpusList, CorpusRoot, CorpusStore, FolderMeta,
-    NoteDoc, NoteKind, NoteMeta, SearchHit, DEFAULT_ROOT_ID, DOT_DIR,
+    NamedView, NoteDoc, NoteKind, NoteMeta, ReferenceManifest as MainManifest,
+    ReferenceNode as MainNode, SearchHit, ViewsManifest, DEFAULT_ROOT_ID, DOT_DIR,
 };
 
 const MCP_PROTOCOL: &str = "2025-03-26";
@@ -86,6 +87,9 @@ struct WorkspaceMetrics {
     intake_notes: usize,
     main_references: usize,
     main_folders: usize,
+    named_views: usize,
+    view_references: usize,
+    view_folders: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -108,33 +112,6 @@ struct BoardOutlineItem {
     y: f64,
     width: f64,
     height: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-enum MainNode {
-    Folder {
-        folder: String,
-        children: Vec<MainNode>,
-    },
-    Note {
-        note: String,
-    },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct MainManifest {
-    version: u8,
-    tree: Vec<MainNode>,
-}
-
-impl Default for MainManifest {
-    fn default() -> Self {
-        Self {
-            version: 1,
-            tree: Vec::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -377,6 +354,19 @@ impl Workspace {
         } else {
             (0, 0)
         };
+        let (named_views, view_references, view_folders) = if self.root.is_default {
+            let views = self.read_views()?;
+            let (references, folders) = views
+                .views
+                .iter()
+                .map(|view| count_main_nodes(&view.tree))
+                .fold((0, 0), |(refs, folders), (next_refs, next_folders)| {
+                    (refs + next_refs, folders + next_folders)
+                });
+            (views.views.len(), references, folders)
+        } else {
+            (0, 0, 0)
+        };
         Ok(WorkspaceMetrics {
             visible_notes,
             boards,
@@ -385,6 +375,9 @@ impl Workspace {
             intake_notes,
             main_references,
             main_folders,
+            named_views,
+            view_references,
+            view_folders,
         })
     }
 
@@ -414,6 +407,140 @@ impl Workspace {
     fn write_main(&self, manifest: &MainManifest) -> Result<(), String> {
         let raw = serde_json::to_string_pretty(manifest).map_err(|e| e.to_string())? + "\n";
         self.store.main_write(&raw)
+    }
+
+    fn read_views(&self) -> Result<ViewsManifest, String> {
+        if !self.root.is_default {
+            return Err("named views belong to the default Rotli root".into());
+        }
+        let raw = self.store.views_read()?;
+        if raw.trim().is_empty() || raw.trim() == "{}" {
+            return Ok(ViewsManifest::default());
+        }
+        serde_json::from_str(&raw).map_err(|error| format!("invalid views manifest: {error}"))
+    }
+
+    fn write_views(&mut self, manifest: &ViewsManifest) -> Result<(), String> {
+        let raw = serde_json::to_string_pretty(manifest).map_err(|e| e.to_string())? + "\n";
+        self.store.views_write(&raw)
+    }
+
+    fn view_create(&mut self, name: &str) -> Result<ViewsManifest, String> {
+        let name = name.trim();
+        let mut manifest = self.read_views()?;
+        if manifest
+            .views
+            .iter()
+            .any(|view| view.name.eq_ignore_ascii_case(name))
+        {
+            return Err(format!("a view named {name} already exists"));
+        }
+        manifest.views.push(NamedView {
+            name: name.to_string(),
+            tree: Vec::new(),
+        });
+        self.write_views(&manifest)?;
+        Ok(manifest)
+    }
+
+    fn view_rename(&mut self, current: &str, next: &str) -> Result<ViewsManifest, String> {
+        let next = next.trim();
+        let mut manifest = self.read_views()?;
+        if manifest
+            .views
+            .iter()
+            .any(|view| view.name != current && view.name.eq_ignore_ascii_case(next))
+        {
+            return Err(format!("a view named {next} already exists"));
+        }
+        let view = manifest
+            .views
+            .iter_mut()
+            .find(|view| view.name == current)
+            .ok_or_else(|| format!("view not found: {current}"))?;
+        view.name = next.to_string();
+        self.write_views(&manifest)?;
+        Ok(manifest)
+    }
+
+    fn view_delete(&mut self, name: &str) -> Result<ViewsManifest, String> {
+        let mut manifest = self.read_views()?;
+        let before = manifest.views.len();
+        manifest.views.retain(|view| view.name != name);
+        if manifest.views.len() == before {
+            return Err(format!("view not found: {name}"));
+        }
+        self.write_views(&manifest)?;
+        Ok(manifest)
+    }
+
+    fn view_assign(
+        &mut self,
+        item_id: &str,
+        target: Option<&str>,
+        parent_id: &str,
+    ) -> Result<ViewsManifest, String> {
+        // Resolve first so a typo cannot become a durable orphan. Boards and
+        // files resolve here too; the corpus sync gate will simply skip tags.
+        self.store.resolve_note_rel(item_id)?;
+        if target.is_some() {
+            self.main_add(item_id, MAIN_ROOT)?;
+        }
+        let mut manifest = self.read_views()?;
+        for view in &mut manifest.views {
+            let _ = main_remove(&mut view.tree, item_id, MAIN_ROOT);
+        }
+        if let Some(target) = target {
+            let view = manifest
+                .views
+                .iter_mut()
+                .find(|view| view.name == target)
+                .ok_or_else(|| format!("view not found: {target}"))?;
+            let node = MainNode::Note {
+                note: item_id.to_string(),
+            };
+            if parent_id == MAIN_ROOT
+                || !main_insert(&mut view.tree, parent_id, node.clone(), MAIN_ROOT)
+            {
+                view.tree.push(node);
+            }
+        }
+        self.write_views(&manifest)?;
+        Ok(manifest)
+    }
+
+    fn view_create_folder(
+        &mut self,
+        view_name: &str,
+        name: &str,
+        parent_id: &str,
+    ) -> Result<String, String> {
+        let name = name.trim();
+        if name.is_empty() || name.contains('/') || name.contains(':') {
+            return Err("a view folder name must be one non-empty path component".into());
+        }
+        let mut manifest = self.read_views()?;
+        let view = manifest
+            .views
+            .iter_mut()
+            .find(|view| view.name == view_name)
+            .ok_or_else(|| format!("view not found: {view_name}"))?;
+        let unique = unique_folder_name(&view.tree, parent_id, name);
+        let node = MainNode::Folder {
+            folder: unique.clone(),
+            children: Vec::new(),
+        };
+        if parent_id == MAIN_ROOT
+            || !main_insert(&mut view.tree, parent_id, node.clone(), MAIN_ROOT)
+        {
+            view.tree.push(node);
+        }
+        self.write_views(&manifest)?;
+        Ok(if parent_id == MAIN_ROOT {
+            format!("{MAIN_ROOT}{unique}")
+        } else {
+            format!("{parent_id}/{unique}")
+        })
     }
 
     fn main_add(&self, item_id: &str, parent_id: &str) -> Result<(), String> {
@@ -1247,6 +1374,7 @@ pub(crate) fn run_if_requested(args: &[String]) -> Option<i32> {
             | "notes"
             | "folders"
             | "main"
+            | "views"
             | "boards"
             | "open"
             | "agent"
@@ -1294,6 +1422,7 @@ fn run_cli(args: &[String]) -> Result<Value, String> {
         "notes" => run_notes_cli(args, root_id),
         "folders" => run_folders_cli(args, root_id),
         "main" => run_main_cli(args),
+        "views" => run_views_cli(args),
         "boards" => run_boards_cli(args, root_id),
         "open" => {
             let id = positional(args, 1, "open needs an item id")?;
@@ -1339,6 +1468,9 @@ fn run_notes_cli(args: &[String], root_id: Option<&str>) -> Result<Value, String
             let mut workspace = Workspace::open(root_id)?;
             let meta = workspace.create_note(title, &body, parent)?;
             let local = workspace.local_id(&meta.id)?;
+            if let Some(view) = option(args, "--view") {
+                workspace.view_assign(&local, Some(view), option(args, "--view-parent").unwrap_or(MAIN_ROOT))?;
+            }
             json_value(workspace.read_note(&local)?)
         }
         "update" => {
@@ -1423,6 +1555,55 @@ fn run_main_cli(args: &[String]) -> Result<Value, String> {
     }
 }
 
+fn run_views_cli(args: &[String]) -> Result<Value, String> {
+    let sub = args.get(1).map(String::as_str).unwrap_or("list");
+    let mut workspace = Workspace::open(None)?;
+    match sub {
+        "list" => {
+            let manifest = workspace.read_views()?;
+            if let Some(name) = option(args, "--view") {
+                json_value(
+                    manifest
+                        .views
+                        .into_iter()
+                        .find(|view| view.name == name)
+                        .ok_or_else(|| format!("view not found: {name}"))?,
+                )
+            } else {
+                json_value(manifest)
+            }
+        }
+        "create" => json_value(workspace.view_create(required_option(args, "--name")?)?),
+        "rename" => json_value(workspace.view_rename(
+            positional(args, 2, "views rename needs the current name")?,
+            required_option(args, "--to")?,
+        )?),
+        "delete" => json_value(workspace.view_delete(positional(
+            args,
+            2,
+            "views delete needs a name",
+        )?)?),
+        "assign" => json_value(workspace.view_assign(
+            positional(args, 2, "views assign needs an item id")?,
+            Some(required_option(args, "--view")?),
+            option(args, "--parent").unwrap_or(MAIN_ROOT),
+        )?),
+        "unassign" => json_value(workspace.view_assign(
+            positional(args, 2, "views unassign needs an item id")?,
+            None,
+            MAIN_ROOT,
+        )?),
+        "create-folder" => Ok(json!({
+            "id": workspace.view_create_folder(
+                required_option(args, "--view")?,
+                required_option(args, "--name")?,
+                option(args, "--parent").unwrap_or(MAIN_ROOT),
+            )?
+        })),
+        _ => Err(format!("unknown views command: {sub}")),
+    }
+}
+
 fn run_boards_cli(args: &[String], root_id: Option<&str>) -> Result<Value, String> {
     let sub = args.get(1).map(String::as_str).unwrap_or("list");
     match sub {
@@ -1446,6 +1627,9 @@ fn run_boards_cli(args: &[String], root_id: Option<&str>) -> Result<Value, Strin
                 option(args, "--main").unwrap_or(MAIN_ROOT),
             )?;
             let local = workspace.local_id(&meta.id)?;
+            if let Some(view) = option(args, "--view") {
+                workspace.view_assign(&local, Some(view), option(args, "--view-parent").unwrap_or(MAIN_ROOT))?;
+            }
             json_value(workspace.read_board(&local)?)
         }
         "update" => {
@@ -1558,7 +1742,7 @@ fn workspace_policy() -> Value {
     json!({
         "content": "Markdown notes are text/markdown editor bodies; Rotli owns and preserves YAML frontmatter.",
         "creation": "New notes enter wiki/_inbox (or legacy Inbox) and are referenced in Main immediately.",
-        "organization": "Main folders are virtual. Physical folders and moves require an explicit disk operation and corpus policy approval.",
+        "organization": "Main is the global reference view. Named views are singular subset projections; Markdown view_tag is synchronized and boards/binaries stay frontmatter-free. All view folders are virtual. Physical folders and moves require an explicit disk operation and corpus policy approval.",
         "concurrency": "Every note or board write requires the revision from an immediately preceding read.",
         "privacy": "Secure, locked, and secret-shaped Markdown is omitted or refused. Board scenes have no secure classification and must not contain secrets.",
         "transport": "The MCP server uses local stdio only and opens no network listener."
@@ -1664,6 +1848,17 @@ fn agent_self_test() -> Result<Value, String> {
         &read.revision,
     )?;
     checks.push("patch one exact span with revision protection");
+    workspace.view_create("OpenSource")?;
+    workspace.view_assign(&created.id, Some("OpenSource"), MAIN_ROOT)?;
+    let view_rel = workspace.store.resolve_note_rel(&created.id)?;
+    let view_text = fs::read_to_string(workspace.store.root().join(view_rel))
+        .map_err(|error| error.to_string())?;
+    if !view_text.contains("view_tag: OpenSource")
+        || !main_contains(&workspace.read_main()?.tree, &created.id)
+    {
+        return Err("named-view metadata or Main-subset self-test failed".into());
+    }
+    checks.push("assign a named view while retaining Main and view_tag");
     if workspace
         .update_note(&created.id, "# stale", &read.revision)
         .is_ok()
@@ -1736,7 +1931,7 @@ rotli roots
 rotli notes list [--root ID] [--limit N]
 rotli notes search QUERY [--root ID] [--limit N]
 rotli notes read ID [--root ID]
-rotli notes create --title TITLE [--body TEXT|--body-file PATH|--stdin] [--main main:FOLDER]
+rotli notes create --title TITLE [--body TEXT|--body-file PATH|--stdin] [--main main:FOLDER] [--view NAME]
 rotli notes update ID --revision REV [--body TEXT|--body-file PATH|--stdin]
 rotli notes patch ID --revision REV --old EXACT_TEXT --new REPLACEMENT
 rotli notes move ID --folder PATH
@@ -1744,6 +1939,7 @@ rotli folders list [--root ID]
 rotli folders create --name NAME [--parent main:FOLDER]          # Main folder
 rotli folders create --disk --name NAME [--parent PATH]         # physical folder, policy-gated
 rotli main list|add|move|remove|create-folder ...
+rotli views list|create|rename|delete|assign|unassign|create-folder ...
 rotli boards list|read|create|update|apply ...
 rotli open ID [--kind note|board|file]
 rotli agent doctor [--root ID]                                  # read-only boundary + metrics
@@ -1790,10 +1986,14 @@ fn handle_mcp_request(request: &Value) -> Option<Value> {
         "initialize" => Some(mcp_success(
             id,
             json!({
-                "protocolVersion": request.pointer("/params/protocolVersion").and_then(Value::as_str).unwrap_or(MCP_PROTOCOL),
+                // The server may only advertise a protocol it implements. If a
+                // client asks for another version, return Rotli's supported
+                // version so the client can accept it or disconnect per MCP's
+                // initialization negotiation contract.
+                "protocolVersion": MCP_PROTOCOL,
                 "capabilities": { "tools": { "listChanged": false } },
                 "serverInfo": { "name": "rotli-workspace", "version": env!("CARGO_PKG_VERSION") },
-                "instructions": "Rotli is a local-first Markdown workspace. Note bodies are text/markdown without YAML frontmatter; Rotli manages frontmatter. Read immediately before editing and pass expectedRevision. New notes enter intake and appear in Main. Main folders are virtual; disk moves are explicit. Secure/locked content is refused. Prefer exact patches and semantic board actions."
+                "instructions": "Rotli is a local-first Markdown workspace. Note bodies are text/markdown without YAML frontmatter; Rotli manages frontmatter. Read immediately before editing and pass expectedRevision. New notes enter intake and appear in Main. Named views are optional singular subsets of Main and synchronize Markdown view_tag. View folders are virtual; disk moves are explicit. Secure/locked content is refused. Prefer exact patches and semantic board actions."
             }),
         )),
         "ping" => Some(mcp_success(id, json!({}))),
@@ -1836,11 +2036,11 @@ fn mcp_failure(id: Value, code: i64, message: &str) -> Value {
 fn mcp_tools() -> Vec<Value> {
     vec![
         tool("rotli_status", "List configured Rotli roots and the agent safety contract.", json!({"type":"object","properties":{},"additionalProperties":false}), true),
-        tool("rotli_metrics", "Count only agent-visible notes, boards, files, intake items, physical folders, and Main references. Secure note counts are not exposed.", json!({"type":"object","properties":{"rootId":{"type":"string"}},"additionalProperties":false}), true),
+        tool("rotli_metrics", "Count only agent-visible notes, boards, files, intake items, physical folders, Main references, and named-view structure. Secure note counts are not exposed.", json!({"type":"object","properties":{"rootId":{"type":"string"}},"additionalProperties":false}), true),
         tool("rotli_list", "List agent-readable notes, boards, and folders. Secure content is omitted.", root_limit_schema(), true),
         tool("rotli_search", "Full-text search agent-readable notes. Secure content is omitted.", json!({"type":"object","properties":{"query":{"type":"string"},"rootId":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":100}},"required":["query"],"additionalProperties":false}), true),
         tool("rotli_read_note", "Read a paged text/markdown editor body, full-document Markdown metrics, and revision. Managed YAML frontmatter is intentionally omitted. Read again immediately before every update.", json!({"type":"object","properties":{"id":{"type":"string"},"rootId":{"type":"string"},"offset":{"type":"integer","minimum":0},"maxChars":{"type":"integer","minimum":1,"maximum":50000}},"required":["id"],"additionalProperties":false}), true),
-        tool("rotli_create_note", "Create a text/markdown note in intake and place it in Main. Pass a one-line title without '#'. Body may omit H1 or begin with an H1 exactly matching title; never pass YAML frontmatter.", json!({"type":"object","properties":{"title":{"type":"string","description":"One line of title text without Markdown heading markers."},"body":{"type":"string","description":"Markdown editor body without YAML frontmatter. An optional leading H1 must exactly match title."},"mainParent":{"type":"string","description":"main: or a Main folder id"},"rootId":{"type":"string"}},"required":["title"],"additionalProperties":false}), false),
+        tool("rotli_create_note", "Create a text/markdown note in intake and place it in Main and, when requested, one named view. Pass a one-line title without '#'. Body may omit H1 or begin with an H1 exactly matching title; never pass YAML frontmatter.", json!({"type":"object","properties":{"title":{"type":"string","description":"One line of title text without Markdown heading markers."},"body":{"type":"string","description":"Markdown editor body without YAML frontmatter. An optional leading H1 must exactly match title."},"mainParent":{"type":"string","description":"main: or a Main folder id"},"view":{"type":"string","description":"Exact named view; Main always retains the item."},"viewParent":{"type":"string","description":"main: or a folder id inside the named view."},"rootId":{"type":"string"}},"required":["title"],"additionalProperties":false}), false),
         tool("rotli_update_note", "Replace the complete text/markdown editor body using optimistic revision protection. Do not include YAML frontmatter; Rotli preserves it. Secure and locked notes are refused.", json!({"type":"object","properties":{"id":{"type":"string"},"body":{"type":"string","description":"Complete Markdown editor body without YAML frontmatter."},"expectedRevision":{"type":"string"},"rootId":{"type":"string"}},"required":["id","body","expectedRevision"],"additionalProperties":false}), false),
         tool("rotli_patch_note", "Replace one exact text span locally without resending the full note. Refuses zero or ambiguous matches and stale revisions.", json!({"type":"object","properties":{"id":{"type":"string"},"oldText":{"type":"string"},"newText":{"type":"string"},"expectedRevision":{"type":"string"},"rootId":{"type":"string"}},"required":["id","oldText","newText","expectedRevision"],"additionalProperties":false}), false),
         tool("rotli_move_note", "Move a note to a policy-allowed physical folder.", json!({"type":"object","properties":{"id":{"type":"string"},"folder":{"type":"string"},"rootId":{"type":"string"}},"required":["id","folder"],"additionalProperties":false}), false),
@@ -1849,8 +2049,15 @@ fn mcp_tools() -> Vec<Value> {
         tool("rotli_place_in_main", "Place a note or board reference in Main.", main_item_schema(false), false),
         tool("rotli_move_in_main", "Move a Main note, board, or folder into another Main folder.", main_item_schema(true), false),
         tool("rotli_remove_from_main", "Remove a reference/folder from Main without deleting the underlying file.", json!({"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false}), false),
+        tool("rotli_list_views", "Read named workspace views. Main is the global all-items reference view and is not duplicated in this manifest.", json!({"type":"object","properties":{},"additionalProperties":false}), true),
+        tool("rotli_create_view", "Create one uniquely named workspace view.", json!({"type":"object","properties":{"name":{"type":"string"}},"required":["name"],"additionalProperties":false}), false),
+        tool("rotli_rename_view", "Rename a workspace view and synchronize Markdown view_tag metadata.", json!({"type":"object","properties":{"name":{"type":"string"},"nextName":{"type":"string"}},"required":["name","nextName"],"additionalProperties":false}), false),
+        tool("rotli_delete_view", "Delete a workspace view without deleting any underlying item or Main reference; Markdown view_tag metadata is cleared.", json!({"type":"object","properties":{"name":{"type":"string"}},"required":["name"],"additionalProperties":false}), false),
+        tool("rotli_assign_view", "Assign an item to one named view, replacing any prior named-view assignment. Main always retains the item.", json!({"type":"object","properties":{"id":{"type":"string"},"view":{"type":"string"},"parent":{"type":"string"}},"required":["id","view"],"additionalProperties":false}), false),
+        tool("rotli_unassign_view", "Remove an item from its named view without removing it from Main or deleting content.", json!({"type":"object","properties":{"id":{"type":"string"}},"required":["id"],"additionalProperties":false}), false),
+        tool("rotli_create_view_folder", "Create a virtual folder inside one named view.", json!({"type":"object","properties":{"view":{"type":"string"},"name":{"type":"string"},"parent":{"type":"string"}},"required":["view","name"],"additionalProperties":false}), false),
         tool("rotli_read_board", "Read compact Excalidraw metadata, outline, and revision without loading raw scene JSON.", item_schema(), true),
-        tool("rotli_create_board", "Create an Excalidraw board and place it in Main.", json!({"type":"object","properties":{"name":{"type":"string"},"description":{"type":"string"},"tags":{"type":"string"},"mainParent":{"type":"string"},"rootId":{"type":"string"}},"required":["name"],"additionalProperties":false}), false),
+        tool("rotli_create_board", "Create an Excalidraw board and place it in Main and, when requested, one named view.", json!({"type":"object","properties":{"name":{"type":"string"},"description":{"type":"string"},"tags":{"type":"string"},"mainParent":{"type":"string"},"view":{"type":"string"},"viewParent":{"type":"string"},"rootId":{"type":"string"}},"required":["name"],"additionalProperties":false}), false),
         tool("rotli_apply_board", "Edit a board with compact actions. Actions: {op:add,id,kind,x,y,width,height,text}; {op:update,id,...}; {op:remove,id}.", json!({"type":"object","properties":{"id":{"type":"string"},"expectedRevision":{"type":"string"},"actions":{"type":"array","items":{"type":"object"}},"description":{"type":"string"},"tags":{"type":"string"},"rootId":{"type":"string"}},"required":["id","expectedRevision","actions"],"additionalProperties":false}), false),
         tool("rotli_open", "Open a note, board, or file in the Rotli app.", json!({"type":"object","properties":{"id":{"type":"string"},"kind":{"type":"string","enum":["note","board","file"]},"rootId":{"type":"string"}},"required":["id"],"additionalProperties":false}), false),
     ]
@@ -1919,6 +2126,13 @@ fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
                 arg_string(args, "mainParent").unwrap_or(MAIN_ROOT),
             )?;
             let local = workspace.local_id(&meta.id)?;
+            if let Some(view) = arg_string(args, "view") {
+                workspace.view_assign(
+                    &local,
+                    Some(view),
+                    arg_string(args, "viewParent").unwrap_or(MAIN_ROOT),
+                )?;
+            }
             json_value(workspace.read_note(&local)?)
         }
         "rotli_update_note" => {
@@ -1978,6 +2192,44 @@ fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
             workspace.main_remove(arg_required(args, "id")?)?;
             json_value(workspace.read_main()?)
         }
+        "rotli_list_views" => json_value(Workspace::open(None)?.read_views()?),
+        "rotli_create_view" => {
+            let mut workspace = Workspace::open(None)?;
+            json_value(workspace.view_create(arg_required(args, "name")?)?)
+        }
+        "rotli_rename_view" => {
+            let mut workspace = Workspace::open(None)?;
+            json_value(workspace.view_rename(
+                arg_required(args, "name")?,
+                arg_required(args, "nextName")?,
+            )?)
+        }
+        "rotli_delete_view" => {
+            let mut workspace = Workspace::open(None)?;
+            json_value(workspace.view_delete(arg_required(args, "name")?)?)
+        }
+        "rotli_assign_view" => {
+            let mut workspace = Workspace::open(None)?;
+            json_value(workspace.view_assign(
+                arg_required(args, "id")?,
+                Some(arg_required(args, "view")?),
+                arg_string(args, "parent").unwrap_or(MAIN_ROOT),
+            )?)
+        }
+        "rotli_unassign_view" => {
+            let mut workspace = Workspace::open(None)?;
+            json_value(workspace.view_assign(arg_required(args, "id")?, None, MAIN_ROOT)?)
+        }
+        "rotli_create_view_folder" => {
+            let mut workspace = Workspace::open(None)?;
+            Ok(json!({
+                "id": workspace.view_create_folder(
+                    arg_required(args, "view")?,
+                    arg_required(args, "name")?,
+                    arg_string(args, "parent").unwrap_or(MAIN_ROOT),
+                )?
+            }))
+        }
         "rotli_read_board" => {
             let id = arg_required(args, "id")?;
             let (mut workspace, local) = Workspace::open_for_item(id, root)?;
@@ -1996,6 +2248,13 @@ fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
                 arg_string(args, "mainParent").unwrap_or(MAIN_ROOT),
             )?;
             let local = workspace.local_id(&meta.id)?;
+            if let Some(view) = arg_string(args, "view") {
+                workspace.view_assign(
+                    &local,
+                    Some(view),
+                    arg_string(args, "viewParent").unwrap_or(MAIN_ROOT),
+                )?;
+            }
             let mut value = json_value(workspace.read_board(&local)?)?;
             if let Some(board) = value.get_mut("board").and_then(Value::as_object_mut) {
                 board.remove("body");
@@ -2167,6 +2426,43 @@ mod tests {
     }
 
     #[test]
+    fn named_views_keep_main_and_markdown_metadata_in_sync() {
+        let temp = TempDir::new().unwrap();
+        let mut workspace = test_workspace(&temp);
+        let created = workspace
+            .create_note("View note", "portable", MAIN_ROOT)
+            .unwrap();
+        workspace.view_create("OpenSource").unwrap();
+        workspace
+            .view_assign(&created.id, Some("OpenSource"), MAIN_ROOT)
+            .unwrap();
+
+        assert!(main_contains(
+            &workspace.read_main().unwrap().tree,
+            &created.id
+        ));
+        assert_eq!(workspace.read_views().unwrap().views[0].name, "OpenSource");
+        let rel = workspace.store.resolve_note_rel(&created.id).unwrap();
+        let text = fs::read_to_string(workspace.store.root().join(rel)).unwrap();
+        assert!(text.contains("view_tag: OpenSource"));
+
+        workspace.view_rename("OpenSource", "Community").unwrap();
+        let rel = workspace.store.resolve_note_rel(&created.id).unwrap();
+        let text = fs::read_to_string(workspace.store.root().join(rel)).unwrap();
+        assert!(text.contains("view_tag: Community"));
+        assert!(!text.contains("view_tag: OpenSource"));
+
+        workspace.view_assign(&created.id, None, MAIN_ROOT).unwrap();
+        let rel = workspace.store.resolve_note_rel(&created.id).unwrap();
+        let text = fs::read_to_string(workspace.store.root().join(rel)).unwrap();
+        assert!(!text.contains("view_tag:"));
+        assert!(main_contains(
+            &workspace.read_main().unwrap().tree,
+            &created.id
+        ));
+    }
+
+    #[test]
     fn memex_creation_lands_in_intake_and_main() {
         let temp = TempDir::new().unwrap();
         let root = temp.path().join("brain");
@@ -2267,6 +2563,12 @@ mod tests {
         .unwrap();
         assert_eq!(
             response
+                .pointer("/result/protocolVersion")
+                .and_then(Value::as_str),
+            Some(MCP_PROTOCOL)
+        );
+        assert_eq!(
+            response
                 .pointer("/result/serverInfo/name")
                 .and_then(Value::as_str),
             Some("rotli-workspace")
@@ -2281,6 +2583,24 @@ mod tests {
         assert!(names.contains("rotli_patch_note"));
         assert!(names.contains("rotli_apply_board"));
         assert!(names.contains("rotli_metrics"));
+    }
+
+    #[test]
+    fn mcp_never_echoes_an_unsupported_protocol_version() {
+        let response = handle_mcp_request(&json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": { "protocolVersion": "2099-01-01" }
+        }))
+        .unwrap();
+
+        assert_eq!(
+            response
+                .pointer("/result/protocolVersion")
+                .and_then(Value::as_str),
+            Some(MCP_PROTOCOL)
+        );
     }
 
     #[test]

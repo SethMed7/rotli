@@ -53,6 +53,12 @@ This is the idea rotli is built around, so it's worth thirty seconds:
 
 They aren't copies. They're the **same file**, reached two ways. Rearrange Main all you like; the brain keeps everything findable. Let the AI refile the brain; your Main arrangement never moves. Your order, and a tidy library, at the same time — and the AI only ever touches a note's *location and metadata*, **never the words inside it** (every change is journaled and undoable).
 
+Main can also open additional named **views** for focused slices such as a
+project, client, or open-source work. Main keeps every referenced item; a named
+view adds its own virtual folders and one `view_tag` to Markdown metadata. New
+items and folders follow the view you are currently in, while the underlying
+file still enters the same intake/Brain workflow.
+
 ## Three fronts, one window
 
 | Front | What it is |

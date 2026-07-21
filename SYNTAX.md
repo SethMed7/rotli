@@ -48,6 +48,17 @@ imports.
   is deliberately not adopted because its measured repository-wide churn would
   obscure behavioral diffs.
 
+## Persistent user-facing names
+
+- Named workspace views use their exact display name as the identifier and as
+  Markdown's `view_tag`; no hidden UUID or slug is introduced.
+- View names are trimmed, 1–64 characters, unique case-insensitively, and use
+  letters, numbers, spaces, periods, underscores, or hyphens. `Main` is
+  reserved for the global reference view.
+- Virtual folder names are one path component and cannot contain `/` or `:`.
+  Render-only ids such as `main:<folder>` stay internal and are never written
+  as user metadata.
+
 ## CSS and design tokens
 
 - Class selectors use kebab-case; BEM-style `--modifier` suffixes are allowed.
@@ -66,4 +77,3 @@ enforce CSS and command conventions.
 
 Run the smallest formatter/type/test check while editing, then the full proof
 chain from [`docs/development/testing.md`](docs/development/testing.md).
-

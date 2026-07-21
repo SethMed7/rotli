@@ -995,7 +995,7 @@ export async function corpusSetBrainPerms(id: string, perms: MemexPerms): Promis
 }
 
 /** The `.rotli/` dot-files — opaque JSON strings the frontend owns. */
-export type SettingsFile = "settings" | "viewstate" | "main";
+export type SettingsFile = "settings" | "viewstate" | "main" | "views";
 
 /** The dot-files the app may WRITE through this lane. `main` goes through
  * corpusMainWrite (which also keeps it committable); `organizer` is the
@@ -1015,6 +1015,13 @@ export function corpusSettingsWrite(file: WritableSettingsFile, contents: string
  * unlike the per-machine settings/viewstate). Read it back with corpusSettingsRead("main"). */
 export function corpusMainWrite(contents: string): Promise<void> {
   return corpusInvoke("corpus_main_write", { contents });
+}
+
+/** Write `.rotli/views.json` through the Rust synchronization boundary. The
+ * host validates unique names and singular membership, then keeps Markdown's
+ * managed `view_tag` aligned; boards and binaries remain frontmatter-free. */
+export function corpusViewsWrite(contents: string): Promise<void> {
+  return corpusInvoke("corpus_views_write", { contents });
 }
 
 export interface WorkspaceOpenRequest {

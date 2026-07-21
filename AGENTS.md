@@ -20,8 +20,9 @@ material—not current specifications.
 
 - Rotli is local-first. User files are durable truth; `.rotli/` contains
   rebuildable projections and explicit settings.
-- One notes folder is one memex. Main is a reference view, never another store.
-  Do not add a database for memex content.
+- One notes folder is one memex. Main is the global reference view; named views
+  are subset reference projections, never stores. Do not add a database for
+  memex content.
 - Markdown is Rotli's primary knowledge surface and alone owns slash commands,
   wikilinks, embed fences, frontmatter, and note-native workflows. DOCX, sheets,
   Excalidraw boards, and assets are secondary bonus work surfaces that keep

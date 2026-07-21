@@ -1,0 +1,66 @@
+# Rotli privacy
+
+Rotli is local-first. The selected notes folder is the source of truth, and the
+current product has no Rotli account service, product analytics, advertising,
+or automatic crash-reporting upload.
+
+## Data stored locally
+
+Rotli reads and writes user-selected Markdown, boards, documents, sheets, media,
+chat history, and attachments. Rebuildable projections and explicit settings
+live under `.rotli/` or the application configuration directory. Credentials
+use the macOS Keychain rather than note files or settings.
+
+Main is a reference arrangement over the same files, not a second content
+store. Deleting the app does not transfer ownership of the files to Rotli.
+
+## Network activity
+
+Rotli does not operate an analytics or account endpoint. Network activity is
+limited to declared product capabilities:
+
+- the signed updater may check the pinned GitHub release feed;
+- user-enabled remote model lanes send the bounded conversation/context needed
+  for that request to the selected provider;
+- web search/fetch sends the query or URL needed for the explicit web action;
+- user-configured Breve email, Signal, mail, and watch services contact their
+  configured destinations; and
+- connected Claude, Codex, or other subscription CLIs follow the privacy terms
+  of those tools and providers.
+
+The destination inventory and guards are documented in
+[`docs/development/security.md`](docs/development/security.md). Adding telemetry,
+an account service, crash upload, sync, or another destination requires an
+explicit privacy and threat-model change before implementation.
+
+## Secure notes
+
+Secure notes are excluded from remote models, remote search observations, and
+the organizer. Recognized on-device models require explicit per-note permission.
+
+Secure notes are plain local files in a protected lane, not an encrypted vault.
+Filesystem encryption is provided by macOS/FileVault when enabled. Users should
+not put secrets on an agent-managed Excalidraw board because board scenes do not
+currently have a secure classification.
+
+## Workspace agents and diagnostics
+
+The local CLI/MCP server uses stdio and opens no network listener. It treats
+agents as remote for content policy, omits secure/secret-shaped notes, refuses
+locked writes, and requires optimistic revisions. The agent process or its model
+provider may still be remote and has its own data practices.
+
+Rotli does not automatically upload diagnostics. Support reports should follow
+[`docs/operations/support-and-diagnostics.md`](docs/operations/support-and-diagnostics.md)
+and exclude private content, paths, and credentials.
+
+## Retention and deletion
+
+Rotli does not retain a server-side copy of the memex because no Rotli content
+service exists. Users control local retention through their filesystem and
+backup tools. Provider, mail, Signal, GitHub, and web services apply their own
+retention policies to data deliberately sent to them.
+
+This document describes the current beta architecture, not legal advice or a
+future online service. Update it whenever a data class, destination, retention
+behavior, or user control changes.

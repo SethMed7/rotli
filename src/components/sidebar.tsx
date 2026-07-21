@@ -38,8 +38,19 @@ import {
   removeFromMain,
   renameFolderInMain,
 } from "../services/mainTree";
-import { useContextMenu } from "../state/contextMenu";
+import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { renameMainRef, useMainStore } from "../state/main";
+import { useViewsStore } from "../state/views";
+import {
+  createNamedView,
+  deleteNamedView,
+  renameNamedView,
+  setNamedViewTree,
+  transferTreeItemToView,
+  viewFolderNameError,
+  viewNameError,
+  viewTree,
+} from "../services/viewTree";
 import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { InlineRenameInput } from "./inlineRenameInput";
 import { useNoteMenu } from "./useNoteMenu";
@@ -545,6 +556,21 @@ export function Sidebar() {
   // never moves Main. Mouse + drag navigable (not part of the j/k roving list yet).
   const mainManifest = useMainStore((s) => s.manifest);
   const setMainTree = useMainStore((s) => s.setTree);
+  const viewsManifest = useViewsStore((s) => s.manifest);
+  const setViewsManifest = useViewsStore((s) => s.setManifest);
+  const viewsWritable = useViewsStore((s) => s.writable);
+  const viewsSaveState = useViewsStore((s) => s.saveState);
+  const viewsError = useViewsStore((s) => s.error);
+  const activeView = useUiStore((s) => s.activeView);
+  const setActiveView = useUiStore((s) => s.setActiveView);
+  const activeTree = activeView ? viewTree(viewsManifest, activeView) : mainManifest.tree;
+  const setActiveTree = (tree: typeof activeTree, ids?: Set<string>) => {
+    if (activeView) {
+      setViewsManifest(setNamedViewTree(viewsManifest, activeView, tree, ids));
+    } else {
+      setMainTree(tree, ids);
+    }
+  };
   const openNoteMenu = useNoteMenu();
   // the FULL id → note index (staged Board + Archive + Trash + Vault included).
   // Main references notes by id from ANYWHERE — projecting or GC'ing it from
@@ -554,10 +580,7 @@ export function Sidebar() {
   // GC then (an unreachable vault / a boot-frame drag must never prune live refs).
   const noteIndex = useNoteIndex();
   const liveIds = useMainGcIds();
-  const mainProjection = useMemo(
-    () => buildMainTree(mainManifest.tree, noteIndex),
-    [mainManifest.tree, noteIndex],
-  );
+  const mainProjection = useMemo(() => buildMainTree(activeTree, noteIndex), [activeTree, noteIndex]);
   // added external folders (Seth, 2026-06-27): roots the user pointed rotli at,
   // not in the memex — every registered root except the built-in default + vault.
   const addedRoots = (useCorpusRoots().data ?? []).filter((r) => r.id !== "default" && r.id !== "vault");
@@ -675,10 +698,93 @@ export function Sidebar() {
   //   mainNewFolder is the ⊕'s name-first input at the Main root. —
   const [renamingMainId, setRenamingMainId] = useState<string | null>(null);
   const [mainNewFolder, setMainNewFolder] = useState(false);
+  const [editingView, setEditingView] = useState<"create" | "rename" | null>(null);
+  const [viewInputError, setViewInputError] = useState<string | null>(null);
+  const [deletingView, setDeletingView] = useState<string | null>(null);
   // Enter/Esc unmount the new-folder input, which fires its commit-on-blur —
   // this ref tells the blur the keystroke already settled it (newFolderHandled's law)
   const mainNewFolderHandled = useRef(false);
   const openContextMenu = useContextMenu((s) => s.open);
+
+  useEffect(() => {
+    if (activeView && !viewsManifest.views.some((view) => view.name === activeView)) {
+      setActiveView(null);
+    }
+  }, [activeView, setActiveView, viewsManifest.views]);
+
+  const commitViewName = (value: string) => {
+    const error = viewNameError(
+      value,
+      viewsManifest.views,
+      editingView === "rename" ? (activeView ?? undefined) : undefined,
+    );
+    if (error) {
+      setViewInputError(error);
+      return;
+    }
+    const name = value.trim();
+    if (editingView === "rename" && activeView) {
+      setViewsManifest(renameNamedView(viewsManifest, activeView, name));
+    } else {
+      setViewsManifest(createNamedView(viewsManifest, name));
+    }
+    setActiveView(name);
+    setEditingView(null);
+    setViewInputError(null);
+  };
+
+  const openViewMenu = (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const items: MenuSpec[] = [
+      {
+        kind: "action",
+        label: "Main — all items",
+        checked: activeView === null,
+        checkedMark: "check",
+        onClick: () => setActiveView(null),
+      },
+      ...viewsManifest.views.map((view) => ({
+        kind: "action" as const,
+        label: view.name,
+        checked: activeView === view.name,
+        checkedMark: "check" as const,
+        onClick: () => setActiveView(view.name),
+      })),
+      { kind: "sep" },
+      {
+        kind: "action",
+        label: "New view…",
+        disabled: !viewsWritable,
+        onClick: () => {
+          setEditingView("create");
+          setViewInputError(null);
+        },
+      },
+    ];
+    if (activeView) {
+      items.push(
+        {
+          kind: "action",
+          label: "Rename view…",
+          disabled: !viewsWritable,
+          onClick: () => {
+            setEditingView("rename");
+            setViewInputError(null);
+          },
+        },
+        {
+          kind: "action",
+          label: "Delete view…",
+          danger: true,
+          disabled: !viewsWritable,
+          onClick: () => setDeletingView(activeView),
+        },
+      );
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    openContextMenu(rect.left, rect.bottom + 4, items, { returnFocus: () => e.currentTarget.focus() });
+  };
 
   // — Main pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell, so the
   //   BoardSurface pointer pattern; a threshold distinguishes drag from click) —
@@ -734,12 +840,14 @@ export function Sidebar() {
         const d = drop;
         if (!d) return;
         if (mode === "add") {
-          // add the note to Main, then place it at the drop (root add if the zone)
-          let tree = addNoteToMain(mainManifest.tree, id);
+          // Named views are subsets of Main: a cross-section add always keeps a
+          // global Main reference, then places the item in the active tree.
+          if (activeView) setMainTree(addNoteToMain(mainManifest.tree, id), liveIds);
+          let tree = addNoteToMain(activeTree, id);
           if (d.id !== MAIN_ROOT) tree = moveInTree(tree, id, d.id, d.pos);
-          setMainTree(tree, liveIds);
+          setActiveTree(tree, liveIds);
         } else {
-          setMainTree(moveInTree(mainManifest.tree, id, d.id, d.pos), liveIds);
+          setActiveTree(moveInTree(activeTree, id, d.id, d.pos), liveIds);
         }
       },
       onEnd: () => {
@@ -853,8 +961,15 @@ export function Sidebar() {
                   placeholder="Folder name…"
                   ariaLabel="Rename Main folder"
                   onCommit={(value) => {
+                    if (activeView) {
+                      const error = viewFolderNameError(value);
+                      if (error) {
+                        setRowActionError(`Couldn’t rename folder — ${error}`);
+                        return;
+                      }
+                    }
                     setRenamingMainId(null);
-                    setMainTree(renameFolderInMain(mainManifest.tree, f.id, value), liveIds);
+                    setActiveTree(renameFolderInMain(activeTree, f.id, value), liveIds);
                   }}
                   onCancel={() => setRenamingMainId(null)}
                 />
@@ -884,11 +999,53 @@ export function Sidebar() {
                       label: "Rename folder…",
                       onClick: () => setRenamingMainId(f.id),
                     },
+                    ...(viewsManifest.views.length > 0
+                      ? [
+                          {
+                            kind: "drill" as const,
+                            label: "Move to view",
+                            items: [
+                              {
+                                kind: "action" as const,
+                                label: "Main only",
+                                checked: activeView === null,
+                                checkedMark: "check" as const,
+                                onClick: () =>
+                                  setViewsManifest(
+                                    transferTreeItemToView(
+                                      mainManifest.tree,
+                                      viewsManifest,
+                                      activeView,
+                                      f.id,
+                                      null,
+                                    ),
+                                  ),
+                              },
+                              ...viewsManifest.views.map((view) => ({
+                                kind: "action" as const,
+                                label: view.name,
+                                checked: activeView === view.name,
+                                checkedMark: "check" as const,
+                                onClick: () =>
+                                  setViewsManifest(
+                                    transferTreeItemToView(
+                                      mainManifest.tree,
+                                      viewsManifest,
+                                      activeView,
+                                      f.id,
+                                      view.name,
+                                    ),
+                                  ),
+                              })),
+                            ],
+                          },
+                        ]
+                      : []),
                     { kind: "sep" as const },
                     {
                       kind: "action" as const,
-                      label: "Remove from Main",
-                      onClick: () => setMainTree(removeFromMain(mainManifest.tree, f.id), liveIds),
+                      label: `Remove from ${activeView ?? "Main"}`,
+                      onClick: () => setActiveTree(removeFromMain(activeTree, f.id), liveIds),
                     },
                   ]);
                 }}
@@ -1197,7 +1354,7 @@ export function Sidebar() {
           const noteId = row.id.slice(MAIN_ROW_PREFIX.length);
           const n = noteIndex.get(noteId);
           if (n) {
-            setSelectedFolderId(mainParentOfNote(mainManifest.tree, noteId) ?? MAIN_ROOT);
+            setSelectedFolderId(mainParentOfNote(activeTree, noteId) ?? MAIN_ROOT);
             setContentView("panes");
             usePanesStore.getState().openSummary(n, { newTab });
           }
@@ -1605,7 +1762,7 @@ export function Sidebar() {
           disabled={sidebarMode === "breve"}
           /* default-OPEN rows (Main folders, the Brain header) need an explicit
              false — wiping the map alone re-EXPANDED them (#83, audit 2026-07) */
-          onClick={() => collapseAllDests([...mainFolderIds(mainManifest.tree), "Brain"])}
+          onClick={() => collapseAllDests([...mainFolderIds(activeTree), "Brain"])}
         >
           <FoldGlyph size={16} />
           <span className="tip" aria-hidden="true">
@@ -1827,12 +1984,30 @@ export function Sidebar() {
                 bare "+" said nothing — the IDE-style NewFolderGlyph, same as the
                 toolbar, is self-explanatory) — opacity-hidden so Tab still reaches it. */}
               <div className="fsec fsec-hdr">
-                Main
+                <button
+                  type="button"
+                  className="fsec-view"
+                  aria-label={`Current view: ${activeView ?? "Main"}. Change view`}
+                  aria-haspopup="menu"
+                  title="Change view"
+                  onClick={openViewMenu}
+                >
+                  <span>{activeView ?? "Main"}</span>
+                  <span aria-hidden="true">
+                    <ChevronRight size={9} />
+                  </span>
+                </button>
+                {(viewsSaveState === "saving" || viewsSaveState === "saved") && (
+                  <span className="fsec-save" role="status">
+                    {viewsSaveState === "saving" ? "Saving…" : "Saved"}
+                  </span>
+                )}
                 <button
                   type="button"
                   className="fsec-add"
-                  aria-label="New folder in Main"
-                  title="New folder in Main"
+                  aria-label={`New folder in ${activeView ?? "Main"}`}
+                  title={`New folder in ${activeView ?? "Main"}`}
+                  disabled={!!activeView && !viewsWritable}
                   /* name-FIRST (#16): open the inline input instead of minting a
                    permanent "New folder 2" the old flow could never rename */
                   onClick={() => setMainNewFolder(true)}
@@ -1840,6 +2015,78 @@ export function Sidebar() {
                   <NewFolderGlyph size={13} />
                 </button>
               </div>
+              {editingView && (
+                <div className="view-editor">
+                  <label htmlFor="new-view-name">
+                    {editingView === "rename" ? "Rename view" : "New view"}
+                  </label>
+                  <div className="view-editor-row">
+                    <input
+                      id="new-view-name"
+                      autoFocus
+                      type="text"
+                      defaultValue={editingView === "rename" ? (activeView ?? "") : ""}
+                      placeholder="View name"
+                      aria-invalid={!!viewInputError}
+                      aria-describedby={viewInputError ? "view-name-error" : undefined}
+                      onChange={() => viewInputError && setViewInputError(null)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          commitViewName(event.currentTarget.value);
+                        } else if (event.key === "Escape") {
+                          event.preventDefault();
+                          setEditingView(null);
+                          setViewInputError(null);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="view-editor-save"
+                      onClick={(event) => {
+                        const input = event.currentTarget.parentElement?.querySelector("input");
+                        if (input) commitViewName(input.value);
+                      }}
+                    >
+                      Save
+                    </button>
+                  </div>
+                  {viewInputError && (
+                    <p id="view-name-error" className="view-editor-error" role="alert">
+                      {viewInputError}
+                    </p>
+                  )}
+                </div>
+              )}
+              {deletingView && (
+                <div className="view-delete" role="alert">
+                  <p>
+                    Delete <b>{deletingView}</b>? Items stay in Main.
+                  </p>
+                  <div>
+                    <button type="button" onClick={() => setDeletingView(null)}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => {
+                        setViewsManifest(deleteNamedView(viewsManifest, deletingView));
+                        setDeletingView(null);
+                        setActiveView(null);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
+              {viewsError && (
+                <p className="view-state-error" role="alert">
+                  {viewsError}
+                </p>
+              )}
               {mainNewFolder && (
                 <div className="sb-newfolder" style={{ paddingLeft: 26 }}>
                   <FolderGlyph size={14} />
@@ -1856,11 +2103,18 @@ export function Sidebar() {
                         const name = e.currentTarget.value.trim();
                         setMainNewFolder(false);
                         if (name) {
+                          if (activeView) {
+                            const error = viewFolderNameError(name);
+                            if (error) {
+                              setRowActionError(`Couldn’t create folder — ${error}`);
+                              return;
+                            }
+                          }
                           // compute the rendered id BEFORE the commit (same
                           // uniquify law) so the fresh row — appended after every
                           // root note — can be scrolled into view, not lost
-                          const folderId = `${MAIN_ROOT}${uniqueRootFolderName(mainManifest.tree, name)}`;
-                          setMainTree(addFolderToMain(mainManifest.tree, name), liveIds);
+                          const folderId = `${MAIN_ROOT}${uniqueRootFolderName(activeTree, name)}`;
+                          setActiveTree(addFolderToMain(activeTree, name), liveIds);
                           requestAnimationFrame(() => {
                             document
                               .querySelector(`[data-main-id="${CSS.escape(folderId)}"]`)
@@ -1883,8 +2137,15 @@ export function Sidebar() {
                       const name = e.currentTarget.value.trim();
                       setMainNewFolder(false);
                       if (name) {
-                        const folderId = `${MAIN_ROOT}${uniqueRootFolderName(mainManifest.tree, name)}`;
-                        setMainTree(addFolderToMain(mainManifest.tree, name), liveIds);
+                        if (activeView) {
+                          const error = viewFolderNameError(name);
+                          if (error) {
+                            setRowActionError(`Couldn’t create folder — ${error}`);
+                            return;
+                          }
+                        }
+                        const folderId = `${MAIN_ROOT}${uniqueRootFolderName(activeTree, name)}`;
+                        setActiveTree(addFolderToMain(activeTree, name), liveIds);
                         requestAnimationFrame(() => {
                           document
                             .querySelector(`[data-main-id="${CSS.escape(folderId)}"]`)
@@ -1897,14 +2158,21 @@ export function Sidebar() {
               )}
               {mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
                 <p className="main-empty" data-main-id="main:">
-                  {/* the Brain section may not exist yet — only promise a drag
-                    source that's actually on screen (#82, audit 2026-07) */}
-                  The notes you reach for, arranged your way. Add one with the <b>⊕</b> on a note row
-                  {hasBrain ? " (or drag it here from the Brain)" : ""} — then <b>★</b> your top {QUICK_MAX}{" "}
-                  for Quick access (the ⌥ Quick window).
+                  {activeView ? (
+                    <>
+                      This view is empty. Press <b>⌘T</b> to create here, or right-click an item and choose{" "}
+                      <b>Move to view → {activeView}</b>. It will still appear in Main.
+                    </>
+                  ) : (
+                    <>
+                      The notes you reach for, arranged your way. Add one with the <b>⊕</b> on a note row
+                      {hasBrain ? " (or drag it here from the Brain)" : ""} — then <b>★</b> your top{" "}
+                      {QUICK_MAX} for Quick access (the ⌥ Quick window).
+                    </>
+                  )}
                 </p>
               ) : (
-                <div data-main-id="main:" className="main-tree">
+                <div data-main-id="main:" data-active-view={activeView ?? "Main"} className="main-tree">
                   {renderMainTree(MAIN_ROOT, 0, rowProps)}
                 </div>
               )}

@@ -108,7 +108,9 @@ reorder, and the shared `src/lib/mainAddDrag.ts` module's Main-add drag from
 an All-notes row — two different code paths land a note in Main, so both are
 covered separately. The Main creation-context spec then proves that opening a
 Main reference and pressing Command-T creates a new tab and an immediate Main
-reference while storage remains in the intake lane.
+reference while storage remains in the intake lane. The named-view spec proves
+inline view creation, active-view Command-T routing, right-click assignment,
+and the invariant that the same item remains visible from global Main.
 
 ## Change proof matrix
 

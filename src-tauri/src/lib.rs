@@ -1008,6 +1008,7 @@ pub fn run() {
             corpus::corpus_settings_read,
             corpus::corpus_settings_write,
             corpus::corpus_main_write,
+            corpus::corpus_views_write,
             workspace::workspace_take_open_request,
             memex::memex_detect,
             memex::memex_read_contract,

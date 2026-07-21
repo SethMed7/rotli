@@ -8,6 +8,8 @@ Describe the user-visible result and the problem it solves.
 - [ ] User files remain the source of truth; no database or competing copy was added.
 - [ ] Memex write lanes, secure-note rules, and Rust trust boundaries remain intact.
 - [ ] Vendor-specific code is isolated behind an adapter where applicable.
+- [ ] Persistent/public schemas remain additive, or include version, migration, downgrade, and rollback evidence.
+- [ ] Security assets, destinations, permissions, or trust assumptions are reflected in the threat model.
 
 ## Validation
 
@@ -20,6 +22,7 @@ Describe the user-visible result and the problem it solves.
 - [ ] `cargo test --manifest-path src-tauri/Cargo.toml`
 - [ ] `NODE_OPTIONS=--max-old-space-size=4096 bun run build`
 - [ ] Current documentation and `CHANGELOG.md` updated when applicable
+- [ ] Dependency/release-sensitive changes record provenance, license, vulnerability, and rollback impact
 
 For UI work, attach desktop screenshots for Warm Light, Warm Dark, Paper, and
 Charcoal and note keyboard, empty, loading, error, disabled, and narrow-window

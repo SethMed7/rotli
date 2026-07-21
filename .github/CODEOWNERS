@@ -1,0 +1,3 @@
+# Default ownership while Rotli remains a single-maintainer private repository.
+# Move this to team ownership before relying on it as a protected-review control.
+* @SethMed7

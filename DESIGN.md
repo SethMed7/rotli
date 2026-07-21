@@ -48,6 +48,10 @@ exception.
   and never delays core work.
 - Copy is direct, specific, and useful: errors say what failed and what the user
   can do next.
+- Main's view switcher stays in the existing section header: exact view name,
+  standard menu disclosure, inline create/rename, and an explicit delete row
+  that states content remains in Main. A named view must not become a second
+  sidebar, tab bar, colored workspace, glow, or card stack.
 
 ## Required states
 

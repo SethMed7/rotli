@@ -14,6 +14,7 @@ export type MenuSpec =
       disabled?: boolean;
       /** A leading ✓ / ★ state marker for toggles. */
       checked?: boolean;
+      checkedMark?: "check" | "star";
     }
   | { kind: "sep" }
   | { kind: "drill"; label: string; items: MenuSpec[]; disabled?: boolean };

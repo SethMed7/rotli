@@ -6,6 +6,8 @@ import { invalidateNotes } from "../services/hooks";
 import { MAIN_ROOT, addNoteToMainAt, mainFolderIds, mainParentOfNote } from "../services/mainTree";
 import { inboxFolderId } from "../services/notes";
 import { useMainStore } from "../state/main";
+import { useViewsStore } from "../state/views";
+import { assignItemToView, viewTree } from "../services/viewTree";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
@@ -31,11 +33,14 @@ function selectedMainFolder(): string | null {
 }
 
 function mainParent(): string {
-  const { manifest } = useMainStore.getState();
+  const activeView = useUiStore.getState().activeView;
+  const tree = activeView
+    ? viewTree(useViewsStore.getState().manifest, activeView)
+    : useMainStore.getState().manifest.tree;
   const selected = selectedMainFolder();
-  if (selected && mainFolderIds(manifest.tree).includes(selected)) return selected;
+  if (selected && mainFolderIds(tree).includes(selected)) return selected;
   const current = focusedItemId();
-  return (current && mainParentOfNote(manifest.tree, current)) || MAIN_ROOT;
+  return (current && mainParentOfNote(tree, current)) || MAIN_ROOT;
 }
 
 function resolvedPhysicalFolder(): string {
@@ -82,8 +87,16 @@ const presenter: NewItemPresenter = {
     await Promise.all([invalidateNotes(), invalidateMemex()]);
   },
   fileInMain(item) {
-    const { manifest, setTree } = useMainStore.getState();
-    setTree(addNoteToMainAt(manifest.tree, item.id, mainParent()));
+    const parent = mainParent();
+    const activeView = useUiStore.getState().activeView;
+    const main = useMainStore.getState();
+    // Main is the global shelf. A named-view folder is local to that view, so
+    // new items land at Main's root while retaining the active view's nesting.
+    main.setTree(addNoteToMainAt(main.manifest.tree, item.id, activeView ? MAIN_ROOT : parent));
+    if (activeView) {
+      const views = useViewsStore.getState();
+      views.setManifest(assignItemToView(views.manifest, item.id, activeView, parent));
+    }
   },
   open(item, options) {
     const panes = usePanesStore.getState();

@@ -11,6 +11,9 @@ fix both in the same change.
 | Public product promise and setup | [`../README.md`](../README.md) |
 | Human contribution workflow | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
 | AI contribution and safety rules | [`../AGENTS.md`](../AGENTS.md) |
+| Public security reporting | [`../SECURITY.md`](../SECURITY.md) |
+| Public privacy boundary | [`../PRIVACY.md`](../PRIVACY.md) |
+| Public beta support boundary | [`../SUPPORT.md`](../SUPPORT.md) |
 | Project-level system architecture | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) |
 | Product interface and interaction design | [`../DESIGN.md`](../DESIGN.md) |
 | Syntax, naming, and formatting | [`../SYNTAX.md`](../SYNTAX.md) |
@@ -25,14 +28,19 @@ fix both in the same change.
 | AI-assisted development workflow | [`development/ai-workflow.md`](development/ai-workflow.md) |
 | Testing, linting, and regression evidence | [`development/testing.md`](development/testing.md) |
 | Egress map, security checks, and the threat model | [`development/security.md`](development/security.md) |
+| Assets, actors, trust boundaries, and residual risk | [`security/threat-model.md`](security/threat-model.md) |
+| Durable schemas, compatibility, migrations, and downgrade behavior | [`architecture/compatibility-and-migrations.md`](architecture/compatibility-and-migrations.md) |
+| Release integrity, provenance, SBOM, keys, and rollback | [`operations/release-and-supply-chain.md`](operations/release-and-supply-chain.md) |
+| Privacy-safe support, diagnostics, backup, and incident triage | [`operations/support-and-diagnostics.md`](operations/support-and-diagnostics.md) |
+| Cross-boundary architecture decision records | [`decisions/README.md`](decisions/README.md) |
 | Where new code, dependencies, and shared constants go | [`development/adding-things.md`](development/adding-things.md) |
 | Token-efficient AI context and project CARL | [`architecture/ai-context-architecture.md`](architecture/ai-context-architecture.md) |
 | Claude/Codex workspace CLI and MCP | [`architecture/agent-workspace.md`](architecture/agent-workspace.md) |
 
 ## Source-of-truth boundaries
 
-- The repository owns code-facing architecture, development, testing, brand,
-  and runtime contracts.
+- The repository owns code-facing architecture, security, operations,
+  development, testing, brand, decision, and runtime contracts.
 - The memex may hold broader product knowledge, research, decision context, and
   model-readable protocols. It does not replace current repository contracts.
 - `.carl/carl.json` is a compact, project-scoped recall layer shared through the
@@ -49,5 +57,7 @@ fix both in the same change.
   copies of AI instructions.
 - Use dated filenames for audits and proposals. Move superseded proposals to
   `archive/` rather than leaving two apparently current specifications.
+- Use an ADR only for a cross-boundary decision that is expensive to reverse.
+  Current capability contracts still own the normative rule.
 - Run `bun run check:docs` after changing contributor guidance, themes, commands,
   or source-of-truth boundaries.
