@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-07-17T00:00:00.000Z",
+  "last_modified": "2026-07-20T00:00:00.000Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -19,6 +19,12 @@
         "main view",
         "database",
         "file naming",
+        "folder naming",
+        "syntax",
+        "prettier",
+        "regression",
+        "evals",
+        "testing",
         "documentation",
         "placement",
         "new module",
@@ -41,7 +47,7 @@
           "text": "Dependencies point domain -> application -> adapters -> composition -> presentation. Vendor libraries and Tauri stay behind narrow adapters; a dependency swap should normally change one adapter, focused tests, and a composition root.",
           "added": "2026-07-11",
           "last_reviewed": "2026-07-11",
-          "source": "docs/architecture/clean-architecture.md"
+          "source": "ARCHITECTURE.md"
         },
         {
           "id": 2,
@@ -56,6 +62,20 @@
           "added": "2026-07-17",
           "last_reviewed": "2026-07-17",
           "source": "docs/development/adding-things.md"
+        },
+        {
+          "id": 4,
+          "text": "Every bug fix starts with a failing reproduction. Features cover success, refusal/failure, and meaningful boundaries. AI behavior adds deterministic offline evals; cross-surface gestures add E2E when unit tests cannot prove wiring. bun run check includes TypeScript, Prettier, ESLint, mechanical guards, all Bun tests, named evals, and runtime/design regressions.",
+          "added": "2026-07-20",
+          "last_reviewed": "2026-07-20",
+          "source": "docs/development/testing.md"
+        },
+        {
+          "id": 5,
+          "text": "SYNTAX.md owns naming and style: src TypeScript files/folders are camelCase; scripts, e2e, docs, and breve-runtime use kebab-case; Rust modules use snake_case. TypeScript identifiers follow camelCase/PascalCase roles, CSS uses kebab-case semantic-token classes, and IPC commands are multi-segment snake_case. Mechanical checks own exceptions.",
+          "added": "2026-07-20",
+          "last_reviewed": "2026-07-20",
+          "source": "SYNTAX.md"
         }
       ],
       "decisions": [
@@ -341,14 +361,14 @@
           "text": "Rotli ships Warm Light, Warm Dark, Paper, and Charcoal. Paper and Charcoal are the calm defaults; the warm pair is intentional. All surfaces use shared semantic color, type, spacing, elevation, focus, and state tokens.",
           "added": "2026-07-11",
           "last_reviewed": "2026-07-11",
-          "source": "src/brand/README.md"
+          "source": "DESIGN.md"
         },
         {
           "id": 1,
           "text": "Preserve the quiet native-desktop language: readable text, clear hierarchy, restrained borders, keyboard safety, and complete loading/empty/error/saved/disabled/destructive states. Do not add another UI framework or raw colors outside src/brand/.",
           "added": "2026-07-11",
           "last_reviewed": "2026-07-11",
-          "source": "AGENTS.md"
+          "source": "DESIGN.md"
         }
       ],
       "decisions": [

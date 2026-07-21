@@ -1,8 +1,10 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
+import { SYNTAX_PATTERNS } from "./syntax-contract.mjs";
 
 const root = process.cwd();
 const violations = [];
+const ignoredDirectories = new Set(["node_modules", "target", "dist", "build"]);
 
 // ── filename law, per tree ───────────────────────────────────────────────────
 // One convention per tree, mechanically held (measured 2026-07-18):
@@ -12,8 +14,9 @@ const violations = [];
 //                            6 outliers were renamed rather than grandfathered)
 // The stem is everything before the first dot, so `check-code-shape.test.ts`
 // and `memex-write-contract-v3.5-proposal.md` both judge their kebab stem.
-const CAMEL = /^[a-z][A-Za-z0-9]*$/;
-const KEBAB = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const CAMEL = SYNTAX_PATTERNS.camelCase;
+const KEBAB = SYNTAX_PATTERNS.kebabCase;
+const SNAKE = SYNTAX_PATTERNS.snakeCase;
 
 function walkNames(dir, extensions, pattern, label, exemptNames = new Set()) {
   for (const name of readdirSync(dir)) {
@@ -26,12 +29,31 @@ function walkNames(dir, extensions, pattern, label, exemptNames = new Set()) {
   }
 }
 
+function walkDirectories(dir, pattern, label) {
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    if (!statSync(path).isDirectory()) continue;
+    if (ignoredDirectories.has(name)) continue;
+    if (!name.startsWith(".") && !pattern.test(name)) {
+      violations.push(`${relative(root, path)}: folders here must be ${label}`);
+    }
+    walkDirectories(path, pattern, label);
+  }
+}
+
 walkNames(join(root, "src"), /\.(ts|tsx)$/, CAMEL, "camelCase", new Set(["vite-env.d.ts"])); // Vite's conventional generated declaration
 walkNames(join(root, "scripts"), /\.(mjs|sh|ts|json|md)$/, KEBAB, "kebab-case");
 walkNames(join(root, "e2e"), /\.ts$/, KEBAB, "kebab-case");
 walkNames(join(root, "breve-runtime/scripts"), /\.(ts|sh)$/, KEBAB, "kebab-case");
 walkNames(join(root, "breve-runtime/tests"), /\.(ts|sh)$/, KEBAB, "kebab-case");
 walkNames(join(root, "docs"), /\.md$/, KEBAB, "kebab-case", new Set(["README.md"])); // GitHub's own convention
+walkDirectories(join(root, "src"), CAMEL, "camelCase");
+walkDirectories(join(root, "scripts"), KEBAB, "kebab-case");
+walkDirectories(join(root, "e2e"), KEBAB, "kebab-case");
+walkDirectories(join(root, "docs"), KEBAB, "kebab-case");
+walkDirectories(join(root, "breve-runtime"), KEBAB, "kebab-case");
+walkNames(join(root, "src-tauri/src"), /\.rs$/, SNAKE, "snake_case");
+walkDirectories(join(root, "src-tauri/src"), SNAKE, "snake_case");
 
 // ── tsconfig strictness parity ───────────────────────────────────────────────
 // Three compilers typecheck this repo (root src, e2e, breve-runtime). Load-
@@ -128,5 +150,5 @@ if (violations.length) {
 }
 
 console.log(
-  "check:structure ok — per-tree filename law, tsconfig strictness parity, no database, Breve dependency ranges aligned",
+  "check:structure ok — per-tree file/folder naming, tsconfig strictness parity, no database, Breve dependency ranges aligned",
 );

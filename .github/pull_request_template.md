@@ -4,14 +4,18 @@ Describe the user-visible result and the problem it solves.
 
 ## Architecture and data
 
-- [ ] Dependency direction still follows `docs/architecture/clean-architecture.md`.
+- [ ] Dependency direction still follows `ARCHITECTURE.md`.
 - [ ] User files remain the source of truth; no database or competing copy was added.
 - [ ] Memex write lanes, secure-note rules, and Rust trust boundaries remain intact.
 - [ ] Vendor-specific code is isolated behind an adapter where applicable.
 
 ## Validation
 
-- [ ] Focused tests for the changed behavior
+- [ ] Bug fix includes a failing reproduction and a focused regression test
+- [ ] Feature covers the happy path, a refusal/failure state, and boundaries
+- [ ] Model behavior includes deterministic offline eval coverage when applicable
+- [ ] Cross-surface interaction includes E2E coverage when applicable
+- [ ] Syntax, naming, Prettier, and TypeScript checks pass
 - [ ] `bun run check`
 - [ ] `cargo test --manifest-path src-tauri/Cargo.toml`
 - [ ] `NODE_OPTIONS=--max-old-space-size=4096 bun run build`

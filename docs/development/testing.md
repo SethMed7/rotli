@@ -10,6 +10,7 @@ direction, runtime wiring, and owning documentation must agree.
 |---|---|
 | `bun run lint` | TypeScript plus code-shape, brand, architecture, IPC, structure, and documentation guards |
 | `bun run test:unit` | Frontend domain, application, adapter, and state tests under `src/` |
+| `bun run test:evals` | Deterministic offline AI loop, routing, model-policy, prompt, retrieval, and memory-workflow evals |
 | `bun run test:breve` | Breve policy, failure-state, locking, and delivery-claim regressions |
 | `bun run test:tooling` | Fixture tests that prove repository linters detect forbidden code shapes |
 | `bun run test:e2e` | Playwright regression layer — drives the real browser twin (chromium) against `vite dev`'s seeded demo corpus |
@@ -45,6 +46,9 @@ Keychain, scheduler, daemon, or production delivery account.
   recovery inputs. No React, Tauri, filesystem, network, or provider process.
 - **Application:** use-case tests with injected ports and in-memory fakes. Cover
   ordering, refusal, retry, and partial-failure behavior.
+- **AI eval:** deterministic offline cases for routing, tool-loop behavior,
+  capability policy, prompt framing, retrieval ranking, and memory workflow.
+  Never call a live provider from the required suite.
 - **Adapter:** real codec/package round trips or host-contract fixtures. Assert
   preservation and failure behavior, not a vendor implementation detail.
 - **Composition:** mechanical wiring checks prove that the intended adapters,
@@ -87,28 +91,47 @@ sections first, never a blind wait. The app has no drag-to-edge autoscroll, so
 if a real user couldn't reach both ends of a drag in one gesture without
 resizing/collapsing first, neither should the test.
 
-The four specs are the pointer-drag regression-layer handoff from
+The interaction specs are the regression-layer handoff from
 `docs/architecture/code-audit.md` ("Regression-layer handoff"): tab reorder
 (the CMP-1 visual-index contract, `src/state/panes.test.ts`'s real-gesture
 twin), the sidebar's own cross-section-into-Main drag, Board (Captures) card
 reorder, and the shared `src/lib/mainAddDrag.ts` module's Main-add drag from
 an All-notes row — two different code paths land a note in Main, so both are
-covered separately.
+covered separately. The Main creation-context spec then proves that opening a
+Main reference and pressing Command-T creates a new tab and an immediate Main
+reference while storage remains in the intake lane.
+
+## Change proof matrix
+
+| Change | Evidence required before the full gate |
+|---|---|
+| Bug fix | A failing reproduction first, then a focused invariant test that fails if the bug returns |
+| Feature | Happy path, refusal/failure state, and meaningful boundary cases at the lowest useful layer |
+| AI/model behavior | Focused unit coverage plus a deterministic case in `test:evals`; no live-provider dependency |
+| Cross-surface gesture or keyboard flow | Focused policy tests plus Playwright when component-local tests cannot prove real wiring |
+| Architecture, syntax, security, or documentation law | A deterministic checker and a checker fixture proving the forbidden case is rejected |
+
+Run Prettier and the smallest type/test/check target while editing. Before
+handoff, `bun run check` reruns TypeScript, `format:check`, ESLint, every
+mechanical contract, the full Bun suite, named evals, and runtime/design
+regressions.
 
 ## Regression rules
 
 1. Reproduce a bug with a failing test or deterministic checker before relying
    on a manual confirmation.
-2. Put policy in a pure module and test it there; test the adapter and composition
+2. A feature covers its happy path, at least one refusal or failure state, and
+   the boundary conditions that define the behavior.
+3. Put policy in a pure module and test it there; test the adapter and composition
    only for translation and wiring.
-3. Concurrency regressions must exercise separate OS processes when process
+4. Concurrency regressions must exercise separate OS processes when process
    ownership is the behavior under test. Mocked PIDs alone are insufficient.
-4. External delivery tests stop at the claim/receipt boundary. CI never sends
+5. External delivery tests stop at the claim/receipt boundary. CI never sends
    Signal messages, email, model requests, or watcher traffic.
-5. A delivery claim is acquired before an external send and becomes a durable
+6. A delivery claim is acquired before an external send and becomes a durable
    receipt only after success. Tests cover contention, completed delivery, stale
    owner recovery, and retry behavior.
-6. Every fixed incident updates its owning contract and, when user-visible, the
+7. Every fixed incident updates its owning contract and, when user-visible, the
    changelog. Test names describe the invariant that must not regress.
 
 ## Mechanical code checks
@@ -118,8 +141,9 @@ covered separately.
 - `check:architecture` discovers clean feature roles and enforces inward role
   dependencies, pure ports/policies, the Tauri adapter boundary, and the
   Markdown-only slash-command boundary.
-- `check:structure` enforces filename and dependency invariants (including the
-  SheetJS/`xlsx` ban — the exceljs codec owns every spreadsheet path).
+- `check:structure` enforces per-tree file/folder naming and dependency
+  invariants (including the SheetJS/`xlsx` ban — the exceljs codec owns every
+  spreadsheet path).
 - `check:ipc` keeps TypeScript invocations and registered Rust handlers aligned,
   and requires multi-segment snake_case command names.
 - `check:hex` bans raw color literals (hex and `rgb()`/`hsl()` functional forms)
@@ -152,8 +176,8 @@ checker. Do not add a convention that only exists in prose.
   regressions.
 - **Browser E2E (Linux):** `bun run check:e2e-types` plus the Playwright suite
   (chromium) against `vite dev`'s seeded demo corpus.
-- **Full regression (macOS):** Bun behavior tests, Breve runtime checks, Rust
-  tests, and the production build.
+- **Full regression (macOS):** Bun behavior tests, deterministic AI evals,
+  Breve runtime checks, Rust tests, and the production build.
 
 CI does not prove native visual quality or real external delivery. Handoffs must
 state those remaining checks explicitly.

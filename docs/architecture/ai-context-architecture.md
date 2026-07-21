@@ -11,7 +11,7 @@ automatic; detail is retrieved only when the task needs it.
 | L0 | `AGENTS.md` plus a tiny tool adapter | Always loaded by the coding tool |
 | L1 | Matching project CARL domain | Claude hook matches recall phrases; no Rotli domain is always-on |
 | L2 | `carl_recall` result | Agent asks for at most two domains and four rules by default |
-| L3 | One owning architecture document | Open only sources returned by CARL or `docs/README.md` |
+| L3 | One owning project or architecture contract | Open only sources returned by CARL or `docs/README.md` |
 | L4 | Relevant implementation and focused tests | Search by capability; avoid repository-wide reads |
 
 `AGENTS.md` contains only durable product laws, safety, dependency direction,
@@ -27,6 +27,8 @@ the current behavior.
 - `ROTLI_MEMEX`: write lanes, metadata, organizer, and secure notes
 - `ROTLI_MEMORY`: RAG, Model Mapping 0, chat summaries, and findability
 - `ROTLI_DOCUMENTS`: DOCX, sheets, boards, slash commands, and embeds
+- `ROTLI_EDITOR`: CodeMirror, live preview, Markdown widgets, and editor seams
+- `ROTLI_KEYS`: actions, keybindings, chords, and keyboard discoverability
 - `ROTLI_BREVE`: integrated runtime and dev/production isolation
 - `ROTLI_DESIGN`: brand, themes, accessibility, and state design
 - `ROTLI_MODELS`: provider boundaries and capability policy

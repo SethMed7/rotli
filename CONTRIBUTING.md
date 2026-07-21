@@ -53,17 +53,19 @@ only after the repository is trusted.
 1. Inspect the current implementation and its tests.
 2. Preserve unrelated dirty-worktree changes.
 3. Keep dependency direction and data ownership consistent with
-   `docs/architecture/clean-architecture.md`.
+   [`ARCHITECTURE.md`](ARCHITECTURE.md).
 4. Put vendor integrations behind a narrow adapter.
-5. Add focused tests for changed behavior and failure states.
+5. Add focused tests for changed behavior, failure states, and boundaries; add
+   a deterministic eval for model behavior and E2E coverage for cross-surface
+   interactions when applicable.
 6. Update the document that owns the changed contract.
 7. Add a changelog entry when users will notice the change.
 
-Filenames follow one convention per tree, enforced by `check:structure`:
-camelCase under `src/`; kebab-case under `scripts/`, `e2e/`, `docs/`, and
-`breve-runtime/`. Product CSS uses semantic tokens from `src/brand/`; raw
-colors (hex or `rgb()`/`hsl()`) outside the token-definition layer fail CI.
-Markdown is the only surface with slash commands and embed syntax.
+[`SYNTAX.md`](SYNTAX.md) defines file, folder, identifier, Rust, IPC, CSS, and
+test naming. [`DESIGN.md`](DESIGN.md) defines the product interaction contract.
+`check:structure`, ESLint, Prettier, and the design-system checks enforce their
+mechanical rules. Markdown is the only surface with slash commands and embed
+syntax.
 
 Where a new surface, feature, vendor dependency, utility, Tauri command,
 TS↔Rust shared constant, or CARL domain belongs — and which mechanical check
@@ -72,13 +74,11 @@ enforces each rule, including the dependency-conflict procedure — is defined i
 
 ## Formatting and linting
 
-Prettier at `printWidth` 110 is the adopted TypeScript formatter. The one-time
-repository-wide reformat commit is pending diff review; until it lands, match
-the surrounding style — wide lines are house style (~110-column soft limit) —
-and never mix format-only churn into behavioral commits. When the reformat
-lands, its SHA joins `.git-blame-ignore-revs` and `format:check` joins the
-`lint` chain; run `git config blame.ignoreRevsFile .git-blame-ignore-revs`
-once locally (GitHub honors the file automatically; local git does not).
+Prettier at `printWidth` 110 is the adopted TypeScript formatter and
+`format:check` is part of `lint`. Use `bun run format` for the formatter-owned
+trees, and keep unrelated format churn out of behavioral commits. Run
+`git config blame.ignoreRevsFile .git-blame-ignore-revs` once locally so
+historical format-only changes stay out of blame (GitHub honors it automatically).
 
 rustfmt is deliberately and permanently not used. Re-measured 2026-07-17
 (rustfmt 1.9.0): a full reformat rewrites thousands of diff lines at any width
@@ -110,6 +110,7 @@ Use these focused gates while iterating:
 ```sh
 bun run lint             # types, code shape, architecture, IPC, structure, docs
 bun run test:unit        # src/ behavior
+bun run test:evals       # deterministic offline model/retrieval behavior
 bun run test:breve       # Breve policy and concurrency regressions
 bun run test:tooling     # linter/checker fixtures
 bun run test:regression  # complete Bun/runtime/design regression suite

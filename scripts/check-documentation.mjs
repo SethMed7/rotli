@@ -1,12 +1,16 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { missingScriptSteps, missingTokens } from "./documentation-contract.mjs";
 
 const root = process.cwd();
 const required = [
   "AGENTS.md",
+  "ARCHITECTURE.md",
   "CLAUDE.md",
   "CONTRIBUTING.md",
+  "DESIGN.md",
+  "SYNTAX.md",
   "docs/README.md",
   "docs/development/ai-workflow.md",
   "docs/development/testing.md",
@@ -14,6 +18,7 @@ const required = [
   "docs/architecture/ai-context-architecture.md",
   ".github/copilot-instructions.md",
   ".github/pull_request_template.md",
+  ".github/workflows/regression.yml",
   ".carl/carl.json",
   ".carl/mcpServer.mjs",
   ".mcp.json",
@@ -32,7 +37,12 @@ if (existsSync(join(root, "AGENTS.md")) && readFileSync(join(root, "AGENTS.md"))
 for (const rel of ["CLAUDE.md", ".github/copilot-instructions.md"]) {
   if (!existsSync(join(root, rel))) continue;
   const text = readFileSync(join(root, rel), "utf8");
-  if (!text.includes("AGENTS.md")) failures.push(`${rel} must point to AGENTS.md`);
+  for (const token of missingTokens(text, ["AGENTS.md", "docs/README.md"])) {
+    failures.push(`${rel} must point to ${token}`);
+  }
+  if (rel === "CLAUDE.md" && !text.includes("carl_recall")) {
+    failures.push("CLAUDE.md must route topic recall through carl_recall");
+  }
 }
 
 for (const rel of ["README.md", "AGENTS.md", "CONTRIBUTING.md", "docs/README.md"]) {
@@ -43,6 +53,9 @@ for (const rel of ["README.md", "AGENTS.md", "CONTRIBUTING.md", "docs/README.md"
 
 if (existsSync(join(root, "docs/README.md"))) {
   const map = readFileSync(join(root, "docs/README.md"), "utf8");
+  for (const token of missingTokens(map, ["../ARCHITECTURE.md", "../DESIGN.md", "../SYNTAX.md"])) {
+    failures.push(`docs/README.md must route to ${token}`);
+  }
   if (!map.includes("development/testing.md")) {
     failures.push("docs/README.md must route to the testing and regression contract");
   }
@@ -68,8 +81,46 @@ if (existsSync(join(root, "docs/development/adding-things.md"))) {
 
 if (existsSync(join(root, "package.json"))) {
   const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  for (const script of ["lint", "test:unit", "test:breve", "test:tooling", "test:regression", "check"]) {
+  for (const script of ["lint", "test:unit", "test:evals", "test:breve", "test:tooling", "test:regression", "check"]) {
     if (!packageJson.scripts?.[script]) failures.push(`package.json is missing documented script: ${script}`);
+  }
+
+  const requiredScriptSteps = {
+    lint: [
+      "tsc --noEmit",
+      "bun run format:check",
+      "bun run check:structure",
+      "bun run check:docs",
+      "bun run lint:eslint",
+    ],
+    "test:regression": [
+      "bun run test",
+      "bun run test:evals",
+      "bun run check:breve-runtime",
+      "bun run check:design-system",
+    ],
+    check: ["bun run lint", "bun run test:regression"],
+  };
+  for (const missing of missingScriptSteps(packageJson.scripts, requiredScriptSteps)) {
+    failures.push(`package.json proof chain is missing ${missing}`);
+  }
+
+  const releaseScript = existsSync(join(root, "scripts/release.sh"))
+    ? readFileSync(join(root, "scripts/release.sh"), "utf8")
+    : "";
+  if (!releaseScript.includes("bun run check")) failures.push("scripts/release.sh must run bun run check before building");
+
+  const regressionWorkflow = existsSync(join(root, ".github/workflows/regression.yml"))
+    ? readFileSync(join(root, ".github/workflows/regression.yml"), "utf8")
+    : "";
+  for (const token of missingTokens(regressionWorkflow, [
+    "bun run check:e2e-types",
+    "bun run test:e2e",
+    "cargo clippy",
+    "cargo test",
+    "bun run build",
+  ])) {
+    failures.push(`regression workflow must run ${token}`);
   }
 
   // ── no orphan tooling (added 2026-07-18; this failure mode recurred) ──────
@@ -146,7 +197,16 @@ function markdownFiles(dir, prefix = "") {
   return files;
 }
 
-const linkedDocs = ["README.md", "AGENTS.md", "CONTRIBUTING.md", "CLAUDE.md", ...markdownFiles(join(root, "docs"))];
+const linkedDocs = [
+  "README.md",
+  "AGENTS.md",
+  "ARCHITECTURE.md",
+  "CONTRIBUTING.md",
+  "CLAUDE.md",
+  "DESIGN.md",
+  "SYNTAX.md",
+  ...markdownFiles(join(root, "docs")),
+];
 for (const rel of linkedDocs) {
   const text = readFileSync(join(root, rel), "utf8");
   for (const match of text.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
@@ -182,6 +242,21 @@ if (existsSync(join(root, ".carl/carl.json"))) {
     if (!glassDecision || !/remove.*Liquid Glass|Liquid Glass.*remove/i.test(glassDecision.decision)) {
       failures.push("Carl must remember that Liquid Glass was removed");
     }
+
+    if (existsSync(join(root, "docs/architecture/ai-context-architecture.md"))) {
+      const contextDoc = readFileSync(join(root, "docs/architecture/ai-context-architecture.md"), "utf8");
+      for (const [name] of domains) {
+        if (!contextDoc.includes(`\`${name}\``)) {
+          failures.push(`docs/architecture/ai-context-architecture.md omits CARL domain ${name}`);
+        }
+      }
+    }
+    const coreSources = new Set((carl.domains?.ROTLI_CORE?.rules ?? []).map((rule) => rule.source));
+    for (const source of ["ARCHITECTURE.md", "SYNTAX.md", "docs/development/testing.md"]) {
+      if (!coreSources.has(source)) failures.push(`ROTLI_CORE must route to ${source}`);
+    }
+    const designSources = new Set((carl.domains?.ROTLI_DESIGN?.rules ?? []).map((rule) => rule.source));
+    if (!designSources.has("DESIGN.md")) failures.push("ROTLI_DESIGN must route to DESIGN.md");
 
     // CARL coverage is measured, not vibes: every top-level src/ directory over
     // the size threshold must appear in this dir→domain map or be exempted with

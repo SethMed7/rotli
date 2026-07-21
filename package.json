@@ -1,7 +1,7 @@
 {
   "name": "rotli",
   "private": true,
-  "version": "0.33.1",
+  "version": "0.33.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,12 +12,13 @@
     "release": "bash scripts/release.sh",
     "test": "bun run test:unit && bun run test:breve && bun run test:tooling",
     "test:unit": "bun test src",
+    "test:evals": "bun test src/ai/hybrid.test.ts src/ai/loop.test.ts src/ai/models.test.ts src/ai/prompt.test.ts src/chatMemory/retrieval.test.ts src/chatMemory/workflow.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "check:e2e-types": "tsc --noEmit -p tsconfig.e2e.json",
     "test:tooling": "bun test scripts/*.test.ts",
     "test:breve": "bun breve-runtime/tests/test-actions.ts && bun breve-runtime/tests/test-intents.ts && bun breve-runtime/tests/test-timectx.ts && bun breve-runtime/tests/test-retention.ts && bun breve-runtime/tests/test-pdf-theme.ts && bun breve-runtime/tests/test-doctor-findings.ts && bun test ./breve-runtime/tests/test-process-lock.ts ./breve-runtime/tests/test-delivery-claim.ts ./breve-runtime/tests/test-watcher-failure.ts ./breve-runtime/tests/test-safe-fetch-fixtures.ts ./breve-runtime/tests/test-markdown-text.ts ./breve-runtime/tests/test-config-locality.ts",
-    "test:regression": "bun run test && bun run check:breve-runtime && bun run check:design-system",
+    "test:regression": "bun run test && bun run test:evals && bun run check:breve-runtime && bun run check:design-system",
     "lint": "tsc --noEmit && bun run format:check && bun run check:code-shape && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:security && bun run check:docs && bun run lint:eslint",
     "lint:eslint": "eslint src e2e playwright.config.ts",
     "check:code-shape": "bun scripts/check-code-shape.mjs",
@@ -75,5 +76,10 @@
     "typescript-eslint": "^8.64.0",
     "vite": "^7.0.4"
   },
-  "trustedDependencies": ["esbuild", "onnxruntime-node", "protobufjs", "sharp"]
+  "trustedDependencies": [
+    "esbuild",
+    "onnxruntime-node",
+    "protobufjs",
+    "sharp"
+  ]
 }

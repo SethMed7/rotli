@@ -2,11 +2,11 @@
 
 This is the placement authority: where a new surface, feature, dependency,
 utility, command, shared constant, or CARL domain goes, and which mechanical
-check enforces each rule. The architecture law behind these rows lives in
-[`../architecture/clean-architecture.md`](../architecture/clean-architecture.md);
-testing evidence lives in [`testing.md`](testing.md). When a row and reality
-disagree, fix both in the same change. `bun run check:docs` verifies that every
-concrete path referenced in this document exists.
+check enforces each rule. [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) owns
+the system shape, [`../../SYNTAX.md`](../../SYNTAX.md) owns naming, and testing
+evidence lives in [`testing.md`](testing.md). When a row and reality disagree,
+fix both in the same change. `bun run check:docs` verifies that every concrete
+path referenced in this document exists.
 
 ## The contract table
 
@@ -24,7 +24,7 @@ concrete path referenced in this document exists.
 | Breve runtime code | `breve-runtime/scripts/` — MIRROR-NOT-IMPORT across the app boundary; **within** breve-runtime, plain imports of package-local helpers (e.g. `breve-runtime/scripts/markdown-text.ts`) are the rule, not mirroring. Values shared with the app get a parity fixture entry | `bun run check:parity`, `bun run check:breve-contract` |
 | Network call (ureq / fetch / network CLI) | Prefer an existing seam (`web_fetch`, `safe-fetch.ts`, `chat_messages`, `llm.ts`). A genuinely new call site MUST be declared in `scripts/fixtures/egress-allowlist.json` with its destination class + guard; off-machine destinations add adversarial rows to `scripts/fixtures/egress-fixtures.json`. Full procedure in [`security.md`](security.md#adding-a-network-call-procedure) | `bun run check:security` |
 | Tests | Co-located `*.test.ts` next to the module (`breve-runtime/tests/` for runtime tests). bun:test declarations use `test(...)`, never the `it(...)` alias — one spelling across the suite | `bun run check:code-shape` (no focus/skip, no test imports from production); ESLint `no-restricted-imports` bans importing `it` from `bun:test` |
-| Any new file (naming) | One filename convention per tree: `src/` camelCase; `scripts/`, `e2e/`, `docs/`, `breve-runtime/scripts/` + `breve-runtime/tests/` kebab-case (the stem before the first dot is what's judged). The 2026-07-18 sweep renamed the six breve camelCase outliers instead of grandfathering | `bun run check:structure` |
+| Any new file or folder (naming) | Follow `SYNTAX.md`: `src/` camelCase; `scripts/`, `e2e/`, `docs/`, and `breve-runtime/` kebab-case; `src-tauri/src/` Rust modules snake_case. The 2026-07-18 sweep renamed outliers instead of grandfathering | `bun run check:structure` |
 | Executable script / checker | `scripts/<kebab-name>.mjs` (or `.sh`), wired into a `package.json` script AND the `lint`/`check`/CI chain in the same change — an orphan checker is a silent third state. Its command joins the map in [`testing.md`](testing.md) | `bun run check:docs` (orphan + chain + command-map guards), `bun run check:structure` (name) |
 | tsconfig / strictness flag | Three compilers typecheck the repo (root, `tsconfig.e2e.json`, `breve-runtime/tsconfig.json`). Load-bearing strictness flags must be enabled in all three or carry a dated, measured divergence entry in `scripts/check-structure.mjs` (today only breve-runtime diverges: `exactOptionalPropertyTypes` 11, `noUnusedLocals` 9, `noUnusedParameters` 3, `noUncheckedIndexedAccess` 86 errors, measured 2026-07-18) | `bun run check:structure` |
 | Regression spec (Playwright E2E) | `e2e/<flow>.spec.ts` — one file per user-facing gesture/flow, not per component. Reuse `e2e/support.ts`'s helpers (`gotoApp`, `pointerDrag`, `edgePoint`, `centerOf`) instead of re-deriving pointer-drag mechanics per spec. Selectors prefer the roles/`data-*` attributes the surface already exposes; add a `data-testid` only when nothing stable exists. Reserve this layer for what a `src/**/*.test.ts` unit test can't exercise — a real pointer/DOM gesture or cross-surface wiring — never a duplicate of coverage a unit test already has | `bun run check:e2e-types` (`tsc -p tsconfig.e2e.json`), `bun run test:e2e` |

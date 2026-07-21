@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.2] - 2026-07-20
+
+### Added
+
+- **Changes now carry their proof with them.** Project-level `ARCHITECTURE.md`,
+  `DESIGN.md`, and `SYNTAX.md` contracts define system, interaction, naming, and
+  formatting rules. The documentation guard now proves the contributor/Claude/
+  CARL graph, release/CI proof chains, and CARL domain catalog stay aligned;
+  structure checks enforce folder and Rust module naming as well as filenames.
+- **AI evals and Main creation have named regression gates.** The regression
+  chain runs deterministic offline model, prompt, tool-loop, retrieval, and
+  memory-workflow evals, while Playwright proves Command-T from a Main note opens
+  a new tab and exposes the intake-backed note in Main immediately.
+
 ### Fixed
 
 - **New notes now work from Main and the Brain view.** `⌘T`, New Note, and the

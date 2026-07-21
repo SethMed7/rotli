@@ -39,9 +39,11 @@ require translating the project into a new set of duplicated rules.
    adapter, presentation state, and independent security boundary.
 3. **Change:** implement the smallest complete vertical slice. Keep policies
    centralized and dependencies pointed inward.
-4. **Prove:** add focused tests, run the relevant guard, then run the full
-   validation matrix before declaring completion. The evidence levels and
-   command ownership are defined in [`testing.md`](testing.md).
+4. **Prove:** reproduce bugs with a failing test; cover feature success,
+   refusal/failure, and boundary cases; add deterministic offline evals for AI
+   behavior. Run Prettier plus the focused test or guard while iterating, then
+   the full validation matrix. Evidence levels and command ownership are in
+   [`testing.md`](testing.md).
 5. **Handoff:** summarize changes, exact validation results, remaining warnings,
    and native visual checks. Clearly state whether anything was committed,
    published, installed, or restarted.

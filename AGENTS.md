@@ -40,21 +40,14 @@ material—not current specifications.
 - Environments: Warm Light, Warm Dark, Paper, and Charcoal. Paper/Charcoal are
   the calm defaults; the warm pair is intentional.
 
-## Architecture
+## Architecture, design, and syntax
 
-Dependencies point inward:
-
-`domain -> application -> adapters -> composition -> presentation`
-
-- Domain is pure; application use cases depend on narrow ports.
-- Tauri, filesystem, network, codecs, editors, and vendor SDKs stay in adapters.
-- Composition roots choose adapters explicitly; presentation sends user intent.
-- Define each policy once. Prefer small pure functions over speculative layers.
-- A dependency swap should normally touch one adapter, focused tests, and a
-  composition root.
-- Source filenames use camelCase; React exports may use PascalCase.
-
-Mechanical guards: `check:architecture`, `check:ipc`, and `check:structure`.
+Follow `ARCHITECTURE.md`, `DESIGN.md`, and `SYNTAX.md`. Dependencies point
+`domain -> application -> adapters -> composition -> presentation`. Domain is
+pure; application uses narrow ports; effects and vendors stay in adapters;
+composition chooses adapters; presentation sends intent. Define policy once.
+Mechanical guards include `check:architecture`, `check:ipc`, `check:structure`,
+and `check:design-system`.
 
 ## Safety
 
@@ -69,7 +62,8 @@ Mechanical guards: `check:architecture`, `check:ipc`, and `check:structure`.
 
 1. Establish current behavior from code and tests.
 2. Implement the smallest complete vertical slice; keep policy centralized.
-3. Add focused behavior and failure-state tests.
+3. Add focused behavior, failure-state, and boundary tests. Bug fixes start with
+   a failing reproduction; model behavior adds deterministic offline evals.
 4. Update the owning contract and `CHANGELOG.md` for user-visible changes.
 5. Run:
 
@@ -82,8 +76,8 @@ NODE_OPTIONS=--max-old-space-size=4096 bun run build
 Use focused commands while iterating: `bun test <file>`, `bun run test:breve`,
 and the relevant `check:*` script.
 
-UI work must use semantic tokens from `src/brand/`, remain keyboard-safe and
-readable in all four environments, and cover loading, empty, error, saved,
+UI work must follow `DESIGN.md`, use semantic tokens from `src/brand/`, remain
+keyboard-safe and readable in all four environments, and cover loading, empty, error, saved,
 disabled, destructive, and narrow-window states. Do not add a UI framework or
 raw colors outside the brand layer.
 
@@ -94,9 +88,9 @@ restarted.
 
 ## Documentation ownership
 
-- `README.md`: public product promise and quick start
-- `CONTRIBUTING.md`: human workflow
+- `README.md` / `CONTRIBUTING.md`: public setup and human workflow
 - `AGENTS.md`: always-loaded AI rules
+- `ARCHITECTURE.md` / `DESIGN.md` / `SYNTAX.md`: project-level contracts
 - `.carl/carl.json`: compact topic recall and decisions
 - `docs/README.md`: current contract map
 - `docs/architecture/`: code-facing contracts and dated audits
