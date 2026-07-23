@@ -125,6 +125,7 @@ import {
   VaultGlyph,
 } from "./glyphs";
 import { type RovingRow, useRovingList } from "./sidebar/useRovingList";
+import { noteDisplayTitle } from "./sidebar/noteDisplayTitle";
 import { BreveSidebar } from "./breve/breveSidebar";
 import { QuokkaMark } from "./character";
 
@@ -235,6 +236,7 @@ interface RowActions {
  * note. */
 function CompactNoteRow({
   note,
+  displayTitle,
   selected,
   padLeft,
   onOpen,
@@ -245,6 +247,8 @@ function CompactNoteRow({
   onContextMenu,
 }: {
   note: NoteSummary;
+  /** Context-shortened tree label; the NoteSummary keeps its canonical title. */
+  displayTitle?: string;
   selected: boolean;
   /** Depth-scaled left inset so a note sits under its folder (Seth, 2026-06-15). */
   padLeft: number;
@@ -285,7 +289,7 @@ function CompactNoteRow({
       {...rowProps}
     >
       {glyphForNote(note, { size: 14, className: "snicon" })}
-      <span className="snt">{note.title || "Empty note"}</span>
+      <span className="snt">{displayTitle || note.title || "Empty note"}</span>
       <span className="snd">{longDateLabel(note.updatedAt)}</span>
       <span className="snact">
         {hidden ? (
@@ -905,48 +909,52 @@ export function Sidebar() {
     };
     return (
       <>
-        {childNotes.map((n) => (
-          <button
-            key={`main:${n.id}`}
-            type="button"
-            data-main-id={n.id}
-            data-note-id={n.id}
-            /* the current file's Main copy wins the highlight (#25) — the same
-               accent pill a compact row gets when it's the focused note */
-            className={`snrow main-row${n.id === focusedNoteId ? " sel" : ""}${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
-            style={{ paddingLeft: 10 + (depth + 1) * 16 }}
-            onPointerDown={(e) => startMainDrag(e, n.id, "move", n.title || "Empty note")}
-            onClick={() => {
-              if (!didMainDragRef.current) {
-                // Main is the creation context as well as the visible projection:
-                // ⌘T / New note must not inherit a stale Brain/Storage selection
-                // from before this row was opened.
-                setSelectedFolderId(parentId);
-                setContentView("panes");
-                usePanesStore.getState().openSummary(n);
-              }
-            }}
-            onAuxClick={(e) => {
-              if (e.button === 1) {
-                e.preventDefault();
-                setSelectedFolderId(parentId);
-                setContentView("panes");
-                usePanesStore.getState().openSummary(n, { newTab: true });
-              }
-            }}
-            onContextMenu={(e) => openNoteMenu(e, n)}
-            {...rp({ id: `main>${n.id}`, kind: "note" })}
-          >
-            {glyphForNote(n, { size: 14, className: "snicon" })}
-            <span className="snt">{n.title || "Empty note"}</span>
-            {/* the floated pin's marker — same quiet glyph as pinned chats */}
-            {n.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
-            {starBtn(n.id)}
-            {/* the hover-× is GONE (Seth, 2026-07-09: its reserved slot read as
-                a broken gap next to the star) — the context menu owns
-                "Remove from Main"; folder rows keep their × below */}
-          </button>
-        ))}
+        {childNotes.map((n) => {
+          const parentFolderName = mainProjection.folders.find((folder) => folder.id === parentId)?.name;
+          const displayTitle = noteDisplayTitle(n.title, parentFolderName) || "Empty note";
+          return (
+            <button
+              key={`main:${n.id}`}
+              type="button"
+              data-main-id={n.id}
+              data-note-id={n.id}
+              /* the current file's Main copy wins the highlight (#25) — the same
+                 accent pill a compact row gets when it's the focused note */
+              className={`snrow main-row${n.id === focusedNoteId ? " sel" : ""}${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
+              style={{ paddingLeft: 10 + (depth + 1) * 16 }}
+              onPointerDown={(e) => startMainDrag(e, n.id, "move", displayTitle)}
+              onClick={() => {
+                if (!didMainDragRef.current) {
+                  // Main is the creation context as well as the visible projection:
+                  // ⌘T / New note must not inherit a stale Brain/Storage selection
+                  // from before this row was opened.
+                  setSelectedFolderId(parentId);
+                  setContentView("panes");
+                  usePanesStore.getState().openSummary(n);
+                }
+              }}
+              onAuxClick={(e) => {
+                if (e.button === 1) {
+                  e.preventDefault();
+                  setSelectedFolderId(parentId);
+                  setContentView("panes");
+                  usePanesStore.getState().openSummary(n, { newTab: true });
+                }
+              }}
+              onContextMenu={(e) => openNoteMenu(e, n)}
+              {...rp({ id: `main>${n.id}`, kind: "note" })}
+            >
+              {glyphForNote(n, { size: 14, className: "snicon" })}
+              <span className="snt">{displayTitle}</span>
+              {/* the floated pin's marker — same quiet glyph as pinned chats */}
+              {n.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
+              {starBtn(n.id)}
+              {/* the hover-× is GONE (Seth, 2026-07-09: its reserved slot read as
+                  a broken gap next to the star) — the context menu owns
+                  "Remove from Main"; folder rows keep their × below */}
+            </button>
+          );
+        })}
         {childFolders.map((f) => {
           const open = expandedDests[f.id] ?? true;
           // inline rename (#16): the context menu's Rename… turns the row into a
@@ -1139,28 +1147,33 @@ export function Sidebar() {
     level: number,
   ): ReactNode => {
     const own = notes.filter((n) => n.folderId === folderId && matches(n));
+    const parentFolderName = folders.find((folder) => folder.id === folderId)?.name;
     return (
       <>
         {own
           .filter((n) => !isBoard(n))
-          .map((note) => (
-            <CompactNoteRow
-              key={note.id}
-              note={note}
-              selected={note.id === focusedNoteId}
-              padLeft={28 + level * 16}
-              onOpen={
-                isFile(note)
-                  ? (newTab) => usePanesStore.getState().openFile(note.id, { newTab })
-                  : openRow(note.id)
-              }
-              actions={rowActions}
-              onBeginMainDrag={(e) => startMainDrag(e, note.id, "add", note.title || "Empty note")}
-              mainDragRef={crossDragRef}
-              rowProps={rp({ id: note.id, kind: "note" })}
-              onContextMenu={(e) => openNoteMenu(e, note)}
-            />
-          ))}
+          .map((note) => {
+            const displayTitle = noteDisplayTitle(note.title, parentFolderName) || "Empty note";
+            return (
+              <CompactNoteRow
+                key={note.id}
+                note={note}
+                displayTitle={displayTitle}
+                selected={note.id === focusedNoteId}
+                padLeft={28 + level * 16}
+                onOpen={
+                  isFile(note)
+                    ? (newTab) => usePanesStore.getState().openFile(note.id, { newTab })
+                    : openRow(note.id)
+                }
+                actions={rowActions}
+                onBeginMainDrag={(e) => startMainDrag(e, note.id, "add", displayTitle)}
+                mainDragRef={crossDragRef}
+                rowProps={rp({ id: note.id, kind: "note" })}
+                onContextMenu={(e) => openNoteMenu(e, note)}
+              />
+            );
+          })}
         {own.filter(isBoard).map((board) => (
           <CompactBoardRow
             key={board.id}

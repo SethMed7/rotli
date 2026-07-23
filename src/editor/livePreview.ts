@@ -31,7 +31,7 @@ import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from ".
 import { type DragGhost, createImageDragGhost } from "../lib/dragGhost";
 import { openUrl, resolveImageSrc } from "../lib/tauri";
 import { usePanesStore } from "../state/panes";
-import { WIKILINK_RE } from "./wikilink";
+import { editorLinkOpensOnClick, WIKILINK_RE } from "./wikilink";
 import { resolveWikilinkTarget } from "./wikilinkIndex";
 
 interface Sel {
@@ -70,7 +70,7 @@ const INLINE: InlineRule[] = [
   {
     re: /\[\[([^\]]+)\]\]/,
     cls: "rotli-wikilink",
-    attrs: { title: "⌘-click to open note" },
+    attrs: { title: "Click to open note" },
     parts: fixed(2, 2),
   },
   { re: /\*\*((?:[^*]|\*(?!\*))+)\*\*/, cls: "rotli-strong", parts: fixed(2, 2) },
@@ -650,7 +650,7 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
 
 const MD_LINK = /\[([^\]]+)\]\(([^)]*)\)/g;
 
-function tryOpenLinkAt(lineText: string, lineFrom: number, pos: number): boolean {
+function tryOpenWikilinkAt(lineText: string, lineFrom: number, pos: number): boolean {
   WIKILINK_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = WIKILINK_RE.exec(lineText)) !== null) {
@@ -666,7 +666,12 @@ function tryOpenLinkAt(lineText: string, lineFrom: number, pos: number): boolean
     }
     if (from > pos) break;
   }
+  return false;
+}
+
+function tryOpenMarkdownLinkAt(lineText: string, lineFrom: number, pos: number): boolean {
   MD_LINK.lastIndex = 0;
+  let m: RegExpExecArray | null;
   while ((m = MD_LINK.exec(lineText)) !== null) {
     const from = lineFrom + m.index;
     const to = from + m[0].length;
@@ -681,12 +686,16 @@ function tryOpenLinkAt(lineText: string, lineFrom: number, pos: number): boolean
 }
 
 export const linkOpener = EditorView.domEventHandlers({
-  mousedown(e, view) {
-    if (!e.metaKey || e.button !== 0) return false;
+  click(e, view) {
     const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
     if (pos == null) return false;
     const line = view.state.doc.lineAt(pos);
-    if (tryOpenLinkAt(line.text, line.from, pos)) {
+    // Note links are workspace navigation, so they behave like visible links.
+    // Ordinary web URLs keep the deliberate ⌘-click editor gesture.
+    if (
+      (editorLinkOpensOnClick("note", e.button, e.metaKey) && tryOpenWikilinkAt(line.text, line.from, pos)) ||
+      (editorLinkOpensOnClick("web", e.button, e.metaKey) && tryOpenMarkdownLinkAt(line.text, line.from, pos))
+    ) {
       e.preventDefault();
       return true;
     }

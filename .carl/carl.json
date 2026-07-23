@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-07-21T17:00:00.000Z",
+  "last_modified": "2026-07-21T18:30:00.000Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -286,6 +286,10 @@
         "slash menu",
         "image move",
         "embed sizing",
+        "mermaid",
+        "diagram",
+        "visual flowchart",
+        "excalidraw conversion",
         "strip markdown"
       ],
       "exclude": [],
@@ -303,6 +307,13 @@
           "added": "2026-07-17",
           "last_reviewed": "2026-07-17",
           "source": "scripts/check-architecture.mjs"
+        },
+        {
+          "id": 2,
+          "text": "Mermaid fences remain Markdown source truth and open a View-Visual-Code workspace. Visual mode losslessly edits the supported flowchart subset (shapes, labels, direction, connections, and node colors) while editor positions remain temporary and unsupported syntax fails closed. src/boards/engine/mermaid.ts is a secondary, confirmed conversion into an independent Excalidraw copy; it never claims to round-trip board geometry into Mermaid text.",
+          "added": "2026-07-21",
+          "last_reviewed": "2026-07-22",
+          "source": "DESIGN.md"
         }
       ],
       "decisions": []

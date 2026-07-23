@@ -14,6 +14,7 @@ import {
 import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "../../breve-runtime/scripts/keychain-names";
 import fixture from "../../scripts/fixtures/parity.json";
 import { endpointIsLocal } from "../ai/guard";
+import { BOARD_LIMITS } from "../boards/validation";
 import { DOCUMENT_CONVERTIBLE_EXTS } from "../documents/kinds";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { type FrontmatterView, type MemexPerms, SECRET_GEMINI_API_KEY } from "./tauri";
@@ -23,6 +24,11 @@ const entries = fixture.entries;
 describe("parity.json ↔ TS constants", () => {
   test("sheetEditMaxBytes", () => {
     expect(SHEET_EDIT_MAX_BYTES).toBe(entries.sheetEditMaxBytes.value);
+  });
+
+  test("boardLimits", () => {
+    const limits: Record<string, number> = { ...BOARD_LIMITS };
+    expect(limits).toEqual(entries.boardLimits.value);
   });
 
   test("documentConvertibleExts", () => {

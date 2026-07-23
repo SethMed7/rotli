@@ -10,6 +10,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.4] - 2026-07-23
+
+### Added
+
+- **Mermaid diagrams now have a real working surface.** Click a rendered
+  diagram to open a keyboard-safe View/Visual/Code workspace with drag-to-pan,
+  wheel/button/keyboard zoom, fit, loading/empty/parse-error states, explicit
+  source apply, and an unapplied-change guard. Visual mode builds supported
+  flowcharts with draggable shapes, labels, direction, node colors, and labeled
+  arrow variants while keeping readable Mermaid as source truth; advanced
+  syntax refuses lossy visual rewriting. `/Mermaid` inserts a valid starter.
+  Desktop users can optionally convert an applied diagram into a separate,
+  independently editable Excalidraw board while the Markdown fence stays intact.
+- **The packaged CLI can rename a note and its file directly.**
+  `rotli rename "CURRENT TITLE OR ID" "NEW TITLE"` resolves one exact note,
+  refuses ambiguous title matches, preserves Markdown heading syntax and
+  managed frontmatter, and routes the physical filename change through the
+  guarded corpus write path.
+
+### Changed
+
+- **Moving between related notes no longer depends on the sidebar.** Visible
+  wikilinks open with a normal click, the note date now shares a compact labeled
+  back/forward trail, and tree rows omit a parent folder name repeated at the
+  start of a child title without rewriting the underlying Markdown.
+- **Agent and model context is explicitly untrusted and bounded.** Model Mapping
+  0 now emits escaped structured JSON instead of prompt-shaped Markdown; note
+  and tool-result framing resists role/delimiter injection, and copied private
+  prose is refused before an enabled web/image tool can send it off-device.
+  MCP requests and outputs are size-capped, returned note/board content is
+  labeled untrusted data, and replacement/removal/move tools advertise their
+  destructive behavior so clients can require approval.
+
+### Fixed
+
+- Full-screen rename, render expansion, and Mermaid workspace backdrops now use
+  the same flat semantic scrim as Command Palette and WhichKey, with static and
+  four-environment browser regressions preventing pale glow effects from
+  returning.
+- **Corrupt or oversized Excalidraw files are preserved instead of becoming an
+  autosavable blank canvas.** GUI, CLI, MCP, and Rust writes share bounded scene
+  validation for file size, elements, embedded files, strings, coordinates,
+  nesting, and semantic action count. The full canvas offers reveal, retry, and
+  a separately confirmed blank-board repair.
+
+### Security
+
+- Corpus reads and mutations now resolve every existing path component with
+  no-follow metadata and canonical registered-root containment. Symlinked note,
+  board, office-file, folder, move, sidecar, and atomic-temp parents fail closed
+  instead of redirecting work outside the memex.
+- Markdown SVG fences now rebuild a strict allowlisted SVG tree. Event handlers,
+  scripts, `foreignObject`, external resources, unsafe URL schemes, inline
+  styles, and unexpected namespaces never enter the live document; production
+  CSP remains a second layer.
+- The secure-organizer proposal was revised before implementation: secure
+  creation remains in `wiki/_secure`, legacy intake files require an explicit
+  protected-lane repair, and only a registered on-device model may produce final
+  allowlisted metadata when both the default-off global setting and the note's
+  `local_ai_allowed: true` permission are present. No secure-derived envelope
+  may reach a remote filer.
+
 ## [0.33.3] - 2026-07-21
 
 ### Changed

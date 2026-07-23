@@ -15,6 +15,9 @@ export interface ModelMapPolicy {
   includeIds: boolean;
 }
 
+const MAX_MAP_FIELD_CHARS = 300;
+const MAX_MAP_ID_CHARS = 128;
+
 /** Model Mapping 0: retrieval shape derives from actual model capacity, not a
  * provider name. A replacement model automatically lands in the right tier. */
 export function modelMapPolicy(contextWindow: number): ModelMapPolicy {
@@ -36,13 +39,28 @@ export function priorityOrder(a: ModelMapNote, b: ModelMapNote): number {
   return a.title.localeCompare(b.title);
 }
 
-/** Legacy budget-only map kept for browser/test callers. */
-export function buildIndex(notes: ModelMapNote[], maxChars = 3500): string {
-  return buildMap(notes, { profile: "expansive", titlesPerArea: 3, includeIds: false }, maxChars);
+function dataField(value: string, cap = MAX_MAP_FIELD_CHARS): string {
+  return value
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029\u202A-\u202E\u2066-\u2069]/g, "�")
+    .slice(0, cap);
 }
 
-/** A bounded, model-specific table of contents generated on demand. Nothing is
- * duplicated on disk: every run projects the current memex and its priorities. */
+function structuredJson(value: unknown): string {
+  return JSON.stringify(value)
+    .replaceAll("<", "\\u003c")
+    .replaceAll(">", "\\u003e")
+    .replaceAll("&", "\\u0026");
+}
+
+/** Legacy budget-only map kept for browser/test callers. */
+export function buildIndex(notes: ModelMapNote[], maxChars = 3500): string {
+  return buildMap(notes, { profile: "expansive", titlesPerArea: 3, includeIds: true }, maxChars);
+}
+
+/** A bounded, model-specific table of contents generated on demand. The map is
+ * serialized as untrusted JSON data; no note-controlled value can create a
+ * prompt heading, delimiter, role label, or literal markup close tag. */
 export function buildModelMap(notes: ModelMapNote[], contextWindow: number, maxChars = 3500): string {
   return buildMap(notes, modelMapPolicy(contextWindow), maxChars);
 }
@@ -50,7 +68,7 @@ export function buildModelMap(notes: ModelMapNote[], contextWindow: number, maxC
 function buildMap(notes: ModelMapNote[], policy: ModelMapPolicy, maxChars: number): string {
   const groups = new Map<string, ModelMapNote[]>();
   for (const note of readable(notes)) {
-    const area = note.folderId || "Notes";
+    const area = dataField(note.folderId || "Notes");
     const group = groups.get(area);
     if (group) group.push(note);
     else groups.set(area, [note]);
@@ -59,29 +77,43 @@ function buildMap(notes: ModelMapNote[], policy: ModelMapPolicy, maxChars: numbe
     .map(([area, areaNotes]) => [area, [...areaNotes].sort(priorityOrder)] as const)
     .sort((a, b) => priorityOrder(a[1][0]!, b[1][0]!) || a[0].localeCompare(b[0]));
 
-  if (policy.profile === "expansive") {
-    const full = entries
-      .map(
-        ([area, areaNotes]) =>
-          `## ${area}\n${areaNotes.map((note) => `- ${note.pinned ? "★ " : ""}${note.title}  {id: ${note.id}}`).join("\n")}`,
-      )
-      .join("\n\n");
-    if (full.length <= maxChars) return full;
-  }
-
-  let out = `Model Map 0 · ${policy.profile}\n`;
-  for (const [area, areaNotes] of entries) {
-    const selected = areaNotes.slice(0, policy.titlesPerArea);
-    const lines = selected.map((note) => {
-      const id = policy.includeIds ? `  {id: ${note.id}}` : "";
-      return `- ${note.pinned ? "★ " : ""}${note.title}${id}`;
+  const encode = (areas: unknown[], truncated: boolean): string =>
+    structuredJson({
+      kind: "rotli.model-map",
+      trust: "untrusted-data",
+      profile: policy.profile,
+      truncated,
+      areas,
     });
-    const section = `\n## ${area} (${areaNotes.length})\n${lines.join("\n")}\n`;
-    if (out.length + section.length > maxChars) {
-      out += "\n…more areas available through search_notes\n";
-      break;
+  const noteData = (note: ModelMapNote) => ({
+    title: dataField(note.title),
+    pinned: note.pinned,
+    ...(policy.includeIds ? { id: dataField(note.id, MAX_MAP_ID_CHARS) } : {}),
+  });
+  const allAreas = entries.map(([name, areaNotes]) => ({
+    name,
+    count: areaNotes.length,
+    notes: areaNotes
+      .slice(0, policy.profile === "expansive" ? areaNotes.length : policy.titlesPerArea)
+      .map(noteData),
+  }));
+  const full = encode(allAreas, false);
+  if (full.length <= maxChars) return full;
+
+  const bounded: unknown[] = [];
+  for (const [name, areaNotes] of entries) {
+    let area: { name: string; count: number; notes: ReturnType<typeof noteData>[] } = {
+      name,
+      count: areaNotes.length,
+      notes: areaNotes.slice(0, policy.titlesPerArea).map(noteData),
+    };
+    if (encode([...bounded, area], true).length > maxChars) {
+      area = { name, count: areaNotes.length, notes: [] };
     }
-    out += section;
+    if (encode([...bounded, area], true).length > maxChars) break;
+    bounded.push(area);
   }
-  return out.trim();
+  const result = encode(bounded, true);
+  if (result.length <= maxChars) return result;
+  return structuredJson({ kind: "rotli.model-map", trust: "untrusted-data", truncated: true, areas: [] });
 }

@@ -253,9 +253,10 @@ export const SLASH_ITEMS: SlashItem[] = [
   {
     label: "Mermaid",
     group: "Insert",
-    hint: "Diagram from text",
+    hint: "Interactive diagram",
     glyph: mermaidGlyph,
     op: { kind: "fence", lang: "mermaid" },
+    keywords: ["diagram", "flowchart", "graph"],
   },
   {
     label: "Link note",

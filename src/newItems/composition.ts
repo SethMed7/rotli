@@ -124,3 +124,18 @@ export async function createManagedItem(
   }
   return item;
 }
+
+/** Create a populated board atomically while preserving the same Main/view
+ * filing and presentation policy used by every other creation entry point. */
+export function createManagedBoardWithBody(
+  body: string,
+  options: { newTab?: boolean; open?: boolean } = {},
+): Promise<CreatedItem> {
+  const populatedBoardCreator: NewItemCreator = {
+    async create() {
+      const board = await corpusCreateBoard(resolvedPhysicalFolder(), body);
+      return { id: board.id, kind: "board" };
+    },
+  };
+  return createNewItem({ creator: populatedBoardCreator, presenter }, "board", options);
+}

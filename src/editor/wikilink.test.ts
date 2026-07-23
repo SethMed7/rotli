@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { NoteSummary } from "../types";
-import { buildTitleCounts, buildWikilinkIndex, resolveWikilink, wikilinkLabel } from "./wikilink";
+import {
+  buildTitleCounts,
+  buildWikilinkIndex,
+  editorLinkOpensOnClick,
+  resolveWikilink,
+  wikilinkLabel,
+} from "./wikilink";
 import { filterSlashItems, slashQueryAtCaret } from "./slashMenu";
 
 const note = (id: string, title: string): NoteSummary => ({
@@ -37,6 +43,13 @@ describe("wikilink", () => {
   test("resolveWikilink returns null for ambiguous title", () => {
     const index = buildWikilinkIndex([note("a", "Dup"), note("b", "Dup")]);
     expect(resolveWikilink("Dup", index)).toBeNull();
+  });
+
+  test("a normal click opens a note link while web links keep the command-click guard", () => {
+    expect(editorLinkOpensOnClick("note", 0, false)).toBe(true);
+    expect(editorLinkOpensOnClick("web", 0, false)).toBe(false);
+    expect(editorLinkOpensOnClick("web", 0, true)).toBe(true);
+    expect(editorLinkOpensOnClick("note", 2, true)).toBe(false);
   });
 });
 

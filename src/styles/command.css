@@ -135,7 +135,7 @@
 
 /* ——— WhichKey — "hold ⌘ to peek" shortcut map (Seth, 2026-06-13) ———
    Centered, pointer-events:none so it can never steal a click, z-index 18 —
-   below the palette (20). Dims + blurs behind the panel (Seth, 2026-06-15: the
+   below the palette (20). Dims behind the panel (Seth, 2026-06-15: the
    panel-over-live-app was hard to read) — the same scrim values as ⌘K. No raw
    hex — kit tokens + the palette's cocoa values. */
 .whichkey {
@@ -147,7 +147,7 @@
   pointer-events: none;
   animation: wk-in var(--motion-enter) var(--motion-ease);
 }
-/* the readability scrim — dim + blur the live app behind the panel */
+/* the flat readability scrim — uniformly dim the live app behind the panel */
 .whichkey::before {
   content: "";
   position: absolute;
@@ -1636,7 +1636,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--ground) 55%, transparent);
+  background: var(--scrim);
 }
 .rename-card {
   width: min(420px, 90vw);

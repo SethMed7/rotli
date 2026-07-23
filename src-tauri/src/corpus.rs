@@ -2057,7 +2057,8 @@ impl CorpusStore {
         let root = fs::canonicalize(&root)
             .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
         if !read_only {
-            fs::create_dir_all(root.join(DOT_DIR))
+            let dot = crate::containment::resolve_beneath(&root, Path::new(DOT_DIR))?;
+            fs::create_dir_all(dot)
                 .map_err(|e| format!("create {}: {e}", root.join(DOT_DIR).display()))?;
         }
 
@@ -2092,7 +2093,8 @@ impl CorpusStore {
         let root = fs::canonicalize(&root)
             .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
         if !read_only {
-            fs::create_dir_all(root.join(DOT_DIR))
+            let dot = crate::containment::resolve_beneath(&root, Path::new(DOT_DIR))?;
+            fs::create_dir_all(dot)
                 .map_err(|e| format!("create {}: {e}", root.join(DOT_DIR).display()))?;
         }
 
@@ -2153,10 +2155,12 @@ impl CorpusStore {
         // validator-safe (no spaces — see sanitize_asset_name).
         let safe = sanitize_asset_name(raw);
         let dir = self.root.join(subdir);
+        self.guard_rel(subdir)?;
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         // `safe` is a single clean component; free_name picks the first uncollided
         // rel under the binary subdir and derives its extension.
         let rel = self.free_name(subdir, &safe, None);
+        self.guard_rel(&rel)?;
         fs::copy(src, self.abs(&rel)).map_err(|e| format!("import {}: {e}", src.display()))?;
         Ok(rel)
     }
@@ -2167,7 +2171,7 @@ impl CorpusStore {
     /// from a truncated parse).
     pub fn file_stat(&self, rel: &str) -> Result<FileStat, String> {
         validate_rel(rel)?;
-        let abs = self.abs(rel);
+        let abs = self.guard_rel(rel)?;
         let meta = fs::metadata(&abs).map_err(|e| format!("stat {rel}: {e}"))?;
         if !meta.is_file() {
             return Err(format!("not a file: {rel}"));
@@ -2184,7 +2188,8 @@ impl CorpusStore {
     /// A surfaced storage asset can enter Rotli's in-memex Archive/Trash when
     /// the root accepts mutations. Markdown and boards keep their own lifecycle.
     fn storage_file_lifecycle_mutable(&self, rel: &str) -> bool {
-        if self.mutation_allowed().is_err() || !self.abs(rel).is_file() {
+        if self.mutation_allowed().is_err() || !self.guard_rel(rel).is_ok_and(|path| path.is_file())
+        {
             return false;
         }
         let in_storage = match self.layout {
@@ -2225,6 +2230,7 @@ impl CorpusStore {
             format!("{disk_sink}/{original_folder}")
         };
         validate_rel(&sink_folder)?;
+        self.guard_rel(&sink_folder)?;
         fs::create_dir_all(self.abs(&sink_folder))
             .map_err(|e| format!("create {sink_folder}: {e}"))?;
         let target_rel = self.free_name(&sink_folder, &name, None);
@@ -2240,6 +2246,7 @@ impl CorpusStore {
     pub fn restore_file(&mut self, rel: &str) -> Result<String, String> {
         validate_rel(rel)?;
         self.mutation_allowed()?;
+        self.guard_rel(rel)?;
         let original_rel = rel
             .strip_prefix("Archive/")
             .or_else(|| rel.strip_prefix("Trash/"))
@@ -2258,6 +2265,7 @@ impl CorpusStore {
             .map(|value| value.to_string_lossy().into_owned())
             .ok_or_else(|| format!("file has no name: {rel}"))?;
         let original_folder = folder_of(original_rel);
+        self.guard_rel(&original_folder)?;
         fs::create_dir_all(self.abs(&original_folder))
             .map_err(|e| format!("create {original_folder}: {e}"))?;
         let target_rel = self.free_name(&original_folder, &name, None);
@@ -2279,6 +2287,7 @@ impl CorpusStore {
     /// content, so the exact pre-Rotli package remains recoverable.
     pub fn write_file_bytes(&mut self, rel: &str, bytes: &[u8], bak: bool) -> Result<(), String> {
         validate_rel(rel)?;
+        self.guard_rel(rel)?;
         // the contract gate — unless this is the sanctioned in-place edit of an
         // existing storage office file, which the note lanes
         // still refuse. Overwrite-only is preserved by the is_file() check below.
@@ -2311,6 +2320,7 @@ impl CorpusStore {
         }
         validate_component(name)?;
         let rel = self.free_name(folder, name, None);
+        self.guard_rel(&rel)?;
         self.writable(&rel)?;
         if !folder.is_empty() {
             fs::create_dir_all(self.abs(folder)).map_err(|e| format!("create folder {folder}: {e}"))?;
@@ -2340,6 +2350,7 @@ impl CorpusStore {
             Layout::LegacyRotli => "Storage",
         };
         let rel = self.free_name(folder, name, None);
+        self.guard_rel(&rel)?;
         fs::create_dir_all(self.abs(folder)).map_err(|e| format!("create {folder}: {e}"))?;
         let abs = self.abs(&rel);
         self.suppress.mark(&abs);
@@ -2533,7 +2544,7 @@ impl CorpusStore {
     /// committable, so set_secure must learn about it (Seth, 2026-06-30 — audit).
     fn gitignore_add(&self, rel: &str) -> Result<(), String> {
         self.mutation_allowed()?;
-        let path = self.root.join(".gitignore");
+        let path = self.guard_rel(".gitignore")?;
         let existing = fs::read_to_string(&path).unwrap_or_default();
         if existing.lines().any(|l| l.trim() == rel) {
             return Ok(());
@@ -2552,7 +2563,7 @@ impl CorpusStore {
     /// gitignore_add). No-op when there's no `.gitignore` or the line isn't present.
     fn gitignore_remove(&self, rel: &str) -> Result<(), String> {
         self.mutation_allowed()?;
-        let path = self.root.join(".gitignore");
+        let path = self.guard_rel(".gitignore")?;
         let Ok(existing) = fs::read_to_string(&path) else {
             return Ok(());
         };
@@ -2575,7 +2586,7 @@ impl CorpusStore {
     /// Idempotent; a no-op outside a git corpus.
     fn ensure_main_committable(&self) -> Result<(), String> {
         self.mutation_allowed()?;
-        let path = self.root.join(".gitignore");
+        let path = self.guard_rel(".gitignore")?;
         if !path.exists() && !self.root.join(".git").exists() {
             return Ok(());
         }
@@ -2850,14 +2861,16 @@ impl CorpusStore {
             "Archive",
             "Trash",
         ] {
-            fs::create_dir_all(self.root.join(name))
+            fs::create_dir_all(self.guard_rel(name)?)
                 .map_err(|e| format!("create reserved folder {name}: {e}"))?;
         }
         Ok(())
     }
 
     fn load_index(&mut self) {
-        let path = self.root.join(DOT_DIR).join("index.json");
+        let Ok(path) = self.guard_rel(&format!("{DOT_DIR}/index.json")) else {
+            return;
+        };
         if let Ok(text) = fs::read_to_string(&path) {
             if let Ok(file) = serde_json::from_str::<IndexFile>(&text) {
                 self.index = file.notes;
@@ -2871,12 +2884,21 @@ impl CorpusStore {
         }
         let file = IndexFile { version: 1, notes: self.index.clone() };
         if let Ok(json) = serde_json::to_string_pretty(&file) {
-            let _ = atomic_write(&self.root.join(DOT_DIR).join("index.json"), &json);
+            if let Ok(path) = self.guard_rel(&format!("{DOT_DIR}/index.json")) {
+                let _ = atomic_write(&path, &json);
+            }
         }
     }
 
     fn abs(&self, rel: &str) -> PathBuf {
         self.root.join(rel)
+    }
+
+    /// Resolve a corpus-relative path without following any symlink component.
+    /// Call this at every read boundary; mutation boundaries receive the same
+    /// check centrally through `writable` / `filer_writable`.
+    fn guard_rel(&self, rel: &str) -> Result<PathBuf, String> {
+        crate::containment::resolve_beneath(&self.root, Path::new(rel))
     }
 
     /// The ownership choke point (Increment 3). Called at the TOP of every
@@ -2906,6 +2928,7 @@ impl CorpusStore {
     }
 
     fn writable(&self, rel: &str) -> Result<(), String> {
+        self.guard_rel(rel)?;
         self.mutation_allowed()?;
         if self.layout == Layout::LegacyRotli {
             return Ok(());
@@ -2946,7 +2969,7 @@ impl CorpusStore {
         matches!(
             ext.as_deref(),
             Some("xlsx") | Some("csv") | Some("docx") | Some("docm") | Some("dotx") | Some("dotm")
-        ) && self.abs(rel).is_file()
+        ) && self.guard_rel(rel).is_ok_and(|path| path.is_file())
     }
 
     /// Scan the disk (the truth), reconciling the id↔path index as we go:
@@ -3000,8 +3023,15 @@ impl CorpusStore {
             {
                 continue;
             }
-            let Some(rel) = self.index.get(&meta.id) else { continue };
-            let Ok(text) = fs::read_to_string(self.abs(rel)) else { continue };
+            let Some(rel) = self.index.get(&meta.id) else {
+                continue;
+            };
+            let Ok(path) = self.guard_rel(rel) else {
+                continue;
+            };
+            let Ok(text) = fs::read_to_string(path) else {
+                continue;
+            };
             let (fm, raw) = parse_document(&text);
             let body = match &fm {
                 Some(_) => editor_body(raw),
@@ -3033,7 +3063,7 @@ impl CorpusStore {
     /// move), rebuild from a scan once and retry.
     fn path_of(&mut self, id: &str) -> Result<String, String> {
         if let Some(rel) = self.index.get(id) {
-            if self.abs(rel).is_file() {
+            if self.guard_rel(rel).is_ok_and(|path| path.is_file()) {
                 return Ok(rel.clone());
             }
         }
@@ -3055,7 +3085,9 @@ impl CorpusStore {
         // writable() allows everything — a raw "../…" from the webview must
         // never reach disk outside the root. ULIDs are bare alphanumerics, so
         // the id path is unaffected (an invalid rel just falls to the index).
-        if validate_rel(id_or_rel).is_ok() && self.abs(id_or_rel).is_file() {
+        if validate_rel(id_or_rel).is_ok()
+            && self.guard_rel(id_or_rel).is_ok_and(|path| path.is_file())
+        {
             return Ok(id_or_rel.to_string());
         }
         self.path_of(id_or_rel)
@@ -3063,7 +3095,7 @@ impl CorpusStore {
 
     pub fn read(&mut self, id: &str) -> Result<NoteDoc, String> {
         let rel = self.path_of(id)?;
-        let abs = self.abs(&rel);
+        let abs = self.guard_rel(&rel)?;
         let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         let (fm, raw) = parse_document(&text);
         let body = match &fm {
@@ -3336,6 +3368,7 @@ impl CorpusStore {
     /// FRESH so a lock set between the classify-read and the write is honored). The
     /// USER's `writable()` is unchanged — two disjoint lanes (Seth, 2026-07-01).
     fn filer_writable(&self, rel: &str) -> Result<(), String> {
+        self.guard_rel(rel)?;
         if self.layout != Layout::Memex {
             return Err("the filer only runs on a memex".into());
         }
@@ -3469,9 +3502,9 @@ impl CorpusStore {
     /// does the append (in the deletable sidecar, per-machine).
     pub fn journal_append(&self, line: &str) -> Result<(), String> {
         self.mutation_allowed()?;
-        let dir = self.root.join(DOT_DIR);
+        let dir = self.guard_rel(DOT_DIR)?;
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        let path = dir.join("brain-journal.jsonl");
+        let path = self.guard_rel(&format!("{DOT_DIR}/brain-journal.jsonl"))?;
         let mut out = fs::read_to_string(&path).unwrap_or_default();
         if !out.is_empty() && !out.ends_with('\n') {
             out.push('\n');
@@ -3483,7 +3516,8 @@ impl CorpusStore {
 
     /// Read the whole brain journal (`""` when none yet).
     pub fn journal_read(&self) -> Result<String, String> {
-        Ok(fs::read_to_string(self.root.join(DOT_DIR).join("brain-journal.jsonl")).unwrap_or_default())
+        let path = self.guard_rel(&format!("{DOT_DIR}/brain-journal.jsonl"))?;
+        Ok(fs::read_to_string(path).unwrap_or_default())
     }
 
     /// Shared Main-manifest seam for the GUI and headless workspace adapters.
@@ -3697,7 +3731,7 @@ impl CorpusStore {
         if surfaced(self.layout, id) == Surface::Hidden {
             return Err(format!("not available here: {id}"));
         }
-        let abs = self.abs(id);
+        let abs = self.guard_rel(id)?;
         if !abs.is_file() {
             return Err(format!("board not found: {id}"));
         }
@@ -3719,6 +3753,7 @@ impl CorpusStore {
             return Err(format!("not a board: {id}"));
         }
         self.writable(id)?;
+        crate::board::validate_scene(body)?;
         // re-create the parent dir if it vanished under us (e.g. the folder was
         // deleted in Finder while a board tab stayed open) — atomic_write needs
         // the dir to exist, and a debounced save must not silently drop edits.
@@ -3752,6 +3787,8 @@ impl CorpusStore {
         // see surfaced()). If the caller's folder isn't itself a writable surface,
         // land the board there so ⌘⇧N always saves and every board shares one home
         // (Seth, 2026-07-07).
+        let body = body.unwrap_or(EMPTY_EXCALIDRAW);
+        crate::board::validate_scene(body)?;
         let folder_id = if self.layout == Layout::Memex
             && !matches!(surfaced(self.layout, folder_id), Surface::NoteRW)
         {
@@ -3768,7 +3805,7 @@ impl CorpusStore {
         let rel = self.free_name(folder_id, "untitled.excalidraw", None);
         let abs = self.abs(&rel);
         self.suppress.mark(&abs);
-        atomic_write(&abs, body.unwrap_or(EMPTY_EXCALIDRAW))?;
+        atomic_write(&abs, body)?;
         let (created_at, updated_at) = file_stamps(&abs);
         Ok(NoteMeta {
             id: rel.clone(),
@@ -3915,14 +3952,18 @@ impl CorpusStore {
         if self.os_trash && trash::delete(abs).is_ok() {
             return Ok(());
         }
-        let trash_dir = self.root.join(DOT_DIR).join("trash");
+        let trash_dir = self.guard_rel(&format!("{DOT_DIR}/trash"))?;
         fs::create_dir_all(&trash_dir).map_err(|e| format!("create trash: {e}"))?;
         let mut dest = trash_dir.join(fallback_name);
         let mut n = 2;
-        while dest.exists() {
+        while fs::symlink_metadata(&dest).is_ok() {
             dest = trash_dir.join(format!("{n}-{fallback_name}"));
             n += 1;
         }
+        let relative_dest = dest
+            .strip_prefix(&self.root)
+            .map_err(|_| "trash destination escaped the corpus".to_string())?;
+        crate::containment::resolve_beneath(&self.root, relative_dest)?;
         fs::rename(abs, &dest).map_err(|e| format!("trash {label}: {e}"))
     }
 
@@ -3968,7 +4009,7 @@ impl CorpusStore {
     /// Opaque JSON dot-files. `background.json` remains a readable legacy slot
     /// so removing the shelved Glass feature never deletes user data.
     pub fn dot_read(&self, which: &str) -> Result<String, String> {
-        let path = self.root.join(DOT_DIR).join(dot_file(which)?);
+        let path = self.guard_rel(&format!("{DOT_DIR}/{}", dot_file(which)?))?;
         match fs::read_to_string(&path) {
             Ok(s) => Ok(s),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),
@@ -3978,7 +4019,8 @@ impl CorpusStore {
 
     pub fn dot_write(&self, which: &str, contents: &str) -> Result<(), String> {
         self.mutation_allowed()?;
-        atomic_write(&self.root.join(DOT_DIR).join(dot_file(which)?), contents)
+        let path = self.guard_rel(&format!("{DOT_DIR}/{}", dot_file(which)?))?;
+        atomic_write(&path, contents)
     }
 
     /// First free relative path in `folder` for `desired` — the collision guard
@@ -4001,7 +4043,7 @@ impl CorpusStore {
         };
         let mut rel = join(desired);
         let mut n = 2;
-        while self.abs(&rel).exists() && keep_rel != Some(rel.as_str()) {
+        while fs::symlink_metadata(self.abs(&rel)).is_ok() && keep_rel != Some(rel.as_str()) {
             rel = join(&format!("{stem}-{n}{ext}"));
             n += 1;
         }
@@ -4544,7 +4586,7 @@ pub fn corpus_open_file(state: tauri::State<'_, CorpusState>, id: String) -> Res
     // The webview-supplied rel joins the root directly — validate like every
     // write lane so "../…" can never reach outside it (audit 2026-07).
     validate_rel(&rel)?;
-    let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
+    let abs = state.route(&root, |s| s.guard_rel(&rel))?;
     if !abs.is_file() {
         return Err(format!("not a file: {}", abs.display()));
     }
@@ -4571,7 +4613,7 @@ pub fn corpus_file_text(
     // Same traversal guard as the write lanes (audit 2026-07): a raw "../…"
     // from the webview must never read a file outside the corpus root.
     validate_rel(&rel)?;
-    let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
+    let abs = state.route(&root, |s| s.guard_rel(&rel))?;
     if !abs.is_file() {
         return Err(format!("not a file: {}", abs.display()));
     }
@@ -4598,7 +4640,7 @@ pub fn corpus_file_bytes(
     let (root, rel) = split_root_id(&id);
     // Same traversal guard as the write lanes (audit 2026-07).
     validate_rel(&rel)?;
-    let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
+    let abs = state.route(&root, |s| s.guard_rel(&rel))?;
     if !abs.is_file() {
         return Err(format!("not a file: {}", abs.display()));
     }
@@ -4749,9 +4791,9 @@ pub fn corpus_convert_document(
 ) -> Result<String, String> {
     let (root, rel) = split_root_id(&id);
     let output_name = converted_document_name(&rel)?;
-    let source = state.route(&root, |store| Ok(store.root().join(&rel)))?;
-    let metadata = fs::metadata(&source)
-        .map_err(|error| format!("read {}: {error}", source.display()))?;
+    let source = state.route(&root, |store| store.guard_rel(&rel))?;
+    let metadata =
+        fs::metadata(&source).map_err(|error| format!("read {}: {error}", source.display()))?;
     if !metadata.is_file() {
         return Err(format!("not a file: {}", source.display()));
     }
@@ -4834,7 +4876,7 @@ pub fn corpus_reveal_file(state: tauri::State<'_, CorpusState>, id: String) -> R
     // resolve_note_rel passes real file paths through and maps ids via the index.
     let abs = state.route(&root, |s| {
         let resolved = s.resolve_note_rel(&rel)?;
-        Ok(s.root().join(resolved))
+        s.guard_rel(&resolved)
     })?;
     if !abs.is_file() {
         return Err(format!("not a file: {}", abs.display()));
@@ -4891,7 +4933,7 @@ pub fn corpus_open_file_with(
         return Err(format!("unknown app: {app}"));
     }
     let (root, rel) = split_root_id(&id);
-    let abs = state.route(&root, |s| Ok(s.root().join(&rel)))?;
+    let abs = state.route(&root, |s| s.guard_rel(&rel))?;
     if !abs.is_file() {
         return Err(format!("not a file: {}", abs.display()));
     }
@@ -4915,7 +4957,10 @@ pub fn corpus_abs(
     root_id: String,
     rel: String,
 ) -> Result<String, String> {
-    state.route(&root_id, |s| Ok(s.abs(&rel).to_string_lossy().into_owned()))
+    validate_rel(&rel)?;
+    state.route(&root_id, |s| {
+        Ok(s.guard_rel(&rel)?.to_string_lossy().into_owned())
+    })
 }
 
 /// The note's frontmatter for the metadata panel (read-only display + lock state).
@@ -6691,6 +6736,57 @@ mod tests {
         fs::write(root.join("self/identity.md"), "# Me\n").unwrap();
         fs::write(root.join("wiki/note.md"), "# A wiki note\n").unwrap();
         fs::write(root.join("chats/welcome.md"), "# Welcome chat\n").unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn note_creation_refuses_a_symlinked_memex_intake_lane() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        let outside = dir.path().join("outside");
+        seed_memex(&root);
+        fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("wiki/_inbox")).unwrap();
+        let mut store = CorpusStore::open(root).unwrap();
+
+        let error = store.create("wiki/_inbox", "# Contained").unwrap_err();
+        assert!(error.contains("symlink"));
+        assert_eq!(fs::read_dir(outside).unwrap().count(), 0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_paths_refuse_reads_writes_moves_and_folder_creation() {
+        let (dir, mut store) = bare();
+        let outside = dir.path().join("outside");
+        fs::create_dir_all(&outside).unwrap();
+
+        fs::create_dir_all(store.root().join("Boards")).unwrap();
+        let outside_board = outside.join("board.excalidraw");
+        fs::write(&outside_board, EMPTY_EXCALIDRAW).unwrap();
+        std::os::unix::fs::symlink(
+            &outside_board,
+            store.root().join("Boards/linked.excalidraw"),
+        )
+        .unwrap();
+        assert!(store.read_board("Boards/linked.excalidraw").is_err());
+        assert!(store
+            .write_board("Boards/linked.excalidraw", EMPTY_EXCALIDRAW)
+            .is_err());
+        assert_eq!(
+            fs::read_to_string(&outside_board).unwrap(),
+            EMPTY_EXCALIDRAW
+        );
+
+        let note = store.create("Inbox", "# Contained\n").unwrap();
+        std::os::unix::fs::symlink(&outside, store.root().join("Escape")).unwrap();
+        assert!(store.move_note(&note.id, "Escape").is_err());
+        assert!(store.create_folder("Child", Some("Escape")).is_err());
+        assert_eq!(fs::read_dir(outside).unwrap().count(), 1);
+        assert!(
+            store.path_of(&note.id).is_ok(),
+            "refused move keeps the note"
+        );
     }
 
     #[test]

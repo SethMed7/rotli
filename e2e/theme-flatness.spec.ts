@@ -43,3 +43,61 @@ test("all four environments keep titlebar tooltips flat and semantically colored
     await themeButton.click();
   }
 });
+
+test("all four environments use one flat semantic scrim for full-screen backdrops", async ({ page }) => {
+  await gotoApp(page);
+  const themeButton = page.getByRole("button", { name: /^Theme —/ });
+
+  for (const theme of themes) {
+    await expect(themeButton).toHaveAccessibleName(`Theme — ${theme}`);
+
+    const audit = await page.evaluate(() => {
+      const semanticProbe = document.createElement("div");
+      semanticProbe.style.cssText = "position:fixed;visibility:hidden;background:var(--scrim)";
+      document.body.append(semanticProbe);
+      const expectedBackground = getComputedStyle(semanticProbe).backgroundColor;
+      semanticProbe.remove();
+
+      const backdrops = [
+        { name: "command palette", className: "pal-scrim" },
+        { name: "WhichKey", className: "whichkey", pseudo: "::before" },
+        { name: "rename", className: "rename-overlay" },
+        { name: "render expansion", className: "rotli-render-overlay" },
+        { name: "Mermaid workspace", className: "rotli-mermaid-workspace" },
+      ];
+
+      const results = backdrops.map(({ name, className, pseudo }) => {
+        const probe = document.createElement("div");
+        probe.className = className;
+        document.body.append(probe);
+        const style = getComputedStyle(probe, pseudo);
+        const result = {
+          name,
+          background: style.backgroundColor,
+          backgroundImage: style.backgroundImage,
+          boxShadow: style.boxShadow,
+          filter: style.filter,
+          backdropFilter: style.getPropertyValue("backdrop-filter"),
+          webkitBackdropFilter: style.getPropertyValue("-webkit-backdrop-filter"),
+        };
+        probe.remove();
+        return result;
+      });
+
+      return { expectedBackground, results };
+    });
+
+    for (const result of audit.results) {
+      expect(result.background, `${theme}: ${result.name} background`).toBe(audit.expectedBackground);
+      expect(result.backgroundImage, `${theme}: ${result.name} background image`).toBe("none");
+      expect(result.boxShadow, `${theme}: ${result.name} shadow`).toBe("none");
+      expect(result.filter, `${theme}: ${result.name} filter`).toBe("none");
+      expect(["", "none"], `${theme}: ${result.name} backdrop filter`).toContain(result.backdropFilter);
+      expect(["", "none"], `${theme}: ${result.name} WebKit backdrop filter`).toContain(
+        result.webkitBackdropFilter,
+      );
+    }
+
+    await themeButton.click();
+  }
+});

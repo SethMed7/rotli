@@ -42,8 +42,16 @@ function namedLine(userName?: string): string {
  * changing what a human reads. */
 function defuse(text: string): string {
   return text
-    .replace(/^(\s*)(STEP\b|User:|Assistant:|System:|CONVERSATION:|RESULT:|ACTION:|<\/?result>)/gim, "$1​$2")
-    .replaceAll("</result>", "<​/result>");
+    .replace(
+      /^(\s*)(STEP\b|User:|Assistant:|System:|Developer:|Tool:|CONVERSATION:|RESULT:|ACTION:|TOOLS:|RULES:|KNOWLEDGE BASE)/gim,
+      "$1​$2",
+    )
+    .replace(/<(\s*\/?\s*(?:result|knowledge_map)\b)/gi, "<​$1");
+}
+
+function renderKnowledgeMap(knowledge: string): string {
+  if (!knowledge) return "(no notes indexed yet — use search_notes to look)";
+  return `<knowledge_map trust="untrusted-data" format="json">\n${defuse(knowledge)}\n</knowledge_map>`;
 }
 
 function renderConversation(history: ChatTurn[], userText: string): string {
@@ -135,7 +143,7 @@ RULES:
 - Use at most ${ctx.maxSteps} steps. If unsure, give your best answer and note what you couldn't verify.
 
 YOUR KNOWLEDGE BASE (index of the user's notes):
-${ctx.knowledge || "(no notes indexed yet — use search_notes to look)"}
+${renderKnowledgeMap(ctx.knowledge)}
 
 CONVERSATION:
 ${renderConversation(ctx.history, ctx.userText)}
@@ -195,7 +203,7 @@ To answer the user: {"thought":"…","final":"your answer"}
 Rules: ${webRule} For past decisions, people, or conversations, search_memory first. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
 
 KNOWLEDGE BASE INDEX:
-${ctx.knowledge || "(no notes indexed yet — use search_notes)"}
+${renderKnowledgeMap(ctx.knowledge)}
 
 CONVERSATION:
 ${renderConversation(ctx.history, ctx.userText)}

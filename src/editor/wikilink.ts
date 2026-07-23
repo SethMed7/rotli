@@ -48,3 +48,8 @@ export function resolveWikilink(target: string, index: WikilinkIndex): string | 
   if (hits?.length === 1) return hits[0]!.id;
   return null;
 }
+
+/** Local note navigation is link-like; web navigation remains deliberate in an editor. */
+export function editorLinkOpensOnClick(kind: "note" | "web", button: number, metaKey: boolean): boolean {
+  return button === 0 && (kind === "note" || metaKey);
+}

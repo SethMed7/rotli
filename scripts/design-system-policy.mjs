@@ -12,6 +12,9 @@ export function flatCssViolations(source, file) {
   if (/--[a-z0-9-]*(?:glow|halo|shadow)[a-z0-9-]*\s*:/i.test(css)) {
     violations.push(`${file}: glow, halo, and shadow tokens are forbidden`);
   }
+  if (/(?:repeating-)?radial-gradient\s*\(/i.test(css)) {
+    violations.push(`${file}: radial gradients are forbidden; use a solid semantic surface or scrim`);
+  }
   if (file !== "src/styles/base.css" && file !== "src/styles/themes.css" && /var\(--rotli-/i.test(css)) {
     violations.push(`${file}: product CSS must consume semantic roles, not fixed --rotli-* palette tokens`);
   }

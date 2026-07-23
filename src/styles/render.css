@@ -156,7 +156,8 @@
   border-radius: var(--r-control);
   cursor: pointer;
   opacity: 0;
-  transition: opacity var(--motion-enter) var(--motion-ease),
+  transition:
+    opacity var(--motion-enter) var(--motion-ease),
     background var(--motion-enter) var(--motion-ease);
 }
 .rotli-render-block:hover .rotli-render-expand,
@@ -191,7 +192,8 @@
   border-radius: var(--r-control);
   cursor: pointer;
   opacity: 0.92;
-  transition: opacity var(--motion-enter) var(--motion-ease),
+  transition:
+    opacity var(--motion-enter) var(--motion-ease),
     background var(--motion-enter) var(--motion-ease);
 }
 .rotli-render-action:hover,
@@ -225,7 +227,8 @@
   background: var(--text-muted);
   opacity: 0.58;
   transform: translateX(-50%);
-  transition: opacity var(--motion-enter) var(--motion-ease),
+  transition:
+    opacity var(--motion-enter) var(--motion-ease),
     background var(--motion-enter) var(--motion-ease);
 }
 .rotli-render-resize:hover::after,
@@ -266,7 +269,7 @@
   align-items: center;
   justify-content: center;
   padding: 48px;
-  background: color-mix(in srgb, var(--text) 28%, transparent);
+  background: var(--scrim);
   animation: rotli-render-fade var(--motion-enter) var(--motion-ease);
 }
 
@@ -306,4 +309,792 @@
 }
 .rotli-render-overlay-card .rotli-render-html iframe {
   height: min(70vh, 560px);
+}
+
+/* Mermaid workspace — one source-backed View / Visual / Code surface. Visual
+   flowchart edits rewrite the Mermaid fence; Excalidraw conversion remains an
+   explicit copy action. */
+.rotli-render-mermaid-trigger {
+  width: 100%;
+  min-height: 72px;
+  cursor: zoom-in;
+  border-radius: var(--r-inner);
+}
+.rotli-render-mermaid-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.rotli-mermaid-workspace-root {
+  position: relative;
+  z-index: 1000;
+}
+.rotli-mermaid-workspace {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--scrim);
+  animation: rotli-render-fade var(--motion-enter) var(--motion-ease);
+}
+.rotli-mermaid-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(1120px, 94vw);
+  height: min(780px, 90vh);
+  overflow: hidden;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-window);
+}
+.rotli-mermaid-toolbar {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.rotli-mermaid-mode,
+.rotli-mermaid-zoom,
+.rotli-mermaid-toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.rotli-mermaid-toolbar-end {
+  margin-left: auto;
+}
+.rotli-mermaid-toolbar button,
+.rotli-mermaid-discard button,
+.rotli-mermaid-convert-confirm button,
+.rotli-mermaid-state button,
+.rotli-mermaid-code button,
+.rotli-mermaid-visual button {
+  min-height: 32px;
+  padding: 5px 10px;
+  color: var(--text-muted);
+  font: 600 12px/1.2 var(--font-body);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+.rotli-mermaid-toolbar button:hover:not(:disabled),
+.rotli-mermaid-discard button:hover:not(:disabled),
+.rotli-mermaid-convert-confirm button:hover:not(:disabled),
+.rotli-mermaid-state button:hover:not(:disabled),
+.rotli-mermaid-code button:hover:not(:disabled),
+.rotli-mermaid-visual button:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--hov);
+}
+.rotli-mermaid-toolbar button:focus-visible,
+.rotli-mermaid-discard button:focus-visible,
+.rotli-mermaid-convert-confirm button:focus-visible,
+.rotli-mermaid-state button:focus-visible,
+.rotli-mermaid-code button:focus-visible,
+.rotli-mermaid-visual button:focus-visible,
+.rotli-mermaid-visual input:focus-visible,
+.rotli-mermaid-visual select:focus-visible,
+.rotli-mermaid-visual textarea:focus-visible,
+.rotli-mermaid-canvas:focus-visible,
+.rotli-mermaid-code textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.rotli-mermaid-toolbar button:disabled,
+.rotli-mermaid-code button:disabled,
+.rotli-mermaid-visual button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.rotli-mermaid-mode {
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+}
+.rotli-mermaid-mode button {
+  min-height: 28px;
+  padding-inline: 12px;
+}
+.rotli-mermaid-mode button.is-active {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+.rotli-mermaid-zoom {
+  color: var(--text-muted);
+}
+.rotli-mermaid-zoom button {
+  min-width: 32px;
+  padding-inline: 7px;
+  border-color: var(--border);
+}
+.rotli-mermaid-zoom output {
+  min-width: 52px;
+  color: var(--text-muted);
+  font:
+    12px/1.2 ui-monospace,
+    Menlo,
+    monospace;
+  text-align: center;
+}
+.rotli-mermaid-more-wrap,
+.rotli-mermaid-shape-menu-wrap {
+  position: relative;
+}
+.rotli-mermaid-more-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 284px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+}
+.rotli-mermaid-more-menu button {
+  display: flex;
+  width: 100%;
+  height: auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 9px 10px;
+  text-align: left;
+}
+.rotli-mermaid-more-menu strong {
+  color: var(--text);
+  font-size: 12px;
+}
+.rotli-mermaid-more-menu span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.rotli-mermaid-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--ground);
+}
+.rotli-mermaid-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.rotli-mermaid-canvas.is-panning {
+  cursor: grabbing;
+}
+.rotli-mermaid-diagram {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.rotli-mermaid-diagram svg {
+  display: block;
+  max-width: none;
+  height: auto;
+}
+.rotli-mermaid-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  max-width: min(440px, 80%);
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  transform: translate(-50%, -50%);
+}
+.rotli-mermaid-state strong {
+  color: var(--text);
+}
+.rotli-mermaid-state.is-error {
+  border-color: color-mix(in srgb, var(--danger, var(--accent-text)) 40%, var(--border));
+}
+.rotli-mermaid-state button {
+  color: var(--text);
+  border-color: var(--border);
+}
+.rotli-mermaid-hint {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  padding: 4px 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  pointer-events: none;
+}
+.rotli-mermaid-code {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  padding: 16px;
+  background: var(--surface);
+}
+.rotli-mermaid-code textarea {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  resize: none;
+  padding: 18px;
+  color: var(--text);
+  font:
+    13px/1.6 ui-monospace,
+    Menlo,
+    monospace;
+  tab-size: 2;
+  background: var(--ground);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+}
+.rotli-mermaid-code footer {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.rotli-mermaid-apply-error {
+  color: var(--danger, var(--accent-text));
+}
+.rotli-mermaid-code button.is-primary,
+.rotli-mermaid-visual button.is-primary,
+.rotli-mermaid-convert-confirm button.is-primary {
+  color: var(--text);
+  background: var(--tint);
+  border-color: var(--accent);
+}
+.rotli-mermaid-discard,
+.rotli-mermaid-convert-confirm,
+.rotli-mermaid-conversion-error {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 6px 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.rotli-mermaid-discard span,
+.rotli-mermaid-convert-confirm span {
+  margin-right: auto;
+}
+.rotli-mermaid-discard button,
+.rotli-mermaid-convert-confirm button {
+  border-color: var(--border);
+}
+.rotli-mermaid-discard button.is-destructive,
+.rotli-mermaid-conversion-error {
+  color: var(--danger, var(--accent-text));
+}
+.rotli-mermaid-conversion-error {
+  justify-content: flex-start;
+  border-top: 1px solid var(--border);
+  border-bottom: 0;
+}
+
+/* Flowchart visual editor. Positions are an editing convenience; Mermaid keeps
+   the final saved layout automatic, while shape semantics and colors persist. */
+.rotli-mermaid-visual {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--surface);
+}
+.rotli-mermaid-visual-tools {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.rotli-mermaid-visual-tools > label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rotli-mermaid-visual-tools > span {
+  margin-left: auto;
+  text-align: right;
+}
+.rotli-mermaid-visual select,
+.rotli-mermaid-visual input,
+.rotli-mermaid-visual textarea {
+  color: var(--text);
+  font: 12px/1.4 var(--font-body);
+  background: var(--ground);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-control);
+}
+.rotli-mermaid-visual select,
+.rotli-mermaid-visual input {
+  min-height: 30px;
+  padding: 4px 7px;
+}
+.rotli-mermaid-visual textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 7px 8px;
+}
+.rotli-mermaid-shape-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  width: 308px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+}
+.rotli-mermaid-shape-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  text-align: left;
+}
+.rotli-mermaid-shape-preview {
+  display: block;
+  width: 31px;
+  height: 20px;
+  flex: none;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+}
+.rotli-mermaid-shape-preview[data-shape="rounded"] {
+  border-radius: var(--r-card);
+}
+.rotli-mermaid-shape-preview[data-shape="stadium"],
+.rotli-mermaid-shape-preview[data-shape="circle"],
+.rotli-mermaid-shape-preview[data-shape="cyl"] {
+  border-radius: var(--r-pill);
+}
+.rotli-mermaid-shape-preview[data-shape="diamond"] {
+  width: 22px;
+  margin-inline: 4px 5px;
+  transform: rotate(45deg);
+}
+.rotli-mermaid-shape-preview[data-shape="hex"] {
+  clip-path: polygon(22% 0, 78% 0, 100% 50%, 78% 100%, 22% 100%, 0 50%);
+}
+.rotli-mermaid-shape-preview[data-shape="lean-r"] {
+  clip-path: polygon(18% 0, 100% 0, 82% 100%, 0 100%);
+}
+.rotli-mermaid-shape-preview[data-shape="lean-l"] {
+  clip-path: polygon(0 0, 82% 0, 100% 100%, 18% 100%);
+}
+.rotli-mermaid-shape-preview[data-shape="dbl-circ"] {
+  border: 3px double var(--border-strong);
+  border-radius: var(--r-pill);
+}
+.rotli-mermaid-shape-preview[data-shape="subproc"] {
+  border-inline-width: 4px;
+}
+.rotli-mermaid-shape-preview[data-shape="text"] {
+  background: transparent;
+  border-color: transparent;
+  border-bottom-color: var(--border-strong);
+}
+.rotli-mermaid-connect-state {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text);
+  font-size: 12px;
+  background: var(--tint);
+  border-bottom: 1px solid var(--border-strong);
+}
+.rotli-mermaid-visual-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+.rotli-mermaid-visual-scroll {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  overflow: auto;
+  background: var(--ground);
+}
+.rotli-mermaid-visual-canvas {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+.rotli-mermaid-visual-canvas.is-connecting {
+  cursor: crosshair;
+}
+.rotli-mermaid-visual-edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.rotli-mermaid-visual-edges line {
+  stroke: var(--text-muted);
+}
+.rotli-mermaid-visual-edges marker path {
+  fill: var(--text-muted);
+}
+.rotli-mermaid-visual-edges g.is-selected line {
+  stroke: var(--accent-text);
+}
+.rotli-mermaid-visual-edges text {
+  fill: var(--text);
+  font: 600 11px/1 var(--font-body);
+}
+.rotli-mermaid-visual-node-wrap {
+  position: absolute;
+  width: 164px;
+  height: 72px;
+}
+.rotli-mermaid-visual-node {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  width: 164px;
+  height: 72px;
+  place-items: center;
+  overflow: hidden;
+  padding: 10px 14px;
+  color: var(--mermaid-node-text);
+  background: var(--mermaid-node-fill);
+  border: 1px solid var(--mermaid-node-stroke);
+  border-radius: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.rotli-mermaid-visual-node:active {
+  cursor: grabbing;
+}
+.rotli-mermaid-visual-node > span {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre-wrap;
+}
+.rotli-mermaid-visual-node.is-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.rotli-mermaid-visual-node[data-shape="rounded"] {
+  border-radius: var(--r-card);
+}
+.rotli-mermaid-visual-node[data-shape="stadium"] {
+  border-radius: var(--r-pill);
+}
+.rotli-mermaid-visual-node[data-shape="circle"],
+.rotli-mermaid-visual-node[data-shape="dbl-circ"] {
+  right: auto;
+  left: 46px;
+  width: 72px;
+  border-radius: 50%;
+}
+.rotli-mermaid-visual-node[data-shape="dbl-circ"] {
+  border: 4px double var(--mermaid-node-stroke);
+}
+.rotli-mermaid-visual-node[data-shape="diamond"] {
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+.rotli-mermaid-visual-node[data-shape="hex"] {
+  clip-path: polygon(18% 0, 82% 0, 100% 50%, 82% 100%, 18% 100%, 0 50%);
+}
+.rotli-mermaid-visual-node[data-shape="lean-r"] {
+  clip-path: polygon(14% 0, 100% 0, 86% 100%, 0 100%);
+}
+.rotli-mermaid-visual-node[data-shape="lean-l"] {
+  clip-path: polygon(0 0, 86% 0, 100% 100%, 14% 100%);
+}
+.rotli-mermaid-visual-node[data-shape="cyl"] {
+  border-radius: 50% / 14%;
+}
+.rotli-mermaid-visual-node[data-shape="subproc"]::after {
+  position: absolute;
+  inset: 0 12px;
+  content: "";
+  border-inline: 1px solid var(--mermaid-node-stroke);
+}
+.rotli-mermaid-visual-node[data-shape="text"] {
+  background: transparent;
+  border-color: transparent;
+}
+.rotli-mermaid-node-port {
+  position: absolute;
+  z-index: 3;
+  right: -7px;
+  bottom: 25px;
+  display: grid;
+  width: 22px;
+  min-height: 22px !important;
+  place-items: center;
+  padding: 0 !important;
+  color: var(--text) !important;
+  background: var(--surface) !important;
+  border-color: var(--border-strong) !important;
+  border-radius: 50% !important;
+}
+.rotli-mermaid-node-port[aria-pressed="true"] {
+  background: var(--tint) !important;
+  border-color: var(--accent) !important;
+}
+.rotli-mermaid-inspector {
+  width: 266px;
+  flex: none;
+  overflow: auto;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+}
+.rotli-mermaid-inspector > header {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.rotli-mermaid-inspector > header span {
+  color: var(--text-muted);
+  font: 11px/1.2 ui-monospace, Menlo, monospace;
+}
+.rotli-mermaid-inspector-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 12px;
+}
+.rotli-mermaid-inspector-fields > label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.rotli-mermaid-color-control {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.rotli-mermaid-color-control legend {
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.rotli-mermaid-color-control > div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.rotli-mermaid-color-control > div > button:not(.rotli-mermaid-color-reset),
+.rotli-mermaid-custom-color {
+  display: grid;
+  width: 24px;
+  min-height: 24px;
+  place-items: center;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+}
+.rotli-mermaid-color-control > div > button.is-active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.rotli-mermaid-custom-color {
+  position: relative;
+  cursor: pointer;
+}
+.rotli-mermaid-custom-color span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.rotli-mermaid-custom-color input {
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  cursor: pointer;
+  border: 0;
+}
+.rotli-mermaid-color-reset {
+  margin-left: auto;
+  padding-inline: 5px !important;
+  font-size: 10px !important;
+}
+.rotli-mermaid-inspector-actions {
+  display: grid;
+  gap: 6px;
+}
+.rotli-mermaid-inspector button.is-destructive {
+  color: var(--danger, var(--accent-text));
+  border-color: color-mix(in srgb, var(--danger, var(--accent-text)) 35%, var(--border));
+}
+.rotli-mermaid-inspector-empty,
+.rotli-mermaid-empty-canvas,
+.rotli-mermaid-visual-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+.rotli-mermaid-inspector-empty {
+  padding: 20px 12px;
+}
+.rotli-mermaid-empty-canvas,
+.rotli-mermaid-visual-state {
+  position: absolute;
+  inset: 0;
+}
+.rotli-mermaid-empty-canvas strong,
+.rotli-mermaid-visual-state strong {
+  color: var(--text);
+}
+.rotli-mermaid-visual-state button,
+.rotli-mermaid-empty-canvas button {
+  border-color: var(--border-strong);
+}
+.rotli-mermaid-connection-list {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 12px 12px;
+  text-align: left;
+}
+.rotli-mermaid-connection-list button {
+  width: 100%;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-color: var(--border);
+}
+.rotli-mermaid-connection-list button.is-active {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--accent);
+}
+.rotli-mermaid-visual-footer {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.rotli-mermaid-visual-footer button {
+  flex: none;
+}
+
+@media (max-width: 720px) {
+  .rotli-mermaid-workspace {
+    padding: 8px;
+  }
+  .rotli-mermaid-panel {
+    width: 100%;
+    height: 100%;
+    border-radius: var(--r-card);
+  }
+  .rotli-mermaid-toolbar {
+    min-height: 88px;
+    flex-wrap: wrap;
+  }
+  .rotli-mermaid-toolbar-end {
+    width: 100%;
+  }
+  .rotli-mermaid-toolbar-end > :first-child {
+    margin-left: auto;
+  }
+  .rotli-mermaid-visual-tools > span {
+    display: none;
+  }
+  .rotli-mermaid-inspector {
+    width: 224px;
+  }
+  .rotli-mermaid-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .rotli-mermaid-visual-body {
+    flex-direction: column;
+  }
+  .rotli-mermaid-inspector {
+    width: 100%;
+    max-height: 42%;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+  .rotli-mermaid-visual-footer > span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotli-render-overlay,
+  .rotli-mermaid-workspace {
+    animation: none;
+  }
 }

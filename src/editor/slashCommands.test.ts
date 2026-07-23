@@ -57,7 +57,10 @@ describe("slash command catalog", () => {
     expect(slashInsertion(byLabel("Divider"))?.insert).toBe("---\n\n");
     expect(slashInsertion(byLabel("Inline code"))).toEqual({ insert: "``", caret: 1 });
     expect(slashInsertion(byLabel("Math"))?.insert).toBe("```math\n\n```");
-    expect(slashInsertion(byLabel("Mermaid"))?.insert).toBe("```mermaid\n\n```");
+    expect(slashInsertion(byLabel("Mermaid"))).toEqual({
+      insert: "```mermaid\nflowchart LR\n  Start[Start] --> Next[Next step]\n```",
+      caret: 32,
+    });
     expect(slashInsertion(byLabel("Table"))?.insert.split("\n")).toHaveLength(4);
   });
 

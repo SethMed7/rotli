@@ -53,6 +53,16 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   typed embed fences, wikilinks, note frontmatter, and note-native workflows.
   DOCX documents, sheets, and Excalidraw boards are secondary bonus work
   surfaces with conventional file behavior, not parallel note systems.
+- A Markdown `mermaid` fence owns its diagram source. The rendered block opens a
+  View/Visual/Code workspace; `/Mermaid` inserts a valid starter flowchart. View
+  provides pan, zoom, and fit. Visual losslessly edits supported flowcharts as
+  readable Mermaid shapes, labels, directions, connections, and portable node
+  colors; unsupported diagram families and advanced syntax fail closed into
+  Code without rewriting source. Applying edits replaces only the fence body.
+  Visual-canvas positions are intentionally temporary because Mermaid owns
+  final layout. The secondary `Convert copy to Excalidraw…` action creates a new
+  user-owned `.excalidraw` file in the active creation context and leaves the
+  Mermaid fence unchanged.
 - Documents are conventional DOCX files. They do not host Markdown slash
   commands or embed syntax. Rotli creates and edits them locally through a
   structured document model, including native Word tables. The DOCX codec
@@ -111,6 +121,12 @@ request:
 - expansive models receive a full per-note map when it fits, then degrade to a
   bounded area map.
 
+The map is serialized as schema-shaped JSON marked `untrusted-data`. Titles,
+folder names, and ids are length-limited, control/framing characters are
+neutralized, and markup delimiter characters are JSON-escaped. The prompt wraps
+the whole object in an explicit untrusted-data boundary; note-controlled values
+never become headings, roles, tool declarations, or delimiters.
+
 Pinned notes and recently touched notes rank first. These are transparent user
 signals stored in normal memex metadata/filesystem state—not hidden learning in
 a database. Future priority signals must remain inspectable and rebuildable.
@@ -134,6 +150,13 @@ notes and prior chat transcripts.
 5. **Generate:** tool observations, current conversation history, and the model-
    specific budget form the answer context. The existing step, history, scratch,
    note, and snippet caps prevent context overflow.
+
+Tool observations and note bodies remain fenced untrusted data. Off-device tool
+arguments pass both the secret detector and a substantial verbatim-overlap check
+against locally retrieved results. The latter blocks ordinary private prose,
+not only credential-shaped strings. Network tools exist only when their explicit
+per-chat capability is on; blocked private text must be rephrased locally rather
+than approved by prompt text.
 
 Starting a chat from a Markdown note reuses the chat already attached to that
 note or creates one durable chat with a stable note-derived identity. Each turn
@@ -171,11 +194,28 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   moves. Locked notes are never modified by the organizer. The organizer skips
   secure notes even if interactive local access was granted.
 - Remote organizer choices apply only to non-secure, unlocked notes.
+- Secure organization remains unimplemented and the ordinary organizer still
+  skips every secure note. Any future implementation must follow the revised
+  [local-only proposal](../decisions/2026-07-22-secure-organizer-and-sheet-metadata.md):
+  legacy secure intake repair precedes access, remote providers receive no
+  secure-derived envelope, and both default-off global consent and explicit
+  `local_ai_allowed: true` are required for a registered on-device model.
 - Secret-shaped prior chats are omitted from remote search results and blocked
   on exact read; the provider egress detector independently checks the final
   prompt as a backstop. Local models may retrieve them on-device.
 - The frontend registry improves UX but never replaces Rust path, extension,
   root-permission, and write-lane validation.
+- Rust resolves each existing relative-path component with no-follow metadata,
+  rejects symlinks, and canonicalizes it beneath the registered root before any
+  read or mutation. The same check covers destination parents before folder and
+  atomic-temp creation, both ends of a move, office/board lanes, `.rotli/`
+  sidecars, and `.gitignore` protection.
+- Excalidraw source is durable even when invalid. A corrupt or over-limit board
+  does not mount a canvas or autosave. TypeScript and Rust independently enforce
+  parity-pinned limits for bytes, elements, semantic actions, strings,
+  coordinates, embedded files, depth, and total JSON nodes; the Rust boundary is
+  shared by GUI, CLI, and MCP writes. Blank repair is an explicit confirmed
+  replacement, never a parse fallback.
 - Storage assets use a recoverable lifecycle: “Remove from Main” only removes a
   reference. Archive/Trash actions move the physical file under the memex sink
   while nesting its original storage path (`trash/storage/rotli/file.docx`), so

@@ -19,11 +19,16 @@
 
 import { type EditorState, type Range, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, WidgetType } from "@codemirror/view";
+import { createEditableBoardFromMermaid } from "../boards/composition";
+import { isTauri } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
 import { usePanesStore } from "../state/panes";
 import { type FenceBlock, type LangKey, innerCode, scanFences } from "./fences";
 import { mountBoardEmbed, mountDocumentEmbed, mountSheetEmbed } from "./embedHosts";
 import { installEmbedControls } from "./embedControls";
+import { mermaidErrorMessage, renderMermaidElement } from "./mermaidRender";
+import { mountMermaidWorkspace } from "./mermaidWorkspace";
+import { sanitizeSvg } from "./svgSanitizer";
 
 // Heavy fence libs (katex / mermaid / jsxgraph) load on first use — they used to
 // ride every note-editor open via a static import. CSS follows the same gate.
@@ -72,7 +77,6 @@ function errorBox(message: string): HTMLElement {
   return box;
 }
 
-let mermaidThemeFor: "dark" | "default" | null = null;
 let katexCssReady: Promise<void> | null = null;
 let jsxgraphCssReady: Promise<void> | null = null;
 
@@ -82,36 +86,12 @@ async function loadKatex() {
   return katex;
 }
 
-async function loadMermaid() {
-  const { default: mermaid } = await import("mermaid");
-  return mermaid;
-}
-
 async function loadJsxgraph() {
   // jsxgraph's package "exports" map hides ./distrib/* — import the stylesheet by
   // a filesystem-relative path so Vite resolves it directly (bypassing exports).
   jsxgraphCssReady ??= import("../../node_modules/jsxgraph/distrib/jsxgraph.css").then(() => undefined);
   const [{ default: JXG }] = await Promise.all([import("jsxgraph"), jsxgraphCssReady]);
   return JXG;
-}
-
-/** mermaid throws "detailed errors" ({ str, hash }) for parse failures and plain
- * Errors otherwise — pull a human message from either shape. */
-function mermaidMessage(e: unknown): string {
-  if (e && typeof e === "object") {
-    const d = e as { str?: unknown; message?: unknown };
-    if (typeof d.str === "string" && d.str) return d.str;
-    if (typeof d.message === "string" && d.message) return d.message;
-  }
-  return String(e);
-}
-
-/** Remove the temp render nodes mermaid leaves in document.body when render()
- * throws (it skips its own removeTempElements() on the error path). */
-function cleanupMermaidOrphans(id: string): void {
-  for (const candidate of [id, `d${id}`, `i${id}`]) {
-    document.getElementById(candidate)?.remove();
-  }
 }
 
 // ——— the renderer registry — one function per language, shared infra ————
@@ -136,27 +116,10 @@ const RENDERERS: Record<StaticLangKey, (code: string, ctx: RenderCtx) => HTMLEle
     },
 
     mermaid: async (code, ctx) => {
-      const mermaid = await loadMermaid();
-      const theme = ctx.dark ? "dark" : "default";
-      if (mermaidThemeFor !== theme) {
-        mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
-        mermaidThemeFor = theme;
-      }
-      if (!code.trim()) {
-        const el = document.createElement("div");
-        el.className = "rotli-render-mermaid";
-        return el;
-      }
       try {
-        const { svg } = await mermaid.render(ctx.id, code);
-        const el = document.createElement("div");
-        el.className = "rotli-render-mermaid";
-        el.innerHTML = svg;
-        return el;
+        return await renderMermaidElement(code, { dark: ctx.dark, id: ctx.id });
       } catch (e) {
-        return errorBox(`mermaid: ${mermaidMessage(e)}`);
-      } finally {
-        cleanupMermaidOrphans(ctx.id);
+        return errorBox(`mermaid: ${mermaidErrorMessage(e)}`);
       }
     },
 
@@ -216,16 +179,20 @@ const RENDERERS: Record<StaticLangKey, (code: string, ctx: RenderCtx) => HTMLEle
       return el;
     },
 
-    // a ```svg fence renders the vector inline; click-to-edit reveals the source
-    // (the code ⇄ preview toggle). User content, so strip <script> before injecting
-    // (the CSP blocks it too).
+    // A ```svg fence renders a fresh allowlisted SVG tree. Note content is
+    // untrusted: scripts, events, foreignObject, resource links, unsafe URLs,
+    // styles, and unexpected namespaces never enter the live document.
     svg: (code) => {
       const el = document.createElement("div");
       el.className = "rotli-render-svg";
       const src = code.trim();
       if (!src) return el; // empty fence while live-typing — quiet placeholder
-      el.innerHTML = src.replace(/<script[\s\S]*?<\/script>/gi, "");
-      return el;
+      try {
+        el.appendChild(sanitizeSvg(src));
+        return el;
+      } catch (error) {
+        return errorBox(`svg: ${(error as Error).message}`);
+      }
     },
 
     // a ```html fence renders the markup in a SANDBOXED srcdoc iframe (same
@@ -370,37 +337,65 @@ class RenderBlockWidget extends WidgetType {
     /** The resolved-theme signature — part of identity so a theme/canvas/tint
      * flip makes eq() differ and CM re-renders the diagram with fresh colors. */
     readonly themeSig: string,
+    readonly sourceFrom: number,
+    readonly sourceTo: number,
   ) {
     super();
   }
 
   eq(o: RenderBlockWidget): boolean {
-    return o.lang === this.lang && o.code === this.code && o.themeSig === this.themeSig;
+    return (
+      o.lang === this.lang &&
+      o.code === this.code &&
+      o.themeSig === this.themeSig &&
+      o.sourceFrom === this.sourceFrom &&
+      o.sourceTo === this.sourceTo
+    );
   }
 
   toDOM(): HTMLElement {
     const container = document.createElement("div");
     container.className = "rotli-render-block";
     container.dataset.lang = this.lang;
-    // math/mermaid/svg/html are click-to-edit: clicking the rendered block lands
-    // the caret in the source — the toggle to see/edit the code. (For html the
-    // iframe swallows clicks on its own area; the block's padding still works.)
-    if (this.lang !== "jsxgraph") container.title = "Click to edit the source";
+    // Mermaid opens an interactive view/code workspace. Other static blocks
+    // retain the hybrid editor's click-to-reveal-source behavior.
+    if (this.lang === "mermaid") container.title = "Open Mermaid diagram";
+    else if (this.lang !== "jsxgraph") container.title = "Click to edit the source";
     this.dom = container;
 
     const body = document.createElement("div");
     body.className = "rotli-render-body";
     container.appendChild(body);
 
+    if (this.lang === "mermaid") {
+      body.classList.add("rotli-render-mermaid-trigger");
+      body.tabIndex = 0;
+      body.setAttribute("role", "button");
+      body.setAttribute("aria-label", "Open Mermaid diagram viewer");
+      const open = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openMermaidWorkspace(this.code, container, this.sourceFrom, this.sourceTo);
+      };
+      body.addEventListener("mousedown", open);
+      body.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") open(event);
+      });
+    }
+
     const expand = document.createElement("button");
     expand.type = "button";
     expand.className = "rotli-render-expand";
-    expand.textContent = "Expand";
-    expand.setAttribute("aria-label", "Expand");
+    expand.textContent = this.lang === "mermaid" ? "Open" : "Expand";
+    expand.setAttribute("aria-label", this.lang === "mermaid" ? "Open Mermaid diagram" : "Expand");
     expand.addEventListener("mousedown", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openExpandOverlay(this.lang, this.code, container);
+      if (this.lang === "mermaid") {
+        openMermaidWorkspace(this.code, container, this.sourceFrom, this.sourceTo);
+      } else {
+        openExpandOverlay(this.lang, this.code, container);
+      }
     });
     container.appendChild(expand);
 
@@ -441,7 +436,7 @@ class RenderBlockWidget extends WidgetType {
     // math/mermaid are static — let clicks through so CM lands the caret at the
     // block edge and reveals the raw source (click-to-edit). jsxgraph keeps its
     // own events (draggable points), so it ignores them; edit it by arrowing in.
-    return this.lang === "jsxgraph";
+    return this.lang === "jsxgraph" || this.lang === "mermaid";
   }
 
   destroy(): void {
@@ -468,6 +463,72 @@ const OPEN_OVERLAYS = new Set<() => void>();
 
 function closeAllOverlays(): void {
   for (const close of [...OPEN_OVERLAYS]) close();
+}
+
+function mermaidCodeRange(
+  view: EditorView,
+  sourceFrom: number,
+  sourceTo: number,
+): { from: number; to: number } | null {
+  if (sourceFrom < 0 || sourceTo > view.state.doc.length || sourceFrom > sourceTo) {
+    return null;
+  }
+  const openLine = view.state.doc.lineAt(sourceFrom);
+  const closeLine = view.state.doc.lineAt(sourceTo);
+  const from = openLine.to + 1;
+  const to = Math.max(from, closeLine.from - 1);
+  return { from, to };
+}
+
+function openMermaidWorkspace(code: string, anchor: HTMLElement, sourceFrom: number, sourceTo: number): void {
+  const view = EditorView.findFromDOM(anchor);
+  if (!view) return;
+  closeAllOverlays();
+
+  let unmount = () => {};
+  let off: (() => void) | null = null;
+  let requestClose: () => void;
+  const close = () => {
+    if (!OPEN_OVERLAYS.has(close)) return;
+    OPEN_OVERLAYS.delete(close);
+    off?.();
+    off = null;
+    unmount();
+    if (anchor.isConnected) anchor.querySelector<HTMLElement>(".rotli-render-body")?.focus();
+  };
+  requestClose = close;
+
+  OPEN_OVERLAYS.add(close);
+  off = useUiStore.getState().registerTransient(() => requestClose());
+  unmount = mountMermaidWorkspace({
+    code,
+    dark: isDarkNode(anchor),
+    conversionAvailable: isTauri(),
+    onRequestCloseReady: (next) => {
+      requestClose = next;
+    },
+    onClose: close,
+    onApply: (nextCode) => {
+      const range = mermaidCodeRange(view, sourceFrom, sourceTo);
+      if (!range) {
+        return "The diagram moved in the note. Close and reopen it before applying.";
+      }
+      if (view.state.doc.sliceString(range.from, range.to) !== code) {
+        return "The diagram changed outside this workspace. Close and reopen it before applying.";
+      }
+      close();
+      view.dispatch({
+        changes: { from: range.from, to: range.to, insert: nextCode },
+        selection: { anchor: range.from + nextCode.length },
+        scrollIntoView: true,
+      });
+      view.focus();
+      return null;
+    },
+    onConvertToExcalidraw: async (nextCode) => {
+      await createEditableBoardFromMermaid(nextCode);
+    },
+  });
 }
 
 function openExpandOverlay(lang: StaticLangKey, code: string, anchor: HTMLElement): void {
@@ -573,7 +634,7 @@ function buildFrom(state: EditorState, fences: FenceBlock[]): BlockState {
       decos.push(Decoration.replace({ widget, block: true }).range(block.from, block.to));
       continue;
     }
-    const widget = new RenderBlockWidget(block.lang as StaticLangKey, code, sig);
+    const widget = new RenderBlockWidget(block.lang as StaticLangKey, code, sig, block.from, block.to);
     decos.push(Decoration.replace({ widget, block: true }).range(block.from, block.to));
   }
 
@@ -613,7 +674,6 @@ const themeWatcher = ViewPlugin.fromClass(
         if (sig === this.lastSig) return;
         this.lastSig = sig;
         CACHE.clear();
-        mermaidThemeFor = null;
         view.dispatch({ effects: bumpTheme.of(++themeVersion) });
       });
       this.obs.observe(document.documentElement, {

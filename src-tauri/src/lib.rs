@@ -11,8 +11,10 @@
 // set_summon_shortcut, and click-away hiding is a setting (set_hide_on_blur)
 // so heavy use can keep the window resident.
 
-mod chat;
+mod board;
 mod breve;
+mod chat;
+mod containment;
 mod corpus;
 mod fsutil;
 mod keychain;

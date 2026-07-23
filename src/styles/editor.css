@@ -8,6 +8,65 @@
 .ed-head {
   white-space: nowrap; /* narrow panes truncate the status, never wrap the head */
 }
+.ed-context {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+.ed-date {
+  flex: 0 0 auto;
+}
+.ed-trail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+.ed-trail-link {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  max-width: 150px;
+  padding: 3px 4px;
+  border: none;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.ed-trail-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ed-trail-link:hover {
+  color: var(--text);
+  background-image: linear-gradient(var(--hov), var(--hov));
+}
+.ed-trail-back {
+  transform: rotate(180deg);
+}
+.ed-trail-sep {
+  width: 3px;
+  height: 3px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--border);
+}
+.ed-trail.compact {
+  padding-left: 7px;
+  gap: 2px;
+}
+.ed-trail.compact .ed-trail-link {
+  width: 22px;
+  justify-content: center;
+  padding-inline: 2px;
+}
 .ed-head .slot {
   margin-left: auto;
   display: flex;
@@ -726,6 +785,7 @@
   text-decoration: underline;
   text-decoration-style: dotted;
   text-underline-offset: 2px;
+  cursor: pointer;
 }
 /* a generic/unknown code fence (```js, plain ```) — raw code voice, never
    markdown-styled (#13, audit 2026-07). Line-granular: the mono family +

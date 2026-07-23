@@ -6,7 +6,12 @@
 // so we render a themed placeholder instead. Kit tokens only (styles/canvas.css).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createCorpusBoardSaver, loadBoard } from "../boards/composition";
+import {
+  createCorpusBoardSaver,
+  loadBoard,
+  replaceCorruptBoardWithEmptyScene,
+  revealBoardSource,
+} from "../boards/composition";
 import {
   type BoardChangeAppState,
   type BoardChangeElements,
@@ -53,6 +58,9 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
       : "light";
 
   const [state, setState] = useState<CanvasState>({ status: "loading", initialData: null });
+  const [loadVersion, setLoadVersion] = useState(0);
+  const [repairConfirm, setRepairConfirm] = useState(false);
+  const [repairBusy, setRepairBusy] = useState(false);
   // a failed board write is the closest thing the shell has to data loss —
   // SAY so inline instead of a console.warn (#11, audit 2026-07). Cleared by
   // the next successful write (the debounced saves keep retrying naturally).
@@ -74,6 +82,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
     if (!isTauri()) return;
     let cancelled = false;
     setState({ status: "loading", initialData: null });
+    setRepairConfirm(false);
     loadBoard(boardId)
       .then(({ scene, meta: loaded }) => {
         if (cancelled) return;
@@ -92,7 +101,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
     return () => {
       cancelled = true;
     };
-  }, [boardId]);
+  }, [boardId, loadVersion]);
 
   // flush any pending save when the board changes or the surface unmounts
   useEffect(() => () => saver.flush(), [saver]);
@@ -101,14 +110,17 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
     (elements: BoardChangeElements, appState: BoardChangeAppState, files: BoardChangeFiles) => {
       // Don't write while still loading (the initialData render fires onChange).
       if (state.status !== "ready") return;
-      saver.schedule(
-        serializeBoardScene({
+      try {
+        const body = serializeBoardScene({
           elements,
           appState: appState as unknown as Record<string, unknown>,
           files: files as unknown as Record<string, unknown>,
           meta: metaRef.current,
-        }),
-      );
+        });
+        saver.schedule(body);
+      } catch (error) {
+        setSaveErr(error instanceof Error ? error.message : String(error));
+      }
     },
     [state.status, saver],
   );
@@ -121,14 +133,17 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
       setMeta(next);
       const api = apiRef.current;
       if (!api || !isTauri()) return;
-      saver.saveNow(
-        serializeBoardScene({
+      try {
+        const body = serializeBoardScene({
           elements: api.getSceneElements(),
           appState: api.getAppState(),
           files: api.getFiles(),
           meta: next,
-        }),
-      );
+        });
+        saver.saveNow(body);
+      } catch (error) {
+        setSaveErr(error instanceof Error ? error.message : String(error));
+      }
     },
     [saver],
   );
@@ -160,6 +175,56 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
         <div className="canvas-placeholder-card">
           <strong>Couldn’t open this board</strong>
           <span>{state.error}</span>
+          <span>The source file is preserved. You can reveal it for recovery or explicitly replace it.</span>
+          <div className="canvas-recovery-actions">
+            <button
+              type="button"
+              onClick={() =>
+                void revealBoardSource(boardId).catch((error: unknown) => {
+                  setState({
+                    status: "error",
+                    initialData: null,
+                    error: error instanceof Error ? error.message : String(error),
+                  });
+                })
+              }
+            >
+              Reveal original
+            </button>
+            <button type="button" onClick={() => setLoadVersion((version) => version + 1)}>
+              Try again
+            </button>
+            {!repairConfirm ? (
+              <button type="button" className="canvas-repair-danger" onClick={() => setRepairConfirm(true)}>
+                Replace with blank board…
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="canvas-repair-danger"
+                disabled={repairBusy}
+                onClick={() => {
+                  setRepairBusy(true);
+                  void replaceCorruptBoardWithEmptyScene(boardId).then(
+                    () => {
+                      setRepairBusy(false);
+                      setLoadVersion((version) => version + 1);
+                    },
+                    (error: unknown) => {
+                      setRepairBusy(false);
+                      setState({
+                        status: "error",
+                        initialData: null,
+                        error: error instanceof Error ? error.message : String(error),
+                      });
+                    },
+                  );
+                }}
+              >
+                {repairBusy ? "Replacing…" : "Confirm replacement"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

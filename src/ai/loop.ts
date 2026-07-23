@@ -6,7 +6,7 @@
 // caller's job — only the final answer is written to the chat file.
 
 import { budgetFor } from "./budget";
-import { looksSecret } from "./guard";
+import { containsPrivateDataOverlap, looksSecret } from "./guard";
 import { extractJsonObject, parseAction } from "./parse";
 import { adapterFor, trimHistory } from "./prompt";
 import { pruneScratch, runTool, statusFor } from "./tools";
@@ -132,6 +132,22 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
         result: "blocked: that input looks like it contains a secret — it wasn't sent off-device.",
       });
       if (consecutiveBad >= 2) break; // insisting on the blocked call → force a final
+      continue;
+    }
+    if (
+      EGRESS_TOOLS.includes(parsed.tool) &&
+      containsPrivateDataOverlap(JSON.stringify(parsed.args), [
+        knowledge,
+        ...scratch.map((entry) => entry.result),
+      ])
+    ) {
+      consecutiveBad += 1;
+      scratch.push({
+        action: sig,
+        result:
+          "blocked: that off-device action repeats private text retrieved from the memex. Rephrase without private prose or perform the network action yourself.",
+      });
+      if (consecutiveBad >= 2) break;
       continue;
     }
     consecutiveBad = 0; // a genuinely NEW, allowed call — the model is working

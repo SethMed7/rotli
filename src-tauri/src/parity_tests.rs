@@ -29,6 +29,43 @@ fn sheet_edit_max_bytes_matches_fixture() {
 }
 
 #[test]
+fn board_limits_match_fixture() {
+    let limits = entry("boardLimits");
+    assert_eq!(
+        limits["maxBytes"].as_u64(),
+        Some(crate::board::BOARD_MAX_BYTES as u64)
+    );
+    assert_eq!(
+        limits["maxElements"].as_u64(),
+        Some(crate::board::BOARD_MAX_ELEMENTS as u64)
+    );
+    assert_eq!(
+        limits["maxActions"].as_u64(),
+        Some(crate::board::BOARD_MAX_ACTIONS as u64)
+    );
+    assert_eq!(
+        limits["maxStringChars"].as_u64(),
+        Some(crate::board::BOARD_MAX_STRING_CHARS as u64)
+    );
+    assert_eq!(
+        limits["maxCoordinate"].as_f64(),
+        Some(crate::board::BOARD_MAX_COORDINATE)
+    );
+    assert_eq!(
+        limits["maxFiles"].as_u64(),
+        Some(crate::board::BOARD_MAX_FILES as u64)
+    );
+    assert_eq!(
+        limits["maxDepth"].as_u64(),
+        Some(crate::board::BOARD_MAX_DEPTH as u64)
+    );
+    assert_eq!(
+        limits["maxNodes"].as_u64(),
+        Some(crate::board::BOARD_MAX_NODES as u64)
+    );
+}
+
+#[test]
 fn document_convertible_exts_match_fixture() {
     assert_eq!(string_list(&entry("documentConvertibleExts")), crate::corpus::DOCUMENT_CONVERTIBLE_EXTS);
 }

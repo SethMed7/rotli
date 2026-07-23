@@ -89,7 +89,7 @@ restarted.
 
 ## Documentation ownership
 
-- `README.md` / `CONTRIBUTING.md`: public setup and human workflow
+- README.md / CONTRIBUTING.md / PRODUCT.md: public docs
 - `AGENTS.md`: always-loaded AI rules
 - `ARCHITECTURE.md` / `DESIGN.md` / `SYNTAX.md`: project-level contracts
 - `.carl/carl.json`: compact topic recall and decisions

@@ -50,17 +50,23 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
 
   const onChange = useCallback(
     (elements: readonly unknown[], appState: Record<string, unknown>, files: Record<string, unknown>) => {
-      if (!isTauri()) return;
-      saver.schedule(serializeBoardScene({ elements, appState, files, meta: metaRef.current }));
+      if (!isTauri() || status !== "ready") return;
+      try {
+        saver.schedule(serializeBoardScene({ elements, appState, files, meta: metaRef.current }));
+      } catch {
+        setStatus("error");
+      }
     },
-    [saver],
+    [saver, status],
   );
 
   if (status === "loading") {
     return <div className="rotli-embed-placeholder">Loading board…</div>;
   }
   if (status === "error") {
-    return <div className="rotli-embed-placeholder">Board unavailable</div>;
+    return (
+      <div className="rotli-embed-placeholder">Board needs recovery in its full tab. Source preserved.</div>
+    );
   }
 
   return (

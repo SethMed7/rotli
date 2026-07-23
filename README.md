@@ -69,7 +69,7 @@ file still enters the same intake/Brain workflow.
 
 ## What's built
 
-- **The editor** — hybrid markdown: the line under your caret shows raw syntax, everything else renders. `- ` starts a list, `[ ]` makes a checkbox, and a quiet format bar floats below. Typography (`Aa`) is a render layer — never written into your files.
+- **The editor** — hybrid markdown: the line under your caret shows raw syntax, everything else renders. `- ` starts a list, `[ ]` makes a checkbox, and a quiet format bar floats below. Mermaid diagrams open into a View/Visual/Code workspace: flowcharts can be built from shapes, arrows, labels, direction, and colors without leaving Mermaid, while an optional conversion creates a separate Excalidraw board copy. Typography (`Aa`) is a render layer — never written into your files.
 - **Panes & tabs** — split with `⌘D` / `⌘⇧D`, tabs with `⌘T`; one tab means zero tab chrome. Everything drag-resizable, everything remembered.
 - **`⌘K`** — every note and action in one palette, recents first.
 - **Quick capture (`⌥C`)** — from anywhere on your Mac: one breath, type, `⏎` — the thought lands in Captures and the AI files it later.
@@ -142,6 +142,7 @@ edits, and updates require a fresh revision.
 /Applications/rotli.app/Contents/MacOS/rotli notes list
 /Applications/rotli.app/Contents/MacOS/rotli notes search "launch plan"
 /Applications/rotli.app/Contents/MacOS/rotli notes create --title "Launch plan" --body "First draft"
+/Applications/rotli.app/Contents/MacOS/rotli rename "Launch plan" "Launch plan v2"
 /Applications/rotli.app/Contents/MacOS/rotli agent doctor
 /Applications/rotli.app/Contents/MacOS/rotli agent self-test
 /Applications/rotli.app/Contents/MacOS/rotli agent config

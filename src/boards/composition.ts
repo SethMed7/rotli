@@ -2,8 +2,20 @@
 // store with the session core. Surfaces get a loader + a debounced saver and
 // never touch corpusReadBoard/corpusWriteBoard themselves.
 
-import { corpusReadBoard, corpusWriteBoard, isTauri } from "../lib/tauri";
-import { type BoardSaver, type LoadedBoard, createBoardSaver, parseBoardBody } from "./session";
+import { corpusReadBoard, corpusRevealFile, corpusWriteBoard, isTauri } from "../lib/tauri";
+import { createManagedBoardWithBody } from "../newItems/composition";
+import { usePanesStore } from "../state/panes";
+import { useUiStore } from "../state/ui";
+import { convertMermaidToBoardScene } from "./engine/mermaid";
+import {
+  EMPTY_BOARD_META,
+  EMPTY_SCENE,
+  type BoardSaver,
+  type LoadedBoard,
+  createBoardSaver,
+  parseBoardBody,
+  serializeBoardScene,
+} from "./session";
 
 /** Read a board from the corpus (the *.excalidraw file is the source of truth). */
 export async function loadBoard(boardId: string): Promise<LoadedBoard> {
@@ -20,4 +32,41 @@ export function createCorpusBoardSaver(
     (body) => (isTauri() ? corpusWriteBoard(boardId, body).then(() => undefined) : Promise.resolve()),
     onResult,
   );
+}
+
+export async function revealBoardSource(boardId: string): Promise<void> {
+  await corpusRevealFile(boardId);
+}
+
+/** Destructive recovery is deliberately separate from load/autosave and may be
+ * called only after the UI has obtained explicit confirmation. */
+export async function replaceCorruptBoardWithEmptyScene(boardId: string): Promise<void> {
+  const body = serializeBoardScene({
+    elements: EMPTY_SCENE.elements,
+    appState: EMPTY_SCENE.appState,
+    files: EMPTY_SCENE.files,
+    meta: EMPTY_BOARD_META,
+  });
+  await corpusWriteBoard(boardId, body);
+}
+
+/** Create an explicit, independently editable board COPY from Mermaid source.
+ * Mermaid has no durable absolute-position syntax, so freeform edits belong to
+ * the new .excalidraw file while the original Markdown fence stays untouched. */
+export async function createEditableBoardFromMermaid(definition: string): Promise<string> {
+  if (!isTauri()) throw new Error("Editable board conversion requires the Rotli desktop app.");
+  const source = definition.trim();
+  if (!source) throw new Error("Add Mermaid source before creating a board copy.");
+
+  const scene = await convertMermaidToBoardScene(source);
+  const body = serializeBoardScene({
+    elements: scene.elements,
+    appState: {},
+    files: scene.files,
+    meta: EMPTY_BOARD_META,
+  });
+  const board = await createManagedBoardWithBody(body, { open: false });
+  usePanesStore.getState().openCanvas(board.id, { newTab: true });
+  useUiStore.getState().setRenamingBoardId(board.id);
+  return board.id;
 }

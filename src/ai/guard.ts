@@ -47,6 +47,38 @@ export function looksSecret(text: string): boolean {
   return (text.match(PAN) ?? []).some(luhnOk);
 }
 
+const PRIVATE_OVERLAP_WORDS = 5;
+
+function proseTokens(text: string): string[] {
+  return (
+    text
+      .normalize("NFKC")
+      .toLocaleLowerCase("en-US")
+      .match(/[\p{L}\p{N}][\p{L}\p{N}'’-]{2,}/gu) ?? []
+  );
+}
+
+/** Detect a substantial verbatim phrase copied from locally retrieved data
+ * into an off-device tool argument. This complements secret-pattern detection:
+ * ordinary journals, plans, names, and business prose deserve an egress stop
+ * even when they do not resemble a credential. */
+export function containsPrivateDataOverlap(outbound: string, localData: readonly string[]): boolean {
+  const outboundTokens = proseTokens(outbound);
+  if (outboundTokens.length < PRIVATE_OVERLAP_WORDS) return false;
+  const outboundPhrases = new Set<string>();
+  for (let i = 0; i <= outboundTokens.length - PRIVATE_OVERLAP_WORDS; i += 1) {
+    outboundPhrases.add(outboundTokens.slice(i, i + PRIVATE_OVERLAP_WORDS).join(" "));
+  }
+  for (const source of localData) {
+    const sourceTokens = proseTokens(source);
+    for (let i = 0; i <= sourceTokens.length - PRIVATE_OVERLAP_WORDS; i += 1) {
+      const phrase = sourceTokens.slice(i, i + PRIVATE_OVERLAP_WORDS).join(" ");
+      if (phrase.length >= 24 && outboundPhrases.has(phrase)) return true;
+    }
+  }
+  return false;
+}
+
 /** Whether a model ENDPOINT is local to this machine (loopback host). The
  * secure-note gate derives locality from the endpoint — never from an asserted
  * flag (#2, audit 2026-07). Unparseable ⇒ false (fail closed). Rust re-derives

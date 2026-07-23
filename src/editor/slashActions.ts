@@ -7,6 +7,9 @@ export interface SlashInsertion {
   caret: number;
 }
 
+export const MERMAID_STARTER = `flowchart LR
+  Start[Start] --> Next[Next step]`;
+
 /** Canonical scaffold for every immediate slash command. Picker commands need
  * a target first and intentionally return null. */
 export function slashInsertion(op: SlashOp): SlashInsertion | null {
@@ -21,6 +24,10 @@ export function slashInsertion(op: SlashOp): SlashInsertion | null {
     return { insert, caret: insert.length };
   }
   if (op.kind === "fence") {
+    if (op.lang === "mermaid") {
+      const insert = `\`\`\`mermaid\n${MERMAID_STARTER}\n\`\`\``;
+      return { insert, caret: insert.indexOf("Start]") };
+    }
     const insert = `\`\`\`${op.lang}\n\n\`\`\``;
     return { insert, caret: 4 + op.lang.length };
   }

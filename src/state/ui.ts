@@ -227,7 +227,7 @@ interface UiState {
   blockHandles: boolean;
   setBlockHandles: (on: boolean) => void;
 
-  /** ⌘K — the only overlay that dims (r3 frame F). */
+  /** ⌘K palette visibility; full-screen overlays share one flat scrim. */
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
 

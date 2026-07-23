@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import type { CorpusNoteMeta } from "../lib/tauri";
 import { budgetFor, contextWindowFor } from "./budget";
-import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
+import { containsPrivateDataOverlap, endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
 import { runAgent } from "./loop";
 import { extractJsonObject, parseAction } from "./parse";
 import { trimHistory } from "./prompt";
@@ -144,9 +144,9 @@ describe("retrieval", () => {
       note({ id: "a", title: "Pricing", folderId: "Projects" }),
       note({ id: "b", title: "Ada", folderId: "People" }),
     ]);
-    expect(idx).toContain("## People");
-    expect(idx).toContain("## Projects");
-    expect(idx).toContain("{id: a}");
+    const map = JSON.parse(idx) as { areas: { name: string; notes: { id: string }[] }[] };
+    expect(map.areas.map((area) => area.name)).toEqual(["People", "Projects"]);
+    expect(map.areas[1]?.notes[0]?.id).toBe("a");
   });
 
   test("buildIndex degrades to an areas map when the full list overflows the budget", () => {
@@ -159,9 +159,13 @@ describe("retrieval", () => {
       }),
     );
     const idx = buildIndex(many, 300); // tiny budget → must collapse
-    expect(idx).toContain("## Projects (50)"); // area + count
-    expect(idx).not.toContain("{id:"); // no per-note ids in the areas map
-    expect(idx.length).toBeLessThan(600);
+    const map = JSON.parse(idx) as {
+      truncated: boolean;
+      areas: { name: string; count: number; notes: unknown[] }[];
+    };
+    expect(map).toMatchObject({ truncated: true });
+    expect(map.areas[0]).toEqual({ name: "Projects", count: 50, notes: [] });
+    expect(idx.length).toBeLessThanOrEqual(300);
   });
 });
 
@@ -246,6 +250,14 @@ describe("guard", () => {
     expect(modelIsOnDevice({ provider: "claude", endpoint: "http://127.0.0.1:9000" })).toBe(false);
     expect(modelIsOnDevice({ provider: "mlx", endpoint: "https://models.example.com" })).toBe(false);
   });
+
+  test("detects copied private prose without flagging short generic overlap", () => {
+    const source = "The unannounced acquisition plan moves the research team to Montreal next spring.";
+    expect(
+      containsPrivateDataOverlap("search: acquisition plan moves the research team to Montreal", [source]),
+    ).toBe(true);
+    expect(containsPrivateDataOverlap("research team", [source])).toBe(false);
+  });
 });
 
 // ── the loop ──────────────────────────────────────────────────────────────────
@@ -317,6 +329,37 @@ describe("runAgent", () => {
     ]);
     await run(host, { history: [], userText: "latest rust?", web: true });
     expect(calls.webSearch).toEqual(["rust 2024 release"]);
+  });
+
+  test("blocks attempted non-secret private-prose exfiltration after a note read", async () => {
+    const privateBody = "The unannounced acquisition plan moves the research team to Montreal next spring.";
+    const { host, calls } = fakeHost(
+      [
+        '{"tool":"read_note","args":{"id":"n1"}}',
+        '{"tool":"web_search","args":{"query":"acquisition plan moves the research team to Montreal"}}',
+        '{"final":"I did not send the private text."}',
+      ],
+      { readNote: async () => privateBody },
+    );
+    const { final } = await run(host, { history: [], userText: "research this", web: true });
+    expect(final).toContain("did not send");
+    expect(calls.webSearch).toEqual([]);
+  });
+
+  test("blocks private prose copied from the untrusted knowledge map", async () => {
+    const privateTitle = "Confidential Montreal acquisition planning milestones";
+    const { host, calls } = fakeHost(
+      [
+        '{"tool":"web_search","args":{"query":"Confidential Montreal acquisition planning milestones"}}',
+        '{"final":"I kept the private title local."}',
+      ],
+      {
+        knowledgeMap: async () =>
+          JSON.stringify({ areas: [{ name: "Projects", notes: [{ title: privateTitle }] }] }),
+      },
+    );
+    await run(host, { history: [], userText: "research this", web: true });
+    expect(calls.webSearch).toEqual([]);
   });
 
   test("generate_image dispatches only when imageTool is on", async () => {

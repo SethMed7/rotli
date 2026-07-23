@@ -7,12 +7,12 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { relativeLabel } from "../lib/dateLabels";
 import { corpusNoteAbsolutePath, corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
-import { invalidateNotes, useNote } from "../services/hooks";
+import { invalidateNotes, useNote, useNoteIndex } from "../services/hooks";
 import { markNoteDraftChanged } from "../services/noteDrafts";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
 import { AaPanel } from "./aaPanel";
-import { ChatGlyph, MetaGlyph } from "../components/glyphs";
+import { ChatGlyph, ChevronRight, MetaGlyph } from "../components/glyphs";
 import { useNoteMenu } from "../components/useNoteMenu";
 import { useMainStore } from "../state/main";
 import { mainHasNote } from "../services/mainTree";
@@ -28,6 +28,9 @@ import {
   useDocumentLines,
 } from "./model";
 import { openChatForNote } from "../noteChat/composition";
+import { backId, forwardId, useNavHistory } from "../state/navHistory";
+import { dispatch } from "../keys/registry";
+import { usePanesStore } from "../state/panes";
 
 /** Below this pane width the format bar collapses its end groups into ⋯. */
 const FORMAT_BAR_COLLAPSE_PX = 440;
@@ -56,6 +59,45 @@ function UpdatedAt({ ts }: { ts: number }) {
   return <>{relativeLabel(ts)}</>;
 }
 
+function NoteHistoryTrail({ compact }: { compact: boolean }) {
+  const previousId = useNavHistory(backId);
+  const nextId = useNavHistory(forwardId);
+  const noteIndex = useNoteIndex();
+  const previousTitle = previousId ? noteIndex.get(previousId)?.title || "Previous note" : null;
+  const nextTitle = nextId ? noteIndex.get(nextId)?.title || "Next note" : null;
+
+  if (!previousTitle && !nextTitle) return null;
+  return (
+    <nav className={compact ? "ed-trail compact" : "ed-trail"} aria-label="Note history">
+      {previousTitle && (
+        <button
+          type="button"
+          className="ed-trail-link"
+          aria-label={`Back to ${previousTitle}`}
+          title={`Back to ${previousTitle} — ⌘[`}
+          onClick={() => dispatch("nav.back")}
+        >
+          <ChevronRight size={11} className="ed-trail-back" />
+          {!compact && <span>{previousTitle}</span>}
+        </button>
+      )}
+      {previousTitle && nextTitle && <span className="ed-trail-sep" aria-hidden="true" />}
+      {nextTitle && (
+        <button
+          type="button"
+          className="ed-trail-link"
+          aria-label={`Forward to ${nextTitle}`}
+          title={`Forward to ${nextTitle} — ⌘]`}
+          onClick={() => dispatch("nav.forward")}
+        >
+          {!compact && <span>{nextTitle}</span>}
+          <ChevronRight size={11} />
+        </button>
+      )}
+    </nav>
+  );
+}
+
 export function EditorSurface({
   noteId,
   paneId,
@@ -75,6 +117,7 @@ export function EditorSurface({
   const [aaOpen, setAaOpen] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
   const [narrow, setNarrow] = useState(false);
+  const [headerCompact, setHeaderCompact] = useState(false);
   // the caret's line + column, reported by CmEditor — the format bar's active
   // states read it (bold-on, heading level, list-on)
   const [ctx, setCtx] = useState<{ line: string | null; selStart: number }>({ line: null, selStart: 0 });
@@ -87,6 +130,7 @@ export function EditorSurface({
   const focusMode = useUiStore((s) => s.focusMode);
   const setFileMetadata = useUiStore((s) => s.setFileMetadata);
   const revealFocusedNote = useUiStore((s) => s.revealFocusedNote);
+  const focusedPane = usePanesStore((s) => s.focusedPaneId === paneId);
   // "In Main" indicator + the note's right-click menu (Seth #23, 2026-07-03: the
   // metadata popover is gone — the ≡ chip toggles metadata instantly, while
   // lifecycle and security actions live in the right-click menu.
@@ -180,7 +224,10 @@ export function EditorSurface({
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setNarrow(el.clientWidth < FORMAT_BAR_COLLAPSE_PX));
+    const ro = new ResizeObserver(() => {
+      setNarrow(el.clientWidth < FORMAT_BAR_COLLAPSE_PX);
+      setHeaderCompact(el.clientWidth < 760);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -202,7 +249,10 @@ export function EditorSurface({
           the main editor: the Quick window
           has no context-menu host, so it keeps its native menu. */}
       <div className="ed-head" onContextMenu={autoFocus ? undefined : (e) => openNoteMenu(e, note)}>
-        {createdLabel(note.createdAt)}
+        <div className="ed-context">
+          <span className="ed-date">{createdLabel(note.createdAt)}</span>
+          {!autoFocus && focusedPane && <NoteHistoryTrail compact={headerCompact} />}
+        </div>
         <div className="slot">
           {/* header-inline status (r5): dot · chars · updated · where · Main. The
               dot is the whole save grammar: muted while edits are in flight, olive

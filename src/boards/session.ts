@@ -1,15 +1,16 @@
 // Board session core — the ONE implementation of the .excalidraw corpus
-// round-trip (parse with blank-scene fallback, canonical serialization,
+// round-trip (fail-closed parsing, canonical serialization,
 // debounced save) shared by the canvas surface and the ```board fence embed.
 // Engine-agnostic and Tauri-free: it knows the scene JSON shape only;
 // composition.ts injects the corpus writer.
 
 import { createDebouncedTask } from "../lib/debouncedTask";
+import { parseAndValidateBoard } from "./validation";
 
 export const BOARD_SAVE_DEBOUNCE_MS = 500;
 
-/** A minimal valid empty Excalidraw scene (used when the file is empty/new or
- * the JSON fails to parse — never throw a blank board away). */
+/** A minimal valid empty Excalidraw scene, used only for an intentionally empty
+ * new file or an explicit user-confirmed repair. */
 export const EMPTY_SCENE = {
   type: "excalidraw" as const,
   version: 2,
@@ -33,18 +34,14 @@ export interface LoadedBoard {
   meta: BoardMeta;
 }
 
-/** Parse a raw .excalidraw body. Empty or corrupt JSON yields the blank scene;
- * top-level rotliMeta is lifted out so every consumer carries it forward. */
+/** Parse and fully validate a raw .excalidraw body. Corrupt or oversized input
+ * throws before a canvas mounts, preserving the original source until the user
+ * explicitly chooses a recovery action. */
 export function parseBoardBody(body: string): LoadedBoard {
-  let scene: unknown = EMPTY_SCENE;
-  const raw = body.trim();
-  if (raw) {
-    try {
-      scene = JSON.parse(raw);
-    } catch {
-      scene = EMPTY_SCENE; // corrupt JSON => start from a blank scene
-    }
+  if (!body.trim()) {
+    throw new Error("The board file is empty. The original file was not changed.");
   }
+  const scene = parseAndValidateBoard(body);
   const rm = (scene as { rotliMeta?: Partial<BoardMeta> }).rotliMeta;
   return { scene, meta: { description: rm?.description ?? "", tags: rm?.tags ?? "" } };
 }
@@ -58,7 +55,7 @@ export function serializeBoardScene(parts: {
   files: Record<string, unknown>;
   meta: BoardMeta;
 }): string {
-  return JSON.stringify({
+  const body = JSON.stringify({
     type: "excalidraw" as const,
     version: 2,
     source: "rotli",
@@ -67,6 +64,8 @@ export function serializeBoardScene(parts: {
     files: parts.files,
     rotliMeta: parts.meta,
   });
+  parseAndValidateBoard(body);
+  return body;
 }
 
 export interface BoardSaver {

@@ -1,22 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import {
-  EMPTY_BOARD_META,
-  EMPTY_SCENE,
-  createBoardSaver,
-  parseBoardBody,
-  serializeBoardScene,
-} from "./session";
+import { EMPTY_SCENE, createBoardSaver, parseBoardBody, serializeBoardScene } from "./session";
 
 const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("parseBoardBody", () => {
-  test("empty body yields the blank scene and empty meta", () => {
-    expect(parseBoardBody("")).toEqual({ scene: EMPTY_SCENE, meta: EMPTY_BOARD_META });
-    expect(parseBoardBody("  \n ")).toEqual({ scene: EMPTY_SCENE, meta: EMPTY_BOARD_META });
+  test("empty source fails closed instead of becoming an autosavable blank scene", () => {
+    expect(() => parseBoardBody("")).toThrow("original file was not changed");
+    expect(() => parseBoardBody("  \n ")).toThrow("original file was not changed");
   });
 
-  test("corrupt JSON never throws a board away", () => {
-    expect(parseBoardBody("{not json").scene).toEqual(EMPTY_SCENE);
+  test("corrupt JSON fails closed instead of becoming an autosavable blank scene", () => {
+    expect(() => parseBoardBody("{not json")).toThrow("original file was not changed");
   });
 
   test("lifts top-level rotliMeta out of the scene", () => {
@@ -31,6 +25,36 @@ describe("parseBoardBody", () => {
   test("missing or partial rotliMeta defaults to empty strings", () => {
     const { meta } = parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, rotliMeta: { tags: "x" } }));
     expect(meta).toEqual({ description: "", tags: "x" });
+  });
+
+  test("rejects excessive elements, strings, and coordinates", () => {
+    expect(() =>
+      parseBoardBody(
+        JSON.stringify({ ...EMPTY_SCENE, elements: Array.from({ length: 10_001 }, () => ({})) }),
+      ),
+    ).toThrow("too many elements");
+    expect(() =>
+      parseBoardBody(
+        JSON.stringify({ ...EMPTY_SCENE, elements: [{ type: "text", text: "x".repeat(100_001) }] }),
+      ),
+    ).toThrow("string that is too long");
+    expect(() =>
+      parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, elements: [{ type: "rectangle", x: 10_000_001 }] })),
+    ).toThrow("coordinate outside");
+    expect(() =>
+      parseBoardBody(
+        JSON.stringify({ ...EMPTY_SCENE, elements: [{ type: "line", points: [[0, 10_000_001]] }] }),
+      ),
+    ).toThrow("coordinate outside");
+  });
+
+  test("validates element and Rotli metadata shapes", () => {
+    expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, elements: ["not-an-element"] }))).toThrow(
+      "elements must be objects",
+    );
+    expect(() =>
+      parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, rotliMeta: { description: { nested: true } } })),
+    ).toThrow("rotliMeta description must be a string");
   });
 });
 

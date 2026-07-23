@@ -19,10 +19,30 @@ describe("flat CSS policy", () => {
     );
   });
 
+  test("rejects radial illumination gradients", () => {
+    expect(
+      flatCssViolations(
+        ".backdrop { background: radial-gradient(circle, var(--tint), transparent); }",
+        "src/styles/example.css",
+      ),
+    ).toEqual([
+      "src/styles/example.css: radial gradients are forbidden; use a solid semantic surface or scrim",
+    ]);
+  });
+
   test("allows flat semantic hierarchy and a class named filter", () => {
     const css =
       ".filter:focus-within { border-color: var(--border-strong); outline: 2px solid var(--accent); }";
     expect(flatCssViolations(css, "src/styles/example.css")).toEqual([]);
+  });
+
+  test("allows functional linear gradients", () => {
+    expect(
+      flatCssViolations(
+        ".skeleton { background: linear-gradient(90deg, transparent, var(--hov)); }",
+        "src/styles/example.css",
+      ),
+    ).toEqual([]);
   });
 
   test("allows the foundation to map fixed palette colors into semantic roles", () => {

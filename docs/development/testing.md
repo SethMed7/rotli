@@ -106,7 +106,12 @@ The interaction specs are the regression-layer handoff from
 twin), the sidebar's own cross-section-into-Main drag, Board (Captures) card
 reorder, and the shared `src/lib/mainAddDrag.ts` module's Main-add drag from
 an All-notes row — two different code paths land a note in Main, so both are
-covered separately. The Main creation-context spec then proves that opening a
+covered separately. `e2e/mermaid-workspace.spec.ts` proves the Mermaid
+View/Visual/Code workspace, real pointer pan, zoom state, source-backed
+flowchart shape/color/connection editing, dirty-close guard, lossless refusal
+for unsupported syntax, the slash starter, browser-mode conversion refusal,
+and the real converter seam. The Main
+creation-context spec then proves that opening a
 Main reference and pressing Command-T creates a new tab and an immediate Main
 reference while storage remains in the intake lane. The named-view spec proves
 inline view creation, active-view Command-T routing, right-click assignment,

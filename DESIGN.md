@@ -41,6 +41,9 @@ exception.
 
 - Every user action remains keyboard reachable and participates in the shared
   action/keybinding system.
+- Note-to-note wikilinks open with an ordinary click. The editor header may
+  expose the existing session back/forward trail beside the date, using compact
+  adjacent-note labels rather than duplicating the sidebar's folder hierarchy.
 - Focus is always visible, predictable, and restored after overlays close.
 - Destructive actions are explicit and visually distinct without becoming
   alarmist.
@@ -59,6 +62,32 @@ Every changed surface accounts for loading, empty, error, saved, disabled, and
 destructive states, plus narrow-window behavior. Long content, missing content,
 keyboard-only navigation, and focus recovery are normal cases rather than
 polish work.
+
+## Diagram interaction
+
+- A rendered Mermaid fence is an entry point to one focused workspace with
+  View, Visual, and Code modes. View supports pointer pan,
+  wheel/button/keyboard zoom, double-click or `0` to fit, and visible loading,
+  empty, and parse-error states.
+- Mermaid text in the Markdown fence remains source of truth. Code changes are
+  explicit, guard unapplied edits on close, and write back only when the user
+  chooses Apply.
+- Visual is a Mermaid editor, not an Excalidraw handoff. It first supports the
+  lossless flowchart subset: add/delete supported shapes, edit labels and
+  direction, connect labeled arrow/line variants, and set portable node fill,
+  border, and text colors. Every persistent edit serializes back into readable
+  Mermaid source. Unsupported diagram families or advanced flowchart syntax
+  keep View and Code fully available and must fail closed with no source rewrite.
+- Mermaid does not encode durable freeform positions. Visual may let people
+  drag shapes to organize the editing canvas, but must state that Mermaid lays
+  out the saved render automatically. It must never imply that absolute canvas
+  geometry, exact node sizing, or arbitrary drawing strokes persist in source.
+- `Convert copy to Excalidraw…` is a secondary, confirmed action. It creates an
+  independent board and leaves the source fence untouched; it is never labeled
+  as Mermaid editing. Dirty Mermaid changes must be applied first. Browser mode
+  disables conversion with explanatory copy because it has no corpus
+  filesystem. The desktop composition root creates the managed board in the
+  active Main/view context, opens it, and starts its rename flow.
 
 ## Layout and accessibility
 

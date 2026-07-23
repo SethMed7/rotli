@@ -5,6 +5,19 @@
       "sourceOfTruth": "src/sheets/kinds.ts SHEET_EDIT_MAX_BYTES ↔ src-tauri/src/corpus.rs SHEET_EDIT_MAX_BYTES",
       "value": 8000000
     },
+    "boardLimits": {
+      "sourceOfTruth": "src/boards/validation.ts BOARD_LIMITS ↔ src-tauri/src/board.rs BOARD_MAX_*",
+      "value": {
+        "maxBytes": 8000000,
+        "maxElements": 10000,
+        "maxActions": 500,
+        "maxStringChars": 100000,
+        "maxCoordinate": 10000000,
+        "maxFiles": 1000,
+        "maxDepth": 64,
+        "maxNodes": 200000
+      }
+    },
     "documentConvertibleExts": {
       "sourceOfTruth": "src/documents/kinds.ts DOCUMENT_CONVERTIBLE_EXTS ↔ src-tauri/src/corpus.rs DOCUMENT_CONVERTIBLE_EXTS",
       "value": ["doc", "rtf", "odt"]

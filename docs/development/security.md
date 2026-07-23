@@ -41,7 +41,7 @@ tripwire that keeps a future change from silently widening any of these.
 | Updater | GitHub releases | — | minisign-signed feed, single pinned HTTPS endpoint |
 | ImapFlow (`mail.ts`) | configured mail hosts | — | TLS strict except loopback |
 | Webview | nothing | — | CSP `connect-src ipc:` only; no fetch/XHR/WebSocket in `src/` |
-| `rotli` CLI / `rotli-workspace` MCP | local Claude/Codex process | requested non-secure note text or compact board data | registered-root discovery + remote-AI secure detector + locked-note refusal + optimistic revision check; stdio only, no network listener |
+| `rotli` CLI / `rotli-workspace` MCP | local Claude/Codex process | requested non-secure note text or compact board data | registered-root discovery + no-follow containment + remote-AI secure detector + locked-note refusal + optimistic revision check + request/output/schema caps + destructive annotations; stdio only |
 
 The full inventory — every ureq / fetch / network-CLI call site with its
 destination class and guard — is tracked in
@@ -55,6 +55,14 @@ classification; users must not place secrets on an agent-managed board.
 Agent-visible workspace metrics are computed only after that same note filter and
 do not disclose a count of withheld secure notes. `rotli agent doctor` forces a
 read-only store, while `rotli agent self-test` uses only a temporary memex.
+Every returned note/board value is labeled untrusted data: it cannot authorize a
+tool call or count as mutation confirmation.
+
+Markdown SVG fences are also untrusted content. The editor parses them as XML
+and rebuilds a fresh, allowlisted SVG subtree; source nodes are never adopted
+into the live document. Event attributes, scripts, `foreignObject`, external
+resources, unsafe URL schemes, inline styles, and unexpected namespaces fail
+closed. The production CSP is a second layer, not the sanitizer.
 
 ## The checks and how to run them
 
@@ -127,15 +135,21 @@ The 2026-07 audit escalated five product-behavior findings. Disposition:
    login Keychain (read-only, its auth token), and the binary's directory.
    Knob: `ROTLI_IMAGE_SANDBOX=0` disables (Configuration Rule safe fallback).
    *App-smoke on next run: agy image generation still saves its PNG.*
-5. **Non-secret private prose via web tool args — DEFERRED, designated next
-   security build.** Bounded today by globe-default-off, the URL-length cap,
-   secure-note exclusion, and step caps. The content-overlap egress check
-   (web args vs recently-read note content) is the next `guard.ts`/`secret.rs`
-   pair to build, scheduled with the quarterly review.
+5. **Non-secret private prose via web tool args — FIXED for substantial verbatim
+   overlap.** Web/image arguments are compared with locally retrieved tool
+   results before dispatch; a five-token, 24-character copied phrase is refused
+   even when it is not secret-shaped. The web globe/image capability, URL and
+   step caps, secure-note exclusion, and secret scan remain independent layers.
+   Paraphrased semantic leakage is a residual risk for the quarterly review.
 
 ### Supply-chain advisories (transitive-only, tracked; reviewed 2026-07-21)
 
-All are outside Rotli's own `src/`. The current `bun audit` reports nine findings:
+All are outside Rotli's own `src/`. The current `bun audit` reports thirteen findings:
+
+- **DOMPurify** ≤ 3.4.11 (low custom-element sanitizer callback bypass) —
+  through Mermaid. Rotli keeps Mermaid at `securityLevel: "strict"` and does
+  not enable custom-element handling; upgrade when Mermaid selects the patched
+  sanitizer.
 
 - **lodash-es** ≤ 4.17.22 (two high/moderate families: template-key code
   injection and prototype pollution) — through Univer, Mermaid, and Excalidraw.
@@ -143,8 +157,17 @@ All are outside Rotli's own `src/`. The current `bun audit` reports nine finding
   ESLint/typescript-eslint build tooling and exceljs's archive path.
 - **nanoid** < 3.3.8 and **uuid** < 11.1.1 (moderate) — library-internal ID
   generation through Excalidraw, Univer, Vite, exceljs, and Mermaid.
+- **sharp** < 0.35.0 (high libvips image-processing family) — through the
+  optional Kokoro/Transformers local voice stack.
+- **immutable** < 4.3.9 (two high denial-of-service families) — through Sass in
+  Excalidraw/Vite's build dependency graph.
 - **esbuild** 0.27.3–0.28.0 (low, Windows dev-server arbitrary file read) —
   through Vite; Rotli's shipped macOS bundle does not expose the dev server.
+
+The direct `@excalidraw/mermaid-to-excalidraw` 2.2.2 dependency is the narrow
+board-engine conversion seam. Excalidraw already supplied the same version
+transitively, so this does not add another converter or widen the runtime's
+network/egress surface.
 
 RustSec found two `quick-xml 0.39.4` denial-of-service advisories
 (`RUSTSEC-2026-0194` and `RUSTSEC-2026-0195`) in the July 21 pushed run. They are
