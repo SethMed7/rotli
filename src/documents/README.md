@@ -7,7 +7,7 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
 - `model.ts` owns framework-free document concepts and blank-document defaults.
 - `ports.ts` defines encoder, local editor codec, reader/writer, and repository boundaries.
 - `workflow.ts` contains dependency-injected create and edit use cases;
-  `conversion.ts` owns the host-independent legacy conversion gate.
+  `conversion.ts` owns the host-independent local conversion gate.
 - `kinds.ts` is the only frontend format-policy registry: extensions, local
   editing support, creation format, search keywords, byte cap, and native apps.
 - `theme.ts` is the only generated-DOCX visual contract: Word font names,
@@ -25,6 +25,9 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
 - `documentEditor.tsx` owns editor lifecycle, scoped ⌘S, dirty parking, and save
   status. `embedDocument.tsx` and `fileSurface.tsx` are hosts; neither parses or
   generates document bytes.
+- `src-tauri/src/document_conversion.rs` is the single adapter for PDF text
+  extraction and the fixed macOS `textutil` process. Corpus code supplies only
+  guarded paths and owns managed-copy creation.
 
 ## Editing boundary
 
@@ -45,9 +48,28 @@ content mutations make a session dirty; viewport zoom and scroll never do.
 Legacy `.doc`, `.rtf`, and `.odt` files use an explicit macOS-local conversion
 workflow. `/usr/bin/textutil` writes a temporary DOCX, Rotli validates the
 package, and the corpus creates a new collision-safe managed copy while leaving
-the original untouched. No account, network service, or in-place conversion is
-involved. `.dot`, `.pages`, and other legacy formats remain unsupported when no
-faithful local conversion route is available.
+the original untouched. A PDF offers the same copy-to-DOCX action from its
+viewer: a bundled pure-Rust adapter extracts embedded text offline by page,
+`textutil` creates the editable DOCX, and Rotli opens that new managed copy.
+This is intentionally a text-first import, not a claim of layout fidelity;
+columns, tables, and complex positioning may need review. Image-only/scanned or
+encrypted PDFs fail explicitly instead of producing an empty document and must
+be OCRed or unlocked first. No account, network service, font download, or
+in-place conversion is involved. `.dot`, `.pages`, and other legacy formats
+remain unsupported when no faithful local conversion route is available.
+
+### PDF parser dependency review
+
+`pdf-extract` 0.12.0 is a direct MIT-licensed Rust dependency used only inside
+`document_conversion.rs`. It supplies the offline embedded-text capability that
+PDFKit’s passive viewer does not expose to Rotli; it adds 28 locked transitive
+packages, primarily `lopdf` plus font/encoding and symmetric-cipher support.
+The parser handles untrusted local files, so the source is capped at 32 MB,
+extracted text at 16 MB, panics are converted into visible failures, malformed
+or textless input refuses conversion, and focused fixtures exercise page
+boundaries plus a complete PDF → valid DOCX path. It has no network or provider
+access. Path containment, read-only source handling, and managed-output gates
+remain independent Rust corpus checks.
 
 The Rust corpus allowlist remains an independent security boundary and must also opt
 in to any newly generated or writable format. A future Google Docs connector should be a

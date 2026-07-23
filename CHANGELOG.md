@@ -10,6 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.5] - 2026-07-23
+
+### Changed
+
+- **Markdown tables now edit as tables.** Clicking a rendered cell opens one
+  focused inline editor while the surrounding rows and columns stay rendered;
+  Tab continues through cells, keyboard focus is visible, and pipe-delimited
+  source remains available through the explicit `</>` escape hatch.
+- **Raw Markdown now has a restrained IDE-like syntax theme.** Rotli’s active
+  accent marks source punctuation while a contrast-safe blue carries headings
+  and emphasis; fenced code, links, quotes, and table structure remain legible
+  across Warm Light, Warm Dark, Paper, and Charcoal. Appearance settings can
+  switch the same grammar to a user-selected monochrome palette.
+- **PDFs can become editable local DOCX copies.** A compact action in the PDF
+  header extracts embedded text offline, preserves page boundaries, creates a
+  new managed DOCX, opens it for editing, and leaves the PDF untouched.
+  Image-only/scanned PDFs refuse an empty conversion and ask for OCR; complex
+  layout still carries an explicit review warning.
+
+### Fixed
+
+- **DOCX files with Word lists open in the editor again.** Rotli now maps
+  bullets and numbering to Univer’s registered presets instead of invalid
+  lowercase aliases that crashed list-heavy documents during mount.
+
 ## [0.33.4] - 2026-07-23
 
 ### Added

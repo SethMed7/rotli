@@ -55,6 +55,8 @@
   --accent-text: #161616;
   --on-accent: #ffffff;
   --success: #6b6b68;
+  --syntax-blue: #256d9f;
+  --syntax-accent: var(--accent-text);
   --hov: rgba(22, 22, 22, 0.07);
   --act: rgba(22, 22, 22, 0.11);
   --scrim: rgba(22, 22, 22, 0.42);
@@ -73,6 +75,8 @@
   --accent-text: #e9e7e2;
   --on-accent: #161616;
   --success: #a8a49c;
+  --syntax-blue: #78b7e3;
+  --syntax-accent: var(--accent-text);
   --hov: rgba(233, 231, 226, 0.08);
   --act: rgba(233, 231, 226, 0.13);
   --scrim: rgba(0, 0, 0, 0.5);
@@ -86,6 +90,13 @@
   /* warm-token leaks re-pointed: done-check ink + Aa segment accent */
   --check-ink: var(--on-accent);
   --seg-accent: var(--accent);
+}
+
+/* Raw Markdown palette is independently user-selectable. Grammar stays fixed;
+   Mono simply collapses its two color roles into the current environment ink. */
+:root[data-syntax-palette="mono"] {
+  --syntax-blue: var(--text);
+  --syntax-accent: var(--text);
 }
 
 /* The quote bar: peach is warm-family truth; mono goes neutral. */

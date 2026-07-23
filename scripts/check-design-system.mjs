@@ -1,6 +1,10 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../src/brand/brevePdfThemes.ts";
+import {
+  BREVE_PDF_PRESETS,
+  contrastRatio,
+  validateBrevePdfPalette,
+} from "../src/brand/brevePdfThemes.ts";
 import { flatCssViolations } from "./design-system-policy.mjs";
 
 const root = process.cwd();
@@ -28,7 +32,7 @@ function blocks(css) {
 const allBlocks = blocks(`${colors}\n${base}\n${themes}`);
 const requiredTokens = [
   "ground", "surface", "surface-2", "tint", "text", "text-muted", "border",
-  "accent", "accent-text", "on-accent", "success",
+  "accent", "accent-text", "on-accent", "success", "syntax-blue", "syntax-accent",
 ];
 const themeSelectors = {
   light: ":root",
@@ -41,6 +45,11 @@ for (const [theme, selector] of Object.entries(themeSelectors)) {
   const body = allBlocks.filter((block) => block.selectors.includes(selector)).map((block) => block.body).join("\n");
   for (const token of requiredTokens) {
     if (!new RegExp(`--${token}\\s*:`).test(body)) violations.push(`${theme}: missing --${token}`);
+  }
+  const syntaxBlue = /--syntax-blue\s*:\s*(#[0-9a-f]{6})/i.exec(body)?.[1];
+  const ground = /--ground\s*:\s*(#[0-9a-f]{6})/i.exec(body)?.[1];
+  if (syntaxBlue && ground && contrastRatio(syntaxBlue, ground) < 4.5) {
+    violations.push(`${theme}: --syntax-blue needs 4.5:1 contrast against --ground`);
   }
 }
 

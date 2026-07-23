@@ -48,7 +48,7 @@ import {
 import { hydrateMain, useMainStore } from "./main";
 import { hydrateViews, useViewsStore } from "./views";
 import { findLeaf, leaves, usePanesStore } from "./panes";
-import { applyTheme } from "./theme";
+import { applySyntaxPalette, applyTheme } from "./theme";
 import {
   ALL_NOTES,
   clampChatSidebarLimit,
@@ -65,6 +65,7 @@ import {
   SEC_NOTES,
   type ThemeFamily,
   type ThemeSetting,
+  type SyntaxPalette,
   useUiStore,
 } from "./ui";
 
@@ -94,6 +95,7 @@ function asEnum<T extends string>(v: unknown, allowed: readonly T[], fallback: T
 
 const THEME_SETTINGS: readonly ThemeSetting[] = ["light", "dark", "system"];
 const THEME_FAMILIES: readonly ThemeFamily[] = ["warm", "mono"];
+const SYNTAX_PALETTES: readonly SyntaxPalette[] = ["rotli", "mono"];
 const MEASURES: readonly Measure[] = ["narrow", "comfort", "wide"];
 
 /** Drop the session-scoped per-chat keys — an unsaved chat's choice (globe,
@@ -142,6 +144,7 @@ interface PersistedSettings {
   themeFamily: ThemeFamily;
   matchLightFamily: ThemeFamily;
   matchDarkFamily: ThemeFamily;
+  syntaxPalette: SyntaxPalette;
   stayOpen: boolean;
   showInDock: boolean;
   /** What the generic New tab command creates. Markdown remains the safe default. */
@@ -290,6 +293,7 @@ export function parseSettings(raw: string): PersistedSettings {
     themeFamily: asEnum(data.themeFamily, THEME_FAMILIES, "warm"),
     matchLightFamily: asEnum(data.matchLightFamily, THEME_FAMILIES, "warm"),
     matchDarkFamily: asEnum(data.matchDarkFamily, THEME_FAMILIES, "warm"),
+    syntaxPalette: asEnum(data.syntaxPalette, SYNTAX_PALETTES, "rotli"),
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
     newTabDefault: asEnum(data.newTabDefault, NEW_ITEM_KINDS, DEFAULT_NEW_ITEM_KIND),
@@ -414,6 +418,7 @@ function applySettings(s: PersistedSettings): void {
     themeFamily: s.themeFamily,
     matchLightFamily: s.matchLightFamily,
     matchDarkFamily: s.matchDarkFamily,
+    syntaxPalette: s.syntaxPalette,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
     newTabDefault: s.newTabDefault,
@@ -693,6 +698,7 @@ function prePaint(): void {
     light: s.matchLightFamily,
     dark: s.matchDarkFamily,
   });
+  applySyntaxPalette(s.syntaxPalette);
 }
 
 // ─── hydrate (awaited by main.tsx before the first render) ───────────────────
@@ -731,6 +737,7 @@ function settingsSnapshot(): string {
     themeFamily: ui.themeFamily,
     matchLightFamily: ui.matchLightFamily,
     matchDarkFamily: ui.matchDarkFamily,
+    syntaxPalette: ui.syntaxPalette,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
     newTabDefault: ui.newTabDefault,

@@ -4759,7 +4759,7 @@ pub fn corpus_create_managed_file(
 }
 
 /// Byte-identical to DOCUMENT_CONVERTIBLE_EXTS in src/documents/kinds.ts (parity.json).
-pub(crate) const DOCUMENT_CONVERTIBLE_EXTS: &[&str] = &["doc", "rtf", "odt"];
+pub(crate) const DOCUMENT_CONVERTIBLE_EXTS: &[&str] = &["doc", "rtf", "odt", "pdf"];
 const LOCAL_DOCUMENT_CONVERSION_MAX_BYTES: u64 = 32_000_000;
 
 fn converted_document_name(rel: &str) -> Result<String, String> {
@@ -4780,10 +4780,11 @@ fn converted_document_name(rel: &str) -> Result<String, String> {
     Ok(format!("{stem}.docx"))
 }
 
-/// Convert a legacy local document into a NEW managed DOCX. The source path is
-/// resolved by the corpus, the converter is the fixed macOS system binary, and
-/// the original is never opened for writing. The resulting bytes still pass
-/// the managed-file extension and mutation gates before entering the memex.
+/// Convert a legacy local document or embedded-text PDF into a NEW managed
+/// DOCX. The source path is resolved by the corpus and is never opened for
+/// writing. PDF extraction is offline; scanned/image-only PDFs fail with an
+/// explicit OCR requirement. The resulting bytes still pass the managed-file
+/// extension and mutation gates before entering the memex.
 #[tauri::command]
 pub fn corpus_convert_document(
     state: tauri::State<'_, CorpusState>,
@@ -4800,6 +4801,11 @@ pub fn corpus_convert_document(
     if metadata.len() > LOCAL_DOCUMENT_CONVERSION_MAX_BYTES {
         return Err("This document is too large for safe local conversion (32 MB maximum).".into());
     }
+    let ext = Path::new(&rel)
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(str::to_ascii_lowercase)
+        .ok_or_else(|| "this file has no supported document extension".to_string())?;
 
     let default_id = state.default_root_id()?;
     state.route(&default_id, |store| {
@@ -4811,36 +4817,7 @@ pub fn corpus_convert_document(
     })?;
 
     #[cfg(target_os = "macos")]
-    let converted = {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        let output = std::env::temp_dir().join(format!("rotli-document-{nonce}.docx"));
-        let command = std::process::Command::new("/usr/bin/textutil")
-            .args(["-convert", "docx", "-output"])
-            .arg(&output)
-            .arg("--")
-            .arg(&source)
-            .output()
-            .map_err(|error| format!("start the macOS document converter: {error}"))?;
-        if !command.status.success() {
-            let _ = fs::remove_file(&output);
-            let detail = String::from_utf8_lossy(&command.stderr).trim().to_string();
-            return Err(if detail.is_empty() {
-                "The macOS document converter could not create an editable DOCX copy.".into()
-            } else {
-                format!("The macOS document converter failed: {detail}")
-            });
-        }
-        let bytes = fs::read(&output).map_err(|error| format!("read converted DOCX: {error}"));
-        let _ = fs::remove_file(&output);
-        let bytes = bytes?;
-        if !bytes.starts_with(b"PK") {
-            return Err("The local converter did not produce a valid DOCX package.".into());
-        }
-        bytes
-    };
+    let converted = crate::document_conversion::convert_document_bytes(&source, &ext)?;
     #[cfg(not(target_os = "macos"))]
     return Err("Local legacy-document conversion is currently available only on macOS.".into());
 
@@ -5489,10 +5466,11 @@ mod tests {
     }
 
     #[test]
-    fn legacy_document_conversion_names_only_the_explicit_local_family() {
+    fn document_conversion_names_only_the_explicit_local_family() {
         assert_eq!(converted_document_name("storage/Quarterly report.doc").unwrap(), "Quarterly report.docx");
         assert_eq!(converted_document_name("storage/notes.rtf").unwrap(), "notes.docx");
         assert_eq!(converted_document_name("storage/draft.odt").unwrap(), "draft.docx");
+        assert_eq!(converted_document_name("storage/reference.pdf").unwrap(), "reference.docx");
         assert!(converted_document_name("storage/design.pages").is_err());
         assert!(converted_document_name("storage/macro.docm").is_err());
     }

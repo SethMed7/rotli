@@ -34,6 +34,7 @@ export async function resetAndReonboard(): Promise<void> {
     themeFamily: "warm",
     matchLightFamily: "warm",
     matchDarkFamily: "warm",
+    syntaxPalette: "rotli",
     stayOpen: false,
     showInDock: false,
     onboarded: false,

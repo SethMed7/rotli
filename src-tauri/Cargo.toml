@@ -1,6 +1,6 @@
 [package]
 name = "rotli"
-version = "0.33.4"
+version = "0.33.5"
 description = "rotli — warm, local-first, hotkey-driven notes for the Mac menu bar"
 authors = ["Seth Medina"]
 edition = "2021"
@@ -29,6 +29,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 regex = "1"                                                     # secret-pattern detection (the `secure` flag)
 base64 = "0.22"                                                 # surfaced binary files → base64 for the in-app viewer (xlsx, …)
+pdf-extract = "0.12"                                            # offline embedded-text extraction for PDF → editable DOCX copies
 # Phase 2 — the corpus (plain .md files become real)
 notify = "8"                                                     # fs watcher (external edits → UI refresh)
 ulid = "1"                                                       # note identity (time-sortable, matches the TS ulid)

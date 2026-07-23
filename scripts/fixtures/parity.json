@@ -20,7 +20,7 @@
     },
     "documentConvertibleExts": {
       "sourceOfTruth": "src/documents/kinds.ts DOCUMENT_CONVERTIBLE_EXTS ↔ src-tauri/src/corpus.rs DOCUMENT_CONVERTIBLE_EXTS",
-      "value": ["doc", "rtf", "odt"]
+      "value": ["doc", "rtf", "odt", "pdf"]
     },
     "memexPerms": {
       "sourceOfTruth": "src/lib/tauri.ts MemexPerms union ↔ src-tauri/src/memex.rs MemexPerms enum serde wire strings",

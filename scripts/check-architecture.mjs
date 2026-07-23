@@ -218,6 +218,29 @@ function walkVendors(dir) {
 }
 walkVendors(join(root, "src"));
 
+// Rust parser/vendor crates receive the same single-adapter protection. Cargo
+// package names use hyphens while Rust paths use underscores.
+const rustVendorSeams = [
+  { vendor: "pdf_extract", allowed: ["src-tauri/src/document_conversion.rs"] },
+];
+function walkRustVendors(dir) {
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) walkRustVendors(path);
+    else if (name.endsWith(".rs")) {
+      const file = relative(root, path);
+      const source = readFileSync(path, "utf8");
+      for (const { vendor, allowed } of rustVendorSeams) {
+        if (allowed.includes(file)) continue;
+        if (source.includes(`${vendor}::`)) {
+          violations.push(`${file}: ${vendor} belongs behind its adapter (${allowed.join(", ")})`);
+        }
+      }
+    }
+  }
+}
+walkRustVendors(join(root, "src-tauri", "src"));
+
 if (violations.length) {
   console.error(`clean architecture boundary failed:\n${violations.map((line) => `  - ${line}`).join("\n")}`);
   process.exit(1);

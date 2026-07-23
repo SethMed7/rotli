@@ -669,6 +669,8 @@ function AppearancePane() {
   const setMatchLightFamily = useUiStore((s) => s.setMatchLightFamily);
   const matchDarkFamily = useUiStore((s) => s.matchDarkFamily);
   const setMatchDarkFamily = useUiStore((s) => s.setMatchDarkFamily);
+  const syntaxPalette = useUiStore((s) => s.syntaxPalette);
+  const setSyntaxPalette = useUiStore((s) => s.setSyntaxPalette);
   const appIcon = useUiStore((s) => s.appIcon);
   const setAppIconState = useUiStore((s) => s.setAppIcon);
   const followingSystem = theme === "system";
@@ -729,6 +731,17 @@ function AppearancePane() {
           </div>
         </div>
       )}
+
+      <h4 className="sethead">Markdown source</h4>
+      <p className="lead">Choose the syntax colors used in Raw Markdown. This never changes the file.</p>
+      <Seg
+        value={syntaxPalette}
+        options={[
+          ["rotli", "Rotli"],
+          ["mono", "Monochrome"],
+        ]}
+        onPick={setSyntaxPalette}
+      />
 
       <h4 className="sethead">App icon</h4>
       <p className="lead">

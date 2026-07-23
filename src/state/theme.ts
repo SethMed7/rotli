@@ -3,7 +3,7 @@
 // it is the chosen setting. The family picks which token set the mode resolves
 // into (warm → light/dark, mono → paper/charcoal).
 
-import type { ThemeFamily, ThemeSetting } from "./ui";
+import type { SyntaxPalette, ThemeFamily, ThemeSetting } from "./ui";
 
 type DataTheme = "light" | "dark" | "paper" | "charcoal";
 
@@ -17,6 +17,10 @@ export function resolveTheme(family: ThemeFamily, mode: "light" | "dark"): DataT
 
 function setDataTheme(value: DataTheme): void {
   document.documentElement.dataset.theme = value;
+}
+
+export function applySyntaxPalette(value: SyntaxPalette): void {
+  document.documentElement.dataset.syntaxPalette = value;
 }
 
 function detachSystemListener(): void {

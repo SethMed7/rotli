@@ -5,14 +5,12 @@
 // text transaction over the table's source range, built from the pure
 // transforms in tables.ts.
 //
-// Reveal is ROW-granular (the Typora/Obsidian middle path — never whole-table
-// "pipe soup"): put the caret in a table and only ITS line shows raw (styled as
-// table source); the rows above and below keep rendering as two partial
-// widgets. Clicking a cell places the caret inside that cell's source span;
-// Tab/⇧Tab/Enter hop cells (cmKeymap.ts). Hovering the widget shows small
-// row/col chips → a mini menu (add/move/delete/align) and +row/+col edges; a
-// `</>` corner chip reveals the whole block raw (the escape hatch) until the
-// caret leaves the table.
+// Cell editing stays inside the rendered table: one focused input replaces one
+// cell's display value while every surrounding row and column remains visual.
+// Tab/⇧Tab/Enter move between cells and can append a row at the end. Hovering
+// the widget shows small row/col chips → a mini menu
+// (add/move/delete/align) and +row/+col edges; a `</>` corner chip explicitly
+// reveals the whole block raw until the caret leaves the table.
 
 import { type EditorState, type Range, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
@@ -22,13 +20,14 @@ import {
   type TableShape,
   addColRight,
   addRowBelow,
-  cellSpansOf,
   deleteCol,
   deleteRow,
   moveCol,
   moveRow,
+  nextCell,
   scanTables,
   setColAlign,
+  setCellText,
   tableToText,
 } from "./tables";
 
@@ -158,6 +157,15 @@ const GRIP_V =
 const GRIP_H =
   '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><circle cx="4" cy="6" r="1.25"/><circle cx="4" cy="10" r="1.25"/><circle cx="8" cy="6" r="1.25"/><circle cx="8" cy="10" r="1.25"/><circle cx="12" cy="6" r="1.25"/><circle cx="12" cy="10" r="1.25"/></svg>';
 
+function plainCellLabel(raw: string, col: number): string {
+  const label = raw
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[*_`~=]/g, "")
+    .trim();
+  return label || `column ${col + 1}`;
+}
+
 /** Renders a table (or a headerless run of rows — the split-reveal twins).
  *  - `rowBase`      absolute data-row index of rows[0] (chip menus need it)
  *  - `rowLineDelta` line offset from the widget's start to the first tbody row
@@ -193,6 +201,7 @@ class TableWidget extends WidgetType {
 
   toDOM(view: EditorView): HTMLElement {
     const wrap = document.createElement("div");
+    wrap.contentEditable = "false";
     // both split twins hug the revealed row (margins collapse to the seam)
     wrap.className = this.full ? "rotli-md-tablewrap" : "rotli-md-tablewrap rotli-md-tablepart";
     const scroll = document.createElement("div");
@@ -200,6 +209,13 @@ class TableWidget extends WidgetType {
     const table = document.createElement("table");
     table.className = "rotli-md-table";
     const colAlign = (i: number): Align => this.align[i] ?? "";
+    const renderCell = (cell: HTMLTableCellElement, raw: string, row: number, col: number) => {
+      cell.dataset.tableRow = String(row);
+      cell.dataset.tableCol = String(col);
+      cell.dataset.raw = raw;
+      cell.tabIndex = 0;
+      cell.innerHTML = inlineCell(raw);
+    };
 
     if (this.header) {
       const thead = document.createElement("thead");
@@ -207,7 +223,7 @@ class TableWidget extends WidgetType {
       this.header.forEach((cell, i) => {
         const th = document.createElement("th");
         if (colAlign(i)) th.style.textAlign = colAlign(i);
-        th.innerHTML = inlineCell(cell);
+        renderCell(th, cell, -1, i);
         htr.appendChild(th);
       });
       thead.appendChild(htr);
@@ -215,12 +231,13 @@ class TableWidget extends WidgetType {
     }
 
     const tbody = document.createElement("tbody");
-    for (const row of this.rows) {
+    for (let localRow = 0; localRow < this.rows.length; localRow++) {
+      const row = this.rows[localRow] ?? [];
       const tr = document.createElement("tr");
       for (let i = 0; i < this.cols; i++) {
         const td = document.createElement("td");
         if (colAlign(i)) td.style.textAlign = colAlign(i);
-        td.innerHTML = inlineCell(row[i] ?? "");
+        renderCell(td, row[i] ?? "", this.rowBase + localRow, i);
         tr.appendChild(td);
       }
       tbody.appendChild(tr);
@@ -229,28 +246,150 @@ class TableWidget extends WidgetType {
     scroll.appendChild(table);
     wrap.appendChild(scroll);
 
-    // ── click a cell → caret into that cell's source span (click-to-edit) ──
+    // ── click a cell → edit INSIDE the rendered table ─────────────────────
+    // The Markdown remains durable truth, but only the active cell becomes a
+    // small text control. Every other cell keeps rendering, so entering a table
+    // never collapses a whole row into pipe-delimited source.
+    type CellTarget = { row: number; col: number };
+    let active: {
+      cell: HTMLTableCellElement;
+      finish: (
+        commit: boolean,
+        target: CellTarget | null,
+        focusAfter: boolean,
+        transform?: (shape: TableShape) => TableShape,
+      ) => void;
+    } | null = null;
+
+    const tableAtWidget = (): TableBlock | null => {
+      if (!wrap.isConnected) return null;
+      const pos = view.posAtDOM(wrap);
+      return (
+        scanTables(view.state.doc).find((candidate) => pos >= candidate.from && pos <= candidate.to) ?? null
+      );
+    };
+
+    const cellAt = (target: CellTarget): HTMLTableCellElement | null =>
+      table.querySelector(
+        `[data-table-row="${target.row}"][data-table-col="${target.col}"]`,
+      ) as HTMLTableCellElement | null;
+
+    const focusRebuiltCell = (tableFrom: number, target: CellTarget) => {
+      requestAnimationFrame(() => {
+        for (const candidate of view.dom.querySelectorAll<HTMLElement>(".rotli-md-tablewrap")) {
+          if (!candidate.isConnected || view.posAtDOM(candidate) !== tableFrom) continue;
+          const cell = candidate.querySelector(
+            `[data-table-row="${target.row}"][data-table-col="${target.col}"]`,
+          );
+          if (!(cell instanceof HTMLTableCellElement)) return;
+          cell.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+          return;
+        }
+      });
+    };
+
+    const startCellEdit = (cell: HTMLTableCellElement) => {
+      const row = Number(cell.dataset.tableRow);
+      const col = Number(cell.dataset.tableCol);
+      if (!Number.isInteger(row) || !Number.isInteger(col)) return;
+      if (active?.cell === cell) {
+        cell.querySelector<HTMLInputElement>(".rotli-md-cell-input")?.focus();
+        return;
+      }
+      if (active) {
+        active.finish(true, { row, col }, true);
+        return;
+      }
+
+      const original = cell.dataset.raw ?? "";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "rotli-md-cell-input";
+      input.value = original;
+      const header = this.header?.[col] ?? "";
+      input.setAttribute(
+        "aria-label",
+        `Edit ${plainCellLabel(header, col)} ${row < 0 ? "header" : `row ${row + 1}`}`,
+      );
+      cell.replaceChildren(input);
+
+      let finished = false;
+      const finish = (
+        commit: boolean,
+        target: CellTarget | null,
+        focusAfter: boolean,
+        transform?: (shape: TableShape) => TableShape,
+      ) => {
+        if (finished) return;
+        finished = true;
+        active = null;
+        const value = commit ? input.value.replace(/\r?\n/g, " ") : original;
+        const current = tableAtWidget();
+        if (!current) return;
+        let next = commit ? setCellText(current, row, col, value) : current;
+        if (!next) return;
+        if (transform) next = transform(next);
+        const changed = commit && (value !== original || transform != null);
+        if (!changed) {
+          renderCell(cell, original, row, col);
+          if (focusAfter && target) startCellEdit(cellAt(target) ?? cell);
+          else if (focusAfter) cell.focus();
+          return;
+        }
+        view.dispatch({
+          changes: { from: current.from, to: current.to, insert: tableToText(next) },
+        });
+        if (focusAfter && target) focusRebuiltCell(current.from, target);
+        else if (focusAfter) view.focus();
+      };
+      active = { cell, finish };
+
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          finish(false, { row, col }, true);
+          return;
+        }
+        if (event.key !== "Tab" && event.key !== "Enter") return;
+        event.preventDefault();
+        event.stopPropagation();
+        const current = tableAtWidget();
+        if (!current) return;
+        let target =
+          event.key === "Tab"
+            ? nextCell(current, { row, col }, event.shiftKey ? -1 : 1)
+            : row < current.rows.length - 1
+              ? { row: row + 1, col }
+              : null;
+        let transform: ((shape: TableShape) => TableShape) | undefined;
+        if (target == null && !event.shiftKey) {
+          target = { row: current.rows.length, col: event.key === "Tab" ? 0 : col };
+          transform = (shape) => addRowBelow(shape, shape.rows.length - 1);
+        }
+        finish(true, target, true, transform);
+      });
+      input.addEventListener("blur", () => finish(true, null, false));
+      input.focus();
+      input.select();
+    };
+
     table.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
+      if (e.target instanceof HTMLInputElement) return;
       const cell = (e.target as HTMLElement).closest?.("td,th");
       if (!(cell instanceof HTMLTableCellElement)) return;
       e.preventDefault();
-      const tr = cell.parentElement as HTMLTableRowElement;
-      const isHead = cell.tagName === "TH";
-      const bodyIdx = isHead ? 0 : Array.prototype.indexOf.call(tr.parentElement?.children ?? [], tr);
-      const lineOffset = isHead ? 0 : this.rowLineDelta + bodyIdx;
-      const startLine = view.state.doc.lineAt(view.posAtDOM(wrap));
-      const lineNo = startLine.number + lineOffset;
-      if (lineNo < 1 || lineNo > view.state.doc.lines) return;
-      const line = view.state.doc.line(lineNo);
-      const spans = cellSpansOf(line.text);
-      const col = Array.prototype.indexOf.call(tr.cells, cell);
-      const sp = spans[Math.min(col, Math.max(0, spans.length - 1))];
-      view.dispatch({
-        selection: { anchor: line.from + (sp ? sp.end : line.text.length) },
-        scrollIntoView: true,
-      });
-      view.focus();
+      startCellEdit(cell);
+    });
+    table.addEventListener("keydown", (event) => {
+      if (event.target instanceof HTMLInputElement) return;
+      if (event.key !== "Enter" && event.key !== "F2") return;
+      const cell = (event.target as HTMLElement).closest?.("td,th");
+      if (!(cell instanceof HTMLTableCellElement)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      startCellEdit(cell);
     });
 
     // ── hover chips: a row grip left of the hovered row, a column grip above
@@ -353,7 +492,7 @@ class TableWidget extends WidgetType {
     return wrap;
   }
   ignoreEvent(): boolean {
-    return false;
+    return true;
   }
 }
 
@@ -365,8 +504,8 @@ function build(state: EditorState, tables: TableBlock[], raw: readonly number[])
   const decos: Range<Decoration>[] = [];
   const sel = state.selection.main;
   for (const t of tables) {
-    const touched = sel.from <= t.to && sel.to >= t.from;
-    if (!touched) {
+    const wholeRaw = raw.includes(t.from) || (!sel.empty && sel.from <= t.to && sel.to >= t.from);
+    if (!wholeRaw) {
       decos.push(
         Decoration.replace({
           widget: new TableWidget(t.header, t.align, t.rows, t.header.length, 0, 2, true),
@@ -377,54 +516,9 @@ function build(state: EditorState, tables: TableBlock[], raw: readonly number[])
     }
     const head = state.doc.lineAt(t.from);
     const lastNum = state.doc.lineAt(t.to).number;
-    const selLine = state.doc.lineAt(sel.from);
-    const wholeRaw = raw.includes(t.from) || state.doc.lineAt(sel.to).number !== selLine.number;
-    if (wholeRaw) {
-      // the escape hatch (or a multi-line selection): every line raw, styled
-      for (let n = head.number; n <= lastNum; n++) decos.push(rawLine.range(state.doc.line(n).from));
-      continue;
-    }
-    // ROW-granular reveal: only the caret's line is raw; the rest keeps rendering
-    const rel = selLine.number - head.number; // 0 header · 1 delimiter · ≥2 data
-    decos.push(rawLine.range(selLine.from));
-    if (rel >= 1) {
-      // header + rows above the caret (caret on the delimiter → header only)
-      const aboveTo = state.doc.line(head.number + rel - 1).to;
-      decos.push(
-        Decoration.replace({
-          widget: new TableWidget(
-            t.header,
-            t.align,
-            rel >= 2 ? t.rows.slice(0, rel - 2) : [],
-            t.header.length,
-            0,
-            2,
-            false,
-          ),
-          block: true,
-        }).range(t.from, aboveTo),
-      );
-    }
-    if (selLine.number < lastNum) {
-      // the rows below the caret — a headerless twin (caret on the header: the
-      // hidden delimiter line leads its range, hence rowLineDelta 1)
-      const belowFrom = state.doc.line(selLine.number + 1).from;
-      const rowBase = rel <= 1 ? 0 : rel - 1;
-      decos.push(
-        Decoration.replace({
-          widget: new TableWidget(
-            null,
-            t.align,
-            t.rows.slice(rowBase),
-            t.header.length,
-            rowBase,
-            rel === 0 ? 1 : 0,
-            false,
-          ),
-          block: true,
-        }).range(belowFrom, t.to),
-      );
-    }
+    // Explicit `</>` source mode (or a real multi-line selection): every line
+    // is raw and styled. A plain cell click never comes through this path.
+    for (let n = head.number; n <= lastNum; n++) decos.push(rawLine.range(state.doc.line(n).from));
   }
   return Decoration.set(decos, true);
 }

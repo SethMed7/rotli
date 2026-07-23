@@ -57,7 +57,7 @@ import { invalidateFolders, invalidateJournal, invalidateNotes } from "./service
 import { notesService } from "./services/notes";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
 import { applyQuickState } from "./state/quick";
-import { applyTheme } from "./state/theme";
+import { applySyntaxPalette, applyTheme } from "./state/theme";
 import { useUiStore } from "./state/ui";
 
 registerDefaultActions();
@@ -411,6 +411,7 @@ export default function App() {
   const themeFamily = useUiStore((s) => s.themeFamily);
   const matchLightFamily = useUiStore((s) => s.matchLightFamily);
   const matchDarkFamily = useUiStore((s) => s.matchDarkFamily);
+  const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const surface = surfaceFromUrl();
 
   useEffect(
@@ -421,6 +422,7 @@ export default function App() {
       }),
     [theme, themeFamily, matchLightFamily, matchDarkFamily],
   );
+  useEffect(() => applySyntaxPalette(syntaxPalette), [syntaxPalette]);
 
   // theme is broadcast from the MAIN window so the quick + capture webviews
   // follow it LIVE (each applies its own theme; without this they only read it

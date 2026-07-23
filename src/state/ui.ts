@@ -10,6 +10,7 @@ export type ThemeSetting = "light" | "dark" | "system";
 
 /** Theme family: Warm is the branded pair; Mono is Paper and Charcoal. */
 export type ThemeFamily = "warm" | "mono";
+export type SyntaxPalette = "rotli" | "mono";
 
 /** The four solid themes, in the order the titlebar sun cycles them. */
 export const SOLID_THEMES: { family: ThemeFamily; mode: "light" | "dark"; label: string }[] = [
@@ -107,6 +108,10 @@ interface UiState {
   setMatchLightFamily: (family: ThemeFamily) => void;
   matchDarkFamily: ThemeFamily;
   setMatchDarkFamily: (family: ThemeFamily) => void;
+  /** Raw Markdown syntax colors. Rotli is the calm blue + active accent
+   * default; Mono keeps the grammar but renders it in the environment ink. */
+  syntaxPalette: SyntaxPalette;
+  setSyntaxPalette: (palette: SyntaxPalette) => void;
 
   /** General: visitor (click-away hides, default) vs resident (stays open). */
   stayOpen: boolean;
@@ -381,6 +386,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setMatchLightFamily: (family) => set({ matchLightFamily: family }),
   matchDarkFamily: "warm",
   setMatchDarkFamily: (family) => set({ matchDarkFamily: family }),
+  syntaxPalette: "rotli",
+  setSyntaxPalette: (palette) => set({ syntaxPalette: palette }),
 
   stayOpen: false,
   setStayOpen: (on) => set({ stayOpen: on }),

@@ -720,6 +720,28 @@
   color: var(--text);
   border-color: var(--text-muted);
 }
+.file-open-ext:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.file-convert-pdf {
+  border-color: color-mix(in srgb, var(--accent-text) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent-text) 8%, transparent);
+  color: var(--accent-text);
+}
+.file-convert-pdf:hover:not(:disabled) {
+  border-color: var(--accent-text);
+  color: var(--accent-text);
+}
+.file-conversion-banner {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-1));
+  color: var(--danger);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
 .file-body {
   flex: 1 1 auto;
   min-height: 0;

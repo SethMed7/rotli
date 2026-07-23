@@ -144,7 +144,7 @@ The 2026-07 audit escalated five product-behavior findings. Disposition:
 
 ### Supply-chain advisories (transitive-only, tracked; reviewed 2026-07-21)
 
-All are outside Rotli's own `src/`. The current `bun audit` reports thirteen findings:
+All are outside Rotli's own `src/`. The current `bun audit` reports twelve findings:
 
 - **DOMPurify** ≤ 3.4.11 (low custom-element sanitizer callback bypass) —
   through Mermaid. Rotli keeps Mermaid at `securityLevel: "strict"` and does
@@ -168,6 +168,15 @@ The direct `@excalidraw/mermaid-to-excalidraw` 2.2.2 dependency is the narrow
 board-engine conversion seam. Excalidraw already supplied the same version
 transitively, so this does not add another converter or widen the runtime's
 network/egress surface.
+
+The direct MIT-licensed `pdf-extract` 0.12.0 dependency is confined to
+`src-tauri/src/document_conversion.rs` and parses local, untrusted PDFs without
+network access. Rotli caps source and extracted sizes, catches parser panics,
+rejects empty/scanned extraction, and never writes the original; malformed,
+page-boundary, and end-to-end DOCX-package tests cover the adapter. Its locked
+transitive path is `pdf-extract → lopdf` plus font/encoding and cipher helpers.
+Review this parser boundary before upgrading or before broadening PDF support
+beyond embedded text.
 
 RustSec found two `quick-xml 0.39.4` denial-of-service advisories
 (`RUSTSEC-2026-0194` and `RUSTSEC-2026-0195`) in the July 21 pushed run. They are

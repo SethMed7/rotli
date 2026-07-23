@@ -51,6 +51,10 @@ exception.
   and never delays core work.
 - Copy is direct, specific, and useful: errors say what failed and what the user
   can do next.
+- A PDF keeps its viewer as the primary surface. `Convert to DOCX` is a compact
+  adjacent action that creates and opens a separate editable copy; progress,
+  disabled state, extraction errors, and the original-file guarantee remain
+  visible without replacing the PDF.
 - Main's view switcher stays in the existing section header: exact view name,
   standard menu disclosure, inline create/rename, and an explicit delete row
   that states content remains in Main. A named view must not become a second
@@ -88,6 +92,18 @@ polish work.
   disables conversion with explanatory copy because it has no corpus
   filesystem. The desktop composition root creates the managed board in the
   active Main/view context, opens it, and starts its rename flow.
+
+## Markdown editing
+
+- Beautified tables stay visually tabular during ordinary editing. Clicking or
+  keyboard-entering a cell opens one inline cell editor; surrounding cells keep
+  rendering, Tab moves in reading order, and focus remains visible. Pipe source
+  is an explicit `</>` escape hatch, not the default response to a cell click.
+- Raw Markdown is a first-class source view. It uses a monospaced editor voice,
+  the active Rotli accent for syntax punctuation, and a contrast-safe semantic
+  blue for headings and emphasis. These roles are theme tokens in all four
+  environments. Appearance offers Rotli (default) and Monochrome palettes;
+  customization changes palette, never grammar or source.
 
 ## Layout and accessibility
 

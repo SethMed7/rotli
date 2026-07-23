@@ -668,6 +668,47 @@
   color: var(--text-muted);
 }
 
+/* Raw Markdown is an intentional source editor, not an unstyled fallback.
+   Structure uses two semantic roles: the active Rotli accent for punctuation
+   and a calm AA blue for headings/emphasis. The tokens live in the brand layer,
+   so all four environments — and future user overrides — keep this grammar. */
+.rotli-cm-host .cm-editor.rotli-raw-mode .cm-scroller,
+.rotli-cm-host .cm-editor.rotli-raw-mode .cm-content {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.rotli-cm-host .cm-editor.rotli-raw-mode .cm-scroller {
+  line-height: 1.55;
+}
+.rotli-raw-accent {
+  color: var(--syntax-accent);
+}
+.rotli-raw-blue,
+.rotli-raw-heading,
+.rotli-raw-strong {
+  color: var(--syntax-blue);
+}
+.rotli-raw-heading,
+.rotli-raw-strong {
+  font-weight: 700;
+}
+.rotli-raw-muted {
+  color: var(--text-muted);
+}
+.rotli-raw-code-token {
+  color: var(--syntax-accent);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  border-radius: var(--r-inner);
+}
+.rotli-cm-host .cm-line.rotli-raw-code-line {
+  background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+}
+.rotli-raw-code-text {
+  color: var(--text);
+}
+.rotli-cm-host .cm-line.rotli-raw-quote-line {
+  color: var(--text-muted);
+}
+
 /* revealed syntax markers (caret touching the span) — clay-deep, dimmed (r4) */
 .rotli-syntax {
   color: var(--accent-text);
@@ -1132,12 +1173,12 @@
   display: none;
 }
 
-/* — beautified GFM tables (Seth, 2026-06-27; interactive 2026-07-01): rendered
-   by tableRender.ts. Reveal is ROW-granular — the caret's line shows raw (the
-   .rotli-table-rawline voice below) while the rest keeps rendering as partial
-   widgets. Hover chips (row/col grips, +row/+col, the `</>` hatch) live inside
-   the wrap; the wrap itself must NOT clip (chips overhang), so horizontal
-   scrolling moved to an inner .rotli-tbl-scroll. — */
+/* — beautified GFM tables (Seth, 2026-06-27; in-table editing 2026-07-23):
+   rendered by tableRender.ts. A clicked cell becomes one inline input while the
+   surrounding table stays rendered; the explicit `</>` hatch is the only
+   ordinary route to pipe-delimited source. Hover row/col/+ controls live inside
+   the wrap; the wrap itself must NOT clip, so horizontal scrolling belongs to
+   the inner .rotli-tbl-scroll. — */
 .rotli-md-tablewrap {
   position: relative;
   margin: 4px 0 10px;
@@ -1176,11 +1217,31 @@
 }
 .rotli-md-table th,
 .rotli-md-table td {
-  cursor: text; /* cells are click-to-edit (caret lands in the source span) */
+  cursor: text;
+}
+.rotli-md-table th:focus-visible,
+.rotli-md-table td:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.rotli-md-cell-input {
+  display: block;
+  width: calc(100% + 18px);
+  min-width: 8ch;
+  box-sizing: border-box;
+  margin: -5px -9px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: var(--r-inner);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  line-height: inherit;
 }
 
-/* the caret's own table line, revealed raw — mono so the pipes read as
-   structure, a whisper of surface so the open row is findable */
+/* explicit `</>` table-source mode — mono so the pipes read as structure */
 .rotli-cm-host .cm-line.rotli-table-rawline {
   font-family: ui-monospace, Menlo, monospace;
   font-size: 0.88em;

@@ -16,6 +16,7 @@ mod breve;
 mod chat;
 mod containment;
 mod corpus;
+mod document_conversion;
 mod fsutil;
 mod keychain;
 mod localmodel;

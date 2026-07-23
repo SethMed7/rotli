@@ -455,6 +455,17 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             read-only location
           </span>
         )}
+        {kind === "pdf" && (
+          <button
+            type="button"
+            className="file-open-ext file-convert-pdf"
+            title="Create a new editable DOCX copy locally; the PDF stays unchanged"
+            disabled={converting}
+            onClick={() => void convertDocument()}
+          >
+            {converting ? "Converting…" : "Convert to DOCX"}
+          </button>
+        )}
         <button
           type="button"
           className="file-open-ext"
@@ -468,6 +479,11 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           Open externally <span aria-hidden="true">▾</span>
         </button>
       </header>
+      {kind === "pdf" && conversionError && (
+        <div className="file-conversion-banner" role="alert">
+          {conversionError}
+        </div>
+      )}
 
       <div
         ref={bodyRef}

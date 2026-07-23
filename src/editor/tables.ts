@@ -247,6 +247,26 @@ export function setColAlign(t: TableShape, i: number, align: Align): TableShape 
   return { ...t, align: a };
 }
 
+/** Replace one visible cell without exposing table serialization to the UI.
+ * `row = -1` addresses the header; data rows are zero-based. Invalid addresses
+ * are refused so a stale widget can never grow or reshape a table by accident. */
+export function setCellText(t: TableShape, row: number, col: number, text: string): TableShape | null {
+  if (col < 0 || col >= t.header.length) return null;
+  if (row === -1) {
+    const header = [...t.header];
+    header[col] = text;
+    return { ...t, header };
+  }
+  if (row < 0 || row >= t.rows.length) return null;
+  const rows = t.rows.map((cells, index) => {
+    if (index !== row) return cells;
+    const next = Array.from({ length: t.header.length }, (_, cell) => cells[cell] ?? "");
+    next[col] = text;
+    return next;
+  });
+  return { ...t, rows };
+}
+
 // ─── cell navigation (Tab / ⇧Tab / Enter hop cells; cmKeymap drives this) ────
 
 /** A cell address: row -1 = the header row, 0.. = data rows. */

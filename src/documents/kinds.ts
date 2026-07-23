@@ -4,7 +4,7 @@
 
 export const DOCX_EDITABLE_EXTS = ["docx", "docm", "dotx", "dotm"] as const;
 export const DOCUMENT_NATIVE_ONLY_EXTS = ["doc", "dot", "odt", "pages", "rtf"] as const;
-export const DOCUMENT_CONVERTIBLE_EXTS = ["doc", "rtf", "odt"] as const;
+export const DOCUMENT_CONVERTIBLE_EXTS = ["doc", "rtf", "odt", "pdf"] as const;
 
 export const DOCX_EDITABLE = new Set<string>(DOCX_EDITABLE_EXTS);
 export const DOCUMENT_CONVERTIBLE = new Set<string>(DOCUMENT_CONVERTIBLE_EXTS);

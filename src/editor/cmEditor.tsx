@@ -30,6 +30,7 @@ import { blockRender } from "./blockRender";
 import { fmBlock } from "./fmBlock";
 import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
 import { tableRender } from "./tableRender";
+import { rawMarkdown } from "./rawMarkdown";
 import { focusDim } from "./focusMode";
 import { linkOpener, livePreview } from "./livePreview";
 import { stripMarkdown } from "./stripMarkdown";
@@ -428,7 +429,7 @@ export function CmEditor({
         // URL. Both read source text in raw and beautified modes, so this sits
         // outside the view-mode compartment.
         linkOpener,
-        viewModeComp.of(rawEditorRef.current ? [] : [livePreview, blockRender, tableRender]),
+        viewModeComp.of(rawEditorRef.current ? rawMarkdown : [livePreview, blockRender, tableRender]),
         blockComp.of(blockHandlesRef.current ? blockHandles(openBlockMenu) : []),
         fmComp.of(fmExt(fmRawRef.current, fmGenRef.current, fmErrRef.current)),
         EditorView.domEventHandlers({
@@ -505,11 +506,12 @@ export function CmEditor({
     viewRef.current?.dispatch({ effects: focusComp.reconfigure(focusMode ? focusDim : []) });
   }, [focusMode, focusComp]);
 
-  // beautified ⇄ raw markdown: swap the live-preview decorations on/off
+  // beautified ⇄ raw markdown: swap WYSIWYG rendering for the IDE-like source
+  // theme. Both modes edit the same Markdown text; only presentation changes.
   useEffect(() => {
     rawEditorRef.current = rawEditor;
     viewRef.current?.dispatch({
-      effects: viewModeComp.reconfigure(rawEditor ? [] : [livePreview, blockRender, tableRender]),
+      effects: viewModeComp.reconfigure(rawEditor ? rawMarkdown : [livePreview, blockRender, tableRender]),
     });
   }, [rawEditor, viewModeComp]);
 

@@ -171,7 +171,10 @@ export function documentToSnapshot(document: EditableDocument): IDocumentData {
       ...(paragraph.list
         ? {
             bullet: {
-              listType: paragraph.list === "number" ? "decimal" : "bullet",
+              // Univer resolves this key through getBulletPresetList(). Lowercase
+              // descriptive values are not aliases: they resolve to undefined
+              // and crash while the document canvas asks for nestingLevel.
+              listType: paragraph.list === "number" ? "ORDER_LIST" : "BULLET_LIST",
               listId: `rotli-${paragraph.list}`,
               nestingLevel: 0,
             },
@@ -397,7 +400,9 @@ function paragraphsInRange(snapshot: IDocumentData, start: number, end: number):
       ...(named ? { namedStyle: named } : {}),
       ...(align ? { alignment: align } : {}),
       ...(mark.bullet
-        ? { list: mark.bullet.listType.toLowerCase().includes("decimal") ? "number" : "bullet" }
+        ? {
+            list: /(?:order|decimal|number)/i.test(mark.bullet.listType) ? "number" : "bullet",
+          }
         : {}),
     });
     cursor = paragraphEnd + 1;

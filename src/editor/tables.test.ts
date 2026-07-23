@@ -19,6 +19,7 @@ import {
   nextCell,
   scanTables,
   setColAlign,
+  setCellText,
   splitRow,
   tableToText,
 } from "./tables";
@@ -163,6 +164,21 @@ describe("column ops", () => {
     const t = setColAlign(shape(), 0, "center");
     expect(t.align).toEqual(["center", "right"]);
     expect(reparse(t).align).toEqual(["center", "right"]);
+  });
+});
+
+describe("cell editing", () => {
+  test("updates header and body cells without changing the table shape", () => {
+    expect(setCellText(shape(), -1, 0, "Model")?.header).toEqual(["Model", "Age"]);
+    expect(setCellText(shape(), 1, 1, "8")?.rows).toEqual([
+      ["Ada", "36"],
+      ["Bo", "8"],
+    ]);
+  });
+
+  test("refuses stale row and column addresses", () => {
+    expect(setCellText(shape(), 2, 0, "nope")).toBeNull();
+    expect(setCellText(shape(), 0, 2, "nope")).toBeNull();
   });
 });
 

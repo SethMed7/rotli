@@ -19,6 +19,14 @@ describe("userName", () => {
   });
 });
 
+describe("raw Markdown syntax palette", () => {
+  test("defaults to Rotli, preserves Mono, and rejects unknown palettes", () => {
+    expect(parseSettings("{}").syntaxPalette).toBe("rotli");
+    expect(parseSettings('{"syntaxPalette":"mono"}').syntaxPalette).toBe("mono");
+    expect(parseSettings('{"syntaxPalette":"neon"}').syntaxPalette).toBe("rotli");
+  });
+});
+
 describe("chatSidebarLimit (#17 — chat list cap)", () => {
   test("defaults a missing key to 5", () => {
     expect(parseSettings("{}").chatSidebarLimit).toBe(5);

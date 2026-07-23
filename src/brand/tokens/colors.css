@@ -32,6 +32,8 @@
   --accent-text:#8F4E37;   /* accent text/links at small sizes (AA) */
   --on-accent:#FFFFFF;     /* text on a clay fill — AA-large/UI only (3.16); for small text prefer cocoa */
   --success:#8D9A76;       /* Olive — UI/icons; for small text use --rotli-olive-text */
+  --syntax-blue:#2F6F9E;   /* raw Markdown semantic structure — AA on light surfaces */
+  --syntax-accent:var(--accent-text); /* source punctuation follows the active Rotli accent */
 }
 
 /* — semantic: DARK surfaces — warm cocoa ground, never clinical grey. Clay clears AA on it. — */
@@ -48,6 +50,8 @@
   --accent-text:#C97E62;
   --on-accent:#241D18;
   --success:#8D9A76;       /* AA (5.55) on the cocoa ground */
+  --syntax-blue:#78B7E3;
+  --syntax-accent:var(--accent-text);
 }
 
 /* NOTE: the old `prefers-color-scheme: dark` media block was removed

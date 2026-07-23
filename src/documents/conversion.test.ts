@@ -19,7 +19,10 @@ describe("legacy document conversion workflow", () => {
     await expect(convertLegacyDocument(converter, "storage/draft.odt")).resolves.toBe(
       "storage/rotli/legacy.docx",
     );
-    expect(calls).toHaveLength(3);
+    await expect(convertLegacyDocument(converter, "storage/reference.pdf")).resolves.toBe(
+      "storage/rotli/legacy.docx",
+    );
+    expect(calls).toHaveLength(4);
   });
 
   test("rejects formats without a faithful local route before calling the host", async () => {
