@@ -11,7 +11,9 @@ import {
   type BrainAction,
   type JournalDeps,
   approveProposal,
+  canUndo,
   deriveJournal,
+  describeAction,
   dismissProposal,
   undoAction,
 } from "./brainJournal";
@@ -394,5 +396,55 @@ describe("dismissProposal / undoAction — same-id re-appends", () => {
     await undoAction(a, deps);
     expect(calls.writeIndex).toEqual([["Projects", ""]]);
     expect(calls.appended[0]?.status).toBe("reverted");
+  });
+});
+
+// ─── the secure-intake repair rows (decision 2026-07-22) ─────────────────────
+// Rust writes them content-free (empty title, ULID noteId) and already-applied;
+// the frontend renders them in history but never offers journal-side undo.
+
+describe("repair rows — content-free, applied, never undoable", () => {
+  const repairRow = (): BrainAction => {
+    const a = row({
+      id: "01JREPAIR",
+      action: "repair",
+      status: "applied",
+      noteId: "01JLEGACYULID",
+      noteUlid: "01JLEGACYULID",
+      noteTitle: "",
+      before: "wiki/_inbox",
+      after: "wiki/_secure",
+    });
+    delete (a as Partial<BrainAction>).area; // Rust repair rows carry no area
+    return a;
+  };
+
+  test("folds into history like any applied row", () => {
+    const v = deriveJournal([repairRow()]);
+    expect(v.pending).toEqual([]);
+    expect(v.history.map((a) => a.id)).toEqual(["01JREPAIR"]);
+  });
+
+  test("describes itself without any note content", () => {
+    const text = describeAction(repairRow(), false);
+    expect(text).toContain("Secure notes");
+    expect(text).not.toContain("undefined");
+    expect(text).not.toContain("“”");
+  });
+
+  test("offers no Undo; undoAction refuses without touching the corpus", async () => {
+    const a = repairRow();
+    expect(canUndo(a)).toBe(false);
+    expect(canUndo(row({}))).toBe(true);
+    const { deps, calls } = fakeDeps("wiki/_secure/x.md");
+    await expect(undoAction(a, deps)).rejects.toThrow(/remove protection/);
+    expect(calls.filerMove).toEqual([]);
+    expect(calls.appended).toEqual([]);
+  });
+
+  test("approve refuses a repair row (it is applied at write time)", async () => {
+    const { deps, calls } = fakeDeps("wiki/_secure/x.md");
+    await expect(approveProposal(repairRow(), deps)).rejects.toThrow(/nothing to approve/);
+    expect(calls.appended).toEqual([]);
   });
 });

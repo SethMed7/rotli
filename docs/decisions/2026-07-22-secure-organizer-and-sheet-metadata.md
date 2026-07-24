@@ -1,11 +1,30 @@
 # Revised proposal: secure-note organization and companion metadata work
 
-Date: 2026-07-22 · Status: **proposed; secure organizer not implemented**
+Date: 2026-07-22 · Status: **legacy intake repair and companions B–D
+implemented 2026-07-24; secure organizer not implemented**
 
 This revision supersedes the secure-organizer transport described in commit
 `ec316fc`. The companion secure-pattern prompt, secure-note explainer, and sheet
 metadata ideas remain separate features and require their own implementation
 reviews. This decision does not authorize a live-memex migration.
+
+*Companions implemented 2026-07-24 (their reviews):*
+
+- **Secure-pattern confirmation** landed as actionable rows in Brain Activity,
+  not a toast — the pane is the app's one "show, never nag" review surface and
+  already carries the repair block. Detector-only notes offer *Make secure*
+  (the existing protected flow) and *Not sensitive*; a dismissal stores the
+  whole-file hash in `.rotli/organizer.json` (rebuildable state, never note
+  frontmatter — resolving open question 2) and re-arms on any change the
+  detector could see. Nothing is ever auto-marked from this lane, and the
+  existing auto-flag-on-metadata-read behavior is unchanged.
+- **The secure-note explainer** is Settings → Security: the fail-closed rules
+  in plain language, explainer-only. The `organize_secure_notes_with_local_ai`
+  consent knob deliberately ships with feature A itself, never before it.
+- **Sheet metadata** is the read-only Details popover on sheet/CSV surfaces:
+  canonical path from the corpus router, size, filesystem stamps, format facts,
+  and per-sheet dimensions — derived lazily on open (resolving open question 4),
+  never stored, with truncated parses reported as "N+" rows.
 
 ## Corrected current-state diagnosis
 
@@ -23,6 +42,13 @@ read it in place. A repair command must first:
 The repair is explicit, previewable, and independently enforced in Rust. It may
 be offered in the UI only after isolated tests prove it cannot target a
 non-secure note or a path outside the registered root.
+
+*Implemented 2026-07-24:* `secure_repair_scan`/`secure_repair_apply` in
+`src-tauri/src/corpus.rs` (per-note on-disk re-validation, delegated to the
+existing ignore-before-move protected flow, content-free journal rows),
+surfaced as the previewable repair block in the Brain Activity pane. The
+normative rule now lives in
+[`memex-data-contract.md`](../architecture/memex-data-contract.md).
 
 ## Secure organization policy
 

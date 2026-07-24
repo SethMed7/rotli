@@ -23,11 +23,13 @@ import {
   corpusFileBytes,
   corpusFileStat,
   corpusFileText,
+  corpusNoteAbsolutePath,
   corpusOpenFile,
   corpusOpenFileWith,
   corpusOpenWithApps,
   corpusRevealFile,
   fileAssetUrl,
+  isTauri,
 } from "../lib/tauri";
 import {
   DOCX_EDITABLE,
@@ -38,6 +40,7 @@ import {
 } from "../documents/kinds";
 import { clamp } from "../lib/clamp";
 import { IMAGE_EXTS, extOf, fileName } from "../lib/fileKind";
+import { deriveSheetFacts, describeShape, formatStamp, sizeLine } from "../sheets/facts";
 import { SHEET_BIN, SHEET_EDITABLE, SHEET_EDIT_MAX_BYTES, SHEET_TEXT } from "../sheets/kinds";
 import { type SheetTable, parseWorkbook } from "../sheets/view";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
@@ -175,6 +178,14 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   const documentChromeRef = useRef<HTMLDivElement | null>(null);
   const scaleRef = useRef(1);
   const openMenu = useContextMenu((s) => s.open);
+  // the sheet Details panel (decision 2026-07-22, feature D): read-only derived
+  // facts, computed lazily when the panel opens — nothing is ever stored
+  const [details, setDetails] = useState(false);
+  const [detailTables, setDetailTables] = useState<SheetTable[] | null>(null);
+  const [detailsErr, setDetailsErr] = useState<string | null>(null);
+  const [absPath, setAbsPath] = useState<string | null>(null);
+  const [pathCopied, setPathCopied] = useState(false);
+  const detailsRef = useRef<HTMLDivElement | null>(null);
 
   const sheetEditable =
     kind === "sheet" && SHEET_EDITABLE.has(ext) && !!stat?.writable && stat.len <= SHEET_EDIT_MAX_BYTES;
@@ -196,6 +207,11 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
     setConversionError("");
     setImgNat(null);
     setImgZoom(imgZoomMemo.get(fileId) ?? "fit");
+    setDetails(false);
+    setDetailTables(null);
+    setDetailsErr(null);
+    setAbsPath(null);
+    setPathCopied(false);
     const fail = (e: unknown) => !cancelled && setErr((e as Error)?.message ?? "couldn't load the file");
 
     // the dropdown's "Open with …" entries — only what's actually installed
@@ -338,6 +354,64 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
     e.stopPropagation();
   };
 
+  // close the Details panel on outside click or Escape — quiet, keyboard-safe
+  useEffect(() => {
+    if (!details) return;
+    const onDown = (e: MouseEvent) => {
+      if (detailsRef.current && !detailsRef.current.contains(e.target as Node)) setDetails(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDetails(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [details]);
+
+  const toggleDetails = () => {
+    const opening = !details;
+    setDetails(opening);
+    if (!opening) return;
+    setPathCopied(false);
+    // the canonical location comes from the corpus router EVERY open — it's the
+    // one source that survives filings and renames (never copied anywhere)
+    if (isTauri() && absPath === null) {
+      corpusNoteAbsolutePath(fileId)
+        .then(setAbsPath)
+        .catch(() => setAbsPath(null));
+    }
+    // dims: the read-only viewer already parsed tables; the EDITABLE path never
+    // did — inspect lazily now, fresh per surface, bounded by the same caps
+    if (tables === null && detailTables === null && !detailsErr) {
+      if (stat && stat.len > READ_MAX_BYTES) {
+        setDetailsErr("too large to inspect here");
+        return;
+      }
+      const load = SHEET_BIN.has(ext)
+        ? corpusFileBytes(fileId).then((b64) => parseWorkbook({ base64: b64 }))
+        : corpusFileText(fileId, READ_MAX_BYTES).then((csv) =>
+            parseWorkbook({ csv, delimiter: ext === "tsv" ? "\t" : "," }),
+          );
+      load
+        .then(setDetailTables)
+        .catch((e) => setDetailsErr((e as Error)?.message ?? "couldn't inspect the file"));
+    }
+  };
+
+  const copyPath = () => {
+    if (!absPath || !navigator.clipboard) return;
+    navigator.clipboard.writeText(absPath).then(
+      () => setPathCopied(true),
+      () => {},
+    );
+  };
+
+  const factTables = tables ?? detailTables;
+  const facts = factTables ? deriveSheetFacts(ext, factTables) : null;
+
   const openExternally = (event: ReactMouseEvent<HTMLButtonElement>) => {
     const editingDocument = kind === "document";
     const items: MenuSpec[] = [
@@ -465,6 +539,66 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           >
             {converting ? "Converting…" : "Convert to DOCX"}
           </button>
+        )}
+        {kind === "sheet" && (
+          <div className="file-details" ref={detailsRef}>
+            <button
+              type="button"
+              className="file-open-ext"
+              aria-expanded={details}
+              aria-haspopup="dialog"
+              title="File facts — location, size, dates, format, and sheet dimensions"
+              onClick={toggleDetails}
+            >
+              Details <span aria-hidden="true">▾</span>
+            </button>
+            {details && (
+              <div className="file-details-pop" role="dialog" aria-label="File details">
+                <dl className="fdp-list">
+                  <dt>Name</dt>
+                  <dd className="fdp-clip" title={name}>
+                    {name}
+                  </dd>
+                  <dt>Where</dt>
+                  <dd className="fdp-clip" title={absPath ?? undefined}>
+                    {absPath ?? "—"}
+                  </dd>
+                  <dt>Size</dt>
+                  <dd>{sizeLine(stat)}</dd>
+                  <dt>Created</dt>
+                  <dd>{formatStamp(stat?.createdMs)}</dd>
+                  <dt>Modified</dt>
+                  <dd>{formatStamp(stat?.modifiedMs)}</dd>
+                  <dt>Format</dt>
+                  <dd>
+                    {facts
+                      ? facts.delimiter
+                        ? `${facts.format} · ${facts.delimiter}-separated · ${facts.encoding}`
+                        : facts.format
+                      : detailsErr
+                        ? "—"
+                        : "Inspecting…"}
+                  </dd>
+                </dl>
+                {facts && (
+                  <ul className="fdp-sheets">
+                    {facts.sheets.map((s) => (
+                      <li key={s.name}>
+                        {facts.sheets.length > 1 && <span className="fdp-sheet-name">{s.name}</span>}
+                        {describeShape(s)}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {detailsErr && <p className="fdp-note">⚠ {detailsErr}</p>}
+                {absPath && (
+                  <button type="button" className="file-open-ext fdp-copy" onClick={copyPath}>
+                    {pathCopied ? "Copied" : "Copy path"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         )}
         <button
           type="button"

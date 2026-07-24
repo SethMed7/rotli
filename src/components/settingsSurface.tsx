@@ -82,6 +82,7 @@ import {
   LaptopGlyph,
   NotesStackGlyph,
   PlusGlyph,
+  ShieldGlyph,
   SunGlyph,
 } from "./glyphs";
 import { Character, type CharacterName, QuokkaMark } from "./character";
@@ -98,7 +99,8 @@ import {
 import { CORPUS_INSTANCE_ID, type MemexInstance, type Perms } from "../memex/config";
 import { NEW_ITEM_DEFINITIONS } from "../newItems/model";
 
-type SettingsPane = "general" | "hotkeys" | "appearance" | "brain" | "models" | "location" | "plugins";
+type SettingsPane =
+  "general" | "hotkeys" | "appearance" | "brain" | "security" | "models" | "location" | "plugins";
 
 const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = [
   { id: "general", label: "General", glyph: LaptopGlyph },
@@ -107,6 +109,9 @@ const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = 
   // the organizer daemon's trust ladder (design §4.3) — minimal Phase-4 pane;
   // capability checkboxes / Pause / Reset Brain are Phase 5 (§4.8)
   { id: "brain", label: "Brain", glyph: NotesStackGlyph },
+  // the secure-note explainer (decision 2026-07-22, feature C) — the ONE plain-
+  // language home for the fail-closed rules; contract stays the spec
+  { id: "security", label: "Security", glyph: ShieldGlyph },
   // connected subscription models + hybrid presets (Seth, 2026-07-02)
   { id: "models", label: "AI Models", glyph: CloudGlyph },
   // Storage + Memory collapsed into one "Location" tab (Seth, 2026-06-27): your
@@ -2063,6 +2068,53 @@ memex — NOT this repo. The README is the ONLY doc that stays in the repo.
   rotli files it, and I keep it under my <Project> folder in Main.
 • Do not create or leave project docs in this repo's docs/ folder.`;
 
+/** The secure-note explainer (decision 2026-07-22, feature C) — plain language
+ * distilled from the memex data contract's fail-closed list. Copy lives here;
+ * the contract stays the spec. Deliberately explainer-only: the secure-note
+ * organization consent knob ships WITH that feature, not before it. */
+function SecurityPane() {
+  return (
+    <>
+      <PaneHead title="Security" char="local" />
+      <p className="lead">
+        A <b>secure note</b> is one rotli treats as private from AI. Some notes become secure on their own —
+        quick captures (<b>⌥C</b>) are secure at birth, and a note that looks like it holds a secret (an API
+        key, a card number) is flagged when rotli reads it. You can also mark any note secure yourself from
+        its metadata panel or the note menu.
+      </p>
+      <span className="mplabel">What secure means</span>
+      <p className="setnote">
+        Secure notes live in <b>Secure notes</b> — a real folder in your memex (<code>wiki/_secure/</code>),
+        not a hidden vault — and every one is kept out of git automatically.
+      </p>
+      <p className="setnote">
+        <b>Remote models never see them.</b> Not the body, not the title, not a snippet — they are left out of
+        everything a remote model receives, including search results and the notes catalog the chat uses. This
+        is enforced twice, independently, and there is no setting that overrides it.
+      </p>
+      <p className="setnote">
+        <b>On-device models are opt-in per note.</b> A model running on this Mac may read a secure note only
+        after you allow <i>Local AI access</i> on that specific note. A cloud model behind a localhost proxy
+        still counts as remote and stays blocked.
+      </p>
+      <p className="setnote">
+        <b>The organizer never touches them.</b> The Brain organizer skips secure notes entirely — it
+        doesn&rsquo;t read, move, or tag them, even when it&rsquo;s allowed to read other notes.
+      </p>
+      <span className="mplabel">Leaving and repairs</span>
+      <p className="setnote">
+        Removing protection (from the note&rsquo;s menu or its shield control) moves the note back to where it
+        lived before and lifts the git ignore — but only after the secret-looking content is gone.
+      </p>
+      <p className="setnote">
+        Older versions of rotli could leave a secure note sitting in intake instead of Secure notes. When
+        that&rsquo;s the case, <b>Brain Activity</b> shows the affected notes and offers a one-click move into
+        the protected folder — words untouched, nothing shown to any AI.
+      </p>
+    </>
+  );
+}
+
 function PluginsPane() {
   const [copied, setCopied] = useState(false);
   const copy = () => {
@@ -2132,6 +2184,7 @@ export function SettingsSurface() {
           {pane === "hotkeys" && <HotkeysPane />}
           {pane === "appearance" && <AppearancePane />}
           {pane === "brain" && <BrainPane />}
+          {pane === "security" && <SecurityPane />}
           {pane === "models" && <ModelsPane />}
           {pane === "location" && <LocationPane />}
           {pane === "plugins" && <PluginsPane />}

@@ -322,6 +322,11 @@ struct NoteState {
     last_fields: BTreeMap<String, String>,
     proposed: ProposedState,
     processed_at: String,
+    /// WHOLE-file hash at the user's "Not sensitive" answer (feature B,
+    /// decision 2026-07-22): a detector-only note with this exact content stays
+    /// out of the review hint. Any change the detector could see re-arms it.
+    /// "" = never dismissed. Explicitly flagged notes never consult this.
+    secure_dismissed: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq)]
@@ -378,8 +383,14 @@ struct NoteSnapshot {
     title: String,
     body: String,
     body_hash: String,
+    /// WHOLE-file hash — the secret detector's input domain (frontmatter too),
+    /// so a "Not sensitive" dismissal re-arms on ANY change the detector sees.
+    text_hash: String,
     locked: bool,
     secure: bool,
+    /// The EXPLICIT `secure: true` frontmatter flag alone (already protected —
+    /// the repair/passive lanes own it). `secure` also merges the detector.
+    secure_flagged: bool,
     fields: BTreeMap<String, String>,
     mtime_age: Duration,
 }
@@ -410,6 +421,7 @@ fn snapshot_note(root: &Path, rel: &str) -> Result<NoteSnapshot, String> {
     }
     // Detect on the WHOLE text (frontmatter too — a foreign `key: sk-…` line is
     // just as much a secret as one in the body). Stricter than `read_for_ai`.
+    let secure_flagged = secure;
     if !secure && crate::secret::looks_secure(&text) {
         secure = true;
     }
@@ -419,8 +431,10 @@ fn snapshot_note(root: &Path, rel: &str) -> Result<NoteSnapshot, String> {
         title: corpus::title_of(body),
         body: body.to_string(),
         body_hash: fnv1a64(body.as_bytes()),
+        text_hash: fnv1a64(text.as_bytes()),
         locked,
         secure,
+        secure_flagged,
         fields,
         mtime_age,
     })
@@ -1158,8 +1172,21 @@ pub(crate) fn run_cycle(
                 // counted + remembered for the §4.2.3 "review them yourself"
                 // line — never modeled, never proposed with content, at any
                 // rung. The durable set keeps the hint up across small cycles.
-                report.secure_skipped += 1;
-                inner.status.lock().unwrap().secure_pending.insert(rel);
+                // Feature B (decision 2026-07-22): a detector-only note the
+                // user answered "Not sensitive" for stays out of the hint
+                // while its content is unchanged; flagged notes never consult
+                // the dismissal (they are already protected).
+                let dismissed = !snap.secure_flagged
+                    && state
+                        .notes
+                        .get(&state_key(&snap))
+                        .is_some_and(|n| !n.secure_dismissed.is_empty() && n.secure_dismissed == snap.text_hash);
+                if dismissed {
+                    inner.status.lock().unwrap().secure_pending.remove(&rel);
+                } else {
+                    report.secure_skipped += 1;
+                    inner.status.lock().unwrap().secure_pending.insert(rel);
+                }
                 continue;
             }
             other => {
@@ -2134,6 +2161,103 @@ pub fn organizer_learn_field(
     learn_field(&state, &note, &key, &value)
 }
 
+// ─── the secure review lane (feature B, decision 2026-07-22) ─────────────────
+
+/// One "review this" row for the Activity pane — a note the daemon skipped as
+/// secure. `flagged` = the explicit frontmatter flag (already protected; the
+/// repair/passive lanes own those) vs detector-only (the confirm lane: the
+/// detector proposes, the user disposes — nothing is ever auto-marked here).
+/// `title` is for the user's own local UI, exactly like the sidebar shows it;
+/// nothing from this payload is journaled or sent anywhere.
+#[derive(serde::Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SecureHint {
+    pub rel: String,
+    pub title: String,
+    pub flagged: bool,
+}
+
+/// The current review rows, RE-VALIDATED fresh per call: each pending rel is
+/// re-snapshotted, entries that stopped looking secure (or vanished) drop out.
+pub(crate) fn secure_hints(
+    corpus_state: &CorpusState,
+    handle: &OrganizerHandle,
+) -> Result<Vec<SecureHint>, String> {
+    let pending: Vec<String> =
+        handle.0.status.lock().unwrap().secure_pending.iter().cloned().collect();
+    if pending.is_empty() {
+        return Ok(Vec::new());
+    }
+    let root_id = corpus_state.default_root_id()?;
+    corpus_state.route(&root_id, |s| {
+        let root = s.root().to_path_buf();
+        let mut out = Vec::new();
+        for rel in &pending {
+            // the set only ever holds our own sweep rels, but the IPC boundary
+            // re-checks anyway — dot components (../) never touch the fs
+            if !candidate_rel(rel) {
+                continue;
+            }
+            let Ok(snap) = snapshot_note(&root, rel) else { continue };
+            if !snap.secure {
+                continue; // cleaned since the last cycle — not review material
+            }
+            out.push(SecureHint {
+                rel: rel.clone(),
+                title: snap.title,
+                flagged: snap.secure_flagged,
+            });
+        }
+        Ok(out)
+    })
+}
+
+/// The user's "Not sensitive" answer for a detector-only note: persist the
+/// whole-file hash so this exact content is never re-nagged, and clear the row
+/// immediately. Refuses explicitly flagged notes (they are protected, not
+/// pending) and non-candidate rels. Same benign raciness as `learn_field`
+/// (#28): a mid-flight cycle may re-persist over this write — the failure mode
+/// is one extra nag next cycle, never corruption.
+pub(crate) fn dismiss_secure(
+    corpus_state: &CorpusState,
+    handle: &OrganizerHandle,
+    rel: &str,
+) -> Result<(), String> {
+    if !candidate_rel(rel) {
+        return Err(format!("not a reviewable note: {rel}"));
+    }
+    let root_id = corpus_state.default_root_id()?;
+    corpus_state.route(&root_id, |s| {
+        let root = s.root().to_path_buf();
+        let snap = snapshot_note(&root, rel)?;
+        if snap.secure_flagged {
+            return Err("This note is marked secure — unmark it from its own menu instead.".into());
+        }
+        let mut st = parse_state(&s.dot_read("organizer")?);
+        st.notes.entry(state_key(&snap)).or_default().secure_dismissed = snap.text_hash.clone();
+        s.dot_write("organizer", &state_pretty(&st))
+    })?;
+    handle.0.status.lock().unwrap().secure_pending.remove(rel);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn organizer_secure_hints(
+    corpus: tauri::State<CorpusState>,
+    state: tauri::State<OrganizerState>,
+) -> Result<Vec<SecureHint>, String> {
+    secure_hints(&corpus, &state.0)
+}
+
+#[tauri::command]
+pub fn organizer_dismiss_secure(
+    corpus: tauri::State<CorpusState>,
+    state: tauri::State<OrganizerState>,
+    rel: String,
+) -> Result<(), String> {
+    dismiss_secure(&corpus, &state.0, &rel)
+}
+
 // ─── tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -2262,6 +2386,7 @@ mod tests {
                 last_fields: BTreeMap::from([("summary".to_string(), "one line".to_string())]),
                 proposed: ProposedState { file: "abc".into(), ..Default::default() },
                 processed_at: "2026-07-01T00:00:00Z".into(),
+                secure_dismissed: String::new(),
             },
         );
         f.areas.insert(
@@ -3050,6 +3175,81 @@ mod tests {
         handle.enqueue(&root, &[root.join(&secret)]);
         run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
         assert_eq!(pending(&handle), 0, "a reviewed capture leaves the hint");
+    }
+
+    /// Feature B (decision 2026-07-22): "Not sensitive" is durable for that
+    /// exact content — immediate row clear, survives later cycles, and any
+    /// change the detector could see re-arms the review. Never auto-marks.
+    #[test]
+    fn not_sensitive_dismissal_persists_and_rearms_on_change() {
+        let (_dir, root, state, handle) = seed_brain();
+        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}");
+        let secret = stage_capture(&state, "# Card\n\ncard 4242 4242 4242 4242\n");
+        handle.enqueue(&root, &[root.join(&secret)]);
+        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        let pending = |h: &OrganizerHandle| h.0.status.lock().unwrap().secure_pending.len();
+        assert_eq!(pending(&handle), 1);
+
+        // the review row: detector-only, real title, NOT flagged
+        let hints = secure_hints(&state, &handle).unwrap();
+        assert_eq!(hints.len(), 1, "{hints:?}");
+        assert_eq!(hints[0].title, "Card");
+        assert!(!hints[0].flagged, "the explicit flag was never set");
+
+        dismiss_secure(&state, &handle, &secret).unwrap();
+        assert_eq!(pending(&handle), 0, "the answer clears the row immediately");
+        assert!(
+            !fs::read_to_string(root.join(&secret)).unwrap().contains("secure"),
+            "Not sensitive must never write into the note"
+        );
+
+        handle.enqueue(&root, &[root.join(&secret)]);
+        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        assert_eq!(pending(&handle), 0, "the dismissal is durable across cycles");
+
+        // a content change the detector sees re-arms the review
+        let text = fs::read_to_string(root.join(&secret)).unwrap();
+        fs::write(root.join(&secret), format!("{text}\nsk-ant-abcdefghijklmnop123\n")).unwrap();
+        handle.enqueue(&root, &[root.join(&secret)]);
+        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        assert_eq!(pending(&handle), 1, "changed content re-arms the hint");
+    }
+
+    /// The dismissal lane fails closed: flagged notes refuse (they are
+    /// protected, not pending), and rels outside the daemon's own candidate
+    /// grammar (dot components, non-wiki paths) never touch the filesystem.
+    #[test]
+    fn dismissal_refuses_flagged_notes_and_alien_rels() {
+        let (_dir, root, state, handle) = seed_brain();
+        let flagged = stage_capture(&state, "# Private\n\nowner notes\n");
+        add_flag(&root, &flagged, "secure: true");
+        let err = dismiss_secure(&state, &handle, &flagged).unwrap_err();
+        assert!(err.contains("marked secure"), "{err}");
+        assert!(dismiss_secure(&state, &handle, "wiki/../self/identity.md").is_err());
+        assert!(dismiss_secure(&state, &handle, "self/identity.md").is_err());
+        assert!(dismiss_secure(&state, &handle, "wiki/README.md").is_err());
+    }
+
+    /// Hints re-validate per call: flagged and detector-only rows split, a
+    /// vanished file drops out, and a cleaned note is no longer review material.
+    #[test]
+    fn secure_hints_split_flagged_from_detector_only_and_prune_stale() {
+        let (_dir, root, state, handle) = seed_brain();
+        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}");
+        let detector = stage_capture(&state, "# Api key\n\nsk-ant-abcdefghijklmnop123\n");
+        let flagged = stage_capture(&state, "# Private\n\nowner notes\n");
+        add_flag(&root, &flagged, "secure: true");
+        let gone = stage_capture(&state, "# Card\n\ncard 4242 4242 4242 4242\n");
+        handle.enqueue(&root, &[root.join(&detector), root.join(&flagged), root.join(&gone)]);
+        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        assert_eq!(handle.0.status.lock().unwrap().secure_pending.len(), 3);
+
+        fs::remove_file(root.join(&gone)).unwrap();
+        let hints = secure_hints(&state, &handle).unwrap();
+        assert_eq!(hints.len(), 2, "{hints:?}");
+        let by_title = |t: &str| hints.iter().find(|h| h.title == t).unwrap();
+        assert!(!by_title("Api key").flagged);
+        assert!(by_title("Private").flagged);
     }
 
     #[test]

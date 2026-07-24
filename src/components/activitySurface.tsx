@@ -6,11 +6,19 @@
 // see everything the AI wants to do or has done, and undo any of it.
 
 import { useState } from "react";
-import { type BrainAction, deriveJournal } from "../services/brainJournal";
+import { type BrainAction, canUndo, deriveJournal, describeAction } from "../services/brainJournal";
 import { approveProposal, dismissProposal, undoAction } from "../services/brainJournalComposition";
 import { daysSinceMidnight } from "../lib/dateLabels";
-import { organizerRunOnce } from "../lib/tauri";
-import { invalidateJournal, invalidateNotes, useJournal, useOrganizerStatus } from "../services/hooks";
+import { corpusSetSecure, organizerDismissSecure, organizerRunOnce, secureRepairApply } from "../lib/tauri";
+import {
+  invalidateJournal,
+  invalidateNotes,
+  useJournal,
+  useOrganizerStatus,
+  useSecureHints,
+  useSecureRepair,
+} from "../services/hooks";
+import { deriveSecureReview } from "../services/secureReview";
 import { usePanesStore } from "../state/panes";
 import { Character } from "./character";
 
@@ -23,28 +31,34 @@ function when(ts: number): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-/** One line per row — same verbs for a proposal and its applied history twin. */
-function describe(a: BrainAction, proposed: boolean): string {
-  const verb =
-    a.action === "file"
-      ? `File “${a.noteTitle}” → ${(a.area ?? a.after).replace(/^wiki\//, "")}`
-      : a.action === "index"
-        ? `Refresh ${a.area ?? a.noteTitle} overview`
-        : `Set ${a.field} on “${a.noteTitle}”`;
-  if (proposed) {
-    // labeled, not a bare number (#84, audit 2026-07)
-    const pct = typeof a.confidence === "number" ? ` · ${Math.round(a.confidence * 100)}% sure` : "";
-    return `Proposes: ${verb}${pct}`;
-  }
-  return a.action === "file" ? `Filed “${a.noteTitle}” → ${a.after.replace(/^wiki\//, "")}` : verb;
-}
-
 export function ActivitySurface() {
   const journal = useJournal();
   const status = useOrganizerStatus().data;
+  const repair = useSecureRepair().data ?? [];
+  const hints = useSecureHints().data ?? [];
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // rows the user just acted on — hidden immediately; the daemon's own set
+  // converges on its next pass (the acted-on file moved or was dismissed)
+  const [acted, setActed] = useState<ReadonlySet<string>>(new Set());
   const openNote = usePanesStore((s) => s.openNote);
+  const review = deriveSecureReview(
+    hints.filter((h) => !acted.has(h.rel)),
+    repair,
+  );
+
+  const actOnHint = (rel: string, op: () => Promise<void>) => {
+    setBusy(rel);
+    setErr(null);
+    op()
+      .then(async () => {
+        setActed((prev) => new Set(prev).add(rel));
+        await invalidateNotes();
+        await invalidateJournal();
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(null));
+  };
 
   const actions = journal.data ?? null;
   const { pending, history } = deriveJournal(actions ?? []);
@@ -101,11 +115,101 @@ export function ActivitySurface() {
           Paused — local model offline. {status.queued} waiting.
         </p>
       )}
-      {(status?.secureSkipped ?? 0) > 0 && (
+      {/* the secure-review confirm lane (feature B, decision 2026-07-22): the
+          detector PROPOSES, the user disposes — nothing is ever auto-marked
+          from here. "Not sensitive" is remembered for that exact content. */}
+      {review.confirm.length > 0 && (
+        <div className="brain-hint" style={{ padding: "0 22px 8px" }}>
+          <p style={{ margin: 0 }}>
+            {review.confirm.length === 1
+              ? "1 note looks like it holds sensitive data"
+              : `${review.confirm.length} notes look like they hold sensitive data`}{" "}
+            — the AI won’t read or move {review.confirm.length === 1 ? "it" : "them"} while you decide.
+          </p>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+            {review.confirm.map((h) => (
+              <li key={h.rel} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  type="button"
+                  className="act-desc"
+                  title="Open the note"
+                  onClick={() => openNote(h.rel)}
+                >
+                  “{h.title}”
+                </button>
+                <button
+                  type="button"
+                  className="act-undo act-approve"
+                  disabled={busy === h.rel}
+                  onClick={() => actOnHint(h.rel, () => corpusSetSecure(h.rel, true))}
+                >
+                  Make secure
+                </button>
+                <button
+                  type="button"
+                  className="act-undo"
+                  disabled={busy === h.rel}
+                  onClick={() => actOnHint(h.rel, () => organizerDismissSecure(h.rel))}
+                >
+                  Not sensitive
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {review.flaggedLeftover > 0 && (
         <p className="brain-hint" style={{ padding: "0 22px 8px" }}>
-          {status?.secureSkipped} {status?.secureSkipped === 1 ? "capture looks" : "captures look"} like they
-          contain secrets — review them yourself. The AI won’t read or move them.
+          {review.flaggedLeftover} secure {review.flaggedLeftover === 1 ? "note awaits" : "notes await"} your
+          review — the AI won’t read or move {review.flaggedLeftover === 1 ? "it" : "them"}.
         </p>
+      )}
+      {/* legacy secure-intake repair (decision 2026-07-22): explicit and
+          previewable — the list IS the preview, one deliberate click applies,
+          and Rust re-validates every note on disk before its protected move. */}
+      {repair.length > 0 && (
+        <div className="brain-hint" style={{ padding: "0 22px 8px" }}>
+          <p style={{ margin: 0 }}>
+            {repair.length === 1
+              ? "1 secure note still sits in intake"
+              : `${repair.length} secure notes still sit in intake`}{" "}
+            — left there by an older version. Moving {repair.length === 1 ? "it" : "them"} into Secure notes
+            keeps {repair.length === 1 ? "its" : "their"} words untouched and never shows the AI anything.
+          </p>
+          <ul style={{ margin: "6px 0", paddingLeft: 18 }}>
+            {repair.map((c) => (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  className="act-desc"
+                  title="Open the note"
+                  onClick={() => openNote(c.id)}
+                >
+                  “{c.title}” — from intake
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            className="act-undo act-approve"
+            disabled={busy === "secure-repair"}
+            onClick={() => {
+              setBusy("secure-repair");
+              setErr(null);
+              secureRepairApply()
+                .then(async (r) => {
+                  if (r.failed.length > 0) setErr(r.failed.join(" · "));
+                  await invalidateNotes();
+                  await invalidateJournal();
+                })
+                .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
+                .finally(() => setBusy(null));
+            }}
+          >
+            {repair.length === 1 ? "Move it to Secure notes" : "Move them to Secure notes"}
+          </button>
+        </div>
       )}
       {actions === null ? (
         <p className="main-empty">Loading…</p>
@@ -135,7 +239,7 @@ export function ActivitySurface() {
                       // the ULID survives filings/renames; the rel is a fallback
                       onClick={() => openNote(a.noteUlid ?? a.noteId)}
                     >
-                      {describe(a, true)}
+                      {describeAction(a, true)}
                     </button>
                     <span className="act-time">{when(a.ts)}</span>
                     <button
@@ -176,20 +280,22 @@ export function ActivitySurface() {
                       title="Open the note"
                       onClick={() => openNote(a.noteUlid ?? a.noteId)}
                     >
-                      {describe(a, false)}
+                      {describeAction(a, false)}
                     </button>
                     <span className="act-time">{when(a.ts)}</span>
                     {undone ? (
                       <span className="act-undone">undone</span>
                     ) : (
-                      <button
-                        type="button"
-                        className="act-undo"
-                        disabled={busy === a.id}
-                        onClick={() => void run(a, undoAction)}
-                      >
-                        Undo
-                      </button>
+                      canUndo(a) && (
+                        <button
+                          type="button"
+                          className="act-undo"
+                          disabled={busy === a.id}
+                          onClick={() => void run(a, undoAction)}
+                        >
+                          Undo
+                        </button>
+                      )
                     )}
                   </div>
                 </li>

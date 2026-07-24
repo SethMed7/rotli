@@ -10,7 +10,9 @@ import {
   corpusListConfig,
   corpusMoveFileToSink,
   isTauri,
+  organizerSecureHints,
   organizerStatus,
+  secureRepairScan,
 } from "../lib/tauri";
 import { readJournal } from "./brainJournalStore";
 import { DEST, isChats, isChatsPath, isSink } from "./destinations";
@@ -40,6 +42,8 @@ export const keys = {
   memexRoots: ["memex-root-markers"] as const,
   journal: ["journal"] as const,
   organizer: ["organizer-status"] as const,
+  secureRepair: ["secure-repair"] as const,
+  secureHints: ["secure-hints"] as const,
 };
 
 /** The connected brains, as sidebar roots (their `vault:`-style rows). Tauri-only.
@@ -239,9 +243,24 @@ export function useOrganizerStatus() {
   return useQuery({ queryKey: keys.organizer, queryFn: organizerStatus, refetchInterval: 60_000 });
 }
 
+/** Legacy secure-intake notes awaiting the explicit repair (decision
+ * 2026-07-22) — the Activity pane's preview. Rides the journal invalidation
+ * beat; the slow poll matches the organizer-status backstop. */
+export function useSecureRepair() {
+  return useQuery({ queryKey: keys.secureRepair, queryFn: secureRepairScan, refetchInterval: 60_000 });
+}
+
+/** The secure-review rows (feature B): detector-only notes awaiting the user's
+ * Make secure / Not sensitive answer, plus flagged leftovers. Same beat. */
+export function useSecureHints() {
+  return useQuery({ queryKey: keys.secureHints, queryFn: organizerSecureHints, refetchInterval: 60_000 });
+}
+
 export async function invalidateJournal(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: keys.journal });
   await queryClient.invalidateQueries({ queryKey: keys.organizer });
+  await queryClient.invalidateQueries({ queryKey: keys.secureRepair });
+  await queryClient.invalidateQueries({ queryKey: keys.secureHints });
 }
 
 // ——— lifecycle (Phase 2c): a note's home changes (archive/trash/restore).

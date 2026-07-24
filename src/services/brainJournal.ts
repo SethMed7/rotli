@@ -9,7 +9,11 @@
 export interface BrainAction {
   id: string;
   ts: number;
-  action: "file" | "field" | "index";
+  /** "repair" = the legacy secure-intake repair (decision 2026-07-22): Rust
+   * moved an explicitly flagged secure note from intake into the protected
+   * lane after the user's confirm. Its rows are CONTENT-FREE by contract —
+   * empty `noteTitle`, ULID `noteId` — and always written already-`applied`. */
+  action: "file" | "field" | "index" | "repair";
   /** The note's rel path AS OF the row's write — display + the [Open] target.
    * A rel pins a moment: a sibling filing or a title rename strands it, so
    * apply/undo resolve through `noteUlid` when present. For an "index" row:
@@ -34,6 +38,35 @@ export interface BrainAction {
   /** classify rows only — the model's 0..1 confidence in the area. */
   confidence?: number;
   status: "proposed" | "applied" | "reverted" | "dismissed";
+}
+
+/** One line per row — same verbs for a proposal and its applied history twin.
+ * The ONE describe grammar (Activity pane; anything else that renders rows). */
+export function describeAction(a: BrainAction, proposed: boolean): string {
+  if (a.action === "repair") {
+    // content-free by contract: the row carries no title, and the protected
+    // destination is the same for every repair
+    return "Moved a secure note into Secure notes — it was left in intake by an older version";
+  }
+  const verb =
+    a.action === "file"
+      ? `File “${a.noteTitle}” → ${(a.area ?? a.after).replace(/^wiki\//, "")}`
+      : a.action === "index"
+        ? `Refresh ${a.area ?? a.noteTitle} overview`
+        : `Set ${a.field} on “${a.noteTitle}”`;
+  if (proposed) {
+    // labeled, not a bare number (#84, audit 2026-07)
+    const pct = typeof a.confidence === "number" ? ` · ${Math.round(a.confidence * 100)}% sure` : "";
+    return `Proposes: ${verb}${pct}`;
+  }
+  return a.action === "file" ? `Filed “${a.noteTitle}” → ${a.after.replace(/^wiki\//, "")}` : verb;
+}
+
+/** Whether a history row offers Undo. A secure-lane repair is deliberately not
+ * undoable from the journal — moving a secure note OUT of the protected lane
+ * is the remove-protection flow on the note itself, never one journal click. */
+export function canUndo(a: BrainAction): boolean {
+  return a.action !== "repair";
 }
 
 // ─── the ONE derivation every consumer shares (Activity pane, sidebar badge) ──
@@ -106,6 +139,7 @@ function fieldValue(lines: string[], key: string): string {
  * or a field the user changed since the proposal REFUSES rather than applying
  * a stale decision (the daemon re-proposes for the new state on its next pass). */
 export async function approveProposal(p: BrainAction, deps: JournalDeps): Promise<void> {
+  if (p.action === "repair") throw new Error("A repair is applied when it happens — nothing to approve.");
   const marker: BrainAction = { ...p, status: "applied", ts: Date.now() };
   if (p.action === "file") {
     if (!p.area) throw new Error("file proposal without an area");
@@ -176,6 +210,11 @@ export async function dismissProposal(p: BrainAction, deps: JournalDeps): Promis
  * (`before` is ""), Rust removes the file so undo restores "no file", not a
  * 0-byte husk. (The daemon re-proposes on its next sweep if members differ.) */
 export async function undoAction(a: BrainAction, deps: JournalDeps): Promise<void> {
+  if (!canUndo(a)) {
+    throw new Error(
+      "A secure-lane repair isn’t undone from here — remove protection from the note’s own menu instead.",
+    );
+  }
   if (a.action === "file") {
     await deps.filerMove(handleOf(a), a.before);
   } else if (a.action === "field" && a.field) {

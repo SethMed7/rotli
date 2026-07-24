@@ -95,6 +95,13 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   exists as an editable DOCX. Formats without a faithful local route remain
   explicitly unsupported.
 - Sheets use the workbook editor/codec boundary; boards use the canvas boundary.
+- Sheet and CSV surfaces carry a read-only **Details** popover of derived facts:
+  file name, the canonical absolute path resolved from the corpus router on
+  every open (never copied into any file, where a move would strand it), byte
+  size, filesystem stamps, format family (CSV/TSV delimiter and UTF-8 decode,
+  or workbook), and per-sheet dimensions computed lazily on open. A parse cap
+  reports "N+" rows rather than implying an exact total; boards and binaries
+  remain frontmatter-free and nothing from this panel is ever stored.
 - Markdown document slash commands list only formats the embedded document
   editor can edit. They may create a blank managed DOCX or embed an existing
   editable DOCX-family file without leaving the parent Markdown tab.
@@ -272,12 +279,30 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   moves. Locked notes are never modified by the organizer. The organizer skips
   secure notes even if interactive local access was granted.
 - Remote organizer choices apply only to non-secure, unlocked notes.
+- A note explicitly flagged `secure: true` whose file still sits in Brain
+  intake is legacy or externally moved state; the organizer must never read it
+  in place. The Brain Activity pane offers the explicit, previewable **legacy
+  secure intake repair**: Rust re-validates the flag on disk per note, refuses
+  non-secure targets, symlinks, and id-less files, completes the protected
+  ignore-before-move into `wiki/_secure/` without changing prose, and journals
+  each repair content-free (ULIDs and lane names only — never title, summary,
+  body, or tags). Repair rows are applied at write time and are not undoable
+  from the journal; leaving the lane remains the remove-protection flow.
 - Secure organization remains unimplemented and the ordinary organizer still
   skips every secure note. Any future implementation must follow the revised
   [local-only proposal](../decisions/2026-07-22-secure-organizer-and-sheet-metadata.md):
-  legacy secure intake repair precedes access, remote providers receive no
-  secure-derived envelope, and both default-off global consent and explicit
-  `local_ai_allowed: true` are required for a registered on-device model.
+  remote providers receive no secure-derived envelope, and both default-off
+  global consent and explicit `local_ai_allowed: true` are required for a
+  registered on-device model.
+- A non-secure note whose content fires the secret detector enters the Brain
+  Activity **secure review** instead of being silently modeled around: the
+  organizer skips it and the pane offers *Make secure* (the existing protected
+  flow) or *Not sensitive*. The detector proposes; the user disposes — this
+  lane never auto-marks a note. A dismissal is content-keyed rebuildable
+  `.rotli/organizer.json` state (never note frontmatter) and re-arms when
+  anything the detector sees changes. The existing auto-secure flag on the
+  metadata read path is unchanged. Settings → Security carries the
+  plain-language explainer for all of this; the contract remains the spec.
 - Secret-shaped prior chats are omitted from remote search results and blocked
   on exact read; the provider egress detector independently checks the final
   prompt as a backstop. Local models may retrieve them on-device.

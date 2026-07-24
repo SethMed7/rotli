@@ -650,6 +650,10 @@ export interface FileStat {
   writable: boolean;
   /** Whether this storage asset may move into the memex Archive or Trash. */
   lifecycleMutable: boolean;
+  /** Filesystem birth/modify stamps (ms since epoch) — derived display facts
+   * for the file-details panel; null when the filesystem can't report one. */
+  createdMs: number | null;
+  modifiedMs: number | null;
 }
 
 /** Size + writability probe for a surfaced file — the sheet editor decides
@@ -858,6 +862,29 @@ export async function organizerRunOnce(): Promise<void> {
   await invoke("organizer_run_once");
 }
 
+/** One secure-review row (feature B, decision 2026-07-22): a note the daemon
+ * skipped as secure. `flagged` = the explicit frontmatter flag (already
+ * protected) vs detector-only (the "Mark it secure?" confirm lane). */
+export interface SecureHint {
+  rel: string;
+  title: string;
+  flagged: boolean;
+}
+
+/** The current review rows, re-validated fresh in Rust per call. */
+export async function organizerSecureHints(): Promise<SecureHint[]> {
+  if (!isTauri()) return [];
+  return invoke<SecureHint[]>("organizer_secure_hints");
+}
+
+/** "Not sensitive": persist the dismissal for this exact content — the note is
+ * never re-nagged until something the detector sees changes. Never writes into
+ * the note itself. */
+export async function organizerDismissSecure(rel: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("organizer_dismiss_secure", { rel });
+}
+
 /** Flip the daemon's in-memory trust rung NOW; persistence rides settings.json
  * (the daemon re-reads it each cycle as the backstop — no ordering dependency). */
 export async function organizerSetTrust(level: string): Promise<void> {
@@ -897,6 +924,35 @@ export async function corpusSetSecure(id: string, secure: boolean): Promise<void
 export async function corpusSetLocalAiAccess(id: string, allowed: boolean): Promise<void> {
   if (!isTauri()) return;
   await invoke("corpus_set_local_ai_access", { id, allowed });
+}
+
+/** One legacy secure-intake note (decision 2026-07-22): flagged `secure: true`
+ * yet physically still in Brain intake. `title`/`rel` feed the user's local
+ * repair preview only — the repair journal stays content-free. */
+export interface SecureRepairCandidate {
+  id: string;
+  rel: string;
+  title: string;
+  folder: string;
+}
+
+export interface SecureRepairReport {
+  repaired: number;
+  /** Per-note refusal messages — transient UI text, never persisted. */
+  failed: string[];
+}
+
+/** Preview legacy secure-intake state in the default memex (read-only). */
+export async function secureRepairScan(): Promise<SecureRepairCandidate[]> {
+  if (!isTauri()) return [];
+  return invoke<SecureRepairCandidate[]>("corpus_secure_repair_scan");
+}
+
+/** Repair every current candidate — Rust re-validates each note on disk, moves
+ * it into the protected lane ignore-first, and journals it content-free. */
+export async function secureRepairApply(): Promise<SecureRepairReport> {
+  if (!isTauri()) return { repaired: 0, failed: [] };
+  return invoke<SecureRepairReport>("corpus_secure_repair_apply");
 }
 
 /** Read a note for an AI model. Rust requires both a loopback endpoint and a

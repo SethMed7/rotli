@@ -10,6 +10,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Notes that look sensitive now ask you, right in Brain Activity.** A
+  non-secure note whose content trips the secret detector shows up as a review
+  row — open it, **Make secure** (the existing protected move), or say **Not
+  sensitive** and rotli remembers that answer for that exact content, re-asking
+  only if the note changes in a way the detector can see. Nothing is ever
+  auto-marked from this lane, and the AI keeps refusing to read or move the
+  note while you decide.
+- **Settings gained a Security section.** What a secure note is, how one is
+  born (quick captures, detection, your own mark), and the fail-closed rules —
+  never sent to remote models, kept out of git, organizer hands-off, on-device
+  access opt-in per note — in plain language, plus where repairs live.
+- **Spreadsheets and CSVs gained a Details popover.** The sheet header's
+  Details button shows the file's canonical location (with one-click copy),
+  size, created/modified stamps, format facts (CSV/TSV delimiter, UTF-8), and
+  every sheet's dimensions — computed fresh when you open it, stored nowhere.
+  Truncated previews say "2,000+ rows" instead of pretending to be exact.
+
+- **Brain Activity can repair legacy secure notes stuck in intake.** A note
+  explicitly marked `secure: true` that still sits physically in Brain intake
+  (`wiki/_inbox/`) — pre-lane state from an older version, or an external move —
+  could never leave: the organizer correctly refuses to read secure notes, and
+  nothing else moved them. The Activity pane now previews these notes by title
+  and, on one explicit click, Rust re-validates each on disk and completes the
+  protected move into `wiki/_secure/` (destination `.gitignore` entry lands
+  before the move, prose stays byte-identical, the same stable id survives).
+  The repair refuses non-secure targets, symlinks, and read-only corpora, and
+  its journal rows are content-free — ULIDs and lane names only, never a title,
+  summary, body, or tag. Secure organization itself remains unimplemented; the
+  organizer still never reads a secure note.
+
 ## [0.33.6] - 2026-07-24
 
 ### Changed

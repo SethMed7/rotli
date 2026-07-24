@@ -1132,6 +1132,27 @@ pub struct FrontmatterView {
     pub fields: Vec<String>,
 }
 
+/// One legacy secure-intake note (decision 2026-07-22): explicitly flagged
+/// `secure: true` yet physically still in Brain intake. The user's repair
+/// preview — `title`/`rel` exist for that local UI only and are never journaled.
+#[derive(serde::Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SecureRepairCandidate {
+    pub id: String,
+    pub rel: String,
+    pub title: String,
+    pub folder: String,
+}
+
+/// The outcome of one repair pass: how many notes reached the protected lane,
+/// plus per-note refusal messages (transient UI text, never persisted).
+#[derive(serde::Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SecureRepairReport {
+    pub repaired: usize,
+    pub failed: Vec<String>,
+}
+
 /// Size + writability of a surfaced file — the sheet editor's up-front probe.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1142,6 +1163,11 @@ pub struct FileStat {
     /// memex Archive or Trash. Separate from `writable`: unsupported formats
     /// still need a recoverable lifecycle action.
     pub lifecycle_mutable: bool,
+    /// Filesystem birth/modify stamps (ms since epoch) — DERIVED display facts
+    /// for the file-details panel, never copied into frontmatter. None when the
+    /// filesystem can't report one.
+    pub created_ms: Option<i64>,
+    pub modified_ms: Option<i64>,
 }
 
 /// What the editor sees: the raw body minus the single conventional blank line
@@ -2303,12 +2329,19 @@ impl CorpusStore {
         if !meta.is_file() {
             return Err(format!("not a file: {rel}"));
         }
+        let stamp_ms = |t: std::io::Result<SystemTime>| {
+            t.ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as i64)
+        };
         Ok(FileStat {
             len: meta.len(),
             // an existing storage/ office file is editable in place
             // even though the contract's writable() refuses the storage lane at large
             writable: self.writable(rel).is_ok() || self.storage_office_editable(rel),
             lifecycle_mutable: self.storage_file_lifecycle_mutable(rel),
+            created_ms: stamp_ms(meta.created()),
+            modified_ms: stamp_ms(meta.modified()),
         })
     }
 
@@ -2832,6 +2865,119 @@ impl CorpusStore {
         atomic_write(&final_path, &compose_document(&final_fm, final_body))?;
         self.gitignore_remove(&final_rel)?;
         Ok(())
+    }
+
+    /// Scan Brain intake for LEGACY secure state (decision 2026-07-22): a note
+    /// explicitly flagged `secure: true` whose file still sits in the intake
+    /// lane. Current creation and flagging place secure notes in the protected
+    /// lane, so such a file is pre-lane or externally moved state the organizer
+    /// must never read in place. Read-only; the preview the UI shows.
+    /// Deliberately narrow:
+    /// - intake ONLY — a secure note in Archive/Trash or a hand-picked folder
+    ///   got there through sanctioned moves that carry its ignore line;
+    /// - the EXPLICIT flag only — detector-only notes stay "review yourself"
+    ///   (the secure-pattern confirmation feature owns proposing the flag);
+    /// - notes with a stable frontmatter id only — the protected move keeps
+    ///   identity by id, and set_secure refuses id-less notes anyway.
+    pub(crate) fn secure_repair_scan(&mut self) -> Result<Vec<SecureRepairCandidate>, String> {
+        let intake = match self.layout {
+            Layout::Memex => "wiki/_inbox",
+            Layout::LegacyRotli => "Inbox",
+        };
+        let mut out = Vec::new();
+        let Ok(entries) = fs::read_dir(self.abs(intake)) else {
+            return Ok(out); // no intake dir → nothing stuck
+        };
+        let mut names: Vec<String> = entries
+            .filter_map(|e| e.ok())
+            // symlinks and subdirectories are not repair material — the intake
+            // lane is flat, and a link's target must never be moved through it
+            .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".md") && !n.starts_with('.'))
+            .collect();
+        names.sort();
+        for name in names {
+            let rel = format!("{intake}/{name}");
+            let Ok(text) = fs::read_to_string(self.abs(&rel)) else { continue };
+            let (fm, raw) = parse_document(&text);
+            let Some(fm) = fm else { continue };
+            if !fm.foreign.iter().any(|l| secure_field(l) == Some(true)) {
+                continue;
+            }
+            let Some(id) = fm.id.clone().filter(|id| !id.is_empty()) else { continue };
+            out.push(SecureRepairCandidate {
+                id,
+                rel: rel.clone(),
+                // title is for the user's own preview UI only — never journaled
+                title: title_of(editor_body(raw)),
+                folder: intake.to_string(),
+            });
+        }
+        Ok(out)
+    }
+
+    /// Repair every current scan candidate: complete the protected move that
+    /// creation/flagging would have done. Each note is RE-VALIDATED on disk
+    /// before its move — the preview is informational, never trusted. Refusals
+    /// (flag gone, id missing, unwritable `.gitignore`, containment) collect
+    /// per note; one bad file never blocks the rest.
+    pub(crate) fn secure_repair_apply(&mut self) -> Result<SecureRepairReport, String> {
+        self.mutation_allowed()?;
+        let mut report = SecureRepairReport::default();
+        for cand in self.secure_repair_scan()? {
+            match self.secure_repair_note(&cand.rel) {
+                Ok(()) => report.repaired += 1,
+                Err(e) => report.failed.push(e),
+            }
+        }
+        Ok(report)
+    }
+
+    /// Repair ONE legacy secure-intake note. Unlike `set_secure` this NEVER
+    /// flags a note — it refuses unless `secure: true` is already on disk, then
+    /// delegates the move to the one existing protected flow (ignore line for
+    /// the current path first, destination ignore before the move, prose
+    /// untouched, stale ignore entries harmless on failure). The journal row is
+    /// CONTENT-FREE: ULIDs and structural folders only — never the title, the
+    /// slug-bearing rel, a summary, or tags.
+    fn secure_repair_note(&mut self, id_or_rel: &str) -> Result<(), String> {
+        self.mutation_allowed()?;
+        let rel = self.resolve_note_rel(id_or_rel)?;
+        let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
+        let (fm, _) = parse_document(&text);
+        let fm = fm.unwrap_or_default();
+        if !fm.foreign.iter().any(|l| secure_field(l) == Some(true)) {
+            return Err("Repair applies only to a note explicitly marked secure".into());
+        }
+        let note_ulid = fm
+            .id
+            .filter(|id| !id.is_empty())
+            .ok_or_else(|| "secure notes require a stable frontmatter id".to_string())?;
+        let before = folder_of(&rel);
+        self.set_secure(&rel, true)?;
+        let after = match self.layout {
+            Layout::Memex => "wiki/_secure",
+            Layout::LegacyRotli => "Secure notes",
+        };
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
+        let row = serde_json::json!({
+            "id": Ulid::new().to_string(),
+            "ts": ts,
+            "action": "repair",
+            "noteId": note_ulid,
+            "noteUlid": note_ulid,
+            "noteTitle": "",
+            "before": before,
+            "after": after,
+            "model": "",
+            "status": "applied",
+        });
+        self.journal_append(&row.to_string())
+            .map_err(|e| format!("The note moved to the protected lane, but journaling failed: {e}"))
     }
 
     /// Grant or revoke secure-note access for loopback-local AI. This is valid
@@ -5307,6 +5453,42 @@ pub fn corpus_set_secure(
     state.route(&root, |s| s.set_secure(&rel, secure))
 }
 
+/// Preview LEGACY secure-intake state in the default memex (read-only): notes
+/// explicitly flagged `secure: true` still sitting in Brain intake.
+#[tauri::command]
+pub fn corpus_secure_repair_scan(
+    state: tauri::State<'_, CorpusState>,
+) -> Result<Vec<SecureRepairCandidate>, String> {
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |s| s.secure_repair_scan())
+}
+
+/// Repair every current candidate (explicit user confirm in the Activity pane):
+/// each note is re-validated on disk, then moved into the protected lane
+/// through the existing ignore-before-move flow and journaled content-free.
+#[tauri::command]
+pub fn corpus_secure_repair_apply(
+    state: tauri::State<'_, CorpusState>,
+    organizer: tauri::State<'_, crate::organizer::OrganizerState>,
+) -> Result<SecureRepairReport, String> {
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    let report = state.route(&default_id, |s| s.secure_repair_apply())?;
+    // the moves are suppress-marked (no watcher events) — owe the organizer one
+    // reconciliation sweep so its secure-pending hint and index diff catch up
+    organizer.0.nudge_sweep();
+    Ok(report)
+}
+
 /// Explicitly permit or deny loopback-local AI access to a secure note.
 #[tauri::command]
 pub fn corpus_set_local_ai_access(
@@ -7267,6 +7449,188 @@ mod tests {
         let plain = store.create("Inbox", "# Plain\n\nnothing secret").unwrap();
         store.move_note(&plain.id, "Archive").unwrap();
         assert!(store.path_of(&plain.id).unwrap().starts_with("Archive/"));
+    }
+
+    /// Decision 2026-07-22 (legacy secure intake repair): a note explicitly
+    /// flagged `secure: true` yet physically still in `wiki/_inbox/` is legacy
+    /// or externally moved state. Repair completes the protected move —
+    /// ignore-before-move, same stable id, prose untouched — and journals it
+    /// WITHOUT recording title, summary, body, or tags.
+    #[test]
+    fn secure_repair_moves_flagged_intake_notes_into_the_lane() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        // the legacy file: flagged secure, stable id, never moved to the lane
+        let legacy_body = "# Gateway ENV\n\nTOKEN=abc-legacy-value\n";
+        fs::write(
+            root.join("wiki/_inbox/gateway-env.md"),
+            format!("---\nid: 01JLEGACYSECUREULID000000\ncreated: 2026-01-01T00:00:00Z\nupdated: 2026-01-01T00:00:00Z\nsecure: true\n---\n\n{legacy_body}"),
+        )
+        .unwrap();
+        // NOT candidates: a plain intake note, a flagged note WITHOUT a stable
+        // id, and a note already living in the protected lane
+        fs::write(root.join("wiki/_inbox/plain.md"), "# Plain\n\nnothing secret\n").unwrap();
+        fs::write(
+            root.join("wiki/_inbox/idless.md"),
+            "---\nsecure: true\n---\n\n# Idless\n\nold hand-made state\n",
+        )
+        .unwrap();
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+        let homed = store.create("wiki/_inbox", "# Homed secret\n\nprivate").unwrap();
+        store.set_secure(&homed.id, true).unwrap();
+        assert!(store.path_of(&homed.id).unwrap().starts_with("wiki/_secure/"));
+
+        let candidates = store.secure_repair_scan().unwrap();
+        assert_eq!(candidates.len(), 1, "only the flagged, id-bearing intake note: {candidates:?}");
+        assert_eq!(candidates[0].id, "01JLEGACYSECUREULID000000");
+        assert_eq!(candidates[0].folder, "wiki/_inbox");
+        assert_eq!(candidates[0].title, "Gateway ENV", "the preview shows the user the real title");
+
+        let report = store.secure_repair_apply().unwrap();
+        assert_eq!(report.repaired, 1);
+        assert!(report.failed.is_empty(), "{:?}", report.failed);
+
+        // moved into the lane, same stable id, prose byte-identical
+        let new_rel = store.path_of("01JLEGACYSECUREULID000000").unwrap();
+        assert!(new_rel.starts_with("wiki/_secure/"), "{new_rel}");
+        let moved = fs::read_to_string(store.abs(&new_rel)).unwrap();
+        assert!(moved.contains(legacy_body.trim_end()), "prose must survive unchanged:\n{moved}");
+        assert!(moved.contains("secure: true"));
+        // the new path is ignored; the old intake path line is gone
+        let ignored = fs::read_to_string(root.join(".gitignore")).unwrap();
+        assert!(ignored.lines().any(|l| l.trim() == new_rel), "{ignored}");
+        assert!(!ignored.lines().any(|l| l.trim() == "wiki/_inbox/gateway-env.md"), "{ignored}");
+        // untouched bystanders
+        assert!(root.join("wiki/_inbox/plain.md").is_file());
+        assert!(root.join("wiki/_inbox/idless.md").is_file());
+
+        // the journal row: applied, content-free, ULID-addressed
+        let journal = store.journal_read().unwrap();
+        let rows: Vec<serde_json::Value> = journal
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .filter(|v: &serde_json::Value| v["action"] == "repair")
+            .collect();
+        assert_eq!(rows.len(), 1, "{journal}");
+        let row = &rows[0];
+        assert_eq!(row["status"], "applied");
+        assert_eq!(row["noteUlid"], "01JLEGACYSECUREULID000000");
+        assert_eq!(row["noteId"], "01JLEGACYSECUREULID000000", "the rel embeds the slug — journal by ULID");
+        assert_eq!(row["noteTitle"], "");
+        assert_eq!(row["before"], "wiki/_inbox");
+        assert_eq!(row["after"], "wiki/_secure");
+        for leak in ["Gateway", "gateway-env", "TOKEN", "abc-legacy-value"] {
+            assert!(!journal.contains(leak), "journal must stay content-free ({leak}):\n{journal}");
+        }
+
+        // idempotent: nothing left to repair, no second journal row
+        assert!(store.secure_repair_scan().unwrap().is_empty());
+        let report = store.secure_repair_apply().unwrap();
+        assert_eq!((report.repaired, report.failed.len()), (0, 0));
+    }
+
+    /// The repair is refusal-first: it can never flag a non-secure note, never
+    /// runs read-only, and detector-only or id-less files are simply not
+    /// candidates (they remain the user's "review yourself" set).
+    #[test]
+    fn secure_repair_refuses_non_secure_and_read_only_targets() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        // detector-firing content, NO explicit flag → not repair material
+        fs::write(
+            root.join("wiki/_inbox/hot.md"),
+            "---\nid: 01JDETECTORONLYULID000000\n---\n\n# Api key\n\nsk-ant-abcdefghijklmnop123\n",
+        )
+        .unwrap();
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+        assert!(store.secure_repair_scan().unwrap().is_empty(), "the explicit flag is required");
+        // the per-note step holds the same line even when called directly
+        let err = store.secure_repair_note("wiki/_inbox/hot.md").unwrap_err();
+        assert!(err.contains("explicitly marked secure"), "{err}");
+        assert!(root.join("wiki/_inbox/hot.md").is_file(), "refusal moves nothing");
+        assert!(
+            !fs::read_to_string(root.join("wiki/_inbox/hot.md")).unwrap().contains("secure: true"),
+            "repair must never ADD the flag"
+        );
+        drop(store);
+
+        let mut ro = CorpusStore::open_read_only(root).unwrap();
+        assert!(ro.secure_repair_scan().is_ok(), "the preview scan stays read-only");
+        assert!(ro.secure_repair_apply().is_err(), "read-only refuses the mutation");
+    }
+
+    /// A symlink dropped into intake is never repair material — the scan skips
+    /// non-regular files, so the link's target can't be moved through the lane.
+    #[cfg(unix)]
+    #[test]
+    fn secure_repair_skips_symlinked_intake_entries() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        let outside = tmp.path().join("outside.md");
+        fs::write(&outside, "---\nid: 01JOUTSIDEULID00000000000\nsecure: true\n---\n\n# Outside\n").unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("wiki/_inbox/linked.md")).unwrap();
+        let mut store = CorpusStore::open(root).unwrap();
+        assert!(store.secure_repair_scan().unwrap().is_empty());
+        let report = store.secure_repair_apply().unwrap();
+        assert_eq!((report.repaired, report.failed.len()), (0, 0));
+        assert!(outside.is_file(), "the outside target is untouched");
+    }
+
+    /// The ignore-before-move discipline holds for repair exactly as for every
+    /// other secure move: an unwritable `.gitignore` refuses the repair with
+    /// nothing moved and the note still readable at its old path.
+    #[test]
+    fn secure_repair_aborts_before_move_when_gitignore_is_unwritable() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        let rel = "wiki/_inbox/stuck.md";
+        fs::write(
+            root.join(rel),
+            "---\nid: 01JSTUCKSECUREULID0000000\nsecure: true\n---\n\n# Stuck\n\nprivate\n",
+        )
+        .unwrap();
+        // a DIRECTORY at .gitignore makes every ignore write fail
+        fs::create_dir(root.join(".gitignore")).unwrap();
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+        let report = store.secure_repair_apply().unwrap();
+        assert_eq!(report.repaired, 0);
+        assert_eq!(report.failed.len(), 1, "{:?}", report.failed);
+        assert!(root.join(rel).is_file(), "nothing moved");
+        assert!(!root.join("wiki/_secure").join("stuck.md").exists());
+        assert!(store.journal_read().unwrap().is_empty(), "a refused repair journals nothing");
+    }
+
+    /// The legacy corpus layout gets the same repair with its own lane names
+    /// (`Inbox` intake → `Secure notes`).
+    #[test]
+    fn secure_repair_covers_the_legacy_layout() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        fs::create_dir_all(store.root().join("Inbox")).unwrap();
+        fs::write(
+            store.root().join("Inbox/old-secret.md"),
+            "---\nid: 01JLEGACYLAYOUTULID000000\nsecure: true\n---\n\n# Old secret\n\nprivate\n",
+        )
+        .unwrap();
+        let candidates = store.secure_repair_scan().unwrap();
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].folder, "Inbox");
+        let report = store.secure_repair_apply().unwrap();
+        assert_eq!((report.repaired, report.failed.len()), (1, 0), "{:?}", report.failed);
+        let new_rel = store.path_of("01JLEGACYLAYOUTULID000000").unwrap();
+        assert!(new_rel.starts_with("Secure notes/"), "{new_rel}");
     }
 
     /// #21 (audit 2026-07): read_for_ai must run the secret DETECTOR when the
