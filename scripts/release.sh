@@ -21,6 +21,15 @@ set -euo pipefail
 
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # repo root
 
+# A release must be attributable to one exact reviewed source commit. Refuse
+# before touching signing credentials or building artifacts when tracked or
+# untracked source state is present.
+if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
+  echo "✗ source tree is dirty — commit or remove every change before release."
+  exit 1
+fi
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+
 # ── knobs (env-overridable; safe defaults) ───────────────────────────────────
 DEVID="${APPLE_SIGNING_IDENTITY:-Developer ID Application: Seth Medina (TEAMID0000)}"
 NOTARY_PROFILE="${ROTLI_NOTARY_PROFILE:-rotli-notary}"
@@ -37,6 +46,17 @@ for arg in "$@"; do
 done
 
 VER="$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("src-tauri/tauri.conf.json","utf8")).version)')"
+PACKAGE_VER="$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("package.json","utf8")).version)')"
+CARGO_VER="$(awk '/^\[package\]/{p=1;next} p && /^version = /{gsub(/"/,"",$3);print $3;exit}' src-tauri/Cargo.toml)"
+LOCK_VER="$(awk '/^\[\[package\]\]/{p=0} /^name = "rotli"$/{p=1;next} p && /^version = /{gsub(/"/,"",$3);print $3;exit}' src-tauri/Cargo.lock)"
+if [ "$VER" != "$PACKAGE_VER" ] || [ "$VER" != "$CARGO_VER" ] || [ "$VER" != "$LOCK_VER" ]; then
+  echo "✗ version mismatch: app=$VER package=$PACKAGE_VER cargo=$CARGO_VER lock=$LOCK_VER"
+  exit 1
+fi
+grep -q "^## \\[$VER\\]" CHANGELOG.md || {
+  echo "✗ CHANGELOG.md has no release heading for $VER"
+  exit 1
+}
 
 # ── 1.0 guard ────────────────────────────────────────────────────────────────
 # Version 1.x is RESERVED for the FIRST PUBLIC LAUNCH. Everything now is 0.x
@@ -139,19 +159,25 @@ ls -lh "$DMG" "$DIST/rotli.app.tar.gz" "$DIST/latest.json"
 
 # ── 7. publish (opt-in) ──────────────────────────────────────────────────────
 if [ "$PUBLISH" -eq 1 ]; then
+  echo "▸ verify exact source commit is pushed"
+  git fetch origin main --tags
+  [ "$(git rev-parse origin/main)" = "$SOURCE_COMMIT" ] || {
+    echo "✗ origin/main is not the exact release commit $SOURCE_COMMIT"
+    exit 1
+  }
+  if git rev-parse -q --verify "refs/tags/v$VER" >/dev/null; then
+    echo "✗ source tag v$VER already exists"
+    exit 1
+  fi
+  git tag "v$VER" "$SOURCE_COMMIT"
+  git push origin "v$VER"
+
   echo "▸ publish → $RELEASES_REPO (tag v$VER)"
   gh release create "v$VER" \
     "$DMG" "$DIST/rotli.app.tar.gz" "$DIST/rotli.app.tar.gz.sig" "$DIST/latest.json" \
     --repo "$RELEASES_REPO" \
     --title "rotli $VER" \
     --notes "$NOTES"
-  # tag the SOURCE repo too — ONLY when the tree is clean, so the tag points at
-  # the exact code released (this session's work may still be uncommitted).
-  if git diff --quiet && git diff --cached --quiet; then
-    git tag "v$VER" 2>/dev/null && git push origin "v$VER" 2>/dev/null || true
-  else
-    echo "ℹ source tree dirty — skipping the v$VER source-repo tag (commit first to tag the exact code)."
-  fi
   echo "✓ published rotli $VER"
 else
   echo "ℹ not published. Re-run with --publish once $RELEASES_REPO exists to ship."

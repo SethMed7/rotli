@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.6] - 2026-07-24
+
 ### Changed
 
 - **Sidebar menus are aligned, scrollable, and explicit about data lifecycle.**

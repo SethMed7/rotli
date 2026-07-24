@@ -44,9 +44,7 @@ The current script:
 
 Known hardening gaps before a 1.0 or paid production release:
 
-- fail before building or publishing when the source tree is dirty;
 - require the exact commit's remote CI result, Rust tests, and clippy evidence;
-- make the source tag mandatory and stop suppressing tag/push failures;
 - pin third-party CI actions to reviewed commit SHAs;
 - add checksums, SBOM, artifact/source provenance, and a release evidence bundle;
 - define beta/stable channels and a signed rollback procedure;

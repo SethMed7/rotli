@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# bump-version.sh <semver> — set the version in lockstep across the three places
-# that must agree for a release: src-tauri/tauri.conf.json, src-tauri/Cargo.toml
-# ([package] version), and package.json. Optionally scaffolds a CHANGELOG heading.
+# bump-version.sh <semver> — set the version in lockstep across the app/package
+# manifests and the Rust lockfile. Optionally scaffolds a CHANGELOG heading.
 #
 #   ./scripts/bump-version.sh 0.2.0
 #
@@ -59,6 +58,17 @@ VERSION="$VERSION" bun -e '
   await Bun.write(p, head + replaced + tail);
 ' "$ROOT/src-tauri/Cargo.toml"
 
+# --- Cargo.lock: the `rotli` package entry generated from Cargo.toml ---
+VERSION="$VERSION" bun -e '
+  const p = process.argv[1];
+  const v = process.env.VERSION;
+  let text = await Bun.file(p).text();
+  const pattern = /(\[\[package\]\]\nname = "rotli"\nversion = ")[^"]+(")/;
+  if (!pattern.test(text)) { console.error("Cargo.lock: no rotli package entry"); process.exit(1); }
+  text = text.replace(pattern, `$1${v}$2`);
+  await Bun.write(p, text);
+' "$ROOT/src-tauri/Cargo.lock"
+
 # --- CHANGELOG: scaffold a dated heading under [Unreleased] (best-effort) ---
 CHANGELOG="$ROOT/CHANGELOG.md"
 if [ -f "$CHANGELOG" ] && ! grep -qE "^## \[$VERSION\]" "$CHANGELOG"; then
@@ -77,4 +87,4 @@ if [ -f "$CHANGELOG" ] && ! grep -qE "^## \[$VERSION\]" "$CHANGELOG"; then
   ' "$CHANGELOG" || true
 fi
 
-echo "bumped to $VERSION (tauri.conf.json · Cargo.toml · package.json)"
+echo "bumped to $VERSION (tauri.conf.json · Cargo.toml · Cargo.lock · package.json)"
