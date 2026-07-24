@@ -10,6 +10,7 @@ import {
   mainParentOfNote,
   gcManifest,
   mainFolderIds,
+  mainItemIdsInFolder,
   mainNoteIds,
   moveInTree,
   parseMainManifest,
@@ -321,5 +322,25 @@ describe("mainFolderIds — the collapse-all / GC id grammar (#83/#78)", () => {
 
   test("empty tree → no ids", () => {
     expect(mainFolderIds([])).toEqual([]);
+  });
+});
+
+describe("mainItemIdsInFolder — virtual-folder lifecycle scope", () => {
+  const tree: MainNode[] = [
+    { note: "outside" },
+    {
+      folder: "Work",
+      children: [{ note: "a" }, { folder: "Deep", children: [{ note: "b" }, { note: "a" }] }],
+    },
+  ];
+
+  test("collects nested durable ids once without touching siblings", () => {
+    expect(mainItemIdsInFolder(tree, "main:Work")).toEqual(["a", "b"]);
+    expect(mainItemIdsInFolder(tree, "main:Work/Deep")).toEqual(["b", "a"]);
+  });
+
+  test("missing and empty folders have no durable contents", () => {
+    expect(mainItemIdsInFolder(tree, "main:Missing")).toEqual([]);
+    expect(mainItemIdsInFolder([{ folder: "Empty", children: [] }], "main:Empty")).toEqual([]);
   });
 });

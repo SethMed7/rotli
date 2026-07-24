@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Sidebar menus are aligned, scrollable, and explicit about data lifecycle.**
+  Ordinary actions no longer carry an empty checkmark indent, long menus keep
+  their Trash actions reachable, named views say “Remove from <view>,” and
+  “Move to Trash” is reserved for the durable file operation. Virtual folders
+  can move their nested contents to Trash through a second confirmation, while
+  Copy File Path exposes the native file location beside Show in Finder.
 - **Note filenames are now readable, deterministic title slugs.** A note titled
   “Strategy master” is stored as `strategy-master.md`; same-title siblings use
   `strategy-master (2).md`, and stable ULIDs remain in frontmatter instead of

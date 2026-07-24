@@ -45,6 +45,13 @@ exception.
   boards, PDFs, DOCX, sheets, and other surfaced files. Opening a conventional
   file expands its containing folder and highlights the same durable item id;
   only chat and meta surfaces intentionally leave content rows quiet.
+- Sidebar context menus keep one label column, reserve a checkmark gutter only
+  when the visible menu contains toggles, and scroll within the window when a
+  long menu would otherwise hide lifecycle actions. Named views distinguish
+  removing a projection from moving durable content to Trash; virtual folders
+  require an explicit second-step confirmation before their contents move.
+- Native content rows expose Copy File Path beside Show in Finder. Browser-mode
+  twins disable both filesystem-only actions instead of pretending they ran.
 - Note-to-note wikilinks open with an ordinary click. The editor header may
   expose the existing session back/forward trail beside the date, using compact
   adjacent-note labels rather than duplicating the sidebar's folder hierarchy.

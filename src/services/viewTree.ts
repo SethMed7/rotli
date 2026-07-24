@@ -175,6 +175,27 @@ export function assignedView(manifest: ViewsManifest, itemId: string): string | 
   return manifest.views.find((view) => contains(view.tree))?.name ?? null;
 }
 
+export type ProjectionMenuAction =
+  | { kind: "remove-view"; label: string }
+  | { kind: "remove-main"; label: "Remove from Main" }
+  | { kind: "add-main"; label: "Add to Main" };
+
+/** Keep projection language separate from durable lifecycle language. A row
+ * opened inside its assigned named view removes only that view reference;
+ * Main continues to use its global add/remove reference action. */
+export function projectionMenuAction(
+  activeView: string | null,
+  assigned: string | null,
+  inMain: boolean,
+): ProjectionMenuAction {
+  if (activeView !== null && assigned === activeView) {
+    return { kind: "remove-view", label: `Remove from ${activeView}` };
+  }
+  return inMain
+    ? { kind: "remove-main", label: "Remove from Main" }
+    : { kind: "add-main", label: "Add to Main" };
+}
+
 function renderedId(node: MainNode, parentId: string): string {
   if ("note" in node) return node.note;
   return parentId === MAIN_ROOT ? `${MAIN_ROOT}${node.folder}` : `${parentId}/${node.folder}`;

@@ -17,7 +17,14 @@ export type MenuSpec =
       checkedMark?: "check" | "star";
     }
   | { kind: "sep" }
-  | { kind: "drill"; label: string; items: MenuSpec[]; disabled?: boolean };
+  | { kind: "drill"; label: string; items: MenuSpec[]; disabled?: boolean; danger?: boolean };
+
+/** Reserve the familiar macOS checkmark gutter only when the visible menu
+ * actually contains toggle state. Drill rows share the same gutter so labels
+ * never jump sideways within one menu; ordinary menus stay flush. */
+export function menuUsesCheckGutter(items: MenuSpec[]): boolean {
+  return items.some((item) => item.kind === "action" && "checked" in item);
+}
 
 interface ContextMenuState {
   menu: { x: number; y: number; items: MenuSpec[]; returnFocus?: () => void } | null;

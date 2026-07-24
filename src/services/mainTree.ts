@@ -161,6 +161,26 @@ export function mainFolderIds(nodes: MainNode[]): string[] {
   return ids;
 }
 
+/** Durable item ids contained by one rendered Main/view folder, including its
+ * nested virtual folders. The folder itself is only a projection; lifecycle
+ * actions operate on these referenced files and then remove the empty virtual
+ * container. Missing ids return an empty list and duplicate refs collapse. */
+export function mainItemIdsInFolder(nodes: MainNode[], folderId: string): string[] {
+  const collect = (node: MainNode): string[] =>
+    "note" in node ? [node.note] : node.children.flatMap(collect);
+  const find = (items: MainNode[], parentId: string): string[] | null => {
+    for (const node of items) {
+      if (!("folder" in node)) continue;
+      const id = idOf(node, parentId);
+      if (id === folderId) return collect(node);
+      const nested = find(node.children, id);
+      if (nested) return nested;
+    }
+    return null;
+  };
+  return [...new Set(find(nodes, MAIN_ROOT) ?? [])];
+}
+
 function findAndRemove(
   nodes: MainNode[],
   dragId: string,

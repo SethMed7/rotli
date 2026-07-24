@@ -32,6 +32,7 @@ import {
   uniqueRootFolderName,
   buildMainTree,
   mainFolderIds,
+  mainItemIdsInFolder,
   mainNoteIds,
   mainParentOfNote,
   moveInTree,
@@ -67,6 +68,7 @@ import {
   useNotes,
   useRestoreNote,
   useSearchableNotes,
+  useTrashItems,
   useTrashNote,
 } from "../services/hooks";
 import { notesService } from "../services/notes";
@@ -687,6 +689,7 @@ export function Sidebar() {
   // trashes and dropping on a normal folder moves. —
   const archiveNote = useArchiveNote();
   const trashNote = useTrashNote();
+  const trashItems = useTrashItems();
   const restoreNote = useRestoreNote();
   const rowActions: RowActions = {
     archive: (id) => archiveNote.mutate(id),
@@ -870,6 +873,11 @@ export function Sidebar() {
     depth: number,
     rp: ReturnType<typeof useRovingList>["rowProps"],
   ): ReactNode => {
+    const rowPad = 10 + (depth + 1) * 16;
+    // Folder rows reserve 18px for the disclosure chevron. Note rows and
+    // rename inputs compensate for that slot so same-depth icons share one
+    // visual column and nested children still advance by exactly 16px.
+    const contentPad = rowPad + 18;
     const childFolders = mainProjection.folders.filter((f) => f.parentId === parentId);
     // the live filter narrows Main too (it used to skip this section entirely —
     // the one Seth curates by hand); MUST mirror mainRovingRows below
@@ -920,7 +928,7 @@ export function Sidebar() {
               /* the current file's Main copy wins the highlight (#25) — the same
                  accent pill a compact row gets when it's the focused note */
               className={`snrow main-row${n.id === focusedItemId ? " sel" : ""}${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
-              style={{ paddingLeft: 10 + (depth + 1) * 16 }}
+              style={{ paddingLeft: contentPad }}
               onPointerDown={(e) => startMainDrag(e, n.id, "move", displayTitle)}
               onClick={() => {
                 if (!didMainDragRef.current) {
@@ -956,12 +964,18 @@ export function Sidebar() {
         })}
         {childFolders.map((f) => {
           const open = expandedDests[f.id] ?? true;
+          const folderItemIds = mainItemIdsInFolder(activeTree, f.id);
+          const folderItems = folderItemIds.flatMap((id) => {
+            const item = noteIndex.get(id);
+            return item ? [item] : [];
+          });
+          const folderScopeComplete = folderItems.length === folderItemIds.length;
           // inline rename (#16): the context menu's Rename… turns the row into a
           // text input — Enter commits (sibling-uniquified), Esc/click-away cancels
           // (the CompactBoardRow grammar).
           if (renamingMainId === f.id) {
             return (
-              <div key={f.id} className="sb-newfolder" style={{ paddingLeft: 10 + (depth + 1) * 16 }}>
+              <div key={f.id} className="sb-newfolder" style={{ paddingLeft: contentPad }}>
                 <FolderGlyph size={14} />
                 <InlineRenameInput
                   defaultValue={f.name}
@@ -990,7 +1004,7 @@ export function Sidebar() {
                 data-main-id={f.id}
                 data-main-folder="1"
                 className={`frow child main-row${dropCls(f.id)}${mainDragId === f.id ? " dragging" : ""}`}
-                style={{ paddingLeft: 10 + (depth + 1) * 16 }}
+                style={{ paddingLeft: rowPad }}
                 onPointerDown={(e) => startMainDrag(e, f.id, "move", f.name)}
                 onClick={() => {
                   // toggle against the OPEN default (?? true) — toggleDestExpanded
@@ -1053,6 +1067,30 @@ export function Sidebar() {
                       kind: "action" as const,
                       label: `Remove from ${activeView ?? "Main"}`,
                       onClick: () => setActiveTree(removeFromMain(activeTree, f.id), liveIds),
+                    },
+                    { kind: "sep" as const },
+                    {
+                      kind: "drill" as const,
+                      label: folderScopeComplete
+                        ? "Move folder contents to Trash…"
+                        : "Unavailable items — can’t trash folder",
+                      danger: true,
+                      disabled: folderItems.length === 0 || !folderScopeComplete,
+                      items: [
+                        {
+                          kind: "action" as const,
+                          label: `Move ${folderItems.length} ${
+                            folderItems.length === 1 ? "item" : "items"
+                          } to Trash`,
+                          danger: true,
+                          onClick: () => {
+                            setRowActionError(null);
+                            trashItems.mutate(folderItems, {
+                              onSuccess: () => setActiveTree(removeFromMain(activeTree, f.id), liveIds),
+                            });
+                          },
+                        },
+                      ],
                     },
                   ]);
                 }}
@@ -2100,7 +2138,7 @@ export function Sidebar() {
                 </p>
               )}
               {mainNewFolder && (
-                <div className="sb-newfolder" style={{ paddingLeft: 26 }}>
+                <div className="sb-newfolder" style={{ paddingLeft: 44 }}>
                   <FolderGlyph size={14} />
                   <input
                     autoFocus

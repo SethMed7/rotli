@@ -11,7 +11,7 @@
 
 import { type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
 import { useTransientPopover } from "../lib/popover";
-import { type MenuSpec, useContextMenu } from "../state/contextMenu";
+import { menuUsesCheckGutter, type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { ChevronRight } from "./glyphs";
 
 export function ContextMenu() {
@@ -62,17 +62,23 @@ export function ContextMenu() {
   if (!menu) return null;
   const top = stack.length > 0 ? stack[stack.length - 1] : null;
   const items = top ? top.items : menu.items;
+  const usesCheckGutter = menuUsesCheckGutter(items);
 
   return (
     <div
       ref={ref}
-      className="ctxmenu"
+      className={`ctxmenu${usesCheckGutter ? " has-checks" : ""}`}
       style={{ left: pos?.left ?? menu.x, top: pos?.top ?? menu.y }}
       role="menu"
       onKeyDown={onKeyDown}
     >
       {top && (
-        <button type="button" className="ctxmenu-back" onClick={() => setStack((s) => s.slice(0, -1))}>
+        <button
+          type="button"
+          className="ctxmenu-back"
+          role="menuitem"
+          onClick={() => setStack((s) => s.slice(0, -1))}
+        >
           <span className="ctxmenu-back-chev" aria-hidden="true">
             ‹
           </span>
@@ -86,10 +92,13 @@ export function ContextMenu() {
             <button
               key={i}
               type="button"
-              className="ctxmenu-item"
+              className={`ctxmenu-item${item.danger ? " danger" : ""}`}
+              role="menuitem"
+              aria-haspopup="menu"
               disabled={item.disabled}
               onClick={() => setStack((s) => [...s, { label: item.label, items: item.items }])}
             >
+              {usesCheckGutter && <span className="ctxmenu-check" aria-hidden="true" />}
               <span className="ctxmenu-label">{item.label}</span>
               <ChevronRight size={11} />
             </button>
@@ -100,15 +109,19 @@ export function ContextMenu() {
             key={i}
             type="button"
             className={`ctxmenu-item${item.danger ? " danger" : ""}`}
+            role={"checked" in item ? "menuitemcheckbox" : "menuitem"}
+            {...("checked" in item ? { "aria-checked": !!item.checked } : {})}
             disabled={item.disabled}
             onClick={() => {
               item.onClick();
               close();
             }}
           >
-            <span className="ctxmenu-check" aria-hidden="true">
-              {item.checked ? (item.checkedMark === "check" ? "✓" : "★") : ""}
-            </span>
+            {usesCheckGutter && (
+              <span className="ctxmenu-check" aria-hidden="true">
+                {item.checked ? (item.checkedMark === "check" ? "✓" : "★") : ""}
+              </span>
+            )}
             <span className="ctxmenu-label">{item.label}</span>
           </button>
         );

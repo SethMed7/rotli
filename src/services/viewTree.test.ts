@@ -6,6 +6,7 @@ import {
   createNamedView,
   deleteNamedView,
   parseViewsManifest,
+  projectionMenuAction,
   renameNamedView,
   setNamedViewTree,
   transferTreeItemToView,
@@ -46,6 +47,21 @@ describe("named view schema", () => {
 });
 
 describe("named view membership", () => {
+  test("menu copy distinguishes view removal from Main membership", () => {
+    expect(projectionMenuAction("OpenSource", "OpenSource", true)).toEqual({
+      kind: "remove-view",
+      label: "Remove from OpenSource",
+    });
+    expect(projectionMenuAction(null, "OpenSource", true)).toEqual({
+      kind: "remove-main",
+      label: "Remove from Main",
+    });
+    expect(projectionMenuAction(null, null, false)).toEqual({
+      kind: "add-main",
+      label: "Add to Main",
+    });
+  });
+
   test("assignment is singular and Main is not represented as another view", () => {
     let manifest = createNamedView(createNamedView(EMPTY_VIEWS, "OpenSource"), "Myela");
     manifest = assignItemToView(manifest, "note-a", "OpenSource");

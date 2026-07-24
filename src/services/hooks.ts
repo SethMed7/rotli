@@ -4,10 +4,18 @@
 import { keepPreviousData, useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { replaceTitleLine } from "../lib/noteTitle";
-import { type CorpusRoot, corpusListConfig, isTauri, organizerStatus } from "../lib/tauri";
+import {
+  type CorpusRoot,
+  corpusFileStat,
+  corpusListConfig,
+  corpusMoveFileToSink,
+  isTauri,
+  organizerStatus,
+} from "../lib/tauri";
 import { readJournal } from "./brainJournalStore";
 import { DEST, isChats, isChatsPath, isSink } from "./destinations";
 import { memexRootMarkers } from "./fsNotes";
+import { trashVirtualFolderItems } from "./folderTrash";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
 import { useUiStore } from "../state/ui";
@@ -251,6 +259,29 @@ export function useTrashNote() {
     mutationFn: (id: string) => notesService.trashNote(id),
     onSuccess: invalidateBoth,
     onError: lifecycleError("delete"),
+  });
+}
+
+/** Trash every durable item referenced by one virtual Main/view folder. Files
+ * are preflighted before the first write; notes/boards then use the same
+ * lifecycle lanes as their individual menus. A partial runtime failure keeps
+ * the virtual folder in place and reports exact progress instead of pretending
+ * the batch was atomic. */
+export function useTrashItems() {
+  return useMutation({
+    mutationFn: (items: NoteSummary[]) =>
+      trashVirtualFolderItems(items, {
+        fileStat: corpusFileStat,
+        moveFile: corpusMoveFileToSink,
+        trashNote: (id) => notesService.trashNote(id),
+      }),
+    onError: (error) =>
+      useUiStore
+        .getState()
+        .setRowActionError(
+          `Couldn’t move this folder to Trash — ${error instanceof Error ? error.message : String(error)}`,
+        ),
+    onSettled: invalidateBoth,
   });
 }
 

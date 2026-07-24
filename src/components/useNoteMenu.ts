@@ -10,12 +10,14 @@ import {
   corpusFileStat,
   corpusFrontmatter,
   corpusMoveFileToSink,
+  corpusNoteAbsolutePath,
   corpusRevealFile,
   corpusRestoreFile,
   corpusSetLocalAiAccess,
   corpusSetLocked,
   corpusSetPinned,
   corpusSetSecure,
+  isTauri,
 } from "../lib/tauri";
 import { discardBlankNote } from "../documents/draftComposition";
 import { isEmptyNote } from "../services/mainDismiss";
@@ -27,7 +29,7 @@ import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useMainStore } from "../state/main";
 import { useViewsStore } from "../state/views";
-import { assignItemToView, assignedView } from "../services/viewTree";
+import { assignItemToView, assignedView, projectionMenuAction } from "../services/viewTree";
 import { usePanesStore } from "../state/panes";
 import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
@@ -45,6 +47,18 @@ export interface MenuAnchor {
   stopPropagation?: () => void;
 }
 
+async function copyFilePath(id: string): Promise<void> {
+  try {
+    const path = await corpusNoteAbsolutePath(id);
+    if (!navigator.clipboard) throw new Error("the clipboard is unavailable");
+    await navigator.clipboard.writeText(path);
+  } catch (err) {
+    useUiStore
+      .getState()
+      .setRowActionError(`Couldn’t copy the file path — ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 export function useNoteMenu() {
   const open = useContextMenu((s) => s.open);
   const openSummary = usePanesStore((s) => s.openSummary);
@@ -54,6 +68,7 @@ export function useNoteMenu() {
   const setTree = useMainStore((s) => s.setTree);
   const viewsManifest = useViewsStore((s) => s.manifest);
   const setViewsManifest = useViewsStore((s) => s.setManifest);
+  const activeView = useUiStore((s) => s.activeView);
   // GC liveIds MUST be the FULL note index (staged/archived/trashed included):
   // setTree prunes any Main ref not in this set, so building it from useNotes()
   // alone made "Add to Main" on a STAGED note a silent no-op — the add and the
@@ -117,15 +132,21 @@ export function useNoteMenu() {
                 label: "Open in new tab",
                 onClick: () => openSummary(note, { newTab: true }),
               },
-              ...(isFile
-                ? [
-                    {
-                      kind: "action" as const,
-                      label: "Show in Finder",
-                      onClick: () => void corpusRevealFile(note.id),
-                    } satisfies MenuSpec,
-                  ]
-                : []),
+              {
+                kind: "action" as const,
+                label: "Show in Finder",
+                disabled: !isTauri(),
+                onClick: () => void corpusRevealFile(note.id),
+              },
+              {
+                kind: "action" as const,
+                label: "Copy File Path",
+                disabled: !isTauri(),
+                onClick: () => {
+                  useUiStore.getState().setRowActionError(null);
+                  void copyFilePath(note.id);
+                },
+              },
               { kind: "sep" as const },
               restoreItem,
             ],
@@ -233,6 +254,7 @@ export function useNoteMenu() {
         items.push({
           kind: "action" as const,
           label: "Show in Finder",
+          disabled: !isTauri(),
           onClick: () => {
             // failures surfaced in the sidebar's inline error note — this
             // silently no-op'd for months while the Rust side threw (Seth #63)
@@ -244,6 +266,15 @@ export function useNoteMenu() {
                   `Couldn't reveal in Finder — ${err instanceof Error ? err.message : String(err)}`,
                 ),
             );
+          },
+        });
+        items.push({
+          kind: "action" as const,
+          label: "Copy File Path",
+          disabled: !isTauri(),
+          onClick: () => {
+            useUiStore.getState().setRowActionError(null);
+            void copyFilePath(note.id);
           },
         });
         items.push({ kind: "sep" as const });
@@ -281,11 +312,14 @@ export function useNoteMenu() {
             onClick: () => togglePinQuick(note.id),
           });
         }
+        const projectionAction = projectionMenuAction(activeView, currentView, inMain);
         items.push({
           kind: "action" as const,
-          label: inMain ? "Remove from Main" : "Add to Main",
+          label: projectionAction.label,
           onClick: () => {
-            if (inMain) {
+            if (projectionAction.kind === "remove-view") {
+              setViewsManifest(assignItemToView(viewsManifest, note.id, null));
+            } else if (projectionAction.kind === "remove-main") {
               setTree(removeFromMain(manifest.tree, note.id), liveIds);
               if (currentView) {
                 setViewsManifest(assignItemToView(viewsManifest, note.id, null));
@@ -398,7 +432,7 @@ export function useNoteMenu() {
         } else {
           items.push({
             kind: "action" as const,
-            label: "Delete",
+            label: "Move to Trash",
             danger: true,
             onClick: () => {
               if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
@@ -423,6 +457,7 @@ export function useNoteMenu() {
       setRenameTarget,
       setViewsManifest,
       viewsManifest,
+      activeView,
     ],
   );
 }
