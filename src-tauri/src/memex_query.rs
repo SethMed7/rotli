@@ -140,6 +140,9 @@ pub fn parse_query(source: &str) -> Result<ParsedQuery, String> {
         if value.is_empty() {
             return Err(format!("query field {input_field} needs a value"));
         }
+        if value.starts_with(['!', '<', '>', '=', '~']) {
+            return Err(format!("invalid query operator for {input_field}"));
+        }
         if matches!(operator, ">" | ">=" | "<" | "<=") && !DATE_FIELDS.contains(&field) {
             return Err("ordering is supported only for created and updated".into());
         }
@@ -227,6 +230,15 @@ mod tests {
         assert!(parse_query("area:>projects")
             .unwrap_err()
             .contains("ordering is supported only"));
+        assert!(parse_query(":payments")
+            .unwrap_err()
+            .contains("must not be empty"));
+        assert!(parse_query("area:==projects")
+            .unwrap_err()
+            .contains("invalid query operator"));
+        assert!(parse_query("area:!projects")
+            .unwrap_err()
+            .contains("invalid query operator"));
         assert!(parse_query("updated:2026-19-99")
             .unwrap_err()
             .contains("ISO YYYY-MM-DD"));

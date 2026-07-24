@@ -28,9 +28,10 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   `strategy-master (2).md`, `strategy-master (3).md`, … sequence.
 - Editing the title at the top of the note and choosing Rename from a note's
   menu are the same domain operation: both update the H1-derived title and
-  physical filename while preserving the stable `id`. Legacy notes whose title
-  is the first non-empty non-H1 line remain readable; a deliberate rename does
-  not silently reinterpret the rest of their body.
+  physical filename while preserving the stable `id`. The first H1 wins even
+  when prose or H2–H6 headings precede it. Legacy notes whose title is the first
+  non-empty non-H1 line remain readable; a deliberate rename promotes that
+  legacy title line to an H1 without reinterpreting the rest of the body.
 - Filename normalization is adoption-on-write, not a scan-time migration. New
   notes use the readable form immediately; editing or explicitly renaming an
   older `<slug>-<id6>.md` note moves it to the readable form. Merely opening or
@@ -131,9 +132,11 @@ The Rust corpus boundary independently validates every write.
   and aliases are selectors rather than identity.
 - `aliases` is a human-editable string list with Rotli-maintained rename
   history. A title/file rename appends the prior title and useful filename stem
-  without deleting existing entries. Current title, current filename stem,
-  canonical title slug, and aliases all resolve local wikilinks and CLI note
-  selectors; ambiguity fails closed and requires the stable `id`.
+  without deleting existing entries. A filename-only normalization retains the
+  exact prior stem without redundantly adding the unchanged title. Current
+  title, current filename stem, canonical title slug, and aliases all resolve
+  local wikilinks and CLI note selectors; ambiguity fails closed and requires
+  the stable `id`.
 - The user owns explicit organizational metadata such as `shelf`, `reach`,
   `view_tag`, `locked`, and the secure-note controls. Rotli manages `view_tag`
   through the named-view workflow so the Markdown and reference tree cannot
@@ -170,6 +173,17 @@ The memex must remain searchable like a database while staying ordinary files:
   Unknown fields round-trip, malformed security fields fail closed, and any
   bulk filename/metadata normalization requires the migration protocol and an
   explicit user-approved apply step.
+- The foundation command `bun scripts/repair-v38-filenames.ts` owns the v3.8
+  bulk repair: dry-run JSON is the default and declares renames, duplicate
+  suffixes, aliases, and wikilink effects before an explicit `--apply`. Rotli
+  continues to normalize one note through its ordinary guarded write path; it
+  does not scan-normalize at startup.
+
+The present top-level vocabulary is already sufficient for database-like
+retrieval without a content database. Candidate future additions
+(`record_type`, `status`, `due`, and `source_refs`) remain non-normative until a
+foundation contract bump gives each a fixed scalar/list type, owner, query
+semantics, and absent-is-valid migration. Rotli must not infer or backfill them.
 
 ## Model capability and Model Mapping 0
 

@@ -19,6 +19,7 @@ import {
   ensureChatBacklink,
   isMemexId,
   noteStem,
+  noteSlugify,
   parseAccessMode,
   parseMemexInfo,
   parsePrimaryUser,
@@ -33,6 +34,8 @@ describe("slugify (conversations.ts parity)", () => {
   test("lowercases + dashes runs of non-alphanumerics", () => {
     expect(slugify("Rotli architecture")).toBe("rotli-architecture");
     expect(slugify("  Hello, World!  ")).toBe("hello-world");
+    expect(slugify("Café résumé")).toBe("caf-r-sum");
+    expect(noteSlugify("Café résumé")).toBe("café-résumé");
   });
   test("caps at 60 chars", () => {
     expect(slugify("a".repeat(80)).length).toBe(60);

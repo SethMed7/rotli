@@ -1,6 +1,7 @@
 // Title/snippet derivation shared by both NotesService implementations.
-// THE TITLE LAW: the title is DERIVED from the first non-empty line, never
-// stored. The Rust corpus derives its own for list rows (corpus.rs title_of /
+// THE TITLE LAW: the title is DERIVED from the first H1, never stored. Legacy
+// notes without an H1 retain the first-non-empty-line fallback until renamed.
+// The Rust corpus derives its own for list rows (corpus.rs title_of /
 // snippet_of), so THESE MUST MATCH IT exactly — otherwise the same note shows
 // one title in a list row (Rust) and another in an opened tab / moved note
 // (TS). This is a faithful port of corpus.rs strip_markdown / title_of /
@@ -47,8 +48,21 @@ function stripMarkdown(line: string): string {
   return rustTrim(s.replace(/[*_`]/g, ""));
 }
 
-/** Title = the first line that is non-empty after stripping markdown. */
+function h1Title(line: string): string | null {
+  const trimmed = rustTrimStart(line);
+  if (!trimmed.startsWith("#") || trimmed.startsWith("##")) return null;
+  const rest = trimmed.slice(1);
+  if (!rest || !new RegExp(`^[${RWS}]`).test(rest)) return null;
+  const title = stripMarkdown(rest);
+  return title || null;
+}
+
+/** Title = first H1; pre-v3.8 H1-less notes keep the legacy fallback. */
 export function titleOf(body: string): string {
+  for (const line of lines(body)) {
+    const title = h1Title(line);
+    if (title) return title;
+  }
   for (const line of lines(body)) {
     const stripped = stripMarkdown(line);
     if (stripped) return stripped;

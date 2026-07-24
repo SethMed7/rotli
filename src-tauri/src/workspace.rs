@@ -1082,24 +1082,28 @@ fn validate_note_title(title: &str) -> Result<&str, String> {
 fn replace_note_title_line(body: &str, next_title: &str) -> Result<String, String> {
     let next_title = validate_note_title(next_title)?;
     let mut lines: Vec<String> = body.split('\n').map(str::to_string).collect();
-    let Some(index) = lines.iter().position(|line| !line.trim().is_empty()) else {
+    let h1_index = lines.iter().position(|line| {
+        let trimmed = line.trim_start_matches([' ', '\t']);
+        trimmed.strip_prefix('#').is_some_and(|rest| {
+            !rest.starts_with('#')
+                && (rest.is_empty()
+                    || rest.chars().next().is_some_and(char::is_whitespace))
+        })
+    });
+    let Some(index) =
+        h1_index.or_else(|| lines.iter().position(|line| !line.trim().is_empty()))
+    else {
         return Ok(format!("# {next_title}\n"));
     };
     let raw = lines[index].trim_end_matches('\r');
-    let carriage_return = if lines[index].ends_with('\r') { "\r" } else { "" };
+    let carriage_return = if lines[index].ends_with('\r') {
+        "\r"
+    } else {
+        ""
+    };
     let trimmed = raw.trim_start_matches([' ', '\t']);
     let indent = &raw[..raw.len() - trimmed.len()];
-    let heading_marks = trimmed.chars().take_while(|value| *value == '#').count();
-    let heading = (1..=6).contains(&heading_marks)
-        && trimmed
-            .chars()
-            .nth(heading_marks)
-            .is_some_and(char::is_whitespace);
-    lines[index] = if heading {
-        format!("{indent}{} {next_title}{carriage_return}", "#".repeat(heading_marks))
-    } else {
-        format!("{next_title}{carriage_return}")
-    };
+    lines[index] = format!("{indent}# {next_title}{carriage_return}");
     Ok(lines.join("\n"))
 }
 
@@ -2763,14 +2767,14 @@ mod tests {
     }
 
     #[test]
-    fn note_rename_title_replacement_preserves_heading_level_and_plain_text() {
+    fn note_rename_rewrites_the_first_h1_and_promotes_a_legacy_title() {
         assert_eq!(
-            replace_note_title_line("\n  ### Old\n\nBody", "New").unwrap(),
-            "\n  ### New\n\nBody"
+            replace_note_title_line("Preface\n  ### Old\n  # Canonical\nBody", "New").unwrap(),
+            "Preface\n  ### Old\n  # New\nBody"
         );
         assert_eq!(
             replace_note_title_line("Old\n\nBody", "New").unwrap(),
-            "New\n\nBody"
+            "# New\n\nBody"
         );
         assert_eq!(replace_note_title_line("\n", "New").unwrap(), "# New\n");
     }
@@ -2839,6 +2843,27 @@ mod tests {
             &vec!["payments".to_string(), "privacy".to_string()]
         );
         assert!(!result.notes[0].metadata.contains_key("text"));
+
+        let private_rel = workspace.store.resolve_note_rel(&private.id).unwrap();
+        let private_path = workspace.store.root().join(private_rel);
+        let private_text = fs::read_to_string(&private_path).unwrap();
+        let (private_frontmatter, private_body) = crate::corpus::parse_document(&private_text);
+        let mut private_frontmatter = private_frontmatter.unwrap();
+        private_frontmatter.foreign = vec![
+            "area: projects".into(),
+            "tags: [payments]".into(),
+            "secure: malformed".into(),
+        ];
+        fs::write(
+            private_path,
+            crate::corpus::compose_document(&private_frontmatter, private_body),
+        )
+        .unwrap();
+        let malformed = workspace.query_remote("tag:payments", 50).unwrap();
+        assert!(
+            malformed.notes.iter().all(|note| note.id != private.id),
+            "malformed secure metadata must fail closed"
+        );
     }
 
     #[test]

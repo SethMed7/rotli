@@ -254,10 +254,8 @@ export function useTrashNote() {
   });
 }
 
-/** Rename a note = rewrite the FIRST non-empty line of its body (the note's
- * title is its first line). Preserves a leading heading marker if present, so a
- * `# Heading` stays a heading and a plain first line stays plain. Composed from
- * getNote + updateNote — no new service surface. */
+/** Rename a note = rewrite its first H1. H1-less legacy notes adopt one at
+ * their former first-non-empty title line. Composed from getNote + updateNote. */
 export function useRenameNote() {
   return useMutation({
     mutationFn: async ({ id, title }: { id: string; title: string }) => {

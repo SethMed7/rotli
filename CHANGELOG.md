@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same implicit-AND grammar with inspectable parsed clauses. Rotli applies its
   secure-content gate before matching and never writes an index or normalizes
   files during a query.
+- **The title rule now matches the foundation contract exactly.** The first H1
+  wins even when prose or lower-level headings precede it; Rename edits that H1,
+  while deliberately renaming an H1-less legacy note promotes its former title
+  line to H1. Unicode title words remain readable in filename slugs.
+- **Legacy filename repair is explicit and reviewable.** The foundation
+  `repair-v38-filenames.ts` command defaults to a JSON plan showing collisions,
+  aliases, and wikilink effects; Rotli itself still performs only guarded
+  per-note adoption and never bulk-renames during listing or startup.
 
 ### Fixed
 

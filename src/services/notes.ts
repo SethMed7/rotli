@@ -6,7 +6,7 @@
 // hooks in ./hooks.ts.
 
 import { isTauri } from "../lib/tauri";
-import { slugify } from "../memex/contract";
+import { noteSlugify } from "../memex/contract";
 import type { Folder, Note, NoteSummary, SearchHit } from "../types";
 import { DEST, isChats, isHidden, isRootMarker, isSink, isTrash, isVault } from "./destinations";
 
@@ -161,7 +161,7 @@ export class InMemoryNotesService implements NotesService {
       id: ulid(now),
       title: titleOf(body),
       snippet: snippetOf(body),
-      aliases: [slugify(titleOf(body))],
+      aliases: [noteSlugify(titleOf(body))],
       folderId,
       createdAt: now,
       updatedAt: now,
@@ -178,7 +178,7 @@ export class InMemoryNotesService implements NotesService {
     const title = titleOf(body);
     const aliases = [...(existing.aliases ?? [])];
     if (existing.title !== title) {
-      for (const alias of [existing.title, slugify(existing.title), slugify(title)]) {
+      for (const alias of [existing.title, noteSlugify(existing.title), noteSlugify(title)]) {
         if (alias && !aliases.some((value) => value.toLocaleLowerCase() === alias.toLocaleLowerCase())) {
           aliases.push(alias);
         }
@@ -270,7 +270,7 @@ export class InMemoryNotesService implements NotesService {
       id: opts.id ?? ulid(opts.createdAt),
       title: titleOf(body),
       snippet: snippetOf(body),
-      aliases: [slugify(titleOf(body))],
+      aliases: [noteSlugify(titleOf(body))],
       folderId,
       createdAt: opts.createdAt,
       updatedAt: opts.updatedAt,

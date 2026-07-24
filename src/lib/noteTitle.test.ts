@@ -6,12 +6,14 @@ describe("replaceTitleLine", () => {
     expect(replaceTitleLine("# Old title\n\nbody", "New title")).toBe("# New title\n\nbody");
   });
 
-  test("preserves the heading level", () => {
-    expect(replaceTitleLine("### Deep\ntext", "Renamed")).toBe("### Renamed\ntext");
+  test("uses the first H1 even when prose or lower headings precede it", () => {
+    expect(replaceTitleLine("Preface\n### Deep\n# Canonical\ntext", "Renamed")).toBe(
+      "Preface\n### Deep\n# Renamed\ntext",
+    );
   });
 
-  test("a plain first line stays plain (no accidental heading)", () => {
-    expect(replaceTitleLine("Buy milk\nand eggs", "Groceries")).toBe("Groceries\nand eggs");
+  test("an H1-less legacy title deliberately adopts the H1 form", () => {
+    expect(replaceTitleLine("Buy milk\nand eggs", "Groceries")).toBe("# Groceries\nand eggs");
   });
 
   test("skips leading blank lines to find the title line", () => {

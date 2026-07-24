@@ -14,6 +14,10 @@ describe("titleOf — first non-empty line, markdown stripped (mirrors Rust titl
     expect(titleOf("### Deep\nbody")).toBe("Deep");
   });
 
+  test("the first H1 outranks earlier prose and lower-level headings", () => {
+    expect(titleOf("Preface\n## Section\n# Canonical title\nbody")).toBe("Canonical title");
+  });
+
   test("keeps a plain first line untouched", () => {
     expect(titleOf("Plain line\nmore")).toBe("Plain line");
   });

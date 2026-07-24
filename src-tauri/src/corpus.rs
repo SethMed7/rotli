@@ -1085,11 +1085,12 @@ const AI_KEYS: [&str; 8] = [
     "filed_at",
 ];
 
-/// A frontmatter line setting the per-note SECURE flag (`secure: true`).
+/// A frontmatter line setting the per-note SECURE flag. Only literal `false`
+/// opens the ordinary lane; malformed values fail closed as secure.
 /// Shared with the organizer daemon (its secure-skip is in-memory, never a write).
 pub(crate) fn secure_field(line: &str) -> Option<bool> {
     let (k, v) = line.split_once(':')?;
-    (k.trim() == "secure").then(|| v.trim() == "true")
+    (k.trim() == "secure").then(|| v.trim() != "false")
 }
 
 /// Explicit permission for a loopback-local model to read a secure note.
@@ -1372,8 +1373,23 @@ fn ensure_backing_folders(folders: &mut Vec<FolderMeta>, notes: &[NoteMeta]) {
 
 // ─── title · snippet · slug · filename ───────────────────────────────────────
 
-/// Title = first non-empty line, markdown stripped. NOT stored anywhere.
+fn h1_title(line: &str) -> Option<String> {
+    let trimmed = line.trim_start();
+    let rest = trimmed.strip_prefix('#')?;
+    if rest.starts_with('#') || !rest.chars().next().is_some_and(char::is_whitespace) {
+        return None;
+    }
+    let title = strip_markdown(rest);
+    (!title.is_empty()).then_some(title)
+}
+
+/// Title = the first H1, markdown stripped. Older notes without an H1 retain
+/// the pre-v3.8 first-non-empty-line fallback until a deliberate rename adopts
+/// the H1 form. The title is never duplicated in frontmatter.
 pub fn title_of(body: &str) -> String {
+    if let Some(title) = body.lines().find_map(h1_title) {
+        return title;
+    }
     body.lines()
         .map(strip_markdown)
         .find(|l| !l.is_empty())
@@ -1600,13 +1616,16 @@ fn sort_hits(hits: &mut [SearchHit]) {
 
 pub fn slugify(title: &str) -> String {
     let mut out = String::new();
+    let mut length = 0usize;
     for c in title.to_lowercase().chars() {
         if c.is_alphanumeric() {
             out.push(c);
+            length += 1;
         } else if !out.is_empty() && !out.ends_with('-') {
             out.push('-');
+            length += 1;
         }
-        if out.len() >= 60 {
+        if length >= 60 {
             break;
         }
     }
@@ -1701,15 +1720,17 @@ fn preserve_rename_aliases(
     fm: &mut Frontmatter,
     rel: &str,
     old_title: &str,
+    new_title: &str,
     id: &str,
 ) -> Result<(), String> {
     let mut aliases = alias_values(fm);
-    push_unique_alias(&mut aliases, old_title);
-    push_unique_alias(&mut aliases, slugify(old_title));
+    if old_title != new_title {
+        push_unique_alias(&mut aliases, old_title);
+        push_unique_alias(&mut aliases, slugify(old_title));
+    }
     let current_stem = filename_stem(rel);
-    if legacy_filename_stem(rel, id).is_none() {
-        push_unique_alias(&mut aliases, current_stem);
-    } else if let Some(legacy) = legacy_filename_stem(rel, id) {
+    push_unique_alias(&mut aliases, current_stem);
+    if let Some(legacy) = legacy_filename_stem(rel, id) {
         push_unique_alias(&mut aliases, legacy);
     }
     fm.foreign.retain(|line| {
@@ -3265,7 +3286,7 @@ impl CorpusStore {
         let mut old_fm = old_fm.unwrap_or_default();
         let title = title_of(body);
         if old_title != title || filename_stem(&rel) != slugify(&old_title) {
-            preserve_rename_aliases(&mut old_fm, &rel, &old_title, id)?;
+            preserve_rename_aliases(&mut old_fm, &rel, &old_title, &title, id)?;
         }
         let created = old_fm
             .created
@@ -3386,7 +3407,7 @@ impl CorpusStore {
         let current_folder = folder_of(rel);
         let title = title_of(&body);
         if filename_stem(rel) != slugify(&title) {
-            preserve_rename_aliases(&mut old_fm, rel, &title, id)?;
+            preserve_rename_aliases(&mut old_fm, rel, &title, &title, id)?;
         }
 
         // The Secure notes destination is a secure-by-default filing action,
@@ -6303,9 +6324,14 @@ mod tests {
     fn slugging_and_collisions() {
         assert_eq!(slugify("Hello, World!"), "hello-world");
         assert_eq!(slugify("  ⌥Space — the way in  "), "space-the-way-in");
+        assert_eq!(slugify("Café résumé"), "café-résumé");
         assert_eq!(slugify("###"), "untitled");
         assert_eq!(title_of("\n\n## **Bold** _title_\nrest"), "Bold title");
         assert_eq!(title_of("- [x] ship it\n"), "ship it");
+        assert_eq!(
+            title_of("Preface\n## Section\n# Canonical title\nBody"),
+            "Canonical title"
+        );
 
         let (_dir, mut store) = bare();
         let a = store.create("", "# Same title\n").unwrap();
@@ -6342,6 +6368,37 @@ mod tests {
             .any(|alias| alias == "the-3-stage-infrastructure-plan"));
         assert_eq!(store.search("myela-stage-plan", 10).unwrap().len(), 1);
         assert!(store.root().join(rel).is_file(), "listing must remain read-only");
+    }
+
+    #[test]
+    fn deliberate_legacy_filename_repair_keeps_the_exact_old_stem() {
+        let (_dir, mut store) = bare();
+        fs::create_dir_all(store.root().join("Notes")).unwrap();
+        let rel = "Notes/myela-stage-plan-abc123.md";
+        fs::write(
+            store.root().join(rel),
+            "---\nid: 01LEGACYABC123\ncreated: 2026-07-01\nupdated: 2026-07-01\npinned: false\naliases: [kept]\n---\n\n# The 3-stage infrastructure plan\n",
+        )
+        .unwrap();
+        store.list().unwrap();
+
+        store
+            .write(
+                "01LEGACYABC123",
+                "# The 3-stage infrastructure plan\n\nEdited deliberately.\n",
+            )
+            .unwrap();
+
+        let repaired = store
+            .root()
+            .join("Notes/the-3-stage-infrastructure-plan.md");
+        assert!(repaired.is_file());
+        assert!(!store.root().join(rel).exists());
+        let text = fs::read_to_string(repaired).unwrap();
+        assert!(text.contains(
+            "aliases: [\"kept\",\"myela-stage-plan-abc123\",\"myela-stage-plan\"]"
+        ));
+        assert!(!text.contains("\"The 3-stage infrastructure plan\""));
     }
 
     #[test]
@@ -7385,7 +7442,7 @@ mod tests {
         assert_eq!(files, vec!["pricing.md"], "expected one clean slug file, got {files:?}");
         let on_disk = fs::read_to_string(inbox.join("pricing.md")).unwrap();
         let _ = rel; // the original path is gone after the title-tracking rename
-        assert!(on_disk.contains("aliases: [\"Pricing\",\"pricing-aa11bb\"]"));
+        assert!(on_disk.contains("aliases: [\"pricing-aa11bb\"]"));
         // the v3.5 user + AI metadata rode through untouched (foreign preservation)
         assert!(on_disk.contains("owner: rotli"), "owner lost:\n{on_disk}");
         assert!(on_disk.contains("shelf: [Inbox]"), "shelf lost:\n{on_disk}");

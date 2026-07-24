@@ -148,7 +148,8 @@ a live memex as automated proof.
 
 - Introduce an explicit compatibility manifest covering settings, view state,
   Main, corpus config, CLI, MCP, and the managed Breve runtime.
-- Add a dry-run report for any future memex engine or instance-script migration.
+- Keep dry-run reports mandatory for future memex engine or instance-script
+  migrations; the v3.8 legacy-filename repair is the first concrete reference.
 - Give the workspace CLI/MCP an application schema version independent from the
   upstream MCP transport version.
 - Add an application-level workspace schema version and golden tool-schema

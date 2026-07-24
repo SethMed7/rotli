@@ -83,13 +83,26 @@ const TZ = "America/New_York";
 export const today = (now: Date = new Date(), tz: string = TZ): string =>
   new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(now);
 
-// ── slug (byte-identical to conversations.ts) ────────────────────────────────
+// ── chat slug (byte-identical to conversations.ts) ───────────────────────────
 export const slugify = (s: string): string =>
   s
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 60);
+
+/** Human-readable note filename slug. Mirrors Rust char::is_alphanumeric and
+ * its 60-Unicode-scalar cap; chat slugs retain their older ASCII contract. */
+export const noteSlugify = (s: string): string =>
+  [
+    ...s
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-|-$/g, ""),
+  ]
+    .slice(0, 60)
+    .join("")
+    .replace(/-$/g, "");
 
 // ── contract-version handshake (mirror mounts.ts verNum/requireContract) ─────
 const verNum = (v: string): number =>
@@ -286,7 +299,7 @@ export interface NoteMeta {
  * frontmatter ULID; Rust adds ` (2)`, ` (3)`, … when a sibling already owns
  * this stem. Empty/punctuation-only titles become `note`. */
 export function noteStem(title: string, _id: string): string {
-  return slugify(title) || "note";
+  return noteSlugify(title) || "note";
 }
 
 /** Compose the full bytes of a brand-NEW staging note: the v3.5 frontmatter + the
