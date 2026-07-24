@@ -225,7 +225,8 @@ export async function writeNote(input: WriteNoteInput): Promise<{ id: string; st
   };
   const contents = composeNote(meta, input.body, today());
   const path = await memexWriteNote(instance.root, stem, contents);
-  return { id, stem, path };
+  const actualStem = path.split("/").pop()?.replace(/\.md$/, "") || stem;
+  return { id, stem: actualStem, path };
 }
 
 // ── validate.ts gate (mirror-not-import: Rust shells the brain's own script) ──

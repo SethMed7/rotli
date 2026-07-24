@@ -4,8 +4,9 @@
 //! on disk = folders in the sidebar. Each note carries exactly four facts in a
 //! YAML frontmatter block — `id`, `created`, `updated`, `pinned` — added on
 //! first edit/create; the title is DERIVED from the first non-empty line,
-//! never stored. Foreign frontmatter keys pass through untouched: a note must
-//! open cleanly in any other editor, forever.
+//! never stored. A managed `aliases` line preserves human link names across
+//! title/file renames. Foreign frontmatter keys pass through untouched: a note
+//! must open cleanly in any other editor, forever.
 //!
 //! `.rotli/` inside the corpus root holds machine-local settings/view state,
 //! rebuildable indexes, and the portable Main/named-view reference manifests.
@@ -994,7 +995,8 @@ fn parse_fields(head: &str) -> Frontmatter {
 /// provenance/control frontmatter. Values stay plain text and are never an
 /// independent source of truth.
 fn searchable_metadata(fm: &Frontmatter) -> String {
-    const KEYS: [&str; 7] = [
+    const KEYS: [&str; 8] = [
+        "aliases",
         "area",
         "summary",
         "tags",
@@ -1053,12 +1055,13 @@ pub(crate) fn field_key(line: &str) -> Option<&str> {
 /// Keys rotli owns directly — the metadata-panel editor touches only OTHER
 /// (foreign) keys; `locked` goes through set_locked, the rest are derived.
 /// v3.7: `owner` promoted to RESERVED (provenance, immutable — not user-editable).
-const RESERVED_KEYS: [&str; 11] = [
+const RESERVED_KEYS: [&str; 12] = [
     "id",
     "created",
     "updated",
     "pinned",
     "origin",
+    "aliases",
     "locked",
     "secure",
     "secure_origin",
@@ -1615,11 +1618,110 @@ pub fn slugify(title: &str) -> String {
     }
 }
 
-/// `slug-of-title-` + last 6 of the ulid: stable across same-title notes,
-/// human-readable in Finder, renamed (through the index) when the title moves.
-fn filename_for(title: &str, id: &str) -> String {
-    let tail: String = id.chars().rev().take(6).collect::<Vec<_>>().into_iter().rev().collect();
-    format!("{}-{}.md", slugify(title), tail.to_lowercase())
+/// The title's human-readable canonical filename. Stable identity lives in
+/// frontmatter, never in the path. `free_name` adds ` (2)`, ` (3)`, … when two
+/// notes with the same title share a folder.
+fn filename_for(title: &str, _id: &str) -> String {
+    format!("{}.md", slugify(title))
+}
+
+fn filename_stem(rel: &str) -> String {
+    Path::new(rel)
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+fn legacy_filename_stem(rel: &str, id: &str) -> Option<String> {
+    let stem = filename_stem(rel);
+    let tail: String = id
+        .chars()
+        .rev()
+        .take(6)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<String>()
+        .to_lowercase();
+    stem.strip_suffix(&format!("-{tail}"))
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn alias_values(fm: &Frontmatter) -> Vec<String> {
+    let Some(value) = fm.foreign.iter().find_map(|line| {
+        let (key, value) = line.split_once(':')?;
+        (key == "aliases").then_some(value.trim())
+    }) else {
+        return Vec::new();
+    };
+    if value.is_empty() {
+        return Vec::new();
+    }
+    if let Ok(parsed) = serde_json::from_str::<Vec<String>>(value) {
+        return parsed;
+    }
+    let inner = value
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+        .unwrap_or(value);
+    inner
+        .split(',')
+        .map(|alias| alias.trim().trim_matches(['"', '\'']).to_string())
+        .filter(|alias| !alias.is_empty())
+        .collect()
+}
+
+fn push_unique_alias(aliases: &mut Vec<String>, value: impl Into<String>) {
+    let value = value.into().trim().to_string();
+    if value.is_empty()
+        || aliases
+            .iter()
+            .any(|existing| existing.eq_ignore_ascii_case(&value))
+    {
+        return;
+    }
+    aliases.push(value);
+}
+
+/// All human selectors that may identify a note without exposing its ULID:
+/// durable frontmatter aliases, its current filename stem, the canonical title
+/// slug, and the pre-0.34 filename stem with the six-character id tail removed.
+fn note_aliases(rel: &str, title: &str, id: &str, fm: &Frontmatter) -> Vec<String> {
+    let mut aliases = alias_values(fm);
+    push_unique_alias(&mut aliases, filename_stem(rel));
+    push_unique_alias(&mut aliases, slugify(title));
+    if let Some(legacy) = legacy_filename_stem(rel, id) {
+        push_unique_alias(&mut aliases, legacy);
+    }
+    aliases
+}
+
+fn preserve_rename_aliases(
+    fm: &mut Frontmatter,
+    rel: &str,
+    old_title: &str,
+    id: &str,
+) -> Result<(), String> {
+    let mut aliases = alias_values(fm);
+    push_unique_alias(&mut aliases, old_title);
+    push_unique_alias(&mut aliases, slugify(old_title));
+    let current_stem = filename_stem(rel);
+    if legacy_filename_stem(rel, id).is_none() {
+        push_unique_alias(&mut aliases, current_stem);
+    } else if let Some(legacy) = legacy_filename_stem(rel, id) {
+        push_unique_alias(&mut aliases, legacy);
+    }
+    fm.foreign.retain(|line| {
+        line.split_once(':')
+            .map(|(key, _)| key != "aliases")
+            .unwrap_or(true)
+    });
+    if !aliases.is_empty() {
+        let value = serde_json::to_string(&aliases).map_err(|error| error.to_string())?;
+        fm.foreign.insert(0, format!("aliases: {value}"));
+    }
+    Ok(())
 }
 
 /// Make a dropped file's name safe for a `storage:` link: slugify the STEM
@@ -1663,6 +1765,10 @@ pub struct NoteMeta {
     pub id: String,
     pub title: String,
     pub snippet: String,
+    /// Human-readable selectors for local links and CLI lookup. The stable
+    /// identity remains `id`; aliases may include the current filename stem,
+    /// canonical title slug, and rename history.
+    pub aliases: Vec<String>,
     /// User-facing folder path ("" = corpus root). In a memex this may be the
     /// note's shelf projection rather than its physical wiki folder.
     pub folder_id: String,
@@ -3040,6 +3146,14 @@ impl CorpusStore {
             let metadata = fm.as_ref().map(searchable_metadata).unwrap_or_default();
             if let Some(m) = search_match(query, &meta.title, body, &meta.snippet)
                 .or_else(|| search_match(query, &meta.title, &metadata, &meta.snippet))
+                .or_else(|| {
+                    search_match(
+                        query,
+                        &meta.title,
+                        &meta.aliases.join("\n"),
+                        &meta.snippet,
+                    )
+                })
             {
                 hits.push(SearchHit {
                     id: meta.id.clone(),
@@ -3140,11 +3254,22 @@ impl CorpusStore {
         let abs = self.abs(&rel);
 
         let existing = fs::read_to_string(&abs).unwrap_or_default();
-        let (old_fm, _) = parse_document(&existing);
+        let (old_fm, old_raw) = parse_document(&existing);
         let (file_created, _) = file_stamps(&abs);
-        let old_fm = old_fm.unwrap_or_default();
+        let old_body = if old_fm.is_some() {
+            editor_body(old_raw)
+        } else {
+            old_raw
+        };
+        let old_title = title_of(old_body);
+        let mut old_fm = old_fm.unwrap_or_default();
+        let title = title_of(body);
+        if old_title != title || filename_stem(&rel) != slugify(&old_title) {
+            preserve_rename_aliases(&mut old_fm, &rel, &old_title, id)?;
+        }
         let created = old_fm
             .created
+            .clone()
             .filter(|s| stamp_to_ms(s).is_some())
             .unwrap_or_else(|| ms_to_stamp(file_created));
         // a memex note stays date-shaped (v3.5: updated: YYYY-MM-DD); local notes
@@ -3163,7 +3288,6 @@ impl CorpusStore {
         };
         let text = compose_document(&fm, &format!("\n{body}"));
 
-        let title = title_of(body);
         // disk_folder routes the file (rename/free_name/origin); the wire
         // folder_id is the shelf-PROJECTED view, so the optimistic UI update after a
         // save lands the note under its shelf, not wiki/_inbox.
@@ -3177,7 +3301,7 @@ impl CorpusStore {
         let target_rel = if current_name == desired {
             rel.clone()
         } else {
-            self.free_name(&disk_folder, &desired, Some(&rel))
+            self.free_note_name(&disk_folder, &desired, Some(&rel))
         };
         let target_abs = self.abs(&target_rel);
 
@@ -3205,13 +3329,14 @@ impl CorpusStore {
                 let _ = self.gitignore_remove(&rel);
             }
         }
-        self.index.insert(id.to_string(), target_rel);
+        self.index.insert(id.to_string(), target_rel.clone());
         self.persist_index();
 
         Ok(NoteMeta {
             id: id.to_string(),
             title,
             snippet: snippet_of(body),
+            aliases: note_aliases(&target_rel, &title_of(body), id, &fm),
             folder_id: folder,
             disk_folder_id: disk_folder.clone(),
             created_at: stamp_to_ms(&created).unwrap_or_else(now_ms),
@@ -3259,6 +3384,10 @@ impl CorpusStore {
         .to_string();
         let mut old_fm = fm.unwrap_or_default();
         let current_folder = folder_of(rel);
+        let title = title_of(&body);
+        if filename_stem(rel) != slugify(&title) {
+            preserve_rename_aliases(&mut old_fm, rel, &title, id)?;
+        }
 
         // The Secure notes destination is a secure-by-default filing action,
         // not merely a visual label. Moving a normal note into it adds the same
@@ -3291,9 +3420,8 @@ impl CorpusStore {
         }
 
         // stable identity, fresh-but-collision-safe filename in the new folder
-        let title = title_of(&body);
         let desired = filename_for(&title, id);
-        let target_rel = self.free_name(target_folder, &desired, None);
+        let target_rel = self.free_note_name(target_folder, &desired, None);
         let target_abs = self.abs(&target_rel);
 
         // preserve id + created; DO NOT bump updated (order stays put)
@@ -3344,13 +3472,14 @@ impl CorpusStore {
                 let _ = self.gitignore_remove(rel);
             }
         }
-        self.index.insert(id.to_string(), target_rel);
+        self.index.insert(id.to_string(), target_rel.clone());
         self.persist_index();
 
         Ok(NoteMeta {
             id: id.to_string(),
             title,
             snippet: snippet_of(&body),
+            aliases: note_aliases(&target_rel, &title_of(&body), id, &fm),
             folder_id: project_lifecycle_folder(self.layout, target_folder),
             disk_folder_id: target_folder.to_string(),
             created_at: stamp_to_ms(&created).unwrap_or(file_created),
@@ -3457,7 +3586,7 @@ impl CorpusStore {
     }
 
     /// FILE a note (by wire id or rel path) into the brain per its `area` frontmatter
-    /// — the Filer's move (`_inbox/…` or a wrong area → `wiki/<area>/<slug>-<id6>.md`).
+    /// — the Filer's move (`_inbox/…` or a wrong area → `wiki/<area>/<slug>.md`).
     /// Gated by `filer_writable` on BOTH ends; reuses `relocate` (fs-atomic,
     /// preserves id/created/foreign, does NOT bump `updated`). The ulid for the index
     /// comes from the note's own frontmatter.
@@ -3672,15 +3801,28 @@ impl CorpusStore {
         let id = Ulid::new().to_string();
         let now = now_stamp();
         let title = title_of(body);
-        let rel = self.free_name(disk_folder, &filename_for(&title, &id), None);
-        let mut foreign = Vec::new();
-        if secure {
-            foreign.push("secure: true".to_string());
-            if self.layout == Layout::Memex
+        let rel = self.free_note_name(disk_folder, &filename_for(&title, &id), None);
+        let mut foreign = vec!["aliases: []".to_string()];
+        if self.layout == Layout::Memex {
+            let shelf = if secure
                 && (folder_id == "Secure notes" || folder_id.starts_with("Secure notes/"))
             {
-                foreign.push(format!("shelf: [{folder_id}]"));
-            }
+                folder_id
+            } else {
+                "Inbox"
+            };
+            foreign.extend([
+                "owner: rotli".to_string(),
+                format!("shelf: [{shelf}]"),
+                "reach: []".to_string(),
+                "area:".to_string(),
+                "summary:".to_string(),
+                "tags: []".to_string(),
+                "links: []".to_string(),
+            ]);
+        }
+        if secure {
+            foreign.push("secure: true".to_string());
         }
         let fm = Frontmatter {
             id: Some(id.clone()),
@@ -3699,10 +3841,12 @@ impl CorpusStore {
         self.index.insert(id.clone(), rel.clone());
         self.persist_index();
         let ms = stamp_to_ms(&now).unwrap_or_else(now_ms);
+        let aliases = note_aliases(&rel, &title, &id, &fm);
         Ok(NoteMeta {
             id,
             title,
             snippet: snippet_of(body),
+            aliases,
             folder_id: project_folder(self.layout, disk_folder, &fm),
             disk_folder_id: disk_folder.to_string(),
             created_at: ms,
@@ -3770,6 +3914,7 @@ impl CorpusStore {
             id: id.to_string(),
             title: board_title(id),
             snippet: String::new(),
+            aliases: Vec::new(),
             folder_id: folder_of(id),
             disk_folder_id: folder_of(id),
             created_at,
@@ -3811,6 +3956,7 @@ impl CorpusStore {
             id: rel.clone(),
             title: board_title(&rel),
             snippet: String::new(),
+            aliases: Vec::new(),
             folder_id: folder_id.to_string(),
             disk_folder_id: folder_id.to_string(),
             created_at,
@@ -3855,6 +4001,7 @@ impl CorpusStore {
                 id: id.to_string(),
                 title: board_title(id),
                 snippet: String::new(),
+                aliases: Vec::new(),
                 folder_id: folder.clone(),
                 disk_folder_id: folder,
                 created_at,
@@ -3874,6 +4021,7 @@ impl CorpusStore {
             id: new_rel.clone(),
             title: board_title(&new_rel),
             snippet: String::new(),
+            aliases: Vec::new(),
             folder_id: folder.clone(),
             disk_folder_id: folder,
             created_at,
@@ -4023,13 +4171,29 @@ impl CorpusStore {
         atomic_write(&path, contents)
     }
 
-    /// First free relative path in `folder` for `desired` — the collision guard
-    /// shared by notes (`.md`), boards (`.excalidraw`), and imported binaries. The
-    /// extension is derived from `desired` (its last `.`), so a taken name becomes
-    /// `stem-2.ext`, `stem-3.ext`, …. `keep_rel` is a path the caller already owns
-    /// (a rename in place), excluded from the collision check. The id suffix makes
-    /// real note collisions rare; this guards the same-slug-same-tail case.
+    /// First free relative path in `folder` for boards and imported binaries.
+    /// These existing surfaces retain their `stem-2.ext` convention.
     fn free_name(&self, folder: &str, desired: &str, keep_rel: Option<&str>) -> String {
+        self.free_name_with(folder, desired, keep_rel, |stem, ext, n| {
+            format!("{stem}-{n}{ext}")
+        })
+    }
+
+    /// Markdown note collisions use the familiar Finder-style suffix while
+    /// stable identity remains in frontmatter.
+    fn free_note_name(&self, folder: &str, desired: &str, keep_rel: Option<&str>) -> String {
+        self.free_name_with(folder, desired, keep_rel, |stem, ext, n| {
+            format!("{stem} ({n}){ext}")
+        })
+    }
+
+    fn free_name_with(
+        &self,
+        folder: &str,
+        desired: &str,
+        keep_rel: Option<&str>,
+        collision_name: impl Fn(&str, &str, usize) -> String,
+    ) -> String {
         let join = |name: &str| {
             if folder.is_empty() {
                 name.to_string()
@@ -4044,7 +4208,7 @@ impl CorpusStore {
         let mut rel = join(desired);
         let mut n = 2;
         while fs::symlink_metadata(self.abs(&rel)).is_ok() && keep_rel != Some(rel.as_str()) {
-            rel = join(&format!("{stem}-{n}{ext}"));
+            rel = join(&collision_name(stem, &ext, n));
             n += 1;
         }
         rel
@@ -4206,18 +4370,23 @@ fn walk(
             // file) never collapse two notes into one.
             let id = fm
                 .id
-                .filter(|id| !id.is_empty() && !new_index.contains_key(id))
+                .as_ref()
+                .filter(|id| !id.is_empty() && !new_index.contains_key(id.as_str()))
+                .cloned()
                 .or_else(|| reverse.get(&rel).filter(|id| !new_index.contains_key(*id)).cloned())
                 .unwrap_or_else(|| Ulid::new().to_string());
             new_index.insert(id.clone(), rel.clone());
+            let title = title_of(body);
+            let aliases = note_aliases(&rel, &title, &id, &fm);
             let (file_created, file_updated) = file_stamps(&abs);
             // only notes physically under a hidden root (Archive/Trash) carry
             // an origin out to the wire; everything else is None.
             let origin = if is_hidden_root(prefix) { fm.origin.clone() } else { None };
             notes.push(NoteMeta {
                 id,
-                title: title_of(body),
+                title,
                 snippet: snippet_of(body),
+                aliases,
                 folder_id,
                 disk_folder_id: prefix.to_string(),
                 created_at: fm.created.as_deref().and_then(stamp_to_ms).unwrap_or(file_created),
@@ -4236,6 +4405,7 @@ fn walk(
                 id: rel.clone(),
                 title: board_title(&rel),
                 snippet: String::new(),
+                aliases: Vec::new(),
                 folder_id: prefix.to_string(),
                 disk_folder_id: prefix.to_string(),
                 created_at: file_created,
@@ -4254,6 +4424,7 @@ fn walk(
                 id: rel.clone(),
                 title: name,
                 snippet: String::new(),
+                aliases: Vec::new(),
                 // a memex storage/ binary re-homes to the Storage destination; a
                 // plain-corpus file stays in its own folder.
                 folder_id: project_folder(layout, prefix, &Frontmatter::default()),
@@ -6142,7 +6313,35 @@ mod tests {
         let pa = store.index.get(&a.id).unwrap().clone();
         let pb = store.index.get(&b.id).unwrap().clone();
         assert_ne!(pa, pb, "same-title notes must get distinct filenames");
-        assert!(pa.starts_with("same-title-") && pa.ends_with(".md"));
+        assert_eq!(pa, "same-title.md");
+        assert_eq!(pb, "same-title (2).md");
+    }
+
+    #[test]
+    fn legacy_id_tailed_filename_is_a_human_alias_without_rewriting_the_file() {
+        let (_dir, mut store) = bare();
+        fs::create_dir_all(store.root().join("Notes")).unwrap();
+        let rel = "Notes/myela-stage-plan-abc123.md";
+        fs::write(
+            store.root().join(rel),
+            "---\nid: 01LEGACYABC123\ncreated: 2026-07-01\nupdated: 2026-07-01\npinned: false\n---\n\n# The 3-stage infrastructure plan\n",
+        )
+        .unwrap();
+
+        let note = store
+            .list()
+            .unwrap()
+            .notes
+            .into_iter()
+            .find(|note| note.id == "01LEGACYABC123")
+            .unwrap();
+        assert!(note.aliases.iter().any(|alias| alias == "myela-stage-plan"));
+        assert!(note
+            .aliases
+            .iter()
+            .any(|alias| alias == "the-3-stage-infrastructure-plan"));
+        assert_eq!(store.search("myela-stage-plan", 10).unwrap().len(), 1);
+        assert!(store.root().join(rel).is_file(), "listing must remain read-only");
     }
 
     #[test]
@@ -6317,13 +6516,15 @@ mod tests {
         let (_dir, mut store) = bare();
         let meta = store.create("Notes", "# First title\n\nBody.\n").unwrap();
         let before = store.index.get(&meta.id).unwrap().clone();
-        assert!(before.contains("first-title-"));
+        assert!(before.ends_with("first-title.md"));
 
         store.write(&meta.id, "# Second title\n\nBody.\n").unwrap();
         let after = store.index.get(&meta.id).unwrap().clone();
-        assert!(after.contains("second-title-"), "file not renamed: {after}");
+        assert!(after.ends_with("second-title.md"), "file not renamed: {after}");
         assert!(!store.root().join(&before).exists(), "old file left behind");
         assert!(store.root().join(&after).is_file());
+        let on_disk = fs::read_to_string(store.root().join(&after)).unwrap();
+        assert!(on_disk.contains("aliases: [\"First title\",\"first-title\"]"));
 
         // id↔path index stays authoritative: read by the same id still works
         let doc = store.read(&meta.id).unwrap();
@@ -6630,8 +6831,8 @@ mod tests {
         assert!(ov.root.ends_with("corpus"), "root missing: {}", ov.root);
         assert!(ov.folders.contains(&"Inbox".to_string()));
         assert!(ov.folders.contains(&"Work".to_string()));
-        assert!(ov.files.iter().any(|f| f.starts_with("Inbox/welcome-to-rotli-")));
-        assert!(ov.files.iter().any(|f| f.starts_with("Work/plan-")));
+        assert!(ov.files.iter().any(|f| f == "Inbox/welcome-to-rotli.md"));
+        assert!(ov.files.iter().any(|f| f == "Work/plan.md"));
         // .rotli never leaks into the picture
         assert!(ov.folders.iter().all(|f| !f.starts_with('.')));
         assert!(ov.files.iter().all(|f| !f.starts_with('.')));
@@ -7172,10 +7373,8 @@ mod tests {
         // the default "Inbox" shelf projects onto the Captures surface ("Board"), not wiki/_inbox
         assert_eq!(meta.folder_id, "Board");
 
-        // the corpus tracks the title in the filename via filename_for = slug-<id6>,
-        // the SAME scheme as the v3.5 noteStem — so the file stays in wiki/_inbox with
-        // a slug-id6 name (here the id "01ABC" is short, last-6 ⇒ "01abc"). The old
-        // name is gone (a rename, never a copy).
+        // A first save normalizes the legacy slug-id filename into the clean
+        // title slug while retaining the old human stem as a durable alias.
         let inbox = root.join("wiki/_inbox");
         let files: Vec<String> = fs::read_dir(&inbox)
             .unwrap()
@@ -7183,9 +7382,10 @@ mod tests {
             .map(|e| e.file_name().to_string_lossy().into_owned())
             .filter(|n| n.ends_with(".md"))
             .collect();
-        assert_eq!(files, vec!["pricing-01abc.md"], "expected one slug-id6 file, got {files:?}");
-        let on_disk = fs::read_to_string(inbox.join("pricing-01abc.md")).unwrap();
+        assert_eq!(files, vec!["pricing.md"], "expected one clean slug file, got {files:?}");
+        let on_disk = fs::read_to_string(inbox.join("pricing.md")).unwrap();
         let _ = rel; // the original path is gone after the title-tracking rename
+        assert!(on_disk.contains("aliases: [\"Pricing\",\"pricing-aa11bb\"]"));
         // the v3.5 user + AI metadata rode through untouched (foreign preservation)
         assert!(on_disk.contains("owner: rotli"), "owner lost:\n{on_disk}");
         assert!(on_disk.contains("shelf: [Inbox]"), "shelf lost:\n{on_disk}");

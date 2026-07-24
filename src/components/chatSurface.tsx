@@ -56,6 +56,7 @@ import { renderInline } from "../editor/render";
 import { CheckGlyph, CloudGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
 import { Character } from "./character";
 import { syncManagedChatMemory } from "../chatMemory/composition";
+import { attachedNoteId as resolveAttachedNoteId } from "../chatMemory/model";
 import { rememberedChatNote, rememberChatNote } from "../noteChat/session";
 
 interface Msg {
@@ -606,17 +607,14 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const write = useWriteChat();
   // The stored title is presentation; attachment identity is the note stem.
   // A session mapping makes a just-created note chat immediately resolvable,
-  // while the stable stem tail restores that link after relaunch.
+  // while a current or preserved filename alias restores it after relaunch.
+  // The resolver retains the old id-tail path for pre-readable-name chats.
   const summary = chatSlug ? chats.data?.find((chat) => chat.slug === chatSlug) : undefined;
   const storedTitle = summary?.title ?? null;
   const attachedStem = (summary?.attachedTo ?? "").replace(/^\[\[|\]\]$/g, "").trim();
   const attachedNoteId =
     rememberedChatNote(chatSlug) ??
-    (attachedStem
-      ? ([...noteIndex.keys()].find(
-          (id) => id.slice(-6).toLowerCase() === attachedStem.slice(-6).toLowerCase(),
-        ) ?? null)
-      : null);
+    (attachedStem ? resolveAttachedNoteId(attachedStem, noteIndex.values()) : null);
   const secureAttachmentHint = attachedStem.startsWith("secure-note-");
 
   // the on-device models the memex-ai store offers; non-Tauri has no bridge.
@@ -906,18 +904,16 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
 
   /** The header note toggle — every chat has a note; it MATERIALIZES on first
    * open (lazy, so quick chats never litter the staging inbox with empties).
-   * An existing note is resolved by its stem's ULID tail — the id never changes
-   * when the organizer files it, so the match survives moves; a missing note
-   * (deleted) self-heals by creating a fresh one. */
+   * An existing note is resolved by its current or preserved filename alias;
+   * legacy ID-tailed attachments remain compatible. A missing note (deleted)
+   * self-heals by creating a fresh one. */
   const onNoteToggle = async () => {
     if (!active || !chatSlug || noteBusy) return;
     if (attachedStem) {
-      const tail = attachedStem.slice(-6).toLowerCase();
-      for (const id of noteIndex.keys()) {
-        if (id.slice(-6).toLowerCase() === tail) {
-          openAttachedNote(id);
-          return;
-        }
+      const existingId = resolveAttachedNoteId(attachedStem, noteIndex.values());
+      if (existingId) {
+        openAttachedNote(existingId);
+        return;
       }
       // not in the index (deleted, or a cold listing) — fall through, re-create
     }

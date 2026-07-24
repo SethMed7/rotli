@@ -55,9 +55,28 @@ export function mergeChatMemory(
   return `${withLink}\n\n${block}\n`;
 }
 
-export function attachedNoteId(stem: string, ids: Iterable<string>): string | null {
+export interface AttachedNoteCandidate {
+  id: string;
+  aliases?: readonly string[];
+}
+
+export function attachedNoteId(stem: string, candidates: Iterable<AttachedNoteCandidate>): string | null {
+  const target = stem.trim().toLocaleLowerCase();
+  if (!target) return null;
+  const available = [...candidates];
+  const exact = available.filter((candidate) =>
+    candidate.aliases?.some((alias) => alias.trim().toLocaleLowerCase() === target),
+  );
+  if (exact.length === 1) return exact[0]!.id;
+  if (exact.length > 1) return null;
+
+  // Pre-readable-filename chat attachments encoded the note ULID's final six
+  // characters in the stem. Keep that fallback until every old attachment has
+  // been refreshed through the alias-aware path.
   const tail = stem.slice(-6).toLowerCase();
   if (!tail) return null;
-  for (const id of ids) if (id.slice(-6).toLowerCase() === tail) return id;
+  for (const candidate of available) {
+    if (candidate.id.slice(-6).toLowerCase() === tail) return candidate.id;
+  }
   return null;
 }

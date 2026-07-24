@@ -15,6 +15,9 @@ export interface NoteSummary {
   id: string; // ulid-style
   title: string;
   snippet: string;
+  /** Human-readable link/query selectors: current filename stem, canonical
+   * title slug, and rename history. Stable identity remains `id`. */
+  aliases?: string[];
   /** User-facing shelf/folder projection. In a memex this can differ from the
    * physical wiki folder that contains the note. */
   folderId: string;

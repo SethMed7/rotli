@@ -50,6 +50,15 @@ imports.
 
 ## Persistent user-facing names
 
+- A Rotli-authored Markdown note's first H1 is its display title. Its filename is
+  the lowercase, hyphen-separated title slug with `.md`; identity remains the
+  frontmatter `id`, never a filename suffix.
+- Same-title notes in one physical folder use `name.md`, `name (2).md`,
+  `name (3).md`, and so on. Existing numbers are never silently renumbered.
+- Editing the title or using Rename updates the filename. The prior title and
+  useful filename stem join the note's `aliases` list so wikilinks and human
+  CLI selectors survive later renames. Ambiguous selectors require the stable
+  `id`.
 - Named workspace views use their exact display name as the identifier and as
   Markdown's `view_tag`; no hidden UUID or slug is introduced.
 - View names are trimmed, 1–64 characters, unique case-insensitively, and use

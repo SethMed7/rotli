@@ -22,8 +22,17 @@ describe("chat memory model", () => {
     expect(next.match(new RegExp(CHAT_MEMORY_END, "g"))?.length).toBe(1);
   });
 
-  test("resolves a filed note by the stable id tail encoded in its stem", () => {
-    expect(attachedNoteId("project-abc123", ["vault:01ABCDEFGHABC123", "other"])).toBe(
+  test("resolves a readable filename stem through note aliases", () => {
+    expect(
+      attachedNoteId("project-chat (2)", [
+        { id: "01NEW", aliases: ["project-chat (2)", "project-chat"] },
+        { id: "01OTHER", aliases: ["other"] },
+      ]),
+    ).toBe("01NEW");
+  });
+
+  test("keeps the legacy stable-id-tail attachment fallback", () => {
+    expect(attachedNoteId("project-abc123", [{ id: "vault:01ABCDEFGHABC123" }, { id: "other" }])).toBe(
       "vault:01ABCDEFGHABC123",
     );
   });

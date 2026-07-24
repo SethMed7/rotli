@@ -9,6 +9,14 @@ const TABLE_NOTE = `# Table editing
 | GLM-5.2 | Open |
 `;
 
+const WRAPPED_TABLE_NOTE = `# Wrapped table editing
+
+| Corpay API | Purpose | Auth | Env vars |
+| ---------- | ------- | ---- | -------- |
+| Cards API | Issue/manage cards | Okta OAuth2 client-credentials | \`CORPAY_CARDS_BASE_URL\`, \`CORPAY_CARDS_TOKEN_URL\`, \`CORPAY_CARDS_CLIENT_ID\`, \`CORPAY_CARDS_CLIENT_SECRET\`, \`CORPAY_CARDS_SCOPE\` |
+| Webhooks | Real-time events | Cognito subscribe + HMAC verify | \`CORPAY_WEBHOOK_SIGNATURE_SECRET\`, \`CORPAY_WEBHOOK_API_KEY\`, \`CORPAY_WEBHOOK_API_KEY_HEADER\` |
+`;
+
 test("clicking a Markdown table cell edits inside the rendered table", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");
@@ -36,6 +44,47 @@ test("clicking a Markdown table cell edits inside the rendered table", async ({ 
   await table.getByRole("textbox", { name: "Edit License row 2" }).press("Tab");
   await expect(table.getByRole("textbox", { name: "Edit Model row 3" })).toBeFocused();
   await expect(table.locator("tbody tr")).toHaveCount(3);
+});
+
+test("editing a wrapped table cell preserves the table's shape", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText(WRAPPED_TABLE_NOTE);
+
+  const table = page.locator(".rotli-md-table");
+  const target = table.getByRole("cell", { name: /CORPAY_CARDS_BASE_URL/ });
+  const row = target.locator("xpath=..");
+  const beforeTable = await table.boundingBox();
+  const beforeCell = await target.boundingBox();
+  const beforeRow = await row.boundingBox();
+  expect(beforeTable).not.toBeNull();
+  expect(beforeCell).not.toBeNull();
+  expect(beforeRow).not.toBeNull();
+
+  await target.click();
+  const cellEditor = table.getByRole("textbox", { name: "Edit Env vars row 1" });
+  await expect(cellEditor).toBeVisible();
+  expect(await cellEditor.evaluate((node) => node.tagName)).toBe("TEXTAREA");
+
+  const duringTable = await table.boundingBox();
+  const duringCell = await cellEditor.locator("xpath=..").boundingBox();
+  const duringRow = await cellEditor.locator("xpath=../..").boundingBox();
+  expect(Math.abs((duringTable?.width ?? 0) - (beforeTable?.width ?? 0))).toBeLessThanOrEqual(1);
+  expect(Math.abs((duringCell?.width ?? 0) - (beforeCell?.width ?? 0))).toBeLessThanOrEqual(1);
+  expect(duringRow?.height ?? 0).toBeGreaterThanOrEqual((beforeRow?.height ?? 0) - 1);
+});
+
+test("an exact note-title wikilink opens on an ordinary click", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("# Link test\n\n[[Pricing decision]]");
+
+  await page.locator(".rotli-wikilink", { hasText: "Pricing decision" }).click();
+  await expect(page.locator(".cm-content")).toContainText("Free local forever.");
 });
 
 test("raw Markdown uses the Rotli syntax grammar without changing source", async ({ page }) => {

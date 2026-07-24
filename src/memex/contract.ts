@@ -32,10 +32,10 @@
 // v3.7 (2026-07-01) opens ONE surface to a SECOND actor: the AI FILER may write the
 // curated `wiki/**` (area/summary/tags/links/… — the AI_KEYS) and file _inbox notes
 // into areas, subject to `locked`. The USER's write lane (canWrite) is byte-unchanged.
-// Purely additive frontmatter keys, so the band just extends to 3.7. We do NOT flip a
-// brain's stored `memex.json` to 3.7 — a 3.6 brain is still in [3.4, 3.7], fully
-// writable, so the Filer works today; flipping is a later step once Breve/voz ship MAX≥3.7.
-export const CONTRACT_VERSION = "3.7";
+// v3.8 (2026-07-24) adds readable filename projections, rename aliases, and a
+// deterministic read-only query grammar. Durable identity and write lanes are
+// unchanged; Rotli mirrors the grammar through CLI/MCP and extends the band.
+export const CONTRACT_VERSION = "3.8";
 export const MIN_CONTRACT = "3.4";
 
 /** Sources allowed on the chats surface (conversations.ts SURFACES.chats.sources).
@@ -282,15 +282,11 @@ export interface NoteMeta {
   secure?: boolean;
 }
 
-/** `<slug>-<id6>` — the staging filename stem (home() = wiki/_inbox/<stem>.md).
- *  id6 = the LAST 6 of the ULID (its RANDOM tail), lowercased so it survives the
- *  Rust safe_slug (lowercase-alnum-dash). The random tail — NOT the time prefix
- *  (first 10 chars, which two notes minutes apart share) — is what disambiguates,
- *  so the same title written twice never collides and overwrites. Empty title ⇒
- *  "note" so the stem never starts with "-". */
-export function noteStem(title: string, id: string): string {
-  const base = slugify(title) || "note";
-  return `${base}-${id.slice(-6).toLowerCase()}`;
+/** The human-readable staging filename stem. Stable identity remains the
+ * frontmatter ULID; Rust adds ` (2)`, ` (3)`, … when a sibling already owns
+ * this stem. Empty/punctuation-only titles become `note`. */
+export function noteStem(title: string, _id: string): string {
+  return slugify(title) || "note";
 }
 
 /** Compose the full bytes of a brand-NEW staging note: the v3.5 frontmatter + the
@@ -301,15 +297,17 @@ export function composeNote(meta: NoteMeta, body: string, date: string): string 
   const head = [
     "---",
     line("id", meta.id),
-    line("owner", meta.owner ?? ROTLI_SOURCE),
     line("created", date),
     line("updated", date),
+    "pinned: false",
+    "aliases: []",
+    line("owner", meta.owner ?? ROTLI_SOURCE),
+    line("shelf", `[${meta.shelf.join(", ")}]`),
+    line("reach", `[${meta.reach.join(", ")}]`),
     line("area", meta.area ?? ""), // blank until the LLM organizer runs
     "summary:", //  ”
     "tags: []", //  ”
-    "links:", //  ”
-    line("shelf", `[${meta.shelf.join(", ")}]`),
-    line("reach", `[${meta.reach.join(", ")}]`),
+    "links: []", //  ”
     ...(meta.secure ? ["secure: true"] : []),
     "---",
     "",

@@ -21,6 +21,7 @@ mod fsutil;
 mod keychain;
 mod localmodel;
 mod memex;
+mod memex_query;
 mod organizer;
 #[cfg(test)]
 mod parity_tests;

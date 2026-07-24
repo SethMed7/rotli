@@ -193,6 +193,8 @@ export interface CorpusNoteMeta {
   id: string;
   title: string;
   snippet: string;
+  /** Current filename/title selectors plus durable rename aliases. */
+  aliases?: string[];
   /** User-facing shelf/folder projection. */
   folderId: string;
   /** Physical folder containing the file (for Brain location/reveal). */

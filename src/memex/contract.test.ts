@@ -220,13 +220,14 @@ describe("parseMemexInfo + isMemexId", () => {
 });
 
 describe("contractInRange", () => {
-  test("rotli's default band is [3.4, 3.7] — prior cards + the v3.6/v3.7 brain pass", () => {
+  test("rotli's default band is [3.4, 3.8] — prior cards and the readable-query brain pass", () => {
     expect(contractInRange("3.4")).toBe(true); // an older memex.json
     expect(contractInRange("3.5")).toBe(true); // the prior engine version
     expect(contractInRange("3.6")).toBe(true); // memex-vault after the identity/personality + org split
-    expect(contractInRange("3.7")).toBe(true); // v3.7 — the AI Filer lane (still in-band)
+    expect(contractInRange("3.7")).toBe(true); // v3.7 — the AI Filer lane
+    expect(contractInRange("3.8")).toBe(true); // v3.8 — readable identity + deterministic queries
     expect(contractInRange("3.3")).toBe(false); // older than rotli supports
-    expect(contractInRange("3.8")).toBe(false); // newer than rotli was built for
+    expect(contractInRange("3.9")).toBe(false); // newer than rotli was built for
   });
   test("can widen the band", () => {
     expect(contractInRange("3.6", "3.4", "3.6")).toBe(true);
@@ -301,15 +302,17 @@ describe("composeNote (v3.5 note contract — byte-exact)", () => {
     expect(out).toBe(
       "---\n" +
         `id: ${ID}\n` +
-        "owner: rotli\n" +
         "created: 2026-06-24\n" +
         "updated: 2026-06-24\n" +
+        "pinned: false\n" +
+        "aliases: []\n" +
+        "owner: rotli\n" +
+        "shelf: [Inbox]\n" +
+        "reach: [seth]\n" +
         "area:\n" +
         "summary:\n" +
         "tags: []\n" +
-        "links:\n" +
-        "shelf: [Inbox]\n" +
-        "reach: [seth]\n" +
+        "links: []\n" +
         "---\n" +
         "# Pricing decision\n" +
         "\n" +
@@ -338,18 +341,17 @@ describe("composeNote (v3.5 note contract — byte-exact)", () => {
 });
 
 describe("noteStem (home() staging filename)", () => {
-  test("slug + the LAST-6-of-id (random tail), lowercased", () => {
-    expect(noteStem("Pricing decision", "01JTESTAAAQRSTV")).toBe("pricing-decision-aqrstv");
+  test("uses only the human-readable title slug", () => {
+    expect(noteStem("Pricing decision", "01JTESTAAAQRSTV")).toBe("pricing-decision");
   });
-  test("empty/symbol-only title falls back to 'note' (never a leading dash)", () => {
-    expect(noteStem("", "01JABCDXYZ012")).toBe("note-xyz012");
-    expect(noteStem("!!!", "01JABCDXYZ012")).toBe("note-xyz012");
+  test("empty/symbol-only title falls back to 'note'", () => {
+    expect(noteStem("", "01JABCDXYZ012")).toBe("note");
+    expect(noteStem("!!!", "01JABCDXYZ012")).toBe("note");
   });
-  test("same title, different ids ⇒ distinct stems (no overwrite) even ms apart", () => {
-    // two ULIDs sharing the time prefix but differing in the random tail
+  test("stable ids do not leak into the human filename", () => {
     const a = "01JTESTAAAA" + "AAAAAA";
     const b = "01JTESTAAAA" + "BBBBBB";
-    expect(noteStem("Pricing decision", a)).not.toBe(noteStem("Pricing decision", b));
+    expect(noteStem("Pricing decision", a)).toBe(noteStem("Pricing decision", b));
   });
 });
 

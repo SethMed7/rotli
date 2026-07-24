@@ -5,7 +5,7 @@
 
 import { beforeEach, describe, expect, test } from "bun:test";
 import type { LeafNode, Tab } from "../types";
-import { findLeaf, usePanesStore } from "./panes";
+import { findLeaf, sidebarItemId, usePanesStore } from "./panes";
 
 const tab = (id: string): Tab => ({
   id,
@@ -23,6 +23,39 @@ const leaf = (id: string, tabIds: string[]): LeafNode => ({
 
 const order = (paneId: string): string[] =>
   (findLeaf(usePanesStore.getState().root, paneId)?.tabs ?? []).map((t) => t.id);
+
+describe("sidebarItemId — every content surface can light its sidebar row", () => {
+  test("returns the durable item id for notes, boards, and surfaced files", () => {
+    expect(sidebarItemId(tab("note"))).toBe("n-note");
+    expect(
+      sidebarItemId({
+        id: "board-tab",
+        surfaceKind: "canvas",
+        boardId: "storage/plan.excalidraw",
+        viewState: { cursor: 0, scroll: 0 },
+      }),
+    ).toBe("storage/plan.excalidraw");
+    expect(
+      sidebarItemId({
+        id: "file-tab",
+        surfaceKind: "file",
+        fileId: "storage/reference.pdf",
+        viewState: { cursor: 0, scroll: 0 },
+      }),
+    ).toBe("storage/reference.pdf");
+  });
+
+  test("meta surfaces do not claim a content row", () => {
+    expect(sidebarItemId(null)).toBeNull();
+    expect(
+      sidebarItemId({
+        id: "activity-tab",
+        surfaceKind: "activity",
+        viewState: { cursor: 0, scroll: 0 },
+      }),
+    ).toBeNull();
+  });
+});
 
 describe("moveTab — same-pane reorder (visual-slot semantics)", () => {
   beforeEach(() => {

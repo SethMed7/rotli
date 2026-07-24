@@ -1239,6 +1239,10 @@
   color: var(--text);
   font: inherit;
   line-height: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  resize: none;
 }
 
 /* explicit `</>` table-source mode — mono so the pipes read as structure */

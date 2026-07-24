@@ -54,6 +54,17 @@ function tabNoteId(tab: Tab): string | null {
   return tab.surfaceKind === "note" ? tab.noteId : null;
 }
 
+/** The durable corpus item represented by a tab, when that surface has a
+ * corresponding sidebar row. Notes, boards, and conventional files all use
+ * this one selection identity; chat/activity remain separate navigation. */
+export function sidebarItemId(tab: Tab | null): string | null {
+  if (!tab) return null;
+  if (tab.surfaceKind === "note") return tab.noteId;
+  if (tab.surfaceKind === "canvas") return tab.boardId;
+  if (tab.surfaceKind === "file") return tab.fileId;
+  return null;
+}
+
 /** Duplicate a tab (its surface target), fresh identity — for splits / ⌘T. */
 function duplicateTab(tab: Tab): Tab {
   if (tab.surfaceKind === "canvas") return makeCanvasTab(tab.boardId);

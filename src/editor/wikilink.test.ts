@@ -19,6 +19,11 @@ const note = (id: string, title: string): NoteSummary => ({
   pinned: false,
 });
 
+const aliasedNote = (id: string, title: string, aliases: string[]): NoteSummary => ({
+  ...note(id, title),
+  aliases,
+});
+
 describe("wikilink", () => {
   test("wikilinkLabel uses title when unique", () => {
     const notes = [note("a", "Alpha"), note("b", "Beta")];
@@ -38,6 +43,25 @@ describe("wikilink", () => {
   test("resolveWikilink by unique title", () => {
     const index = buildWikilinkIndex([note("path/x", "My Note")]);
     expect(resolveWikilink("My Note", index)).toBe("path/x");
+  });
+
+  test("resolveWikilink by filename or rename alias without case sensitivity", () => {
+    const index = buildWikilinkIndex([
+      aliasedNote("path/x", "The 3-stage infrastructure plan", [
+        "the-3-stage-infrastructure-plan",
+        "myela-stage-plan",
+      ]),
+    ]);
+    expect(resolveWikilink("myela-stage-plan", index)).toBe("path/x");
+    expect(resolveWikilink("MYELA-STAGE-PLAN", index)).toBe("path/x");
+  });
+
+  test("resolveWikilink refuses an ambiguous alias", () => {
+    const index = buildWikilinkIndex([
+      aliasedNote("a", "First", ["shared-name"]),
+      aliasedNote("b", "Second", ["shared-name"]),
+    ]);
+    expect(resolveWikilink("shared-name", index)).toBeNull();
   });
 
   test("resolveWikilink returns null for ambiguous title", () => {

@@ -80,7 +80,7 @@ import {
   isVault,
 } from "../services/destinations";
 import {
-  useFocusedBoardId,
+  sidebarItemId,
   useFocusedChatSlug,
   useFocusedNoteId,
   useFocusedTab,
@@ -621,8 +621,6 @@ export function Sidebar() {
   const collapseAllDests = useUiStore((s) => s.collapseAllDests);
   const toggleDestExpanded = useUiStore((s) => s.toggleDestExpanded);
   const setDestExpanded = useUiStore((s) => s.setDestExpanded);
-  const focusedNoteId = useFocusedNoteId();
-  const focusedBoardId = useFocusedBoardId();
   const openNote = usePanesStore((s) => s.openNote);
   const openCanvas = usePanesStore((s) => s.openCanvas);
   const openChat = usePanesStore((s) => s.openChat);
@@ -636,6 +634,7 @@ export function Sidebar() {
   // lives in the Chat front, so every destination goes quiet. Nothing focused
   // (or a meta surface like Activity) keeps the plain behavior.
   const focusedTab = useFocusedTab();
+  const focusedItemId = sidebarItemId(focusedTab);
   const focusedHome = useMemo(() => {
     if (!focusedTab) return null;
     if (focusedTab.surfaceKind === "note") {
@@ -920,7 +919,7 @@ export function Sidebar() {
               data-note-id={n.id}
               /* the current file's Main copy wins the highlight (#25) — the same
                  accent pill a compact row gets when it's the focused note */
-              className={`snrow main-row${n.id === focusedNoteId ? " sel" : ""}${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
+              className={`snrow main-row${n.id === focusedItemId ? " sel" : ""}${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
               style={{ paddingLeft: 10 + (depth + 1) * 16 }}
               onPointerDown={(e) => startMainDrag(e, n.id, "move", displayTitle)}
               onClick={() => {
@@ -1159,7 +1158,7 @@ export function Sidebar() {
                 key={note.id}
                 note={note}
                 displayTitle={displayTitle}
-                selected={note.id === focusedNoteId}
+                selected={note.id === focusedItemId}
                 padLeft={28 + level * 16}
                 onOpen={
                   isFile(note)
@@ -1178,7 +1177,7 @@ export function Sidebar() {
           <CompactBoardRow
             key={board.id}
             board={board}
-            selected={board.id === focusedBoardId}
+            selected={board.id === focusedItemId}
             padLeft={28 + level * 16}
             onOpen={openBoardRow(board.id)}
             renaming={renamingBoardId === board.id}
@@ -1426,28 +1425,28 @@ export function Sidebar() {
     },
   });
 
-  // #25 — reveal the current file: when the focused note changes, auto-expand the
-  // folder that holds it so its row is on screen (and highlighted). Main's copy
-  // wins; a note not in Main is revealed in the Brain instead. Keyed ONLY on
-  // focusedNoteId (the latest projections ride in a ref) so it fires on
-  // navigation, never re-opening a folder the user just collapsed by hand.
+  // #25 — reveal the current item: when the focused note, board, or file changes,
+  // auto-expand the folder that holds it so its row is on screen and highlighted.
+  // Main's copy wins; an item not in Main is revealed at its physical home.
+  // Keyed ONLY on focusedItemId (the latest projections ride in a ref) so it
+  // fires on navigation, never re-opening a folder the user just collapsed.
   const revealRef = useRef({ mainProjection, noteIndex });
   revealRef.current = { mainProjection, noteIndex };
   const revealNonce = useUiStore((s) => s.revealNonce);
 
-  // Expand the folder chain that holds the focused note (Main copy wins; a note
-  // not in Main is revealed in the Brain). Reads the latest projections via the
-  // ref so it never re-opens a folder the user just collapsed by hand.
-  const expandToFocusedNote = (
+  // Expand the folder chain that holds the focused item (Main copy wins).
+  // Reads the latest projections via the ref so it never re-opens a folder the
+  // user just collapsed by hand.
+  const expandToFocusedItem = (
     mode: "auto" | "brain" = "auto",
-    targetNoteId: string | null = focusedNoteId,
+    targetItemId: string | null = focusedItemId,
   ) => {
-    if (!targetNoteId) return;
+    if (!targetItemId) return;
     const { mainProjection: proj, noteIndex: idx } = revealRef.current;
     // "brain" mode skips the Main-wins short-circuit so "Open in Brain" reveals the
     // note's REAL home in the Brain even when it's also pinned in Main (Seth #3,
     // 2026-07-08). "auto" keeps Main's copy winning on ordinary navigation.
-    const inMain = mode === "brain" ? undefined : proj.notes.find((n) => n.id === targetNoteId);
+    const inMain = mode === "brain" ? undefined : proj.notes.find((n) => n.id === targetItemId);
     if (inMain) {
       let parent: string | null = inMain.folderId;
       const seen = new Set<string>();
@@ -1458,7 +1457,7 @@ export function Sidebar() {
       }
       return;
     }
-    const note = idx.get(targetNoteId);
+    const note = idx.get(targetItemId);
     if (!note) return;
     const fid = noteDiskFolder(note);
     if (isSecureBrainFolder(fid)) {
@@ -1486,19 +1485,19 @@ export function Sidebar() {
   };
 
   // #25 — auto-reveal on navigation: expand the holder, never scroll (a yanked
-  // scroll on every click is jarring). Keyed on the note id, not the closure.
+  // scroll on every click is jarring). Keyed on the item id, not the closure.
   useEffect(() => {
-    expandToFocusedNote("auto", focusedNoteId);
+    expandToFocusedItem("auto", focusedItemId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusedNoteId, setDestExpanded]);
+  }, [focusedItemId, setDestExpanded]);
 
   // Explicit reveal (the editor's location chip): expand AND scroll the row into
   // view. Fires ONLY on the nonce bump, so normal navigation never scroll-yanks.
   useEffect(() => {
     if (!revealNonce) return;
     const { revealMode: mode, revealNoteId } = useUiStore.getState();
-    const targetNoteId = revealNoteId ?? focusedNoteId;
-    expandToFocusedNote(mode, targetNoteId);
+    const targetItemId = revealNoteId ?? focusedItemId;
+    expandToFocusedItem(mode, targetItemId);
     // two frames: the first lets the just-expanded folder chain commit to the
     // DOM, the second scrolls the now-rendered row into view (pre-release review).
     // In "brain" mode, scroll to the BRAIN occurrence (not the Main copy, which
@@ -1511,7 +1510,7 @@ export function Sidebar() {
             mode === "brain" ? ".sidebar .snrow.sel:not(.main-row)" : ".sidebar .snrow.sel",
           ),
         );
-        const sel = candidates.find((row) => row.dataset.noteId === targetNoteId) ?? candidates[0];
+        const sel = candidates.find((row) => row.dataset.noteId === targetItemId) ?? candidates[0];
         sel?.scrollIntoView({ block: "center", behavior: "smooth" });
       });
     });

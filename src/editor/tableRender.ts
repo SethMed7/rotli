@@ -274,6 +274,39 @@ class TableWidget extends WidgetType {
         `[data-table-row="${target.row}"][data-table-col="${target.col}"]`,
       ) as HTMLTableCellElement | null;
 
+    /** Hold the rendered column geometry while one cell swaps rich content for
+     * a text control. Otherwise auto-layout recomputes around one long editor
+     * value and the whole table jumps sideways. */
+    const freezeTableGeometry = (): (() => void) => {
+      const tableRect = table.getBoundingClientRect();
+      const referenceRow = table.rows.item(0);
+      if (!referenceRow || tableRect.width <= 0) return () => {};
+
+      const colgroup = document.createElement("colgroup");
+      for (const cell of Array.from(referenceRow.cells)) {
+        const col = document.createElement("col");
+        col.style.width = `${cell.getBoundingClientRect().width}px`;
+        colgroup.appendChild(col);
+      }
+
+      const previous = {
+        width: table.style.width,
+        maxWidth: table.style.maxWidth,
+        tableLayout: table.style.tableLayout,
+      };
+      table.insertBefore(colgroup, table.firstChild);
+      table.style.width = `${tableRect.width}px`;
+      table.style.maxWidth = "none";
+      table.style.tableLayout = "fixed";
+
+      return () => {
+        colgroup.remove();
+        table.style.width = previous.width;
+        table.style.maxWidth = previous.maxWidth;
+        table.style.tableLayout = previous.tableLayout;
+      };
+    };
+
     const focusRebuiltCell = (tableFrom: number, target: CellTarget) => {
       requestAnimationFrame(() => {
         for (const candidate of view.dom.querySelectorAll<HTMLElement>(".rotli-md-tablewrap")) {
@@ -293,7 +326,7 @@ class TableWidget extends WidgetType {
       const col = Number(cell.dataset.tableCol);
       if (!Number.isInteger(row) || !Number.isInteger(col)) return;
       if (active?.cell === cell) {
-        cell.querySelector<HTMLInputElement>(".rotli-md-cell-input")?.focus();
+        cell.querySelector<HTMLTextAreaElement>(".rotli-md-cell-input")?.focus();
         return;
       }
       if (active) {
@@ -302,8 +335,10 @@ class TableWidget extends WidgetType {
       }
 
       const original = cell.dataset.raw ?? "";
-      const input = document.createElement("input");
-      input.type = "text";
+      const cellRect = cell.getBoundingClientRect();
+      const releaseGeometry = freezeTableGeometry();
+      const input = document.createElement("textarea");
+      input.rows = 1;
       input.className = "rotli-md-cell-input";
       input.value = original;
       const header = this.header?.[col] ?? "";
@@ -312,6 +347,13 @@ class TableWidget extends WidgetType {
         `Edit ${plainCellLabel(header, col)} ${row < 0 ? "header" : `row ${row + 1}`}`,
       );
       cell.replaceChildren(input);
+      const minimumHeight = Math.max(0, Math.ceil(cellRect.height - 2));
+      input.style.minHeight = `${minimumHeight}px`;
+      const fitInputHeight = () => {
+        input.style.height = "0";
+        input.style.height = `${Math.max(minimumHeight, input.scrollHeight)}px`;
+      };
+      fitInputHeight();
 
       let finished = false;
       const finish = (
@@ -323,6 +365,7 @@ class TableWidget extends WidgetType {
         if (finished) return;
         finished = true;
         active = null;
+        releaseGeometry();
         const value = commit ? input.value.replace(/\r?\n/g, " ") : original;
         const current = tableAtWidget();
         if (!current) return;
@@ -344,7 +387,9 @@ class TableWidget extends WidgetType {
       };
       active = { cell, finish };
 
+      input.addEventListener("input", fitInputHeight);
       input.addEventListener("keydown", (event) => {
+        if (event.isComposing) return;
         if (event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
@@ -376,14 +421,14 @@ class TableWidget extends WidgetType {
 
     table.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
-      if (e.target instanceof HTMLInputElement) return;
+      if (e.target instanceof HTMLTextAreaElement) return;
       const cell = (e.target as HTMLElement).closest?.("td,th");
       if (!(cell instanceof HTMLTableCellElement)) return;
       e.preventDefault();
       startCellEdit(cell);
     });
     table.addEventListener("keydown", (event) => {
-      if (event.target instanceof HTMLInputElement) return;
+      if (event.target instanceof HTMLTextAreaElement) return;
       if (event.key !== "Enter" && event.key !== "F2") return;
       const cell = (event.target as HTMLElement).closest?.("td,th");
       if (!(cell instanceof HTMLTableCellElement)) return;

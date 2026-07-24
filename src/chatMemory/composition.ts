@@ -25,10 +25,7 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
   const repository = {
     async findByStem(stem: string): Promise<ChatMemoryNote | null> {
       const summaries = await notesService.listNotes();
-      const id = attachedNoteId(
-        stem,
-        summaries.map((note) => note.id),
-      );
+      const id = attachedNoteId(stem, summaries);
       if (!id) return null;
       const note = await notesService.getNote(id);
       return note ? { id, stem, body: note.body } : null;

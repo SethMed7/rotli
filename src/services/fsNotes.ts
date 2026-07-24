@@ -148,6 +148,7 @@ export class FsNotesService implements NotesService {
       id: meta.id,
       title: titleOf(body),
       snippet: snippetOf(body),
+      ...(meta.aliases ? { aliases: meta.aliases } : {}),
       folderId: meta.folderId,
       diskFolderId: meta.diskFolderId,
       createdAt: meta.createdAt,

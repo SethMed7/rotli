@@ -10,6 +10,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Note filenames are now readable, deterministic title slugs.** A note titled
+  “Strategy master” is stored as `strategy-master.md`; same-title siblings use
+  `strategy-master (2).md`, and stable ULIDs remain in frontmatter instead of
+  leaking into filenames. Typing a new title or using Rename updates the file,
+  preserves old title/file selectors in human-readable `aliases`, and lets
+  wikilinks and `rotli rename` resolve exact titles, filenames, aliases, or IDs.
+  Untouched legacy files are not rewritten merely by opening the memex.
+- **Frontmatter now has an explicit record contract for filesystem querying.**
+  Identity, human selectors, user organization, and AI enrichment have declared
+  ownership and types; aliases participate in local search while unknown user
+  metadata continues to round-trip.
+- **Memex v3.8 adds deterministic structured queries.** The packaged CLI
+  accepts expressions such as `area:projects tags:payments
+  updated:>=2026-07-01`, and the read-only `rotli_query` MCP tool exposes the
+  same implicit-AND grammar with inspectable parsed clauses. Rotli applies its
+  secure-content gate before matching and never writes an index or normalizes
+  files during a query.
+
+### Fixed
+
+- **PDFs, DOCX files, sheets, and other file surfaces now stay visible in the
+  sidebar.** The focused file uses the same active-row identity as notes and
+  boards, and opening it expands the folder chain that contains it.
+- **Editing a long Markdown table cell no longer reshapes the table.** The
+  inline editor preserves the rendered column widths and minimum row height,
+  wraps long values, and grows vertically when the edit needs more room.
+
 ## [0.33.5] - 2026-07-23
 
 ### Changed

@@ -21,6 +21,20 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   routes a new note through **Brain intake**: the portable staging lane currently
   stored at `wiki/_inbox/`. An explicit writable local folder remains the
   physical home.
+- A Rotli-authored note's first H1 is its title. The filename is a derived,
+  human-readable projection: lowercase title words joined with hyphens and a
+  `.md` extension (`# Strategy master` → `strategy-master.md`). Stable identity
+  lives only in frontmatter. Two same-title siblings use the familiar
+  `strategy-master (2).md`, `strategy-master (3).md`, … sequence.
+- Editing the title at the top of the note and choosing Rename from a note's
+  menu are the same domain operation: both update the H1-derived title and
+  physical filename while preserving the stable `id`. Legacy notes whose title
+  is the first non-empty non-H1 line remain readable; a deliberate rename does
+  not silently reinterpret the rest of their body.
+- Filename normalization is adoption-on-write, not a scan-time migration. New
+  notes use the readable form immediately; editing or explicitly renaming an
+  older `<slug>-<id6>.md` note moves it to the readable form. Merely opening or
+  listing a memex never rewrites user files.
 - **Documents and sheets** created by Rotli live in the managed binary lane:
   `storage/rotli/` in a memex or `Storage/` in the legacy layout.
 - **Boards** are raw `.excalidraw` files. The corpus adapter chooses the writable
@@ -91,8 +105,35 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
 
 The Rust corpus boundary independently validates every write.
 
+- Frontmatter is the memex's portable record, not an imitation database hidden
+  beside it. Known fields have stable names, types, ownership, and canonical
+  group order; unknown user fields survive byte-for-byte. New Rotli notes use:
+
+  ```yaml
+  ---
+  id: 01...
+  created: 2026-07-24
+  updated: 2026-07-24
+  pinned: false
+  aliases: []
+  owner: rotli
+  shelf: [Inbox]
+  reach: [seth]
+  area:
+  summary:
+  tags: []
+  links: []
+  ---
+  ```
+
 - Rotli owns identity/provenance facts such as `id`, `created`, `updated`, and
-  `pinned`.
+  `pinned`. `id` is the primary key and never changes; paths, filenames, titles,
+  and aliases are selectors rather than identity.
+- `aliases` is a human-editable string list with Rotli-maintained rename
+  history. A title/file rename appends the prior title and useful filename stem
+  without deleting existing entries. Current title, current filename stem,
+  canonical title slug, and aliases all resolve local wikilinks and CLI note
+  selectors; ambiguity fails closed and requires the stable `id`.
 - The user owns explicit organizational metadata such as `shelf`, `reach`,
   `view_tag`, `locked`, and the secure-note controls. Rotli manages `view_tag`
   through the named-view workflow so the Markdown and reference tree cannot
@@ -106,6 +147,29 @@ The Rust corpus boundary independently validates every write.
 - The metadata surface derives and displays the canonical absolute file path
   from the corpus router. Paths are never copied into editable frontmatter,
   where a title rename or Brain filing move could make them stale.
+
+## Queryable filesystem records
+
+The memex must remain searchable like a database while staying ordinary files:
+
+- The canonical record is `frontmatter + H1 + body + filesystem location`.
+  Rebuildable indexes may parse and accelerate those records but never become
+  authoritative.
+- Exact lookup accepts stable `id`, title, current filename stem, or `aliases`.
+  Human selectors are case-insensitive and return no result when ambiguous.
+- Full-text retrieval searches title, body, and the declared searchable metadata
+  vocabulary (`aliases`, `area`, `summary`, `tags`, `links`, `shelf`, `reach`,
+  and `view_tag`). Secure-content gates still apply independently.
+- Structured filtering uses the memex v3.8 grammar owned by the foundation's
+  `QUERY.md`: quoted/bare text plus predicates such as `area:projects`,
+  `tag:payments`, or `updated:>=2026-07-01`, joined with implicit `AND`. Rotli
+  implements it through `rotli notes query` and read-only MCP `rotli_query`.
+  Parsed clauses accompany bounded results; queries never mutate files or treat
+  `.rotli/` indexes as durable data.
+- Schema evolution is additive and versioned through the memex contract.
+  Unknown fields round-trip, malformed security fields fail closed, and any
+  bulk filename/metadata normalization requires the migration protocol and an
+  explicit user-approved apply step.
 
 ## Model capability and Model Mapping 0
 

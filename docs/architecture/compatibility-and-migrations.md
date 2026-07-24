@@ -12,7 +12,7 @@ to defaults instead of triggering a content rewrite.
 
 | Surface | Current compatibility signal | Durability | Rule |
 |---|---|---|---|
-| `memex.json` and Markdown/frontmatter | Memex contract band `3.4` through `3.7` | User-portable durable truth | Out-of-band roots open read-only; unknown frontmatter survives |
+| `memex.json` and Markdown/frontmatter | Memex contract band `3.4` through `3.8` | User-portable durable truth | Out-of-band roots open read-only; unknown frontmatter survives |
 | App `corpus.json` | `version: 1` | Machine-local root registry | Migrate copy-first; never infer or rewrite missing user roots silently |
 | `.rotli/main.json` | `version: 1` | Portable Main arrangement | References only; preserve unknown items; never copy content into Main |
 | `.rotli/views.json` | `version: 1` | Portable named subset arrangements | Unsupported newer versions stay read-only; names are identifiers; writes synchronize singular Markdown `view_tag` membership |

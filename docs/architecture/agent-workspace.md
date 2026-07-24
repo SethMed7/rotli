@@ -27,9 +27,15 @@ maintaining separate file-manipulation implementations.
 
 ## Note, Main, and named-view behavior
 
-- Listing and full-text search omit every Markdown note refused by the existing
+- Listing, full-text search, and structured query omit every Markdown note refused by the existing
   remote-AI secure-content gate. The gate checks both durable metadata and the
   secret-pattern detector.
+- `rotli notes query 'EXPRESSION'` and MCP `rotli_query` implement the memex v3.8
+  grammar from `QUERY.md`: quoted/bare text and typed predicates such as
+  `area:projects`, `tags:payments`, or `updated:>=2026-07-01`, combined with
+  implicit `AND`. Parsed clauses ride with bounded results so humans and agents
+  can inspect what was evaluated. Querying is read-only and never repairs,
+  normalizes, files, renames, or writes an index.
 - Reads return editor Markdown plus a content revision. Updates require that
   revision and fail on a concurrent edit instead of overwriting newer bytes.
 - Every note result declares `text/markdown`, states that Rotli owns and omits
@@ -41,10 +47,12 @@ maintaining separate file-manipulation implementations.
   or begin with exactly the same H1; conflicting H1s and caller-supplied YAML
   frontmatter fail before a file is created. Update bodies are also editor
   Markdown without frontmatter, so agents cannot replace Rotli metadata.
-- `rotli rename "CURRENT TITLE OR ID" "NEW TITLE"` resolves one exact,
-  agent-visible Markdown note, refuses missing or ambiguous title matches,
-  preserves the existing Markdown heading level and managed frontmatter, and
-  uses the corpus write path so the physical filename follows the new title.
+- `rotli rename "CURRENT TITLE, FILENAME, ALIAS, OR ID" "NEW TITLE"` resolves
+  one exact, agent-visible Markdown note, refuses missing or ambiguous human
+  selectors, preserves the existing Markdown heading level and managed
+  frontmatter, and uses the corpus write path so the physical filename follows
+  the new title. Prior human selectors remain in `aliases`; note-list results
+  expose those aliases while stable `id` remains authoritative.
 - External-agent updates and moves refuse secure and locked notes. Explicit
   user-directed calls may edit or file non-secure `wiki/**` notes through the
   existing filer ownership gate; this is distinct from autonomous organizer
@@ -126,6 +134,7 @@ rotli agent doctor      # read-only root, boundary, policy, and visible metrics
 rotli agent config      # copy-ready Claude/Codex commands and Codex TOML
 rotli agent self-test   # full workflow in a disposable temporary memex
 rotli rename "Old" "New" # rename one exact note title and its physical file
+rotli notes query 'area:projects tags:payments' # inspectable metadata filters
 rotli views list        # named reference trees (Main remains global)
 rotli mcp               # stdio protocol process used by either client
 ```

@@ -41,6 +41,10 @@ exception.
 
 - Every user action remains keyboard reachable and participates in the shared
   action/keybinding system.
+- The sidebar's active-item grammar follows the focused pane across Markdown,
+  boards, PDFs, DOCX, sheets, and other surfaced files. Opening a conventional
+  file expands its containing folder and highlights the same durable item id;
+  only chat and meta surfaces intentionally leave content rows quiet.
 - Note-to-note wikilinks open with an ordinary click. The editor header may
   expose the existing session back/forward trail beside the date, using compact
   adjacent-note labels rather than duplicating the sidebar's folder hierarchy.
@@ -97,8 +101,10 @@ polish work.
 
 - Beautified tables stay visually tabular during ordinary editing. Clicking or
   keyboard-entering a cell opens one inline cell editor; surrounding cells keep
-  rendering, Tab moves in reading order, and focus remains visible. Pipe source
-  is an explicit `</>` escape hatch, not the default response to a cell click.
+  rendering, the current column widths and row height remain stable, long cell
+  text wraps instead of forcing a single horizontal line, Tab moves in reading
+  order, and focus remains visible. Pipe source is an explicit `</>` escape
+  hatch, not the default response to a cell click.
 - Raw Markdown is a first-class source view. It uses a monospaced editor voice,
   the active Rotli accent for syntax punctuation, and a contrast-safe semantic
   blue for headings and emphasis. These roles are theme tokens in all four

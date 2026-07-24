@@ -36,10 +36,11 @@ use uuid::Uuid;
 /// `src/memex/contract.ts` `CONTRACT_VERSION` exactly (the lockstep test below
 /// pins it; #24, audit 2026-07: the two sides drifted 3.6 vs 3.7 and Rust's
 /// verdict is the effective one — a 3.7 brain silently opened read-only).
-/// v3.7 adds the AI Filer lane (additive frontmatter keys only). rotli still
+/// v3.8 adds readable filename projections, aliases, and a read-only query
+/// grammar on top of v3.7's AI Filer lane. rotli still
 /// WRITES to a v3.4 brain (the chat/inbox shape is unchanged), so the supported
 /// band is `[MIN_CONTRACT, CONTRACT_VERSION]`.
-const CONTRACT_VERSION: &str = "3.7";
+const CONTRACT_VERSION: &str = "3.8";
 const MIN_CONTRACT: &str = "3.4";
 /// The inbox sentinel new captures are inserted after (matches memex-vault's inbox.md).
 const INBOX_MARK: &str = "<!-- entries below this line -->";
@@ -820,12 +821,12 @@ fn move_chat_to_bucket(
 }
 
 /// Write a brand-new note (full v3.5 bytes composed by TS) into the `wiki/_inbox/`
-/// staging area as `<stem>.md`. The stem is `<slug>-<id6>` from the TS `noteStem`;
-/// `safe_slug` re-validates it on the wire (lowercase-alnum-dash, no separators, no
-/// `..`) so the frontend can never escape the staging dir. Atomic + under the lock,
-/// exactly like a chat write. The ROOT must be registered (#20). A later phase's
-/// local LLM classifies + `git mv`s the note out to `wiki/<area>/`; rotli only
-/// ever writes the staging copy.
+/// staging area as `<slug>.md`. `safe_slug` validates the requested base; a
+/// sibling collision becomes `<slug> (2).md`, `<slug> (3).md`, … under one
+/// directory-level creation lock. Stable identity remains the frontmatter ULID.
+/// Atomic + under the lock, exactly like a chat write. The ROOT must be
+/// registered (#20). A later phase's local LLM classifies + `git mv`s the note
+/// out to `wiki/<area>/`; rotli only ever writes the staging copy.
 #[tauri::command]
 pub fn memex_write_note(
     app: tauri::AppHandle,
@@ -849,26 +850,34 @@ fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, Stri
             frontmatter.lines().any(|line| line.trim() == "secure: true")
         });
     let lane = if secure { "_secure" } else { "_inbox" };
-    let rel = format!("wiki/{lane}/{safe}.md");
-    assert_writable(&rel)?;
     let dir = root.join("wiki").join(lane);
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let path = dir.join(format!("{safe}.md"));
-    if secure {
-        let ignore = root.join(".gitignore");
-        let existing = fs::read_to_string(&ignore).unwrap_or_default();
-        if !existing.lines().any(|line| line.trim() == rel) {
-            let mut next = existing;
-            if !next.is_empty() && !next.ends_with('\n') {
-                next.push('\n');
-            }
-            next.push_str(&rel);
-            next.push('\n');
-            atomic_write(&ignore, &next)?;
+    with_file_lock(&dir.join(".rotli-note-create"), || {
+        let mut file_name = format!("{safe}.md");
+        let mut number = 2;
+        while dir.join(&file_name).exists() {
+            file_name = format!("{safe} ({number}).md");
+            number += 1;
         }
-    }
-    with_file_lock(&path, || atomic_write(&path, contents))?;
-    Ok(path.to_string_lossy().to_string())
+        let rel = format!("wiki/{lane}/{file_name}");
+        assert_writable(&rel)?;
+        let path = dir.join(&file_name);
+        if secure {
+            let ignore = root.join(".gitignore");
+            let existing = fs::read_to_string(&ignore).unwrap_or_default();
+            if !existing.lines().any(|line| line.trim() == rel) {
+                let mut next = existing;
+                if !next.is_empty() && !next.ends_with('\n') {
+                    next.push('\n');
+                }
+                next.push_str(&rel);
+                next.push('\n');
+                atomic_write(&ignore, &next)?;
+            }
+        }
+        atomic_write(&path, contents)?;
+        Ok(path.to_string_lossy().to_string())
+    })
 }
 
 #[derive(Serialize)]
@@ -1041,9 +1050,10 @@ mod tests {
         assert!(contract_ok(Some("3.4"))); // memex-vault's memex.json today
         assert!(contract_ok(Some("3.5"))); // mid-band
         assert!(contract_ok(Some("3.6"))); // mid-band
-        assert!(contract_ok(Some("3.7"))); // the Filer-lane contract / the ceiling (#24)
+        assert!(contract_ok(Some("3.7"))); // the Filer-lane contract
+        assert!(contract_ok(Some("3.8"))); // readable identity + query grammar ceiling
         assert!(!contract_ok(Some("3.3"))); // below the floor
-        assert!(!contract_ok(Some("3.8"))); // above the ceiling
+        assert!(!contract_ok(Some("3.9"))); // above the ceiling
         assert!(!contract_ok(Some("4.0"))); // a future major
         assert!(!contract_ok(None));
     }
@@ -1122,11 +1132,13 @@ mod tests {
     fn write_note_lands_in_wiki_inbox_and_refuses_bad_stems() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
-        let stem = "pricing-decision-01jtes";
+        let stem = "pricing-decision";
         let body = "---\nid: 01JTEST\n---\n# Pricing decision\n";
         let path = write_note_at(root, stem, body).unwrap();
-        assert!(path.ends_with("wiki/_inbox/pricing-decision-01jtes.md"));
+        assert!(path.ends_with("wiki/_inbox/pricing-decision.md"));
         assert_eq!(std::fs::read_to_string(&path).unwrap(), body);
+        let duplicate = write_note_at(root, stem, "---\nid: 02JTEST\n---\n# Pricing decision\n").unwrap();
+        assert!(duplicate.ends_with("wiki/_inbox/pricing-decision (2).md"));
         // a stem with a path separator / traversal / caps is rejected by safe_slug
         assert!(write_note_at(root, "../escape", "x").is_err());
         assert!(write_note_at(root, "a/b", "x").is_err());

@@ -141,6 +141,7 @@ edits, and updates require a fresh revision.
 ```sh
 /Applications/rotli.app/Contents/MacOS/rotli notes list
 /Applications/rotli.app/Contents/MacOS/rotli notes search "launch plan"
+/Applications/rotli.app/Contents/MacOS/rotli notes query 'area:projects tags:payments updated:>=2026-07-01'
 /Applications/rotli.app/Contents/MacOS/rotli notes create --title "Launch plan" --body "First draft"
 /Applications/rotli.app/Contents/MacOS/rotli rename "Launch plan" "Launch plan v2"
 /Applications/rotli.app/Contents/MacOS/rotli agent doctor

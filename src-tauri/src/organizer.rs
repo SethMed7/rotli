@@ -559,7 +559,8 @@ fn parse_classify(raw: &str, vocab: &[(String, String)]) -> Option<ClassifyOut> 
 
 /// Every OTHER note in the brain as a `(rel, stem)` pair — the link-candidate
 /// haystack, off a lock-free walk. Stems (filename minus `.md`, which carry the
-/// `<slug>-<id6>` shape) stand in for titles: unique, no body ever rides a
+/// readable filename stem (including a duplicate suffix when present) stands
+/// in for titles: unique, no body ever rides a
 /// prompt. SECURE and LOCKED notes are dropped here: a secure note's slug is
 /// derived from its title (often the secret itself for a quick capture), and
 /// letting it into the candidate list would ship it to the model AND let the
@@ -737,9 +738,13 @@ impl EnrichOut {
 /// The never-clobber rule (§3.5): a field the daemon may touch is empty on
 /// disk, or byte-equal to what the daemon itself last wrote. Anything else is
 /// a user edit — untouched, not even proposed.
+fn field_value_is_empty(value: &str) -> bool {
+    matches!(value.trim(), "" | "[]")
+}
+
 fn field_eligible(snap: &NoteSnapshot, ns: Option<&NoteState>, key: &str) -> bool {
     let current = snap.fields.get(key).map(String::as_str).unwrap_or("");
-    current.is_empty()
+    field_value_is_empty(current)
         || ns.is_some_and(|n| n.last_fields.get(key).map(String::as_str) == Some(current))
 }
 
@@ -1505,7 +1510,7 @@ pub(crate) fn run_cycle(
                 // never-clobber, re-checked FRESH: `eligible` was sampled before
                 // the model call — an edit inside that window makes the field the
                 // user's (empty or daemon-authored stays fair game).
-                let still_ours = current.is_empty()
+                let still_ours = field_value_is_empty(&current)
                     || state.notes.get(&key).is_some_and(|n| {
                         n.last_fields.get(fkey).map(String::as_str) == Some(current.as_str())
                     });
@@ -3424,7 +3429,9 @@ mod tests {
         assert_eq!(fields, ["summary", "tags", "links"]);
         let links_row = rows.iter().find(|r| r["field"] == "links").unwrap();
         assert_eq!(links_row["after"], format!("[[{peer_stem}]]"));
-        assert!(!fs::read_to_string(root.join(&note)).unwrap().contains("summary:"));
+        let unchanged = fs::read_to_string(root.join(&note)).unwrap();
+        assert!(unchanged.contains("\nsummary:\n"));
+        assert!(!unchanged.contains("summary: one line"));
 
         // Tidy: the same pass on a fresh note APPLIES and records the baseline
         write_settings(&state, "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}");
