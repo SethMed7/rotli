@@ -12,18 +12,25 @@ export type MenuSpec =
       onClick: () => void;
       danger?: boolean;
       disabled?: boolean;
-      /** A leading ✓ / ★ state marker for toggles. */
+      /** How `checked` shows: a leading ✓ / ★ gutter marker for toggles, or
+       * "highlight" — an active-row background with NO gutter (a selector
+       * among exclusive options, e.g. the Main view switcher; Seth, 2026-07-24:
+       * cleaner than a checkmark indenting every sibling). */
       checked?: boolean;
-      checkedMark?: "check" | "star";
+      checkedMark?: "check" | "star" | "highlight";
     }
   | { kind: "sep" }
   | { kind: "drill"; label: string; items: MenuSpec[]; disabled?: boolean; danger?: boolean };
 
 /** Reserve the familiar macOS checkmark gutter only when the visible menu
  * actually contains toggle state. Drill rows share the same gutter so labels
- * never jump sideways within one menu; ordinary menus stay flush. */
+ * never jump sideways within one menu; ordinary menus stay flush. Highlight-
+ * marked selectors show state as a row background instead, so they never
+ * reserve the gutter — their labels sit flush left. */
 export function menuUsesCheckGutter(items: MenuSpec[]): boolean {
-  return items.some((item) => item.kind === "action" && "checked" in item);
+  return items.some(
+    (item) => item.kind === "action" && "checked" in item && item.checkedMark !== "highlight",
+  );
 }
 
 interface ContextMenuState {

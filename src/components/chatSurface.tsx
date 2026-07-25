@@ -53,7 +53,7 @@ import { type Measure } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
 import { usePanesStore } from "../state/panes";
 import { renderInline } from "../editor/render";
-import { CheckGlyph, CloudGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
+import { CloudGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
 import { Character } from "./character";
 import { syncManagedChatMemory } from "../chatMemory/composition";
 import { attachedNoteId as resolveAttachedNoteId } from "../chatMemory/model";
@@ -535,7 +535,6 @@ function ModelPicker({
                     {(m.localDefault || m.isDefault) && (
                       <span className="chat-modelrow-tag def">default</span>
                     )}
-                    <span className="chat-modelrow-check">{sel && <CheckGlyph size={13} />}</span>
                   </button>
                 );
               })}

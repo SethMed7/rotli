@@ -1594,6 +1594,15 @@
 .ctxmenu-item.danger {
   color: var(--danger, var(--accent-text));
 }
+/* the "highlight" checked mark — an exclusive selector's active row (the Main
+   view switcher): state as background, no checkmark gutter, flush labels */
+.ctxmenu-item.active {
+  background: var(--tint);
+  font-weight: 500;
+}
+.ctxmenu-item.active:hover:not(:disabled) {
+  background: var(--tint);
+}
 .ctxmenu-item svg {
   flex: 0 0 auto;
   margin-left: auto;

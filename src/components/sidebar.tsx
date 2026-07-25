@@ -747,14 +747,14 @@ export function Sidebar() {
         kind: "action",
         label: "Main — all items",
         checked: activeView === null,
-        checkedMark: "check",
+        checkedMark: "highlight",
         onClick: () => setActiveView(null),
       },
       ...viewsManifest.views.map((view) => ({
         kind: "action" as const,
         label: view.name,
         checked: activeView === view.name,
-        checkedMark: "check" as const,
+        checkedMark: "highlight" as const,
         onClick: () => setActiveView(view.name),
       })),
       { kind: "sep" },
@@ -1030,7 +1030,7 @@ export function Sidebar() {
                                 kind: "action" as const,
                                 label: "Main only",
                                 checked: activeView === null,
-                                checkedMark: "check" as const,
+                                checkedMark: "highlight" as const,
                                 onClick: () =>
                                   setViewsManifest(
                                     transferTreeItemToView(
@@ -1046,7 +1046,7 @@ export function Sidebar() {
                                 kind: "action" as const,
                                 label: view.name,
                                 checked: activeView === view.name,
-                                checkedMark: "check" as const,
+                                checkedMark: "highlight" as const,
                                 onClick: () =>
                                   setViewsManifest(
                                     transferTreeItemToView(

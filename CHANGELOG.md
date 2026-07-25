@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Exclusive choice menus mark the current option with a highlight, not a
+  checkmark.** The Main view switcher and both "Move to view" submenus (note
+  menu and Main-folder menu) now show the current view as a tinted active row,
+  so sibling rows sit flush left instead of carrying a checkmark indent.
+  Ordinary ✓/★ toggle menus (Pin, Lock, Secure, Star) keep their macOS-style
+  gutter — those are on/off states, not a choice among options. The chat model
+  picker drops its redundant trailing checkmark for the same reason: the
+  highlighted row already is the answer.
+
 ## [0.34.0] - 2026-07-24
 
 ### Added

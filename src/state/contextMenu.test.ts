@@ -19,6 +19,32 @@ describe("context menu alignment", () => {
     expect(menuUsesCheckGutter(items)).toBe(true);
   });
 
+  test("highlight-marked selectors never reserve the gutter — labels stay flush", () => {
+    // the Main view switcher (Seth, 2026-07-24): active state is a row
+    // background, so its siblings must not pick up a checkmark indent
+    const items: MenuSpec[] = [
+      {
+        kind: "action",
+        label: "Main — all items",
+        checked: true,
+        checkedMark: "highlight",
+        onClick: () => {},
+      },
+      { kind: "action", label: "OpenSource", checked: false, checkedMark: "highlight", onClick: () => {} },
+      { kind: "sep" },
+      { kind: "action", label: "New view…", onClick: () => {} },
+    ];
+    expect(menuUsesCheckGutter(items)).toBe(false);
+  });
+
+  test("a highlight selector beside a real ✓ toggle keeps the shared gutter", () => {
+    const items: MenuSpec[] = [
+      { kind: "action", label: "Main", checked: true, checkedMark: "highlight", onClick: () => {} },
+      { kind: "action", label: "Pin", checked: false, checkedMark: "check", onClick: () => {} },
+    ];
+    expect(menuUsesCheckGutter(items)).toBe(true);
+  });
+
   test("toggle state inside a drill does not indent the parent menu", () => {
     const items: MenuSpec[] = [
       {

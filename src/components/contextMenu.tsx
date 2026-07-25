@@ -104,11 +104,12 @@ export function ContextMenu() {
             </button>
           );
         }
+        const highlighted = !!item.checked && item.checkedMark === "highlight";
         return (
           <button
             key={i}
             type="button"
-            className={`ctxmenu-item${item.danger ? " danger" : ""}`}
+            className={`ctxmenu-item${item.danger ? " danger" : ""}${highlighted ? " active" : ""}`}
             role={"checked" in item ? "menuitemcheckbox" : "menuitem"}
             {...("checked" in item ? { "aria-checked": !!item.checked } : {})}
             disabled={item.disabled}
@@ -119,7 +120,11 @@ export function ContextMenu() {
           >
             {usesCheckGutter && (
               <span className="ctxmenu-check" aria-hidden="true">
-                {item.checked ? (item.checkedMark === "check" ? "✓" : "★") : ""}
+                {item.checked && item.checkedMark !== "highlight"
+                  ? item.checkedMark === "check"
+                    ? "✓"
+                    : "★"
+                  : ""}
               </span>
             )}
             <span className="ctxmenu-label">{item.label}</span>

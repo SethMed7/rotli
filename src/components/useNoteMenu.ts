@@ -287,14 +287,14 @@ export function useNoteMenu() {
                 kind: "action" as const,
                 label: "Main only",
                 checked: currentView === null,
-                checkedMark: "check" as const,
+                checkedMark: "highlight" as const,
                 onClick: () => setViewsManifest(assignItemToView(viewsManifest, note.id, null)),
               },
               ...viewsManifest.views.map((view) => ({
                 kind: "action" as const,
                 label: view.name,
                 checked: currentView === view.name,
-                checkedMark: "check" as const,
+                checkedMark: "highlight" as const,
                 onClick: () => {
                   setTree(addNoteToMain(manifest.tree, note.id), liveIds);
                   setViewsManifest(assignItemToView(viewsManifest, note.id, view.name));
