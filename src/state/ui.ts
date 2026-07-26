@@ -51,6 +51,7 @@ export function clampChatSidebarLimit(n: unknown): number {
 /** The folders rail selection: the two smart rows or a real folder id. */
 export const ALL_NOTES = "all";
 export const RECENT = "recent";
+export const TASKS = "tasks";
 
 /** What the content area (right of the sidebar) renders: the note panes, the
  * Board grid, the searchable All-notes grid, or the Chat surface. All of these
@@ -58,7 +59,7 @@ export const RECENT = "recent";
  * left-menu sections (Inbox · Chat · Notes) stay visible (Seth, 2026-06-24;
  * Chat folded in from a full-surface front 2026-06-26). */
 // (the old "chat" contentView is retired — chat is a PANE surface now)
-export type ContentView = "panes" | "board" | "allNotes" | "allChats" | "recent";
+export type ContentView = "panes" | "board" | "allNotes" | "allChats" | "recent" | "tasks";
 
 /** The sidebar's high-level lens. Breve is an operational view over the same
  * corpus, not a separate window or a tab, so switching lenses must leave the

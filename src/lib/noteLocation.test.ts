@@ -27,9 +27,9 @@ describe("brainLocationLabel", () => {
     expect(brainLocationLabel("wiki/_secure")).toBe("Brain › Secure notes");
     expect(brainLocationLabel("wiki/_secure/calls")).toBe("Brain › Secure notes");
   });
-  test("storage keeps its path", () => {
-    expect(brainLocationLabel("Storage/Images")).toBe("Storage › Images");
-    expect(brainLocationLabel("Storage")).toBe("Storage");
+  test("the storage lane displays as Assets (2026-07-25) — the id keeps the old word", () => {
+    expect(brainLocationLabel("Storage/Images")).toBe("Assets › Images");
+    expect(brainLocationLabel("Storage")).toBe("Assets");
   });
   test("sinks + inbox + fallback", () => {
     expect(brainLocationLabel("Archive")).toBe("Archive");

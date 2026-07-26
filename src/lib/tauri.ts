@@ -942,6 +942,27 @@ export interface SecureRepairReport {
   failed: string[];
 }
 
+/** One open Markdown checkbox — the Tasks projection (decision 2026-07-25).
+ * `line` indexes the editor body's lines: the toggle handle. */
+export interface TaskItem {
+  noteId: string;
+  noteTitle: string;
+  line: number;
+  text: string;
+}
+
+/** Every open checkbox in the default corpus, derived per call. */
+export async function corpusTasks(): Promise<TaskItem[]> {
+  if (!isTauri()) return [];
+  return invoke<TaskItem[]>("corpus_tasks");
+}
+
+/** Check one task off — Rust re-validates the exact text before flipping. */
+export async function corpusToggleTask(id: string, line: number, expect: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_toggle_task", { id, line, expect });
+}
+
 /** Preview legacy secure-intake state in the default memex (read-only). */
 export async function secureRepairScan(): Promise<SecureRepairCandidate[]> {
   if (!isTauri()) return [];

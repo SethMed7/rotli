@@ -963,6 +963,8 @@ pub fn run() {
             corpus::corpus_set_secure,
             corpus::corpus_secure_repair_scan,
             corpus::corpus_secure_repair_apply,
+            corpus::corpus_tasks,
+            corpus::corpus_toggle_task,
             corpus::corpus_set_local_ai_access,
             corpus::corpus_read_ai,
             corpus::corpus_write,

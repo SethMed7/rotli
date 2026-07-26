@@ -117,7 +117,7 @@ tokens, keyboard behavior, and readable hierarchy across all four.
 
 You work how you want in **Main**; the AI organizes the **brain** underneath — location and metadata only, never the words inside your notes.
 
-*Built on [memex](https://github.com/SethMed7/memex) — the open foundation for how your data is organized.*
+*Your vault is just plain files in a documented layout — rotli is the layer that manages and understands it. The format lives with rotli, not behind it.*
 
 <br clear="all">
 

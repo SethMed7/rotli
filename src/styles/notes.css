@@ -119,12 +119,12 @@
   font-size: 11px;
   color: var(--text-muted);
 }
-/* per-section hover "+": appears where the count sits (on row hover) to drop a
-   folder inside that section — the reference's per-section add (Seth, 2026-06-24).
-   :has() lets the count make way only on rows that actually carry a "+" (smart
-   rows / Archive / Trash keep their count on hover). */
+/* per-section "+" pair (new note · new folder): ALWAYS visible on folder rows
+   (Seth, 2026-07-25, from the Zen reference: "the icons are always there, not
+   only on hover — it's just cleaner"). Quiet muted marks beside the count;
+   system rows (Storage · Archive · Trash · Secure notes) carry none at all. */
 .frow-add {
-  display: none;
+  display: inline-flex;
   margin-left: auto;
   flex: 0 0 auto;
   align-items: center;
@@ -133,6 +133,7 @@
   height: 22px;
   border-radius: var(--r-control);
   color: var(--text-muted);
+  opacity: 0.55;
   cursor: pointer;
 }
 /* only the FIRST add-icon takes the auto margin — the pair then rides the right
@@ -144,15 +145,10 @@
 .frow-add svg {
   display: block;
 }
-.frow:hover .frow-add {
-  display: inline-flex;
-}
-.frow:hover:has(.frow-add) .count {
-  display: none;
-}
 .frow-add:hover {
   background: var(--hov);
   color: var(--text);
+  opacity: 1;
 }
 /* the disclosure caret: a 14px slot left of the icon, rotated 90° when open —
    the inline chevron that makes a destination/folder expandable (Seth,
@@ -324,8 +320,9 @@
   border-radius: var(--r-control);
   color: var(--text-muted);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--motion-exit) var(--motion-ease);
+  /* always visible, quietly (Seth, 2026-07-25 — the Zen rule: affordances are
+     there, not hover-revealed); full strength on hover/focus */
+  opacity: 0.55;
 }
 .fsec-save + .fsec-add {
   margin-left: 0;
@@ -334,13 +331,13 @@
   cursor: not-allowed;
   opacity: 0.28;
 }
-.fsec-hdr:hover .fsec-add,
 .fsec-add:focus-visible {
   opacity: 1;
 }
 .fsec-add:hover {
   background: var(--hov);
   color: var(--text);
+  opacity: 1;
 }
 
 .view-editor,
@@ -795,6 +792,45 @@
 .sb-rows .snrow:focus-visible {
   background: var(--hov);
   outline-offset: -2px;
+}
+
+/* — the vault header (decision 2026-07-25): the current vault by name, one
+   click to switch/connect. A quiet full-width row above the create toolbar. — */
+.vault-switch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  margin: 10px 12px 0;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  border-radius: var(--r-control);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.vault-switch:hover {
+  background: var(--hov);
+}
+.vault-switch svg {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.vault-switch-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vault-switch-caret {
+  flex: 0 0 auto;
+  font-size: 9px;
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
 /* — the filter row pinned at the sidebar's top (filter on top, no header) — */

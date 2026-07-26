@@ -985,7 +985,7 @@ function LocationPane() {
       )}
 
       {/* —— Storage organization (Seth, 2026-06-30) —— */}
-      <h4 className="sethead">Storage</h4>
+      <h4 className="sethead">Assets</h4>
       <div className="mprow">
         <span className="mplabel">Organize Storage by</span>
         <Seg
@@ -999,7 +999,7 @@ function LocationPane() {
         />
       </div>
       <p className="setnote">
-        Your files (audio · images · PDFs · …) group this way under the <b>Storage</b> section.
+        Your files (audio · images · PDFs · …) group this way under the <b>Assets</b> section.
       </p>
 
       {!isDev && (

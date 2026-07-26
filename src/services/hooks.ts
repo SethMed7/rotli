@@ -9,6 +9,7 @@ import {
   corpusFileStat,
   corpusListConfig,
   corpusMoveFileToSink,
+  corpusTasks,
   isTauri,
   organizerSecureHints,
   organizerStatus,
@@ -44,6 +45,7 @@ export const keys = {
   organizer: ["organizer-status"] as const,
   secureRepair: ["secure-repair"] as const,
   secureHints: ["secure-hints"] as const,
+  tasks: ["tasks"] as const,
 };
 
 /** The connected brains, as sidebar roots (their `vault:`-style rows). Tauri-only.
@@ -213,6 +215,8 @@ export function useNote(id: string) {
 export async function invalidateNotes(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: ["notes"] });
   await queryClient.invalidateQueries({ queryKey: ["note"] });
+  // a body edit can add/complete checkboxes — the Tasks projection re-derives
+  await queryClient.invalidateQueries({ queryKey: keys.tasks });
 }
 
 export async function invalidateFolders(): Promise<void> {
@@ -254,6 +258,12 @@ export function useSecureRepair() {
  * Make secure / Not sensitive answer, plus flagged leftovers. Same beat. */
 export function useSecureHints() {
   return useQuery({ queryKey: keys.secureHints, queryFn: organizerSecureHints, refetchInterval: 60_000 });
+}
+
+/** The Tasks projection (decision 2026-07-25) — every open checkbox, derived
+ * per call. Rides the notes invalidation beat (a toggle IS a note edit). */
+export function useTasks() {
+  return useQuery({ queryKey: keys.tasks, queryFn: corpusTasks });
 }
 
 export async function invalidateJournal(): Promise<void> {

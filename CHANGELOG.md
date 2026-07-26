@@ -10,6 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Tasks — every open checkbox, one view.** A new Tasks row beside All notes
+  gathers every `- [ ]` you've written across your notes, grouped by note with
+  a live count. Check one off right there — it's a real edit to the note (the
+  note stays the only truth), re-validated against the exact text so a note
+  edited meanwhile refuses instead of flipping the wrong line. Fenced code is
+  ignored; Archive and Trash never nag.
+- **The sidebar header is a vault switcher.** The top of the sidebar names the
+  vault you're in; one click lists your known vaults (current one highlighted),
+  switches between them — honestly labeled, since switching relaunches —
+  connects another vault, or jumps to Location settings.
+
+### Changed
+
+- **Storage is now Assets.** One system home for every image, video, PDF, and
+  file — same lane on disk, clearer name everywhere it appears (sidebar,
+  Settings, file surfaces, note locations).
+- **Sidebar create affordances are always visible, and system rows have none.**
+  The per-folder new-note/new-folder pair and the Main-header new-folder mark
+  no longer hide until hover — they sit quietly beside the counts at reduced
+  strength. Storage, Archive, Trash, and Secure notes rows drop their create
+  affordances entirely: those are system surfaces, and the toolbar's New…
+  actions still target them when selected.
+
 ## [0.34.1] - 2026-07-25
 
 ### Changed

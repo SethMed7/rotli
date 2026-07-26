@@ -1153,6 +1153,17 @@ pub struct SecureRepairReport {
     pub failed: Vec<String>,
 }
 
+/// One open Markdown checkbox — the Tasks surface projection (decision
+/// 2026-07-25). `line` indexes the editor body's lines: the toggle handle.
+#[derive(serde::Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskItem {
+    pub note_id: String,
+    pub note_title: String,
+    pub line: usize,
+    pub text: String,
+}
+
 /// Size + writability of a surfaced file — the sheet editor's up-front probe.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1628,6 +1639,20 @@ fn is_trash_folder(folder: &str) -> bool {
 /// that happens to be named "chats" is just a folder — callers gate on layout.
 fn is_chats_folder(folder: &str) -> bool {
     folder == "chats" || folder.starts_with("chats/")
+}
+
+/// Archive and its subtree — excluded from the Tasks projection (a task in a
+/// sink is not a nag; restore is what resurrects it).
+fn is_archive_folder(folder: &str) -> bool {
+    folder == "Archive" || folder.starts_with("Archive/")
+}
+
+/// An open `- [ ]` / `* [ ]` checkbox line's own text (None for anything else,
+/// including checked boxes and empty checkboxes — nothing to show or toggle).
+fn open_task_text(trimmed: &str) -> Option<&str> {
+    let rest = trimmed.strip_prefix("- [ ]").or_else(|| trimmed.strip_prefix("* [ ]"))?;
+    let rest = rest.trim();
+    (!rest.is_empty()).then_some(rest)
 }
 
 /// rank asc (title hits first) → recency desc → id asc (deterministic wire).
@@ -3340,6 +3365,90 @@ impl CorpusStore {
         Ok(hits)
     }
 
+    /// The Tasks projection (decision 2026-07-25): every open `- [ ]` checkbox
+    /// across ordinary Markdown notes, in corpus list order. Derived per call —
+    /// Markdown stays the only truth. Trash/Archive/chats/boards excluded;
+    /// fenced code skipped; secure and locked notes INCLUDED (this is the
+    /// user's own local screen, and the surface is not agent-exposed).
+    pub(crate) fn tasks(&mut self) -> Result<Vec<TaskItem>, String> {
+        let list = self.list()?;
+        let mut out = Vec::new();
+        for meta in &list.notes {
+            if meta.kind != NoteKind::Note
+                || is_trash_folder(&meta.folder_id)
+                || is_archive_folder(&meta.folder_id)
+                || (self.layout == Layout::Memex && is_chats_folder(&meta.folder_id))
+            {
+                continue;
+            }
+            let Some(rel) = self.index.get(&meta.id) else { continue };
+            let Ok(path) = self.guard_rel(rel) else { continue };
+            let Ok(text) = fs::read_to_string(path) else { continue };
+            let (fm, raw) = parse_document(&text);
+            let body = match &fm {
+                Some(_) => editor_body(raw),
+                None => raw,
+            };
+            let mut fenced = false;
+            for (line, raw_line) in body.lines().enumerate() {
+                let trimmed = raw_line.trim_start();
+                if trimmed.starts_with("```") {
+                    fenced = !fenced;
+                    continue;
+                }
+                if fenced {
+                    continue;
+                }
+                if let Some(text) = open_task_text(trimmed) {
+                    out.push(TaskItem {
+                        note_id: meta.id.clone(),
+                        note_title: meta.title.clone(),
+                        line,
+                        text: text.to_string(),
+                    });
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// Check ONE open task off (`[ ]` → `[x]`) — a real user edit through the
+    /// ordinary note write path (updated bump, rename aliases, gitignore-follow
+    /// all ride along). Re-validates the exact line first: a note edited since
+    /// the list was built refuses instead of flipping the wrong line. `line`
+    /// indexes the EDITOR BODY's lines — the same domain `tasks()` reports.
+    pub(crate) fn toggle_task(&mut self, id_or_rel: &str, line: usize, expect: &str) -> Result<(), String> {
+        self.mutation_allowed()?;
+        let rel = self.resolve_note_rel(id_or_rel)?;
+        let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
+        let (fm, raw) = parse_document(&text);
+        let body = match &fm {
+            Some(_) => editor_body(raw),
+            None => raw,
+        };
+        let stale = || "This task changed since the list was made — it refreshes on its own.".to_string();
+        let lines: Vec<&str> = body.lines().collect();
+        let Some(current) = lines.get(line) else { return Err(stale()) };
+        if open_task_text(current.trim_start()) != Some(expect) {
+            return Err(stale());
+        }
+        let mut new_lines: Vec<String> = lines.iter().map(|s| (*s).to_string()).collect();
+        new_lines[line] = current.replacen("[ ]", "[x]", 1);
+        let mut new_body = new_lines.join("\n");
+        if body.ends_with('\n') {
+            new_body.push('\n');
+        }
+        // write() resolves through the ID index — hand it the note's stable id
+        // (the frontmatter ULID when it has one; the rel doubles as the id for
+        // a frontmatter-less legacy file).
+        let wire_id = fm
+            .as_ref()
+            .and_then(|f| f.id.clone())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| rel.clone());
+        self.write(&wire_id, &new_body).map(|_| ())
+    }
+
     /// Resolve an id through the index; on a miss (stale index, external
     /// move), rebuild from a scan once and retry.
     fn path_of(&mut self, id: &str) -> Result<String, String> {
@@ -4867,6 +4976,32 @@ pub fn corpus_list(state: tauri::State<'_, CorpusState>) -> Result<CorpusList, S
         }
     }
     Ok(CorpusList { folders, notes })
+}
+
+/// The Tasks projection over the DEFAULT corpus (decision 2026-07-25): every
+/// open checkbox, derived per call. Read-only.
+#[tauri::command]
+pub fn corpus_tasks(state: tauri::State<'_, CorpusState>) -> Result<Vec<TaskItem>, String> {
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |s| s.tasks())
+}
+
+/// Check one open task off — re-validated against its exact text, written
+/// through the ordinary note write path.
+#[tauri::command]
+pub fn corpus_toggle_task(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    line: usize,
+    expect: String,
+) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.toggle_task(&rel, line, &expect))
 }
 
 /// FULL-TEXT search across every registered root — the same aggregation +
@@ -7609,6 +7744,53 @@ mod tests {
         assert!(root.join(rel).is_file(), "nothing moved");
         assert!(!root.join("wiki/_secure").join("stuck.md").exists());
         assert!(store.journal_read().unwrap().is_empty(), "a refused repair journals nothing");
+    }
+
+    /// The Tasks projection (decision 2026-07-25): open checkboxes only, fenced
+    /// code skipped, sinks excluded, and the toggle is a validated user edit
+    /// through the ordinary write path.
+    #[test]
+    fn tasks_project_open_checkboxes_and_toggle_checks_them_off() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        let note = store
+            .create(
+                "Inbox",
+                "# Plan\n\n- [ ] call the bank\n- [x] already done\n- [ ]\n```\n- [ ] not a task — code\n```\n* [ ] second style\n",
+            )
+            .unwrap();
+        // a task in a sink is not a nag
+        let sunk = store.create("Inbox", "# Sunk\n\n- [ ] never nags\n").unwrap();
+        store.move_note(&sunk.id, "Archive").unwrap();
+
+        let tasks = store.tasks().unwrap();
+        let texts: Vec<&str> = tasks.iter().map(|t| t.text.as_str()).collect();
+        assert_eq!(texts, vec!["call the bank", "second style"], "{tasks:?}");
+        assert!(tasks.iter().all(|t| t.note_id == note.id));
+        assert_eq!(tasks[0].note_title, "Plan");
+
+        // checking off rewrites exactly that line, through the write path
+        store.toggle_task(&note.id, tasks[0].line, "call the bank").unwrap();
+        let body = store.read(&note.id).unwrap().body;
+        assert!(body.contains("- [x] call the bank"), "{body}");
+        assert!(body.contains("* [ ] second style"), "other tasks untouched: {body}");
+        assert!(body.contains("- [ ] not a task — code"), "fenced text untouched: {body}");
+        assert_eq!(store.tasks().unwrap().len(), 1, "a checked task leaves the list");
+
+        // stale refusal: the note changed since the list was built
+        let err = store.toggle_task(&note.id, tasks[0].line, "call the bank").unwrap_err();
+        assert!(err.contains("changed since"), "{err}");
+        // and a wrong line index refuses the same way
+        assert!(store.toggle_task(&note.id, 999, "second style").is_err());
+
+        // read-only stores refuse the mutation, not the projection
+        drop(store);
+        let root = tmp.path().join("corpus");
+        let mut ro = CorpusStore::open_read_only(root).unwrap();
+        assert!(ro.tasks().is_ok());
+        let remaining = ro.tasks().unwrap();
+        assert!(ro.toggle_task(&note.id, remaining[0].line, "second style").is_err());
     }
 
     /// The legacy corpus layout gets the same repair with its own lane names

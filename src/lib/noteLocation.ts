@@ -18,7 +18,8 @@ export function brainLocationLabel(folderId: string): string {
   if (f.startsWith("wiki/")) return titleCase(f.slice("wiki/".length).replace(/\//g, " › "));
   if (f === "Board") return "Captures";
   if (f === "Archive" || f === "Trash") return f;
-  if (f.startsWith("Storage")) return f.replace(/\//g, " › ");
+  // "Assets" is Storage's display name (2026-07-25) — ids keep the old word
+  if (f.startsWith("Storage")) return f.replace(/^Storage/, "Assets").replace(/\//g, " › ");
   if (f.startsWith("vault:")) {
     const sub = f.slice("vault:".length).replace(/^wiki\//, "");
     return sub ? `Library › ${titleCase(sub.replace(/\//g, " › "))}` : "Linked library";

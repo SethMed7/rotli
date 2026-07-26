@@ -214,6 +214,16 @@ export function LockGlyph({ open = false, ...props }: GlyphProps & { open?: bool
   );
 }
 
+/** A checkbox square with a check — the Tasks smart view (2026-07-25). */
+export function TaskGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="3" />
+      <path d="M8.6 12.4l2.4 2.4 4.6-5.2" />
+    </Glyph>
+  );
+}
+
 /** A shield with a check — the per-note "secure" flag (secrets detected). */
 export function ShieldGlyph(props: GlyphProps) {
   return (

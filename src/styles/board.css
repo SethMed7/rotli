@@ -92,6 +92,65 @@
   width: calc(100% - 16px);
 }
 
+/* — the Tasks surface (decision 2026-07-25): open checkboxes grouped by note.
+   Quiet list grammar; the checkbox is the one interactive accent. — */
+.tasks .task-group {
+  padding: 6px 22px 10px;
+}
+.task-note {
+  display: block;
+  border: none;
+  background: none;
+  padding: 2px 0;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.task-note:hover {
+  color: var(--text);
+}
+.task-list {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 0;
+  color: var(--text);
+  font-size: 13px;
+}
+.task-row.done .task-text {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.task-check {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+.task-check:hover:not(:disabled) {
+  border-color: var(--accent-text);
+}
+.task-check:disabled {
+  cursor: default;
+  border-color: var(--border);
+  background: var(--hov);
+}
+.task-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .board-head {
   flex: 0 0 auto;
   display: flex;

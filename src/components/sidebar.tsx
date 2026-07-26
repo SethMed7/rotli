@@ -63,6 +63,7 @@ import {
   useCorpusRoots,
   useFolders,
   useJournal,
+  useTasks,
   useMainGcIds,
   useNoteIndex,
   useNotes,
@@ -88,9 +89,16 @@ import {
   useFocusedTab,
   usePanesStore,
 } from "../state/panes";
-import { ALL_NOTES, RECENT, SEC_CHAT, SEC_INBOX, SEC_NOTES, useUiStore } from "../state/ui";
+import { ALL_NOTES, RECENT, SEC_CHAT, SEC_INBOX, SEC_NOTES, TASKS, useUiStore } from "../state/ui";
 import { activeInstance } from "../memex/config";
-import { invalidateMemex, useInstanceChats, useMemexConfig } from "../memex/useMemex";
+import {
+  invalidateMemex,
+  useChooseFolder,
+  useConnectBrain,
+  useInstanceChats,
+  useMemexConfig,
+} from "../memex/useMemex";
+import { buildVaultMenu, vaultDisplayName } from "../services/vaultSwitcher";
 import { archiveChat, deleteChat, pinChat } from "../memex/service";
 import { useChatRename } from "../services/chatRename";
 import type { Folder, NoteSummary } from "../types";
@@ -107,6 +115,7 @@ import {
   ChatGlyph,
   ChevronRight,
   ClockGlyph,
+  TaskGlyph,
   CoffeeGlyph,
   ExcalidrawGlyph,
   FileGlyph,
@@ -208,7 +217,10 @@ const DEST_ROWS: { id: Destination; label: string; Glyph: typeof InboxGlyph }[] 
   // row under Notes (Seth, 2026-06-30). Staged notes (wiki/_inbox) project there.
   { id: DEST.secure, label: "Secure notes", Glyph: ShieldGlyph },
   { id: DEST.vault, label: "Vault", Glyph: VaultGlyph },
-  { id: DEST.storage, label: "Storage", Glyph: StorageGlyph },
+  // "Assets" is the DISPLAY name (decision 2026-07-25, Zen reference) — one
+  // system home for every image/video/PDF/file. The id + disk lane stay
+  // "Storage"/storage/ (persisted expansion keys, folder ids, the contract).
+  { id: DEST.storage, label: "Assets", Glyph: StorageGlyph },
   { id: DEST.archive, label: "Archive", Glyph: ArchiveGlyph },
   { id: DEST.trash, label: "Trash", Glyph: TrashGlyph },
 ];
@@ -555,6 +567,8 @@ export function Sidebar() {
   );
   // unreviewed daemon proposals — the quiet badge on the Activity link (§4.4.2)
   const pendingProposals = deriveJournal(useJournal().data ?? []).pending.length;
+  // open checkboxes across the corpus — the Tasks smart row's count
+  const openTaskCount = useTasks().data?.length ?? 0;
 
   // MAIN — the user's hand-arranged view over the Brain (memex-vault wiki/projects/rotli/main-brain-daemon.md).
   // A `.rotli/main.json` manifest of folders + note-id refs, projected into synthetic
@@ -788,6 +802,26 @@ export function Sidebar() {
         },
       );
     }
+    const rect = e.currentTarget.getBoundingClientRect();
+    openContextMenu(rect.left, rect.bottom + 4, items, { returnFocus: () => e.currentTarget.focus() });
+  };
+
+  // — the vault switcher (decision 2026-07-25): the sidebar header names the
+  //   current vault and opens one menu — switch (repoints the notes folder,
+  //   which relaunches), connect another, or open Location settings. Menu
+  //   grammar lives in services/vaultSwitcher.ts (pure, tested). —
+  const chooseFolderMut = useChooseFolder();
+  const connectBrainMut = useConnectBrain();
+  const vaultName = vaultDisplayName(memexCfg.data?.instances ?? []);
+  const openVaultMenu = (e: MouseEvent<HTMLButtonElement>) => {
+    const vaultErr = (verb: string) => (err: unknown) =>
+      setRowActionError(`Couldn’t ${verb} — ${err instanceof Error ? err.message : String(err)}`);
+    const items = buildVaultMenu(memexCfg.data?.instances ?? [], {
+      switchTo: (root) => void chooseFolderMut.mutateAsync(root).catch(vaultErr("switch vaults")),
+      connect: () => void connectBrainMut.mutateAsync(undefined).catch(vaultErr("connect the vault")),
+      // Location lives inside Settings — the pane picker is one click away
+      openSettings: () => dispatch("app.settings"),
+    });
     const rect = e.currentTarget.getBoundingClientRect();
     openContextMenu(rect.left, rect.bottom + 4, items, { returnFocus: () => e.currentTarget.focus() });
   };
@@ -1363,6 +1397,7 @@ export function Sidebar() {
     ? [
         { id: ALL_NOTES, kind: "smart" },
         { id: RECENT, kind: "smart" },
+        { id: TASKS, kind: "smart" },
         // Main — the user's hand-arranged rows, in manifest order.
         ...mainRovingRows(MAIN_ROOT),
         // Brain — a collapsible destination; its areas ride under it when open.
@@ -1426,6 +1461,10 @@ export function Sidebar() {
       setSelectedFolderId(row.id);
       if (row.id === ALL_NOTES) {
         setContentView("allNotes");
+      } else if (row.id === TASKS) {
+        setContentView("tasks");
+      } else if (row.id === RECENT) {
+        setContentView("recent");
       } else {
         toggleDestExpanded(row.id);
         setContentView("panes");
@@ -1744,6 +1783,25 @@ export function Sidebar() {
       // The editor keeps its native menu (spell-check / copy) — this is scoped here.
       onContextMenu={(event) => event.preventDefault()}
     >
+      {/* the vault header (decision 2026-07-25, Zen reference): the current
+          vault by name, one click to switch/connect. Hidden in Breve mode —
+          Breve is a mode over the same vault, not a different one. */}
+      {sidebarMode !== "breve" && (
+        <button
+          type="button"
+          className="vault-switch"
+          aria-haspopup="menu"
+          aria-label={`Vault: ${vaultName}. Switch or connect vaults`}
+          title="Switch or connect vaults"
+          onClick={openVaultMenu}
+        >
+          <VaultGlyph size={14.5} />
+          <span className="vault-switch-name">{vaultName}</span>
+          <span className="vault-switch-caret" aria-hidden="true">
+            ▾
+          </span>
+        </button>
+      )}
       {/* the sidebar toggle now lives in the titlebar (always visible, the clear
           reopen) — the search row is just the filter + new-note (Seth, 2026-06-15) */}
       <div className={sidebarMode === "breve" ? "nl-top breve-active" : "nl-top"}>
@@ -2025,6 +2083,21 @@ export function Sidebar() {
                   the total lives on All notes (#60, audit 2026-07) */}
                 <span className="fname">Recent</span>
               </button>
+              {/* Tasks — every open checkbox across your notes, one view
+                  (decision 2026-07-25). The count is OPEN tasks, not notes. */}
+              <button
+                type="button"
+                className={`frow${contentView === "tasks" ? " sel" : ""}`}
+                onClick={() => {
+                  setSelectedFolderId(TASKS);
+                  setContentView("tasks");
+                }}
+                {...rowProps({ id: TASKS, kind: "smart" })}
+              >
+                <TaskGlyph size={14.5} />
+                <span className="fname">Tasks</span>
+                {openTaskCount > 0 && <span className="count">{openTaskCount}</span>}
+              </button>
 
               {/* — MAIN: your hand-picked notes, arranged your way. Star a row (★) to
                   put it in Quick access — the capped set the ⌥ Quick window cycles
@@ -2281,7 +2354,9 @@ export function Sidebar() {
                         </span>
                         <ShieldGlyph size={14} />
                         <span className="fname">Secure notes</span>
-                        {sectionAddBtn(DEST.secure)}
+                        {/* no create affordances on system rows (Seth, 2026-07-25):
+                            quick captures are secure at birth, and the toolbar's
+                            New… still targets this row when it's selected */}
                         <span className="count">{secureNotes.length}</span>
                       </button>
                       {secureOpen && (
@@ -2323,8 +2398,9 @@ export function Sidebar() {
                       </span>
                       <Glyph size={14.5} />
                       <span className="fname">{label}</span>
-                      {/* the external Vault is read-mostly — no "+ new note/folder" */}
-                      {!isHidden(id) && !isVault(id) && sectionAddBtn(id)}
+                      {/* destination rows are SYSTEM rows (Seth, 2026-07-25) —
+                          no create affordances here; the always-visible pair
+                          lives on user folder rows, the toolbar covers the rest */}
                       <span className="count">{destNotes.length}</span>
                     </button>
                     {open && (

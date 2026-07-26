@@ -525,7 +525,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           <div ref={documentChromeRef} className="file-document-chrome" />
         )}
         {kind === "document" && probed && DOCX_EDITABLE.has(ext) && !documentEditable && !tooLarge && (
-          <span className="file-readonly" title="Move this document into Rotli Storage to edit it locally.">
+          <span className="file-readonly" title="Move this document into Assets to edit it locally.">
             read-only location
           </span>
         )}
@@ -714,7 +714,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           !documentEditable &&
           !tooLarge && (
             <div className="file-document-fallback">
-              <p>This document is in a protected location. Move it into Rotli Storage to edit it.</p>
+              <p>This document is in a protected location. Move it into Assets to edit it.</p>
             </div>
           )}
         {!err && kind === "document" && probed && !DOCX_EDITABLE.has(ext) && (
@@ -724,7 +724,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
                 <h2>Convert a copy to edit here</h2>
                 <p>
                   Rotli can use the local macOS document converter for .{ext}. It creates a new managed DOCX
-                  in Rotli Storage and leaves the original unchanged.
+                  in Assets and leaves the original unchanged.
                 </p>
                 <button
                   type="button"

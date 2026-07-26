@@ -11,6 +11,7 @@ import { useNotes } from "../services/hooks";
 import { DEST } from "../services/destinations";
 import { useUiStore } from "../state/ui";
 import { AllChatsSurface } from "./allChatsSurface";
+import { TasksSurface } from "./tasksSurface";
 import { BoardSurface } from "./boardSurface";
 import { EmptyState } from "./emptyState";
 import { ClockGlyph } from "./glyphs";
@@ -112,6 +113,8 @@ export function NotesSurface() {
         <NoteListSurface title="All notes" searchable searchPlaceholder="Search all notes…" />
       ) : contentView === "allChats" ? (
         <AllChatsSurface />
+      ) : contentView === "tasks" ? (
+        <TasksSurface />
       ) : contentView === "recent" ? (
         <NoteListSurface title="Recent" glyph={<ClockGlyph size={15} />} />
       ) : (

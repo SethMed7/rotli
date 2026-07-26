@@ -95,6 +95,13 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   exists as an editable DOCX. Formats without a faithful local route remain
   explicitly unsupported.
 - Sheets use the workbook editor/codec boundary; boards use the canvas boundary.
+- The **Tasks** view is a per-call projection of open `- [ ]` checkboxes across
+  ordinary Markdown notes (fenced code skipped; Trash/Archive/chats excluded;
+  secure and locked notes included — it is the user's own local screen and is
+  not exposed through the agent workspace). Checking a task off rewrites that
+  one line through the ordinary note write path after re-validating the exact
+  text; no task database or task metadata exists. Spec:
+  [`2026-07-25-tasks-surface.md`](../decisions/2026-07-25-tasks-surface.md).
 - Sheet and CSV surfaces carry a read-only **Details** popover of derived facts:
   file name, the canonical absolute path resolved from the corpus router on
   every open (never copied into any file, where a move would strand it), byte
