@@ -81,4 +81,7 @@ survive at all is the design question.
    no longer points at the external template repo; the vault format speaks in
    rotli's own voice). The external steps — archiving `SethMed7/memex`,
    migrating memex-vault tooling references, CLAUDE.md guidance — remain
-   Seth's explicit call and are untouched.
+   Seth's explicit call and are untouched. The vocabulary question is now
+   answered by [`2026-07-26-vault-vs-brain.md`](2026-07-26-vault-vs-brain.md):
+   **Vault** (the data) vs **Brain** (the optional AI layer), with a raw-vault
+   opt-out designed there.
