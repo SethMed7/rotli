@@ -546,6 +546,32 @@ struct CorpusView {
     memex_id: Option<String>,
     /// when is_memex: the brain's write perms; else null
     perms: Option<memex::MemexPerms>,
+    /// The vault's Librarian switch (display fact for the switcher/Location —
+    /// read from the root's own settings sidecar, never stored in corpus.json).
+    brain_enabled: bool,
+}
+
+/// A connected brain + per-root display facts the config file never stores.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BrainRootView {
+    #[serde(flatten)]
+    brain: corpus::ConnectedBrain,
+    brain_enabled: bool,
+}
+
+/// A root's Librarian switch, straight off its settings sidecar. Same rules as
+/// `CorpusStore::brain_enabled`: missing file/field ⇒ on; a real IO error ⇒
+/// off (fail closed on the consent boundary).
+fn root_brain_enabled(root: &std::path::Path) -> bool {
+    match std::fs::read_to_string(root.join(".rotli").join("settings.json")) {
+        Ok(s) => serde_json::from_str::<serde_json::Value>(&s)
+            .ok()
+            .and_then(|v| v.get("brainEnabled").and_then(serde_json::Value::as_bool))
+            .unwrap_or(true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => true,
+        Err(_) => false,
+    }
 }
 
 /// The whole Location config — the one folder (+ whether it's a brain) + connected
@@ -554,7 +580,7 @@ struct CorpusView {
 #[serde(rename_all = "camelCase")]
 struct CorpusConfigView {
     corpus: CorpusView,
-    brains: Vec<corpus::ConnectedBrain>,
+    brains: Vec<BrainRootView>,
     folders: Vec<corpus::CorpusRoot>,
     active_brain_id: Option<String>,
 }
@@ -570,14 +596,23 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
     if cfg!(debug_assertions) {
         perms = Some(memex::MemexPerms::ReadOnly);
     }
+    let corpus_brain_enabled = root_brain_enabled(&cfg.corpus.abs_path);
     CorpusConfigView {
         corpus: CorpusView {
             abs_path: cfg.corpus.abs_path,
             is_memex,
             memex_id,
             perms,
+            brain_enabled: corpus_brain_enabled,
         },
-        brains: cfg.brains,
+        brains: cfg
+            .brains
+            .into_iter()
+            .map(|b| {
+                let brain_enabled = root_brain_enabled(&b.abs_path);
+                BrainRootView { brain: b, brain_enabled }
+            })
+            .collect(),
         folders: cfg.folders,
         active_brain_id: cfg.active_brain_id,
     }

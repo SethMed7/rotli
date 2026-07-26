@@ -73,7 +73,7 @@ import {
   useTrashNote,
 } from "../services/hooks";
 import { notesService } from "../services/notes";
-import { type CorpusRoot, corpusAddFolder, corpusForgetFolder, corpusRenameBoard } from "../lib/tauri";
+import { type CorpusRoot, corpusForgetFolder, corpusRenameBoard } from "../lib/tauri";
 import {
   DEST,
   type Destination,
@@ -89,7 +89,7 @@ import {
   useFocusedTab,
   usePanesStore,
 } from "../state/panes";
-import { ALL_NOTES, RECENT, SEC_CHAT, SEC_INBOX, SEC_NOTES, TASKS, useUiStore } from "../state/ui";
+import { ALL_NOTES, RECENT, SEC_CHAT, SEC_INBOX, SEC_MAIN, SEC_NOTES, TASKS, useUiStore } from "../state/ui";
 import { activeInstance } from "../memex/config";
 import {
   invalidateMemex,
@@ -99,7 +99,7 @@ import {
   useMemexConfig,
 } from "../memex/useMemex";
 import { buildVaultMenu, vaultDisplayName } from "../services/vaultSwitcher";
-import { archiveChat, deleteChat, pinChat } from "../memex/service";
+import { archiveChat, deleteChat, initMemexAsCorpus, pickFolder, pinChat } from "../memex/service";
 import { useChatRename } from "../services/chatRename";
 import type { Folder, NoteSummary } from "../types";
 import { dispatch } from "../keys/registry";
@@ -108,7 +108,6 @@ import { longDateLabel } from "../lib/dateLabels";
 import { createDragGhost } from "../lib/dragGhost";
 import { createPointerDragSession } from "../lib/pointerDrag";
 import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
-import { isSecureBrainFolder } from "../security/secureNotes";
 import {
   ArchiveGlyph,
   BoardGlyph as CanvasItemGlyph,
@@ -824,6 +823,11 @@ export function Sidebar() {
     const items = buildVaultMenu(memexCfg.data?.instances ?? [], {
       switchTo: (root) => void chooseFolderMut.mutateAsync(root).catch(vaultErr("switch vaults")),
       connect: () => void connectBrainMut.mutateAsync(undefined).catch(vaultErr("connect the vault")),
+      // "New vault…": pick an empty folder, scaffold a vault, switch into it
+      createNew: () =>
+        void pickFolder()
+          .then((path) => (path ? initMemexAsCorpus(path) : undefined))
+          .catch(vaultErr("create the vault")),
       // Location lives inside Settings — the pane picker is one click away
       openSettings: () => dispatch("app.settings"),
     });
@@ -1370,8 +1374,16 @@ export function Sidebar() {
   const inboxSecOpen = expandedDests[SEC_INBOX] ?? true;
   const chatSecOpen = expandedDests[SEC_CHAT] ?? true;
   const notesSecOpen = expandedDests[SEC_NOTES] ?? true;
-  const brainOpen = expandedDests.Brain ?? true;
-  const secureOpen = expandedDests[DEST.secure] ?? false;
+  // MAIN is collapsible as a whole (Seth, 2026-07-26) — default open
+  const mainSecOpen = expandedDests[SEC_MAIN] ?? true;
+  // the System browser target (contentView "system")
+  const systemRoot = useUiStore((s) => s.systemRoot);
+  const setSystemRoot = useUiStore((s) => s.setSystemRoot);
+  const openSystemRoot = (id: string) => {
+    setSelectedFolderId(id);
+    setSystemRoot(id);
+    setContentView("system");
+  };
   const hasBrain = childrenOf("wiki").length > 0 || brainNotes.length > 0 || secureNotes.length > 0;
 
   // Main rows in the roving order — mirrors renderMainTree's traversal exactly
@@ -1403,33 +1415,13 @@ export function Sidebar() {
         { id: ALL_NOTES, kind: "smart" },
         { id: RECENT, kind: "smart" },
         { id: TASKS, kind: "smart" },
-        // Main — the user's hand-arranged rows, in manifest order.
-        ...mainRovingRows(MAIN_ROOT),
-        // Brain — a collapsible destination; its areas ride under it when open.
-        ...(hasBrain
-          ? [
-              { id: "Brain", kind: "folder" } as RovingRow,
-              ...(brainOpen
-                ? [
-                    { id: DEST.secure, kind: "folder" } as RovingRow,
-                    ...(secureOpen
-                      ? [
-                          ...visibleNoteRows(secureNotes, DEST.secure),
-                          ...subtreeRows(DEST.secure, secureNotes),
-                        ]
-                      : []),
-                    ...subtreeRows("wiki", brainNotes),
-                  ]
-                : []),
-            ]
-          : []),
-        ...visibleDestRows.flatMap(({ id }) => {
-          const destNotes = notesByDest[id] ?? [];
-          const open = expandedDests[id] ?? false;
-          const row: RovingRow = { id, kind: "folder" };
-          if (!open) return [row];
-          return [row, ...visibleNoteRows(destNotes, id), ...subtreeRows(id, destNotes)];
-        }),
+        // Main — the user's hand-arranged rows, in manifest order (collapsible
+        // as a whole, 2026-07-26).
+        ...(mainSecOpen ? mainRovingRows(MAIN_ROOT) : []),
+        // System rows are FLAT (2026-07-26): each opens the browser surface on
+        // the right — no inline subtrees to walk.
+        ...(hasBrain ? [{ id: "Brain", kind: "folder" } as RovingRow] : []),
+        ...visibleDestRows.map(({ id }) => ({ id, kind: "folder" }) as RovingRow),
       ]
     : [];
 
@@ -1470,6 +1462,9 @@ export function Sidebar() {
         setContentView("tasks");
       } else if (row.id === RECENT) {
         setContentView("recent");
+      } else if (row.id === "Brain" || visibleDestRows.some((d) => d.id === row.id)) {
+        // System rows open the browser surface (2026-07-26), never a dropdown
+        openSystemRoot(row.id);
       } else {
         toggleDestExpanded(row.id);
         setContentView("panes");
@@ -1542,27 +1537,19 @@ export function Sidebar() {
     const note = idx.get(targetItemId);
     if (!note) return;
     const fid = noteDiskFolder(note);
-    if (isSecureBrainFolder(fid)) {
-      setDestExpanded("Brain", true);
-      setDestExpanded(DEST.secure, true);
-      const shelfParts = note.folderId.split("/");
-      for (let i = 2; i <= shelfParts.length; i++) {
-        setDestExpanded(shelfParts.slice(0, i).join("/"), true);
-      }
-    } else if (fid === "wiki" || fid.startsWith("wiki/")) {
-      setDestExpanded("Brain", true);
-      // "wiki/projects/rotli" → open "wiki/projects" then "wiki/projects/rotli"
-      const parts = fid.split("/");
-      for (let i = 2; i <= parts.length; i++) {
-        setDestExpanded(parts.slice(0, i).join("/"), true);
-      }
-    } else if (fid) {
-      // Storage/… · Archive · Trash · a plain folder: open the id chain so the
-      // row is on screen (reveal was a no-op for these — pre-release review).
-      const parts = fid.split("/");
-      for (let i = 1; i <= parts.length; i++) {
-        setDestExpanded(parts.slice(0, i).join("/"), true);
-      }
+    // System content no longer expands inline (2026-07-26) — an EXPLICIT
+    // reveal ("Show in Library" / the location chip) opens the right-side
+    // browser at the item's root instead; auto-reveal on plain navigation
+    // stays quiet (there is no sidebar row to surface).
+    if (mode !== "brain") return;
+    if (fid === "wiki" || fid.startsWith("wiki/")) {
+      openSystemRoot("Brain");
+    } else if (fid.startsWith("Storage")) {
+      openSystemRoot(DEST.storage);
+    } else if (fid.startsWith("Archive")) {
+      openSystemRoot(DEST.archive);
+    } else if (fid.startsWith("Trash")) {
+      openSystemRoot(DEST.trash);
     }
   };
 
@@ -1788,28 +1775,26 @@ export function Sidebar() {
       // The editor keeps its native menu (spell-check / copy) — this is scoped here.
       onContextMenu={(event) => event.preventDefault()}
     >
-      {/* the vault header (decision 2026-07-25, Zen reference): the current
-          vault by name, one click to switch/connect. Hidden in Breve mode —
-          Breve is a mode over the same vault, not a different one. */}
-      {sidebarMode !== "breve" && (
-        <button
-          type="button"
-          className="vault-switch"
-          aria-haspopup="menu"
-          aria-label={`Vault: ${vaultName}. Switch or connect vaults`}
-          title="Switch or connect vaults"
-          onClick={openVaultMenu}
-        >
-          <VaultGlyph size={14.5} />
-          <span className="vault-switch-name">{vaultName}</span>
-          <span className="vault-switch-caret" aria-hidden="true">
-            ▾
-          </span>
-        </button>
-      )}
-      {/* the sidebar toggle now lives in the titlebar (always visible, the clear
-          reopen) — the search row is just the filter + new-note (Seth, 2026-06-15) */}
+      {/* ONE header row (Seth, 2026-07-26): the vault switcher + the create
+          icons share a line — less chrome before the content starts. Hidden in
+          Breve mode — Breve is a mode over the same vault, not a different one. */}
       <div className={sidebarMode === "breve" ? "nl-top breve-active" : "nl-top"}>
+        {sidebarMode !== "breve" && (
+          <button
+            type="button"
+            className="vault-switch"
+            aria-haspopup="menu"
+            aria-label={`Vault: ${vaultName}. Switch or connect vaults`}
+            title="Switch or connect vaults"
+            onClick={openVaultMenu}
+          >
+            <VaultGlyph size={14.5} />
+            <span className="vault-switch-name">{vaultName}</span>
+            <span className="vault-switch-caret" aria-hidden="true">
+              ▾
+            </span>
+          </button>
+        )}
         <button
           type="button"
           className={sidebarMode === "breve" ? "icobtn railon sb-breve-toggle" : "icobtn sb-breve-toggle"}
@@ -2111,25 +2096,47 @@ export function Sidebar() {
                 the always-visible "+ New folder" row was too loud; 2026-07-17: the
                 bare "+" said nothing — the IDE-style NewFolderGlyph, same as the
                 toolbar, is self-explanatory) — opacity-hidden so Tab still reaches it. */}
+              {/* the MAIN header (reworked 2026-07-26): the label COLLAPSES the
+                  section (chevron + big target); the view menu moved to its own
+                  quiet ▾; a new-note button joined new-folder. */}
               <div className="fsec fsec-hdr">
                 <button
                   type="button"
                   className="fsec-view"
+                  aria-expanded={mainSecOpen}
+                  aria-label={`${activeView ?? "Main"} — ${mainSecOpen ? "collapse" : "expand"}`}
+                  title={mainSecOpen ? "Collapse Main" : "Expand Main"}
+                  onClick={() => setDestExpanded(SEC_MAIN, !mainSecOpen)}
+                >
+                  <span className={`fchev${mainSecOpen ? " open" : ""}`} aria-hidden="true">
+                    <ChevronRight size={9} />
+                  </span>
+                  <span>{activeView ?? "Main"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="fsec-viewpick"
                   aria-label={`Current view: ${activeView ?? "Main"}. Change view`}
                   aria-haspopup="menu"
                   title="Change view"
                   onClick={openViewMenu}
                 >
-                  <span>{activeView ?? "Main"}</span>
-                  <span aria-hidden="true">
-                    <ChevronRight size={9} />
-                  </span>
+                  ▾
                 </button>
                 {(viewsSaveState === "saving" || viewsSaveState === "saved") && (
                   <span className="fsec-save" role="status">
                     {viewsSaveState === "saving" ? "Saving…" : "Saved"}
                   </span>
                 )}
+                <button
+                  type="button"
+                  className="fsec-add"
+                  aria-label={`New note in ${activeView ?? "Main"}`}
+                  title={`New note in ${activeView ?? "Main"}`}
+                  onClick={() => dispatch("notes.new")}
+                >
+                  <NewFileGlyph size={13} />
+                </button>
                 <button
                   type="button"
                   className="fsec-add"
@@ -2284,177 +2291,93 @@ export function Sidebar() {
                   />
                 </div>
               )}
-              {mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
-                <p className="main-empty" data-main-id="main:">
-                  {activeView ? (
-                    <>
-                      This view is empty. Press <b>⌘T</b> to create here, or right-click an item and choose{" "}
-                      <b>Move to view → {activeView}</b>. It will still appear in Main.
-                    </>
-                  ) : (
-                    <>
-                      The notes you reach for, arranged your way. Add one with the <b>⊕</b> on a note row
-                      {hasBrain ? " (or drag it here from the Brain)" : ""} — then <b>★</b> your top{" "}
-                      {QUICK_MAX} for Quick access (the ⌥ Quick window).
-                    </>
-                  )}
-                </p>
-              ) : (
-                <div data-main-id="main:" data-active-view={activeView ?? "Main"} className="main-tree">
-                  {renderMainTree(MAIN_ROOT, 0, rowProps)}
-                </div>
-              )}
-
-              <div className="fsec">Destinations</div>
-
-              {/* — the Brain: AI-organized areas, now a COLLAPSIBLE destination (Seth) — */}
-              {hasBrain && (
-                <div>
-                  <button
-                    type="button"
-                    className={`frow${destSelected("Brain") ? " sel" : ""}`}
-                    onClick={() => {
-                      toggleDestExpanded("Brain");
-                      setSelectedFolderId("Brain");
-                    }}
-                    {...rowProps({ id: "Brain", kind: "folder" })}
-                  >
-                    <span className={`fchev${brainOpen ? " open" : ""}`} aria-hidden="true">
-                      <ChevronRight size={10} />
-                    </span>
-                    <NotesStackGlyph size={14} />
-                    {/* the LIBRARY — the Librarian's organized areas (2026-07-26
-                        rename; the "Brain" folder id stays internal) */}
-                    <span className="fname">Library</span>
-                    <span className="count">{brainNotes.length + secureNotes.length}</span>
-                  </button>
-                  {brainOpen && (
-                    <>
-                      <p className="brain-hint">
-                        {brainEnabledUi ? (
-                          <>
-                            The Librarian files everything here so it stays findable. Your <b>Main</b> above
-                            is yours — same notes, your order.
-                          </>
-                        ) : (
-                          <>
-                            This vault is raw — no Librarian. These areas are plain folders, yours to arrange.
-                          </>
-                        )}
-                      </p>
-                      <button
-                        type="button"
-                        className="frow child brain-activity-link"
-                        style={{ paddingLeft: 42 }}
-                        onClick={() => usePanesStore.getState().openActivity()}
-                        title={
-                          brainEnabledUi
-                            ? "See and undo what the Librarian has done"
-                            : "History of the Librarian's past actions and secure-note repairs"
-                        }
-                      >
-                        <ClockGlyph size={13} />
-                        <span className="fname">Activity</span>
-                        {pendingProposals > 0 && <span className="count">{pendingProposals}</span>}
-                      </button>
-                      <button
-                        type="button"
-                        className={`frow child${destSelected(DEST.secure) ? " sel" : ""}`}
-                        style={{ paddingLeft: 42 }}
-                        onClick={() => {
-                          toggleDestExpanded(DEST.secure);
-                          setSelectedFolderId(DEST.secure);
-                          setContentView("panes");
-                        }}
-                        {...rowProps({ id: DEST.secure, kind: "folder" })}
-                      >
-                        <span className={`fchev${secureOpen ? " open" : ""}`} aria-hidden="true">
-                          <ChevronRight size={10} />
-                        </span>
-                        <ShieldGlyph size={14} />
-                        <span className="fname">Secure notes</span>
-                        {/* no create affordances on system rows (Seth, 2026-07-25):
-                            quick captures are secure at birth, and the toolbar's
-                            New… still targets this row when it's selected */}
-                        <span className="count">{secureNotes.length}</span>
-                      </button>
-                      {secureOpen && (
-                        <>
-                          <p className="brain-hint secure-brain-hint">
-                            Stored inside your Brain, but never visible to remote AI. Local AI remains off
-                            until you allow it on an individual note.
-                          </p>
-                          {compactRows(secureNotes, DEST.secure, rowProps, 2)}
-                          {newFolderRow(DEST.secure, 60)}
-                          {renderFolderTree(DEST.secure, secureNotes, 1, rowProps)}
-                        </>
-                      )}
-                      {renderFolderTree("wiki", brainNotes, 1, rowProps)}
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* — destination rows: each toggles expansion AND selects (⌘N target) — */}
-              {visibleDestRows.map(({ id, label, Glyph }) => {
-                const destNotes = notesByDest[id] ?? [];
-                const open = expandedDests[id] ?? false;
-                const selected = destSelected(id);
-                return (
-                  <div key={id}>
-                    <button
-                      type="button"
-                      className={`frow${selected ? " sel" : ""}`}
-                      onClick={() => {
-                        toggleDestExpanded(id);
-                        setSelectedFolderId(id);
-                        setContentView("panes");
-                      }}
-                      {...rowProps({ id, kind: "folder" })}
-                    >
-                      <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
-                        <ChevronRight size={10} />
-                      </span>
-                      <Glyph size={14.5} />
-                      <span className="fname">{label}</span>
-                      {/* destination rows are SYSTEM rows (Seth, 2026-07-25) —
-                          no create affordances here; the always-visible pair
-                          lives on user folder rows, the toolbar covers the rest */}
-                      <span className="count">{destNotes.length}</span>
-                    </button>
-                    {open && (
+              {mainSecOpen &&
+                (mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
+                  <p className="main-empty" data-main-id="main:">
+                    {activeView ? (
                       <>
-                        {id === DEST.secure && (
-                          <p className="brain-hint">
-                            Remote AI never sees these notes. Local AI is off until you allow it on an
-                            individual note.
-                          </p>
-                        )}
-                        {compactRows(destNotes, id, rowProps, 1)}
-                        {!isVault(id) && newFolderRow(id, 44)}
-                        {renderFolderTree(id, destNotes, 0, rowProps)}
+                        This view is empty. Press <b>⌘T</b> to create here, or right-click an item and choose{" "}
+                        <b>Move to view → {activeView}</b>. It will still appear in Main.
+                      </>
+                    ) : (
+                      <>
+                        The notes you reach for, arranged your way. Add one with the <b>⊕</b> on a note row
+                        {hasBrain ? " (or drag it here from the Library)" : ""} — then <b>★</b> your top{" "}
+                        {QUICK_MAX} for Quick access (the ⌥ Quick window).
                       </>
                     )}
+                  </p>
+                ) : (
+                  <div data-main-id="main:" data-active-view={activeView ?? "Main"} className="main-tree">
+                    {renderMainTree(MAIN_ROOT, 0, rowProps)}
                   </div>
+                ))}
+
+              {/* — SYSTEM (Seth, 2026-07-26: Destinations→System): app-managed
+                  surfaces. NOT dropdowns — each row opens the Finder-style
+                  browser on the right (search + Folders⇄List), where a real
+                  file view belongs. No create affordances, no add-folder row
+                  (external folders connect from Location settings). — */}
+              <div className="fsec">System</div>
+
+              {hasBrain && (
+                <button
+                  type="button"
+                  className={`frow${contentView === "system" && systemRoot === "Brain" ? " sel" : ""}`}
+                  onClick={() => openSystemRoot("Brain")}
+                  title={
+                    brainEnabledUi
+                      ? "The Library — where the Librarian files everything"
+                      : "The Library — plain folders in this raw vault"
+                  }
+                  {...rowProps({ id: "Brain", kind: "folder" })}
+                >
+                  <NotesStackGlyph size={14} />
+                  <span className="fname">Library</span>
+                  <span className="count">{brainNotes.length + secureNotes.length}</span>
+                </button>
+              )}
+              {visibleDestRows.map(({ id, label, Glyph }) => {
+                const destNotes = notesByDest[id] ?? [];
+                const selected = contentView === "system" && systemRoot === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`frow${selected ? " sel" : ""}`}
+                    onClick={() => openSystemRoot(id)}
+                    {...rowProps({ id, kind: "folder" })}
+                  >
+                    <Glyph size={14.5} />
+                    <span className="fname">{label}</span>
+                    <span className="count">{destNotes.length}</span>
+                  </button>
                 );
               })}
+              {/* the Librarian's journal is a system surface too — the quiet
+                  badge is unreviewed proposals */}
+              <button
+                type="button"
+                className="frow"
+                onClick={() => usePanesStore.getState().openActivity()}
+                title={
+                  brainEnabledUi
+                    ? "See and undo what the Librarian has done"
+                    : "History of the Librarian's past actions and secure-note repairs"
+                }
+              >
+                <ClockGlyph size={14} />
+                <span className="fname">Activity</span>
+                {pendingProposals > 0 && <span className="count">{pendingProposals}</span>}
+              </button>
 
               {/* added external folders (Seth, 2026-06-27): folders you point rotli at
-                without moving them into the memex — browse + edit in place. The
-                "Add a folder…" row picks one (relaunches to surface it). */}
+                without moving them into the memex — browse + edit in place.
+                Adding one moved to Location settings (2026-07-26). */}
               {addedRoots.length > 0 && <div className="fsec">Folders</div>}
               {addedRoots.map((r) => (
                 <AddedRootRow key={r.id} root={r} />
               ))}
-              <button
-                type="button"
-                className="frow sb-addfolder"
-                title="Add a folder to browse + edit in place (not moved into your memex)"
-                onClick={() => void corpusAddFolder()}
-              >
-                <PlusGlyph size={13} />
-                <span className="fname">Add a folder…</span>
-              </button>
             </div>
           )}
         </div>

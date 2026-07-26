@@ -15,13 +15,15 @@ const inst = (over: Partial<MemexInstance>): MemexInstance => ({
   memexId: "mx_abc",
   mode: "local",
   perms: "read-only",
+  brainEnabled: true,
   ...over,
 });
 
 const handlers = () => {
-  const calls: { switched: string[]; connected: number; settings: number } = {
+  const calls: { switched: string[]; connected: number; created: number; settings: number } = {
     switched: [],
     connected: 0,
+    created: 0,
     settings: 0,
   };
   return {
@@ -29,6 +31,7 @@ const handlers = () => {
     h: {
       switchTo: (root: string) => calls.switched.push(root),
       connect: () => (calls.connected += 1),
+      createNew: () => (calls.created += 1),
       openSettings: () => (calls.settings += 1),
     },
   };
@@ -81,10 +84,28 @@ describe("buildVaultMenu", () => {
     expect(calls.connected).toBe(1);
   });
 
-  test("an empty instance list still offers connect + settings (fresh install)", () => {
+  test("an empty instance list still offers new + connect + settings (fresh install)", () => {
     const { h } = handlers();
     const items = buildVaultMenu([], h);
-    expect(items.filter((i) => i.kind === "action").length).toBe(2);
+    expect(items.filter((i) => i.kind === "action").length).toBe(3);
     expect(items.some((i) => i.kind === "sep")).toBe(false);
+  });
+
+  test("raw vaults carry a quiet suffix; Librarian-on stays unmarked (calm)", () => {
+    const { calls, h } = handlers();
+    const items = buildVaultMenu(
+      [
+        inst({ id: CORPUS_INSTANCE_ID, label: "my-vault", brainEnabled: false }),
+        inst({ label: "work-vault", brainEnabled: true }),
+      ],
+      h,
+    );
+    const labels = items.filter((i) => i.kind === "action").map((i) => (i.kind === "action" ? i.label : ""));
+    expect(labels[0]).toBe("my-vault · raw");
+    expect(labels[1]).toBe("work-vault");
+
+    const create = items.find((i) => i.kind === "action" && i.label === "New vault…");
+    create!.kind === "action" && create!.onClick();
+    expect(calls.created).toBe(1);
   });
 });

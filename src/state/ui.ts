@@ -59,7 +59,7 @@ export const TASKS = "tasks";
  * left-menu sections (Inbox · Chat · Notes) stay visible (Seth, 2026-06-24;
  * Chat folded in from a full-surface front 2026-06-26). */
 // (the old "chat" contentView is retired — chat is a PANE surface now)
-export type ContentView = "panes" | "board" | "allNotes" | "allChats" | "recent" | "tasks";
+export type ContentView = "panes" | "board" | "allNotes" | "allChats" | "recent" | "tasks" | "system";
 
 /** The sidebar's high-level lens. Breve is an operational view over the same
  * corpus, not a separate window or a tab, so switching lenses must leave the
@@ -73,6 +73,8 @@ export type BreveView = "briefs" | "watchlist" | "routines" | "models" | "config
 export const SEC_INBOX = "sec:inbox";
 export const SEC_CHAT = "sec:chat";
 export const SEC_NOTES = "sec:notes";
+/** The MAIN section's own collapse key (2026-07-26: Main is collapsible). */
+export const SEC_MAIN = "sec:main";
 
 /** Sidebar width clamp — small enough to tuck away, never wide enough to eat
  * the editor (one rail now, not two — Seth, 2026-06-13). */
@@ -246,6 +248,10 @@ interface UiState {
    * Board/All-notes are VIEWS in the pane area, not full-surface takeovers
    * (Seth, 2026-06-24). Esc returns to "panes". Not persisted (transient). */
   contentView: ContentView;
+  /** Which System root the browser surface shows (contentView "system") —
+   * "Brain" (the Library) or a destination id. Transient, like contentView. */
+  systemRoot: string | null;
+  setSystemRoot: (id: string | null) => void;
   setContentView: (view: ContentView) => void;
 
   /** The board id currently being renamed inline in the sidebar (its row shows a
@@ -502,6 +508,8 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   contentView: "panes",
   setContentView: (view) => set({ contentView: view }),
+  systemRoot: null,
+  setSystemRoot: (id) => set({ systemRoot: id }),
   renameTarget: null,
   setRenameTarget: (t) => set({ renameTarget: t }),
 

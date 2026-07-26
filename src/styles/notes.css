@@ -121,8 +121,9 @@
 }
 /* per-section "+" pair (new note · new folder): ALWAYS visible on folder rows
    (Seth, 2026-07-25, from the Zen reference: "the icons are always there, not
-   only on hover — it's just cleaner"). Quiet muted marks beside the count;
-   system rows (Storage · Archive · Trash · Secure notes) carry none at all. */
+   only on hover — it's just cleaner"). Whisper-quiet at rest (calm pass,
+   2026-07-26) — present, never competing with names and counts; system rows
+   (Assets · Archive · Trash · Secure notes) carry none at all. */
 .frow-add {
   display: inline-flex;
   margin-left: auto;
@@ -133,7 +134,7 @@
   height: 22px;
   border-radius: var(--r-control);
   color: var(--text-muted);
-  opacity: 0.55;
+  opacity: 0.38;
   cursor: pointer;
 }
 /* only the FIRST add-icon takes the auto margin — the pair then rides the right
@@ -231,7 +232,7 @@
   margin-left: 42px;
 }
 .main-row {
-  cursor: grab;
+  cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */
 }
 /* #9 (Seth, 2026-07-03): the star + × sat with an awkward gap between them on a
    short-title row. Root cause — the shared `.snact { margin-left: auto }` absorbed
@@ -320,12 +321,34 @@
   border-radius: var(--r-control);
   color: var(--text-muted);
   cursor: pointer;
-  /* always visible, quietly (Seth, 2026-07-25 — the Zen rule: affordances are
-     there, not hover-revealed); full strength on hover/focus */
-  opacity: 0.55;
+  /* always visible, whisper-quiet (Seth, 2026-07-25 Zen rule + 2026-07-26
+     calm pass); full strength on hover/focus */
+  opacity: 0.38;
 }
 .fsec-save + .fsec-add {
   margin-left: 0;
+}
+.fsec-add + .fsec-add {
+  margin-left: 0;
+}
+/* the view picker ▾ (2026-07-26: the header label now collapses Main, so
+   changing views got its own quiet control beside the name) */
+.fsec-viewpick {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  padding: 2px 5px;
+  margin: -2px 0;
+  border-radius: var(--r-control);
+  color: var(--text-muted);
+  font-size: 9px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.fsec-viewpick:hover {
+  background: var(--hov);
+  color: var(--text);
+  opacity: 1;
 }
 .fsec-add:disabled {
   cursor: not-allowed;
@@ -801,20 +824,31 @@
   align-items: center;
   gap: 7px;
   flex: 0 0 auto;
-  margin: 10px 12px 0;
-  padding: 6px 8px;
+  margin: 8px 12px 0;
+  padding: 5px 8px;
   border: none;
   background: none;
   border-radius: var(--r-control);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12.5px;
+  /* calm pass (Seth, 2026-07-26: "clean and simple, not too poppy") — the
+     vault name is a quiet header, not a heading; the create toolbar below
+     carries the visual weight of actions */
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
 }
 .vault-switch:hover {
   background: var(--hov);
+}
+/* one-row header (2026-07-26): inside the toolbar the switcher takes the free
+   space and the create icons ride its right — no second chrome row */
+.nl-top .vault-switch {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 6px;
 }
 .vault-switch svg {
   flex: 0 0 auto;
@@ -1238,7 +1272,7 @@
   font-weight: 500;
   color: var(--text-muted);
   position: relative;
-  cursor: grab; /* draggable — drag to reorder / move / split */
+  cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */ /* draggable — drag to reorder / move / split */
   z-index: 1;
 }
 .tab:active {

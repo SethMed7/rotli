@@ -10,6 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **System opens like a Finder, not a dropdown.** The Destinations section is
+  now **System** (Library · Assets · Archive · Trash · Activity), and each row
+  opens a real file browser on the right instead of an inline tree: a search
+  box on top, a Folders ⇄ List toggle, real folder structure (never synthetic
+  groupings), and rows that open, right-click, and drag into Main like every
+  other list. "Add a folder…" moved to Settings → Location where vault
+  management lives.
+- **Main collapses.** The Main header's label is now a disclosure — one click
+  folds the whole section. Changing views got its own quiet ▾ beside the name,
+  and a new-note button joined new-folder in the header.
+- **One header row.** The vault switcher and the create toolbar share a single
+  line — less chrome before your notes begin.
+- **The cursor points, it doesn't grab.** Draggable rows and images show the
+  familiar pointing hand at rest; the open-hand grab only appears mid-drag.
+- **The left menu got quieter.** The vault header sits lighter (regular
+  weight, tighter rhythm) and the always-visible create marks fell to a
+  whisper at rest — present when you reach for them, invisible when you read
+  past them. The vault switcher also grew up: **New vault…** scaffolds a
+  fresh vault wherever you point it, and raw vaults carry a quiet "· raw"
+  suffix so you always know which vaults the Librarian looks after —
+  Librarian-on stays unmarked, because the default shouldn't shout.
+
 ## [0.36.0] - 2026-07-26
 
 ### Added

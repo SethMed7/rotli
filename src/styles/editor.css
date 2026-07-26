@@ -1089,7 +1089,7 @@
   transition: background var(--motion-exit) var(--motion-ease), color var(--motion-exit) var(--motion-ease);
 }
 .cm-bh-grip {
-  cursor: grab;
+  cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */
 }
 .cm-bh-grip:active {
   cursor: grabbing;
@@ -1116,7 +1116,7 @@
   max-width: 100%;
   height: auto;
   border-radius: var(--r-inner);
-  cursor: grab;
+  cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */
 }
 .rotli-img-moving {
   opacity: 0.5;

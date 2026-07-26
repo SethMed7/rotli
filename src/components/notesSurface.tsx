@@ -11,6 +11,7 @@ import { useNotes } from "../services/hooks";
 import { DEST } from "../services/destinations";
 import { useUiStore } from "../state/ui";
 import { AllChatsSurface } from "./allChatsSurface";
+import { SystemSurface } from "./systemSurface";
 import { TasksSurface } from "./tasksSurface";
 import { BoardSurface } from "./boardSurface";
 import { EmptyState } from "./emptyState";
@@ -72,6 +73,7 @@ export function NotesSurface() {
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
   const contentView = useUiStore((s) => s.contentView);
+  const systemRoot = useUiStore((s) => s.systemRoot);
   const sidebarMode = useUiStore((s) => s.sidebarMode);
   const allNotes = useNotes().data;
   const archived = useNotes(DEST.archive).data;
@@ -115,6 +117,8 @@ export function NotesSurface() {
         <AllChatsSurface />
       ) : contentView === "tasks" ? (
         <TasksSurface />
+      ) : contentView === "system" && systemRoot ? (
+        <SystemSurface key={systemRoot} rootId={systemRoot} />
       ) : contentView === "recent" ? (
         <NoteListSurface title="Recent" glyph={<ClockGlyph size={15} />} />
       ) : (

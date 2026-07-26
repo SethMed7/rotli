@@ -92,6 +92,46 @@
   width: calc(100% - 16px);
 }
 
+/* — the System browser (2026-07-26): Library · Assets · Archive · Trash open
+   Finder-style on the right — search, Folders ⇄ List, real folder structure.
+   Folder headers are quiet disclosure rows; items reuse the shared list rows. — */
+.sysb-group {
+  padding: 0 10px;
+}
+.sysb-folder {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  border-radius: var(--r-control);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.sysb-folder:hover {
+  background: var(--hov);
+}
+.sysb-folder .count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.sysb-folder-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sysb-nested {
+  margin-left: 14px;
+}
+
 /* — the Tasks surface (decision 2026-07-25): open checkboxes grouped by note.
    Quiet list grammar; the checkbox is the one interactive accent. — */
 .tasks .task-group {

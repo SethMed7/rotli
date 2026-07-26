@@ -1007,6 +1007,9 @@ export interface ConnectedBrain {
   memexId: string | null;
   mode: string | null;
   perms: MemexPerms;
+  /** The vault's Librarian switch — a per-root display fact the view derives
+   * from that root's own settings sidecar (never stored in corpus.json). */
+  brainEnabled: boolean;
 }
 
 /** The active corpus, enriched with whether it IS a memex (derived) + its perms. */
@@ -1016,6 +1019,8 @@ export interface CorpusRefView {
   memexId: string | null;
   /** when isMemex: "chats+inbox" | "read-only"; else null */
   perms: MemexPerms | null;
+  /** The active vault's Librarian switch (see ConnectedBrain.brainEnabled). */
+  brainEnabled: boolean;
 }
 
 /** The whole Location config (the one place "where do my notes live" is decided). */
@@ -1032,7 +1037,13 @@ export interface CorpusConfigView {
 export function corpusListConfig(): Promise<CorpusConfigView> {
   if (!isTauri()) {
     return Promise.resolve({
-      corpus: { absPath: "~/Documents/rotli", isMemex: false, memexId: null, perms: null },
+      corpus: {
+        absPath: "~/Documents/rotli",
+        isMemex: false,
+        memexId: null,
+        perms: null,
+        brainEnabled: true,
+      },
       brains: [],
       folders: [],
       activeBrainId: null,

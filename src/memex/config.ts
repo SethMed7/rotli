@@ -22,6 +22,8 @@ export interface MemexInstance {
   /** Access mode snapshot ("local"|"open"|"secure"); re-read on open. */
   mode: string | null;
   perms: Perms;
+  /** The vault's Librarian switch (per-root display fact; raw = false). */
+  brainEnabled: boolean;
 }
 
 export interface MemexConfig {
@@ -49,6 +51,7 @@ export function fromCorpusConfig(v: CorpusConfigView): MemexConfig {
       memexId: v.corpus.memexId,
       mode: null,
       perms: v.corpus.perms ?? "read-only",
+      brainEnabled: v.corpus.brainEnabled ?? true,
     });
   }
   for (const b of v.brains) {
@@ -60,6 +63,7 @@ export function fromCorpusConfig(v: CorpusConfigView): MemexConfig {
       memexId: b.memexId,
       mode: b.mode,
       perms: b.perms,
+      brainEnabled: b.brainEnabled ?? true,
     });
   }
   const activeId = v.corpus.isMemex ? CORPUS_INSTANCE_ID : v.activeBrainId;

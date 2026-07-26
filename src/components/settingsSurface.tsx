@@ -26,6 +26,7 @@ import {
   chatModels,
   checkForUpdate,
   cliDetect,
+  corpusAddFolder,
   corpusOverview,
   demoMode,
   downloadAndInstallUpdate,
@@ -1082,6 +1083,16 @@ function LocationPane() {
               onClick={() => run(() => connectBrainMut.mutateAsync(undefined))}
             >
               Link a library…
+            </button>
+            {/* moved here from the sidebar's System section (2026-07-26) —
+                browse + edit a plain folder in place, never moved into the vault */}
+            <button
+              type="button"
+              className="ghostbtn"
+              disabled={busy}
+              onClick={() => run(() => corpusAddFolder())}
+            >
+              Add a folder…
             </button>
           </div>
         </>

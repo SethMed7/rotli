@@ -16,8 +16,16 @@ export interface VaultMenuHandlers {
   switchTo: (root: string) => void;
   /** Folder picker → connect another vault (relaunches on success). */
   connect: () => void;
+  /** Folder picker → scaffold a NEW vault there and switch to it. */
+  createNew: () => void;
   /** Open Settings (Location holds the full vault management). */
   openSettings: () => void;
+}
+
+/** A vault row's label: raw vaults carry a quiet suffix; Librarian-on is the
+ * default and stays unmarked (calm — only the exception is labeled). */
+export function vaultRowLabel(inst: Pick<MemexInstance, "label" | "brainEnabled">): string {
+  return inst.brainEnabled ? inst.label : `${inst.label} · raw`;
 }
 
 /** The sidebar-header vault name: the corpus instance's label, else a fallback
@@ -33,7 +41,7 @@ export function buildVaultMenu(instances: MemexInstance[], handlers: VaultMenuHa
   if (corpus) {
     items.push({
       kind: "action",
-      label: corpus.label,
+      label: vaultRowLabel(corpus),
       checked: true,
       checkedMark: "highlight",
       // clicking the current vault is a calm no-op — never a surprise relaunch
@@ -43,13 +51,14 @@ export function buildVaultMenu(instances: MemexInstance[], handlers: VaultMenuHa
   for (const inst of others) {
     items.push({
       kind: "action",
-      label: inst.label,
+      label: vaultRowLabel(inst),
       checked: false,
       checkedMark: "highlight",
       onClick: () => handlers.switchTo(inst.root),
     });
   }
   if (items.length > 0) items.push({ kind: "sep" });
+  items.push({ kind: "action", label: "New vault…", onClick: handlers.createNew });
   items.push({ kind: "action", label: "Connect another vault…", onClick: handlers.connect });
   items.push({ kind: "action", label: "Location settings…", onClick: handlers.openSettings });
   if (others.length > 0) {
