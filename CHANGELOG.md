@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-07-26
+
 ### Added
 
 - **Tasks — every open checkbox, one view.** A new Tasks row beside All notes
