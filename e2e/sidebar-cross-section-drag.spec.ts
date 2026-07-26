@@ -28,10 +28,10 @@ test("dragging a note from Storage into Main adds a reference without moving it"
   const mainRoot = page.locator('[data-main-id="main:"]');
   await expect(mainRoot).toContainText("arranged your way");
 
-  // Storage groups by file type by default (src/services/storageTree.ts); every
-  // seeded .md note lands in the synthetic "Other" bucket — expand Storage, then
-  // Other, to reach a plain note row.
-  await page.locator(".frow", { hasText: "Storage" }).first().click();
+  // The storage lane displays as "Assets" (2026-07-25) and groups by file type
+  // by default (src/services/storageTree.ts); every seeded .md note lands in
+  // the synthetic "Other" bucket — expand Assets, then Other, to reach a row.
+  await page.locator(".frow", { hasText: "Assets" }).first().click();
   await page.locator(".frow", { hasText: "Other" }).first().click();
   const source = page.locator("[data-note-id]", { hasText: "Groceries" });
   await expect(source).toBeVisible();
