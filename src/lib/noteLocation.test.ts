@@ -17,15 +17,15 @@ describe("brainLocationLabel", () => {
   test("wiki area → title-cased area", () => {
     expect(brainLocationLabel("wiki/projects")).toBe("Projects");
     expect(brainLocationLabel("wiki/projects/rotli")).toBe("Projects › Rotli");
-    expect(brainLocationLabel("wiki")).toBe("Brain");
+    expect(brainLocationLabel("wiki")).toBe("Library");
   });
   test("staging + board → Captures", () => {
     expect(brainLocationLabel("wiki/_inbox")).toBe("Captures");
     expect(brainLocationLabel("Board")).toBe("Captures");
   });
   test("the protected lane is a real home inside the Brain", () => {
-    expect(brainLocationLabel("wiki/_secure")).toBe("Brain › Secure notes");
-    expect(brainLocationLabel("wiki/_secure/calls")).toBe("Brain › Secure notes");
+    expect(brainLocationLabel("wiki/_secure")).toBe("Library › Secure notes");
+    expect(brainLocationLabel("wiki/_secure/calls")).toBe("Library › Secure notes");
   });
   test("the storage lane displays as Assets (2026-07-25) — the id keeps the old word", () => {
     expect(brainLocationLabel("Storage/Images")).toBe("Assets › Images");
@@ -40,7 +40,7 @@ describe("brainLocationLabel", () => {
   });
   test("linked library (vault) path", () => {
     expect(brainLocationLabel("vault:")).toBe("Linked library");
-    expect(brainLocationLabel("vault:wiki/people")).toBe("Library › People");
+    expect(brainLocationLabel("vault:wiki/people")).toBe("Linked library › People");
   });
 });
 

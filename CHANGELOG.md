@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Meet the Librarian.** The AI layer has a name and a face: the quiet
+  on-device helper that files your notes into the **Library** and fills in
+  their metadata is now the Librarian, with the quokka to match. Settings →
+  Librarian is its home — the switch, the explainer, and how much it may do —
+  and its change log is **Librarian Activity**. Same behavior, warmer name;
+  nothing about your files or settings changes. A connected vault now reads
+  "Linked library" so it can't be confused with your own Library.
+- **A practice vault, one click from onboarding.** Want to try rotli (or walk
+  a friend through it) without touching your real notes? Onboarding's location
+  step gained "Try a practice vault": rotli scaffolds a scratch vault, carries
+  your settings over, and keeps your current vault registered — untouched, and
+  one click away in the vault switcher.
+
+- **A vault can now be raw — no AI touches it.** Settings → Brain gained a
+  master switch, and onboarding now leads with the promise ("your vault is
+  just a folder") before asking the one question: a **brain** (rotli's AI
+  files and tags your notes, logged and undoable) or a **raw vault** (just
+  your files, organized by you). Raw means the organizer never runs, nothing
+  files or enriches — enforced independently in the daemon and the write
+  boundary — while security never turns off: secure notes, the secret
+  detector, and repairs work identically in both modes. Flipping the switch
+  never moves or rewrites a file, an untouched vault keeps today's behavior
+  exactly, and turning the Brain back on resumes gently at Suggest.
+
 ## [0.35.0] - 2026-07-26
 
 ### Added

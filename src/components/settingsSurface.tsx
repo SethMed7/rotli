@@ -36,6 +36,7 @@ import {
   localModelSetDefault,
   localModelUninstall,
   organizerRunOnce,
+  organizerSetBrain,
   organizerSetTrust,
   revealCorpus,
   SECRET_GEMINI_API_KEY,
@@ -108,7 +109,7 @@ const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = 
   { id: "appearance", label: "Appearance", glyph: SunGlyph },
   // the organizer daemon's trust ladder (design §4.3) — minimal Phase-4 pane;
   // capability checkboxes / Pause / Reset Brain are Phase 5 (§4.8)
-  { id: "brain", label: "Brain", glyph: NotesStackGlyph },
+  { id: "brain", label: "Librarian", glyph: NotesStackGlyph },
   // the secure-note explainer (decision 2026-07-22, feature C) — the ONE plain-
   // language home for the fail-closed rules; contract stays the spec
   { id: "security", label: "Security", glyph: ShieldGlyph },
@@ -1105,6 +1106,8 @@ const TRUST_CAPTIONS: Record<OrganizerTrust, string> = {
 };
 
 function BrainPane() {
+  const brainOn = useUiStore((s) => s.brainEnabled);
+  const setBrainEnabled = useUiStore((s) => s.setBrainEnabled);
   const trust = useUiStore((s) => s.organizerTrust);
   const setTrust = useUiStore((s) => s.setOrganizerTrust);
   const model = useUiStore((s) => s.organizerModel);
@@ -1116,108 +1119,152 @@ function BrainPane() {
   // note never claims a live state it can't see ("Running a pass…" showed
   // forever — #85, audit 2026-07); errors get the err class other panes use.
   const [ranNote, setRanNote] = useState<{ text: string; err: boolean } | null>(null);
+  // the master switch (vault-vs-brain, 2026-07-26). Turning it OFF makes this
+  // a RAW vault: the organizer never acts, nothing files or enriches — and
+  // nothing moves; existing areas and metadata stay exactly as they are.
+  // Turning it back ON resumes at Suggest (never auto-apply on re-entry).
+  const toggleBrain = () => {
+    if (brainOn) {
+      setBrainEnabled(false);
+      // the LIVE off signal (pressure-test 2026-07-26): stop an in-flight
+      // cycle now — the debounced settings write alone left minutes of
+      // modeling after the user's raw choice
+      organizerSetBrain(false).catch(() => {});
+      return;
+    }
+    setBrainEnabled(true);
+    setTrust("suggest");
+    organizerSetTrust("suggest").catch(() => {});
+    // the live on signal owes the daemon a sweep — it resumes on the normal
+    // gates (idle, plugged in), gently, at Suggest
+    organizerSetBrain(true).catch(() => {});
+  };
   return (
     <>
-      <PaneHead title="Brain" char="knowledge" />
+      <PaneHead title="The Librarian" char="knowledge" />
       <p className="lead">
-        The organizing model you choose keeps the Brain tidy: it files notes into the right areas and fills in
-        their metadata (area, tags, a one-line summary). It only ever changes <b>where a note lives</b> and
-        its <b>metadata</b> — the words inside your notes are never touched.
+        Your vault is just a folder of plain files — complete without any AI. The <b>Librarian</b> is the
+        optional caretaker on top: a quiet helper that files your notes into the Library&rsquo;s areas and
+        fills in their metadata (area, tags, a one-line summary). It only ever changes{" "}
+        <b>where a note lives</b> and its <b>metadata</b> — the words inside your notes are never touched, and
+        everything it does is logged in Librarian Activity, undoable.
       </p>
-      <Seg
-        value={trust}
-        options={[
-          ["off", "Off"],
-          ["suggest", "Suggest"],
-          ["tidy", "Tidy"],
-          ["organize", "Organize"],
-        ]}
-        onPick={(v) => {
-          // store first (persists via settings.json — the daemon's backstop),
-          // then nudge the in-memory rung so the flip is immediate
-          setTrust(v);
-          organizerSetTrust(v).catch(() => {});
-        }}
+      <Toggle
+        on={brainOn}
+        onChange={toggleBrain}
+        title={brainOn ? "The Librarian is in" : "This is a raw vault"}
+        desc={
+          brainOn
+            ? "The Librarian keeps this vault organized. Turn it off and nothing files, tags, or summarizes — your files stay exactly where they are."
+            : "No AI touches this vault. Your existing areas and metadata stayed exactly as they were. Inviting the Librarian back is gentle — it suggests, you approve."
+        }
       />
-      <p className="setnote">{TRUST_CAPTIONS[trust]}</p>
-      <p className="setnote">
-        It always skips: <b>locked notes</b> (lock a note in its metadata panel and the organizer won&rsquo;t
-        touch it at all — not even its metadata) · <b>secure notes</b> · your hand-arranged <b>Main</b>.
-      </p>
-      <span className="mplabel">Organizing model</span>
-      <Seg
-        value={model}
-        options={[
-          ["local", "On this Mac"],
-          ["claude", "Claude Sonnet 5"],
-          ["gemini35", "Gemini 3.5 Flash"],
-        ]}
-        onPick={(m) => setModel(m)}
-      />
-      <p className="setnote">
-        {model === "claude" ? (
-          <>
-            <b>Claude Sonnet 5</b> (via <code>claude -p</code>) does the organizing — your <b>non-secure</b>{" "}
-            notes are sent to Anthropic to file. <b>Secure</b> and <b>locked</b> notes are never sent
-            anywhere.
-          </>
-        ) : model === "gemini35" ? (
-          <>
-            <b>Gemini 3.5 Flash</b> (through the authenticated Antigravity lane) organizes your{" "}
-            <b>non-secure</b> notes. <b>Secure</b> and <b>locked</b> notes never enter a remote model.
-          </>
-        ) : (
-          <>A local model on this Mac organizes — nothing ever leaves your machine.</>
-        )}
-      </p>
-      <span className="mplabel">Wait before organizing</span>
-      <Seg
-        value={String(quiet)}
-        options={[
-          ["60", "1 min"],
-          ["120", "2 min"],
-          ["300", "5 min"],
-          ["600", "10 min"],
-          ["900", "15 min"],
-        ]}
-        onPick={(v) => setQuiet(Number(v))}
-      />
-      <p className="setnote">
-        After you stop touching a note, the organizer waits this long before it scans it.
-      </p>
-      <p className="setnote">
-        It waits for its moment: only when you&rsquo;re away, plugged in, and the machine is cool — never on
-        battery, never over a chat. <b>Run now</b> does one pass immediately.
-      </p>
-      <button
-        type="button"
-        className="ghostbtn"
-        disabled={trust === "off"}
-        onClick={() => {
-          organizerRunOnce()
-            .then(() =>
-              setRanNote({
-                text: "Pass queued — what it finds lands in Brain Activity.",
-                err: false,
-              }),
-            )
-            .catch((e) => setRanNote({ text: e instanceof Error ? e.message : String(e), err: true }));
-        }}
-      >
-        Run now
-      </button>{" "}
-      <button
-        type="button"
-        className="ghostbtn"
-        onClick={() => {
-          // Activity is a pane in the notes surface — leave Settings to show it
-          setSettingsOpen(false);
-          usePanesStore.getState().openActivity();
-        }}
-      >
-        View activity
-      </button>
-      {ranNote && <p className={ranNote.err ? "setnote err" : "setnote"}>{ranNote.text}</p>}
+      {!brainOn && (
+        <p className="setnote">
+          Security never turns off: secure notes stay protected, the secret detector still runs, and the
+          Activity pane still offers its secure-note repairs.
+        </p>
+      )}
+      {brainOn && (
+        <>
+          <span className="mplabel">How much it may do</span>
+          <Seg
+            value={trust}
+            options={[
+              ["off", "Off"],
+              ["suggest", "Suggest"],
+              ["tidy", "Tidy"],
+              ["organize", "Organize"],
+            ]}
+            onPick={(v) => {
+              // store first (persists via settings.json — the daemon's backstop),
+              // then nudge the in-memory rung so the flip is immediate
+              setTrust(v);
+              organizerSetTrust(v).catch(() => {});
+            }}
+          />
+          <p className="setnote">{TRUST_CAPTIONS[trust]}</p>
+          <p className="setnote">
+            It always skips: <b>locked notes</b> (lock a note in its metadata panel and the organizer
+            won&rsquo;t touch it at all — not even its metadata) · <b>secure notes</b> · your hand-arranged{" "}
+            <b>Main</b>.
+          </p>
+          <span className="mplabel">Organizing model</span>
+          <Seg
+            value={model}
+            options={[
+              ["local", "On this Mac"],
+              ["claude", "Claude Sonnet 5"],
+              ["gemini35", "Gemini 3.5 Flash"],
+            ]}
+            onPick={(m) => setModel(m)}
+          />
+          <p className="setnote">
+            {model === "claude" ? (
+              <>
+                <b>Claude Sonnet 5</b> (via <code>claude -p</code>) does the organizing — your{" "}
+                <b>non-secure</b> notes are sent to Anthropic to file. <b>Secure</b> and <b>locked</b> notes
+                are never sent anywhere.
+              </>
+            ) : model === "gemini35" ? (
+              <>
+                <b>Gemini 3.5 Flash</b> (through the authenticated Antigravity lane) organizes your{" "}
+                <b>non-secure</b> notes. <b>Secure</b> and <b>locked</b> notes never enter a remote model.
+              </>
+            ) : (
+              <>A local model on this Mac organizes — nothing ever leaves your machine.</>
+            )}
+          </p>
+          <span className="mplabel">Wait before organizing</span>
+          <Seg
+            value={String(quiet)}
+            options={[
+              ["60", "1 min"],
+              ["120", "2 min"],
+              ["300", "5 min"],
+              ["600", "10 min"],
+              ["900", "15 min"],
+            ]}
+            onPick={(v) => setQuiet(Number(v))}
+          />
+          <p className="setnote">
+            After you stop touching a note, the organizer waits this long before it scans it.
+          </p>
+          <p className="setnote">
+            It waits for its moment: only when you&rsquo;re away, plugged in, and the machine is cool — never
+            on battery, never over a chat. <b>Run now</b> does one pass immediately.
+          </p>
+          <button
+            type="button"
+            className="ghostbtn"
+            disabled={trust === "off"}
+            onClick={() => {
+              organizerRunOnce()
+                .then(() =>
+                  setRanNote({
+                    text: "Pass queued — what it finds lands in Librarian Activity.",
+                    err: false,
+                  }),
+                )
+                .catch((e) => setRanNote({ text: e instanceof Error ? e.message : String(e), err: true }));
+            }}
+          >
+            Run now
+          </button>{" "}
+          <button
+            type="button"
+            className="ghostbtn"
+            onClick={() => {
+              // Activity is a pane in the notes surface — leave Settings to show it
+              setSettingsOpen(false);
+              usePanesStore.getState().openActivity();
+            }}
+          >
+            View activity
+          </button>
+          {ranNote && <p className={ranNote.err ? "setnote err" : "setnote"}>{ranNote.text}</p>}
+        </>
+      )}
     </>
   );
 }
@@ -2098,7 +2145,7 @@ function SecurityPane() {
         still counts as remote and stays blocked.
       </p>
       <p className="setnote">
-        <b>The organizer never touches them.</b> The Brain organizer skips secure notes entirely — it
+        <b>The Librarian never touches them.</b> rotli&rsquo;s organizer skips secure notes entirely — it
         doesn&rsquo;t read, move, or tag them, even when it&rsquo;s allowed to read other notes.
       </p>
       <span className="mplabel">Leaving and repairs</span>
@@ -2108,8 +2155,8 @@ function SecurityPane() {
       </p>
       <p className="setnote">
         Older versions of rotli could leave a secure note sitting in intake instead of Secure notes. When
-        that&rsquo;s the case, <b>Brain Activity</b> shows the affected notes and offers a one-click move into
-        the protected folder — words untouched, nothing shown to any AI.
+        that&rsquo;s the case, <b>Librarian Activity</b> shows the affected notes and offers a one-click move
+        into the protected folder — words untouched, nothing shown to any AI.
       </p>
     </>
   );

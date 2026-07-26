@@ -98,6 +98,23 @@ describe("parseSettings — organizerTrust", () => {
   });
 });
 
+describe("parseSettings — the Brain master switch (vault-vs-brain, 2026-07-26)", () => {
+  test("a MISSING field means ON — every existing vault keeps today's behavior", () => {
+    expect(parseSettings("{}").brainEnabled).toBe(true);
+    expect(parseSettings("not json").brainEnabled).toBe(true);
+  });
+
+  test("an explicit raw-vault choice survives the round trip", () => {
+    expect(parseSettings('{"brainEnabled":false}').brainEnabled).toBe(false);
+    expect(parseSettings('{"brainEnabled":true}').brainEnabled).toBe(true);
+  });
+
+  test("a garbage value falls to the safe default (on = today)", () => {
+    expect(parseSettings('{"brainEnabled":"nope"}').brainEnabled).toBe(true);
+    expect(parseSettings('{"brainEnabled":0}').brainEnabled).toBe(true);
+  });
+});
+
 describe("parseSettings — creation and Brain model", () => {
   test("new tabs default to Markdown and only accept known item kinds", () => {
     expect(parseSettings("{}").newTabDefault).toBe("markdown");

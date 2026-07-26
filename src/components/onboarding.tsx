@@ -18,6 +18,8 @@ import {
   isTauri,
   localModelInstall,
   localModelInstallProgress,
+  organizerSetBrain,
+  organizerSetTrust,
 } from "../lib/tauri";
 import { LOCAL_CATALOG } from "../ai/models";
 import { LaptopGlyph } from "./glyphs";
@@ -36,6 +38,7 @@ const STEPS = [
   "dock",
   "behavior",
   "memory",
+  "brain",
   "models",
   "done",
 ] as const;
@@ -166,6 +169,55 @@ function Choice<T extends string>({
   );
 }
 
+/** The Brain-vs-Raw choice (vault-vs-brain, 2026-07-26) — the trust step.
+ * Leads with the promise (your vault is just a folder of plain files), then
+ * the one decision: does rotli's AI organize it, or is it raw? Both are the
+ * same format on disk; the choice is reversible in Settings → Brain, and
+ * flipping it later never moves or rewrites a file. */
+function BrainChoiceStep() {
+  const brainOn = useUiStore((s) => s.brainEnabled);
+  const setBrainEnabled = useUiStore((s) => s.setBrainEnabled);
+  const setTrust = useUiStore((s) => s.setOrganizerTrust);
+  const pick = (v: "brain" | "raw") => {
+    const on = v === "brain";
+    // picking brain AFTER raw is a re-enable: clamp to Suggest (never
+    // auto-apply on re-entry — pressure-test 2026-07-26); the live daemon
+    // channel keeps the in-memory state honest during the flow
+    if (on && !brainOn) {
+      setTrust("suggest");
+      organizerSetTrust("suggest").catch(() => {});
+    }
+    setBrainEnabled(on);
+    organizerSetBrain(on).catch(() => {});
+  };
+  return (
+    <div className="onb-step">
+      <Character name="knowledge" size={96} className="onb-quokka" />
+      <h1 className="onb-title">Your vault is just a folder</h1>
+      <p className="onb-sub">
+        Plain files on your Mac — readable in any editor, yours forever, complete without any AI. The only
+        question: would you like the <b>Librarian</b> to look after it?
+      </p>
+      <Choice
+        value={brainOn ? "brain" : "raw"}
+        onPick={pick}
+        options={[
+          {
+            value: "brain",
+            title: "With the Librarian",
+            desc: "A quiet on-device helper files your captures into the Library and fills in tags and summaries — never the words inside. Every action is logged and undoable.",
+          },
+          {
+            value: "raw",
+            title: "A raw vault",
+            desc: "Just your files, organized by you. No AI touches the vault. You can invite the Librarian any time — nothing moves either way.",
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
 /** The "Your brain" step — the user picks WHERE their notes live: adopt a memex we
  * detect on this Mac (Use), scaffold a fresh one at a folder they choose (Create),
  * or keep a plain ~/Documents/rotli notes folder (later). The choice is RECORDED
@@ -226,13 +278,13 @@ function MemexStep() {
 
   return (
     <div className="onb-step">
-      <h1 className="onb-title">Your brain</h1>
+      <h1 className="onb-title">Your vault</h1>
       <p className="onb-sub">
-        rotli keeps your notes in <b>one folder</b> — and that folder is your <b>brain</b> (a memex): notes,
-        chats, and knowledge together, organized by AI but always yours to arrange. Pick where it lives.
+        rotli keeps your notes in <b>one folder</b> — your <b>vault</b>: notes, chats, and knowledge together,
+        plain files, always yours. Pick where it lives.
       </p>
       {detect.isLoading ? (
-        <p className="onb-sub">Looking for an existing brain…</p>
+        <p className="onb-sub">Looking for an existing vault…</p>
       ) : (
         <div className="onb-choices">
           {currentRoot && (
@@ -263,7 +315,7 @@ function MemexStep() {
               onClick={() => setPendingChoice({ kind: "use", path: d.root, label: d.label })}
             >
               <span className="onb-choice-title">Use {d.label}</span>
-              <span className="onb-choice-desc">{d.root} · the brain we found on this Mac</span>
+              <span className="onb-choice-desc">{d.root} · the vault we found on this Mac</span>
             </button>
           ))}
           <button
@@ -272,9 +324,24 @@ function MemexStep() {
             aria-pressed={isInit}
             onClick={() => void createNew()}
           >
-            <span className="onb-choice-title">Create a new brain…</span>
+            <span className="onb-choice-title">Create a new vault…</span>
             <span className="onb-choice-desc">
-              {isInit && pending?.path ? pending.path : "Choose a folder — rotli starts a fresh memex there."}
+              {isInit && pending?.path ? pending.path : "Choose a folder — rotli starts a fresh vault there."}
+            </span>
+          </button>
+          {/* the PRACTICE vault (2026-07-26): a scratch vault to learn in.
+              The vault being left keeps its files untouched AND stays
+              registered — one click away in the sidebar's vault switcher. */}
+          <button
+            type="button"
+            className={pending?.kind === "practice" ? "onb-choice sel" : "onb-choice"}
+            aria-pressed={pending?.kind === "practice"}
+            onClick={() => setPendingChoice({ kind: "practice" })}
+          >
+            <span className="onb-choice-title">Try a practice vault</span>
+            <span className="onb-choice-desc">
+              A scratch vault to play in
+              {currentRoot ? " — your current vault stays untouched and one click away" : ""}.
             </span>
           </button>
           <button
@@ -561,6 +628,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         )}
 
         {step === "memory" && <MemexStep />}
+
+        {step === "brain" && <BrainChoiceStep />}
 
         {step === "models" && <ModelsStep />}
 

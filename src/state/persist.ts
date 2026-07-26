@@ -189,6 +189,10 @@ interface PersistedSettings {
   appIcon: "default" | "warm" | "paper" | "charcoal" | "clay";
   /** Raw frontmatter at the top of the note (Show file metadata): hide / show. */
   fileMetadata: "hide" | "show";
+  /** The vault's Brain master switch (vault-vs-brain, 2026-07-26). The Rust
+   * organizer and corpus filer gate read this same field independently.
+   * Missing ⇒ true — an untouched vault behaves exactly like today. */
+  brainEnabled: boolean;
   /** The organizer daemon's §4.3 trust rung; the Rust daemon re-reads this file
    * each cycle, so persisting here IS the durable knob. Default: suggest. */
   organizerTrust: OrganizerTrust;
@@ -353,6 +357,9 @@ export function parseSettings(raw: string): PersistedSettings {
     // changes a note's location + metadata — journaled and undoable, never the
     // note's words — so full auto-organize is the intended out-of-box behavior.
     // An unknown rung (hand-edit, future build) falls to the same default.
+    // the Brain master switch (vault-vs-brain, 2026-07-26): a MISSING field
+    // means ON — every existing vault keeps today's behavior untouched
+    brainEnabled: asBool(data.brainEnabled, true),
     organizerTrust: asEnum(data.organizerTrust, ORGANIZER_TRUSTS, "organize"),
     // default LOCAL (on-device) so organizing never leaves the Mac unless chosen
     organizerModel: asEnum(data.organizerModel, ORGANIZER_MODELS, "local"),
@@ -438,6 +445,7 @@ function applySettings(s: PersistedSettings): void {
     storageGrouping: s.storageGrouping,
     appIcon: s.appIcon,
     fileMetadata: s.fileMetadata,
+    brainEnabled: s.brainEnabled,
     organizerTrust: s.organizerTrust,
     organizerModel: s.organizerModel,
     organizerQuietSecs: s.organizerQuietSecs,
@@ -757,6 +765,7 @@ function settingsSnapshot(): string {
     storageGrouping: ui.storageGrouping,
     appIcon: ui.appIcon,
     fileMetadata: ui.fileMetadata,
+    brainEnabled: ui.brainEnabled,
     organizerTrust: ui.organizerTrust,
     organizerModel: ui.organizerModel,
     organizerQuietSecs: ui.organizerQuietSecs,

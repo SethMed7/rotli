@@ -331,6 +331,12 @@ interface UiState {
    * Suggest (the shipped default) = journal proposals only, provably write-free
    * on the corpus. Persisted; the caller ALSO pushes it to Rust via
    * organizerSetTrust (the daemon re-reads settings.json as the backstop). */
+  /** The vault's Brain master switch (vault-vs-brain, 2026-07-26): false = a
+   * RAW vault — the organizer never acts, nothing files or enriches. Persisted
+   * per-vault in settings.json; Rust reads the same field independently.
+   * Flipping it NEVER moves or rewrites a file. */
+  brainEnabled: boolean;
+  setBrainEnabled: (on: boolean) => void;
   organizerTrust: OrganizerTrust;
   setOrganizerTrust: (t: OrganizerTrust) => void;
   /** Which model the organizer runs (design §4; Seth, 2026-07-03). Persisted;
@@ -552,6 +558,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setFileMetadata: (v) => set({ fileMetadata: v }),
   // Organize by default (Seth, 2026-07-02): the daemon only ever changes a
   // note's LOCATION + METADATA — journaled and undoable — never the words.
+  brainEnabled: true,
+  setBrainEnabled: (on) => set({ brainEnabled: on }),
   organizerTrust: "organize",
   setOrganizerTrust: (t) => set({ organizerTrust: t }),
   organizerModel: "local",

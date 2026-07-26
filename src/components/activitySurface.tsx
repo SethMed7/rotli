@@ -20,6 +20,7 @@ import {
 } from "../services/hooks";
 import { deriveSecureReview } from "../services/secureReview";
 import { usePanesStore } from "../state/panes";
+import { useUiStore } from "../state/ui";
 import { Character } from "./character";
 
 function when(ts: number): string {
@@ -33,6 +34,10 @@ function when(ts: number): string {
 
 export function ActivitySurface() {
   const journal = useJournal();
+  // RAW vault (vault-vs-brain, 2026-07-26): organizer surfaces hide; the
+  // journal HISTORY stays (it happened), and security surfaces (secure-note
+  // repair, the review lane) are vault properties that never turn off.
+  const brainOn = useUiStore((s) => s.brainEnabled);
   const status = useOrganizerStatus().data;
   const repair = useSecureRepair().data ?? [];
   const hints = useSecureHints().data ?? [];
@@ -82,12 +87,12 @@ export function ActivitySurface() {
   return (
     <div className="board activity">
       <header className="board-head">
-        <h2 className="board-title">Brain Activity</h2>
+        <h2 className="board-title">Librarian Activity</h2>
         <span className="board-count">{pending.length + history.length}</span>
         {/* the daemon is event-driven and sleeps when idle — this is the
             explicit nudge (one pass now, then back to sleep). Hidden when the
             worker never spawned (not a memex) or the ladder is Off. */}
-        {status?.running && status.trust !== "off" && (
+        {brainOn && status?.running && status.trust !== "off" && (
           <button
             type="button"
             className="act-undo"
@@ -110,7 +115,7 @@ export function ActivitySurface() {
         </p>
       )}
       {/* quiet daemon-status lines — show, never nag (§4.8) */}
-      {status?.modelOffline && (
+      {brainOn && status?.modelOffline && (
         <p className="brain-hint" style={{ padding: "0 22px 8px" }}>
           Paused — local model offline. {status.queued} waiting.
         </p>
@@ -218,8 +223,8 @@ export function ActivitySurface() {
           <Character name="knowledge" size={104} className="be-quokka" />
           <p className="be-title">Nothing yet</p>
           <p className="be-sub">
-            When the AI files a note or updates its metadata it shows here — and you can undo any of it.
-            On-device, logged, reversible.
+            When the Librarian files a note or updates its metadata it shows here — and you can undo any of
+            it. On-device, logged, reversible.
           </p>
         </div>
       ) : (
@@ -242,16 +247,20 @@ export function ActivitySurface() {
                       {describeAction(a, true)}
                     </button>
                     <span className="act-time">{when(a.ts)}</span>
-                    <button
-                      type="button"
-                      /* the affirmative action gets the quiet accent — no more
-                         identical ghost twins (#84, audit 2026-07) */
-                      className="act-undo act-approve"
-                      disabled={busy === a.id}
-                      onClick={() => void run(a, approveProposal)}
-                    >
-                      Approve
-                    </button>
+                    {/* raw vault: Approve would hit the Rust refusal — only
+                        Dismiss (journal-only) remains actionable */}
+                    {brainOn && (
+                      <button
+                        type="button"
+                        /* the affirmative action gets the quiet accent — no more
+                           identical ghost twins (#84, audit 2026-07) */
+                        className="act-undo act-approve"
+                        disabled={busy === a.id}
+                        onClick={() => void run(a, approveProposal)}
+                      >
+                        Approve
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="act-undo"
@@ -286,6 +295,9 @@ export function ActivitySurface() {
                     {undone ? (
                       <span className="act-undone">undone</span>
                     ) : (
+                      /* raw vault: Undo replays a Brain move and would hit the
+                         Rust refusal — history stays readable, not actionable */
+                      brainOn &&
                       canUndo(a) && (
                         <button
                           type="button"

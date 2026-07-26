@@ -702,6 +702,23 @@ fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
 
 // ─── brain + corpus mutators (write ONLY corpus.json) ───────────────────────
 
+/// Carry the CURRENT corpus's `.rotli/settings.json` to a newly adopted root
+/// that has NONE (vault-vs-brain, 2026-07-26): onboarding writes its choices —
+/// including the Brain-vs-raw decision — before the corpus switch, and losing
+/// them silently re-enabled the Brain on a vault the user explicitly chose raw
+/// (pressure-test). A destination that already has settings keeps them: its
+/// own prior choices outrank this flow's. Never touches any other file.
+pub fn carry_settings(current: &Path, new_root: &Path) -> Result<(), String> {
+    let src = current.join(".rotli").join("settings.json");
+    let dst_dir = new_root.join(".rotli");
+    let dst = dst_dir.join("settings.json");
+    if !src.is_file() || dst.exists() {
+        return Ok(());
+    }
+    fs::create_dir_all(&dst_dir).map_err(|e| format!("create {}: {e}", dst_dir.display()))?;
+    fs::copy(&src, &dst).map_err(|e| format!("carry settings: {e}")).map(|_| ())
+}
+
 /// Repoint the active corpus at `path`. The caller relaunches so it opens.
 pub fn set_corpus_path(app: &tauri::AppHandle, path: PathBuf) -> Result<(), String> {
     let mut cfg = ensure_corpus_config(app);
@@ -3772,6 +3789,34 @@ impl CorpusStore {
     /// `_inbox` staging and the curated areas). Refuses a `locked` note (re-read
     /// FRESH so a lock set between the classify-read and the write is honored). The
     /// USER's `writable()` is unchanged — two disjoint lanes (Seth, 2026-07-01).
+    /// The vault's Brain master switch (vault-vs-brain, 2026-07-26). Read from
+    /// the settings sidecar per call. A MISSING file/field means ON — existing
+    /// vaults keep today's behavior (the frontend's debounced saver later
+    /// writes the resolved value like every other setting). A REAL read error
+    /// fails CLOSED (pressure-test 2026-07-26): an unreadable consent boundary
+    /// must never silently re-enable the Brain on a raw vault.
+    pub(crate) fn brain_enabled(&self) -> bool {
+        let Ok(settings) = self.dot_read("settings") else {
+            return false; // NotFound is Ok("{}") — this is a genuine IO fault
+        };
+        serde_json::from_str::<serde_json::Value>(&settings)
+            .ok()
+            .and_then(|v| v.get("brainEnabled").and_then(serde_json::Value::as_bool))
+            .unwrap_or(true)
+    }
+
+    /// RAW vault (vault-vs-brain, 2026-07-26): no Brain ⇒ no ORGANIZING —
+    /// the second, independent layer behind the organizer's own cycle gate.
+    /// Deliberately NOT inside `filer_writable`: that gate also fronts agent
+    /// edits and Breve's managed writes, which are vault features, not Brain
+    /// features (pressure-test 2026-07-26 — the broad placement broke both).
+    fn brain_gate(&self) -> Result<(), String> {
+        if !self.brain_enabled() {
+            return Err("This vault's Librarian is off — nothing files or enriches it.".into());
+        }
+        Ok(())
+    }
+
     fn filer_writable(&self, rel: &str) -> Result<(), String> {
         self.guard_rel(rel)?;
         if self.layout != Layout::Memex {
@@ -3815,6 +3860,7 @@ impl CorpusStore {
     /// wire id OR a rel path (resolve_note_rel). pub(crate): the organizer daemon
     /// writes through this same gate — no second write primitive.
     pub(crate) fn set_ai_field(&mut self, id_or_rel: &str, key: &str, value: &str) -> Result<(), String> {
+        self.brain_gate()?;
         let key = key.trim();
         if !AI_KEYS.contains(&key) {
             return Err(format!("`{key}` is not a filer-writable field"));
@@ -3842,6 +3888,7 @@ impl CorpusStore {
     /// by `filer_writable`. pub(crate): the organizer daemon's RefreshIndex
     /// applies through this same gate — no second write lane.
     pub(crate) fn write_index(&self, area: &str, body: &str) -> Result<(), String> {
+        self.brain_gate()?;
         if area.contains('/') || area.contains("..") || area.trim().is_empty() {
             return Err(format!("invalid area: {area}"));
         }
@@ -3867,6 +3914,7 @@ impl CorpusStore {
     /// preserves id/created/foreign, does NOT bump `updated`). The ulid for the index
     /// comes from the note's own frontmatter.
     pub fn file_note(&mut self, id_or_rel: &str) -> Result<NoteMeta, String> {
+        self.brain_gate()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let text = fs::read_to_string(self.abs(rel)).map_err(|e| format!("read {rel}: {e}"))?;
         let area = parse_document(&text)
@@ -3891,6 +3939,7 @@ impl CorpusStore {
     /// `relocate` (fs-atomic, preserves id, doesn't bump `updated`). The ulid comes
     /// from the note's own frontmatter.
     pub fn filer_move(&mut self, id_or_rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
+        self.brain_gate()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
         self.filer_writable(target_folder)?;
@@ -7744,6 +7793,98 @@ mod tests {
         assert!(root.join(rel).is_file(), "nothing moved");
         assert!(!root.join("wiki/_secure").join("stuck.md").exists());
         assert!(store.journal_read().unwrap().is_empty(), "a refused repair journals nothing");
+    }
+
+    /// A RAW vault (vault-vs-brain, 2026-07-26) refuses the ENTIRE filer lane —
+    /// daemon, manual filing, and index writes alike — while the user lane and
+    /// security controls stay fully alive. A missing field means ON.
+    #[test]
+    fn raw_vault_refuses_the_filer_lane_but_not_the_user() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        let mut store = CorpusStore::open(root).unwrap();
+        store.os_trash = false;
+        let note = store.create("wiki/_inbox", "# Draft\n\nwords\n").unwrap();
+
+        // missing field ⇒ the filer lane works exactly like today
+        store.set_ai_field(&note.id, "summary", "one line").unwrap();
+        store.set_ai_field(&note.id, "area", "Projects").unwrap();
+
+        store.dot_write("settings", "{\"brainEnabled\":false}").unwrap();
+        let err = store.set_ai_field(&note.id, "summary", "two lines").unwrap_err();
+        assert!(err.contains("Librarian is off"), "{err}");
+        assert!(store.file_note(&note.id).unwrap_err().contains("Librarian is off"));
+        assert!(store.write_index("Projects", "# P\n").unwrap_err().contains("Librarian is off"));
+        assert!(store.filer_move(&note.id, "wiki/Projects").unwrap_err().contains("Librarian is off"));
+
+        // the AGENT edit surface is a VAULT feature, not a Brain feature
+        // (pressure-test 2026-07-26: the broad filer_writable gate broke it) —
+        // CLI/MCP edits keep working in a raw vault
+        store
+            .write_for_remote_agent(&note.id, "# Draft\n\nagent words\n")
+            .unwrap();
+
+        // the USER lane is untouched: editing, moving, security controls
+        store.write(&note.id, "# Draft\n\nmore words\n").unwrap();
+        store.set_locked(&note.id, true).unwrap();
+        store.set_locked(&note.id, false).unwrap();
+        store.set_secure(&note.id, true).unwrap();
+        assert!(store.path_of(&note.id).unwrap().starts_with("wiki/_secure/"));
+        store.set_secure(&note.id, false).unwrap();
+
+        // flipping back on restores the lane
+        store.dot_write("settings", "{\"brainEnabled\":true}").unwrap();
+        store.set_ai_field(&note.id, "summary", "three lines").unwrap();
+    }
+
+    /// The consent boundary fails CLOSED (pressure-test 2026-07-26): a genuine
+    /// IO error reading settings must never silently re-enable the Brain.
+    /// (A MISSING file stays ON — dot_read maps NotFound to "{}".)
+    #[test]
+    fn brain_enabled_fails_closed_on_a_real_read_error() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path().join("brain");
+        seed_memex(&root);
+        let store = CorpusStore::open(root.clone()).unwrap();
+        assert!(store.brain_enabled(), "no settings file at all ⇒ ON (today's behavior)");
+        // a DIRECTORY at the settings path makes the read a genuine IO error
+        fs::create_dir_all(root.join(".rotli/settings.json")).unwrap();
+        assert!(!store.brain_enabled(), "an unreadable consent boundary fails closed");
+    }
+
+    /// Onboarding's choices survive the corpus switch (pressure-test
+    /// 2026-07-26): a newly adopted root with NO settings inherits the current
+    /// file; a root with its OWN settings keeps them.
+    #[test]
+    fn carry_settings_seeds_new_roots_and_respects_existing_ones() {
+        let tmp = TempDir::new().unwrap();
+        let old = tmp.path().join("old");
+        let fresh = tmp.path().join("fresh");
+        let veteran = tmp.path().join("veteran");
+        fs::create_dir_all(old.join(".rotli")).unwrap();
+        fs::create_dir_all(&fresh).unwrap();
+        fs::create_dir_all(veteran.join(".rotli")).unwrap();
+        fs::write(old.join(".rotli/settings.json"), "{\"brainEnabled\":false}").unwrap();
+        fs::write(veteran.join(".rotli/settings.json"), "{\"brainEnabled\":true}").unwrap();
+
+        carry_settings(&old, &fresh).unwrap();
+        assert_eq!(
+            fs::read_to_string(fresh.join(".rotli/settings.json")).unwrap(),
+            "{\"brainEnabled\":false}",
+            "the raw-vault choice rides along to a settings-less root"
+        );
+        carry_settings(&old, &veteran).unwrap();
+        assert_eq!(
+            fs::read_to_string(veteran.join(".rotli/settings.json")).unwrap(),
+            "{\"brainEnabled\":true}",
+            "a vault with its own settings keeps them"
+        );
+        // no source settings → clean no-op
+        let bare = tmp.path().join("bare");
+        fs::create_dir_all(&bare).unwrap();
+        carry_settings(&bare, &fresh).unwrap();
     }
 
     /// The Tasks projection (decision 2026-07-25): open checkboxes only, fenced

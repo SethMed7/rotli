@@ -614,14 +614,23 @@ fn corpus_choose_folder(app: AppHandle, path: Option<String>) -> Result<bool, St
         return Ok(false);
     }
     match memex::detect_folder(&abs).kind.as_str() {
-        "memex" => corpus::set_corpus_path(&app, abs)?,
+        "memex" => {
+            corpus::carry_settings(&current, &abs)?;
+            corpus::set_corpus_path(&app, abs)?;
+        }
         "fresh" => {
             if !corpus::is_memex_root(&current) {
                 corpus::relocate(&current, &abs)?;
             }
+            // relocate carried .rotli/ along; this covers the memex-root
+            // branch above it (no relocate) — a no-op when settings exist
+            corpus::carry_settings(&current, &abs)?;
             corpus::set_corpus_path(&app, abs)?;
         }
-        _ => corpus::set_corpus_path(&app, abs)?,
+        _ => {
+            corpus::carry_settings(&current, &abs)?;
+            corpus::set_corpus_path(&app, abs)?;
+        }
     }
     app.restart();
 }
@@ -636,6 +645,53 @@ fn corpus_init_memex(app: AppHandle, path: String) -> Result<(), String> {
     }
     let root = std::path::PathBuf::from(&path);
     memex::scaffold_memex(&root)?;
+    // a scaffolded memex has no .rotli — carry the onboarding flow's choices
+    // (Librarian-vs-raw included) so the new vault honors what was just picked
+    corpus::carry_settings(&corpus::resolve_corpus(&app), &root)?;
+    corpus::set_corpus_path(&app, root)?;
+    app.restart();
+}
+
+/// Create a PRACTICE vault (vault platform, 2026-07-26): scaffold a fresh
+/// scratch vault at an obvious home, carry the current settings along, keep
+/// the vault being left registered as a connected library (one click away in
+/// the switcher), and relaunch into the practice vault. The current vault's
+/// FILES are never touched — this is a switch plus a courtesy registration.
+#[tauri::command]
+fn corpus_create_practice_vault(app: AppHandle) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Err("Creating or replacing the primary memex is disabled in development.".into());
+    }
+    use tauri::Manager;
+    let current = corpus::resolve_corpus(&app);
+    let home = app.path().home_dir().map_err(|e| e.to_string())?;
+    let mut root = home.join("rotli Practice Vault");
+    let mut n = 1;
+    while root.exists() {
+        n += 1;
+        root = home.join(format!("rotli Practice Vault {n}"));
+    }
+    memex::scaffold_memex(&root)?;
+    corpus::carry_settings(&current, &root)?;
+    // best-effort: the practice vault must open even if the courtesy
+    // registration of the outgoing vault is refused (plain folders have no
+    // memex identity to register — they stay reachable via Location settings)
+    if corpus::is_memex_root(&current) {
+        if let Ok(meta) = memex::prepare_brain_connect(&current) {
+            let _ = corpus::upsert_brain(
+                &app,
+                corpus::ConnectedBrain {
+                    id: String::new(),
+                    label: meta.label,
+                    abs_path: current.clone(),
+                    memex_id: Some(meta.memex_id),
+                    mode: meta.mode,
+                    perms: meta.perms,
+                },
+                false, // visible + switchable, never silently the write target
+            );
+        }
+    }
     corpus::set_corpus_path(&app, root)?;
     app.restart();
 }
@@ -917,6 +973,7 @@ pub fn run() {
             corpus_list_config,
             corpus_choose_folder,
             corpus_init_memex,
+            corpus_create_practice_vault,
             corpus_connect_brain,
             corpus_forget_brain,
             corpus_set_active_brain,
@@ -1003,6 +1060,7 @@ pub fn run() {
             keychain::secret_delete,
             organizer::organizer_status,
             organizer::organizer_run_once,
+            organizer::organizer_set_brain,
             organizer::organizer_set_trust,
             organizer::organizer_learn_field,
             organizer::organizer_secure_hints,

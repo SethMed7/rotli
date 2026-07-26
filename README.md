@@ -29,29 +29,29 @@ It lives in your menu bar — **no dock icon, no ⌘Tab entry, no badges, no pin
 
 And everything you write is **yours**: plain markdown in one folder *you* choose. Open it in any editor, back it up however you like, keep it when rotli is long forgotten. rotli is a warm window onto your files — never their owner.
 
-## One folder is your whole brain
+## One folder is your whole vault
 
-Your notes folder *is* a **memex** — one local folder that quietly holds everything:
+Your notes live in a **vault** — one local folder that quietly holds everything:
 
 ```
-your notes folder/          ← one folder = your memex, openable in any editor
+your vault/                 ← one folder, openable in any editor
   a-note.md                 ← plain markdown + a little frontmatter (id · created · updated …)
-  wiki/                     ← the AI-organized "brain" — People · Projects · Research …
+  wiki/                     ← the Library — People · Projects · Research …
   chats/                    ← your AI conversations
   storage/                  ← files, images, PDFs, boards — referenced from notes
   .rotli/                   ← the app's own state; delete it and lose nothing but a rebuild
 ```
 
-You just capture. A small **on-device** AI files each note into the **brain** — the areas like *People*, *Projects*, and *Research*. You never have to think about where a note goes, yet it's always exactly where you'd look for it.
+You just capture. The **Librarian** — a small **on-device** helper — files each note into the **Library**'s areas like *People*, *Projects*, and *Research*. You never have to think about where a note goes, yet it's always exactly where you'd look for it. Prefer no AI at all? Choose a **raw vault** and the Librarian never runs — just your files, organized by you.
 
-## Main and the brain — one file, two ways in
+## Main and the Library — one file, two ways in
 
 This is the idea rotli is built around, so it's worth thirty seconds:
 
 - **Main** is *your* shelf — the notes you reach for, arranged by hand, in whatever order makes sense to you.
-- **The brain** is where those same notes actually live on disk, filed into tidy areas by the AI.
+- **The Library** is where those same notes actually live on disk, filed into tidy areas by the Librarian.
 
-They aren't copies. They're the **same file**, reached two ways. Rearrange Main all you like; the brain keeps everything findable. Let the AI refile the brain; your Main arrangement never moves. Your order, and a tidy library, at the same time — and the AI only ever touches a note's *location and metadata*, **never the words inside it** (every change is journaled and undoable).
+They aren't copies. They're the **same file**, reached two ways. Rearrange Main all you like; the Library keeps everything findable. Let the Librarian refile things; your Main arrangement never moves. Your order, and a tidy library, at the same time — and the Librarian only ever touches a note's *location and metadata*, **never the words inside it** (every change is journaled and undoable).
 
 Main can also open additional named **views** for focused slices such as a
 project, client, or open-source work. Main keeps every referenced item; a named
@@ -115,7 +115,7 @@ tokens, keyboard behavior, and readable hierarchy across all four.
 - **Secrets are auto-detected** and never sent to a remote model or out to the web.
 - **Works fully offline** — no account, nothing phones home.
 
-You work how you want in **Main**; the AI organizes the **brain** underneath — location and metadata only, never the words inside your notes.
+You work how you want in **Main**; the Librarian organizes the **Library** underneath — location and metadata only, never the words inside your notes — and a raw vault opts out of AI entirely.
 
 *Your vault is just plain files in a documented layout — rotli is the layer that manages and understands it. The format lives with rotli, not behind it.*
 
@@ -171,7 +171,7 @@ Contributing or working with an AI coding tool? Start with
 | ✅ | **Your notes folder is a memex** — plain files, atomic writes, fs watcher, persistence |
 | ✅ | **Search** — full-text across your notes (titles + bodies), instant |
 | ✅ | **Chat** — on-device by default, or your own connected models; your notes are its knowledge base |
-| ✅ | **The brain** — an on-device organizer files your captures into areas, fully journaled + undoable |
+| ✅ | **The Librarian** — an on-device organizer files your captures into the Library, fully journaled + undoable — or choose a raw vault with no AI at all |
 | ⏳ | **Inbox** — a calm layer over your own email |
 
 ---

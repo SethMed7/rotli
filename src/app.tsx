@@ -46,7 +46,13 @@ import {
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { EditorView } from "@codemirror/view";
 import { activeInstance, isWritable } from "./memex/config";
-import { chooseFolder, initMemexAsCorpus, loadConfig as memexLoadConfig, writeNote } from "./memex/service";
+import {
+  chooseFolder,
+  createPracticeVault,
+  initMemexAsCorpus,
+  loadConfig as memexLoadConfig,
+  writeNote,
+} from "./memex/service";
 import { summonChat } from "./services/chatSummon";
 import { flushSettingsNow } from "./state/persist";
 import { hydrateMain } from "./state/main";
@@ -372,7 +378,15 @@ function MainShell() {
             useMemexStore.getState().setPendingChoice(null);
             // "keep" (the pre-seeded re-onboard default, #12) deliberately
             // commits NOTHING — the corpus stays exactly where it is.
-            if (choice?.path && (choice.kind === "use" || choice.kind === "init")) {
+            if (choice?.kind === "practice") {
+              // the practice vault (2026-07-26): settings flush first so the
+              // Librarian-vs-raw pick rides along (carry_settings), then Rust
+              // scaffolds the scratch vault, registers the outgoing vault as a
+              // connected library, and relaunches — no existing file touched
+              void flushSettingsNow()
+                .then(() => createPracticeVault())
+                .catch(() => {});
+            } else if (choice?.path && (choice.kind === "use" || choice.kind === "init")) {
               const path = choice.path;
               const kind = choice.kind;
               void flushSettingsNow()

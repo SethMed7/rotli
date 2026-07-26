@@ -177,6 +177,16 @@ pub(crate) struct OrganizerInner {
     /// (the user picks Off, the worker wakes, and the still-unflushed file says
     /// Organize — the downgrade race).
     settings_trust: Mutex<Option<Trust>>,
+    /// The Brain master switch, LIVE (vault-vs-brain, 2026-07-26): true = this
+    /// vault is RAW. `organizer_set_brain` flips it immediately — the same
+    /// in-memory channel trust has, so turning the Brain off stops an
+    /// IN-FLIGHT cycle at the next candidate instead of after the debounced
+    /// settings write (pressure-test: the mid-cycle model leak). settings.json
+    /// re-adopts via `settings_brain` each cycle as the durable backstop.
+    brain_off: AtomicBool,
+    /// The brainEnabled value LAST SEEN in settings.json — same changed-only
+    /// adoption rule as `settings_trust`, for the same debounce race.
+    settings_brain: Mutex<Option<bool>>,
     status: Mutex<StatusSnapshot>,
     /// Whether the worker thread was spawned (false = no memex corpus).
     running: AtomicBool,
@@ -222,6 +232,8 @@ impl OrganizerHandle {
             cv: Condvar::new(),
             trust: Mutex::new(Trust::Organize), // the default rung; settings.json overrides each cycle
             settings_trust: Mutex::new(None),
+            brain_off: AtomicBool::new(false),
+            settings_brain: Mutex::new(None),
             status: Mutex::new(StatusSnapshot::default()),
             running: AtomicBool::new(false),
             run_now: AtomicBool::new(false),
@@ -1031,6 +1043,11 @@ impl OrgModel {
 }
 
 struct Knobs {
+    /// The vault's Brain master switch (decision 2026-07-26, vault-vs-brain):
+    /// false = a RAW vault — no cycles, no sweeps, no model calls, ever.
+    /// Missing from settings ⇒ true (existing vaults keep today's behavior
+    /// byte-for-byte; the field is additive and no migration writes it).
+    brain_enabled: bool,
     trust: Option<Trust>,
     threshold: f64,
     quiet: Duration,
@@ -1040,6 +1057,7 @@ struct Knobs {
 fn parse_knobs(settings_json: &str) -> Knobs {
     let v: serde_json::Value = serde_json::from_str(settings_json).unwrap_or(serde_json::Value::Null);
     Knobs {
+        brain_enabled: v.get("brainEnabled").and_then(serde_json::Value::as_bool).unwrap_or(true),
         trust: v.get("organizerTrust").and_then(|t| t.as_str()).map(Trust::parse),
         threshold: v
             .get("organizerThreshold")
@@ -1077,6 +1095,15 @@ fn read_knobs(corpus_state: &CorpusState, root_id: &str, inner: &OrganizerInner)
         if *seen != Some(t) {
             *seen = Some(t);
             *inner.trust.lock().unwrap() = t;
+        }
+    }
+    {
+        // same changed-only adoption for the Brain switch — the live atomic
+        // (organizer_set_brain) wins over a debounced-stale file
+        let mut seen = inner.settings_brain.lock().unwrap();
+        if *seen != Some(knobs.brain_enabled) {
+            *seen = Some(knobs.brain_enabled);
+            inner.brain_off.store(!knobs.brain_enabled, Ordering::SeqCst);
         }
     }
     knobs
@@ -1135,6 +1162,14 @@ pub(crate) fn run_cycle(
 ) -> Result<CycleReport, String> {
     let mut report = CycleReport::default();
     let knobs = read_knobs(corpus_state, root_id, inner);
+    if inner.brain_off.load(Ordering::SeqCst) {
+        // a RAW vault has no Brain at all (vault-vs-brain, 2026-07-26) —
+        // harder off than Trust::Off: the queue and review hints drain so
+        // nothing accumulates or nags while the vault stays untouched.
+        inner.queue.lock().unwrap().clear();
+        inner.status.lock().unwrap().secure_pending.clear();
+        return Ok(report);
+    }
     if *inner.trust.lock().unwrap() == Trust::Off {
         return Ok(report); // dormant: drain nothing, model nothing
     }
@@ -1149,6 +1184,14 @@ pub(crate) fn run_cycle(
     let mut vocab: Option<Vec<(String, String)>> = None;
     let mut peers: Option<Vec<(String, String)>> = None; // enrich link haystack, once per cycle
     'candidates: for rel in rels {
+        // the Brain switch is LIVE per candidate too (pressure-test 2026-07-26:
+        // a vault turned raw mid-cycle must stop MODELING now, not after the
+        // in-flight queue drains — each model call can run minutes)
+        if inner.brain_off.load(Ordering::SeqCst) {
+            inner.queue.lock().unwrap().clear();
+            inner.status.lock().unwrap().secure_pending.clear();
+            return Ok(report);
+        }
         // trust is LIVE per candidate — `organizer_set_trust` can downgrade the
         // rung mid-cycle (each model call is up to 45s; a long queue must not
         // keep applying at a rung the user just left). Off parks the rest.
@@ -1465,6 +1508,14 @@ pub(crate) fn run_cycle(
                 report.journal_written = true;
             }
             continue;
+        }
+        // the Brain switch is re-checked between the SAME candidate's classify
+        // and enrich calls too — a mid-flight raw flip stops before the next
+        // model call, not merely the next candidate (pressure-test 2026-07-26)
+        if inner.brain_off.load(Ordering::SeqCst) {
+            inner.queue.lock().unwrap().clear();
+            inner.status.lock().unwrap().secure_pending.clear();
+            return Ok(report);
         }
         let peers = peers.get_or_insert_with(|| list_peers(root));
         let self_stem =
@@ -1948,6 +1999,16 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
             let corpus_state = app.state::<CorpusState>();
             let knobs = read_knobs(&corpus_state, &root_id, inner);
             quiet = knobs.quiet; // run_cycle re-reads its own copy; keep the planner's fresh
+            if inner.brain_off.load(Ordering::SeqCst) {
+                // RAW vault: consume every wake signal and park — no sweep, no
+                // cycle, and nothing left queued to act on if the Brain later
+                // returns (re-enabling starts fresh from its own sweep).
+                inner.run_now.store(false, Ordering::SeqCst);
+                inner.sweep_at.lock().unwrap().take();
+                inner.queue.lock().unwrap().clear();
+                inner.status.lock().unwrap().secure_pending.clear();
+                continue;
+            }
             if *inner.trust.lock().unwrap() == Trust::Off {
                 inner.run_now.store(false, Ordering::SeqCst);
                 continue; // dormant — don't even sweep (the planner parks next)
@@ -2106,6 +2167,24 @@ pub fn organizer_run_once(state: tauri::State<OrganizerState>) -> Result<(), Str
     inner.run_now.store(true, Ordering::SeqCst);
     // notify UNDER the queue mutex (same reason as nudge_sweep: the parked
     // worker re-checks run_now while holding it — no lost wakeup)
+    let _q = inner.queue.lock().unwrap();
+    inner.cv.notify_all();
+    Ok(())
+}
+
+/// Immediate in-memory Brain flip (vault-vs-brain, 2026-07-26) — the same
+/// live channel trust has. OFF stops an in-flight cycle at the next candidate;
+/// ON un-parks the worker and owes it a reconciliation sweep, so re-enabling
+/// is felt now instead of racing the debounced settings write. settings.json
+/// remains the durable backstop the daemon re-adopts each cycle.
+#[tauri::command]
+pub fn organizer_set_brain(state: tauri::State<OrganizerState>, enabled: bool) -> Result<(), String> {
+    let inner = &state.0 .0;
+    inner.brain_off.store(!enabled, Ordering::SeqCst);
+    if enabled {
+        *inner.sweep_at.lock().unwrap() = Some(Instant::now());
+    }
+    // notify under the queue mutex — the parked worker re-checks while holding it
     let _q = inner.queue.lock().unwrap();
     inner.cv.notify_all();
     Ok(())
@@ -3175,6 +3254,122 @@ mod tests {
         handle.enqueue(&root, &[root.join(&secret)]);
         run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
         assert_eq!(pending(&handle), 0, "a reviewed capture leaves the hint");
+    }
+
+    /// Every user file under the root, byte-for-byte, EXCLUDING `.rotli/`
+    /// (state is a rebuildable projection; the vault-vs-brain acceptance is
+    /// about the user's files).
+    fn user_tree(root: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+        fn walk(dir: &Path, root: &Path, out: &mut std::collections::BTreeMap<String, Vec<u8>>) {
+            for e in fs::read_dir(dir).unwrap().flatten() {
+                let name = e.file_name().to_string_lossy().into_owned();
+                if name == ".rotli" {
+                    continue;
+                }
+                let p = e.path();
+                if p.is_dir() {
+                    walk(&p, root, out);
+                } else if p.is_file() {
+                    let rel = p.strip_prefix(root).unwrap().to_string_lossy().into_owned();
+                    out.insert(rel, fs::read(&p).unwrap());
+                }
+            }
+        }
+        let mut out = std::collections::BTreeMap::new();
+        walk(root, root, &mut out);
+        out
+    }
+
+    /// THE vault-vs-brain acceptance test (decision 2026-07-26): a raw vault
+    /// never reaches a model and never changes a file — and toggling the Brain
+    /// off → on (Suggest) → off leaves every user file byte-identical.
+    #[test]
+    fn raw_vault_never_models_and_toggling_never_changes_files() {
+        let (_dir, root, state, handle) = seed_brain();
+        write_settings(
+            &state,
+            "{\"brainEnabled\":false,\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}",
+        );
+        let plain = stage_capture(&state, "# Alazan 84\n\nland deal notes\n");
+        let secret = stage_capture(&state, "# Card\n\ncard 4242 4242 4242 4242\n");
+        let before = user_tree(&root);
+
+        // RAW: the transport must never fire, even at trust=organize
+        let calls = AtomicUsize::new(0);
+        let counting = |p: &str| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            dual_transport(p)
+        };
+        handle.enqueue(&root, &[root.join(&plain), root.join(&secret)]);
+        let report = run_cycle(&state, "default", &root, &handle.0, &no_gates(), &counting).unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 0, "a raw vault must NEVER be modeled");
+        assert_eq!((report.proposals, report.applied), (0, 0));
+        assert!(handle.0.queue.lock().unwrap().is_empty(), "the queue drains without acting");
+        assert_eq!(handle.0.status.lock().unwrap().secure_pending.len(), 0, "no review nags");
+        assert!(journal_rows(&state).is_empty(), "a raw vault journals nothing");
+        assert_eq!(user_tree(&root), before, "raw cycles leave every user file byte-identical");
+
+        // Brain back ON at Suggest — resumes proposing, still never rewrites files
+        write_settings(
+            &state,
+            "{\"brainEnabled\":true,\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        );
+        handle.0.settings_trust.lock().unwrap().take(); // fresh adoption of the file's rung
+        handle.enqueue(&root, &[root.join(&plain), root.join(&secret)]);
+        let report = run_cycle(&state, "default", &root, &handle.0, &no_gates(), &counting).unwrap();
+        assert!(calls.load(Ordering::SeqCst) > 0, "re-enabling resumes the Brain");
+        assert!(report.proposals > 0, "Suggest proposes on re-entry");
+        assert_eq!(report.applied, 0, "never auto-apply on re-entry");
+        assert_eq!(user_tree(&root), before, "Suggest proposals never touch user files");
+
+        // and OFF again: inert once more
+        write_settings(&state, "{\"brainEnabled\":false,\"organizerQuietSecs\":0}");
+        let at_reenter = calls.load(Ordering::SeqCst);
+        handle.enqueue(&root, &[root.join(&plain)]);
+        let report = run_cycle(&state, "default", &root, &handle.0, &no_gates(), &counting).unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), at_reenter, "off means off, immediately");
+        assert_eq!((report.proposals, report.applied), (0, 0));
+        assert_eq!(user_tree(&root), before, "the full off→on→off round trip changed nothing");
+    }
+
+    /// The LIVE off signal (pressure-test 2026-07-26): flipping the Brain off
+    /// MID-CYCLE stops at the next candidate — the in-flight queue must not
+    /// keep reaching a model for minutes after the user's raw choice.
+    #[test]
+    fn brain_off_mid_cycle_stops_at_the_next_candidate() {
+        let (_dir, root, state, handle) = seed_brain();
+        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}");
+        let a = stage_capture(&state, "# Alazan 84\n\nland deal notes\n");
+        let b = stage_capture(&state, "# Trip plan\n\nflights and hotels\n");
+        handle.enqueue(&root, &[root.join(&a), root.join(&b)]);
+        let calls = AtomicUsize::new(0);
+        let inner = handle.0.clone();
+        let transport = |p: &str| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            // the user flips raw WHILE the first model call is in flight —
+            // exactly what organizer_set_brain's atomic does
+            inner.brain_off.store(true, Ordering::SeqCst);
+            dual_transport(p)
+        };
+        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "the SECOND candidate must never be modeled after the off flip"
+        );
+        assert!(handle.0.queue.lock().unwrap().is_empty(), "the rest drains without acting");
+    }
+
+    /// The missing-field default IS the compatibility promise: an untouched
+    /// settings file behaves exactly like today (brain on).
+    #[test]
+    fn missing_brain_field_means_on() {
+        assert!(parse_knobs("{}").brain_enabled);
+        assert!(parse_knobs("not json at all").brain_enabled);
+        assert!(parse_knobs("{\"brainEnabled\":true}").brain_enabled);
+        assert!(!parse_knobs("{\"brainEnabled\":false}").brain_enabled);
+        // garbage value → the safe default (on = today's behavior)
+        assert!(parse_knobs("{\"brainEnabled\":\"nope\"}").brain_enabled);
     }
 
     /// Feature B (decision 2026-07-22): "Not sensitive" is durable for that

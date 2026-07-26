@@ -216,7 +216,9 @@ const DEST_ROWS: { id: Destination; label: string; Glyph: typeof InboxGlyph }[] 
   // "Capture" (DEST.inbox) is GONE — captures have ONE home now, the "Captures"
   // row under Notes (Seth, 2026-06-30). Staged notes (wiki/_inbox) project there.
   { id: DEST.secure, label: "Secure notes", Glyph: ShieldGlyph },
-  { id: DEST.vault, label: "Vault", Glyph: VaultGlyph },
+  // "Linked library" (2026-07-26): a CONNECTED vault — distinct from both the
+  // local Library and the vault-switcher's whole-vault concept
+  { id: DEST.vault, label: "Linked library", Glyph: VaultGlyph },
   // "Assets" is the DISPLAY name (decision 2026-07-25, Zen reference) — one
   // system home for every image/video/PDF/file. The id + disk lane stay
   // "Storage"/storage/ (persisted expansion keys, folder ids, the contract).
@@ -569,6 +571,9 @@ export function Sidebar() {
   const pendingProposals = deriveJournal(useJournal().data ?? []).pending.length;
   // open checkboxes across the corpus — the Tasks smart row's count
   const openTaskCount = useTasks().data?.length ?? 0;
+  // raw vault (vault-vs-brain, 2026-07-26): the Brain section's copy changes —
+  // the areas are real folders either way, so the TREE stays visible
+  const brainEnabledUi = useUiStore((s) => s.brainEnabled);
 
   // MAIN — the user's hand-arranged view over the Brain (memex-vault wiki/projects/rotli/main-brain-daemon.md).
   // A `.rotli/main.json` manifest of folders + note-id refs, projected into synthetic
@@ -2318,21 +2323,35 @@ export function Sidebar() {
                       <ChevronRight size={10} />
                     </span>
                     <NotesStackGlyph size={14} />
-                    <span className="fname">Brain</span>
+                    {/* the LIBRARY — the Librarian's organized areas (2026-07-26
+                        rename; the "Brain" folder id stays internal) */}
+                    <span className="fname">Library</span>
                     <span className="count">{brainNotes.length + secureNotes.length}</span>
                   </button>
                   {brainOpen && (
                     <>
                       <p className="brain-hint">
-                        Organized by AI so anything you save stays findable. Your <b>Main</b> above is yours —
-                        same notes, your order.
+                        {brainEnabledUi ? (
+                          <>
+                            The Librarian files everything here so it stays findable. Your <b>Main</b> above
+                            is yours — same notes, your order.
+                          </>
+                        ) : (
+                          <>
+                            This vault is raw — no Librarian. These areas are plain folders, yours to arrange.
+                          </>
+                        )}
                       </p>
                       <button
                         type="button"
                         className="frow child brain-activity-link"
                         style={{ paddingLeft: 42 }}
                         onClick={() => usePanesStore.getState().openActivity()}
-                        title="See and undo what the AI has done"
+                        title={
+                          brainEnabledUi
+                            ? "See and undo what the Librarian has done"
+                            : "History of the Librarian's past actions and secure-note repairs"
+                        }
                       >
                         <ClockGlyph size={13} />
                         <span className="fname">Activity</span>

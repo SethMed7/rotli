@@ -46,6 +46,14 @@
 .onb-mark {
   margin-bottom: 4px;
 }
+/* the step's quokka accent (Librarian rename, 2026-07-26) — a friendly,
+   currentColor line-art character above the title; decorative, never loud */
+.onb-quokka {
+  display: block;
+  margin: 0 auto 10px;
+  color: var(--text-muted);
+}
+
 .onb-title {
   font-family: var(--font-display);
   font-weight: 700;

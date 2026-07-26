@@ -1,9 +1,21 @@
 # Design: Vault vs Brain — and the raw-vault opt-out
 
-Date: 2026-07-26 · Status: **proposed — design only, no implementation in this
-change**. Implementation requires its own session and MUST NOT alter the
-behavior of any existing vault without the user explicitly flipping the new
-choice themselves (Seth: "be very careful not to break my local memex").
+Date: 2026-07-26 · Status: **implemented same day (Phase 1)** — with two
+recorded refinements below. The prime rule held: no existing vault's behavior
+changes without the user explicitly flipping the new choice themselves.
+
+*Implementation refinements (2026-07-26):*
+
+- **Intake stays as a plain folder.** A raw memex-layout vault still creates
+  quick captures in `wiki/_inbox/` — but with no Brain it is just an inbox
+  folder (surfaced as Captures): nothing stages, classifies, or refiles from
+  it. Divergent creation paths per mode would have doubled the routing surface
+  for zero user benefit; explicit folder selection already creates in place.
+- **The worker parks rather than never spawning.** The daemon thread exists
+  for any memex corpus but is fully inert for a raw vault: every wake signal
+  is consumed, the queue and review hints drain, no sweep, no model call, no
+  state write. This keeps the runtime toggle instant in both directions
+  (structural no-spawn would demand a relaunch to enable).
 
 ## The two concepts, finally separated
 
@@ -81,3 +93,32 @@ there is a Brain at all.
 The live-memex protection is the acceptance test: open a copy of a real
 populated memex, toggle raw and back, and diff the tree — zero file changes,
 zero moves, journal empty. Only then does the switch reach the UI.
+
+## Pressure-test record (2026-07-26, 24-agent adversarial workflow)
+
+16 confirmed findings; the fixes that shipped with Phase 1:
+
+- **Live off signal.** The switch gained trust's in-memory channel
+  (`organizer_set_brain` + a per-model-call re-check), so turning raw stops an
+  in-flight cycle before its next model call — not after the debounced
+  settings write or the queued candidates drained.
+- **Gate placement.** The corpus-side gate moved out of `filer_writable`
+  (which also fronts agent edits and Breve writes — both vault features) into
+  the organizer-specific operations: `set_ai_field`, `file_note`,
+  `write_index`, `filer_move`.
+- **Choices survive the corpus switch.** `carry_settings` copies the current
+  settings file to a newly adopted root that has none, so an onboarding
+  raw-vault choice is not silently dropped; a root with its own settings keeps
+  them.
+- **Fail closed.** A genuine IO error reading the settings sidecar now reads
+  as Brain-off; only a genuinely missing file means "on" (the compatibility
+  promise).
+- **No dead actions.** Raw vaults hide Approve and Undo in Brain Activity
+  (Dismiss stays — journal-only), the onboarding re-pick clamps to Suggest
+  like the Settings toggle, and the sidebar Brain section speaks raw-mode
+  copy while keeping the folder tree (the files are real either way).
+
+Accepted, not fixed here: the browser-demo settings-write mismatch (demo
+plumbing predates this feature), the first debounced save writing the resolved
+`brainEnabled` value like every other setting, and stale "Brain/AI" vocabulary
+in a few menus — the last folds into the pending rename decision.

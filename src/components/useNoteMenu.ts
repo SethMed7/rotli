@@ -211,7 +211,7 @@ export function useNoteMenu() {
         }
         items.push({
           kind: "action" as const,
-          label: "Show in Brain",
+          label: "Show in Library",
           onClick: () => {
             // One file, two views: Main is a shortcut over the Brain. Always
             // open the note first so focus settles for the reveal.
@@ -357,7 +357,7 @@ export function useNoteMenu() {
           if (fm?.secure && !secureAtHome) {
             items.push({
               kind: "action" as const,
-              label: "Move into Brain › Secure notes",
+              label: "Move into Library › Secure notes",
               onClick: () => runFm("move to Secure notes", corpusSetSecure(note.id, true)),
             });
           }

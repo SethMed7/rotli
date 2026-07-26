@@ -10,12 +10,14 @@ import { create } from "zustand";
  * pre-seeded default on a 0.x re-onboard: committing it is a deliberate NO-OP,
  * so a mis-click can never relocate the corpus — #12, audit 2026-07) · "later"
  * — keep a plain ~/Documents/rotli notes folder. */
-export type MemexChoiceKind = "use" | "init" | "keep" | "later";
+export type MemexChoiceKind = "use" | "init" | "keep" | "later" | "practice";
 
 export interface PendingMemexChoice {
   kind: MemexChoiceKind;
   /** "use": the existing memex root to adopt. "init": the empty folder to
-   * scaffold in. "keep": the current corpus root (display only — never committed). */
+   * scaffold in. "keep": the current corpus root (display only — never
+   * committed). "practice": a fresh scratch vault at an app-chosen home —
+   * the current vault stays registered and untouched (2026-07-26). */
   path?: string;
   label?: string;
 }

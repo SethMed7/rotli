@@ -286,6 +286,19 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   moves. Locked notes are never modified by the organizer. The organizer skips
   secure notes even if interactive local access was granted.
 - Remote organizer choices apply only to non-secure, unlocked notes.
+- **Product vocabulary (2026-07-26):** the organizer layer is branded the
+  **Librarian** and its organized area (the `wiki/` tree) the **Library**; a
+  connected vault is a **Linked library**. These are display names only —
+  contract terms, folder ids (`Brain`, `wiki/`), and the `brainEnabled`
+  setting keep their internal names.
+- **A vault may be raw** (vault-vs-brain, 2026-07-26): the per-vault
+  `brainEnabled` setting (missing ⇒ on) turns the Brain layer off entirely.
+  Raw means the organizer never acts and the filer write lane refuses —
+  enforced independently in the daemon's cycle gate and the corpus boundary.
+  Flipping the switch never moves or rewrites a file; re-enabling resumes at
+  Suggest. Security controls (secure notes, the detector, repairs) are vault
+  properties and hold identically in both modes. Spec:
+  [`2026-07-26-vault-vs-brain.md`](../decisions/2026-07-26-vault-vs-brain.md).
 - A note explicitly flagged `secure: true` whose file still sits in Brain
   intake is legacy or externally moved state; the organizer must never read it
   in place. The Brain Activity pane offers the explicit, previewable **legacy

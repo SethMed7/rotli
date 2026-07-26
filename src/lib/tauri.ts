@@ -862,6 +862,14 @@ export async function organizerRunOnce(): Promise<void> {
   await invoke("organizer_run_once");
 }
 
+/** Immediate in-memory Brain flip (vault-vs-brain, 2026-07-26) — OFF stops an
+ * in-flight cycle at the next candidate; ON un-parks the worker and owes it a
+ * sweep. settings.json stays the durable backstop via the normal persist. */
+export async function organizerSetBrain(enabled: boolean): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("organizer_set_brain", { enabled });
+}
+
 /** One secure-review row (feature B, decision 2026-07-22): a note the daemon
  * skipped as secure. `flagged` = the explicit frontmatter flag (already
  * protected) vs detector-only (the "Mark it secure?" confirm lane). */
@@ -1041,11 +1049,19 @@ export async function corpusChooseFolder(path?: string): Promise<boolean> {
   return invoke<boolean>("corpus_choose_folder", { path: path ?? null });
 }
 
-/** Onboarding "create a new brain": scaffold a fresh memex at `path` and make it
+/** Onboarding "create a new vault": scaffold a fresh memex at `path` and make it
  * your corpus (the corpus IS a memex). Relaunches on success. */
 export async function corpusInitMemex(path: string): Promise<void> {
   if (!isTauri()) return;
   await invoke("corpus_init_memex", { path });
+}
+
+/** Scaffold + switch to a scratch PRACTICE vault at an app-chosen home
+ * (2026-07-26): settings carry along, the outgoing vault stays registered as a
+ * connected library, and no existing file is touched. Relaunches on success. */
+export async function corpusCreatePracticeVault(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_create_practice_vault");
 }
 
 /** Connect a memex as a brain (read + write per its perms); relaunches so its row

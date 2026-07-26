@@ -49,7 +49,7 @@ function tabLabel(tab: Tab, titles: Map<string, string>): string {
     case "file":
       return fileName(tab.fileId);
     case "activity":
-      return "Brain Activity";
+      return "Librarian Activity";
   }
 }
 

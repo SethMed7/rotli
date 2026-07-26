@@ -12,8 +12,9 @@ function titleCase(s: string): string {
 /** The note's disk/Brain home, humanized (no Main prefix). */
 export function brainLocationLabel(folderId: string): string {
   const f = folderId || "";
-  if (f === "wiki") return "Brain";
-  if (f === "wiki/_secure" || f.startsWith("wiki/_secure/")) return "Brain › Secure notes";
+  // "Library" is the Brain area's display name (Librarian rename, 2026-07-26)
+  if (f === "wiki") return "Library";
+  if (f === "wiki/_secure" || f.startsWith("wiki/_secure/")) return "Library › Secure notes";
   if (f.startsWith("wiki/_")) return "Captures"; // _inbox note-staging etc.
   if (f.startsWith("wiki/")) return titleCase(f.slice("wiki/".length).replace(/\//g, " › "));
   if (f === "Board") return "Captures";
@@ -21,8 +22,10 @@ export function brainLocationLabel(folderId: string): string {
   // "Assets" is Storage's display name (2026-07-25) — ids keep the old word
   if (f.startsWith("Storage")) return f.replace(/^Storage/, "Assets").replace(/\//g, " › ");
   if (f.startsWith("vault:")) {
+    // a CONNECTED vault — "Linked library" so it can't be confused with the
+    // local Library (the Librarian's own area; rename 2026-07-26)
     const sub = f.slice("vault:".length).replace(/^wiki\//, "");
-    return sub ? `Library › ${titleCase(sub.replace(/\//g, " › "))}` : "Linked library";
+    return sub ? `Linked library › ${titleCase(sub.replace(/\//g, " › "))}` : "Linked library";
   }
   if (f === "" || f === "Inbox") return "Inbox";
   return f;

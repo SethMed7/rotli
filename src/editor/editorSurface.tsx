@@ -270,9 +270,9 @@ export function EditorSurface({
             <button
               type="button"
               className={inMain ? "ed-loc in-main" : "ed-loc"}
-              title={`In the Brain: ${brainLocation}${
+              title={`In the Library: ${brainLocation}${
                 shelfLocation !== brainLocation ? `\nShelf: ${shelfLocation}` : ""
-              }${diskPath ? `\nOn disk: ${diskPath}` : ""}\nClick to reveal in the Brain`}
+              }${diskPath ? `\nOn disk: ${diskPath}` : ""}\nClick to reveal in the Library`}
               onClick={() => revealFocusedNote("brain", noteId)}
             >
               {noteLocationLabel(brainFolder, inMain)}
