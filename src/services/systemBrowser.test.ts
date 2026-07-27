@@ -78,3 +78,33 @@ describe("filterSystemItems (List mode)", () => {
     expect(filterSystemItems(items, "zzz")).toEqual([]);
   });
 });
+
+// paper-cut sweep 2026-07-27: the Library browser renders EMPTY folders too —
+// a Finder that hides empty directories reads as data loss. Seeded paths only
+// appear while the query is blank (search still removes match-less folders).
+describe("empty-folder seeding", () => {
+  test("seeded folders render as empty groups when the query is blank", () => {
+    const groups = groupSystemItems([note({ id: "a", folderId: "wiki/Projects" })], "wiki", "", [
+      "wiki/People",
+      "wiki/Projects",
+    ]);
+    expect(groups.map((g) => g.label)).toEqual(["People", "Projects"]);
+    expect(groups[0]?.items).toEqual([]);
+    expect(groups[1]?.items.map((n) => n.id)).toEqual(["a"]);
+  });
+
+  test("a search query hides empty folders entirely", () => {
+    const groups = groupSystemItems(
+      [note({ id: "a", folderId: "wiki/Projects", title: "hit me" })],
+      "wiki",
+      "hit",
+      ["wiki/People"],
+    );
+    expect(groups.map((g) => g.label)).toEqual(["Projects"]);
+  });
+
+  test("root items still lead empty folders", () => {
+    const groups = groupSystemItems([note({ id: "b", folderId: "wiki" })], "wiki", "", ["wiki/People"]);
+    expect(groups.map((g) => g.label)).toEqual(["", "People"]);
+  });
+});

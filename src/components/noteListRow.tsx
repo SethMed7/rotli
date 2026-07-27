@@ -11,6 +11,7 @@ import { glyphForNote, PinGlyph } from "./glyphs";
 export function NoteListRow({
   note,
   snippetNode,
+  selected,
   onOpen,
   onContextMenu,
 }: {
@@ -18,6 +19,8 @@ export function NoteListRow({
   /** Replaces the plain snippet — a full-text search row passes the framed
    * match snippet with its <mark> (MatchText). Plain lists omit it. */
   snippetNode?: ReactNode | undefined;
+  /** The revealed row ("Show in Library" landed here) — the one active state. */
+  selected?: boolean | undefined;
   onOpen: (note: NoteSummary, newTab: boolean) => void;
   onContextMenu?: (e: MouseEvent, note: NoteSummary) => void;
 }) {
@@ -27,7 +30,8 @@ export function NoteListRow({
     <li>
       <button
         type="button"
-        className="recent-row"
+        className={selected ? "recent-row sel" : "recent-row"}
+        data-note-id={note.id}
         onClick={(e) => onOpen(note, e.metaKey)}
         onPointerDown={
           // drag a note/board row into Main (a plain click still opens it); files

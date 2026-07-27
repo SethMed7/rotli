@@ -472,6 +472,18 @@
 .recent-row:hover {
   background: var(--hov);
 }
+/* the revealed row ("Show in Library" landed here) — the app's ONE active
+   state: the solid accent pill, all inner ink flipped (mirrors .snrow.sel) */
+.recent-row.sel,
+.recent-row.sel:hover {
+  background: var(--accent);
+}
+.recent-row.sel .rr-title,
+.recent-row.sel .rr-snippet,
+.recent-row.sel .rr-date,
+.recent-row.sel svg {
+  color: var(--on-accent);
+}
 .recent-row .rr-icon {
   flex: 0 0 auto;
   color: var(--text-muted);

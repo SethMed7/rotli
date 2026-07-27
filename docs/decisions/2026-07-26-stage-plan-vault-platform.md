@@ -41,6 +41,15 @@ Implement `2026-07-26-vault-vs-brain.md` exactly:
 - Audit which organizer knobs are truly vault-local (trust, quiet window,
   organizing model live in the corpus's own settings sidecar — verify, and
   move anything global that should be per-vault).
+  **Audited 2026-07-27: all vault-local.** Every knob (`brainEnabled`,
+  `organizerTrust`, `organizerModel`, `organizerQuietSecs`, settings-only
+  `organizerThreshold`) lives in the vault's own `.rotli/settings.json`;
+  the daemon re-reads it per cycle (`parse_knobs`), `root_brain_enabled`
+  reads each root's own sidecar, and `corpus.json` deliberately stores none
+  of them. Secure/locked handling is hardwired at three layers, not a knob.
+  One caveat carried to the Phase 3 notes: `carry_settings` copies
+  `organizerModel` (remote-model consent) onto newly adopted vaults — per-knob
+  curation belongs to the future settings split.
 - "New vault…" in the switcher: scaffold an empty vault with the Brain/raw
   choice at creation (reuses onboarding's cards; relaunches into it).
 
@@ -52,6 +61,72 @@ Implement `2026-07-26-vault-vs-brain.md` exactly:
   honest relaunch switcher stands and this defers without shame.
 - Per-vault UI state isolation audit (panes, expansion, recents — `.rotli/`
   is per-vault, so this should mostly hold; prove it).
+
+### Spike result (2026-07-27): **NO-GO — the relaunch switcher stands**
+
+Four parallel investigations (Rust bootstrap · registry/wire grammar ·
+frontend state · UI-state isolation) against the code at `02ea52e`.
+
+**Why no-go.** "Open vault in new window" is not a window feature — it
+inverts the restart-based single-active-corpus design on five fronts at once:
+
+1. **Lifecycles have no teardown.** The per-root fs watcher and the organizer
+   daemon are detached `std::thread`s bound by value at `setup()`
+   (`lib.rs:1197`, `organizer.rs:1930`); `brain_off` only parks the organizer.
+   Live multi-vault needs stop/rebind for both, plus Breve-supervisor rebind.
+2. **The bare-id wire grammar IS the single-vault assumption.** ~12 commands
+   hard-pin `default_id` (settings/viewstate/main/views/journal/tasks), all
+   bare ids mean "the process's vault", and per-vault `.rotli/` state stores
+   bare ids on disk. Per-window binding means a window-label→root map threaded
+   through the IPC boundary or root-prefixing every id everywhere.
+3. **`settings.json` is a mixed bag.** App-global chrome (theme, OS hotkeys,
+   AI lanes, onboarded, userName) lives in the *vault's* sidecar, written
+   whole-file last-writer-wins by one elected writer (`isMainSurface`). Two
+   writer windows fork global settings per vault and clobber passthrough keys.
+   A global-vs-vault-local settings split (with migration) is a hard
+   prerequisite.
+4. **The event fabric is single-window.** Corpus/journal refresh events are
+   `emit_to("main", …)`; JS broadcasts (`rotli:quick-set`, theme, rebind)
+   assume every webview views one vault. A second content window silently
+   never refreshes.
+5. **Security regresses without new machinery.** The asset protocol has
+   `allow_directory` and no revocation in use, and `corpus.json` mutates
+   without cross-process locking — the relaunch is what currently guarantees
+   scope hygiene and registry consistency.
+
+**Cost.** Multi-window over the *same* active vault: **M** (event routing,
+QuitFlush label list, summon/blur laws — the Quick window proves the
+multi-webview pattern). Window-per-vault: **XL** — a rewrite of the `setup()`
+bootstrap into a dynamic root manager, plus the settings split, plus event
+vault-scoping, with heavy regression surface (corpus.rs ~8k lines, persist.ts,
+tauri.ts, the parity suites). Not worth it while the honest relaunch switcher
+covers the workflow.
+
+**If ever revisited, in order:** settings split (global vs vault-local) →
+teardown-capable watcher/organizer lifecycles → window→root IPC routing →
+event-fabric scoping → asset-scope revocation + corpus.json locking.
+
+### UI-state isolation audit (2026-07-27): **holds, with three findings**
+
+Everything per-vault genuinely lives in that vault's `.rotli/`
+(`settings.json` + `viewstate.json` via the single debounced writer, plus
+`main.json`/`views.json` and organizer sidecars) — panes, MRU, expansion,
+zoom, quick ids, per-note Aa styles are ISOLATED by construction. Findings:
+
+1. **`carry_settings` over-copies** (`corpus.rs:705`): adopting a fresh vault
+   copies the whole `settings.json`, including note-id-keyed maps
+   (`quickNoteIds`, `captureOrder`, `noteStyles`, `expandedDests`) that can't
+   resolve in the new vault until per-surface prunes run. Cosmetic today;
+   would need per-key curation in any settings split.
+2. **App-global prefs fork per vault by design-accident**: theme, OS-global
+   hotkeys, AI provider lanes, onboarded, userName ride the vault sidecar —
+   switching vaults can change the theme and re-register different global
+   shortcuts. Same root cause as spike item 3; fix belongs to the settings
+   split, not a point patch.
+3. **`chatWeb`/`chatMeasure` key by bare chat slug** while chats union across
+   connected brains — a slug collision across brains shares one web-egress
+   toggle (privacy-adjacent; narrow). Fix is vault-qualifying the key when the
+   settings split happens.
 
 ## Phase 4 — consolidation completion  *(Seth's explicit go, per item)*
 

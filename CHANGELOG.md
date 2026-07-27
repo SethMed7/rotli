@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The Library browser shows empty folders.** A folder with zero notes is
+  still a real folder (Finder truth) — it now renders with a 0 count instead
+  of vanishing. Searching still hides match-less folders.
+- **"Show in Library" lands on the note's exact folder.** The note menu and
+  the editor's location chip now open the Library browser with the note's
+  folder expanded, the row marked with the app's one active state, and the
+  list scrolled to it — not just the browser root.
+- **Raw vaults are visible in Settings → Location.** The notes-folder row and
+  each linked library card show the same quiet `raw` badge the vault switcher
+  uses when a vault runs without the Librarian.
+
 ### Fixed
 
 - **Editor paper-cut sweep** — a focused QA pass over tables, navigation,

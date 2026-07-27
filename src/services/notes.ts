@@ -330,6 +330,14 @@ if (!FS_MODE) {
   // A nested wiki subfolder so the tree + descendant scoping render like fs mode.
   const vaultProjects = svc.seedReserved("vault:wiki/projects", "projects", "vault:wiki");
 
+  // The corpus's OWN Library (wiki/) — mirrors fs mode, where the Librarian
+  // files notes into areas. One filed note (below) + one EMPTY area, so the
+  // System browser's Finder truths hold in the browser fixture too: empty
+  // folders render, and "Show in Library" lands on the exact folder.
+  svc.seedReserved("wiki", "wiki", null);
+  const wikiProjects = svc.seedReserved("wiki/Projects", "Projects", "wiki");
+  svc.seedReserved("wiki/People", "People", "wiki");
+
   // A couple of LOCAL user folders under Storage — path-style ids so the tree
   // renders and descendant scoping behaves exactly like fs mode.
   const storageWork = svc.seedReserved(`${DEST.storage}/Work`, "Work", DEST.storage);
@@ -456,6 +464,15 @@ Scrap this. The three-tier idea died; we went free-local + one paid sync line. K
         updatedAt: now - 5 * DAY,
         origin: localBrain.id,
       },
+    );
+
+    // —— Library: a note the Librarian filed into an area (wiki/Projects) ——
+    svc.seedNote(
+      wikiProjects.id,
+      `# Launch checklist
+
+Filed under **Projects** by the Librarian — same file, reachable from Main and the Library alike.`,
+      { createdAt: now - 2 * DAY, updatedAt: now - DAY },
     );
 
     // —— Board: loose quick-captures, the staging area. Cards, not notes — you

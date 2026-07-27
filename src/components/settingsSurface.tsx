@@ -817,6 +817,7 @@ function BrainCard({
           </span>
           {isCorpus && <span className="memex-badge">this folder</span>}
           {inst.mode && <span className="memex-badge">{inst.mode}</span>}
+          {!inst.brainEnabled && <span className="memex-badge">raw</span>}
         </div>
         <div className="mc-path">{inst.root}</div>
         <div className="mc-meta">{inst.memexId?.slice(0, 14) ?? "—"}</div>
@@ -961,6 +962,7 @@ function LocationPane() {
           ) : (
             corpusIsBrain && <span className="memex-badge write">memex</span>
           )}
+          {active && !active.brainEnabled && <span className="memex-badge">raw</span>}
         </div>
         <div className="locact">
           <button type="button" className="ghostbtn" onClick={() => void revealCorpus()}>

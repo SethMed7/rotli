@@ -4,12 +4,13 @@
 // folder structure (physical paths, never synthetic groupings), rows that
 // open/right-click/drag exactly like every other list (NoteListRow).
 
-import { useMemo, useState } from "react";
-import { projectNoteToBrain } from "../lib/noteLocation";
+import { useEffect, useMemo, useState } from "react";
+import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
 import { DEST } from "../services/destinations";
-import { useNotes, useSearchableNotes } from "../services/hooks";
+import { useFolders, useNotes, useSearchableNotes } from "../services/hooks";
 import { type SystemViewMode, filterSystemItems, groupSystemItems } from "../services/systemBrowser";
 import { usePanesStore } from "../state/panes";
+import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { Character } from "./character";
 import { ChevronRight, SearchGlyph } from "./glyphs";
@@ -60,8 +61,54 @@ export function SystemSurface({ rootId }: { rootId: string }) {
 
   const openSummary = usePanesStore((s) => s.openSummary);
   const openMenu = useNoteMenu();
-  const groups = useMemo(() => groupSystemItems(items, root.prefix, query), [items, root.prefix, query]);
+  // Empty directories are real (Finder truth) — seed the Library's folder list
+  // so a folder with zero notes still renders. Library-only for now: other
+  // roots' folder ids use disk-case paths that need their own mapping.
+  const foldersData = useFolders().data;
+  const folderSeed = useMemo(
+    () => (isLibrary ? (foldersData ?? []).filter((f) => f.id.startsWith("wiki/")).map((f) => f.id) : []),
+    [isLibrary, foldersData],
+  );
+  const groups = useMemo(
+    () => groupSystemItems(items, root.prefix, query, folderSeed),
+    [items, root.prefix, query, folderSeed],
+  );
   const flat = useMemo(() => filterSystemItems(items, query), [items, query]);
+
+  // "Show in Library" (the note menu / the editor's location chip): land on the
+  // note's EXACT folder — clear any filter, un-collapse its group, mark the row,
+  // and scroll it into view once the async items carry it (BoardSurface's
+  // proven reveal pattern; two frames so the expanded group commits first).
+  const revealNonce = useUiStore((s) => s.revealNonce);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!revealNonce) return;
+    const { revealNoteId } = useUiStore.getState();
+    if (!revealNoteId) return;
+    const target = items.find((n) => n.id === revealNoteId);
+    if (!target) return;
+    setQuery("");
+    setSelectedId(revealNoteId);
+    const path = noteDiskFolder(target);
+    setCollapsed((prev) => {
+      if (!prev.has(path)) return prev;
+      const next = new Set(prev);
+      next.delete(path);
+      return next;
+    });
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        document
+          .querySelector(`.system-browser [data-note-id="${CSS.escape(revealNoteId)}"]`)
+          ?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [revealNonce, items]);
 
   return (
     <div className="board allnotes system-browser">
@@ -97,36 +144,32 @@ export function SystemSurface({ rootId }: { rootId: string }) {
         />
       </div>
 
-      {items.length === 0 ? (
-        <div className="list-empty">
-          <Character name="rest" size={104} className="be-quokka" />
-          <p className="be-title">Nothing here</p>
-          <p className="be-sub">{root.title} is empty.</p>
-        </div>
-      ) : mode === "list" ? (
-        flat.length === 0 ? (
+      {(mode === "list" ? flat.length === 0 : groups.length === 0) ? (
+        query.trim() !== "" ? (
           <div className="list-empty">
             <p className="be-title">No matches</p>
             <p className="be-sub">Try a different search.</p>
           </div>
         ) : (
-          <div className="board-scroll">
-            <ul className="recent-list">
-              {flat.map((n) => (
-                <NoteListRow
-                  key={n.id}
-                  note={n}
-                  onOpen={(note, newTab) => openSummary(note, { newTab })}
-                  onContextMenu={openMenu}
-                />
-              ))}
-            </ul>
+          <div className="list-empty">
+            <Character name="rest" size={104} className="be-quokka" />
+            <p className="be-title">Nothing here</p>
+            <p className="be-sub">{root.title} is empty.</p>
           </div>
         )
-      ) : groups.length === 0 ? (
-        <div className="list-empty">
-          <p className="be-title">No matches</p>
-          <p className="be-sub">Try a different search.</p>
+      ) : mode === "list" ? (
+        <div className="board-scroll">
+          <ul className="recent-list">
+            {flat.map((n) => (
+              <NoteListRow
+                key={n.id}
+                note={n}
+                selected={n.id === selectedId}
+                onOpen={(note, newTab) => openSummary(note, { newTab })}
+                onContextMenu={openMenu}
+              />
+            ))}
+          </ul>
         </div>
       ) : (
         <div className="board-scroll">
@@ -155,6 +198,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
                       <NoteListRow
                         key={n.id}
                         note={n}
+                        selected={n.id === selectedId}
                         onOpen={(note, newTab) => openSummary(note, { newTab })}
                         onContextMenu={openMenu}
                       />

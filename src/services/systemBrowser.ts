@@ -49,8 +49,15 @@ function relLabel(path: string, rootPrefix: string): string {
 
 /** Group scoped items by their real folder (Folders mode): root items first,
  * then folders in path order, each folder's items pinned→recency. The search
- * query filters ITEMS — a folder with no matches disappears entirely. */
-export function groupSystemItems(items: NoteSummary[], rootPrefix: string, query: string): SystemGroup[] {
+ * query filters ITEMS — a folder with no matches disappears entirely.
+ * `folderPaths` seeds EMPTY directories (Finder truth: an empty folder exists)
+ * while the query is blank; searching still removes match-less folders. */
+export function groupSystemItems(
+  items: NoteSummary[],
+  rootPrefix: string,
+  query: string,
+  folderPaths: readonly string[] = [],
+): SystemGroup[] {
   const filtered = filterSystemItems(items, query);
   const byPath = new Map<string, NoteSummary[]>();
   for (const n of filtered) {
@@ -58,6 +65,11 @@ export function groupSystemItems(items: NoteSummary[], rootPrefix: string, query
     const list = byPath.get(path) ?? [];
     list.push(n);
     byPath.set(path, list);
+  }
+  if (query.trim() === "") {
+    for (const p of folderPaths) {
+      if (!byPath.has(p)) byPath.set(p, []);
+    }
   }
   const paths = [...byPath.keys()].sort((a, b) => a.localeCompare(b));
   const groups: SystemGroup[] = [];
