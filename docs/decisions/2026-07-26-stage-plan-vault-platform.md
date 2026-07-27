@@ -134,6 +134,12 @@ zoom, quick ids, per-note Aa styles are ISOLATED by construction. Findings:
   stays internal/contract-level where renaming would churn ids or paths).
 - External steps, each individually Seth-authorized: archive `SethMed7/memex`,
   repoint memex-vault tooling references, update CLAUDE.md guidance.
+  **Executed 2026-07-27 (Seth's go, all three):** `SethMed7/memex` is archived
+  read-only with a retirement notice pointing at rotli (its local clone
+  `~/memex` stays as reference); memex-vault's tooling needed **no** repointing
+  — its contracts are self-contained and only a historical CHANGELOG entry
+  mentions the repo (history stays); the home `CLAUDE.md` guidance now
+  describes the memex structure as rotli's vault format.
 
 ## From the ZenNotes analysis
 
