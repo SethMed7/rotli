@@ -10,6 +10,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Editor paper-cut sweep** — a focused QA pass over tables, navigation,
+  indentation, and checkboxes (16 defects confirmed by adversarial review;
+  all 16 fixed):
+  - **A pipe typed into a table cell can no longer eat its neighbor.** Cell
+    pipes now serialize as GFM `\|`, pasted tables with escaped pipes parse
+    correctly, and serialization pads short rows but **never truncates** long
+    ones — the three paths that silently deleted cell content are closed.
+  - **Prose + `---` is not a table.** A delimiter row must match the header's
+    cell count (the GFM rule), so "Alpha | Beta" above a `---` divider stays
+    text instead of being swallowed into a table widget that rewrote the `---`.
+  - **Tab is never stuck in a ragged table row** — missing cells are skipped
+    and Tab past the last real cell grows the table, as always.
+  - **Fenced code is grammar-free.** Space after `[]`, Enter after a dash
+    line, and Tab inside a ``` fence no longer rewrite your code with list
+    markers or task boxes.
+  - **Numbered lists renumber on Enter.** Inserting an item mid-list bumps
+    every following sibling (1. 2. 2. is gone); nested items ride along.
+  - **Format-bar toggles respect indentation.** Bullet/numbered/checklist on
+    a Tab-nested line toggles its own marker instead of stacking a second one
+    at column 0 — and over a multi-line selection they now toggle every
+    spanned line and keep the selection.
+  - **The task shorthand is more forgiving**: `- []`+Space upgrades an
+    existing bullet, and a pasted tab indent normalizes to spaces so the task
+    renders.
+  - **Enter at the very start of an empty list item** inserts a line above
+    instead of silently eating the marker.
+  - **Back/Forward forgets discarded notes** — closing an untouched new note
+    removes it from the trail, so Forward can't reopen a note that no longer
+    exists; filing a note to the Brain now retargets trail entries the same
+    way it retargets open tabs (board and chat renames follow suit, and a
+    file moved to Trash leaves the trail).
+  - **Back/Forward remembers boards, chats, and files** — every content
+    surface now enters the trail, so Back from a board returns to the board's
+    predecessor instead of skipping to the last note. Replay also reuses the
+    surface's open tab in *any* pane — no more duplicate tabs spawning in
+    whichever pane happens to hold focus.
+
 ## [0.37.0] - 2026-07-26
 
 

@@ -14,8 +14,9 @@
 //   the last row exits below the table — so the pipes never need
 //   hand-navigation and Enter can't split a row.
 
-import { EditorSelection } from "@codemirror/state";
+import { EditorSelection, type EditorState, type Line } from "@codemirror/state";
 import type { Command, EditorView, KeyBinding } from "@codemirror/view";
+import { lineInFence, scanFences } from "./fences";
 import {
   type CellRef,
   type TableBlock,
@@ -25,6 +26,12 @@ import {
   scanTables,
   tableToText,
 } from "./tables";
+
+/** Fenced code is grammar-free: no list continuation, no task shorthand, no
+ * list indent — `[]` or `- item` inside a ``` fence is the user's code. */
+function inFence(view: EditorView, line: Line): boolean {
+  return lineInFence(line.from, scanFences(view.state.doc));
+}
 
 /** The list grammar (column-0 markers, optional leading indent), identical to
  * the renderer's: bullets, numbered (count up), tasks (reset to unchecked),
@@ -44,12 +51,40 @@ function listPrefixOf(line: string): { prefixLen: number; next: string; empty: b
   };
 }
 
+/** After inserting a numbered item, renumber the following SAME-indent siblings
+ * (2 → 3 → …) so the list never shows duplicate numbers. Deeper-indented items
+ * ride along untouched; anything else (blank, bullet, prose) ends the list. */
+function renumberAfter(state: EditorState, line: Line, nextMarker: string) {
+  const marker = /^( *)(\d+)\. $/.exec(nextMarker);
+  if (!marker) return [];
+  const indent = marker[1]?.length ?? 0;
+  let num = Number(marker[2]);
+  const changes: { from: number; to: number; insert: string }[] = [];
+  for (let n = line.number + 1; n <= state.doc.lines; n++) {
+    const l = state.doc.line(n);
+    const m = /^( *)(\d+)\. /.exec(l.text);
+    if (!m) break;
+    const ind = m[1]?.length ?? 0;
+    if (ind > indent) continue;
+    if (ind < indent) break;
+    num++;
+    if (Number(m[2]) !== num) {
+      changes.push({ from: l.from + ind, to: l.from + ind + (m[2]?.length ?? 0), insert: String(num) });
+    }
+  }
+  return changes;
+}
+
 const enterContinueList: Command = (view) => {
   const range = view.state.selection.main;
   if (!range.empty) return false; // a selection-replacing Enter → default split
   const line = view.state.doc.lineAt(range.head);
+  if (inFence(view, line)) return false;
   const list = listPrefixOf(line.text);
   if (!list) return false;
+  // caret inside/before the marker → let the default newline run (an Enter at
+  // column 0 of an empty item must insert a line above, never eat the marker)
+  if (range.head - line.from < list.prefixLen) return false;
   if (list.empty) {
     // Enter on an empty list item exits the list (clears the marker)
     view.dispatch({
@@ -60,17 +95,14 @@ const enterContinueList: Command = (view) => {
     });
     return true;
   }
-  if (range.head - line.from >= list.prefixLen) {
-    const insert = `\n${list.next}`;
-    view.dispatch({
-      changes: { from: range.head, insert },
-      selection: EditorSelection.cursor(range.head + insert.length),
-      scrollIntoView: true,
-      userEvent: "input",
-    });
-    return true;
-  }
-  return false; // caret inside the marker → let the default newline run
+  const insert = `\n${list.next}`;
+  view.dispatch({
+    changes: [{ from: range.head, insert }, ...renumberAfter(view.state, line, list.next)],
+    selection: EditorSelection.cursor(range.head + insert.length),
+    scrollIntoView: true,
+    userEvent: "input",
+  });
+  return true;
 };
 
 const tabIndent: Command = (view) => {
@@ -87,8 +119,8 @@ const tabIndent: Command = (view) => {
     view.dispatch({ changes, userEvent: "input.indent" });
     return true;
   }
-  // a list line nests; a plain line gets a soft tab at the caret
-  if (listPrefixOf(startLine.text)) {
+  // a list line nests; a plain (or fenced-code) line gets a soft tab at the caret
+  if (!inFence(view, startLine) && listPrefixOf(startLine.text)) {
     view.dispatch({ changes: { from: startLine.from, insert: "  " }, userEvent: "input.indent" });
   } else {
     view.dispatch(state.replaceSelection("  "));
@@ -115,10 +147,14 @@ const taskOnSpace: Command = (view) => {
   const range = view.state.selection.main;
   if (!range.empty) return false;
   const line = view.state.doc.lineAt(range.head);
+  if (inFence(view, line)) return false; // code is code — never rewrite it
   const before = line.text.slice(0, range.head - line.from);
-  const m = /^(\s*)\[ ?\]$/.exec(before);
+  // "[ ]"/"[]" at line start — optionally after an existing bullet ("- []"
+  // upgrades the bullet to a task). Pasted tab indents normalize to the two
+  // spaces the rest of the grammar speaks.
+  const m = /^(\s*)(?:- )?\[ ?\]$/.exec(before);
   if (!m) return false; // not a task shorthand → space types normally
-  const prefix = `${m[1] ?? ""}- [ ] `;
+  const prefix = `${(m[1] ?? "").replace(/\t/g, "  ")}- [ ] `;
   view.dispatch({
     changes: { from: line.from, to: range.head, insert: prefix },
     selection: EditorSelection.cursor(line.from + prefix.length),
@@ -180,6 +216,16 @@ function appendRow(view: EditorView, t: TableBlock): void {
   });
 }
 
+/** Whether a cell address exists in the SOURCE — a ragged (pasted/hand-edited)
+ * row can have fewer cells than the header, and hopping must skip the holes or
+ * Tab would reselect the same clamped cell forever. */
+function cellExists(view: EditorView, t: TableBlock, ref: CellRef): boolean {
+  if (ref.row === -1) return ref.col < t.header.length;
+  const headLine = view.state.doc.lineAt(t.from);
+  const line = view.state.doc.line(headLine.number + ref.row + 2);
+  return ref.col < cellSpansOf(line.text).length;
+}
+
 const tableTab: Command = (view) => {
   const ctx = tableCtxAt(view);
   if (!ctx) return false;
@@ -190,7 +236,8 @@ const tableTab: Command = (view) => {
     else appendRow(view, t);
     return true;
   }
-  const next = nextCell(t, ref, 1);
+  let next = nextCell(t, ref, 1);
+  while (next && !cellExists(view, t, next)) next = nextCell(t, next, 1);
   if (next) selectCell(view, t, next);
   else appendRow(view, t); // Tab past the last cell grows the table
   return true;
@@ -200,7 +247,8 @@ const tableShiftTab: Command = (view) => {
   const ctx = tableCtxAt(view);
   if (!ctx) return false;
   const { t, ref } = ctx;
-  const prev = ref ? nextCell(t, ref, -1) : { row: -1, col: Math.max(0, t.header.length - 1) };
+  let prev = ref ? nextCell(t, ref, -1) : { row: -1, col: Math.max(0, t.header.length - 1) };
+  while (prev && !cellExists(view, t, prev)) prev = nextCell(t, prev, -1);
   if (prev) selectCell(view, t, prev);
   return true; // trap ⇧Tab inside a table either way
 };

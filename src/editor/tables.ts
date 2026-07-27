@@ -37,15 +37,37 @@ function parseDelimiter(s: string): Align[] | null {
 }
 
 /** Split a `| a | b |` row into trimmed cells, dropping the empty edges that the
- * optional leading/trailing pipes produce. */
+ * optional leading/trailing pipes produce. GFM's `\|` is an escaped pipe — cell
+ * CONTENT, unescaped here (tableToText re-escapes on serialize); `\\` stays a
+ * literal pair so an escaped backslash can still sit before a real separator. */
 export function splitRow(s: string): string[] {
-  const cells = s
-    .trim()
-    .split("|")
-    .map((c) => c.trim());
-  if (cells.length && cells[0] === "") cells.shift();
-  if (cells.length && cells[cells.length - 1] === "") cells.pop();
-  return cells;
+  const t = s.trim();
+  const cells: string[] = [];
+  let cur = "";
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i]!;
+    if (ch === "\\" && t[i + 1] === "|") {
+      cur += "|";
+      i++;
+      continue;
+    }
+    if (ch === "\\" && i + 1 < t.length) {
+      cur += ch + t[i + 1];
+      i++;
+      continue;
+    }
+    if (ch === "|") {
+      cells.push(cur);
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  cells.push(cur);
+  const out = cells.map((c) => c.trim());
+  if (out.length && out[0] === "") out.shift();
+  if (out.length && out[out.length - 1] === "") out.pop();
+  return out;
 }
 
 /** All GFM tables in the doc, in order. Fenced code is OPAQUE: a pipe-table
@@ -63,7 +85,10 @@ export function scanTables(doc: Text): TableBlock[] {
     if (looksLikeRow(headLine.text) && !lineInFence(headLine.from, fences)) {
       const align = parseDelimiter(delimLine.text);
       const header = splitRow(headLine.text);
-      if (align && header.length > 0) {
+      // GFM: the delimiter row's cell count must EQUAL the header's, or there is
+      // no table at all — otherwise "Alpha | Beta" over a --- divider would be
+      // swallowed into a bogus widget and the first op would rewrite the ---.
+      if (align && header.length > 0 && align.length === header.length) {
         // gather data rows until a blank / non-row line
         const rows: string[][] = [];
         let last = n + 1;
@@ -118,10 +143,15 @@ export interface CellSpan {
 }
 
 export function cellSpansOf(line: string): CellSpan[] {
-  // walk the raw line splitting on `|` (splitRow's grammar) but keeping offsets
+  // walk the raw line splitting on `|` (splitRow's grammar, escape pairs kept
+  // opaque so `\|` never separates) but keeping offsets
   const segs: { s: number; e: number }[] = [];
   let start = 0;
   for (let i = 0; i <= line.length; i++) {
+    if (i < line.length && line[i] === "\\" && i + 1 < line.length) {
+      i++;
+      continue;
+    }
     if (i === line.length || line[i] === "|") {
       segs.push({ s: start, e: i });
       start = i + 1;
@@ -151,11 +181,15 @@ function delimCell(a: Align, w: number): string {
   return dashes(w);
 }
 
-/** Serialize a shape back to markdown (no trailing newline). Rows are normalized
- * to the header's column count; columns pad to their widest cell. */
+/** Serialize a shape back to markdown (no trailing newline). Short rows pad to
+ * the header's column count; long (ragged) rows keep their overflow cells —
+ * truncation was silent data loss. Cell pipes serialize as GFM `\|` so a pipe
+ * typed into a cell can never split it. Columns pad to their widest cell. */
 export function tableToText(t: TableShape): string {
   const cols = Math.max(1, t.header.length);
-  const norm = (r: string[]) => Array.from({ length: cols }, (_, i) => r[i] ?? "");
+  const esc = (c: string) => c.replace(/\|/g, "\\|");
+  const norm = (r: string[]) =>
+    (r.length > cols ? r : Array.from({ length: cols }, (_, i) => r[i] ?? "")).map(esc);
   const header = norm(t.header);
   const rows = t.rows.map(norm);
   const widths = Array.from({ length: cols }, (_, i) =>

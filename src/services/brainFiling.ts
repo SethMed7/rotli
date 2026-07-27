@@ -28,8 +28,9 @@ export async function fileNoteToArea(
   const title = (rel.split("/").pop() ?? rel).replace(/-[a-z0-9]{6}\.md$/i, "").replace(/\.md$/, "");
   await corpusSetAiField(rel, "area", area);
   const newRel = await corpusFileNote(rel);
-  // a .md note's wire id is its ULID and survives the move — only a tab that was
-  // opened BY rel path needs retargeting (a no-op otherwise).
+  // a .md note's wire id is its ULID and survives the move — only a tab (or a
+  // Back/Forward trail entry) that was opened BY rel path needs retargeting
+  // (a no-op otherwise; retargetNote retargets the trail alongside the tabs).
   usePanesStore.getState().retargetNote(rel, newRel);
   if (opts?.journal !== false) {
     await logAction({

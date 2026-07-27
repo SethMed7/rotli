@@ -10,8 +10,12 @@ import {
   backId,
   canBack,
   canForward,
+  dropNav,
   forwardId,
+  navEntry,
+  parseNavEntry,
   pushNav,
+  rewriteNav,
   stepNav,
 } from "./navHistory";
 
@@ -93,5 +97,74 @@ describe("stepNav + can/at helpers", () => {
     expect(canForward(EMPTY_NAV)).toBe(false);
     expect(backId(EMPTY_NAV)).toBe(null);
     expect(forwardId(EMPTY_NAV)).toBe(null);
+  });
+});
+
+// paper-cut sweep 2026-07-27: a hard-discarded blank note must leave the trail
+// (Forward must never reopen a note that no longer exists), and Brain filing
+// retargets rel-path entries the way it already retargets open tabs.
+describe("dropNav", () => {
+  test("removes every occurrence and keeps the cursor on its entry", () => {
+    let s = pushNav(pushNav(pushNav(EMPTY_NAV, "a"), "n"), "b"); // [a n b] @2
+    s = dropNav(s, "n");
+    expect(s).toEqual({ stack: ["a", "b"], index: 1 });
+  });
+
+  test("dropping the CURRENT entry lands the cursor on the previous survivor", () => {
+    const s = dropNav(pushNav(pushNav(EMPTY_NAV, "a"), "n"), "n"); // [a n] @1
+    expect(s).toEqual({ stack: ["a"], index: 0 });
+  });
+
+  test("collapses the adjacent duplicates a removal creates", () => {
+    let s = pushNav(pushNav(pushNav(EMPTY_NAV, "a"), "n"), "a"); // [a n a] @2
+    s = dropNav(s, "n");
+    expect(s).toEqual({ stack: ["a"], index: 0 });
+  });
+
+  test("an id not in the trail is a no-op (same object)", () => {
+    const s = pushNav(EMPTY_NAV, "a");
+    expect(dropNav(s, "zz")).toBe(s);
+  });
+
+  test("dropping the only entry empties the trail", () => {
+    expect(dropNav(pushNav(EMPTY_NAV, "a"), "a")).toEqual({ stack: [], index: -1 });
+  });
+});
+
+describe("rewriteNav", () => {
+  test("maps every occurrence to the new id, cursor unmoved", () => {
+    let s = pushNav(pushNav(pushNav(EMPTY_NAV, "old"), "b"), "old"); // [old b old] @2
+    s = stepNav(s, -1); // @1
+    s = rewriteNav(s, "old", "new");
+    expect(s).toEqual({ stack: ["new", "b", "new"], index: 1 });
+  });
+
+  test("collapses adjacent duplicates the rewrite creates", () => {
+    const s = rewriteNav(pushNav(pushNav(EMPTY_NAV, "a"), "old"), "old", "a"); // [a old] @1
+    expect(s).toEqual({ stack: ["a"], index: 0 });
+  });
+
+  test("an id not in the trail is a no-op (same object)", () => {
+    const s = pushNav(EMPTY_NAV, "a");
+    expect(rewriteNav(s, "zz", "yy")).toBe(s);
+  });
+});
+
+// paper-cut sweep 2026-07-27 (#6): the trail records every CONTENT surface —
+// notes stay bare ids (compat with drop/retarget callers), boards/chats/files
+// carry a kind prefix so replay can dispatch to the right opener.
+describe("navEntry / parseNavEntry", () => {
+  test("notes stay bare ids — ULIDs and rel paths alike", () => {
+    expect(navEntry("note", "01HZX")).toBe("01HZX");
+    expect(parseNavEntry("01HZX")).toEqual({ kind: "note", id: "01HZX" });
+    expect(parseNavEntry("wiki/_inbox/foo.md")).toEqual({ kind: "note", id: "wiki/_inbox/foo.md" });
+  });
+
+  test("canvas, chat, and file entries round-trip through their prefix", () => {
+    for (const kind of ["canvas", "chat", "file"] as const) {
+      const entry = navEntry(kind, "storage/x.bin");
+      expect(entry).toBe(`${kind}:storage/x.bin`);
+      expect(parseNavEntry(entry)).toEqual({ kind, id: "storage/x.bin" });
+    }
   });
 });

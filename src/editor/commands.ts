@@ -154,17 +154,35 @@ const BLOCK_RULES: Record<BlockToggle, { add: string; test: RegExp }> = {
 };
 
 export function blockToggleActive(line: string, kind: BlockToggle): boolean {
-  return BLOCK_RULES[kind].test.test(line);
+  return BLOCK_RULES[kind].test.test(line.replace(/^\s*/, ""));
 }
 
+/** Toggle a block prefix AFTER any leading indent — a Tab-nested "  - child"
+ * toggles its own marker in place; the indent always survives. */
 export function applyBlockToggle(line: string, kind: BlockToggle): PrefixEdit {
+  const indent = /^\s*/.exec(line)?.[0] ?? "";
+  const rest = line.slice(indent.length);
   const rule = BLOCK_RULES[kind];
-  const on = rule.test.exec(line);
+  const on = rule.test.exec(rest);
   if (on) {
-    const next = line.slice(on[0].length);
+    const next = indent + rest.slice(on[0].length);
     return { line: next, delta: -on[0].length };
   }
-  const stripped = line.replace(ANY_BLOCK_PREFIX, "");
-  const next = rule.add + stripped;
+  const stripped = rest.replace(ANY_BLOCK_PREFIX, "");
+  const next = indent + rule.add + stripped;
   return { line: next, delta: next.length - line.length };
+}
+
+/** The multi-line selection policy (the format bar over N lines): if every
+ * non-blank line already carries the marker, toggle them all OFF; otherwise
+ * turn the missing ones ON and leave marked lines untouched. Blank lines never
+ * gain a marker. Returns one replacement per input line — null = untouched. */
+export function applyBlockToggleAll(lines: string[], kind: BlockToggle): (string | null)[] {
+  const targets = lines.filter((t) => t.trim() !== "");
+  const allOn = targets.length > 0 && targets.every((t) => blockToggleActive(t, kind));
+  return lines.map((t) => {
+    if (t.trim() === "") return null;
+    if (!allOn && blockToggleActive(t, kind)) return null;
+    return applyBlockToggle(t, kind).line;
+  });
 }

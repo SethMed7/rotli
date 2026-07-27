@@ -53,11 +53,13 @@ describe("tableToText", () => {
     expect(reparse(shape())).toEqual(shape());
   });
 
-  test("normalizes ragged rows to the header's column count", () => {
+  test("pads short rows to the header's column count, NEVER truncates long ones", () => {
+    // truncation was silent data loss (paper-cut sweep 2026-07-27): a ragged-long
+    // row (pasted or hand-edited) must keep its overflow cells in the source
     const t: TableShape = { header: ["a", "b"], align: ["", ""], rows: [["only"], ["x", "y", "z"]] };
     expect(reparse(t).rows).toEqual([
       ["only", ""],
-      ["x", "y"],
+      ["x", "y", "z"],
     ]);
   });
 
@@ -90,6 +92,53 @@ describe("scanTables + fences (#13)", () => {
     expect(tables.length).toBe(1);
     expect(tables[0]?.header).toEqual(["real", "table"]);
     expect(tables[0]?.from).toBe(doc.line(8).from);
+  });
+});
+
+describe("escaped pipes (GFM \\|) — paper-cut sweep 2026-07-27", () => {
+  test("splitRow treats \\| as cell content, not a separator", () => {
+    expect(splitRow("| a \\| b | keepme |")).toEqual(["a | b", "keepme"]);
+  });
+
+  test("an escaped backslash before a pipe still separates (\\\\ then |)", () => {
+    expect(splitRow("| a \\\\ | b |")).toEqual(["a \\\\", "b"]);
+  });
+
+  test("cellSpansOf skips escaped pipes so spans match splitRow's cells", () => {
+    const line = "| a \\| b | keepme |";
+    const spans = cellSpansOf(line);
+    expect(spans.length).toBe(2);
+    expect(line.slice(spans[0]!.start, spans[0]!.end)).toBe("a \\| b");
+    expect(line.slice(spans[1]!.start, spans[1]!.end)).toBe("keepme");
+  });
+
+  test("tableToText escapes pipes typed into a cell — the round-trip is lossless", () => {
+    const t: TableShape = { header: ["a", "b"], align: ["", ""], rows: [["5 | 6", "x"]] };
+    expect(tableToText(t)).toContain("5 \\| 6");
+    expect(reparse(t)).toEqual(t);
+  });
+
+  test("a pasted GFM table with \\| survives a row op without losing cells", () => {
+    const doc = Text.of(["| cmd | desc |", "| --- | --- |", "| a \\| b | keepme |"]);
+    const t = scanTables(doc)[0]!;
+    expect(t.rows).toEqual([["a | b", "keepme"]]);
+    const after = tableToText(addRowBelow(t, 0));
+    expect(after).toContain("keepme");
+    expect(after).toContain("a \\| b");
+  });
+});
+
+describe("delimiter/header cell counts must match (GFM) — paper-cut sweep 2026-07-27", () => {
+  test("a bare --- under a piped prose line is NOT a table", () => {
+    // "Alpha | Beta" then a --- divider: GFM requires the delimiter row's cell
+    // count to equal the header's; otherwise no table exists at all
+    expect(scanTables(Text.of(["Alpha | Beta", "---"]))).toEqual([]);
+  });
+
+  test("a matching delimiter still forms a table", () => {
+    const t = scanTables(Text.of(["Alpha | Beta", "--- | ---"]));
+    expect(t.length).toBe(1);
+    expect(t[0]!.header).toEqual(["Alpha", "Beta"]);
   });
 });
 

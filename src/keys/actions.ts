@@ -27,7 +27,7 @@ import {
 } from "../documents/draftComposition";
 import type { NewItemKind } from "../newItems/model";
 import { navigate } from "../state/navHistory";
-import { findLeaf, leaves, usePanesStore } from "../state/panes";
+import { findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
 import { cycleQuick, removeQuickNote } from "../state/quick";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
 import { registerAction } from "./registry";
@@ -156,7 +156,7 @@ export function registerDefaultActions(): void {
     defaultChord: "Meta+BracketLeft",
     run: () => {
       if (!notesWorkspaceActive()) return;
-      navigate(-1, (id) => usePanesStore.getState().openNote(id));
+      navigate(-1, openNavTarget);
     },
   });
   registerAction({
@@ -165,7 +165,7 @@ export function registerDefaultActions(): void {
     defaultChord: "Meta+BracketRight",
     run: () => {
       if (!notesWorkspaceActive()) return;
-      navigate(1, (id) => usePanesStore.getState().openNote(id));
+      navigate(1, openNavTarget);
     },
   });
   registerAction({

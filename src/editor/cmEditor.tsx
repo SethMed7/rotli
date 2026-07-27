@@ -21,6 +21,7 @@ import { rotliKeymap } from "./cmKeymap";
 import {
   type EditorHandle,
   applyBlockToggle,
+  applyBlockToggleAll,
   applyHeading,
   registerEditor,
   toggleInlineMark,
@@ -257,7 +258,32 @@ export function CmEditor({
       const view = viewRef.current;
       if (!view) return;
       const r = view.state.selection.main;
-      const line = view.state.doc.lineAt(r.head);
+      const startLine = view.state.doc.lineAt(r.from);
+      const endLine = view.state.doc.lineAt(r.to);
+      // a multi-line selection toggles every spanned line (mixed → all on,
+      // uniformly on → all off) and KEEPS the selection
+      if (startLine.number !== endLine.number) {
+        const lines = [];
+        for (let n = startLine.number; n <= endLine.number; n++) lines.push(view.state.doc.line(n));
+        const next = applyBlockToggleAll(
+          lines.map((l) => l.text),
+          kind,
+        );
+        const changes = lines.flatMap((l, i) => {
+          const insert = next[i];
+          return insert == null ? [] : [{ from: l.from, to: l.to, insert }];
+        });
+        if (changes.length === 0) return;
+        const set = view.state.changes(changes);
+        view.dispatch({
+          changes: set,
+          selection: EditorSelection.range(set.mapPos(r.anchor), set.mapPos(r.head)),
+          scrollIntoView: true,
+        });
+        view.focus();
+        return;
+      }
+      const line = startLine;
       const res = applyBlockToggle(line.text, kind);
       const col = clamp(r.head - line.from + res.delta, 0, res.line.length);
       view.dispatch({

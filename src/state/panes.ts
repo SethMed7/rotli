@@ -19,7 +19,14 @@ import { clamp } from "../lib/clamp";
 import { initialNoteId, ulid } from "../services/notes";
 import type { LeafNode, PaneNode, SplitDir, Tab } from "../types";
 import { touchMru } from "./mru";
-import { recordNav } from "./navHistory";
+import {
+  type NavKind,
+  dropNavEntry,
+  navEntry,
+  parseNavEntry,
+  recordNav,
+  retargetNavEntry,
+} from "./navHistory";
 import { useUiStore } from "./ui";
 
 const MIN_PANE_WIDTH = 320;
@@ -329,6 +336,10 @@ interface PanesState {
   openSummary: (note: { id: string; kind?: string }, opts?: { newTab?: boolean }) => void;
   /** Bind a freshly-created chat (in `paneId`'s active chat tab) to its new slug. */
   bindChat: (paneId: string, chatSlug: string) => void;
+  /** Focus + activate the surface's open tab in ANY pane (Back/Forward replay
+   * must reuse work, never spawn a duplicate in whichever pane holds focus).
+   * Returns false when the surface is nowhere open. */
+  activateSurface: (kind: NavKind, id: string) => boolean;
   closeTab: () => void;
   closeTabById: (paneId: string, tabId: string) => void;
   activateTab: (paneId: string, tabId: string) => void;
@@ -351,6 +362,18 @@ interface PanesState {
 const initialLeaf = makeLeaf(makeTab(initialNoteId));
 touchMru(initialNoteId); // the note the window opens on is the freshest "recent"
 recordNav(initialNoteId); // …and the first entry in the Back/Forward trail (#14)
+
+/** Re-open a Back/Forward trail entry: reuse the surface's open tab in any
+ * pane first (#7), else dispatch to the opener its kind names (#6). */
+export function openNavTarget(entry: string): void {
+  const { kind, id } = parseNavEntry(entry);
+  const panes = usePanesStore.getState();
+  if (panes.activateSurface(kind, id)) return;
+  if (kind === "canvas") panes.openCanvas(id);
+  else if (kind === "chat") panes.openChat(id);
+  else if (kind === "file") panes.openFile(id);
+  else panes.openNote(id);
+}
 
 /** Before a row split: does one more column fit at the 320px floor?
  * Auto-collapse the ONE sidebar if that's what it takes (Seth, 2026-06-13: the
@@ -439,6 +462,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
     openCanvas: (boardId, opts) => {
       // boards aren't notes — no touchMru. Like openNote, surface the panes.
+      recordNav(navEntry("canvas", boardId)); // #6: boards join the trail
       useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
       set({
@@ -453,29 +477,36 @@ export const usePanesStore = create<PanesState>((set, get) => {
       });
     },
 
-    retargetBoard: (oldId, newId) =>
+    retargetBoard: (oldId, newId) => {
+      retargetNavEntry(navEntry("canvas", oldId), navEntry("canvas", newId));
       set((s) => ({
         root: mapAllTabs(s.root, (t) =>
           t.surfaceKind === "canvas" && t.boardId === oldId ? { ...t, boardId: newId } : t,
         ),
-      })),
+      }));
+    },
 
-    retargetNote: (oldId, newId) =>
+    retargetNote: (oldId, newId) => {
+      retargetNavEntry(oldId, newId); // the trail follows the move like the tabs do
       set((s) => ({
         root: mapAllTabs(s.root, (t) =>
           t.surfaceKind === "note" && t.noteId === oldId ? { ...t, noteId: newId } : t,
         ),
-      })),
+      }));
+    },
 
-    retargetChat: (oldSlug, newSlug) =>
+    retargetChat: (oldSlug, newSlug) => {
+      retargetNavEntry(navEntry("chat", oldSlug), navEntry("chat", newSlug));
       set((s) => ({
         root: mapAllTabs(s.root, (t) =>
           t.surfaceKind === "chat" && t.chatSlug === oldSlug ? { ...t, chatSlug: newSlug } : t,
         ),
-      })),
+      }));
+    },
 
     openChat: (chatSlug, opts) => {
       // chats aren't notes — no touchMru. Like openCanvas, surface the panes.
+      if (chatSlug) recordNav(navEntry("chat", chatSlug)); // fresh null chats have no identity yet
       useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
       // a fresh chat (null slug — "New chat") is ALWAYS a new tab; a saved chat
@@ -495,6 +526,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
     openFile: (fileId, opts) => {
       // files aren't notes — no touchMru. Like openCanvas, surface the panes.
+      recordNav(navEntry("file", fileId)); // #6: surfaced files join the trail
       useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
       set({
@@ -510,6 +542,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
     },
 
     closeFileTabs: (fileId) => {
+      dropNavEntry(navEntry("file", fileId)); // the file left the corpus — Forward must not chase it
       // Snapshot identities first: closeTabById can collapse leaves, so walking
       // and mutating the live tree in one pass would skip tabs after a collapse.
       const targets = leaves(get().root).flatMap((leaf) =>
@@ -561,7 +594,8 @@ export const usePanesStore = create<PanesState>((set, get) => {
       else get().openNote(note.id, opts);
     },
 
-    bindChat: (paneId, chatSlug) =>
+    bindChat: (paneId, chatSlug) => {
+      recordNav(navEntry("chat", chatSlug)); // the fresh chat just gained its identity
       set((s) => ({
         root: updateLeaf(s.root, paneId, (l) => ({
           ...l,
@@ -569,7 +603,31 @@ export const usePanesStore = create<PanesState>((set, get) => {
             t.id === l.activeTabId && t.surfaceKind === "chat" ? { ...t, chatSlug } : t,
           ),
         })),
-      })),
+      }));
+    },
+
+    activateSurface: (kind, id) => {
+      const match = (t: Tab): boolean =>
+        kind === "note"
+          ? t.surfaceKind === "note" && t.noteId === id
+          : kind === "canvas"
+            ? t.surfaceKind === "canvas" && t.boardId === id
+            : kind === "chat"
+              ? t.surfaceKind === "chat" && t.chatSlug === id
+              : t.surfaceKind === "file" && t.fileId === id;
+      for (const l of leaves(get().root)) {
+        const hit = l.tabs.find(match);
+        if (hit) {
+          useUiStore.getState().setContentView("panes");
+          set({
+            focusedPaneId: l.id,
+            root: updateLeaf(get().root, l.id, (leaf) => ({ ...leaf, activeTabId: hit.id })),
+          });
+          return true;
+        }
+      }
+      return false;
+    },
 
     closeTab: () => {
       const leaf = focusedLeaf();

@@ -5,7 +5,8 @@
 
 import { beforeEach, describe, expect, test } from "bun:test";
 import type { LeafNode, Tab } from "../types";
-import { findLeaf, sidebarItemId, usePanesStore } from "./panes";
+import { useNavHistory } from "./navHistory";
+import { findLeaf, openNavTarget, sidebarItemId, usePanesStore } from "./panes";
 
 const tab = (id: string): Tab => ({
   id,
@@ -202,5 +203,111 @@ describe("closeFileTabs — remove a trashed asset from every pane", () => {
     const [remaining] = findLeaf(usePanesStore.getState().root, "p1")?.tabs ?? [];
     expect(remaining?.surfaceKind).toBe("note");
     if (remaining?.surfaceKind === "note") expect(remaining.noteId).toBe("");
+  });
+});
+
+// paper-cut sweep 2026-07-27 (#6/#7): every content surface enters the
+// Back/Forward trail (Activity stays out — the same meta-surface rule as
+// sidebarItemId), and replay reuses an open tab in ANY pane instead of
+// spawning a duplicate in whichever pane happens to hold focus.
+describe("the nav trail records every content surface", () => {
+  beforeEach(() => {
+    usePanesStore.setState({ root: leaf("p1", ["A"]), focusedPaneId: "p1" });
+    useNavHistory.setState({ stack: [], index: -1, suppress: false });
+  });
+
+  test("openCanvas records a canvas: entry", () => {
+    usePanesStore.getState().openCanvas("storage/plan.excalidraw");
+    expect(useNavHistory.getState().stack).toEqual(["canvas:storage/plan.excalidraw"]);
+  });
+
+  test("openFile records a file: entry", () => {
+    usePanesStore.getState().openFile("storage/ref.pdf");
+    expect(useNavHistory.getState().stack).toEqual(["file:storage/ref.pdf"]);
+  });
+
+  test("openChat records saved chats; a fresh null chat records nothing", () => {
+    usePanesStore.getState().openChat(null);
+    expect(useNavHistory.getState().stack).toEqual([]);
+    usePanesStore.getState().openChat("daily");
+    expect(useNavHistory.getState().stack).toEqual(["chat:daily"]);
+  });
+
+  test("bindChat records the newly-bound slug (the fresh chat gained identity)", () => {
+    usePanesStore.getState().openChat(null);
+    usePanesStore.getState().bindChat("p1", "fresh-chat");
+    expect(useNavHistory.getState().stack).toEqual(["chat:fresh-chat"]);
+  });
+
+  test("openActivity records nothing (meta surface)", () => {
+    usePanesStore.getState().openActivity();
+    expect(useNavHistory.getState().stack).toEqual([]);
+  });
+
+  test("closeFileTabs drops the file's trail entries (the file left the corpus)", () => {
+    usePanesStore.getState().openFile("storage/gone.pdf");
+    expect(useNavHistory.getState().stack).toEqual(["file:storage/gone.pdf"]);
+    usePanesStore.getState().closeFileTabs("storage/gone.pdf");
+    expect(useNavHistory.getState().stack).toEqual([]);
+  });
+
+  test("retargetNote / retargetChat / retargetBoard follow renames into the trail", () => {
+    useNavHistory.setState({
+      stack: ["wiki/_inbox/foo.md", "chat:old-slug", "canvas:old.excalidraw"],
+      index: 2,
+      suppress: false,
+    });
+    usePanesStore.getState().retargetNote("wiki/_inbox/foo.md", "wiki/projects/foo.md");
+    usePanesStore.getState().retargetChat("old-slug", "new-slug");
+    usePanesStore.getState().retargetBoard("old.excalidraw", "new.excalidraw");
+    expect(useNavHistory.getState().stack).toEqual([
+      "wiki/projects/foo.md",
+      "chat:new-slug",
+      "canvas:new.excalidraw",
+    ]);
+  });
+});
+
+describe("activateSurface + openNavTarget — replay reuses open tabs anywhere", () => {
+  const twoPanes = (): void => {
+    usePanesStore.setState({
+      root: {
+        kind: "split",
+        id: "s1",
+        dir: "row",
+        children: [leaf("p1", ["A"]), leaf("p2", ["B"])],
+        sizes: [0.5, 0.5],
+      },
+      focusedPaneId: "p1",
+    });
+    useNavHistory.setState({ stack: [], index: -1, suppress: false });
+  };
+
+  beforeEach(twoPanes);
+
+  test("focuses the pane already showing the surface and adds no tab", () => {
+    // note n-B lives in pane 2; pane 1 is focused
+    expect(usePanesStore.getState().activateSurface("note", "n-B")).toBe(true);
+    expect(usePanesStore.getState().focusedPaneId).toBe("p2");
+    expect(order("p1")).toEqual(["A"]);
+    expect(order("p2")).toEqual(["B"]);
+  });
+
+  test("returns false when the surface is nowhere open", () => {
+    expect(usePanesStore.getState().activateSurface("note", "n-ZZ")).toBe(false);
+    expect(usePanesStore.getState().focusedPaneId).toBe("p1");
+  });
+
+  test("openNavTarget prefers the existing tab over opening a duplicate", () => {
+    openNavTarget("n-B");
+    expect(usePanesStore.getState().focusedPaneId).toBe("p2");
+    expect(order("p1")).toEqual(["A"]); // no duplicate tab spawned in pane 1
+  });
+
+  test("openNavTarget falls back to the right opener per kind", () => {
+    openNavTarget("canvas:storage/plan.excalidraw");
+    const pane = findLeaf(usePanesStore.getState().root, "p1");
+    const active = pane?.tabs.find((t) => t.id === pane.activeTabId);
+    expect(active?.surfaceKind).toBe("canvas");
   });
 });

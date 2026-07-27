@@ -10,6 +10,7 @@ import { invalidateNotes } from "../services/hooks";
 import { removeFromMain } from "../services/mainTree";
 import { claimClosedNoteDrafts } from "../services/noteDrafts";
 import { useMainStore } from "../state/main";
+import { dropNavEntry } from "../state/navHistory";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { removeQuickNote } from "../state/quick";
 import { useUiStore } from "../state/ui";
@@ -60,6 +61,7 @@ export async function discardBlankNote(noteId: string): Promise<void> {
     return;
   }
   removeQuickNote(noteId);
+  dropNavEntry(noteId); // Forward must never reopen a note that no longer exists
   const { manifest, setTree } = useMainStore.getState();
   setTree(removeFromMain(manifest.tree, noteId));
   await Promise.all([invalidateNotes(), invalidateMemex()]);
