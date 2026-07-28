@@ -75,7 +75,7 @@ import { useFolders } from "../services/hooks";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
 import { resetAndReonboard } from "../state/onboarding";
 import { setQuickFolderSynced } from "../state/quick";
-import { type AppIcon, type OrganizerTrust, SOLID_THEMES, useUiStore } from "../state/ui";
+import { ACCENT_COLORS, type AppIcon, type OrganizerTrust, SOLID_THEMES, useUiStore } from "../state/ui";
 import {
   CheckGlyph,
   CloudGlyph,
@@ -667,6 +667,37 @@ const APP_ICONS: { id: AppIcon; label: string }[] = [
   { id: "clay", label: "Clay" },
 ];
 
+/** The primary-color swatch row — shared by Appearance and onboarding's theme
+ * step (Seth, 2026-07-28: "charcoal theme with blue primary color"). Default
+ * renders as the current theme's own accent. */
+export function AccentRow() {
+  const accentColor = useUiStore((s) => s.accentColor);
+  const setAccentColor = useUiStore((s) => s.setAccentColor);
+  return (
+    <div className="accentrow" role="radiogroup" aria-label="Primary color">
+      {ACCENT_COLORS.map((accent) => (
+        <button
+          type="button"
+          key={accent}
+          role="radio"
+          aria-checked={accentColor === accent}
+          className={accentColor === accent ? "accentdot sel" : "accentdot"}
+          title={accent === "default" ? "Theme default" : accent[0]?.toUpperCase() + accent.slice(1)}
+          aria-label={accent === "default" ? "Theme default" : accent}
+          style={
+            accent === "default"
+              ? { background: "var(--accent)" }
+              : { background: `var(--accent-swatch-${accent})` }
+          }
+          onClick={() => setAccentColor(accent)}
+        >
+          {accent === "default" && <span className="accentdot-auto">A</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function AppearancePane() {
   const theme = useUiStore((s) => s.theme);
   const setTheme = useUiStore((s) => s.setTheme);
@@ -738,6 +769,13 @@ function AppearancePane() {
           </div>
         </div>
       )}
+
+      <h4 className="sethead">Primary color</h4>
+      <p className="lead">
+        The active state, folder color, and selection wash. Default keeps each theme’s own — or pick one that
+        follows you across themes.
+      </p>
+      <AccentRow />
 
       <h4 className="sethead">Markdown source</h4>
       <p className="lead">Choose the syntax colors used in Raw Markdown. This never changes the file.</p>

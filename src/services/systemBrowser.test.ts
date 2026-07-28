@@ -123,10 +123,12 @@ describe("breadcrumbOf", () => {
 });
 
 describe("kindLabel", () => {
-  test("mirrors Finder's Kind column for the three item families", () => {
+  test("mirrors Finder's Kind column, extension-aware for files", () => {
     expect(kindLabel(note({}))).toBe("Note");
     expect(kindLabel(note({ kind: "board" }))).toBe("Board");
-    expect(kindLabel(note({ kind: "file" }))).toBe("File");
+    expect(kindLabel(note({ kind: "file", id: "storage/ref.pdf" }))).toBe("PDF");
+    expect(kindLabel(note({ kind: "file", id: "storage/pic.PNG" }))).toBe("PNG image");
+    expect(kindLabel(note({ kind: "file", id: "storage/data.parquet" }))).toBe("PARQUET file");
   });
 });
 

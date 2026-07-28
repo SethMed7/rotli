@@ -41,3 +41,35 @@ test("the toolbar New-folder button creates a real folder at the browser's cwd",
   await expect(tile).toBeVisible();
   await expect(tile.locator(".fdr-tile-sub")).toHaveText("0 items");
 });
+
+test("Finder multi-select: ⌘-click, rubber band, and ⌘⌫ to Trash", async ({ page }) => {
+  await gotoApp(page);
+  await page.locator(".frow", { hasText: "Assets" }).first().click();
+
+  // ⌘-click builds a selection
+  await page.locator(".system-browser .fdr-tile", { hasText: "Groceries" }).click();
+  await page.locator(".system-browser .fdr-tile", { hasText: "Quokka world" }).click({ modifiers: ["Meta"] });
+  await expect(page.locator(".system-browser .fdr-tile.sel")).toHaveCount(2);
+
+  // clicking empty space clears; a rubber-band drag re-selects
+  const scroll = page.locator(".system-browser .board-scroll");
+  const box = await scroll.boundingBox();
+  if (!box) throw new Error("no scroll box");
+  await page.mouse.click(box.x + box.width - 20, box.y + box.height - 20);
+  await expect(page.locator(".system-browser .fdr-tile.sel")).toHaveCount(0);
+  await page.mouse.move(box.x + box.width - 10, box.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 10, box.y + 120, { steps: 8 });
+  await page.mouse.up();
+  await expect(
+    page.locator(".system-browser .fdr-tile.sel:not(:has(.fdr-tile-icon.folder))"),
+  ).not.toHaveCount(0);
+
+  // ⌘⌫ moves the selection to Trash
+  await page.locator(".system-browser .fdr-tile", { hasText: "Groceries" }).click();
+  await page.locator(".system-browser .fdr-tile", { hasText: "Quokka world" }).click({ modifiers: ["Meta"] });
+  await page.keyboard.press("Meta+Backspace");
+  await expect(page.locator(".system-browser .fdr-tile", { hasText: "Groceries" })).toHaveCount(0);
+  await page.locator(".frow", { hasText: "Trash" }).first().click();
+  await expect(page.locator(".system-browser .fdr-tile", { hasText: "Groceries" })).toBeVisible();
+});

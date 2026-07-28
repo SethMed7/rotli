@@ -23,3 +23,13 @@ test("dragging a capture card onto another card's left half reorders before it",
 
   await expect(titles).toHaveText([/Ask Maria/, /Gateway export enum/, /Idea: warm empty-state/]);
 });
+
+test("capture cards select on click and open on double-click", async ({ page }) => {
+  await gotoApp(page);
+  await page.locator(".sb-notes-tree .frow", { hasText: "Captures" }).first().click();
+  const card = page.locator("[data-cap-id]").first();
+  await card.click();
+  await expect(page.locator(".board-bar-count")).toContainText("1 selected");
+  await card.dblclick();
+  await expect(page.locator(".cm-content").last()).toBeVisible();
+});

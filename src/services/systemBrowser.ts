@@ -8,7 +8,7 @@
 import { noteDiskFolder } from "../lib/noteLocation";
 import type { NoteSummary } from "../types";
 
-export type SystemViewMode = "folders" | "list";
+export type SystemViewMode = "folders" | "list" | "columns";
 export type SystemSortKey = "name" | "date";
 
 /** One subfolder of the current directory, as Finder would show it. */
@@ -133,9 +133,33 @@ export function breadcrumbOf(
   return crumbs;
 }
 
-/** Finder's Kind column, for the three item families. */
+/** Finder's Kind column — extension-aware for files (Seth, 2026-07-28:
+ * "show file type"), so a PDF says PDF, not the useless "File". */
+const FILE_KINDS: Record<string, string> = {
+  pdf: "PDF",
+  png: "PNG image",
+  jpg: "JPEG image",
+  jpeg: "JPEG image",
+  gif: "GIF image",
+  webp: "WebP image",
+  svg: "SVG image",
+  csv: "CSV spreadsheet",
+  xlsx: "Spreadsheet",
+  docx: "Document",
+  md: "Markdown",
+  txt: "Plain text",
+  mp3: "Audio",
+  m4a: "Audio",
+  wav: "Audio",
+  mp4: "Video",
+  mov: "Video",
+};
+
 export function kindLabel(n: NoteSummary): string {
   if (n.kind === "board") return "Board";
-  if (n.kind === "file") return "File";
+  if (n.kind === "file") {
+    const ext = n.id.slice(n.id.lastIndexOf(".") + 1).toLowerCase();
+    return FILE_KINDS[ext] ?? (ext && ext !== n.id ? `${ext.toUpperCase()} file` : "File");
+  }
   return "Note";
 }

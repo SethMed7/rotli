@@ -48,7 +48,7 @@ import {
 import { hydrateMain, useMainStore } from "./main";
 import { hydrateViews, useViewsStore } from "./views";
 import { findLeaf, leaves, usePanesStore } from "./panes";
-import { applySyntaxPalette, applyTheme } from "./theme";
+import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
 import {
   ALL_NOTES,
   clampChatSidebarLimit,
@@ -68,6 +68,7 @@ import {
   type SyntaxPalette,
   useUiStore,
 } from "./ui";
+import { ACCENT_COLORS, type AccentColor } from "./ui";
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -145,6 +146,7 @@ interface PersistedSettings {
   matchLightFamily: ThemeFamily;
   matchDarkFamily: ThemeFamily;
   syntaxPalette: SyntaxPalette;
+  accentColor: AccentColor;
   stayOpen: boolean;
   showInDock: boolean;
   /** What the generic New tab command creates. Markdown remains the safe default. */
@@ -298,6 +300,7 @@ export function parseSettings(raw: string): PersistedSettings {
     matchLightFamily: asEnum(data.matchLightFamily, THEME_FAMILIES, "warm"),
     matchDarkFamily: asEnum(data.matchDarkFamily, THEME_FAMILIES, "warm"),
     syntaxPalette: asEnum(data.syntaxPalette, SYNTAX_PALETTES, "rotli"),
+    accentColor: asEnum(data.accentColor, ACCENT_COLORS, "default"),
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
     newTabDefault: asEnum(data.newTabDefault, NEW_ITEM_KINDS, DEFAULT_NEW_ITEM_KIND),
@@ -426,6 +429,7 @@ function applySettings(s: PersistedSettings): void {
     matchLightFamily: s.matchLightFamily,
     matchDarkFamily: s.matchDarkFamily,
     syntaxPalette: s.syntaxPalette,
+    accentColor: s.accentColor,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
     newTabDefault: s.newTabDefault,
@@ -703,6 +707,7 @@ function prePaint(): void {
     dark: s.matchDarkFamily,
   });
   applySyntaxPalette(s.syntaxPalette);
+  applyAccent(s.accentColor);
 }
 
 // ─── hydrate (awaited by main.tsx before the first render) ───────────────────
@@ -742,6 +747,7 @@ function settingsSnapshot(): string {
     matchLightFamily: ui.matchLightFamily,
     matchDarkFamily: ui.matchDarkFamily,
     syntaxPalette: ui.syntaxPalette,
+    accentColor: ui.accentColor,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
     newTabDefault: ui.newTabDefault,

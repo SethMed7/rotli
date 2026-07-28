@@ -3,7 +3,7 @@
 // it is the chosen setting. The family picks which token set the mode resolves
 // into (warm → light/dark, mono → paper/charcoal).
 
-import type { SyntaxPalette, ThemeFamily, ThemeSetting } from "./ui";
+import type { AccentColor, SyntaxPalette, ThemeFamily, ThemeSetting } from "./ui";
 
 type DataTheme = "light" | "dark" | "paper" | "charcoal";
 
@@ -21,6 +21,13 @@ function setDataTheme(value: DataTheme): void {
 
 export function applySyntaxPalette(value: SyntaxPalette): void {
   document.documentElement.dataset.syntaxPalette = value;
+}
+
+/** The primary color rides a data attribute beside the theme — "default"
+ * removes it so each theme's own accent truth applies. */
+export function applyAccent(value: AccentColor): void {
+  if (value === "default") delete document.documentElement.dataset.accent;
+  else document.documentElement.dataset.accent = value;
 }
 
 function detachSystemListener(): void {

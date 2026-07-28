@@ -4,6 +4,7 @@ import type { HybridPreset, ProviderId } from "../ai/models";
 import { DEFAULT_NEW_ITEM_KIND, type NewItemKind } from "../newItems/model";
 import { inboxFolderId } from "../services/notes";
 import type { Measure } from "./noteStyle";
+import type { NoteSummary } from "../types";
 import { create } from "zustand";
 
 export type ThemeSetting = "light" | "dark" | "system";
@@ -11,6 +12,13 @@ export type ThemeSetting = "light" | "dark" | "system";
 /** Theme family: Warm is the branded pair; Mono is Paper and Charcoal. */
 export type ThemeFamily = "warm" | "mono";
 export type SyntaxPalette = "rotli" | "mono";
+
+/** The user's PRIMARY color (Seth, 2026-07-28): the active state, folder
+ * color, selection wash — everything riding --accent. "default" keeps each
+ * theme's own truth (warm clay / mono ink); a named accent overrides it in
+ * both schemes. Chosen in onboarding, changeable in Settings → Appearance. */
+export const ACCENT_COLORS = ["default", "blue", "green", "violet", "rose", "amber"] as const;
+export type AccentColor = (typeof ACCENT_COLORS)[number];
 
 /** The four solid themes, in the order the titlebar sun cycles them. */
 export const SOLID_THEMES: { family: ThemeFamily; mode: "light" | "dark"; label: string }[] = [
@@ -115,6 +123,9 @@ interface UiState {
    * default; Mono keeps the grammar but renders it in the environment ink. */
   syntaxPalette: SyntaxPalette;
   setSyntaxPalette: (palette: SyntaxPalette) => void;
+  /** The primary color — see ACCENT_COLORS. "default" = the theme's own. */
+  accentColor: AccentColor;
+  setAccentColor: (accent: AccentColor) => void;
 
   /** General: visitor (click-away hides, default) vs resident (stays open). */
   stayOpen: boolean;
@@ -211,6 +222,11 @@ interface UiState {
    * the browser answers by opening its create-folder input at its cwd. */
   systemFolderNonce: number;
   requestSystemFolder: () => void;
+  /** The System browser's current multi-selection (Finder gestures: ⌘/⇧-click,
+   * rubber band) — item SUMMARIES so ⌘⌫'s registry action can trash kind-aware
+   * without reaching back into a component. */
+  systemSelection: NoteSummary[];
+  setSystemSelection: (items: NoteSummary[]) => void;
 
   /** null is Main, the all-items reference view. A string is the exact unique
    * name of the active additional view from `.rotli/views.json`. */
@@ -405,6 +421,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setMatchDarkFamily: (family) => set({ matchDarkFamily: family }),
   syntaxPalette: "rotli",
   setSyntaxPalette: (palette) => set({ syntaxPalette: palette }),
+  accentColor: "default",
+  setAccentColor: (accent) => set({ accentColor: accent }),
 
   stayOpen: false,
   setStayOpen: (on) => set({ stayOpen: on }),
@@ -499,6 +517,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setSelectedFolderId: (id) => set({ selectedFolderId: id }),
   systemFolderNonce: 0,
   requestSystemFolder: () => set((s) => ({ systemFolderNonce: s.systemFolderNonce + 1 })),
+  systemSelection: [],
+  setSystemSelection: (items) => set({ systemSelection: items }),
   activeView: null,
   setActiveView: (name) => set({ activeView: name, selectedFolderId: "main:" }),
 

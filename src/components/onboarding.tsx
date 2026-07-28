@@ -27,6 +27,7 @@ import { useDetectMemex } from "../memex/useMemex";
 import { pickFolder } from "../memex/service";
 import { useMemexStore } from "../state/memex";
 import { SOLID_THEMES, type ThemeFamily, useUiStore } from "../state/ui";
+import { AccentRow } from "./settingsSurface";
 
 // Appearance FIRST (right after the greeting) so you pick a theme before walking the
 // rest of setup — never trudge through the flow in a theme that hurts your eyes (Seth).
@@ -601,6 +602,10 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                 );
               })}
             </div>
+            <p className="onb-sub onb-accent-lead">
+              And a primary color — the active state and folder tint. Default follows the theme.
+            </p>
+            <AccentRow />
           </div>
         )}
 

@@ -10,6 +10,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Main rows gather.** ⌘-click Main rows to select several, then one drag
+  moves the whole selection into a folder — a plain click still just opens.
+- **Capture cards read at a glance.** The card shows up to six lines of the
+  capture (they're one-off quick notes — the card is often all you need);
+  click still selects, double-click still opens, and "Make a note" graduates
+  it.
+- **The left menu settles.** Main is no longer collapsible — its header is
+  purely the view switcher; the Recent row is gone (All notes already sorts by
+  recency); **System is pinned at the sidebar's bottom**, always visible,
+  never collapsing; and a quiet **Files** button under it opens the vault
+  folder in Finder. Active System rows drop the wash and bar — the open
+  surface on the right already says it.
+- **The System browser selects like Finder.** ⌘-click toggles, ⇧-click
+  ranges, and dragging on empty space rubber-bands a selection; **⌘⌫ moves
+  the selection to Trash**. The Kind column now shows real file types (PDF,
+  PNG image, Spreadsheet…), echoed on grid tiles.
+- **A third view: Columns.** The Finder column view — each column lists one
+  folder, clicking a folder opens the next column, double-click opens the
+  item.
+- **Pick your primary color.** The active state, folder tint, and selection
+  wash can follow you across themes: Default (each theme's own), Blue, Green,
+  Violet, Rose, or Amber — tuned per light/dark scheme, chosen in
+  onboarding's theme step or Settings → Appearance. Charcoal with a blue
+  primary is now a thing.
+
 ## [0.40.0] - 2026-07-28
 
 

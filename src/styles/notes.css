@@ -1594,3 +1594,63 @@
 .caret-down svg {
   transform: rotate(90deg);
 }
+
+/* — SYSTEM, pinned (Seth, 2026-07-28): its own uncollapsible zone at the
+   sidebar's bottom, separated by a hairline; the scrolling tree lives above.
+   Active System rows keep only the tinted icon — the open surface on the
+   right already says which one is open (no wash, no bar: redundant). — */
+.sb-system {
+  flex: 0 0 auto;
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--border);
+}
+.sb-system .frow.sel,
+.sb-rows .frow.sel {
+  background: none;
+}
+.sb-system .frow.sel::before,
+.sb-rows .frow.sel::before {
+  display: none;
+}
+.sb-files {
+  color: var(--text-muted);
+}
+.sb-files:hover {
+  color: var(--text);
+}
+
+/* — the primary-color swatch row (Appearance + onboarding) — */
+.accentrow {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0 4px;
+}
+.accentdot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.accentdot.sel {
+  border-color: var(--text);
+}
+.accentdot-auto {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--on-accent);
+}
+.onb-accent-lead {
+  margin-top: 18px;
+}
+
+/* Main multi-select (Seth, 2026-07-28): ⌘-clicked rows gather with the quiet
+   accent wash (distinct from the focused note's solid pill); dragging any
+   gathered row carries the whole selection into a folder */
+.main-row.msel {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}

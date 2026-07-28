@@ -52,6 +52,8 @@ const ROOTS: Record<string, { title: string; prefix: string }> = {
 // switch, and a Finder that forgets its view or its place feels broken
 const modeMemo = new Map<string, SystemViewMode>();
 const cwdMemo = new Map<string, string>();
+// the Columns view's open chain (relative folder paths), per root
+const colPathMemo = new Map<string, string[]>();
 
 export function SystemSurface({ rootId }: { rootId: string }) {
   const root = ROOTS[rootId] ?? { title: rootId, prefix: rootId };
@@ -78,7 +80,21 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     cwdMemo.set(rootId, path);
     setCwdState(path);
   };
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Columns (Seth, 2026-07-28, the Finder column view): a chain of opened
+  // folders; each column lists one folder, clicking a folder opens the next
+  const [colPath, setColPathState] = useState<string[]>(() => colPathMemo.get(rootId) ?? []);
+  const setColPath = (chain: string[]) => {
+    colPathMemo.set(rootId, chain);
+    setColPathState(chain);
+  };
+  // Finder selection (Seth, 2026-07-28): the multi-selection lives in the ui
+  // store so ⌘⌫'s registry action can trash it; the anchor drives ⇧ ranges;
+  // a highlighted folder is its own single slot (folders don't trash).
+  const selection = useUiStore((s) => s.systemSelection);
+  const setSelection = useUiStore((s) => s.setSystemSelection);
+  const selectedIds = useMemo(() => new Set(selection.map((n) => n.id)), [selection]);
+  const anchorRef = useRef<string | null>(null);
+  const [folderSel, setFolderSel] = useState<string | null>(null);
   // expanded folder rows (List mode disclosure triangles) — per-mount
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [sort, setSort] = useState<{ key: SystemSortKey; dir: 1 | -1 }>({ key: "name", dir: 1 });
@@ -106,8 +122,20 @@ export function SystemSurface({ rootId }: { rootId: string }) {
 
   const enter = (path: string) => {
     setCwd(path);
-    setSelectedId(null);
   };
+
+  const revealing = useRef(false);
+  useEffect(() => {
+    if (revealing.current) {
+      // the reveal navigated here AND selected the target — keep it
+      revealing.current = false;
+      return;
+    }
+    setSelection([]);
+    setFolderSel(null);
+    anchorRef.current = null;
+    return () => setSelection([]);
+  }, [rootId, cwd, setSelection]);
 
   // "New folder" — a REAL directory at the cwd (Finder's verb, restored after
   // the fold left folder creation with no UI at all; P0 sweep 2026-07-28).
@@ -146,7 +174,9 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     const target = items.find((n) => n.id === revealNoteId);
     if (!target) return;
     setQuery("");
-    setSelectedId(revealNoteId);
+    revealing.current = true;
+    setSelection([target]);
+    anchorRef.current = revealNoteId;
     setCwd(noteDiskFolder(target));
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
@@ -168,8 +198,33 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: key === "date" ? -1 : 1 },
     );
 
+  const visibleItems = searching ? hits : listing.items;
+  const selectItem = (n: NoteSummary, e: { metaKey: boolean; shiftKey: boolean }, order?: NoteSummary[]) => {
+    setFolderSel(null);
+    if (e.metaKey) {
+      // ⌘-click toggles
+      const has = selectedIds.has(n.id);
+      setSelection(has ? selection.filter((x) => x.id !== n.id) : [...selection, n]);
+      anchorRef.current = n.id;
+    } else if (e.shiftKey && anchorRef.current) {
+      // ⇧-click ranges from the anchor within the visible order
+      const span = order ?? visibleItems;
+      const a = span.findIndex((v) => v.id === anchorRef.current);
+      const b = span.findIndex((v) => v.id === n.id);
+      if (a >= 0 && b >= 0) {
+        setSelection(span.slice(Math.min(a, b), Math.max(a, b) + 1));
+      } else {
+        setSelection([n]);
+        anchorRef.current = n.id;
+      }
+    } else {
+      setSelection([n]);
+      anchorRef.current = n.id;
+    }
+  };
+
   const itemHandlers = (n: NoteSummary) => ({
-    onClick: () => setSelectedId(n.id),
+    onClick: (e: MouseEvent) => selectItem(n, e),
     onDoubleClick: () => openSummary(n),
     onAuxClick: (e: MouseEvent) => {
       if (e.button === 1) {
@@ -183,6 +238,76 @@ export function SystemSurface({ rootId }: { rootId: string }) {
         ? undefined
         : (e: ReactPointerEvent) => startMainAddDrag(e, n.id, n.title || "Empty note"),
   });
+
+  // rubber-band selection on EMPTY space (items own their gestures/drags):
+  // pointer capture on the scroll host, live hit-test against [data-note-id]
+  const itemById = useMemo(() => new Map(items.map((n) => [n.id, n])), [items]);
+  const marqueeStart = useRef<{ host: HTMLDivElement; x: number; y: number } | null>(null);
+  const [marqueeRect, setMarqueeRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const marqueeBase = useRef<NoteSummary[]>([]);
+  const marqueeDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("button, input, [data-note-id]")) return;
+    const host = e.currentTarget;
+    const r = host.getBoundingClientRect();
+    const x = e.clientX - r.left + host.scrollLeft;
+    const y = e.clientY - r.top + host.scrollTop;
+    marqueeBase.current = e.metaKey ? selection : [];
+    if (!e.metaKey) {
+      setSelection([]);
+      setFolderSel(null);
+      anchorRef.current = null;
+    }
+    marqueeStart.current = { host, x, y };
+    setMarqueeRect({ left: x, top: y, width: 0, height: 0 });
+    host.setPointerCapture(e.pointerId);
+  };
+  const marqueeMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const start = marqueeStart.current;
+    if (!start) return;
+    const host = start.host;
+    const r = host.getBoundingClientRect();
+    const x = e.clientX - r.left + host.scrollLeft;
+    const y = e.clientY - r.top + host.scrollTop;
+    const rect = {
+      left: Math.min(start.x, x),
+      top: Math.min(start.y, y),
+      width: Math.abs(x - start.x),
+      height: Math.abs(y - start.y),
+    };
+    setMarqueeRect(rect);
+    const picked: NoteSummary[] = [...marqueeBase.current];
+    for (const el of host.querySelectorAll<HTMLElement>("[data-note-id]")) {
+      const b = el.getBoundingClientRect();
+      const bx = b.left - r.left + host.scrollLeft;
+      const by = b.top - r.top + host.scrollTop;
+      const hit =
+        bx < rect.left + rect.width &&
+        bx + b.width > rect.left &&
+        by < rect.top + rect.height &&
+        by + b.height > rect.top;
+      if (!hit) continue;
+      const n = el.dataset.noteId ? itemById.get(el.dataset.noteId) : undefined;
+      if (n && !picked.some((x) => x.id === n.id)) picked.push(n);
+    }
+    setSelection(picked);
+  };
+  const marqueeUp = () => {
+    marqueeStart.current = null;
+    setMarqueeRect(null);
+  };
+  const scrollProps = {
+    onPointerDown: marqueeDown,
+    onPointerMove: marqueeMove,
+    onPointerUp: marqueeUp,
+    onPointerCancel: marqueeUp,
+  };
+  const marqueeNode = marqueeRect && <div className="fdr-marquee" style={marqueeRect} />;
 
   // Finder's list layout: each expanded folder's children render DIRECTLY
   // under its row, indented one step deeper.
@@ -199,7 +324,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
               entry={f}
               depth={depth}
               open={expanded.has(f.path)}
-              selected={selectedId === f.path}
+              selected={folderSel === f.path}
               onToggle={() =>
                 setExpanded((prev) => {
                   const next = new Set(prev);
@@ -208,7 +333,10 @@ export function SystemSurface({ rootId }: { rootId: string }) {
                   return next;
                 })
               }
-              onSelect={() => setSelectedId(f.path)}
+              onSelect={() => {
+                setSelection([]);
+                setFolderSel(f.path);
+              }}
               onEnter={() => enter(f.path)}
             />
             {expanded.has(f.path) && renderListRows(f.path, depth + 1)}
@@ -218,7 +346,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
           <button
             type="button"
             key={n.id}
-            className={selectedId === n.id ? "fdr-row sel" : "fdr-row"}
+            className={selectedIds.has(n.id) ? "fdr-row sel" : "fdr-row"}
             style={{ paddingLeft: 12 + depth * 18 }}
             data-note-id={n.id}
             title="Open"
@@ -293,6 +421,13 @@ export function SystemSurface({ rootId }: { rootId: string }) {
           >
             List
           </button>
+          <button
+            type="button"
+            className={mode === "columns" ? "fsh-tab on" : "fsh-tab"}
+            onClick={() => setMode("columns")}
+          >
+            Columns
+          </button>
         </div>
       </header>
 
@@ -349,13 +484,14 @@ export function SystemSurface({ rootId }: { rootId: string }) {
             <p className="be-sub">Try a different search.</p>
           </div>
         ) : (
-          <div className="board-scroll">
+          <div className="board-scroll" {...scrollProps}>
+            {marqueeNode}
             <ul className="recent-list">
               {hits.map((n) => (
                 <NoteListRow
                   key={n.id}
                   note={n}
-                  selected={n.id === selectedId}
+                  selected={selectedIds.has(n.id)}
                   onOpen={(note, newTab) => openSummary(note, { newTab })}
                   onContextMenu={openMenu}
                 />
@@ -376,15 +512,19 @@ export function SystemSurface({ rootId }: { rootId: string }) {
           </div>
         )
       ) : mode === "folders" ? (
-        <div className="board-scroll">
+        <div className="board-scroll" {...scrollProps}>
+          {marqueeNode}
           <div className="fdr-grid">
             {listing.folders.map((f) => (
               <button
                 type="button"
                 key={f.path}
-                className={selectedId === f.path ? "fdr-tile sel" : "fdr-tile"}
+                className={folderSel === f.path ? "fdr-tile sel" : "fdr-tile"}
                 title="Open folder"
-                onClick={() => setSelectedId(f.path)}
+                onClick={() => {
+                  setSelection([]);
+                  setFolderSel(f.path);
+                }}
                 onDoubleClick={() => enter(f.path)}
               >
                 <FolderGlyph size={44} className="fdr-tile-icon folder" />
@@ -396,20 +536,70 @@ export function SystemSurface({ rootId }: { rootId: string }) {
               <button
                 type="button"
                 key={n.id}
-                className={selectedId === n.id ? "fdr-tile sel" : "fdr-tile"}
+                className={selectedIds.has(n.id) ? "fdr-tile sel" : "fdr-tile"}
                 data-note-id={n.id}
                 title="Open"
                 {...itemHandlers(n)}
               >
                 {glyphForNote(n, { size: 38, className: "fdr-tile-icon" })}
                 <span className="fdr-tile-name">{n.title || "Empty note"}</span>
-                <span className="fdr-tile-sub">{longDateLabel(n.updatedAt)}</span>
+                <span className="fdr-tile-sub">
+                  {n.kind ? `${kindLabel(n)} · ${longDateLabel(n.updatedAt)}` : longDateLabel(n.updatedAt)}
+                </span>
               </button>
             ))}
           </div>
         </div>
+      ) : mode === "columns" ? (
+        <div className="board-scroll fdrc-scroll">
+          <div className="fdrc-row">
+            {[root.prefix, ...colPath].map((path, depth) => {
+              const col = listFolderContents(items, path, folderSeed);
+              const openChild = colPath[depth];
+              return (
+                <div key={path} className="fdrc-col">
+                  {col.folders.map((f) => (
+                    <button
+                      type="button"
+                      key={f.path}
+                      className={`fdrc-item folder${openChild === f.path ? " open" : ""}`}
+                      onClick={() => {
+                        // clicking a folder OPENS the next column (Finder's law)
+                        setColPath([...colPath.slice(0, depth), f.path]);
+                        setSelection([]);
+                        setFolderSel(null);
+                      }}
+                    >
+                      <FolderGlyph size={14} className="fdr-row-icon folder" />
+                      <span className="fdrc-name">{f.name}</span>
+                      <ChevronRight size={10} className="fdrc-chev" />
+                    </button>
+                  ))}
+                  {col.items.map((n) => (
+                    <button
+                      type="button"
+                      key={n.id}
+                      className={selectedIds.has(n.id) ? "fdrc-item sel" : "fdrc-item"}
+                      data-note-id={n.id}
+                      title="Open"
+                      onClick={(e) => selectItem(n, e, col.items)}
+                      onDoubleClick={() => openSummary(n)}
+                      onContextMenu={(e) => openMenu(e, n)}
+                    >
+                      {glyphForNote(n, { size: 14, className: "fdr-row-icon" })}
+                      <span className="fdrc-name">{n.title || "Empty note"}</span>
+                      <span className="fdrc-kind">{kindLabel(n)}</span>
+                    </button>
+                  ))}
+                  {col.folders.length === 0 && col.items.length === 0 && <p className="fdrc-empty">Empty</p>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       ) : (
-        <div className="board-scroll">
+        <div className="board-scroll" {...scrollProps}>
+          {marqueeNode}
           <div className="fdr-list">
             <div className="fdr-cols">
               <button type="button" className="fdr-col name" onClick={() => sortBy("name")}>

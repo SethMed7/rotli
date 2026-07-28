@@ -104,3 +104,87 @@
 :root[data-theme="charcoal"] {
   --quote-bar: color-mix(in srgb, var(--text-muted) 55%, transparent);
 }
+
+/* — PRIMARY color (Seth, 2026-07-28): a user-chosen accent riding data-accent
+   beside data-theme. "default" (no attribute) keeps each theme's own truth —
+   warm clay, mono ink. Each named accent carries a light-scheme and a
+   dark-scheme value so, e.g., Charcoal + blue reads correctly. Token-layer
+   raw hex, same standing as the theme blocks above. — */
+:root[data-theme="light"][data-accent="blue"],
+:root[data-theme="paper"][data-accent="blue"] {
+  --accent: #2f6fae;
+  --accent-text: #2a64a0;
+  --on-accent: #ffffff;
+}
+:root[data-theme="dark"][data-accent="blue"],
+:root[data-theme="charcoal"][data-accent="blue"] {
+  --accent: #78b7e3;
+  --accent-text: #8cc3e8;
+  --on-accent: #14202b;
+}
+:root[data-theme="light"][data-accent="green"],
+:root[data-theme="paper"][data-accent="green"] {
+  --accent: #3f7d51;
+  --accent-text: #396f49;
+  --on-accent: #ffffff;
+}
+:root[data-theme="dark"][data-accent="green"],
+:root[data-theme="charcoal"][data-accent="green"] {
+  --accent: #8fc9a0;
+  --accent-text: #9ed3ae;
+  --on-accent: #14231a;
+}
+:root[data-theme="light"][data-accent="violet"],
+:root[data-theme="paper"][data-accent="violet"] {
+  --accent: #6a5ab2;
+  --accent-text: #5f51a3;
+  --on-accent: #ffffff;
+}
+:root[data-theme="dark"][data-accent="violet"],
+:root[data-theme="charcoal"][data-accent="violet"] {
+  --accent: #b3a6ee;
+  --accent-text: #beb3f1;
+  --on-accent: #1c1830;
+}
+:root[data-theme="light"][data-accent="rose"],
+:root[data-theme="paper"][data-accent="rose"] {
+  --accent: #ad5470;
+  --accent-text: #9d4c66;
+  --on-accent: #ffffff;
+}
+:root[data-theme="dark"][data-accent="rose"],
+:root[data-theme="charcoal"][data-accent="rose"] {
+  --accent: #e3a0b3;
+  --accent-text: #e8adbe;
+  --on-accent: #2b1a20;
+}
+:root[data-theme="light"][data-accent="amber"],
+:root[data-theme="paper"][data-accent="amber"] {
+  --accent: #9a6f1e;
+  --accent-text: #8b641b;
+  --on-accent: #ffffff;
+}
+:root[data-theme="dark"][data-accent="amber"],
+:root[data-theme="charcoal"][data-accent="amber"] {
+  --accent: #dfb15f;
+  --accent-text: #e5bc74;
+  --on-accent: #2a2110;
+}
+
+/* picker swatches for the accent row (Settings + onboarding) — the LIGHT
+   values; the dark scheme derives at apply time via data-accent itself */
+:root {
+  --accent-swatch-blue: #2f6fae;
+  --accent-swatch-green: #3f7d51;
+  --accent-swatch-violet: #6a5ab2;
+  --accent-swatch-rose: #ad5470;
+  --accent-swatch-amber: #9a6f1e;
+}
+:root[data-theme="dark"],
+:root[data-theme="charcoal"] {
+  --accent-swatch-blue: #78b7e3;
+  --accent-swatch-green: #8fc9a0;
+  --accent-swatch-violet: #b3a6ee;
+  --accent-swatch-rose: #e3a0b3;
+  --accent-swatch-amber: #dfb15f;
+}

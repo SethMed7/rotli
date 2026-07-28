@@ -64,3 +64,18 @@ test("the System browser is a real Finder: grid, columned list, folder entry, br
   await expect(page.locator(".system-browser .board-title")).toHaveText("Assets");
   await expect(page.locator(".system-browser .fdr-tile", { hasText: "Groceries" })).toBeVisible();
 });
+
+test("the Columns view drills like Finder's column view", async ({ page }) => {
+  await gotoApp(page);
+  await page.locator(".frow", { hasText: "Library" }).first().click();
+  await page.locator(".system-browser .fsh-tab", { hasText: "Columns" }).click();
+
+  // column 1 lists the root's folders; clicking one opens column 2
+  await page.locator(".fdrc-item.folder", { hasText: "Projects" }).click();
+  await expect(page.locator(".fdrc-col")).toHaveCount(2);
+  await expect(page.locator(".fdrc-item", { hasText: "Launch checklist" })).toBeVisible();
+
+  // double-click opens the note in a tab
+  await page.locator(".fdrc-item", { hasText: "Launch checklist" }).dblclick();
+  await expect(page.locator(".tabstrip", { hasText: "Launch checklist" }).first()).toBeVisible();
+});

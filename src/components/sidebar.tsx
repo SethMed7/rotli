@@ -67,7 +67,7 @@ import {
   useSearchableNotes,
   useTrashItems,
 } from "../services/hooks";
-import { type CorpusRoot, corpusForgetFolder } from "../lib/tauri";
+import { type CorpusRoot, corpusForgetFolder, isTauri, revealCorpus } from "../lib/tauri";
 import { DEST, type Destination, isRootMarker } from "../services/destinations";
 import {
   sidebarItemId,
@@ -76,7 +76,7 @@ import {
   useFocusedTab,
   usePanesStore,
 } from "../state/panes";
-import { ALL_NOTES, RECENT, SEC_CHAT, SEC_INBOX, SEC_MAIN, SEC_NOTES, TASKS, useUiStore } from "../state/ui";
+import { ALL_NOTES, SEC_CHAT, SEC_INBOX, SEC_NOTES, TASKS, useUiStore } from "../state/ui";
 import { activeInstance } from "../memex/config";
 import {
   invalidateMemex,
@@ -100,7 +100,6 @@ import {
   ChatGlyph,
   ChevronRight,
   ActivityGlyph,
-  ClockGlyph,
   TaskGlyph,
   CoffeeGlyph,
   FileGlyph,
@@ -633,6 +632,10 @@ export function Sidebar() {
   // — Main pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell, so the
   //   BoardSurface pointer pattern; a threshold distinguishes drag from click) —
   const [mainDragId, setMainDragId] = useState<string | null>(null);
+  // Finder-style multi-select in Main (Seth, 2026-07-28): ⌘-click gathers
+  // rows, dragging any gathered row moves the WHOLE selection into a folder;
+  // a plain click still just opens (and clears the gathering).
+  const [mainSel, setMainSel] = useState<ReadonlySet<string>>(new Set());
   const [mainDrop, setMainDrop] = useState<{ id: string; pos: DropPos } | null>(null);
   const didMainDragRef = useRef(false);
   // cross-section drag: a note dragged FROM the Brain (or any note list) INTO Main.
@@ -651,11 +654,14 @@ export function Sidebar() {
     // button guard BEFORE the ref reset — a right-click must not clear the
     // last drag's click suppression (the session guards again internally)
     if (e.button !== 0) return;
+    // dragging a gathered row moves the whole selection (Finder's rule)
+    const dragIds = mode === "move" && mainSel.has(id) && mainSel.size > 1 ? [...mainSel] : [id];
+    const dragLabel = dragIds.length > 1 ? `${dragIds.length} items` : label;
     let drop: { id: string; pos: DropPos } | null = null;
     const dragFlag = mode === "move" ? didMainDragRef : crossDragRef;
     dragFlag.current = false;
     createPointerDragSession(e, {
-      ghost: (x, y) => createDragGhost(label, x, y),
+      ghost: (x, y) => createDragGhost(dragLabel, x, y),
       // dragFlag stays armed past onEnd so the trailing click is eaten
       onStart: () => {
         dragFlag.current = true;
@@ -666,7 +672,7 @@ export function Sidebar() {
           "[data-main-id]",
         ) as HTMLElement | null;
         const tid = hit?.dataset.mainId;
-        if (!hit || !tid || (mode === "move" && tid === id)) {
+        if (!hit || !tid || (mode === "move" && dragIds.includes(tid))) {
           drop = null;
           setMainDrop(null);
           return;
@@ -691,7 +697,10 @@ export function Sidebar() {
           if (d.id !== MAIN_ROOT) tree = moveInTree(tree, id, d.id, d.pos);
           setActiveTree(tree, liveIds);
         } else {
-          setActiveTree(moveInTree(activeTree, id, d.id, d.pos), liveIds);
+          let tree = activeTree;
+          for (const moveId of dragIds) tree = moveInTree(tree, moveId, d.id, d.pos);
+          setActiveTree(tree, liveIds);
+          setMainSel(new Set());
         }
       },
       onEnd: () => {
@@ -780,18 +789,28 @@ export function Sidebar() {
               data-note-id={n.id}
               /* the current file's Main copy wins the highlight (#25) — the same
                  accent pill a compact row gets when it's the focused note */
-              className={`snrow main-row${n.id === focusedItemId ? " sel" : ""}${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
+              className={`snrow main-row${n.id === focusedItemId ? " sel" : ""}${mainSel.has(n.id) ? " msel" : ""}${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
               style={{ paddingLeft: contentPad }}
               onPointerDown={(e) => startMainDrag(e, n.id, "move", displayTitle)}
-              onClick={() => {
-                if (!didMainDragRef.current) {
-                  // Main is the creation context as well as the visible projection:
-                  // ⌘T / New note must not inherit a stale Brain/Storage selection
-                  // from before this row was opened.
-                  setSelectedFolderId(parentId);
-                  setContentView("panes");
-                  usePanesStore.getState().openSummary(n);
+              onClick={(e) => {
+                if (didMainDragRef.current) return;
+                // ⌘-click gathers for a multi-drag instead of opening
+                if (e.metaKey) {
+                  setMainSel((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(n.id)) next.delete(n.id);
+                    else next.add(n.id);
+                    return next;
+                  });
+                  return;
                 }
+                setMainSel(new Set());
+                // Main is the creation context as well as the visible projection:
+                // ⌘T / New note must not inherit a stale Brain/Storage selection
+                // from before this row was opened.
+                setSelectedFolderId(parentId);
+                setContentView("panes");
+                usePanesStore.getState().openSummary(n);
               }}
               onAuxClick={(e) => {
                 if (e.button === 1) {
@@ -944,7 +963,6 @@ export function Sidebar() {
   const chatSecOpen = expandedDests[SEC_CHAT] ?? true;
   const notesSecOpen = expandedDests[SEC_NOTES] ?? true;
   // MAIN is collapsible as a whole (Seth, 2026-07-26) — default open
-  const mainSecOpen = expandedDests[SEC_MAIN] ?? true;
   // the System browser target (contentView "system")
   const systemRoot = useUiStore((s) => s.systemRoot);
   const setSystemRoot = useUiStore((s) => s.setSystemRoot);
@@ -983,24 +1001,23 @@ export function Sidebar() {
   // the Main manifest rows (Seth follow-up, 2026-07-01 — j/k for Main). When
   // that section is collapsed there are no roving rows; the Inbox/Chat sections
   // are plain buttons, outside the listbox.
-  const rows: RovingRow[] = notesSecOpen
-    ? [
-        // MUST mirror the rendered order exactly — a skipped visual row makes
-        // the cursor teleport (Captures/Activity were missing; P0 2026-07-28)
-        { id: ALL_NOTES, kind: "smart" },
-        { id: CAPTURES_ROW, kind: "smart" },
-        { id: RECENT, kind: "smart" },
-        { id: TASKS, kind: "smart" },
-        // Main — the user's hand-arranged rows, in manifest order (collapsible
-        // as a whole, 2026-07-26).
-        ...(mainSecOpen ? mainRovingRows(MAIN_ROOT) : []),
-        // System rows are FLAT (2026-07-26): each opens the browser surface on
-        // the right — no inline subtrees to walk.
-        ...(hasBrain ? [{ id: "Brain", kind: "folder" } as RovingRow] : []),
-        ...visibleDestRows.map(({ id }) => ({ id, kind: "folder" }) as RovingRow),
-        { id: ACTIVITY_ROW, kind: "smart" },
-      ]
-    : [];
+  // MUST mirror the rendered order exactly — a skipped visual row makes the
+  // cursor teleport. System is PINNED at the sidebar's bottom and never
+  // collapses (Seth, 2026-07-28), so its rows are always walkable.
+  const rows: RovingRow[] = [
+    ...(notesSecOpen
+      ? [
+          { id: ALL_NOTES, kind: "smart" } as RovingRow,
+          { id: CAPTURES_ROW, kind: "smart" } as RovingRow,
+          { id: TASKS, kind: "smart" } as RovingRow,
+          // Main — always visible; the header only switches views (2026-07-28)
+          ...mainRovingRows(MAIN_ROOT),
+        ]
+      : []),
+    ...(hasBrain ? [{ id: "Brain", kind: "folder" } as RovingRow] : []),
+    ...visibleDestRows.map(({ id }) => ({ id, kind: "folder" }) as RovingRow),
+    { id: ACTIVITY_ROW, kind: "smart" },
+  ];
 
   const { rowProps } = useRovingList(rows, {
     // l / Enter: a note opens in place; a folder/dest toggles its expansion and
@@ -1046,8 +1063,6 @@ export function Sidebar() {
         setContentView("allNotes");
       } else if (row.id === TASKS) {
         setContentView("tasks");
-      } else if (row.id === RECENT) {
-        setContentView("recent");
       } else if (row.id === "Brain" || visibleDestRows.some((d) => d.id === row.id)) {
         // System rows open the browser surface (2026-07-26), never a dropdown
         openSystemRoot(row.id);
@@ -1284,7 +1299,6 @@ export function Sidebar() {
             if (contentView === "system") {
               requestSystemFolder();
             } else {
-              setDestExpanded(SEC_MAIN, true);
               setMainNewFolder(true);
             }
           }}
@@ -1517,20 +1531,6 @@ export function Sidebar() {
                 <span className="fname">Captures</span>
                 {captureCount > 0 && <span className="count">{captureCount}</span>}
               </button>
-              <button
-                type="button"
-                className={`frow${contentView === "recent" ? " sel" : ""}`}
-                onClick={() => {
-                  setSelectedFolderId(RECENT);
-                  setContentView("recent");
-                }}
-                {...rowProps({ id: RECENT, kind: "smart" })}
-              >
-                <ClockGlyph size={14.5} />
-                {/* no count: "how many notes exist" says nothing about RECENCY —
-                  the total lives on All notes (#60, audit 2026-07) */}
-                <span className="fname">Recent</span>
-              </button>
               {/* Tasks — every open checkbox across your notes, one view
                   (decision 2026-07-25). The count is OPEN tasks, not notes. */}
               <button
@@ -1554,31 +1554,19 @@ export function Sidebar() {
                 the always-visible "+ New folder" row was too loud; 2026-07-17: the
                 bare "+" said nothing — the IDE-style NewFolderGlyph, same as the
                 toolbar, is self-explanatory) — opacity-hidden so Tab still reaches it. */}
-              {/* the MAIN header (reworked 2026-07-26): the label COLLAPSES the
-                  section (chevron + big target); the view menu moved to its own
-                  quiet ▾; a new-note button joined new-folder. */}
+              {/* the MAIN header (reworked 2026-07-28, Seth: "not collapsible —
+                  just a way to change the views"): the label + ▾ are ONE view
+                  switcher; Main always shows. */}
               <div className="fsec fsec-hdr">
                 <button
                   type="button"
                   className="fsec-view"
-                  aria-expanded={mainSecOpen}
-                  aria-label={`${activeView ?? "Main"} — ${mainSecOpen ? "collapse" : "expand"}`}
-                  title={mainSecOpen ? "Collapse Main" : "Expand Main"}
-                  onClick={() => setDestExpanded(SEC_MAIN, !mainSecOpen)}
-                >
-                  <span className={`fchev${mainSecOpen ? " open" : ""}`} aria-hidden="true">
-                    <ChevronRight size={9} />
-                  </span>
-                  <span>{activeView ?? "Main"}</span>
-                </button>
-                <button
-                  type="button"
-                  className="fsec-viewpick"
                   aria-label={`Current view: ${activeView ?? "Main"}. Change view`}
                   aria-haspopup="menu"
                   title="Change view"
                   onClick={openViewMenu}
                 >
+                  <span>{activeView ?? "Main"}</span>
                   <span className="caret-down" aria-hidden="true">
                     <ChevronRight size={9} />
                   </span>
@@ -1751,98 +1739,114 @@ export function Sidebar() {
                   />
                 </div>
               )}
-              {mainSecOpen &&
-                (mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
-                  <p className="main-empty" data-main-id="main:">
-                    {activeView ? (
-                      <>
-                        This view is empty. Press <b>⌘T</b> to create here, or right-click an item and choose{" "}
-                        <b>Move to view → {activeView}</b>. It will still appear in Main.
-                      </>
-                    ) : (
-                      <>
-                        The notes you reach for, arranged your way. Right-click a note and choose{" "}
-                        <b>Add to Main</b>
-                        {hasBrain ? ", or drag one here from the Library" : ""} — then <b>★</b> your top{" "}
-                        {QUICK_MAX} for Quick access (the ⌥ Quick window).
-                      </>
-                    )}
-                  </p>
-                ) : (
-                  <div data-main-id="main:" data-active-view={activeView ?? "Main"} className="main-tree">
-                    {renderMainTree(MAIN_ROOT, 0, rowProps)}
-                  </div>
-                ))}
-
-              {/* — SYSTEM (Seth, 2026-07-26: Destinations→System): app-managed
-                  surfaces. NOT dropdowns — each row opens the Finder-style
-                  browser on the right (search + Folders⇄List), where a real
-                  file view belongs. No create affordances, no add-folder row
-                  (external folders connect from Location settings). — */}
-              <div className="fsec">System</div>
-
-              {hasBrain && (
-                <button
-                  type="button"
-                  className={`frow${contentView === "system" && systemRoot === "Brain" ? " sel" : ""}`}
-                  onClick={() => openSystemRoot("Brain")}
-                  title={
-                    brainEnabledUi
-                      ? "The Library — where the Librarian files everything"
-                      : "The Library — plain folders in this raw vault"
-                  }
-                  {...rowProps({ id: "Brain", kind: "folder" })}
-                >
-                  <NotesStackGlyph size={14.5} />
-                  <span className="fname">Library</span>
-                  {brainNotes.length + secureNotes.length > 0 && (
-                    <span className="count">{brainNotes.length + secureNotes.length}</span>
+              {mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
+                <p className="main-empty" data-main-id="main:">
+                  {activeView ? (
+                    <>
+                      This view is empty. Press <b>⌘T</b> to create here, or right-click an item and choose{" "}
+                      <b>Move to view → {activeView}</b>. It will still appear in Main.
+                    </>
+                  ) : (
+                    <>
+                      The notes you reach for, arranged your way. Right-click a note and choose{" "}
+                      <b>Add to Main</b>
+                      {hasBrain ? ", or drag one here from the Library" : ""} — then <b>★</b> your top{" "}
+                      {QUICK_MAX} for Quick access (the ⌥ Quick window).
+                    </>
                   )}
-                </button>
+                </p>
+              ) : (
+                <div data-main-id="main:" data-active-view={activeView ?? "Main"} className="main-tree">
+                  {renderMainTree(MAIN_ROOT, 0, rowProps)}
+                </div>
               )}
-              {visibleDestRows.map(({ id, label, Glyph }) => {
-                const destNotes = notesByDest[id] ?? [];
-                const selected = contentView === "system" && systemRoot === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`frow${selected ? " sel" : ""}`}
-                    onClick={() => openSystemRoot(id)}
-                    {...rowProps({ id, kind: "folder" })}
-                  >
-                    <Glyph size={14.5} />
-                    <span className="fname">{label}</span>
-                    {destNotes.length > 0 && <span className="count">{destNotes.length}</span>}
-                  </button>
-                );
-              })}
-              {/* the Librarian's journal is a system surface too — the quiet
-                  badge is unreviewed proposals */}
-              <button
-                type="button"
-                className="frow"
-                onClick={() => usePanesStore.getState().openActivity()}
-                title={
-                  brainEnabledUi
-                    ? "See and undo what the Librarian has done"
-                    : "History of the Librarian's past actions and secure-note repairs"
-                }
-                {...rowProps({ id: ACTIVITY_ROW, kind: "smart" })}
-              >
-                <ActivityGlyph size={14.5} />
-                <span className="fname">Activity</span>
-                {pendingProposals > 0 && <span className="count">{pendingProposals}</span>}
-              </button>
-
-              {/* added external folders (Seth, 2026-06-27): folders you point rotli at
-                without moving them into the memex — browse + edit in place.
-                Adding one moved to Location settings (2026-07-26). */}
-              {addedRoots.length > 0 && <div className="fsec">Folders</div>}
-              {addedRoots.map((r) => (
-                <AddedRootRow key={r.id} root={r} />
-              ))}
             </div>
+          )}
+        </div>
+      )}
+      {/* — SYSTEM, pinned (Seth, 2026-07-28): its own bottom zone — always
+          visible, never collapses, visually separate from the scrolling tree.
+          The Files button is the vault's Finder door. — */}
+      {sidebarMode === "notes" && (
+        <div className="sb-system" style={{ zoom: sidebarZoom }}>
+          {/* — SYSTEM (Seth, 2026-07-26: Destinations→System): app-managed
+                surfaces. NOT dropdowns — each row opens the Finder-style
+                browser on the right (search + Folders⇄List), where a real
+                file view belongs. No create affordances, no add-folder row
+                (external folders connect from Location settings). — */}
+          <div className="fsec">System</div>
+
+          {hasBrain && (
+            <button
+              type="button"
+              className={`frow${contentView === "system" && systemRoot === "Brain" ? " sel" : ""}`}
+              onClick={() => openSystemRoot("Brain")}
+              title={
+                brainEnabledUi
+                  ? "The Library — where the Librarian files everything"
+                  : "The Library — plain folders in this raw vault"
+              }
+              {...rowProps({ id: "Brain", kind: "folder" })}
+            >
+              <NotesStackGlyph size={14.5} />
+              <span className="fname">Library</span>
+              {brainNotes.length + secureNotes.length > 0 && (
+                <span className="count">{brainNotes.length + secureNotes.length}</span>
+              )}
+            </button>
+          )}
+          {visibleDestRows.map(({ id, label, Glyph }) => {
+            const destNotes = notesByDest[id] ?? [];
+            const selected = contentView === "system" && systemRoot === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`frow${selected ? " sel" : ""}`}
+                onClick={() => openSystemRoot(id)}
+                {...rowProps({ id, kind: "folder" })}
+              >
+                <Glyph size={14.5} />
+                <span className="fname">{label}</span>
+                {destNotes.length > 0 && <span className="count">{destNotes.length}</span>}
+              </button>
+            );
+          })}
+          {/* the Librarian's journal is a system surface too — the quiet
+                badge is unreviewed proposals */}
+          <button
+            type="button"
+            className="frow"
+            onClick={() => usePanesStore.getState().openActivity()}
+            title={
+              brainEnabledUi
+                ? "See and undo what the Librarian has done"
+                : "History of the Librarian's past actions and secure-note repairs"
+            }
+            {...rowProps({ id: ACTIVITY_ROW, kind: "smart" })}
+          >
+            <ActivityGlyph size={14.5} />
+            <span className="fname">Activity</span>
+            {pendingProposals > 0 && <span className="count">{pendingProposals}</span>}
+          </button>
+
+          {/* added external folders (Seth, 2026-06-27): folders you point rotli at
+              without moving them into the memex — browse + edit in place.
+              Adding one moved to Location settings (2026-07-26). */}
+          {addedRoots.length > 0 && <div className="fsec">Folders</div>}
+          {addedRoots.map((r) => (
+            <AddedRootRow key={r.id} root={r} />
+          ))}
+          {isTauri() && (
+            <button
+              type="button"
+              className="frow sb-files"
+              title="Open the vault folder in Finder"
+              onClick={() => void revealCorpus()}
+            >
+              <FolderGlyph size={14.5} />
+              <span className="fname">Files</span>
+            </button>
           )}
         </div>
       )}

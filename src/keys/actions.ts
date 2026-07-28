@@ -27,6 +27,7 @@ import {
 } from "../documents/draftComposition";
 import type { NewItemKind } from "../newItems/model";
 import { navigate } from "../state/navHistory";
+import { trashSystemSelection } from "../services/systemTrash";
 import { findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
 import { cycleQuick, removeQuickNote } from "../state/quick";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
@@ -383,6 +384,16 @@ export function registerDefaultActions(): void {
     defaultChord: "Meta+Shift+T",
     run: () => {
       if (notesWorkspaceActive()) usePanesStore.getState().reopenClosedTab();
+    },
+  });
+  registerAction({
+    id: "system.trashSelection",
+    title: "Move selection to Trash",
+    defaultChord: "Meta+Backspace",
+    run: () => {
+      const ui = useUiStore.getState();
+      if (ui.contentView !== "system" || ui.systemSelection.length === 0) return;
+      void trashSystemSelection();
     },
   });
   for (let n = 1; n <= 8; n++) {
