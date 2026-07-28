@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The current view is visible again.** The view switcher's active row used a
+  tint that vanished on the dark themes — it now carries a small accent bar and
+  an accent-mixed wash that reads at a glance in all four environments (still
+  no checkmark gutter; labels stay flush).
+- **Collapse-all no longer reopens folded sections.** The toolbar's
+  collapse-all folds the trees, but it used to reset the Chat/Notes/Main
+  section fold states back to open as a side effect. Sections now stay exactly
+  as you left them.
+
+### Changed
+
+- **The sync answer, in words.** SUPPORT.md now documents "your folder, your
+  sync": recommended setups (iCloud Drive · git · any folder-sync tool), the
+  one-app-per-vault caution, and the honest mobile story — plain files any
+  editor can read.
+- **The System browser is now a real Finder.** You're *in* one folder and see
+  only its direct contents — subfolders as folders, notes as items. Double-click
+  a folder to enter it, climb back with the breadcrumb (or ‹), single-click to
+  select, double-click to open: the exact conventions your hands already know.
+  **Folders** is the icon grid; **List** is the columned list (Name · Date
+  Modified · Kind) with disclosure triangles and sortable columns. Search still
+  flattens across the whole root, "Show in Library" now lands you *inside* the
+  note's folder, and empty folders render as real tiles.
+
 ## [0.38.0] - 2026-07-27
 
 

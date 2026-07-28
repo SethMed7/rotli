@@ -1,19 +1,40 @@
-// The System browser (Seth, 2026-07-26): Library · Assets · Archive · Trash
-// open HERE, Finder-style, instead of inline sidebar dropdowns — a surface
-// people already understand: search on top, a Folders ⇄ List toggle, real
-// folder structure (physical paths, never synthetic groupings), rows that
-// open/right-click/drag exactly like every other list (NoteListRow).
+// The System browser (Finder rework 2026-07-27, from Seth's screenshots):
+// Library · Assets · Archive · Trash open HERE as a real Finder — you are IN
+// one folder and see only its direct contents. "Folders" is the icon-grid
+// view (double-click a folder to enter, double-click an item to open);
+// "List" is the columned list (Name · Date Modified · Kind) with disclosure
+// triangles. A breadcrumb climbs back up; search flattens across the root.
+// Single click selects, double click opens — Finder conventions, zero friction.
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { longDateLabel } from "../lib/dateLabels";
+import { startMainAddDrag } from "../lib/mainAddDrag";
 import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
 import { DEST } from "../services/destinations";
 import { useFolders, useNotes, useSearchableNotes } from "../services/hooks";
-import { type SystemViewMode, filterSystemItems, groupSystemItems } from "../services/systemBrowser";
+import {
+  type FolderEntry,
+  type SystemSortKey,
+  type SystemViewMode,
+  breadcrumbOf,
+  filterSystemItems,
+  kindLabel,
+  listFolderContents,
+  sortFolderListing,
+} from "../services/systemBrowser";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { Character } from "./character";
-import { ChevronRight, SearchGlyph } from "./glyphs";
+import { ChevronRight, FolderGlyph, SearchGlyph, glyphForNote } from "./glyphs";
 import { NoteListRow } from "./noteListRow";
 import { useNoteMenu } from "./useNoteMenu";
 
@@ -25,9 +46,10 @@ const ROOTS: Record<string, { title: string; prefix: string }> = {
   [DEST.trash]: { title: "Trash", prefix: "Trash" },
 };
 
-// per-root session memory for the view mode — the surface unmounts on every
-// content-view switch, and a Finder that forgets its view feels broken
+// per-root session memory — the surface unmounts on every content-view
+// switch, and a Finder that forgets its view or its place feels broken
 const modeMemo = new Map<string, SystemViewMode>();
+const cwdMemo = new Map<string, string>();
 
 export function SystemSurface({ rootId }: { rootId: string }) {
   const root = ROOTS[rootId] ?? { title: rootId, prefix: rootId };
@@ -49,38 +71,47 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     modeMemo.set(rootId, m);
     setModeState(m);
   };
-  // collapsed folder paths (Folders mode) — per-mount, like Finder disclosure
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
-  const toggleFolder = (path: string) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
+  const [cwd, setCwdState] = useState<string>(() => cwdMemo.get(rootId) ?? root.prefix);
+  const setCwd = (path: string) => {
+    cwdMemo.set(rootId, path);
+    setCwdState(path);
+  };
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // expanded folder rows (List mode disclosure triangles) — per-mount
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const [sort, setSort] = useState<{ key: SystemSortKey; dir: 1 | -1 }>({ key: "name", dir: 1 });
 
-  const openSummary = usePanesStore((s) => s.openSummary);
-  const openMenu = useNoteMenu();
-  // Empty directories are real (Finder truth) — seed the Library's folder list
-  // so a folder with zero notes still renders. Library-only for now: other
-  // roots' folder ids use disk-case paths that need their own mapping.
+  // Empty directories are real (Finder truth) — seed the Library's on-disk
+  // folder list so a folder with zero notes still renders. Library-only:
+  // other roots' folder ids use disk-case paths that need their own mapping.
   const foldersData = useFolders().data;
   const folderSeed = useMemo(
     () => (isLibrary ? (foldersData ?? []).filter((f) => f.id.startsWith("wiki/")).map((f) => f.id) : []),
     [isLibrary, foldersData],
   );
-  const groups = useMemo(
-    () => groupSystemItems(items, root.prefix, query, folderSeed),
-    [items, root.prefix, query, folderSeed],
-  );
-  const flat = useMemo(() => filterSystemItems(items, query), [items, query]);
 
-  // "Show in Library" (the note menu / the editor's location chip): land on the
-  // note's EXACT folder — clear any filter, un-collapse its group, mark the row,
-  // and scroll it into view once the async items carry it (BoardSurface's
-  // proven reveal pattern; two frames so the expanded group commits first).
+  const openSummary = usePanesStore((s) => s.openSummary);
+  const openMenu = useNoteMenu();
+
+  const searching = query.trim() !== "";
+  const hits = useMemo(() => filterSystemItems(items, query), [items, query]);
+  const listing = useMemo(
+    () => sortFolderListing(listFolderContents(items, cwd, folderSeed), sort.key, sort.dir),
+    [items, cwd, folderSeed, sort],
+  );
+  const crumbs = useMemo(() => breadcrumbOf(cwd, root.prefix, root.title), [cwd, root.prefix, root.title]);
+  const atRoot = cwd === root.prefix;
+
+  const enter = (path: string) => {
+    setCwd(path);
+    setSelectedId(null);
+  };
+
+  // "Show in Library" (the note menu / the editor's location chip): land IN
+  // the note's exact folder — Finder's reveal. Clear any filter, select the
+  // row, and scroll it into view once the async items carry it (two frames so
+  // the navigated view commits first).
   const revealNonce = useUiStore((s) => s.revealNonce);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   useEffect(() => {
     if (!revealNonce) return;
     const { revealNoteId } = useUiStore.getState();
@@ -89,13 +120,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     if (!target) return;
     setQuery("");
     setSelectedId(revealNoteId);
-    const path = noteDiskFolder(target);
-    setCollapsed((prev) => {
-      if (!prev.has(path)) return prev;
-      const next = new Set(prev);
-      next.delete(path);
-      return next;
-    });
+    setCwd(noteDiskFolder(target));
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => {
@@ -108,12 +133,112 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealNonce, items]);
+
+  const sortBy = (key: SystemSortKey) =>
+    setSort((s) =>
+      s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: key === "date" ? -1 : 1 },
+    );
+
+  const itemHandlers = (n: NoteSummary) => ({
+    onClick: () => setSelectedId(n.id),
+    onDoubleClick: () => openSummary(n),
+    onAuxClick: (e: MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        openSummary(n, { newTab: true });
+      }
+    },
+    onContextMenu: (e: MouseEvent) => openMenu(e, n),
+    onPointerDown:
+      n.kind === "file"
+        ? undefined
+        : (e: ReactPointerEvent) => startMainAddDrag(e, n.id, n.title || "Empty note"),
+  });
+
+  // Finder's list layout: each expanded folder's children render DIRECTLY
+  // under its row, indented one step deeper.
+  const renderListRows = (path: string, depth: number): ReactNode => {
+    const l =
+      depth === 0
+        ? listing
+        : sortFolderListing(listFolderContents(items, path, folderSeed), sort.key, sort.dir);
+    return (
+      <>
+        {l.folders.map((f) => (
+          <Fragment key={f.path}>
+            <FolderListRow
+              entry={f}
+              depth={depth}
+              open={expanded.has(f.path)}
+              selected={selectedId === f.path}
+              onToggle={() =>
+                setExpanded((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(f.path)) next.delete(f.path);
+                  else next.add(f.path);
+                  return next;
+                })
+              }
+              onSelect={() => setSelectedId(f.path)}
+              onEnter={() => enter(f.path)}
+            />
+            {expanded.has(f.path) && renderListRows(f.path, depth + 1)}
+          </Fragment>
+        ))}
+        {l.items.map((n) => (
+          <button
+            type="button"
+            key={n.id}
+            className={selectedId === n.id ? "fdr-row sel" : "fdr-row"}
+            style={{ paddingLeft: 12 + depth * 18 }}
+            data-note-id={n.id}
+            title="Open"
+            {...itemHandlers(n)}
+          >
+            <span className="fdr-name">
+              {glyphForNote(n, { size: 14, className: "fdr-row-icon" })}
+              {n.title || "Empty note"}
+            </span>
+            <span className="fdr-date">{longDateLabel(n.updatedAt)}</span>
+            <span className="fdr-kind">{kindLabel(n)}</span>
+          </button>
+        ))}
+      </>
+    );
+  };
+
+  const empty = listing.folders.length === 0 && listing.items.length === 0;
 
   return (
     <div className="board allnotes system-browser">
       <header className="board-head">
-        <h2 className="board-title">{root.title}</h2>
+        {!atRoot && (
+          <button
+            type="button"
+            className="fdr-up"
+            aria-label="Back"
+            title="Back"
+            onClick={() => enter(crumbs[crumbs.length - 2]?.path ?? root.prefix)}
+          >
+            <ChevronRight size={11} className="fdr-up-chev" />
+          </button>
+        )}
+        <nav className="fdr-crumbs" aria-label="Folder path">
+          {crumbs.map((c, i) => (
+            <span key={c.path} className="fdr-crumb-seg">
+              {i > 0 && <ChevronRight size={9} className="fdr-crumb-sep" aria-hidden="true" />}
+              {i === crumbs.length - 1 ? (
+                <h2 className="board-title">{c.label}</h2>
+              ) : (
+                <button type="button" className="fdr-crumb" onClick={() => enter(c.path)}>
+                  {c.label}
+                </button>
+              )}
+            </span>
+          ))}
+        </nav>
         <span className="board-count">{items.length}</span>
         <div className="file-mode-tabs" role="tablist" aria-label="View" style={{ marginLeft: "auto" }}>
           <button
@@ -144,72 +269,137 @@ export function SystemSurface({ rootId }: { rootId: string }) {
         />
       </div>
 
-      {(mode === "list" ? flat.length === 0 : groups.length === 0) ? (
-        query.trim() !== "" ? (
+      {searching ? (
+        hits.length === 0 ? (
           <div className="list-empty">
             <p className="be-title">No matches</p>
             <p className="be-sub">Try a different search.</p>
           </div>
         ) : (
+          <div className="board-scroll">
+            <ul className="recent-list">
+              {hits.map((n) => (
+                <NoteListRow
+                  key={n.id}
+                  note={n}
+                  selected={n.id === selectedId}
+                  onOpen={(note, newTab) => openSummary(note, { newTab })}
+                  onContextMenu={openMenu}
+                />
+              ))}
+            </ul>
+          </div>
+        )
+      ) : empty ? (
+        atRoot ? (
           <div className="list-empty">
             <Character name="rest" size={104} className="be-quokka" />
             <p className="be-title">Nothing here</p>
             <p className="be-sub">{root.title} is empty.</p>
           </div>
+        ) : (
+          <div className="list-empty">
+            <p className="be-title">This folder is empty</p>
+          </div>
         )
-      ) : mode === "list" ? (
+      ) : mode === "folders" ? (
         <div className="board-scroll">
-          <ul className="recent-list">
-            {flat.map((n) => (
-              <NoteListRow
-                key={n.id}
-                note={n}
-                selected={n.id === selectedId}
-                onOpen={(note, newTab) => openSummary(note, { newTab })}
-                onContextMenu={openMenu}
-              />
+          <div className="fdr-grid">
+            {listing.folders.map((f) => (
+              <button
+                type="button"
+                key={f.path}
+                className={selectedId === f.path ? "fdr-tile sel" : "fdr-tile"}
+                title="Open folder"
+                onClick={() => setSelectedId(f.path)}
+                onDoubleClick={() => enter(f.path)}
+              >
+                <FolderGlyph size={44} className="fdr-tile-icon folder" />
+                <span className="fdr-tile-name">{f.name}</span>
+                <span className="fdr-tile-sub">{f.itemCount === 1 ? "1 item" : `${f.itemCount} items`}</span>
+              </button>
             ))}
-          </ul>
+            {listing.items.map((n) => (
+              <button
+                type="button"
+                key={n.id}
+                className={selectedId === n.id ? "fdr-tile sel" : "fdr-tile"}
+                data-note-id={n.id}
+                title="Open"
+                {...itemHandlers(n)}
+              >
+                {glyphForNote(n, { size: 38, className: "fdr-tile-icon" })}
+                <span className="fdr-tile-name">{n.title || "Empty note"}</span>
+                <span className="fdr-tile-sub">{longDateLabel(n.updatedAt)}</span>
+              </button>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="board-scroll">
-          {groups.map((g) => {
-            const isRoot = g.label === "";
-            const open = !collapsed.has(g.path);
-            return (
-              <section key={g.path || "(root)"} className="sysb-group">
-                {!isRoot && (
-                  <button
-                    type="button"
-                    className="sysb-folder"
-                    aria-expanded={open}
-                    onClick={() => toggleFolder(g.path)}
-                  >
-                    <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
-                      <ChevronRight size={10} />
-                    </span>
-                    <span className="sysb-folder-name">{g.label}</span>
-                    <span className="count">{g.items.length}</span>
-                  </button>
-                )}
-                {(isRoot || open) && (
-                  <ul className={isRoot ? "recent-list" : "recent-list sysb-nested"}>
-                    {g.items.map((n) => (
-                      <NoteListRow
-                        key={n.id}
-                        note={n}
-                        selected={n.id === selectedId}
-                        onOpen={(note, newTab) => openSummary(note, { newTab })}
-                        onContextMenu={openMenu}
-                      />
-                    ))}
-                  </ul>
-                )}
-              </section>
-            );
-          })}
+          <div className="fdr-list">
+            <div className="fdr-cols">
+              <button type="button" className="fdr-col name" onClick={() => sortBy("name")}>
+                Name{sort.key === "name" ? (sort.dir === 1 ? " ↑" : " ↓") : ""}
+              </button>
+              <button type="button" className="fdr-col" onClick={() => sortBy("date")}>
+                Date Modified{sort.key === "date" ? (sort.dir === 1 ? " ↑" : " ↓") : ""}
+              </button>
+              <span className="fdr-col kind">Kind</span>
+            </div>
+            {renderListRows(cwd, 0)}
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+function FolderListRow({
+  entry,
+  depth,
+  open,
+  selected,
+  onToggle,
+  onSelect,
+  onEnter,
+}: {
+  entry: FolderEntry;
+  depth: number;
+  open: boolean;
+  selected: boolean;
+  onToggle: () => void;
+  onSelect: () => void;
+  onEnter: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={selected ? "fdr-row folder sel" : "fdr-row folder"}
+      style={{ paddingLeft: 12 + depth * 18 }}
+      title="Open folder"
+      onClick={onSelect}
+      onDoubleClick={onEnter}
+    >
+      <span className="fdr-name">
+        {/* the disclosure triangle — pointer affordance; the row itself stays
+            the accessible control (double-click enters, single selects) */}
+        <span
+          className={`fchev${open ? " open" : ""}`}
+          aria-hidden="true"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <ChevronRight size={10} />
+        </span>
+        <FolderGlyph size={14} className="fdr-row-icon folder" />
+        {entry.name}
+      </span>
+      <span className="fdr-date">{entry.updatedAt === null ? "—" : longDateLabel(entry.updatedAt)}</span>
+      <span className="fdr-kind">Folder</span>
+    </button>
   );
 }

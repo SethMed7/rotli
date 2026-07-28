@@ -1595,13 +1595,25 @@
   color: var(--danger, var(--accent-text));
 }
 /* the "highlight" checked mark — an exclusive selector's active row (the Main
-   view switcher): state as background, no checkmark gutter, flush labels */
-.ctxmenu-item.active {
-  background: var(--tint);
-  font-weight: 500;
-}
+   view switcher): state as background, no checkmark gutter, flush labels.
+   Accent-mixed + a solid accent bar so the current choice reads at a glance in
+   ALL FOUR themes — the plain --tint wash disappeared on the dark surfaces
+   (Seth, 2026-07-27). */
+.ctxmenu-item.active,
 .ctxmenu-item.active:hover:not(:disabled) {
-  background: var(--tint);
+  position: relative;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-weight: 600;
+}
+.ctxmenu-item.active::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 .ctxmenu-item svg {
   flex: 0 0 auto;

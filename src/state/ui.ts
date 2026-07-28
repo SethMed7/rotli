@@ -481,7 +481,15 @@ export const useUiStore = create<UiState>((set, get) => ({
       revealNoteId: noteId ?? null,
     })),
   collapseAllDests: (defaultOpenIds = []) =>
-    set({ expandedDests: Object.fromEntries(defaultOpenIds.map((id) => [id, false])) }),
+    set((s) => ({
+      expandedDests: {
+        // section fold states (sec:*) are the user's own arrangement —
+        // collapse-all folds the TREES; it must never REOPEN a folded section
+        // (replacing the map wiped them back to default-open — Seth, 2026-07-27)
+        ...Object.fromEntries(Object.entries(s.expandedDests).filter(([id]) => id.startsWith("sec:"))),
+        ...Object.fromEntries(defaultOpenIds.map((id) => [id, false])),
+      },
+    })),
 
   selectedFolderId: ALL_NOTES,
   setSelectedFolderId: (id) => set({ selectedFolderId: id }),

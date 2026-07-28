@@ -23,7 +23,8 @@ test("dragging a note from the Assets browser into Main adds a reference without
   await page.locator(".frow", { hasText: "Assets" }).first().click();
   await expect(page.locator(".system-browser .board-title")).toHaveText("Assets");
 
-  const source = page.locator(".system-browser .recent-row", { hasText: "Groceries" }).first();
+  // Groceries sits at the Assets root — an icon tile in the Finder grid
+  const source = page.locator(".system-browser .fdr-tile", { hasText: "Groceries" }).first();
   await expect(source).toBeVisible();
 
   await pointerDrag(page, source, await centerOf(mainRoot));
@@ -31,14 +32,16 @@ test("dragging a note from the Assets browser into Main adds a reference without
   // the note now appears under Main …
   await expect(page.locator(".main-tree [data-main-id]", { hasText: "Groceries" })).toBeVisible();
   // … and Assets still has its copy: Main is a reference, not a move
-  await expect(page.locator(".system-browser .recent-row", { hasText: "Groceries" })).toBeVisible();
+  await expect(page.locator(".system-browser .fdr-tile", { hasText: "Groceries" })).toBeVisible();
 });
 
-test("the System browser searches and toggles between Folders and List", async ({ page }) => {
+test("the System browser is a real Finder: grid, columned list, folder entry, breadcrumb", async ({
+  page,
+}) => {
   await gotoApp(page);
   await page.locator(".frow", { hasText: "Assets" }).first().click();
 
-  // the search narrows instantly; a no-match query says so honestly
+  // the search flattens across the root; a no-match query says so honestly
   const search = page.locator(".system-browser .allnotes-search input");
   await search.fill("Groceries");
   await expect(page.locator(".system-browser .recent-row", { hasText: "Groceries" })).toBeVisible();
@@ -46,9 +49,18 @@ test("the System browser searches and toggles between Folders and List", async (
   await expect(page.locator(".system-browser .be-title", { hasText: "No matches" })).toBeVisible();
   await search.fill("");
 
-  // Folders ⇄ List — both render the same items, structured vs flat
+  // List = Finder's columned list: Name · Date Modified · Kind, folder rows included
   await page.locator(".system-browser .fsh-tab", { hasText: "List" }).click();
-  await expect(page.locator(".system-browser .sysb-folder")).toHaveCount(0);
+  await expect(page.locator(".system-browser .fdr-col", { hasText: "Date Modified" })).toBeVisible();
+  await expect(page.locator(".system-browser .fdr-row", { hasText: "Groceries" })).toBeVisible();
+  await expect(page.locator(".system-browser .fdr-row.folder", { hasText: "Work" })).toBeVisible();
+
+  // Folders = the icon grid; double-clicking a folder ENTERS it and the
+  // breadcrumb climbs back — spatial navigation, like a traditional Finder
   await page.locator(".system-browser .fsh-tab", { hasText: "Folders" }).click();
-  await expect(page.locator(".system-browser .recent-row", { hasText: "Groceries" })).toBeVisible();
+  await page.locator(".system-browser .fdr-tile", { hasText: "Work" }).dblclick();
+  await expect(page.locator(".system-browser .board-title")).toHaveText("Work");
+  await page.locator(".system-browser .fdr-crumb", { hasText: "Assets" }).click();
+  await expect(page.locator(".system-browser .board-title")).toHaveText("Assets");
+  await expect(page.locator(".system-browser .fdr-tile", { hasText: "Groceries" })).toBeVisible();
 });

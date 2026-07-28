@@ -149,7 +149,7 @@ zoom, quick ids, per-note Aa styles are ISOLATED by construction. Findings:
 | B | **Onboarding trust pass** | "Just a folder" is what wins people; our flow leads with mechanics. | Phase 1 item 4 |
 | C | **Editor paper-cut sweep** | Their issue tracker is tables/navigation/indent edge cases — that's what users actually file and judge by. One focused QA pass over rotli's tables, back/forward, indentation, template flows; fix the top findings. | Its own session |
 | D | **Agent-workspace visibility** | Independent analysis called their MCP "the standout differentiator" — rotli already ships CLI + MCP first-party; it's underexposed, not underbuilt. | Item A's page + docs |
-| E | **Sync/mobile answer, in words** | Their gap and ours; the honest local-first answer is "your folder, your sync" — document recommended setups (iCloud Drive, git) in SUPPORT.md instead of building a service. | Small doc task |
+| E | **Sync/mobile answer, in words** | Their gap and ours; the honest local-first answer is "your folder, your sync" — document recommended setups (iCloud Drive, git) in SUPPORT.md instead of building a service. **Done 2026-07-27** (SUPPORT.md "Sync and other devices"). | Small doc task |
 | F | **CSV-as-database view** | Genuinely envied feature in their community; rotli has the sheet machinery to do a calmer version later. | Backlog, after the stage |
 
 ## Sequencing
