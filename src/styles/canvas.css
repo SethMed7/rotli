@@ -19,6 +19,23 @@
   min-height: 0;
 }
 
+/* — the theme bridge (boards slice 2026-07-28): the canvas follows rotli's
+   FAMILY, not just light/dark — the vendor's stock violet accent and island
+   chrome were the one un-rotli surface in the app. Kit tokens re-mixed into
+   the vendor's own custom properties; mode (light/dark) still rides the
+   `theme` prop. — */
+.canvas-surface .excalidraw,
+.rotli-embed-board-inner .excalidraw {
+  --color-primary: var(--accent);
+  --color-primary-darker: color-mix(in srgb, var(--accent) 85%, var(--text));
+  --color-primary-darkest: color-mix(in srgb, var(--accent) 70%, var(--text));
+  --color-primary-hover: color-mix(in srgb, var(--accent) 88%, var(--ground));
+  --color-primary-light: color-mix(in srgb, var(--accent) 18%, var(--ground));
+  --color-primary-light-darker: color-mix(in srgb, var(--accent) 28%, var(--ground));
+  --island-bg-color: var(--surface);
+  --default-bg-color: var(--ground);
+}
+
 /* A failed board WRITE — the inline data-loss warning strip pinned over the
    canvas bottom; cleared by the next successful save (#11, audit 2026-07). */
 .canvas-save-err {
@@ -35,6 +52,39 @@
   color: var(--danger, var(--accent-text));
   font-size: 12.5px;
   line-height: 1.45;
+}
+
+/* The ```board embed's quiet status lines: view-only notice (the board's own
+   tab holds the pen) and the save-failure strip (mirrors .canvas-save-err). */
+.rotli-embed-board-inner {
+  position: relative;
+}
+.rotli-embed-viewonly {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 4px 10px;
+  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.rotli-embed-saveerr {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 7;
+  max-width: calc(100% - 24px);
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--danger, var(--accent-text)) 35%, transparent);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--danger, var(--accent-text));
+  font-size: 11.5px;
 }
 
 /* The browser (no-shell) + loading/error placeholders — quiet, centered, warm. */

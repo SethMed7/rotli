@@ -46,9 +46,23 @@ export function parseBoardBody(body: string): LoadedBoard {
   return { scene, meta: { description: rm?.description ?? "", tags: rm?.tags ?? "" } };
 }
 
-/** Canonical on-disk scene JSON. Volatile UI cruft (collaborators) is stripped
- * so saves stay diff-friendly; rotliMeta always rides top-level so no save path
- * can drop the board's AI description/tags. */
+/** The appState keys that are CONTENT, not viewport churn. Excalidraw's live
+ * appState carries scroll/zoom/selection/tool — persisting those meant panning
+ * a board rewrote the file (git noise in a vault that IS a git repo, mtime
+ * feeding recency). Only the durable canvas choices survive a save. */
+const DURABLE_APP_STATE = ["viewBackgroundColor", "gridSize", "gridModeEnabled", "gridStep"] as const;
+
+function durableAppState(appState: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of DURABLE_APP_STATE) {
+    if (appState[key] !== undefined) out[key] = appState[key];
+  }
+  return out;
+}
+
+/** Canonical on-disk scene JSON. Volatile UI state (collaborators, viewport,
+ * selection, tool) is stripped so saves stay diff-friendly; rotliMeta always
+ * rides top-level so no save path can drop the board's AI description/tags. */
 export function serializeBoardScene(parts: {
   elements: readonly unknown[];
   appState: Record<string, unknown>;
@@ -60,7 +74,7 @@ export function serializeBoardScene(parts: {
     version: 2,
     source: "rotli",
     elements: parts.elements,
-    appState: { ...parts.appState, collaborators: undefined },
+    appState: durableAppState(parts.appState),
     files: parts.files,
     rotliMeta: parts.meta,
   });
@@ -69,8 +83,13 @@ export function serializeBoardScene(parts: {
 }
 
 export interface BoardSaver {
-  /** Stash the freshest body and (re)arm the trailing debounce. */
-  schedule(body: string): void;
+  /** The just-loaded canonical body — a later save identical to it is skipped
+   * (opening/panning a board must never touch the file). */
+  prime(body: string): void;
+  /** Stash the freshest BUILDER and (re)arm the trailing debounce. The builder
+   * runs at most once per drain — Excalidraw fires onChange per pointer move,
+   * and serializing megabytes per event was the big-board perf cliff. */
+  schedule(build: () => string): void;
   /** Write immediately (metadata edits don't ride the Excalidraw onChange). */
   saveNow(body: string): void;
   /** Cancel the timer and write anything pending (unmount / board switch). */
@@ -79,25 +98,42 @@ export interface BoardSaver {
 
 /** Debounced writer behind every board save path, so pending-body semantics and
  * failure surfacing can't drift between surfaces. `onResult` receives the write
- * error (or null on success) when the caller shows save state. */
+ * (or serialization) error — or null on success — when the caller shows save
+ * state. Unchanged bodies never hit the disk. */
 export function createBoardSaver(
   write: (body: string) => Promise<void>,
   onResult?: (error: string | null) => void,
 ): BoardSaver {
-  let pendingBody: string | null = null;
+  let pendingBuild: (() => string) | null = null;
+  let lastSaved: string | null = null;
   const put = (body: string): Promise<void> =>
     write(body).then(
-      () => onResult?.(null),
+      () => {
+        lastSaved = body;
+        onResult?.(null);
+      },
       (e: unknown) => onResult?.(e instanceof Error ? e.message : String(e)),
     );
   const task = createDebouncedTask(BOARD_SAVE_DEBOUNCE_MS, () => {
-    const body = pendingBody;
-    pendingBody = null;
-    if (body !== null) return put(body);
+    const build = pendingBuild;
+    pendingBuild = null;
+    if (!build) return;
+    let body: string;
+    try {
+      body = build();
+    } catch (e) {
+      onResult?.(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    if (body === lastSaved) return; // viewport churn, selection, a no-op — skip
+    return put(body);
   });
   return {
-    schedule(body) {
-      pendingBody = body;
+    prime(body) {
+      lastSaved = body;
+    },
+    schedule(build) {
+      pendingBuild = build;
       task.schedule();
     },
     saveNow(body) {

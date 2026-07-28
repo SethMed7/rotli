@@ -12,6 +12,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Boards stop rewriting themselves.** Opening, panning, zooming, or
+  selecting on a board no longer touches the file — only durable content
+  (elements, images, canvas background, grid) persists, and an unchanged
+  scene never writes. In a vault that's a git repo this ends the phantom
+  diffs, and serialization now runs once per save instead of on every
+  pointer move — the big-board stutter is gone.
+- **The canvas owns its keys.** ⌘D used to duplicate a shape *and* split the
+  pane; ⌘0 reset canvas zoom *and* toggled the sidebar; ⌘=/⌘− were dead over
+  a board. Inside a board those chords now belong to Excalidraw — zoom where
+  you are. The vendor's own theme toggle is gone too; the titlebar sun is the
+  one theme owner.
+- **Boards look like rotli.** The canvas accent, islands, and default
+  background now follow the app's theme family in all four environments —
+  no more stock-violet island floating in a warm app.
+- **Embedded boards can't fight their tab.** While a board's own tab is open
+  anywhere, its note embed goes view-only (two live editors used to silently
+  overwrite each other's strokes). Embed save failures now show the same
+  warning strip the full canvas has, and pending board saves register with
+  the quit-flush handshake — ⌘Q inside the save window can no longer drop
+  your last strokes.
+- **Board rename failures say why** (read-only vault, name collision) in the
+  sidebar's error lane instead of silently snapping back.
+
 - **Manual filing is back.** The System fold had quietly removed every by-hand
   move: right-click a note → **Move to…** now refiles it into a Library area
   (through the Librarian's journaled, undoable lane when it's on) or any plain

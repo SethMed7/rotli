@@ -116,6 +116,19 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
+/** The chords Excalidraw owns on its own canvas (boards slice 2026-07-28):
+ * ⌘D duplicated an object AND split the pane; ⌘0 reset canvas zoom AND toggled
+ * the sidebar; ⌘=/⌘− were dead keys over a board (the app's contextual zoom
+ * no-ops on canvas tabs). Inside a board, the canvas vocabulary wins — "zoom
+ * where I am" is the house rule. Tab/app chords (⌘W, ⌘T, ⌘1-9…) still pass. */
+const CANVAS_OWNED_CHORDS = new Set(["Meta+D", "Meta+Shift+D", "Meta+0", "Meta+Equal", "Meta+Minus"]);
+
+function isCanvasTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement && target.closest(".canvas-surface, .rotli-embed-board-inner") !== null
+  );
+}
+
 /** Attach the one dispatcher for this webview's surface. Idempotent. */
 export function attachDispatcher(surface: Surface): () => void {
   if (detach) return detach;
@@ -131,6 +144,8 @@ export function attachDispatcher(surface: Surface): () => void {
       const key = pressed.split("+").pop() ?? "";
       if (!/^(Esc|Enter|F\d{1,2})$/.test(key)) return;
     }
+    // over an Excalidraw canvas the clash chords belong to the canvas
+    if (CANVAS_OWNED_CHORDS.has(pressed) && isCanvasTarget(event.target)) return;
     for (const action of actions.values()) {
       if (action.global) continue; // OS-side, handled in Rust
       if (!action.shared && action.surface !== surface) continue;

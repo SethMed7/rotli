@@ -4,9 +4,9 @@
 // directions. (Cross-pane moves are exercised via the same clamped-splice path.)
 
 import { beforeEach, describe, expect, test } from "bun:test";
-import type { LeafNode, Tab } from "../types";
+import type { LeafNode, PaneNode, Tab } from "../types";
 import { useNavHistory } from "./navHistory";
-import { findLeaf, openNavTarget, sidebarItemId, tabsRightOf, usePanesStore } from "./panes";
+import { boardTabOpen, findLeaf, openNavTarget, sidebarItemId, tabsRightOf, usePanesStore } from "./panes";
 
 const tab = (id: string): Tab => ({
   id,
@@ -361,5 +361,37 @@ describe("tabsRightOf", () => {
     expect(tabsRightOf(l, "B")).toEqual(["C", "D"]);
     expect(tabsRightOf(l, "D")).toEqual([]);
     expect(tabsRightOf(l, "zz")).toEqual([]);
+  });
+});
+
+// boards slice 2026-07-28: while a board's own canvas tab is open anywhere,
+// the ```board embed goes view-only — two live savers on one file silently
+// overwrote each other's strokes.
+describe("boardTabOpen", () => {
+  test("sees a canvas tab for the board in any pane", () => {
+    const root: PaneNode = {
+      kind: "split",
+      id: "s",
+      dir: "row",
+      children: [
+        leaf("p1", ["A"]),
+        {
+          kind: "leaf",
+          id: "p2",
+          tabs: [
+            {
+              id: "c",
+              surfaceKind: "canvas",
+              boardId: "storage/plan.excalidraw",
+              viewState: { cursor: 0, scroll: 0 },
+            },
+          ],
+          activeTabId: "c",
+        },
+      ],
+      sizes: [0.5, 0.5],
+    };
+    expect(boardTabOpen(root, "storage/plan.excalidraw")).toBe(true);
+    expect(boardTabOpen(root, "storage/other.excalidraw")).toBe(false);
   });
 });

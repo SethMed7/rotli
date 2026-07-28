@@ -74,6 +74,13 @@ export function refitColumns(): void {
   if (!fits(ui.sidebarCollapsed) && fits(true)) ui.setSidebarCollapsed(true);
 }
 
+/** True when ANY pane holds a canvas tab for this board — the ```board embed
+ * goes view-only then, so two live savers can't silently last-writer-wins each
+ * other's strokes (boards slice 2026-07-28). */
+export function boardTabOpen(root: PaneNode, boardId: string): boolean {
+  return leaves(root).some((l) => l.tabs.some((t) => t.surfaceKind === "canvas" && t.boardId === boardId));
+}
+
 /** The tab ids strictly AFTER the anchor in strip order — "Close tabs to the
  * right"'s pure answer (P0 sweep 2026-07-28). Unknown anchor → nothing falls. */
 export function tabsRightOf(leaf: LeafNode, tabId: string): string[] {

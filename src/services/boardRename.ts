@@ -26,8 +26,14 @@ export function useBoardRename() {
         retargetBoard(boardId, meta.id);
         renameMainRef(boardId, meta.id); // the Main slot follows the new path id (#33)
         await invalidateNotes();
-      } catch {
-        /* board is read-only or gone — leave it */
+      } catch (err) {
+        // the row just snaps back — SAY why (read-only vault, name collision…);
+        // the sidebar's inline error lane already exists for exactly this
+        useUiStore
+          .getState()
+          .setRowActionError(
+            `Couldn’t rename the board — ${err instanceof Error ? err.message : String(err)}`,
+          );
       }
     },
     [setRenamingBoardId, retargetBoard],

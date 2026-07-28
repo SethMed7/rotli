@@ -20,6 +20,7 @@ import {
   BoardCanvas,
 } from "../boards/engine/excalidraw";
 import { type BoardMeta, EMPTY_BOARD_META, serializeBoardScene } from "../boards/session";
+import { onQuitFlush } from "../lib/quitFlush";
 import { isTauri } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
 
@@ -88,6 +89,25 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
         if (cancelled) return;
         metaRef.current = loaded;
         setMeta(loaded);
+        // prime the saver with the CANONICAL body — merely opening the board
+        // (or panning it) then produces an identical body and never writes
+        try {
+          const s = scene as {
+            elements?: unknown[];
+            appState?: Record<string, unknown>;
+            files?: Record<string, unknown>;
+          };
+          saver.prime(
+            serializeBoardScene({
+              elements: s.elements ?? [],
+              appState: s.appState ?? {},
+              files: s.files ?? {},
+              meta: loaded,
+            }),
+          );
+        } catch {
+          /* a foreign scene that can't re-serialize just skips the baseline */
+        }
         setState({ status: "ready", initialData: scene as ExcalidrawInitialData });
       })
       .catch((err: unknown) => {
@@ -101,28 +121,42 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
     return () => {
       cancelled = true;
     };
-  }, [boardId, loadVersion]);
+  }, [boardId, loadVersion, saver]);
 
-  // flush any pending save when the board changes or the surface unmounts
+  // flush any pending save when the board changes or the surface unmounts —
+  // and on ⌘Q/tray-Quit, which can fire inside the debounce window (the
+  // quit-flush handshake; boards never registered before and could lose the
+  // last strokes)
   useEffect(() => () => saver.flush(), [saver]);
+  useEffect(() => {
+    onQuitFlush(() => saver.flush());
+  }, [saver]);
 
+  // the freshest scene parts ride a ref; serialization runs inside the saver's
+  // debounce (at most once per drain) — it used to run per onChange, i.e. per
+  // pointer move, which was the big-board stutter
+  const sceneRef = useRef<{
+    elements: readonly unknown[];
+    appState: Record<string, unknown>;
+    files: Record<string, unknown>;
+  } | null>(null);
+  const buildBody = useCallback(() => {
+    const s = sceneRef.current;
+    if (!s) throw new Error("no scene captured");
+    return serializeBoardScene({ ...s, meta: metaRef.current });
+  }, []);
   const onChange = useCallback(
     (elements: BoardChangeElements, appState: BoardChangeAppState, files: BoardChangeFiles) => {
       // Don't write while still loading (the initialData render fires onChange).
       if (state.status !== "ready") return;
-      try {
-        const body = serializeBoardScene({
-          elements,
-          appState: appState as unknown as Record<string, unknown>,
-          files: files as unknown as Record<string, unknown>,
-          meta: metaRef.current,
-        });
-        saver.schedule(body);
-      } catch (error) {
-        setSaveErr(error instanceof Error ? error.message : String(error));
-      }
+      sceneRef.current = {
+        elements,
+        appState: appState as unknown as Record<string, unknown>,
+        files: files as unknown as Record<string, unknown>,
+      };
+      saver.schedule(buildBody);
     },
-    [state.status, saver],
+    [state.status, saver, buildBody],
   );
 
   // Persist a metadata edit right away (it doesn't ride the Excalidraw onChange
@@ -236,6 +270,9 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
         initialData={state.initialData}
         onChange={onChange}
         theme={excaliTheme}
+        // the titlebar sun is the ONE theme owner — the vendor's own toggle
+        // was a second authority fighting it (boards slice 2026-07-28)
+        UIOptions={{ canvasActions: { toggleTheme: false } }}
         excalidrawAPI={(api) => {
           apiRef.current = api as unknown as ExcaliApi;
         }}
