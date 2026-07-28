@@ -359,7 +359,12 @@ export function Palette({ onClose }: { onClose: () => void }) {
                     type="button"
                     key={row.key}
                     className={i === selected ? "prow sel" : "prow"}
-                    onMouseEnter={() => setIndex(i)}
+                    // onMouseMove, NOT onMouseEnter: when ↑↓ scrolls the list,
+                    // rows shift under a stationary cursor and Chromium fires
+                    // synthetic enter events — snapping the selection back to
+                    // the hovered row and eating the arrow keys (Seth,
+                    // 2026-07-28). A real pointer move is the only hover vote.
+                    onMouseMove={() => setIndex(i)}
                     onClick={(e) => row.run(e.metaKey)}
                   >
                     {row.icon}

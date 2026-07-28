@@ -11,6 +11,7 @@ import {
   folderSegmentLabel,
   kindLabel,
   listFolderContents,
+  rerootDiskPath,
   sortFolderListing,
 } from "./systemBrowser";
 
@@ -152,5 +153,42 @@ describe("folderSegmentLabel", () => {
     expect(folderSegmentLabel("_inbox")).toBe("Captures");
     expect(folderSegmentLabel("Storage")).toBe("Assets");
     expect(folderSegmentLabel("Projects")).toBe("Projects");
+  });
+});
+
+describe("rerootDiskPath (the 422-count-but-empty-Assets bug, 2026-07-28)", () => {
+  test("a path already under the prefix passes through", () => {
+    expect(rerootDiskPath("Storage", "Storage")).toBe("Storage");
+    expect(rerootDiskPath("Storage/chats", "Storage")).toBe("Storage/chats");
+  });
+
+  test("a memex's lowercase lane re-roots onto the destination prefix", () => {
+    expect(rerootDiskPath("storage", "Storage")).toBe("Storage");
+    expect(rerootDiskPath("storage/chats/x", "Storage")).toBe("Storage/chats/x");
+    expect(rerootDiskPath("trash/wiki/projects", "Trash")).toBe("Trash/wiki/projects");
+  });
+
+  test("a foreign path surfaces AT the root rather than vanishing", () => {
+    expect(rerootDiskPath("wiki/Projects", "Storage")).toBe("Storage");
+  });
+
+  test("a prefix-named sibling lane is NOT swallowed by startsWith", () => {
+    expect(rerootDiskPath("StorageBackup/x", "Storage")).toBe("Storage");
+  });
+
+  test("listFolderContents browses a memex storage lane through the mapping", () => {
+    const items = [
+      note({ id: "s1", title: "Loose", folderId: "Storage", diskFolderId: "storage" }),
+      note({ id: "s2", title: "Chat log", folderId: "Storage", diskFolderId: "storage/chats" }),
+      note({ id: "s3", title: "Deep", folderId: "Storage", diskFolderId: "storage/chats/2026" }),
+    ];
+    const pathOf = (n: NoteSummary) => rerootDiskPath(n.diskFolderId ?? n.folderId, "Storage");
+    const l = listFolderContents(items, "Storage", [], pathOf);
+    expect(l.items.map((n) => n.id)).toEqual(["s1"]);
+    expect(l.folders.map((f) => f.path)).toEqual(["Storage/chats"]);
+    expect(l.folders[0]?.itemCount).toBe(2);
+    const inside = listFolderContents(items, "Storage/chats", [], pathOf);
+    expect(inside.items.map((n) => n.id)).toEqual(["s2"]);
+    expect(inside.folders.map((f) => f.path)).toEqual(["Storage/chats/2026"]);
   });
 });

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import type { LeafNode, PaneNode, Tab } from "../types";
 import { useNavHistory } from "./navHistory";
 import {
+  activeTabOf,
   boardTabOpen,
   findLeaf,
   leaves,
@@ -458,6 +459,44 @@ describe("the closed-tab stack (⌘⇧T)", () => {
     });
     usePanesStore.getState().closeFileTabs("storage/x.pdf");
     expect(usePanesStore.getState().closedTabs).toHaveLength(0);
+  });
+});
+
+// Seth, 2026-07-28: "I should be able to close all tabs and have an empty
+// state" — the lone pane may go EMPTY instead of silently refusing the close.
+describe("closing the last tab of the lone pane", () => {
+  beforeEach(() => {
+    usePanesStore.setState({
+      root: leaf("p1", ["A"]),
+      focusedPaneId: "p1",
+      closedTabs: [],
+    });
+  });
+
+  test("empties the pane instead of no-oping, and ⌘⇧T brings the tab back", () => {
+    usePanesStore.getState().closeTabById("p1", "A");
+    const l = findLeaf(usePanesStore.getState().root, "p1");
+    expect(l?.tabs).toEqual([]);
+    expect(activeTabOf(l!)).toBeNull();
+    usePanesStore.getState().reopenClosedTab();
+    expect(order("p1")).toEqual(["A"]);
+    expect(findLeaf(usePanesStore.getState().root, "p1")?.activeTabId).toBe("A");
+  });
+
+  test("opening a note into the empty pane starts a fresh tab", () => {
+    usePanesStore.getState().closeTabById("p1", "A");
+    usePanesStore.getState().openNote("n-new");
+    const l = findLeaf(usePanesStore.getState().root, "p1");
+    expect(l?.tabs).toHaveLength(1);
+    expect(activeTabOf(l!)?.surfaceKind).toBe("note");
+  });
+
+  test("⌘W on the already-empty pane stays a quiet no-op", () => {
+    usePanesStore.getState().closeTabById("p1", "A");
+    usePanesStore.getState().closeTab();
+    const l = findLeaf(usePanesStore.getState().root, "p1");
+    expect(l?.tabs).toEqual([]);
+    expect(usePanesStore.getState().closedTabs).toHaveLength(1); // only the real close recorded
   });
 });
 

@@ -720,7 +720,9 @@ export function Sidebar() {
     depth: number,
     rp: ReturnType<typeof useRovingList>["rowProps"],
   ): ReactNode => {
-    const rowPad = 10 + (depth + 1) * 16;
+    // depth 0 starts flush at the section inset (Seth, 2026-07-28: the extra
+    // first step was wasted left whitespace); children advance 16px per level
+    const rowPad = 10 + depth * 16;
     // Folder rows reserve 18px for the disclosure chevron. Note rows and
     // rename inputs compensate for that slot so same-depth icons share one
     // visual column and nested children still advance by exactly 16px.
@@ -1211,6 +1213,8 @@ export function Sidebar() {
 
   // a top-level section header (Inbox · Chat · Notes): a clickable disclosure row
   // that toggles its accordion (state persisted in expandedDests under SEC_*).
+  // The chevron rides the RIGHT edge (Seth, 2026-07-28: the left slot was
+  // wasted whitespace) — the glyph + label start flush at the row's inset.
   const sectionHeader = (
     id: string,
     label: string,
@@ -1219,12 +1223,12 @@ export function Sidebar() {
     count?: number,
   ): ReactNode => (
     <button type="button" className="sb-section" aria-expanded={open} onClick={() => toggleDestExpanded(id)}>
-      <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
-        <ChevronRight size={11} />
-      </span>
       <Glyph size={15.5} />
       <span className="fname">{label}</span>
       {count != null && count > 0 && <span className="count">{count}</span>}
+      <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
+        <ChevronRight size={11} />
+      </span>
     </button>
   );
 
@@ -1379,9 +1383,6 @@ export function Sidebar() {
               </div>
               {STUB_EMAIL_ACCOUNTS.map((addr) => (
                 <div key={addr} className="sb-stub-row acct" aria-disabled="true">
-                  <span className="fchev" aria-hidden="true">
-                    <ChevronRight size={10} />
-                  </span>
                   <MailGlyph size={13} />
                   <span className="fname">{addr}</span>
                 </div>

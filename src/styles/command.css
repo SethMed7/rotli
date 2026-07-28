@@ -1605,16 +1605,6 @@
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   font-weight: 600;
 }
-.ctxmenu-item.active::before {
-  content: "";
-  position: absolute;
-  left: 2px;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--accent);
-}
 .ctxmenu-item svg {
   flex: 0 0 auto;
   margin-left: auto;

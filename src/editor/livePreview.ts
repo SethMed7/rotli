@@ -47,6 +47,9 @@ interface InlineRule {
   cls: string;
   /** Extra DOM attributes on the content mark (the link's ⌘-click tooltip). */
   attrs?: Record<string, string>;
+  /** Per-MATCH class/attrs override (the wikilink's resolved-vs-missing look). */
+  clsFor?: (m: RegExpExecArray) => string;
+  attrsFor?: (m: RegExpExecArray) => Record<string, string> | undefined;
   /** Marker + content ranges RELATIVE to the match start. */
   parts: (m: RegExpExecArray) => { markers: [number, number][]; content: [number, number] };
 }
@@ -70,8 +73,28 @@ const INLINE: InlineRule[] = [
   {
     re: /\[\[([^\]]+)\]\]/,
     cls: "rotli-wikilink",
-    attrs: { title: "Click to open note" },
-    parts: fixed(2, 2),
+    // a link that resolves to NOTHING must not look identical to a live one —
+    // the silent dead click read as broken (Seth, 2026-07-28)
+    clsFor: (m) =>
+      resolveWikilinkTarget(m[1] ?? "") ? "rotli-wikilink" : "rotli-wikilink rotli-wikilink-missing",
+    attrsFor: (m) =>
+      resolveWikilinkTarget(m[1] ?? "")
+        ? { title: "Click to open note" }
+        : { title: "No note with this name — the link has nowhere to go" },
+    // [[target|display]] hides "[[target|" and "]]", showing only the display
+    // (an EMPTY display falls back to showing the whole inner text)
+    parts: (m) => {
+      const L = m[0].length;
+      const pipe = (m[1] ?? "").indexOf("|");
+      const open = pipe >= 0 && 2 + pipe + 1 < L - 2 ? 2 + pipe + 1 : 2;
+      return {
+        markers: [
+          [0, open],
+          [L - 2, L],
+        ] as [number, number][],
+        content: [open, L - 2] as [number, number],
+      };
+    },
   },
   { re: /\*\*((?:[^*]|\*(?!\*))+)\*\*/, cls: "rotli-strong", parts: fixed(2, 2) },
   { re: /==([^=]+)==/, cls: "rotli-hl", parts: fixed(2, 2) },
@@ -95,6 +118,15 @@ const INLINE: InlineRule[] = [
     },
   },
   { re: /\*([^*\s](?:[^*]*[^*\s])?)\*/, cls: "rotli-em", parts: fixed(1, 1) },
+  // a BARE url typed as plain text is a link too (Seth, 2026-07-28: "we should
+  // notice links") — no markers to hide, trailing punctuation stays prose.
+  // Sits after the md-link rule: `[t](url)` starts earlier so it wins the scan.
+  {
+    re: /https?:\/\/[^\s<>()[\]]*[^\s<>()[\].,;:!?'"]/,
+    cls: "rotli-link rotli-autolink",
+    attrs: { title: "⌘-click to open" },
+    parts: (m) => ({ markers: [], content: [0, m[0].length] as [number, number] }),
+  },
 ];
 
 // a line that is JUST an image — ![alt](url) or ![caption|width](url)
@@ -460,12 +492,9 @@ function scanInline(
     const cs = matchStart + cr[0];
     const ce = matchStart + cr[1];
     if (ce > cs) {
-      decos.push(
-        Decoration.mark(rule.attrs ? { class: rule.cls, attributes: rule.attrs } : { class: rule.cls }).range(
-          cs,
-          ce,
-        ),
-      );
+      const cls = rule.clsFor?.(m) ?? rule.cls;
+      const attrs = rule.attrsFor?.(m) ?? rule.attrs;
+      decos.push(Decoration.mark(attrs ? { class: cls, attributes: attrs } : { class: cls }).range(cs, ce));
     }
     const touched = sel.from <= spanEnd && sel.to >= spanStart;
     for (const [s, e] of markers) {
@@ -685,6 +714,24 @@ function tryOpenMarkdownLinkAt(lineText: string, lineFrom: number, pos: number):
   return false;
 }
 
+// mirrors the autolink INLINE rule — a bare url ⌘-clicks open like an md link
+const BARE_URL = /https?:\/\/[^\s<>()[\]]*[^\s<>()[\].,;:!?'"]/g;
+
+function tryOpenBareUrlAt(lineText: string, lineFrom: number, pos: number): boolean {
+  BARE_URL.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = BARE_URL.exec(lineText)) !== null) {
+    const from = lineFrom + m.index;
+    const to = from + m[0].length;
+    if (pos >= from && pos <= to) {
+      void openUrl(m[0]).catch(() => {});
+      return true;
+    }
+    if (from > pos) break;
+  }
+  return false;
+}
+
 export const linkOpener = EditorView.domEventHandlers({
   click(e, view) {
     const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
@@ -694,7 +741,8 @@ export const linkOpener = EditorView.domEventHandlers({
     // Ordinary web URLs keep the deliberate ⌘-click editor gesture.
     if (
       (editorLinkOpensOnClick("note", e.button, e.metaKey) && tryOpenWikilinkAt(line.text, line.from, pos)) ||
-      (editorLinkOpensOnClick("web", e.button, e.metaKey) && tryOpenMarkdownLinkAt(line.text, line.from, pos))
+      (editorLinkOpensOnClick("web", e.button, e.metaKey) &&
+        (tryOpenMarkdownLinkAt(line.text, line.from, pos) || tryOpenBareUrlAt(line.text, line.from, pos)))
     ) {
       e.preventDefault();
       return true;

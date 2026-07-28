@@ -126,6 +126,16 @@ const INLINE_RULES: InlineRule[] = [
     re: /\*([^*\s](?:[^*]*[^*\s])?)\*/,
     render: (m, key) => <em key={key}>{renderInline(m[1] ?? "")}</em>,
   },
+  // a BARE url is a link too (mirrors livePreview's autolink rule) — the
+  // md-link rule sits earlier so `[t](url)` keeps winning the scan
+  {
+    re: /https?:\/\/[^\s<>()[\]]*[^\s<>()[\].,;:!?'"]/,
+    render: (m, key) => (
+      <a className="md-link" href={m[0]} title={m[0]} key={key} onClick={openLink}>
+        {m[0]}
+      </a>
+    ),
+  },
 ];
 
 export function renderInline(text: string): ReactNode[] {

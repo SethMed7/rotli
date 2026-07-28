@@ -69,6 +69,18 @@ describe("wikilink", () => {
     expect(resolveWikilink("Dup", index)).toBeNull();
   });
 
+  test("resolveWikilink strips display alias, heading fragment, and .md", () => {
+    const index = buildWikilinkIndex([note("path/x", "My Note")]);
+    expect(resolveWikilink("My Note|shown text", index)).toBe("path/x");
+    expect(resolveWikilink("My Note#Section", index)).toBe("path/x");
+    expect(resolveWikilink("My Note.md", index)).toBe("path/x");
+  });
+
+  test("resolveWikilink falls back to the last segment of a path-style target", () => {
+    const index = buildWikilinkIndex([note("wiki/projects/x.md", "My Note")]);
+    expect(resolveWikilink("projects/My Note", index)).toBe("wiki/projects/x.md");
+  });
+
   test("a normal click opens a note link while web links keep the command-click guard", () => {
     expect(editorLinkOpensOnClick("note", 0, false)).toBe(true);
     expect(editorLinkOpensOnClick("web", 0, false)).toBe(false);

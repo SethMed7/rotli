@@ -11,8 +11,8 @@
 // macOS WKWebView shell): drag within a strip to reorder, onto another strip to
 // move, or onto a pane edge to split. The gesture + hit-testing live in
 // lib/tabDrag; the strip just starts it on pointerdown and reads the store's
-// dropPreview to paint the 2px insertion line. The lone-tab-in-lone-pane hides
-// its × (closing it is a no-op anyway).
+// dropPreview to paint the 2px insertion line. Every tab is closeable — the
+// last one leaves the lone pane in the quokka rest state (Seth, 2026-07-28).
 
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBoardRename } from "../services/boardRename";
@@ -31,7 +31,7 @@ import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree
 import { useNoteIndex } from "../services/hooks";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useMainStore } from "../state/main";
-import { leaves, usePanesStore } from "../state/panes";
+import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { LeafNode, Tab } from "../types";
 import { ChatGlyph, ClockGlyph, ExcalidrawGlyph, FileGlyph, PlusGlyph, XGlyph, glyphForNote } from "./glyphs";
@@ -83,9 +83,6 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   const dropAt = usePanesStore((s) =>
     s.dropPreview?.kind === "strip" && s.dropPreview.paneId === pane.id ? s.dropPreview.index : null,
   );
-  // the only tab of the only pane: closing it is a no-op, so hide its × — the
-  // strip stays for the new always-visible law (Seth, 2026-06-13)
-  const loneInLonePane = usePanesStore((s) => leaves(s.root).length === 1 && pane.tabs.length === 1);
   // the FULL note index — a tab can hold a STAGED note (wiki/_inbox → the
   // hidden "Board" root) or an archived/trashed one; useNotes() alone read
   // those tabs as "Untitled".
@@ -174,7 +171,6 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
     items.push({
       kind: "action",
       label: "Close tab",
-      disabled: loneInLonePane,
       onClick: () => closeTabWithDraftCleanup(pane.id, tab.id),
     });
     items.push({
@@ -235,7 +231,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                   onAuxClick={(event) => {
                     // middle-click closes — the twin of the note rows' middle-
                     // click-opens grammar (#81, audit 2026-07)
-                    if (event.button === 1 && !loneInLonePane) {
+                    if (event.button === 1) {
                       event.preventDefault();
                       closeTabWithDraftCleanup(pane.id, tab.id);
                     }
@@ -285,20 +281,18 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                       {tabLabel(tab, titles)}
                     </span>
                   )}
-                  {!loneInLonePane && (
-                    <button
-                      type="button"
-                      className="x"
-                      aria-label="Close tab — ⌘W"
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        closeTabWithDraftCleanup(pane.id, tab.id);
-                      }}
-                    >
-                      <XGlyph size={9} />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="x"
+                    aria-label="Close tab — ⌘W"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      closeTabWithDraftCleanup(pane.id, tab.id);
+                    }}
+                  >
+                    <XGlyph size={9} />
+                  </button>
                 </div>
                 {dropAt === pane.tabs.length && i === pane.tabs.length - 1 && (
                   <span className="tab-ins" aria-hidden="true" />

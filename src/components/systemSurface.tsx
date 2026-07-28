@@ -30,6 +30,7 @@ import {
   filterSystemItems,
   kindLabel,
   listFolderContents,
+  rerootDiskPath,
   sortFolderListing,
 } from "../services/systemBrowser";
 import { usePanesStore } from "../state/panes";
@@ -113,9 +114,16 @@ export function SystemSurface({ rootId }: { rootId: string }) {
 
   const searching = query.trim() !== "";
   const hits = useMemo(() => filterSystemItems(items, query), [items, query]);
+  // every browse listing reads disk paths THROUGH the root's namespace — in a
+  // memex the disk lane is lowercase ("storage/…") while the destination id is
+  // "Storage", and the raw comparison rendered 422 assets as an empty root
+  const pathOf = useMemo(
+    () => (n: NoteSummary) => rerootDiskPath(noteDiskFolder(n), root.prefix),
+    [root.prefix],
+  );
   const listing = useMemo(
-    () => sortFolderListing(listFolderContents(items, cwd, folderSeed), sort.key, sort.dir),
-    [items, cwd, folderSeed, sort],
+    () => sortFolderListing(listFolderContents(items, cwd, folderSeed, pathOf), sort.key, sort.dir),
+    [items, cwd, folderSeed, pathOf, sort],
   );
   const crumbs = useMemo(() => breadcrumbOf(cwd, root.prefix, root.title), [cwd, root.prefix, root.title]);
   const atRoot = cwd === root.prefix;
@@ -177,7 +185,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     revealing.current = true;
     setSelection([target]);
     anchorRef.current = revealNoteId;
-    setCwd(noteDiskFolder(target));
+    setCwd(rerootDiskPath(noteDiskFolder(target), root.prefix));
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => {
@@ -315,7 +323,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     const l =
       depth === 0
         ? listing
-        : sortFolderListing(listFolderContents(items, path, folderSeed), sort.key, sort.dir);
+        : sortFolderListing(listFolderContents(items, path, folderSeed, pathOf), sort.key, sort.dir);
     return (
       <>
         {l.folders.map((f) => (
@@ -554,7 +562,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
         <div className="board-scroll fdrc-scroll">
           <div className="fdrc-row">
             {[root.prefix, ...colPath].map((path, depth) => {
-              const col = listFolderContents(items, path, folderSeed);
+              const col = listFolderContents(items, path, folderSeed, pathOf);
               const openChild = colPath[depth];
               return (
                 <div key={path} className="fdrc-col">

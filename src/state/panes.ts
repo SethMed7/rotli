@@ -193,10 +193,10 @@ export function leaves(node: PaneNode, out: LeafNode[] = []): LeafNode[] {
   return out;
 }
 
-export function activeTabOf(leaf: LeafNode): Tab {
-  const tab = leaf.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf.tabs[0];
-  if (!tab) throw new Error("pane with zero tabs");
-  return tab;
+/** The leaf's active tab — null ONLY for the lone pane after its last tab
+ * closed (the quokka empty state; every other leaf always holds tabs). */
+export function activeTabOf(leaf: LeafNode): Tab | null {
+  return leaf.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf.tabs[0] ?? null;
 }
 
 function updateLeaf(node: PaneNode, id: string, fn: (leaf: LeafNode) => LeafNode): PaneNode {
@@ -515,8 +515,11 @@ export const usePanesStore = create<PanesState>((set, get) => {
     // the height floor mirrors the divider drag's 160px minimum
     if (dir === "col" && (rowCount(root) + 1) * MIN_PANE_HEIGHT > window.innerHeight) return;
     const leaf = focusedLeaf();
-    // a specific tab (open-to-the-side) or a duplicate of the active one — never empty
-    const dup = tab ?? duplicateTab(activeTabOf(leaf));
+    // a specific tab (open-to-the-side) or a duplicate of the active one — never
+    // empty; the all-tabs-closed rest state has nothing to duplicate, so no split
+    const active = activeTabOf(leaf);
+    const dup = tab ?? (active ? duplicateTab(active) : null);
+    if (!dup) return;
     const newLeaf = makeLeaf(dup);
     set({ root: splitLeaf(get().root, leaf.id, dir, newLeaf), focusedPaneId: newLeaf.id });
   };
@@ -750,7 +753,15 @@ export const usePanesStore = create<PanesState>((set, get) => {
         // last tab: closing it closes the pane (unless it's the only pane)
         const neighbor = nextFocusAfterClose(get().root, leaf.id);
         const remaining = removeLeaf(get().root, leaf.id);
-        if (!remaining) return;
+        if (!remaining) {
+          // the LAST tab anywhere: the lone pane stays, empty — the quokka
+          // rest state (Seth, 2026-07-28: "close all tabs, get an empty
+          // state"); ⌘⇧T still brings the tab back
+          if (!closing) return;
+          record();
+          set({ root: updateLeaf(get().root, paneId, (l) => ({ ...l, tabs: [], activeTabId: "" })) });
+          return;
+        }
         const fallback = leaves(remaining)[0];
         if (!fallback) return;
         const focus = neighbor && findLeaf(remaining, neighbor) ? neighbor : fallback.id;

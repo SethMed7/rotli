@@ -10,6 +10,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-07-28
+
+### Added
+
+- **Bare links are links.** A plain `https://…` typed into a note now renders
+  as a real link — ⌘-click opens it in the browser, same as `[text](url)`
+  links. The chat surface opens them on a plain click.
+- **Close every tab.** The last tab's × is no longer hidden: close it and the
+  pane rests with the quokka and three quiet ways back in (⌘N new note ·
+  ⌘K search · ⌘⇧T reopen). ⌘⇧T restores exactly what you closed.
+
+### Changed
+
+- **The sidebar breathes.** Section chevrons (Inbox · Chat · Notes) moved to
+  the row's right edge and the Main tree lost its wasted first indent step —
+  icons and labels start flush left. The pinned System zone is smaller and
+  quieter: compact muted rows that warm up on hover.
+- **One selection grammar.** The redundant accent bar beside active rows is
+  gone everywhere (menus, sidebar rows, chat rows) — the tinted background
+  alone marks the active item.
+- **Wikilinks tell the truth.** `[[links]]` survive renames (the old title and
+  filename ride along as aliases) and keep working for archived notes; a link
+  whose note was deleted — or never existed — now renders dimmed with a dashed
+  underline and says so, instead of silently doing nothing. `[[target|shown]]`,
+  `[[target#heading]]`, `[[target.md]]`, and path-style targets all resolve.
+
+### Fixed
+
+- **⌘K arrows work with the mouse parked over the list.** Scrolling the
+  selection used to fire synthetic hover events that snapped it back under the
+  cursor — arrow keys read as dead. Selection now only follows real pointer
+  movement.
+- **Assets no longer claims "Nothing here" beside a real count.** The
+  Assets/Archive/Trash browsers compared destination names against on-disk
+  memex lane paths (`Storage` vs `storage/…`), so the listing always came up
+  empty. Paths are now read through the destination's namespace.
+
 ## [0.41.1] - 2026-07-28
 
 

@@ -49,7 +49,8 @@ import { SlashPicker } from "./slashPicker";
 import { pickerFence, slashInsertion } from "./slashActions";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
 import { setWikilinkNotes } from "./wikilinkIndex";
-import { useSearchableNotes } from "../services/hooks";
+import { useNotes, useSearchableNotes } from "../services/hooks";
+import { DEST } from "../services/destinations";
 import type { NoteSummary } from "../types";
 
 interface SlashState {
@@ -211,10 +212,20 @@ export function CmEditor({
   const pickerRef = useRef<PickerState | null>(null);
   pickerRef.current = picker;
   const { notes: searchableNotes } = useSearchableNotes();
+  // ARCHIVED notes still exist — their wikilinks must keep resolving (and
+  // opening); only Trash reads as deleted → the missing look (Seth, 2026-07-28:
+  // "if I delete then it should show like that")
+  const archivedNotes = useNotes(DEST.archive).data;
 
   useEffect(() => {
-    setWikilinkNotes(searchableNotes);
-  }, [searchableNotes]);
+    const archived = (archivedNotes ?? []).filter((n) => n.kind !== "file");
+    setWikilinkNotes(archived.length ? [...searchableNotes, ...archived] : searchableNotes);
+    // re-decorate: the resolved-vs-missing wikilink look reads this index,
+    // which lands async after the view first painted — an explicit (no-move)
+    // selection transaction is the cheapest "selectionSet" rebuild trigger
+    const view = viewRef.current;
+    if (view) view.dispatch({ selection: view.state.selection });
+  }, [searchableNotes, archivedNotes]);
   // the slash key-handler reads live state through this ref (the CM dom handler
   // is created once, but it must see the current query/index)
   const slashRef = useRef<{ open: boolean; handle: (e: KeyboardEvent) => boolean }>({

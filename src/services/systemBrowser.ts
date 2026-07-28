@@ -54,6 +54,21 @@ export function filterSystemItems(items: NoteSummary[], query: string): NoteSumm
 
 const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base" });
 
+/** Map a note's ON-DISK folder path into the browser root's namespace. In a
+ * memex the projection renames lifecycle lanes (disk `storage/…` surfaces as
+ * destination "Storage") while `diskFolderId` keeps the on-disk lowercase —
+ * comparing them raw made the Assets/Archive/Trash browsers read as empty
+ * beside a real count (Seth, 2026-07-28: "Assets shows empty but a count of
+ * 422"). A path already under the prefix passes through; a case-twin first
+ * segment re-roots onto the prefix; anything else surfaces AT the root
+ * rather than vanishing. */
+export function rerootDiskPath(path: string, rootPrefix: string): string {
+  if (path === rootPrefix || path.startsWith(`${rootPrefix}/`)) return path;
+  const first = path.split("/")[0] ?? "";
+  if (first.toLowerCase() === rootPrefix.toLowerCase()) return rootPrefix + path.slice(first.length);
+  return rootPrefix;
+}
+
 /** The direct child of `cwd` that `path` sits under, or null. */
 function childOf(cwd: string, path: string): string | null {
   if (!path.startsWith(`${cwd}/`)) return null;
@@ -65,16 +80,18 @@ function childOf(cwd: string, path: string): string | null {
 /** A directory's direct contents. Subfolders derive from every item's real
  * disk folder UNION the seeded directory paths (so an EMPTY directory is
  * still a real folder — hiding it reads as data loss). Finder's default
- * order: folders and items each name-ascending. */
+ * order: folders and items each name-ascending. `pathOf` lets a surface remap
+ * each item's disk path into its root namespace (rerootDiskPath). */
 export function listFolderContents(
   items: NoteSummary[],
   cwd: string,
   seedFolders: readonly string[] = [],
+  pathOf: (n: NoteSummary) => string = noteDiskFolder,
 ): FolderListing {
   const children = new Set<string>();
   const direct: NoteSummary[] = [];
   for (const n of items) {
-    const path = noteDiskFolder(n);
+    const path = pathOf(n);
     if (path === cwd) {
       direct.push(n);
       continue;
@@ -89,7 +106,7 @@ export function listFolderContents(
   }
   const folders = [...children].sort(byName).map((path) => {
     const inside = items.filter((n) => {
-      const p = noteDiskFolder(n);
+      const p = pathOf(n);
       return p === path || p.startsWith(`${path}/`);
     });
     return {

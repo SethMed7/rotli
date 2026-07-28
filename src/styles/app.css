@@ -306,16 +306,6 @@
   background: var(--tint);
   font-weight: 500;
 }
-.mrow.sel::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 7px;
-  bottom: 7px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--accent);
-}
 .mrow .hk {
   margin-left: auto;
 }
@@ -377,4 +367,29 @@ body[data-surface="capture"] {
   text-align: center;
   padding: 24px;
   gap: 6px;
+}
+
+/* — all tabs closed: the lone pane's quokka rest state (Seth, 2026-07-28) —
+   the .list-empty stage plus quiet inline actions back into the app */
+.pane-empty {
+  height: 100%;
+}
+.pane-empty .be-sub {
+  display: flex;
+  gap: 14px;
+  margin-top: 4px;
+}
+.pane-empty-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--r-control);
+}
+.pane-empty-act:hover {
+  background: var(--hov);
+  color: var(--text);
 }

@@ -49,17 +49,34 @@ export function wikilinkLabel(note: NoteSummary, titleCounts: Map<string, number
   return count > 1 ? note.id : note.title;
 }
 
+/** The NAVIGATION target inside [[…]] — strips the Obsidian-style display
+ * alias (`[[target|shown]]`), heading fragment (`[[target#h2]]`), and a
+ * trailing `.md`, which all read as "link broken" when treated literally. */
+export function wikilinkTargetOf(inner: string): string {
+  let t = (inner.split("|")[0] ?? "").split("#")[0] ?? "";
+  t = t.trim();
+  if (t.toLowerCase().endsWith(".md")) t = t.slice(0, -3);
+  return t;
+}
+
 /** Resolve [[target]] to a note id, or null when missing / ambiguous. */
 export function resolveWikilink(target: string, index: WikilinkIndex): string | null {
-  const t = target.trim();
+  const t = wikilinkTargetOf(target);
   if (!t) return null;
   if (index.byId.has(t)) return t;
-  const key = linkKey(t);
-  const candidates = [...(index.byTitle.get(key) ?? []), ...(index.byAlias.get(key) ?? [])].filter(
-    (note, position, notes) => notes.findIndex((candidate) => candidate.id === note.id) === position,
-  );
-  if (candidates.length === 1) return candidates[0]!.id;
-  return null;
+  const lookup = (value: string): string | null => {
+    const key = linkKey(value);
+    const candidates = [...(index.byTitle.get(key) ?? []), ...(index.byAlias.get(key) ?? [])].filter(
+      (note, position, notes) => notes.findIndex((candidate) => candidate.id === note.id) === position,
+    );
+    return candidates.length === 1 ? candidates[0]!.id : null;
+  };
+  const direct = lookup(t);
+  if (direct) return direct;
+  // a path-style target ([[projects/Note]]) still names ONE note — try its
+  // last segment before giving up
+  const last = t.includes("/") ? t.slice(t.lastIndexOf("/") + 1) : null;
+  return last ? lookup(last) : null;
 }
 
 /** Local note navigation is link-like; web navigation remains deliberate in an editor. */

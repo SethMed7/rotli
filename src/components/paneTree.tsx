@@ -19,13 +19,42 @@ import { ChatSurface } from "./chatSurface";
 import { ActivitySurface } from "./activitySurface";
 import { FileSurface } from "./fileSurface";
 import { activeTabOf, leaves, refitColumns, usePanesStore } from "../state/panes";
+import { dispatch } from "../keys/registry";
 import type { LeafNode, PaneNode, SplitNode } from "../types";
+import { Character } from "./character";
 import { TabStrip } from "./tabStrip";
 
 // Excalidraw is heavy (~3.5MB with its mermaid/katex deps) and most sessions
 // never open a board — code-split it so it loads only when a canvas tab mounts,
 // keeping the main bundle lean (Seth, 2026-06-24).
 const CanvasSurface = lazy(() => import("./canvasSurface").then((m) => ({ default: m.CanvasSurface })));
+
+/** All tabs closed (only possible in the lone pane) — the quokka rest state
+ * (Seth, 2026-07-28: "close all tabs and have an empty state"). Quiet, with
+ * the three ways back in. */
+function PaneEmptyState() {
+  return (
+    <div className="list-empty pane-empty">
+      <Character name="rest" size={120} className="be-quokka" />
+      <p className="be-title">All clear</p>
+      <p className="be-sub">
+        <button type="button" className="pane-empty-act" onClick={() => dispatch("notes.new")}>
+          <kbd>⌘N</kbd> new note
+        </button>
+        <button type="button" className="pane-empty-act" onClick={() => dispatch("palette.toggle")}>
+          <kbd>⌘K</kbd> search
+        </button>
+        <button
+          type="button"
+          className="pane-empty-act"
+          onClick={() => usePanesStore.getState().reopenClosedTab()}
+        >
+          <kbd>⌘⇧T</kbd> reopen tab
+        </button>
+      </p>
+    </div>
+  );
+}
 
 function LeafView({ node }: { node: LeafNode }) {
   const focusedPaneId = usePanesStore((s) => s.focusedPaneId);
@@ -47,15 +76,16 @@ function LeafView({ node }: { node: LeafNode }) {
           never bleeds from the previously active tab. data-pane-body lets the
           pointer-drag controller (lib/tabDrag) find this leaf via elementFromPoint. */}
       <div className="pane-body" data-pane-body data-leaf-id={node.id}>
-        {tab.surfaceKind === "note" && <EditorSurface key={tab.id} paneId={node.id} noteId={tab.noteId} />}
-        {tab.surfaceKind === "canvas" && (
+        {!tab && <PaneEmptyState />}
+        {tab?.surfaceKind === "note" && <EditorSurface key={tab.id} paneId={node.id} noteId={tab.noteId} />}
+        {tab?.surfaceKind === "canvas" && (
           <Suspense fallback={<div className="canvas-surface" />}>
             <CanvasSurface key={tab.id} paneId={node.id} boardId={tab.boardId} />
           </Suspense>
         )}
-        {tab.surfaceKind === "chat" && <ChatSurface key={tab.id} paneId={node.id} chatSlug={tab.chatSlug} />}
-        {tab.surfaceKind === "file" && <FileSurface key={tab.id} paneId={node.id} fileId={tab.fileId} />}
-        {tab.surfaceKind === "activity" && <ActivitySurface key={tab.id} />}
+        {tab?.surfaceKind === "chat" && <ChatSurface key={tab.id} paneId={node.id} chatSlug={tab.chatSlug} />}
+        {tab?.surfaceKind === "file" && <FileSurface key={tab.id} paneId={node.id} fileId={tab.fileId} />}
+        {tab?.surfaceKind === "activity" && <ActivitySurface key={tab.id} />}
         {/* split-detach preview — mounted only mid-drag, pointer-events:none
             (the controller hit-tests the pane body, not this overlay) */}
         {draggingTab && (

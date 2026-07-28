@@ -828,6 +828,13 @@
   text-underline-offset: 2px;
   cursor: pointer;
 }
+/* a wikilink that resolves to NO note — visibly inert so a dead click never
+   reads as broken navigation (Seth, 2026-07-28); dashed + muted, no pointer */
+.rotli-wikilink-missing {
+  color: var(--text-muted);
+  text-decoration-style: dashed;
+  cursor: text;
+}
 /* a generic/unknown code fence (```js, plain ```) — raw code voice, never
    markdown-styled (#13, audit 2026-07). Line-granular: the mono family +
    a quiet wash so the block reads as one unit while staying editable. */

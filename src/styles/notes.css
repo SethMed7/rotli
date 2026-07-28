@@ -169,11 +169,11 @@
 .frow:hover {
   background: var(--hov);
 }
-/* Selection (Seth, 2026-06-15): a quiet accent WASH (not the heavy peach fill)
-   plus a slim 2px clay bar — one calm grammar in every theme, distinct from the
-   plain hover. */
+/* Selection (Seth, 2026-06-15; bar retired 2026-07-28: the wash already says
+   it — the extra accent line was redundant): a quiet accent WASH, one calm
+   grammar in every theme, distinct from the plain hover. */
 .frow.sel {
-  /* the wash + bar carry the state — no bold, so the label never re-truncates
+  /* the wash carries the state — no bold, so the label never re-truncates
      and the row never shimmies on selection (slice 5, 2026-07-28) */
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
@@ -183,20 +183,10 @@
 .frow.sel .fchev svg {
   color: var(--text-muted);
 }
-.frow.sel::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 2px;
-  border-radius: 0 2px 2px 0;
-  background: var(--accent);
-}
 /* One active-surface grammar (slice 5, 2026-07-28): a .sel System/smart row
-   means "this surface is OPEN on the right" — the same wash + 2px bar the open
-   chat row carries. (The old bold-only stripping dated from when .sel meant a
-   mere ⌘N create-target; that meaning died with the System fold.) */
+   means "this surface is OPEN on the right" — the same wash the open chat row
+   carries. (The old bold-only stripping dated from when .sel meant a mere ⌘N
+   create-target; that meaning died with the System fold.) */
 /* nested rows indent via inline padding-left (depth-scaled in JSX, ~16px/level);
    the .child class keeps a fallback inset for depth 0 */
 .frow.child {
@@ -536,23 +526,27 @@
   flex: 0 0 auto;
 }
 .sb-section .fname {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: left;
 }
 .sb-section .count {
-  margin-left: auto;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
 }
+/* the disclosure chevron rides the RIGHT edge (Seth, 2026-07-28) — quiet at
+   rest, and the left inset stays flush for the glyph + label */
 .sb-section .fchev {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
   width: 12px;
-  margin-left: -2px;
   color: var(--text-muted);
+  opacity: 0.6;
   transition: transform var(--motion-exit) var(--motion-ease);
 }
 .sb-section .fchev.open {
@@ -697,23 +691,13 @@
 .sb-chatrow:hover {
   background: var(--hov);
 }
-/* the open chat is the active row — the same calm accent wash + 2px bar the note
-   tree uses for a selected folder (kept distinct from the open-note pill). */
+/* the open chat is the active row — the same calm accent wash the note tree
+   uses for a selected folder (kept distinct from the open-note pill). */
 .sb-chatrow.sel {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 .sb-chatrow.sel svg {
   color: var(--accent-text);
-}
-.sb-chatrow.sel::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 2px;
-  border-radius: 0 2px 2px 0;
-  background: var(--accent);
 }
 .sb-chat-empty,
 .sb-chat-more {
@@ -1597,20 +1581,37 @@
 
 /* — SYSTEM, pinned (Seth, 2026-07-28): its own uncollapsible zone at the
    sidebar's bottom, separated by a hairline; the scrolling tree lives above.
-   Active System rows keep only the tinted icon — the open surface on the
-   right already says which one is open (no wash, no bar: redundant). — */
+   Compact + quiet (Seth, 2026-07-28: "not in the user's face") — smaller,
+   muted rows that warm up on hover. Active System rows keep only the tinted
+   icon — the open surface on the right already says which one is open. — */
 .sb-system {
   flex: 0 0 auto;
-  padding: 6px 8px 8px;
+  padding: 3px 8px 6px;
   border-top: 1px solid var(--border);
+}
+.sb-system .fsec {
+  padding: 6px 10px 3px;
+  font-size: 10px;
+}
+.sb-system .frow {
+  padding: 3.5px 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.sb-system .frow:hover,
+.sb-system .frow.sel {
+  color: var(--text);
+}
+.sb-system .frow svg {
+  width: 13px;
+  height: 13px;
+}
+.sb-system .frow .count {
+  font-size: 10px;
 }
 .sb-system .frow.sel,
 .sb-rows .frow.sel {
   background: none;
-}
-.sb-system .frow.sel::before,
-.sb-rows .frow.sel::before {
-  display: none;
 }
 .sb-files {
   color: var(--text-muted);
