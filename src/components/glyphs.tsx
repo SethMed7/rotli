@@ -258,6 +258,16 @@ export function ClockGlyph(props: GlyphProps) {
   );
 }
 
+/** The Librarian's journal — a quiet pulse line. (Recent keeps the clock; one
+ * icon per meaning, slice 5 2026-07-28.) */
+export function ActivityGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M3 12h4l3-7 4 14 3-7h4" />
+    </Glyph>
+  );
+}
+
 /** New folder / new tab (r1/r2 gates). */
 export function PlusGlyph(props: GlyphProps) {
   return (

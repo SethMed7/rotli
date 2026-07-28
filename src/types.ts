@@ -56,17 +56,11 @@ export interface SearchHit {
 
 /** Per-tab view state only — the document buffer is shared per noteId
  * (r2 lock #4); tabs hold cursor/scroll, never content. */
-export interface TabViewState {
-  cursor: number;
-  scroll: number;
-}
-
 /** Discriminated union, ready to extend: `| { surfaceKind: "chat"; … }`. */
 export interface NoteTab {
   id: string;
   surfaceKind: "note";
   noteId: string;
-  viewState: TabViewState;
 }
 
 /** An Excalidraw canvas tab. boardId IS the board's corpus-relative path
@@ -76,7 +70,6 @@ export interface CanvasTab {
   id: string;
   surfaceKind: "canvas";
   boardId: string;
-  viewState: TabViewState;
 }
 
 /** A chat tab — chatSlug is the chats/<slug>.md basename, or null for a fresh
@@ -85,7 +78,6 @@ export interface ChatTab {
   id: string;
   surfaceKind: "chat";
   chatSlug: string | null;
-  viewState: TabViewState;
 }
 
 /** A surfaced binary FILE tab (audio/pdf/image/text) — rendered IN-APP, never
@@ -95,7 +87,6 @@ export interface FileTab {
   id: string;
   surfaceKind: "file";
   fileId: string;
-  viewState: TabViewState;
 }
 
 /** The Brain Activity view — the AI-Filer change journal (see/review/undo). A
@@ -103,7 +94,6 @@ export interface FileTab {
 export interface ActivityTab {
   id: string;
   surfaceKind: "activity";
-  viewState: TabViewState;
 }
 
 export type Tab = NoteTab | CanvasTab | ChatTab | FileTab | ActivityTab;

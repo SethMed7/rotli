@@ -12,6 +12,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Bullet indenting handles foreign notes.** Notes written by external
+  editors or AI tools indent lists with tabs — those bullets rendered as raw
+  text, Shift-Tab did nothing, and Tab just typed spaces. Tab-indented
+  bullets, tasks, numbered items, and quotes now render at their proper
+  depth, and Tab/Shift-Tab quietly normalize the line to rotli's two-space
+  levels as part of the gesture.
+
+### Changed
+
+- **Splits and tabs forgive.** Closing a pane merges its tabs into the
+  neighbor instead of discarding your working set; **⌘⇧T reopens the last
+  closed tab** at its old slot; ⌃⇧Tab cycles backward; and the tab menu
+  gained "Split right/down with this tab".
+- **"Open to the right"** in the note menu splits with the *target* — "this
+  note beside that one" is one gesture now instead of split-open-close-the-duplicate.
+- **Panes read clearer**: unfocused panes' tab strips mute slightly, dividers
+  show their grab line on hover and double-click to even out (drag is also
+  smoother — one resize per frame), and ⌘⌥-arrow focus now finds any pane
+  that actually shares an edge.
+- **The left menu speaks one grammar**: a System/smart row whose surface is
+  open carries the same accent wash + bar as an open chat; selection no
+  longer bolds (labels stop re-truncating); zero counts hide instead of
+  badging "0" and the Notes header stops duplicating the All-notes count;
+  Activity gets its own pulse icon (Recent keeps the clock); the text "▾"
+  carets became real glyphs; drag-drop indicator lines and the added-folder ×
+  no longer shift the layout; the full Quick-access star stays visible and
+  explains itself when clicked; empty states share one voice; and Main
+  folders answer the keyboard "m" menu (rename and friends) with proper
+  aria-expanded state.
+
 - **Boards stop rewriting themselves.** Opening, panning, zooming, or
   selecting on a board no longer touches the file — only durable content
   (elements, images, canvas background, grid) persists, and an unchanged

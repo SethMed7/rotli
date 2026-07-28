@@ -241,7 +241,6 @@ describe("unknownSettingsKeys — the round-trip remainder (#35)", () => {
 });
 
 describe("validTab — every surfaceKind survives a relaunch (#34)", () => {
-  const vs = { cursor: 0, scroll: 0 };
   const alive = new Set(["note-1"]);
   const roundTrips = (tab: Tab) => {
     // what the pane store persisted must revalidate to itself
@@ -249,12 +248,12 @@ describe("validTab — every surfaceKind survives a relaunch (#34)", () => {
   };
 
   test("round-trips all five tab kinds", () => {
-    roundTrips({ id: "t1", surfaceKind: "note", noteId: "note-1", viewState: vs });
-    roundTrips({ id: "t2", surfaceKind: "canvas", boardId: "Inbox/b.excalidraw", viewState: vs });
-    roundTrips({ id: "t3", surfaceKind: "chat", chatSlug: "my-chat", viewState: vs });
-    roundTrips({ id: "t4", surfaceKind: "chat", chatSlug: null, viewState: vs });
-    roundTrips({ id: "t5", surfaceKind: "file", fileId: "storage/report.xlsx", viewState: vs });
-    roundTrips({ id: "t6", surfaceKind: "activity", viewState: vs });
+    roundTrips({ id: "t1", surfaceKind: "note", noteId: "note-1" });
+    roundTrips({ id: "t2", surfaceKind: "canvas", boardId: "Inbox/b.excalidraw" });
+    roundTrips({ id: "t3", surfaceKind: "chat", chatSlug: "my-chat" });
+    roundTrips({ id: "t4", surfaceKind: "chat", chatSlug: null });
+    roundTrips({ id: "t5", surfaceKind: "file", fileId: "storage/report.xlsx" });
+    roundTrips({ id: "t6", surfaceKind: "activity" });
   });
 
   test("still drops the malformed ones", () => {

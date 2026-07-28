@@ -37,7 +37,7 @@ function inFence(view: EditorView, line: Line): boolean {
  * the renderer's: bullets, numbered (count up), tasks (reset to unchecked),
  * quotes. Returns the marker for the NEXT line and whether the item is empty. */
 function listPrefixOf(line: string): { prefixLen: number; next: string; empty: boolean } | null {
-  const m = line.match(/^( *)((?:- \[[ xX]\] |- |\d+\. |> ))(.*)$/);
+  const m = line.match(/^([ \t]*)((?:- \[[ xX]\] |- |\d+\. |> ))(.*)$/);
   if (!m) return null;
   const indent = m[1] ?? "";
   const prefix = m[2] ?? "";
@@ -105,23 +105,40 @@ const enterContinueList: Command = (view) => {
   return true;
 };
 
+/** A line's leading indent, tab-tolerant (a tab = one level = 2 columns).
+ * Tab/⇧Tab NORMALIZE tab indents into the app's two-space grammar as part of
+ * the gesture — foreign notes (external editors, LLM output) indent with tabs,
+ * which the space-only grammar used to treat as immovable (Seth, 2026-07-28:
+ * "shift tab on bullets is very buggy"). */
+const leadingIndent = (text: string): string => /^[ \t]*/.exec(text)?.[0] ?? "";
+
 const tabIndent: Command = (view) => {
   const { state } = view;
   const range = state.selection.main;
   const startLine = state.doc.lineAt(range.from);
   const endLine = state.doc.lineAt(range.to);
-  // a multi-line selection indents every line it spans
+  // a multi-line selection indents every line it spans (tabs normalized)
   if (startLine.number !== endLine.number) {
     const changes = [];
     for (let n = startLine.number; n <= endLine.number; n++) {
-      changes.push({ from: state.doc.line(n).from, insert: "  " });
+      const l = state.doc.line(n);
+      const indent = leadingIndent(l.text);
+      changes.push({ from: l.from, to: l.from + indent.length, insert: `  ${indent.replace(/\t/g, "  ")}` });
     }
     view.dispatch({ changes, userEvent: "input.indent" });
     return true;
   }
   // a list line nests; a plain (or fenced-code) line gets a soft tab at the caret
   if (!inFence(view, startLine) && listPrefixOf(startLine.text)) {
-    view.dispatch({ changes: { from: startLine.from, insert: "  " }, userEvent: "input.indent" });
+    const indent = leadingIndent(startLine.text);
+    view.dispatch({
+      changes: {
+        from: startLine.from,
+        to: startLine.from + indent.length,
+        insert: `  ${indent.replace(/\t/g, "  ")}`,
+      },
+      userEvent: "input.indent",
+    });
   } else {
     view.dispatch(state.replaceSelection("  "));
   }
@@ -136,8 +153,12 @@ const tabOutdent: Command = (view) => {
   const changes = [];
   for (let n = startLine.number; n <= endLine.number; n++) {
     const l = state.doc.line(n);
-    const remove = l.text.startsWith("  ") ? 2 : l.text.startsWith(" ") ? 1 : 0;
-    if (remove) changes.push({ from: l.from, to: l.from + remove });
+    const indent = leadingIndent(l.text);
+    if (!indent) continue;
+    // normalize tabs → two-space levels, then drop one level
+    const norm = indent.replace(/\t/g, "  ");
+    const next = norm.slice(0, Math.max(0, norm.length - 2));
+    if (next !== indent) changes.push({ from: l.from, to: l.from + indent.length, insert: next });
   }
   if (changes.length > 0) view.dispatch({ changes, userEvent: "delete.dedent" });
   return true; // trap ⇧Tab so it never tabs focus out of the editor

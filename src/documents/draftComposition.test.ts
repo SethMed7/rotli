@@ -21,13 +21,11 @@ function pane(): LeafNode {
         id: "note-tab",
         surfaceKind: "note",
         noteId: "existing-note",
-        viewState: { cursor: 0, scroll: 0 },
       },
       {
         id: "document-tab",
         surfaceKind: "file",
         fileId: FILE_ID,
-        viewState: { cursor: 0, scroll: 0 },
       },
     ],
   };

@@ -226,6 +226,12 @@ export function useNoteMenu() {
           label: "Open in new tab",
           onClick: () => openSummary(note, { newTab: true }),
         });
+        items.push({
+          kind: "action" as const,
+          label: "Open to the right",
+          onClick: () =>
+            usePanesStore.getState().openToSide(isBoard ? "canvas" : isFile ? "file" : "note", note.id),
+        });
         if (isNote) {
           items.push({
             kind: "action" as const,

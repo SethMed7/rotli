@@ -33,31 +33,37 @@ export function parseBlock(line: string): Block {
     const kind = `h${h[1].length}` as "h1" | "h2" | "h3";
     return { kind, prefixLen: h[0].length, text: line.slice(h[0].length) };
   }
-  // list kinds may carry a leading indent → nesting depth (2 spaces per level)
-  const indent = /^( +)/.exec(line)?.[1]?.length ?? 0;
-  const body = indent > 0 ? line.slice(indent) : line;
+  // list kinds may carry a leading indent → nesting depth (2 columns per
+  // level). TAB-tolerant (Seth, 2026-07-28): foreign notes indent with tabs —
+  // a tab counts one level; prefixLen stays CHARACTER-based for offsets while
+  // `indent` carries columns for depth.
+  const indentChars = /^[ \t]+/.exec(line)?.[0] ?? "";
+  const indent = indentChars.replace(/\t/g, "  ").length;
+  const body = indentChars ? line.slice(indentChars.length) : line;
   const t = TASK_RE.exec(body);
   if (t)
     return {
       kind: "task",
-      prefixLen: indent + t[0].length,
+      prefixLen: indentChars.length + t[0].length,
       text: body.slice(t[0].length),
       done: t[1] !== " ",
       indent,
     };
-  if (body.startsWith("- ")) return { kind: "bullet", prefixLen: indent + 2, text: body.slice(2), indent };
+  if (body.startsWith("- "))
+    return { kind: "bullet", prefixLen: indentChars.length + 2, text: body.slice(2), indent };
   const n = NUMBERED_RE.exec(body);
   if (n)
     return {
       kind: "numbered",
-      prefixLen: indent + n[0].length,
+      prefixLen: indentChars.length + n[0].length,
       text: body.slice(n[0].length),
       marker: `${n[1]}.`,
       indent,
     };
   // quotes de-indent like the other list kinds so a Tab-nested quote ("  > x")
   // stays a quote (and nests) instead of falling through to a literal paragraph
-  if (body.startsWith("> ")) return { kind: "quote", prefixLen: indent + 2, text: body.slice(2), indent };
+  if (body.startsWith("> "))
+    return { kind: "quote", prefixLen: indentChars.length + 2, text: body.slice(2), indent };
   return { kind: "para", prefixLen: 0, text: line };
 }
 

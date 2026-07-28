@@ -88,25 +88,35 @@ function SplitView({ node }: { node: SplitNode }) {
     divider.classList.add("dragging");
     divider.setPointerCapture(event.pointerId);
 
+    // coalesce pointermove into one store write per frame — every write
+    // re-renders the whole tree, which stuttered with a canvas pane mounted
+    let raf = 0;
+    let latest = startPos;
     const onMove = (ev: globalThis.PointerEvent) => {
-      const pos = node.dir === "row" ? ev.clientX : ev.clientY;
-      const delta = (pos - startPos) / total;
-      let a = (startSizes[index] ?? 0) + delta;
-      let b = (startSizes[index + 1] ?? 0) - delta;
-      if (a < minFrac) {
-        b -= minFrac - a;
-        a = minFrac;
-      }
-      if (b < minFrac) {
-        a -= minFrac - b;
-        b = minFrac;
-      }
-      const sizes = [...startSizes];
-      sizes[index] = a;
-      sizes[index + 1] = b;
-      setSplitSizes(node.id, sizes);
+      latest = node.dir === "row" ? ev.clientX : ev.clientY;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const delta = (latest - startPos) / total;
+        let a = (startSizes[index] ?? 0) + delta;
+        let b = (startSizes[index + 1] ?? 0) - delta;
+        if (a < minFrac) {
+          b -= minFrac - a;
+          a = minFrac;
+        }
+        if (b < minFrac) {
+          a -= minFrac - b;
+          b = minFrac;
+        }
+        const sizes = [...startSizes];
+        sizes[index] = a;
+        sizes[index + 1] = b;
+        setSplitSizes(node.id, sizes);
+      });
     };
     const onUp = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
       divider.classList.remove("dragging");
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
@@ -128,7 +138,15 @@ function SplitView({ node }: { node: SplitNode }) {
           className="divider"
           role="separator"
           aria-orientation={node.dir === "row" ? "vertical" : "horizontal"}
+          title="Drag to resize — double-click to even out"
           onPointerDown={startDrag(i - 1)}
+          // Finder/IDE muscle memory: double-click a divider → even split
+          onDoubleClick={() =>
+            setSplitSizes(
+              node.id,
+              node.children.map(() => 1 / node.children.length),
+            )
+          }
         />,
       );
     }

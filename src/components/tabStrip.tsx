@@ -189,6 +189,21 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
       disabled: pane.tabs[pane.tabs.length - 1]?.id === tab.id,
       onClick: () => closeTabsRightWithDraftCleanup(pane.id, tab.id),
     });
+    items.push({ kind: "sep" });
+    // detachTab was fully built but findable only by accidentally dragging a
+    // tab onto a pane edge — give it menu words (slice 4, 2026-07-28)
+    items.push({
+      kind: "action",
+      label: "Split right with this tab",
+      disabled: pane.tabs.length < 2,
+      onClick: () => usePanesStore.getState().detachTab(pane.id, tab.id, pane.id, "right"),
+    });
+    items.push({
+      kind: "action",
+      label: "Split down with this tab",
+      disabled: pane.tabs.length < 2,
+      onClick: () => usePanesStore.getState().detachTab(pane.id, tab.id, pane.id, "down"),
+    });
     useContextMenu.getState().open(event.clientX, event.clientY, items);
   };
 

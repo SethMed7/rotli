@@ -6,13 +6,20 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import type { LeafNode, PaneNode, Tab } from "../types";
 import { useNavHistory } from "./navHistory";
-import { boardTabOpen, findLeaf, openNavTarget, sidebarItemId, tabsRightOf, usePanesStore } from "./panes";
+import {
+  boardTabOpen,
+  findLeaf,
+  leaves,
+  openNavTarget,
+  sidebarItemId,
+  tabsRightOf,
+  usePanesStore,
+} from "./panes";
 
 const tab = (id: string): Tab => ({
   id,
   surfaceKind: "note",
   noteId: `n-${id}`,
-  viewState: { cursor: 0, scroll: 0 },
 });
 
 const leaf = (id: string, tabIds: string[]): LeafNode => ({
@@ -33,7 +40,6 @@ describe("sidebarItemId — every content surface can light its sidebar row", ()
         id: "board-tab",
         surfaceKind: "canvas",
         boardId: "storage/plan.excalidraw",
-        viewState: { cursor: 0, scroll: 0 },
       }),
     ).toBe("storage/plan.excalidraw");
     expect(
@@ -41,7 +47,6 @@ describe("sidebarItemId — every content surface can light its sidebar row", ()
         id: "file-tab",
         surfaceKind: "file",
         fileId: "storage/reference.pdf",
-        viewState: { cursor: 0, scroll: 0 },
       }),
     ).toBe("storage/reference.pdf");
   });
@@ -52,7 +57,6 @@ describe("sidebarItemId — every content surface can light its sidebar row", ()
       sidebarItemId({
         id: "activity-tab",
         surfaceKind: "activity",
-        viewState: { cursor: 0, scroll: 0 },
       }),
     ).toBeNull();
   });
@@ -150,7 +154,7 @@ describe("openNote — reuse-or-new-tab, never replace", () => {
       root: {
         kind: "leaf",
         id: "p1",
-        tabs: [{ id: "seed", surfaceKind: "note", noteId: "", viewState: { cursor: 0, scroll: 0 } }],
+        tabs: [{ id: "seed", surfaceKind: "note", noteId: "" }],
         activeTabId: "seed",
       },
       focusedPaneId: "p1",
@@ -166,7 +170,6 @@ describe("closeFileTabs — remove a trashed asset from every pane", () => {
     id,
     surfaceKind: "file",
     fileId,
-    viewState: { cursor: 0, scroll: 0 },
   });
 
   test("closes every matching file tab and preserves unrelated work", () => {
@@ -383,7 +386,6 @@ describe("boardTabOpen", () => {
               id: "c",
               surfaceKind: "canvas",
               boardId: "storage/plan.excalidraw",
-              viewState: { cursor: 0, scroll: 0 },
             },
           ],
           activeTabId: "c",
@@ -393,5 +395,84 @@ describe("boardTabOpen", () => {
     };
     expect(boardTabOpen(root, "storage/plan.excalidraw")).toBe(true);
     expect(boardTabOpen(root, "storage/other.excalidraw")).toBe(false);
+  });
+});
+
+// slice 4 (2026-07-28): closing a pane must not discard your working set —
+// its tabs MERGE into the geometric neighbor; an accidental ⌘W is undone by
+// ⌘⇧T (a session closed-tab stack); and "open to the side" splits with the
+// TARGET, never a duplicate of what you're on.
+describe("closePane merges tabs into the neighbor", () => {
+  test("the closing pane's tabs land in the neighbor and its active tab stays active", () => {
+    usePanesStore.setState({
+      root: {
+        kind: "split",
+        id: "s",
+        dir: "row",
+        children: [leaf("p1", ["A"]), leaf("p2", ["B", "C"])],
+        sizes: [0.5, 0.5],
+      },
+      focusedPaneId: "p2",
+    });
+    usePanesStore.getState().closePane();
+    const remaining = leaves(usePanesStore.getState().root);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.tabs.map((t) => t.id)).toEqual(["A", "B", "C"]);
+    expect(remaining[0]?.activeTabId).toBe("B"); // what you were looking at survives
+  });
+});
+
+describe("the closed-tab stack (⌘⇧T)", () => {
+  beforeEach(() => {
+    usePanesStore.setState({
+      root: leaf("p1", ["A", "B", "C"]),
+      focusedPaneId: "p1",
+      closedTabs: [],
+    });
+  });
+
+  test("⌘W then reopen restores the tab at its old slot", () => {
+    usePanesStore.getState().closeTabById("p1", "B");
+    expect(order("p1")).toEqual(["A", "C"]);
+    usePanesStore.getState().reopenClosedTab();
+    expect(order("p1")).toEqual(["A", "B", "C"]);
+    expect(findLeaf(usePanesStore.getState().root, "p1")?.activeTabId).toBe("B");
+  });
+
+  test("reopen with an empty stack is a quiet no-op", () => {
+    usePanesStore.getState().reopenClosedTab();
+    expect(order("p1")).toEqual(["A", "B", "C"]);
+  });
+
+  test("a trashed file's force-closed tabs are NOT reopenable (the target is gone)", () => {
+    usePanesStore.setState({
+      root: {
+        kind: "leaf",
+        id: "p1",
+        tabs: [tab("A"), { id: "doc", surfaceKind: "file", fileId: "storage/x.pdf" }],
+        activeTabId: "A",
+      },
+      focusedPaneId: "p1",
+      closedTabs: [],
+    });
+    usePanesStore.getState().closeFileTabs("storage/x.pdf");
+    expect(usePanesStore.getState().closedTabs).toHaveLength(0);
+  });
+});
+
+describe("openToSide", () => {
+  test("splits right with the TARGET note — no duplicate of the current tab", () => {
+    // the split-time floor check reads window metrics — give it room
+    (window as unknown as { innerWidth: number }).innerWidth = 2000;
+    usePanesStore.setState({ root: leaf("p1", ["A"]), focusedPaneId: "p1" });
+    usePanesStore.getState().openToSide("note", "n-B");
+    const all = leaves(usePanesStore.getState().root);
+    expect(all).toHaveLength(2);
+    const fresh = all.find((l) => l.id !== "p1");
+    expect(fresh?.tabs).toHaveLength(1);
+    const t = fresh?.tabs[0];
+    expect(t?.surfaceKind).toBe("note");
+    if (t?.surfaceKind === "note") expect(t.noteId).toBe("n-B");
+    expect(usePanesStore.getState().focusedPaneId).toBe(fresh?.id ?? "missing");
   });
 });

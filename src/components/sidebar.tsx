@@ -99,6 +99,7 @@ import {
   BoardGlyph as CanvasItemGlyph,
   ChatGlyph,
   ChevronRight,
+  ActivityGlyph,
   ClockGlyph,
   TaskGlyph,
   CoffeeGlyph,
@@ -208,7 +209,7 @@ function AddedRootRow({ root }: { root: CorpusRoot }) {
   const focusedNoteId = useFocusedNoteId();
   return (
     <div>
-      <button type="button" className="frow" onClick={() => setOpen((o) => !o)}>
+      <button type="button" className="frow" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
           <ChevronRight size={10} />
         </span>
@@ -227,6 +228,14 @@ function AddedRootRow({ root }: { root: CorpusRoot }) {
             if (confirming)
               void corpusForgetFolder(root.id); // relaunches
             else setConfirming(true);
+          }}
+          onKeyDown={(e) => {
+            // role="button" spans get no synthetic click from Enter/Space
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              e.currentTarget.click();
+            }
           }}
         >
           {confirming ? "Remove?" : "×"}
@@ -247,7 +256,7 @@ function AddedRootRow({ root }: { root: CorpusRoot }) {
           </button>
         ))}
       {open && notes.length === 0 && (
-        <div className="sb-stub-note" style={{ paddingLeft: 44 }}>
+        <div className="sb-empty" style={{ paddingLeft: 44 }}>
           No notes in this folder yet.
         </div>
       )}
@@ -413,6 +422,94 @@ export function Sidebar() {
   const filter = "";
 
   const trashItems = useTrashItems();
+
+  // ONE Main-folder menu for right-click AND the roving "m" key (slice 5,
+  // 2026-07-28: keyboard users could reach a folder row but never rename it).
+  const openMainFolderMenu = (
+    x: number,
+    y: number,
+    folderId: string,
+    opts?: { returnFocus?: () => void },
+  ) => {
+    const f = mainProjection.folders.find((ff) => ff.id === folderId);
+    if (!f) return;
+    const folderItemIds = mainItemIdsInFolder(activeTree, f.id);
+    const folderItems = folderItemIds.flatMap((id) => {
+      const item = noteIndex.get(id);
+      return item ? [item] : [];
+    });
+    const folderScopeComplete = folderItems.length === folderItemIds.length;
+    openContextMenu(
+      x,
+      y,
+      [
+        {
+          kind: "action" as const,
+          label: "Rename folder…",
+          onClick: () => setRenamingMainId(f.id),
+        },
+        ...(viewsManifest.views.length > 0
+          ? [
+              {
+                kind: "drill" as const,
+                label: "Move to view",
+                items: [
+                  {
+                    kind: "action" as const,
+                    label: "Main only",
+                    checked: activeView === null,
+                    checkedMark: "highlight" as const,
+                    onClick: () =>
+                      setViewsManifest(
+                        transferTreeItemToView(mainManifest.tree, viewsManifest, activeView, f.id, null),
+                      ),
+                  },
+                  ...viewsManifest.views.map((view) => ({
+                    kind: "action" as const,
+                    label: view.name,
+                    checked: activeView === view.name,
+                    checkedMark: "highlight" as const,
+                    onClick: () =>
+                      setViewsManifest(
+                        transferTreeItemToView(mainManifest.tree, viewsManifest, activeView, f.id, view.name),
+                      ),
+                  })),
+                ],
+              },
+            ]
+          : []),
+        { kind: "sep" as const },
+        {
+          kind: "action" as const,
+          label: `Remove from ${activeView ?? "Main"}`,
+          onClick: () => setActiveTree(removeFromMain(activeTree, f.id), liveIds),
+        },
+        { kind: "sep" as const },
+        {
+          kind: "drill" as const,
+          label: folderScopeComplete
+            ? "Move folder contents to Trash…"
+            : "Unavailable items — can’t trash folder",
+          danger: true,
+          disabled: folderItems.length === 0 || !folderScopeComplete,
+          items: [
+            {
+              kind: "action" as const,
+              label: `Move ${folderItems.length} ${folderItems.length === 1 ? "item" : "items"} to Trash`,
+              danger: true,
+              onClick: () => {
+                setRowActionError(null);
+                trashItems.mutate(folderItems, {
+                  onSuccess: () => setActiveTree(removeFromMain(activeTree, f.id), liveIds),
+                });
+              },
+            },
+          ],
+        },
+      ],
+      opts,
+    );
+  };
 
   // — Main folder rename + name-first create (#16, audit 2026-07): the ⊕ used to
   //   mint a permanent "New folder 2" with no rename anywhere. renamingMainId
@@ -648,7 +745,22 @@ export function Sidebar() {
           title={label}
           onClick={(ev) => {
             ev.stopPropagation();
-            if (!full) togglePinQuick(id);
+            if (full) {
+              // the disabled star must explain itself — a silent no-op read as
+              // broken (slice 5, 2026-07-28); the inline error lane is right here
+              setRowActionError(`Quick access is full (${QUICK_MAX}) — unstar one first.`);
+              return;
+            }
+            togglePinQuick(id);
+          }}
+          // a span with role="button" gets no synthetic click from the
+          // keyboard — wire Enter/Space by hand (slice 5, 2026-07-28)
+          onKeyDown={(ev) => {
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              ev.stopPropagation();
+              ev.currentTarget.click();
+            }
           }}
         >
           <StarGlyph size={13} filled={starred} />
@@ -705,12 +817,6 @@ export function Sidebar() {
         })}
         {childFolders.map((f) => {
           const open = expandedDests[f.id] ?? true;
-          const folderItemIds = mainItemIdsInFolder(activeTree, f.id);
-          const folderItems = folderItemIds.flatMap((id) => {
-            const item = noteIndex.get(id);
-            return item ? [item] : [];
-          });
-          const folderScopeComplete = folderItems.length === folderItemIds.length;
           // inline rename (#16): the context menu's Rename… turns the row into a
           // text input — Enter commits (sibling-uniquified), Esc/click-away cancels
           // (the CompactBoardRow grammar).
@@ -744,6 +850,7 @@ export function Sidebar() {
                 type="button"
                 data-main-id={f.id}
                 data-main-folder="1"
+                aria-expanded={open}
                 className={`frow child main-row${dropCls(f.id)}${mainDragId === f.id ? " dragging" : ""}`}
                 style={{ paddingLeft: rowPad }}
                 onPointerDown={(e) => startMainDrag(e, f.id, "move", f.name)}
@@ -755,85 +862,7 @@ export function Sidebar() {
                 onContextMenu={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  openContextMenu(e.clientX, e.clientY, [
-                    {
-                      kind: "action" as const,
-                      label: "Rename folder…",
-                      onClick: () => setRenamingMainId(f.id),
-                    },
-                    ...(viewsManifest.views.length > 0
-                      ? [
-                          {
-                            kind: "drill" as const,
-                            label: "Move to view",
-                            items: [
-                              {
-                                kind: "action" as const,
-                                label: "Main only",
-                                checked: activeView === null,
-                                checkedMark: "highlight" as const,
-                                onClick: () =>
-                                  setViewsManifest(
-                                    transferTreeItemToView(
-                                      mainManifest.tree,
-                                      viewsManifest,
-                                      activeView,
-                                      f.id,
-                                      null,
-                                    ),
-                                  ),
-                              },
-                              ...viewsManifest.views.map((view) => ({
-                                kind: "action" as const,
-                                label: view.name,
-                                checked: activeView === view.name,
-                                checkedMark: "highlight" as const,
-                                onClick: () =>
-                                  setViewsManifest(
-                                    transferTreeItemToView(
-                                      mainManifest.tree,
-                                      viewsManifest,
-                                      activeView,
-                                      f.id,
-                                      view.name,
-                                    ),
-                                  ),
-                              })),
-                            ],
-                          },
-                        ]
-                      : []),
-                    { kind: "sep" as const },
-                    {
-                      kind: "action" as const,
-                      label: `Remove from ${activeView ?? "Main"}`,
-                      onClick: () => setActiveTree(removeFromMain(activeTree, f.id), liveIds),
-                    },
-                    { kind: "sep" as const },
-                    {
-                      kind: "drill" as const,
-                      label: folderScopeComplete
-                        ? "Move folder contents to Trash…"
-                        : "Unavailable items — can’t trash folder",
-                      danger: true,
-                      disabled: folderItems.length === 0 || !folderScopeComplete,
-                      items: [
-                        {
-                          kind: "action" as const,
-                          label: `Move ${folderItems.length} ${
-                            folderItems.length === 1 ? "item" : "items"
-                          } to Trash`,
-                          danger: true,
-                          onClick: () => {
-                            setRowActionError(null);
-                            trashItems.mutate(folderItems, {
-                              onSuccess: () => setActiveTree(removeFromMain(activeTree, f.id), liveIds),
-                            });
-                          },
-                        },
-                      ],
-                    },
-                  ]);
+                  openMainFolderMenu(e.clientX, e.clientY, f.id);
                 }}
                 {...rp({ id: f.id, kind: "folder" })}
               >
@@ -1046,7 +1075,17 @@ export function Sidebar() {
     // uses, anchored under the row; on close the cursor returns to the row
     // (the RowMenu unification, 2026-07-01). A Main row maps to its note.
     onOpenMenu: (row, anchor) => {
-      if (row.kind !== "note") return;
+      if (row.kind !== "note") {
+        // Main folder rows have a real menu (Rename / Move to view / Remove /
+        // Trash contents) — the keyboard deserves it too (slice 5, 2026-07-28)
+        if (row.kind === "folder" && row.id.startsWith(MAIN_ROOT)) {
+          const rect = anchor.getBoundingClientRect();
+          openMainFolderMenu(rect.left + 24, rect.bottom + 4, row.id, {
+            returnFocus: () => anchor.focus(),
+          });
+        }
+        return;
+      }
       const bare = row.id.startsWith(MAIN_ROW_PREFIX) ? row.id.slice(MAIN_ROW_PREFIX.length) : row.id;
       // the FULL index — the menu's hidden-root branch needs archived/trashed
       // (and staged Main) rows to resolve, not just the default listing
@@ -1193,13 +1232,13 @@ export function Sidebar() {
             className="vault-switch"
             aria-haspopup="menu"
             aria-label={`Vault: ${vaultName}. Switch or connect vaults`}
-            title="Switch or connect vaults"
+            title={`${vaultName} — switch or connect vaults`}
             onClick={openVaultMenu}
           >
             <VaultGlyph size={14.5} />
             <span className="vault-switch-name">{vaultName}</span>
-            <span className="vault-switch-caret" aria-hidden="true">
-              ▾
+            <span className="vault-switch-caret caret-down" aria-hidden="true">
+              <ChevronRight size={9} />
             </span>
           </button>
         )}
@@ -1363,7 +1402,7 @@ export function Sidebar() {
                   Connect a memex in Settings → Location
                 </button>
               ) : chatList.length === 0 ? (
-                <p className="sb-chat-empty">No chats yet.</p>
+                <p className="sb-empty">No chats yet.</p>
               ) : (
                 chatList.slice(0, chatSidebarLimit).map((c) =>
                   chatRename.renamingChatSlug === c.slug ? (
@@ -1450,7 +1489,7 @@ export function Sidebar() {
             the local destinations + Vault/Knowledge + nested folders. This wrapper
             is the roving listbox: Tab enters at the one tabIndex=0 row, j/k walk
             it; the keyboard highlight is :focus-visible. ── */}
-          {sectionHeader(SEC_NOTES, "Notes", NotesStackGlyph, notesSecOpen, searchableCount)}
+          {sectionHeader(SEC_NOTES, "Notes", NotesStackGlyph, notesSecOpen)}
           {notesSecOpen && (
             <div className="sb-notes-tree" role="listbox" aria-label="Notes tree">
               <button
@@ -1464,7 +1503,7 @@ export function Sidebar() {
               >
                 <FileGlyph size={14.5} />
                 <span className="fname">All notes</span>
-                <span className="count">{searchableCount}</span>
+                {searchableCount > 0 && <span className="count">{searchableCount}</span>}
               </button>
               {/* Board — quick captures collected as cards; opens its grid in the
                 content area (an action row, not a roving folder). */}
@@ -1476,7 +1515,7 @@ export function Sidebar() {
               >
                 <CaptureBoardGlyph size={14.5} />
                 <span className="fname">Captures</span>
-                <span className="count">{captureCount}</span>
+                {captureCount > 0 && <span className="count">{captureCount}</span>}
               </button>
               <button
                 type="button"
@@ -1540,7 +1579,9 @@ export function Sidebar() {
                   title="Change view"
                   onClick={openViewMenu}
                 >
-                  ▾
+                  <span className="caret-down" aria-hidden="true">
+                    <ChevronRight size={9} />
+                  </span>
                 </button>
                 {(viewsSaveState === "saving" || viewsSaveState === "saved") && (
                   <span className="fsec-save" role="status">
@@ -1752,9 +1793,11 @@ export function Sidebar() {
                   }
                   {...rowProps({ id: "Brain", kind: "folder" })}
                 >
-                  <NotesStackGlyph size={14} />
+                  <NotesStackGlyph size={14.5} />
                   <span className="fname">Library</span>
-                  <span className="count">{brainNotes.length + secureNotes.length}</span>
+                  {brainNotes.length + secureNotes.length > 0 && (
+                    <span className="count">{brainNotes.length + secureNotes.length}</span>
+                  )}
                 </button>
               )}
               {visibleDestRows.map(({ id, label, Glyph }) => {
@@ -1770,7 +1813,7 @@ export function Sidebar() {
                   >
                     <Glyph size={14.5} />
                     <span className="fname">{label}</span>
-                    <span className="count">{destNotes.length}</span>
+                    {destNotes.length > 0 && <span className="count">{destNotes.length}</span>}
                   </button>
                 );
               })}
@@ -1787,7 +1830,7 @@ export function Sidebar() {
                 }
                 {...rowProps({ id: ACTIVITY_ROW, kind: "smart" })}
               >
-                <ClockGlyph size={14} />
+                <ActivityGlyph size={14.5} />
                 <span className="fname">Activity</span>
                 {pendingProposals > 0 && <span className="count">{pendingProposals}</span>}
               </button>

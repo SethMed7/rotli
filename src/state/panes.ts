@@ -36,23 +36,23 @@ const MIN_PANE_HEIGHT = 160;
 const SIDEBAR_WIDTH = 240;
 
 function makeTab(noteId: string): Tab {
-  return { id: ulid(), surfaceKind: "note", noteId, viewState: { cursor: 0, scroll: 0 } };
+  return { id: ulid(), surfaceKind: "note", noteId };
 }
 
 function makeCanvasTab(boardId: string): Tab {
-  return { id: ulid(), surfaceKind: "canvas", boardId, viewState: { cursor: 0, scroll: 0 } };
+  return { id: ulid(), surfaceKind: "canvas", boardId };
 }
 
 function makeChatTab(chatSlug: string | null): Tab {
-  return { id: ulid(), surfaceKind: "chat", chatSlug, viewState: { cursor: 0, scroll: 0 } };
+  return { id: ulid(), surfaceKind: "chat", chatSlug };
 }
 
 function makeFileTab(fileId: string): Tab {
-  return { id: ulid(), surfaceKind: "file", fileId, viewState: { cursor: 0, scroll: 0 } };
+  return { id: ulid(), surfaceKind: "file", fileId };
 }
 
 function makeActivityTab(): Tab {
-  return { id: ulid(), surfaceKind: "activity", viewState: { cursor: 0, scroll: 0 } };
+  return { id: ulid(), surfaceKind: "activity" };
 }
 
 /** The noteId of a tab, or null for a canvas tab — the one place every
@@ -281,6 +281,29 @@ function neighborIn(root: PaneNode, fromId: string, dir: FocusDir): string | nul
   const rects = leafRects(root);
   const from = rects.find((r) => r.id === fromId);
   if (!from) return null;
+  const EPS = 0.001;
+  // pass 1 — EDGE-ADJACENT with cross-axis overlap: the honest neighbor even
+  // when center axis-dominance fails (a tall pane beside two stacked short
+  // ones used to strand ⌘⌥→ as a silent no-op; slice 4, 2026-07-28). The
+  // biggest shared edge wins.
+  let adjacentBest: { id: string; overlap: number } | null = null;
+  for (const r of rects) {
+    if (r.id === fromId) continue;
+    const adjacent =
+      (dir === "left" && Math.abs(r.x + r.w - from.x) < EPS) ||
+      (dir === "right" && Math.abs(from.x + from.w - r.x) < EPS) ||
+      (dir === "up" && Math.abs(r.y + r.h - from.y) < EPS) ||
+      (dir === "down" && Math.abs(from.y + from.h - r.y) < EPS);
+    if (!adjacent) continue;
+    const overlap =
+      dir === "left" || dir === "right"
+        ? Math.min(from.y + from.h, r.y + r.h) - Math.max(from.y, r.y)
+        : Math.min(from.x + from.w, r.x + r.w) - Math.max(from.x, r.x);
+    if (overlap <= EPS) continue;
+    if (!adjacentBest || overlap > adjacentBest.overlap) adjacentBest = { id: r.id, overlap };
+  }
+  if (adjacentBest) return adjacentBest.id;
+  // pass 2 — the original center-distance fallback (non-adjacent hops)
   const cx = from.x + from.w / 2;
   const cy = from.y + from.h / 2;
   let best: { id: string; dist: number } | null = null;
@@ -311,6 +334,15 @@ export interface DraggingTab {
   paneId: string;
   tabId: string;
 }
+
+/** A closed tab the session can bring back (⌘⇧T) — where it lived and at which
+ * slot, so reopen restores the strip exactly (slice 4, 2026-07-28). */
+export interface ClosedTab {
+  tab: Tab;
+  paneId: string;
+  index: number;
+}
+const CLOSED_TAB_CAP = 10;
 
 /** Where a detached tab lands relative to its target leaf. */
 export type DetachDir = "left" | "right" | "up" | "down";
@@ -369,7 +401,17 @@ interface PanesState {
    * Returns false when the surface is nowhere open. */
   activateSurface: (kind: NavKind, id: string) => boolean;
   closeTab: () => void;
-  closeTabById: (paneId: string, tabId: string) => void;
+  /** `record: false` skips the closed-tab stack — for force-closes whose
+   * target no longer exists (a trashed file's tabs are not reopenable). */
+  closeTabById: (paneId: string, tabId: string, opts?: { record?: boolean }) => void;
+  /** The session's reopenable closes, oldest→newest (capped). */
+  closedTabs: ClosedTab[];
+  /** ⌘⇧T — bring back the most recently closed tab, at its old slot. */
+  reopenClosedTab: () => void;
+  /** "Open to the right": split with the TARGET as the new pane's tab — the
+   * plain split duplicates what you're on, which made "this note beside that
+   * one" a three-gesture dance (slice 4, 2026-07-28). */
+  openToSide: (kind: "note" | "canvas" | "file", id: string) => void;
   activateTab: (paneId: string, tabId: string) => void;
   /** Walk the strip: 1 = forward (⌃Tab), -1 = backward (⌃⇧Tab); wraps. */
   cycleTab: (dir?: 1 | -1) => void;
@@ -433,13 +475,14 @@ export const usePanesStore = create<PanesState>((set, get) => {
     return first;
   };
 
-  const split = (dir: SplitDir) => {
+  const split = (dir: SplitDir, tab?: Tab) => {
     const { root } = get();
     if (dir === "row" && !ensureRoomForColumn(root)) return;
     // the height floor mirrors the divider drag's 160px minimum
     if (dir === "col" && (rowCount(root) + 1) * MIN_PANE_HEIGHT > window.innerHeight) return;
     const leaf = focusedLeaf();
-    const dup = duplicateTab(activeTabOf(leaf)); // duplicate, never empty
+    // a specific tab (open-to-the-side) or a duplicate of the active one — never empty
+    const dup = tab ?? duplicateTab(activeTabOf(leaf));
     const newLeaf = makeLeaf(dup);
     set({ root: splitLeaf(get().root, leaf.id, dir, newLeaf), focusedPaneId: newLeaf.id });
   };
@@ -592,7 +635,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
             })),
           });
         } else {
-          get().closeTabById(target.paneId, target.tabId);
+          get().closeTabById(target.paneId, target.tabId, { record: false });
         }
       }
     },
@@ -656,9 +699,16 @@ export const usePanesStore = create<PanesState>((set, get) => {
       get().closeTabById(leaf.id, leaf.activeTabId);
     },
 
-    closeTabById: (paneId, tabId) => {
+    closeTabById: (paneId, tabId, opts) => {
       const leaf = findLeaf(get().root, paneId);
       if (!leaf) return;
+      const closing = leaf.tabs.find((t) => t.id === tabId);
+      const closingIndex = leaf.tabs.findIndex((t) => t.id === tabId);
+      const record = () => {
+        if (!closing || opts?.record === false) return;
+        const stack = [...get().closedTabs, { tab: closing, paneId, index: closingIndex }];
+        set({ closedTabs: stack.slice(-CLOSED_TAB_CAP) });
+      };
       if (leaf.tabs.length <= 1) {
         // last tab: closing it closes the pane (unless it's the only pane)
         const neighbor = nextFocusAfterClose(get().root, leaf.id);
@@ -667,12 +717,14 @@ export const usePanesStore = create<PanesState>((set, get) => {
         const fallback = leaves(remaining)[0];
         if (!fallback) return;
         const focus = neighbor && findLeaf(remaining, neighbor) ? neighbor : fallback.id;
+        record();
         set({
           root: remaining,
           focusedPaneId: get().focusedPaneId === leaf.id ? focus : get().focusedPaneId,
         });
         return;
       }
+      record();
       set({
         root: updateLeaf(get().root, paneId, (l) => {
           const index = l.tabs.findIndex((t) => t.id === tabId);
@@ -684,6 +736,40 @@ export const usePanesStore = create<PanesState>((set, get) => {
           return { ...l, tabs, activeTabId: nextActive };
         }),
       });
+    },
+
+    closedTabs: [],
+
+    reopenClosedTab: () => {
+      const stack = get().closedTabs;
+      const last = stack[stack.length - 1];
+      if (!last) return; // quiet no-op — nothing to bring back
+      set({ closedTabs: stack.slice(0, -1) });
+      // the source pane if it still exists, else wherever focus lives now
+      const target = findLeaf(get().root, last.paneId)?.id ?? focusedLeaf().id;
+      set({
+        root: updateLeaf(get().root, target, (l) => {
+          const at = Math.min(last.index, l.tabs.length);
+          return {
+            ...l,
+            tabs: [...l.tabs.slice(0, at), last.tab, ...l.tabs.slice(at)],
+            activeTabId: last.tab.id,
+          };
+        }),
+        focusedPaneId: target,
+      });
+    },
+
+    openToSide: (kind, id) => {
+      const tab = kind === "canvas" ? makeCanvasTab(id) : kind === "file" ? makeFileTab(id) : makeTab(id);
+      if (kind === "note") {
+        touchMru(id);
+        recordNav(id);
+      } else {
+        recordNav(navEntry(kind, id));
+      }
+      useUiStore.getState().setContentView("panes");
+      split("row", tab);
     },
 
     activateTab: (paneId, tabId) => {
@@ -731,7 +817,15 @@ export const usePanesStore = create<PanesState>((set, get) => {
       const fallback = leaves(remaining)[0];
       if (!fallback) return;
       const focus = neighbor && findLeaf(remaining, neighbor) ? neighbor : fallback.id;
-      set({ root: remaining, focusedPaneId: focus });
+      // the working set survives (slice 4, 2026-07-28): ⌘⌥W used to silently
+      // discard every tab in the pane — they MERGE into the neighbor instead,
+      // with the tab you were on staying active
+      const merged = updateLeaf(remaining, focus, (l) => ({
+        ...l,
+        tabs: [...l.tabs, ...leaf.tabs],
+        activeTabId: leaf.activeTabId,
+      }));
+      set({ root: merged, focusedPaneId: focus });
     },
 
     setSplitSizes: (splitId, sizes) => {

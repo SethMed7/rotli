@@ -377,6 +377,14 @@ export function registerDefaultActions(): void {
       if (notesWorkspaceActive()) usePanesStore.getState().cycleTab(-1);
     },
   });
+  registerAction({
+    id: "tabs.reopen",
+    title: "Reopen closed tab",
+    defaultChord: "Meta+Shift+T",
+    run: () => {
+      if (notesWorkspaceActive()) usePanesStore.getState().reopenClosedTab();
+    },
+  });
   for (let n = 1; n <= 8; n++) {
     registerAction({
       id: `tabs.jump${n}`,

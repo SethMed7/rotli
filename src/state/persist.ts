@@ -506,38 +506,34 @@ interface PersistedViewstate {
 export function validTab(v: unknown, alive: Set<string>): Tab | null {
   const o = record(v);
   if (typeof o.id !== "string" || !o.id) return null;
-  const vs = record(o.viewState);
-  const viewState = {
-    cursor: typeof vs.cursor === "number" ? vs.cursor : 0,
-    scroll: typeof vs.scroll === "number" ? vs.scroll : 0,
-  };
+  // legacy trees carried a per-tab viewState nobody ever wrote or read —
+  // the field is retired (slice 4, 2026-07-28); hydration simply drops it
   // canvas: boards have no alive-set (ids are paths, no ulid index), so accept
   // any non-empty boardId — the surface handles a since-deleted board itself.
   if (o.surfaceKind === "canvas") {
     if (typeof o.boardId !== "string" || !o.boardId) return null;
-    return { id: o.id, surfaceKind: "canvas", boardId: o.boardId, viewState };
+    return { id: o.id, surfaceKind: "canvas", boardId: o.boardId };
   }
   if (o.surfaceKind === "chat") {
     return {
       id: o.id,
       surfaceKind: "chat",
       chatSlug: typeof o.chatSlug === "string" ? o.chatSlug : null,
-      viewState,
     };
   }
   // file: like canvas, ids are paths (no alive-set) — FileSurface itself shows
   // the honest error for a since-deleted file.
   if (o.surfaceKind === "file") {
     if (typeof o.fileId !== "string" || !o.fileId) return null;
-    return { id: o.id, surfaceKind: "file", fileId: o.fileId, viewState };
+    return { id: o.id, surfaceKind: "file", fileId: o.fileId };
   }
   // activity: a singleton view with no binding — nothing to validate but shape.
   if (o.surfaceKind === "activity") {
-    return { id: o.id, surfaceKind: "activity", viewState };
+    return { id: o.id, surfaceKind: "activity" };
   }
   if (o.surfaceKind !== "note") return null;
   if (typeof o.noteId !== "string" || !alive.has(o.noteId)) return null;
-  return { id: o.id, surfaceKind: "note", noteId: o.noteId, viewState };
+  return { id: o.id, surfaceKind: "note", noteId: o.noteId };
 }
 
 /** Validate + prune in one pass: structure must hold AND every tab's note must

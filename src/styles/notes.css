@@ -173,8 +173,9 @@
    plus a slim 2px clay bar — one calm grammar in every theme, distinct from the
    plain hover. */
 .frow.sel {
+  /* the wash + bar carry the state — no bold, so the label never re-truncates
+     and the row never shimmies on selection (slice 5, 2026-07-28) */
   background: color-mix(in srgb, var(--accent) 10%, transparent);
-  font-weight: 600;
 }
 .frow.sel svg {
   color: var(--accent-text);
@@ -192,16 +193,10 @@
   border-radius: 0 2px 2px 0;
   background: var(--accent);
 }
-/* THE one-active-state law (Seth, 2026-06-15): in the sidebar tree only the OPEN
-   note carries the pill. A selected destination/folder is just bold text + an
-   accent icon — no fill, no bar — so nothing competes with the active note.
-   (Scoped to .sb-rows; the Settings nav keeps the base .frow.sel highlight.) */
-.sb-rows .frow.sel {
-  background: none;
-}
-.sb-rows .frow.sel::before {
-  display: none;
-}
+/* One active-surface grammar (slice 5, 2026-07-28): a .sel System/smart row
+   means "this surface is OPEN on the right" — the same wash + 2px bar the open
+   chat row carries. (The old bold-only stripping dated from when .sel meant a
+   mere ⌘N create-target; that meaning died with the System fold.) */
 /* nested rows indent via inline padding-left (depth-scaled in JSX, ~16px/level);
    the .child class keeps a fallback inset for depth 0 */
 .frow.child {
@@ -215,7 +210,8 @@
 }
 
 /* — Main: the user's hand-arranged view over the Brain (Seth, 2026-07-01) — */
-.main-empty {
+.main-empty,
+.sb-empty {
   margin: 2px 12px 6px;
   padding: 4px 10px;
   font-size: 12px;
@@ -246,11 +242,29 @@
 .main-row.dragging {
   opacity: 0.4;
 }
-.mdrop-before {
-  border-top: 2px solid var(--accent);
-}
+/* drop-position lines paint WITHOUT reflow (slice 5, 2026-07-28): the old real
+   borders pushed neighbors 2px on every row the ghost crossed — visible jitter
+   exactly when the user is aiming */
+.mdrop-before,
 .mdrop-after {
-  border-bottom: 2px solid var(--accent);
+  position: relative;
+}
+.mdrop-before::before,
+.mdrop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  z-index: 2;
+  pointer-events: none;
+}
+.mdrop-before::before {
+  top: -1px;
+}
+.mdrop-after::after {
+  bottom: -1px;
 }
 .mdrop-into {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
@@ -472,7 +486,9 @@
 .main-row .mstar.full,
 .main-row:hover .mstar.full {
   cursor: not-allowed;
-  opacity: 0.14;
+  /* 0.14 was sub-perceptual on the light grounds — "disabled" must still read
+     as PRESENT (slice 5, 2026-07-28); the click explains itself inline */
+  opacity: 0.3;
 }
 .snrow.sel .mstar.on {
   color: var(--on-accent);
@@ -685,7 +701,6 @@
    tree uses for a selected folder (kept distinct from the open-note pill). */
 .sb-chatrow.sel {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
-  font-weight: 600;
 }
 .sb-chatrow.sel svg {
   color: var(--accent-text);
@@ -871,13 +886,13 @@
 .nl-top {
   display: flex;
   align-items: center;
-  justify-content: center;
+  /* left-aligned like every other chrome row — a wrapped icon line floating
+     centered read as no other surface in the app (slice 5, 2026-07-28) */
+  justify-content: flex-start;
   gap: 8px;
   padding: 12px 12px 10px;
   flex: 0 0 auto;
-  /* the IDE create icons (New note · folder · board · Collapse all) are centered
-     as a cluster; on a narrow sidebar they wrap instead of squeezing
-     (#7/#13, 2026-07-03; centered 2026-07-08). */
+  /* on a narrow sidebar the create icons wrap instead of squeezing */
   flex-wrap: wrap;
 }
 /* keep the filter usable when the row wraps — it takes the first line, the icons
@@ -1073,23 +1088,38 @@
   top: -4px;
   bottom: -4px;
 }
-.divider.dragging::before {
+.divider.dragging::before,
+.divider:hover::before {
   content: "";
   position: absolute;
   background: var(--accent);
   z-index: 1;
 }
-.split.row > .divider.dragging::before {
+/* grabbability whispers before commitment: the same accent line, softened
+   (slice 4, 2026-07-28) */
+.divider:hover:not(.dragging)::before {
+  opacity: 0.45;
+}
+.split.row > .divider.dragging::before,
+.split.row > .divider:hover::before {
   top: 0;
   bottom: 0;
   left: -0.5px;
   width: 2px;
 }
-.split.col > .divider.dragging::before {
+.split.col > .divider.dragging::before,
+.split.col > .divider:hover::before {
   left: 0;
   right: 0;
   top: -0.5px;
   height: 2px;
+}
+
+/* focused-pane clarity (slice 4, 2026-07-28): the 2px tab tick could scroll
+   out of view — the UNFOCUSED strips also mute slightly, a tonal shift that
+   reads without rings or borders */
+.panes.multi .pane:not(.focused) .tabstrip {
+  opacity: 0.72;
 }
 
 /* — split-detach dropzones: the overlay above a pane body, live ONLY while a
@@ -1526,8 +1556,11 @@
 
 /* — added external folders (Seth, 2026-06-27): the "Add a folder…" row + the
    hover × that forgets a folder (files kept). Mirrors the frow-add hover slot. — */
+/* the added-root × keeps its slot (opacity, not display — the reserved-slot
+   affordance law; the old display swap double-shifted the row on every hover) */
 .sb-root-x {
-  display: none;
+  display: inline-flex;
+  opacity: 0;
   margin-left: auto;
   flex: 0 0 auto;
   font-size: 11px;
@@ -1536,12 +1569,11 @@
   border-radius: var(--r-inner);
   color: var(--text-muted);
   cursor: pointer;
+  transition: opacity var(--motion-exit) var(--motion-ease);
 }
-.frow:hover .sb-root-x {
-  display: inline-flex;
-}
-.frow:hover:has(.sb-root-x) .count {
-  display: none;
+.frow:hover .sb-root-x,
+.sb-root-x:focus-visible {
+  opacity: 0.7;
 }
 .sb-root-x:hover {
   background: var(--hov);
@@ -1551,4 +1583,14 @@
   display: inline-flex;
   color: var(--accent-text);
   font-weight: 600;
+}
+
+/* text "▾" carets retired (slice 5, 2026-07-28) — same stroked chevron family
+   as every disclosure, rotated to point down */
+.caret-down {
+  display: inline-flex;
+  align-items: center;
+}
+.caret-down svg {
+  transform: rotate(90deg);
 }

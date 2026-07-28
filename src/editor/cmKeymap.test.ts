@@ -142,3 +142,43 @@ describe("Tab on a ragged table row (#3)", () => {
     expect(text(v).slice(sel.from, sel.to)).toBe("2");
   });
 });
+
+// Seth, 2026-07-28: Shift-Tab on tab-indented bullets (external editors, LLM
+// output) was dead — the outdent grammar only spoke spaces. Tab/Shift-Tab now
+// NORMALIZE tab indents to the app's two-space levels as part of the gesture.
+describe("tab-indented lists (foreign notes)", () => {
+  test("Shift-Tab outdents a tab-indented bullet one level", () => {
+    const doc = "- alpha\n\t- child";
+    const v = viewOf(doc, doc.length);
+    expect(press(v, "Tab", true)).toBe(true);
+    expect(text(v)).toBe("- alpha\n- child");
+  });
+
+  test("two tabs normalize and drop one level", () => {
+    const doc = "\t\t- deep";
+    const v = viewOf(doc, doc.length);
+    expect(press(v, "Tab", true)).toBe(true);
+    expect(text(v)).toBe("  - deep");
+  });
+
+  test("Tab on a tab-indented bullet nests one MORE level, normalized", () => {
+    const doc = "\t- child";
+    const v = viewOf(doc, doc.length);
+    expect(press(v, "Tab")).toBe(true);
+    expect(text(v)).toBe("    - child");
+  });
+
+  test("Enter continues a tab-indented item as a sibling", () => {
+    const doc = "\t- child";
+    const v = viewOf(doc, doc.length);
+    expect(press(v, "Enter")).toBe(true);
+    expect(text(v)).toBe("\t- child\n\t- ");
+  });
+
+  test("a task keeps its checkbox through Shift-Tab", () => {
+    const doc = "- [ ] a\n  - [x] b";
+    const v = viewOf(doc, doc.length);
+    expect(press(v, "Tab", true)).toBe(true);
+    expect(text(v)).toBe("- [ ] a\n- [x] b");
+  });
+});

@@ -109,3 +109,43 @@ test("raw Markdown uses the Rotli syntax grammar without changing source", async
   await expect(page.locator(".rotli-raw-code-line")).toHaveCount(4);
   await expect(editor).toContainText("flowchart LR");
 });
+
+test("bullet outdent works on app-made AND tab-indented (foreign) lists", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+
+  // the app's own flow: nest with Tab, come back with Shift-Tab, keep typing
+  await page.keyboard.type("- alpha");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("child");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.type("gamma");
+  await expect(editor).toContainText("gamma");
+
+  await page.keyboard.press("Meta+A");
+  await page.keyboard.press("Delete");
+
+  // a foreign note indented with TABS (external editors, LLM output): the
+  // bullet must render as a bullet and Shift-Tab must outdent it — this was
+  // completely dead (raw text, no-op Shift-Tab; Seth, 2026-07-28)
+  await page.keyboard.insertText("- alpha\n\t- child");
+  await expect(page.locator(".rotli-li")).toHaveCount(2); // BOTH lines are bullets
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.type("!");
+  await expect(editor).toContainText("child!");
+
+  await page.keyboard.press("Meta+A");
+  await page.keyboard.press("Delete");
+
+  // tasks keep their checkboxes through an outdent
+  await page.keyboard.insertText("- [ ] a\n  - [x] b");
+  await expect(page.locator(".rotli-check")).toHaveCount(2);
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.locator(".rotli-check")).toHaveCount(2);
+});
