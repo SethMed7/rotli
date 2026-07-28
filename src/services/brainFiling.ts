@@ -1,6 +1,6 @@
 // Manual Brain filing — ONE path shared by every surface that files a note into
-// a wiki area (the metadata panel's "File to the Brain" and the right-click
-// menu's drill). A `.md` note travels the wire as its frontmatter ULID, but the
+// a wiki area (the row menu's "Move to…" drill and Activity's proposal
+// approval). A `.md` note travels the wire as its frontmatter ULID, but the
 // filing journal + staged-detection speak PATHS — so the flow starts by
 // resolving through the ULID→rel bridge (corpus_note_path). The move itself
 // runs through the v3.7 Filer gate, any open pane retargets, and the action is

@@ -6,7 +6,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import type { LeafNode, Tab } from "../types";
 import { useNavHistory } from "./navHistory";
-import { findLeaf, openNavTarget, sidebarItemId, usePanesStore } from "./panes";
+import { findLeaf, openNavTarget, sidebarItemId, tabsRightOf, usePanesStore } from "./panes";
 
 const tab = (id: string): Tab => ({
   id,
@@ -309,5 +309,57 @@ describe("activateSurface + openNavTarget — replay reuses open tabs anywhere",
     const pane = findLeaf(usePanesStore.getState().root, "p1");
     const active = pane?.tabs.find((t) => t.id === pane.activeTabId);
     expect(active?.surfaceKind).toBe("canvas");
+  });
+});
+
+// P0 sweep 2026-07-28: Activity must APPEND like every surface (it was the one
+// opener that mutated the active tab in place, eating the note you were on),
+// Ctrl+Shift+Tab cycles backward, and "Close tabs to the right" needs a pure
+// answer for which tabs fall.
+describe("openActivity appends, never replaces", () => {
+  beforeEach(() => {
+    usePanesStore.setState({ root: leaf("p1", ["A"]), focusedPaneId: "p1" });
+  });
+
+  test("opening Activity keeps the note tab and adds an activity tab", () => {
+    usePanesStore.getState().openActivity();
+    const pane = findLeaf(usePanesStore.getState().root, "p1");
+    expect(pane?.tabs.map((t) => t.surfaceKind)).toEqual(["note", "activity"]);
+    expect(pane?.tabs.find((t) => t.id === pane.activeTabId)?.surfaceKind).toBe("activity");
+  });
+
+  test("a second open activates the existing Activity tab, adding none", () => {
+    usePanesStore.getState().openActivity();
+    usePanesStore.getState().activateTab("p1", "A");
+    usePanesStore.getState().openActivity();
+    const pane = findLeaf(usePanesStore.getState().root, "p1");
+    expect(pane?.tabs.length).toBe(2);
+    expect(pane?.tabs.find((t) => t.id === pane.activeTabId)?.surfaceKind).toBe("activity");
+  });
+});
+
+describe("cycleTab walks both directions", () => {
+  beforeEach(() => {
+    usePanesStore.setState({ root: leaf("p1", ["A", "B", "C"]), focusedPaneId: "p1" });
+  });
+
+  test("backward from the first tab wraps to the last", () => {
+    usePanesStore.getState().cycleTab(-1);
+    expect(findLeaf(usePanesStore.getState().root, "p1")?.activeTabId).toBe("C");
+  });
+
+  test("forward still wraps front-to-back", () => {
+    usePanesStore.getState().activateTab("p1", "C");
+    usePanesStore.getState().cycleTab(1);
+    expect(findLeaf(usePanesStore.getState().root, "p1")?.activeTabId).toBe("A");
+  });
+});
+
+describe("tabsRightOf", () => {
+  test("returns the ids strictly after the anchor, in strip order", () => {
+    const l = leaf("p1", ["A", "B", "C", "D"]);
+    expect(tabsRightOf(l, "B")).toEqual(["C", "D"]);
+    expect(tabsRightOf(l, "D")).toEqual([]);
+    expect(tabsRightOf(l, "zz")).toEqual([]);
   });
 });

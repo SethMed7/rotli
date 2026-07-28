@@ -146,6 +146,17 @@ function containsNote(nodes: MainNode[], noteId: string): boolean {
  * writes these explicitly closed (Main folders default OPEN, so wiping the
  * map re-expanded them — #83, audit 2026-07), and the persisted-map GC keeps
  * only these among "main:*" keys (#78). */
+/** The ONE Main row comparator: pinned notes FLOAT above the hand-arranged
+ * order (Seth, 2026-07-09), the manifest itself is never reordered. Both the
+ * renderer and the roving j/k walk MUST use this — they diverged once and the
+ * keyboard cursor visibly teleported (P0 sweep 2026-07-28). */
+export function mainRowSort(
+  a: { pinned: boolean; mainOrder: number },
+  b: { pinned: boolean; mainOrder: number },
+): number {
+  return Number(b.pinned) - Number(a.pinned) || a.mainOrder - b.mainOrder;
+}
+
 export function mainFolderIds(nodes: MainNode[]): string[] {
   const ids: string[] = [];
   const walk = (ns: MainNode[], parentId: string) => {

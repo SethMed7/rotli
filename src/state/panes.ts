@@ -61,6 +61,27 @@ function tabNoteId(tab: Tab): string | null {
   return tab.surfaceKind === "note" ? tab.noteId : null;
 }
 
+/** Window shrank below the split floors? Collapse the sidebar — the same quiet
+ * self-correction the split-time check applies, which used to run only at
+ * split CREATION and let a later resize crush every pane (P0 sweep 2026-07-28). */
+export function refitColumns(): void {
+  const ui = useUiStore.getState();
+  const columns = columnCount(usePanesStore.getState().root);
+  if (columns < 2) return;
+  const sidebarWidth = ui.sidebarWidth || SIDEBAR_WIDTH;
+  const fits = (collapsed: boolean) =>
+    window.innerWidth - (collapsed ? 0 : sidebarWidth) >= columns * MIN_PANE_WIDTH;
+  if (!fits(ui.sidebarCollapsed) && fits(true)) ui.setSidebarCollapsed(true);
+}
+
+/** The tab ids strictly AFTER the anchor in strip order — "Close tabs to the
+ * right"'s pure answer (P0 sweep 2026-07-28). Unknown anchor → nothing falls. */
+export function tabsRightOf(leaf: LeafNode, tabId: string): string[] {
+  const at = leaf.tabs.findIndex((t) => t.id === tabId);
+  if (at < 0) return [];
+  return leaf.tabs.slice(at + 1).map((t) => t.id);
+}
+
 /** The durable corpus item represented by a tab, when that surface has a
  * corresponding sidebar row. Notes, boards, and conventional files all use
  * this one selection identity; chat/activity remain separate navigation. */
@@ -343,7 +364,8 @@ interface PanesState {
   closeTab: () => void;
   closeTabById: (paneId: string, tabId: string) => void;
   activateTab: (paneId: string, tabId: string) => void;
-  cycleTab: () => void;
+  /** Walk the strip: 1 = forward (⌃Tab), -1 = backward (⌃⇧Tab); wraps. */
+  cycleTab: (dir?: 1 | -1) => void;
   jumpTab: (index: number) => void;
   lastTab: () => void;
   splitRight: () => void;
@@ -569,22 +591,15 @@ export const usePanesStore = create<PanesState>((set, get) => {
     },
 
     openActivity: () => {
+      // like every other surface: reuse the pane's Activity tab or APPEND one —
+      // it used to swap the ACTIVE tab in place, eating the note you were on
+      // (the one violation of the never-replace law; P0 sweep 2026-07-28)
       useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
       set({
-        root: updateLeaf(get().root, leaf.id, (l) => {
-          // focus an existing Activity tab in this pane, else swap the active tab
-          const existing = l.tabs.find((t) => t.surfaceKind === "activity");
-          if (existing) return { ...l, activeTabId: existing.id };
-          return {
-            ...l,
-            tabs: l.tabs.map((t) =>
-              t.id === l.activeTabId
-                ? { id: l.activeTabId, surfaceKind: "activity", viewState: { cursor: 0, scroll: 0 } }
-                : t,
-            ),
-          };
-        }),
+        root: updateLeaf(get().root, leaf.id, (l) =>
+          placeTab(l, undefined, (t) => t.surfaceKind === "activity", makeActivityTab),
+        ),
       });
     },
 
@@ -678,11 +693,11 @@ export const usePanesStore = create<PanesState>((set, get) => {
       });
     },
 
-    cycleTab: () => {
+    cycleTab: (dir = 1) => {
       const leaf = focusedLeaf();
       if (leaf.tabs.length < 2) return;
       const index = leaf.tabs.findIndex((t) => t.id === leaf.activeTabId);
-      const next = leaf.tabs[(index + 1) % leaf.tabs.length];
+      const next = leaf.tabs[(index + dir + leaf.tabs.length) % leaf.tabs.length];
       if (next) get().activateTab(leaf.id, next.id);
     },
 

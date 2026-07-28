@@ -74,6 +74,14 @@ export function isSink(folderId: string): boolean {
   return SINK_ROOTS.some((root) => folderId === root || folderId.startsWith(`${root}/`));
 }
 
+/** The Assets lane (Storage and its subtree) — the MANAGED BINARY home. A note
+ * must never be BORN here (P0 sweep 2026-07-28: browsing Assets then ⌘N used to
+ * drop a markdown note inside storage/), so creation routing treats it like a
+ * hidden root. */
+export function isStorageLane(folderId: string): boolean {
+  return folderId === DEST.storage || folderId.startsWith(`${DEST.storage}/`);
+}
+
 /** Trash and its subtree only — the ONE root note SEARCH never surfaces
  * (Archive stays findable; restore is what resurrects Trash). Mirrors Rust
  * `is_trash_folder` (corpus.rs). */

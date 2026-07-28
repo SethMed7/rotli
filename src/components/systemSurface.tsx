@@ -13,13 +13,15 @@ import {
   type ReactNode,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { longDateLabel } from "../lib/dateLabels";
 import { startMainAddDrag } from "../lib/mainAddDrag";
 import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
 import { DEST } from "../services/destinations";
-import { useFolders, useNotes, useSearchableNotes } from "../services/hooks";
+import { invalidateFolders, useFolders, useNotes, useSearchableNotes } from "../services/hooks";
+import { notesService } from "../services/notes";
 import {
   type FolderEntry,
   type SystemSortKey,
@@ -34,7 +36,7 @@ import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { Character } from "./character";
-import { ChevronRight, FolderGlyph, SearchGlyph, glyphForNote } from "./glyphs";
+import { ChevronRight, FolderGlyph, NewFolderGlyph, SearchGlyph, glyphForNote } from "./glyphs";
 import { NoteListRow } from "./noteListRow";
 import { useNoteMenu } from "./useNoteMenu";
 
@@ -106,6 +108,31 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     setCwd(path);
     setSelectedId(null);
   };
+
+  // "New folder" — a REAL directory at the cwd (Finder's verb, restored after
+  // the fold left folder creation with no UI at all; P0 sweep 2026-07-28).
+  // The existing write gates answer per vault: legacy vaults create anywhere,
+  // a memex refuses the curated wiki tree with its honest message.
+  const [newFolder, setNewFolder] = useState(false);
+  const [folderError, setFolderError] = useState<string | null>(null);
+  const folderHandled = useRef(false);
+  const commitNewFolder = async (name: string) => {
+    setNewFolder(false);
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      setFolderError(null);
+      await notesService.createFolder(trimmed, cwd);
+      await invalidateFolders();
+    } catch (err) {
+      setFolderError(`Couldn’t create the folder — ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+  // the sidebar's toolbar New-folder button routes here while a browser is open
+  const systemFolderNonce = useUiStore((s) => s.systemFolderNonce);
+  useEffect(() => {
+    if (systemFolderNonce > 0) setNewFolder(true);
+  }, [systemFolderNonce]);
 
   // "Show in Library" (the note menu / the editor's location chip): land IN
   // the note's exact folder — Finder's reveal. Clear any filter, select the
@@ -240,6 +267,17 @@ export function SystemSurface({ rootId }: { rootId: string }) {
           ))}
         </nav>
         <span className="board-count">{items.length}</span>
+        {isLibrary && (
+          <button
+            type="button"
+            className="icobtn fdr-newbtn"
+            aria-label="New folder here"
+            title="New folder here"
+            onClick={() => setNewFolder(true)}
+          >
+            <NewFolderGlyph size={15} />
+          </button>
+        )}
         <div className="file-mode-tabs" role="tablist" aria-label="View" style={{ marginLeft: "auto" }}>
           <button
             type="button"
@@ -268,6 +306,41 @@ export function SystemSurface({ rootId }: { rootId: string }) {
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
+
+      {folderError && (
+        <p className="fdr-error" role="alert">
+          ⚠ {folderError}
+        </p>
+      )}
+      {newFolder && (
+        <div className="fdr-newfolder">
+          <FolderGlyph size={14} className="fdr-row-icon folder" />
+          <input
+            autoFocus
+            type="text"
+            placeholder="Folder name"
+            aria-label="New folder name"
+            onKeyDown={(e) => {
+              // a keystroke that handles the input unmounts it — the ensuing
+              // blur must not double-commit or undo a cancel
+              if (e.key === "Enter") {
+                folderHandled.current = true;
+                void commitNewFolder(e.currentTarget.value);
+              } else if (e.key === "Escape") {
+                folderHandled.current = true;
+                setNewFolder(false);
+              }
+            }}
+            onBlur={(e) => {
+              if (folderHandled.current) {
+                folderHandled.current = false;
+                return;
+              }
+              void commitNewFolder(e.currentTarget.value);
+            }}
+          />
+        </div>
+      )}
 
       {searching ? (
         hits.length === 0 ? (

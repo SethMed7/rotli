@@ -14,7 +14,6 @@
 // grammar, shared with the panes.
 
 import {
-  type KeyboardEvent,
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -32,6 +31,7 @@ import {
   uniqueRootFolderName,
   buildMainTree,
   mainFolderIds,
+  mainRowSort,
   mainItemIdsInFolder,
   mainNoteIds,
   mainParentOfNote,
@@ -40,7 +40,7 @@ import {
   renameFolderInMain,
 } from "../services/mainTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
-import { renameMainRef, useMainStore } from "../state/main";
+import { useMainStore } from "../state/main";
 import { useViewsStore } from "../state/views";
 import {
   createNamedView,
@@ -57,9 +57,6 @@ import { InlineRenameInput } from "./inlineRenameInput";
 import { useNoteMenu } from "./useNoteMenu";
 import { deriveJournal } from "../services/brainJournal";
 import {
-  invalidateFolders,
-  invalidateNotes,
-  useArchiveNote,
   useCorpusRoots,
   useFolders,
   useJournal,
@@ -67,21 +64,11 @@ import {
   useMainGcIds,
   useNoteIndex,
   useNotes,
-  useRestoreNote,
   useSearchableNotes,
   useTrashItems,
-  useTrashNote,
 } from "../services/hooks";
-import { notesService } from "../services/notes";
-import { type CorpusRoot, corpusForgetFolder, corpusRenameBoard } from "../lib/tauri";
-import {
-  DEST,
-  type Destination,
-  destContains,
-  isHidden,
-  isRootMarker,
-  isVault,
-} from "../services/destinations";
+import { type CorpusRoot, corpusForgetFolder } from "../lib/tauri";
+import { DEST, type Destination, isRootMarker } from "../services/destinations";
 import {
   sidebarItemId,
   useFocusedChatSlug,
@@ -104,7 +91,6 @@ import { useChatRename } from "../services/chatRename";
 import type { Folder, NoteSummary } from "../types";
 import { dispatch } from "../keys/registry";
 import { openNewItemMenu } from "../newItems/menu";
-import { longDateLabel } from "../lib/dateLabels";
 import { createDragGhost } from "../lib/dragGhost";
 import { createPointerDragSession } from "../lib/pointerDrag";
 import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
@@ -116,7 +102,6 @@ import {
   ClockGlyph,
   TaskGlyph,
   CoffeeGlyph,
-  ExcalidrawGlyph,
   FileGlyph,
   glyphForNote,
   FolderGlyph,
@@ -138,29 +123,6 @@ import { type RovingRow, useRovingList } from "./sidebar/useRovingList";
 import { noteDisplayTitle } from "./sidebar/noteDisplayTitle";
 import { BreveSidebar } from "./breve/breveSidebar";
 import { QuokkaMark } from "./character";
-
-/** Restore-from-hidden glyph (Seth, 2026-06-13): a counter-clockwise arc arrow
- * — "put it back". Lives here, not in glyphs.tsx, since this is the only place
- * Restore appears and this phase touches Sidebar only; same 1.7 stroke /
- * 24-viewBox grammar as the shared Glyph helper so it reads as one family. */
-function RestoreGlyph({ size = 16 }: { size?: number }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={size}
-      height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M4 9a8 8 0 1 1-1.5 5" />
-      <path d="M4 4v5h5" />
-    </svg>
-  );
-}
 
 /** Collapse-all glyph — two chevrons folding toward the center ("fold the tree
  * up"). Inline like RestoreGlyph; same 1.7 stroke / 24-viewBox family. */
@@ -231,220 +193,6 @@ const DEST_ROWS: { id: Destination; label: string; Glyph: typeof InboxGlyph }[] 
  * (a LATER increment; this writes nothing). These two are Seth's known addresses
  * from the IA doc Addendum. */
 const STUB_EMAIL_ACCOUNTS = ["maintainer@example.com", "hello@sethmedina.com"];
-
-/** The lifecycle handlers a compact row needs in its hover slot — wired once at
- * the Sidebar top (the hooks live there) and passed down so the row stays a
- * pure-ish leaf (Seth, 2026-06-13). */
-interface RowActions {
-  archive: (id: string) => void;
-  trash: (id: string) => void;
-  restore: (id: string) => void;
-  /** Add this note to the user's hand-arranged Main view (a ⊕ hover affordance). */
-  addToMain?: (id: string) => void;
-}
-
-/** A compact note row: title + day label only — NO snippet line (that is the
- * difference from the old NoteList's three-line .nrow). Click opens the note;
- * ⌘-click opens it in a new tab. The .snact slot carries the hover affordances
- * — Archive + Trash for a normal row, a single Restore for a row already in
- * Archive/Trash. Each action button stops propagation so it never opens the
- * note. */
-function CompactNoteRow({
-  note,
-  displayTitle,
-  selected,
-  padLeft,
-  onOpen,
-  actions,
-  onBeginMainDrag,
-  mainDragRef,
-  rowProps,
-  onContextMenu,
-}: {
-  note: NoteSummary;
-  /** Context-shortened tree label; the NoteSummary keeps its canonical title. */
-  displayTitle?: string;
-  selected: boolean;
-  /** Depth-scaled left inset so a note sits under its folder (Seth, 2026-06-15). */
-  padLeft: number;
-  onOpen: (newTab: boolean) => void;
-  actions: RowActions;
-  /** Right-click → open the row's context menu (optional). */
-  onContextMenu?: (e: MouseEvent) => void;
-  /** Begin a cross-section pointer-drag of this note INTO Main (optional). */
-  onBeginMainDrag?: (e: ReactPointerEvent) => void;
-  /** Shared flag set while such a drag happens — suppresses the row's click. */
-  mainDragRef?: { current: boolean };
-  /** Roving-list props (Seth, 2026-06-13): tabIndex/role/aria-selected + the
-   * focus-scoped j/k onKeyDown. Spread last so the keyboard handlers win, but
-   * the row keeps its own mouse open + drag gestures. */
-  rowProps: ReturnType<ReturnType<typeof useRovingList>["rowProps"]>;
-}) {
-  const onClick = (event: MouseEvent) => {
-    if (mainDragRef?.current) return; // a drag-into-Main just happened, not a click
-    onOpen(event.metaKey);
-  };
-  const hidden = isHidden(note.folderId); // Archive/Trash (or nested) → Restore
-  return (
-    <button
-      type="button"
-      data-note-id={note.id}
-      className={selected ? "snrow sel" : "snrow"}
-      style={{ paddingLeft: padLeft }}
-      onClick={onClick}
-      onAuxClick={(event) => {
-        // middle-click opens in a new tab (IDE/browser habit) — no modifier
-        if (event.button === 1) {
-          event.preventDefault();
-          onOpen(true);
-        }
-      }}
-      onContextMenu={onContextMenu}
-      onPointerDown={onBeginMainDrag}
-      {...rowProps}
-    >
-      {glyphForNote(note, { size: 14, className: "snicon" })}
-      <span className="snt">{displayTitle || note.title || "Empty note"}</span>
-      <span className="snd">{longDateLabel(note.updatedAt)}</span>
-      <span className="snact">
-        {hidden ? (
-          <span
-            role="button"
-            tabIndex={0}
-            className="snactbtn"
-            aria-label="Restore"
-            onClick={(event) => {
-              event.stopPropagation();
-              actions.restore(note.id);
-            }}
-          >
-            <RestoreGlyph size={16} />
-          </span>
-        ) : (
-          <>
-            {actions.addToMain && (
-              <span
-                role="button"
-                tabIndex={0}
-                className="snactbtn"
-                aria-label="Add to Main"
-                title="Add to Main"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  actions.addToMain?.(note.id);
-                }}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  width="15"
-                  height="15"
-                  aria-hidden="true"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                >
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </span>
-            )}
-            <span
-              role="button"
-              tabIndex={0}
-              className="snactbtn"
-              aria-label="Archive"
-              onClick={(event) => {
-                event.stopPropagation();
-                actions.archive(note.id);
-              }}
-            >
-              <ArchiveGlyph size={16} />
-            </span>
-            <span
-              role="button"
-              tabIndex={0}
-              className="snactbtn"
-              aria-label="Move to Trash"
-              onClick={(event) => {
-                event.stopPropagation();
-                actions.trash(note.id);
-              }}
-            >
-              <TrashGlyph size={16} />
-            </span>
-          </>
-        )}
-      </span>
-    </button>
-  );
-}
-
-/** A compact board (.excalidraw) row: the canvas glyph + the file's basename —
- * NO date, NO lifecycle slot (boards aren't in the note lifecycle yet). Click
- * opens the board on the focused pane; ⌘-click opens it in a new tab. Reuses
- * the .snrow grammar so a board sits in the same column as the notes around it
- * (Seth, 2026-06-24). */
-function CompactBoardRow({
-  board,
-  selected,
-  padLeft,
-  onOpen,
-  renaming,
-  onCommitRename,
-  onCancelRename,
-  rowProps,
-  onContextMenu,
-}: {
-  board: NoteSummary;
-  selected: boolean;
-  padLeft: number;
-  onOpen: (newTab: boolean) => void;
-  renaming: boolean;
-  onCommitRename: (name: string) => void;
-  onCancelRename: () => void;
-  rowProps: ReturnType<ReturnType<typeof useRovingList>["rowProps"]>;
-  /** Right-click → the full note context menu (its Rename… drops the row into
-   * the inline rename below — the old rename-only right-click grew up). */
-  onContextMenu: (e: MouseEvent) => void;
-}) {
-  const onClick = (event: MouseEvent) => onOpen(event.metaKey);
-  // inline rename: the menu's Rename… (or a freshly created board) turns the row
-  // into a text input. Enter commits; Esc / click-away cancels (Seth, 2026-06-26).
-  if (renaming) {
-    return (
-      <div className="sb-newfolder snrow" style={{ paddingLeft: padLeft }}>
-        <ExcalidrawGlyph size={14} className="snicon" />
-        <InlineRenameInput
-          defaultValue={board.title}
-          placeholder="Board name…"
-          ariaLabel="Rename board"
-          onCommit={onCommitRename}
-          onCancel={onCancelRename}
-        />
-      </div>
-    );
-  }
-  return (
-    <button
-      type="button"
-      className={selected ? "snrow sel" : "snrow"}
-      style={{ paddingLeft: padLeft }}
-      onClick={onClick}
-      onAuxClick={(event) => {
-        // middle-click opens in a new tab — the same gesture note rows have
-        if (event.button === 1) {
-          event.preventDefault();
-          onOpen(true);
-        }
-      }}
-      onContextMenu={onContextMenu}
-      {...rowProps}
-    >
-      <CanvasItemGlyph size={14} className="snicon" />
-      <span className="snt">{board.title || "Untitled board"}</span>
-    </button>
-  );
-}
 
 /** A top-level row for an ADDED external folder (Seth, 2026-06-27): a folder you
  * pointed rotli at without moving it into the memex. Self-contained (its own
@@ -633,7 +381,6 @@ export function Sidebar() {
     return boardNotes.filter((n) => !curated.has(n.id) && !quickNoteIds.includes(n.id)).length;
   }, [boardNotesData, mainManifest.tree, quickNoteIds]);
 
-  const selectedFolderId = useUiStore((s) => s.selectedFolderId);
   const setSelectedFolderId = useUiStore((s) => s.setSelectedFolderId);
   const contentView = useUiStore((s) => s.contentView);
   const setContentView = useUiStore((s) => s.setContentView);
@@ -641,10 +388,10 @@ export function Sidebar() {
   const collapseAllDests = useUiStore((s) => s.collapseAllDests);
   const toggleDestExpanded = useUiStore((s) => s.toggleDestExpanded);
   const setDestExpanded = useUiStore((s) => s.setDestExpanded);
+  const requestSystemFolder = useUiStore((s) => s.requestSystemFolder);
   const openNote = usePanesStore((s) => s.openNote);
   const openCanvas = usePanesStore((s) => s.openCanvas);
   const openChat = usePanesStore((s) => s.openChat);
-  const retargetBoard = usePanesStore((s) => s.retargetBoard);
   const focusedChatSlug = useFocusedChatSlug();
   // The DERIVED destination highlight (Seth #1, 2026-07-08): a destination/folder
   // row only reads "selected" while the focused tab's content actually LIVES
@@ -655,31 +402,6 @@ export function Sidebar() {
   // (or a meta surface like Activity) keeps the plain behavior.
   const focusedTab = useFocusedTab();
   const focusedItemId = sidebarItemId(focusedTab);
-  const focusedHome = useMemo(() => {
-    if (!focusedTab) return null;
-    if (focusedTab.surfaceKind === "note") {
-      const note = noteIndex.get(focusedTab.noteId);
-      if (!note) return null;
-      const diskFolder = noteDiskFolder(note);
-      // wiki/_inbox is internal staging; its user-facing home is Captures.
-      return diskFolder.startsWith("wiki/_") ? note.folderId : diskFolder;
-    }
-    if (focusedTab.surfaceKind === "canvas") return noteIndex.get(focusedTab.boardId)?.folderId ?? null;
-    if (focusedTab.surfaceKind === "file") {
-      const slash = focusedTab.fileId.lastIndexOf("/");
-      if (slash >= 0) return focusedTab.fileId.slice(0, slash);
-      // slashless: a root-marker file ("lib:x.pdf") homes to its marker ("lib:");
-      // a bare corpus-root file keeps its own id (matches no destination — quiet)
-      const colon = focusedTab.fileId.indexOf(":");
-      return colon > 0 ? focusedTab.fileId.slice(0, colon + 1) : focusedTab.fileId;
-    }
-    if (focusedTab.surfaceKind === "chat") return "chats";
-    return null; // activity + future meta surfaces
-  }, [focusedTab, noteIndex]);
-  const destSelected = (id: string) =>
-    selectedFolderId === id && (focusedHome === null || destContains(id, focusedHome));
-  const renamingBoardId = useUiStore((s) => s.renamingBoardId);
-  const setRenamingBoardId = useUiStore((s) => s.setRenamingBoardId);
   // failed row-menu actions (file-to-brain, board rename) land here — the menu
   // that launched them is gone by the time they fail (#11, audit 2026-07)
   const rowActionError = useUiStore((s) => s.rowActionError);
@@ -690,31 +412,7 @@ export function Sidebar() {
   // search covers it; `filter` stays empty so `matches()` passes every row.
   const filter = "";
 
-  // — inline nested new-folder row: when set, an <input> renders under this
-  // parent id; null = not creating. Enter (or clicking away) commits a non-empty
-  // name — Finder/Apple Notes commit on blur, not discard; Esc/empty cancels
-  // (Seth, 2026-06-24). —
-  const [newFolderParent, setNewFolderParent] = useState<string | null>(null);
-  const [newFolderName, setNewFolderName] = useState("");
-  // Enter and Esc both unmount the input, which fires a blur — this ref tells the
-  // blur handler that the keystroke already settled it, so it doesn't re-commit
-  // (a double-create on Enter) or override an Esc-cancel.
-  const newFolderHandled = useRef(false);
-
-  // — lifecycle mutations (Seth, 2026-06-13): wired once here, the .mutate fns
-  // flow down to every compact row's hover slot AND the destination dropzones.
-  // moveNote handles the origin rule, so dropping on Archive/Trash archives or
-  // trashes and dropping on a normal folder moves. —
-  const archiveNote = useArchiveNote();
-  const trashNote = useTrashNote();
   const trashItems = useTrashItems();
-  const restoreNote = useRestoreNote();
-  const rowActions: RowActions = {
-    archive: (id) => archiveNote.mutate(id),
-    trash: (id) => trashNote.mutate(id),
-    restore: (id) => restoreNote.mutate(id),
-    addToMain: (id) => setMainTree(addNoteToMain(mainManifest.tree, id), liveIds),
-  };
 
   // — Main folder rename + name-first create (#16, audit 2026-07): the ⊕ used to
   //   mint a permanent "New folder 2" with no rename anywhere. renamingMainId
@@ -926,9 +624,9 @@ export function Sidebar() {
     // the one Seth curates by hand); MUST mirror mainRovingRows below
     const childNotes = mainProjection.notes
       .filter((n) => n.folderId === parentId && matches(n))
-      // pinned notes FLOAT above the hand-arranged order (Seth, 2026-07-09:
-      // "pin should float") — the manifest itself is never reordered
-      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || a.mainOrder - b.mainOrder);
+      // pinned float above hand-arranged order — the ONE comparator, shared
+      // with mainRovingRows so j/k always mirrors the rendered order
+      .sort(mainRowSort);
     const dropCls = (rowId: string) => (mainDrop?.id === rowId ? ` mdrop-${mainDrop.pos}` : "");
     // Star = "quick access": pins a Main note into the capped set the ⌥ Quick
     // window cycles (Seth, 2026-07-01 — "anything starred opens with my hotkey").
@@ -1194,9 +892,6 @@ export function Sidebar() {
   const matches = (note: NoteSummary): boolean =>
     !q || note.title.toLowerCase().includes(q) || note.snippet.toLowerCase().includes(q);
 
-  const openRow = (id: string) => (newTab: boolean) => openNote(id, { newTab });
-  const openBoardRow = (id: string) => (newTab: boolean) => openCanvas(id, { newTab });
-
   // an item is a board when its corpus walk tagged it kind:"board"; missing kind
   // (old data, serde default) reads as a note — so this split is back-compat.
   const isBoard = (n: NoteSummary): boolean => n.kind === "board";
@@ -1213,161 +908,6 @@ export function Sidebar() {
     if (isBoard(n)) boardIds.add(n.id);
     else if (isFile(n)) fileIds.add(n.id);
   }
-
-  // —— compact rows for one folder id (own notes + own boards), filtered ——
-  // `rp` is the roving rowProps factory (passed in so this helper can run before
-  // useRovingList is even declared — React calls it during render either way).
-  // `level` is the row's tree depth (dest-direct notes = 1); ~16px per level so
-  // a row's icon lands under its folder's icon (Seth, 2026-06-15). Notes render
-  // first, then boards — both in the same indented column (Seth, 2026-06-24).
-  const compactRows = (
-    notes: NoteSummary[],
-    folderId: string,
-    rp: ReturnType<typeof useRovingList>["rowProps"],
-    level: number,
-  ): ReactNode => {
-    const own = notes.filter((n) => n.folderId === folderId && matches(n));
-    const parentFolderName = folders.find((folder) => folder.id === folderId)?.name;
-    return (
-      <>
-        {own
-          .filter((n) => !isBoard(n))
-          .map((note) => {
-            const displayTitle = noteDisplayTitle(note.title, parentFolderName) || "Empty note";
-            return (
-              <CompactNoteRow
-                key={note.id}
-                note={note}
-                displayTitle={displayTitle}
-                selected={note.id === focusedItemId}
-                padLeft={28 + level * 16}
-                onOpen={
-                  isFile(note)
-                    ? (newTab) => usePanesStore.getState().openFile(note.id, { newTab })
-                    : openRow(note.id)
-                }
-                actions={rowActions}
-                onBeginMainDrag={(e) => startMainDrag(e, note.id, "add", displayTitle)}
-                mainDragRef={crossDragRef}
-                rowProps={rp({ id: note.id, kind: "note" })}
-                onContextMenu={(e) => openNoteMenu(e, note)}
-              />
-            );
-          })}
-        {own.filter(isBoard).map((board) => (
-          <CompactBoardRow
-            key={board.id}
-            board={board}
-            selected={board.id === focusedItemId}
-            padLeft={28 + level * 16}
-            onOpen={openBoardRow(board.id)}
-            renaming={renamingBoardId === board.id}
-            onCommitRename={(name) => void commitBoardRename(board.id, name)}
-            onCancelRename={() => setRenamingBoardId(null)}
-            rowProps={rp({ id: board.id, kind: "note" })}
-            onContextMenu={(e) => openNoteMenu(e, board)}
-          />
-        ))}
-      </>
-    );
-  };
-
-  // hide memex plumbing folders ("_templates", "_inbox", …): they're how the
-  // AI stages/templates notes, never something the user files into (2026-06-26).
-  // ONE predicate for the JSX tree AND the roving list — subtreeRows missing it
-  // put phantom rows in the j/k order that wedged the cursor (#45, audit 2026-07).
-  const isPlumbingFolder = (folder: { id: string; name: string }): boolean =>
-    folder.id.startsWith("vault:") && folder.name.startsWith("_");
-
-  // —— recursive user-folder subtree under a destination (like FoldersRail) ——
-  const renderFolderTree = (
-    parentId: string,
-    destNotes: NoteSummary[],
-    depth: number,
-    rp: ReturnType<typeof useRovingList>["rowProps"],
-  ): ReactNode =>
-    childrenOf(parentId)
-      .filter((folder) => !isPlumbingFolder(folder))
-      .map((folder) => {
-        const open = expandedDests[folder.id] ?? false;
-        const selected = destSelected(folder.id);
-        // the memex "wiki" is the AI's filing structure — surface it as "Knowledge"
-        // with a plain-language note that the AI organizes it (transparency without
-        // the wiki jargon the average user wouldn't know what to do with)
-        const isVaultWiki = folder.id === "vault:wiki";
-        // a Brain area (wiki/<area> in the corpus) reads with a capitalized label —
-        // "people" → "People", "projects" → "Projects" (Seth, 2026-06-30)
-        const isWikiArea = folder.id.startsWith("wiki/") && folder.parentId === "wiki";
-        const label = isVaultWiki
-          ? "Knowledge"
-          : isWikiArea
-            ? folder.name.charAt(0).toUpperCase() + folder.name.slice(1)
-            : folder.name;
-        const hint = isVaultWiki
-          ? "Organized by AI so anything you save here stays findable — your folders are how you see your notes; this is how the AI files them underneath."
-          : undefined;
-        return (
-          <div key={folder.id}>
-            <button
-              type="button"
-              className={`frow child${selected ? " sel" : ""}`}
-              style={{ paddingLeft: 10 + (depth + 1) * 16 }}
-              onClick={() => {
-                toggleDestExpanded(folder.id);
-                setSelectedFolderId(folder.id);
-                setContentView("panes");
-              }}
-              {...rp({ id: folder.id, kind: "folder" })}
-            >
-              <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
-                <ChevronRight size={10} />
-              </span>
-              <FolderGlyph size={14} />
-              <span className="fname" title={hint}>
-                {label}
-              </span>
-              {!isVault(folder.id) && sectionAddBtn(folder.id)}
-              <span className="count">{countFor(folder, destNotes)}</span>
-            </button>
-            {open && (
-              <>
-                {compactRows(destNotes, folder.id, rp, depth + 2)}
-                {!isVault(folder.id) && newFolderRow(folder.id, 28 + (depth + 2) * 16)}
-                {renderFolderTree(folder.id, destNotes, depth + 1, rp)}
-              </>
-            )}
-          </div>
-        );
-      });
-
-  // —— the flat, in-render-order list the roving j/k cursor walks (Seth,
-  // 2026-06-13). One pure pass that mirrors the JSX traversal exactly: the two
-  // smart rows, then each destination row, and — when a dest/folder is expanded
-  // — its filtered compact note rows followed by its child folders, recursively.
-  // Build it from the SAME inputs the render uses (expandedDests + the filter)
-  // so the cursor never points at a row that isn't on screen. ——
-  // notes first, then boards — MUST mirror compactRows' render order exactly, or
-  // the j/k cursor points at an off-screen row (boards ride kind:"note" here;
-  // onOpen/onOpenMenu disambiguate via the boardIds Set).
-  const visibleNoteRows = (notes: NoteSummary[], folderId: string): RovingRow[] => {
-    const own = notes.filter((n) => n.folderId === folderId && matches(n));
-    return [...own.filter((n) => !isBoard(n)), ...own.filter(isBoard)].map((n) => ({
-      id: n.id,
-      kind: "note" as const,
-    }));
-  };
-
-  const subtreeRows = (parentId: string, destNotes: NoteSummary[]): RovingRow[] =>
-    childrenOf(parentId)
-      // MUST mirror renderFolderTree's plumbing filter — a folder the JSX hides
-      // must never become a roving row (#45: j/k wedged on the phantom)
-      .filter((folder) => !isPlumbingFolder(folder))
-      .flatMap((folder) => {
-        const open = expandedDests[folder.id] ?? false;
-        const row: RovingRow = { id: folder.id, kind: "folder" };
-        if (!open) return [row];
-        return [row, ...visibleNoteRows(destNotes, folder.id), ...subtreeRows(folder.id, destNotes)];
-      });
 
   // the three top-level sections' open state (Seth's IA, 2026-06-26). Default
   // open so a fresh window shows the full tree; persisted via expandedDests.
@@ -1391,12 +931,16 @@ export function Sidebar() {
   // SAME ids as their Brain twins, so their roving ids carry a "main>" prefix
   // (folders already carry "main:") — no id collision, j/k walks both copies.
   const MAIN_ROW_PREFIX = "main>";
+  // roving ids for the two ACTION rows (open a surface, never a selection) —
+  // distinct sentinels so they can't collide with folder/dest ids
+  const CAPTURES_ROW = "row:captures";
+  const ACTIVITY_ROW = "row:activity";
   const mainRovingRows = (parentId: string): RovingRow[] => [
     // filtered by matches() exactly like renderMainTree — the roving cursor
     // must never point at a row the live filter hid
     ...mainProjection.notes
       .filter((n) => n.folderId === parentId && matches(n))
-      .sort((a, b) => a.mainOrder - b.mainOrder)
+      .sort(mainRowSort) // MUST mirror renderMainTree — pinned float included
       .map((n) => ({ id: `${MAIN_ROW_PREFIX}${n.id}`, kind: "note" as const })),
     ...mainProjection.folders
       .filter((f) => f.parentId === parentId)
@@ -1412,7 +956,10 @@ export function Sidebar() {
   // are plain buttons, outside the listbox.
   const rows: RovingRow[] = notesSecOpen
     ? [
+        // MUST mirror the rendered order exactly — a skipped visual row makes
+        // the cursor teleport (Captures/Activity were missing; P0 2026-07-28)
         { id: ALL_NOTES, kind: "smart" },
+        { id: CAPTURES_ROW, kind: "smart" },
         { id: RECENT, kind: "smart" },
         { id: TASKS, kind: "smart" },
         // Main — the user's hand-arranged rows, in manifest order (collapsible
@@ -1422,6 +969,7 @@ export function Sidebar() {
         // the right — no inline subtrees to walk.
         ...(hasBrain ? [{ id: "Brain", kind: "folder" } as RovingRow] : []),
         ...visibleDestRows.map(({ id }) => ({ id, kind: "folder" }) as RovingRow),
+        { id: ACTIVITY_ROW, kind: "smart" },
       ]
     : [];
 
@@ -1453,6 +1001,15 @@ export function Sidebar() {
       // not toggleDestExpanded's closed default (first press must collapse)
       if (row.id.startsWith(MAIN_ROOT)) {
         setDestExpanded(row.id, !(expandedDests[row.id] ?? true));
+        return;
+      }
+      // the two action rows: they open their surface, never become a selection
+      if (row.id === CAPTURES_ROW) {
+        dispatch("board.open");
+        return;
+      }
+      if (row.id === ACTIVITY_ROW) {
+        usePanesStore.getState().openActivity();
         return;
       }
       setSelectedFolderId(row.id);
@@ -1590,155 +1147,6 @@ export function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealNonce]);
 
-  // the create target: the selected folder, falling back to Inbox when a smart
-  // row (All notes / Recent), a hidden root (Archive / Trash / Board), OR the
-  // external read-mostly Vault is selected — so freshly created content never
-  // starts life inside a sink, the capture board, or the Vault (mirrors
-  // newNote() in actions, plus the lifecycle + read-only-vault guards).
-  const resolvedParent = (): string =>
-    selectedFolderId === ALL_NOTES ||
-    selectedFolderId === RECENT ||
-    isHidden(selectedFolderId) ||
-    isVault(selectedFolderId)
-      ? DEST.inbox
-      : selectedFolderId;
-
-  // Commit an inline board rename (right-click a board row, or naming a fresh
-  // one): rename the .excalidraw, retarget any open canvas tab to the new id,
-  // refresh. Enter commits; Esc / click-away cancels (Seth, 2026-06-26).
-  const commitBoardRename = async (boardId: string, raw: string) => {
-    setRenamingBoardId(null);
-    const name = raw.trim();
-    if (!name) return;
-    try {
-      setRowActionError(null);
-      const meta = await corpusRenameBoard(boardId, name);
-      retargetBoard(boardId, meta.id);
-      renameMainRef(boardId, meta.id); // the Main slot follows the new path id (#33)
-      await invalidateNotes();
-    } catch (e) {
-      // board is read-only or gone — leave it as is, and SAY why: the inline
-      // sidebar error note, not a console.warn (#11, audit 2026-07)
-      setRowActionError(`Couldn’t rename the board — ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
-
-  // "+" → New folder: open the inline input row under a parent (and expand it so
-  // the input is on screen). The header "+" passes nothing → the resolved
-  // (selected) folder; a per-section "+" passes that section id directly, so you
-  // can drop a folder inside any section in one click ("folders in folders").
-  const startNewFolder = (parent?: string) => {
-    const target = parent ?? resolvedParent();
-    setNewFolderName("");
-    setNewFolderParent(target);
-    setDestExpanded(target, true);
-  };
-
-  const cancelNewFolder = () => {
-    setNewFolderParent(null);
-    setNewFolderName("");
-  };
-
-  // Enter commits an inline new folder; empty name or Esc cancels. Creates via
-  // the service directly (the only nested-folder path) then refreshes + expands
-  // and selects the parent so the new child is visible.
-  const commitNewFolder = async () => {
-    const parent = newFolderParent;
-    const name = newFolderName.trim();
-    if (!parent || !name) {
-      cancelNewFolder();
-      return;
-    }
-    await notesService.createFolder(name, parent);
-    await invalidateFolders();
-    setDestExpanded(parent, true);
-    setSelectedFolderId(parent);
-    cancelNewFolder();
-  };
-
-  const onNewFolderKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      event.stopPropagation();
-      newFolderHandled.current = true; // the ensuing blur must not re-commit
-      void commitNewFolder();
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      newFolderHandled.current = true; // the ensuing blur must not override cancel
-      cancelNewFolder();
-    }
-  };
-
-  // clicking away commits a non-empty name (Finder/Apple Notes behaviour), UNLESS
-  // a keystroke (Enter/Esc) already handled it — that keystroke unmounts the input
-  // and fires this blur, which would otherwise double-create or undo a cancel.
-  const onNewFolderBlur = () => {
-    if (newFolderHandled.current) {
-      newFolderHandled.current = false;
-      return;
-    }
-    void commitNewFolder();
-  };
-
-  // the inline new-folder input row, rendered inside the parent's expanded
-  // subtree (depth-scaled to sit under its siblings). Shown only when
-  // newFolderParent === this id.
-  const newFolderRow = (parentId: string, padLeft: number): ReactNode =>
-    newFolderParent === parentId ? (
-      <div className="sb-newfolder" style={{ paddingLeft: padLeft }}>
-        <FolderGlyph size={14} />
-        <input
-          autoFocus
-          type="text"
-          placeholder="Folder name…"
-          value={newFolderName}
-          onChange={(e) => setNewFolderName(e.target.value)}
-          onKeyDown={onNewFolderKeyDown}
-          onBlur={onNewFolderBlur}
-          aria-label="New folder name"
-        />
-      </div>
-    ) : null;
-
-  // per-destination hover icons (Seth #7/#13, 2026-07-03): VS Code drops a
-  // new-file + new-folder pair on a folder row's hover — content lands in THAT
-  // exact folder, no target ambiguity. role=button spans (the row itself is a
-  // <button>, so a nested <button> would be invalid markup — the same trick the
-  // note rows use for archive/trash). New note routes through notes.new after
-  // selecting the folder, so it inherits every routing + Main-filing rule.
-  const sectionAddBtn = (parentId: string): ReactNode => (
-    <>
-      <span
-        role="button"
-        tabIndex={0}
-        className="frow-add"
-        aria-label="New note here"
-        title="New note here"
-        onClick={(event) => {
-          event.stopPropagation();
-          setSelectedFolderId(parentId);
-          dispatch("notes.new");
-        }}
-      >
-        <NewFileGlyph size={13} />
-      </span>
-      <span
-        role="button"
-        tabIndex={0}
-        className="frow-add"
-        aria-label="New folder inside"
-        title="New folder inside"
-        onClick={(event) => {
-          event.stopPropagation();
-          startNewFolder(parentId);
-        }}
-      >
-        <NewFolderGlyph size={13} />
-      </span>
-    </>
-  );
-
   // — Chat openers: chats open as PANES now (a pane holds a chat OR a note, side
   //   by side, multiple at once), so "New chat"/a row opens a chat pane; "All
   //   chats" opens a searchable content view (the twin of All notes). The open
@@ -1830,7 +1238,17 @@ export function Sidebar() {
           className="icobtn"
           aria-label={sidebarMode === "breve" ? "New folder is unavailable in Breve" : "New folder"}
           disabled={sidebarMode === "breve"}
-          onClick={() => startNewFolder()}
+          onClick={() => {
+            // the System browser open? create a real folder at its cwd; else a
+            // Main (virtual) folder — the inline notes-tree input died with the
+            // 2026-07-26 System fold and left this button a silent no-op (P0)
+            if (contentView === "system") {
+              requestSystemFolder();
+            } else {
+              setDestExpanded(SEC_MAIN, true);
+              setMainNewFolder(true);
+            }
+          }}
         >
           <NewFolderGlyph size={16} />
           <span className="tip" aria-hidden="true">
@@ -2054,6 +1472,7 @@ export function Sidebar() {
                 type="button"
                 className={`frow${contentView === "board" ? " sel" : ""}`}
                 onClick={() => dispatch("board.open")}
+                {...rowProps({ id: CAPTURES_ROW, kind: "smart" })}
               >
                 <CaptureBoardGlyph size={14.5} />
                 <span className="fname">Captures</span>
@@ -2301,8 +1720,9 @@ export function Sidebar() {
                       </>
                     ) : (
                       <>
-                        The notes you reach for, arranged your way. Add one with the <b>⊕</b> on a note row
-                        {hasBrain ? " (or drag it here from the Library)" : ""} — then <b>★</b> your top{" "}
+                        The notes you reach for, arranged your way. Right-click a note and choose{" "}
+                        <b>Add to Main</b>
+                        {hasBrain ? ", or drag one here from the Library" : ""} — then <b>★</b> your top{" "}
                         {QUICK_MAX} for Quick access (the ⌥ Quick window).
                       </>
                     )}
@@ -2365,6 +1785,7 @@ export function Sidebar() {
                     ? "See and undo what the Librarian has done"
                     : "History of the Librarian's past actions and secure-note repairs"
                 }
+                {...rowProps({ id: ACTIVITY_ROW, kind: "smart" })}
               >
                 <ClockGlyph size={14} />
                 <span className="fname">Activity</span>

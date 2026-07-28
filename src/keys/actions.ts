@@ -369,6 +369,14 @@ export function registerDefaultActions(): void {
       if (notesWorkspaceActive()) usePanesStore.getState().cycleTab();
     },
   });
+  registerAction({
+    id: "tabs.cyclePrev",
+    title: "Previous tab",
+    defaultChord: "Ctrl+Shift+Tab",
+    run: () => {
+      if (notesWorkspaceActive()) usePanesStore.getState().cycleTab(-1);
+    },
+  });
   for (let n = 1; n <= 8; n++) {
     registerAction({
       id: `tabs.jump${n}`,

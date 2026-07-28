@@ -5,7 +5,7 @@
 // The sidebar's "m" key opens the SAME menu with a synthetic anchor + a
 // returnFocus that hands the cursor back to the row (the RowMenu unification).
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   corpusFileStat,
   corpusFrontmatter,
@@ -22,7 +22,10 @@ import {
 import { discardBlankNote } from "../documents/draftComposition";
 import { isEmptyNote } from "../services/mainDismiss";
 import { markNoteDraftChanged } from "../services/noteDrafts";
-import { DEST, isSink } from "../services/destinations";
+import { DEST, isHidden, isSink, isStorageLane } from "../services/destinations";
+import { fileNoteToArea } from "../services/brainFiling";
+import { notesService } from "../services/notes";
+import { useFolders } from "../services/hooks";
 import { invalidateNotes, useArchiveNote, useRestoreNote, useTrashNote } from "../services/hooks";
 import { useMainGcIds } from "../services/hooks";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
@@ -75,6 +78,38 @@ export function useNoteMenu() {
   // GC of it happened in the same call. undefined until every listing loaded
   // (a still-loading or errored vault must not read as "gone" — skip the GC).
   const liveIds = useMainGcIds();
+  const brainOn = useUiStore((s) => s.brainEnabled);
+  // "Move to…" targets: Library areas (top-level wiki/<area>, internal lanes
+  // excluded) then plain user folders — never the sinks, the Assets lane, the
+  // vault marker trees, or chats.
+  const foldersData = useFolders().data;
+  const moveTargets = useMemo(() => {
+    const all = foldersData ?? [];
+    const areas = all
+      .filter((f) => /^wiki\/[^/_][^/]*$/.test(f.id))
+      .map((f) => ({ label: `Library › ${f.name}`, folderId: f.id, area: f.id.slice("wiki/".length) }));
+    const plain = all
+      .filter(
+        (f) =>
+          f.id !== "wiki" &&
+          !f.id.startsWith("wiki/") &&
+          !f.id.startsWith("vault:") &&
+          !f.id.startsWith("chats") &&
+          f.id !== DEST.secure &&
+          !isHidden(f.id) &&
+          !isStorageLane(f.id) &&
+          !/^storage(\/|$)/.test(f.id),
+      )
+      .map((f) => ({
+        // fs-mode ids ARE paths and read well; a legacy ulid id falls back to
+        // the folder's display name
+        label: f.id.includes("/") || f.id === f.name ? f.id.split("/").join(" › ") : f.name,
+        folderId: f.id,
+        area: null as string | null,
+      }));
+    const byLabel = (a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label);
+    return [...areas.sort(byLabel), ...plain.sort(byLabel)];
+  }, [foldersData]);
   const archive = useArchiveNote();
   const trash = useTrashNote();
   const restore = useRestoreNote();
@@ -278,6 +313,41 @@ export function useNoteMenu() {
           },
         });
         items.push({ kind: "sep" as const });
+        // "Move to…" — manual filing, restored (P0 sweep 2026-07-28: the fold
+        // removed every by-hand move; a raw vault had NO way to leave _inbox).
+        // Library areas route through the Filer gate when the Librarian is on
+        // (journaled + undoable in Activity); everything else is a plain move.
+        // The write gates stay the authority — refusals surface right here.
+        if (!isBoard && !isFile && moveTargets.length > 0) {
+          const here = noteDiskFolder(note);
+          items.push({
+            kind: "drill" as const,
+            label: "Move to…",
+            items: moveTargets.map((t) => ({
+              kind: "action" as const,
+              label: t.label,
+              checked: t.folderId === here,
+              checkedMark: "highlight" as const,
+              disabled: t.folderId === here,
+              onClick: () => {
+                useUiStore.getState().setRowActionError(null);
+                // the Filer lane (journal + undo) needs the Librarian AND the
+                // native shell; the browser twin moves plainly, like a raw vault
+                const run =
+                  t.area && brainOn && isTauri()
+                    ? fileNoteToArea(note.id, t.area)
+                    : notesService.moveNote(note.id, t.folderId).then(() => invalidateNotes());
+                void run.catch((err: unknown) =>
+                  useUiStore
+                    .getState()
+                    .setRowActionError(
+                      `Couldn’t move the note — ${err instanceof Error ? err.message : String(err)}`,
+                    ),
+                );
+              },
+            })),
+          });
+        }
         if (viewsManifest.views.length > 0) {
           items.push({
             kind: "drill" as const,
@@ -458,6 +528,8 @@ export function useNoteMenu() {
       setViewsManifest,
       viewsManifest,
       activeView,
+      moveTargets,
+      brainOn,
     ],
   );
 }

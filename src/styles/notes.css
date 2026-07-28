@@ -1228,19 +1228,11 @@
 }
 .tabscroll-wrap::before {
   left: 0;
-  background: linear-gradient(
-    90deg,
-    var(--ground),
-    color-mix(in srgb, var(--ground), transparent 100%)
-  );
+  background: linear-gradient(90deg, var(--ground), color-mix(in srgb, var(--ground), transparent 100%));
 }
 .tabscroll-wrap::after {
   right: 0;
-  background: linear-gradient(
-    270deg,
-    var(--ground),
-    color-mix(in srgb, var(--ground), transparent 100%)
-  );
+  background: linear-gradient(270deg, var(--ground), color-mix(in srgb, var(--ground), transparent 100%));
 }
 .tabscroll-wrap[data-fade-left="true"]::before {
   opacity: 1;
@@ -1534,21 +1526,6 @@
 
 /* — added external folders (Seth, 2026-06-27): the "Add a folder…" row + the
    hover × that forgets a folder (files kept). Mirrors the frow-add hover slot. — */
-.sb-addfolder .fname,
-.sb-addfolder svg {
-  color: var(--text-muted);
-}
-/* same subtlety pass (Seth, 2026-07-01): the trailing "Add a folder…" row now
-   fades in while the pointer is over the Notes tree (or on keyboard focus)
-   instead of sitting there always-on — opacity keeps it in the tab order. */
-.sb-addfolder {
-  opacity: 0;
-  transition: opacity var(--motion-exit) var(--motion-ease);
-}
-.sb-notes-tree:hover .sb-addfolder,
-.sb-addfolder:focus-visible {
-  opacity: 1;
-}
 .sb-root-x {
   display: none;
   margin-left: auto;

@@ -1,7 +1,7 @@
 /** Composition root for item creation. Product rules stay in model/workflow. */
 import { invalidateMemex } from "../memex/useMemex";
 import { createRoutedNote } from "../services/createNote";
-import { DEST, isHidden, isVault } from "../services/destinations";
+import { DEST, isHidden, isStorageLane, isVault } from "../services/destinations";
 import { invalidateNotes } from "../services/hooks";
 import { MAIN_ROOT, addNoteToMainAt, mainFolderIds, mainParentOfNote } from "../services/mainTree";
 import { inboxFolderId } from "../services/notes";
@@ -49,6 +49,7 @@ function resolvedPhysicalFolder(): string {
     selected === RECENT ||
     selected.startsWith(MAIN_ROOT) ||
     isHidden(selected) ||
+    isStorageLane(selected) || // Assets is the managed binary lane — nothing is born there
     isVault(selected)
     ? DEST.inbox
     : selected;

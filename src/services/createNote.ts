@@ -6,7 +6,7 @@
 
 import { CORPUS_INSTANCE_ID, activeInstance, isWritable } from "../memex/config";
 import { loadConfig, writeNote } from "../memex/service";
-import { VAULT_MARKER, isHidden, isVault, isWikiPath } from "./destinations";
+import { VAULT_MARKER, isHidden, isStorageLane, isVault, isWikiPath } from "./destinations";
 import { notesService } from "./notes";
 import { creationIsSecure, isSecureNotesFolder } from "../security/secureNotes";
 
@@ -41,14 +41,20 @@ export function routeDecision(
   }
   const brainView = sel === BRAIN_VIEW_ID || isWikiPath(sel);
   const explicitLocal =
-    !isSmart && sel !== "" && !isVault(sel) && !isHidden(sel) && !(memexWritable && brainView);
+    !isSmart &&
+    sel !== "" &&
+    !isVault(sel) &&
+    !isHidden(sel) &&
+    !isStorageLane(sel) &&
+    !(memexWritable && brainView);
   if (!explicitLocal && memexWritable) {
     const sub = isVault(sel) ? sel.slice(VAULT_MARKER.length) : "";
     const shelf =
       sub && !sub.startsWith("wiki") && sub !== "chats" && !sub.startsWith("chats/") ? [sub] : undefined;
     return shelf ? { kind: "memex", shelf } : { kind: "memex" };
   }
-  const folder = isSmart || isVault(sel) || isHidden(sel) || sel === "" ? localFallback : sel;
+  const folder =
+    isSmart || isVault(sel) || isHidden(sel) || isStorageLane(sel) || sel === "" ? localFallback : sel;
   return { kind: "local", folder };
 }
 

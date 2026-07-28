@@ -10,6 +10,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Manual filing is back.** The System fold had quietly removed every by-hand
+  move: right-click a note → **Move to…** now refiles it into a Library area
+  (through the Librarian's journaled, undoable lane when it's on) or any plain
+  folder — which also un-strands raw vaults, where captures had no way to
+  leave the intake folder at all.
+- **"New folder" works again.** The toolbar button had been a silent no-op —
+  and the last folder-creation UI — since the System fold. The Library browser
+  now has its own **New folder here** (the toolbar button routes to it while a
+  browser is open; elsewhere it starts a Main folder). Vault rules still
+  apply: a memex's curated tree politely refuses, plain vaults create anywhere.
+- **A note can no longer be born in Assets.** Browsing Assets then ⌘N used to
+  drop a markdown note inside the managed `storage/` lane; creation now routes
+  to intake/Inbox like every other non-home selection.
+- **Activity opens beside your work, not over it** — it was the one surface
+  that replaced the tab you were on instead of appending.
+- **The sidebar is fully keyboard-walkable again**: Captures and Activity
+  joined the j/k order (the cursor used to teleport past them), and pinned
+  Main notes no longer desync the keyboard order from the visual one.
+- **⌃⇧Tab cycles tabs backward**, and the tab menu gained **Close tabs to the
+  right**.
+- **Shrinking the window respects the pane floors** — the sidebar now
+  auto-collapses on resize when splits need the room (it only checked at
+  split time before).
+- Main's empty-state copy no longer references the removed ⊕ affordance, and
+  ~700 lines of unreachable sidebar code left behind by the System fold are
+  gone (the dead thicket that hid these regressions).
+
 ## [0.39.0] - 2026-07-27
 
 

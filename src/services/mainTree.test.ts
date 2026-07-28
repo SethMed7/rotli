@@ -17,6 +17,7 @@ import {
   removeFromMain,
   renameFolderInMain,
   renameNoteRef,
+  mainRowSort,
 } from "./mainTree";
 
 const note = (id: string, folderId = "wiki/projects"): NoteSummary =>
@@ -342,5 +343,19 @@ describe("mainItemIdsInFolder — virtual-folder lifecycle scope", () => {
   test("missing and empty folders have no durable contents", () => {
     expect(mainItemIdsInFolder(tree, "main:Missing")).toEqual([]);
     expect(mainItemIdsInFolder([{ folder: "Empty", children: [] }], "main:Empty")).toEqual([]);
+  });
+});
+
+// P0 sweep 2026-07-28: the roving j/k order MUST mirror the rendered order —
+// renderMainTree floats pinned notes, the keyboard walk didn't, so the cursor
+// visibly teleported whenever a Main note was pinned. One comparator, two users.
+describe("mainRowSort", () => {
+  test("pinned notes float first, then the hand-arranged order", () => {
+    const rows = [
+      { pinned: false, mainOrder: 0 },
+      { pinned: true, mainOrder: 2 },
+      { pinned: false, mainOrder: 1 },
+    ];
+    expect([...rows].sort(mainRowSort).map((r) => r.mainOrder)).toEqual([2, 0, 1]);
   });
 });

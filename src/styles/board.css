@@ -204,6 +204,35 @@
   color: var(--text-muted);
 }
 
+/* the New-folder-here input row + its quiet error line */
+.fdr-newbtn {
+  margin-left: 2px;
+}
+.fdr-newfolder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 24px 0;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  border-radius: var(--r-control);
+}
+.fdr-newfolder input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+.fdr-error {
+  margin: 6px 24px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* the columned list — Finder's list view */
 .fdr-list {
   padding: 0 8px 24px;

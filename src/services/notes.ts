@@ -48,7 +48,15 @@ export class InMemoryNotesService implements NotesService {
   }
 
   async createFolder(name: string, parentId: string | null = null): Promise<Folder> {
-    const folder: Folder = { id: ulid(), name, parentId };
+    // a RESERVED parent (id === its path, seedReserved) gets a path-style
+    // child id, mirroring fs mode where folderId === the relative path — the
+    // System browser's folder seeding depends on that grammar
+    const parent = parentId ? this.folders.get(parentId) : null;
+    if (parentId && !parent) throw new Error(`no folder ${parentId}`);
+    const pathStyle = parent && (parent.id.includes("/") || parent.id === parent.name);
+    const folder: Folder = pathStyle
+      ? { id: `${parentId}/${name}`, name, parentId }
+      : { id: ulid(), name, parentId };
     this.folders.set(folder.id, folder);
     return folder;
   }

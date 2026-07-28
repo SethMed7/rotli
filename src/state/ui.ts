@@ -207,6 +207,10 @@ interface UiState {
   /** Folders-rail selection (window-level). */
   selectedFolderId: string;
   setSelectedFolderId: (id: string) => void;
+  /** Bumped by the sidebar's New-folder button while a System browser is open —
+   * the browser answers by opening its create-folder input at its cwd. */
+  systemFolderNonce: number;
+  requestSystemFolder: () => void;
 
   /** null is Main, the all-items reference view. A string is the exact unique
    * name of the active additional view from `.rotli/views.json`. */
@@ -493,6 +497,8 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   selectedFolderId: ALL_NOTES,
   setSelectedFolderId: (id) => set({ selectedFolderId: id }),
+  systemFolderNonce: 0,
+  requestSystemFolder: () => set((s) => ({ systemFolderNonce: s.systemFolderNonce + 1 })),
   activeView: null,
   setActiveView: (name) => set({ activeView: name, selectedFolderId: "main:" }),
 

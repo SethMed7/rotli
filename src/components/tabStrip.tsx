@@ -17,7 +17,11 @@
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBoardRename } from "../services/boardRename";
 import { useChatRename } from "../services/chatRename";
-import { closeOtherTabsWithDraftCleanup, closeTabWithDraftCleanup } from "../documents/draftComposition";
+import {
+  closeOtherTabsWithDraftCleanup,
+  closeTabWithDraftCleanup,
+  closeTabsRightWithDraftCleanup,
+} from "../documents/draftComposition";
 import { fileName } from "../lib/fileKind";
 import { InlineRenameInput } from "./inlineRenameInput";
 import { startTabDrag } from "../lib/tabDrag";
@@ -178,6 +182,12 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
       label: "Close other tabs",
       disabled: pane.tabs.length <= 1,
       onClick: () => closeOtherTabsWithDraftCleanup(pane.id, tab.id),
+    });
+    items.push({
+      kind: "action",
+      label: "Close tabs to the right",
+      disabled: pane.tabs[pane.tabs.length - 1]?.id === tab.id,
+      onClick: () => closeTabsRightWithDraftCleanup(pane.id, tab.id),
     });
     useContextMenu.getState().open(event.clientX, event.clientY, items);
   };

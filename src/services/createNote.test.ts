@@ -10,12 +10,20 @@ const FALLBACK = "Inbox";
 describe("routeDecision (memex-vs-local)", () => {
   test("no writable memex ⇒ always local", () => {
     expect(routeDecision("All notes", true, false, FALLBACK)).toEqual({ kind: "local", folder: FALLBACK });
-    expect(routeDecision("Storage/Work", false, false, FALLBACK)).toEqual({
-      kind: "local",
-      folder: "Storage/Work",
-    });
     // a vault selection with no writable memex still can't write the memex ⇒ local inbox
     expect(routeDecision("vault:Inbox", false, false, FALLBACK)).toEqual({ kind: "local", folder: FALLBACK });
+  });
+
+  test("the Assets lane never births a note (P0 sweep 2026-07-28)", () => {
+    // Storage/** is the MANAGED BINARY lane — browsing Assets then ⌘N used to
+    // drop a markdown note inside it. It now routes like a hidden root: memex
+    // intake when writable, the local fallback otherwise.
+    expect(routeDecision("Storage", false, false, FALLBACK)).toEqual({ kind: "local", folder: FALLBACK });
+    expect(routeDecision("Storage/Work", false, false, FALLBACK)).toEqual({
+      kind: "local",
+      folder: FALLBACK,
+    });
+    expect(routeDecision("Storage/Work", false, true, FALLBACK)).toEqual({ kind: "memex" });
   });
 
   test("writable memex + a smart row / the vault marker ⇒ memex, default shelf", () => {
@@ -52,9 +60,11 @@ describe("routeDecision (memex-vs-local)", () => {
   });
 
   test("an EXPLICIT local folder is ALWAYS respected, even with a writable memex", () => {
-    expect(routeDecision("Storage/Work", false, true, FALLBACK)).toEqual({
+    // (Storage/** stopped being an eligible example — the Assets lane never
+    // births a note; see the dedicated test above)
+    expect(routeDecision("Inbox/Clients", false, true, FALLBACK)).toEqual({
       kind: "local",
-      folder: "Storage/Work",
+      folder: "Inbox/Clients",
     });
     expect(routeDecision("Inbox", false, true, FALLBACK)).toEqual({ kind: "local", folder: "Inbox" });
   });

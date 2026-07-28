@@ -6,12 +6,19 @@
 // 5-region split-detach overlay: drop on the center to move the tab here, on
 // an edge band to carve a split. Splits/focus/tabs/drag all live in the store.
 
-import { type PointerEvent as ReactPointerEvent, type ReactNode, Suspense, lazy, useRef } from "react";
+import {
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  Suspense,
+  lazy,
+  useEffect,
+  useRef,
+} from "react";
 import { EditorSurface } from "../editor/editorSurface";
 import { ChatSurface } from "./chatSurface";
 import { ActivitySurface } from "./activitySurface";
 import { FileSurface } from "./fileSurface";
-import { activeTabOf, leaves, usePanesStore } from "../state/panes";
+import { activeTabOf, leaves, refitColumns, usePanesStore } from "../state/panes";
 import type { LeafNode, PaneNode, SplitNode } from "../types";
 import { TabStrip } from "./tabStrip";
 
@@ -150,6 +157,20 @@ function PaneView({ node }: { node: PaneNode }) {
 export function PaneTree() {
   const root = usePanesStore((s) => s.root);
   const multi = leaves(root).length > 1;
+  // the split floors are enforced at split time — a later window shrink must
+  // re-run the fit check (debounced) or flex quietly crushes every column
+  useEffect(() => {
+    let timer = 0;
+    const onResize = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(refitColumns, 150);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
   return (
     <div className={multi ? "panes multi" : "panes"}>
       <PaneView node={root} />

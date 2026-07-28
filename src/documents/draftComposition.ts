@@ -11,7 +11,7 @@ import { removeFromMain } from "../services/mainTree";
 import { claimClosedNoteDrafts } from "../services/noteDrafts";
 import { useMainStore } from "../state/main";
 import { dropNavEntry } from "../state/navHistory";
-import { findLeaf, leaves, usePanesStore } from "../state/panes";
+import { findLeaf, leaves, tabsRightOf, usePanesStore } from "../state/panes";
 import { removeQuickNote } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import type { Tab } from "../types";
@@ -115,6 +115,14 @@ export function closeOtherTabsWithDraftCleanup(paneId: string, keepTabId: string
   for (const tab of leaf.tabs) {
     if (tab.id !== keepTabId) closeTabWithDraftCleanup(paneId, tab.id);
   }
+}
+
+/** "Close tabs to the right" — trims the session tail from the anchor onward
+ * (the standard editor gesture; P0 sweep 2026-07-28). Same draft hygiene. */
+export function closeTabsRightWithDraftCleanup(paneId: string, anchorTabId: string): void {
+  const leaf = findLeaf(usePanesStore.getState().root, paneId);
+  if (!leaf) return;
+  for (const id of tabsRightOf(leaf, anchorTabId)) closeTabWithDraftCleanup(paneId, id);
 }
 
 export function closeFocusedTabWithDraftCleanup(): void {
