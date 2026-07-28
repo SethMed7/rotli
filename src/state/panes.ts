@@ -81,6 +81,18 @@ export function boardTabOpen(root: PaneNode, boardId: string): boolean {
   return leaves(root).some((l) => l.tabs.some((t) => t.surfaceKind === "canvas" && t.boardId === boardId));
 }
 
+/** An EDIT promotes the item's preview tab(s) to permanent, wherever open —
+ * "if I click and edit it should stay open" (Seth, 2026-07-28). Cheap no-op
+ * when nothing matches. */
+export function keepTabsFor(itemId: string): void {
+  const { root } = usePanesStore.getState();
+  const dirty = leaves(root).some((l) => l.tabs.some((t) => t.preview && sidebarItemId(t) === itemId));
+  if (!dirty) return;
+  usePanesStore.setState({
+    root: mapAllTabs(root, (t) => (t.preview && sidebarItemId(t) === itemId ? { ...t, preview: false } : t)),
+  });
+}
+
 /** The tab ids strictly AFTER the anchor in strip order — "Close tabs to the
  * right"'s pure answer (P0 sweep 2026-07-28). Unknown anchor → nothing falls. */
 export function tabsRightOf(leaf: LeafNode, tabId: string): string[] {
@@ -113,20 +125,33 @@ function makeLeaf(tab: Tab): LeafNode {
   return { kind: "leaf", id: ulid(), tabs: [tab], activeTabId: tab.id };
 }
 
-/** The standard editor open (Seth, 2026-07-03): a plain open ACTIVATES the
- * target's already-open tab in this pane if there is one, else APPENDS a new
- * tab — it never replaces the tab you're in. `opts.newTab` (⌘T / ⌘-click) forces
- * a fresh tab even when the target is already open. `matches` identifies an
- * existing tab for the same target; `make` mints a fresh one. */
+/** The standard editor open, PREVIEW-tab flavored (Seth, 2026-07-28: "every
+ * click shouldn't open a new tab"): a plain open ACTIVATES the target's open
+ * tab if there is one — and re-activating the PREVIEW tab's own target KEEPS
+ * it (click-again-to-keep). Otherwise the pane's one preview tab is REUSED in
+ * place, so browsing never piles up tabs; only editing or re-clicking makes a
+ * tab permanent. `opts.newTab` (⌘T / ⌘-click) always appends a permanent tab.
+ * `previewable: false` (chat/activity) keeps the old append-permanent path. */
 function placeTab(
   l: LeafNode,
   opts: { newTab?: boolean } | undefined,
   matches: (t: Tab) => boolean,
   make: () => Tab,
+  previewable = false,
 ): LeafNode {
   if (!opts?.newTab) {
     const existing = l.tabs.find(matches);
-    if (existing) return { ...l, activeTabId: existing.id };
+    if (existing) {
+      // clicking the item ALREADY showing in the preview tab = keep it
+      if (existing.preview && l.activeTabId === existing.id) {
+        return {
+          ...l,
+          tabs: l.tabs.map((t) => (t.id === existing.id ? { ...t, preview: false } : t)),
+          activeTabId: existing.id,
+        };
+      }
+      return { ...l, activeTabId: existing.id };
+    }
     // FILL the pristine startup placeholder rather than leaving a ghost tab
     // beside the note: the real (fs) app boots with one note tab whose target is
     // "" (initialNoteId), and the startup effect opens the freshest note into it.
@@ -134,8 +159,17 @@ function placeTab(
     // swallows a real note (Seth, 2026-07-03 — the pre-release review's blocker).
     const active = l.tabs.find((t) => t.id === l.activeTabId);
     if (active && active.surfaceKind === "note" && active.noteId === "") {
-      const filled = make();
+      const filled = previewable ? { ...make(), preview: true } : make();
       return { ...l, tabs: l.tabs.map((t) => (t.id === active.id ? filled : t)), activeTabId: filled.id };
+    }
+    // browsing reuses the pane's preview slot in place
+    if (previewable) {
+      const slot = l.tabs.find((t) => "preview" in t && t.preview);
+      const fresh = { ...make(), preview: true };
+      if (slot) {
+        return { ...l, tabs: l.tabs.map((t) => (t.id === slot.id ? fresh : t)), activeTabId: fresh.id };
+      }
+      return { ...l, tabs: [...l.tabs, fresh], activeTabId: fresh.id };
     }
   }
   const tab = make();
@@ -527,6 +561,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
             opts,
             (t) => t.surfaceKind === "note" && t.noteId === noteId,
             () => makeTab(noteId),
+            true,
           ),
         ),
       });
@@ -544,6 +579,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
             opts,
             (t) => t.surfaceKind === "canvas" && t.boardId === boardId,
             () => makeCanvasTab(boardId),
+            true,
           ),
         ),
       });
@@ -608,6 +644,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
             opts,
             (t) => t.surfaceKind === "file" && t.fileId === fileId,
             () => makeFileTab(fileId),
+            true,
           ),
         ),
       });

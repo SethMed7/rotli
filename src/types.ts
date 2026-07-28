@@ -59,6 +59,9 @@ export interface SearchHit {
 /** Discriminated union, ready to extend: `| { surfaceKind: "chat"; … }`. */
 export interface NoteTab {
   id: string;
+  /** A PREVIEW tab (single-click browse): the next plain open REUSES it.
+   * Editing or re-clicking the same item keeps it (drops the flag). */
+  preview?: boolean;
   surfaceKind: "note";
   noteId: string;
 }
@@ -68,6 +71,9 @@ export interface NoteTab {
  * files next to .md notes; the file is the source of truth. */
 export interface CanvasTab {
   id: string;
+  /** A PREVIEW tab (single-click browse): the next plain open REUSES it.
+   * Editing or re-clicking the same item keeps it (drops the flag). */
+  preview?: boolean;
   surfaceKind: "canvas";
   boardId: string;
 }
@@ -76,6 +82,8 @@ export interface CanvasTab {
  * unsent chat (the file is created on the first send, then the tab is bound to it). */
 export interface ChatTab {
   id: string;
+  /** Never set for this kind — present so the union reads uniformly. */
+  preview?: boolean;
   surfaceKind: "chat";
   chatSlug: string | null;
 }
@@ -85,6 +93,9 @@ export interface ChatTab {
  * possibly root-prefixed like "vault:storage/x.mp3"). */
 export interface FileTab {
   id: string;
+  /** A PREVIEW tab (single-click browse): the next plain open REUSES it.
+   * Editing or re-clicking the same item keeps it (drops the flag). */
+  preview?: boolean;
   surfaceKind: "file";
   fileId: string;
 }
@@ -93,6 +104,8 @@ export interface FileTab {
  * singleton view (no per-note binding). */
 export interface ActivityTab {
   id: string;
+  /** Never set for this kind — present so the union reads uniformly. */
+  preview?: boolean;
   surfaceKind: "activity";
 }
 

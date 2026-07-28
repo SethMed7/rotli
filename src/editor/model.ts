@@ -8,6 +8,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import { onQuitFlush } from "../lib/quitFlush";
 import { invalidateNotes } from "../services/hooks";
 import { markNoteDraftChanged } from "../services/noteDrafts";
+import { keepTabsFor } from "../state/panes";
 import { notesService } from "../services/notes";
 
 const SYNC_DEBOUNCE_MS = 400;
@@ -78,8 +79,10 @@ export function editDocument(noteId: string, edit: (lines: readonly string[]) =>
   const current = docs.get(noteId);
   if (!current) return;
   // the single funnel every real keystroke passes through — a session-created
-  // note stops being an ephemeral blank draft the moment it's written into
+  // note stops being an ephemeral blank draft the moment it's written into,
+  // and an edited PREVIEW tab becomes a kept tab (Seth, 2026-07-28)
   markNoteDraftChanged(noteId);
+  keepTabsFor(noteId);
   docs.set(noteId, edit(current));
   const set = subs.get(noteId);
   if (set) for (const fn of set) fn();

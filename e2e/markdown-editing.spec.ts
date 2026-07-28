@@ -126,7 +126,7 @@ test("bullet outdent works on app-made AND tab-indented (foreign) lists", async 
   await page.keyboard.type("gamma");
   await expect(editor).toContainText("gamma");
 
-  await page.keyboard.press("Meta+A");
+  await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.press("Delete");
 
   // a foreign note indented with TABS (external editors, LLM output): the
@@ -139,7 +139,7 @@ test("bullet outdent works on app-made AND tab-indented (foreign) lists", async 
   await page.keyboard.type("!");
   await expect(editor).toContainText("child!");
 
-  await page.keyboard.press("Meta+A");
+  await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.press("Delete");
 
   // tasks keep their checkboxes through an outdent

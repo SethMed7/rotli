@@ -228,8 +228,8 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                   data-tab-index={i}
                   aria-selected={tab.id === pane.activeTabId}
                   className={`${tab.id === pane.activeTabId ? "tab active" : "tab"}${
-                    dragging ? " dragging" : ""
-                  }`}
+                    tab.preview ? " preview" : ""
+                  }${dragging ? " dragging" : ""}`}
                   onClick={() => activateTab(pane.id, tab.id)}
                   onContextMenu={(event) => openTabMenu(event, tab)}
                   onAuxClick={(event) => {

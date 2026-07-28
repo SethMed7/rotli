@@ -11,7 +11,7 @@ import { removeFromMain } from "../services/mainTree";
 import { claimClosedNoteDrafts } from "../services/noteDrafts";
 import { useMainStore } from "../state/main";
 import { dropNavEntry } from "../state/navHistory";
-import { findLeaf, leaves, tabsRightOf, usePanesStore } from "../state/panes";
+import { findLeaf, keepTabsFor, leaves, tabsRightOf, usePanesStore } from "../state/panes";
 import { removeQuickNote } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import type { Tab } from "../types";
@@ -26,6 +26,7 @@ export function trackNewDocumentDraft(fileId: string): void {
 
 export function markDocumentDraftChanged(fileId: string): void {
   drafts.markChanged(fileId);
+  keepTabsFor(fileId); // an edited preview tab becomes a kept tab
 }
 
 function fileIdOf(tab: Tab | undefined): string | null {

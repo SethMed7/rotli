@@ -14,7 +14,7 @@ async function createDiagramNote(page: import("@playwright/test").Page): Promise
   await page.keyboard.press("Meta+T");
   const editor = page.locator(".cm-content").last();
   await editor.click();
-  await page.keyboard.press("Meta+A");
+  await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.insertText(DIAGRAM_NOTE);
   await expect(page.locator(".rotli-render-mermaid-trigger")).toBeVisible();
 }

@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Browsing doesn't pile up tabs.** A plain click opens a note (or board, or
+  file) into one reusable *preview* tab — shown in quiet italics — and the
+  next click reuses it. Click the same item again, or start editing, and the
+  tab stays for good. ⌘-click and ⌘T still open real tabs, exactly as before.
+
+### Fixed
+
+- CI-only e2e flake: select-all in the editor now uses the platform modifier
+  (⌘A was a dead key inside CodeMirror on Linux runners).
+
 ## [0.41.0] - 2026-07-28
 
 

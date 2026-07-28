@@ -1654,3 +1654,9 @@
 .main-row.msel {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
+
+/* preview tabs (Seth, 2026-07-28: browse without piling up tabs) — the quiet
+   italic that says "passing through"; editing or re-clicking un-italicizes */
+.tab.preview > span:not(.tglyph) {
+  font-style: italic;
+}

@@ -22,6 +22,7 @@ import {
 import { type BoardMeta, EMPTY_BOARD_META, serializeBoardScene } from "../boards/session";
 import { onQuitFlush } from "../lib/quitFlush";
 import { isTauri } from "../lib/tauri";
+import { keepTabsFor } from "../state/panes";
 import { useUiStore } from "../state/ui";
 
 /** The slice of Excalidraw's imperative API we use to re-serialize the scene on a
@@ -69,7 +70,15 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
 
   // every save path (debounce, flush-on-unmount, metadata) funnels through the
   // shared saver so the failure/recovery surfacing can't drift between them
-  const saver = useMemo(() => createCorpusBoardSaver(boardId, setSaveErr), [boardId]);
+  const saver = useMemo(
+    () =>
+      createCorpusBoardSaver(boardId, (err) => {
+        setSaveErr(err);
+        // a real saved change = intent to keep the tab (preview → permanent)
+        if (!err) keepTabsFor(boardId);
+      }),
+    [boardId],
+  );
 
   // G — board metadata (Seth, 2026-06-26): description + tags ride top-level in
   // the .excalidraw (see boards/session.ts BoardMeta).
