@@ -1,12 +1,19 @@
 // Repro spec: ⌘K palette must support ↑/↓ selection and ⏎ open (r3 frame F's
 // footer promise). Written against the browser twin's seeded demo corpus.
 
-import { expect, test } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
 import { gotoApp } from "./support";
+
+/** The app registers ⌘K (Meta) only — a synthesized Ctrl+K does nothing on the
+ * Linux runners (the 0.41.0 lesson). The titlebar search button dispatches the
+ * same palette.toggle on every platform. */
+async function openPalette(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+}
 
 test("palette: arrows move the selection and Enter opens the row", async ({ page }) => {
   await gotoApp(page);
-  await page.keyboard.press("ControlOrMeta+k");
+  await openPalette(page);
   const input = page.getByPlaceholder("Search notes, files, chats, actions…");
   await expect(input).toBeFocused();
 
@@ -36,7 +43,7 @@ test("palette: arrows keep working while the cursor rests over the list", async 
   // cursor, Chromium fires synthetic hover events, and a hover-driven
   // setIndex snaps the selection back — arrows read as dead
   await gotoApp(page);
-  await page.keyboard.press("ControlOrMeta+k");
+  await openPalette(page);
   const input = page.getByPlaceholder("Search notes, files, chats, actions…");
   await input.fill("e"); // broad match — enough rows to overflow the 384px list
   const rows = page.locator(".prow");
