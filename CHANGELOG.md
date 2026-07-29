@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-07-29
+
 ### Added
 
 - **Mermaid grew a camera — everywhere.** The diagram in your note pans and
@@ -32,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   view too.
 - Embedded boards (and sheets/documents) remember their resized height across
   edits and restarts.
+- Protection toggles in the row menu (Lock from the AI, Mark secure) wear a
+  lock in the gutter — the star belongs to Quick access alone.
 
 ## [0.44.0] - 2026-07-29
 
