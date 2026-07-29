@@ -114,13 +114,6 @@
 .fdr-up-chev {
   transform: rotate(180deg);
 }
-.fdr-crumbs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-  overflow: hidden;
-}
 .fdr-crumb-seg {
   display: inline-flex;
   align-items: center;
@@ -202,6 +195,114 @@
 .fdr-tile-sub {
   font-size: 10.5px;
   color: var(--text-muted);
+}
+/* image assets show the PICTURE (Seth, 2026-07-28) — a contained thumb in the
+   glyph's slot, hairline-bordered so light images hold a shape on any theme */
+.fdr-thumb {
+  width: 84px;
+  height: 58px;
+  object-fit: cover;
+  border-radius: var(--r-inner);
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+}
+
+/* — the Gallery view: big preview over a filmstrip (Seth, 2026-07-28) — */
+.fdrg {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.fdrg-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 24px;
+}
+.fdrg-preview {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--r-card);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+}
+.fdrg-big {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.fdrg-strip {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px 10px;
+  overflow-x: auto;
+  border-top: 1px solid var(--border);
+}
+.fdrg-cell {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent;
+  background: none;
+  border-radius: var(--r-inner);
+  cursor: pointer;
+  padding: 2px;
+}
+.fdrg-cell img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: cover;
+  border-radius: calc(var(--r-inner) - 2px);
+}
+.fdrg-cell:hover {
+  background: var(--hov);
+}
+.fdrg-cell.sel {
+  border-color: var(--accent);
+}
+
+/* — the Finder path bar (Seth, 2026-07-28: crumbs live at the BOTTOM) — */
+.fdr-pathbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 14px;
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.fdr-pathbar .fdr-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+.fdr-crumb-glyph {
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+.fdr-pathbar .fdr-crumb.leaf {
+  cursor: default;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* the view switcher's icon tabs (words moved into tooltips) */
+.fsh-tab.vicon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 9px;
 }
 
 /* the New-folder-here input row + its quiet error line */

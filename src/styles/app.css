@@ -266,10 +266,17 @@
   left: 0;
   transform: none;
 }
-.tb-trail .tip,
-.nl-top .icobtn .tip {
+.tb-trail .tip {
   left: auto;
   right: 0;
+  transform: none;
+}
+/* the sidebar header hugs the WINDOW'S left edge — its tips extend rightward
+   over the content area, so a narrow sidebar can never clip them offscreen
+   (Seth, 2026-07-28: "hovers close to edge break out of screen") */
+.nl-top .icobtn .tip {
+  left: 0;
+  right: auto;
   transform: none;
 }
 /* — module switcher popover (r5 approved; r7 final) — */

@@ -876,8 +876,9 @@
   gap: 8px;
   padding: 12px 12px 10px;
   flex: 0 0 auto;
-  /* on a narrow sidebar the create icons wrap instead of squeezing */
-  flex-wrap: wrap;
+  /* ONE row always (Seth, 2026-07-28: the wrapped icon line left awkward
+     whitespace) — the vault name shrinks to "…" before any icon moves */
+  flex-wrap: nowrap;
 }
 /* keep the filter usable when the row wraps — it takes the first line, the icons
    drop to the next */
@@ -1613,11 +1614,46 @@
 .sb-rows .frow.sel {
   background: none;
 }
-.sb-files {
-  color: var(--text-muted);
+/* — the utility footer (Seth, 2026-07-28, Obsidian reference): Files ·
+   Librarian · Settings split one quiet row under the System rows — */
+.sb-foot {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
 }
-.sb-files:hover {
+.sb-footbtn {
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 4px;
+  border: none;
+  background: none;
+  font: inherit;
+  border-radius: var(--r-control);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sb-footbtn:hover {
+  background: var(--hov);
   color: var(--text);
+}
+.sb-footbtn svg {
+  flex: 0 0 auto;
+}
+.sb-footbtn .fname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-footbtn .count {
+  font-size: 10px;
+  color: var(--text-muted);
 }
 
 /* — the primary-color swatch row (Appearance + onboarding) — */

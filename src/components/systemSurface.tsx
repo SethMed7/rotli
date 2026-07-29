@@ -7,6 +7,7 @@
 // Single click selects, double click opens — Finder conventions, zero friction.
 
 import {
+  type ButtonHTMLAttributes,
   Fragment,
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -17,27 +18,42 @@ import {
   useState,
 } from "react";
 import { longDateLabel } from "../lib/dateLabels";
+import { IMAGE_EXTS, extOf } from "../lib/fileKind";
 import { startMainAddDrag } from "../lib/mainAddDrag";
 import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
+import { fileAssetUrl } from "../lib/tauri";
 import { DEST } from "../services/destinations";
-import { invalidateFolders, useFolders, useNotes, useSearchableNotes } from "../services/hooks";
+import { invalidateFolders, useFolders, useNoteIndex, useNotes, useSearchableNotes } from "../services/hooks";
 import { notesService } from "../services/notes";
 import {
   type FolderEntry,
+  type FolderListing,
   type SystemSortKey,
   type SystemViewMode,
   breadcrumbOf,
   filterSystemItems,
+  folderSegmentLabel,
   kindLabel,
   listFolderContents,
   rerootDiskPath,
   sortFolderListing,
 } from "../services/systemBrowser";
+import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { Character } from "./character";
-import { ChevronRight, FolderGlyph, NewFolderGlyph, SearchGlyph, glyphForNote } from "./glyphs";
+import {
+  ChevronRight,
+  ColumnsViewGlyph,
+  FolderGlyph,
+  GalleryViewGlyph,
+  GridViewGlyph,
+  ListViewGlyph,
+  NewFolderGlyph,
+  SearchGlyph,
+  glyphForNote,
+} from "./glyphs";
 import { NoteListRow } from "./noteListRow";
 import { useNoteMenu } from "./useNoteMenu";
 
@@ -56,6 +72,66 @@ const cwdMemo = new Map<string, string>();
 // the Columns view's open chain (relative folder paths), per root
 const colPathMemo = new Map<string, string[]>();
 
+// Image tiles show the PICTURE (Seth, 2026-07-28: "or else I don't know what
+// I'm looking at") — asset-protocol URLs resolve once and cache for the
+// session; every other kind keeps its type glyph.
+const thumbCache = new Map<string, string>();
+
+function isImageNote(n: NoteSummary): boolean {
+  return n.kind === "file" && IMAGE_EXTS.has(extOf(n.id));
+}
+
+function useThumb(n: NoteSummary): string | null {
+  const img = isImageNote(n);
+  const [url, setUrl] = useState<string | null>(img ? (thumbCache.get(n.id) ?? null) : null);
+  useEffect(() => {
+    if (!img) return;
+    const cached = thumbCache.get(n.id);
+    if (cached) {
+      setUrl(cached);
+      return;
+    }
+    let live = true;
+    void fileAssetUrl(n.id).then((u) => {
+      if (!u) return;
+      thumbCache.set(n.id, u);
+      if (live) setUrl(u);
+    });
+    return () => {
+      live = false;
+    };
+  }, [n.id, img]);
+  return img ? url : null;
+}
+
+type ItemHandlers = ButtonHTMLAttributes<HTMLButtonElement> & {
+  onPointerDown?: ((e: ReactPointerEvent) => void) | undefined;
+};
+
+/** One grid tile — a component so the thumb hook runs per tile. */
+function ItemTile({ n, selected, handlers }: { n: NoteSummary; selected: boolean; handlers: ItemHandlers }) {
+  const thumb = useThumb(n);
+  return (
+    <button
+      type="button"
+      className={selected ? "fdr-tile sel" : "fdr-tile"}
+      data-note-id={n.id}
+      title="Open"
+      {...handlers}
+    >
+      {thumb ? (
+        <img className="fdr-thumb" src={thumb} alt="" loading="lazy" draggable={false} />
+      ) : (
+        glyphForNote(n, { size: 38, className: "fdr-tile-icon" })
+      )}
+      <span className="fdr-tile-name">{n.title || "Empty note"}</span>
+      <span className="fdr-tile-sub">
+        {n.kind ? `${kindLabel(n)} · ${longDateLabel(n.updatedAt)}` : longDateLabel(n.updatedAt)}
+      </span>
+    </button>
+  );
+}
+
 export function SystemSurface({ rootId }: { rootId: string }) {
   const root = ROOTS[rootId] ?? { title: rootId, prefix: rootId };
   const isLibrary = rootId === "Brain";
@@ -63,12 +139,28 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   // is its own subtree straight from the notes service
   const destData = useNotes(isLibrary ? DEST.secure : rootId).data;
   const { notes: searchable } = useSearchableNotes();
+  // Finder truth for the Library too (Seth, 2026-07-28: "the Library isn't
+  // working like Assets"): the projected wiki NOTES alone hid every file and
+  // board living inside wiki folders (brief PDFs, images, canvases) — the
+  // full index carries them, minus the internal wiki/_ lanes (secure arrives
+  // through its own destination above).
+  const noteIndex = useNoteIndex();
   const items = useMemo<NoteSummary[]>(() => {
     const destItems = destData ?? [];
     if (!isLibrary) return destItems;
     const brain = searchable.map(projectNoteToBrain).filter((n): n is NoteSummary => n !== null);
-    return [...brain, ...destItems];
-  }, [isLibrary, destData, searchable]);
+    const seen = new Set([...brain, ...destItems].map((n) => n.id));
+    const extras: NoteSummary[] = [];
+    for (const n of noteIndex.values()) {
+      if (n.kind !== "file" && n.kind !== "board") continue;
+      if (seen.has(n.id)) continue;
+      const disk = noteDiskFolder(n);
+      if (disk !== "wiki" && !disk.startsWith("wiki/")) continue;
+      if (disk.startsWith("wiki/_")) continue;
+      extras.push(n);
+    }
+    return [...brain, ...destItems, ...extras];
+  }, [isLibrary, destData, searchable, noteIndex]);
 
   const [query, setQuery] = useState("");
   const [mode, setModeState] = useState<SystemViewMode>(() => modeMemo.get(rootId) ?? "folders");
@@ -127,6 +219,28 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   );
   const crumbs = useMemo(() => breadcrumbOf(cwd, root.prefix, root.title), [cwd, root.prefix, root.title]);
   const atRoot = cwd === root.prefix;
+  // the bottom path bar's trail — the Columns view follows its own open chain
+  const pathTrail = useMemo(
+    () =>
+      mode === "columns"
+        ? breadcrumbOf(colPath[colPath.length - 1] ?? root.prefix, root.prefix, root.title)
+        : crumbs,
+    [mode, colPath, crumbs, root.prefix, root.title],
+  );
+  // the selected entry names the path bar's leaf, like Finder's
+  const pathLeaf =
+    selection.length === 1
+      ? selection[0]!.title || "Empty note"
+      : folderSel
+        ? folderSegmentLabel(folderSel.slice(folderSel.lastIndexOf("/") + 1))
+        : null;
+  /** A path under the root → the Columns view's chain of open folders. */
+  const colChainTo = (path: string): string[] => {
+    const rel = path.startsWith(`${root.prefix}/`) ? path.slice(root.prefix.length + 1) : "";
+    if (!rel) return [];
+    const segs = rel.split("/");
+    return segs.map((_, i) => `${root.prefix}/${segs.slice(0, i + 1).join("/")}`);
+  };
 
   const enter = (path: string) => {
     setCwd(path);
@@ -203,8 +317,46 @@ export function SystemSurface({ rootId }: { rootId: string }) {
 
   const sortBy = (key: SystemSortKey) =>
     setSort((s) =>
-      s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: key === "date" ? -1 : 1 },
+      s.key === key
+        ? { key, dir: s.dir === 1 ? -1 : 1 }
+        : { key, dir: key === "date" || key === "created" ? -1 : 1 },
     );
+
+  // right-click on EMPTY space — Finder's background menu (Seth, 2026-07-28:
+  // "clean up via right click… sort by"): New folder where creation is
+  // offered, and the Sort-by selector (re-pick the active key to flip
+  // direction, same as the List headers)
+  const bgMenu = (e: MouseEvent) => {
+    if ((e.target as HTMLElement).closest("[data-note-id], .fdr-tile, .fdr-row, .fdrg-cell, input")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const sortItem = (key: SystemSortKey, label: string): MenuSpec => ({
+      kind: "action",
+      label: sort.key === key ? `${label} ${sort.dir === 1 ? "↑" : "↓"}` : label,
+      checked: sort.key === key,
+      checkedMark: "highlight",
+      onClick: () => sortBy(key),
+    });
+    const items: MenuSpec[] = [
+      ...(isLibrary
+        ? [
+            { kind: "action" as const, label: "New folder", onClick: () => setNewFolder(true) },
+            { kind: "sep" as const },
+          ]
+        : []),
+      {
+        kind: "drill",
+        label: "Sort by",
+        items: [
+          sortItem("name", "Name"),
+          sortItem("kind", "Kind"),
+          sortItem("date", "Date modified"),
+          sortItem("created", "Date created"),
+        ],
+      },
+    ];
+    useContextMenu.getState().open(e.clientX, e.clientY, items);
+  };
 
   const visibleItems = searching ? hits : listing.items;
   const selectItem = (n: NoteSummary, e: { metaKey: boolean; shiftKey: boolean }, order?: NoteSummary[]) => {
@@ -388,20 +540,9 @@ export function SystemSurface({ rootId }: { rootId: string }) {
             <ChevronRight size={11} className="fdr-up-chev" />
           </button>
         )}
-        <nav className="fdr-crumbs" aria-label="Folder path">
-          {crumbs.map((c, i) => (
-            <span key={c.path} className="fdr-crumb-seg">
-              {i > 0 && <ChevronRight size={9} className="fdr-crumb-sep" aria-hidden="true" />}
-              {i === crumbs.length - 1 ? (
-                <h2 className="board-title">{c.label}</h2>
-              ) : (
-                <button type="button" className="fdr-crumb" onClick={() => enter(c.path)}>
-                  {c.label}
-                </button>
-              )}
-            </span>
-          ))}
-        </nav>
+        {/* the full trail lives in the BOTTOM path bar now (Finder's home for
+            it — Seth, 2026-07-28); the header keeps just where-am-I */}
+        <h2 className="board-title">{crumbs[crumbs.length - 1]?.label ?? root.title}</h2>
         <span className="board-count">{items.length}</span>
         {isLibrary && (
           <button
@@ -414,28 +555,28 @@ export function SystemSurface({ rootId }: { rootId: string }) {
             <NewFolderGlyph size={15} />
           </button>
         )}
+        {/* the view switcher wears Finder's icons (Seth, 2026-07-28: "the
+            proper icons people are used to"); the words live in the tooltips */}
         <div className="file-mode-tabs" role="tablist" aria-label="View" style={{ marginLeft: "auto" }}>
-          <button
-            type="button"
-            className={mode === "folders" ? "fsh-tab on" : "fsh-tab"}
-            onClick={() => setMode("folders")}
-          >
-            Folders
-          </button>
-          <button
-            type="button"
-            className={mode === "list" ? "fsh-tab on" : "fsh-tab"}
-            onClick={() => setMode("list")}
-          >
-            List
-          </button>
-          <button
-            type="button"
-            className={mode === "columns" ? "fsh-tab on" : "fsh-tab"}
-            onClick={() => setMode("columns")}
-          >
-            Columns
-          </button>
+          {(
+            [
+              ["folders", "Icons", GridViewGlyph],
+              ["list", "List", ListViewGlyph],
+              ["columns", "Columns", ColumnsViewGlyph],
+              ["gallery", "Gallery", GalleryViewGlyph],
+            ] as const
+          ).map(([m, label, ViewGlyph]) => (
+            <button
+              key={m}
+              type="button"
+              className={mode === m ? "fsh-tab vicon on" : "fsh-tab vicon"}
+              title={label}
+              aria-label={`${label} view`}
+              onClick={() => setMode(m)}
+            >
+              <ViewGlyph size={15} />
+            </button>
+          ))}
         </div>
       </header>
 
@@ -520,7 +661,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
           </div>
         )
       ) : mode === "folders" ? (
-        <div className="board-scroll" {...scrollProps}>
+        <div className="board-scroll" {...scrollProps} onContextMenu={bgMenu}>
           {marqueeNode}
           <div className="fdr-grid">
             {listing.folders.map((f) => (
@@ -541,23 +682,25 @@ export function SystemSurface({ rootId }: { rootId: string }) {
               </button>
             ))}
             {listing.items.map((n) => (
-              <button
-                type="button"
-                key={n.id}
-                className={selectedIds.has(n.id) ? "fdr-tile sel" : "fdr-tile"}
-                data-note-id={n.id}
-                title="Open"
-                {...itemHandlers(n)}
-              >
-                {glyphForNote(n, { size: 38, className: "fdr-tile-icon" })}
-                <span className="fdr-tile-name">{n.title || "Empty note"}</span>
-                <span className="fdr-tile-sub">
-                  {n.kind ? `${kindLabel(n)} · ${longDateLabel(n.updatedAt)}` : longDateLabel(n.updatedAt)}
-                </span>
-              </button>
+              <ItemTile key={n.id} n={n} selected={selectedIds.has(n.id)} handlers={itemHandlers(n)} />
             ))}
           </div>
         </div>
+      ) : mode === "gallery" ? (
+        <GalleryView
+          listing={listing}
+          selectedIds={selectedIds}
+          folderSel={folderSel}
+          onSelectItem={(n) => selectItem(n, { metaKey: false, shiftKey: false })}
+          onSelectFolder={(path) => {
+            setSelection([]);
+            setFolderSel(path);
+          }}
+          onOpenItem={(n) => openSummary(n)}
+          onEnterFolder={enter}
+          onItemMenu={openMenu}
+          onBgMenu={bgMenu}
+        />
       ) : mode === "columns" ? (
         <div className="board-scroll fdrc-scroll">
           <div className="fdrc-row">
@@ -606,7 +749,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
           </div>
         </div>
       ) : (
-        <div className="board-scroll" {...scrollProps}>
+        <div className="board-scroll" {...scrollProps} onContextMenu={bgMenu}>
           {marqueeNode}
           <div className="fdr-list">
             <div className="fdr-cols">
@@ -616,12 +759,213 @@ export function SystemSurface({ rootId }: { rootId: string }) {
               <button type="button" className="fdr-col" onClick={() => sortBy("date")}>
                 Date Modified{sort.key === "date" ? (sort.dir === 1 ? " ↑" : " ↓") : ""}
               </button>
-              <span className="fdr-col kind">Kind</span>
+              <button type="button" className="fdr-col kind" onClick={() => sortBy("kind")}>
+                Kind{sort.key === "kind" ? (sort.dir === 1 ? " ↑" : " ↓") : ""}
+              </button>
             </div>
             {renderListRows(cwd, 0)}
           </div>
         </div>
       )}
+
+      {/* — the Finder path bar, at the BOTTOM where people expect it (Seth,
+          2026-07-28); every segment navigates, the selected item is the leaf — */}
+      {!searching && (
+        <nav className="fdr-pathbar" aria-label="Folder path">
+          {pathTrail.map((c, i) => (
+            <span key={c.path} className="fdr-crumb-seg">
+              {i > 0 && <ChevronRight size={9} className="fdr-crumb-sep" aria-hidden="true" />}
+              <button
+                type="button"
+                className="fdr-crumb"
+                onClick={() => {
+                  if (mode === "columns") setColPath(c.path === root.prefix ? [] : colChainTo(c.path));
+                  else enter(c.path);
+                }}
+              >
+                {i === 0 ? null : <FolderGlyph size={12} className="fdr-crumb-glyph" />}
+                {c.label}
+              </button>
+            </span>
+          ))}
+          {pathLeaf && (
+            <span className="fdr-crumb-seg">
+              <ChevronRight size={9} className="fdr-crumb-sep" aria-hidden="true" />
+              <span className="fdr-crumb leaf">{pathLeaf}</span>
+            </span>
+          )}
+        </nav>
+      )}
+    </div>
+  );
+}
+
+// ——— Gallery — Finder's fourth view (Seth, 2026-07-28): one BIG preview of
+// the highlighted entry over a horizontal filmstrip of the folder's contents.
+// ←/→ walk the strip, ⏎ opens (or enters a folder), double-click likewise. ———
+
+type GalleryEntry = { kind: "folder"; f: FolderEntry } | { kind: "item"; n: NoteSummary };
+
+function GalleryStage({ n }: { n: NoteSummary }) {
+  const thumb = useThumb(n);
+  if (thumb) return <img className="fdrg-preview" src={thumb} alt={n.title} draggable={false} />;
+  return (
+    <div className="fdrg-big">
+      {glyphForNote(n, { size: 84, className: "fdr-tile-icon" })}
+      <span className="fdr-tile-name">{n.title || "Empty note"}</span>
+      <span className="fdr-tile-sub">
+        {kindLabel(n)} · {longDateLabel(n.updatedAt)}
+      </span>
+    </div>
+  );
+}
+
+function GalleryCell({
+  n,
+  selected,
+  ...handlers
+}: {
+  n: NoteSummary;
+  selected: boolean;
+} & ItemHandlers) {
+  const thumb = useThumb(n);
+  return (
+    <button
+      type="button"
+      className={selected ? "fdrg-cell sel" : "fdrg-cell"}
+      data-note-id={n.id}
+      title={n.title || "Empty note"}
+      {...handlers}
+    >
+      {thumb ? (
+        <img src={thumb} alt="" loading="lazy" draggable={false} />
+      ) : (
+        glyphForNote(n, { size: 26, className: "fdr-tile-icon" })
+      )}
+    </button>
+  );
+}
+
+function GalleryView({
+  listing,
+  selectedIds,
+  folderSel,
+  onSelectItem,
+  onSelectFolder,
+  onOpenItem,
+  onEnterFolder,
+  onItemMenu,
+  onBgMenu,
+}: {
+  listing: FolderListing;
+  selectedIds: ReadonlySet<string>;
+  folderSel: string | null;
+  onSelectItem: (n: NoteSummary) => void;
+  onSelectFolder: (path: string) => void;
+  onOpenItem: (n: NoteSummary) => void;
+  onEnterFolder: (path: string) => void;
+  onItemMenu: (e: MouseEvent, n: NoteSummary) => void;
+  onBgMenu: (e: MouseEvent) => void;
+}) {
+  const entries: GalleryEntry[] = [
+    ...listing.folders.map((f) => ({ kind: "folder" as const, f })),
+    ...listing.items.map((n) => ({ kind: "item" as const, n })),
+  ];
+  const current = folderSel
+    ? entries.find((e) => e.kind === "folder" && e.f.path === folderSel)
+    : (entries.find((e) => e.kind === "item" && selectedIds.has(e.n.id)) ?? entries[0]);
+  const idx = current ? entries.indexOf(current) : -1;
+  // the implicit first-entry preview must BE the selection (Greptile, PR #1):
+  // the stage read entries[0] while the path bar read the empty selection —
+  // out of sync until the first explicit click. Promote it once on entry.
+  const hasExplicit = folderSel !== null || entries.some((e) => e.kind === "item" && selectedIds.has(e.n.id));
+  useEffect(() => {
+    if (hasExplicit) return;
+    const first = entries[0];
+    if (!first) return;
+    if (first.kind === "folder") onSelectFolder(first.f.path);
+    else onSelectItem(first.n);
+    // entries' identity churns per render; length + the explicit flag are the
+    // real triggers, and the select callbacks are stable in behavior
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasExplicit, entries.length]);
+  const select = (entry: GalleryEntry | undefined) => {
+    if (!entry) return;
+    if (entry.kind === "folder") onSelectFolder(entry.f.path);
+    else onSelectItem(entry.n);
+  };
+  const activate = () => {
+    if (!current) return;
+    if (current.kind === "folder") onEnterFolder(current.f.path);
+    else onOpenItem(current.n);
+  };
+  // keep the highlighted cell in view as ←/→ walk the strip
+  const stripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    stripRef.current
+      ?.querySelector(".fdrg-cell.sel")
+      ?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [idx]);
+  return (
+    <div
+      className="fdrg"
+      tabIndex={0}
+      role="listbox"
+      aria-label="Gallery"
+      onKeyDown={(e) => {
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          select(entries[Math.min(idx + 1, entries.length - 1)]);
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          select(entries[Math.max(idx - 1, 0)]);
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          activate();
+        }
+      }}
+      onContextMenu={onBgMenu}
+    >
+      <div className="fdrg-stage" onDoubleClick={activate}>
+        {current?.kind === "item" ? (
+          <GalleryStage n={current.n} />
+        ) : current ? (
+          <div className="fdrg-big">
+            <FolderGlyph size={96} className="fdr-tile-icon folder" />
+            <span className="fdr-tile-name">{current.f.name}</span>
+            <span className="fdr-tile-sub">
+              {current.f.itemCount === 1 ? "1 item" : `${current.f.itemCount} items`}
+            </span>
+          </div>
+        ) : (
+          <p className="fdrc-empty">Empty</p>
+        )}
+      </div>
+      <div className="fdrg-strip" ref={stripRef}>
+        {entries.map((entry) =>
+          entry.kind === "folder" ? (
+            <button
+              key={entry.f.path}
+              type="button"
+              className={entry === current ? "fdrg-cell sel" : "fdrg-cell"}
+              title={entry.f.name}
+              onClick={() => onSelectFolder(entry.f.path)}
+              onDoubleClick={() => onEnterFolder(entry.f.path)}
+            >
+              <FolderGlyph size={30} className="fdr-tile-icon folder" />
+            </button>
+          ) : (
+            <GalleryCell
+              key={entry.n.id}
+              n={entry.n}
+              selected={entry === current}
+              onClick={() => onSelectItem(entry.n)}
+              onDoubleClick={() => onOpenItem(entry.n)}
+              onContextMenu={(e) => onItemMenu(e, entry.n)}
+            />
+          ),
+        )}
+      </div>
     </div>
   );
 }

@@ -165,6 +165,43 @@ export function ImageGlyph(props: GlyphProps) {
 }
 
 /** Vision capability — used where a model can inspect image attachments. */
+/* — the System browser's view-switcher family (Seth, 2026-07-28: "the proper
+   icons people are used to" — Finder's icon/list/columns/gallery marks) — */
+export function GridViewGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="4" y="4" width="7" height="7" rx="1.5" />
+      <rect x="13" y="4" width="7" height="7" rx="1.5" />
+      <rect x="4" y="13" width="7" height="7" rx="1.5" />
+      <rect x="13" y="13" width="7" height="7" rx="1.5" />
+    </Glyph>
+  );
+}
+export function ListViewGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
+      <path d="M9 6h10.5M9 12h10.5M9 18h10.5" />
+    </Glyph>
+  );
+}
+export function ColumnsViewGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="3.5" y="5" width="17" height="14" rx="2" />
+      <path d="M9.2 5v14M14.8 5v14" />
+    </Glyph>
+  );
+}
+export function GalleryViewGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="3.5" y="4" width="17" height="11.5" rx="2" />
+      <path d="M5.5 19.5h.01M10 19.5h.01M14.5 19.5h.01M19 19.5h.01" />
+    </Glyph>
+  );
+}
+
 export function EyeGlyph(props: GlyphProps) {
   return (
     <Glyph {...props}>

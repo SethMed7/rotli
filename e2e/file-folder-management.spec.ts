@@ -1,26 +1,29 @@
-// Manual file/folder management, restored (P0 sweep 2026-07-28): the System
-// fold had severed every by-hand move and left folder creation with no working
-// UI at all. "Move to…" lives in the row menu; "New folder" lives in the
-// Library browser (and the sidebar's toolbar button routes there while a
-// browser is open).
+// Manual file/folder management: "Move to…" retired 2026-07-28 (it listed
+// Library areas regardless of the view — the System browser and the Librarian
+// own placement); Duplicate is the by-hand copy verb in its place. "New
+// folder" lives in the Library browser (and the sidebar's toolbar button
+// routes there while a browser is open).
 
 import { expect, test } from "@playwright/test";
 import { gotoApp } from "./support";
 
 test.use({ viewport: { width: 1280, height: 900 } });
 
-test("Move to… refiles a note into another Library area", async ({ page }) => {
+test("Duplicate copies a note as 'title copy' and opens it", async ({ page }) => {
   await gotoApp(page);
 
   await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
   await page.locator(".recent-row", { hasText: "Launch checklist" }).click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Move to…" }).click();
-  await page.getByRole("menuitemcheckbox", { name: "Library › People" }).click();
+  await page.getByRole("menuitem", { name: "Duplicate" }).click();
 
-  // the note now lives in wiki/People — the Library browser proves it
-  await page.locator(".frow", { hasText: "Library" }).first().click();
-  await page.locator(".system-browser .fdr-tile", { hasText: "People" }).dblclick();
-  await expect(page.locator(".system-browser .fdr-tile", { hasText: "Launch checklist" })).toBeVisible();
+  // the copy opens as the active tab, named after its source
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Launch checklist copy");
+  // and the old Move to… verb is gone from the row menu (opening the copy
+  // left the list view — return to it first)
+  await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
+  await page.locator(".recent-row", { hasText: "Groceries" }).click({ button: "right" });
+  await expect(page.getByRole("menuitem", { name: "Duplicate" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Move to…" })).toHaveCount(0);
 });
 
 test("the toolbar New-folder button creates a real folder at the browser's cwd", async ({ page }) => {

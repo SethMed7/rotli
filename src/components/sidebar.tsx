@@ -96,7 +96,6 @@ import { createPointerDragSession } from "../lib/pointerDrag";
 import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
 import {
   ArchiveGlyph,
-  BoardGlyph as CanvasItemGlyph,
   ChatGlyph,
   ChevronRight,
   ActivityGlyph,
@@ -119,6 +118,7 @@ import {
   TrashGlyph,
   VaultGlyph,
 } from "./glyphs";
+import { Icon } from "./icon";
 import { type RovingRow, useRovingList } from "./sidebar/useRovingList";
 import { noteDisplayTitle } from "./sidebar/noteDisplayTitle";
 import { BreveSidebar } from "./breve/breveSidebar";
@@ -980,10 +980,10 @@ export function Sidebar() {
   // SAME ids as their Brain twins, so their roving ids carry a "main>" prefix
   // (folders already carry "main:") — no id collision, j/k walks both copies.
   const MAIN_ROW_PREFIX = "main>";
-  // roving ids for the two ACTION rows (open a surface, never a selection) —
-  // distinct sentinels so they can't collide with folder/dest ids
+  // roving id for the one ACTION row (opens a surface, never a selection) —
+  // a distinct sentinel so it can't collide with folder/dest ids. (The old
+  // Activity row moved into the utility footer, outside the roving list.)
   const CAPTURES_ROW = "row:captures";
-  const ACTIVITY_ROW = "row:activity";
   const mainRovingRows = (parentId: string): RovingRow[] => [
     // filtered by matches() exactly like renderMainTree — the roving cursor
     // must never point at a row the live filter hid
@@ -1018,7 +1018,6 @@ export function Sidebar() {
       : []),
     ...(hasBrain ? [{ id: "Brain", kind: "folder" } as RovingRow] : []),
     ...visibleDestRows.map(({ id }) => ({ id, kind: "folder" }) as RovingRow),
-    { id: ACTIVITY_ROW, kind: "smart" },
   ];
 
   const { rowProps } = useRovingList(rows, {
@@ -1051,13 +1050,9 @@ export function Sidebar() {
         setDestExpanded(row.id, !(expandedDests[row.id] ?? true));
         return;
       }
-      // the two action rows: they open their surface, never become a selection
+      // the action row: it opens its surface, never becomes a selection
       if (row.id === CAPTURES_ROW) {
         dispatch("board.open");
-        return;
-      }
-      if (row.id === ACTIVITY_ROW) {
-        usePanesStore.getState().openActivity();
         return;
       }
       setSelectedFolderId(row.id);
@@ -1312,18 +1307,8 @@ export function Sidebar() {
             {sidebarMode === "breve" ? "Unavailable in Breve" : "New folder"}
           </span>
         </button>
-        <button
-          type="button"
-          className="icobtn"
-          aria-label={sidebarMode === "breve" ? "New board is unavailable in Breve" : "New board"}
-          disabled={sidebarMode === "breve"}
-          onClick={() => dispatch("boards.new")}
-        >
-          <CanvasItemGlyph size={16} />
-          <span className="tip" aria-hidden="true">
-            {sidebarMode === "breve" ? "Unavailable in Breve" : "New board"}
-          </span>
-        </button>
+        {/* New board lives in the New… dropdown (Seth, 2026-07-28) — its own
+            header icon was one too many for a narrow sidebar */}
         {/* collapse-all — fold every expanded section/folder at once (VS Code's
             collapse icon; handy once folders nest deep). Kept last, like the IDE. */}
         <button
@@ -1813,24 +1798,6 @@ export function Sidebar() {
               </button>
             );
           })}
-          {/* the Librarian's journal is a system surface too — the quiet
-                badge is unreviewed proposals */}
-          <button
-            type="button"
-            className="frow"
-            onClick={() => usePanesStore.getState().openActivity()}
-            title={
-              brainEnabledUi
-                ? "See and undo what the Librarian has done"
-                : "History of the Librarian's past actions and secure-note repairs"
-            }
-            {...rowProps({ id: ACTIVITY_ROW, kind: "smart" })}
-          >
-            <ActivityGlyph size={14.5} />
-            <span className="fname">Activity</span>
-            {pendingProposals > 0 && <span className="count">{pendingProposals}</span>}
-          </button>
-
           {/* added external folders (Seth, 2026-06-27): folders you point rotli at
               without moving them into the memex — browse + edit in place.
               Adding one moved to Location settings (2026-07-26). */}
@@ -1838,17 +1805,43 @@ export function Sidebar() {
           {addedRoots.map((r) => (
             <AddedRootRow key={r.id} root={r} />
           ))}
-          {isTauri() && (
+          {/* — the utility footer (Seth, 2026-07-28, from the Obsidian
+              reference): Files · Librarian · Settings share one quiet row.
+              The Librarian is the old Activity row — it's the Librarian's
+              journal, so it wears the Librarian's name; the badge stays the
+              unreviewed proposals. — */}
+          <div className="sb-foot">
+            {isTauri() && (
+              <button
+                type="button"
+                className="sb-footbtn"
+                title="Open the vault folder in Finder"
+                onClick={() => void revealCorpus()}
+              >
+                <FolderGlyph size={14} />
+                <span className="fname">Files</span>
+              </button>
+            )}
             <button
               type="button"
-              className="frow sb-files"
-              title="Open the vault folder in Finder"
-              onClick={() => void revealCorpus()}
+              className="sb-footbtn"
+              title={brainEnabledUi ? "See and undo the Librarian's work" : "The Librarian's journal"}
+              onClick={() => usePanesStore.getState().openActivity()}
             >
-              <FolderGlyph size={14.5} />
-              <span className="fname">Files</span>
+              <ActivityGlyph size={14} />
+              <span className="fname">Librarian</span>
+              {pendingProposals > 0 && <span className="count">{pendingProposals}</span>}
             </button>
-          )}
+            <button
+              type="button"
+              className="sb-footbtn"
+              title="Settings"
+              onClick={() => dispatch("app.settings")}
+            >
+              <Icon name="rotli-settings" size={14} />
+              <span className="fname">Settings</span>
+            </button>
+          </div>
         </div>
       )}
     </aside>

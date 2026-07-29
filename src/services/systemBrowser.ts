@@ -8,8 +8,8 @@
 import { noteDiskFolder } from "../lib/noteLocation";
 import type { NoteSummary } from "../types";
 
-export type SystemViewMode = "folders" | "list" | "columns";
-export type SystemSortKey = "name" | "date";
+export type SystemViewMode = "folders" | "list" | "columns" | "gallery";
+export type SystemSortKey = "name" | "date" | "kind" | "created";
 
 /** One subfolder of the current directory, as Finder would show it. */
 export interface FolderEntry {
@@ -121,14 +121,20 @@ export function listFolderContents(
 }
 
 /** Re-order a listing by a Finder column. Folders and items sort within their
- * own bands (folders never interleave with items — the list view's grammar). */
+ * own bands (folders never interleave with items — the list view's grammar).
+ * Folders are all one Kind and carry no created stamp, so those keys fall back
+ * to date-modified / name for the folder band. */
 export function sortFolderListing(l: FolderListing, key: SystemSortKey, dir: 1 | -1): FolderListing {
-  const folders = [...l.folders].sort((a, b) =>
-    key === "name" ? dir * byName(a.name, b.name) : dir * ((a.updatedAt ?? 0) - (b.updatedAt ?? 0)),
-  );
-  const items = [...l.items].sort((a, b) =>
-    key === "name" ? dir * byName(a.title, b.title) : dir * (a.updatedAt - b.updatedAt),
-  );
+  const folders = [...l.folders].sort((a, b) => {
+    if (key === "name" || key === "kind") return dir * byName(a.name, b.name);
+    return dir * ((a.updatedAt ?? 0) - (b.updatedAt ?? 0));
+  });
+  const items = [...l.items].sort((a, b) => {
+    if (key === "name") return dir * byName(a.title, b.title);
+    if (key === "kind") return dir * (byName(kindLabel(a), kindLabel(b)) || byName(a.title, b.title));
+    if (key === "created") return dir * (a.createdAt - b.createdAt);
+    return dir * (a.updatedAt - b.updatedAt);
+  });
   return { folders, items };
 }
 

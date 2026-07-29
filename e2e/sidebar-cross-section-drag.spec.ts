@@ -50,14 +50,14 @@ test("the System browser is a real Finder: grid, columned list, folder entry, br
   await search.fill("");
 
   // List = Finder's columned list: Name · Date Modified · Kind, folder rows included
-  await page.locator(".system-browser .fsh-tab", { hasText: "List" }).click();
+  await page.getByRole("button", { name: "List view" }).click();
   await expect(page.locator(".system-browser .fdr-col", { hasText: "Date Modified" })).toBeVisible();
   await expect(page.locator(".system-browser .fdr-row", { hasText: "Groceries" })).toBeVisible();
   await expect(page.locator(".system-browser .fdr-row.folder", { hasText: "Work" })).toBeVisible();
 
   // Folders = the icon grid; double-clicking a folder ENTERS it and the
   // breadcrumb climbs back — spatial navigation, like a traditional Finder
-  await page.locator(".system-browser .fsh-tab", { hasText: "Folders" }).click();
+  await page.getByRole("button", { name: "Icons view" }).click();
   await page.locator(".system-browser .fdr-tile", { hasText: "Work" }).dblclick();
   await expect(page.locator(".system-browser .board-title")).toHaveText("Work");
   await page.locator(".system-browser .fdr-crumb", { hasText: "Assets" }).click();
@@ -68,7 +68,7 @@ test("the System browser is a real Finder: grid, columned list, folder entry, br
 test("the Columns view drills like Finder's column view", async ({ page }) => {
   await gotoApp(page);
   await page.locator(".frow", { hasText: "Library" }).first().click();
-  await page.locator(".system-browser .fsh-tab", { hasText: "Columns" }).click();
+  await page.getByRole("button", { name: "Columns view" }).click();
 
   // column 1 lists the root's folders; clicking one opens column 2
   await page.locator(".fdrc-item.folder", { hasText: "Projects" }).click();

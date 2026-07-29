@@ -5,7 +5,7 @@
 // The sidebar's "m" key opens the SAME menu with a synthetic anchor + a
 // returnFocus that hands the cursor back to the row (the RowMenu unification).
 
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import {
   corpusFileStat,
   corpusFrontmatter,
@@ -22,10 +22,9 @@ import {
 import { discardBlankNote } from "../documents/draftComposition";
 import { isEmptyNote } from "../services/mainDismiss";
 import { markNoteDraftChanged } from "../services/noteDrafts";
-import { DEST, isHidden, isSink, isStorageLane } from "../services/destinations";
-import { fileNoteToArea } from "../services/brainFiling";
+import { DEST, isSink } from "../services/destinations";
+import { createRoutedNote } from "../services/createNote";
 import { notesService } from "../services/notes";
-import { useFolders } from "../services/hooks";
 import { invalidateNotes, useArchiveNote, useRestoreNote, useTrashNote } from "../services/hooks";
 import { useMainGcIds } from "../services/hooks";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
@@ -48,6 +47,26 @@ export interface MenuAnchor {
   clientY: number;
   preventDefault?: () => void;
   stopPropagation?: () => void;
+}
+
+/** A duplicate's body: the title line gains " copy". The title is the first
+ * non-blank line AFTER any leading `---` fence block (Greptile, PR #1: naming
+ * the fence itself "--- copy" corrupted YAML frontmatter) — and a line that
+ * is itself a `---` rule is never renamed. */
+export function copyBody(body: string): string {
+  const lines = body.split("\n");
+  let start = 0;
+  if (lines[0]?.trim() === "---") {
+    const close = lines.findIndex((l, at) => at > 0 && l.trim() === "---");
+    if (close > 0) start = close + 1;
+  }
+  for (let i = start; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    if (line.trim() === "" || line.trim() === "---") continue;
+    lines[i] = `${line} copy`;
+    return lines.join("\n");
+  }
+  return body;
 }
 
 async function copyFilePath(id: string): Promise<void> {
@@ -78,38 +97,6 @@ export function useNoteMenu() {
   // GC of it happened in the same call. undefined until every listing loaded
   // (a still-loading or errored vault must not read as "gone" — skip the GC).
   const liveIds = useMainGcIds();
-  const brainOn = useUiStore((s) => s.brainEnabled);
-  // "Move to…" targets: Library areas (top-level wiki/<area>, internal lanes
-  // excluded) then plain user folders — never the sinks, the Assets lane, the
-  // vault marker trees, or chats.
-  const foldersData = useFolders().data;
-  const moveTargets = useMemo(() => {
-    const all = foldersData ?? [];
-    const areas = all
-      .filter((f) => /^wiki\/[^/_][^/]*$/.test(f.id))
-      .map((f) => ({ label: `Library › ${f.name}`, folderId: f.id, area: f.id.slice("wiki/".length) }));
-    const plain = all
-      .filter(
-        (f) =>
-          f.id !== "wiki" &&
-          !f.id.startsWith("wiki/") &&
-          !f.id.startsWith("vault:") &&
-          !f.id.startsWith("chats") &&
-          f.id !== DEST.secure &&
-          !isHidden(f.id) &&
-          !isStorageLane(f.id) &&
-          !/^storage(\/|$)/.test(f.id),
-      )
-      .map((f) => ({
-        // fs-mode ids ARE paths and read well; a legacy ulid id falls back to
-        // the folder's display name
-        label: f.id.includes("/") || f.id === f.name ? f.id.split("/").join(" › ") : f.name,
-        folderId: f.id,
-        area: null as string | null,
-      }));
-    const byLabel = (a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label);
-    return [...areas.sort(byLabel), ...plain.sort(byLabel)];
-  }, [foldersData]);
   const archive = useArchiveNote();
   const trash = useTrashNote();
   const restore = useRestoreNote();
@@ -319,39 +306,40 @@ export function useNoteMenu() {
           },
         });
         items.push({ kind: "sep" as const });
-        // "Move to…" — manual filing, restored (P0 sweep 2026-07-28: the fold
-        // removed every by-hand move; a raw vault had NO way to leave _inbox).
-        // Library areas route through the Filer gate when the Librarian is on
-        // (journaled + undoable in Activity); everything else is a plain move.
-        // The write gates stay the authority — refusals surface right here.
-        if (!isBoard && !isFile && moveTargets.length > 0) {
-          const here = noteDiskFolder(note);
+        // "Move to…" retired (Seth, 2026-07-28: it listed Library areas no
+        // matter which view you were in — misleading; the System browser and
+        // the Librarian own placement). Duplicate replaces it as the quick
+        // by-hand verb: a full copy, "title copy". Placement goes through the
+        // ONE creation router — a plain folder duplicates in place, a curated
+        // memex folder routes to Brain staging BY DECISION, and any real
+        // failure surfaces instead of silently mislanding the copy (Greptile,
+        // PR #1: the old blanket catch hid deleted-folder/permission errors).
+        if (!isBoard && !isFile) {
           items.push({
-            kind: "drill" as const,
-            label: "Move to…",
-            items: moveTargets.map((t) => ({
-              kind: "action" as const,
-              label: t.label,
-              checked: t.folderId === here,
-              checkedMark: "highlight" as const,
-              disabled: t.folderId === here,
-              onClick: () => {
-                useUiStore.getState().setRowActionError(null);
-                // the Filer lane (journal + undo) needs the Librarian AND the
-                // native shell; the browser twin moves plainly, like a raw vault
-                const run =
-                  t.area && brainOn && isTauri()
-                    ? fileNoteToArea(note.id, t.area)
-                    : notesService.moveNote(note.id, t.folderId).then(() => invalidateNotes());
-                void run.catch((err: unknown) =>
-                  useUiStore
-                    .getState()
-                    .setRowActionError(
-                      `Couldn’t move the note — ${err instanceof Error ? err.message : String(err)}`,
-                    ),
-                );
-              },
-            })),
+            kind: "action" as const,
+            label: "Duplicate",
+            onClick: () => {
+              useUiStore.getState().setRowActionError(null);
+              void (async () => {
+                const src = await notesService.getNote(note.id);
+                if (!src) throw new Error("the note could not be read");
+                const home = noteDiskFolder(note);
+                const dupId = await createRoutedNote({
+                  selectedFolderId: home,
+                  isSmart: false,
+                  localFallback: home,
+                  body: copyBody(src.body),
+                });
+                await invalidateNotes();
+                usePanesStore.getState().openNote(dupId);
+              })().catch((err: unknown) =>
+                useUiStore
+                  .getState()
+                  .setRowActionError(
+                    `Couldn’t duplicate the note — ${err instanceof Error ? err.message : String(err)}`,
+                  ),
+              );
+            },
           });
         }
         if (viewsManifest.views.length > 0) {
@@ -534,8 +522,6 @@ export function useNoteMenu() {
       setViewsManifest,
       viewsManifest,
       activeView,
-      moveTargets,
-      brainOn,
     ],
   );
 }
