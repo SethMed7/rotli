@@ -133,6 +133,171 @@
   margin-right: 2px;
 }
 
+/* ——— Quick Look preview (Seth, 2026-07-29): a modal PEEK at an item without
+   opening its full surface. Same flat scrim + bordered surface as ⌘K; the
+   Open button escalates to the real surface. ——— */
+.pv-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 21;
+  background: var(--scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  animation: scrim-in var(--motion-enter) var(--motion-ease);
+}
+.pvw {
+  display: flex;
+  flex-direction: column;
+  width: min(880px, 100%);
+  max-height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+.pv-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.pv-head svg {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.pv-title {
+  font-weight: 600;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pv-meta {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pv-open {
+  flex: 0 0 auto;
+  border: 1px solid var(--border-strong);
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  padding: 3px 12px;
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+.pv-open:hover {
+  background: var(--hov);
+}
+.pv-x {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 17px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+.pv-x:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.pv-body {
+  flex: 1;
+  min-height: 120px;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pv-media {
+  max-width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+}
+.pv-frame {
+  width: 100%;
+  height: 72vh;
+  border: none;
+}
+.pv-player {
+  width: 80%;
+  margin: 40px 0;
+}
+.pv-text {
+  align-self: stretch;
+  width: 100%;
+  margin: 0;
+  padding: 16px 20px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.pv-note {
+  align-self: flex-start;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 20px 26px 30px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.pv-note h1,
+.pv-note h2,
+.pv-note h3 {
+  margin: 0.7em 0 0.3em;
+}
+.pv-note p,
+.pv-note blockquote {
+  margin: 0;
+}
+.pv-note blockquote {
+  border-left: 2px solid var(--border-strong);
+  padding-left: 10px;
+  color: var(--text-muted);
+}
+.pv-blank {
+  height: 0.6em;
+}
+.pv-li {
+  position: relative;
+}
+.pv-marker {
+  position: absolute;
+  transform: translateX(-1.2em);
+  color: var(--text-muted);
+}
+.pv-wait {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.pv-metacard {
+  text-align: center;
+  padding: 36px 24px;
+}
+.pv-metacard-note {
+  font-size: 13px;
+  margin: 0 0 10px;
+}
+.pv-metacard-line {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin: 2px 0;
+}
+
 /* ——— WhichKey — "hold ⌘ to peek" shortcut map (Seth, 2026-06-13) ———
    Centered, pointer-events:none so it can never steal a click, z-index 18 —
    below the palette (20). Dims behind the panel (Seth, 2026-06-15: the

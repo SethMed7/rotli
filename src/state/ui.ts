@@ -259,6 +259,11 @@ interface UiState {
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
 
+  /** Quick Look peek (Seth, 2026-07-29): the item previewed in a modal without
+   * opening its full surface; null = closed. */
+  previewItem: NoteSummary | null;
+  setPreviewItem: (item: NoteSummary | null) => void;
+
   /** Settings as its own surface in the window (r1 frame F); Esc returns. */
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
@@ -536,6 +541,9 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   paletteOpen: false,
   setPaletteOpen: (open) => set({ paletteOpen: open }),
+
+  previewItem: null,
+  setPreviewItem: (item) => set({ previewItem: item }),
 
   settingsOpen: false,
   setSettingsOpen: (open) => set({ settingsOpen: open }),

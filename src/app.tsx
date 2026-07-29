@@ -16,6 +16,7 @@ import { CaptureCard } from "./components/captureCard";
 import { NotesSurface } from "./components/notesSurface";
 import { Onboarding } from "./components/onboarding";
 import { Palette } from "./components/palette";
+import { PreviewModal } from "./components/previewModal";
 import { ContextMenu } from "./components/contextMenu";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
@@ -413,6 +414,7 @@ function MainShell() {
         {settingsOpen ? <SettingsSurface /> : <NotesSurface />}
       </main>
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
+      <PreviewModal />
       {whichKey && <WhichKey onClose={() => setWhichKey(false)} />}
       <ContextMenu />
       <RenameDialog />

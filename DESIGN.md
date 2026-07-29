@@ -73,6 +73,11 @@ exception.
 - Every tab is closeable, including the last one: the lone pane rests on the
   quokka empty state with quiet ways back in (new note · search · reopen tab).
   An empty pane is a designed state, not an error.
+- Quick Look is a PEEK, never the workspace: Space (or the row menu's Preview)
+  opens a modal preview; formats without a faithful cheap render show an
+  honest metadata card, and the Open button is always the escalation to the
+  item's real surface. Esc and outside-click close through the transient
+  stack.
 - Focus is always visible, predictable, and restored after overlays close.
 - Destructive actions are explicit and visually distinct without becoming
   alarmist.

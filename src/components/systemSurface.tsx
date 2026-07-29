@@ -528,7 +528,20 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   const empty = listing.folders.length === 0 && listing.items.length === 0;
 
   return (
-    <div className="board allnotes system-browser">
+    // Space = Quick Look on the single-selected item (Finder muscle memory;
+    // Seth, 2026-07-29) — anywhere in the browser except a text input
+    <div
+      className="board allnotes system-browser"
+      onKeyDown={(e) => {
+        if (e.key !== " ") return;
+        const t = e.target as HTMLElement;
+        if (t.closest("input, textarea") || t.isContentEditable) return;
+        const single = selection.length === 1 ? selection[0] : null;
+        if (!single) return;
+        e.preventDefault();
+        useUiStore.getState().setPreviewItem(single);
+      }}
+    >
       <header className="board-head">
         {!atRoot && (
           <button

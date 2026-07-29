@@ -208,6 +208,13 @@ export function useNoteMenu() {
         };
 
         const items: MenuSpec[] = [];
+        // Quick Look (Seth, 2026-07-29): peek without opening fully — Space in
+        // the System browser opens the same modal
+        items.push({
+          kind: "action" as const,
+          label: "Preview",
+          onClick: () => useUiStore.getState().setPreviewItem(note),
+        });
         items.push({
           kind: "action" as const,
           label: "Open in new tab",
