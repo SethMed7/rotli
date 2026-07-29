@@ -17,7 +17,7 @@ SANDBOX=""; if [ "$BREVE_SANDBOX" != "0" ] && [ -f "$SB" ]; then SANDBOX="/usr/b
 # fable, then opus — overpowered, and a vanished default = no brief). Env override wins.
 BREVE_MODEL="${BREVE_MODEL:-$(bun "$BREVE/scripts/brief-model.ts" 2>/dev/null || echo sonnet)}"
 # Resolve the memex + storage roots from config (config.local.json owns the real paths; no hardcoding).
-KNOWLEDGE="$(bun "$BREVE/scripts/print-root.ts" knowledge 2>/dev/null || echo "$HOME/memex")"
+KNOWLEDGE="$(bun "$BREVE/scripts/print-root.ts" knowledge 2>/dev/null || echo "$HOME/memex-vault")"
 STORE="$(bun "$BREVE/scripts/print-root.ts" storage 2>/dev/null || echo "$HOME/memex-storage")"
 # Cross-provider fallback chain. Each agent CLI has INDEPENDENT auth (Anthropic / Google / OpenAI), so a
 # Claude outage or 401 (the common failure) doesn't touch the others. argv[0] resolved to an absolute

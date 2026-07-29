@@ -16,8 +16,10 @@ const VERSION = JSON.parse(
 const DOWNLOAD_URL = `https://github.com/SethMed7/rotli-releases/releases/download/v${VERSION}/rotli_${VERSION}_aarch64.dmg`;
 const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
 const GITHUB_URL = 'https://github.com/SethMed7/rotli';
-// the open foundation for how rotli organizes data
-const MEMEX_URL = 'https://github.com/SethMed7/memex';
+// the memex-format story — the format lives on as rotli's vault format
+// (the old standalone SethMed7/memex repo is retired), so the story link
+// points at rotli's own releases home rather than a dead repo
+const MEMEX_URL = RELEASES_URL;
 
 const features = [
   {
@@ -129,7 +131,7 @@ const promises = [
           <b>Brain</b> for the AI — location and metadata only, never the words inside your notes.
         </p>
         <a class="memex-link" href={MEMEX_URL} rel="noopener">
-          Built on memex — the open foundation for how your data is organized →
+          Built on the memex vault format — one plain folder, yours to keep →
         </a>
       </div>
       <span class="char privacy-char" set:html={staysLocal} />

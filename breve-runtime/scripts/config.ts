@@ -106,7 +106,7 @@ export const launchdOrg = (): string => process.env.BREVE_LAUNCHD_ORG ?? local.l
 /** The memex BASE — the repo root that holds the contracts, clients/, and (if multi-tenant) the
  *  users.json registry + users/<name>/ partitions. This is the value `knowledgePath()` returns. */
 const memexBase = (): string =>
-  expand(process.env.BREVE_KNOWLEDGE ?? local.knowledgePath ?? join(homedir(), "memex"));
+  expand(process.env.BREVE_KNOWLEDGE ?? local.knowledgePath ?? join(homedir(), "memex-vault"));
 
 /** The memex knowledge base Breve reads and routes captures into (the memex base / default partition). */
 export const knowledgePath = (): string => memexBase();

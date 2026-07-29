@@ -1,7 +1,7 @@
 /**
  * BREVE identity & access — WHO may talk to Breve and which memex partition(s) each reaches.
  *
- * The split (see ~/memex multi-tenancy, v3.3):
+ * The split (memex multi-tenancy, v3.3 — the format now lives as rotli's vault format):
  *   • memex's users.json (in the knowledge base) owns WHERE partitions live (name → path) + role.
  *   • THIS file (access.json) owns WHO: a Signal identity (phone/uuid) → the memex user(s) it may
  *     reach + its powers. memex stays integration-neutral; the phone↔user binding lives only here.

@@ -7,7 +7,7 @@ Lives in `scripts/config.ts`.*
 
 **The embedded brief runtime has NO code dependency on the memex implementation.** Rotli owns and
 supervises the runtime, while the knowledge base is resolved by **path at runtime**
-(`config.local.json` → `knowledgePath`, default `~/memex`) and may be absent on a fresh install.
+(`config.local.json` → `knowledgePath`, default `~/memex-vault`) and may be absent on a fresh install.
 Everything the runtime reads about the memex —
 the partition registry, the access mode, the instance identity — it reads by *opening files*, not by
 importing memex code.
@@ -20,7 +20,7 @@ Rotli (.rotli/breve)         memex corpus
 
 ## Why mirror instead of `import`
 
-`config.ts` deliberately **re-implements** the small slice of `memex/scripts/mounts.ts` it needs
+`config.ts` deliberately **re-implements** the small slice of the vault's `scripts/mounts.ts` it needs
 (`readMemexRegistry` / `accessMode` / `knowledgePathFor` / `memexInfo`). It does **not** import
 mounts.ts. The header comment says why, and it's load-bearing:
 
@@ -43,7 +43,8 @@ contract version. The cost is that the mirror must be **kept in sync by hand** w
 
 ## Maintenance rule
 
-When `memex/scripts/mounts.ts` changes the **users.json / mode / memex.json** format, update the
+When the vault's `scripts/mounts.ts` (the memex format lives on as rotli's vault format; the old
+standalone repo is retired) changes the **users.json / mode / memex.json** format, update the
 mirror in `config.ts` in the same change — this is the *one* place the contract is duplicated, on
 purpose, by value. (Behavioral/feature logic still lives only in Breve; the memex never fetches,
 sends, or calls an LLM — it only declares structure + config.) See the memex's `STRUCTURE.md` for the

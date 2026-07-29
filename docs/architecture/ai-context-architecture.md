@@ -34,6 +34,7 @@ the current behavior.
 - `ROTLI_MODELS`: provider boundaries and capability policy
 - `ROTLI_SECURITY`: assets, trust boundaries, privacy, vulnerabilities, and residual risk
 - `ROTLI_OPERATIONS`: release, daemon, Keychain, and process safety
+- `ROTLI_SHELL`: the app shell — sidebar, tabs/panes, System and Library browsers, row menus
 
 All domains are `always_on: false`. Claude's installed CARL hook walks upward
 from the working directory, finds this project file, and injects only domains

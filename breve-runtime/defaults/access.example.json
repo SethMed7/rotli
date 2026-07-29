@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "memexRoot": "~/memex",
+  "memexRoot": "~/memex-vault",
   "bindings": [
     {
       "phone": "+1XXXXXXXXXX",
@@ -19,5 +19,5 @@
       "powers": ["knowledge"]
     }
   ],
-  "_notes": "LEGACY / LOCAL-MODE TEMPLATE ONLY — access.json is consulted only when there is NO memex users.json registry, or mode === 'local'. In secure/open mode the memex policy (identities.local.json + users.json) is AUTHORITATIVE and this file is ignored; new multi-tenant installs should wire identities via ~/memex/template/identities.local.json.example + users.json.example instead. WHO may talk to Breve and which memex partition(s) each reaches. Copy to access.json (gitignored — holds phone numbers). phone = E.164 Signal number; uuid = Signal account UUID (either may match). role admin can reach ANY memex partition + run /user-add; member is siloed to its `users`. `users` = memex partition names (from the knowledge base's users.json — the WHERE). primaryUser = default partition on a new conversation. powers default to ['knowledge'] for members; admin gets the full set. With NO access.json, Breve synthesizes one admin binding from signal.json's owner over the single-tenant '__default__' partition (today's behavior). Secrets stay in the Keychain, never here."
+  "_notes": "LEGACY / LOCAL-MODE TEMPLATE ONLY — access.json is consulted only when there is NO memex users.json registry, or mode === 'local'. In secure/open mode the memex policy (identities.local.json + users.json) is AUTHORITATIVE and this file is ignored; new multi-tenant installs should wire identities via the vault's template/identities.local.json.example + users.json.example instead. WHO may talk to Breve and which memex partition(s) each reaches. Copy to access.json (gitignored — holds phone numbers). phone = E.164 Signal number; uuid = Signal account UUID (either may match). role admin can reach ANY memex partition + run /user-add; member is siloed to its `users`. `users` = memex partition names (from the knowledge base's users.json — the WHERE). primaryUser = default partition on a new conversation. powers default to ['knowledge'] for members; admin gets the full set. With NO access.json, Breve synthesizes one admin binding from signal.json's owner over the single-tenant '__default__' partition (today's behavior). Secrets stay in the Keychain, never here."
 }

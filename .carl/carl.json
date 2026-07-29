@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-07-21T18:30:00.000Z",
+  "last_modified": "2026-07-29T02:00:00.000Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -117,7 +117,11 @@
           "rationale": "One versioned home prevents code/document drift. The memex retains broader product knowledge and model-readable protocols.",
           "date": "2026-07-06",
           "source": "manual",
-          "recall": ["docs", "brand", "source of truth"],
+          "recall": [
+            "docs",
+            "brand",
+            "source of truth"
+          ],
           "status": "active"
         }
       ]
@@ -168,7 +172,11 @@
           "rationale": "Local-first ownership avoids lock-in and keeps files usable without Rotli.",
           "date": "2026-06-22",
           "source": "manual",
-          "recall": ["local-first", "files", "ownership"],
+          "recall": [
+            "local-first",
+            "files",
+            "ownership"
+          ],
           "status": "active"
         },
         {
@@ -177,7 +185,11 @@
           "rationale": "Automatic organization is useful because it never rewrites note prose and every action remains reviewable.",
           "date": "2026-07-02",
           "source": "manual",
-          "recall": ["organizer", "trust", "brain"],
+          "recall": [
+            "organizer",
+            "trust",
+            "brain"
+          ],
           "status": "active"
         }
       ]
@@ -314,6 +326,13 @@
           "added": "2026-07-21",
           "last_reviewed": "2026-07-22",
           "source": "DESIGN.md"
+        },
+        {
+          "id": 3,
+          "text": "Wikilink targets normalize before resolution: |display, #heading, and trailing .md strip; path-style targets fall back to their last segment; archived notes resolve (only Trash reads as deleted). An unresolvable wikilink renders dimmed-dashed 'missing' — never a silent dead click. Bare http(s) URLs autolink and open on ⌘-click like [text](url); plain click stays the caret.",
+          "added": "2026-07-29",
+          "last_reviewed": "2026-07-29",
+          "source": "src/editor/wikilink.ts"
         }
       ],
       "decisions": []
@@ -421,7 +440,13 @@
           "rationale": "Multiple temperatures serve real preferences; Glass added complexity without strengthening the native desktop experience.",
           "date": "2026-07-11",
           "source": "manual",
-          "recall": ["themes", "warm", "paper", "charcoal", "glass"],
+          "recall": [
+            "themes",
+            "warm",
+            "paper",
+            "charcoal",
+            "glass"
+          ],
           "status": "active"
         }
       ]
@@ -555,6 +580,65 @@
           "added": "2026-07-21",
           "last_reviewed": "2026-07-21",
           "source": "docs/operations/support-and-diagnostics.md"
+        },
+        {
+          "id": 4,
+          "text": "Substantive code changes land through a feature branch + pull request reviewed by the Greptile GitHub app; findings are fixed and answered on-thread before a squash merge. Releases gate on the merged commit's CI conclusion VALUE, never exit codes. E2E specs drive UI through real controls, never ⌘-chords (Linux CI has no Meta key). Doc-only corrections may commit directly.",
+          "added": "2026-07-29",
+          "last_reviewed": "2026-07-29",
+          "source": "AGENTS.md"
+        }
+      ],
+      "decisions": []
+    },
+    "ROTLI_SHELL": {
+      "state": "active",
+      "always_on": false,
+      "recall": [
+        "sidebar",
+        "system browser",
+        "library browser",
+        "assets browser",
+        "gallery view",
+        "path bar",
+        "breadcrumb",
+        "tab strip",
+        "pane",
+        "split",
+        "tabs",
+        "empty state",
+        "context menu",
+        "row menu",
+        "duplicate",
+        "librarian row",
+        "utility footer",
+        "view switcher",
+        "thumbnails",
+        "command palette",
+        "quick search"
+      ],
+      "exclude": [],
+      "rules": [
+        {
+          "id": 0,
+          "text": "The System browser (Library/Assets/Archive/Trash) is a spatial Finder with four views — Icons (image thumbnails), List, Columns, Gallery (big preview + filmstrip, arrow keys) — switched by Finder icons. The folder trail is a BOTTOM path bar whose leaf is the selection; background right-click offers New folder + Sort by (name/kind/modified/created). Listings read disk paths through rerootDiskPath (memex lanes are lowercase on disk); the Library lists wiki notes AND the files/boards inside wiki folders.",
+          "added": "2026-07-29",
+          "last_reviewed": "2026-07-29",
+          "source": "src/components/systemSurface.tsx"
+        },
+        {
+          "id": 1,
+          "text": "The sidebar: one-row header (vault name ellipsizes first, New-board lives inside the New… menu), section chevrons on the row's RIGHT edge, a compact pinned System zone, and a utility footer — Files · Librarian · Settings (the Librarian entry is the journal formerly labeled Activity; internal ids keep 'activity'). Row menus offer Duplicate (via createRoutedNote, 'title copy'); the old Move to… manual filing is retired — the browser and the Librarian own placement.",
+          "added": "2026-07-29",
+          "last_reviewed": "2026-07-29",
+          "source": "src/components/sidebar.tsx"
+        },
+        {
+          "id": 2,
+          "text": "Every tab is closeable including the last: the lone pane goes EMPTY (activeTabOf returns null) and rests on the quokka empty state with new-note/search/reopen actions; ⌘⇧T restores. The ⌘K palette follows real pointer movement only (onMouseMove, never onMouseEnter — scroll-under-cursor hover events snap the selection back).",
+          "added": "2026-07-29",
+          "last_reviewed": "2026-07-29",
+          "source": "src/state/panes.ts"
         }
       ],
       "decisions": []

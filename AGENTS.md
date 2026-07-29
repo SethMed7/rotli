@@ -7,14 +7,12 @@ Canonical repository instructions for AI-assisted work. Human contributors use
 
 1. Read `README.md`, this file, and the relevant contract from `docs/README.md`.
 2. If project CARL tools are available, call `carl_recall` with the task topic
-   before broad code or documentation scans. Otherwise inspect only the matching
-   domain in `.carl/carl.json`.
+   before broad scans; otherwise read the matching `.carl/carl.json` domain.
 3. Inspect implementation, focused tests, and `git status --short`. Preserve all
    unrelated work.
 
 Current code and owning contracts outrank CARL summaries. `docs/archive/`, old
-changelog entries, generated output, and Carl sessions are historical/runtime
-material—not current specifications.
+changelog entries, generated output, and Carl sessions are historical only.
 
 ## Product laws
 
@@ -74,8 +72,9 @@ cargo test --manifest-path src-tauri/Cargo.toml
 NODE_OPTIONS=--max-old-space-size=4096 bun run build
 ```
 
-Use focused commands while iterating: `bun test <file>`, `bun run test:breve`,
-and the relevant `check:*` script.
+Iterate with focused commands: `bun test <file>` and the relevant `check:*`
+script. Substantive changes land via Greptile-reviewed PRs (fixes on-thread);
+releases gate on CI conclusion; E2E clicks real controls, never ⌘-chords.
 
 UI work must follow `DESIGN.md`, use semantic tokens from `src/brand/`, remain
 keyboard-safe and readable in all four environments, and cover loading, empty, error, saved,
@@ -83,9 +82,8 @@ disabled, destructive, and narrow-window states. Do not add a UI framework or
 raw colors outside the brand layer.
 
 Browser mode does not prove native titlebar, menu-bar, filesystem, Keychain,
-updater, or scheduler behavior. Report exact checks, remaining warnings, human
-visual work, and whether anything was committed, published, installed, or
-restarted.
+updater, or scheduler behavior. Report exact checks, warnings, human visual
+work, and any commit/publish/install/restart.
 
 ## Documentation ownership
 

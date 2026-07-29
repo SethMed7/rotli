@@ -150,7 +150,12 @@ The Rust corpus boundary independently validates every write.
   exact prior stem without redundantly adding the unchanged title. Current
   title, current filename stem, canonical title slug, and aliases all resolve
   local wikilinks and CLI note selectors; ambiguity fails closed and requires
-  the stable `id`.
+  the stable `id`. Wikilink targets are normalized before resolution
+  (2026-07-28): a `|display` alias, a `#heading` fragment, and a trailing
+  `.md` are stripped, and a path-style target falls back to its last segment.
+  Archived notes keep resolving (only Trash reads as deleted); a target that
+  resolves to nothing renders visibly inert (dimmed, dashed) rather than
+  silently ignoring the click.
 - The user owns explicit organizational metadata such as `shelf`, `reach`,
   `view_tag`, `locked`, and the secure-note controls. Rotli manages `view_tag`
   through the named-view workflow so the Markdown and reference tree cannot
@@ -290,7 +295,9 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   **Librarian** and its organized area (the `wiki/` tree) the **Library**; a
   connected vault is a **Linked library**. These are display names only —
   contract terms, folder ids (`Brain`, `wiki/`), and the `brainEnabled`
-  setting keep their internal names.
+  setting keep their internal names. Since 2026-07-28 the journal surface
+  (formerly the sidebar's "Activity" row) is reached as **Librarian** in the
+  sidebar's utility footer; "Activity" survives only in internal identifiers.
 - **A vault may be raw** (vault-vs-brain, 2026-07-26): the per-vault
   `brainEnabled` setting (missing ⇒ on) turns the Brain layer off entirely.
   Raw means the organizer never acts and the filer write lane refuses —
@@ -301,7 +308,8 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   [`2026-07-26-vault-vs-brain.md`](../decisions/2026-07-26-vault-vs-brain.md).
 - A note explicitly flagged `secure: true` whose file still sits in Brain
   intake is legacy or externally moved state; the organizer must never read it
-  in place. The Brain Activity pane offers the explicit, previewable **legacy
+  in place. The Librarian journal (the sidebar footer's **Librarian** entry)
+  offers the explicit, previewable **legacy
   secure intake repair**: Rust re-validates the flag on disk per note, refuses
   non-secure targets, symlinks, and id-less files, completes the protected
   ignore-before-move into `wiki/_secure/` without changing prose, and journals
@@ -314,8 +322,8 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   remote providers receive no secure-derived envelope, and both default-off
   global consent and explicit `local_ai_allowed: true` are required for a
   registered on-device model.
-- A non-secure note whose content fires the secret detector enters the Brain
-  Activity **secure review** instead of being silently modeled around: the
+- A non-secure note whose content fires the secret detector enters the
+  Librarian journal's **secure review** instead of being silently modeled around: the
   organizer skips it and the pane offers *Make secure* (the existing protected
   flow) or *Not sensitive*. The detector proposes; the user disposes — this
   lane never auto-marks a note. A dismissal is content-keyed rebuildable

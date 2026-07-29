@@ -52,9 +52,27 @@ exception.
   require an explicit second-step confirmation before their contents move.
 - Native content rows expose Copy File Path beside Show in Finder. Browser-mode
   twins disable both filesystem-only actions instead of pretending they ran.
-- Note-to-note wikilinks open with an ordinary click. The editor header may
+- Note-to-note wikilinks open with an ordinary click; web links — markdown
+  links and bare-URL autolinks alike — keep the deliberate ⌘-click gesture
+  inside the editor. A wikilink that resolves to no note renders visibly inert (dimmed,
+  dashed underline, honest tooltip) — a dead link must never look like a live
+  one. The editor header may
   expose the existing session back/forward trail beside the date, using compact
   adjacent-note labels rather than duplicating the sidebar's folder hierarchy.
+- The sidebar ends in a pinned utility footer — Files · Librarian · Settings on
+  one quiet row; section disclosure chevrons ride the row's right edge so icons
+  and labels start flush left.
+- The System browser is a spatial Finder with four views — Icons, List,
+  Columns, Gallery — switched by the standard Finder icons (words live in
+  tooltips). Image assets show real thumbnails wherever a tile or filmstrip
+  renders them. The folder trail is a bottom path bar (the Finder placement —
+  an explicit exception to header-adjacent navigation): every segment
+  navigates and the current selection is the leaf. Right-clicking empty space
+  offers New folder (where creation is allowed) and Sort by Name / Kind /
+  Date modified / Date created; re-picking the active key flips direction.
+- Every tab is closeable, including the last one: the lone pane rests on the
+  quokka empty state with quiet ways back in (new note · search · reopen tab).
+  An empty pane is a designed state, not an error.
 - Focus is always visible, predictable, and restored after overlays close.
 - Destructive actions are explicit and visually distinct without becoming
   alarmist.

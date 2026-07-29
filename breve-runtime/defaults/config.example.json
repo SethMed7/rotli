@@ -1,5 +1,5 @@
 {
-  "knowledgePath": "~/memex",
+  "knowledgePath": "~/memex-vault",
   "assetsPath": "~/memex-storage/assets",
   "storagePath": "~/memex-storage",
   "llm": {

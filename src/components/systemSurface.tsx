@@ -1,10 +1,11 @@
-// The System browser (Finder rework 2026-07-27, from Seth's screenshots):
+// The System browser (Finder rework 2026-07-27/28, from Seth's screenshots):
 // Library · Assets · Archive · Trash open HERE as a real Finder — you are IN
-// one folder and see only its direct contents. "Folders" is the icon-grid
-// view (double-click a folder to enter, double-click an item to open);
-// "List" is the columned list (Name · Date Modified · Kind) with disclosure
-// triangles. A breadcrumb climbs back up; search flattens across the root.
-// Single click selects, double click opens — Finder conventions, zero friction.
+// one folder and see only its direct contents. FOUR views behind Finder's own
+// icons: Icons (grid, image thumbnails), List (Name · Date Modified · Kind,
+// disclosure triangles), Columns, and Gallery (big preview + filmstrip). The
+// folder trail is the BOTTOM path bar (Finder's placement) with the selection
+// as its leaf; right-clicking empty space offers New folder + Sort by; search
+// flattens across the root. Single click selects, double click opens.
 
 import {
   type ButtonHTMLAttributes,
