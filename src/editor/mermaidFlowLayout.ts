@@ -1,4 +1,4 @@
-import type { MermaidFlowchart } from "./mermaidFlowchart";
+import type { MermaidFlowchart, MermaidNodeShape } from "./mermaidFlowchart";
 
 export interface MermaidCanvasPoint {
   x: number;
@@ -12,6 +12,49 @@ export interface MermaidFlowLayout {
 }
 
 export const MERMAID_VISUAL_NODE_SIZE = { width: 164, height: 72 } as const;
+
+export interface MermaidEdgeSegment {
+  from: MermaidCanvasPoint;
+  to: MermaidCanvasPoint;
+}
+
+/* circle/dbl-circ render as 72px circles centered in the node wrap, so their
+   boundary is the wrap's half-height in every direction */
+function boundaryDistance(shape: MermaidNodeShape, ux: number, uy: number): number {
+  const halfW = MERMAID_VISUAL_NODE_SIZE.width / 2;
+  const halfH = MERMAID_VISUAL_NODE_SIZE.height / 2;
+  if (shape === "circle" || shape === "dbl-circ") return halfH;
+  if (shape === "diamond") return 1 / (Math.abs(ux) / halfW + Math.abs(uy) / halfH);
+  return Math.min(ux === 0 ? Infinity : halfW / Math.abs(ux), uy === 0 ? Infinity : halfH / Math.abs(uy));
+}
+
+/* Trim a center-to-center connection so it starts and ends at each node's
+   border instead of running beneath (or across) the labels. Takes the nodes'
+   wrap top-left positions; falls back to the centers when the nodes overlap. */
+export function trimMermaidEdge(
+  from: MermaidCanvasPoint,
+  to: MermaidCanvasPoint,
+  fromShape: MermaidNodeShape,
+  toShape: MermaidNodeShape,
+): MermaidEdgeSegment {
+  const halfW = MERMAID_VISUAL_NODE_SIZE.width / 2;
+  const halfH = MERMAID_VISUAL_NODE_SIZE.height / 2;
+  const c1 = { x: from.x + halfW, y: from.y + halfH };
+  const c2 = { x: to.x + halfW, y: to.y + halfH };
+  const dx = c2.x - c1.x;
+  const dy = c2.y - c1.y;
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return { from: c1, to: c2 };
+  const ux = dx / length;
+  const uy = dy / length;
+  const exitFrom = boundaryDistance(fromShape, ux, uy);
+  const exitTo = boundaryDistance(toShape, ux, uy);
+  if (exitFrom + exitTo >= length) return { from: c1, to: c2 };
+  return {
+    from: { x: c1.x + ux * exitFrom, y: c1.y + uy * exitFrom },
+    to: { x: c2.x - ux * exitTo, y: c2.y - uy * exitTo },
+  };
+}
 
 function nodeLevels(model: MermaidFlowchart): Map<string, number> {
   const nodeIds = new Set(model.nodes.map((node) => node.id));

@@ -25,6 +25,8 @@ import {
   parsePrimaryUser,
   setAttachedTo,
   setChatPinned,
+  setChatSecureContext,
+  hasSecureContext,
   slugify,
 } from "./contract";
 
@@ -167,6 +169,32 @@ describe("setChatPinned (sidebar pin-to-top)", () => {
     expect(setChatPinned(base, false)).toBe(base);
     const bare = "# just a body\npinned: true\n";
     expect(setChatPinned(bare, true)).toBe(bare); // a body line never matches
+  });
+});
+
+describe("secureContext taint (secure-note reads poison the chat, one-way)", () => {
+  test("marks a chat and reads back; marking twice is byte-identical", () => {
+    const base = "---\ntitle: T\n---\n\nbody\n";
+    expect(hasSecureContext(base)).toBe(false);
+    const marked = setChatSecureContext(base);
+    expect(marked).toBe("---\ntitle: T\nsecureContext: true\n---\n\nbody\n");
+    expect(hasSecureContext(marked)).toBe(true);
+    expect(setChatSecureContext(marked)).toBe(marked);
+  });
+
+  test("a stale secureContext: false line is rewritten to true, exactly once", () => {
+    const base = "---\ntitle: T\nsecureContext: false\n---\n\nbody\n";
+    const marked = setChatSecureContext(base);
+    expect(marked).toContain("secureContext: true");
+    expect(marked.match(/^secureContext:/gm)?.length).toBe(1);
+  });
+
+  test("a body line never matches, in either direction", () => {
+    const bare = "# just a body\nsecureContext: true\n";
+    expect(setChatSecureContext(bare)).toBe(bare); // no frontmatter — untouched
+    expect(hasSecureContext(bare)).toBe(false); // and never read as tainted
+    const decoy = "---\ntitle: T\n---\n\nsecureContext: true\n";
+    expect(hasSecureContext(decoy)).toBe(false);
   });
 });
 

@@ -406,11 +406,8 @@ pub fn local_model_set_default(id: String) -> Result<(), String> {
     }
     // must be an installed model dir under the shared models/ (canonicalize both
     // so a `..` or symlink can't point the server outside the store)
-    let models = std::fs::canonicalize(models_dir()).map_err(|e| e.to_string())?;
-    let target = std::fs::canonicalize(&path).map_err(|_| format!("no such model on disk: {id}"))?;
-    if !target.starts_with(&models) || !target.is_dir() {
-        return Err("that isn't an installed local model.".into());
-    }
+    let target = contained_model_dir(&models_dir(), Path::new(&path))
+        .map_err(|_| format!("that isn't an installed local model: {id}"))?;
     let plist = mlx_plist()?;
     if !plist.is_file() {
         return Err("the MLX server isn't installed on this Mac (no launchd plist).".into());
@@ -427,6 +424,18 @@ pub fn local_model_set_default(id: String) -> Result<(), String> {
         ));
     }
     reload_mlx(&plist)
+}
+
+/// The registry is shared, user-writable data — a `path` it declares is trusted
+/// only after canonicalizing and confirming it sits beneath the models store,
+/// so a corrupt or hostile entry can't point a destructive command elsewhere.
+fn contained_model_dir(models: &Path, path: &Path) -> Result<PathBuf, String> {
+    let models = std::fs::canonicalize(models).map_err(|e| e.to_string())?;
+    let target = std::fs::canonicalize(path).map_err(|_| "no such model on disk".to_string())?;
+    if !target.starts_with(&models) || !target.is_dir() {
+        return Err("that path isn't inside the local models store".into());
+    }
+    Ok(target)
 }
 
 fn uid() -> Result<String, String> {
@@ -492,6 +501,16 @@ pub fn local_model_uninstall(id: String) -> Result<(), String> {
             return Err("that's the default local model — make another one the default first.".into());
         }
     }
+    // the registry's path is user-writable data: only a dir proven to sit
+    // inside the models store may be trashed (audit 2026-07-29 — a hostile
+    // entry could otherwise point this at the vault or ~/Documents)
+    let trash_target = if path.exists() {
+        Some(contained_model_dir(&models_dir(), &path).map_err(|_| {
+            format!("{id}'s registry path isn't inside the local models store — refusing to remove it.")
+        })?)
+    } else {
+        None
+    };
     // splice the entry out, then trash the dir (registry first: a dir that
     // lingers is harmless; a registry pointing at a gone dir is not)
     if let Some(arr) = reg.get_mut("models").and_then(|m| m.as_array_mut()) {
@@ -499,8 +518,8 @@ pub fn local_model_uninstall(id: String) -> Result<(), String> {
     }
     bump_updated(&mut reg);
     write_registry(&reg)?;
-    if path.exists() {
-        let _ = trash::delete(&path);
+    if let Some(target) = trash_target {
+        let _ = trash::delete(&target);
     }
     Ok(())
 }
@@ -510,6 +529,31 @@ pub fn local_model_uninstall(id: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn registry_paths_outside_the_models_store_are_refused() {
+        let tmp = std::env::temp_dir().join(format!("rotli-lm-contain-{}", std::process::id()));
+        let models = tmp.join("models");
+        let inside = models.join("good-model");
+        let outside = tmp.join("victim-dir");
+        std::fs::create_dir_all(&inside).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+
+        assert!(contained_model_dir(&models, &inside).is_ok());
+        assert!(contained_model_dir(&models, &outside).is_err());
+        // `..` escape resolves outside and is refused
+        assert!(contained_model_dir(&models, &models.join("good-model/../../victim-dir")).is_err());
+        // a symlink inside the store pointing out is refused after canonicalize
+        let link = models.join("sneaky");
+        let _ = std::os::unix::fs::symlink(&outside, &link);
+        assert!(contained_model_dir(&models, &link).is_err());
+        // a file (not a dir) inside the store is refused
+        let file = models.join("loose-file");
+        std::fs::write(&file, b"x").unwrap();
+        assert!(contained_model_dir(&models, &file).is_err());
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
 
     #[test]
     fn repo_ids_are_owner_slash_name_only() {

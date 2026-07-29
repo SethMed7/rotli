@@ -11,6 +11,8 @@ import type { ModelMeta } from "./budget";
 export type ToolName =
   | "search_notes"
   | "read_note"
+  | "create_note"
+  | "open_note"
   | "search_memory"
   | "read_memory"
   | "read_file"
@@ -61,6 +63,11 @@ export interface Host {
   /** Read one note by id. Secure notes require explicit local-AI permission;
    * remote models can never read them. */
   readNote(id: string): Promise<string>;
+  /** CREATE a note — the same intake lane as the workspace CLI (staging/Inbox;
+   * the organizer files it later). Returns the observation the model reports. */
+  createNote(title: string, body: string): Promise<string>;
+  /** Open a note on screen (a tab in the app). Optional — headless hosts skip it. */
+  openNote?(id: string): Promise<string>;
   /** Master retrieval across organized notes and prior chats. Optional so a
    * portable host can degrade to note search without implementing chat IO. */
   searchMemory?(query: string, limit: number): Promise<MemoryHit[]>;

@@ -10,6 +10,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The chat composer grows with you** — up to seven lines while you type,
+  then it scrolls inside, so long messages stay visible instead of hiding
+  behind one cramped line.
+- **A real thinking indicator** — three quietly pulsing dots ahead of the
+  status line while a model works (still, for reduced-motion users).
+- **Chat models can create and open notes.** Ask for a note in chat and the
+  model writes it through the same intake lane as the CLI (staging/Inbox, the
+  organizer files it later) and can open any note on screen in a tab.
+- **Copy file path** on a chat's right-click menu — the chat is a real
+  `chats/<slug>.md` file, and now the menu says so.
+
+### Changed
+
+- **Text selection wears your primary color** — a translucent wash of the
+  theme accent instead of the fixed peach tint, in the editor and everywhere.
+- **The chat's attached note is real conversation notes now.** The model that
+  answers also keeps a "Conversation notes" section — decisions, facts, action
+  items, open questions — like a colleague taking notes, replacing the old
+  speaker-labeled transcript, its visible HTML markers, and the stray "> chat:"
+  blockquote (old notes migrate on their next update; without a usable model
+  the section falls back to a topics digest).
+
+### Security
+
+- **Secure-note content can no longer reach a remote model through chat
+  history.** When a local model reads a secure note during a chat turn, the
+  chat is permanently marked `secureContext` — remote and routed models leave
+  its picker, web search locks off, sends to non-local models refuse, its
+  transcript is excluded from remote models' chat-memory retrieval, and no
+  unlabeled memory note is written from it.
+- **A secure-context chat writes secure notes.** When chat carries secure-note
+  content, any note the model creates is stamped `secure: true` — the model
+  can't launder secure prose into an open note (Greptile P1, PR #4).
+- **Boards joined the remote egress gate.** Connected agents (CLI/MCP) can no
+  longer read, list, or rewrite a board whose scene carries secret-shaped
+  content — the boards mirror of the note lane's rule.
+- **Breve's keychain unlock password left the process table.** Unlocks and
+  secret writes now ride `security -i` over stdin instead of argv, and the
+  image-generation sandbox explicitly denies the Breve keychain file.
+- **`Uninstall` for a local model only trashes inside the models store.** A
+  corrupt or hostile registry path can no longer point the delete at an
+  arbitrary folder.
+- **The memex read lane refuses symlink escapes** — spine reads resolve
+  through the same containment as every corpus lane instead of a string
+  check, and real read errors are no longer reported as empty files.
+
+### Fixed
+
+- **Unreadable notes fail closed.** A note that can't be read (permissions,
+  invalid UTF-8) now refuses blank-discard and body saves instead of being
+  treated as empty — previously it could be trashed or have its frontmatter
+  (including `secure: true`) silently regenerated. The brain journal and
+  corpus `.gitignore` gained the same protection against wholesale rewrite.
+
+- **Visual mermaid shapes are visible again.** A generic button reset was
+  outranking the shape styling, leaving nodes as bare labels until selected;
+  shapes now render their fill and border in every theme, and connections
+  stop at each shape's border — arrowheads land on the shape instead of
+  hiding under the label.
+
 ## [0.45.0] - 2026-07-29
 
 ### Added

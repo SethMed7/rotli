@@ -243,6 +243,28 @@ export function setChatPinned(contents: string, pinned: boolean): string {
   return `${contents.slice(0, fm.index)}---\n${next}\n---${contents.slice(fm.index + fm[0].length)}`;
 }
 
+/** Mark a chat as SECURE-CONTEXT: a turn's tool trace read a secure note, so
+ * the transcript may carry its prose and must never ride to a remote model —
+ * even after a model switch (audit 2026-07-29 #7). One-way: nothing unsets it.
+ * Pure; same first-frontmatter-block discipline as setChatPinned. */
+export function setChatSecureContext(contents: string): string {
+  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
+  if (!fm || fm[1] === undefined) return contents; // no frontmatter — leave the file alone
+  const block = fm[1];
+  if (/^secureContext:\s*true\s*$/m.test(block)) return contents;
+  const next = /^secureContext:.*$/m.test(block)
+    ? block.replace(/^secureContext:.*$/m, "secureContext: true")
+    : `${block}\nsecureContext: true`;
+  return `${contents.slice(0, fm.index)}---\n${next}\n---${contents.slice(fm.index + fm[0].length)}`;
+}
+
+/** Whether a chat file carries the secure-context marker (first frontmatter
+ * block only — a message line can never match). */
+export function hasSecureContext(contents: string): boolean {
+  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
+  return !!fm && fm[1] !== undefined && /^secureContext:\s*true\s*$/m.test(fm[1]);
+}
+
 /** Keep the attached note's `## Chat` backlink in sync (byte-identical to
  *  conversations.ts ensureChatLink). Pure: returns the new note body; Rust writes it. */
 export function ensureChatBacklink(noteBody: string, slug: string): string {

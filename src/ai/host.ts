@@ -9,6 +9,7 @@ import {
   cliComplete,
   corpusFileBytes,
   corpusFileText,
+  corpusFrontmatter,
   corpusList,
   corpusReadAi,
   corpusSearch,
@@ -24,6 +25,11 @@ import { contextWindowFor } from "./budget";
 import { buildModelMap } from "../memex/modelMap";
 import { activeInstance } from "../memex/config";
 import { listChats, loadConfig, readChat as readMemexChat } from "../memex/service";
+import { hasSecureContext } from "../memex/contract";
+import { invalidateMemex } from "../memex/useMemex";
+import { createRoutedNote } from "../services/createNote";
+import { invalidateNotes } from "../services/hooks";
+import { usePanesStore } from "../state/panes";
 import { memoryKeywords, mergeKeywordHits, rankChatMemories } from "../chatMemory/retrieval";
 import { looksSecret, modelIsOnDevice } from "./guard";
 import type { CompleteReq, Host } from "./types";
@@ -82,7 +88,18 @@ export interface HostImageCtx {
 
 export function makeTauriHost(
   model: ChatModelInfo,
-  opts?: { requestId?: string; image?: HostImageCtx },
+  opts?: {
+    requestId?: string;
+    image?: HostImageCtx;
+    /** Fired when this run reads a SECURE note (a local model with per-note
+     * permission may) — the chat surface taints the chat so its history can
+     * never later ride to a remote model (audit 2026-07-29 #7). */
+    onSecureNoteRead?: () => void;
+    /** Whether this chat already carries secure-note content — a note the
+     * model creates in that state is stamped `secure: true`, so a same-run
+     * create_note can't launder secure prose into an open note (PR #4 P1). */
+    isSecureContext?: () => boolean;
+  },
 ): Host {
   return {
     complete({ messages, formatJson }) {
@@ -124,10 +141,45 @@ export function makeTauriHost(
         return aiReadableHits(ranked, model);
       }
     },
-    readNote(id) {
+    async readNote(id) {
       // Rust verifies model id + provider registration + loopback endpoint.
       // A localhost proxy for a frontier provider therefore remains remote.
-      return corpusReadAi(id, model);
+      const text = await corpusReadAi(id, model);
+      if (opts?.onSecureNoteRead) {
+        try {
+          const frontmatter = await corpusFrontmatter(id);
+          // unknowable security state counts as secure — fail closed
+          if (!frontmatter || frontmatter.secure === true) opts.onSecureNoteRead();
+        } catch {
+          opts.onSecureNoteRead();
+        }
+      }
+      return text;
+    },
+    async createNote(title, body) {
+      // the same intake lane as the workspace CLI and ⌘N with a smart row
+      // selected: memex staging when a writable memex is active, else the
+      // local Inbox. The model's text is CONTENT, never a path or a folder.
+      const heading = title && !/^#\s/.test(body) ? `# ${title}\n\n` : "";
+      const markdown = `${heading}${body}\n`.replace(/\n+$/, "\n");
+      // a chat that carries secure-note content writes SECURE notes — the
+      // model cannot launder secure prose into an open note (PR #4 P1)
+      const secure = opts?.isSecureContext?.() === true;
+      const id = await createRoutedNote({
+        selectedFolderId: "",
+        isSmart: true,
+        localFallback: "Inbox",
+        body: markdown,
+        ...(secure ? { secure: true } : {}),
+      });
+      await Promise.all([invalidateNotes(), invalidateMemex()]);
+      return `created ${secure ? "SECURE " : ""}note ${id}${title ? ` ("${title}")` : ""} in the intake${
+        secure ? " (marked secure because this chat carries secure-note content)" : ""
+      } — tell the user it's there, and offer open_note to show it.`;
+    },
+    async openNote(id) {
+      usePanesStore.getState().openNote(id);
+      return `opened note ${id} in a tab. Tell the user it's on screen.`;
     },
     async searchMemory(query, limit) {
       const queries = [query, ...memoryKeywords(query)].slice(0, 7);
@@ -155,11 +207,12 @@ export function makeTauriHost(
           modifiedMs: summary.modifiedMs,
         })),
       );
-      // A remote model never receives a secret-shaped chat. The provider's
-      // Rust egress detector is the final backstop when observations are sent.
+      // A remote model never receives a secret-shaped chat, nor one whose
+      // secureContext marker says a secure note fed its transcript. The
+      // provider's Rust egress detector is the final backstop on send.
       const safeDocuments = modelIsOnDevice(model)
         ? documents
-        : documents.filter((document) => !looksSecret(document.body));
+        : documents.filter((document) => !looksSecret(document.body) && !hasSecureContext(document.body));
       const chatHits = rankChatMemories(safeDocuments, query, limit).map(({ score: _score, ...hit }) => hit);
       const chatQuota = Math.ceil(limit / 2);
       const selected = [...chatHits.slice(0, chatQuota), ...noteHits.slice(0, limit - chatQuota)];

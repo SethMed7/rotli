@@ -19,6 +19,25 @@ const PW_FILE = `${process.env.HOME}/.breve-secrets/keychain-pw`;
 // Serialize all unlock/read/relock so concurrent reads don't race over the keychain.
 let mutex: Promise<unknown> = Promise.resolve();
 
+/** Quote one argument for `security -i`'s command tokenizer. */
+function securityQuote(arg: string): string {
+  return `"${arg.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+/** Run one `security` subcommand with its arguments fed over STDIN (`security -i`)
+ *  so the unlock password and secret values never ride the subprocess argv,
+ *  where any same-user process can read them (KERN_PROCARGS2 / `ps -E`). */
+async function securityStdin(parts: string[]): Promise<void> {
+  const line = `${parts.map(securityQuote).join(" ")}\n`;
+  const proc = Bun.spawn(["security", "-i"], { stdin: new Response(line), stdout: "ignore", stderr: "pipe" });
+  const [code, err] = await Promise.all([proc.exited, new Response(proc.stderr).text()]);
+  if (code !== 0) throw new Error(err.trim() || `security exited ${code}`);
+}
+
+async function unlockKeychain(pw: string): Promise<void> {
+  await securityStdin(["unlock-keychain", "-p", pw, KEYCHAIN]);
+}
+
 /** Read the unlock password: sandbox-denied file first, then the legacy login item. */
 async function unlockPw(): Promise<string> {
   const file = Bun.file(PW_FILE);
@@ -41,7 +60,7 @@ export async function readSecret(service: string): Promise<string> {
     }
     try {
       const pw = await unlockPw();
-      if (pw) await $`security unlock-keychain -p ${pw} ${KEYCHAIN}`.quiet();
+      if (pw) await unlockKeychain(pw);
       try {
         return (await $`security find-generic-password -s ${service} -w ${KEYCHAIN}`.text()).trim();
       } finally {
@@ -62,9 +81,19 @@ export async function writeSecret(service: string, value: string): Promise<boole
   const run = mutex.then(async () => {
     try {
       const pw = await unlockPw();
-      if (pw) await $`security unlock-keychain -p ${pw} ${KEYCHAIN}`.quiet();
+      if (pw) await unlockKeychain(pw);
       try {
-        await $`security add-generic-password -U -s ${service} -a ${process.env.USER ?? "breve"} -w ${value} ${KEYCHAIN}`.quiet();
+        await securityStdin([
+          "add-generic-password",
+          "-U",
+          "-s",
+          service,
+          "-a",
+          process.env.USER ?? "breve",
+          "-w",
+          value,
+          KEYCHAIN,
+        ]);
         return true;
       } finally {
         try { await $`security lock-keychain ${KEYCHAIN}`.quiet(); } catch {}
@@ -85,7 +114,7 @@ if (import.meta.main) {
     const run = mutex.then(async () => {
       try {
         const pw = await unlockPw();
-        if (pw) await $`security unlock-keychain -p ${pw} ${KEYCHAIN}`.quiet();
+        if (pw) await unlockKeychain(pw);
         try {
           await $`security delete-generic-password -s ${service} ${KEYCHAIN}`.quiet();
         } finally {

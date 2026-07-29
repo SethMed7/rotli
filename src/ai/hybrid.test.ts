@@ -61,6 +61,7 @@ function makeHosts(scripts: Record<string, (string | (() => string))[]>) {
     },
     searchNotes: async () => [],
     readNote: async () => "",
+    createNote: async () => "created note n-new in the intake",
     readFile: async () => "",
     webSearch: async () => [],
     webFetch: async () => "",

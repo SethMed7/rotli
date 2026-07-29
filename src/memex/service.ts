@@ -42,6 +42,7 @@ import {
   parsePrimaryUser,
   setAttachedTo,
   setChatPinned,
+  setChatSecureContext,
   today,
   ulid,
 } from "./contract";
@@ -140,6 +141,18 @@ export async function setChatAttachedTo(instance: MemexInstance, slug: string, s
   }
   const existing = await memexRead(instance.root, rel);
   const next = setAttachedTo(existing, stem);
+  if (next !== existing) await memexWriteChat(instance.root, slug, next);
+}
+
+/** Stamp the one-way secure-context marker on an EXISTING chat — written the
+ * moment a turn's tool trace read a secure note (audit 2026-07-29 #7). */
+export async function markChatSecureContext(instance: MemexInstance, slug: string): Promise<void> {
+  const rel = `chats/${slug}.md`;
+  if (!canWrite(rel, instance.perms)) {
+    throw new Error("This memex is read-only for rotli — connect it with write access first.");
+  }
+  const existing = await memexRead(instance.root, rel);
+  const next = setChatSecureContext(existing);
   if (next !== existing) await memexWriteChat(instance.root, slug, next);
 }
 

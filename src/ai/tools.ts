@@ -70,6 +70,10 @@ export function statusFor(tool: ToolName): string {
       return "searching your memory…";
     case "read_note":
       return "reading a note…";
+    case "create_note":
+      return "creating a note…";
+    case "open_note":
+      return "opening the note…";
     case "read_memory":
       return "reading a memory…";
     case "read_file":
@@ -135,6 +139,20 @@ export async function runTool(
       const id = String(args.id ?? "").trim();
       if (id === "") return 'error: read_note needs an "id" from search_notes or the index.';
       return truncate(await host.readNote(id), budget.readNoteChars);
+    }
+    case "create_note": {
+      const title = String(args.title ?? "").trim();
+      const body = String(args.body ?? args.text ?? args.content ?? "").trim();
+      if (title === "" && body === "") {
+        return 'error: create_note needs a "title" and a markdown "body".';
+      }
+      return await host.createNote(title, body);
+    }
+    case "open_note": {
+      const id = String(args.id ?? "").trim();
+      if (id === "") return 'error: open_note needs an "id" from search_notes or the index.';
+      if (!host.openNote) return "error: this host cannot open notes on screen.";
+      return await host.openNote(id);
     }
     case "read_file": {
       const q = String(args.query ?? args.name ?? args.file ?? "").trim();

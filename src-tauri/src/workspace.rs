@@ -231,10 +231,28 @@ impl Workspace {
     }
 
     fn list_remote(&mut self, limit: usize) -> Result<CorpusList, String> {
-        let mut list = self.store.list()?;
-        list.notes.retain(|meta| {
-            meta.kind != NoteKind::Note || self.store.read_for_ai(&meta.id, false).is_ok()
-        });
+        let CorpusList { folders, notes } = self.store.list()?;
+        let mut kept = Vec::with_capacity(notes.len());
+        for meta in notes {
+            let visible = match meta.kind {
+                NoteKind::Note => self.store.read_for_ai(&meta.id, false).is_ok(),
+                // boards get the same secret gate the reads enforce — a
+                // scene the agent can't read shouldn't be offered to it
+                NoteKind::Board => self
+                    .store
+                    .read_board(&meta.id)
+                    .map(|b| Self::board_egress_allowed(&b.body).is_ok())
+                    .unwrap_or(false),
+                _ => true,
+            };
+            if visible {
+                kept.push(meta);
+            }
+        }
+        let mut list = CorpusList {
+            notes: kept,
+            folders,
+        };
         list.notes.truncate(limit.min(500));
         list.notes = list
             .notes
@@ -747,8 +765,23 @@ impl Workspace {
         Ok(self.prefix_meta(meta))
     }
 
+    /// The workspace serves EXTERNAL agents (CLI/MCP — remote surfaces), and a
+    /// board has no frontmatter to carry a secure flag, so the detector is the
+    /// whole gate: a secret-shaped scene never ships to a connected agent —
+    /// the boards mirror of the note lane's read_for_ai (audit 2026-07-29).
+    fn board_egress_allowed(body: &str) -> Result<(), String> {
+        if crate::secret::looks_secure(body) {
+            return Err(
+                "this board carries secret-shaped content — it isn't available to connected agents."
+                    .into(),
+            );
+        }
+        Ok(())
+    }
+
     fn read_board(&mut self, local_id: &str) -> Result<BoardReadResult, String> {
         let mut board = self.store.read_board(local_id)?;
+        Self::board_egress_allowed(&board.body)?;
         let revision = revision(board.body.as_bytes());
         let scene = validate_board(&board.body)
             .map_err(|error| format!("board cannot be opened safely: {error}"))?;
@@ -783,6 +816,8 @@ impl Workspace {
     ) -> Result<NoteMeta, String> {
         require_revision(expected_revision)?;
         let current = self.store.read_board(local_id)?;
+        // a board a connected agent may not read, it may not blindly rewrite
+        Self::board_egress_allowed(&current.body)?;
         compare_revision(expected_revision, current.body.as_bytes())?;
         validate_board(scene_body)?;
         self.store
@@ -800,6 +835,7 @@ impl Workspace {
     ) -> Result<NoteMeta, String> {
         require_revision(expected_revision)?;
         let current = self.store.read_board(local_id)?;
+        Self::board_egress_allowed(&current.body)?;
         compare_revision(expected_revision, current.body.as_bytes())?;
         let mut scene = validate_board(&current.body)
             .map_err(|error| format!("board cannot be edited safely: {error}"))?;
@@ -2677,6 +2713,49 @@ mod tests {
             is_default: true,
         })
         .unwrap()
+    }
+
+    #[test]
+    fn remote_board_lane_refuses_secret_shaped_scenes() {
+        let temp = TempDir::new().unwrap();
+        let mut ws = test_workspace(&temp);
+
+        // an honest board flows through the whole remote lane
+        let clean = ws.create_board("Diagram", "", "", MAIN_ROOT).unwrap();
+        let clean_local = ws.local_id(&clean.id).unwrap();
+        let read = ws.read_board(&clean_local).unwrap();
+        assert!(!read.revision.is_empty());
+
+        // plant a card-number text element in a second board's scene
+        let secret = ws.create_board("Payments", "", "", MAIN_ROOT).unwrap();
+        let secret_local = ws.local_id(&secret.id).unwrap();
+        let body = ws.store.read_board(&secret_local).unwrap().body;
+        let mut scene: Value = serde_json::from_str(&body).unwrap();
+        scene["elements"] = json!([{
+            "id": "el1", "type": "text", "x": 0, "y": 0,
+            "text": "card: 4242 4242 4242 4242"
+        }]);
+        ws.store
+            .write_board(&secret_local, &serde_json::to_string(&scene).unwrap())
+            .unwrap();
+
+        // read, blind update, and apply all refuse
+        let err = ws.read_board(&secret_local).unwrap_err();
+        assert!(err.contains("secret-shaped"), "read must refuse: {err}");
+        let rev = revision(serde_json::to_string(&scene).unwrap().as_bytes());
+        assert!(ws.update_board(&secret_local, &body, &rev).is_err());
+        assert!(ws.apply_board(&secret_local, &[], &rev, None, None).is_err());
+
+        // and the listing offers only the clean board
+        let listed = ws.list_remote(100).unwrap();
+        let boards: Vec<_> = listed
+            .notes
+            .iter()
+            .filter(|n| n.kind == NoteKind::Board)
+            .map(|n| n.title.clone())
+            .collect();
+        assert!(boards.iter().any(|t| t == "Diagram"), "clean board stays listed");
+        assert!(!boards.iter().any(|t| t == "Payments"), "secret board must not list");
     }
 
     #[test]

@@ -1450,6 +1450,17 @@ export function Sidebar() {
                             label: "Rename…",
                             onClick: () => chatRename.start(c.slug),
                           },
+                          {
+                            kind: "action" as const,
+                            // the chat IS a file on disk (chats/<slug>.md) —
+                            // surface that truth right in the row menu
+                            label: "Copy file path",
+                            onClick: () => {
+                              if (activeMemex) {
+                                void navigator.clipboard.writeText(`${activeMemex.root}/chats/${c.slug}.md`);
+                              }
+                            },
+                          },
                           { kind: "sep" as const },
                           {
                             kind: "action" as const,

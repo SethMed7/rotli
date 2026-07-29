@@ -17,6 +17,7 @@ import {
   type ReactNode,
   type RefObject,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -35,7 +36,8 @@ import {
 } from "../ai/models";
 import type { ChatTurn, RunInput } from "../ai/types";
 import { CORPUS_INSTANCE_ID, activeInstance } from "../memex/config";
-import { readChat, writeNote } from "../memex/service";
+import { markChatSecureContext, readChat, writeNote } from "../memex/service";
+import { hasSecureContext } from "../memex/contract";
 import { useInstanceChats, useMemexConfig, useSetChatAttachedTo, useWriteChat } from "../memex/useMemex";
 import {
   type ChatModelInfo,
@@ -56,7 +58,11 @@ import { renderInline } from "../editor/render";
 import { CloudGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
 import { Character } from "./character";
 import { syncManagedChatMemory } from "../chatMemory/composition";
-import { attachedNoteId as resolveAttachedNoteId } from "../chatMemory/model";
+import {
+  attachedNoteId as resolveAttachedNoteId,
+  buildChatNotesPrompt,
+  type MemoryTurn,
+} from "../chatMemory/model";
 import { rememberedChatNote, rememberChatNote } from "../noteChat/session";
 
 interface Msg {
@@ -649,9 +655,13 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   );
   const catalogSettled = models.isFetched && providerChecksSettled;
   const allGroups = mergedModels(models.data ?? [], aiProviders, hybridPresets, blockedModels, providerReady);
-  // A secure-note chat never offers a connected or routing model. The exact
-  // frontmatter is rechecked on send as the authoritative backstop.
-  const groups: ModelGroups = secureAttachmentHint ? { ...allGroups, connected: [], presets: [] } : allGroups;
+  // A secure-note chat never offers a connected or routing model — and neither
+  // does a loose chat whose history was fed by a secure-note read (the
+  // secureContext taint, audit 2026-07-29 #7). The exact frontmatter is
+  // rechecked on send as the authoritative backstop.
+  const [secureContext, setSecureContext] = useState(false);
+  const secureChat = secureAttachmentHint || secureContext;
+  const groups: ModelGroups = secureChat ? { ...allGroups, connected: [], presets: [] } : allGroups;
   const modelList = flattenModels(groups);
   const savedPick = modelList.find((m) => m.id === chatModelId);
   const fallbackPick = modelList.find((m) => m.isDefault) ?? modelList[0] ?? null;
@@ -679,6 +689,10 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const [assetsOpen, setAssetsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const msgRef = useRef<HTMLTextAreaElement>(null);
+  // true once THIS chat's history carries secure-note content (loaded marker
+  // or a secure read during a live turn) — drives the one-way taint
+  const secureReadRef = useRef(false);
   const measureBtnRef = useRef<HTMLButtonElement>(null);
   const assetsBtnRef = useRef<HTMLButtonElement>(null);
   // the live turn's cancel key (connected CLIs only — Rust kills the child)
@@ -690,7 +704,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   // rides a PANE-scoped key (session-only, never persisted): a shared "" key leaked
   // one globe click into every future fresh chat across relaunches (#7, audit 2026-07)
   const webKey = chatSlug ?? `unsaved:${paneId}`;
-  const globeOn = secureAttachmentHint ? false : (chatWeb[webKey] ?? false);
+  const globeOn = secureChat ? false : (chatWeb[webKey] ?? false);
   // per-chat measure rides the same key; missing = the tuned comfort column
   const measure: Measure = chatMeasure[webKey] ?? "comfort";
   // image attach is gated on the picked model's vision capability
@@ -702,10 +716,18 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     let cancelled = false;
     if (active && chatSlug) {
       readChat(active, chatSlug)
-        .then((t) => !cancelled && setMessages(parseMessages(t)))
+        .then((t) => {
+          if (cancelled) return;
+          setMessages(parseMessages(t));
+          const tainted = hasSecureContext(t);
+          secureReadRef.current = tainted;
+          setSecureContext(tainted);
+        })
         .catch(() => !cancelled && setMessages([]));
     } else {
       setMessages([]);
+      secureReadRef.current = false;
+      setSecureContext(false);
     }
     return () => {
       cancelled = true;
@@ -718,6 +740,15 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     if (el) el.scrollTo({ top: el.scrollHeight });
   }, [messages, busy]);
 
+  // the composer grows with its content (WKWebView has no field-sizing) —
+  // the CSS max-height caps it around seven lines, then it scrolls inside
+  useLayoutEffect(() => {
+    const el = msgRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [message]);
+
   const send = async () => {
     if (!active || !writable || !message.trim() || busy) return;
     if (!picked) {
@@ -727,12 +758,12 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       ]);
       return;
     }
-    let attachedSecure = secureAttachmentHint;
+    let attachmentIsSecure = secureAttachmentHint;
     if (attachedNoteId) {
       try {
         const frontmatter = await corpusFrontmatter(attachedNoteId);
         if (!frontmatter) throw new Error("missing note security metadata");
-        attachedSecure = attachedSecure || frontmatter.secure === true;
+        attachmentIsSecure = attachmentIsSecure || frontmatter.secure === true;
       } catch {
         setMessages((previous) => [
           ...previous,
@@ -744,12 +775,14 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
         return;
       }
     }
+    // the whole secure lineage: attached-secure, or the chat's own taint
+    const attachedSecure = attachmentIsSecure || secureReadRef.current;
     if (attachedSecure && !modelIsOnDevice(picked)) {
       setMessages((previous) => [
         ...previous,
         {
           speaker: "rotli",
-          text: "⚠ This chat is attached to a secure note. Choose an on-device model to continue.",
+          text: "⚠ This chat carries secure-note content. Choose an on-device model to continue.",
         },
       ]);
       return;
@@ -791,7 +824,17 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     // a preset pick routes through the hybrid layer; everything else is the
     // normal loop. Both yield the same event stream.
     const preset = presetFor(picked.id, hybridPresets);
-    const hostOpts = image ? { requestId, image } : { requestId };
+    // a secure-note read mid-run taints the chat immediately (UI + this
+    // turn's persistence) and one-way — the marker lands on the chat file below
+    const onSecureNoteRead = () => {
+      secureReadRef.current = true;
+      setSecureContext(true);
+    };
+    // live view of the taint, so a create_note AFTER a secure read in the
+    // same run already sees the secure context (PR #4 P1)
+    const isSecureContext = () => secureReadRef.current || attachedSecure;
+    const baseOpts = { requestId, onSecureNoteRead, isSecureContext };
+    const hostOpts = image ? { ...baseOpts, image } : baseOpts;
     const events = preset
       ? runHybrid(preset, modelList, runInput, (m, o) => makeTauriHost(m, { ...hostOpts, ...o }), requestId)
       : runAgent(makeTauriHost(picked, hostOpts), runInput);
@@ -819,6 +862,18 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       { speaker: "rotli", text: reply },
     ];
     const memoryTurns = [...messages, ...turn];
+    // the notes-keeping model: the same pick as the chat rewrites the attached
+    // note's "Conversation notes" each turn (a preset routes per-leg, so it
+    // falls back to the deterministic topics digest instead)
+    const composeNotes =
+      picked.api === "preset"
+        ? undefined
+        : (context: { turns: readonly MemoryTurn[]; currentNotes: string | null }) =>
+            makeTauriHost(picked, {}).complete({
+              messages: [
+                { role: "user", content: buildChatNotesPrompt(context.currentNotes, context.turns) },
+              ],
+            });
     try {
       if (chatSlug) {
         const sum = chats.data?.find((c) => c.slug === chatSlug);
@@ -829,14 +884,23 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
           title: memoryTitle,
           messages: turn,
         });
+        if (secureReadRef.current) {
+          await markChatSecureContext(active, chatSlug).catch(() => {});
+        }
         const memoryStem = (sum?.attachedTo ?? "").replace(/^\[\[|\]\]$/g, "").trim();
-        await syncManagedChatMemory({
-          instance: active,
-          title: memoryTitle,
-          chatSlug,
-          ...(memoryStem ? { attachedStem: memoryStem } : {}),
-          turns: memoryTurns,
-        }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
+        // a TAINTED loose chat writes no memory note — its prose must not
+        // land in a fresh unlabeled note remote models could read. An
+        // attached-secure chat keeps syncing into its own (secure) note.
+        if (!secureReadRef.current || attachmentIsSecure) {
+          await syncManagedChatMemory({
+            instance: active,
+            title: memoryTitle,
+            chatSlug,
+            ...(memoryStem ? { attachedStem: memoryStem } : {}),
+            ...(composeNotes ? { composeNotes } : {}),
+            turns: memoryTurns,
+          }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
+        }
       } else {
         const memoryTitle = title.trim() || deriveTitle(userText);
         const res = await write.mutateAsync({
@@ -844,12 +908,17 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
           title: memoryTitle,
           messages: turn,
         });
-        await syncManagedChatMemory({
-          instance: active,
-          title: memoryTitle,
-          chatSlug: res.slug,
-          turns: memoryTurns,
-        }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
+        if (secureReadRef.current) {
+          await markChatSecureContext(active, res.slug).catch(() => {});
+        } else {
+          await syncManagedChatMemory({
+            instance: active,
+            title: memoryTitle,
+            chatSlug: res.slug,
+            ...(composeNotes ? { composeNotes } : {}),
+            turns: memoryTurns,
+          }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
+        }
         bindChat(paneId, res.slug); // this tab now IS that chat
         if (globeOn) setChatWeb(res.slug, true); // carry the globe to the saved chat
         clearChatWeb(webKey); // the pane-scoped unsaved key is spent (#7)
@@ -1048,7 +1117,14 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
               {busy && (
                 <div className="cmsg ai">
                   <div className="cmsg-who">rotli</div>
-                  <div className="cmsg-bubble cmsg-think">{status}</div>
+                  <div className="cmsg-bubble cmsg-think" role="status">
+                    <span className="cmsg-think-dots" aria-hidden="true">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                    {status}
+                  </div>
                 </div>
               )}
               {saveErr && (
@@ -1134,6 +1210,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                 />
                 <div className="chat-box">
                   <textarea
+                    ref={msgRef}
                     className="chat-msg"
                     rows={1}
                     placeholder={busy ? "thinking…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"}
@@ -1167,10 +1244,10 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                       type="button"
                       className={globeOn ? "chat-tool on" : "chat-tool"}
                       aria-pressed={globeOn}
-                      disabled={secureAttachmentHint}
+                      disabled={secureChat}
                       title={
-                        secureAttachmentHint
-                          ? "Web search is unavailable for a secure-note chat"
+                        secureChat
+                          ? "Web search is unavailable for a chat with secure-note content"
                           : globeOn
                             ? "Web search is ON for this chat"
                             : "Web search — let this chat reach the internet"

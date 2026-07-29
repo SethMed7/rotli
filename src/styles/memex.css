@@ -494,7 +494,10 @@
   padding: 4px 2px;
   resize: none;
   min-height: 24px;
-  max-height: 200px;
+  /* seven lines (14px × 1.5) plus the vertical padding — the JS autosize
+     grows to fit and this cap hands longer drafts an inner scrollbar */
+  max-height: 155px;
+  overflow-y: auto;
   color: var(--text);
   font: inherit;
   font-size: 14px;
@@ -1842,8 +1845,42 @@ body:has(.document-editor) [role="dialog"] input:disabled {
   font: inherit;
 }
 .cmsg-think {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--text-muted);
   font-style: italic;
+}
+/* three quiet dots ahead of the status line; base.css's reduced-motion
+   rule freezes the pulse for users who ask for stillness */
+.cmsg-think-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cmsg-think-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.3;
+  animation: cmsg-think-pulse 1.1s var(--motion-ease) infinite;
+}
+.cmsg-think-dots i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.cmsg-think-dots i:nth-child(3) {
+  animation-delay: 0.36s;
+}
+@keyframes cmsg-think-pulse {
+  0%,
+  70%,
+  100% {
+    opacity: 0.3;
+  }
+  35% {
+    opacity: 1;
+  }
 }
 /* a failed chats/<slug>.md write — inline under the thread (#11, audit 2026-07) */
 .chat-save-err {

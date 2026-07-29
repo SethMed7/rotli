@@ -852,7 +852,10 @@
   width: 164px;
   height: 72px;
 }
-.rotli-mermaid-visual-node {
+/* the extra .rotli-mermaid-visual ancestor outranks the generic
+   `.rotli-mermaid-visual button` chrome reset — without it the reset's
+   transparent background/border win and shapes render as bare labels */
+.rotli-mermaid-visual .rotli-mermaid-visual-node {
   position: absolute;
   inset: 0;
   display: grid;
@@ -867,6 +870,13 @@
   border-radius: 0;
   cursor: grab;
   touch-action: none;
+}
+.rotli-mermaid-visual .rotli-mermaid-visual-node:hover:not(:disabled) {
+  color: var(--mermaid-node-text);
+  background: var(--mermaid-node-fill);
+}
+.rotli-mermaid-visual .rotli-mermaid-visual-node[data-shape="text"]:hover:not(:disabled) {
+  background: transparent;
 }
 .rotli-mermaid-visual-node:active {
   cursor: grabbing;

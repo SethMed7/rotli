@@ -115,7 +115,17 @@ function stripComments(src) {
   const toolBlock = types.match(/export type ToolName\s*=([\s\S]*?);/);
   if (!toolBlock) failures.push("src/ai/types.ts: could not find the ToolName union to check EGRESS_TOOLS completeness.");
   const toolNames = toolBlock ? [...toolBlock[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]) : [];
-  const localTools = ["search_notes", "read_note", "search_memory", "read_memory", "read_file"];
+  // create_note writes INTO the vault and open_note opens a tab — both stay
+  // on-device (no bytes leave), so they classify local (PR #4, 2026-07-29).
+  const localTools = [
+    "search_notes",
+    "read_note",
+    "create_note",
+    "open_note",
+    "search_memory",
+    "read_memory",
+    "read_file",
+  ];
   // WEB_TOOLS + IMAGE_TOOLS are spread into EGRESS_TOOLS; collect both arrays.
   const egressListed = [
     ...[...loop.matchAll(/const (?:WEB_TOOLS|IMAGE_TOOLS): ToolName\[\] = \[([^\]]*)\]/g)]

@@ -4,7 +4,7 @@ import { invalidateMemex } from "../memex/useMemex";
 import { invalidateNotes } from "../services/hooks";
 import { notesService } from "../services/notes";
 import { attachedNoteId, type MemoryTurn } from "./model";
-import { syncChatMemory, type ChatMemoryNote } from "./workflow";
+import { syncChatMemory, type ChatMemoryNote, type ComposeChatNotes } from "./workflow";
 
 export interface ManagedChatMemoryInput {
   instance: MemexInstance;
@@ -12,6 +12,9 @@ export interface ManagedChatMemoryInput {
   chatSlug: string;
   attachedStem?: string;
   turns: readonly MemoryTurn[];
+  /** The model that rewrites the conversation notes each turn (optional —
+   * without it, existing notes are kept and new notes get the topics digest). */
+  composeNotes?: ComposeChatNotes;
 }
 
 export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Promise<ChatMemoryNote> {

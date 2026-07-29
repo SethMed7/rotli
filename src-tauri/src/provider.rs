@@ -521,6 +521,9 @@ fn agy_sandbox_profile(home: &str, write_dir: &str, bin_dir: &str) -> String {
   (subpath "{home}/.antigravity")
   (subpath "{home}/Library/Keychains")
   (subpath "{bin_dir}"))
+(deny file-read*
+  (literal "{home}/Library/Keychains/breve.keychain-db")
+  (literal "{home}/Library/Keychains/breve.keychain"))
 (deny file-write* (subpath "{home}"))
 (allow file-write*
   (subpath "{write_dir}")
@@ -553,6 +556,20 @@ mod image_sandbox_tests {
         // the write-allow list must NOT include the Keychain (read-only there)
         let write_allow = p.split("(deny file-write*").nth(1).expect("write section");
         assert!(!write_allow.contains("Keychains"));
+    }
+
+    #[test]
+    fn profile_denies_the_breve_keychain_after_the_keychains_allow() {
+        // SBPL: later rules win — the Breve keychain deny must come AFTER the
+        // broad Keychains read-allow, or a sandboxed engine holding a harvested
+        // unlock password could read breve.keychain-db (audit 2026-07-29 #6).
+        let p = agy_sandbox_profile("/Users/x", "/Users/x/m", "/Users/x/.local/bin");
+        let allow_at = p.find("(subpath \"/Users/x/Library/Keychains\")").expect("keychains allow");
+        let deny_at = p
+            .find("(literal \"/Users/x/Library/Keychains/breve.keychain-db\")")
+            .expect("breve keychain deny");
+        assert!(deny_at > allow_at, "the breve deny must follow the allow to win");
+        assert!(p.contains("(literal \"/Users/x/Library/Keychains/breve.keychain\")"));
     }
 }
 

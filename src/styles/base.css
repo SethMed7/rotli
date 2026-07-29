@@ -79,9 +79,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* selection is always the peach tint — never clay, never a new color */
+/* selection wears the PRIMARY color (Seth, 2026-07-29) — a translucent wash
+   of the theme's accent, so a chosen data-accent shows up in every select */
 ::selection {
-  background: var(--tint);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 /* focus-visible is always a 2px clay ring, 2px offset, keyboard-only */

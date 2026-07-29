@@ -12,7 +12,15 @@ import { adapterFor, trimHistory } from "./prompt";
 import { pruneScratch, runTool, statusFor } from "./tools";
 import type { AgentEvent, Host, RunInput, ScratchStep, ToolName } from "./types";
 
-const NOTE_TOOLS: ToolName[] = ["search_memory", "read_memory", "search_notes", "read_note", "read_file"];
+const NOTE_TOOLS: ToolName[] = [
+  "search_memory",
+  "read_memory",
+  "search_notes",
+  "read_note",
+  "create_note",
+  "open_note",
+  "read_file",
+];
 const WEB_TOOLS: ToolName[] = ["web_search", "web_fetch"];
 const IMAGE_TOOLS: ToolName[] = ["generate_image"];
 // every tool whose ARGS leave the device — the secret guard covers them all

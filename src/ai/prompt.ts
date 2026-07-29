@@ -130,6 +130,8 @@ TOOLS — to use one, reply with a SINGLE JSON object:
 - {"thought":"…","tool":"read_memory","args":{"id":"…"}}     → read a note or original chat returned by search_memory
 - {"thought":"…","tool":"search_notes","args":{"query":"…"}}  → find notes (returns id, title, folder, snippet)
 - {"thought":"…","tool":"read_note","args":{"id":"…"}}        → read one note's full text by id
+- {"thought":"…","tool":"create_note","args":{"title":"…","body":"…markdown…"}} → create a NEW note in the user's memex (it lands in their intake; the organizer files it)
+- {"thought":"…","tool":"open_note","args":{"id":"…"}}        → open a note on the user's screen, in a tab
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} → read a file by name (text, or a spreadsheet as CSV)
 ${webTools}${imageTool}
 When you can answer, reply: {"thought":"…","final":"your answer to the user"}
@@ -197,6 +199,8 @@ Tools:
 - {"thought":"…","tool":"read_memory","args":{"id":"…"}} — read the exact note or chat returned by search_memory
 - {"thought":"…","tool":"search_notes","args":{"query":"…"}} — find notes (id, title, folder, snippet)
 - {"thought":"…","tool":"read_note","args":{"id":"…"}} — read one note by id
+- {"thought":"…","tool":"create_note","args":{"title":"…","body":"…markdown…"}} — create a NEW note in the user's memex (lands in their intake)
+- {"thought":"…","tool":"open_note","args":{"id":"…"}} — open a note on the user's screen, in a tab
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}
 To answer the user: {"thought":"…","final":"your answer"}
 

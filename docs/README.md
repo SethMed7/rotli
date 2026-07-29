@@ -22,7 +22,7 @@ fix both in the same change.
 | Memex storage, metadata, RAG, and secure notes | [`architecture/memex-data-contract.md`](architecture/memex-data-contract.md) |
 | File editing and no-preview-only product law | [`architecture/memex-data-contract.md#editing-capabilities`](architecture/memex-data-contract.md#editing-capabilities) |
 | FileSurface capability matrix | [`architecture/file-surface-capability-audit-2026-07-11.md`](architecture/file-surface-capability-audit-2026-07-11.md) |
-| Current system-wide findings and priorities | [`architecture/system-audit-2026-07-11.md`](architecture/system-audit-2026-07-11.md) |
+| Current system-wide findings and priorities | [`architecture/system-audit-2026-07-29.md`](architecture/system-audit-2026-07-29.md) |
 | Code organization audit | [`architecture/code-audit.md`](architecture/code-audit.md) |
 | Managed Breve runtime | [`../breve-runtime/README.md`](../breve-runtime/README.md) |
 | Brand implementation | [`../src/brand/README.md`](../src/brand/README.md) |

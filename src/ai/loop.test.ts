@@ -57,6 +57,7 @@ function fakeHost(replies: string[], over: Partial<Host> = {}): { host: Host; ca
       calls.readMemory.push(id);
       return `# Cedar launch\nThe July decision came from ${id}.`;
     },
+    createNote: async (title) => `created note n-new ("${title}") in the intake`,
     readFile: async (q) => `csv,for,${q}\n1,2,3`,
     webSearch: async (q) => {
       calls.webSearch.push(q);
@@ -287,6 +288,28 @@ describe("runAgent", () => {
     expect(calls.readNote).toEqual(["n1"]);
     const tools = events.filter((e) => e.type === "tool").map((e) => (e as { tool: string }).tool);
     expect(tools).toEqual(["search_notes", "read_note"]);
+  });
+
+  test("create_note and open_note run the host lanes and feed the model their observations", async () => {
+    const opened: string[] = [];
+    const { host } = fakeHost(
+      [
+        '{"tool":"create_note","args":{"title":"Statement descriptors","body":"- keep it short"}}',
+        '{"tool":"open_note","args":{"id":"n-new"}}',
+        '{"final":"Created the note and opened it."}',
+      ],
+      {
+        openNote: async (id) => {
+          opened.push(id);
+          return `opened note ${id} in a tab.`;
+        },
+      },
+    );
+    const { final, events } = await run(host, { history: [], userText: "make a note of that", web: false });
+    expect(final).toContain("Created the note");
+    expect(opened).toEqual(["n-new"]);
+    const tools = events.filter((e) => e.type === "tool").map((e) => (e as { tool: string }).tool);
+    expect(tools).toEqual(["create_note", "open_note"]);
   });
 
   test("preloads an explicitly attached note through the host access gate", async () => {

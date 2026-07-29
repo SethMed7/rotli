@@ -26,6 +26,7 @@ import {
   type MermaidCanvasPoint,
   MERMAID_VISUAL_NODE_SIZE,
   layoutMermaidFlowchart,
+  trimMermaidEdge,
 } from "./mermaidFlowLayout";
 import {
   type MermaidViewport,
@@ -269,6 +270,9 @@ export function MermaidVisualEditor({
   const [isPanning, setIsPanning] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const panRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
+  // pointerup nulls panRef before the synthetic click arrives, so the click
+  // handler needs the traveled flag to survive the pan's teardown
+  const panTraveledRef = useRef(false);
 
   useEffect(() => {
     if (!automaticLayout || !model) return;
@@ -443,6 +447,7 @@ export function MermaidVisualEditor({
   const onStagePointerEnd = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const pan = panRef.current;
     if (!pan || pan.pointerId !== event.pointerId) return;
+    panTraveledRef.current = pan.moved;
     panRef.current = null;
     setIsPanning(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -586,7 +591,9 @@ export function MermaidVisualEditor({
           onPointerCancel={onStagePointerEnd}
           onClick={(event) => {
             // a pan that traveled must not read as a click-clear
-            if (event.target === event.currentTarget && !panRef.current) setSelection(null);
+            const traveled = panTraveledRef.current;
+            panTraveledRef.current = false;
+            if (event.target === event.currentTarget && !traveled) setSelection(null);
           }}
         >
           {model.nodes.length === 0 ? (
@@ -630,11 +637,12 @@ export function MermaidVisualEditor({
                 {model.edges.map((edge) => {
                   const from = positions[edge.from];
                   const to = positions[edge.to];
-                  if (!from || !to) return null;
-                  const x1 = from.x + MERMAID_VISUAL_NODE_SIZE.width / 2;
-                  const y1 = from.y + MERMAID_VISUAL_NODE_SIZE.height / 2;
-                  const x2 = to.x + MERMAID_VISUAL_NODE_SIZE.width / 2;
-                  const y2 = to.y + MERMAID_VISUAL_NODE_SIZE.height / 2;
+                  const fromNode = model.nodes.find((node) => node.id === edge.from);
+                  const toNode = model.nodes.find((node) => node.id === edge.to);
+                  if (!from || !to || !fromNode || !toNode) return null;
+                  const segment = trimMermaidEdge(from, to, fromNode.shape, toNode.shape);
+                  const { x: x1, y: y1 } = segment.from;
+                  const { x: x2, y: y2 } = segment.to;
                   return (
                     <g key={edge.id} className={selection?.id === edge.id ? "is-selected" : ""}>
                       <line

@@ -450,7 +450,9 @@ pub struct ContractRaw {
 #[tauri::command]
 pub fn memex_read_contract(app: tauri::AppHandle, root: String) -> Result<ContractRaw, String> {
     let root = registered_root(&app, &root)?;
-    let rd = |n: &str| fs::read_to_string(root.join(n)).unwrap_or_default();
+    // read_at's containment applies here too — a symlink planted as a
+    // contract file must not read outside the vault (missing files stay "")
+    let rd = |n: &str| read_at(&root, n).unwrap_or_default();
     Ok(ContractRaw {
         memex_json: rd("memex.json"),
         users_json: rd("users.json"),
@@ -468,10 +470,16 @@ pub fn memex_read(app: tauri::AppHandle, root: String, rel: String) -> Result<St
 }
 
 fn read_at(root: &Path, rel: &str) -> Result<String, String> {
-    if rel.contains("..") || rel.starts_with('/') {
-        return Err("bad path".into());
+    // resolve_beneath, not a string `..` check: a symlink planted inside a
+    // vault must not carry this read outside the registered root — the same
+    // standard every corpus lane already holds (audit 2026-07-29). A missing
+    // file still reads as ""; any other failure is a real error, not "empty".
+    let abs = crate::containment::resolve_beneath(root, Path::new(rel))?;
+    match fs::read_to_string(&abs) {
+        Ok(text) => Ok(text),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(e) => Err(format!("read {rel}: {e}")),
     }
-    Ok(fs::read_to_string(root.join(rel)).unwrap_or_default())
 }
 
 /// Frontmatter scalar lookup (mirrors conversations.ts `fm`; line-based so it's
@@ -1122,10 +1130,30 @@ mod tests {
     #[test]
     fn read_at_rejects_traversal() {
         let dir = tempfile::tempdir().unwrap();
-        assert!(read_at(dir.path(), "../etc/passwd").is_err());
-        assert!(read_at(dir.path(), "/abs").is_err());
+        let root = std::fs::canonicalize(dir.path()).unwrap();
+        assert!(read_at(&root, "../etc/passwd").is_err());
+        assert!(read_at(&root, "/abs").is_err());
         // a missing-but-safe rel reads as "", never an error
-        assert_eq!(read_at(dir.path(), "nope.md").unwrap(), "");
+        assert_eq!(read_at(&root, "nope.md").unwrap(), "");
+    }
+
+    #[test]
+    fn read_at_refuses_a_symlink_escape() {
+        // a link inside the vault pointing at an outside file must not be
+        // followed — the old string-only guard read straight through it
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("vault");
+        let outside = dir.path().join("outside.txt");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(&outside, "victim").unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("sneaky.md")).unwrap();
+        let root = std::fs::canonicalize(&root).unwrap();
+
+        let err = read_at(&root, "sneaky.md").unwrap_err();
+        assert!(err.contains("symlink"), "must refuse the link: {err}");
+        // an honest file beside it still reads
+        std::fs::write(root.join("honest.md"), "ok").unwrap();
+        assert_eq!(read_at(&root, "honest.md").unwrap(), "ok");
     }
 
     #[test]

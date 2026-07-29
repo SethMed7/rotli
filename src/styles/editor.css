@@ -662,7 +662,7 @@
   padding: 0;
 }
 .rotli-cm-host .cm-content ::selection {
-  background: color-mix(in srgb, var(--tint) 85%, transparent);
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
 }
 .rotli-cm-host .cm-placeholder {
   color: var(--text-muted);

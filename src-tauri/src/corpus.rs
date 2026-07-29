@@ -1986,6 +1986,19 @@ fn atomic_write_bytes(path: &Path, contents: &[u8]) -> Result<(), String> {
     crate::fsutil::atomic_write_bytes(path, contents, ".rotli-write-")
 }
 
+/// Read a file that is about to be REWRITTEN or judged: a missing file reads
+/// as empty, but any other failure (permissions, invalid UTF-8) propagates.
+/// `unwrap_or_default` here once let an unreadable note read as "blank" — and
+/// blank is exactly what discard destroys and what a rewrite starts from
+/// (audit 2026-07-29: fail-open reads).
+fn read_existing_text(path: &Path) -> Result<String, String> {
+    match fs::read_to_string(path) {
+        Ok(text) => Ok(text),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(e) => Err(format!("couldn't read the existing file: {e}")),
+    }
+}
+
 // ─── the id↔path index (.rotli/index.json — authoritative, rebuildable) ─────
 
 #[derive(Serialize, Deserialize, Default)]
@@ -2747,7 +2760,9 @@ impl CorpusStore {
     fn gitignore_add(&self, rel: &str) -> Result<(), String> {
         self.mutation_allowed()?;
         let path = self.guard_rel(".gitignore")?;
-        let existing = fs::read_to_string(&path).unwrap_or_default();
+        // an unreadable .gitignore must not be rewritten from empty — that
+        // would drop every OTHER secure note's ignore line
+        let existing = read_existing_text(&path)?;
         if existing.lines().any(|l| l.trim() == rel) {
             return Ok(());
         }
@@ -2792,7 +2807,7 @@ impl CorpusStore {
         if !path.exists() && !self.root.join(".git").exists() {
             return Ok(());
         }
-        let existing = fs::read_to_string(&path).unwrap_or_default();
+        let existing = read_existing_text(&path)?;
         let mut lines: Vec<String> = existing.lines().map(str::to_string).collect();
         let mut changed = false;
         for l in lines.iter_mut() {
@@ -3546,7 +3561,9 @@ impl CorpusStore {
     ) -> Result<NoteMeta, String> {
         let abs = self.abs(&rel);
 
-        let existing = fs::read_to_string(&abs).unwrap_or_default();
+        // an unreadable existing file must abort the save — regenerating
+        // frontmatter from "empty" would drop secure/locked/tags/created
+        let existing = read_existing_text(&abs)?;
         let (old_fm, old_raw) = parse_document(&existing);
         let (file_created, _) = file_stamps(&abs);
         let old_body = if old_fm.is_some() {
@@ -3959,7 +3976,8 @@ impl CorpusStore {
         let dir = self.guard_rel(DOT_DIR)?;
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let path = self.guard_rel(&format!("{DOT_DIR}/brain-journal.jsonl"))?;
-        let mut out = fs::read_to_string(&path).unwrap_or_default();
+        // a failed read must not silently REPLACE the whole journal with one line
+        let mut out = read_existing_text(&path)?;
         if !out.is_empty() && !out.ends_with('\n') {
             out.push('\n');
         }
@@ -4404,7 +4422,10 @@ impl CorpusStore {
         let rel = self.path_of(id)?;
         self.writable(&rel)?;
         let abs = self.abs(&rel);
-        let existing = fs::read_to_string(&abs).unwrap_or_default();
+        // fail CLOSED: a note that can't be read (permissions, invalid UTF-8)
+        // is not provably blank — refusing beats trashing real content
+        let existing = read_existing_text(&abs)
+            .map_err(|e| format!("the note couldn't be inspected — refusing to discard ({e})"))?;
         let (_fm, body) = parse_document(&existing);
         if !body.trim().is_empty() {
             return Err("the note isn't blank — refusing to discard".into());
@@ -7202,6 +7223,26 @@ mod tests {
         let kept = store.create("Inbox", "# Real note\n").unwrap();
         assert!(store.discard_blank(&kept.id).is_err(), "non-blank must refuse");
         assert!(store.read(&kept.id).is_ok(), "refusal leaves the note untouched");
+    }
+
+    #[test]
+    fn discard_blank_refuses_a_note_it_cannot_read() {
+        // an externally-edited note with invalid UTF-8 is NOT provably blank —
+        // the old unwrap_or_default read it as "" and trashed real content
+        let (_dir, mut store) = bare();
+        let note = store.create("Inbox", "").unwrap();
+        let rel = store.index.get(&note.id).unwrap().clone();
+        let abs = store.root().join(&rel);
+        fs::write(&abs, [0xC3, 0x28, b'r', b'e', b'a', b'l']).unwrap();
+
+        let err = store.discard_blank(&note.id).unwrap_err();
+        assert!(err.contains("refusing to discard"), "unreadable must refuse: {err}");
+        assert!(abs.is_file(), "the file must survive the refusal");
+
+        // the same unreadable file must abort a body save instead of
+        // regenerating its frontmatter from nothing
+        assert!(store.write(&note.id, "new body").is_err());
+        assert_eq!(fs::read(&abs).unwrap(), [0xC3, 0x28, b'r', b'e', b'a', b'l']);
     }
 
     #[test]
