@@ -161,3 +161,31 @@ test("Mermaid source converts to an editable Excalidraw scene", async ({ page })
   expect(scene.types).toContain("arrow");
   expect(scene.types).toContain("text");
 });
+
+test("the Visual canvas has its own camera: zoom controls and empty-space pan", async ({ page }) => {
+  await gotoApp(page);
+  await createDiagramNote(page);
+  await page.locator(".rotli-render-mermaid-trigger").click();
+  const dialog = page.getByRole("dialog", { name: "Mermaid diagram" });
+  await dialog.getByRole("button", { name: "Visual" }).click();
+
+  // corner zoom controls mirror View's − % + Fit
+  const level = dialog.getByLabel("Canvas zoom level");
+  await expect(level).toHaveText("100%");
+  await dialog.getByRole("button", { name: "Zoom canvas in" }).click();
+  await expect(level).toHaveText("120%");
+
+  // dragging EMPTY canvas pans (the transform changes; nodes stay put)
+  const stage = dialog.getByLabel(/Flowchart editing canvas/);
+  const canvas = dialog.locator(".rotli-mermaid-visual-canvas");
+  const before = await canvas.getAttribute("style");
+  const box = await stage.boundingBox();
+  if (!box) throw new Error("visual stage has no bounding box");
+  // top-right of the stage is empty canvas (nodes flow from the left; the
+  // zoom overlay rides the bottom-right corner)
+  await page.mouse.move(box.x + box.width - 60, box.y + 50);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 150, box.y + 110, { steps: 6 });
+  await page.mouse.up();
+  expect(await canvas.getAttribute("style")).not.toBe(before);
+});

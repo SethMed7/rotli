@@ -759,13 +759,71 @@
   position: relative;
   min-width: 0;
   flex: 1;
-  overflow: auto;
+  /* the CAMERA owns navigation now (Seth, 2026-07-29) — no native scroll */
+  overflow: hidden;
   background: var(--ground);
+  cursor: grab;
+  touch-action: none;
+}
+.rotli-mermaid-visual-scroll.is-panning {
+  cursor: grabbing;
 }
 .rotli-mermaid-visual-canvas {
   position: relative;
   min-width: 100%;
   min-height: 100%;
+}
+/* the INLINE mermaid camera (Seth, 2026-07-29): the fence widget is a small
+   viewport of its own — scroll zooms, drag pans, double-click fits */
+.rotli-mermaid-inline {
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.rotli-mermaid-inline:active {
+  cursor: grabbing;
+}
+.rotli-mermaid-inline-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+/* the Visual canvas zoom — View's − % + Fit, riding the stage corner */
+.rotli-mermaid-visual-zoom {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-control);
+}
+.rotli-mermaid-visual-zoom button {
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  padding: 2px 7px;
+  border-radius: var(--r-inner);
+  cursor: pointer;
+}
+.rotli-mermaid-visual-zoom button:hover {
+  background: var(--hov);
+}
+.rotli-mermaid-visual-zoom output {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 36px;
+  text-align: center;
 }
 .rotli-mermaid-visual-canvas.is-connecting {
   cursor: crosshair;

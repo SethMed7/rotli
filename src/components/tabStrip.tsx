@@ -54,6 +54,8 @@ function tabLabel(tab: Tab, titles: Map<string, string>): string {
       return fileName(tab.fileId);
     case "activity":
       return "Librarian Activity";
+    case "newItem":
+      return "New…";
   }
 }
 

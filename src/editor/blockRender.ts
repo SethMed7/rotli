@@ -22,7 +22,13 @@ import { Decoration, type DecorationSet, EditorView, ViewPlugin, WidgetType } fr
 import { createEditableBoardFromMermaid } from "../boards/composition";
 import { isTauri } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
-import { usePanesStore } from "../state/panes";
+import { findLeaf, leaves, usePanesStore } from "../state/panes";
+import {
+  type MermaidViewport,
+  fitMermaidViewport,
+  panMermaidViewport,
+  zoomMermaidViewportAt,
+} from "./mermaidViewport";
 import { type FenceBlock, type LangKey, innerCode, scanFences } from "./fences";
 import { mountBoardEmbed, mountDocumentEmbed, mountSheetEmbed } from "./embedHosts";
 import { installEmbedControls } from "./embedControls";
@@ -282,6 +288,8 @@ class EmbedBlockWidget extends WidgetType {
       container,
       body,
       kind: this.kind,
+      // resized heights survive rebuilds + restarts, per embedded file
+      persistKey: this.fileId.trim(),
       onOpen: () => {
         if (this.kind === "board") usePanesStore.getState().openCanvas(this.fileId, { newTab: true });
         else usePanesStore.getState().openFile(this.fileId, { newTab: true });
@@ -330,6 +338,7 @@ class EmbedBlockWidget extends WidgetType {
 class RenderBlockWidget extends WidgetType {
   private destroyed = false;
   private dom: HTMLElement | null = null;
+  private camera: InlineMermaidCamera | null = null;
 
   constructor(
     readonly lang: StaticLangKey,
@@ -372,15 +381,20 @@ class RenderBlockWidget extends WidgetType {
       body.tabIndex = 0;
       body.setAttribute("role", "button");
       body.setAttribute("aria-label", "Open Mermaid diagram viewer");
-      const open = (event: Event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        openMermaidWorkspace(this.code, container, this.sourceFrom, this.sourceTo);
-      };
-      body.addEventListener("mousedown", open);
+      // click still opens the workspace — but a DRAG pans and a scroll zooms
+      // in place (Seth, 2026-07-29: "usable without clicking in"), so the
+      // open gesture moved from mousedown to the camera's no-travel pointerup
       body.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") open(event);
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          event.stopPropagation();
+          openMermaidWorkspace(this.code, container, this.sourceFrom, this.sourceTo);
+        }
       });
+      this.camera?.cleanup();
+      this.camera = createInlineMermaidCamera(body, this.code, () =>
+        openMermaidWorkspace(this.code, container, this.sourceFrom, this.sourceTo),
+      );
     }
 
     const expand = document.createElement("button");
@@ -408,10 +422,18 @@ class RenderBlockWidget extends WidgetType {
     };
     const key = `${this.lang}|${ctx.dark ? "d" : "l"}|${tokens("--text")}|${tokens("--accent")}|${this.code}`;
 
+    const mountRendered = (el: HTMLElement) => {
+      if (this.lang === "mermaid" && this.camera) {
+        this.camera.mount(el);
+      } else {
+        body.replaceChildren(el);
+      }
+    };
+
     if (this.lang !== "jsxgraph") {
       const cached = cacheGet(key);
       if (cached) {
-        body.appendChild(cached);
+        mountRendered(cached);
         return container;
       }
     }
@@ -421,13 +443,13 @@ class RenderBlockWidget extends WidgetType {
       out
         .then((el) => {
           if (this.destroyed) return; // widget gone — never touch its DOM
-          body.replaceChildren(el);
           if (this.lang !== "jsxgraph") cacheSet(key, el);
+          mountRendered(el);
         })
         .catch(() => {});
     } else {
-      body.appendChild(out);
       if (this.lang !== "jsxgraph") cacheSet(key, out);
+      mountRendered(out);
     }
     return container;
   }
@@ -441,6 +463,8 @@ class RenderBlockWidget extends WidgetType {
 
   destroy(): void {
     this.destroyed = true;
+    this.camera?.cleanup();
+    this.camera = null;
     if (this.dom) {
       this.dom.querySelectorAll<HTMLElement>(".rotli-render-jsxgraph").forEach(freeIfBoard);
     }
@@ -450,6 +474,142 @@ class RenderBlockWidget extends WidgetType {
 
 function cryptoId(): string {
   return Math.random().toString(36).slice(2, 10);
+}
+
+// ——— the inline mermaid camera (Seth, 2026-07-29): scroll zooms, drag pans,
+//     a no-travel click still opens the workspace. Viewports persist per
+//     source across the rebuilds that reveal-on-caret causes. ———
+
+const INLINE_VIEWPORTS = new Map<string, MermaidViewport>();
+const INLINE_VIEWPORT_CAP = 100; // LRU, like embedSizeMemory — long sessions must not hoard
+const INLINE_MAX_HEIGHT = 460;
+const INLINE_MIN_HEIGHT = 160;
+
+function rememberInlineViewport(code: string, viewport: MermaidViewport): void {
+  INLINE_VIEWPORTS.delete(code); // re-insert = LRU touch
+  INLINE_VIEWPORTS.set(code, viewport);
+  while (INLINE_VIEWPORTS.size > INLINE_VIEWPORT_CAP) {
+    const oldest = INLINE_VIEWPORTS.keys().next().value;
+    if (oldest === undefined) break;
+    INLINE_VIEWPORTS.delete(oldest);
+  }
+}
+
+interface InlineMermaidCamera {
+  /** The rendered diagram landed — stage it and fit/restore the viewport. */
+  mount(rendered: HTMLElement): void;
+  cleanup(): void;
+}
+
+/** Gesture installation is SYNCHRONOUS (toDOM time) so click-to-open works
+ * the instant the widget exists — the async mermaid render mounts into the
+ * already-armed camera when it lands (a slow import must not eat clicks). */
+function createInlineMermaidCamera(
+  body: HTMLElement,
+  code: string,
+  openWorkspace: () => void,
+): InlineMermaidCamera {
+  body.classList.add("rotli-mermaid-inline");
+  const stage = document.createElement("div");
+  stage.className = "rotli-mermaid-inline-stage";
+
+  let rendered: HTMLElement | null = null;
+  const contentSize = () => {
+    const svg = rendered?.querySelector("svg");
+    const box = svg?.viewBox?.baseVal;
+    if (box && box.width > 0 && box.height > 0) return { x: box.width, y: box.height };
+    const rect = rendered?.getBoundingClientRect();
+    return { x: rect?.width || 1, y: rect?.height || 1 };
+  };
+
+  let viewport = INLINE_VIEWPORTS.get(code) ?? null;
+  const apply = () => {
+    if (!viewport) return;
+    stage.style.transform = `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.scale})`;
+    rememberInlineViewport(code, viewport);
+  };
+  const fitInline = () => {
+    if (!rendered) return;
+    viewport = fitMermaidViewport({ x: body.clientWidth, y: body.clientHeight }, contentSize());
+    apply();
+  };
+
+  const onWheel = (event: WheelEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!viewport) return;
+    const rect = body.getBoundingClientRect();
+    const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    const factor = Math.exp(-event.deltaY * 0.0015);
+    viewport = zoomMermaidViewportAt(viewport, viewport.scale * factor, anchor);
+    apply();
+  };
+  // NON-passive on purpose: the editor scroller must not also scroll
+  body.addEventListener("wheel", onWheel, { passive: false });
+
+  let pan: { pointerId: number; x: number; y: number; moved: boolean } | null = null;
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.button !== 0) return;
+    pan = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+    body.setPointerCapture(event.pointerId);
+  };
+  const onPointerMove = (event: PointerEvent) => {
+    if (!pan || pan.pointerId !== event.pointerId || !viewport) return;
+    const dx = event.clientX - pan.x;
+    const dy = event.clientY - pan.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) pan.moved = true;
+    pan.x = event.clientX;
+    pan.y = event.clientY;
+    if (pan.moved) {
+      viewport = panMermaidViewport(viewport, { x: dx, y: dy });
+      apply();
+    }
+  };
+  const endPan = (event: PointerEvent) => {
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    const wasClick = !pan.moved;
+    pan = null;
+    if (body.hasPointerCapture(event.pointerId)) body.releasePointerCapture(event.pointerId);
+    // the promised click-to-open, only when the pointer never traveled
+    if (wasClick) openWorkspace();
+  };
+  const onPointerCancel = (event: PointerEvent) => {
+    if (pan?.pointerId === event.pointerId) pan = null;
+  };
+  const onDblClick = (event: MouseEvent) => {
+    event.preventDefault();
+    fitInline();
+  };
+  body.addEventListener("pointerdown", onPointerDown);
+  body.addEventListener("pointermove", onPointerMove);
+  body.addEventListener("pointerup", endPan);
+  body.addEventListener("pointercancel", onPointerCancel);
+  body.addEventListener("dblclick", onDblClick);
+
+  return {
+    mount(el) {
+      rendered = el;
+      stage.replaceChildren(el);
+      body.replaceChildren(stage);
+      // size the viewport box to the diagram (capped), then fit or restore —
+      // after layout so clientWidth is real
+      requestAnimationFrame(() => {
+        const size = contentSize();
+        body.style.height = `${Math.max(INLINE_MIN_HEIGHT, Math.min(INLINE_MAX_HEIGHT, size.y + 24))}px`;
+        if (viewport) apply();
+        else fitInline();
+      });
+    },
+    cleanup() {
+      // the FULL teardown the contract promises (Greptile P2, PR #3)
+      body.removeEventListener("wheel", onWheel);
+      body.removeEventListener("pointerdown", onPointerDown);
+      body.removeEventListener("pointermove", onPointerMove);
+      body.removeEventListener("pointerup", endPan);
+      body.removeEventListener("pointercancel", onPointerCancel);
+      body.removeEventListener("dblclick", onDblClick);
+    },
+  };
 }
 
 // ——— the expand overlay (transient, on-brand) ————————————————————————
@@ -480,10 +640,20 @@ function mermaidCodeRange(
   return { from, to };
 }
 
+/** The note hosting the workspace — the focused pane's active note tab (the
+ * click that opened the fence focused its pane first). Null on non-note tabs. */
+function focusedNoteId(): string | null {
+  const { root, focusedPaneId } = usePanesStore.getState();
+  const leaf = findLeaf(root, focusedPaneId) ?? leaves(root)[0];
+  const tab = leaf?.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf?.tabs[0];
+  return tab && tab.surfaceKind === "note" ? tab.noteId : null;
+}
+
 function openMermaidWorkspace(code: string, anchor: HTMLElement, sourceFrom: number, sourceTo: number): void {
   const view = EditorView.findFromDOM(anchor);
   if (!view) return;
   closeAllOverlays();
+  const sourceNoteId = focusedNoteId();
 
   let unmount = () => {};
   let off: (() => void) | null = null;
@@ -526,7 +696,38 @@ function openMermaidWorkspace(code: string, anchor: HTMLElement, sourceFrom: num
       return null;
     },
     onConvertToExcalidraw: async (nextCode) => {
-      await createEditableBoardFromMermaid(nextCode);
+      // the copy files beside the SOURCE note — same Main folder, same view
+      await createEditableBoardFromMermaid(nextCode, sourceNoteId ? { besideNoteId: sourceNoteId } : {});
+    },
+    onConvertAndEmbed: async (nextCode) => {
+      // the fence must still be what this workspace opened on — same stale
+      // guard as Apply, checked BEFORE the board file is created
+      const range = mermaidCodeRange(view, sourceFrom, sourceTo);
+      if (!range || view.state.doc.sliceString(range.from, range.to) !== code) {
+        return "The diagram changed in the note. Close and reopen it before replacing.";
+      }
+      const boardId = await createEditableBoardFromMermaid(nextCode, {
+        ...(sourceNoteId ? { besideNoteId: sourceNoteId } : {}),
+        open: false,
+      });
+      // RE-run the guard after the await (Greptile P1, PR #3): the board
+      // write takes real time and the note may have changed under us — the
+      // offsets must be validated against the FRESH document before dispatch
+      const fresh = mermaidCodeRange(view, sourceFrom, sourceTo);
+      if (!fresh || view.state.doc.sliceString(fresh.from, fresh.to) !== code) {
+        return "The note changed while converting — the board was created but not embedded.";
+      }
+      const openLine = view.state.doc.lineAt(sourceFrom);
+      const closeLine = view.state.doc.lineAt(sourceTo);
+      view.dispatch({
+        changes: {
+          from: openLine.from,
+          to: closeLine.to,
+          insert: `\`\`\`board\n${boardId}\n\`\`\``,
+        },
+        scrollIntoView: true,
+      });
+      return null;
     },
   });
 }

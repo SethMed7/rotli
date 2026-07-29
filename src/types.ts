@@ -109,7 +109,17 @@ export interface ActivityTab {
   surfaceKind: "activity";
 }
 
-export type Tab = NoteTab | CanvasTab | ChatTab | FileTab | ActivityTab;
+/** The ⌘N chooser — a blank new tab with NO type yet (Seth, 2026-07-29:
+ * "you have to choose board / md / doc etc"); picking a kind replaces it
+ * with the created item's real surface. */
+export interface NewItemTab {
+  id: string;
+  /** Never set for this kind — present so the union reads uniformly. */
+  preview?: boolean;
+  surfaceKind: "newItem";
+}
+
+export type Tab = NoteTab | CanvasTab | ChatTab | FileTab | ActivityTab | NewItemTab;
 
 export type SplitDir = "row" | "col";
 

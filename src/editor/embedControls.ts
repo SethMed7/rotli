@@ -1,3 +1,4 @@
+import { rememberEmbedHeight, rememberedEmbedHeight } from "./embedSizeMemory";
 import {
   EMBED_MIN_HEIGHT,
   createEmbedSizeState,
@@ -24,11 +25,15 @@ export function installEmbedControls({
   body,
   kind,
   onOpen,
+  persistKey,
 }: {
   container: HTMLElement;
   body: HTMLElement;
   kind: EmbedKind;
   onOpen(): void;
+  /** File id whose resized height is REMEMBERED across widget rebuilds and
+   * restarts (Seth, 2026-07-29); omitted = per-mount sizing as before. */
+  persistKey?: string;
 }): () => void {
   const actions = document.createElement("div");
   actions.className = "rotli-render-actions";
@@ -45,7 +50,9 @@ export function installEmbedControls({
   actions.appendChild(open);
   container.appendChild(actions);
 
-  let size = createEmbedSizeState(DEFAULT_HEIGHT[kind]);
+  let size = createEmbedSizeState(
+    (persistKey ? rememberedEmbedHeight(persistKey) : null) ?? DEFAULT_HEIGHT[kind],
+  );
   // CodeMirror calls WidgetType.toDOM before attaching the result, so resolve
   // the pane lazily instead of capturing a guaranteed-null ancestor here.
   const viewport = () => container.closest<HTMLElement>(".ed-scroll");
@@ -106,10 +113,11 @@ export function installEmbedControls({
   resize.title = `Drag to resize ${kind}; use arrow keys for precise resizing`;
   container.appendChild(resize);
 
-  const applyResize = (height: number) => {
+  const applyResize = (height: number, remember = true) => {
     size = resizeEmbed(size, height, viewportHeight());
     resize.setAttribute("aria-valuemax", String(embedHeightLimit(viewportHeight())));
     resize.setAttribute("aria-valuenow", String(size.height));
+    if (remember && persistKey) rememberEmbedHeight(persistKey, size.height);
     applySize();
   };
   resize.addEventListener("keydown", (event) => {
@@ -173,7 +181,8 @@ export function installEmbedControls({
   });
   window.addEventListener("resize", fitExpanded);
   document.addEventListener("keydown", onKeyDown, true);
-  applyResize(size.height);
+  // seed pass — never re-records the height it just read
+  applyResize(size.height, false);
 
   return () => {
     observer?.disconnect();

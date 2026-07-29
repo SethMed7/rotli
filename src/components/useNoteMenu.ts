@@ -417,12 +417,15 @@ export function useNoteMenu() {
             kind: "action" as const,
             label: fm?.locked ? "Unlock — let the AI organize it" : "Lock from the AI",
             checked: !!fm?.locked,
+            // protection states wear the LOCK, not the star (Seth, 2026-07-29)
+            checkedMark: "lock" as const,
             onClick: () => runFm("lock", corpusSetLocked(note.id, !fm?.locked)),
           });
           items.push({
             kind: "action" as const,
             label: fm?.secure ? "Remove secure protection" : "Mark secure — block remote AI",
             checked: !!fm?.secure,
+            checkedMark: "lock" as const,
             onClick: () => runFm("mark secure", corpusSetSecure(note.id, !fm?.secure)),
           });
           if (fm?.secure && !secureAtHome) {

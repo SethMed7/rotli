@@ -7,7 +7,7 @@ import { MAIN_ROOT, addNoteToMainAt, mainFolderIds, mainParentOfNote } from "../
 import { inboxFolderId } from "../services/notes";
 import { useMainStore } from "../state/main";
 import { useViewsStore } from "../state/views";
-import { assignItemToView, viewTree } from "../services/viewTree";
+import { assignItemToView, assignedView, viewTree } from "../services/viewTree";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
@@ -57,15 +57,23 @@ function resolvedPhysicalFolder(): string {
 
 const creator: NewItemCreator = {
   async create(kind) {
-    if (kind === "markdown") {
+    if (kind === "markdown" || kind === "mermaid") {
       const selected = useUiStore.getState().selectedFolderId;
       const selectedMain = selected.startsWith(MAIN_ROOT);
       const routeFolder = selectedMain ? ALL_NOTES : selected;
+      // a Mermaid diagram is a NOTE born with the starter flowchart fence —
+      // the same body the slash command inserts (Seth, 2026-07-29)
+      const body =
+        kind === "mermaid"
+          ? await import("../editor/slashActions").then(
+              (m) => `# Diagram\n\n\`\`\`mermaid\n${m.MERMAID_STARTER}\n\`\`\`\n`,
+            )
+          : "";
       const id = await createRoutedNote({
         selectedFolderId: routeFolder,
         isSmart: routeFolder === ALL_NOTES || routeFolder === RECENT,
         localFallback: inboxFolderId,
-        body: "",
+        body,
       });
       return { id, kind };
     }
@@ -83,6 +91,29 @@ const creator: NewItemCreator = {
   },
 };
 
+/** The named view (if any) whose OWN tree carries a folder with this rendered
+ * id — folder ids share one grammar ("main:<path>") across Main and every
+ * view, so a Main folder mirrored into a view matches by id. Seth, 2026-07-29:
+ * "if I put a file in a folder that is part of a view it should be seen in
+ * that view." */
+export function viewContainingFolder(folderId: string): string | null {
+  if (folderId === MAIN_ROOT) return null;
+  const manifest = useViewsStore.getState().manifest;
+  for (const view of manifest.views) {
+    if (mainFolderIds(view.tree).includes(folderId)) return view.name;
+  }
+  return null;
+}
+
+/** Assign `itemId` to the view that mirrors `parent`, when one does. Runs
+ * AFTER the Main write (assignItemToView wipes other memberships first). */
+export function inheritFolderView(itemId: string, parent: string): void {
+  const view = viewContainingFolder(parent);
+  if (!view) return;
+  const views = useViewsStore.getState();
+  views.setManifest(assignItemToView(views.manifest, itemId, view, parent));
+}
+
 const presenter: NewItemPresenter = {
   async refresh() {
     await Promise.all([invalidateNotes(), invalidateMemex()]);
@@ -97,12 +128,14 @@ const presenter: NewItemPresenter = {
     if (activeView) {
       const views = useViewsStore.getState();
       views.setManifest(assignItemToView(views.manifest, item.id, activeView, parent));
+    } else {
+      inheritFolderView(item.id, parent);
     }
   },
   open(item, options) {
     const panes = usePanesStore.getState();
     useUiStore.getState().setSidebarMode("notes");
-    if (item.kind === "markdown") panes.openNote(item.id, options);
+    if (item.kind === "markdown" || item.kind === "mermaid") panes.openNote(item.id, options);
     else if (item.kind === "board") {
       panes.openCanvas(item.id, options);
       useUiStore.getState().setRenamingBoardId(item.id);
@@ -120,17 +153,21 @@ export async function createManagedItem(
   // embed targets) must never be tracked — a later open+close-unedited would
   // discard a file something else already embeds.
   if (options.open !== false) {
-    if (item.kind === "markdown") trackNewNoteDraft(item.id);
+    // a mermaid item IS a markdown note — an abandoned blank tracks the same
+    if (item.kind === "markdown" || item.kind === "mermaid") trackNewNoteDraft(item.id);
     else if (item.kind === "document") trackNewDocumentDraft(item.id);
   }
   return item;
 }
 
 /** Create a populated board atomically while preserving the same Main/view
- * filing and presentation policy used by every other creation entry point. */
+ * filing and presentation policy used by every other creation entry point.
+ * `besideNoteId` (Seth, 2026-07-29: a converted diagram lands "in the same
+ * path I am in") files the board beside that note — same Main folder, same
+ * named view — instead of reading the ambient selection. */
 export function createManagedBoardWithBody(
   body: string,
-  options: { newTab?: boolean; open?: boolean } = {},
+  options: { newTab?: boolean; open?: boolean; besideNoteId?: string } = {},
 ): Promise<CreatedItem> {
   const populatedBoardCreator: NewItemCreator = {
     async create() {
@@ -138,5 +175,25 @@ export function createManagedBoardWithBody(
       return { id: board.id, kind: "board" };
     },
   };
-  return createNewItem({ creator: populatedBoardCreator, presenter }, "board", options);
+  const beside = options.besideNoteId;
+  const filingPresenter: NewItemPresenter = beside
+    ? {
+        ...presenter,
+        fileInMain(item) {
+          const main = useMainStore.getState();
+          const views = useViewsStore.getState();
+          const view = assignedView(views.manifest, beside);
+          if (view) {
+            const parentInView = mainParentOfNote(viewTree(views.manifest, view), beside) ?? MAIN_ROOT;
+            main.setTree(addNoteToMainAt(main.manifest.tree, item.id, MAIN_ROOT));
+            views.setManifest(assignItemToView(views.manifest, item.id, view, parentInView));
+            return;
+          }
+          const parent = mainParentOfNote(main.manifest.tree, beside) ?? MAIN_ROOT;
+          main.setTree(addNoteToMainAt(main.manifest.tree, item.id, parent));
+          inheritFolderView(item.id, parent);
+        },
+      }
+    : presenter;
+  return createNewItem({ creator: populatedBoardCreator, presenter: filingPresenter }, "board", options);
 }

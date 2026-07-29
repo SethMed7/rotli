@@ -1,5 +1,5 @@
 /** Stable item kinds used by every creation entry point and persisted setting. */
-export const NEW_ITEM_KINDS = ["markdown", "document", "sheet", "board"] as const;
+export const NEW_ITEM_KINDS = ["markdown", "document", "sheet", "board", "mermaid"] as const;
 
 export type NewItemKind = (typeof NEW_ITEM_KINDS)[number];
 
@@ -30,6 +30,11 @@ export const NEW_ITEM_DEFINITIONS: readonly NewItemDefinition[] = [
     kind: "board",
     label: "Board",
     description: "A freeform Excalidraw canvas.",
+  },
+  {
+    kind: "mermaid",
+    label: "Mermaid diagram",
+    description: "A note born with a flowchart fence and its visual workspace.",
   },
 ];
 

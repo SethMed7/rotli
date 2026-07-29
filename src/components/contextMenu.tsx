@@ -12,7 +12,7 @@
 import { type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
 import { useTransientPopover } from "../lib/popover";
 import { menuUsesCheckGutter, type MenuSpec, useContextMenu } from "../state/contextMenu";
-import { ChevronRight } from "./glyphs";
+import { ChevronRight, LockGlyph } from "./glyphs";
 
 export function ContextMenu() {
   const menu = useContextMenu((s) => s.menu);
@@ -120,11 +120,17 @@ export function ContextMenu() {
           >
             {usesCheckGutter && (
               <span className="ctxmenu-check" aria-hidden="true">
-                {item.checked && item.checkedMark !== "highlight"
-                  ? item.checkedMark === "check"
-                    ? "✓"
-                    : "★"
-                  : ""}
+                {item.checked && item.checkedMark !== "highlight" ? (
+                  item.checkedMark === "check" ? (
+                    "✓"
+                  ) : item.checkedMark === "lock" ? (
+                    <LockGlyph size={11} />
+                  ) : (
+                    "★"
+                  )
+                ) : (
+                  ""
+                )}
               </span>
             )}
             <span className="ctxmenu-label">{item.label}</span>

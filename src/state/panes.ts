@@ -55,6 +55,10 @@ function makeActivityTab(): Tab {
   return { id: ulid(), surfaceKind: "activity" };
 }
 
+function makeNewItemTab(): Tab {
+  return { id: ulid(), surfaceKind: "newItem" };
+}
+
 /** The noteId of a tab, or null for a canvas tab — the one place every
  * `.noteId` read funnels through so a CanvasTab never crashes NoteTab code. */
 function tabNoteId(tab: Tab): string | null {
@@ -118,6 +122,7 @@ function duplicateTab(tab: Tab): Tab {
   if (tab.surfaceKind === "chat") return makeChatTab(tab.chatSlug);
   if (tab.surfaceKind === "file") return makeFileTab(tab.fileId);
   if (tab.surfaceKind === "activity") return makeActivityTab();
+  if (tab.surfaceKind === "newItem") return makeNewItemTab();
   return makeTab(tab.noteId);
 }
 
@@ -423,6 +428,8 @@ interface PanesState {
   closeFileTabs: (fileId: string) => void;
   /** Open the Brain Activity view (the AI-Filer change journal). Singleton per pane. */
   openActivity: () => void;
+  /** ⌘N — a blank NEW TAB with the type chooser (Seth, 2026-07-29). */
+  openNewItemTab: () => void;
   /** Open a note/board/file by its summary — the ONE place open-by-kind lives.
    * Dispatches on `kind` and forwards `opts` so ⌘-click / newTab works uniformly
    * for every row type (Seth, 2026-06-30 — was hand-written in 5 places, files
@@ -690,6 +697,20 @@ export const usePanesStore = create<PanesState>((set, get) => {
         root: updateLeaf(get().root, leaf.id, (l) =>
           placeTab(l, undefined, (t) => t.surfaceKind === "activity", makeActivityTab),
         ),
+      });
+    },
+
+    openNewItemTab: () => {
+      // ALWAYS a fresh tab — the chooser is a blank slate, never a reuse
+      useUiStore.getState().setContentView("panes");
+      const leaf = focusedLeaf();
+      const tab = makeNewItemTab();
+      set({
+        root: updateLeaf(get().root, leaf.id, (l) => ({
+          ...l,
+          tabs: [...l.tabs, tab],
+          activeTabId: tab.id,
+        })),
       });
     },
 

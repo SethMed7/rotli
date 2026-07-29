@@ -10,6 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Mermaid grew a camera — everywhere.** The diagram in your note pans and
+  zooms in place (scroll zooms, drag pans, double-click fits, a still click
+  opens the workspace), and the Visual editor gained the same camera: scroll
+  to zoom at the cursor, drag empty canvas to pan, − % + Fit controls, with
+  node dragging staying exact at every zoom level.
+- **Converting to Excalidraw lands beside the note** — same Main folder, same
+  named view — and offers **Convert & replace in note**, swapping the mermaid
+  fence for the new board embedded right there.
+- **Mermaid diagram is a New… item**, next to Board: a note born with the
+  starter flowchart.
+- **⌘N opens a blank chooser tab** — pick Markdown / Document / Sheet / Board
+  / Mermaid and the tab becomes it. **⌘⇧T is New board** now; reopen-closed-tab
+  moved to ⌘⌥T (everything stays rebindable).
+
+### Fixed
+
+- Files added to a Main folder that a named view mirrors now show in that
+  view too.
+- Embedded boards (and sheets/documents) remember their resized height across
+  edits and restarts.
+
 ## [0.44.0] - 2026-07-29
 
 ### Added

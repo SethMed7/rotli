@@ -260,18 +260,29 @@ export function registerDefaultActions(): void {
   });
 
   // — notes —
+  // ⌘N is the blank NEW-TAB chooser now (Seth, 2026-07-29): "no type selected,
+  // you have to choose". notes.new stays palette/menu-reachable, chord-free.
   registerAction({
     id: "notes.new",
     title: "New note",
-    defaultChord: "Meta+N",
+    defaultChord: null,
     run: () => {
       if (useUiStore.getState().sidebarMode !== "breve") runCreate("markdown", false);
+    },
+  });
+  registerAction({
+    id: "tabs.newChooser",
+    title: "New tab (choose type)",
+    defaultChord: "Meta+N",
+    run: () => {
+      if (useUiStore.getState().sidebarMode !== "breve") usePanesStore.getState().openNewItemTab();
     },
   });
   for (const [id, title, kind] of [
     ["items.newMarkdown", "New Markdown note", "markdown"],
     ["items.newDocument", "New document", "document"],
     ["items.newSheet", "New sheet", "sheet"],
+    ["items.newMermaid", "New Mermaid diagram", "mermaid"],
   ] as const) {
     registerAction({
       id,
@@ -285,7 +296,8 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "boards.new",
     title: "New Excalidraw board",
-    defaultChord: "Meta+Shift+N",
+    // ⌘⇧T (Seth, 2026-07-29) — reopen-closed-tab moved to ⌘⌥T for it
+    defaultChord: "Meta+Shift+T",
     run: () => {
       if (useUiStore.getState().sidebarMode === "breve") return;
       runCreate("board", true);
@@ -381,7 +393,8 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "tabs.reopen",
     title: "Reopen closed tab",
-    defaultChord: "Meta+Shift+T",
+    // ⌘⌥T — ⌘⇧T became New board (Seth, 2026-07-29); rebindable as ever
+    defaultChord: "Meta+Alt+T",
     run: () => {
       if (notesWorkspaceActive()) usePanesStore.getState().reopenClosedTab();
     },

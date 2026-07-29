@@ -2,6 +2,7 @@ import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -26,6 +27,12 @@ import {
   MERMAID_VISUAL_NODE_SIZE,
   layoutMermaidFlowchart,
 } from "./mermaidFlowLayout";
+import {
+  type MermaidViewport,
+  fitMermaidViewport,
+  panMermaidViewport,
+  zoomMermaidViewportAt,
+} from "./mermaidViewport";
 
 interface MermaidVisualEditorProps {
   applyError: string;
@@ -255,6 +262,13 @@ export function MermaidVisualEditor({
   const [pendingFrom, setPendingFrom] = useState<string | null>(null);
   const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
   const dragRef = useRef<NodeDrag | null>(null);
+  // the Visual camera (Seth, 2026-07-29: "similar to how Excalidraw is,
+  // including the zooming") — same tested viewport math as View mode; starts
+  // at 1:1 so node-drag pixels stay honest until the user zooms
+  const [camera, setCamera] = useState<MermaidViewport>({ x: 0, y: 0, scale: 1 });
+  const [isPanning, setIsPanning] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const panRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
 
   useEffect(() => {
     if (!automaticLayout || !model) return;
@@ -355,22 +369,82 @@ export function MermaidVisualEditor({
     [pendingFrom, positions],
   );
 
-  const moveDrag = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    setPositions((current) => ({
-      ...current,
-      [drag.id]: {
-        x: drag.origin.x + event.clientX - drag.start.x,
-        y: drag.origin.y + event.clientY - drag.start.y,
-      },
-    }));
-  }, []);
+  const moveDrag = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      // screen-pixel deltas divide by the camera scale so a node tracks the
+      // cursor 1:1 at every zoom level
+      const scale = camera.scale || 1;
+      setPositions((current) => ({
+        ...current,
+        [drag.id]: {
+          x: drag.origin.x + (event.clientX - drag.start.x) / scale,
+          y: drag.origin.y + (event.clientY - drag.start.y) / scale,
+        },
+      }));
+    },
+    [camera.scale],
+  );
 
   const endDrag = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
+
+  // — camera gestures: scroll zooms at the cursor, dragging EMPTY canvas pans,
+  //   the corner controls mirror View's − % + Fit —
+  const zoomCameraBy = useCallback((factor: number) => {
+    const stage = stageRef.current;
+    const anchor = stage ? { x: stage.clientWidth / 2, y: stage.clientHeight / 2 } : { x: 0, y: 0 };
+    setCamera((current) => zoomMermaidViewportAt(current, current.scale * factor, anchor));
+  }, []);
+
+  const fitCamera = useCallback((content: { x: number; y: number }) => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    setCamera(fitMermaidViewport({ x: stage.clientWidth, y: stage.clientHeight }, content));
+  }, []);
+
+  const onStageWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    const factor = Math.exp(-event.deltaY * 0.0015);
+    setCamera((current) => zoomMermaidViewportAt(current, current.scale * factor, anchor));
+  }, []);
+
+  const onStagePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    // nodes, ports, and inspector controls own their gestures — only the empty
+    // stage (or the edges layer beneath the nodes) starts a pan
+    const target = event.target as HTMLElement;
+    if (target.closest(".rotli-mermaid-visual-node-wrap, button, input, select, textarea")) return;
+    panRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsPanning(true);
+  }, []);
+
+  const onStagePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    const dx = event.clientX - pan.x;
+    const dy = event.clientY - pan.y;
+    if (Math.abs(dx) + Math.abs(dy) > 2) pan.moved = true;
+    pan.x = event.clientX;
+    pan.y = event.clientY;
+    setCamera((current) => panMermaidViewport(current, { x: dx, y: dy }));
+  }, []);
+
+  const onStagePointerEnd = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    panRef.current = null;
+    setIsPanning(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -410,18 +484,26 @@ export function MermaidVisualEditor({
       className="rotli-mermaid-visual"
       aria-label="Visual Mermaid flowchart editor"
       onKeyDown={(event: ReactKeyboardEvent<HTMLElement>) => {
+        const inField =
+          event.target instanceof HTMLInputElement ||
+          event.target instanceof HTMLTextAreaElement ||
+          event.target instanceof HTMLSelectElement;
         if (event.key === "Escape" && pendingFrom) {
           event.preventDefault();
           event.stopPropagation();
           setPendingFrom(null);
-        } else if (
-          (event.key === "Delete" || event.key === "Backspace") &&
-          selection &&
-          !(event.target instanceof HTMLInputElement) &&
-          !(event.target instanceof HTMLTextAreaElement)
-        ) {
+        } else if ((event.key === "Delete" || event.key === "Backspace") && selection && !inField) {
           event.preventDefault();
           deleteSelection();
+        } else if (!inField && (event.key === "+" || event.key === "=")) {
+          event.preventDefault();
+          zoomCameraBy(1.2);
+        } else if (!inField && event.key === "-") {
+          event.preventDefault();
+          zoomCameraBy(1 / 1.2);
+        } else if (!inField && event.key === "0") {
+          event.preventDefault();
+          fitCamera({ x: canvasWidth, y: canvasHeight });
         }
       }}
     >
@@ -494,10 +576,17 @@ export function MermaidVisualEditor({
 
       <div className="rotli-mermaid-visual-body">
         <div
-          className="rotli-mermaid-visual-scroll"
-          aria-label="Flowchart editing canvas"
+          ref={stageRef}
+          className={isPanning ? "rotli-mermaid-visual-scroll is-panning" : "rotli-mermaid-visual-scroll"}
+          aria-label="Flowchart editing canvas. Drag empty space to pan and scroll to zoom."
+          onWheel={onStageWheel}
+          onPointerDown={onStagePointerDown}
+          onPointerMove={onStagePointerMove}
+          onPointerUp={onStagePointerEnd}
+          onPointerCancel={onStagePointerEnd}
           onClick={(event) => {
-            if (event.target === event.currentTarget) setSelection(null);
+            // a pan that traveled must not read as a click-clear
+            if (event.target === event.currentTarget && !panRef.current) setSelection(null);
           }}
         >
           {model.nodes.length === 0 ? (
@@ -513,7 +602,12 @@ export function MermaidVisualEditor({
               className={
                 pendingFrom ? "rotli-mermaid-visual-canvas is-connecting" : "rotli-mermaid-visual-canvas"
               }
-              style={{ width: canvasWidth, height: canvasHeight }}
+              style={{
+                width: canvasWidth,
+                height: canvasHeight,
+                transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.scale})`,
+                transformOrigin: "0 0",
+              }}
             >
               <svg
                 className="rotli-mermaid-visual-edges"
@@ -623,6 +717,20 @@ export function MermaidVisualEditor({
                   </div>
                 );
               })}
+            </div>
+          )}
+          {model.nodes.length > 0 && (
+            <div className="rotli-mermaid-visual-zoom" aria-label="Canvas zoom">
+              <button type="button" aria-label="Zoom canvas out" onClick={() => zoomCameraBy(1 / 1.2)}>
+                −
+              </button>
+              <output aria-label="Canvas zoom level">{Math.round(camera.scale * 100)}%</output>
+              <button type="button" aria-label="Zoom canvas in" onClick={() => zoomCameraBy(1.2)}>
+                +
+              </button>
+              <button type="button" onClick={() => fitCamera({ x: canvasWidth, y: canvasHeight })}>
+                Fit
+              </button>
             </div>
           )}
         </div>

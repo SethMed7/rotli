@@ -28,6 +28,9 @@ interface MermaidWorkspaceProps {
   conversionAvailable: boolean;
   onApply(code: string): string | null;
   onConvertToExcalidraw(code: string): Promise<void>;
+  /** Convert AND swap the note's mermaid fence for a ```board embed — returns
+   * an error message when the fence went stale, null on success. */
+  onConvertAndEmbed?(code: string): Promise<string | null>;
   onClose(): void;
   onRequestCloseReady?(requestClose: () => void): void;
 }
@@ -64,6 +67,7 @@ function MermaidWorkspace({
   conversionAvailable,
   onApply,
   onConvertToExcalidraw,
+  onConvertAndEmbed,
   onClose,
   onRequestCloseReady,
 }: MermaidWorkspaceProps) {
@@ -241,6 +245,26 @@ function MermaidWorkspace({
     }
   }, [draft, onClose, onConvertToExcalidraw]);
 
+  const convertAndEmbed = useCallback(async () => {
+    if (!onConvertAndEmbed) return;
+    setConversionStatus("creating");
+    setConversionError("");
+    try {
+      const error = await onConvertAndEmbed(draft);
+      if (error) {
+        setConfirmConversion(false);
+        setConversionError(error);
+        setConversionStatus("error");
+        return;
+      }
+      onClose();
+    } catch (error) {
+      setConfirmConversion(false);
+      setConversionError(error instanceof Error ? error.message : String(error));
+      setConversionStatus("error");
+    }
+  }, [draft, onClose, onConvertAndEmbed]);
+
   const applyDraft = useCallback(() => {
     const error = onApply(draft);
     if (error) setApplyError(error);
@@ -417,20 +441,29 @@ function MermaidWorkspace({
         {confirmConversion && (
           <div className="rotli-mermaid-convert-confirm" role="alert">
             <span>
-              <strong>Create a separate Excalidraw board?</strong> The Mermaid diagram in this note stays
-              unchanged.
+              <strong>Convert to an Excalidraw board?</strong> Keep the Mermaid fence and open a separate
+              board — or replace the fence with the board embedded right here.
             </span>
             <button type="button" onClick={() => setConfirmConversion(false)}>
               Cancel
             </button>
             <button
               type="button"
-              className="is-primary"
               disabled={conversionStatus === "creating"}
               onClick={() => void createExcalidrawCopy()}
             >
-              {conversionStatus === "creating" ? "Creating copy…" : "Create board copy"}
+              {conversionStatus === "creating" ? "Creating…" : "Create board copy"}
             </button>
+            {onConvertAndEmbed && (
+              <button
+                type="button"
+                className="is-primary"
+                disabled={conversionStatus === "creating"}
+                onClick={() => void convertAndEmbed()}
+              >
+                {conversionStatus === "creating" ? "Converting…" : "Convert & replace in note"}
+              </button>
+            )}
           </div>
         )}
 

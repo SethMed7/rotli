@@ -9,7 +9,8 @@
 // surface can start a Main-add drag by calling this on a row's pointerdown.
 
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { MAIN_ROOT, addNoteToMain, type DropPos, moveInTree } from "../services/mainTree";
+import { inheritFolderView } from "../newItems/composition";
+import { MAIN_ROOT, addNoteToMain, type DropPos, mainParentOfNote, moveInTree } from "../services/mainTree";
 import { useMainStore } from "../state/main";
 import { createDragGhost } from "./dragGhost";
 import { createPointerDragSession } from "./pointerDrag";
@@ -38,6 +39,10 @@ export function commitMainAdd(noteId: string, drop: { id: string; pos: DropPos }
   let tree = addNoteToMain(m.manifest.tree, noteId);
   if (drop.id !== MAIN_ROOT) tree = moveInTree(tree, noteId, drop.id, drop.pos);
   m.setTree(tree);
+  // landing in a folder a named view mirrors makes the item show THERE too
+  // (Seth, 2026-07-29) — runs after the Main write, like every view assign
+  const parent = mainParentOfNote(tree, noteId);
+  if (parent && parent !== MAIN_ROOT) inheritFolderView(noteId, parent);
 }
 
 /** Begin a possible Main-add drag from a row's pointerdown. `id` is the note or

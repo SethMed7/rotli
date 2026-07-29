@@ -52,8 +52,14 @@ export async function replaceCorruptBoardWithEmptyScene(boardId: string): Promis
 
 /** Create an explicit, independently editable board COPY from Mermaid source.
  * Mermaid has no durable absolute-position syntax, so freeform edits belong to
- * the new .excalidraw file while the original Markdown fence stays untouched. */
-export async function createEditableBoardFromMermaid(definition: string): Promise<string> {
+ * the new .excalidraw file while the original Markdown fence stays untouched.
+ * `besideNoteId` files the board in the source note's Main folder / named view
+ * (Seth, 2026-07-29: "it should put it in the same path I am in"); `open:
+ * false` skips the new tab (the replace-with-embed flow shows it inline). */
+export async function createEditableBoardFromMermaid(
+  definition: string,
+  opts: { besideNoteId?: string; open?: boolean } = {},
+): Promise<string> {
   if (!isTauri()) throw new Error("Editable board conversion requires the Rotli desktop app.");
   const source = definition.trim();
   if (!source) throw new Error("Add Mermaid source before creating a board copy.");
@@ -65,8 +71,13 @@ export async function createEditableBoardFromMermaid(definition: string): Promis
     files: scene.files,
     meta: EMPTY_BOARD_META,
   });
-  const board = await createManagedBoardWithBody(body, { open: false });
-  usePanesStore.getState().openCanvas(board.id, { newTab: true });
-  useUiStore.getState().setRenamingBoardId(board.id);
+  const board = await createManagedBoardWithBody(body, {
+    open: false,
+    ...(opts.besideNoteId ? { besideNoteId: opts.besideNoteId } : {}),
+  });
+  if (opts.open !== false) {
+    usePanesStore.getState().openCanvas(board.id, { newTab: true });
+    useUiStore.getState().setRenamingBoardId(board.id);
+  }
   return board.id;
 }

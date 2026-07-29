@@ -12,12 +12,14 @@ export type MenuSpec =
       onClick: () => void;
       danger?: boolean;
       disabled?: boolean;
-      /** How `checked` shows: a leading ✓ / ★ gutter marker for toggles, or
-       * "highlight" — an active-row background with NO gutter (a selector
-       * among exclusive options, e.g. the Main view switcher; Seth, 2026-07-24:
-       * cleaner than a checkmark indenting every sibling). */
+      /** How `checked` shows: a leading ✓ / ★ / 🔒-glyph gutter marker for
+       * toggles ("lock" for protection states — Seth, 2026-07-29: secure is a
+       * lock, not a star), or "highlight" — an active-row background with NO
+       * gutter (a selector among exclusive options, e.g. the Main view
+       * switcher; Seth, 2026-07-24: cleaner than a checkmark indenting every
+       * sibling). */
       checked?: boolean;
-      checkedMark?: "check" | "star" | "highlight";
+      checkedMark?: "check" | "star" | "highlight" | "lock";
     }
   | { kind: "sep" }
   | { kind: "drill"; label: string; items: MenuSpec[]; disabled?: boolean; danger?: boolean };
