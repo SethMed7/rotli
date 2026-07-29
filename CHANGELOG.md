@@ -10,6 +10,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-07-28
+
+### Added
+
+- **Pictures look like pictures.** Image assets in the System browser show a
+  real thumbnail instead of a generic glyph — in the icon grid and in the new
+  **Gallery view**: Finder's fourth view, a big preview over a filmstrip
+  (←/→ walk it, ⏎ opens). The view switcher now wears the standard Finder
+  icons, with the words in tooltips.
+- **Duplicate.** The row menu's new copy verb: a full copy titled
+  "title copy" that opens on create. Placement routes like every new note —
+  in place for a plain folder, Brain staging for a curated memex folder —
+  and failures say so instead of mislaying the copy. ("Move to…" is retired:
+  it listed Library areas no matter which view you were in.)
+
+### Changed
+
+- **The path bar moved home.** The System browser's crumb trail now sits at
+  the bottom, Finder-style — every segment navigates, and the selected item
+  is the leaf. Right-clicking empty space offers New folder and Sort by
+  Name / Kind / Date modified / Date created (pick again to flip direction).
+- **The Library tells the whole truth.** It now lists the files and boards
+  living inside wiki folders (brief PDFs, images, canvases) — not just
+  notes, which read as broken next to Assets.
+- **The sidebar footer.** Files · **Librarian** · Settings share one quiet
+  row (the Activity row renamed — it's the Librarian's journal). The
+  New-board header icon folded into the New… menu, the header keeps to one
+  row with the vault name shrinking to "…" first, and header tooltips can no
+  longer clip off a narrow sidebar.
+
 ## [0.42.0] - 2026-07-28
 
 ### Added
