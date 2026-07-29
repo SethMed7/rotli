@@ -10,13 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-07-29
+
 ### Added
 
 - **Quick Look.** Press Space on anything selected in the System browser — or
   pick Preview from any row menu — for a modal peek without opening the full
   surface: images, PDFs, audio, video, text and CSV heads, and a readable
   note render. Formats without a faithful cheap preview show an honest
-  metadata card. Open escalates to the real surface; Esc closes.
+  metadata card. Open escalates to the real surface; Esc closes, and focus
+  returns to where you were.
 
 ## [0.43.0] - 2026-07-28
 
