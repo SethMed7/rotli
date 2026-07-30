@@ -33,6 +33,7 @@ import {
   type SystemViewMode,
   breadcrumbOf,
   filterSystemItems,
+  LIBRARY_HIDDEN_LANES,
   folderSegmentLabel,
   kindLabel,
   listFolderContents,
@@ -188,7 +189,12 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   const setSelection = useUiStore((s) => s.setSystemSelection);
   const selectedIds = useMemo(() => new Set(selection.map((n) => n.id)), [selection]);
   const anchorRef = useRef<string | null>(null);
-  const [folderSel, setFolderSel] = useState<string | null>(null);
+  // MULTI folder selection (Seth, 2026-07-30: "can't select multiple things")
+  // — an array in selection order; the last entry names the path-bar leaf
+  const [folderSel, setFolderSel] = useState<string[]>([]);
+  const folderSelSet = useMemo(() => new Set(folderSel), [folderSel]);
+  const lastFolderSel = folderSel[folderSel.length - 1] ?? null;
+  const folderAnchorRef = useRef<string | null>(null);
   // expanded folder rows (List mode disclosure triangles) — per-mount
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [sort, setSort] = useState<{ key: SystemSortKey; dir: 1 | -1 }>({ key: "name", dir: 1 });
@@ -214,9 +220,17 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     () => (n: NoteSummary) => rerootDiskPath(noteDiskFolder(n), root.prefix),
     [root.prefix],
   );
+  // the Library hides its SYSTEM LANES (_inbox → the Captures front,
+  // _templates → machine plumbing) — as bare tiles they read as broken
+  // empty folders (Seth, 2026-07-30)
+  const hiddenLanes = useMemo<ReadonlySet<string>>(
+    () => (isLibrary ? LIBRARY_HIDDEN_LANES : new Set()),
+    [isLibrary],
+  );
   const listing = useMemo(
-    () => sortFolderListing(listFolderContents(items, cwd, folderSeed, pathOf), sort.key, sort.dir),
-    [items, cwd, folderSeed, pathOf, sort],
+    () =>
+      sortFolderListing(listFolderContents(items, cwd, folderSeed, pathOf, hiddenLanes), sort.key, sort.dir),
+    [items, cwd, folderSeed, pathOf, hiddenLanes, sort],
   );
   const crumbs = useMemo(() => breadcrumbOf(cwd, root.prefix, root.title), [cwd, root.prefix, root.title]);
   const atRoot = cwd === root.prefix;
@@ -232,8 +246,8 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   const pathLeaf =
     selection.length === 1
       ? selection[0]!.title || "Empty note"
-      : folderSel
-        ? folderSegmentLabel(folderSel.slice(folderSel.lastIndexOf("/") + 1))
+      : lastFolderSel
+        ? folderSegmentLabel(lastFolderSel.slice(lastFolderSel.lastIndexOf("/") + 1))
         : null;
   /** A path under the root → the Columns view's chain of open folders. */
   const colChainTo = (path: string): string[] => {
@@ -255,8 +269,9 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       return;
     }
     setSelection([]);
-    setFolderSel(null);
+    setFolderSel([]);
     anchorRef.current = null;
+    folderAnchorRef.current = null;
     return () => setSelection([]);
   }, [rootId, cwd, setSelection]);
 
@@ -360,8 +375,35 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   };
 
   const visibleItems = searching ? hits : listing.items;
+  /** Folder tiles/rows multi-select exactly like items (Seth, 2026-07-30):
+   * ⌘ toggles, ⇧ ranges over the listing's folder band, a plain click selects
+   * alone (and clears the item selection); ⌘ keeps a MIXED selection alive. */
+  const selectFolder = (path: string, e: { metaKey: boolean; shiftKey: boolean }) => {
+    if (e.metaKey) {
+      const has = folderSelSet.has(path);
+      setFolderSel(has ? folderSel.filter((p) => p !== path) : [...folderSel, path]);
+      folderAnchorRef.current = path;
+    } else if (e.shiftKey && folderAnchorRef.current) {
+      // ⇧ is single-band like selectItem's mirror rule: only ⌘ mixes bands
+      setSelection([]);
+      const order = listing.folders.map((f) => f.path);
+      const a = order.indexOf(folderAnchorRef.current);
+      const b = order.indexOf(path);
+      if (a >= 0 && b >= 0) {
+        setFolderSel(order.slice(Math.min(a, b), Math.max(a, b) + 1));
+      } else {
+        setFolderSel([path]);
+        folderAnchorRef.current = path;
+      }
+    } else {
+      setSelection([]);
+      setFolderSel([path]);
+      folderAnchorRef.current = path;
+    }
+  };
   const selectItem = (n: NoteSummary, e: { metaKey: boolean; shiftKey: boolean }, order?: NoteSummary[]) => {
-    setFolderSel(null);
+    // a plain/⇧ item click clears the folder band; ⌘ keeps a mixed selection
+    if (!e.metaKey) setFolderSel([]);
     if (e.metaKey) {
       // ⌘-click toggles
       const has = selectedIds.has(n.id);
@@ -411,6 +453,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     height: number;
   } | null>(null);
   const marqueeBase = useRef<NoteSummary[]>([]);
+  const marqueeBaseFolders = useRef<string[]>([]);
   const marqueeDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest("button, input, [data-note-id]")) return;
@@ -419,10 +462,12 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     const x = e.clientX - r.left + host.scrollLeft;
     const y = e.clientY - r.top + host.scrollTop;
     marqueeBase.current = e.metaKey ? selection : [];
+    marqueeBaseFolders.current = e.metaKey ? folderSel : [];
     if (!e.metaKey) {
       setSelection([]);
-      setFolderSel(null);
+      setFolderSel([]);
       anchorRef.current = null;
+      folderAnchorRef.current = null;
     }
     marqueeStart.current = { host, x, y };
     setMarqueeRect({ left: x, top: y, width: 0, height: 0 });
@@ -442,8 +487,12 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       height: Math.abs(y - start.y),
     };
     setMarqueeRect(rect);
+    // Set-based dedup — this loop reruns per pointermove (Greptile, PR #18)
     const picked: NoteSummary[] = [...marqueeBase.current];
-    for (const el of host.querySelectorAll<HTMLElement>("[data-note-id]")) {
+    const pickedIds = new Set(picked.map((n) => n.id));
+    const pickedFolders: string[] = [...marqueeBaseFolders.current];
+    const pickedFolderSet = new Set(pickedFolders);
+    for (const el of host.querySelectorAll<HTMLElement>("[data-note-id], [data-folder-path]")) {
       const b = el.getBoundingClientRect();
       const bx = b.left - r.left + host.scrollLeft;
       const by = b.top - r.top + host.scrollTop;
@@ -453,10 +502,22 @@ export function SystemSurface({ rootId }: { rootId: string }) {
         by < rect.top + rect.height &&
         by + b.height > rect.top;
       if (!hit) continue;
+      const folderPath = el.dataset.folderPath;
+      if (folderPath) {
+        if (!pickedFolderSet.has(folderPath)) {
+          pickedFolderSet.add(folderPath);
+          pickedFolders.push(folderPath);
+        }
+        continue;
+      }
       const n = el.dataset.noteId ? itemById.get(el.dataset.noteId) : undefined;
-      if (n && !picked.some((x) => x.id === n.id)) picked.push(n);
+      if (n && !pickedIds.has(n.id)) {
+        pickedIds.add(n.id);
+        picked.push(n);
+      }
     }
     setSelection(picked);
+    setFolderSel(pickedFolders);
   };
   const marqueeUp = () => {
     marqueeStart.current = null;
@@ -476,7 +537,11 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     const l =
       depth === 0
         ? listing
-        : sortFolderListing(listFolderContents(items, path, folderSeed, pathOf), sort.key, sort.dir);
+        : sortFolderListing(
+            listFolderContents(items, path, folderSeed, pathOf, hiddenLanes),
+            sort.key,
+            sort.dir,
+          );
     return (
       <>
         {l.folders.map((f) => (
@@ -485,7 +550,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
               entry={f}
               depth={depth}
               open={expanded.has(f.path)}
-              selected={folderSel === f.path}
+              selected={folderSelSet.has(f.path)}
               onToggle={() =>
                 setExpanded((prev) => {
                   const next = new Set(prev);
@@ -494,10 +559,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
                   return next;
                 })
               }
-              onSelect={() => {
-                setSelection([]);
-                setFolderSel(f.path);
-              }}
+              onSelect={(e) => selectFolder(f.path, e)}
               onEnter={() => enter(f.path)}
             />
             {expanded.has(f.path) && renderListRows(f.path, depth + 1)}
@@ -682,12 +744,10 @@ export function SystemSurface({ rootId }: { rootId: string }) {
               <button
                 type="button"
                 key={f.path}
-                className={folderSel === f.path ? "fdr-tile sel" : "fdr-tile"}
+                data-folder-path={f.path}
+                className={folderSelSet.has(f.path) ? "fdr-tile sel" : "fdr-tile"}
                 title="Open folder"
-                onClick={() => {
-                  setSelection([]);
-                  setFolderSel(f.path);
-                }}
+                onClick={(e) => selectFolder(f.path, e)}
                 onDoubleClick={() => enter(f.path)}
               >
                 <FolderGlyph size={44} className="fdr-tile-icon folder" />
@@ -704,11 +764,12 @@ export function SystemSurface({ rootId }: { rootId: string }) {
         <GalleryView
           listing={listing}
           selectedIds={selectedIds}
-          folderSel={folderSel}
+          folderSel={lastFolderSel}
           onSelectItem={(n) => selectItem(n, { metaKey: false, shiftKey: false })}
           onSelectFolder={(path) => {
             setSelection([]);
-            setFolderSel(path);
+            setFolderSel([path]);
+            folderAnchorRef.current = path;
           }}
           onOpenItem={(n) => openSummary(n)}
           onEnterFolder={enter}
@@ -719,7 +780,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
         <div className="board-scroll fdrc-scroll">
           <div className="fdrc-row">
             {[root.prefix, ...colPath].map((path, depth) => {
-              const col = listFolderContents(items, path, folderSeed, pathOf);
+              const col = listFolderContents(items, path, folderSeed, pathOf, hiddenLanes);
               const openChild = colPath[depth];
               return (
                 <div key={path} className="fdrc-col">
@@ -732,7 +793,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
                         // clicking a folder OPENS the next column (Finder's law)
                         setColPath([...colPath.slice(0, depth), f.path]);
                         setSelection([]);
-                        setFolderSel(null);
+                        setFolderSel([]);
                       }}
                     >
                       <FolderGlyph size={14} className="fdr-row-icon folder" />
@@ -998,12 +1059,13 @@ function FolderListRow({
   open: boolean;
   selected: boolean;
   onToggle: () => void;
-  onSelect: () => void;
+  onSelect: (e: { metaKey: boolean; shiftKey: boolean }) => void;
   onEnter: () => void;
 }) {
   return (
     <button
       type="button"
+      data-folder-path={entry.path}
       className={selected ? "fdr-row folder sel" : "fdr-row folder"}
       style={{ paddingLeft: 12 + depth * 18 }}
       title="Open folder"

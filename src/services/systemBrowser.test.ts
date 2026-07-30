@@ -192,3 +192,24 @@ describe("rerootDiskPath (the 422-count-but-empty-Assets bug, 2026-07-28)", () =
     expect(inside.folders.map((f) => f.path)).toEqual(["Storage/chats/2026"]);
   });
 });
+
+// Library system lanes (Seth, 2026-07-30): _inbox (→ the Captures front) and
+// _templates (contract plumbing) are real directories but NOT browsable
+// areas — hidden from the listing whether they arrive as item paths or seeds.
+describe("hidden lanes", () => {
+  const items = [
+    note({ id: "a", title: "Alpha", folderId: "wiki", updatedAt: 30 }),
+    note({ id: "s", title: "Staged", folderId: "wiki/_inbox", updatedAt: 50 }),
+  ];
+  const hidden = new Set(["wiki/_inbox", "wiki/_templates"]);
+
+  test("hidden lanes never surface as folder tiles — from items or seeds", () => {
+    const l = listFolderContents(items, "wiki", ["wiki/_templates", "wiki/Projects"], undefined, hidden);
+    expect(l.folders.map((f) => f.path)).toEqual(["wiki/Projects"]);
+  });
+
+  test("without the hidden set the same lanes DO surface (other roots unaffected)", () => {
+    const l = listFolderContents(items, "wiki", ["wiki/_templates", "wiki/Projects"]);
+    expect(l.folders.map((f) => f.path).sort()).toEqual(["wiki/Projects", "wiki/_inbox", "wiki/_templates"]);
+  });
+});

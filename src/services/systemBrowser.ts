@@ -37,6 +37,15 @@ export function folderSegmentLabel(seg: string): string {
   return seg;
 }
 
+/** The Library's SYSTEM LANES — real directories that are NOT browsable
+ * knowledge areas, hidden from the Library grid (Seth, 2026-07-30: they
+ * rendered as broken-looking empty tiles). `wiki/_inbox` is the capture
+ * staging lane whose notes surface through the Captures front (sidebar +
+ * board); `wiki/_templates` is contract-owned machine plumbing (the chat
+ * template lives there; the organizer skips it like _inbox). Neither is
+ * deletable through rotli — the memex write guard owns them. */
+export const LIBRARY_HIDDEN_LANES: ReadonlySet<string> = new Set(["wiki/_inbox", "wiki/_templates"]);
+
 /** pinned float first, then most-recently touched — search-result order. */
 function sortByRecency(items: NoteSummary[]): NoteSummary[] {
   return [...items].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
@@ -87,6 +96,7 @@ export function listFolderContents(
   cwd: string,
   seedFolders: readonly string[] = [],
   pathOf: (n: NoteSummary) => string = noteDiskFolder,
+  hidden: ReadonlySet<string> = new Set(),
 ): FolderListing {
   const children = new Set<string>();
   const direct: NoteSummary[] = [];
@@ -97,12 +107,12 @@ export function listFolderContents(
       continue;
     }
     const child = childOf(cwd, path);
-    if (child) children.add(child);
+    if (child && !hidden.has(child)) children.add(child);
   }
   for (const seed of seedFolders) {
     if (seed === cwd) continue;
     const child = childOf(cwd, seed);
-    if (child) children.add(child);
+    if (child && !hidden.has(child)) children.add(child);
   }
   const folders = [...children].sort(byName).map((path) => {
     const inside = items.filter((n) => {

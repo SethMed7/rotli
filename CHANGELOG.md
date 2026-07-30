@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [Unreleased]
+
+### Changed
+
+- **The Library selects like a Finder.** Folder tiles join the selection
+  grammar items always had: ⌘-click gathers several, ⇧-click ranges across
+  the folder band, and the empty-space marquee sweeps folders and items alike
+  — in Icons and List views (Columns keeps its click-opens-the-next-column
+  law). ⌘-click also mixes folders and items in one selection.
+- **The Library stops showing its plumbing.** The `_templates` and `Captures`
+  tiles are gone from the Library grid — both looked like broken empty
+  folders, and neither is a browsable area: `_templates` is the vault's
+  contract-owned template lane (the organizer deliberately skips it), and
+  `Captures` was the `_inbox` staging lane, whose notes already live in the
+  Captures front (sidebar + board). Nothing was deleted from disk — they were
+  never rotli's to delete.
+
 ## [0.51.0] - 2026-07-30
 
 ### Added
