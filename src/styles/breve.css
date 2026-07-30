@@ -166,85 +166,112 @@
   color: var(--accent-text);
 }
 
-.breve-brief-overview {
-  display: grid;
-  grid-template-columns: minmax(260px, 0.8fr) minmax(360px, 1.2fr);
-  margin: 20px 0 34px;
+/* — the inline reader (2026-07-30 rework): reading is zone 1. A quiet meta bar
+   (older/newer steps · kind · date · ~min · Open in Notes), then the brief's
+   own markdown, then the finite-edition close. No card, no chrome — the page
+   IS the brief. — */
+.breve-reader {
+  margin: 18px 0 34px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.breve-reader-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  padding: 8px 0;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-}
-.breve-next-brief {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  min-height: 168px;
-  padding: 22px 28px 22px 0;
-  border-right: 1px solid var(--border);
-}
-.breve-next-brief > span {
+  margin-bottom: 18px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 11.5px;
 }
-.breve-next-brief strong {
-  margin-top: 5px;
-  font-family: var(--font-display);
-  font-size: 17px;
-  font-weight: 700;
+.breve-reader-nav {
+  display: inline-flex;
+  gap: 2px;
 }
-.breve-next-brief p {
-  margin-top: 3px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.breve-next-brief .ghostbtn {
-  margin-top: 16px;
-}
-.breve-readiness-list {
+.breve-reader-step {
   display: grid;
-  align-content: center;
-  padding: 12px 0 12px 28px;
-}
-.breve-readiness-list > div {
-  display: grid;
-  grid-template-columns: 92px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  min-height: 46px;
-  border-bottom: 1px solid var(--border);
-}
-.breve-readiness-list > div:last-child {
-  border-bottom: 0;
-}
-.breve-readiness-list dt {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-.breve-readiness-list dd {
-  min-width: 0;
-  overflow: hidden;
-  font-size: 12.5px;
-  font-weight: 550;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.breve-readiness-list button,
-.breve-readiness-list > div > span {
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 11px;
-}
-.breve-readiness-list button {
-  padding: 6px 4px;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
   border-radius: var(--r-control);
-  color: var(--accent-text);
+  background: none;
+  color: var(--text-muted);
   cursor: pointer;
 }
-.breve-readiness-list button:hover {
+.breve-reader-step:hover:not(:disabled) {
   background: var(--hov);
   color: var(--text);
+}
+.breve-reader-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.breve-reader-step .flip {
+  transform: rotate(180deg);
+}
+.breve-reader-min {
+  white-space: nowrap;
+}
+/* the reader's markdown column rides the shared static peek grammar (.pv-note);
+   here it just gets the reading measure + a touch more line air */
+.breve-read {
+  max-width: 720px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.breve-reader-end {
+  max-width: 720px;
+  margin-top: 26px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.breve-reader-end strong {
+  color: var(--text);
+  font-weight: 600;
+}
+/* quiet inline text-link buttons (Settings hint, Routines jump) */
+.breve-linkbtn {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  cursor: pointer;
+}
+.breve-linkbtn:hover {
+  text-decoration: underline;
+}
+/* the library row currently in the reader */
+.breve-brief-row.sel {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+/* — merged Settings groups: the former page titles as quiet section anchors — */
+.breve-embed + .breve-embed {
+  margin-top: 30px;
+}
+.breve-settings-group {
+  margin: 26px 0 6px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.breve-settings-group h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+}
+.breve-settings-group p {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 .breve-brief-toolbar {
   display: flex;
@@ -1533,18 +1560,6 @@
   }
   .breve-pdf-preview {
     min-height: 260px;
-  }
-  .breve-brief-overview {
-    grid-template-columns: 1fr;
-  }
-  .breve-next-brief {
-    min-height: 0;
-    padding-right: 0;
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .breve-readiness-list {
-    padding-left: 0;
   }
   .breve-routine-columns {
     display: none;

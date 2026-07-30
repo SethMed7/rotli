@@ -73,7 +73,10 @@ export type ContentView = "panes" | "board" | "allNotes" | "allChats" | "recent"
  * corpus, not a separate window or a tab, so switching lenses must leave the
  * current notes contentView and pane tree untouched. */
 export type SidebarMode = "notes" | "breve";
-export type BreveView = "briefs" | "watchlist" | "routines" | "models" | "configure";
+/** Breve's four sections (2026-07-30 rework): reading first (Briefs), then the
+ * schedule (Routines), the topic registry (Watchlist), and one Settings home
+ * (the former Models + Configure views merged). */
+export type BreveView = "briefs" | "routines" | "watchlist" | "settings";
 
 /** The top-level left-menu sections (Seth's decided IA, 2026-06-26): Chat ·
  * Notes. Each is a collapsible accordion; its open state lives in expandedDests

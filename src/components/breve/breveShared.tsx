@@ -3,7 +3,7 @@
 // loading states. Pulled out of the surface file so sibling views can reuse
 // them without growing the god-file.
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { CheckGlyph } from "../glyphs";
 import { useUiStore } from "../../state/ui";
@@ -51,12 +51,25 @@ export function SaveNote({
   );
 }
 
+/** Every guarded form registers itself here. Two forms can be mounted at ONCE
+ * now (the merged Settings page hosts Models + Delivery), so breveDirty must
+ * be the UNION of live dirty sources — a last-writer-wins boolean let a clean
+ * form clear a dirty sibling's guard and lose its draft silently (adversarial
+ * review 2026-07-30, HIGH). */
+const dirtySources = new Set<object>();
+
 export function useBreveDraftGuard(dirty: boolean) {
   const setBreveDirty = useUiStore((state) => state.setBreveDirty);
+  const source = useRef({}).current;
   useEffect(() => {
-    setBreveDirty(dirty);
-    return () => setBreveDirty(false);
-  }, [dirty, setBreveDirty]);
+    if (dirty) dirtySources.add(source);
+    else dirtySources.delete(source);
+    setBreveDirty(dirtySources.size > 0);
+    return () => {
+      dirtySources.delete(source);
+      setBreveDirty(dirtySources.size > 0);
+    };
+  }, [dirty, source, setBreveDirty]);
 }
 
 export function EmptyMessage({

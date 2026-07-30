@@ -68,10 +68,17 @@ describe("parseSettings — Breve sidebar lens", () => {
   });
 
   test("keeps every valid Breve view", () => {
-    for (const view of ["briefs", "watchlist", "routines", "models", "configure"] as const) {
+    for (const view of ["briefs", "routines", "watchlist", "settings"] as const) {
       const s = parseSettings(JSON.stringify({ sidebarMode: "breve", breveView: view }));
       expect(s.sidebarMode).toBe("breve");
       expect(s.breveView).toBe(view);
+    }
+  });
+
+  test("migrates the retired Models/Configure views into Settings", () => {
+    for (const view of ["models", "configure"]) {
+      const s = parseSettings(JSON.stringify({ sidebarMode: "breve", breveView: view }));
+      expect(s.breveView).toBe("settings");
     }
   });
 

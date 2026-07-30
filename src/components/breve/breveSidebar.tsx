@@ -1,7 +1,7 @@
 import type { ComponentType, KeyboardEvent } from "react";
 import type { BreveView } from "../../state/ui";
 import { useUiStore } from "../../state/ui";
-import { ClockGlyph, CloudGlyph, CoffeeGlyph, EyeGlyph, FileGlyph, MailGlyph } from "../glyphs";
+import { ClockGlyph, CoffeeGlyph, EyeGlyph, FileGlyph, GearGlyph } from "../glyphs";
 import { useBreveSnapshot } from "./useBreve";
 
 type NavItem = {
@@ -10,12 +10,13 @@ type NavItem = {
   glyph: ComponentType<{ size?: number }>;
 };
 
+// Reading first, then the schedule, then the registry, then one Settings home
+// (Models + Configure merged — Seth, 2026-07-30).
 const NAV: NavItem[] = [
   { id: "briefs", label: "Briefs", glyph: FileGlyph },
-  { id: "watchlist", label: "Watchlist", glyph: EyeGlyph },
   { id: "routines", label: "Routines", glyph: ClockGlyph },
-  { id: "models", label: "Models", glyph: CloudGlyph },
-  { id: "configure", label: "Configure", glyph: MailGlyph },
+  { id: "watchlist", label: "Watchlist", glyph: EyeGlyph },
+  { id: "settings", label: "Settings", glyph: GearGlyph },
 ];
 
 export function BreveSidebar({ zoom }: { zoom: number }) {
@@ -25,10 +26,9 @@ export function BreveSidebar({ zoom }: { zoom: number }) {
   const enabledRoutines = snapshot?.config.routines.filter((r) => r.enabled).length ?? 0;
   const counts: Record<BreveView, number | null> = {
     briefs: snapshot ? snapshot.briefs.length : null,
-    watchlist: snapshot ? snapshot.counts.topics : null,
     routines: snapshot ? enabledRoutines : null,
-    models: null,
-    configure: null,
+    watchlist: snapshot ? snapshot.counts.topics : null,
+    settings: null,
   };
   const sourceLabel = !snapshot
     ? "Loading Breve…"

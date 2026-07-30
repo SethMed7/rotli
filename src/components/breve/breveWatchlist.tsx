@@ -148,7 +148,11 @@ export function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
   const [query, setQuery] = useState("");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState("");
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
+  // groups arrive FOLDED (2026-07-30: 34 topics read as 10 calm rows, not a
+  // wall) — search auto-expands matches, Add topic unfolds its group
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    () => new Set(initial.sections.map((section) => section.id)),
+  );
   const [openItems, setOpenItems] = useState<Set<string>>(() => new Set());
   const pendingFocus = useRef<string | null>(null);
   const markdown = watchlistDocument(sections, preferences);
@@ -169,13 +173,29 @@ export function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
       })
     : sections;
 
+  // section ids regenerate on every reparse, so carrying fold state across a
+  // snapshot reset needs a TITLE mirror — without it, saving refolds the very
+  // group the user was working in (adversarial review, MEDIUM)
+  const expandedTitlesRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    expandedTitlesRef.current = new Set(
+      sections.filter((section) => !collapsedGroups.has(section.id)).map((section) => section.title),
+    );
+  }, [sections, collapsedGroups]);
+
   useEffect(() => {
     if (dirty) return;
     const next = editableWatchlist(snapshot.watchlist);
     setSections(next.sections);
     setPreferences(next.preferences);
     setBase(watchlistDocument(next.sections, next.preferences));
-    setCollapsedGroups(new Set());
+    setCollapsedGroups(
+      new Set(
+        next.sections
+          .filter((section) => !expandedTitlesRef.current.has(section.title))
+          .map((section) => section.id),
+      ),
+    );
     setOpenItems(new Set());
   }, [dirty, snapshot.watchlist]);
 

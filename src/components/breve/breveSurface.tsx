@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   type BreveRoutine,
   type BreveSnapshot,
@@ -17,6 +17,7 @@ import {
   breveWriteConfig,
   chatModels,
   cliDetect,
+  corpusFileText,
   isTauri,
   type BreveDeliverySettings,
   type BrevePdfPalette,
@@ -27,6 +28,7 @@ import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../../brand/brevePdf
 import { CLI_CATALOG, PROVIDER_IDS, PROVIDER_LABELS, type ProviderId } from "../../ai/models";
 import { useUiStore } from "../../state/ui";
 import { usePanesStore } from "../../state/panes";
+import { type Block, parseBlock, renderInline } from "../../editor/render";
 import { CheckGlyph, ChevronRight, ClockGlyph, LockGlyph, SearchGlyph, XGlyph } from "../glyphs";
 import {
   EMPTY_BREVE_SNAPSHOT,
@@ -64,39 +66,15 @@ function SourceStrip({ snapshot }: { snapshot: BreveSnapshot }) {
   );
 }
 
-function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
+/** The legacy-Breve migration ladder (import → take over scheduling → retire).
+ * Lives in Settings (2026-07-30 rework) — Briefs is a reading surface now. */
+function MigrationBands({ snapshot }: { snapshot: BreveSnapshot }) {
   const queryClient = useQueryClient();
-  const openNote = usePanesStore((s) => s.openNote);
-  const setSidebarMode = useUiStore((s) => s.setSidebarMode);
-  const setView = useUiStore((s) => s.setBreveView);
   const [importState, setImportState] = useState<SaveState>("idle");
   const [takeoverState, setTakeoverState] = useState<SaveState>("idle");
   const [retireState, setRetireState] = useState<SaveState>("idle");
   const [retireArmed, setRetireArmed] = useState(false);
   const [error, setError] = useState("");
-  const [briefQuery, setBriefQuery] = useState("");
-  const [briefKind, setBriefKind] = useState<"all" | "morning" | "lunch" | "night">("all");
-  const briefs = useMemo(() => sortBriefs(snapshot.briefs), [snapshot.briefs]);
-  const normalizedBriefQuery = briefQuery.trim().toLowerCase();
-  const visibleBriefs = briefs.filter(
-    (brief) =>
-      (briefKind === "all" || brief.kind === briefKind) &&
-      (!normalizedBriefQuery ||
-        `${brief.title} ${brief.date} ${brief.kind}`.toLowerCase().includes(normalizedBriefQuery)),
-  );
-  const now = Date.now();
-  const nextBriefRoutine = snapshot.config.routines
-    .filter((routine) => routine.enabled && routine.kind === "brief")
-    .map((routine) => ({ routine, epoch: nextRoutineEpoch(routine, now, snapshot.config.timezone) }))
-    .filter((entry): entry is { routine: BreveRoutine; epoch: number } => entry.epoch !== null)
-    .sort((a, b) => a.epoch - b.epoch)[0]?.routine;
-  const deliveryLanes = [
-    ...new Set(
-      snapshot.config.routines
-        .filter((routine) => routine.enabled && routine.kind === "brief")
-        .flatMap((routine) => routine.lanes),
-    ),
-  ].map((lane) => (lane === "inApp" ? "Rotli" : lane.charAt(0).toUpperCase() + lane.slice(1)));
 
   const importLegacy = async () => {
     setImportState("saving");
@@ -138,10 +116,7 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
   };
 
   return (
-    <div className="breve-page">
-      <PageHead title="Briefs" detail="Morning, lunch, and night briefings in one searchable library." />
-      {(snapshot.source !== "rotli" || snapshot.legacyRoot) && <SourceStrip snapshot={snapshot} />}
-
+    <>
       {snapshot.source === "legacy" && !snapshot.imported && (
         <section className="breve-import-band" aria-labelledby="breve-import-title">
           <div>
@@ -214,64 +189,239 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
           <SaveNote state={retireState} error={error} />
         </section>
       )}
+    </>
+  );
+}
 
-      <section className="breve-brief-overview" aria-label="Breve readiness">
-        <div className="breve-next-brief">
-          <span>Next scheduled run</span>
-          <strong>{nextBriefRoutine?.label ?? "No brief is scheduled"}</strong>
+/** The reader loads at most this much of a brief — far above any real brief. */
+const BRIEF_READ_BYTES = 262_144;
+
+/** Rotli frontmatter is metadata, not the brief — the reader starts at the
+ * brief's own `# title`. The closing fence must be exactly `---` on its own
+ * line (never `----` or a prefixed line), CRLF tolerated; anything that isn't
+ * a well-formed fence pair renders untouched (adversarial review, LOW). */
+function stripBriefFrontmatter(text: string): string {
+  const fence = text.match(/^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/);
+  return fence ? text.slice(fence[0].length) : text;
+}
+
+/** The inline reader's static markdown render — the SAME line grammar the
+ * editor and Quick Look use (parseBlock + renderInline). Read-only by design:
+ * the brief note itself stays one "Open in Notes" away. */
+function BriefBody({ body }: { body: string }) {
+  const blocks: ReactNode[] = [];
+  let key = 0;
+  for (const line of body.split("\n")) {
+    const b: Block = parseBlock(line);
+    key += 1;
+    if (b.kind === "blank") blocks.push(<div key={key} className="pv-blank" />);
+    else if (b.kind === "h1") blocks.push(<h1 key={key}>{renderInline(b.text)}</h1>);
+    else if (b.kind === "h2") blocks.push(<h2 key={key}>{renderInline(b.text)}</h2>);
+    else if (b.kind === "h3") blocks.push(<h3 key={key}>{renderInline(b.text)}</h3>);
+    else if (b.kind === "quote") blocks.push(<blockquote key={key}>{renderInline(b.text)}</blockquote>);
+    else if (b.kind === "bullet" || b.kind === "task" || b.kind === "numbered")
+      blocks.push(
+        <div key={key} className="pv-li" style={{ paddingLeft: `${(b.indent ?? 0) + 1.2}em` }}>
+          <span className="pv-marker">{b.kind === "numbered" ? (b.marker ?? "•") : "•"}</span>
+          {renderInline(b.text)}
+        </div>,
+      );
+    else blocks.push(<p key={key}>{renderInline(b.text)}</p>);
+  }
+  return <div className="pv-note breve-read">{blocks}</div>;
+}
+
+/** Same-day recency for the reader: night is the day's newest, morning its
+ * oldest. sortBriefs keeps same-day kinds ASCENDING for the library list, so
+ * the reader re-sorts (adversarial review: "latest" was the morning brief and
+ * Older/Newer stepped backwards within a day). */
+const KIND_RECENCY: Record<string, number> = { morning: 0, lunch: 1, night: 2 };
+
+function briefDateLabel(date: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(`${date}T12:00:00`));
+}
+
+function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
+  const openNote = usePanesStore((s) => s.openNote);
+  const setSidebarMode = useUiStore((s) => s.setSidebarMode);
+  const setView = useUiStore((s) => s.setBreveView);
+  const [briefQuery, setBriefQuery] = useState("");
+  const [briefKind, setBriefKind] = useState<"all" | "morning" | "lunch" | "night">("all");
+  // which brief the inline reader shows — reading happens HERE, never by
+  // leaving Breve (Seth, 2026-07-30); default = the latest readable brief
+  const [openStem, setOpenStem] = useState<string | null>(null);
+  const readerRef = useRef<HTMLElement | null>(null);
+  const briefs = useMemo(() => sortBriefs(snapshot.briefs), [snapshot.briefs]);
+  const readable = useMemo(
+    () =>
+      briefs
+        .filter((brief) => brief.path)
+        .sort((a, b) =>
+          a.date === b.date
+            ? (KIND_RECENCY[b.kind] ?? 0) - (KIND_RECENCY[a.kind] ?? 0)
+            : b.date.localeCompare(a.date),
+        ),
+    [briefs],
+  );
+  const current = readable.find((brief) => brief.stem === openStem) ?? readable[0];
+  const currentIndex = current ? readable.findIndex((brief) => brief.stem === current.stem) : -1;
+  const newer = currentIndex > 0 ? readable[currentIndex - 1] : undefined;
+  const older = currentIndex >= 0 ? readable[currentIndex + 1] : undefined;
+  const normalizedBriefQuery = briefQuery.trim().toLowerCase();
+  const visibleBriefs = briefs.filter(
+    (brief) =>
+      (briefKind === "all" || brief.kind === briefKind) &&
+      (!normalizedBriefQuery ||
+        `${brief.title} ${brief.date} ${brief.kind}`.toLowerCase().includes(normalizedBriefQuery)),
+  );
+  const now = Date.now();
+  const nextBriefRoutine = snapshot.config.routines
+    .filter((routine) => routine.enabled && routine.kind === "brief")
+    .map((routine) => ({ routine, epoch: nextRoutineEpoch(routine, now, snapshot.config.timezone) }))
+    .filter((entry): entry is { routine: BreveRoutine; epoch: number } => entry.epoch !== null)
+    .sort((a, b) => a.epoch - b.epoch)[0]?.routine;
+
+  const body = useQuery({
+    queryKey: ["breve", "brief-body", current?.path ?? ""],
+    enabled: !!current?.path,
+    staleTime: 60_000,
+    queryFn: () => corpusFileText(current!.path!, BRIEF_READ_BYTES),
+  });
+  const briefText = body.data ? stripBriefFrontmatter(body.data) : "";
+  const readMinutes = briefText ? Math.max(1, Math.round(briefText.split(/\s+/).length / 220)) : null;
+
+  const readBrief = (stem: string) => {
+    setOpenStem(stem);
+    requestAnimationFrame(() => readerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+
+  return (
+    <div className="breve-page">
+      <PageHead title="Briefs" detail="Today's brief, read right here — the library sits below." />
+
+      {snapshot.source === "legacy" && !snapshot.imported && (
+        <div className="breve-honesty" role="status">
           <p>
-            {nextBriefRoutine
-              ? formatNextRoutine(nextBriefRoutine, now, snapshot.config.timezone)
-              : "Turn on a briefing routine to resume delivery."}
+            A legacy Breve library was found but not imported yet — bring it in from{" "}
+            <button type="button" className="breve-linkbtn" onClick={() => setView("settings")}>
+              Settings
+            </button>
+            .
           </p>
-          <button type="button" className="ghostbtn" onClick={() => setView("routines")}>
-            Adjust schedule
-          </button>
         </div>
-        <dl className="breve-readiness-list">
-          <div>
-            <dt>Watchlist</dt>
-            <dd>
-              {snapshot.counts.topics
-                ? `${snapshot.counts.topics} topics in ${snapshot.counts.sections} groups`
-                : "No topics yet"}
-            </dd>
-            <button type="button" onClick={() => setView("watchlist")}>
-              {snapshot.counts.topics ? "Review" : "Add topics"}
-            </button>
-          </div>
-          <div>
-            <dt>Delivery</dt>
-            <dd>{deliveryLanes.length ? deliveryLanes.join(" · ") : "No delivery lanes enabled"}</dd>
-            <button type="button" onClick={() => setView("configure")}>
-              Configure
-            </button>
-          </div>
-          <div>
-            <dt>Latest brief</dt>
-            <dd>{briefs[0] ? briefs[0].title : "Nothing generated yet"}</dd>
-            {briefs[0]?.path ? (
+      )}
+
+      {!current ? (
+        briefs.length > 0 ? (
+          <EmptyMessage
+            title="These briefs live in the legacy library."
+            detail="Import them from Settings to read them here without leaving Breve."
+            action={
+              <button type="button" className="ghostbtn primary" onClick={() => setView("settings")}>
+                Open Settings
+              </button>
+            }
+          />
+        ) : (
+          <EmptyMessage
+            title="Your first brief has not arrived yet."
+            detail={
+              snapshot.counts.topics > 0
+                ? "Your watchlist is ready. Review the routine schedule to choose when Breve should arrive."
+                : "Add the topics you care about, then choose when each briefing should arrive."
+            }
+            action={
               <button
                 type="button"
-                onClick={() => {
-                  setSidebarMode("notes");
-                  openNote(briefs[0]!.path!);
-                }}
+                className="ghostbtn primary"
+                onClick={() => setView(snapshot.counts.topics > 0 ? "routines" : "watchlist")}
               >
-                Open
+                {snapshot.counts.topics > 0 ? "Review routines" : "Build watchlist"}
               </button>
-            ) : (
-              <span>
-                {briefs.length
-                  ? import.meta.env.DEV
-                    ? "Read-only snapshot"
-                    : "Stored outside Rotli"
-                  : "Waiting"}
-              </span>
-            )}
+            }
+          />
+        )
+      ) : (
+        <section className="breve-reader" aria-label={`Brief: ${current.title}`} ref={readerRef}>
+          <div className="breve-reader-bar">
+            <div className="breve-reader-nav" role="group" aria-label="Brief navigation">
+              <button
+                type="button"
+                className="breve-reader-step"
+                disabled={!older}
+                aria-label="Older brief"
+                title={older ? `Older — ${older.title}` : "This is the oldest brief"}
+                onClick={() => older && readBrief(older.stem)}
+              >
+                <ChevronRight size={12} className="flip" />
+              </button>
+              <button
+                type="button"
+                className="breve-reader-step"
+                disabled={!newer}
+                aria-label="Newer brief"
+                title={newer ? `Newer — ${newer.title}` : "This is the latest brief"}
+                onClick={() => newer && readBrief(newer.stem)}
+              >
+                <ChevronRight size={12} />
+              </button>
+            </div>
+            <span className={`breve-kind ${current.kind}`}>{current.kind}</span>
+            <time dateTime={current.date}>{briefDateLabel(current.date)}</time>
+            {readMinutes !== null && <span className="breve-reader-min">~{readMinutes} min</span>}
+            <span className="breve-toolbar-grow" />
+            <button
+              type="button"
+              className="ghostbtn quiet"
+              title="Open the brief note in the editor"
+              onClick={() => {
+                setSidebarMode("notes");
+                openNote(current.path!);
+              }}
+            >
+              Open in Notes
+            </button>
           </div>
-        </dl>
-      </section>
+          {body.isLoading ? (
+            <BreveSkeleton label="Opening the brief" />
+          ) : body.isError ? (
+            <EmptyMessage
+              title="This brief could not be read."
+              detail="The file may have moved. The library below is still live."
+              action={
+                <button type="button" className="ghostbtn" onClick={() => void body.refetch()}>
+                  Try again
+                </button>
+              }
+            />
+          ) : (
+            <>
+              <BriefBody body={briefText} />
+              {/* the finite-edition close: a brief ENDS — no feed, no more-to-load
+                  (the anti-infinite-scroll statement, market pass 2026-07-30) */}
+              <p className="breve-reader-end">
+                That&rsquo;s the whole brief
+                {snapshot.counts.topics ? ` — distilled from your ${snapshot.counts.topics} topics` : ""}.
+                {nextBriefRoutine && (
+                  <>
+                    {" "}
+                    Next: <strong>{nextBriefRoutine.label}</strong> —{" "}
+                    {formatNextRoutine(nextBriefRoutine, now, snapshot.config.timezone)}.{" "}
+                    <button type="button" className="breve-linkbtn" onClick={() => setView("routines")}>
+                      Routines
+                    </button>
+                  </>
+                )}
+              </p>
+            </>
+          )}
+        </section>
+      )}
 
       <section className="breve-section breve-library-section" aria-labelledby="breve-recent-title">
         <div className="breve-section-head copy">
@@ -368,16 +518,20 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
                   <span className="breve-brief-state">{brief.imported ? "In Rotli" : "Legacy"}</span>
                 </>
               );
+              // a row READS the brief in place (the inline reader above) —
+              // leaving Breve is the reader's explicit "Open in Notes" only
               return brief.path ? (
                 <button
                   type="button"
-                  className="breve-brief-row interactive"
+                  className={
+                    current?.stem === brief.stem
+                      ? "breve-brief-row interactive sel"
+                      : "breve-brief-row interactive"
+                  }
                   key={brief.stem}
-                  title={`Open ${brief.title}`}
-                  onClick={(event) => {
-                    setSidebarMode("notes");
-                    openNote(brief.path!, { newTab: event.metaKey });
-                  }}
+                  aria-current={current?.stem === brief.stem ? "true" : undefined}
+                  title={`Read ${brief.title}`}
+                  onClick={() => readBrief(brief.stem)}
                 >
                   {content}
                 </button>
@@ -663,7 +817,18 @@ type DetectMap = Partial<
   Record<ProviderId, { installed: boolean; authenticated: boolean; version: string | null }>
 >;
 
-function ModelsView({ snapshot }: { snapshot: BreveSnapshot }) {
+/** A merged-Settings group heading — the former standalone page titles demoted
+ * to quiet section anchors inside the one Settings home. */
+function SettingsGroupHead({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="breve-settings-group">
+      <h2>{title}</h2>
+      <p>{detail}</p>
+    </div>
+  );
+}
+
+function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; embedded?: boolean }) {
   const queryClient = useQueryClient();
   const aiProviders = useUiStore((s) => s.aiProviders);
   const blockedModels = useUiStore((s) => s.blockedModels);
@@ -736,7 +901,10 @@ function ModelsView({ snapshot }: { snapshot: BreveSnapshot }) {
     setSaveState("saving");
     setError("");
     try {
-      const next = await breveWriteConfig(config);
+      // write only THIS form's slice over the freshest config — the co-mounted
+      // Delivery form may have saved since this one went dirty, and writing the
+      // whole stale copy would revert its work (adversarial review, HIGH)
+      const next = await breveWriteConfig({ ...snapshot.config, modelPolicy: config.modelPolicy });
       queryClient.setQueryData(BREVE_QUERY_KEY, next);
       setBase(next.config);
       setSaveState("saved");
@@ -755,11 +923,18 @@ function ModelsView({ snapshot }: { snapshot: BreveSnapshot }) {
   };
 
   return (
-    <div className="breve-page">
-      <PageHead
-        title="Models"
-        detail="Choose the writer, ordered fallbacks, and the local helper used by briefs."
-      />
+    <div className={embedded ? "breve-embed" : "breve-page"}>
+      {embedded ? (
+        <SettingsGroupHead
+          title="Models"
+          detail="Choose the writer, ordered fallbacks, and the local helper used by briefs."
+        />
+      ) : (
+        <PageHead
+          title="Models"
+          detail="Choose the writer, ordered fallbacks, and the local helper used by briefs."
+        />
+      )}
       <div className="breve-config-toolbar">
         <span className="breve-toolbar-grow" />
         <SaveNote state={saveState} error={error} dirty={dirty} />
@@ -1116,7 +1291,7 @@ function DeliveryStatus({ ready, children }: { ready: boolean; children: string 
   );
 }
 
-function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
+function ConfigureView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; embedded?: boolean }) {
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({
     queryKey: ["breve", "delivery-settings"],
@@ -1173,7 +1348,9 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
     setError("");
     try {
       if (configDirty) {
-        const nextSnapshot = await breveWriteConfig(config);
+        // slice-write, same reasoning as the Models save: never clobber the
+        // co-mounted Models form's saved policy with a stale full config
+        const nextSnapshot = await breveWriteConfig({ ...snapshot.config, pdfTheme: config.pdfTheme });
         setConfig(nextSnapshot.config);
         setConfigBase(nextSnapshot.config);
         queryClient.setQueryData(BREVE_QUERY_KEY, nextSnapshot);
@@ -1230,10 +1407,22 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
     }
   };
 
+  const deliveryHead = embedded ? (
+    <SettingsGroupHead
+      title="Delivery & appearance"
+      detail="Where Breve sends email and Signal messages, and how the PDF edition looks."
+    />
+  ) : (
+    <PageHead
+      title="Configure"
+      detail="Choose how Breve looks and where it sends email and Signal messages."
+    />
+  );
+
   if (settingsQuery.isError) {
     return (
-      <div className="breve-page">
-        <PageHead title="Configure" detail="Connect the services Breve uses to deliver for you." />
+      <div className={embedded ? "breve-embed" : "breve-page"}>
+        {deliveryHead}
         <EmptyMessage
           title="Delivery settings could not be loaded."
           detail="Your saved configuration was not changed. Try reading the snapshot again."
@@ -1248,19 +1437,16 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
   }
   if (settingsQuery.isLoading || !draft) {
     return (
-      <div className="breve-page">
-        <PageHead title="Configure" detail="Connect the services Breve uses to deliver for you." />
+      <div className={embedded ? "breve-embed" : "breve-page"}>
+        {deliveryHead}
         <BreveSkeleton label="Loading delivery settings" />
       </div>
     );
   }
 
   return (
-    <div className="breve-page">
-      <PageHead
-        title="Configure"
-        detail="Choose how Breve looks and where it sends email and Signal messages."
-      />
+    <div className={embedded ? "breve-embed" : "breve-page"}>
+      {deliveryHead}
 
       <div className="breve-config-savebar">
         <p>
@@ -1503,6 +1689,23 @@ function ConfigureView({ snapshot }: { snapshot: BreveSnapshot }) {
   );
 }
 
+/** One Settings home (2026-07-30 rework): the legacy migration ladder, then
+ * the former Models and Configure pages as quiet groups. */
+function SettingsView({ snapshot }: { snapshot: BreveSnapshot }) {
+  return (
+    <div className="breve-page">
+      <PageHead
+        title="Settings"
+        detail="Models, delivery, appearance, and the legacy migration — one home."
+      />
+      {(snapshot.source !== "rotli" || snapshot.legacyRoot) && <SourceStrip snapshot={snapshot} />}
+      <MigrationBands snapshot={snapshot} />
+      <ModelsView snapshot={snapshot} embedded />
+      <ConfigureView snapshot={snapshot} embedded />
+    </div>
+  );
+}
+
 export function BreveSurface() {
   const view = useUiStore((s) => s.breveView);
   const query = useBreveSnapshot();
@@ -1538,10 +1741,9 @@ export function BreveSurface() {
   return (
     <main className="breve-surface" aria-label={`Breve ${view}`}>
       {view === "briefs" && <BriefsView snapshot={snapshot} />}
-      {view === "watchlist" && <WatchlistView snapshot={snapshot} />}
       {view === "routines" && <RoutinesView snapshot={snapshot} />}
-      {view === "models" && <ModelsView snapshot={snapshot} />}
-      {view === "configure" && <ConfigureView snapshot={snapshot} />}
+      {view === "watchlist" && <WatchlistView snapshot={snapshot} />}
+      {view === "settings" && <SettingsView snapshot={snapshot} />}
     </main>
   );
 }

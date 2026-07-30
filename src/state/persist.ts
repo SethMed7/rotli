@@ -52,6 +52,7 @@ import { findLeaf, leaves, usePanesStore } from "./panes";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
 import {
   ALL_NOTES,
+  type BreveView,
   clampChatSidebarLimit,
   clampSidebarWidth,
   clampSidebarZoom,
@@ -224,7 +225,7 @@ interface PersistedSettings {
   sidebarZoom: number;
   /** Which high-level sidebar lens and Breve section reopen on launch. */
   sidebarMode: "notes" | "breve";
-  breveView: "briefs" | "watchlist" | "routines" | "models" | "configure";
+  breveView: BreveView;
   expandedDests: Record<string, boolean>;
   /** Hotkey overrides keyed by action id; null = explicitly unbound. */
   bindings: Record<string, string | null>;
@@ -403,12 +404,12 @@ export function parseSettings(raw: string): PersistedSettings {
     sidebarZoom: clampSidebarZoom(typeof data.sidebarZoom === "number" ? data.sidebarZoom : 1),
     sidebarMode: data.sidebarMode === "breve" ? "breve" : "notes",
     breveView:
-      data.breveView === "watchlist" ||
-      data.breveView === "routines" ||
-      data.breveView === "models" ||
-      data.breveView === "configure"
+      data.breveView === "watchlist" || data.breveView === "routines" || data.breveView === "settings"
         ? data.breveView
-        : "briefs",
+        : // the retired Models/Configure views merged into Settings (2026-07-30)
+          data.breveView === "models" || data.breveView === "configure"
+          ? "settings"
+          : "briefs",
     expandedDests,
     bindings,
     noteStyles,
