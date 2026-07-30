@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The Breve watchlist reads before it edits.** Topics now render as compact
+  scannable rows — name, source domain, one-line guidance — under their group
+  headers instead of a page of always-open forms; clicking a row (or its
+  explicit Edit) expands one in-place editor with a Done to fold it back.
+  Every group header carries its own “+ Add topic” button, so adding to a
+  group no longer requires hunting; “Add group” stays in the sticky manager
+  bar beside Save. Validation moved off the page banner and onto the
+  offending row (“Name this topic, or remove it.”), with a compact
+  fix-the-marked-rows hint next to the disabled Save and a needs-attention
+  note on collapsed groups hiding invalid rows. Same watchlist Markdown
+  contract, same capabilities — presentation only.
+
 ## [0.48.0] - 2026-07-30
 
 ### Added

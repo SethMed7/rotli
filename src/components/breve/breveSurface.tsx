@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import {
   type BreveRoutine,
   type BreveSnapshot,
@@ -15,11 +15,9 @@ import {
   breveTestSignal,
   breveWriteDeliverySettings,
   breveWriteConfig,
-  breveWriteWatchlist,
   chatModels,
   cliDetect,
   isTauri,
-  openUrl,
   type BreveDeliverySettings,
   type BrevePdfPalette,
   type BrevePdfTheme,
@@ -27,25 +25,9 @@ import {
 } from "../../lib/tauri";
 import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../../brand/brevePdfThemes";
 import { CLI_CATALOG, PROVIDER_IDS, PROVIDER_LABELS, type ProviderId } from "../../ai/models";
-import {
-  parseWatchlist,
-  serializeWatchlist,
-  legacyWatchUrl,
-  type WatchItem,
-  type WatchSection,
-} from "../../routines/watchlist";
 import { useUiStore } from "../../state/ui";
 import { usePanesStore } from "../../state/panes";
-import {
-  CheckGlyph,
-  ChevronRight,
-  ClockGlyph,
-  ExternalLinkGlyph,
-  LockGlyph,
-  PlusGlyph,
-  SearchGlyph,
-  XGlyph,
-} from "../glyphs";
+import { CheckGlyph, ChevronRight, ClockGlyph, LockGlyph, SearchGlyph, XGlyph } from "../glyphs";
 import {
   EMPTY_BREVE_SNAPSHOT,
   formatNextRoutine,
@@ -54,71 +36,15 @@ import {
   sortBriefs,
 } from "../../routines/briefs";
 import { BREVE_QUERY_KEY, useBreveSnapshot } from "./useBreve";
-
-type SaveState = "idle" | "saving" | "saved" | "error";
-
-function PageHead({ title, detail }: { title: string; detail: string }) {
-  return (
-    <header className="breve-page-head">
-      <hgroup>
-        <h2>{title}</h2>
-        <p>{detail}</p>
-      </hgroup>
-    </header>
-  );
-}
-
-function SaveNote({ state, error, dirty = false }: { state: SaveState; error?: string; dirty?: boolean }) {
-  if (state === "idle" && !dirty) return null;
-  const message =
-    state === "saving"
-      ? "Saving…"
-      : state === "saved"
-        ? "Saved"
-        : state === "error"
-          ? error || "Could not save"
-          : "Unsaved changes";
-  return (
-    <span
-      className={state === "error" ? "breve-save-note err" : "breve-save-note"}
-      role={state === "error" ? "alert" : "status"}
-      aria-live={state === "error" ? "assertive" : "polite"}
-    >
-      {state === "saved" && <CheckGlyph size={12} />}
-      {message}
-    </span>
-  );
-}
-
-function useBreveDraftGuard(dirty: boolean) {
-  const setBreveDirty = useUiStore((state) => state.setBreveDirty);
-  useEffect(() => {
-    setBreveDirty(dirty);
-    return () => setBreveDirty(false);
-  }, [dirty, setBreveDirty]);
-}
-
-function EmptyMessage({ title, detail, action }: { title: string; detail: string; action?: ReactNode }) {
-  return (
-    <div className="breve-empty-state">
-      <strong>{title}</strong>
-      <p>{detail}</p>
-      {action}
-    </div>
-  );
-}
-
-function BreveSkeleton({ label }: { label: string }) {
-  return (
-    <div className="breve-skeleton" role="status" aria-label={label} aria-busy="true">
-      <span className="breve-skeleton-title" />
-      <span className="breve-skeleton-copy" />
-      <span className="breve-skeleton-band" />
-      <span className="breve-skeleton-row" />
-      <span className="breve-skeleton-row short" />
-    </div>
-  );
-}
+import {
+  BreveSkeleton,
+  EmptyMessage,
+  PageHead,
+  SaveNote,
+  useBreveDraftGuard,
+  type SaveState,
+} from "./breveShared";
+import { WatchlistView } from "./breveWatchlist";
 
 function SourceStrip({ snapshot }: { snapshot: BreveSnapshot }) {
   const label =
@@ -468,449 +394,6 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
   );
 }
 
-type EditableWatchItem = WatchItem & { id: string };
-type EditableWatchSection = Omit<WatchSection, "items"> & { id: string; items: EditableWatchItem[] };
-
-function normalizedWebsite(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const candidate = /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  try {
-    const parsed = new URL(candidate);
-    if ((parsed.protocol !== "https:" && parsed.protocol !== "http:") || !parsed.hostname) return null;
-    return parsed.toString();
-  } catch {
-    return null;
-  }
-}
-
-function WatchGuidanceInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (!ref.current) return;
-    const frame = requestAnimationFrame(() => {
-      if (!ref.current) return;
-      ref.current.style.height = "auto";
-      ref.current.style.height = `${Math.max(72, ref.current.scrollHeight)}px`;
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [value]);
-  return (
-    <textarea
-      ref={ref}
-      value={value}
-      rows={2}
-      placeholder="The signal, change, or angle that matters"
-      onChange={(event) => onChange(event.target.value)}
-      onKeyDown={(event) => event.stopPropagation()}
-    />
-  );
-}
-
-function editId(): string {
-  return crypto.randomUUID();
-}
-
-function editableWatchlist(markdown: string): { sections: EditableWatchSection[]; preferences: string } {
-  const parsed = parseWatchlist(markdown);
-  return {
-    preferences: parsed.preferences,
-    sections: parsed.sections.map((section) => ({
-      ...section,
-      note: section.note ?? "",
-      id: editId(),
-      items: section.items.map((item) => ({
-        ...item,
-        url: item.url ?? legacyWatchUrl(item.watch),
-        id: editId(),
-      })),
-    })),
-  };
-}
-
-function watchlistDocument(sections: EditableWatchSection[], preferences: string): string {
-  return serializeWatchlist({
-    preferences,
-    sections: sections.map(({ title, note, items }) => ({
-      title,
-      ...(note ? { note } : {}),
-      items: items.map(({ watch, lens, url }) => ({
-        watch,
-        lens,
-        ...(url?.trim() ? { url: url.trim() } : {}),
-      })),
-    })),
-  });
-}
-
-function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
-  const queryClient = useQueryClient();
-  const initial = useMemo(() => editableWatchlist(snapshot.watchlist), [snapshot.watchlist]);
-  const [sections, setSections] = useState(initial.sections);
-  const [preferences, setPreferences] = useState(initial.preferences);
-  const [base, setBase] = useState(() => watchlistDocument(initial.sections, initial.preferences));
-  const [query, setQuery] = useState("");
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [error, setError] = useState("");
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
-  const markdown = watchlistDocument(sections, preferences);
-  const dirty = markdown !== base;
-  useBreveDraftGuard(dirty);
-  const topicCount = sections.reduce((total, section) => total + section.items.length, 0);
-  const duplicateGroup = sections.find(
-    (section, index) =>
-      !!section.title.trim() &&
-      sections.findIndex(
-        (candidate) => candidate.title.trim().toLowerCase() === section.title.trim().toLowerCase(),
-      ) !== index,
-  );
-  const invalid = sections.some(
-    (section) => !section.title.trim() || section.items.some((item) => !item.watch.trim()),
-  );
-  const invalidWebsite = sections
-    .flatMap((section) => section.items)
-    .find((item) => item.url?.trim() && !normalizedWebsite(item.url));
-  const validation = duplicateGroup
-    ? `“${duplicateGroup.title.trim()}” is used more than once. Give each group a unique name.`
-    : invalid
-      ? "Every group and topic needs a name. Complete or remove the empty row before saving."
-      : invalidWebsite
-        ? `“${invalidWebsite.url}” is not a valid website. Use a domain or an http/https URL.`
-        : "";
-  const normalizedQuery = query.trim().toLowerCase();
-  const visibleSections = normalizedQuery
-    ? sections.flatMap((section) => {
-        const groupMatches = section.title.toLowerCase().includes(normalizedQuery);
-        const items = groupMatches
-          ? section.items
-          : section.items.filter((item) =>
-              `${item.watch} ${item.lens} ${item.url ?? ""}`.toLowerCase().includes(normalizedQuery),
-            );
-        return items.length || groupMatches ? [{ ...section, items }] : [];
-      })
-    : sections;
-
-  useEffect(() => {
-    if (dirty) return;
-    const next = editableWatchlist(snapshot.watchlist);
-    setSections(next.sections);
-    setPreferences(next.preferences);
-    setBase(watchlistDocument(next.sections, next.preferences));
-    setCollapsedGroups(new Set());
-  }, [dirty, snapshot.watchlist]);
-
-  const updateSection = (sectionId: string, patch: Partial<Pick<EditableWatchSection, "title" | "note">>) => {
-    setSections((current) =>
-      current.map((section) => (section.id === sectionId ? { ...section, ...patch } : section)),
-    );
-    setSaveState("idle");
-  };
-
-  const updateItem = (sectionId: string, itemId: string, patch: Partial<WatchItem>) => {
-    setSections((current) =>
-      current.map((section) =>
-        section.id === sectionId
-          ? {
-              ...section,
-              items: section.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
-            }
-          : section,
-      ),
-    );
-    setSaveState("idle");
-  };
-
-  const addTopic = (sectionId: string) => {
-    setQuery("");
-    setSections((current) =>
-      current.map((section) =>
-        section.id === sectionId
-          ? { ...section, items: [...section.items, { id: editId(), watch: "", lens: "", url: "" }] }
-          : section,
-      ),
-    );
-    setSaveState("idle");
-  };
-
-  const addGroup = () => {
-    setQuery("");
-    setSections((current) => [
-      ...current,
-      { id: editId(), title: "New group", items: [{ id: editId(), watch: "", lens: "", url: "" }] },
-    ]);
-    setSaveState("idle");
-  };
-
-  const save = async () => {
-    if (validation) return;
-    setSaveState("saving");
-    setError("");
-    try {
-      const next = await breveWriteWatchlist(markdown);
-      queryClient.setQueryData(BREVE_QUERY_KEY, next);
-      setBase(markdown);
-      setSaveState("saved");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setSaveState("error");
-    }
-  };
-
-  return (
-    <div className="breve-page">
-      <PageHead
-        title="Watchlist"
-        detail="Tell Breve what to follow and what kind of change matters to you."
-      />
-      <div className="breve-watch-manager-bar">
-        <label className="breve-watch-search" htmlFor="breve-watch-search">
-          <SearchGlyph size={14} />
-          <input
-            id="breve-watch-search"
-            aria-label="Search watchlist topics"
-            value={query}
-            placeholder="Search topics…"
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => event.stopPropagation()}
-          />
-        </label>
-        <span className="breve-watch-count">
-          {topicCount} {topicCount === 1 ? "topic" : "topics"} in {sections.length}{" "}
-          {sections.length === 1 ? "group" : "groups"}
-        </span>
-        <span className="breve-toolbar-grow" />
-        <SaveNote state={saveState} error={error} dirty={dirty} />
-        <button type="button" className="ghostbtn" onClick={addGroup}>
-          <PlusGlyph size={13} /> Add group
-        </button>
-        <button
-          type="button"
-          className="ghostbtn primary"
-          disabled={!dirty || !!validation || saveState === "saving"}
-          onClick={() => void save()}
-        >
-          {saveState === "saving" ? "Saving…" : "Save watchlist"}
-        </button>
-      </div>
-      {validation && (
-        <p id="breve-watch-validation" className="breve-watch-validation" role="alert">
-          {validation}
-        </p>
-      )}
-
-      <div className="breve-watch-groups">
-        {visibleSections.map((section) => {
-          const expanded = !!normalizedQuery || !collapsedGroups.has(section.id);
-          const duplicate =
-            !!section.title.trim() &&
-            sections.filter(
-              (candidate) => candidate.title.trim().toLowerCase() === section.title.trim().toLowerCase(),
-            ).length > 1;
-          return (
-            <section
-              className="breve-watch-group"
-              key={section.id}
-              aria-label={`${section.title || "Untitled"} watch group`}
-            >
-              <div className="breve-watch-group-head">
-                <button
-                  type="button"
-                  className="breve-watch-disclosure"
-                  aria-label={`${expanded ? "Collapse" : "Expand"} ${section.title || "watch group"}`}
-                  aria-expanded={expanded}
-                  onClick={() =>
-                    setCollapsedGroups((current) => {
-                      const next = new Set(current);
-                      if (next.has(section.id)) next.delete(section.id);
-                      else next.add(section.id);
-                      return next;
-                    })
-                  }
-                >
-                  <ChevronRight size={12} className={expanded ? "open" : undefined} />
-                </button>
-                <label>
-                  <span className="sr-only">Group name</span>
-                  <input
-                    value={section.title}
-                    aria-label="Group name"
-                    aria-invalid={!section.title.trim() || duplicate}
-                    aria-describedby={validation ? "breve-watch-validation" : undefined}
-                    onChange={(event) => updateSection(section.id, { title: event.target.value })}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  />
-                </label>
-                <span>
-                  {section.items.length} {section.items.length === 1 ? "topic" : "topics"}
-                </span>
-                <button
-                  type="button"
-                  className="breve-watch-remove"
-                  aria-label={`Remove ${section.title || "group"}`}
-                  title={section.items.length ? "Remove the topics first" : "Remove group"}
-                  disabled={section.items.length > 0}
-                  onClick={() => {
-                    setSections((current) => current.filter((candidate) => candidate.id !== section.id));
-                    setSaveState("idle");
-                  }}
-                >
-                  <XGlyph size={13} />
-                </button>
-              </div>
-
-              {expanded && (
-                <>
-                  <label className="breve-watch-group-note">
-                    <span className="sr-only">Optional group guidance</span>
-                    <input
-                      value={section.note ?? ""}
-                      placeholder="Optional guidance for this group"
-                      onChange={(event) => updateSection(section.id, { note: event.target.value })}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    />
-                  </label>
-
-                  <div className="breve-watch-items">
-                    {section.items.map((item) => (
-                      <div className="breve-watch-item" key={item.id}>
-                        <label className="breve-watch-topic-field">
-                          <span className="breve-watch-field-label">Topic</span>
-                          <input
-                            value={item.watch}
-                            placeholder="Company, person, product, or theme"
-                            aria-invalid={!item.watch.trim()}
-                            aria-describedby={validation ? "breve-watch-validation" : undefined}
-                            onChange={(event) =>
-                              updateItem(section.id, item.id, { watch: event.target.value })
-                            }
-                            onKeyDown={(event) => event.stopPropagation()}
-                          />
-                        </label>
-                        <label className="breve-watch-website-field">
-                          <span className="breve-watch-field-label">Website or source</span>
-                          <span className="breve-watch-link-control">
-                            <input
-                              type="url"
-                              inputMode="url"
-                              value={item.url ?? ""}
-                              placeholder="company.com"
-                              aria-invalid={!!item.url?.trim() && !normalizedWebsite(item.url)}
-                              aria-describedby={validation ? "breve-watch-validation" : undefined}
-                              onChange={(event) =>
-                                updateItem(section.id, item.id, { url: event.target.value })
-                              }
-                              onBlur={() => {
-                                const normalized = normalizedWebsite(item.url ?? "");
-                                if (normalized) updateItem(section.id, item.id, { url: normalized });
-                              }}
-                              onKeyDown={(event) => event.stopPropagation()}
-                            />
-                            <button
-                              type="button"
-                              className="breve-watch-open-link"
-                              disabled={!normalizedWebsite(item.url ?? "")}
-                              aria-label={`Open website for ${item.watch || "topic"}`}
-                              title={
-                                normalizedWebsite(item.url ?? "")
-                                  ? "Open website"
-                                  : "Add a valid website first"
-                              }
-                              onClick={() => {
-                                const url = normalizedWebsite(item.url ?? "");
-                                if (url) void openUrl(url);
-                              }}
-                            >
-                              <ExternalLinkGlyph size={13} />
-                            </button>
-                          </span>
-                        </label>
-                        <button
-                          type="button"
-                          className="breve-watch-remove"
-                          aria-label={`Remove ${item.watch || "empty topic"}`}
-                          title="Remove topic"
-                          onClick={() => {
-                            setSections((current) =>
-                              current.map((candidate) =>
-                                candidate.id === section.id
-                                  ? {
-                                      ...candidate,
-                                      items: candidate.items.filter(
-                                        (candidateItem) => candidateItem.id !== item.id,
-                                      ),
-                                    }
-                                  : candidate,
-                              ),
-                            );
-                            setSaveState("idle");
-                          }}
-                        >
-                          <XGlyph size={13} />
-                        </button>
-                        <label className="breve-watch-guidance-field">
-                          <span className="breve-watch-field-label">What should Breve look for?</span>
-                          <WatchGuidanceInput
-                            value={item.lens}
-                            onChange={(lens) => updateItem(section.id, item.id, { lens })}
-                          />
-                        </label>
-                      </div>
-                    ))}
-                    {section.items.length === 0 && (
-                      <p className="breve-watch-group-empty">No topics in this group yet.</p>
-                    )}
-                  </div>
-                  <button type="button" className="breve-watch-add" onClick={() => addTopic(section.id)}>
-                    <PlusGlyph size={13} /> Add topic
-                  </button>
-                </>
-              )}
-            </section>
-          );
-        })}
-        {sections.length === 0 && (
-          <div className="breve-watch-empty">
-            <p>Your watchlist is empty.</p>
-            <span>Add a group, then add the topics Breve should follow.</span>
-            <button type="button" className="ghostbtn primary" onClick={addGroup}>
-              Add first group
-            </button>
-          </div>
-        )}
-        {sections.length > 0 && visibleSections.length === 0 && (
-          <div className="breve-watch-empty">
-            <p>No topics match “{query}”.</p>
-            <button type="button" className="ghostbtn" onClick={() => setQuery("")}>
-              Clear search
-            </button>
-          </div>
-        )}
-      </div>
-
-      <section className="breve-watch-preferences" aria-labelledby="breve-watch-preferences-title">
-        <div>
-          <h3 id="breve-watch-preferences-title">Brief preferences</h3>
-          <p>Optional guidance that applies across every topic.</p>
-        </div>
-        <label>
-          <span className="sr-only">Brief preferences for every topic</span>
-          <textarea
-            value={preferences}
-            rows={4}
-            aria-labelledby="breve-watch-preferences-title"
-            placeholder="For example: Keep each brief concise and prioritize meaningful product changes."
-            onChange={(event) => {
-              setPreferences(event.target.value);
-              setSaveState("idle");
-            }}
-            onKeyDown={(event) => event.stopPropagation()}
-          />
-        </label>
-      </section>
-    </div>
-  );
-}
-
 type BriefSlot = "morning" | "lunch" | "night";
 
 function routineBriefSlot(routine: BreveRoutine): BriefSlot | null {
@@ -923,6 +406,7 @@ function routineBriefSlot(routine: BreveRoutine): BriefSlot | null {
 
 function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
   const queryClient = useQueryClient();
+  const setView = useUiStore((s) => s.setBreveView);
   const [config, setConfig] = useState(snapshot.config);
   const [base, setBase] = useState(snapshot.config);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -1075,11 +559,24 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
             {config.routines.filter((routine) => routine.enabled).length} of {config.routines.length} active
           </span>
         </div>
-        <div className="breve-routine-columns" aria-hidden="true">
-          <span>Automation</span>
-          <span>Cadence</span>
-          <span>Delivery</span>
-        </div>
+        {config.routines.length === 0 && (
+          <EmptyMessage
+            title="No automations yet."
+            detail="Breve's briefing and check-in jobs appear here once a Breve library is imported or set up. Start from the Briefs page."
+            action={
+              <button type="button" className="ghostbtn" onClick={() => setView("briefs")}>
+                Go to Briefs
+              </button>
+            }
+          />
+        )}
+        {config.routines.length > 0 && (
+          <div className="breve-routine-columns" aria-hidden="true">
+            <span>Automation</span>
+            <span>Cadence</span>
+            <span>Delivery</span>
+          </div>
+        )}
         <div className="breve-routine-list">
           {config.routines.map((routine) => {
             const lanes = [...new Set(["inApp", "signal", "email", ...routine.lanes])];
