@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-07-30T12:47:15.928Z",
+  "last_modified": "2026-07-30",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -108,6 +108,13 @@
           "added": "2026-07-21",
           "last_reviewed": "2026-07-21",
           "source": "docs/decisions/README.md"
+        },
+        {
+          "id": 9,
+          "text": "Review findings become mechanical guards: when Greptile or any reviewer flags a CLASS of issue (not a one-off), the same PR lands a guard for that class — a check script assertion, eslint restriction, parity fixture, or the tracked .githooks/pre-commit (staged-file Prettier + conflict markers; enable with git config core.hooksPath .githooks). Precedents: check:security's tool local-vs-egress classification, check:ipc, the hook's formatting guard.",
+          "added": "2026-07-30",
+          "last_reviewed": "2026-07-30",
+          "source": "CONTRIBUTING.md"
         }
       ],
       "decisions": [
@@ -644,15 +651,5 @@
       "decisions": []
     }
   },
-  "staging": [
-    {
-      "id": "stg-001",
-      "proposed_domain": "ROTLI_CORE",
-      "rule_text": "Review findings become mechanical guards: when Greptile or any reviewer flags a CLASS of issue (not a one-off), the same PR lands a guard for that class — a check script assertion, eslint restriction, parity fixture, or the tracked .githooks/pre-commit (staged-file Prettier + conflict markers; enable with git config core.hooksPath .githooks). Precedents: check:security's tool local-vs-egress classification, check:ipc, the hook's formatting guard.",
-      "rationale": "Seth, 2026-07-30: \"make sure we are learning from the greptile reviews... update our linters and prettier etc. so we don't keep running into those issues.\" The session repeatedly hit formatting drift reaching commits, and review classes (tool classification, secure-lane closures) that mechanical gates caught or should have caught.",
-      "source": "AI proposal",
-      "proposed_at": "2026-07-30T12:47:15.927Z",
-      "status": "pending"
-    }
-  ]
+  "staging": []
 }
