@@ -108,9 +108,23 @@ its nursery (at adoption time it missed 3 of 8 real floating-promise sites).
 `breve-runtime/scripts/` is measured but deferred at 76 findings (71
 `no-explicit-any`, 4 `no-floating-promises`, 1 `no-misused-promises`;
 re-measured 2026-07-17) — over the 15-site adoption threshold; revisit once
-the `any` debt shrinks. This repository has no git
-hooks: enforcement is the `lint` chain locally plus CI. If a pre-commit hook
-is ever added, measure eslint `projectService` per-commit latency first.
+the `any` debt shrinks. Git hooks are deliberately MINIMAL: the tracked
+`.githooks/pre-commit` runs only staged-file Prettier + a conflict-marker
+grep (sub-second — the old "measure eslint latency first" concern is why
+eslint/tsc stay out of it). Enable once per clone with
+`git config core.hooksPath .githooks`; full enforcement remains the `lint`
+chain locally plus CI, and `git commit --no-verify` stays available for
+genuine emergencies.
+
+## Review learnings become guards
+
+When a review (Greptile or otherwise) flags a CLASS of issue — not a one-off
+typo — land a mechanical guard for that class in the same PR: a
+`scripts/check-*.mjs` assertion, an eslint restriction, a parity fixture, or a
+hook line. Precedents: `check:security`'s tool local-vs-egress classification
+(caught the next new tools automatically), the IPC contract check, and this
+hook's formatting/conflict guards. A review that only fixes the instance
+teaches nothing; the guard is the lesson.
 
 ## Required validation
 

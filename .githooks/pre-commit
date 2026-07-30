@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Fast pre-commit guards — STAGED files only, so per-commit latency stays low
+# (CONTRIBUTING's condition for ever adding a hook). Born from review learnings
+# (Seth, 2026-07-30): formatting drift and conflict markers kept reaching PRs.
+# Full enforcement remains `bun run lint` + CI; bypass: git commit --no-verify.
+set -euo pipefail
+
+staged_ts=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' || true)
+staged_all=$(git diff --cached --name-only --diff-filter=ACM || true)
+
+if [ -n "$staged_ts" ]; then
+  # shellcheck disable=SC2086
+  if ! bunx prettier --check $staged_ts >/dev/null 2>&1; then
+    echo "✗ pre-commit: staged TypeScript is not Prettier-formatted."
+    echo "  bunx prettier --write <files>   (or: bun run format)"
+    exit 1
+  fi
+fi
+
+if [ -n "$staged_all" ]; then
+  # conflict markers must never land (a resolved-merge leftover shipped once)
+  # shellcheck disable=SC2086
+  if grep -lE '^(<{7}|={7}|>{7})( |$)' $staged_all 2>/dev/null; then
+    echo "✗ pre-commit: conflict markers in the staged files above."
+    exit 1
+  fi
+fi

@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Reviews now teach the tooling.** A tracked, sub-second pre-commit hook
+  (staged-file Prettier + conflict-marker guard; enable with
+  `git config core.hooksPath .githooks`) plus a standing rule in
+  CONTRIBUTING: when a review flags a class of issue, the same PR lands a
+  mechanical guard for that class.
+
 ## [0.47.0] - 2026-07-30
 
 ### Added
