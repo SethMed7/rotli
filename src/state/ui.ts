@@ -304,6 +304,12 @@ interface UiState {
   rowActionError: string | null;
   setRowActionError: (e: string | null) => void;
 
+  /** The chat that was focused when a NEW chat was opened (Seth, 2026-07-30:
+   * "this chat should default to folder I was in") — the first save reads it
+   * to file the new chat into the same folder, then clears it. Transient. */
+  newChatOrigin: string | null;
+  setNewChatOrigin: (slug: string | null) => void;
+
   /** The user's name — onboarding's "What should rotli call you?" / Settings →
    * General. Personalizes AI chat (the prompt persona line). Persisted; "" = unset. */
   userName: string;
@@ -568,6 +574,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   setRenamingChatSlug: (slug) => set({ renamingChatSlug: slug }),
   rowActionError: null,
   setRowActionError: (e) => set({ rowActionError: e }),
+
+  newChatOrigin: null,
+  setNewChatOrigin: (slug) => set({ newChatOrigin: slug }),
 
   userName: "",
   setUserName: (name) => set({ userName: name }),

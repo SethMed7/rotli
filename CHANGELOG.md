@@ -24,6 +24,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Light, Warm Dark, Paper, Charcoal — with every semantic token the sidebar
   consumes resolving in each.
 
+## [Unreleased]
+
+### Added
+
+- **Chats can be reorganized inside their folders.** Drag a chat onto another
+  chat in a folder to place it exactly there (the same drop-line grammar as
+  Main); dropping on the folder row still files it at the end. The manual
+  order lives in the same rebuildable sidecar as the folders themselves.
+- **Every reply can be stopped.** The send button becomes a Stop while rotli
+  is working — connected CLI models are killed for real, the local model's
+  in-flight reply is discarded — and your prompt returns to the composer
+  intact, ready to edit and resend.
+
+### Changed
+
+- **Naming a chat is optional by design.** The title field says so — press ⏎
+  on it empty and you drop straight into the message box; the chat names
+  itself from your first message.
+- **New chats land where you'd look for them.** A chat started while you're
+  in a foldered chat files itself into that same folder; the loose list now
+  sorts most-recent-first (pinned still float), so a fresh chat is always at
+  the top, never buried at the bottom.
+- **Working looks alive.** The static "thinking…" now ambles through a warm
+  little vocabulary — reading the shelves…, connecting dots…, brewing an
+  answer… — beside the pulsing dots, and real tool statuses still take over
+  when something concrete is happening.
+- **The local model answers like it means it.** The Gemma prompt now carries
+  an explicit answer contract — lead with the facts themselves, never "that's
+  documented in the family/ subfolder", with a BAD/GOOD example it can
+  imitate — and asks for Markdown structure (bulleted lists, bold names), so
+  replies come back direct and formatted instead of vague and flat.
+
 ## [0.50.0] - 2026-07-30
 
 ### Changed

@@ -20,9 +20,19 @@ export interface ChatFoldersManifest {
   /** chat slug → folder id. Slugs that no longer exist are ignored on render
    * and pruned on the next write. */
   assignments: Record<string, string>;
+  /** folder id → the user's MANUAL order of its chat slugs (drag-reorder,
+   * Seth 2026-07-30). Additive v1 field: absent/unknown folders mean "no
+   * manual order — keep the list's own (recency) order"; slugs not listed
+   * sort after the ordered ones in list order. */
+  order: Record<string, string[]>;
 }
 
-export const EMPTY_CHAT_FOLDERS: ChatFoldersManifest = { version: 1, folders: [], assignments: {} };
+export const EMPTY_CHAT_FOLDERS: ChatFoldersManifest = {
+  version: 1,
+  folders: [],
+  assignments: {},
+  order: {},
+};
 
 /** Parse a manifest defensively — any malformed shape reads as empty (the
  * sidecar is rebuildable; garbage must never break the chat list). */
@@ -40,7 +50,12 @@ export function parseChatFolders(raw: string): ChatFoldersManifest {
     for (const [slug, folderId] of Object.entries(parsed.assignments ?? {})) {
       if (typeof folderId === "string" && ids.has(folderId)) assignments[slug] = folderId;
     }
-    return { version: 1, folders, assignments };
+    const order: Record<string, string[]> = {};
+    for (const [folderId, slugs] of Object.entries(parsed.order ?? {})) {
+      if (!ids.has(folderId) || !Array.isArray(slugs)) continue;
+      order[folderId] = slugs.filter((slug): slug is string => typeof slug === "string");
+    }
+    return { version: 1, folders, assignments, order };
   } catch {
     return structuredClone(EMPTY_CHAT_FOLDERS);
   }
@@ -87,7 +102,20 @@ export function deleteChatFolder(manifest: ChatFoldersManifest, id: string): Cha
     assignments: Object.fromEntries(
       Object.entries(manifest.assignments).filter(([, assigned]) => assigned !== id),
     ),
+    order: Object.fromEntries(Object.entries(manifest.order).filter(([folderId]) => folderId !== id)),
   };
+}
+
+/** Replace one folder's manual chat order wholesale — the drag-reorder commit.
+ * The caller hands the full rendered order; unknown slugs are kept (they prune
+ * naturally when the folder re-renders without them). */
+export function setChatFolderOrder(
+  manifest: ChatFoldersManifest,
+  folderId: string,
+  slugs: string[],
+): ChatFoldersManifest {
+  if (!manifest.folders.some((folder) => folder.id === folderId)) return manifest;
+  return { ...manifest, order: { ...manifest.order, [folderId]: slugs } };
 }
 
 /** Assign a chat to a folder (null clears it back to the loose list). */
@@ -102,7 +130,8 @@ export function assignChatToFolder(
   return { ...manifest, assignments };
 }
 
-/** A renamed chat keeps its folder — the assignment key follows the slug. */
+/** A renamed chat keeps its folder AND its manual position — both the
+ * assignment key and any order entry follow the slug. */
 export function migrateChatFolderSlug(
   manifest: ChatFoldersManifest,
   oldSlug: string,
@@ -113,7 +142,13 @@ export function migrateChatFolderSlug(
   const assignments = { ...manifest.assignments };
   delete assignments[oldSlug];
   assignments[newSlug] = assigned;
-  return { ...manifest, assignments };
+  const order = Object.fromEntries(
+    Object.entries(manifest.order).map(([folderId, slugs]) => [
+      folderId,
+      slugs.map((slug) => (slug === oldSlug ? newSlug : slug)),
+    ]),
+  );
+  return { ...manifest, assignments, order };
 }
 
 export interface GroupedChats<T> {
@@ -122,7 +157,9 @@ export interface GroupedChats<T> {
 }
 
 /** Project the flat chat list through the manifest: folders (in manifest
- * order) with their chats, then everything unassigned, original order kept. */
+ * order) with their chats, then everything unassigned, list order kept.
+ * A folder with a MANUAL order sorts its chats by it; slugs it doesn't list
+ * (newly filed chats) keep their list-order position after the ordered ones. */
 export function groupChats<T extends { slug: string }>(
   chats: readonly T[],
   manifest: ChatFoldersManifest,
@@ -136,7 +173,16 @@ export function groupChats<T extends { slug: string }>(
     else loose.push(chat);
   }
   return {
-    folders: manifest.folders.map((folder) => ({ folder, chats: byFolder.get(folder.id) ?? [] })),
+    folders: manifest.folders.map((folder) => {
+      const unsorted = byFolder.get(folder.id) ?? [];
+      const manual = manifest.order[folder.id];
+      if (!manual || manual.length === 0) return { folder, chats: unsorted };
+      const pos = new Map(manual.map((slug, i) => [slug, i] as const));
+      const chatsSorted = [...unsorted].sort(
+        (a, b) => (pos.get(a.slug) ?? Infinity) - (pos.get(b.slug) ?? Infinity),
+      );
+      return { folder, chats: chatsSorted };
+    }),
     loose,
   };
 }

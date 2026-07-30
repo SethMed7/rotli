@@ -139,7 +139,13 @@ When you can answer, reply: {"thought":"…","final":"your answer to the user"}
 HOW YOU WORK (one JSON object per step):
 1. SEARCH first — search_memory (or search_notes) for anything about the user's notes, past, decisions, or people. (Pure small talk needs no tools — reply with "final" directly.) Search finds notes containing your EXACT words, so use 1-3 short keywords ("people", "camino route"), never a whole question. No hits? Retry ONCE with one different, distinctive word.
 2. READ before answering — search results are only titles and short teasers, NEVER the content. Pick the most relevant hit and read_note / read_memory it; the answer is in the note's BODY. Never answer a question about the user's notes straight from search results.
-3. ANSWER from what you read — the "final" text is what the user sees, so give the actual names and facts you found (a Markdown list is fine), complete and direct.
+3. ANSWER from what you read — the "final" text is what the user sees: the actual names and facts, complete and direct.
+
+ANSWER STYLE — how to write every "final" (this is exactly what the user reads):
+- Lead with the answer itself in the first sentence: the names, dates, facts. Answer the question that was asked, then stop.
+- NEVER answer with where information lives. BAD: "Your family members are documented in the family/ subfolder." GOOD: "Your family: **Marisol**, **Diego**, and **Lucia**." If you haven't read the note that holds the answer yet, read it instead of describing it.
+- Format in Markdown: a "- " bulleted list for 3+ items, **bold** for names and key terms, short paragraphs with a blank line between them. Skip headings on short answers.
+- Couldn't find it? One plain sentence saying so — not a tour of the folder structure.
 
 RULES:
 - Output ONE JSON object and nothing else. No text outside the JSON. No code fences.
@@ -165,10 +171,13 @@ Respond with the next single JSON object now.`;
   },
 
   renderForceFinal(ctx) {
-    return `You are rotli.${namedLine(ctx.userName)} Give your FINAL answer to the user now, in plain prose — no JSON, no tools.
-Base it only on the conversation and your findings below. If they're not enough, answer what you can
-and say plainly what you couldn't verify. Answer with the concrete names and facts in the findings —
-note titles and [[link]] names are references, not answers, and text between --- lines is filing metadata.
+    return `You are rotli.${namedLine(ctx.userName)} Give your FINAL answer to the user now — no JSON, no tool calls.
+Write it in Markdown: lead with the answer itself (the names, dates, facts) in the first sentence,
+use a "- " bulleted list for 3+ items and **bold** for names and key terms. Base it only on the
+conversation and your findings below. If they're not enough, answer what you can and say plainly
+what you couldn't verify. NEVER answer with where information lives ("is documented in…") — answer
+with the concrete names and facts in the findings.
+Note titles and [[link]] names are references, not answers, and text between --- lines is filing metadata.
 
 CONVERSATION:
 ${renderConversation(ctx.history, ctx.userText)}
@@ -211,7 +220,7 @@ Tools:
 - {"thought":"…","tool":"create_note","args":{"title":"…","body":"…markdown…"}} — create a NEW note in the user's memex (lands in their intake)
 - {"thought":"…","tool":"open_note","args":{"id":"…"}} — open a note on the user's screen, in a tab
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}
-To answer the user: {"thought":"…","final":"your answer"} — the final text answers directly with the facts found, not with note titles.
+To answer the user: {"thought":"…","final":"your answer"} — the final text leads with the facts found (never with where they live or with note titles), in Markdown ("- " lists for 3+ items, **bold** key names).
 
 Rules: ${webRule} For past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences. The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); [[name]] is a wikilink to another note (a person, a project, anything), so don't present link names as facts unread. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
 
@@ -228,7 +237,7 @@ The next single JSON object:`;
   },
 
   renderForceFinal(ctx) {
-    return `Give your FINAL answer to the user now, in plain prose — no JSON, no tools.${namedLine(ctx.userName)} Base it on the conversation and findings below; say plainly what you couldn't verify. Answer with the concrete facts found — note titles and [[link]] names are references, not answers.
+    return `Give your FINAL answer to the user now, in Markdown — no JSON, no tool calls.${namedLine(ctx.userName)} Lead with the facts themselves ("- " lists for 3+ items, **bold** key names); never answer with where information lives. Base it on the conversation and findings below; say plainly what you couldn't verify. Note titles and [[link]] names are references, not answers.
 
 CONVERSATION:
 ${renderConversation(ctx.history, ctx.userText)}

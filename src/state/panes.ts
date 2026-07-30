@@ -636,6 +636,12 @@ export const usePanesStore = create<PanesState>((set, get) => {
     openChat: (chatSlug, opts) => {
       // chats aren't notes — no touchMru. Like openCanvas, surface the panes.
       if (chatSlug) recordNav(navEntry("chat", chatSlug)); // fresh null chats have no identity yet
+      if (chatSlug === null) {
+        // remember WHERE the new chat came from: a chat focused right now
+        // seeds the new one's folder on first save (Seth, 2026-07-30)
+        const active = activeTabOf(focusedLeaf());
+        useUiStore.getState().setNewChatOrigin(active?.surfaceKind === "chat" ? active.chatSlug : null);
+      }
       useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
       // a fresh chat (null slug — "New chat") is ALWAYS a new tab; a saved chat

@@ -137,3 +137,33 @@ describe("untrusted prompt data framing", () => {
     }
   });
 });
+
+// The 2026-07-30 directness + formatting pass (Seth: gemma "not quite
+// answering my questions directly… and no formatting"). Gemma needs the
+// answer contract EXPLICIT: lead with the facts, never "where it lives",
+// Markdown structure — with a BAD/GOOD contrast it can imitate.
+describe("answer style — direct, formatted finals", () => {
+  test("the gemma prompt carries the answer-style contract with a BAD/GOOD contrast", () => {
+    const p = gemmaAdapter.renderPrompt({ ...base });
+    expect(p).toContain("ANSWER STYLE");
+    expect(p).toContain("Lead with the answer itself");
+    expect(p).toContain("NEVER answer with where information lives");
+    expect(p).toContain('BAD: "Your family members are documented');
+    expect(p).toContain("Format in Markdown");
+  });
+
+  test("both force-final prompts demand Markdown facts, not plain prose or locations", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      const p = adapter.renderForceFinal({ history: [], userText: "hi", scratch: [] });
+      expect(p).toContain("Markdown");
+      expect(p.toLowerCase()).toContain("where information lives");
+      expect(p).not.toContain("plain prose");
+    }
+  });
+
+  test("the frontier final rule leads with facts and allows Markdown lists", () => {
+    const p = frontierAdapter.renderPrompt({ ...base });
+    expect(p).toContain("leads with the facts found");
+    expect(p).toContain("Markdown");
+  });
+});

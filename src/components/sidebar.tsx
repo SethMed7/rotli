@@ -35,6 +35,7 @@ import {
   loadChatFolders,
   renameChatFolder,
   saveChatFolders,
+  setChatFolderOrder,
 } from "../services/chatFolders";
 import { buildStorageTree } from "../services/storageTree";
 import {
@@ -398,8 +399,13 @@ export function Sidebar() {
   const rawChatListData = useInstanceChats(activeMemex).data;
   // pinned chats float to the top (stable sort keeps the slug order within each
   // group) — the pin lives in the chat's own frontmatter (Seth #4, 2026-07-08)
+  // pinned float, then RECENCY (Seth, 2026-07-30: "most recent chats at top")
+  // — the disk listing's arbitrary order surfaced brand-new chats at the bottom
   const chatList = useMemo(
-    () => [...(rawChatListData ?? [])].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
+    () =>
+      [...(rawChatListData ?? [])].sort(
+        (a, b) => Number(b.pinned) - Number(a.pinned) || b.modifiedMs - a.modifiedMs,
+      ),
     [rawChatListData],
   );
   const chatRename = useChatRename();
@@ -445,14 +451,16 @@ export function Sidebar() {
   // the WKWebView shell). Dropping on a folder row assigns through the same
   // manifest write the row menu uses; anywhere else abandons. The dragged row
   // dims, the hovered folder tints, the title rides as a ghost. —
+  type ChatDrop =
+    { kind: "folder"; id: string } | { kind: "row"; slug: string; folderId: string; after: boolean };
   const [chatDragSlug, setChatDragSlug] = useState<string | null>(null);
-  const [chatDropFolder, setChatDropFolder] = useState<string | null>(null);
+  const [chatDrop, setChatDrop] = useState<ChatDrop | null>(null);
   const didChatDragRef = useRef(false);
   const startChatDrag = (e: ReactPointerEvent, slug: string, label: string) => {
     // button guard BEFORE the ref reset — a right-click must not clear the
     // last drag's click suppression (the session guards again internally)
     if (e.button !== 0 || !activeMemex) return;
-    let drop: string | null = null;
+    let drop: ChatDrop | null = null;
     didChatDragRef.current = false;
     createPointerDragSession(e, {
       ghost: (x, y) => createDragGhost(label, x, y),
@@ -462,26 +470,55 @@ export function Sidebar() {
         setChatDragSlug(slug);
       },
       onMove: (x, y) => {
-        const hit = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest(
-          "[data-chatfolder-id]",
-        ) as HTMLElement | null;
-        drop = hit?.dataset.chatfolderId ?? null;
-        setChatDropFolder(drop);
+        const el = document.elementFromPoint(x, y) as HTMLElement | null;
+        // an IN-FOLDER chat row is a POSITION target (reorder, Seth
+        // 2026-07-30); the folder row itself files at the end
+        const row = el?.closest("[data-chat-infolder]") as HTMLElement | null;
+        const rowSlug = row?.dataset.chatSlug;
+        const rowFolder = row?.dataset.chatInfolder;
+        if (row && rowSlug && rowFolder && rowSlug !== slug) {
+          const rect = row.getBoundingClientRect();
+          drop = {
+            kind: "row",
+            slug: rowSlug,
+            folderId: rowFolder,
+            after: rect.height === 0 ? true : y > rect.top + rect.height / 2,
+          };
+          setChatDrop(drop);
+          return;
+        }
+        const folderRow = el?.closest("[data-chatfolder-id]") as HTMLElement | null;
+        const folderId = folderRow?.dataset.chatfolderId;
+        drop = folderId ? { kind: "folder", id: folderId } : null;
+        setChatDrop(drop);
       },
       onDrop: () => {
         const d = drop;
         if (!d) return;
-        updateChatFolders((m) => assignChatToFolder(m, slug, d));
+        if (d.kind === "folder") {
+          updateChatFolders((m) => assignChatToFolder(m, slug, d.id));
+          return;
+        }
+        // reorder: rebuild the folder's RENDERED order with the dragged slug
+        // spliced beside the target, then commit assignment + order together
+        const group = groupedChats.folders.find(({ folder }) => folder.id === d.folderId);
+        const slugs = (group?.chats ?? []).map((c) => c.slug).filter((s) => s !== slug);
+        const at = slugs.indexOf(d.slug);
+        if (at < 0) return;
+        slugs.splice(d.after ? at + 1 : at, 0, slug);
+        updateChatFolders((m) =>
+          setChatFolderOrder(assignChatToFolder(m, slug, d.folderId), d.folderId, slugs),
+        );
       },
       onEnd: () => {
         setChatDragSlug(null);
-        setChatDropFolder(null);
+        setChatDrop(null);
       },
     });
   };
 
   // one chat row, shared by folder groups and the loose list below them
-  const renderChatRow = (c: (typeof chatList)[number], inFolder: boolean) =>
+  const renderChatRow = (c: (typeof chatList)[number], folderId: string | null) =>
     chatRename.renamingChatSlug === c.slug ? (
       <InlineRenameInput
         key={c.slug}
@@ -495,12 +532,20 @@ export function Sidebar() {
       <button
         type="button"
         key={c.slug}
+        data-chat-slug={c.slug}
+        data-chat-infolder={folderId ?? undefined}
         /* a chat row lights only while the PANES actually show it — never
            alongside an active All-chats (or other) view (Seth, 2026-07-30:
            two highlights at once read as wrong) */
-        className={`sb-chatrow${inFolder ? " in-folder" : ""}${
+        className={`sb-chatrow${folderId ? " in-folder" : ""}${
           contentView === "panes" && focusedChatSlug === c.slug ? " sel" : ""
-        }${chatDragSlug === c.slug ? " dragging" : ""}`}
+        }${chatDragSlug === c.slug ? " dragging" : ""}${
+          chatDrop?.kind === "row" && chatDrop.slug === c.slug
+            ? chatDrop.after
+              ? " mdrop-after"
+              : " mdrop-before"
+            : ""
+        }`}
         onPointerDown={(e) => startChatDrag(e, c.slug, c.title || c.slug)}
         onClick={() => {
           if (didChatDragRef.current) return;
@@ -1686,7 +1731,7 @@ export function Sidebar() {
                           <button
                             type="button"
                             className={`sb-chatrow sb-chatfolder-row${
-                              chatDropFolder === folder.id ? " chatdrop" : ""
+                              chatDrop?.kind === "folder" && chatDrop.id === folder.id ? " chatdrop" : ""
                             }`}
                             data-chatfolder-id={folder.id}
                             aria-expanded={open}
@@ -1723,11 +1768,11 @@ export function Sidebar() {
                             <span className="sb-chatfolder-n">{chats.length}</span>
                           </button>
                         )}
-                        {open && chats.map((c) => renderChatRow(c, true))}
+                        {open && chats.map((c) => renderChatRow(c, folder.id))}
                       </div>
                     );
                   })}
-                  {groupedChats.loose.slice(0, chatSidebarLimit).map((c) => renderChatRow(c, false))}
+                  {groupedChats.loose.slice(0, chatSidebarLimit).map((c) => renderChatRow(c, null))}
                 </>
               )}
               {groupedChats.loose.length > chatSidebarLimit && (

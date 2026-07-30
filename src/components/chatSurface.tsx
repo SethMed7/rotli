@@ -50,6 +50,12 @@ import {
 } from "../lib/tauri";
 import { fileName } from "../lib/fileKind";
 import { useTransientPopover } from "../lib/popover";
+import {
+  assignChatToFolder,
+  invalidateChatFolders,
+  loadChatFolders,
+  saveChatFolders,
+} from "../services/chatFolders";
 import { invalidateNotes, useNoteIndex } from "../services/hooks";
 import { type Measure } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
@@ -181,23 +187,6 @@ function SendGlyph() {
       aria-hidden="true"
     >
       <path d="M8 12.5v-9M4 7l4-3.5L12 7" />
-    </svg>
-  );
-}
-function SpinGlyph() {
-  return (
-    <svg
-      className="chat-send-spin"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M8 1.8a6.2 6.2 0 1 1-6.2 6.2" />
     </svg>
   );
 }
@@ -552,6 +541,21 @@ function ModelPicker({
   );
 }
 
+/** The processing vocabulary (Seth, 2026-07-30: "add something fun here") —
+ * quiet, warm, rotli-toned. The loop's generic "thinking…" statuses rotate
+ * through these; REAL tool statuses ("searching notes…") always win. */
+const THINK_WORDS = [
+  "thinking…",
+  "reading the shelves…",
+  "connecting dots…",
+  "flipping through notes…",
+  "following a hunch…",
+  "brewing an answer…",
+  "lining up the facts…",
+] as const;
+
+const isThinkWord = (s: string): boolean => (THINK_WORDS as readonly string[]).includes(s);
+
 /** Render an assistant message as light markdown: ``` fenced code → <pre>, every
  * other line via the editor's inline renderer (bold/italic/code/links), blank
  * lines kept as gaps. Source-of-truth stays the .md; this is display only. */
@@ -675,7 +679,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("thinking…");
+  const [status, setStatus] = useState<string>(THINK_WORDS[0]!);
   const [images, setImages] = useState<string[]>([]);
   const [visionHint, setVisionHint] = useState(false);
   // a failed chats/<slug>.md write — the thread still shows for this session,
@@ -695,8 +699,14 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const secureReadRef = useRef(false);
   const measureBtnRef = useRef<HTMLButtonElement>(null);
   const assetsBtnRef = useRef<HTMLButtonElement>(null);
-  // the live turn's cancel key (connected CLIs only — Rust kills the child)
+  // the live turn's cancel key (connected CLIs — Rust kills the child)
   const requestRef = useRef<string | null>(null);
+  // run sequence: Stop orphans the in-flight run — its late events and reply
+  // must land NOWHERE (the local lane can't abort the HTTP mid-generation;
+  // orphaning is the honest cancel: the UI is free, the result is discarded)
+  const runSeq = useRef(0);
+  // what Stop gives back to the composer — the sent prompt returns intact
+  const lastSentRef = useRef<{ text: string; images: string[] } | null>(null);
 
   const writable = active?.perms === "chats+inbox";
 
@@ -789,6 +799,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     }
     const userText = message.trim();
     const imgs = images;
+    lastSentRef.current = { text: userText, images: imgs };
     setMessage("");
     setImages([]);
     // history = the prior turns; the new user message rides as runAgent's userText
@@ -798,7 +809,8 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     }));
     setMessages((p) => [...p, { speaker: "you", text: userText }]);
     setBusy(true);
-    setStatus("thinking…");
+    setStatus(THINK_WORDS[0]!);
+    const myRun = ++runSeq.current;
 
     const requestId = crypto.randomUUID();
     requestRef.current = requestId;
@@ -842,12 +854,17 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     let reply = "";
     try {
       for await (const ev of events) {
-        if (ev.type === "status") setStatus(ev.text);
-        else if (ev.type === "final") reply = ev.text;
+        if (runSeq.current !== myRun) return; // stopped — discard everything late
+        if (ev.type === "status") {
+          // the loop's generic thinking beats join the rotating vocabulary;
+          // real tool statuses ("searching notes…") pass through untouched
+          setStatus(/^thinking…/.test(ev.text) ? nextThinkWord() : ev.text);
+        } else if (ev.type === "final") reply = ev.text;
       }
     } catch (e) {
       reply = `⚠ ${(e as Error)?.message ?? "the model failed"}`;
     }
+    if (runSeq.current !== myRun) return; // stopped mid-generation — the reply lands nowhere
     requestRef.current = null;
     setBusy(false);
 
@@ -920,6 +937,23 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }
         bindChat(paneId, res.slug); // this tab now IS that chat
+        // folder inheritance (Seth, 2026-07-30): a new chat opened FROM a
+        // foldered chat files itself into the same folder on first save.
+        // Best-effort — a manifest hiccup must never fail the send.
+        const originSlug = useUiStore.getState().newChatOrigin;
+        useUiStore.getState().setNewChatOrigin(null);
+        if (originSlug) {
+          try {
+            const manifest = await loadChatFolders(active);
+            const folderId = manifest.assignments[originSlug];
+            if (folderId) {
+              await saveChatFolders(active, assignChatToFolder(manifest, res.slug, folderId));
+              await invalidateChatFolders();
+            }
+          } catch {
+            /* the chat still saved — folder filing is recoverable by hand */
+          }
+        }
         if (globeOn) setChatWeb(res.slug, true); // carry the globe to the saved chat
         clearChatWeb(webKey); // the pane-scoped unsaved key is spent (#7)
         const m = chatMeasure[webKey];
@@ -932,6 +966,46 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       // persistence failed — the in-memory thread still shows for this session,
       // and the inline note below the thread says it won't survive a reload
       setSaveErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  /** Rotate the processing word (skipping index 0's plain "thinking…" cycle
+   * start is fine — it's in the pool). Pure ref-free pick off the clock. */
+  const thinkIdx = useRef(0);
+  const nextThinkWord = () => {
+    thinkIdx.current = (thinkIdx.current + 1) % THINK_WORDS.length;
+    return THINK_WORDS[thinkIdx.current]!;
+  };
+
+  // while busy AND showing a vocabulary word, amble to the next one every
+  // few seconds — a real tool status parks the rotation until the next beat.
+  // Rotation is inlined in the updater (not nextThinkWord) so the interval's
+  // closure holds nothing stale (Greptile, PR #17).
+  useEffect(() => {
+    if (!busy) return;
+    const t = setInterval(() => {
+      setStatus((s) => {
+        if (!isThinkWord(s)) return s;
+        thinkIdx.current = (thinkIdx.current + 1) % THINK_WORDS.length;
+        return THINK_WORDS[thinkIdx.current]!;
+      });
+    }, 2600);
+    return () => clearInterval(t);
+  }, [busy]);
+
+  /** Stop (Seth, 2026-07-30): orphan the run, kill any CLI child, and hand the
+   * prompt back to the composer — the optimistic user bubble comes off the
+   * thread since the turn will never be answered or persisted. */
+  const stopTurn = () => {
+    runSeq.current++;
+    if (requestRef.current) void cliCancel(requestRef.current).catch(() => {});
+    requestRef.current = null;
+    setBusy(false);
+    setMessages((p) => (p.length > 0 && p[p.length - 1]?.speaker === "you" ? p.slice(0, -1) : p));
+    const sent = lastSentRef.current;
+    if (sent) {
+      setMessage(sent.text);
+      setImages(sent.images);
     }
   };
 
@@ -1148,10 +1222,18 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                 {!chatSlug && (
                   <input
                     className="chat-input chat-title-input"
-                    placeholder="Chat title (optional)…"
+                    placeholder="Chat title (optional — ⏎ skips; your first message names it)…"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    onKeyDown={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      // ⏎ with nothing typed = "you name it": drop into the
+                      // composer; the first message titles the chat (deriveTitle)
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        msgRef.current?.focus();
+                      }
+                    }}
                   />
                 )}
                 {images.length > 0 && (
@@ -1268,29 +1350,23 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                       <ClipGlyph />
                     </button>
                     <span className="chat-box-grow" />
-                    {(() => {
-                      // connected CLIs (and presets, which may route to one)
-                      // cancel for real — Rust kills the child mid-step
-                      const cancellable = picked?.api === "cli" || picked?.api === "preset";
-                      return (
-                        <button
-                          type="button"
-                          className="chat-send"
-                          aria-label={busy && cancellable ? "Stop" : "Send"}
-                          title={busy && cancellable ? "Stop this reply" : undefined}
-                          disabled={busy ? !cancellable : !message.trim() || !picked}
-                          onClick={() => {
-                            if (busy) {
-                              if (requestRef.current) void cliCancel(requestRef.current).catch(() => {});
-                              return;
-                            }
-                            void send();
-                          }}
-                        >
-                          {busy ? cancellable ? <StopGlyph /> : <SpinGlyph /> : <SendGlyph />}
-                        </button>
-                      );
-                    })()}
+                    {/* EVERY lane stops now (Seth, 2026-07-30): CLIs die for
+                        real (Rust kills the child); the local lane orphans the
+                        run — the reply is discarded and the prompt returns to
+                        the composer either way */}
+                    <button
+                      type="button"
+                      className="chat-send"
+                      aria-label={busy ? "Stop" : "Send"}
+                      title={busy ? "Stop — cancel this reply and get the prompt back" : undefined}
+                      disabled={busy ? false : !message.trim() || !picked}
+                      onClick={() => {
+                        if (busy) stopTurn();
+                        else void send();
+                      }}
+                    >
+                      {busy ? <StopGlyph /> : <SendGlyph />}
+                    </button>
                   </div>
                 </div>
               </div>
