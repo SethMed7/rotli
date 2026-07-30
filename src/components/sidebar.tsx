@@ -636,7 +636,7 @@ export function Sidebar() {
         }}
         title={c.title || c.slug}
       >
-        <ChatGlyph size={13} />
+        <ChatGlyph size={14} />
         <span className="fname">{c.title || c.slug}</span>
         {c.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
       </button>
@@ -1645,7 +1645,7 @@ export function Sidebar() {
           {chatSecOpen && (
             <div className="sb-chat">
               <button type="button" className="sb-chatnew" onClick={openNewChat}>
-                <PlusGlyph size={13} />
+                <PlusGlyph size={14} />
                 <span>New chat</span>
               </button>
               <button
@@ -1655,7 +1655,7 @@ export function Sidebar() {
                 className={`sb-chatrow all${contentView === "allChats" ? " sel" : ""}`}
                 onClick={openAllChats}
               >
-                <SearchGlyph size={13} />
+                <SearchGlyph size={14} />
                 <span className="fname">All chats</span>
               </button>
               {!activeMemex ? (
@@ -1718,7 +1718,7 @@ export function Sidebar() {
                             <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
                               <ChevronRight size={10} />
                             </span>
-                            <FolderGlyph size={13} />
+                            <FolderGlyph size={14} />
                             <span className="fname">{folder.name}</span>
                             <span className="sb-chatfolder-n">{chats.length}</span>
                           </button>

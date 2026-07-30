@@ -563,13 +563,10 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 5px 10px 5px 16px;
+  padding: 5px 10px;
   font-size: 12.5px;
   color: var(--text-muted);
   cursor: default;
-}
-.sb-stub-row.acct {
-  padding-left: 14px;
 }
 .sb-stub-row svg {
   color: var(--text-muted);
@@ -642,7 +639,10 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 10px 6px 16px;
+  /* the ONE first-level row inset (consistency audit 2026-07-30): every row
+     under a section header starts at the tree's 10px base — chat rows sat
+     6px deeper than their Notes siblings for no reason */
+  padding: 6px 10px;
   border-radius: var(--r-control);
   font-size: 13px;
   color: var(--text);
@@ -656,22 +656,17 @@
   flex-direction: column;
   gap: 1px;
 }
-.sb-chatfolder-row .fname {
-  font-weight: 600;
-}
 .sb-chatfolder-n {
   margin-left: auto;
   font-size: 11px;
   color: var(--text-muted);
 }
-/* the folder row wears the Notes tree's disclosure grammar (chevron + tighter
-   gap so the glyph column matches); children indent past the chevron slot,
-   exactly the contentPad = rowPad + 18 rule the Main tree uses */
-.sb-chatfolder-row {
-  gap: 6px;
-}
+/* the folder row wears the Notes tree's exact disclosure grammar — shared
+   .fchev slot, shared gap, no bold (the chevron + glyph carry folder-ness,
+   same as Main's folders); children indent past the chevron slot, exactly
+   the contentPad = rowPad + 18 rule the Main tree uses */
 .sb-chatrow.in-folder {
-  padding-left: 34px;
+  padding-left: 28px;
 }
 /* drag-a-chat-into-a-folder feedback (Seth, 2026-07-30): the dragged row dims
    like a Main row; the hovered folder tints like an mdrop-into target */
@@ -685,7 +680,7 @@
 .sb-chatrename {
   width: 100%;
   margin: 0;
-  padding: 6px 10px 6px 16px;
+  padding: 6px 10px;
   border: 1px solid color-mix(in srgb, var(--accent-text) 45%, var(--border));
   border-radius: var(--r-control);
   background: var(--surface-2);
@@ -723,13 +718,17 @@
 .sb-chatrow:hover {
   background: var(--hov);
 }
-/* the open chat is the active row — the same calm accent wash the note tree
-   uses for a selected folder (kept distinct from the open-note pill). */
-.sb-chatrow.sel {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+/* the OPEN chat rides the ONE active-item state — the same solid accent pill
+   the open note wears (consistency audit 2026-07-30; the old 10% wash cited a
+   "selected folder wash" the tree retired in the one-active-state redesign) */
+.sb-chatrow.sel,
+.sb-chatrow.sel:hover {
+  background: var(--accent);
+  color: var(--on-accent);
 }
-.sb-chatrow.sel svg {
-  color: var(--accent-text);
+.sb-chatrow.sel svg,
+.sb-chatrow.sel .sb-chatpin {
+  color: var(--on-accent);
 }
 .sb-chat-empty,
 .sb-chat-more {
@@ -739,11 +738,15 @@
   font: inherit;
   font-size: 12px;
   color: var(--text-muted);
-  padding: 6px 10px 6px 16px;
+  padding: 6px 10px;
+  border-radius: var(--r-control);
   cursor: pointer;
 }
+/* interactive rows share ONE hover grammar: the --hov wash (audit 2026-07-30;
+   these two darkened their text only, unlike every sibling row) */
 .sb-chat-empty:hover,
 .sb-chat-more:hover {
+  background: var(--hov);
   color: var(--text);
 }
 
