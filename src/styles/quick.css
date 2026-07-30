@@ -59,59 +59,6 @@
   color: var(--accent-text);
 }
 
-/* — the switcher: ‹ title  i/n ›  ✕ — */
-.quick-switch {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-}
-.qsw-arrow,
-.qsw-x {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: none;
-  background: none;
-  border-radius: var(--r-control);
-  color: var(--text-muted);
-  cursor: pointer;
-  flex: 0 0 auto;
-  transition: background var(--motion-exit) var(--motion-ease);
-}
-.qsw-arrow:hover:not(:disabled),
-.qsw-x:hover {
-  background: var(--hov);
-  color: var(--text);
-}
-.qsw-arrow:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-.qsw-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-.qsw-count {
-  flex: 0 0 auto;
-  font-size: 11px;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.qsw-grow {
-  flex: 1;
-}
-
 /* — empty-state voices (the container is the shared .list-empty) — */
 .qe-title {
   font-family: var(--font-display);
@@ -334,7 +281,4 @@
 /* — the reused editor, tightened for the narrow card — */
 body[data-surface="quick"] .ed-head {
   padding: 12px 20px 0;
-}
-body[data-surface="quick"] .ed-body {
-  padding: 8px 22px 86px;
 }

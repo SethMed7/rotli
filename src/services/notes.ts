@@ -15,7 +15,7 @@ import { DEST, isChats, isHidden, isRootMarker, isSink, isTrash, isVault } from 
  * "vault:chats/…" counts as Chat-front transcripts here, exactly like fs mode
  * with a plain corpus + a connected brain. */
 const MEMEX_MARKERS: ReadonlySet<string> = new Set([DEST.vault]);
-import { snippetOf, titleOf } from "./derive";
+import { snippetOf, summaryOrder, titleOf } from "./derive";
 import { FsNotesService } from "./fsNotes";
 import { searchMatch, sortHits } from "./search";
 import type { NoteCreationPolicy } from "../security/secureNotes";
@@ -100,13 +100,7 @@ export class InMemoryNotesService implements NotesService {
       return all
         .filter((n) => n.folderId.startsWith(folderId))
         .map(({ body: _body, ...summary }) => summary)
-        .sort((a, b) =>
-          a.pinned !== b.pinned
-            ? a.pinned
-              ? -1
-              : 1
-            : b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-        );
+        .sort(summaryOrder);
     }
     const within = folderId ? this.descendants(folderId) : null; // once, not per note
     let scoped: Note[];
@@ -118,15 +112,7 @@ export class InMemoryNotesService implements NotesService {
       );
     else if (folderId && isHidden(folderId)) scoped = all.filter((n) => within.has(n.folderId));
     else scoped = all.filter((n) => within.has(n.folderId) && !isHidden(n.folderId));
-    return scoped
-      .map(({ body: _body, ...summary }) => summary)
-      .sort((a, b) =>
-        a.pinned !== b.pinned
-          ? a.pinned
-            ? -1
-            : 1
-          : b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-      );
+    return scoped.map(({ body: _body, ...summary }) => summary).sort(summaryOrder);
   }
 
   /** The browser twin of Rust corpus_search: same scope (never Trash, never

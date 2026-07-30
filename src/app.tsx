@@ -12,15 +12,14 @@ import "./styles/memex.css";
 import "./styles/breve.css";
 import "@excalidraw/excalidraw/index.css";
 import "./styles/canvas.css";
+import { Suspense, lazy } from "react";
 import { CaptureCard } from "./components/captureCard";
 import { NotesSurface } from "./components/notesSurface";
-import { Onboarding } from "./components/onboarding";
 import { Palette } from "./components/palette";
 import { PreviewModal } from "./components/previewModal";
 import { ContextMenu } from "./components/contextMenu";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
-import { SettingsSurface } from "./components/settingsSurface";
 import { Titlebar } from "./components/titlebar";
 import { WhichKey } from "./components/whichKey";
 import { registerDefaultActions } from "./keys/actions";
@@ -61,18 +60,34 @@ import { hydrateViews } from "./state/views";
 import { useMemexStore } from "./state/memex";
 import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateJournal, invalidateNotes } from "./services/hooks";
+import { queryClient } from "./services/query";
 import { notesService } from "./services/notes";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
 import { applyQuickState } from "./state/quick";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./state/theme";
 import { useUiStore } from "./state/ui";
 
+// Settings and Onboarding are full-surface fronts most sessions never (or
+// once) open — split them off the entry chunk like paneTree's CanvasSurface
+// (perf audit 2026-07-30, #18). Suspense falls back to nothing for a frame.
+const SettingsSurface = lazy(() =>
+  import("./components/settingsSurface").then((m) => ({ default: m.SettingsSurface })),
+);
+const Onboarding = lazy(() => import("./components/onboarding").then((m) => ({ default: m.Onboarding })));
+
 registerDefaultActions();
 
 if (import.meta.env.DEV) {
-  // Review automation can drive any registry action: __rotli.dispatch("palette.toggle")
-  (window as Window & { __rotli?: { dispatch: (actionId: string) => void } }).__rotli = {
+  // Review automation can drive any registry action (__rotli.dispatch) and
+  // observe cache behavior (__rotli.queryClient — the e2e proof that typing
+  // no longer refetches the notes universe, audit 2026-07-30 #1).
+  (
+    window as Window & {
+      __rotli?: { dispatch: (actionId: string) => void; queryClient: typeof queryClient };
+    }
+  ).__rotli = {
     dispatch,
+    queryClient,
   };
 }
 
@@ -270,9 +285,10 @@ function MainShell() {
         await Promise.all(toStorage.map((p) => corpusImportFile("default", p)));
       }
       if (view && images.length) {
+        // import together, insert in drop order (audit 2026-07-30, batch half)
+        const wires = await Promise.all(images.map((p) => corpusImportFile("default", p)));
         let insert = "";
-        for (const p of images) {
-          const wire = await corpusImportFile("default", p);
+        for (const wire of wires) {
           if (wire) insert += `\n![](storage:${wire.replace(/^storage\//i, "")})\n`;
         }
         if (insert) {
@@ -362,43 +378,45 @@ function MainShell() {
   if (showOnboarding) {
     return (
       <div className="app-window">
-        <Onboarding
-          onDone={() => {
-            setOnboarded(true);
-            setOnboardingVersion(APP_VERSION);
-            // apply the deferred window choices now (changing them live during
-            // onboarding can kill the frameless window — #1)
-            const ui = useUiStore.getState();
-            void setHideOnBlur(!ui.stayOpen);
-            void setDockVisible(ui.showInDock);
-            // commit the deferred brain choice from the "Your brain" step: "use"
-            // adopts an existing memex AS the corpus, "init" scaffolds a new one.
-            // Both RELAUNCH, so flush `onboarded` to disk FIRST or first-run loops
-            // back into onboarding (the 500 ms debounced writer wouldn't fire in time).
-            const choice = useMemexStore.getState().pendingChoice;
-            useMemexStore.getState().setPendingChoice(null);
-            // "keep" (the pre-seeded re-onboard default, #12) deliberately
-            // commits NOTHING — the corpus stays exactly where it is.
-            if (choice?.kind === "practice") {
-              // the practice vault (2026-07-26): settings flush first so the
-              // Librarian-vs-raw pick rides along (carry_settings), then Rust
-              // scaffolds the scratch vault, registers the outgoing vault as a
-              // connected library, and relaunches — no existing file touched
-              void flushSettingsNow()
-                .then(() => createPracticeVault())
-                .catch(() => {});
-            } else if (choice?.path && (choice.kind === "use" || choice.kind === "init")) {
-              const path = choice.path;
-              const kind = choice.kind;
-              void flushSettingsNow()
-                .then(async () => {
-                  if (kind === "init") await initMemexAsCorpus(path);
-                  else await chooseFolder(path);
-                })
-                .catch(() => {});
-            }
-          }}
-        />
+        <Suspense fallback={null}>
+          <Onboarding
+            onDone={() => {
+              setOnboarded(true);
+              setOnboardingVersion(APP_VERSION);
+              // apply the deferred window choices now (changing them live during
+              // onboarding can kill the frameless window — #1)
+              const ui = useUiStore.getState();
+              void setHideOnBlur(!ui.stayOpen);
+              void setDockVisible(ui.showInDock);
+              // commit the deferred brain choice from the "Your brain" step: "use"
+              // adopts an existing memex AS the corpus, "init" scaffolds a new one.
+              // Both RELAUNCH, so flush `onboarded` to disk FIRST or first-run loops
+              // back into onboarding (the 500 ms debounced writer wouldn't fire in time).
+              const choice = useMemexStore.getState().pendingChoice;
+              useMemexStore.getState().setPendingChoice(null);
+              // "keep" (the pre-seeded re-onboard default, #12) deliberately
+              // commits NOTHING — the corpus stays exactly where it is.
+              if (choice?.kind === "practice") {
+                // the practice vault (2026-07-26): settings flush first so the
+                // Librarian-vs-raw pick rides along (carry_settings), then Rust
+                // scaffolds the scratch vault, registers the outgoing vault as a
+                // connected library, and relaunches — no existing file touched
+                void flushSettingsNow()
+                  .then(() => createPracticeVault())
+                  .catch(() => {});
+              } else if (choice?.path && (choice.kind === "use" || choice.kind === "init")) {
+                const path = choice.path;
+                const kind = choice.kind;
+                void flushSettingsNow()
+                  .then(async () => {
+                    if (kind === "init") await initMemexAsCorpus(path);
+                    else await chooseFolder(path);
+                  })
+                  .catch(() => {});
+              }
+            }}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -411,7 +429,13 @@ function MainShell() {
             Recent all render inside NotesSurface's content area (contentView), so
             the three left-menu sections stay visible (Seth, 2026-06-26). Memory is
             no longer a front — the brain is browsed via the Vault tree (2026-06-28). */}
-        {settingsOpen ? <SettingsSurface /> : <NotesSurface />}
+        {settingsOpen ? (
+          <Suspense fallback={null}>
+            <SettingsSurface />
+          </Suspense>
+        ) : (
+          <NotesSurface />
+        )}
       </main>
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
       <PreviewModal />

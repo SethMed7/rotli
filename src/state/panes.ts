@@ -1027,18 +1027,6 @@ export function useFocusedNoteId(): string | null {
   });
 }
 
-/** The canvas companion: the focused pane's active board id, or null when the
- * active tab is a note. The Sidebar's board rows light up against this so a
- * board reads "open" the same way a note does (the .sel pill is canvas-aware). */
-export function useFocusedBoardId(): string | null {
-  return usePanesStore((s) => {
-    const leaf = findLeaf(s.root, s.focusedPaneId) ?? leaves(s.root)[0];
-    if (!leaf) return null;
-    const tab = leaf.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf.tabs[0];
-    return tab && tab.surfaceKind === "canvas" ? tab.boardId : null;
-  });
-}
-
 /** The focused pane's active TAB itself (a stable reference from the tree — safe
  * as a zustand selector). The Sidebar derives the destination highlight from
  * where this tab's content actually lives (Seth #1, 2026-07-08). */

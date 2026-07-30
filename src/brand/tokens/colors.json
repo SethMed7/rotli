@@ -42,15 +42,63 @@
   "contrast": {
     "note": "WCAG 2.1 relative-luminance contrast ratios, computed for the rotli palette (target: AA 4.5 normal / 3.0 large+UI). Clay and Olive are mid-tone: as FILLS or LARGE/UI they pass; as SMALL TEXT on light, use the derived clay-text/olive-text. Recompute with svgshot/a real checker before freeze.",
     "pairs": [
-      { "fg": "#3A3028", "bg": "#F8F2E9", "ratio": 11.55, "use": "cocoa body text on linen ground", "pass": "AAA" },
+      {
+        "fg": "#3A3028",
+        "bg": "#F8F2E9",
+        "ratio": 11.55,
+        "use": "cocoa body text on linen ground",
+        "pass": "AAA"
+      },
       { "fg": "#6E6155", "bg": "#F8F2E9", "ratio": 5.38, "use": "muted text on linen", "pass": "AA" },
-      { "fg": "#8F4E37", "bg": "#F8F2E9", "ratio": 5.70, "use": "clay accent text/links on linen (derived)", "pass": "AA" },
-      { "fg": "#5F6B49", "bg": "#F8F2E9", "ratio": 5.12, "use": "olive text on linen (derived)", "pass": "AA" },
-      { "fg": "#C97E62", "bg": "#F8F2E9", "ratio": 2.84, "use": "raw clay text on linen — TOO LOW for small text", "pass": "fail-small (use #8F4E37)" },
-      { "fg": "#FFFFFF", "bg": "#C97E62", "ratio": 3.16, "use": "white on a clay fill (button)", "pass": "AA-large/UI only" },
-      { "fg": "#3A3028", "bg": "#C97E62", "ratio": 4.07, "use": "cocoa on a clay fill", "pass": "AA-large (near AA)" },
-      { "fg": "#8D9A76", "bg": "#F8F2E9", "ratio": 2.69, "use": "raw olive on linen — TOO LOW for small text", "pass": "fail-small (use #5F6B49)" },
-      { "fg": "#F1E7DA", "bg": "#241D18", "ratio": 13.6, "use": "body text on dark cocoa ground", "pass": "AAA" },
+      {
+        "fg": "#8F4E37",
+        "bg": "#F8F2E9",
+        "ratio": 5.7,
+        "use": "clay accent text/links on linen (derived)",
+        "pass": "AA"
+      },
+      {
+        "fg": "#5F6B49",
+        "bg": "#F8F2E9",
+        "ratio": 5.12,
+        "use": "olive text on linen (derived)",
+        "pass": "AA"
+      },
+      {
+        "fg": "#C97E62",
+        "bg": "#F8F2E9",
+        "ratio": 2.84,
+        "use": "raw clay text on linen — TOO LOW for small text",
+        "pass": "fail-small (use #8F4E37)"
+      },
+      {
+        "fg": "#FFFFFF",
+        "bg": "#C97E62",
+        "ratio": 3.16,
+        "use": "white on a clay fill (button)",
+        "pass": "AA-large/UI only"
+      },
+      {
+        "fg": "#3A3028",
+        "bg": "#C97E62",
+        "ratio": 4.07,
+        "use": "cocoa on a clay fill",
+        "pass": "AA-large (near AA)"
+      },
+      {
+        "fg": "#8D9A76",
+        "bg": "#F8F2E9",
+        "ratio": 2.69,
+        "use": "raw olive on linen — TOO LOW for small text",
+        "pass": "fail-small (use #5F6B49)"
+      },
+      {
+        "fg": "#F1E7DA",
+        "bg": "#241D18",
+        "ratio": 13.6,
+        "use": "body text on dark cocoa ground",
+        "pass": "AAA"
+      },
       { "fg": "#B7A593", "bg": "#241D18", "ratio": 6.98, "use": "muted text on dark", "pass": "AA" },
       { "fg": "#C97E62", "bg": "#241D18", "ratio": 5.26, "use": "clay accent text on dark", "pass": "AA" },
       { "fg": "#8D9A76", "bg": "#241D18", "ratio": 5.55, "use": "olive accent text on dark", "pass": "AA" }

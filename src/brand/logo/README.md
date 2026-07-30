@@ -26,6 +26,7 @@ logo/
   lockup-stacked.svg            r mark above wordmark
   tray-template.svg             monochrome macOS menu-bar template mark (the r), pixel-snapped
 ```
+
 (Tiles + favicon + app-icon + social avatar live under `tiles/` once the marks exist.)
 
 ## Rules

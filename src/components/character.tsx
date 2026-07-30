@@ -4,66 +4,30 @@
 // Each vendored SVG is a single `currentColor` path, so the LINE color follows
 // the theme (set `color` on the wrapper) while the SHAPE stays constant — exactly
 // Seth's rule (2026-06-26). The mark (upper-body quokka) is the in-app logo.
+//
+// The full-size poses live in characterArt.ts behind a dynamic import (perf
+// audit 2026-07-30, #6: ~450 KB of inlined markup was 29% of the entry chunk).
+// They stay ?raw inline SVG — tinting survives; only the LOADING moved. The
+// wrapper span reserves its box, so the one async tick never shifts layout.
+// The bold logo mark stays eager: it's ~6 KB and sits in the titlebar at
+// first paint.
 
-// the bold-body mark: only the body+ears carry a thick stroke (eyes/nose/mouth stay
-// crisp), so the lone mark reads clearly at tiny chrome sizes — tray + titlebar
-// (Seth, 2026-06-27). The full-size characters keep the plain line weight.
-//
-// Re-vendored 2026-07-02: the original export's FILENAMES were rotated one pose
-// off (base showed the shield, stays_local the easel, …) — each file now carries
-// the pose its name claims: base = plain standing · notes = notepad+pencil ·
-// ai_chat = laptop+speech bubble · inbox = envelope · excalidraw_board = easel ·
-// knowledge_system = files+org tree · stays_local = shield+padlock. Same pass
-// doubled the eye-highlight holes (17→34 viewBox units) so the eyes read as eyes
-// with a catchlight instead of blobs at empty-state sizes; and a derived `rest`
-// pose (closed eyes, same line grammar) joined the set for quiet empty states.
-//
-// waving / searching / celebrating (2026-07-02): three NEW poses generated with
-// gpt-image-2 against the base as a style reference, binarized, and potrace'd
-// back to single-path currentColor vectors — same character, same line weight.
-// waving greets on onboarding's welcome; celebrating closes it; searching is
-// reserved for a future search surface (transient "no matches" states stay
-// art-free by the placement law).
+import { useEffect, useState } from "react";
 import logoMark from "../assets/characters/_logo-bold.svg?raw";
-import aiChat from "../assets/characters/ai_chat.svg?raw";
-import base from "../assets/characters/base.svg?raw";
-import board from "../assets/characters/excalidraw_board.svg?raw";
-import celebrating from "../assets/characters/celebrating.svg?raw";
-import inbox from "../assets/characters/inbox.svg?raw";
-import knowledge from "../assets/characters/knowledge_system.svg?raw";
-import notes from "../assets/characters/notes.svg?raw";
-import rest from "../assets/characters/rest.svg?raw";
-import searching from "../assets/characters/searching.svg?raw";
-import staysLocal from "../assets/characters/stays_local.svg?raw";
-import waving from "../assets/characters/waving.svg?raw";
+import type { CharacterName } from "./characterArt";
 
-/** Each character maps to a part of the app (used in that surface's empty state). */
-export type CharacterName =
-  | "base"
-  | "notes"
-  | "chat"
-  | "inbox"
-  | "board"
-  | "knowledge"
-  | "local"
-  | "rest"
-  | "waving"
-  | "searching"
-  | "celebrating";
+export type { CharacterName } from "./characterArt";
 
-const SVGS: Record<CharacterName, string> = {
-  base,
-  notes,
-  chat: aiChat,
-  inbox,
-  board,
-  knowledge,
-  local: staysLocal,
-  rest,
-  waving,
-  searching,
-  celebrating,
-};
+let artCache: Record<CharacterName, string> | null = null;
+let artPromise: Promise<Record<CharacterName, string>> | null = null;
+
+function loadArt(): Promise<Record<CharacterName, string>> {
+  artPromise ??= import("./characterArt").then((m) => {
+    artCache = m.SVGS;
+    return m.SVGS;
+  });
+  return artPromise;
+}
 
 interface CharacterProps {
   name: CharacterName;
@@ -74,12 +38,23 @@ interface CharacterProps {
 /** A quokka character illustration. Inherits `color` for its line color (so a
  * parent can tune it per theme/surface); defaults to the surface text color. */
 export function Character({ name, size = 120, className }: CharacterProps) {
+  const [art, setArt] = useState(artCache);
+  useEffect(() => {
+    if (art) return;
+    let live = true;
+    void loadArt().then((a) => {
+      if (live) setArt(a);
+    });
+    return () => {
+      live = false;
+    };
+  }, [art]);
   return (
     <span
       className={className ? `quokka ${className}` : "quokka"}
       style={{ width: size, height: size }}
       aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: SVGS[name] }}
+      dangerouslySetInnerHTML={{ __html: art?.[name] ?? "" }}
     />
   );
 }

@@ -16,6 +16,7 @@ import {
   secureRepairScan,
 } from "../lib/tauri";
 import { readJournal } from "./brainJournalStore";
+import { summaryOrder } from "./derive";
 import { DEST, isChats, isChatsPath, isSink } from "./destinations";
 import { memexRootMarkers } from "./fsNotes";
 import { trashVirtualFolderItems } from "./folderTrash";
@@ -23,7 +24,7 @@ import { notesService } from "./notes";
 import { queryClient } from "./query";
 import { archiveNoteWithImages, trashNoteWithImages } from "./noteLifecycle";
 import { useUiStore } from "../state/ui";
-import type { NoteSummary } from "../types";
+import type { Note, NoteSummary } from "../types";
 
 /** Surface a lifecycle failure inline instead of swallowing it — the memex write
  * gate can refuse a move, and a silent rejection reads as "nothing happened"
@@ -218,6 +219,48 @@ export async function invalidateNotes(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: ["note"] });
   // a body edit can add/complete checkboxes — the Tasks projection re-derives
   await queryClient.invalidateQueries({ queryKey: keys.tasks });
+}
+
+/** Scoped cache refresh after ONE note's body sync — the editor's 400ms tick.
+ * invalidateNotes() here fanned into ~9 uncached full-vault walks per tick
+ * (perf audit 2026-07-30, #1): with staleTime ∞, invalidating ["notes"]
+ * refetches every mounted listing, and each listing is a corpus_list walk.
+ * A body sync already HAS the fresh note — so patch it into the caches
+ * directly: zero refetches, zero walks. Structural ops (create/move/trash/
+ * restore/external change) still use invalidateNotes().
+ *
+ * List caches are touched ONLY when a row would visibly change (title,
+ * snippet, pin, or the updatedAt label drifting past a minute) — steady
+ * mid-body typing leaves every list identity untouched, so useNoteIndex,
+ * TabStrip, and the note lists don't re-derive per tick. */
+export function applyNoteWrite(note: Note, opts?: { tasksChanged?: boolean }): Promise<void> {
+  const { body: _body, ...summary } = note;
+  queryClient.setQueryData(keys.note(note.id), note);
+  const entries = queryClient.getQueriesData<NoteSummary[]>({ queryKey: ["notes"] });
+  // judge rowChanged against the FRESHEST cached copy across every list — if
+  // caches ever diverged (an interrupted earlier patch), the stalest copy must
+  // not answer "nothing changed" for the rest (Greptile, PR #13)
+  let cached: NoteSummary | undefined;
+  for (const [, data] of entries) {
+    const hit = data?.find((n) => n.id === note.id);
+    if (hit && (!cached || hit.updatedAt > cached.updatedAt)) cached = hit;
+  }
+  const rowChanged =
+    !!cached &&
+    (cached.title !== summary.title ||
+      cached.snippet !== summary.snippet ||
+      cached.pinned !== summary.pinned ||
+      Math.abs(summary.updatedAt - cached.updatedAt) >= 60_000);
+  if (rowChanged) {
+    for (const [key, data] of entries) {
+      if (!data?.some((n) => n.id === note.id)) continue;
+      const next = data.map((n) => (n.id === note.id ? { ...n, ...summary } : n)).sort(summaryOrder);
+      queryClient.setQueryData(key, next);
+    }
+  }
+  // a checkbox add/toggle re-derives the Tasks projection; anything else skips
+  // the corpus_tasks walk entirely
+  return opts?.tasksChanged ? queryClient.invalidateQueries({ queryKey: keys.tasks }) : Promise.resolve();
 }
 
 export async function invalidateFolders(): Promise<void> {

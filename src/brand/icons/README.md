@@ -6,19 +6,19 @@ tilted rounded tag; Settings rebuilt segmented; dark olive lifted). Replaces the
 
 ## The set — 11 symbols, re-cut to module truth
 
-| id | Name | Accent |
-|---|---|---|
-| `rotli-notes` | Notes (module) | clay first line |
-| `rotli-chat` | Chat (module) | clay center line |
-| `rotli-voice` | Voice (module) | clay dot in the capsule |
-| `rotli-memory` | the Memory (module) | clay center seam |
-| `rotli-inbox` | Inbox (module) | clay unread dot |
-| `rotli-board` | Board (module) | one clay-filled tile |
-| `rotli-capture` | Quick capture | clay plus |
-| `rotli-tags` | Tags | clay dot at the eyelet |
-| `rotli-search` | Search | — |
-| `rotli-sync` | Sync | clay + olive pair (the one two-hue exception — it IS the semantic) |
-| `rotli-settings` | Settings | one clay knob |
+| id               | Name                | Accent                                                             |
+| ---------------- | ------------------- | ------------------------------------------------------------------ |
+| `rotli-notes`    | Notes (module)      | clay first line                                                    |
+| `rotli-chat`     | Chat (module)       | clay center line                                                   |
+| `rotli-voice`    | Voice (module)      | clay dot in the capsule                                            |
+| `rotli-memory`   | the Memory (module) | clay center seam                                                   |
+| `rotli-inbox`    | Inbox (module)      | clay unread dot                                                    |
+| `rotli-board`    | Board (module)      | one clay-filled tile                                               |
+| `rotli-capture`  | Quick capture       | clay plus                                                          |
+| `rotli-tags`     | Tags                | clay dot at the eyelet                                             |
+| `rotli-search`   | Search              | —                                                                  |
+| `rotli-sync`     | Sync                | clay + olive pair (the one two-hue exception — it IS the semantic) |
+| `rotli-settings` | Settings            | one clay knob                                                      |
 
 ## Family law
 

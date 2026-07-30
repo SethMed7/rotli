@@ -689,13 +689,6 @@ export async function corpusWriteFileBytes(id: string, base64: string, bak = fal
   await invoke("corpus_write_file_bytes", { id, base64, bak });
 }
 
-/** Create a NEW file from base64 bytes in `folderId` (collision-safe) — the
- * csv → xlsx convert. Returns the new file's wire id. "" outside Tauri. */
-export async function corpusNewFileBytes(folderId: string, name: string, base64: string): Promise<string> {
-  if (!isTauri()) return "";
-  return invoke<string>("corpus_new_file_bytes", { folderId, name, base64 });
-}
-
 /** Create a Rotli-owned .xlsx/.docx in its managed storage lane. */
 export async function corpusCreateManagedFile(name: string, base64: string): Promise<string> {
   if (!isTauri()) return "";
@@ -765,12 +758,6 @@ export async function corpusSetLocked(id: string, locked: boolean): Promise<void
 export async function corpusSetPinned(id: string, pinned: boolean): Promise<void> {
   if (!isTauri()) return;
   await invoke("corpus_set_pinned", { id, pinned });
-}
-
-/** Set or (empty value) remove a foreign frontmatter field — the metadata editor. */
-export async function corpusSetField(id: string, key: string, value: string): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("corpus_set_field", { id, key, value });
 }
 
 /** The note's frontmatter as RAW TEXT (fences included), byte-exact from disk —

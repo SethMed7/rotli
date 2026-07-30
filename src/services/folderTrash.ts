@@ -19,16 +19,16 @@ export async function trashVirtualFolderItems(
     throw new Error("one or more files are read-only; nothing was moved");
   }
 
+  // independent moves ride together (audit 2026-07-30, batch half) — the
+  // per-item accounting below is identical to the old serial loop's
+  const results = await Promise.allSettled(
+    items.map((item) => (item.kind === "file" ? ports.moveFile(item.id, "Trash") : ports.trashNote(item.id))),
+  );
   let moved = 0;
   const failures: string[] = [];
-  for (const item of items) {
-    try {
-      if (item.kind === "file") await ports.moveFile(item.id, "Trash");
-      else await ports.trashNote(item.id);
-      moved += 1;
-    } catch (error) {
-      failures.push(error instanceof Error ? error.message : String(error));
-    }
+  for (const result of results) {
+    if (result.status === "fulfilled") moved += 1;
+    else failures.push(result.reason instanceof Error ? result.reason.message : String(result.reason));
   }
   if (failures.length) {
     throw new Error(`${moved} of ${items.length} items moved; ${failures.length} failed (${failures[0]})`);

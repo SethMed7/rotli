@@ -6,10 +6,11 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 import { onQuitFlush } from "../lib/quitFlush";
-import { invalidateNotes } from "../services/hooks";
+import { applyNoteWrite } from "../services/hooks";
 import { markNoteDraftChanged } from "../services/noteDrafts";
 import { keepTabsFor } from "../state/panes";
 import { notesService } from "../services/notes";
+import type { Note } from "../types";
 
 const SYNC_DEBOUNCE_MS = 400;
 // a failed write retries on its own — waiting for the next keystroke would
@@ -22,11 +23,23 @@ const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
 // The one write funnel syncNow uses — swappable so tests can simulate the disk
 // failing (the in-memory test service can't fail any other way).
-let writeNoteBody: (noteId: string, body: string) => Promise<unknown> = (noteId, body) =>
+let writeNoteBody: (noteId: string, body: string) => Promise<Note | void> = (noteId, body) =>
   notesService.updateNote(noteId, body);
 
 export function setWriteNoteBodyForTests(fn: typeof writeNoteBody | null): void {
   writeNoteBody = fn ?? ((noteId, body) => notesService.updateNote(noteId, body));
+}
+
+// ——— checkbox signature: the Tasks projection walks the corpus (corpus_tasks),
+// so a body sync invalidates it ONLY when the note's checkbox lines actually
+// changed — steady typing never pays that walk (perf audit 2026-07-30, #4/#5).
+const TASK_LINE = /^\s*[-*+]\s+\[[ xX]\]/;
+const taskSigs = new Map<string, string>();
+
+function taskSignature(lines: readonly string[]): string {
+  let sig = "";
+  for (const line of lines) if (TASK_LINE.test(line)) sig += `${line}\n`;
+  return sig;
 }
 
 // ——— the olive-dot grammar: muted while a debounced sync is pending or in
@@ -96,7 +109,10 @@ export function useDocumentSaveError(noteId: string): string | null {
 /** Seed the buffer from the service body. No-op if the note is already open
  * somewhere — the live buffer is the truth, never the (possibly stale) query. */
 export function ensureDocument(noteId: string, body: string): void {
-  if (!docs.has(noteId)) docs.set(noteId, body.split("\n"));
+  if (docs.has(noteId)) return;
+  const lines = body.split("\n");
+  docs.set(noteId, lines);
+  taskSigs.set(noteId, taskSignature(lines));
 }
 
 /** Replace a CLEAN buffer with disk truth (external edit / agent write). No-op
@@ -108,6 +124,7 @@ export function reloadDocumentIfClean(noteId: string, body: string): void {
   const cur = docs.get(noteId);
   if (cur && cur.length === next.length && cur.every((l, i) => l === next[i])) return;
   docs.set(noteId, next);
+  taskSigs.set(noteId, taskSignature(next));
   const set = subs.get(noteId);
   if (set) for (const fn of set) fn();
 }
@@ -120,6 +137,7 @@ export function evictDocument(noteId: string): void {
   if (pending !== undefined) clearTimeout(pending);
   timers.delete(noteId);
   docs.delete(noteId);
+  taskSigs.delete(noteId);
   setDirty(noteId, false);
   setSaveError(noteId, null);
   const set = subs.get(noteId);
@@ -146,11 +164,19 @@ function syncNow(noteId: string): Promise<void> {
   const lines = docs.get(noteId);
   if (!lines) return Promise.resolve();
   return writeNoteBody(noteId, lines.join("\n"))
-    .then(() => {
+    .then((note) => {
       setSaveError(noteId, null);
       // saved — unless newer keystrokes already queued the next sync
       if (!timers.has(noteId)) setDirty(noteId, false);
-      return invalidateNotes();
+      if (!note) return; // test stub — no cache to patch
+      // SCOPED refresh (audit 2026-07-30, #1): patch the fresh note into the
+      // caches instead of invalidating ["notes"] — that fanned into ~9
+      // main-thread corpus walks per 400ms typing tick. Tasks re-derive only
+      // when the checkbox lines changed.
+      const sig = taskSignature(lines);
+      const tasksChanged = taskSigs.get(noteId) !== sig;
+      taskSigs.set(noteId, sig);
+      return applyNoteWrite(note, { tasksChanged });
     })
     .catch((err: unknown) => {
       // the note is gone (deleted with a pending sync): drop the orphan buffer.

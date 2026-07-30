@@ -970,7 +970,10 @@
 }
 .rotli-mermaid-inspector > header span {
   color: var(--text-muted);
-  font: 11px/1.2 ui-monospace, Menlo, monospace;
+  font:
+    11px/1.2 ui-monospace,
+    Menlo,
+    monospace;
 }
 .rotli-mermaid-inspector-fields {
   display: flex;

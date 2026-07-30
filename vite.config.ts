@@ -24,6 +24,14 @@ export default defineConfig(async () => ({
     __APP_VERSION__: JSON.stringify(appVersion),
   },
 
+  // katex reaches the graph twice — our blockRender import and
+  // mermaid-to-excalidraw's own dependency — and without dedupe Rollup shipped
+  // two identical 260 KB chunks that BOTH loaded at runtime (perf audit
+  // 2026-07-30, #7). One resolved copy = one chunk.
+  resolve: {
+    dedupe: ["katex"],
+  },
+
   build: {
     // Optional editors (Univer, Excalidraw, Mermaid, exceljs) are intentionally
     // lazy and much larger than the startup graph. Replace Vite's one-size-fits-

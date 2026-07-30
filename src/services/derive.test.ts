@@ -6,7 +6,7 @@
 // (corpus.rs) and MUST stay in lockstep with them.
 
 import { describe, expect, test } from "bun:test";
-import { snippetOf, titleOf } from "./derive";
+import { snippetOf, summaryOrder, titleOf } from "./derive";
 
 describe("titleOf — first non-empty line, markdown stripped (mirrors Rust title_of)", () => {
   test("strips a leading #-run", () => {
@@ -107,5 +107,23 @@ describe("whitespace alphabet matches Rust char::is_whitespace (not JS trim)", (
 
   test("does NOT trim a leading BOM (U+FEFF) — matches Rust, which keeps it", () => {
     expect(titleOf("﻿Title from BOM\nbody")).toBe("﻿Title from BOM");
+  });
+});
+
+// The list-order lockstep (Greptile, PR #13): summaryOrder is a faithful port
+// of corpus_list's sort in corpus.rs `list()` — pinned first, updated_at desc,
+// id asc. If the Rust sort ever grows a key, this fixture (and derive.ts) must
+// move with it, or cache-patched lists visibly reorder on the next refetch.
+describe("summaryOrder — the corpus_list sort, ported", () => {
+  const row = (id: string, updatedAt: number, pinned = false) => ({ id, updatedAt, pinned });
+
+  test("pinned floats above everything, regardless of recency", () => {
+    const sorted = [row("old-pin", 10, true), row("fresh", 999)].sort(summaryOrder);
+    expect(sorted.map((r) => r.id)).toEqual(["old-pin", "fresh"]);
+  });
+
+  test("within a pin band: updatedAt desc, then id asc as the stable tiebreak", () => {
+    const sorted = [row("b", 5), row("c", 9), row("a", 5)].sort(summaryOrder);
+    expect(sorted.map((r) => r.id)).toEqual(["c", "a", "b"]);
   });
 });

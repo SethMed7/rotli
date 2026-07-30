@@ -19,12 +19,20 @@
     "brand": "brand.json",
     "tokens": ["tokens/colors.css", "tokens/colors.json", "tokens/type.css"],
     "logo": [
-      "logo/wordmark.svg", "logo/wordmark.mono.svg", "logo/wordmark.mono-white.svg",
-      "logo/r-mark.svg", "logo/r-mark.mono.svg", "logo/r-mark.mono-white.svg"
+      "logo/wordmark.svg",
+      "logo/wordmark.mono.svg",
+      "logo/wordmark.mono-white.svg",
+      "logo/r-mark.svg",
+      "logo/r-mark.mono.svg",
+      "logo/r-mark.mono-white.svg"
     ],
     "tiles": [
-      "tiles/tile-linen.svg", "tiles/tile-cocoa.svg", "tiles/tile-clay.svg",
-      "tiles/favicon.svg", "tiles/app-icon-512.svg", "tiles/social-avatar-1024.svg"
+      "tiles/tile-linen.svg",
+      "tiles/tile-cocoa.svg",
+      "tiles/tile-clay.svg",
+      "tiles/favicon.svg",
+      "tiles/app-icon-512.svg",
+      "tiles/social-avatar-1024.svg"
     ],
     "icons": "icons/rotli-icons.sprite.svg (v2, 11 symbols) + icons/src/ (11 sources) + icons/README.md (context rules)",
     "fonts": [

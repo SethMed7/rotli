@@ -40,6 +40,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Startup got ~35% lighter and typing got dramatically cheaper.** The quokka
+  illustrations (~450 KB, 29% of startup JS) now load on demand — same inline
+  line-art, same theme tinting, just fetched the moment a quokka moment
+  appears; katex is bundled once instead of twice (−260 KB and no more
+  double-load); and Settings, Breve, and Onboarding code-split off the entry
+  chunk. Typing in a note no longer refetches the whole notes universe every
+  400ms — the editor patches its own save straight into the caches (full
+  refreshes still run for create/move/trash/external changes, and the Tasks
+  list re-derives only when checkbox lines actually change). Launch hydration
+  reads its files in parallel, batched file drops and multi-archive/trash run
+  their independent writes together (with exact per-item failure reporting),
+  and a dead-code sweep dropped ~470 lines of orphaned CSS, four unused
+  exports, and an unused native devDependency.
+
 - **The Breve watchlist reads before it edits.** Topics now render as compact
   scannable rows — name, source domain, one-line guidance — under their group
   headers instead of a page of always-open forms; clicking a row (or its

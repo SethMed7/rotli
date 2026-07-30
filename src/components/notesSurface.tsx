@@ -19,7 +19,11 @@ import { ClockGlyph } from "./glyphs";
 import { NoteListSurface } from "./noteListSurface";
 import { Sidebar } from "./sidebar";
 import { PaneTree } from "./paneTree";
-import { BreveSurface } from "./breve/breveSurface";
+import { Suspense, lazy } from "react";
+
+// Breve is a whole product surface most note sessions never enter — split it
+// off the entry chunk like paneTree's CanvasSurface (perf audit 2026-07-30, #18)
+const BreveSurface = lazy(() => import("./breve/breveSurface").then((m) => ({ default: m.BreveSurface })));
 
 /** Drag grip on the sidebar's right edge — same pointer grammar as the pane
  * dividers (8px hit zone, cocoa-tinted line while dragging, never clay). */
@@ -108,7 +112,9 @@ export function NotesSurface() {
       {/* the content area: the note panes, or a grid view (Board / All notes)
           that renders HERE so the sidebar never moves (Seth, 2026-06-24) */}
       {sidebarMode === "breve" ? (
-        <BreveSurface />
+        <Suspense fallback={null}>
+          <BreveSurface />
+        </Suspense>
       ) : contentView === "board" ? (
         <BoardSurface />
       ) : contentView === "allNotes" ? (

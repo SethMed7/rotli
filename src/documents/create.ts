@@ -110,10 +110,6 @@ export async function createDocxBase64(template: DocxTemplate): Promise<string> 
   return zip.generateAsync({ type: "base64", compression: "DEFLATE" });
 }
 
-export async function createBlankDocxBase64(): Promise<string> {
-  return createDocxBase64(blankDocumentDraft());
-}
-
 export function blankDocumentTemplate(): DocxTemplate {
   return blankDocumentDraft();
 }

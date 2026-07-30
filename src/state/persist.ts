@@ -686,10 +686,12 @@ async function gcPersistedMaps(): Promise<void> {
   try {
     const cfg = await loadConfig();
     if (cfg.instances.length > 0) {
+      // list every brain's chats/ together (audit 2026-07-30, #13) — Promise.all
+      // keeps the keep-on-error rule: ONE failed listing rejects and the catch
+      // below skips the whole prune
+      const lists = await Promise.all(cfg.instances.map((inst) => listChats(inst)));
       const slugs = new Set<string>();
-      for (const inst of cfg.instances) {
-        for (const c of await listChats(inst)) slugs.add(c.slug);
-      }
+      for (const list of lists) for (const c of list) slugs.add(c.slug);
       const ui = useUiStore.getState();
       const liveKey = (k: string) => slugs.has(k) || k.startsWith("unsaved:");
       const kept = pruneMap(ui.chatWeb, liveKey);
@@ -751,8 +753,10 @@ export async function hydratePersistedState(): Promise<void> {
     settingsPassthrough = unknownSettingsKeys(raw);
     applySettings(settings);
     if (isMainSurface()) {
-      await hydrateMain();
-      await hydrateViews();
+      // Main + Views are independent reads — hydrate them together (perf
+      // audit 2026-07-30, #13). Viewstate is NOT independent: it validates
+      // activeView/selection against BOTH hydrated manifests, so it waits.
+      await Promise.all([hydrateMain(), hydrateViews()]);
       await hydrateViewstate();
       await gcPersistedMaps(); // needs the hydrated Main manifest (#78)
       applyShellSideEffects(settings);

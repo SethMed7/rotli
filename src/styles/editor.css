@@ -1126,7 +1126,9 @@
   color: inherit;
   border-radius: var(--r-inner);
   cursor: pointer;
-  transition: background var(--motion-exit) var(--motion-ease), color var(--motion-exit) var(--motion-ease);
+  transition:
+    background var(--motion-exit) var(--motion-ease),
+    color var(--motion-exit) var(--motion-ease);
 }
 .cm-bh-grip {
   cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */

@@ -86,3 +86,16 @@ export function snippetOf(body: string): string {
   }
   return [...parts.join(" ")].slice(0, 140).join("");
 }
+
+/** The one list order — a faithful port of corpus_list's sort (corpus.rs
+ * `list()`: pinned first, then `updated_at` desc, then id asc), shared by the
+ * in-memory service and the scoped cache patch (applyNoteWrite) so a patched
+ * list can never disagree with the next full refetch. Kept in lockstep like
+ * titleOf/snippetOf above; locked by derive.test.ts. */
+export function summaryOrder(
+  a: { pinned: boolean; updatedAt: number; id: string },
+  b: { pinned: boolean; updatedAt: number; id: string },
+): number {
+  if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+  return b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}

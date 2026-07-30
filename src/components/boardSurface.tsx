@@ -24,6 +24,22 @@ import { Character } from "./character";
 import { ArchiveGlyph, CheckGlyph, glyphForNote } from "./glyphs";
 import { useNoteMenu } from "./useNoteMenu";
 
+/** Per-item accounting for a batched archive: say exactly how many failed (and
+ * why, first reason) through the app's row-action banner — the loop used to be
+ * serial with silent rejection. */
+function reportArchiveFailures(results: PromiseSettledResult<unknown>[], total: number, noun: string): void {
+  const failed = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+  if (failed.length === 0) return;
+  const reason = failed[0]!.reason;
+  useUiStore
+    .getState()
+    .setRowActionError(
+      `${failed.length} of ${total} ${noun}s couldn’t be archived — ${
+        reason instanceof Error ? reason.message : String(reason)
+      }`,
+    );
+}
+
 export function BoardSurface() {
   const stagedData = useNotes(DEST.board).data;
   // a CURATED note is a full note, not a passing capture (Seth, 2026-07-01: "my
@@ -173,7 +189,10 @@ export function BoardSurface() {
         .filter((b) => b.length > 0)
         .join("\n\n");
       const note = await notesService.createNote(DEST.inbox, body);
-      for (const c of ordered) await archiveNoteWithImages(c.id);
+      // consume the originals together — independent archives, so one failure
+      // must not strand the rest (audit 2026-07-30, #16 batch half)
+      const results = await Promise.allSettled(ordered.map((c) => archiveNoteWithImages(c.id)));
+      reportArchiveFailures(results, ordered.length, "merged capture");
       await invalidateNotes();
       setSelected(new Set());
       openNote(note.id); // returns the content area to the panes
@@ -187,7 +206,8 @@ export function BoardSurface() {
     if (chosen.length === 0 || busy) return;
     setBusy(true);
     try {
-      for (const c of chosen) await archiveNoteWithImages(c.id);
+      const results = await Promise.allSettled(chosen.map((c) => archiveNoteWithImages(c.id)));
+      reportArchiveFailures(results, chosen.length, "capture");
       await invalidateNotes();
       setSelected(new Set());
     } finally {

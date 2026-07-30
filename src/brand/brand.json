@@ -10,7 +10,10 @@
     "oneIdea": "Cognitive quiet — it holds what matters and gets out of your way.",
     "oneWord": "Quiet",
     "metaphor": "The quokka on Rottnest Island — small, focused, always smiling because the island was designed for it. The app is the island; every module is part of it; nothing has to be learned.",
-    "taglines": ["I will quietly hold what matters, and I will not get in your way.", "Warm. Quiet. Instant."],
+    "taglines": [
+      "I will quietly hold what matters, and I will not get in your way.",
+      "Warm. Quiet. Instant."
+    ],
     "values": [
       { "key": "Quiet", "line": "Calm beats busy. Empty surfaces beat noise." },
       { "key": "Warm", "line": "Lamplit, never clinical. Paper under a desk lamp." },
@@ -27,7 +30,13 @@
   },
   "type": "Personal-first productivity app · Mac menu-bar · local-first · warm/calm",
   "color": {
-    "core": { "cocoa": "#3A3028", "clay": "#C97E62", "peach": "#F2D6C2", "linen": "#F8F2E9", "olive": "#8D9A76" },
+    "core": {
+      "cocoa": "#3A3028",
+      "clay": "#C97E62",
+      "peach": "#F2D6C2",
+      "linen": "#F8F2E9",
+      "olive": "#8D9A76"
+    },
     "roles": {
       "ink": "#3A3028",
       "accent": "#C97E62",
@@ -64,23 +73,48 @@
   },
   "shape": {
     "boubaKiki": "bouba (rounded/warm)",
-    "language": ["rounded pill buttons", "12px flat cards", "soft/curled wordmark", "rounded tag/chip shapes", "solid surfaces with one-pixel borders"],
+    "language": [
+      "rounded pill buttons",
+      "12px flat cards",
+      "soft/curled wordmark",
+      "rounded tag/chip shapes",
+      "solid surfaces with one-pixel borders"
+    ],
     "radii": { "structural": 12, "interactive": 8, "accent": 4, "full": 9999 },
     "note": "Rounded + soft throughout — nothing sharp or clinical. The wordmark's roundness sets the tone."
   },
   "texture": {
     "register": "matte + warm (lamplit, organic)",
-    "candidates": ["soft paper-grain / dot texture at very low opacity", "the curled-r flourish as a sparing motif", "rounded tag/pill shapes"],
+    "candidates": [
+      "soft paper-grain / dot texture at very low opacity",
+      "the curled-r flourish as a sparing motif",
+      "rounded tag/pill shapes"
+    ],
     "note": "Provisional — explore at the pattern step. Quiet, not busy; opacities below conscious perception. Construct programmatically."
   },
   "icons": {
     "system": "outline · consistent stroke · 24-grid · one idea each · hover label on every icon (quokka principle) · accent sparingly with clay (olive for success/sync)",
-    "ids": ["text-notes", "sheets", "quick-notes", "calendar", "transcript", "action-items", "tags", "reminder", "sync", "search"],
+    "ids": [
+      "text-notes",
+      "sheets",
+      "quick-notes",
+      "calendar",
+      "transcript",
+      "action-items",
+      "tags",
+      "reminder",
+      "sync",
+      "search"
+    ],
     "sprite": "icons/rotli-icons.sprite.svg (to be drawn — see icons/README.md)"
   },
   "motion": {
     "principle": "calm + instant — the app visits, it doesn't sweep in",
-    "signatures": ["window show/hide = crossfade with a 1px lift (not a slide)", "transform/opacity only (60fps)", "no app-about-itself notifications"],
+    "signatures": [
+      "window show/hide = crossfade with a 1px lift (not a slide)",
+      "transform/opacity only (60fps)",
+      "no app-about-itself notifications"
+    ],
     "a11y": "Respect prefers-reduced-motion; all animations skippable."
   },
   "logo": {

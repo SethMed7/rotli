@@ -293,43 +293,6 @@
   font-size: 12px;
 }
 
-/* "All chats" browse — a search box over a scrollable list of every chat. */
-.chat-browse {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.chat-browse-search {
-  flex: 0 0 auto;
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid var(--border);
-}
-.chat-browse-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.chat-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: none;
-  background: none;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-  padding: 4px 8px 4px 0;
-  border-radius: var(--r-control);
-}
-.chat-back:hover {
-  color: var(--text);
-}
-
 /* the chat connect-state's voice — the container is the shared .list-empty */
 .chat-empty {
   gap: 10px;
@@ -351,25 +314,7 @@
 .chat-cta:hover {
   background-image: linear-gradient(var(--hov), var(--hov));
 }
-
-.chat-body {
-  flex: 1;
-  display: flex;
-  min-height: 0;
-}
-
-.chat-list {
-  width: 232px;
-  flex: 0 0 auto;
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.chat-new,
-.chat-item {
+.chat-new {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -389,31 +334,11 @@
   font-weight: 600;
   margin-bottom: 4px;
 }
-.chat-new:hover,
-.chat-item:hover {
+.chat-new:hover {
   background: var(--hov);
 }
-.chat-new.sel,
-.chat-item.sel {
+.chat-new.sel {
   background: var(--tint);
-}
-.chat-item-title {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.chat-item-attach {
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.chat-list-empty {
-  font-size: 12px;
-  color: var(--text-muted);
-  padding: 6px 10px;
-  margin: 0;
 }
 
 .chat-main {
@@ -435,15 +360,6 @@
   max-width: var(--chat-measure, 740px);
   margin: 0 auto;
   min-width: 0;
-}
-.chat-pre {
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-  font-family: var(--font-body);
-  font-size: 14px;
-  line-height: 1.65;
-  color: var(--text);
-  margin: 0;
 }
 .chat-newhint {
   color: var(--text-muted);
@@ -561,11 +477,6 @@
   to {
     transform: rotate(360deg);
   }
-}
-.chat-err {
-  font-size: 12px;
-  color: var(--danger, var(--accent-text));
-  margin: 0;
 }
 
 /* composer tool buttons — web globe · image attach (line-art, theme-aware) */
@@ -844,12 +755,11 @@
   border-radius: var(--r-control);
   /* transparency checkerboard (#80, audit 2026-07) — theme-aware (token-mixed,
      no raw hex) so transparent art never dissolves into the pane background */
-  background:
-    repeating-conic-gradient(
-        color-mix(in srgb, var(--text) 8%, transparent) 0% 25%,
-        transparent 0% 50%
-      )
-      0 0 / 16px 16px;
+  background: repeating-conic-gradient(
+      color-mix(in srgb, var(--text) 8%, transparent) 0% 25%,
+      transparent 0% 50%
+    )
+    0 0 / 16px 16px;
 }
 /* an svg with no intrinsic size keeps the old fill-the-pane behavior (vectors
    scale losslessly, and max-w/h alone would collapse it) */
@@ -916,49 +826,6 @@
   overflow: auto;
   padding: 0;
   display: block;
-}
-
-/* — MetaPanel: the Brain filing controls (v3.7 manual Filer) — */
-.metabrain {
-  margin: 4px 0 2px;
-}
-.metafile-areas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  padding: 2px 0 4px;
-}
-.metafile-area {
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-  padding: 3px 10px;
-  cursor: pointer;
-}
-.metafile-area:hover {
-  border-color: var(--text-muted);
-}
-.metafiled {
-  font-size: 12.5px;
-  color: var(--text-muted);
-}
-.meta-activity {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: none;
-  color: var(--accent-text);
-  font: inherit;
-  font-size: 12px;
-  padding: 4px 0;
-  cursor: pointer;
-}
-.meta-activity:hover {
-  text-decoration: underline;
 }
 
 /* — Brain Activity surface: one journal action per row, undoable — */
@@ -1039,25 +906,6 @@
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--text);
-}
-.file-other {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-.file-other button {
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
-  background: var(--tint);
-  color: var(--text);
-  font: inherit;
-  font-weight: 600;
-  font-size: 13px;
-  padding: 7px 16px;
-  cursor: pointer;
 }
 
 /* spreadsheet (xlsx/csv) viewer + the universal iframe fallback */
@@ -1203,9 +1051,6 @@
   max-width: 140px;
   font-size: 11.5px;
   color: var(--text-muted);
-}
-.sheet-editor-space {
-  flex: 1 1 auto;
 }
 .sheet-editor-host {
   flex: 1 1 auto;
@@ -1522,164 +1367,6 @@ body:has(.document-editor) [role="dialog"] input:disabled {
   color: var(--text-muted);
 }
 
-/* ── Memory browser (read-only spine; reuses chat-surface/list/main) ── */
-.mem-crumbs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1px;
-  padding: 2px 4px 8px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-}
-.mem-crumb-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
-}
-.mem-crumb {
-  border: none;
-  background: none;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 12px;
-  padding: 2px 5px;
-  border-radius: var(--r-inner);
-  cursor: pointer;
-}
-.mem-crumb:hover {
-  color: var(--text);
-  background: var(--hov);
-}
-.mem-crumb.sel {
-  color: var(--text);
-  font-weight: 600;
-}
-.mem-sep {
-  color: var(--text-muted);
-  opacity: 0.6;
-}
-.mem-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  padding: 7px 10px;
-  border-radius: var(--r-control);
-  cursor: pointer;
-}
-.mem-row:hover {
-  background: var(--hov);
-}
-.mem-file.sel {
-  background: var(--tint);
-}
-.mem-glyph {
-  flex: 0 0 auto;
-  width: 16px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.mem-dir .mem-name {
-  font-weight: 600;
-}
-.mem-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ── ＋ Note: the one write affordance in Memory (wiki/_inbox staging, v3.5) ── */
-.mem-newnote {
-  margin-left: auto;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: var(--r-control);
-  cursor: pointer;
-}
-.mem-newnote:hover {
-  background-image: linear-gradient(var(--hov), var(--hov));
-}
-.mem-compose {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  height: 100%;
-}
-.mem-compose-hint {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--text-muted);
-}
-.mem-compose-hint code {
-  font-size: 12px;
-}
-.mem-compose-area {
-  flex: 1;
-  min-height: 180px;
-  resize: none;
-  border: 1px solid var(--border);
-  border-radius: var(--r-card);
-  background: var(--surface-2);
-  color: var(--text);
-  font-family: var(--font-mono, monospace);
-  font-size: 13px;
-  line-height: 1.55;
-  padding: 12px 14px;
-}
-.mem-compose-area:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-.mem-compose-err {
-  margin: 0;
-  font-size: 12px;
-  color: var(--danger, var(--accent-text));
-}
-.mem-compose-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.mem-compose-cancel,
-.mem-compose-save {
-  font: inherit;
-  font-size: 12.5px;
-  padding: 7px 14px;
-  border-radius: var(--r-control);
-  cursor: pointer;
-}
-.mem-compose-cancel {
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text);
-}
-.mem-compose-cancel:hover {
-  background-image: linear-gradient(var(--hov), var(--hov));
-}
-.mem-compose-save {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--accent-text);
-}
-.mem-compose-save:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
 /* ── Settings → Memory pane extras (the rest reuses the settings voice) ── */
 .memex-card {
   display: flex;
@@ -1887,10 +1574,6 @@ body:has(.document-editor) [role="dialog"] input:disabled {
   margin: 4px 0 0;
   font-size: 12px;
   line-height: 1.5;
-}
-/* head: chat title + grow spacer + the model selector on one line */
-.chat-head-grow {
-  flex: 1 1 auto;
 }
 .chat-title-h {
   font-size: 14px;
