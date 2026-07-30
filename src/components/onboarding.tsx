@@ -50,7 +50,7 @@ const GLOBAL_HOTKEYS: { id: string; label: string; hint: string }[] = [
   {
     id: "capture.summon",
     label: "Quick capture",
-    hint: "One breath into Inbox — without leaving what you’re doing.",
+    hint: "One breath into Captures — without leaving what you’re doing.",
   },
   {
     id: "quick.summon",

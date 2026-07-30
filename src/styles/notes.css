@@ -492,10 +492,10 @@
   padding: 14px 10px 5px;
 }
 
-/* — the three top-level left-menu sections (Inbox · Chat · Notes), Seth's IA
-   2026-06-26. A section header is a prominent, full-width disclosure row: bolder
-   than a folder row, with the section glyph + a soft top rule between sections so
-   the three read as distinct zones. — */
+/* — the top-level left-menu sections (Chat · Notes), Seth's IA 2026-06-26.
+   A section header is a prominent, full-width disclosure row: bolder than a
+   folder row, with the section glyph + a soft top rule between sections so
+   they read as distinct zones. — */
 .sb-section {
   display: flex;
   align-items: center;
@@ -512,7 +512,6 @@
   position: relative;
 }
 .sb-section + .sb-section,
-.sb-inbox-stub + .sb-section,
 .sb-chat + .sb-section {
   border-top: 1px solid var(--border);
   margin-top: 6px;
@@ -551,46 +550,6 @@
 }
 .sb-section .fchev.open {
   transform: rotate(90deg);
-}
-
-/* — Inbox (email) placeholder: the intended account → thread structure, rendered
-   disabled until the mail integration lands. Clearly a stub (muted, no hover). — */
-.sb-inbox-stub {
-  padding: 1px 0 6px;
-}
-.sb-stub-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 5px 10px;
-  font-size: 12.5px;
-  color: var(--text-muted);
-  cursor: default;
-}
-.sb-stub-row svg {
-  color: var(--text-muted);
-  flex: 0 0 auto;
-  opacity: 0.8;
-}
-.sb-stub-row .fname {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sb-stub-row .fchev {
-  display: grid;
-  place-items: center;
-  width: 12px;
-  color: var(--text-muted);
-  opacity: 0.6;
-}
-.sb-stub-note {
-  margin: 6px 10px 2px 16px;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--text-muted);
-  opacity: 0.85;
 }
 
 /* — a failed row-menu action (file-to-brain, board rename): an inline,

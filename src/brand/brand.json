@@ -5,7 +5,7 @@
   "status": "SHIPPED — marks approved (gate round 3, 2026-06-11), board frozen, kit.json written. This is the live, app-embedded kit (src/brand/, v0.24.4).",
   "source": "Seth-approved brand board 2026-06-06, regenerated 2026-06-10 (../../engine/BRANDS/rotli/_reference/brand-board.png; intake run ../../engine/RUNS/rotli/2026-06-10-board-intake/)",
   "identity": {
-    "what": "A warm, local-first, hotkey-driven notes app for Mac — one menu-bar shell where your notes folder *is* a memex (one folder: notes · chats · knowledge · files). Three fronts: Inbox (emails) · Chat (AI chats) · Notes (Capture · the AI-organized 'brain' wiki areas · Storage · Boards). AI rides your own CLI subscriptions (claude/codex/agy) or a local MLX model — rotli bundles no LLM/STT/TTS and has no separate Voice front (dictation lives in a sibling app, voz).",
+    "what": "A warm, local-first, hotkey-driven notes app for Mac — one menu-bar shell where your notes folder *is* a memex (one folder: notes · chats · knowledge · files). Two fronts: Chat (AI chats) · Notes (Capture · the AI-organized 'brain' wiki areas · Storage · Boards); an email Inbox front is on the roadmap. AI rides your own CLI subscriptions (claude/codex/agy) or a local MLX model — rotli bundles no LLM/STT/TTS and has no separate Voice front (dictation lives in a sibling app, voz).",
     "essence": "Warm, quiet, instant — a visitor on your screen, not a resident.",
     "oneIdea": "Cognitive quiet — it holds what matters and gets out of your way.",
     "oneWord": "Quiet",

@@ -59,13 +59,15 @@ view adds its own virtual folders and one `view_tag` to Markdown metadata. New
 items and folders follow the view you are currently in, while the underlying
 file still enters the same intake/Brain workflow.
 
-## Three fronts, one window
+## Two fronts, one window
 
 | Front | What it is |
 |---|---|
 | **Notes** | The note system — a hybrid-markdown editor that hides syntax until your caret lands on it, plus Excalidraw **boards**, all saved as plain files. |
 | **Chat** | Your AI conversations. On-device by default, or your own connected models (Claude Code · Codex · Antigravity). Your notes are its knowledge base — it reads them to answer. |
-| **Inbox** | A calm layer over your own email. *(coming)* |
+
+More fronts are planned — an email **Inbox**, mobile and tablet apps, and a
+handwriting-first notebook experience. See [ROADMAP.md](ROADMAP.md).
 
 ## What's built
 
@@ -172,7 +174,7 @@ Contributing or working with an AI coding tool? Start with
 | ✅ | **Search** — full-text across your notes (titles + bodies), instant |
 | ✅ | **Chat** — on-device by default, or your own connected models; your notes are its knowledge base |
 | ✅ | **The Librarian** — an on-device organizer files your captures into the Library, fully journaled + undoable — or choose a raw vault with no AI at all |
-| ⏳ | **Inbox** — a calm layer over your own email |
+| ⏳ | **[The roadmap](ROADMAP.md)** — email Inbox · mobile & tablet · handwriting-to-text notebook |
 
 ---
 

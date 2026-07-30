@@ -10,6 +10,7 @@ fix both in the same change.
 |---|---|
 | Public product promise and setup | [`../README.md`](../README.md) |
 | Product users, purpose, positioning, and design principles | [`../PRODUCT.md`](../PRODUCT.md) |
+| Planned features (Inbox's return, mobile/tablet, handwriting notebook) | [`../ROADMAP.md`](../ROADMAP.md) |
 | Human contribution workflow | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
 | AI contribution and safety rules | [`../AGENTS.md`](../AGENTS.md) |
 | Public security reporting | [`../SECURITY.md`](../SECURITY.md) |

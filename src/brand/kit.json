@@ -14,7 +14,7 @@
     "engine/RUNS/rotli/2026-06-11-icons-recut"
   ],
   "freezeGate": "Marks approved (gate r3, board intake 06-10). World soft-approved 06-11. Icons re-cut to module truth and approved 06-11 (Tags revised to tilted tag; Settings segmented; olive-bright token added). Seth: freeze confirmed 2026-06-11 — Stage 2 (the app, own fresh repo) opens.",
-  "identity": "Warm, quiet, instant. The quokka and its island. Your notes folder is a memex (one folder of plain .md files — notes · chats · knowledge · files), with three fronts over it: Inbox · Chat · Notes.",
+  "identity": "Warm, quiet, instant. The quokka and its island. Your notes folder is a memex (one folder of plain .md files — notes · chats · knowledge · files), with two fronts over it: Chat · Notes.",
   "contents": {
     "brand": "brand.json",
     "tokens": ["tokens/colors.css", "tokens/colors.json", "tokens/type.css"],

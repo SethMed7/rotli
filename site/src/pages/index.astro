@@ -27,8 +27,8 @@ const features = [
     body: 'one folder holds it all — notes, chats, knowledge, files, even Excalidraw boards. plain files on your Mac, yours to keep.',
   },
   {
-    title: 'three fronts',
-    body: 'inbox for email, chat for your models, notes — with Excalidraw boards built in, saved as plain files in the same folder.',
+    title: 'two fronts',
+    body: 'chat for your models, notes for everything else — with Excalidraw boards built in, saved as plain files in the same folder.',
   },
   {
     title: 'low-pulse',
@@ -102,7 +102,7 @@ const promises = [
       </div>
     </section>
 
-    <!-- (4) three fronts -->
+    <!-- (4) two fronts -->
     <section class="features">
       {features.map((f) => (
         <div class="feature">
@@ -332,7 +332,7 @@ const promises = [
        `display:block` on this selector would out-specify them and show all four. */
     .shot-frame img { width: 100%; height: auto; }
 
-    /* ---- three fronts ---- */
+    /* ---- two fronts ---- */
     .features {
       display: grid;
       grid-template-columns: repeat(3, 1fr);

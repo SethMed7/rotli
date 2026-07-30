@@ -63,8 +63,8 @@ export const TASKS = "tasks";
 
 /** What the content area (right of the sidebar) renders: the note panes, the
  * Board grid, the searchable All-notes grid, or the Chat surface. All of these
- * are views in the pane area — the sidebar never moves for them, so the three
- * left-menu sections (Inbox · Chat · Notes) stay visible (Seth, 2026-06-24;
+ * are views in the pane area — the sidebar never moves for them, so the
+ * left-menu sections (Chat · Notes) stay visible (Seth, 2026-06-24;
  * Chat folded in from a full-surface front 2026-06-26). */
 // (the old "chat" contentView is retired — chat is a PANE surface now)
 export type ContentView = "panes" | "board" | "allNotes" | "allChats" | "recent" | "tasks" | "system";
@@ -75,10 +75,12 @@ export type ContentView = "panes" | "board" | "allNotes" | "allChats" | "recent"
 export type SidebarMode = "notes" | "breve";
 export type BreveView = "briefs" | "watchlist" | "routines" | "models" | "configure";
 
-/** The three top-level left-menu sections (Seth's decided IA, 2026-06-26): Inbox
- * (email) · Chat · Notes. Each is a collapsible accordion; its open state lives in
- * expandedDests under these reserved ids (so it persists like a destination). */
-export const SEC_INBOX = "sec:inbox";
+/** The top-level left-menu sections (Seth's decided IA, 2026-06-26): Chat ·
+ * Notes. Each is a collapsible accordion; its open state lives in expandedDests
+ * under these reserved ids (so it persists like a destination). The Inbox
+ * (email) front was removed 2026-07-30 until the mail integration is real —
+ * see ROADMAP.md; its persisted "sec:inbox" key stays valid in persist.ts so
+ * user state survives the eventual restore. */
 export const SEC_CHAT = "sec:chat";
 export const SEC_NOTES = "sec:notes";
 /** The MAIN section's own collapse key (2026-07-26: Main is collapsible). */
@@ -497,10 +499,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   breveDirty: false,
   setBreveDirty: (dirty) => set({ breveDirty: dirty }),
 
-  // the three sections open by default, plus the Capture(Inbox) + Vault dests
-  // inside Notes — so a fresh window shows the full three-section tree.
+  // the sections open by default, plus the Capture(Inbox) + Vault dests
+  // inside Notes — so a fresh window shows the full section tree.
   expandedDests: {
-    [SEC_INBOX]: true,
     [SEC_CHAT]: true,
     [SEC_NOTES]: true,
     Inbox: true,

@@ -91,7 +91,7 @@ import {
   useFocusedTab,
   usePanesStore,
 } from "../state/panes";
-import { ALL_NOTES, SEC_CHAT, SEC_INBOX, SEC_NOTES, TASKS, useUiStore } from "../state/ui";
+import { ALL_NOTES, SEC_CHAT, SEC_NOTES, TASKS, useUiStore } from "../state/ui";
 import { activeInstance } from "../memex/config";
 import {
   invalidateMemex,
@@ -127,7 +127,6 @@ import {
   glyphForNote,
   FolderGlyph,
   InboxGlyph,
-  MailGlyph,
   NewFileGlyph,
   NewFolderGlyph,
   NotesStackGlyph,
@@ -192,8 +191,9 @@ function CaptureBoardGlyph({ size = 16 }: { size?: number }) {
 
 /** The five reserved destinations, in sidebar order, each with its glyph. The
  * note-capture root keeps its on-disk id "Inbox" (the memex contract is unchanged)
- * but is LABELED "Capture" now that the top-level word "Inbox" means email (Seth,
- * 2026-06-26). The ⌥C one-breath capture lands as a staged note in wiki/_inbox/
+ * but is LABELED "Capture" — the word "Inbox" is reserved for the future email
+ * front (removed from the sidebar 2026-07-30, see ROADMAP.md; Seth, 2026-06-26).
+ * The ⌥C one-breath capture lands as a staged note in wiki/_inbox/
  * (inbox.md is not a rotli write surface — #96, audit 2026-07). */
 const DEST_ROWS: { id: Destination; label: string; Glyph: typeof InboxGlyph }[] = [
   // "Capture" (DEST.inbox) is GONE — captures have ONE home now, the "Captures"
@@ -209,12 +209,6 @@ const DEST_ROWS: { id: Destination; label: string; Glyph: typeof InboxGlyph }[] 
   { id: DEST.archive, label: "Archive", Glyph: ArchiveGlyph },
   { id: DEST.trash, label: "Trash", Glyph: TrashGlyph },
 ];
-
-/** Stubbed email accounts for the Inbox (email) placeholder — the intended
- * account/thread structure, rendered disabled until the mail integration lands
- * (a LATER increment; this writes nothing). These two are Seth's known addresses
- * from the IA doc Addendum. */
-const STUB_EMAIL_ACCOUNTS = ["maintainer@example.com", "hello@sethmedina.com"];
 
 /** A top-level row for an ADDED external folder (Seth, 2026-06-27): a folder you
  * pointed rotli at without moving it into the memex. Self-contained (its own
@@ -1265,9 +1259,8 @@ export function Sidebar() {
     else if (isFile(n)) fileIds.add(n.id);
   }
 
-  // the three top-level sections' open state (Seth's IA, 2026-06-26). Default
+  // the top-level sections' open state (Seth's IA, 2026-06-26). Default
   // open so a fresh window shows the full tree; persisted via expandedDests.
-  const inboxSecOpen = expandedDests[SEC_INBOX] ?? true;
   const chatSecOpen = expandedDests[SEC_CHAT] ?? true;
   const notesSecOpen = expandedDests[SEC_NOTES] ?? true;
   // MAIN is collapsible as a whole (Seth, 2026-07-26) — default open
@@ -1307,8 +1300,8 @@ export function Sidebar() {
 
   // the roving j/k cursor walks the NOTES section (the corpus tree) INCLUDING
   // the Main manifest rows (Seth follow-up, 2026-07-01 — j/k for Main). When
-  // that section is collapsed there are no roving rows; the Inbox/Chat sections
-  // are plain buttons, outside the listbox.
+  // that section is collapsed there are no roving rows; the Chat section
+  // is plain buttons, outside the listbox.
   // MUST mirror the rendered order exactly — a skipped visual row makes the
   // cursor teleport. System is PINNED at the sidebar's bottom and never
   // collapses (Seth, 2026-07-28), so its rows are always walkable.
@@ -1512,14 +1505,14 @@ export function Sidebar() {
   const openAllChats = () => setContentView("allChats");
   const openChatRow = (slug: string) => openChat(slug);
 
-  // a top-level section header (Inbox · Chat · Notes): a clickable disclosure row
+  // a top-level section header (Chat · Notes): a clickable disclosure row
   // that toggles its accordion (state persisted in expandedDests under SEC_*).
   // The chevron rides the RIGHT edge (Seth, 2026-07-28: the left slot was
   // wasted whitespace) — the glyph + label start flush at the row's inset.
   const sectionHeader = (
     id: string,
     label: string,
-    Glyph: typeof MailGlyph,
+    Glyph: typeof ChatGlyph,
     open: boolean,
     count?: number,
   ): ReactNode => (
@@ -1651,9 +1644,11 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* the three top-level sections (Seth's IA, 2026-06-26): Inbox (email) ·
-          Chat · Notes — replacing the retired top module dropdown. Each is a
-          collapsible accordion; only the Notes tree is the roving j/k listbox. */}
+      {/* the top-level sections (Seth's IA, 2026-06-26): Chat · Notes — each a
+          collapsible accordion; only the Notes tree is the roving j/k listbox.
+          The Inbox (email) front was removed 2026-07-30 pending the real mail
+          integration — see ROADMAP.md; the restore blueprint is
+          docs/archive/notes-chat-inbox-rearchitecture.md. */}
       {/* the whole section tree scales with the sidebar zoom (⌘+/⌘− while focus
           is in the sidebar) — CSS zoom scales rows + text together; the fixed-
           positioned popovers (RowMenu, the "+" menu) sit OUTSIDE this node, so
@@ -1662,28 +1657,6 @@ export function Sidebar() {
         <BreveSidebar zoom={sidebarZoom} />
       ) : (
         <div className="sb-rows" aria-label="Sections" style={{ zoom: sidebarZoom }}>
-          {/* ── INBOX = email. The mail integration is a LATER increment; this is a
-            clear placeholder of the intended account → thread structure and rotli
-            writes nothing for it. ── */}
-          {sectionHeader(SEC_INBOX, "Inbox", MailGlyph, inboxSecOpen)}
-          {inboxSecOpen && (
-            <div className="sb-inbox-stub">
-              <div className="sb-stub-row" aria-disabled="true">
-                <SearchGlyph size={13} />
-                <span className="fname">All</span>
-              </div>
-              {STUB_EMAIL_ACCOUNTS.map((addr) => (
-                <div key={addr} className="sb-stub-row acct" aria-disabled="true">
-                  <MailGlyph size={13} />
-                  <span className="fname">{addr}</span>
-                </div>
-              ))}
-              <p className="sb-stub-note">
-                Connect email — coming. Your mailboxes (account → thread) will live here.
-              </p>
-            </div>
-          )}
-
           {/* ── CHAT — a ChatGPT-style front over the memex chats/: New chat, a
             searchable All, and the recent history (a LIMITED view). ── */}
           {sectionHeader(SEC_CHAT, "Chat", ChatGlyph, chatSecOpen, chatList.length)}

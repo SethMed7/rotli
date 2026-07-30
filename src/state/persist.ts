@@ -62,7 +62,6 @@ import {
   RECENT,
   RESERVED_DESTS,
   SEC_CHAT,
-  SEC_INBOX,
   SEC_NOTES,
   type ThemeFamily,
   type ThemeSetting,
@@ -286,8 +285,7 @@ export function parseSettings(raw: string): PersistedSettings {
     if (typeof open === "boolean") expandedDests[id] = open;
   }
   if (Object.keys(expandedDests).length === 0) {
-    // the three left-menu sections + the Capture(Inbox) & Vault dests inside Notes
-    expandedDests[SEC_INBOX] = true;
+    // the left-menu sections + the Capture(Inbox) & Vault dests inside Notes
     expandedDests[SEC_CHAT] = true;
     expandedDests[SEC_NOTES] = true;
     expandedDests.Inbox = true;
@@ -705,7 +703,8 @@ async function gcPersistedMaps(): Promise<void> {
   try {
     const folders = await notesService.listFolders();
     const valid = new Set<string>([
-      SEC_INBOX,
+      "sec:inbox", // the removed Inbox front's persisted key — kept valid so
+      // the user's open/closed state survives the front's return (ROADMAP.md)
       SEC_CHAT,
       SEC_NOTES,
       "Brain", // the Brain section header keys its accordion here
