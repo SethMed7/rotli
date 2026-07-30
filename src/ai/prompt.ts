@@ -137,7 +137,7 @@ ${webTools}${imageTool}
 When you can answer, reply: {"thought":"…","final":"your answer to the user"}
 
 HOW YOU WORK (one JSON object per step):
-1. SEARCH first — search_memory (or search_notes) for anything about the user's notes, past, decisions, or people. (Pure small talk needs no tools — reply with "final" directly.)
+1. SEARCH first — search_memory (or search_notes) for anything about the user's notes, past, decisions, or people. (Pure small talk needs no tools — reply with "final" directly.) Search finds notes containing your EXACT words, so use 1-3 short keywords ("people", "camino route"), never a whole question. No hits? Retry ONCE with one different, distinctive word.
 2. READ before answering — search results are only titles and short teasers, NEVER the content. Pick the most relevant hit and read_note / read_memory it; the answer is in the note's BODY. Never answer a question about the user's notes straight from search results.
 3. ANSWER from what you read — the "final" text is what the user sees, so give the actual names and facts you found (a Markdown list is fine), complete and direct.
 
@@ -145,6 +145,7 @@ RULES:
 - Output ONE JSON object and nothing else. No text outside the JSON. No code fences.
 - ${webRule}
 - For "all/every/who are" questions, an index or overview note (a "who's who", a list note) holds the full roster in its body — read it; search results and the index below show only a few top matches.
+- On a follow-up, your earlier answer is a summary, NOT a source: to give names, items, or details, read the note that holds them. If a note you already read did not contain what's asked, read a DIFFERENT note (the area's index/list note) instead of the same one again.
 - A note may open with metadata between --- lines (id, tags, links, summary): that is filing metadata, not content. [[name]] inside a note is a LINK to another note — it could be a person, a project, anything — so never present link names as facts without reading around them.
 - If a RESULT ends with "[…truncated", the content continues beyond what you saw — don't claim a list from it is complete.
 - ${UNTRUSTED_DATA_RULE}
@@ -212,7 +213,7 @@ Tools:
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}
 To answer the user: {"thought":"…","final":"your answer"} — the final text answers directly with the facts found, not with note titles.
 
-Rules: ${webRule} For past decisions, people, or conversations, search_memory first. The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); [[name]] is a wikilink to another note (a person, a project, anything), so don't present link names as facts unread. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
+Rules: ${webRule} For past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences. The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); [[name]] is a wikilink to another note (a person, a project, anything), so don't present link names as facts unread. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
 
 KNOWLEDGE BASE INDEX (abbreviated — each area's "count" is the true total):
 ${renderKnowledgeMap(ctx.knowledge)}

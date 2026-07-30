@@ -68,6 +68,25 @@ describe("read-before-answer scaffolding (the 2026-07-29 people-list failure)", 
     }
   });
 
+  test("both adapters teach keyword search (exact-substring engine, not sentences)", () => {
+    // corpus_search is exact-substring: whole-question queries return zero hits
+    // (the 2026-07-30 vault-sweep F1 pattern) — both prompts must teach short
+    // keywords and the gemma one the retry-once-with-a-different-word move.
+    const gemma = gemmaAdapter.renderPrompt({ ...base });
+    expect(gemma).toContain("EXACT words");
+    expect(gemma).toContain("never a whole question");
+    expect(frontierAdapter.renderPrompt({ ...base })).toContain("short keywords, not sentences");
+  });
+
+  test("the gemma prompt teaches follow-ups to re-read a source, not the prior answer", () => {
+    // per-turn scratch resets, so a follow-up that needs specifics must read a
+    // note again — and a note that lacked them must not be re-read (the
+    // 2026-07-30 vault-sweep F4 path-re-treading pattern).
+    const prompt = gemmaAdapter.renderPrompt({ ...base });
+    expect(prompt).toContain("your earlier answer is a summary, NOT a source");
+    expect(prompt).toContain("read a DIFFERENT note");
+  });
+
   test("both adapters teach the explicit truncation marker", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
       expect(adapter.renderPrompt({ ...base })).toContain("[…truncated");

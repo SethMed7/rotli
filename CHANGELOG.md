@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   main thread, so every on-device generation beachballed the whole window and
   even your just-sent message painted late — it now runs on a worker, keeping
   the app responsive (and send instant) while a model thinks.
+- **Local models search smarter and follow up properly.** The agent prompts
+  now teach 1-3-keyword searches (the engine matches exact substrings, so
+  whole-question queries found nothing) and that a follow-up asking for
+  specifics requires re-reading the source note — proven against a live
+  whole-vault evaluation (`scripts/eval-vault-sweep.ts`, a reusable harness
+  that reads the real vault only through the workspace CLI's security
+  boundary). The full findings and the retrieval roadmap live in
+  `docs/design/local-model-retrieval-notes.md`.
 - Clicking All chats no longer leaves the previously open chat highlighted
   beneath it — one selection at a time.
 
@@ -216,11 +224,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.41.1] - 2026-07-28
 
-
 ### Changed
 
 - **Browsing doesn't pile up tabs.** A plain click opens a note (or board, or
-  file) into one reusable *preview* tab — shown in quiet italics — and the
+  file) into one reusable _preview_ tab — shown in quiet italics — and the
   next click reuses it. Click the same item again, or start editing, and the
   tab stays for good. ⌘-click and ⌘T still open real tabs, exactly as before.
 
@@ -230,7 +237,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (⌘A was a dead key inside CodeMirror on Linux runners).
 
 ## [0.41.0] - 2026-07-28
-
 
 ### Changed
 
@@ -261,7 +267,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.40.0] - 2026-07-28
 
-
 ### Fixed
 
 - **Bullet indenting handles foreign notes.** Notes written by external
@@ -277,7 +282,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   neighbor instead of discarding your working set; **⌘⇧T reopens the last
   closed tab** at its old slot; ⌃⇧Tab cycles backward; and the tab menu
   gained "Split right/down with this tab".
-- **"Open to the right"** in the note menu splits with the *target* — "this
+- **"Open to the right"** in the note menu splits with the _target_ — "this
   note beside that one" is one gesture now instead of split-open-close-the-duplicate.
 - **Panes read clearer**: unfocused panes' tab strips mute slightly, dividers
   show their grab line on hover and double-click to even out (drag is also
@@ -300,8 +305,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scene never writes. In a vault that's a git repo this ends the phantom
   diffs, and serialization now runs once per save instead of on every
   pointer move — the big-board stutter is gone.
-- **The canvas owns its keys.** ⌘D used to duplicate a shape *and* split the
-  pane; ⌘0 reset canvas zoom *and* toggled the sidebar; ⌘=/⌘− were dead over
+- **The canvas owns its keys.** ⌘D used to duplicate a shape _and_ split the
+  pane; ⌘0 reset canvas zoom _and_ toggled the sidebar; ⌘=/⌘− were dead over
   a board. Inside a board those chords now belong to Excalidraw — zoom where
   you are. The vendor's own theme toggle is gone too; the titlebar sun is the
   one theme owner.
@@ -346,7 +351,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.39.0] - 2026-07-27
 
-
 ### Fixed
 
 - **The current view is visible again.** The view switcher's active row used a
@@ -364,17 +368,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sync": recommended setups (iCloud Drive · git · any folder-sync tool), the
   one-app-per-vault caution, and the honest mobile story — plain files any
   editor can read.
-- **The System browser is now a real Finder.** You're *in* one folder and see
+- **The System browser is now a real Finder.** You're _in_ one folder and see
   only its direct contents — subfolders as folders, notes as items. Double-click
   a folder to enter it, climb back with the breadcrumb (or ‹), single-click to
   select, double-click to open: the exact conventions your hands already know.
   **Folders** is the icon grid; **List** is the columned list (Name · Date
   Modified · Kind) with disclosure triangles and sortable columns. Search still
-  flattens across the whole root, "Show in Library" now lands you *inside* the
+  flattens across the whole root, "Show in Library" now lands you _inside_ the
   note's folder, and empty folders render as real tiles.
 
 ## [0.38.0] - 2026-07-27
-
 
 ### Changed
 
@@ -425,11 +428,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Back/Forward remembers boards, chats, and files** — every content
     surface now enters the trail, so Back from a board returns to the board's
     predecessor instead of skipping to the last note. Replay also reuses the
-    surface's open tab in *any* pane — no more duplicate tabs spawning in
+    surface's open tab in _any_ pane — no more duplicate tabs spawning in
     whichever pane happens to hold focus.
 
 ## [0.37.0] - 2026-07-26
-
 
 ### Changed
 
@@ -580,7 +582,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metadata continues to round-trip.
 - **Memex v3.8 adds deterministic structured queries.** The packaged CLI
   accepts expressions such as `area:projects tags:payments
-  updated:>=2026-07-01`, and the read-only `rotli_query` MCP tool exposes the
+updated:>=2026-07-01`, and the read-only `rotli_query` MCP tool exposes the
   same implicit-AND grammar with inspectable parsed clauses. Rotli applies its
   secure-content gate before matching and never writes an index or normalizes
   files during a query.
@@ -922,7 +924,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   add-drag, tab drag, board cards, sidebar tree).
 - **Structural seams** (batch 5): boards share one session core behind the
   canvas surface and the Markdown embed; sheets/boards/noteChat/editor are
-  now *named* clean-architecture exemptions, so opt-in-by-file-presence is no
+  now _named_ clean-architecture exemptions, so opt-in-by-file-presence is no
   longer a silent state; `MemexPerms` is a real Rust enum end-to-end instead
   of stringly-typed compares.
 - **Formatting decisions recorded** (batch 8, decision-gated): Prettier at
@@ -1234,7 +1236,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   drop-indicator line at the exact landing spot (upper half of a line = before
   it, lower half = after; the blank space below the note = the end), the note
   auto-scrolls near the edges, and Escape cancels the drag. Two silent bugs
-  died with it: a downward drag used to land one image-line *above* the drop
+  died with it: a downward drag used to land one image-line _above_ the drop
   point, and a mid-drag redraw could scatter the image to the wrong place
   entirely. Drops also snap out of tables and code fences instead of
   splitting them.
@@ -1242,7 +1244,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   used to rewrite the whole line and wipe the `- ` prefix.
 
 ## [0.27.0] - 2026-07-09
-
 
 ### Added
 
@@ -1258,12 +1259,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The formula trap.** Typing `=SUM(…)` into the current editor used to be
   silently saved as literal text; it now refuses loudly and saves nothing.
-- **The context menu tells the truth now.** *Show in Finder* actually reveals
+- **The context menu tells the truth now.** _Show in Finder_ actually reveals
   the note (its Rust command never learned that notes travel as ids, not
-  paths — it failed silently for months); *Pin to top* actually pins — pinned
+  paths — it failed silently for months); _Pin to top_ actually pins — pinned
   notes **float** above your hand-arranged Main order and the Captures order
-  (the arrangement itself is never touched) with a quiet pin marker; *Open in
-  Brain* became **Show in Brain** and handles staged notes (a capture's brain
+  (the arrangement itself is never touched) with a quiet pin marker; _Open in
+  Brain_ became **Show in Brain** and handles staged notes (a capture's brain
   home is the Captures board, so that's what opens — the old reveal visibly
   did nothing). And when any of these fails, the sidebar says so instead of
   swallowing it.
@@ -1276,7 +1277,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.26.1] - 2026-07-08
 
-
 ### Added
 
 - **Back / Forward.** The titlebar grew ‹ › buttons beside search — walk your
@@ -1285,13 +1285,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The ⌘K palette finds more.** Files by name (that PDF in Storage is one
   keystroke away) and chats by title now show up alongside notes and actions.
   Result rows got richer, too: a title match highlights the matched letters,
-  and a body match shows the note's home *and* the snippet instead of one or
+  and a body match shows the note's home _and_ the snippet instead of one or
   the other.
 
 ### Fixed
 
 - **Other themes no longer creep in.** Three real leaks, all sealed: native
-  dropdown menus and scrollbars now follow *rotli's* theme instead of the OS
+  dropdown menus and scrollbars now follow _rotli's_ theme instead of the OS
   appearance (`color-scheme` per theme); the ⌘-hold shortcut overlay's blur
   was hardcoded warm-cocoa and painted the warm theme over Paper/Charcoal/
   Glass — it now uses the theme's own scrim (glass got a proper one); and a
@@ -1299,7 +1299,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was removed.
 
 ## [0.26.0] - 2026-07-08
-
 
 ### Added
 
@@ -1309,8 +1308,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   multi-select** (drag a rectangle, ⇧ extends, ⌘ toggles single cells in or out,
   arrows walk and ⇧+arrows extend), **insert / delete rows and columns**
   (right-click a row number or column header), and a **Live ⇄ Theme** color
-  toggle — *Live* shows the sheet's true colors on a paper canvas exactly as
-  Excel would, *Theme* lets it blend into rotli. Display only; the file always
+  toggle — _Live_ shows the sheet's true colors on a paper canvas exactly as
+  Excel would, _Theme_ lets it blend into rotli. Display only; the file always
   keeps its real colors, and ⌘S remains the only write.
 - **Chats are first-class in the sidebar.** Right-click a chat for **Pin to
   top** (rides the chat's own frontmatter), **Rename…** (inline), **Archive**,
@@ -1332,7 +1331,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   there — a stale ⌘N target no longer glows while you work elsewhere.
 
 ## [0.25.0] - 2026-07-08
-
 
 ### Fixed
 
@@ -1383,7 +1381,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Open in Brain** (opens it and reveals where it lives in the sidebar — Main is
   just a view). The editor's location chip now shows the note's Brain folder + its
   absolute on-disk path in its tooltip.
-- **First-run model setup.** Onboarding now has an *Its mind* step: grab a small
+- **First-run model setup.** Onboarding now has an _Its mind_ step: grab a small
   on-device model in one click (the download keeps going if you continue), or skip
   and connect a subscription later in Settings — so a fresh install lands with a
   working chat. Optional; it never blocks setup.
@@ -1534,7 +1532,7 @@ first foundations of the Breve→rotli merge.
 - **Clicking a file follows the standard editor model now.** A plain click in the
   sidebar **activates that file's tab if it's already open**, otherwise opens it in
   a **new tab** — it never replaces the file you're working in. ⌘-click / ⌘T still
-  force a fresh tab. (Previously a plain click *replaced* the active tab, so opening
+  force a fresh tab. (Previously a plain click _replaced_ the active tab, so opening
   a second file lost your place.) Applies to notes, boards, files, and saved chats;
   "New chat" always opens fresh.
 
@@ -1559,7 +1557,7 @@ first foundations of the Breve→rotli merge.
 ### Fixed
 
 - **No more ghost tab on launch.** With the new tab model, the app's pristine
-  startup tab is now *filled* with your freshest note instead of leaving an empty
+  startup tab is now _filled_ with your freshest note instead of leaving an empty
   tab beside it (caught by the pre-release review).
 
 ### Internal
@@ -1575,6 +1573,7 @@ Feedback sweep, day 2: organizer controls (pick the model + idle delay), the Bre
 check-up fix, and the metadata/onboarding polish from Seth's live pass.
 
 ### Added
+
 - **Pick the organizer's model** (Settings → Brain). Choose **On this Mac** (the
   local MLX model — default, nothing leaves the machine) or **Claude Sonnet 5**
   (via `claude -p`). With the Claude lane, non-secure notes are sent to Anthropic
@@ -1585,6 +1584,7 @@ check-up fix, and the metadata/onboarding polish from Seth's live pass.
   now **5 minutes** (was 45s), so the organizer waits until you've moved on.
 
 ### Changed
+
 - **The metadata (≡) icon is now an instant toggle** (feedback #23). Clicking it
   shows/hides the note's frontmatter immediately — no more popover. The controls
   that lived in that popover — **Lock from the AI**, **Mark secure**, and **File
@@ -1592,16 +1592,17 @@ check-up fix, and the metadata/onboarding polish from Seth's live pass.
   existing Add-to-Main / Star / Rename), reachable by right-clicking a note in the
   sidebar or the editor's header chrome. The old `MetaPanel` popover is retired.
 - **An open note now shows "★ In Main"** in its header status line when it's in
-  Main (feedback #1). Main membership is deliberately *not* in the note's
+  Main (feedback #1). Main membership is deliberately _not_ in the note's
   frontmatter — it lives in `.rotli/main.json` so the AI reorganizing the Brain
   never disturbs your arrangement — so this is the glanceable indicator that was
   missing, plus Add/Remove-from-Main in the right-click menu.
 
 ### Fixed
+
 - **Dropped images no longer create "broken asset" refs.** `import_file` copied a
   dropped file into `storage/` with its original name, so a macOS screenshot
   ("Screenshot 2026-… AM.png") produced a spaced `storage:` link that breaks
-  markdown *and* the memex validator's `[A-Za-z0-9._/-]` regex — the recurring
+  markdown _and_ the memex validator's `[A-Za-z0-9._/-]` regex — the recurring
   Breve check-up failures. Names are now slugified on import
   (`screenshot-2026-…-am.png`); the existing rotli-feedback note's 16 refs + files
   were de-spaced so `validate.ts` passes.
@@ -1619,8 +1620,9 @@ tracker in `docs/design/feedback-2026-07-03.md`). This release is **Batch 1 of 7
 Tabs & Main core**.
 
 ### Changed
-- **⌘T opens a new *blank* note, not a duplicate** (#8). The tab-strip "+" and ⌘T
-  both created another tab of the *same* note; now they open a fresh note in a new
+
+- **⌘T opens a new _blank_ note, not a duplicate** (#8). The tab-strip "+" and ⌘T
+  both created another tab of the _same_ note; now they open a fresh note in a new
   tab — the IDE "new tab" gesture. The old duplicate-the-active-tab `newTab()` store
   method is retired (splits still duplicate, unchanged).
 - **Every new note auto-files into Main** (#15). ⌘N, the "+" menu, and ⌘T now drop
@@ -1637,6 +1639,7 @@ Tabs & Main core**.
 The first-contact fixes from Seth's live pass over 0.24.0.
 
 ### Fixed
+
 - **The lane toggle now actually flips.** The bare switch in a lane card was missing its
   ON-state styling (the knob styles only existed under the old full-row toggle), so an
   enabled lane looked OFF — the "enabled UI is confusing" report. Enabled lanes now show a
@@ -1649,6 +1652,7 @@ The first-contact fixes from Seth's live pass over 0.24.0.
   ("ready · v2.1.199").
 
 ### Changed
+
 - **The Brain organizes by default.** The trust ladder's default rung is now **Organize**
   (was Suggest) — across the UI default, the settings parse, and the Rust daemon — because
   the daemon only ever changes a note's **location + metadata** (journaled, undoable); the
@@ -1662,6 +1666,7 @@ The AI Models pane grows up: verification, per-model control, starter presets, a
 "Scan my Mac".
 
 ### Added
+
 - **Connected lanes are now cards that prove themselves.** Toggling a lane on runs one
   tiny REAL reply in the background on the lane's cheapest model (detection only proves a
   binary + a credential; a ping proves the path) — the card shows "working ✓ · haiku ·
@@ -1680,6 +1685,7 @@ The AI Models pane grows up: verification, per-model control, starter presets, a
   the Macs that can carry them.
 
 ### Changed
+
 - The whole AI Models pane breathes: sectioned groups with real spacing, roomier rows,
   cards instead of packed toggles.
 - The shared registry's `updated` field is now stamped on every install/uninstall.
@@ -1688,6 +1694,7 @@ The pre-test verification sweep: every connected lane's exact invocation was exe
 live against the installed CLIs before handing the build over for testing.
 
 ### Fixed
+
 - **The Codex lane was broken on arrival** — `codex exec` (0.137.0) has no
   `--ask-for-approval` flag (exec mode never prompts; that flag belongs to interactive
   mode), so every codex chat turn and codex image job would have died on argv parsing.
@@ -1695,6 +1702,7 @@ live against the installed CLIs before handing the build over for testing.
   of claude's `--no-session-persistence`). A regression test now pins the flag OUT.
 
 ### Verified (no changes needed)
+
 - The exact claude argv end-to-end (haiku ping → `result`/`is_error` envelope parses),
   the corrected codex argv end-to-end (`item.completed` → `agent_message`), the agy argv
   end-to-end ("OK" on stdout), the claude Keychain detect probe, and all five curated
@@ -1705,6 +1713,7 @@ live against the installed CLIs before handing the build over for testing.
 Install on-device models straight from Settings — and pick any of them per chat.
 
 ### Added
+
 - **Local model installer (Settings → AI Models → On this Mac):** browse a curated set of
   MLX chat models or paste any Hugging Face repo id, and rotli downloads the weights (via
   the memex-ai venv's `hf` CLI) into the shared store with a live progress bar + Cancel,
@@ -1720,12 +1729,14 @@ Install on-device models straight from Settings — and pick any of them per cha
   default model refuses uninstall so other memex apps never lose their model.
 
 ### Changed
-- rotli now *writes* two shared memex-ai artifacts (it only read them before): spliced
+
+- rotli now _writes_ two shared memex-ai artifacts (it only read them before): spliced
   `registry.json` model entries and the MLX server's `MEMEX_MLX_MODEL` launchd env. Both
   are surgical and reversible — the registry rewrite preserves every other key (atomic
   tmp+rename), and the plist edit is a single value `Set`.
 
 ### Notes
+
 - Connected models (Claude/Codex/Antigravity CLIs, Gemini API) are entirely separate
   lanes and unaffected by local model choices.
 - Downloads shell the venv's `hf` binary (`~/.memex/ai/mlx-venv/bin/hf`); a repo id is
@@ -1741,6 +1752,7 @@ The AI Chat flow, rethought: connected subscription models, hybrid routing, and 
 chat that organizes itself.
 
 ### Added
+
 - **Connected models (Settings → AI Models):** chat can now run on the subscriptions
   already signed in on this Mac — **Claude Code** (Claude Pro/Max), **Codex** (ChatGPT),
   **Antigravity** (Google AI Pro/Ultra; bundles Gemini 3.x + Claude 4.6 models) — plus a
@@ -1773,6 +1785,7 @@ chat that organizes itself.
   ride the same secret-egress guard as the web tools.
 
 ### Changed
+
 - **The send button is a button now** — a filled circular ↑ (ChatGPT/Claude style);
   spinner while a local model thinks, a real **stop** square for connected models
   (Rust kills the subprocess mid-step).
@@ -1781,6 +1794,7 @@ chat that organizes itself.
   caps) — local models keep the tuned Gemma scaffold and their exact tiers.
 
 ### Notes
+
 - Personal-use lane: rotli drives the **user's own** installed, signed-in CLIs on their
   own machine. Distributing this to other users would need each vendor's blessing
   (Anthropic requires approval for third-party subscription auth) — fine for 0.x.
@@ -1791,6 +1805,7 @@ chat that organizes itself.
 ## [0.21.1] — 2026-07-02
 
 ### Added
+
 - **Three new quokka poses** — `waving`, `searching`, and `celebrating` — generated against the
   base character as a style reference (gpt-image-2), binarized, and vector-traced back into the
   set's single-path `currentColor` format. Same character, same line weight, big catchlight eyes.
@@ -1803,6 +1818,7 @@ chat that organizes itself.
 The quokkas, properly.
 
 ### Fixed
+
 - **The eyes read as eyes now.** Every character's eye-highlight hole doubled (17→34 viewBox
   units) — at empty-state sizes the eyes now carry a visible catchlight instead of collapsing
   into blobs. (The set is single-path evenodd line art; the holes were simply too small to
@@ -1815,6 +1831,7 @@ The quokkas, properly.
   match their panes.
 
 ### Added
+
 - **A new `rest` character** — closed eyes, same hand-drawn line grammar (derived from the base
   pose) — for quiet empty states.
 - **Quokkas in more empty states:** All notes ("No notes yet" → the notepad quokka), All chats
@@ -1834,8 +1851,9 @@ honesty pass over the docs. The rest of the findings stay tracked in the report 
 performance batch and the mega-refactors are sequenced there, not forgotten).
 
 ### Fixed — security & secrets (the batch that shipped first)
-- **A secure note's `.gitignore` line now follows the file** *(the audit's one
-  critical, #1)* — flagging a note `secure:` gitignores it, but renaming it, filing it
+
+- **A secure note's `.gitignore` line now follows the file** _(the audit's one
+  critical, #1)_ — flagging a note `secure:` gitignores it, but renaming it, filing it
   to the Brain, moving or undoing it used to leave the OLD path in `.gitignore`,
   silently making the secret committable. Every relocate/rename now re-syncs the
   gitignore entry (remove old, add new), test-pinned through the flag→file→assert loop.
@@ -1843,7 +1861,7 @@ performance batch and the mega-refactors are sequenced there, not forgotten).
   hardcoded `true`; locality is now derived from the picked model's actual endpoint
   (loopback check, TS + Rust in lockstep), so a registry entry can't masquerade as
   local and walk off with a secure note.
-- **Secret detection runs at the AI boundary too** (#21, #23) — a note that *looks*
+- **Secret detection runs at the AI boundary too** (#21, #23) — a note that _looks_
   secret (even if its metadata panel was never opened) is refused to remote models,
   and the detectors on both sides now catch **separator-less** card numbers
   (Luhn-checked 15–16 digit runs) — the exact shape in the migrated notes. Dash-less
@@ -1869,6 +1887,7 @@ performance batch and the mega-refactors are sequenced there, not forgotten).
   inbox appends).
 
 ### Fixed — data safety & correctness
+
 - **Dirty spreadsheets survive quit** (#4) — unsaved sheet edits used to die silently
   with ⌘Q; every parked dirty session now flushes through the real save path the
   moment the window hides (the same seam settings flush on) — **and quit itself is
@@ -1891,7 +1910,7 @@ performance batch and the mega-refactors are sequenced there, not forgotten).
   "already classified" (state mutates only after the writes succeed, #25); index
   proposals get the same supersede + approve-time freshness grammar file/field rows
   always had (no more zombie rows or stale-approve overwrites, #26); a frontmatter
-  edit made *during* a model call is no longer clobbered by the apply window (#27);
+  edit made _during_ a model call is no longer clobbered by the apply window (#27);
   **approving a proposal now teaches the daemon** the approved value is daemon-owned
   (it used to freeze the field forever — cooperation reduced maintenance, #28); an
   explicit **Run now** on battery is queued instead of silently swallowed by the power
@@ -1912,6 +1931,7 @@ performance batch and the mega-refactors are sequenced there, not forgotten).
   de-dashed slug (#87).
 
 ### Changed / Added — the UX batch
+
 - **Failures surface where you work** (#11) — a failed board write shows a data-loss
   strip over the canvas; a failed chat save renders an inline "won't survive a reload"
   note; a failed file-to-Brain or board rename lands as a dismissible sidebar note.
@@ -1920,8 +1940,8 @@ performance batch and the mega-refactors are sequenced there, not forgotten).
   now pre-seeds a selected **"Keep my current location"** card; clicking through can
   never relocate the corpus. (A true first run still requires the explicit choice —
   the v0.8.7 no-silent-default rule stands.)
-- **Generic code fences render as code** (#13) — a ```js block (or a bare ```) keeps a
-  mono voice; its contents are never markdown-styled, and a pipe-table *example* inside
+- **Generic code fences render as code** (#13) — a `js block (or a bare `) keeps a
+  mono voice; its contents are never markdown-styled, and a pipe-table _example_ inside
   any fence is never turned into a live table widget (the slash menu shipped the repro).
 - **Links open** (#14) — **⌘-click** a markdown link (raw or beautified) to open it,
   with a tooltip that says so; plain click stays the edit path. Rendered links (chat
@@ -1932,10 +1952,10 @@ performance batch and the mega-refactors are sequenced there, not forgotten).
   and the ⊕ is now **name-first**: it opens an input instead of minting a permanent
   "New folder 2".
 - **Honest labels** — the Aa panel's global rows say "· all notes" instead of hiding
-  behind the per-note footnote (#52); a read-only sheet says *why* ("view only · .ods"
+  behind the per-note footnote (#52); a read-only sheet says _why_ ("view only · .ods"
   / "· too large", #53); the PDF pane takes keyboard focus so space/arrows page
   immediately (#54); the Captures board quietly explains that a curated card
-  *graduates* — it leaves the board and lives with your notes — and the cards carry
+  _graduates_ — it leaves the board and lives with your notes — and the cards carry
   the app's right-click menu (star · Add to Main · File to the Brain · archive), so
   graduating happens where the captures live (#56).
 - **Small pleasures** (#80–#85) — a theme-aware checkerboard behind transparent
@@ -1945,6 +1965,7 @@ performance batch and the mega-refactors are sequenced there, not forgotten).
   styled.
 
 ### Docs
+
 - **The design doc tells the shipped truth** (#30) — `docs/design/main-brain-daemon.md`
   now marks `reach:` scoping (§4.2.6), the configurable battery budget (§6.3), and the
   Settings → Brain capability checkboxes (§4.8) as **Phase-5 deferrals** instead of
@@ -1959,10 +1980,11 @@ One release, three batches. **Phase 4 of the Main/Brain plan**
 Plus the files/metadata batch and an editor · search · viewer batch.
 
 ### Added — the organizer daemon (Phase 4)
+
 - **The Suggest daemon** (`organizer.rs`) — an event-driven Rust background worker that
   runs three narrow jobs against the local model: **Classify** (staged `wiki/_inbox`
   captures → an area, or a `suggested_area` hint below the confidence threshold),
-  **Enrich** (fill *empty* `summary`/`tags`/`links` — a field you edited is never
+  **Enrich** (fill _empty_ `summary`/`tags`/`links` — a field you edited is never
   clobbered; link candidates come from keyword ranking, the model only confirms), and
   **Refresh index** (deterministic `wiki/<area>/_index.md` overviews — same members, same
   bytes, no thrash). Gated to run politely: per-note quiet period, user idle or app
@@ -1992,6 +2014,7 @@ Plus the files/metadata batch and an editor · search · viewer batch.
   (Settings → Hotkeys → Chat).
 
 ### Added — files & metadata
+
 - **Editable spreadsheets** — `.xlsx` and `.csv` open in an **editable grid** (typed
   values + bold/text-color/fill styling, multi-sheet) when the file's store is writable;
   a vault / linked-library / memex-`storage/` sheet keeps the read-only table. Explicit
@@ -2013,13 +2036,14 @@ Plus the files/metadata batch and an editor · search · viewer batch.
   restores the reserved `id`/`owner`/`created` keys and refuses read-only notes; the
   metadata panel slims down to the Lock/Secure switches + Brain filing (the old key:value
   field editor is gone — the file itself is the editor now).
-- **Drag ghosts everywhere** — dragging a Main row (reorder *and* pull-in from the brain)
+- **Drag ghosts everywhere** — dragging a Main row (reorder _and_ pull-in from the brain)
   or a Board capture card now paints the same floating label ghost tab-dragging always
   had: what you drag literally comes with you. One shared implementation
   (`lib/dragGhost`), pointer-events-transparent so drop hit-testing is untouched — and
   **Esc / pointercancel now abandons** those drags mid-flight, same as tabs.
 
 ### Added — editor · search · viewers
+
 - **Full-text search, everywhere you type a query** — All notes, the sidebar filter, the
   palette picker, and Quick Note now search **note bodies**, not just titles, across the
   whole searchable universe (staged captures + the brain + the Vault + added folders).
@@ -2028,7 +2052,7 @@ Plus the files/metadata batch and an editor · search · viewer batch.
   The ranking/snippet grammar is one pure core in Rust (`corpus_search`) with a TS twin
   for the dev surface — mirrored test vectors keep them in lockstep, and offsets are
   char-counted so no emoji ever shifts a highlight.
-- **```html fences render** — same code ⇄ preview model as ```svg: the markup renders in
+- **`html fences render** — same code ⇄ preview model as `svg: the markup renders in
   a **sandboxed, script-free** iframe (verified against the shipped CSP — no
   `allow-scripts`, opaque origin; fence content is untrusted the moment a note is
   shared); click the block to see/edit the source.
@@ -2050,6 +2074,7 @@ Plus the files/metadata batch and an editor · search · viewer batch.
   full value on hover.
 
 ### Changed
+
 - **Sidebar polish** — the live filter now narrows **Main** too (it used to skip the one
   section you curate by hand) and matches **snippets**, not just titles — with the j/k
   roving cursor kept honest (it never lands on a filtered-out row). Main's always-visible
@@ -2057,17 +2082,19 @@ Plus the files/metadata batch and an editor · search · viewer batch.
   Tab-reachable).
 
 ### Fixed
+
 - **Main no longer forgets staged notes** — Main, tab titles, and the row menu now read
   the FULL note index (staged Captures + Archive + Trash + Vault), not just the default
-  listing. A staged note placed in Main used to vanish from the row *and* get GC'd out of
+  listing. A staged note placed in Main used to vanish from the row _and_ get GC'd out of
   `.rotli/main.json` on the next save (the "seeded Main emptied itself / tab says
   Untitled" bug), and "Add to Main" on a staged note was a silent no-op. A Main ref now
   survives anywhere its file actually lives.
 
 ### Notes
-- **Secure/locked are absolute:** a `secure` note (or one that merely *looks* secret) never
+
+- **Secure/locked are absolute:** a `secure` note (or one that merely _looks_ secret) never
   enters **any** model — local included — at any trust rung; a `locked` note is never
-  touched. That includes the *edges*: secure/locked notes are **omitted from the generated
+  touched. That includes the _edges_: secure/locked notes are **omitted from the generated
   `_index.md` overviews** (a quick capture's title is often the secret itself) and their
   title-derived filenames are **kept out of the link-candidate lists** sent to the model.
   Activity quietly counts skipped secret-looking captures for you to review yourself — a
@@ -2091,6 +2118,7 @@ duplication, the Rust shell) — less to manage, nothing user-visible lost. The 
 back clean (no unused deps; write paths already share one `atomic_write`/`relocate` core).
 
 ### Changed
+
 - **One menu system.** The sidebar's old keyboard row-popover (RowMenu) is gone; the **m key
   now opens the same right-click menu**, anchored under the row — so keyboard users get the
   FULL action set (Star, Add to Main, Rename…, File to the Brain, Archive, Delete) instead of
@@ -2105,6 +2133,7 @@ back clean (no unused deps; write paths already share one `atomic_write`/`reloca
   vocabulary separately) and one `invalidateBoth` for the lifecycle mutations.
 
 ### Removed (dead code)
+
 - The **HTML5 note-drag dropzones** in the sidebar (`NOTE_DRAG_TYPE`/`dropProps`): nothing has
   started an HTML5 drag since the pointer-drag era — the handlers could never fire. (Moving a
   note is the ⊕/drag-into-Main gesture + Archive/Trash; a pointer-based move-to-folder can
@@ -2118,6 +2147,7 @@ back clean (no unused deps; write paths already share one `atomic_write`/`reloca
 ## [0.18.1] — 2026-07-01
 
 ### Fixed
+
 - **Manual "File to the Brain" actually works now.** A `.md` note travels the app as its
   frontmatter ULID, but the Filer's commands expected a file path — so the metadata panel's
   filing section never recognized a staged note, and 0.18.0's right-click drill never showed.
@@ -2133,12 +2163,13 @@ A reported-issues sweep before Phase 4 (the organizer daemon): everything open f
 left-menu / Quick-access / hotkey reports, resolved.
 
 ### Added
+
 - **j/k keyboard nav reaches Main.** The sidebar's roving cursor now walks your Main rows
   (notes and folders, in your arrangement order) the same as the rest of the tree — j/k to
   move, Enter/l to open, h to collapse a Main folder, m for the row menu. Main notes ride
   with their own roving ids, so a note pinned in Main and visible in the Brain are two
   distinct stops.
-- **Contextual ⌘+ / ⌘− zoom.** Zoom *where you are*: with focus in the sidebar it scales the
+- **Contextual ⌘+ / ⌘− zoom.** Zoom _where you are_: with focus in the sidebar it scales the
   whole section tree (persisted, clamped 0.8–1.4×); in a note it steps that note's body-text
   size (the per-note Aa render layer — never written into the .md). "Reset zoom" is in the
   palette; all three are rebindable in Settings → Hotkeys.
@@ -2151,11 +2182,13 @@ left-menu / Quick-access / hotkey reports, resolved.
   Filer gate + Activity journal as the metadata panel, one shared code path.
 
 ### Changed
+
 - **Captures shows only real captures.** A staged note you've **curated** — added to Main or
   ★ starred for Quick access — is a full note you keep, so it leaves the Captures board (and
   the sidebar count). Your "main note — seth" no longer poses as a sticky note.
 
 ### Fixed
+
 - **Tab drag-reorder landed one slot right of the preview line** (the hit-test counted the
   dragged tab itself; audit CMP-1) — now it lands exactly where the line showed, locked by
   a new `moveTab` test suite.
@@ -2167,6 +2200,7 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.17.0] — 2026-07-01
 
 ### Added
+
 - **Right-click context menu on notes.** Right-click any note (in the Brain, a folder, Main, All notes or
   Recent) for: **Open in new tab · ★ Star / Unstar** (Quick access) **· Add to / Remove from Main ·
   Rename… · Archive · Delete**. Files get a slimmer menu (open / star / Main / delete). Built on a small
@@ -2179,29 +2213,34 @@ left-menu / Quick-access / hotkey reports, resolved.
   a blank tab first.
 
 ### Notes
+
 - **Move-into-a-Brain-area** from the right-click menu is a fast follow (it needs the note-id → path bridge
   the Filer uses); today, file a note into an area from its metadata panel's **File to the Brain**.
 
 ## [0.16.0] — 2026-07-01
 
 ### Added
+
 - **All chats — a searchable list, the twin of All notes.** Clicking **All chats** in the sidebar used to
   just toggle an inline expand (and did nothing when you had only a few chats). It now opens a proper
   content view: every chat in a searchable list, click a row to open it in a pane. (New `AllChatsSurface`
-  + an `allChats` content view.)
+  - an `allChats` content view.)
 
 ### Changed
+
 - **Every pane surface fills its pane.** Follow-through on the chat-centering fix: images, PDFs,
   spreadsheets, markdown, canvases and the activity log all render in a full-width pane body — no more
   content-width collapse.
 
 ### Notes
+
 - **CSV & Excel render in-app.** (Already built; now demoed.) A `.csv`/`.xlsx` opens read-only as a table
   with a tab per sheet. Two sample files are seeded into Main to show it off.
 
 ## [0.15.0] — 2026-07-01
 
 ### Changed
+
 - **"Quick access" is now two things done right — Main + starred Quick access.** The sidebar section is
   back to **Main**: your hand-picked notes, arranged your way. **Quick access** is now what it should be —
   a **capped set (≤5) of starred notes** that live in Main. **★** a Main row to star it; anything starred
@@ -2209,7 +2248,8 @@ left-menu / Quick-access / hotkey reports, resolved.
   arrangement without moving anything.
 
 ### Fixed
-- **Chat is *really* centered now.** The prior fix centered *inside* the chat surface, but the surface
+
+- **Chat is _really_ centered now.** The prior fix centered _inside_ the chat surface, but the surface
   itself had no `flex: 1` in the pane row — so it collapsed to its content width and pinned left, dead
   space on the right, and the internal `margin: 0 auto` had no room to work. Every pane surface
   (chat, file, canvas, activity) now fills the pane, so the chat column truly sits centered.
@@ -2217,6 +2257,7 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.14.1] — 2026-07-01
 
 ### Fixed
+
 - **Chat is actually centered now.** The conversation was left-pinned once it had messages — a flex-item's
   default `min-width: auto` let wide message content push the thread past its `max-width`. Switched to plain
   block centering (`margin: 0 auto` + `min-width: 0`), so the column is locked at its reading width and
@@ -2227,8 +2268,9 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.14.0] — 2026-07-01
 
 ### Changed
+
 - **Onboarding picks your theme first.** The appearance step moved right after the welcome, so you set a
-  theme you like *before* walking the rest of setup — no more trudging through it in one that hurts your eyes.
+  theme you like _before_ walking the rest of setup — no more trudging through it in one that hurts your eyes.
 - **Sidebar: "Quick access" + a collapsible Brain.** The "Main" section is now **Quick access** — your
   hand-picked, most-needed notes (add with **⊕** on a note row, or drag one from the Brain). The **Brain**
   is now a **collapsible row inside Destinations** (its Activity link + areas fold away when you don't need
@@ -2239,6 +2281,7 @@ left-menu / Quick-access / hotkey reports, resolved.
   to the same centered column as the conversation.
 
 ### Fixed
+
 - **The quokka's face reads again.** The onboarding + empty-state quokkas were rendering with a heavy
   stroke that filled in the eyes and nose dot — swapped to the original artwork (a clean `evenodd` fill)
   recolored to `currentColor` so it still follows your theme. (The app icon was already correct.)
@@ -2246,6 +2289,7 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.13.0] — 2026-07-01
 
 ### Added — Phase 3: manual filing + the Brain **Activity** log (see & undo the AI)
+
 - **File a note into the Brain, by hand.** In a staged note's metadata panel (the Aa chip → metadata),
   a **"File to the Brain"** row lets you pick an area — the note files into `wiki/<area>/` through the
   v3.7 Filer gate, and its open pane retargets to the new location. A filed note shows **"🧠 Filed in
@@ -2253,22 +2297,24 @@ left-menu / Quick-access / hotkey reports, resolved.
 - **Brain Activity** — a new pane (open it from **Brain → Activity** in the sidebar, or "Brain Activity →"
   in the metadata panel) that logs every Filer action to `.rotli/brain-journal.jsonl` and lets you **undo
   any of it**: a filed note moves back, a set field restores. This is the **trust surface** — see and
-  reverse every AI write *before* any of it becomes automatic (the background daemon is Phase 4). New Rust
+  reverse every AI write _before_ any of it becomes automatic (the background daemon is Phase 4). New Rust
   `filer_move` + journal append/read + a `surfaceKind:"activity"` pane; `src/services/brainJournal.ts`.
 
 ### Changed
+
 - **Drag a note from the Brain (or any list) into Main.** Cross-section pointer-drag: grab a note in the
   Brain and drop it into your Main view — before/after a row, or into a Main folder (the **⊕** still works
-  too). Areas like **People** stay auto-maintained *in the Brain*; **Main is your curated subset of
+  too). Areas like **People** stay auto-maintained _in the Brain_; **Main is your curated subset of
   individual notes**, never a mirror of the areas. (Replaces the dead HTML5 note drag with the pointer
   pattern that works in the WKWebView shell.)
 
 ## [0.12.0] — 2026-07-01
 
 ### Added — contract v3.7: the AI **Filer** write lane (capability only, no daemon yet)
+
 - **The write-lane foundation for the background AI organizer** (Phase 2 of the Main/Brain/daemon plan,
   `docs/design/main-brain-daemon.md`). A second, narrower write actor — the **Filer** — may now write the
-  curated `wiki/**` brain (which stays read-only for *you*), gated separately from your own writes. **Two
+  curated `wiki/**` brain (which stays read-only for _you_), gated separately from your own writes. **Two
   actors, two gates, disjoint key-sets:** you write `chats/`+`_inbox` and never the curated brain; the
   Filer writes the brain (`area`/`summary`/`tags`/`links`/…) and never your Main arrangement, and it
   refuses any `locked` note. New Rust `filer_writable` gate + `set_ai_field` (AI-keys-only) + `file_note`
@@ -2284,8 +2330,9 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.11.0] — 2026-07-01
 
 ### Added
+
 - **Main — your hand-arranged view over the Brain.** A new sidebar section above the Brain where you
-  arrange notes into your *own* folders and order, independent of how the AI files them underneath. It
+  arrange notes into your _own_ folders and order, independent of how the AI files them underneath. It
   holds no files of its own — it references your Brain notes by id, so it's **"one file, two views"**
   (edit a note in Main or in Brain, it's the same file). **⊕** on any note row adds it to Main; **drag**
   rows to reorder or move them into Main folders; **+ New folder** makes a Main-only folder. Persisted to
@@ -2296,6 +2343,7 @@ left-menu / Quick-access / hotkey reports, resolved.
   Main from other sections + j/k keyboard nav for Main are follow-ups.)
 
 ### Fixed
+
 - **Images and PDFs use the pane.** A small-resolution image (e.g. a Breve newsletter) no longer renders
   tiny at its natural size — it fills the pane (object-fit, so it scales up and stays readable); PDFs and
   the iframe fallback get a full-bleed block body instead of being shrunk by the centered layout.
@@ -2303,12 +2351,13 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.10.1] — 2026-06-30
 
 ### Fixed
+
 - **Metadata panel no longer hangs on "Reading…".** Opening it on a secret-adjacent note triggers the
-  auto-secure-flag, which writes + updates `.gitignore` *during the read*; 0.10.0's security hardening made
+  auto-secure-flag, which writes + updates `.gitignore` _during the read_; 0.10.0's security hardening made
   that write propagate errors, so any hiccup errored the whole read — and the panel had no `.catch`. The
   read-path auto-flag is now best-effort (still persists + logs; explicit "Mark secure" still hard-fails),
   and the panel surfaces the error instead of hanging forever.
-- **Quick Note chord no longer *occasionally* opens the main window too.** 0.10.0's visibility guard had a
+- **Quick Note chord no longer _occasionally_ opens the main window too.** 0.10.0's visibility guard had a
   race — the spurious macOS `Reopen` could fire before the panel registered as visible. Added a
   deterministic backstop: a summon timestamp stamped before the panel steals focus + a grace window in the
   reopen handler (belt **and** suspenders).
@@ -2320,6 +2369,7 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.10.0] — 2026-06-30
 
 ### Changed
+
 - **The Brain shows in the sidebar.** Your AI-organized wiki areas (People · Projects · Research ·
   Engineering · Theology · Reference) now render as a navigable **Brain** section under Notes — before
   they were invisible (the sidebar never asked for the `wiki` folder tree). Area labels are prettified.
@@ -2339,6 +2389,7 @@ left-menu / Quick-access / hotkey reports, resolved.
   Storage). Computed in the frontend (`src/services/storageTree.ts`); your files never move on disk.
 
 ### Added
+
 - **In-app file viewers (universal).** Clicking a surfaced file opens it in a right-pane **file surface**
   instead of shelling the OS default app: audio gets a real player with a play button (no more Apple
   Music), video/image/pdf render inline, text reads in-pane, and **anything else** falls back to an
@@ -2350,6 +2401,7 @@ left-menu / Quick-access / hotkey reports, resolved.
   by name (text, or a spreadsheet as CSV) so it can answer questions about it — look, don't act.
 
 ### Fixed
+
 - **The Quick Note chord opens ONLY the Quick Note.** Summoning the floating note (⌥Q, or a rebound chord
   like ⌥.) activates the app, which fired a spurious macOS `Reopen` — and the main window came up too,
   defeating the whole point. The reopen now uses our OWN window-visibility check (the OS
@@ -2357,6 +2409,7 @@ left-menu / Quick-access / hotkey reports, resolved.
   floating note alone.
 
 ### Internal (code-health pass)
+
 - A codebase audit drove a cleanup. **Hardened security:** `gitignore_add` now propagates its write error
   (+ a symmetric `gitignore_remove` when a note is un-secured); the web-egress secret guard keys off
   `WEB_TOOLS`. **Removed dead code:** the unwired `captureToInbox`/`inbox.md` chain (TS + Rust command +
@@ -2370,10 +2423,11 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.9.0] — 2026-06-29
 
 ### Added
+
 - **The agentic memex client** — Chat is no longer a context-free one-shot. The on-device model now runs
   a multi-step **tool-use loop** over your memex (its knowledge base) and, opt-in per chat, the web:
   - **`search_notes` / `read_note`** — the model searches and reads your notes (their organization +
-    metadata) to answer. Secure notes stay readable by the *local* model (the remote gate still holds).
+    metadata) to answer. Secure notes stay readable by the _local_ model (the remote gate still holds).
   - **Web search — DuckDuckGo, no API key** — a per-chat **globe** toggle in the composer (off by
     default) lets a chat reach the internet (`web_search` / `web_fetch`); the model only uses it when
     your notes don't cover the question.
@@ -2387,8 +2441,7 @@ left-menu / Quick-access / hotkey reports, resolved.
   detector is never sent to the web. The detector is now shared (`src-tauri/src/secret.rs`) by the
   secure-note flag and the web guard.
 - **Multi-turn model bridge** (`chat_messages`) — flattens the transcript for MLX `/api/generate` (with
-  JSON coercion), or sends a real messages array to llama.cpp **with the Bearer key** (fixes a latent
-  401) plus image content-parts, and lazy-kickstarts the on-demand llama.cpp server.
+  JSON coercion), or sends a real messages array to llama.cpp **with the Bearer key** (fixes a latent 401) plus image content-parts, and lazy-kickstarts the on-demand llama.cpp server.
 - **Vision serving** — gemma-3 is multimodal. Because the shared MLX server runs in a frozen py3.9 venv
   (Breve's) where the gemma3 mlx-vlm path can't install, vision runs in an **isolated py3.11 sidecar**
   (`~/.memex/ai/mlx-vlm-venv` + `mlx-vlm-server.py` on :11437); the text server **proxies** image
@@ -2396,12 +2449,14 @@ left-menu / Quick-access / hotkey reports, resolved.
   unaffected. One-time setup: `~/.memex/ai/setup-vision.sh`.
 
 ### Changed
+
 - The Chat composer gained the **globe** (web) and **paperclip** (image) controls beside the model
   selector; `chat_models` and the memex-ai registry now carry a **`vision`** capability (gemma-3 flagged).
 
 ## [0.8.9] — 2026-06-29
 
 ### Changed
+
 - **Chat is a centered modern column** (ChatGPT/Claude style): the conversation + composer share a
   max-width and center in the pane; the **model selector moved into the composer** (bottom); AI
   replies render as **plain text** in the column, only your messages are bubbles.
@@ -2410,6 +2465,7 @@ left-menu / Quick-access / hotkey reports, resolved.
   model hallucinating with no real context).
 
 ### Fixed
+
 - **The welcome quokka's face reads again** — 0.6.3's uniform `stroke-width:12` had filled in the eye
   cutouts; dialed `stays_local` back to 4 (the body's weight is the fill, so the face returns with
   minimal body change).
@@ -2417,6 +2473,7 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.8.8] — 2026-06-29
 
 ### Added
+
 - **onboardingVersion gate** — onboarding now re-runs reliably across updates. While `0.x` (beta),
   **every version change re-onboards** (the flow is still evolving); once `1.0`, the bar freezes at
   `1.0.0` so updates never re-onboard — **only a fresh install does**. The build version is injected
@@ -2425,6 +2482,7 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.8.7] — 2026-06-29
 
 ### Fixed
+
 - **Onboarding now requires choosing where rotli lives** — no more silent `~/Documents/rotli`
   default. The location step is required: **"Skip setup" jumps to it**, **"Continue" is gated** until
   you pick, and the third option is **"Use a plain folder…"** (choose a location) instead of a silent
@@ -2434,6 +2492,7 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.8.6] — 2026-06-29
 
 ### Added
+
 - **Secure notes.** A regex pass detects secret patterns (API/private keys, JWTs, SSNs, card
   numbers) and auto-flags a note `secure: true` — **without recording the secret**. A secure note's
   content is **never sent to a remote model** (the `corpus_read_ai` gate refuses it; a local model
@@ -2443,16 +2502,19 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.8.5] — 2026-06-29
 
 ### Added
+
 - **Opens maximized**, and **double-click the titlebar to zoom** — the standard macOS gesture,
   re-enabled over the manual-drag titlebar.
 
 ### Fixed
+
 - **Block-handle gutter** no longer shows a light/white bar: the editor gutter is transparent, so the
   `+` / grip handles sit subtly in the left margin, theme-matched.
 
 ## [0.8.4] — 2026-06-29
 
 ### Added
+
 - **Move an inline image** — drag the image itself to reposition it (it drops at the cursor line);
   resize stays on the corner grip, and a plain click still reveals the source.
 - **Editable metadata** — the metadata panel's fields (shelf/reach/area/tags…) are now editable:
@@ -2460,12 +2522,14 @@ left-menu / Quick-access / hotkey reports, resolved.
   (id/created/updated/pinned/origin/locked) stay managed by rotli.
 
 ### Changed
+
 - **Chat is a pane surface now.** A chat opens in a pane like a note or canvas — so **multiple
   chats** can be open at once, and a pane can hold a **chat OR a note** (note left, chat right).
   "New chat" / a chat row opens a chat pane; "All chats" expands the sidebar list; tabs/splits/
   drag work on chats for free.
 
 ### Fixed
+
 - **Chat UI rebuilt.** Role labels (you · rotli), assistant replies render as **markdown**
   (bold/italic/code/links + fenced code blocks), a centered empty state, and a **multi-line
   composer** (⏎ send · ⇧⏎ newline). User-right / AI-left bubbles, the model selector intact.
@@ -2473,6 +2537,7 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.8.3] — 2026-06-29
 
 ### Added
+
 - **Milkdown-style block handles** — each block's left-gutter handle is now a **`+`** (add a
   block below) and a real **6-dot grip** (drag to reorder · click for actions), replacing the
   lone `⠿` that font-fell-back to a thin white bar.
@@ -2498,6 +2563,7 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.8.2] — 2026-06-28
 
 ### Added
+
 - **"Use as notes folder"** on a connected brain — promote it to BE your notes folder, so a separate plain
   `~/Documents/rotli` no longer lingers alongside it (the same folder can't be both corpus and brain).
 - **Non-note files surface in Storage.** The walker only emitted `.md` + `.excalidraw`, so the Storage
@@ -2506,11 +2572,12 @@ left-menu / Quick-access / hotkey reports, resolved.
   binaries into the memex `storage/` per the model.
 
 ### Changed
+
 - **"brain" → "linked library"** in Settings → Location: a connected memex is now a **"linked library"** (a
   second memex you reference, tucked away) — freeing "brain" to mean your own AI-organized areas inside
   Notes (per `docs/model.md`). A rotli-created memex now scaffolds the gitignored `storage/`.
 - **Removed the orphaned Memory front** (dead code — nothing opened it); the brain is browsed via the
-  Vault tree. Memory is how things are *saved*, not a front.
+  Vault tree. Memory is how things are _saved_, not a front.
 - **Storage shows the memex `storage/`.** On a memex corpus the Storage front now surfaces the binary
   asset store read-only (opened in the OS default app), projected to the Storage destination — it was
   hidden before.
@@ -2519,6 +2586,7 @@ left-menu / Quick-access / hotkey reports, resolved.
   shows in Storage and opens in the OS default app.
 
 ### Docs
+
 - **Locked the rotli model + vocabulary** (`docs/model.md`) and realigned the always-injected `.carl`
   rules: three fronts (Inbox · Chat · Notes); "your notes folder is a memex"; **"brain" = your AI-organized
   areas inside Notes** (not a connected memex); a second memex is a "linked library"; Storage = the memex
@@ -2529,16 +2597,18 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.8.1] — 2026-06-27
 
 ### Added
+
 - **Onboarding picks where your brain lives.** The first-run **Your brain** step now lets you **Use** a
   memex detected on this Mac, **Create a new brain…** (choose a folder — rotli scaffolds a fresh v3.6 memex
   there and makes it your corpus), or keep **just simple notes** in `~/Documents/rotli`. Whichever you pick,
-  your one folder *is* your brain (or a plain notes folder if you defer). New Rust `corpus_init_memex`
+  your one folder _is_ your brain (or a plain notes folder if you defer). New Rust `corpus_init_memex`
   scaffolds the v3.6 spine + a fresh `mx_` `memex.json`; the choice commits once after onboarding, with the
   `onboarded` flag flushed to disk before the relaunch so first-run can't loop.
 
 ## [0.8.0] — 2026-06-27
 
 ### Changed
+
 - **One folder = your brain: the corpus.json unification.** Replaced four separate location
   mechanisms (`corpus-root.txt`, `corpus-memex-root.txt`, `corpus-roots.json`, `memex-instances.json`)
   with a single `corpus.json` — the notes corpus IS a memex by default (its folder is your brain), plus
@@ -2547,12 +2617,13 @@ left-menu / Quick-access / hotkey reports, resolved.
   a brain that was double-registered as both a vault root and an instance — notes load byte-identically).
 - **The Location pane is one folder.** Collapsed to a single **"Choose folder…"** smart picker (a memex →
   use it as your brain · an empty folder → move your notes there · any folder → use as-is) + **Your brain**
-  + **Other brains** / **Connect a brain…**. The four separate folder pickers, the "rotli sync" card, and
-  the Quick-capture toggle are gone — quick capture has one fixed home (the active brain's `inbox.md`,
-  falling back to the Board only when there's no writable brain).
+  - **Other brains** / **Connect a brain…**. The four separate folder pickers, the "rotli sync" card, and
+    the Quick-capture toggle are gone — quick capture has one fixed home (the active brain's `inbox.md`,
+    falling back to the Board only when there's no writable brain).
 - **Memex contract bumped to 3.6** (numeric band `[3.4, 3.6]`), matching memex-vault's `STRUCTURE.md`.
 
 ### Fixed
+
 - First-run onboarding can't loop (the `onboarded` flag is flushed to disk before the connect-brain
   relaunch); a note created into a memex corpus opens correctly (wire-id prefix derived from the active
   root); choosing/connecting an already-registered folder can't open the same directory twice; "Check the
@@ -2560,6 +2631,7 @@ left-menu / Quick-access / hotkey reports, resolved.
   validated; a corrupt `corpus.json` is preserved as `.bak` instead of silently re-migrated.
 
 ### Docs
+
 - Reconciled the always-injected CARL contract rule (v3.6 · `identity/`+`personality/` · the corpus.json
   model) and bannered the superseded design docs (`memex-rules-first-pass.md` write boundary,
   `next-stages.md` Track 2).
@@ -2567,9 +2639,10 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.7.2] — 2026-06-27
 
 ### Changed
+
 - **Settings simplified: Storage + Memory → one "Location" tab.** The two overlapping settings sections
   collapsed into a single **Location** pane (the nav is now General · Hotkeys · Appearance · Location ·
-  Plugins), organized around the idea that your notes folder *is* — or can become — a **brain** (a memex):
+  Plugins), organized around the idea that your notes folder _is_ — or can become — a **brain** (a memex):
   **Your notes folder** (storage medium · path · Reveal/Move) → **Your brain** (detect / connect / start a
   memex, per-instance perms, Browse in Notes, Check the brain) → **The Vault** (browse a brain alongside,
   read-only) → **Quick capture**. Pure UI re-composition — every control is preserved, with no data-layer
@@ -2579,12 +2652,14 @@ left-menu / Quick-access / hotkey reports, resolved.
 ## [0.7.1] — 2026-06-27
 
 ### Fixed
+
 - **Block handles actually drag now.** The handle used HTML5 drag-and-drop, which the macOS WKWebView
   swallows — and a `draggable` element steals the click, so neither the drag nor the menu fired in the
   app. Rewrote the interaction with **mouse events**: drag the ⠿ to reorder (with a drop line), or click
   it for the menu. Both verified.
 
 ### Added
+
 - **Tables are beautified.** GFM markdown tables now render as real tables in the editor (bordered cells,
   bold header, column alignment from the `:---:` row, zebra rows). Put the caret inside and it reveals the
   raw markdown to edit — same live-preview model as fenced code. The `.md` is untouched.
@@ -2594,6 +2669,7 @@ left-menu / Quick-access / hotkey reports, resolved.
 Two new features — block editing + external folders — plus the small-icon polish.
 
 ### Added
+
 - **Block handles (Milkdown-style)** — a toggle in the **Aa** panel (Blocks: Off / Handles). Turn it on
   and every block gets a **⠿ handle** in the gutter: **drag it to reorder** the block, or **click it** for
   a menu — **Add below · Move up · Move down · Delete**. The `.md` stays the source of truth (every action
@@ -2605,6 +2681,7 @@ Two new features — block editing + external folders — plus the small-icon po
   rotli stays a notes app, not an IDE — only your markdown notes surface.
 
 ### Changed
+
 - **Titlebar identity** — just the quokka mark now, **centered** in the bar (no "rotli" wordmark).
 - **Bolder small icons** — the menu-bar tray + titlebar quokka thicken only the **body outline** (eyes/
   mouth stay crisp) so they read clearly at chrome size; the full-size art is unchanged.
@@ -2614,6 +2691,7 @@ Two new features — block editing + external folders — plus the small-icon po
 ## [0.6.3] — 2026-06-26
 
 ### Changed
+
 - **Bolder quokka lines** — the line-art quokka (logo, characters, icons) now draws with a thicker
   stroke, so it reads with more presence at every size.
 - **Refreshed app/dock icon** — regenerated the full icon set (and the menu-bar mark) from the
@@ -2622,6 +2700,7 @@ Two new features — block editing + external folders — plus the small-icon po
 ## [0.6.2] — 2026-06-26
 
 ### Added
+
 - **Quokka accents in Settings** — each Settings section (General · Hotkeys · Appearance · Storage ·
   Memory · Plugins) now carries a small, muted line-art quokka at the top-right of its heading,
   matched to the section (Memory → the knowledge quokka, Storage → the stays-local quokka, …). Like
@@ -2632,6 +2711,7 @@ Two new features — block editing + external folders — plus the small-icon po
 New brand: the line-art quokka. A warm, hand-drawn identity replaces the AI-generated art.
 
 ### Changed
+
 - **New app icon** — the quokka logo on a **linen** tile with **black lines** (clean and legible at every
   size). Regenerated the full macOS/iOS/Android icon set from it.
 - **New menu-bar icon** — the quokka as a macOS **template** icon, so it tints to the menu bar
@@ -2644,6 +2724,7 @@ New brand: the line-art quokka. A warm, hand-drawn identity replaces the AI-gene
   follows the active theme; the shape never changes).
 
 ### Removed
+
 - The old **AI-generated quokka image** (`assets/world/quokka-master.jpg`) — replaced by the line-art set.
 
 ## [0.6.0] — 2026-06-26
@@ -2651,6 +2732,7 @@ New brand: the line-art quokka. A warm, hand-drawn identity replaces the AI-gene
 The left menu becomes the navigator — three sections, no more top dropdown (IA rework, Increment 1).
 
 ### Added
+
 - **Three top-level left-menu sections: Inbox · Chat · Notes.** The titlebar module dropdown is
   retired — the sidebar IS the navigation now. Each section is a collapsible accordion (state
   persists):
@@ -2671,34 +2753,37 @@ The left menu becomes the navigator — three sections, no more top dropdown (IA
   (llama.cpp) — so the picked model actually runs. The choice persists.
 
 ### Changed
+
 - **"Inbox" now means email; the note-capture concept is "Capture."** The local capture destination
   (and the ⌥C one-breath capture) is **labeled Capture** so the word "Inbox" is free for mail. The
   on-disk name and the memex contract are **unchanged** (`inbox.md` keeps its name; rotli still writes
   only `chats/`, `inbox.md`, `wiki/_inbox/`).
 - The titlebar identity is now a plain **rotli** home wordmark (click → back to the note panes).
 
-*(Increment 1 is the structural left-menu rework only. Streaming chat, `@note`/`@board`/`@email`
+_(Increment 1 is the structural left-menu rework only. Streaming chat, `@note`/`@board`/`@email`
 context, the chat-owns-a-summary-note model, Breve `history/` rendered in Chat, and the real email
-integration are later increments. Plan: `docs/notes-chat-inbox-rearchitecture.md`.)*
+integration are later increments. Plan: `docs/notes-chat-inbox-rearchitecture.md`.)_
 
 ## [0.5.0] — 2026-06-26
 
 The Chat front begins — a real on-device chat (Increment 1).
 
 ### Added
+
 - **Chat actually talks now.** The Chat front (module switcher → **Chat**) is a real conversation:
   type a message and the **on-device model replies** — the same local MLX/Gemma server Breve uses,
   bridged through **Rust** (the webview's CSP can't reach `localhost`, so a `chat_complete` command
   POSTs the model). Messages render as **bubbles**; the thread **persists as `chats/<slug>.md`** in
   your memex (rotli's owned surface, v3.5 contract) and reloads from there. The left list is your
   **history**. Needs your local model running on `:11435`; if it's not, the chat says so in-line.
-  *(Increment 1 — one-shot replies, no streaming yet. Next: streaming · `@note`/`@board`/`@email`
+  _(Increment 1 — one-shot replies, no streaming yet. Next: streaming · `@note`/`@board`/`@email`
   context · the chat-owns-a-summary-note model · Breve `history/` rendered in this surface · the
-  3-section left menu. Plan: `docs/notes-chat-inbox-rearchitecture.md`.)*
+  3-section left menu. Plan: `docs/notes-chat-inbox-rearchitecture.md`.)_
 
 ## [0.4.3] — 2026-06-26
 
 ### Added
+
 - **Rename a board from its tab, too** — double-click a board's tab to rename it inline (joins the
   sidebar right-click rename from 0.4.2; both share one flow). And **⌘⇧N makes a new board** (⌘N stays
   new-note), opening it straight into its name field.
@@ -2706,19 +2791,21 @@ The Chat front begins — a real on-device chat (Increment 1).
   button (bottom-right of a board). A board is just an image to a text LLM, so this is how it'll know
   what a board is about and pull it into a chat as `@board` context later. Stored top-level in the
   `.excalidraw` file (not Excalidraw's appState, which it strips) and preserved across drawing edits.
-  *(Wiring it into rotli's own ⌘K search arrives with the Chat front.)*
+  _(Wiring it into rotli's own ⌘K search arrives with the Chat front.)_
 
 ## [0.4.2] — 2026-06-26
 
 ### Added
+
 - **Name and rename your boards.** A new board's sidebar row opens an inline name field
   the moment you create it (name it first, no more "untitled"), and **right-click any board
   → rename** in place (Enter commits, Esc / click-away cancels). The `.excalidraw` file is
   renamed on disk and any open canvas tab follows the new name. (New `corpus_rename_board`,
-  unit-tested.) *(Renaming via the tab, a dedicated new-board chord, and board metadata for
-  AI search are the next step.)*
+  unit-tested.) _(Renaming via the tab, a dedicated new-board chord, and board metadata for
+  AI search are the next step.)_
 
 ### Fixed
+
 - **The sidebar's right-click no longer pops the webview's "Reload" menu** — it's suppressed
   in the sidebar so rotli's own row actions take over (the editor keeps its native menu for
   spell-check / copy).
@@ -2728,6 +2815,7 @@ The Chat front begins — a real on-device chat (Increment 1).
 ## [0.4.1] — 2026-06-26
 
 ### Fixed
+
 - **The Vault no longer goes empty after the memex move** — an installed app had its Vault
   bound to the now-gone `~/smBrain`; that dead binding was dropped without rebinding, so the
   Vault showed nothing. It now **self-heals** to `~/memex-vault` (a vanished bound path
@@ -2737,6 +2825,7 @@ The Chat front begins — a real on-device chat (Increment 1).
   again (date left, status right); the body column stays centered.
 
 ### Changed
+
 - **Notes use a bit more width by default** (comfort measure 720→820px) so a note fills more
   of a wide screen.
 - **Recent reads as a clean table** — hairline row separators + roomier rows + clearer
@@ -2751,6 +2840,7 @@ Vault's `wiki` reframed as "Knowledge", Settings-on-General, and two interaction
 (the Quick Note hotkey, and a board tab trapping note-clicks) put right.
 
 ### Fixed
+
 - **A note no longer hugs the left on a wide screen** — the writing column is centered and
   a touch wider (comfort measure 660→720px, default size 14.5→15px), so a note fills more of
   a big display instead of stranding dead space on the right. The date/status header aligns
@@ -2763,12 +2853,13 @@ Vault's `wiki` reframed as "Knowledge", Settings-on-General, and two interaction
   longer surfaces the main window; if you came from another app it steps out cleanly instead.
 
 ### Changed
+
 - **Settings opens on General** (was Hotkeys).
 - **Recent is a dated list** — every note ordered by most-recently-touched, shown as rows
   with the date on the right (title · snippet · date), in the content area.
 - **The memex `wiki` reads as "Knowledge"** in the Vault, with a plain-language note (on hover)
   that it's AI-organized for retrieval; the `_templates`/`_inbox` plumbing folders are hidden
-  from the tree. (A toggle to *reveal* the AI metadata on a note is still to come — it's
+  from the tree. (A toggle to _reveal_ the AI metadata on a note is still to come — it's
   stripped at the read layer today.)
 - **The connected memex is now `memex-vault`** (was `smBrain`). The maintainer's brain
   moved to `~/memex-vault` (repo `SethMed7/memex-vault`) to read as what it is — a private
@@ -2776,7 +2867,7 @@ Vault's `wiki` reframed as "Knowledge", Settings-on-General, and two interaction
   references follow it; the `vault:` root scheme and the **Vault** UI label are unchanged.
   A memex's binaries now live in an internal, gitignored `storage/` (the `storage:` root),
   so a connected memex is one self-contained folder. (No corpus migration — rotli keys the
-  Vault by root *name*, not path; re-point it in Settings → Storage if you'd bound the old
+  Vault by root _name_, not path; re-point it in Settings → Storage if you'd bound the old
   path, or rebuild so the new `~/memex-vault` default auto-binds.)
 
 ## [0.3.0] — 2026-06-25
@@ -2786,9 +2877,10 @@ memex (your `~/memex-vault`) per the v3.5 note contract, plus the Vault, Excalid
 nested folders, and inline diagrams/math from the increments since 0.2.2.
 
 ### Added
+
 - **Notes show by your folders, not the brain's filing** (memex integration, Phase 2 —
   shelf-projection, read side) — a note in a connected memex now appears in the sidebar
-  under its `shelf:` (the folder *you* put it in), never its disk path. So a note rotli
+  under its `shelf:` (the folder _you_ put it in), never its disk path. So a note rotli
   staged into `wiki/_inbox/` with `shelf: [Inbox]` shows under **Inbox**; one filed to
   `Myela/Payments` shows there — and you never feel it physically lives in `wiki/`. The
   `wiki/_inbox/` staging dir is hidden from the tree (it's plumbing); curated notes that
@@ -2845,16 +2937,18 @@ nested folders, and inline diagrams/math from the increments since 0.2.2.
   folder inside Inbox) from the `+` menu. The inline name commits on Enter or
   when you click away (Esc cancels).
 - **Per-section `+`** — hover any section (Inbox / Brain / Storage / a folder)
-  and a `+` appears where the count was: one click drops a new folder *inside*
+  and a `+` appears where the count was: one click drops a new folder _inside_
   that section. Plus a **collapse-all** button in the sidebar header.
 
 ### Changed
+
 - **Board** and **All notes** now open as grids in the content area to the right
   of the sidebar — the sidebar no longer disappears, and there's no empty pane.
   Board stays a home for quick captures; All notes adds a search box and shows
   every note (and board) as cards. Clicking a card returns to the editor/canvas.
 
 ### Fixed
+
 - The editor now keeps the caret above the floating format bar while you type —
   the last line pushes up instead of sliding behind the bar.
 - The Quick Note hotkey (⌥Q) now controls **only** the Quick Note: closing it
@@ -2865,24 +2959,28 @@ nested folders, and inline diagrams/math from the increments since 0.2.2.
 ## [0.2.2] - 2026-06-24
 
 ### Added
+
 - Copy as you see it: copying from the beautified editor strips markdown syntax —
   no `**` around bold, links become their text, list/heading prefixes dropped.
 - A **Beautified ⇄ Raw markdown** view toggle in the Aa panel — read your notes as
   live WYSIWYG or as the plain markdown source (the file is identical either way).
 
 ### Changed
+
 - Tidier bullet / numbered lists: a tighter hanging indent and a centered marker,
   so the glyph sits next to its text instead of adrift at the far left.
 
 ## [0.2.1] - 2026-06-24
 
 ### Added
+
 - A quiet "update available" dot on the titlebar Settings button, so a new
   release tells you it's here without a badge or a ping. The check now also
   re-runs when you summon the app and on a slow timer (still silent — no
   auto-download, no modal).
 
 ### Fixed
+
 - Auto-update could fail to unpack (`failed to unpack ._rotli.app`): the updater
   archive is now built with `COPYFILE_DISABLE=1` so macOS doesn't add AppleDouble
   sidecar files the unpacker rejects.
@@ -2893,6 +2991,7 @@ First public release — a warm, local-first menu-bar notes app, now with a meme
 brain and signed auto-updates.
 
 ### Added
+
 - **memex integration** — rotli can read/connect/initiate a memex knowledge spine
   (for the maintainer, `~/memex-vault`): a read-only Memory browser over `wiki`/`self`/
   `chats`, a Chat front that writes named `chats/` conversations, ⌥C captures that
@@ -2907,12 +3006,14 @@ brain and signed auto-updates.
   external-edit watcher). Developer-ID signed + notarized.
 
 ### Release tooling
+
 - `bun run build:mac`, `bun run release`, and the `bump-version` / `predmg-clean` /
   `make-latest-json` scripts.
 
 ## [0.1.0]
 
 ### Added
+
 - memex integration (Increments 1–3): detect/connect/init a memex instance,
   the read-only Memory browser over its spine, chats/ + inbox.md write seam, and
   "Browse in Notes" to point the Notes tree at a memex.
