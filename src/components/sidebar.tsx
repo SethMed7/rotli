@@ -100,7 +100,14 @@ import {
   useMemexConfig,
 } from "../memex/useMemex";
 import { buildVaultMenu, vaultDisplayName } from "../services/vaultSwitcher";
-import { archiveChat, deleteChat, initMemexAsCorpus, pickFolder, pinChat } from "../memex/service";
+import {
+  archiveChat,
+  deleteChat,
+  initMemexAsCorpus,
+  pickFolder,
+  pinChat,
+  revealChat,
+} from "../memex/service";
 import { useChatRename } from "../services/chatRename";
 import type { Folder, NoteSummary } from "../types";
 import { dispatch } from "../keys/registry";
@@ -433,6 +440,46 @@ export function Sidebar() {
       );
   };
 
+  // — drag a chat INTO a folder (Seth, 2026-07-30: "drag chat into the folder
+  // properly"): the Main tree's pointer-drag grammar (HTML5 DnD stays dead in
+  // the WKWebView shell). Dropping on a folder row assigns through the same
+  // manifest write the row menu uses; anywhere else abandons. The dragged row
+  // dims, the hovered folder tints, the title rides as a ghost. —
+  const [chatDragSlug, setChatDragSlug] = useState<string | null>(null);
+  const [chatDropFolder, setChatDropFolder] = useState<string | null>(null);
+  const didChatDragRef = useRef(false);
+  const startChatDrag = (e: ReactPointerEvent, slug: string, label: string) => {
+    // button guard BEFORE the ref reset — a right-click must not clear the
+    // last drag's click suppression (the session guards again internally)
+    if (e.button !== 0 || !activeMemex) return;
+    let drop: string | null = null;
+    didChatDragRef.current = false;
+    createPointerDragSession(e, {
+      ghost: (x, y) => createDragGhost(label, x, y),
+      // didChatDragRef stays armed past onEnd so the trailing click is eaten
+      onStart: () => {
+        didChatDragRef.current = true;
+        setChatDragSlug(slug);
+      },
+      onMove: (x, y) => {
+        const hit = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest(
+          "[data-chatfolder-id]",
+        ) as HTMLElement | null;
+        drop = hit?.dataset.chatfolderId ?? null;
+        setChatDropFolder(drop);
+      },
+      onDrop: () => {
+        const d = drop;
+        if (!d) return;
+        updateChatFolders((m) => assignChatToFolder(m, slug, d));
+      },
+      onEnd: () => {
+        setChatDragSlug(null);
+        setChatDropFolder(null);
+      },
+    });
+  };
+
   // one chat row, shared by folder groups and the loose list below them
   const renderChatRow = (c: (typeof chatList)[number], inFolder: boolean) =>
     chatRename.renamingChatSlug === c.slug ? (
@@ -453,8 +500,12 @@ export function Sidebar() {
            two highlights at once read as wrong) */
         className={`sb-chatrow${inFolder ? " in-folder" : ""}${
           contentView === "panes" && focusedChatSlug === c.slug ? " sel" : ""
-        }`}
-        onClick={() => openChatRow(c.slug)}
+        }${chatDragSlug === c.slug ? " dragging" : ""}`}
+        onPointerDown={(e) => startChatDrag(e, c.slug, c.title || c.slug)}
+        onClick={() => {
+          if (didChatDragRef.current) return;
+          openChatRow(c.slug);
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -473,6 +524,19 @@ export function Sidebar() {
           };
           const assignedFolder = chatFoldersManifest.assignments[c.slug];
           openContextMenu(e.clientX, e.clientY, [
+            // the open verbs mirror the note row's menu (Seth, 2026-07-30:
+            // "pretty much the same things as the notes")
+            {
+              kind: "action" as const,
+              label: "Open in new tab",
+              onClick: () => openChat(c.slug, { newTab: true }),
+            },
+            {
+              kind: "action" as const,
+              label: "Open to the right",
+              onClick: () => usePanesStore.getState().openToSide("chat", c.slug),
+            },
+            { kind: "sep" as const },
             {
               kind: "action" as const,
               label: c.pinned ? "Unpin from top" : "Pin to top",
@@ -526,6 +590,20 @@ export function Sidebar() {
                   },
                 },
               ],
+            },
+            {
+              kind: "action" as const,
+              label: "Show in Finder",
+              disabled: !isTauri(),
+              onClick: () => {
+                if (!activeMemex) return;
+                setRowActionError(null);
+                void revealChat(activeMemex, c.slug).catch((err) =>
+                  setRowActionError(
+                    `Couldn't reveal in Finder — ${err instanceof Error ? err.message : String(err)}`,
+                  ),
+                );
+              },
             },
             {
               kind: "action" as const,
@@ -1607,7 +1685,10 @@ export function Sidebar() {
                         ) : (
                           <button
                             type="button"
-                            className="sb-chatrow sb-chatfolder-row"
+                            className={`sb-chatrow sb-chatfolder-row${
+                              chatDropFolder === folder.id ? " chatdrop" : ""
+                            }`}
+                            data-chatfolder-id={folder.id}
                             aria-expanded={open}
                             onClick={() => setDestExpanded(folderKey, !open)}
                             onContextMenu={(e) => {
@@ -1631,6 +1712,12 @@ export function Sidebar() {
                             }}
                             title={folder.name}
                           >
+                            {/* the Notes tree's disclosure grammar (Seth,
+                                2026-07-30: "needs to be clear what is a
+                                folder") — rotating chevron + folder glyph */}
+                            <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
+                              <ChevronRight size={10} />
+                            </span>
                             <FolderGlyph size={13} />
                             <span className="fname">{folder.name}</span>
                             <span className="sb-chatfolder-n">{chats.length}</span>

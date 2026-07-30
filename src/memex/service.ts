@@ -23,6 +23,7 @@ import {
   memexReadContract,
   memexValidate,
   memexArchiveChat,
+  memexRevealChat,
   memexDeleteChat,
   memexRenameChat,
   memexWriteChat,
@@ -185,6 +186,11 @@ export async function archiveChat(instance: MemexInstance, slug: string): Promis
     throw new Error("this brain is read-only — can't archive a chat here");
   }
   await memexArchiveChat(instance.root, slug);
+}
+
+/** Reveal a chat's file in Finder — read-only, no perms gate needed. */
+export async function revealChat(instance: MemexInstance, slug: string): Promise<void> {
+  await memexRevealChat(instance.root, slug);
 }
 
 /** Pin/unpin a chat (frontmatter `pinned:` — the sidebar sorts pinned first). */

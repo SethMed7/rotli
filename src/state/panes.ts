@@ -459,7 +459,7 @@ interface PanesState {
   /** "Open to the right": split with the TARGET as the new pane's tab — the
    * plain split duplicates what you're on, which made "this note beside that
    * one" a three-gesture dance (slice 4, 2026-07-28). */
-  openToSide: (kind: "note" | "canvas" | "file", id: string) => void;
+  openToSide: (kind: "note" | "canvas" | "file" | "chat", id: string) => void;
   activateTab: (paneId: string, tabId: string) => void;
   /** Walk the strip: 1 = forward (⌃Tab), -1 = backward (⌃⇧Tab); wraps. */
   cycleTab: (dir?: 1 | -1) => void;
@@ -523,19 +523,23 @@ export const usePanesStore = create<PanesState>((set, get) => {
     return first;
   };
 
-  const split = (dir: SplitDir, tab?: Tab) => {
+  /** Carve a split. Returns whether it actually happened — a window too
+   * narrow/short for another pane refuses, and callers with a fallback
+   * (openToSide) must know, or the click dies silently. */
+  const split = (dir: SplitDir, tab?: Tab): boolean => {
     const { root } = get();
-    if (dir === "row" && !ensureRoomForColumn(root)) return;
+    if (dir === "row" && !ensureRoomForColumn(root)) return false;
     // the height floor mirrors the divider drag's 160px minimum
-    if (dir === "col" && (rowCount(root) + 1) * MIN_PANE_HEIGHT > window.innerHeight) return;
+    if (dir === "col" && (rowCount(root) + 1) * MIN_PANE_HEIGHT > window.innerHeight) return false;
     const leaf = focusedLeaf();
     // a specific tab (open-to-the-side) or a duplicate of the active one — never
     // empty; the all-tabs-closed rest state has nothing to duplicate, so no split
     const active = activeTabOf(leaf);
     const dup = tab ?? (active ? duplicateTab(active) : null);
-    if (!dup) return;
+    if (!dup) return false;
     const newLeaf = makeLeaf(dup);
     set({ root: splitLeaf(get().root, leaf.id, dir, newLeaf), focusedPaneId: newLeaf.id });
+    return true;
   };
 
   /** When a pane closes, focus its geometric NEIGHBOR — never jump to the
@@ -837,15 +841,32 @@ export const usePanesStore = create<PanesState>((set, get) => {
     },
 
     openToSide: (kind, id) => {
-      const tab = kind === "canvas" ? makeCanvasTab(id) : kind === "file" ? makeFileTab(id) : makeTab(id);
+      const tab =
+        kind === "canvas"
+          ? makeCanvasTab(id)
+          : kind === "file"
+            ? makeFileTab(id)
+            : kind === "chat"
+              ? makeChatTab(id)
+              : makeTab(id);
+      useUiStore.getState().setContentView("panes");
+      if (!split("row", tab)) {
+        // no room for another column (adversarial review, PR #15): degrade to
+        // a new tab HERE instead of a dead click. The open* fallbacks record
+        // nav/MRU themselves — and recording happens ONLY on a real open, so
+        // a refused split can no longer plant a phantom Back/Forward entry.
+        if (kind === "note") get().openNote(id, { newTab: true });
+        else if (kind === "canvas") get().openCanvas(id, { newTab: true });
+        else if (kind === "file") get().openFile(id, { newTab: true });
+        else get().openChat(id, { newTab: true });
+        return;
+      }
       if (kind === "note") {
         touchMru(id);
         recordNav(id);
       } else {
         recordNav(navEntry(kind, id));
       }
-      useUiStore.getState().setContentView("panes");
-      split("row", tab);
     },
 
     activateTab: (paneId, tabId) => {

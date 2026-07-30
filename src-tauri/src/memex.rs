@@ -842,6 +842,31 @@ pub fn memex_archive_chat(app: tauri::AppHandle, root: String, slug: String) -> 
     move_chat_to_bucket(&app, &root, &slug, "archive")
 }
 
+/// Reveal a chat's markdown file in Finder (`open -R`) — the chat row's
+/// "Show in Finder", the same truth-on-disk affordance note rows have.
+/// Read-only: registered root (#20) + the safe_slug jail; a missing file
+/// errors instead of revealing the parent folder.
+#[tauri::command]
+pub fn memex_reveal_chat(app: tauri::AppHandle, root: String, slug: String) -> Result<(), String> {
+    let root = registered_root(&app, &root)?;
+    let safe = safe_slug(&slug)?;
+    let path = root.join("chats").join(format!("{safe}.md"));
+    if !path.is_file() {
+        return Err(format!("chat not found on disk: {safe}"));
+    }
+    // spawn, don't wait — corpus_reveal_file's shape (a sync command blocks the
+    // main thread for as long as it waits; adversarial review, PR #15)
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open")
+        .arg("-R")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| format!("reveal: {e}"))?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = path;
+    Ok(())
+}
+
 /// Move `chats/<slug>.md` into a hidden `chats/<bucket>/` subfolder (trash/archive).
 /// Both ends are writable-gated and `bucket` is a fixed literal, so no slug can
 /// escape `chats/`.

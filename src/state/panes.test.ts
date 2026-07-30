@@ -401,6 +401,58 @@ describe("boardTabOpen", () => {
   });
 });
 
+// The chat-note split repro (Seth, 2026-07-30: "only the note should open to a
+// new pane, not duplicate the chat"): splitting to the side must carve the new
+// pane WITH exactly the passed tab — splitRight() alone duplicates the active
+// tab, which is what put a chat copy beside the opened note.
+describe("openToSide carves a pane holding ONLY the passed item", () => {
+  beforeEach(() => {
+    // bun's window has no layout — give the column-fit guard a wide viewport
+    (window as { innerWidth: number }).innerWidth = 2400;
+    const l = leaf("solo", ["A"]);
+    usePanesStore.setState({ root: l, focusedPaneId: "solo" });
+  });
+
+  test("a note opens alone beside a chat tab — no duplicate of the source tab", () => {
+    usePanesStore.setState({
+      root: {
+        kind: "leaf",
+        id: "solo",
+        tabs: [{ id: "c", surfaceKind: "chat", chatSlug: "testing-gemma" }],
+        activeTabId: "c",
+      },
+      focusedPaneId: "solo",
+    });
+    usePanesStore.getState().openToSide("note", "n-1");
+    const all = leaves(usePanesStore.getState().root);
+    expect(all).toHaveLength(2);
+    const newPane = all.find((l) => l.id !== "solo")!;
+    expect(newPane.tabs).toHaveLength(1);
+    expect(newPane.tabs[0]).toMatchObject({ surfaceKind: "note", noteId: "n-1" });
+  });
+
+  test("a chat opens to the side as a chat tab (the row menu's Open to the right)", () => {
+    usePanesStore.getState().openToSide("chat", "analyzing-why");
+    const all = leaves(usePanesStore.getState().root);
+    expect(all).toHaveLength(2);
+    const newPane = all.find((l) => l.id !== "solo")!;
+    expect(newPane.tabs).toHaveLength(1);
+    expect(newPane.tabs[0]).toMatchObject({ surfaceKind: "chat", chatSlug: "analyzing-why" });
+  });
+
+  test("no room for a column → the item still opens HERE as a new tab (never a dead click)", () => {
+    // a window too narrow for a second 320px pane (adversarial review, PR #15:
+    // the refused split used to swallow the click AND record a phantom nav entry)
+    (window as { innerWidth: number }).innerWidth = 500;
+    usePanesStore.getState().openToSide("note", "n-2");
+    const all = leaves(usePanesStore.getState().root);
+    expect(all).toHaveLength(1);
+    const pane = all[0]!;
+    expect(pane.tabs.some((t) => t.surfaceKind === "note" && t.noteId === "n-2")).toBe(true);
+    expect(pane.activeTabId).toBe(pane.tabs.find((t) => t.surfaceKind === "note" && t.noteId === "n-2")!.id);
+  });
+});
+
 // audit 2026-07-30 correctness #2: the same dual-writer law for sheets — while
 // a file's tab is open anywhere, the ```sheet embed goes view-only.
 describe("fileTabOpen", () => {

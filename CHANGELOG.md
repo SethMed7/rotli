@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [Unreleased]
+
+### Changed
+
+- **Chat folders read as folders.** The Chat section's folder rows now carry
+  the Notes tree's disclosure grammar — a rotating chevron beside the folder
+  glyph, with chats indented one clear step beneath — and you can **drag a
+  chat onto a folder** to file it (same pointer-drag as the Main tree: the
+  row dims, the folder tints, drop assigns).
+- **Chat rows match note rows.** The right-click menu gains Open in new tab,
+  Open to the right, and Show in Finder (revealing the real `chats/<slug>.md`
+  on disk), alongside the existing Pin, Rename, Move to folder, Copy file
+  path, Archive, and Delete.
+- **The active tab lost its blue top line.** The 2px accent edge that marked
+  the focused pane's active tab is gone — the tab already reads active by
+  merging into its editor.
+
+### Fixed
+
+- **The chat's note button opens only the note.** With "open beside the chat"
+  set, clicking the note icon used to split the pane with a duplicate of the
+  chat and then add the note next to it; the split now carves the new pane
+  with the note alone.
+
 ## [0.49.0] - 2026-07-30
 
 ### Fixed

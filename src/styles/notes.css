@@ -664,8 +664,22 @@
   font-size: 11px;
   color: var(--text-muted);
 }
+/* the folder row wears the Notes tree's disclosure grammar (chevron + tighter
+   gap so the glyph column matches); children indent past the chevron slot,
+   exactly the contentPad = rowPad + 18 rule the Main tree uses */
+.sb-chatfolder-row {
+  gap: 6px;
+}
 .sb-chatrow.in-folder {
-  padding-left: 30px;
+  padding-left: 34px;
+}
+/* drag-a-chat-into-a-folder feedback (Seth, 2026-07-30): the dragged row dims
+   like a Main row; the hovered folder tints like an mdrop-into target */
+.sb-chatrow.dragging {
+  opacity: 0.4;
+}
+.sb-chatfolder-row.chatdrop {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 /* inline rename over a chat row (Seth #4, 2026-07-08) — same footprint as the row */
 .sb-chatrename {
@@ -1398,18 +1412,9 @@
   border-bottom: none;
   z-index: 2;
 }
-/* focus = 2px clay top edge on the focused pane's active tab — ONLY when
-   more than one pane exists (single clay element by construction) */
-.panes.multi .pane.focused .tab.active::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 9px;
-  right: 9px;
-  height: 2px;
-  border-radius: 0 0 2px 2px;
-  background: var(--accent);
-}
+/* The 2px accent top edge that marked the focused pane's active tab is GONE
+   (Seth, 2026-07-30: "I don't like the blue line on top of the active tab").
+   Pane focus still reads from the active tab merging into its editor. */
 .tab .x {
   margin-left: auto;
   width: 15px;

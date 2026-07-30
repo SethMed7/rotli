@@ -1266,6 +1266,10 @@ export function memexDeleteChat(root: string, slug: string): Promise<void> {
 export function memexArchiveChat(root: string, slug: string): Promise<void> {
   return memexInvoke("memex_archive_chat", { root, slug });
 }
+/** Reveal `chats/<slug>.md` in Finder — the chat row's "Show in Finder". */
+export function memexRevealChat(root: string, slug: string): Promise<void> {
+  return memexInvoke("memex_reveal_chat", { root, slug });
+}
 /** Write a v3.5 note into wiki/_inbox/, or wiki/_secure/ when its composed
  * frontmatter carries secure:true. Returns the absolute path. */
 export function memexWriteNote(root: string, stem: string, contents: string): Promise<string> {

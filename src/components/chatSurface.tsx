@@ -602,7 +602,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const bindChat = usePanesStore((s) => s.bindChat);
   const openNote = usePanesStore((s) => s.openNote);
   const openFile = usePanesStore((s) => s.openFile);
-  const splitRight = usePanesStore((s) => s.splitRight);
+  const openToSide = usePanesStore((s) => s.openToSide);
   const noteIndex = useNoteIndex();
   const setAttached = useSetChatAttachedTo();
 
@@ -959,12 +959,13 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const assetIds = assetPrefix ? [...noteIndex.keys()].filter((id) => id.startsWith(assetPrefix)).sort() : [];
 
   /** Open the attached note per the Settings choice: a new tab here, or a
-   * right split beside the chat (split() focuses the new pane, so openNote
-   * lands in it). */
+   * right split beside the chat. The split path carves the pane WITH the note
+   * tab directly (openToSide) — splitRight() duplicates the active tab, so the
+   * old splitRight+openNote pair left a copy of the chat riding in the new
+   * pane next to the note (Seth, 2026-07-30: "only the note should open"). */
   const openAttachedNote = (noteId: string) => {
     if (chatNoteOpen === "split") {
-      splitRight();
-      openNote(noteId);
+      openToSide("note", noteId);
     } else {
       openNote(noteId, { newTab: true });
     }

@@ -1124,6 +1124,7 @@ pub fn run() {
             memex::memex_rename_chat,
             memex::memex_delete_chat,
             memex::memex_archive_chat,
+            memex::memex_reveal_chat,
             memex::memex_write_note,
             memex::memex_validate,
             memex::memex_pick_folder
