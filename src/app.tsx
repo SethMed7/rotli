@@ -34,6 +34,7 @@ import {
   onBrainJournal,
   onCaptureSave,
   onCorpusChanged,
+  onOpenRequest,
   onQuickSet,
   onRebind,
   onSummonChat,
@@ -223,9 +224,10 @@ function MainShell() {
   );
 
   // `rotli open <id>` (CLI/MCP) writes one tiny request beside the corpus
-  // sidecars, then activates the app. Consume it at startup and while Rotli is
-  // resident so an agent-opened item lands in the same pane flow as a user
-  // click. Polling is intentionally slow and local; no daemon or network port.
+  // sidecars, then activates the app — Rust forwards that activation as
+  // "rotli:open-request" (perf audit 2026-07-30, #15: this was a 750ms poll
+  // for the app's lifetime, ~115k IPC calls/day). Consume once at startup for
+  // a request queued while Rotli wasn't running, then on each event.
   useEffect(() => {
     if (!isTauri()) return;
     let stopped = false;
@@ -245,10 +247,10 @@ function MainShell() {
         });
     };
     consume();
-    const timer = window.setInterval(consume, 750);
+    const unlisten = onOpenRequest(consume);
     return () => {
       stopped = true;
-      window.clearInterval(timer);
+      unlisten();
     };
   }, []);
 

@@ -222,11 +222,18 @@ pub struct InstallProgress {
 /// Current download progress for an in-flight install — the UI polls this while
 /// the (long) `local_model_install` runs. Byte total of the target dir; `done`
 /// once weights land. Robust vs. parsing `hf`'s tqdm.
+/// ASYNC command (perf audit 2026-07-30, #14): `dir_bytes` walks a GB-scale
+/// download dir and two surfaces poll this at 1 Hz — each tick froze the main
+/// thread. The walk runs on a worker; the name guard stays first.
 #[tauri::command]
-pub fn local_model_install_progress(name: String) -> Result<InstallProgress, String> {
+pub async fn local_model_install_progress(name: String) -> Result<InstallProgress, String> {
     valid_name(&name)?;
-    let dir = models_dir().join(&name);
-    Ok(InstallProgress { bytes: dir_bytes(&dir), done: looks_complete(&dir) })
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = models_dir().join(&name);
+        Ok(InstallProgress { bytes: dir_bytes(&dir), done: looks_complete(&dir) })
+    })
+    .await
+    .map_err(|e| format!("progress worker failed ({e})"))?
 }
 
 /// Download an MLX model from Hugging Face into the shared store and register
@@ -347,8 +354,16 @@ fn sysctl(name: &str) -> Option<String> {
     (!s.is_empty()).then_some(s)
 }
 
+/// ASYNC command (perf audit 2026-07-30, #14): three sysctl spawns + a df
+/// spawn ran on the main thread. They run on a worker now, unchanged.
 #[tauri::command]
-pub fn system_profile() -> Result<SystemProfile, String> {
+pub async fn system_profile() -> Result<SystemProfile, String> {
+    tauri::async_runtime::spawn_blocking(system_profile_blocking)
+        .await
+        .map_err(|e| format!("profile worker failed ({e})"))?
+}
+
+fn system_profile_blocking() -> Result<SystemProfile, String> {
     let ram_bytes: u64 = sysctl("hw.memsize")
         .and_then(|s| s.parse().ok())
         .ok_or("couldn't read this Mac's memory size")?;

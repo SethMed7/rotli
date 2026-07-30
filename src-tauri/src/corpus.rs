@@ -1883,7 +1883,7 @@ pub struct FolderMeta {
     pub parent_id: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CorpusList {
     pub folders: Vec<FolderMeta>,
     pub notes: Vec<NoteMeta>,
@@ -1954,21 +1954,39 @@ fn normalized_watch_path(path: &Path) -> PathBuf {
 }
 
 #[derive(Clone, Default)]
-pub struct SuppressSet(Arc<Mutex<HashMap<PathBuf, Instant>>>);
+pub struct SuppressSet {
+    paths: Arc<Mutex<HashMap<PathBuf, Instant>>>,
+    /// The corpus CHANGE GENERATION (perf audit 2026-07-30, #1/#5): bumped by
+    /// every internal write (mark() is the one chokepoint every mutating store
+    /// method already passes through) and by the watcher for external bursts.
+    /// `list()`'s walk cache is valid exactly while this is unchanged.
+    generation: Arc<std::sync::atomic::AtomicU64>,
+}
 
 impl SuppressSet {
     pub fn mark(&self, path: &Path) {
-        let mut map = self.0.lock().unwrap();
+        self.bump();
+        let mut map = self.paths.lock().unwrap();
         map.retain(|_, at| at.elapsed() < SUPPRESS_TTL);
         map.insert(normalized_watch_path(path), Instant::now());
     }
 
     pub fn contains(&self, path: &Path) -> bool {
-        self.0
+        self.paths
             .lock()
             .unwrap()
             .get(&normalized_watch_path(path))
             .is_some_and(|at| at.elapsed() < SUPPRESS_TTL)
+    }
+
+    /// Invalidate walk caches without suppressing anything — the watcher calls
+    /// this once per fired external burst.
+    pub fn bump(&self) {
+        self.generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.generation.load(std::sync::atomic::Ordering::SeqCst)
     }
 }
 
@@ -2142,6 +2160,32 @@ pub struct CorpusStore {
     /// into the store so the Rust gates enforce it, not only the TS `canWrite`
     /// (#3, audit 2026-07). Never cleared below the band verdict.
     perms_read_only: bool,
+    /// The memoized walk (perf audit 2026-07-30, #1/#5): valid while the
+    /// suppress-set generation is unchanged. Holds the sorted list AND each
+    /// note's parsed text so search()/tasks() stop re-reading every file.
+    list_cache: Option<ListCache>,
+}
+
+/// One walked note's parsed text, cached beside its meta.
+///
+/// MEMORY TRADEOFF (deliberate, Greptile PR #14): the whole corpus's note
+/// bodies stay resident while the walk cache is valid — ~3 MB for a typical
+/// 1k-note corpus, ~200 MB for an extreme 20k×10 KB one. That buys
+/// search()/tasks() answering from one parse instead of a second full-vault
+/// read per call. No eviction on purpose (the cache IS the working set of a
+/// local-first notes app); if a future corpus class outgrows this, the
+/// refactor seam is: evict `body`/`metadata` here while keeping the metas,
+/// and let search/tasks fall back to per-note reads.
+struct CachedNoteText {
+    body: String,
+    /// The searchable frontmatter projection ("" when the note has none).
+    metadata: String,
+}
+
+struct ListCache {
+    generation: u64,
+    list: CorpusList,
+    texts: HashMap<String, CachedNoteText>,
 }
 
 fn valid_view_name(name: &str) -> bool {
@@ -2278,6 +2322,7 @@ impl CorpusStore {
             layout: Layout::LegacyRotli,
             band_read_only: false,
             perms_read_only: read_only,
+            list_cache: None,
         };
         store.load_index();
         // Scaffold the six reserved sidebar destinations every open (idempotent),
@@ -2317,6 +2362,7 @@ impl CorpusStore {
             layout: Layout::Memex,
             band_read_only,
             perms_read_only: read_only,
+            list_cache: None,
         };
         store.load_index();
         Ok(store)
@@ -3306,13 +3352,30 @@ impl CorpusStore {
     /// frontmatter ids win, then the previous index (keeps frontmatter-less
     /// files stable across runs), then a freshly minted ulid.
     pub fn list(&mut self) -> Result<CorpusList, String> {
+        self.ensure_walked()?;
+        Ok(self.list_cache.as_ref().expect("ensure_walked fills the cache").list.clone())
+    }
+
+    /// Walk the disk ONLY when the change generation moved (perf audit
+    /// 2026-07-30, #1: with staleTime ∞ + broad invalidation, ~9 uncached
+    /// walks rode every editor tick). Internal writes bump the generation at
+    /// `suppress.mark()`; external changes bump it from the watcher — an
+    /// unchanged generation means the disk is exactly as last walked.
+    fn ensure_walked(&mut self) -> Result<(), String> {
+        // read the generation BEFORE walking: a write landing mid-walk makes
+        // the stored generation stale and the next call re-walks — the safe side
+        let generation = self.suppress.generation();
+        if self.list_cache.as_ref().is_some_and(|c| c.generation == generation) {
+            return Ok(());
+        }
         let mut folders: Vec<FolderMeta> = Vec::new();
         let mut notes: Vec<NoteMeta> = Vec::new();
+        let mut texts: HashMap<String, CachedNoteText> = HashMap::new();
         let reverse: HashMap<String, String> =
             self.index.iter().map(|(id, p)| (p.clone(), id.clone())).collect();
         let mut new_index: HashMap<String, String> = HashMap::new();
 
-        walk(self.layout, &self.root, "", &reverse, &mut new_index, &mut folders, &mut notes)?;
+        walk(self.layout, &self.root, "", &reverse, &mut new_index, &mut folders, &mut notes, &mut texts)?;
 
         if new_index != self.index {
             self.index = new_index;
@@ -3328,7 +3391,8 @@ impl CorpusStore {
                 .then(b.updated_at.cmp(&a.updated_at))
                 .then(a.id.cmp(&b.id))
         });
-        Ok(CorpusList { folders, notes })
+        self.list_cache = Some(ListCache { generation, list: CorpusList { folders, notes }, texts });
+        Ok(())
     }
 
     /// Case-insensitive FULL-TEXT search over this root's notes: one `list()`
@@ -3345,31 +3409,23 @@ impl CorpusStore {
         if query.trim().is_empty() {
             return Ok(hits);
         }
-        let list = self.list()?;
-        for meta in &list.notes {
+        // the cached walk already parsed every note (audit 2026-07-30, #5:
+        // search was a DOUBLE full read — list() then re-read+parse per body)
+        self.ensure_walked()?;
+        let layout = self.layout;
+        let cache = self.list_cache.as_ref().expect("ensure_walked fills the cache");
+        for meta in &cache.list.notes {
             if meta.kind != NoteKind::Note
                 || is_trash_folder(&meta.folder_id)
-                || (self.layout == Layout::Memex && is_chats_folder(&meta.folder_id))
+                || (layout == Layout::Memex && is_chats_folder(&meta.folder_id))
             {
                 continue;
             }
-            let Some(rel) = self.index.get(&meta.id) else {
+            let Some(text) = cache.texts.get(&meta.id) else {
                 continue;
             };
-            let Ok(path) = self.guard_rel(rel) else {
-                continue;
-            };
-            let Ok(text) = fs::read_to_string(path) else {
-                continue;
-            };
-            let (fm, raw) = parse_document(&text);
-            let body = match &fm {
-                Some(_) => editor_body(raw),
-                None => raw,
-            };
-            let metadata = fm.as_ref().map(searchable_metadata).unwrap_or_default();
-            if let Some(m) = search_match(query, &meta.title, body, &meta.snippet)
-                .or_else(|| search_match(query, &meta.title, &metadata, &meta.snippet))
+            if let Some(m) = search_match(query, &meta.title, &text.body, &meta.snippet)
+                .or_else(|| search_match(query, &meta.title, &text.metadata, &meta.snippet))
                 .or_else(|| {
                     search_match(
                         query,
@@ -3403,24 +3459,21 @@ impl CorpusStore {
     /// fenced code skipped; secure and locked notes INCLUDED (this is the
     /// user's own local screen, and the surface is not agent-exposed).
     pub(crate) fn tasks(&mut self) -> Result<Vec<TaskItem>, String> {
-        let list = self.list()?;
+        // rides the same cached walk as list()/search() — no second read pass
+        self.ensure_walked()?;
+        let layout = self.layout;
+        let cache = self.list_cache.as_ref().expect("ensure_walked fills the cache");
         let mut out = Vec::new();
-        for meta in &list.notes {
+        for meta in &cache.list.notes {
             if meta.kind != NoteKind::Note
                 || is_trash_folder(&meta.folder_id)
                 || is_archive_folder(&meta.folder_id)
-                || (self.layout == Layout::Memex && is_chats_folder(&meta.folder_id))
+                || (layout == Layout::Memex && is_chats_folder(&meta.folder_id))
             {
                 continue;
             }
-            let Some(rel) = self.index.get(&meta.id) else { continue };
-            let Ok(path) = self.guard_rel(rel) else { continue };
-            let Ok(text) = fs::read_to_string(path) else { continue };
-            let (fm, raw) = parse_document(&text);
-            let body = match &fm {
-                Some(_) => editor_body(raw),
-                None => raw,
-            };
+            let Some(text) = cache.texts.get(&meta.id) else { continue };
+            let body = &text.body;
             let mut fenced = false;
             for (line, raw_line) in body.lines().enumerate() {
                 let trimmed = raw_line.trim_start();
@@ -4648,6 +4701,7 @@ fn walk(
     new_index: &mut HashMap<String, String>,
     folders: &mut Vec<FolderMeta>,
     notes: &mut Vec<NoteMeta>,
+    texts: &mut HashMap<String, CachedNoteText>,
 ) -> Result<(), String> {
     let dir = if prefix.is_empty() { root.to_path_buf() } else { root.join(prefix) };
     let mut entries: Vec<_> = fs::read_dir(&dir)
@@ -4698,7 +4752,7 @@ fn walk(
                     parent_id,
                 });
             }
-            walk(layout, root, &rel, reverse, new_index, folders, notes)?;
+            walk(layout, root, &rel, reverse, new_index, folders, notes, texts)?;
         } else if kind.is_file() && name.ends_with(".md") {
             let abs = entry.path();
             let Ok(text) = fs::read_to_string(&abs) else { continue };
@@ -4707,6 +4761,7 @@ fn walk(
                 Some(_) => editor_body(raw),
                 None => raw,
             };
+            let had_fm = fm.is_some();
             let fm = fm.unwrap_or_default();
             // shelf-projection (v3.5): a wiki note appears under its shelf (the
             // user's folder), not its disk path. Computed BEFORE fm.id is moved.
@@ -4722,6 +4777,15 @@ fn walk(
                 .or_else(|| reverse.get(&rel).filter(|id| !new_index.contains_key(*id)).cloned())
                 .unwrap_or_else(|| Ulid::new().to_string());
             new_index.insert(id.clone(), rel.clone());
+            // cache the parsed text beside the meta — search()/tasks() read it
+            // instead of a second full read+parse pass (audit 2026-07-30, #5)
+            texts.insert(
+                id.clone(),
+                CachedNoteText {
+                    body: body.to_string(),
+                    metadata: if had_fm { searchable_metadata(&fm) } else { String::new() },
+                },
+            );
             let title = title_of(body);
             let aliases = note_aliases(&rel, &title, &id, &fm);
             let (file_created, file_updated) = file_stamps(&abs);
@@ -4848,6 +4912,9 @@ pub fn spawn_watcher(
                     Err(RecvTimeoutError::Timeout) => {
                         paths.sort();
                         paths.dedup();
+                        // stale-cache order: bump BEFORE the notify, so the
+                        // frontend's refetch can never hit a pre-change cache
+                        suppress.bump();
                         on_change(&paths);
                         break;
                     }
@@ -5328,8 +5395,12 @@ fn converted_document_name(rel: &str) -> Result<String, String> {
 /// writing. PDF extraction is offline; scanned/image-only PDFs fail with an
 /// explicit OCR requirement. The resulting bytes still pass the managed-file
 /// extension and mutation gates before entering the memex.
+/// ASYNC command (perf audit 2026-07-30, #14): the textutil/PDF extraction can
+/// run multi-second on a ≤32 MB document and froze the window. The subprocess
+/// moves to a worker; every gate (path guard, size ceiling, managed-lane
+/// availability, extension check) runs exactly where it did before.
 #[tauri::command]
-pub fn corpus_convert_document(
+pub async fn corpus_convert_document(
     state: tauri::State<'_, CorpusState>,
     id: String,
 ) -> Result<String, String> {
@@ -5359,13 +5430,16 @@ pub fn corpus_convert_document(
         }
     })?;
 
-    #[cfg(target_os = "macos")]
-    let converted = crate::document_conversion::convert_document_bytes(&source, &ext)?;
     #[cfg(not(target_os = "macos"))]
     return Err("Local legacy-document conversion is currently available only on macOS.".into());
 
     #[cfg(target_os = "macos")]
     {
+        let converted = tauri::async_runtime::spawn_blocking(move || {
+            crate::document_conversion::convert_document_bytes(&source, &ext)
+        })
+        .await
+        .map_err(|e| format!("conversion worker failed ({e})"))??;
         let rel = state.route(&default_id, |store| {
             store.create_managed_file(&output_name, &converted)
         })?;
@@ -5718,6 +5792,37 @@ pub fn corpus_read_ai(
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| s.read_for_ai(&rel, model_is_local))
+}
+
+/// Batch form of the AI read-permission probe (perf audit 2026-07-30, #4):
+/// which of `ids` may this model read? The verdict comes from the EXACT same
+/// enforcement as `corpus_read_ai` — `read_for_ai` per id, secure detector
+/// included — so Rust stays the enforcement point and TS only FILTERS its hit
+/// list with the answer. Bodies are never returned. ASYNC: the old per-note
+/// probe was ~350 serial IPC round-trips on the main thread, holding the first
+/// token of every chat; the batch runs once, on a worker.
+#[tauri::command]
+pub async fn corpus_readable_ids(
+    app: tauri::AppHandle,
+    ids: Vec<String>,
+    model_id: String,
+    endpoint: String,
+) -> Result<Vec<String>, String> {
+    let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let state = app.state::<CorpusState>();
+        let mut readable = Vec::new();
+        for id in ids {
+            let (root, rel) = split_root_id(&id);
+            if state.route(&root, |s| s.read_for_ai(&rel, model_is_local)).is_ok() {
+                readable.push(id);
+            }
+        }
+        Ok(readable)
+    })
+    .await
+    .map_err(|e| format!("permission probe worker failed ({e})"))?
 }
 
 #[tauri::command]
@@ -8631,6 +8736,82 @@ mod tests {
         for name in ["Inbox", "Vault", "Storage", "Board"] {
             assert!(!vroot.join(name).exists(), "vault memex must not be scaffolded: {name}");
         }
+    }
+
+    // ─── the walk cache (perf audit 2026-07-30, #1/#5) ───────────────────────
+
+    #[test]
+    fn walk_cache_holds_until_the_generation_moves() {
+        let (_dir, mut store) = bare();
+        store.create("", "# First\n").unwrap();
+        let n = store.list().unwrap().notes.len();
+
+        // a DIRECT disk write (no store, no watcher running): an unchanged
+        // generation means list() must serve the cache, not re-walk
+        fs::write(store.root().join("sneaky.md"), "# Sneaky\n").unwrap();
+        assert_eq!(store.list().unwrap().notes.len(), n, "cache re-walked without a bump");
+
+        // the watcher's lane: an external burst bumps the generation
+        store.suppress_set().bump();
+        assert_eq!(store.list().unwrap().notes.len(), n + 1, "bump did not refresh the walk");
+    }
+
+    #[test]
+    fn internal_writes_invalidate_the_walk_cache() {
+        let (_dir, mut store) = bare();
+        let before = store.list().unwrap().notes.len();
+        store.create("", "# Fresh note\n").unwrap();
+        assert_eq!(
+            store.list().unwrap().notes.len(),
+            before + 1,
+            "a store write must invalidate the cached walk (suppress.mark bumps)"
+        );
+    }
+
+    #[test]
+    fn search_and_tasks_ride_the_cached_parse() {
+        let (_dir, mut store) = bare();
+        store.create("", "# Groceries\n\noat milk\n\n- [ ] buy the good butter\n").unwrap();
+        // both projections answer from the SAME cached walk — and stay correct
+        let hits = store.search("oat milk", 10).unwrap();
+        assert_eq!(hits.len(), 1, "cached body missed a search hit");
+        let tasks = store.tasks().unwrap();
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].text, "buy the good butter");
+        // an edit refreshes what they see
+        let id = hits[0].id.clone();
+        store.write(&id, "# Groceries\n\nalmond milk\n").unwrap();
+        assert!(store.search("oat milk", 10).unwrap().is_empty(), "stale cached body served");
+        assert_eq!(store.search("almond milk", 10).unwrap().len(), 1);
+        assert!(store.tasks().unwrap().is_empty(), "checked-off task survived in the cache");
+    }
+
+    #[test]
+    fn external_change_refreshes_through_the_watcher() {
+        let (_dir, mut store) = bare();
+        let root = store.root().to_path_buf();
+        let suppress = store.suppress_set();
+        let fired = Arc::new(AtomicUsize::new(0));
+        let counter = fired.clone();
+        spawn_watcher(root.clone(), suppress, move |_paths: &[PathBuf]| {
+            counter.fetch_add(1, Ordering::SeqCst);
+        })
+        .unwrap();
+        std::thread::sleep(Duration::from_millis(400)); // watcher warm-up
+
+        let before = store.list().unwrap().notes.len();
+        fs::write(root.join("external.md"), "# From another app\n").unwrap();
+        // wait for the debounced fire (poll watcher 100ms + debounce 300ms)
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while fired.load(Ordering::SeqCst) == 0 && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(fired.load(Ordering::SeqCst) >= 1, "watcher never fired");
+        assert_eq!(
+            store.list().unwrap().notes.len(),
+            before + 1,
+            "the watcher's bump must refresh the cached walk"
+        );
     }
 
     #[test]

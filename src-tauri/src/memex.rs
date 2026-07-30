@@ -938,8 +938,17 @@ pub struct ValidateReport {
 /// Shell out to the brain's own `scripts/validate.ts` (mirror-not-import: we exec
 /// it by path, never load it). Degrades to "skipped" if bun / the script is absent.
 /// The ROOT must be registered (#20) — this execs a script FROM the target tree.
+/// ASYNC command (perf audit 2026-07-30, #14): the `bun validate.ts` subprocess
+/// is unbounded and froze the window for its full run. It executes on a worker
+/// now; the registered-root gate (#20) stays exactly where it was.
 #[tauri::command]
-pub fn memex_validate(app: tauri::AppHandle, root: String) -> Result<ValidateReport, String> {
+pub async fn memex_validate(app: tauri::AppHandle, root: String) -> Result<ValidateReport, String> {
+    tauri::async_runtime::spawn_blocking(move || memex_validate_blocking(&app, &root))
+        .await
+        .map_err(|e| format!("validate worker failed ({e})"))?
+}
+
+fn memex_validate_blocking(app: &tauri::AppHandle, root: &str) -> Result<ValidateReport, String> {
     if cfg!(debug_assertions) {
         return Ok(ValidateReport {
             ok: true,
@@ -949,7 +958,7 @@ pub fn memex_validate(app: tauri::AppHandle, root: String) -> Result<ValidateRep
             warnings: 0,
         });
     }
-    let root = registered_root(&app, &root)?;
+    let root = registered_root(app, root)?;
     let script = root.join("scripts").join("validate.ts");
     if !script.exists() {
         return Ok(ValidateReport {

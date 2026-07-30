@@ -989,6 +989,17 @@ export async function corpusReadAi(
   return invoke<string>("corpus_read_ai", { id, modelId: model.id, endpoint: model.endpoint });
 }
 
+/** Which of `ids` this model may READ — ONE batched probe instead of a serial
+ * corpus_read_ai per note (perf audit 2026-07-30, #4). Rust runs the exact
+ * read_for_ai enforcement per id; the TS side only filters with the answer. */
+export async function corpusReadableIds(
+  ids: string[],
+  model: Pick<ChatModelInfo, "id" | "endpoint">,
+): Promise<string[]> {
+  if (!isTauri()) return [];
+  return invoke<string[]>("corpus_readable_ids", { ids, modelId: model.id, endpoint: model.endpoint });
+}
+
 // ——— the unified Location model (corpus.json) — ONE folder = your notes = your
 //     brain, plus connected read-only "other brains". Replaces corpus-root.txt +
 //     corpus-memex-root.txt + corpus-roots.json + memex-instances.json. ———
@@ -1143,6 +1154,15 @@ export function workspaceTakeOpenRequest(): Promise<WorkspaceOpenRequest | null>
 export function onCorpusChanged(cb: () => void): () => void {
   if (!isTauri()) return () => {};
   const unlisten = listen("rotli:corpus-changed", () => cb());
+  return () => void unlisten.then((fn) => fn());
+}
+
+/** Rust → main window: `rotli open <id>` wrote its mailbox and activated the
+ * app (the Reopen event) — consume the request NOW. Replaces the app-lifetime
+ * 750ms workspaceTakeOpenRequest poll (perf audit 2026-07-30, #15). */
+export function onOpenRequest(cb: () => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen("rotli:open-request", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 

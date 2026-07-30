@@ -12,6 +12,7 @@ import {
   corpusFrontmatter,
   corpusList,
   corpusReadAi,
+  corpusReadableIds,
   corpusSearch,
   generateImage as tauriGenerateImage,
   webFetch as tauriWebFetch,
@@ -65,17 +66,23 @@ async function cachedChatBody(
 }
 
 async function aiReadableHits<T extends { id: string }>(hits: T[], model: ChatModelInfo): Promise<T[]> {
-  const allowed = await Promise.all(
-    hits.map(async (hit) => {
-      try {
-        await corpusReadAi(hit.id, model);
-        return true;
-      } catch {
-        return false;
-      }
-    }),
-  );
-  return hits.filter((_hit, index) => allowed[index] === true);
+  if (hits.length === 0) return hits;
+  // ONE batched probe (perf audit 2026-07-30, #4) — the per-note corpusReadAi
+  // loop was ~350 serial IPC reads holding a chat's first token. Rust remains
+  // the enforcement point (read_for_ai per id, secure detector included);
+  // this side only filters with the answer. A failed probe reads as "none
+  // readable" — fail closed, never open.
+  try {
+    const readable = new Set(
+      await corpusReadableIds(
+        hits.map((hit) => hit.id),
+        model,
+      ),
+    );
+    return hits.filter((hit) => readable.has(hit.id));
+  } catch {
+    return [];
+  }
 }
 
 export interface HostImageCtx {

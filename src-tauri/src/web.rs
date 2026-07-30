@@ -34,15 +34,27 @@ pub struct WebResult {
 
 /// Web search via DuckDuckGo (no key). Returns up to `limit` results (default 5).
 /// The egress guard blocks a query that looks like it carries a secret.
+///
+/// ASYNC command (perf audit 2026-07-30, #3): a sync command runs on the MAIN
+/// thread, and this one holds up to two sequential 10s blocking fetches — the
+/// window froze for the duration, per agent tool call. The blocking work moves
+/// to a worker; every guard stays exactly where it was, inside the body.
 #[tauri::command]
-pub fn web_search(query: String, limit: Option<usize>) -> Result<Vec<WebResult>, String> {
+pub async fn web_search(query: String, limit: Option<usize>) -> Result<Vec<WebResult>, String> {
+    tauri::async_runtime::spawn_blocking(move || web_search_blocking(&query, limit))
+        .await
+        .map_err(|e| format!("web search worker failed ({e})"))?
+}
+
+fn web_search_blocking(query: &str, limit: Option<usize>) -> Result<Vec<WebResult>, String> {
     let q = query.trim();
     if q.is_empty() {
         return Ok(vec![]);
     }
     if crate::secret::protected_for_remote(q) {
         return Err(
-            "blocked: that query looks like it contains a secret — not sending it to the web.".into(),
+            "blocked: that query looks like it contains a secret — not sending it to the web."
+                .into(),
         );
     }
     let limit = limit.unwrap_or(5).clamp(1, 10);
@@ -196,8 +208,19 @@ fn read_capped(r: impl Read) -> Result<Vec<u8>, String> {
 /// Output is capped (`max_chars`, default 8000) so a page can't blow the small
 /// model's context. The egress guard blocks a URL that looks like a secret; the
 /// hardened agent above blocks private/loopback/link-local/metadata targets.
+///
+/// ASYNC command (perf audit 2026-07-30, #3): the blocking ureq fetch (20s
+/// timeout × up to 3 redirect hops) froze the window for its full duration.
+/// It runs on a worker now; the secret guard, SSRF vetting (`vet_fetch_url` /
+/// `vet_redirect`), and the size cap all stay exactly where they were.
 #[tauri::command]
-pub fn web_fetch(url: String, max_chars: Option<usize>) -> Result<String, String> {
+pub async fn web_fetch(url: String, max_chars: Option<usize>) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || web_fetch_blocking(&url, max_chars))
+        .await
+        .map_err(|e| format!("web fetch worker failed ({e})"))?
+}
+
+fn web_fetch_blocking(url: &str, max_chars: Option<usize>) -> Result<String, String> {
     let url = url.trim();
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         return Err("web_fetch needs an http(s) URL.".into());
@@ -537,7 +560,9 @@ mod tests {
 
     #[test]
     fn egress_guard_blocks_a_secret_query() {
-        let r = web_search("here is my key sk-ant-api03-EXAMPLE0EXAMPLE0EXAM please search".into(), None);
+        // the blocking inner IS the command body (the async wrapper only moves
+        // it to a worker) — the guard is exercised where it lives
+        let r = web_search_blocking("here is my key sk-ant-api03-EXAMPLE0EXAMPLE0EXAM please search", None);
         assert!(r.is_err());
     }
 
@@ -626,11 +651,11 @@ mod tests {
 
     #[test]
     fn web_fetch_refuses_hostile_urls_before_any_network() {
-        assert!(web_fetch("http://169.254.169.254/latest/meta-data".into(), None).is_err());
-        assert!(web_fetch("http://localhost:11435/v1/models".into(), None).is_err());
-        assert!(web_fetch("https://user:pass@example.com/".into(), None).is_err());
-        assert!(web_fetch("ftp://example.com/x".into(), None).is_err()); // scheme
-        assert!(web_fetch("file:///etc/passwd".into(), None).is_err());
+        assert!(web_fetch_blocking("http://169.254.169.254/latest/meta-data", None).is_err());
+        assert!(web_fetch_blocking("http://localhost:11435/v1/models", None).is_err());
+        assert!(web_fetch_blocking("https://user:pass@example.com/", None).is_err());
+        assert!(web_fetch_blocking("ftp://example.com/x", None).is_err()); // scheme
+        assert!(web_fetch_blocking("file:///etc/passwd", None).is_err());
     }
 
     #[test]

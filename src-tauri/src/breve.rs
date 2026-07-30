@@ -1045,12 +1045,21 @@ pub fn breve_remove_resend_key() -> Result<(), String> {
     keychain::delete_secret(keychain::BREVE_RESEND_ACCOUNT)
 }
 
+/// ASYNC command (perf audit 2026-07-30, #14): the Resend POST holds a 30s
+/// blocking timeout and froze the window. The keychain read + network move to
+/// a worker; the settings validation stays exactly as it was.
 #[tauri::command]
-pub fn breve_test_email(state: tauri::State<'_, CorpusState>) -> Result<String, String> {
+pub async fn breve_test_email(state: tauri::State<'_, CorpusState>) -> Result<String, String> {
     if cfg!(debug_assertions) {
         return Ok("Test email simulated in Tauri dev mode".into());
     }
     let root = active_root(&state)?;
+    tauri::async_runtime::spawn_blocking(move || breve_test_email_blocking(&root))
+        .await
+        .map_err(|e| format!("email test worker failed ({e})"))?
+}
+
+fn breve_test_email_blocking(root: &Path) -> Result<String, String> {
     let home = root.join(routines::MANAGED_DIR);
     let settings = delivery_settings_at(&home, keychain::get_secret(keychain::BREVE_RESEND_ACCOUNT).is_some());
     validate_delivery_settings(&settings)?;
@@ -1079,12 +1088,21 @@ pub fn breve_test_email(state: tauri::State<'_, CorpusState>) -> Result<String, 
     }
 }
 
+/// ASYNC command (perf audit 2026-07-30, #14): the signal-cli send subprocess
+/// is unbounded and froze the window. It runs on a worker; settings validation
+/// stays exactly as it was.
 #[tauri::command]
-pub fn breve_test_signal(state: tauri::State<'_, CorpusState>) -> Result<String, String> {
+pub async fn breve_test_signal(state: tauri::State<'_, CorpusState>) -> Result<String, String> {
     if cfg!(debug_assertions) {
         return Ok("Test Signal simulated in Tauri dev mode".into());
     }
     let root = active_root(&state)?;
+    tauri::async_runtime::spawn_blocking(move || breve_test_signal_blocking(&root))
+        .await
+        .map_err(|e| format!("signal test worker failed ({e})"))?
+}
+
+fn breve_test_signal_blocking(root: &Path) -> Result<String, String> {
     let home = root.join(routines::MANAGED_DIR);
     let settings = delivery_settings_at(&home, keychain::get_secret(keychain::BREVE_RESEND_ACCOUNT).is_some());
     validate_delivery_settings(&settings)?;

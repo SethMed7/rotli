@@ -40,6 +40,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The window stops freezing for background work.** The commands that used to
+  run on the main thread — web fetch/search for agent tools (up to 20s each),
+  document conversion, memex validation, Breve's email/Signal delivery tests,
+  the model-download progress walk, and the system profile — now run on worker
+  threads, so the app keeps painting while they work (every security guard
+  unchanged and in place). The corpus walk behind every note list is memoized
+  against a change generation — your own writes and external file changes
+  (via the watcher) refresh it, everything else answers from cache — and
+  search and the Tasks list reuse that one parse instead of re-reading every
+  note twice. A chat's first token no longer waits on ~350 serial per-note
+  permission probes: one batched Rust check (same enforcement, same secure
+  detector) answers for the whole hit list. And the 750ms `rotli open`
+  mailbox poll (~115k IPC calls/day) is gone — Rust forwards the CLI's
+  activation as a `rotli:open-request` event instead.
+
 - **Startup got ~35% lighter and typing got dramatically cheaper.** The quokka
   illustrations (~450 KB, 29% of startup JS) now load on demand — same inline
   line-art, same theme tinting, just fetched the moment a quokka moment

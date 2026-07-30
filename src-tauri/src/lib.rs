@@ -1059,6 +1059,7 @@ pub fn run() {
             corpus::corpus_toggle_task,
             corpus::corpus_set_local_ai_access,
             corpus::corpus_read_ai,
+            corpus::corpus_readable_ids,
             corpus::corpus_write,
             corpus::corpus_create,
             corpus::corpus_delete,
@@ -1387,6 +1388,13 @@ pub fn run() {
                     if reopen_should_show_main(has_visible_windows, ours_up, summoned) {
                         show_main(app);
                     }
+                    // `rotli open <id>` writes its mailbox file then runs
+                    // `open -a rotli` — which lands here as a Reopen. Nudge the
+                    // frontend to CONSUME the mailbox now (the seventh rotli:*
+                    // event, replacing the app-lifetime 750ms poll — perf audit
+                    // 2026-07-30, #15). Firing with no request pending is a
+                    // cheap no-op read on the other side.
+                    let _ = app.emit_to("main", "rotli:open-request", ());
                 }
             }
             #[cfg(not(target_os = "macos"))]
