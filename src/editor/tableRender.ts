@@ -14,6 +14,8 @@
 
 import { type EditorState, type Range, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
+import { noteIdFacet } from "./livePreview";
+import { MIN_TABLE_COL_PX, tableWidthKey, useTableWidthsStore } from "../state/tableWidths";
 import {
   type Align,
   type TableBlock,
@@ -181,12 +183,21 @@ class TableWidget extends WidgetType {
     readonly rowBase: number,
     readonly rowLineDelta: number,
     readonly full: boolean,
+    /** Position-independent identity for persisted column widths (header
+     * signature + occurrence); "" on the headerless split twins. */
+    readonly widthSig: string = "",
   ) {
     super();
   }
+  /** Live only while a column drag is in flight — destroy() runs it so the
+   * window-level drag listeners never outlive the widget (PR #9 review). */
+  private dropResizeCleanup: (() => void) | null = null;
+  destroy(): void {
+    this.dropResizeCleanup?.();
+  }
   eq(o: TableWidget): boolean {
     return (
-      JSON.stringify([o.header, o.align, o.rows, o.cols, o.rowBase, o.rowLineDelta, o.full]) ===
+      JSON.stringify([o.header, o.align, o.rows, o.cols, o.rowBase, o.rowLineDelta, o.full, o.widthSig]) ===
       JSON.stringify([
         this.header,
         this.align,
@@ -195,6 +206,7 @@ class TableWidget extends WidgetType {
         this.rowBase,
         this.rowLineDelta,
         this.full,
+        this.widthSig,
       ])
     );
   }
@@ -246,6 +258,108 @@ class TableWidget extends WidgetType {
     scroll.appendChild(table);
     wrap.appendChild(scroll);
 
+    // ── column RESIZE (Seth, 2026-07-30): drag a column boundary; widths are
+    //    view state persisted per note+table (never the .md), double-click a
+    //    boundary to reset the table to auto layout. ──
+    const noteId = view.state.facet(noteIdFacet);
+    const widthKey = this.full && this.widthSig && noteId ? tableWidthKey(noteId, this.widthSig) : null;
+    let userWidths: number[] | null = widthKey
+      ? (useTableWidthsStore.getState().widths[widthKey]?.slice() ?? null)
+      : null;
+    let widthColgroup: HTMLTableColElement[] | null = null;
+    const applyColWidths = (cols: number[] | null) => {
+      if (cols === null) {
+        table.querySelector("colgroup.rotli-tbl-widths")?.remove();
+        widthColgroup = null;
+        table.style.tableLayout = "";
+        table.style.width = "";
+        return;
+      }
+      if (!widthColgroup || widthColgroup.length !== cols.length) {
+        table.querySelector("colgroup.rotli-tbl-widths")?.remove();
+        const group = document.createElement("colgroup");
+        group.className = "rotli-tbl-widths";
+        widthColgroup = cols.map(() => {
+          const col = document.createElement("col");
+          group.appendChild(col);
+          return col;
+        });
+        table.insertBefore(group, table.firstChild);
+      }
+      cols.forEach((w, i) => {
+        const col = widthColgroup?.[i];
+        if (col) col.style.width = `${w}px`;
+      });
+      table.style.tableLayout = "fixed";
+      table.style.width = `${cols.reduce((a, b) => a + b, 0)}px`;
+    };
+    if (userWidths && userWidths.length === this.cols) applyColWidths(userWidths);
+    else userWidths = null;
+
+    /** The column boundary under the pointer (within 5px of a cell edge), or
+     * -1. Boundary i sits between column i and i+1 — the last edge is the
+     * add-column zone, not a resize. */
+    const RESIZE_EDGE = 5;
+    const boundaryAt = (e: MouseEvent): number => {
+      if (!widthKey) return -1;
+      const cell = (e.target as HTMLElement).closest?.("td,th");
+      if (!(cell instanceof HTMLTableCellElement)) return -1;
+      const col = Number(cell.dataset.tableCol);
+      if (!Number.isInteger(col)) return -1;
+      const rect = cell.getBoundingClientRect();
+      // the pointer must really be AT the cell — the Tab-advance path drives
+      // cells with a synthetic mousedown at (0,0), which must never resize
+      if (e.clientY < rect.top || e.clientY > rect.bottom) return -1;
+      if (e.clientX < rect.left - RESIZE_EDGE || e.clientX > rect.right + RESIZE_EDGE) return -1;
+      if (rect.right - e.clientX <= RESIZE_EDGE && col < this.cols - 1) return col;
+      if (e.clientX - rect.left <= RESIZE_EDGE && col > 0) return col - 1;
+      return -1;
+    };
+    const currentColWidths = (): number[] => {
+      const reference = table.rows.item(0);
+      if (!reference) return [];
+      return Array.from(reference.cells).map((cell) => cell.getBoundingClientRect().width);
+    };
+    const startColResize = (e: MouseEvent, boundary: number) => {
+      if (!widthKey) return;
+      const startWidths = userWidths?.length === this.cols ? userWidths.slice() : currentColWidths();
+      if (startWidths.length !== this.cols) return;
+      const startX = e.clientX;
+      wrap.classList.add("rotli-tbl-resizing");
+      const onMove = (ev: MouseEvent) => {
+        const next = startWidths.slice();
+        next[boundary] = Math.max(MIN_TABLE_COL_PX, (startWidths[boundary] ?? 0) + ev.clientX - startX);
+        userWidths = next;
+        applyColWidths(next);
+      };
+      const onUp = () => {
+        cleanupResize();
+        if (userWidths) useTableWidthsStore.getState().setTableWidths(widthKey, userWidths);
+      };
+      const cleanupResize = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        wrap.classList.remove("rotli-tbl-resizing");
+        this.dropResizeCleanup = null;
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      // CodeMirror may destroy the widget mid-drag (note closed, doc rebuilt)
+      // — destroy() runs this so no window listener outlives the widget
+      this.dropResizeCleanup = cleanupResize;
+    };
+    table.addEventListener("mousemove", (e) => {
+      if (e.buttons) return; // an active drag owns the cursor
+      table.style.cursor = boundaryAt(e) >= 0 ? "col-resize" : "";
+    });
+    table.addEventListener("dblclick", (e) => {
+      if (boundaryAt(e) < 0 || !widthKey) return;
+      e.preventDefault();
+      userWidths = null;
+      applyColWidths(null);
+      useTableWidthsStore.getState().setTableWidths(widthKey, null);
+    });
+
     // ── click a cell → edit INSIDE the rendered table ─────────────────────
     // The Markdown remains durable truth, but only the active cell becomes a
     // small text control. Every other cell keeps rendering, so entering a table
@@ -278,6 +392,9 @@ class TableWidget extends WidgetType {
      * a text control. Otherwise auto-layout recomputes around one long editor
      * value and the whole table jumps sideways. */
     const freezeTableGeometry = (): (() => void) => {
+      // user column widths already pin the geometry — freezing again would
+      // stack a second colgroup over the widths one
+      if (table.style.tableLayout === "fixed") return () => {};
       const tableRect = table.getBoundingClientRect();
       const referenceRow = table.rows.item(0);
       if (!referenceRow || tableRect.width <= 0) return () => {};
@@ -422,6 +539,13 @@ class TableWidget extends WidgetType {
     table.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
       if (e.target instanceof HTMLTextAreaElement) return;
+      // a press on a column boundary RESIZES — it must never open the cell editor
+      const boundary = boundaryAt(e);
+      if (boundary >= 0) {
+        e.preventDefault();
+        startColResize(e, boundary);
+        return;
+      }
       const cell = (e.target as HTMLElement).closest?.("td,th");
       if (!(cell instanceof HTMLTableCellElement)) return;
       e.preventDefault();
@@ -548,12 +672,29 @@ const rawLine = Decoration.line({ class: "rotli-table-rawline" });
 function build(state: EditorState, tables: TableBlock[], raw: readonly number[]): DecorationSet {
   const decos: Range<Decoration>[] = [];
   const sel = state.selection.main;
+  // width identity: header signature + occurrence among same-header tables,
+  // so persisted widths survive the table moving within the note
+  const sigCounts = new Map<string, number>();
   for (const t of tables) {
+    // JSON, not join("|") — an escaped pipe inside a header cell must never
+    // collide two different tables onto one widths key (PR #9 review)
+    const headerSig = JSON.stringify(t.header);
+    const occurrence = sigCounts.get(headerSig) ?? 0;
+    sigCounts.set(headerSig, occurrence + 1);
     const wholeRaw = raw.includes(t.from) || (!sel.empty && sel.from <= t.to && sel.to >= t.from);
     if (!wholeRaw) {
       decos.push(
         Decoration.replace({
-          widget: new TableWidget(t.header, t.align, t.rows, t.header.length, 0, 2, true),
+          widget: new TableWidget(
+            t.header,
+            t.align,
+            t.rows,
+            t.header.length,
+            0,
+            2,
+            true,
+            `${headerSig}#${occurrence}`,
+          ),
           block: true,
         }).range(t.from, t.to),
       );

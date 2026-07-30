@@ -12,11 +12,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Table columns resize by drag.** Grab any column boundary in a rendered
+  Markdown table and drag; widths persist per table on this Mac (the .md never
+  changes) and a double-click on a boundary returns the table to automatic
+  layout.
 - **Reviews now teach the tooling.** A tracked, sub-second pre-commit hook
   (staged-file Prettier + conflict-marker guard; enable with
   `git config core.hooksPath .githooks`) plus a standing rule in
   CONTRIBUTING: when a review flags a class of issue, the same PR lands a
   mechanical guard for that class.
+
+### Fixed
+
+- **Images load in notes from every location — and repair themselves.**
+  Relative and `storage:` image links resolved only against the primary
+  corpus, so notes living in a connected brain showed empty broken boxes —
+  they now resolve against the note's own root. And a link that stops
+  resolving is classified, not abandoned: a MOVED image heals the link to its
+  new home, an ARCHIVED image still renders (the link stays untouched so a
+  restore heals it naturally), an image in the TRASH says "photo deleted — in
+  the Trash", and only a truly gone file reads "not found".
+- **Images follow their note.** Trashing or archiving a note takes its images
+  to the same place — unless another note also uses them (the check is
+  conservative: any doubt keeps the file put). A General setting, on by
+  default; restoring a file from Trash or Archive returns it to its original
+  path, so the note's link works again immediately.
+- **Settings reads as one column.** Every control now holds a single shared
+  width — the four themes sit in one row, segmented choices are compact
+  controls instead of full-width bars, and the App icon area no longer floats
+  against a stretched segment above it.
 
 ## [0.47.0] - 2026-07-30
 

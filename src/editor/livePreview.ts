@@ -15,7 +15,7 @@
 // bullet line cleanly becomes a paragraph). Bullets/numbers/checkboxes render
 // as widgets ALWAYS (a list always looks like a list — never a stray dash).
 
-import { type Range, RangeSet } from "@codemirror/state";
+import { Facet, type Range, RangeSet } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -29,7 +29,8 @@ import { scanFences } from "./fences";
 import { lineInTable, scanTables } from "./tables";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
 import { type DragGhost, createImageDragGhost } from "../lib/dragGhost";
-import { openUrl, resolveImageSrc } from "../lib/tauri";
+import { openUrl, resolveImageSrc, rootIdOf } from "../lib/tauri";
+import { locateLostImage } from "../services/imageRepair";
 import { usePanesStore } from "../state/panes";
 import { editorLinkOpensOnClick, WIKILINK_RE } from "./wikilink";
 import { resolveWikilinkTarget } from "./wikilinkIndex";
@@ -161,8 +162,16 @@ function listItemImage(
 // corpus splits it off the body; table delimiter rows carry pipes so they miss)
 const HR_LINE = /^ {0,3}(-{3,}|\*{3,}|_{3,})\s*$/;
 
-// resolved image urls, keyed by raw markdown src (see ImgWidget.toDOM)
+// resolved image urls, keyed by root + raw markdown src (see ImgWidget.toDOM)
 const IMG_SRC_CACHE = new Map<string, string>();
+
+/** The OPEN NOTE's wire id, provided by cmEditor — widgets that need per-note
+ * context read it here: images resolve relative srcs against the note's
+ * corpus root (Seth, 2026-07-30: photos in non-default-root notes rendered as
+ * broken boxes), and table widgets key their persisted column widths by it. */
+export const noteIdFacet = Facet.define<string, string>({
+  combine: (values) => values[0] ?? "",
+});
 
 // ——— widgets ———
 
@@ -263,15 +272,63 @@ class ImgWidget extends WidgetType {
     wrap.appendChild(img);
     // select/deselect recreates the widget DOM — cache resolved urls so the
     // image doesn't blank-flash through the async resolve on every click
-    const cached = IMG_SRC_CACHE.get(this.src);
+    const rootId = rootIdOf(view.state.facet(noteIdFacet));
+    const cacheKey = `${rootId}\0${this.src}`;
+    const showState = (text: string) => {
+      if (!wrap.isConnected) return;
+      wrap.classList.add("missing");
+      const label = document.createElement("span");
+      label.className = "rotli-img-missing";
+      label.textContent = text;
+      wrap.appendChild(label);
+    };
+    // heal the markdown link in place — the moved file's new home replaces the
+    // stale src (guarded: the line must still carry exactly this src)
+    const healSrc = (newRel: string): boolean => {
+      if (!wrap.isConnected) return false;
+      const pos = view.posAtDOM(wrap);
+      const line = view.state.doc.lineAt(pos);
+      const text = view.state.doc.sliceString(line.from, line.to);
+      const target = `](${this.src})`;
+      const at = text.indexOf(target);
+      if (at < 0) return false;
+      const from = line.from + at + 2;
+      view.dispatch({ changes: { from, to: from + this.src.length, insert: newRel } });
+      return true;
+    };
+    // a src that no longer resolves is CLASSIFIED, not abandoned (Seth,
+    // 2026-07-30): moved → heal the link; archived → still exists, render it;
+    // trashed → "photo deleted"; only a truly gone file says "not found"
+    const rescue = () =>
+      locateLostImage(this.src, rootId).then((loc) => {
+        if (loc.kind === "moved") {
+          if (healSrc(loc.rel)) return; // the rebuilt widget renders the new src
+          showState(`image moved — ${loc.rel}`);
+          return;
+        }
+        if (loc.kind === "archived") {
+          return resolveImageSrc(loc.rel, rootId).then((url) => {
+            if (url && wrap.isConnected)
+              img.src = url; // render from the Archive, link untouched
+            else showState(`image in the Archive — ${this.src}`);
+          });
+        }
+        if (loc.kind === "trashed") showState(`photo deleted — in the Trash (${this.src})`);
+        else showState(`image not found — ${this.src}`);
+      });
+    const cached = IMG_SRC_CACHE.get(cacheKey);
     if (cached) img.src = cached;
     else {
-      void resolveImageSrc(this.src).then((url) => {
-        if (url) {
-          IMG_SRC_CACHE.set(this.src, url);
-          img.src = url;
-        }
-      });
+      void resolveImageSrc(this.src, rootId)
+        .then((url) => {
+          if (url) {
+            IMG_SRC_CACHE.set(cacheKey, url);
+            img.src = url;
+          } else {
+            return rescue();
+          }
+        })
+        .catch(() => showState(`image not found — ${this.src}`));
     }
     img.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;

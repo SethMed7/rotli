@@ -7,7 +7,7 @@ import { corpusFileStat, corpusMoveFileToSink } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
 import { trashVirtualFolderItems } from "./folderTrash";
 import { invalidateNotes } from "./hooks";
-import { notesService } from "./notes";
+import { trashNoteWithImages } from "./noteLifecycle";
 
 export async function trashSystemSelection(): Promise<void> {
   const ui = useUiStore.getState();
@@ -18,7 +18,7 @@ export async function trashSystemSelection(): Promise<void> {
     await trashVirtualFolderItems(items, {
       fileStat: corpusFileStat,
       moveFile: corpusMoveFileToSink,
-      trashNote: (id) => notesService.trashNote(id),
+      trashNote: (id) => trashNoteWithImages(id),
     });
     ui.setSystemSelection([]);
   } catch (err) {

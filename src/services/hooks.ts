@@ -21,6 +21,7 @@ import { memexRootMarkers } from "./fsNotes";
 import { trashVirtualFolderItems } from "./folderTrash";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
+import { archiveNoteWithImages, trashNoteWithImages } from "./noteLifecycle";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 
@@ -277,7 +278,7 @@ export async function invalidateJournal(): Promise<void> {
 
 export function useArchiveNote() {
   return useMutation({
-    mutationFn: (id: string) => notesService.archiveNote(id),
+    mutationFn: (id: string) => archiveNoteWithImages(id),
     onSuccess: invalidateBoth,
     onError: lifecycleError("archive"),
   });
@@ -285,7 +286,7 @@ export function useArchiveNote() {
 
 export function useTrashNote() {
   return useMutation({
-    mutationFn: (id: string) => notesService.trashNote(id),
+    mutationFn: (id: string) => trashNoteWithImages(id),
     onSuccess: invalidateBoth,
     onError: lifecycleError("delete"),
   });
@@ -302,7 +303,7 @@ export function useTrashItems() {
       trashVirtualFolderItems(items, {
         fileStat: corpusFileStat,
         moveFile: corpusMoveFileToSink,
-        trashNote: (id) => notesService.trashNote(id),
+        trashNote: (id) => trashNoteWithImages(id),
       }),
     onError: (error) =>
       useUiStore

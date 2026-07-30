@@ -15,6 +15,7 @@ import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
 import { mainNoteIds } from "../services/mainTree";
 import { notesService } from "../services/notes";
+import { archiveNoteWithImages } from "../services/noteLifecycle";
 import { useFocusedNoteId, usePanesStore } from "../state/panes";
 import { useMainStore } from "../state/main";
 import { useUiStore } from "../state/ui";
@@ -159,7 +160,7 @@ export function BoardSurface() {
         .filter((b) => b.length > 0)
         .join("\n\n");
       const note = await notesService.createNote(DEST.inbox, body);
-      for (const c of ordered) await notesService.archiveNote(c.id);
+      for (const c of ordered) await archiveNoteWithImages(c.id);
       await invalidateNotes();
       setSelected(new Set());
       openNote(note.id); // returns the content area to the panes
@@ -173,7 +174,7 @@ export function BoardSurface() {
     if (chosen.length === 0 || busy) return;
     setBusy(true);
     try {
-      for (const c of chosen) await notesService.archiveNote(c.id);
+      for (const c of chosen) await archiveNoteWithImages(c.id);
       await invalidateNotes();
       setSelected(new Set());
     } finally {

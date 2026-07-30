@@ -33,7 +33,7 @@ import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHand
 import { tableRender } from "./tableRender";
 import { rawMarkdown } from "./rawMarkdown";
 import { focusDim } from "./focusMode";
-import { linkOpener, livePreview } from "./livePreview";
+import { linkOpener, livePreview, noteIdFacet } from "./livePreview";
 import { stripMarkdown } from "./stripMarkdown";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import {
@@ -466,6 +466,9 @@ export function CmEditor({
         // URL. Both read source text in raw and beautified modes, so this sits
         // outside the view-mode compartment.
         linkOpener,
+        // per-note widget context: image srcs resolve against THIS note's
+        // corpus root; table widgets key persisted column widths by the id
+        noteIdFacet.of(noteId),
         viewModeComp.of(rawEditorRef.current ? rawMarkdown : [livePreview, blockRender, tableRender]),
         blockComp.of(blockHandlesRef.current ? blockHandles(openBlockMenu) : []),
         fmComp.of(fmExt(fmRawRef.current, fmGenRef.current, fmErrRef.current)),

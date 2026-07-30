@@ -8,6 +8,7 @@ import { type BlockToggle, type HeadingLevel, type InlineMark, activeEditor } fr
 import { summonChat } from "../services/chatSummon";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
 import { notesService } from "../services/notes";
+import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLifecycle";
 import { captureHandle } from "../lib/captureHandle";
 import { quickHandle } from "../lib/quickHandle";
 import {
@@ -316,7 +317,7 @@ export function registerDefaultActions(): void {
     run: () => {
       if (!notesWorkspaceActive()) return;
       const id = focusedNoteIdNow();
-      if (id) void notesService.archiveNote(id).then(invalidateNotes).catch(lifecycleError("archive"));
+      if (id) void archiveNoteWithImages(id).then(invalidateNotes).catch(lifecycleError("archive"));
     },
   });
   registerAction({
@@ -326,7 +327,7 @@ export function registerDefaultActions(): void {
     run: () => {
       if (!notesWorkspaceActive()) return;
       const id = focusedNoteIdNow();
-      if (id) void notesService.trashNote(id).then(invalidateNotes).catch(lifecycleError("delete"));
+      if (id) void trashNoteWithImages(id).then(invalidateNotes).catch(lifecycleError("delete"));
     },
   });
   registerAction({

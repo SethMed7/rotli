@@ -45,6 +45,7 @@ import {
   type NoteStyle,
   useNoteStyleStore,
 } from "./noteStyle";
+import { MIN_TABLE_COL_PX, noteIdOfWidthKey, useTableWidthsStore } from "./tableWidths";
 import { hydrateMain, useMainStore } from "./main";
 import { hydrateViews, useViewsStore } from "./views";
 import { findLeaf, leaves, usePanesStore } from "./panes";
@@ -153,6 +154,8 @@ interface PersistedSettings {
   newTabDefault: NewItemKind;
   /** Editor spell-check (red squiggles); on by default. */
   spellcheck: boolean;
+  /** Images follow their note into Archive/Trash (sole references only). */
+  tidyImagesWithNote: boolean;
   /** Editor view: raw markdown vs beautified (WYSIWYG); beautified by default. */
   rawEditor: boolean;
   /** Block handles (drag/add/remove blocks); ON by default since the floating
@@ -228,6 +231,8 @@ interface PersistedSettings {
   bindings: Record<string, string | null>;
   /** The per-note Aa layer — NEVER written into the .md files. */
   noteStyles: Record<string, NoteStyle>;
+  /** Per-table column widths (noteId-keyed view state) — NEVER in the .md. */
+  tableWidths: Record<string, number[]>;
 }
 
 /** Keys the file carried that this build doesn't know — a hand-set daemon knob
@@ -259,6 +264,17 @@ export function parseSettings(raw: string): PersistedSettings {
         ? Math.min(MAX_TEXT_SIZE, Math.max(MIN_TEXT_SIZE, s.size))
         : DEFAULT_NOTE_STYLE.size;
     noteStyles[id] = { size, measure: asEnum(s.measure, MEASURES, DEFAULT_NOTE_STYLE.measure) };
+  }
+  // table column widths — only arrays of finite positive numbers survive
+  const tableWidths: Record<string, number[]> = {};
+  for (const [key, cols] of Object.entries(record(data.tableWidths))) {
+    if (
+      Array.isArray(cols) &&
+      cols.length > 0 &&
+      cols.every((w) => typeof w === "number" && Number.isFinite(w) && w > 0)
+    ) {
+      tableWidths[key] = cols.map((w) => Math.max(MIN_TABLE_COL_PX, Math.round(w)));
+    }
   }
   // expandedDests — keep only boolean entries; missing → seed Inbox + Vault so
   // an old config (which lacked this key) opens with the default tree. A stale
@@ -305,6 +321,7 @@ export function parseSettings(raw: string): PersistedSettings {
     showInDock: asBool(data.showInDock, false),
     newTabDefault: asEnum(data.newTabDefault, NEW_ITEM_KINDS, DEFAULT_NEW_ITEM_KIND),
     spellcheck: asBool(data.spellcheck, true),
+    tidyImagesWithNote: asBool(data.tidyImagesWithNote, true),
     rawEditor: asBool(data.rawEditor, false),
     blockHandles2: asBool(data.blockHandles2, true),
     userName: typeof data.userName === "string" ? data.userName : "",
@@ -397,6 +414,7 @@ export function parseSettings(raw: string): PersistedSettings {
     expandedDests,
     bindings,
     noteStyles,
+    tableWidths,
   };
 }
 
@@ -434,6 +452,7 @@ function applySettings(s: PersistedSettings): void {
     showInDock: s.showInDock,
     newTabDefault: s.newTabDefault,
     spellcheck: s.spellcheck,
+    tidyImagesWithNote: s.tidyImagesWithNote,
     rawEditor: s.rawEditor,
     blockHandles: s.blockHandles2,
     userName: s.userName,
@@ -468,6 +487,7 @@ function applySettings(s: PersistedSettings): void {
   });
   useBindingsStore.setState({ overrides: s.bindings });
   useNoteStyleStore.setState({ styles: s.noteStyles });
+  useTableWidthsStore.setState({ widths: s.tableWidths });
 }
 
 /** Settings that live OUTSIDE the webview: window behavior, Dock policy, and
@@ -595,6 +615,12 @@ async function hydrateViewstate(): Promise<void> {
   const kept = Object.entries(styles).filter(([id]) => alive.has(id));
   if (kept.length !== Object.keys(styles).length) {
     useNoteStyleStore.setState({ styles: Object.fromEntries(kept) });
+  }
+  // same discipline for table column widths (key prefix = note id)
+  const widths = useTableWidthsStore.getState().widths;
+  const keptWidths = Object.entries(widths).filter(([key]) => alive.has(noteIdOfWidthKey(key)));
+  if (keptWidths.length !== Object.keys(widths).length) {
+    useTableWidthsStore.setState({ widths: Object.fromEntries(keptWidths) });
   }
 
   const root = validPane(data.root, alive);
@@ -753,6 +779,7 @@ function settingsSnapshot(): string {
     showInDock: ui.showInDock,
     newTabDefault: ui.newTabDefault,
     spellcheck: ui.spellcheck,
+    tidyImagesWithNote: ui.tidyImagesWithNote,
     rawEditor: ui.rawEditor,
     blockHandles2: ui.blockHandles,
     userName: ui.userName,
@@ -786,6 +813,7 @@ function settingsSnapshot(): string {
     expandedDests: ui.expandedDests,
     bindings: useBindingsStore.getState().overrides,
     noteStyles: useNoteStyleStore.getState().styles,
+    tableWidths: useTableWidthsStore.getState().widths,
   };
   // unknown keys ride under the known ones (known always win) — see #35
   return JSON.stringify({ ...settingsPassthrough, ...snapshot });
@@ -841,6 +869,7 @@ export function attachPersistence(): () => void {
     useUiStore.subscribe(saver.schedule),
     useBindingsStore.subscribe(saver.schedule),
     useNoteStyleStore.subscribe(saver.schedule),
+    useTableWidthsStore.subscribe(saver.schedule),
     usePanesStore.subscribe(saver.schedule),
     useMruStore.subscribe(saver.schedule),
   ];

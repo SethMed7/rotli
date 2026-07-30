@@ -610,6 +610,13 @@ export async function resolveImageSrc(src: string, rootId = "default"): Promise<
   return abs ? convertFileSrc(abs) : "";
 }
 
+/** The corpus root a wire id belongs to ("default" for bare ids) — for
+ * callers that must resolve RELATIVE resources (images) against the same
+ * corpus the note lives in, not blindly against the default root. */
+export function rootIdOf(id: string): string {
+  return splitRootId(id).rootId;
+}
+
 /** Split a corpus wire id into its root + relative path. The default LOCAL root
  * emits BARE ids ("storage/x.mp3"); a non-default root prefixes "<rootid>:rel"
  * where rootid has no slash. Mirrors Rust `split_root_id`. */

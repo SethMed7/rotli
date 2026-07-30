@@ -46,6 +46,38 @@ test("clicking a Markdown table cell edits inside the rendered table", async ({ 
   await expect(table.locator("tbody tr")).toHaveCount(3);
 });
 
+test("dragging a column boundary resizes the column; double-click resets", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText(TABLE_NOTE);
+
+  const table = page.locator(".rotli-md-table");
+  await expect(table).toBeVisible();
+  const firstHeader = table.locator("th").first();
+  const before = await firstHeader.boundingBox();
+  if (!before) throw new Error("no header box");
+
+  // press ON the boundary between the two columns and drag 80px right
+  await page.mouse.move(before.x + before.width - 2, before.y + before.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(before.x + before.width + 78, before.y + before.height / 2, { steps: 4 });
+  await page.mouse.up();
+
+  const after = await firstHeader.boundingBox();
+  if (!after) throw new Error("no header box after drag");
+  expect(after.width).toBeGreaterThan(before.width + 60);
+  // the boundary press resized — it must not have opened the cell editor
+  await expect(table.locator(".rotli-md-cell-input")).toHaveCount(0);
+
+  // double-click the boundary → back to auto layout
+  await page.mouse.dblclick(after.x + after.width - 2, after.y + after.height / 2);
+  const restored = await firstHeader.boundingBox();
+  if (!restored) throw new Error("no header box after reset");
+  expect(Math.abs(restored.width - before.width)).toBeLessThan(12);
+});
+
 test("editing a wrapped table cell preserves the table's shape", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");

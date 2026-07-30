@@ -243,6 +243,11 @@ interface UiState {
   spellcheck: boolean;
   setSpellcheck: (on: boolean) => void;
 
+  /** Images follow their note into Archive/Trash when only that note uses
+   * them (Seth, 2026-07-30). On by default; a Settings → General switch. */
+  tidyImagesWithNote: boolean;
+  setTidyImagesWithNote: (on: boolean) => void;
+
   /** Editor view: false = beautified (live WYSIWYG), true = raw markdown source.
    * A per-eye preference — the .md is identical either way. Persisted. */
   rawEditor: boolean;
@@ -532,6 +537,8 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   spellcheck: true,
   setSpellcheck: (on) => set({ spellcheck: on }),
+  tidyImagesWithNote: true,
+  setTidyImagesWithNote: (on) => set({ tidyImagesWithNote: on }),
 
   rawEditor: false,
   setRawEditor: (on) => set({ rawEditor: on }),

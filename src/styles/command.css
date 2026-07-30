@@ -552,7 +552,7 @@
   font-size: 13px;
   color: var(--text-muted);
   line-height: 1.6;
-  max-width: 540px;
+  max-width: 640px;
   margin-bottom: 22px;
 }
 
@@ -1109,9 +1109,10 @@
 /* appearance — one card per theme (no family/mode two-step) */
 .famrow {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* four themes, ONE row — 3+1 wrapping read as an accident (2026-07-30) */
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
-  max-width: 560px;
+  max-width: 640px;
   margin-bottom: 14px;
 }
 .famcard {
@@ -1226,6 +1227,7 @@
   align-items: center;
   gap: 12px;
   margin-top: 8px;
+  max-width: 640px;
   font-size: var(--fs-label);
   color: var(--text-muted);
 }
@@ -1256,7 +1258,7 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 6px;
-  max-width: 560px;
+  max-width: 640px;
 }
 /* soft filled cards, no hard outline (Seth, 2026-07-06: "I don't like the white
    outline style"). The card is a subtle raised fill (--surface-2) on the page's
@@ -1268,6 +1270,8 @@
   align-items: center;
   gap: 14px;
   width: 100%;
+  /* a LONE toggle (outside .swgroup) still holds the shared control measure */
+  max-width: 640px;
   text-align: left;
   padding: 12px 14px;
   background: var(--surface-2);
@@ -1284,11 +1288,17 @@
   opacity: 0.5;
   cursor: default;
 }
+/* a settings segmented choice stays a compact CONTROL — the Aa panel's
+   flex:1 segments stretched each half to ~360px in the 720px body and the
+   pair read as two lost bars (Seth, 2026-07-30) */
+.set-main .segrow {
+  max-width: 344px;
+}
 /* app-icon picker (Settings → Appearance → App icon) */
 .appicon-row {
   display: flex;
-  gap: 12px;
-  margin-top: 6px;
+  gap: 14px;
+  margin-top: 10px;
   flex-wrap: wrap;
 }
 .appicon {

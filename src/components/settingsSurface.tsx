@@ -469,6 +469,8 @@ function GeneralPane() {
   const setShowInDock = useUiStore((s) => s.setShowInDock);
   const spellcheck = useUiStore((s) => s.spellcheck);
   const setSpellcheck = useUiStore((s) => s.setSpellcheck);
+  const tidyImagesWithNote = useUiStore((s) => s.tidyImagesWithNote);
+  const setTidyImagesWithNote = useUiStore((s) => s.setTidyImagesWithNote);
   const fileMetadata = useUiStore((s) => s.fileMetadata);
   const setFileMetadata = useUiStore((s) => s.setFileMetadata);
   const newTabDefault = useUiStore((s) => s.newTabDefault);
@@ -596,6 +598,12 @@ function GeneralPane() {
           title="Check spelling"
           desc="Underline misspelled words in red as you write."
           onChange={() => setSpellcheck(!spellcheck)}
+        />
+        <Toggle
+          on={tidyImagesWithNote}
+          title="Images follow their note"
+          desc="Trashing or archiving a note takes its images along — unless another note also uses them."
+          onChange={() => setTidyImagesWithNote(!tidyImagesWithNote)}
         />
         <Toggle
           on={fileMetadata === "show"}

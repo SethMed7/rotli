@@ -1125,6 +1125,27 @@
   border-radius: var(--r-inner);
   cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */
 }
+/* mid column-drag: the whole widget locks selection + keeps the col cursor */
+.rotli-md-tablewrap.rotli-tbl-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+.rotli-md-tablewrap.rotli-tbl-resizing table {
+  cursor: col-resize;
+}
+/* a src that resolved to nothing: keep the frame honest — name the file
+   instead of showing an empty box (Seth, 2026-07-30) */
+.rotli-img.missing img {
+  display: none;
+}
+.rotli-img-missing {
+  display: inline-block;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-control);
+}
 .rotli-img-moving {
   opacity: 0.5;
 }
