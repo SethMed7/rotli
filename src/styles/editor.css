@@ -835,6 +835,28 @@
   text-decoration-style: dashed;
   cursor: text;
 }
+/* fenced-code TOKEN COLORS (Seth, 2026-07-30) — IDE-grade, riding the accent
+   swatch tokens so every theme (and scheme) adapts with zero new raw colors */
+.rotli-tok-kw {
+  color: var(--accent-swatch-violet);
+}
+.rotli-tok-str {
+  color: var(--accent-swatch-green);
+}
+.rotli-tok-cmt {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.rotli-tok-num {
+  color: var(--accent-swatch-amber);
+}
+.rotli-tok-fn {
+  color: var(--accent-swatch-blue);
+}
+.rotli-tok-type,
+.rotli-tok-attr {
+  color: var(--accent-swatch-rose);
+}
 /* a generic/unknown code fence (```js, plain ```) — raw code voice, never
    markdown-styled (#13, audit 2026-07). Line-granular: the mono family +
    a quiet wash so the block reads as one unit while staying editable. */

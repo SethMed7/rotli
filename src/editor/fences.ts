@@ -32,7 +32,9 @@ export interface FenceBlock {
   to: number;
 }
 
-const FENCE_OPEN = /^```([A-Za-z0-9_-]*)\s*$/;
+// `+` joined the class for ```c++ (PR #10 review: the c++ alias was dead —
+// the scanner rejected the line entirely, leaving the block markdown-styled)
+const FENCE_OPEN = /^```([A-Za-z0-9+_-]*)\s*$/;
 const FENCE_CLOSE = /^```\s*$/;
 
 /** Collect EVERY fully-closed fence — target langs flagged for blockRender, and

@@ -34,6 +34,7 @@ import { tableRender } from "./tableRender";
 import { rawMarkdown } from "./rawMarkdown";
 import { focusDim } from "./focusMode";
 import { linkOpener, livePreview, noteIdFacet } from "./livePreview";
+import { codeHighlight } from "./codeHighlight";
 import { stripMarkdown } from "./stripMarkdown";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import {
@@ -469,7 +470,9 @@ export function CmEditor({
         // per-note widget context: image srcs resolve against THIS note's
         // corpus root; table widgets key persisted column widths by the id
         noteIdFacet.of(noteId),
-        viewModeComp.of(rawEditorRef.current ? rawMarkdown : [livePreview, blockRender, tableRender]),
+        viewModeComp.of(
+          rawEditorRef.current ? rawMarkdown : [livePreview, blockRender, tableRender, codeHighlight],
+        ),
         blockComp.of(blockHandlesRef.current ? blockHandles(openBlockMenu) : []),
         fmComp.of(fmExt(fmRawRef.current, fmGenRef.current, fmErrRef.current)),
         EditorView.domEventHandlers({
@@ -551,7 +554,9 @@ export function CmEditor({
   useEffect(() => {
     rawEditorRef.current = rawEditor;
     viewRef.current?.dispatch({
-      effects: viewModeComp.reconfigure(rawEditor ? rawMarkdown : [livePreview, blockRender, tableRender]),
+      effects: viewModeComp.reconfigure(
+        rawEditor ? rawMarkdown : [livePreview, blockRender, tableRender, codeHighlight],
+      ),
     });
   }, [rawEditor, viewModeComp]);
 

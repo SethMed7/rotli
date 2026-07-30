@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Code blocks read like an IDE.** Fenced code with a language tag (```ts,
+  ```json, ```python, ```rust, ```bash and twenty-some more, aliases
+  included) renders with real syntax colors — keywords, strings, comments,
+  numbers, functions, and types each in their own voice, tuned per theme by
+  riding the accent palette. Languages load lazily so notes stay fast, an
+  unknown language stays plain (never wrongly colored), and the markdown
+  source is untouched.
 - **Table columns resize by drag.** Grab any column boundary in a rendered
   Markdown table and drag; widths persist per table on this Mac (the .md never
   changes) and a double-click on a boundary returns the table to automatic

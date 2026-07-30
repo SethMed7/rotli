@@ -119,6 +119,24 @@ test("an exact note-title wikilink opens on an ordinary click", async ({ page })
   await expect(page.locator(".cm-content")).toContainText("Free local forever.");
 });
 
+test("a ts code fence renders IDE-grade token colors", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText(
+    '# Code\n\n```ts\nconst greeting: string = "hello";\n// a comment\nfunction shout(s: string) {\n  return s.toUpperCase();\n}\n```\n',
+  );
+
+  // the async highlighter loads the language, then marks land as decorations
+  await expect(page.locator(".rotli-tok-kw").first()).toBeVisible(); // const / function / return
+  await expect(page.locator(".rotli-tok-str").first()).toContainText('"hello"');
+  await expect(page.locator(".rotli-tok-cmt").first()).toContainText("// a comment");
+  await expect(page.locator(".rotli-tok-fn").first()).toBeVisible(); // shout / toUpperCase
+  // the source is untouched — the fence still carries its exact text
+  await expect(editor).toContainText("const greeting");
+});
+
 test("raw Markdown uses the Rotli syntax grammar without changing source", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");
