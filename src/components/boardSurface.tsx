@@ -19,6 +19,7 @@ import { archiveNoteWithImages } from "../services/noteLifecycle";
 import { useFocusedNoteId, usePanesStore } from "../state/panes";
 import { useMainStore } from "../state/main";
 import { useUiStore } from "../state/ui";
+import { pendingRevealKey } from "./captureReveal";
 import { Character } from "./character";
 import { ArchiveGlyph, CheckGlyph, glyphForNote } from "./glyphs";
 import { useNoteMenu } from "./useNoteMenu";
@@ -49,8 +50,20 @@ export function BoardSurface() {
   const [busy, setBusy] = useState(false);
 
   // "Show in Brain" on a Captures note: select + scroll the card into view.
+  // Fires once per (focus, nonce) — captures stays in the deps only so a
+  // reveal that lands before the list loads still runs; the handled-key guard
+  // keeps later list churn from clobbering a multi-select (audit 2026-07-30).
+  const handledRevealRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!focusedNoteId || !captures.some((c) => c.id === focusedNoteId)) return;
+    if (!focusedNoteId) return;
+    const key = pendingRevealKey(
+      handledRevealRef.current,
+      focusedNoteId,
+      revealNonce,
+      captures.map((c) => c.id),
+    );
+    if (!key) return;
+    handledRevealRef.current = key;
     setSelected(new Set([focusedNoteId]));
     if (!revealNonce) return;
     const raf = requestAnimationFrame(() => {

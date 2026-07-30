@@ -10,6 +10,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A note that can't save says so.** A failed note write (read-only volume,
+  permissions, disk full) now surfaces an inline error above the text —
+  “This note isn’t saving” — keeps your words in the buffer, and retries on
+  its own every few seconds (quit still attempts one final write). Before,
+  every failure except a deleted note was silently swallowed and the only
+  hint was a muted dot. (Perf audit 2026-07-30, correctness #1.)
+- **Sheet embeds joined the quit-flush lane.** A ```sheet fence edited inside
+  a note now registers its unsaved cells with the same hide/quit flush the
+  full sheet editor uses, parks them across scroll-away remounts, resumes a
+  parked session instead of showing stale rows, and surfaces write failures
+  inline. And while the sheet's own tab is open anywhere, the embed goes
+  view-only — two live savers can no longer overwrite each other's cells.
+  (Correctness #2.)
+- **Main can't lose an arrangement quietly.** `.rotli/main.json` writes now
+  carry the same latest-wins sequence guard named views always had, and the
+  sidebar's Main header shows Saving…/Saved — with an inline error if the
+  write fails. (Correctness #3.)
+- **Settings survive a transient write failure.** The debounced settings/
+  viewstate writer only marks a payload written once it lands, so a failed
+  write retries instead of silently reverting your theme, keybindings, and
+  panes at next launch. (Correctness #4.)
+- **Captures multi-select no longer resets mid-flight.** Selecting several
+  capture cards survives unrelated background changes (Main edits, Quick
+  access changes) — the reveal-and-select effect now fires once per reveal
+  instead of on every list refresh. (Correctness #5.)
+
 ### Changed
 
 - **The Breve watchlist reads before it edits.** Topics now render as compact

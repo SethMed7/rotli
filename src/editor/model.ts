@@ -12,10 +12,22 @@ import { keepTabsFor } from "../state/panes";
 import { notesService } from "../services/notes";
 
 const SYNC_DEBOUNCE_MS = 400;
+// a failed write retries on its own — waiting for the next keystroke would
+// leave a note that's done being typed in unsaved forever
+const RETRY_DELAY_MS = 5000;
 
 const docs = new Map<string, string[]>();
 const subs = new Map<string, Set<() => void>>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+// The one write funnel syncNow uses — swappable so tests can simulate the disk
+// failing (the in-memory test service can't fail any other way).
+let writeNoteBody: (noteId: string, body: string) => Promise<unknown> = (noteId, body) =>
+  notesService.updateNote(noteId, body);
+
+export function setWriteNoteBodyForTests(fn: typeof writeNoteBody | null): void {
+  writeNoteBody = fn ?? ((noteId, body) => notesService.updateNote(noteId, body));
+}
 
 // ——— the olive-dot grammar: muted while a debounced sync is pending or in
 // flight, olive once the service confirmed the write. NO spinners, ever. ———
@@ -39,6 +51,46 @@ export function useDocumentDirty(noteId: string): boolean {
     };
   }, []);
   return useSyncExternalStore(subscribe, () => dirtyIds.has(noteId));
+}
+
+// ——— save failures SURFACE (perf audit 2026-07-30, correctness #1): a write
+// that fails for any reason other than "the note is gone" keeps the buffer,
+// shows itself in the editor, and retries — silence here is data loss. ———
+
+const saveErrors = new Map<string, string>();
+// per-note subscriber partitions, same shape as `subs` — note A's failure must
+// not wake note B's editor (Greptile, PR #12)
+const errorSubs = new Map<string, Set<() => void>>();
+
+function setSaveError(noteId: string, message: string | null): void {
+  if ((saveErrors.get(noteId) ?? null) === message) return;
+  if (message === null) saveErrors.delete(noteId);
+  else saveErrors.set(noteId, message);
+  const set = errorSubs.get(noteId);
+  if (set) for (const fn of set) fn();
+}
+
+/** The note's last failed-write message, null when saves are healthy. */
+export function documentSaveError(noteId: string): string | null {
+  return saveErrors.get(noteId) ?? null;
+}
+
+export function useDocumentSaveError(noteId: string): string | null {
+  const subscribe = useCallback(
+    (fn: () => void) => {
+      let set = errorSubs.get(noteId);
+      if (!set) {
+        set = new Set();
+        errorSubs.set(noteId, set);
+      }
+      set.add(fn);
+      return () => {
+        set.delete(fn);
+      };
+    },
+    [noteId],
+  );
+  return useSyncExternalStore(subscribe, () => documentSaveError(noteId));
 }
 
 /** Seed the buffer from the service body. No-op if the note is already open
@@ -69,6 +121,7 @@ export function evictDocument(noteId: string): void {
   timers.delete(noteId);
   docs.delete(noteId);
   setDirty(noteId, false);
+  setSaveError(noteId, null);
   const set = subs.get(noteId);
   if (set) for (const fn of set) fn();
 }
@@ -92,21 +145,37 @@ export function editDocument(noteId: string, edit: (lines: readonly string[]) =>
 function syncNow(noteId: string): Promise<void> {
   const lines = docs.get(noteId);
   if (!lines) return Promise.resolve();
-  return notesService
-    .updateNote(noteId, lines.join("\n"))
+  return writeNoteBody(noteId, lines.join("\n"))
     .then(() => {
+      setSaveError(noteId, null);
       // saved — unless newer keystrokes already queued the next sync
       if (!timers.has(noteId)) setDirty(noteId, false);
       return invalidateNotes();
     })
     .catch((err: unknown) => {
       // the note is gone (deleted with a pending sync): drop the orphan buffer.
-      // Any other failure keeps the buffer — it stays dirty and the next edit
-      // reschedules the sync, so nothing is lost silently.
       if (err instanceof Error && err.message.startsWith("unknown note")) {
         evictDocument(noteId);
+        return;
       }
+      // any other failure (read-only volume, permissions, disk full) keeps the
+      // buffer AND says so: the note stays dirty, the editor shows the error,
+      // and a retry timer keeps the sync alive even with no further keystroke.
+      // The retry rides the timers map, so quit-flush picks it up too.
+      setSaveError(noteId, err instanceof Error ? err.message : String(err));
+      scheduleRetry(noteId);
     });
+}
+
+function scheduleRetry(noteId: string): void {
+  if (timers.has(noteId)) return; // newer keystrokes already queued a sync
+  timers.set(
+    noteId,
+    setTimeout(() => {
+      timers.delete(noteId);
+      void syncNow(noteId);
+    }, RETRY_DELAY_MS),
+  );
 }
 
 function scheduleSync(noteId: string): void {
@@ -125,12 +194,12 @@ function scheduleSync(noteId: string): void {
 /** Flush ONE note's pending debounced sync — the note/tab-switch path.
  * The timer would still fire 400ms later, but flushing at the switch means
  * the list row and the disk are already true when the eye lands elsewhere. */
-export function flushNote(noteId: string): void {
+export function flushNote(noteId: string): Promise<void> {
   const pending = timers.get(noteId);
-  if (pending === undefined) return;
+  if (pending === undefined) return Promise.resolve();
   clearTimeout(pending);
   timers.delete(noteId);
-  void syncNow(noteId);
+  return syncNow(noteId);
 }
 
 /** Flush every pending debounced sync immediately — the quit/reload path. The

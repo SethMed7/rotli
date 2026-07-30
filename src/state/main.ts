@@ -4,7 +4,8 @@
 // replaces the tree and persists; hydration loads it before first render.
 
 import { create } from "zustand";
-import { corpusMainWrite, corpusSettingsRead } from "../lib/tauri";
+import { corpusMainWrite, corpusSettingsRead, isTauri } from "../lib/tauri";
+import { createTrackedWrite } from "../lib/trackedWrite";
 import {
   EMPTY_MAIN,
   type MainManifest,
@@ -16,8 +17,12 @@ import {
   serializeMainManifest,
 } from "../services/mainTree";
 
+export type MainSaveState = "idle" | "saving" | "saved" | "error";
+
 interface MainState {
   manifest: MainManifest;
+  saveState: MainSaveState;
+  error: string | null;
   /** Replace the Main tree and persist. Pass `liveIds` to prune dead note-refs
    * (ids whose note no longer exists) on save — empty folders are kept. */
   setTree: (tree: MainNode[], liveIds?: Set<string>) => void;
@@ -32,8 +37,15 @@ function isMainSurface(): boolean {
   return (new URLSearchParams(window.location.search).get("window") ?? "main") === "main";
 }
 
+// back-to-back setTree calls (drags, draft composition) race their writes —
+// only the LATEST call's outcome may report, or a stale completion masks a
+// lost arrangement (audit 2026-07-30, correctness #3; same guard as views.ts)
+const writeMain = createTrackedWrite(corpusMainWrite);
+
 export const useMainStore = create<MainState>((set) => ({
   manifest: EMPTY_MAIN,
+  saveState: "idle",
+  error: null,
   setTree: (tree, liveIds) => {
     if (!isMainSurface()) {
       console.warn("main.json write refused off the main surface");
@@ -41,10 +53,16 @@ export const useMainStore = create<MainState>((set) => ({
     }
     const cleaned = liveIds ? gcManifest(tree, liveIds) : tree;
     const manifest: MainManifest = { version: 1, tree: cleaned };
-    set({ manifest });
-    void corpusMainWrite(serializeMainManifest(manifest)).catch((e) =>
-      console.warn("main.json write failed", e),
-    );
+    set({ manifest, saveState: isTauri() ? "saving" : "saved", error: null });
+    if (!isTauri()) return;
+    writeMain(serializeMainManifest(manifest), (ok, error) => {
+      if (ok) set({ saveState: "saved" });
+      else
+        set({
+          saveState: "error",
+          error: `Couldn’t save Main — ${error instanceof Error ? error.message : String(error)}`,
+        });
+    });
   },
 }));
 

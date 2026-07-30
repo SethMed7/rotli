@@ -10,7 +10,15 @@
 // (and no unhandled rejection) escapes the test.
 
 import { afterEach, describe, expect, test } from "bun:test";
-import { editDocument, ensureDocument, evictDocument, reloadDocumentIfClean } from "./model";
+import {
+  documentSaveError,
+  editDocument,
+  ensureDocument,
+  evictDocument,
+  flushNote,
+  reloadDocumentIfClean,
+  setWriteNoteBodyForTests,
+} from "./model";
 
 // Track buffer ids we create so cleanup can clear their pending sync timers.
 const touched = new Set<string>();
@@ -91,6 +99,59 @@ describe("editDocument", () => {
       return [];
     });
     expect(ran).toBe(false);
+  });
+});
+
+// The loss bug from the 2026-07-30 perf audit (correctness #1): every sync
+// failure except "unknown note" was swallowed — a read-only volume or full
+// disk left typed content only in the buffer, with no signal beyond a muted
+// dot. These lock the new contract: the buffer is KEPT, the failure SURFACES,
+// and a later successful write clears it.
+describe("sync failure surfacing", () => {
+  afterEach(() => {
+    setWriteNoteBodyForTests(null);
+  });
+
+  test("a failed write keeps the buffer and surfaces the error", async () => {
+    setWriteNoteBodyForTests(() => Promise.reject(new Error("disk full")));
+    buffer("fail", "hello");
+    editDocument("fail", () => ["hello world"]);
+    await flushNote("fail");
+    expect(read("fail")).toEqual(["hello world"]);
+    expect(documentSaveError("fail")).toBe("disk full");
+  });
+
+  test("a later successful write clears the surfaced error", async () => {
+    let failures = 1;
+    setWriteNoteBodyForTests(() =>
+      failures-- > 0 ? Promise.reject(new Error("transient")) : Promise.resolve(),
+    );
+    buffer("recover", "x");
+    editDocument("recover", () => ["y"]);
+    await flushNote("recover");
+    expect(documentSaveError("recover")).toBe("transient");
+    editDocument("recover", () => ["z"]);
+    await flushNote("recover");
+    expect(documentSaveError("recover")).toBeNull();
+  });
+
+  test("unknown-note failures still evict the orphan buffer, with no error surfaced", async () => {
+    setWriteNoteBodyForTests(() => Promise.reject(new Error("unknown note: ghost2")));
+    buffer("ghost2", "x");
+    editDocument("ghost2", () => ["y"]);
+    await flushNote("ghost2");
+    expect(read("ghost2")).toBeUndefined();
+    expect(documentSaveError("ghost2")).toBeNull();
+  });
+
+  test("evicting a note clears its surfaced error", async () => {
+    setWriteNoteBodyForTests(() => Promise.reject(new Error("io error")));
+    buffer("gone", "x");
+    editDocument("gone", () => ["y"]);
+    await flushNote("gone");
+    expect(documentSaveError("gone")).toBe("io error");
+    evictDocument("gone");
+    expect(documentSaveError("gone")).toBeNull();
   });
 });
 

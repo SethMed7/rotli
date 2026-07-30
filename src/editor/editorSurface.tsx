@@ -25,6 +25,7 @@ import {
   flushNote,
   reloadDocumentIfClean,
   useDocumentDirty,
+  useDocumentSaveError,
   useDocumentLines,
 } from "./model";
 import { openChatForNote } from "../noteChat/composition";
@@ -111,6 +112,7 @@ export function EditorSurface({
   const note = useNote(noteId).data;
   const docLines = useDocumentLines(noteId);
   const dirty = useDocumentDirty(noteId);
+  const saveError = useDocumentSaveError(noteId);
   const queryLines = useMemo(() => note?.body.split("\n"), [note?.body]);
   const lines = docLines ?? queryLines;
 
@@ -219,7 +221,12 @@ export function EditorSurface({
 
   // leaving a note (tab switch, pane close, note switch) flushes its pending
   // debounced save — keystrokes are never parked in a timer behind your back
-  useEffect(() => () => flushNote(noteId), [noteId]);
+  useEffect(
+    () => () => {
+      void flushNote(noteId);
+    },
+    [noteId],
+  );
 
   useEffect(() => {
     const el = rootRef.current;
@@ -325,6 +332,11 @@ export function EditorSurface({
         </div>
       </div>
       {aaOpen && <AaPanel noteId={noteId} anchorRef={aaChipRef} onClose={() => setAaOpen(false)} />}
+      {saveError && (
+        <div className="ed-saveerr" role="alert">
+          ⚠ This note isn’t saving — {saveError}. Your text is kept here and rotli keeps retrying.
+        </div>
+      )}
       <CmEditor
         key={noteId}
         noteId={noteId}

@@ -9,6 +9,7 @@ import { useNavHistory } from "./navHistory";
 import {
   activeTabOf,
   boardTabOpen,
+  fileTabOpen,
   findLeaf,
   leaves,
   openNavTarget,
@@ -397,6 +398,38 @@ describe("boardTabOpen", () => {
     };
     expect(boardTabOpen(root, "storage/plan.excalidraw")).toBe(true);
     expect(boardTabOpen(root, "storage/other.excalidraw")).toBe(false);
+  });
+});
+
+// audit 2026-07-30 correctness #2: the same dual-writer law for sheets — while
+// a file's tab is open anywhere, the ```sheet embed goes view-only.
+describe("fileTabOpen", () => {
+  test("sees a file tab for the sheet in any pane", () => {
+    const root: PaneNode = {
+      kind: "split",
+      id: "s",
+      dir: "row",
+      children: [
+        leaf("p1", ["A"]),
+        {
+          kind: "leaf",
+          id: "p2",
+          tabs: [{ id: "f", surfaceKind: "file", fileId: "storage/budget.xlsx" }],
+          activeTabId: "f",
+        },
+      ],
+      sizes: [0.5, 0.5],
+    };
+    expect(fileTabOpen(root, "storage/budget.xlsx")).toBe(true);
+    expect(fileTabOpen(root, "storage/other.xlsx")).toBe(false);
+    // a note tab on the same id never counts — only file surfaces own the pen
+    const noteLeaf: LeafNode = {
+      kind: "leaf",
+      id: "p3",
+      tabs: [{ id: "n", surfaceKind: "note", noteId: "storage/budget.xlsx" }],
+      activeTabId: "n",
+    };
+    expect(fileTabOpen(noteLeaf, "storage/budget.xlsx")).toBe(false);
   });
 });
 

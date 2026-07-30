@@ -4,7 +4,14 @@
 
 import { describe, expect, test } from "bun:test";
 import type { Tab } from "../types";
-import { parseHybridPresets, parseSettings, pruneMap, unknownSettingsKeys, validTab } from "./persist";
+import {
+  createPersistDrain,
+  parseHybridPresets,
+  parseSettings,
+  pruneMap,
+  unknownSettingsKeys,
+  validTab,
+} from "./persist";
 import { clampChatSidebarLimit } from "./ui";
 
 describe("userName", () => {
@@ -283,5 +290,57 @@ describe("pruneMap — the persisted-map GC primitive (#78)", () => {
   test("empty map stays itself", () => {
     const m: Record<string, boolean> = {};
     expect(pruneMap(m, () => false)).toBe(m);
+  });
+});
+
+// Correctness #4 from the 2026-07-30 perf audit: the writer used to advance
+// its high-water mark BEFORE the write landed, so one transient failure meant
+// the payload was never retried — theme/keys/panes reverted at next launch.
+describe("createPersistDrain — settings survive a transient write failure", () => {
+  test("a failed write leaves the mark behind, so the next drain retries the payload", async () => {
+    const landed: string[] = [];
+    let fail = true;
+    const drain = createPersistDrain(
+      (_key, payload) => (fail ? Promise.reject(new Error("io")) : (landed.push(payload), Promise.resolve())),
+      { settings: () => "A", viewstate: () => "" },
+      { settings: "init", viewstate: "" },
+      () => {},
+    );
+    await drain(); // transient failure — nothing landed
+    expect(landed).toEqual([]);
+    fail = false;
+    await drain(); // no store change since, but the payload MUST retry
+    expect(landed).toEqual(["A"]);
+  });
+
+  test("a landed payload is not rewritten", async () => {
+    let writes = 0;
+    const drain = createPersistDrain(
+      () => (writes++, Promise.resolve()),
+      { settings: () => "A", viewstate: () => "" },
+      { settings: "init", viewstate: "" },
+      () => {},
+    );
+    await drain();
+    await drain();
+    expect(writes).toBe(1);
+  });
+
+  test("onFailure fires so the saver can re-arm, and only settled keys advance", async () => {
+    let failures = 0;
+    const landed: string[] = [];
+    const drain = createPersistDrain(
+      (key, payload) =>
+        key === "viewstate" ? Promise.reject(new Error("io")) : (landed.push(payload), Promise.resolve()),
+      { settings: () => "S", viewstate: () => "V" },
+      { settings: "init-s", viewstate: "init-v" },
+      () => failures++,
+    );
+    await drain();
+    expect(landed).toEqual(["S"]);
+    expect(failures).toBe(1);
+    await drain(); // settings already landed; only viewstate retries
+    expect(landed).toEqual(["S"]);
+    expect(failures).toBe(2);
   });
 });

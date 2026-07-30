@@ -85,6 +85,13 @@ export function boardTabOpen(root: PaneNode, boardId: string): boolean {
   return leaves(root).some((l) => l.tabs.some((t) => t.surfaceKind === "canvas" && t.boardId === boardId));
 }
 
+/** True when ANY pane holds a file tab for this file — the ```sheet embed goes
+ * view-only then, same dual-writer law as boardTabOpen (an embed and an open
+ * SheetEditor tab must never both write the file; audit 2026-07-30). */
+export function fileTabOpen(root: PaneNode, fileId: string): boolean {
+  return leaves(root).some((l) => l.tabs.some((t) => t.surfaceKind === "file" && t.fileId === fileId));
+}
+
 /** An EDIT promotes the item's preview tab(s) to permanent, wherever open —
  * "if I click and edit it should stay open" (Seth, 2026-07-28). Cheap no-op
  * when nothing matches. */

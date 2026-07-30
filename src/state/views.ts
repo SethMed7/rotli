@@ -3,6 +3,7 @@
 
 import { create } from "zustand";
 import { corpusSettingsRead, corpusViewsWrite, isTauri } from "../lib/tauri";
+import { createTrackedWrite } from "../lib/trackedWrite";
 import {
   EMPTY_VIEWS,
   type ViewsManifest,
@@ -21,7 +22,9 @@ interface ViewsState {
   setManifest: (manifest: ViewsManifest) => void;
 }
 
-let writeSequence = 0;
+// the shared latest-wins guard (lib/trackedWrite) — this store's original
+// inline writeSequence, extracted so main.ts uses the identical policy
+const writeViews = createTrackedWrite(corpusViewsWrite);
 
 export const useViewsStore = create<ViewsState>((set, get) => ({
   manifest: EMPTY_VIEWS,
@@ -33,18 +36,14 @@ export const useViewsStore = create<ViewsState>((set, get) => ({
     if (!get().writable) return;
     set({ manifest, saveState: isTauri() ? "saving" : "saved", error: null });
     if (!isTauri()) return;
-    const sequence = ++writeSequence;
-    void corpusViewsWrite(serializeViewsManifest(manifest))
-      .then(() => {
-        if (sequence === writeSequence) set({ saveState: "saved" });
-      })
-      .catch((error) => {
-        if (sequence !== writeSequence) return;
+    writeViews(serializeViewsManifest(manifest), (ok, error) => {
+      if (ok) set({ saveState: "saved" });
+      else
         set({
           saveState: "error",
           error: `Couldn’t save views — ${error instanceof Error ? error.message : String(error)}`,
         });
-      });
+    });
   },
 }));
 

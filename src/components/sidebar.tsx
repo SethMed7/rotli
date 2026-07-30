@@ -350,6 +350,8 @@ export function Sidebar() {
   // never moves Main. Mouse + drag navigable (not part of the j/k roving list yet).
   const mainManifest = useMainStore((s) => s.manifest);
   const setMainTree = useMainStore((s) => s.setTree);
+  const mainSaveState = useMainStore((s) => s.saveState);
+  const mainError = useMainStore((s) => s.error);
   const viewsManifest = useViewsStore((s) => s.manifest);
   const setViewsManifest = useViewsStore((s) => s.setManifest);
   const viewsWritable = useViewsStore((s) => s.writable);
@@ -358,6 +360,9 @@ export function Sidebar() {
   const activeView = useUiStore((s) => s.activeView);
   const setActiveView = useUiStore((s) => s.setActiveView);
   const activeTree = activeView ? viewTree(viewsManifest, activeView) : mainManifest.tree;
+  // the header's Saving…/Saved chip follows whichever tree is being edited —
+  // main.json now reports its writes too (audit 2026-07-30, correctness #3)
+  const treeSaveState = activeView ? viewsSaveState : mainSaveState;
   const setActiveTree = (tree: typeof activeTree, ids?: Set<string>) => {
     if (activeView) {
       setViewsManifest(setNamedViewTree(viewsManifest, activeView, tree, ids));
@@ -1718,9 +1723,9 @@ export function Sidebar() {
                     <ChevronRight size={9} />
                   </span>
                 </button>
-                {(viewsSaveState === "saving" || viewsSaveState === "saved") && (
+                {(treeSaveState === "saving" || treeSaveState === "saved") && (
                   <span className="fsec-save" role="status">
-                    {viewsSaveState === "saving" ? "Saving…" : "Saved"}
+                    {treeSaveState === "saving" ? "Saving…" : "Saved"}
                   </span>
                 )}
                 <button
@@ -1815,6 +1820,11 @@ export function Sidebar() {
               {viewsError && (
                 <p className="view-state-error" role="alert">
                   {viewsError}
+                </p>
+              )}
+              {mainError && (
+                <p className="view-state-error" role="alert">
+                  {mainError}
                 </p>
               )}
               {mainNewFolder && (

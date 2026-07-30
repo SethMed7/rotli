@@ -839,6 +839,43 @@ export async function flushSettingsNow(): Promise<void> {
   await corpusSettingsWrite("settings", settingsSnapshot());
 }
 
+/** One drain of the debounced writer. The high-water marks advance ONLY when
+ * a write LANDS — advancing before (the pre-audit shape) meant one transient
+ * failure marked the payload written and it never retried: theme/keys/panes
+ * silently reverted at next launch (perf audit 2026-07-30, correctness #4).
+ * Exported for tests (the shell's corpusSettingsWrite doesn't exist under bun). */
+export function createPersistDrain(
+  write: (key: "settings" | "viewstate", payload: string) => Promise<void>,
+  snapshot: { settings: () => string; viewstate: () => string },
+  seed: { settings: string; viewstate: string },
+  onFailure: () => void,
+): () => Promise<void> {
+  let lastSettings = seed.settings;
+  let lastViewstate = seed.viewstate;
+  return () => {
+    const writes: Array<Promise<void>> = [];
+    const settings = snapshot.settings();
+    if (settings !== lastSettings) {
+      writes.push(
+        write("settings", settings).then(() => {
+          lastSettings = settings;
+        }),
+      );
+    }
+    const viewstate = snapshot.viewstate();
+    if (viewstate !== lastViewstate) {
+      writes.push(
+        write("viewstate", viewstate).then(() => {
+          lastViewstate = viewstate;
+        }),
+      );
+    }
+    return Promise.allSettled(writes).then((results) => {
+      if (results.some((r) => r.status === "rejected")) onFailure();
+    });
+  };
+}
+
 /** Subscribe the one writer to every durable store. Writes are debounced,
  * deduplicated against the last written payload, and flushed the moment the
  * window hides (visibilitychange) or unloads (pagehide). Call once, after
@@ -846,24 +883,19 @@ export async function flushSettingsNow(): Promise<void> {
 export function attachPersistence(): () => void {
   if (!isTauri() || !isMainSurface()) return () => {};
 
-  // seed from the just-hydrated state so hydration itself never writes back
-  let lastSettings = settingsSnapshot();
-  let lastViewstate = viewstateSnapshot();
-
-  const saver = createDebouncedTask(SAVE_DEBOUNCE_MS, (): Promise<void> => {
-    const writes: Array<Promise<void>> = [];
-    const settings = settingsSnapshot();
-    if (settings !== lastSettings) {
-      lastSettings = settings;
-      writes.push(corpusSettingsWrite("settings", settings));
-    }
-    const viewstate = viewstateSnapshot();
-    if (viewstate !== lastViewstate) {
-      lastViewstate = viewstate;
-      writes.push(corpusSettingsWrite("viewstate", viewstate));
-    }
-    return Promise.allSettled(writes).then(() => undefined);
-  });
+  // NOTE the deliberate ordering: `drain` closes over `saver`, which is
+  // assigned on the next line. Safe — onFailure only ever fires after an async
+  // write settles, long past this block — but don't hoist `drain` elsewhere.
+  const drain = createPersistDrain(
+    corpusSettingsWrite,
+    { settings: settingsSnapshot, viewstate: viewstateSnapshot },
+    // seed from the just-hydrated state so hydration itself never writes back
+    { settings: settingsSnapshot(), viewstate: viewstateSnapshot() },
+    // a failed write re-arms the debounce so the payload retries even with no
+    // further store change (hide/quit flushes retry it too)
+    () => saver.schedule(),
+  );
+  const saver = createDebouncedTask(SAVE_DEBOUNCE_MS, drain);
 
   const unsubs = [
     useUiStore.subscribe(saver.schedule),

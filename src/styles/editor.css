@@ -8,6 +8,17 @@
 .ed-head {
   white-space: nowrap; /* narrow panes truncate the status, never wrap the head */
 }
+/* a failed note write is data loss in waiting — it SAYS so inline, above the
+   text, until a retry lands (perf audit 2026-07-30, correctness #1) */
+.ed-saveerr {
+  margin: 0 16px 4px;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--danger);
+  font-size: 11.5px;
+}
 .ed-context {
   display: flex;
   align-items: center;
