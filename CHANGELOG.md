@@ -8,23 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
-## [Unreleased]
-
-### Changed
-
-- **One sidebar row grammar.** A consistency audit of the whole left menu:
-  every first-level row now starts at the same left inset across Inbox, Chat,
-  and Notes (chat and inbox rows sat 6px deeper for no reason); chat-section
-  icons match the tree's sizes; chat folder rows drop their bold (the chevron
-  and folder glyph carry folder-ness, exactly like Main's folders) and share
-  the tree's chevron column; the open chat now wears the same solid accent
-  pill as the open note (one active-item state, replacing the lighter wash);
-  and the "+N more" / connect-a-memex rows hover with the shared wash like
-  every other interactive row. Verified in all four environments — Warm
-  Light, Warm Dark, Paper, Charcoal — with every semantic token the sidebar
-  consumes resolving in each.
-
-## [Unreleased]
+## [0.51.0] - 2026-07-30
 
 ### Added
 
@@ -55,6 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   documented in the family/ subfolder", with a BAD/GOOD example it can
   imitate — and asks for Markdown structure (bulleted lists, bold names), so
   replies come back direct and formatted instead of vague and flat.
+- **One sidebar row grammar.** A consistency audit of the whole left menu:
+  every first-level row now starts at the same left inset across Inbox, Chat,
+  and Notes (chat and inbox rows sat 6px deeper for no reason); chat-section
+  icons match the tree's sizes; chat folder rows drop their bold (the chevron
+  and folder glyph carry folder-ness, exactly like Main's folders) and share
+  the tree's chevron column; the open chat now wears the same solid accent
+  pill as the open note (one active-item state, replacing the lighter wash);
+  and the "+N more" / connect-a-memex rows hover with the shared wash like
+  every other interactive row. Verified in all four environments — Warm
+  Light, Warm Dark, Paper, Charcoal — with every semantic token the sidebar
+  consumes resolving in each.
 
 ## [0.50.0] - 2026-07-30
 
