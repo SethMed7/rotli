@@ -1031,6 +1031,27 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  position: relative;
+}
+/* the focus landing light (Seth, 2026-07-30): when a hotkey (or click) moves
+   focus in a split, the arriving pane wears a brief accent outline that fades
+   — a border, not a glow (flat law). pointer-events: none keeps it inert. */
+.pane.focus-flash::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  border: 2px solid var(--accent);
+  animation: pane-focus-flash 0.7s var(--motion-ease) forwards;
+}
+@keyframes pane-focus-flash {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+  }
 }
 /* the editor + drag overlay live here, below the always-on tab strip; it is
    the positioning context for the split-detach dropzones (Seth, 2026-06-13) */

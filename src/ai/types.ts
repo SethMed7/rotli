@@ -12,6 +12,7 @@ export type ToolName =
   | "search_notes"
   | "read_note"
   | "create_note"
+  | "update_note"
   | "open_note"
   | "search_memory"
   | "read_memory"
@@ -66,6 +67,11 @@ export interface Host {
   /** CREATE a note — the same intake lane as the workspace CLI (staging/Inbox;
    * the organizer files it later). Returns the observation the model reports. */
   createNote(title: string, body: string): Promise<string>;
+  /** REWRITE an existing note's editor body (frontmatter preserved). Gated
+   * like a read — the model may only edit what it could read — and a
+   * secure-context chat may only edit notes that are themselves secure.
+   * Optional so headless/portable hosts can stay read-only. */
+  updateNote?(id: string, body: string): Promise<string>;
   /** Open a note on screen (a tab in the app). Optional — headless hosts skip it. */
   openNote?(id: string): Promise<string>;
   /** Master retrieval across organized notes and prior chats. Optional so a

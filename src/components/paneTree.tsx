@@ -13,6 +13,7 @@ import {
   lazy,
   useEffect,
   useRef,
+  useState,
 } from "react";
 import { EditorSurface } from "../editor/editorSurface";
 import { ChatSurface } from "./chatSurface";
@@ -67,9 +68,33 @@ function LeafView({ node }: { node: LeafNode }) {
   );
   const tab = activeTabOf(node);
 
+  // the focus landing light (Seth, 2026-07-30: hotkey pane-focus "needs some
+  // sort of quick visual highlight") — when focus ARRIVES here, a brief accent
+  // outline fades out. Multi-pane only; the lone pane has nowhere else to be.
+  const focused = node.id === focusedPaneId;
+  const multi = usePanesStore((s) => s.root.kind === "split");
+  const [flash, setFlash] = useState(false);
+  // starts FALSE on purpose: a pane BORN focused (open-to-the-side carves one)
+  // is exactly the "where am I now" moment and must flash too
+  const prevFocused = useRef(false);
+  useEffect(() => {
+    const was = prevFocused.current;
+    prevFocused.current = focused;
+    if (!focused || was || !multi) return;
+    setFlash(true);
+  }, [focused, multi]);
+  // the fade timer keys off `flash` in its own effect — StrictMode's double
+  // mount re-arms it cleanly (the combined effect lost its timer to the ref
+  // mutation on the second pass and the light never faded)
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(false), 700);
+    return () => clearTimeout(t);
+  }, [flash]);
+
   return (
     <section
-      className={node.id === focusedPaneId ? "pane focused" : "pane"}
+      className={`pane${focused ? " focused" : ""}${flash ? " focus-flash" : ""}`}
       onMouseDownCapture={() => focusPane(node.id)}
     >
       <TabStrip pane={node} />

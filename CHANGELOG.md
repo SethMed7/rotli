@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [Unreleased]
+
+### Added
+
+- **The chat can edit your notes now.** A new `update_note` tool lets the
+  model rewrite an existing note when you ask — "clean up my summary on this
+  note" becomes a real edit, not an apology. It rides the same write lane the
+  editor uses (frontmatter and metadata preserved), may only touch notes it
+  is allowed to READ (secure gates enforced in Rust, unchanged), and a chat
+  carrying secure content can only edit notes that are themselves secure. If
+  the note's tab is open, it refreshes live — and your own unsaved edits in
+  that tab always win.
+- **A landing light for pane focus.** When focus moves between split panes —
+  by hotkey or click — the arriving pane flashes a brief accent outline that
+  fades, so your eye lands where your keyboard did.
+
 ## [0.52.0] - 2026-07-30
 
 ### Changed

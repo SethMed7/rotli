@@ -9,7 +9,7 @@ import { containsPrivateDataOverlap, endpointIsLocal, looksSecret, modelIsOnDevi
 import { runAgent } from "./loop";
 import { extractJsonObject, parseAction } from "./parse";
 import { trimHistory } from "./prompt";
-import { buildIndex, pruneScratch, rankNotes, runTool, truncateBody } from "./tools";
+import { buildIndex, pruneScratch, rankNotes, runTool, stripLeadingFrontmatter, truncateBody } from "./tools";
 import type { AgentEvent, ChatTurn, Host, RunInput, ToolName } from "./types";
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
@@ -490,4 +490,68 @@ describe("runAgent", () => {
     const { final } = await run(host, { history: [], userText: "q", web: false, maxSteps: 5 });
     expect(final).toBe("done");
   });
+});
+
+// update_note (Seth, 2026-07-30: "chats should have ability to edit notes
+// directly") — argument discipline + the optional-host degrade. The security
+// laws (read gate, secure-context refusal) live in host.ts against Rust gates.
+describe("update_note tool", () => {
+  const budget = budgetFor({ id: "gemma-3-12b-it-qat-4bit" });
+
+  test("demands an id AND a complete body", async () => {
+    const { host } = fakeHost([]);
+    const editable = { ...host, updateNote: async () => "updated" };
+    expect(await runTool(editable, "update_note", { id: "n1" }, budget)).toContain("error:");
+    expect(await runTool(editable, "update_note", { body: "x" }, budget)).toContain("error:");
+  });
+
+  test("routes id + body to the host and returns its observation", async () => {
+    const { host } = fakeHost([]);
+    const calls: Array<[string, string]> = [];
+    const editable = {
+      ...host,
+      updateNote: async (id: string, body: string) => {
+        calls.push([id, body]);
+        return `updated note ${id}`;
+      },
+    };
+    const out = await runTool(editable, "update_note", { id: "n1", body: "# New\n\ntext" }, budget);
+    expect(out).toBe("updated note n1");
+    expect(calls).toEqual([["n1", "# New\n\ntext"]]);
+  });
+
+  test("a host without updateNote degrades to an honest error", async () => {
+    const { host } = fakeHost([]);
+    const readOnly = { ...host };
+    delete (readOnly as { updateNote?: unknown }).updateNote;
+    expect(await runTool(readOnly, "update_note", { id: "n1", body: "x" }, budget)).toContain(
+      "cannot edit notes",
+    );
+  });
+});
+
+describe("stripLeadingFrontmatter (the update_note write boundary)", () => {
+  test("removes a leading fence, keeps the content", () => {
+    expect(stripLeadingFrontmatter("---\nid: x\ntags: [a]\n---\n\n# Title\n\nbody")).toBe("# Title\n\nbody");
+  });
+
+  test("a body without a fence passes through untouched", () => {
+    expect(stripLeadingFrontmatter("# Title\n\nbody")).toBe("# Title\n\nbody");
+  });
+
+  test("a thematic break mid-document is NOT a fence", () => {
+    const body = "# Title\n\n---\n\nafter the break";
+    expect(stripLeadingFrontmatter(body)).toBe(body);
+  });
+});
+
+test("stripLeadingFrontmatter tolerates trailing spaces on the fence lines (gemma's '--- ')", () => {
+  expect(stripLeadingFrontmatter("--- \nid: x \n--- \n\n# T\n\nbody")).toBe("# T\n\nbody");
+});
+
+test("stripLeadingFrontmatter never eats prose between thematic breaks (Greptile PR #19)", () => {
+  const breaks = "---\nSome rule or separator\n---\nActual prose";
+  expect(stripLeadingFrontmatter(breaks)).toBe(breaks);
+  // a real metadata fence (key: value + yaml list lines) still strips
+  expect(stripLeadingFrontmatter("---\nid: x\ntags:\n- a\n- b\n---\n\n# T\nbody")).toBe("# T\nbody");
 });

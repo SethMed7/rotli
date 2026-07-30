@@ -14,6 +14,7 @@
 
 import { runAgent } from "../src/ai/loop";
 import { contextWindowFor } from "../src/ai/budget";
+import { stripLeadingFrontmatter } from "../src/ai/tools";
 import { buildModelMap, type ModelMapNote } from "../src/memex/modelMap";
 import type { AgentEvent, ChatTurn, Host, NoteHit } from "../src/ai/types";
 
@@ -237,6 +238,14 @@ function makeFixtureHost(modelId: string, log: StepLog[]): Host {
       if (!n) throw new Error(`no note with id "${id}"`);
       return n.body;
     },
+    async updateNote(id, body) {
+      const n = FIXTURE_NOTES.find((x) => x.id === id);
+      if (!n) return `blocked: no note with id "${id}"`;
+      // the REAL write boundary, not a mirror — drift here would score wrong
+      const content = stripLeadingFrontmatter(body);
+      lastUpdates.push({ id, body: content });
+      return `updated note ${id} — its content is replaced with your new text. Tell the user what you changed.`;
+    },
     async readFile(query) {
       return `no file matching "${query}". Use the exact filename (e.g. report.csv).`;
     },
@@ -261,6 +270,10 @@ function makeFixtureHost(modelId: string, log: StepLog[]): Host {
     },
   };
 }
+
+// update_note calls recorded per case (reset in runCase) — the edit case
+// scores the WRITE, not just the final prose.
+const lastUpdates: Array<{ id: string; body: string }> = [];
 
 // ── cases + scoring ───────────────────────────────────────────────────────────
 
@@ -304,12 +317,32 @@ const CASES: EvalCase[] = [
       return { pass: hits.length >= 2, detail: `route facts present: ${hits.join(", ") || "none"}` };
     },
   },
+  {
+    // the 2026-07-30 capability: "clean up this note" must become a REAL
+    // update_note write that keeps the decisions and sheds no frontmatter
+    name: "edit",
+    turns: ["clean up and tighten my caminorx note — keep all the decisions"],
+    score(final) {
+      const up = lastUpdates.find((u) => u.id === "n-caminorx");
+      if (!up) {
+        return { pass: false, detail: `no update_note write on n-caminorx (final: ${final.slice(0, 120)})` };
+      }
+      const low = up.body.toLowerCase();
+      const kept = ["porto", "marisol", "portugu"].filter((k) => low.includes(k));
+      const fenced = up.body.startsWith("---");
+      return {
+        pass: kept.length >= 2 && !fenced,
+        detail: `updated n-caminorx; decisions kept: [${kept.join(", ")}]; frontmatter leaked: ${fenced}`,
+      };
+    },
+  },
 ];
 
 // ── runner ────────────────────────────────────────────────────────────────────
 
 async function runCase(c: EvalCase, modelId: string, logDir: string): Promise<boolean> {
   const log: StepLog[] = [];
+  lastUpdates.length = 0;
   const host = makeFixtureHost(modelId, log);
   const history: ChatTurn[] = [];
   let final = "";

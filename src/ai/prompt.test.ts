@@ -167,3 +167,26 @@ describe("answer style — direct, formatted finals", () => {
     expect(p).toContain("Markdown");
   });
 });
+
+// update_note (Seth, 2026-07-30) — both adapters offer the edit tool with the
+// full-body contract (a fragment would destroy the rest of the note).
+describe("update_note in the prompts", () => {
+  test("both adapters list update_note with the complete-body rule", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      const p = adapter.renderPrompt({ ...base });
+      expect(p).toContain('"tool":"update_note"');
+      expect(p).toContain("COMPLETE new markdown");
+    }
+  });
+});
+
+// The edit-workflow rule (live-eval failure 2026-07-30: without it, "clean up
+// my note" produced prose in chat instead of an update_note write).
+describe("edit workflow rule", () => {
+  test("both adapters teach read-then-update for note-change requests", () => {
+    const g = gemmaAdapter.renderPrompt({ ...base });
+    expect(g).toContain("ACTUALLY EDIT IT");
+    const f = frontierAdapter.renderPrompt({ ...base });
+    expect(f).toContain("read_note then update_note");
+  });
+});

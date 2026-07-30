@@ -115,12 +115,15 @@ function stripComments(src) {
   const toolBlock = types.match(/export type ToolName\s*=([\s\S]*?);/);
   if (!toolBlock) failures.push("src/ai/types.ts: could not find the ToolName union to check EGRESS_TOOLS completeness.");
   const toolNames = toolBlock ? [...toolBlock[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]) : [];
-  // create_note writes INTO the vault and open_note opens a tab — both stay
-  // on-device (no bytes leave), so they classify local (PR #4, 2026-07-29).
+  // create_note/update_note write INTO the vault and open_note opens a tab —
+  // all stay on-device (no bytes leave), so they classify local (PR #4,
+  // 2026-07-29; update_note added 2026-07-30, gated by corpus_read_ai + the
+  // secure-context refusal in host.ts).
   const localTools = [
     "search_notes",
     "read_note",
     "create_note",
+    "update_note",
     "open_note",
     "search_memory",
     "read_memory",

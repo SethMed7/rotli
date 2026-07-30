@@ -12,6 +12,26 @@ export function truncate(s: string, max: number): string {
   return s.length <= max ? s : `${s.slice(0, max)}…`;
 }
 
+/** Strip a LEADING frontmatter fence from a model-authored note body. The
+ * model reads notes as full file text (fences included), so a faithful
+ * rewrite often echoes the metadata back — but the write lane (corpus_write)
+ * preserves frontmatter itself, and passing the fence through would embed a
+ * duplicate copy INSIDE the body. Content only crosses the write boundary. */
+export function stripLeadingFrontmatter(body: string): string {
+  // fence lines tolerate trailing spaces — gemma emits "--- \n" (live eval
+  // 2026-07-30, the frontmatter-leak case)
+  const m = body.match(/^---[ \t]*\n([\s\S]*?)\n---[ \t]*\n?/);
+  if (!m) return body;
+  // strip ONLY a block that reads as metadata (key: value lines, plus yaml
+  // list/continuation lines) — a body OPENING with a thematic break must not
+  // lose real prose sitting between two --- lines (Greptile PR #19)
+  const lines = (m[1] ?? "").split("\n").filter((line) => line.trim() !== "");
+  const metadataish =
+    lines.length > 0 && lines.every((line) => /^([A-Za-z_][\w-]*[ \t]*:|[ \t]|-)/.test(line));
+  if (!metadataish) return body;
+  return body.slice(m[0].length).replace(/^\n+/, "");
+}
+
 /** Truncate a READ body (note / memory / file) with an EXPLICIT marker. A bare
  * "…" read as end-of-content and the model presented partial lists as complete
  * (the 2026-07-29 people-list failure); the marker names what was cut so the
@@ -81,6 +101,8 @@ export function statusFor(tool: ToolName): string {
       return "reading a note…";
     case "create_note":
       return "creating a note…";
+    case "update_note":
+      return "updating the note…";
     case "open_note":
       return "opening the note…";
     case "read_memory":
@@ -156,6 +178,15 @@ export async function runTool(
         return 'error: create_note needs a "title" and a markdown "body".';
       }
       return await host.createNote(title, body);
+    }
+    case "update_note": {
+      const id = String(args.id ?? "").trim();
+      const body = String(args.body ?? args.text ?? args.content ?? "").trim();
+      if (id === "" || body === "") {
+        return 'error: update_note needs an "id" and the COMPLETE new markdown "body" (it replaces the whole note — read_note first).';
+      }
+      if (!host.updateNote) return "error: this host cannot edit notes.";
+      return await host.updateNote(id, body);
     }
     case "open_note": {
       const id = String(args.id ?? "").trim();
