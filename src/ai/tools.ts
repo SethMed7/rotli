@@ -12,6 +12,15 @@ export function truncate(s: string, max: number): string {
   return s.length <= max ? s : `${s.slice(0, max)}…`;
 }
 
+/** Truncate a READ body (note / memory / file) with an EXPLICIT marker. A bare
+ * "…" read as end-of-content and the model presented partial lists as complete
+ * (the 2026-07-29 people-list failure); the marker names what was cut so the
+ * model can qualify its answer, and the prompts teach it to. */
+export function truncateBody(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return `${s.slice(0, max)}\n[…truncated — the remaining ${s.length - max} characters were not shown]`;
+}
+
 /** Keyword-rank the corpus for a query — title (×3) + folder/area (×2) + snippet (×1).
  * Boards/files are skipped (they aren't readable text for the model). */
 export function rankNotes(notes: CorpusNoteMeta[], query: string, limit: number): NoteHit[] {
@@ -120,7 +129,7 @@ export async function runTool(
         : id.startsWith("chat:")
           ? "error: this host cannot read prior chats."
           : await host.readNote(id);
-      return truncate(body, budget.readNoteChars);
+      return truncateBody(body, budget.readNoteChars);
     }
     case "search_notes": {
       const q = String(args.query ?? "").trim();
@@ -138,7 +147,7 @@ export async function runTool(
     case "read_note": {
       const id = String(args.id ?? "").trim();
       if (id === "") return 'error: read_note needs an "id" from search_notes or the index.';
-      return truncate(await host.readNote(id), budget.readNoteChars);
+      return truncateBody(await host.readNote(id), budget.readNoteChars);
     }
     case "create_note": {
       const title = String(args.title ?? "").trim();
@@ -157,7 +166,7 @@ export async function runTool(
     case "read_file": {
       const q = String(args.query ?? args.name ?? args.file ?? "").trim();
       if (q === "") return 'error: read_file needs a "query" — the filename (e.g. report.csv).';
-      return truncate(await host.readFile(q), budget.readNoteChars * 2);
+      return truncateBody(await host.readFile(q), budget.readNoteChars * 2);
     }
     case "web_search": {
       const q = String(args.query ?? "").trim();

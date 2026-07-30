@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Local-model chat reads your notes before answering about them.** Asking the
+  on-device model things like "who are the people in my vault?" used to get a
+  wrong list parroted from note titles, search snippets, and `links:` stems
+  (e.g. a project offered as a person) — the model never opened the note, and
+  when it did, the body was cut at 2,000 characters with no warning. The agent
+  prompts now carry an explicit search → read → answer workflow, teach that
+  `[[wikilinks]]` and frontmatter are references/metadata rather than content,
+  the 128k local family (Gemma 3) reads up to 6,000 characters per note with a
+  visible `[…truncated]` marker when a note is longer, and final answers are
+  steered to concrete facts instead of note titles. Verified with live evals
+  against the local MLX server (`scripts/eval-local-chat.ts`).
+
 ## [0.46.0] - 2026-07-29
 
 ### Added

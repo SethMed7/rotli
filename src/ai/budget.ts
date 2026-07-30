@@ -72,13 +72,18 @@ export function budgetFor(model: ModelMeta): Budget {
     };
   }
   if (ctx >= 64_000) {
+    // readNoteChars was 2000 (~500 tokens on a 128k-window model) — real notes
+    // truncated mid-body and the model answered from frontmatter link stems
+    // instead of the content (the 2026-07-29 people-list failure). A 6000-char
+    // read is still under 2% of the window; scratch grows to hold two full
+    // reads plus a search.
     return {
       maxHits: 6,
       snippetChars: 160,
-      readNoteChars: 2000,
+      readNoteChars: 6000,
       webFetchChars: 6000,
       maxIndexChars: 3500,
-      maxScratchChars: 9000,
+      maxScratchChars: 16_000,
       maxHistoryChars: 12_000,
       maxSteps: 5,
     };
@@ -87,10 +92,10 @@ export function budgetFor(model: ModelMeta): Budget {
     return {
       maxHits: 5,
       snippetChars: 120,
-      readNoteChars: 1400,
+      readNoteChars: 2000,
       webFetchChars: 4000,
       maxIndexChars: 2000,
-      maxScratchChars: 5000,
+      maxScratchChars: 6000,
       maxHistoryChars: 6000,
       maxSteps: 5,
     };

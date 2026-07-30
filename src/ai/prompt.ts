@@ -136,15 +136,22 @@ TOOLS — to use one, reply with a SINGLE JSON object:
 ${webTools}${imageTool}
 When you can answer, reply: {"thought":"…","final":"your answer to the user"}
 
+HOW YOU WORK (one JSON object per step):
+1. SEARCH first — search_memory (or search_notes) for anything about the user's notes, past, decisions, or people. (Pure small talk needs no tools — reply with "final" directly.)
+2. READ before answering — search results are only titles and short teasers, NEVER the content. Pick the most relevant hit and read_note / read_memory it; the answer is in the note's BODY. Never answer a question about the user's notes straight from search results.
+3. ANSWER from what you read — the "final" text is what the user sees, so give the actual names and facts you found (a Markdown list is fine), complete and direct.
+
 RULES:
 - Output ONE JSON object and nothing else. No text outside the JSON. No code fences.
 - ${webRule}
-- For anything about the user's past, decisions, people, or prior conversations, search_memory before answering.
+- For "all/every/who are" questions, an index or overview note (a "who's who", a list note) holds the full roster in its body — read it; search results and the index below show only a few top matches.
+- A note may open with metadata between --- lines (id, tags, links, summary): that is filing metadata, not content. [[name]] inside a note is a LINK to another note — it could be a person, a project, anything — so never present link names as facts without reading around them.
+- If a RESULT ends with "[…truncated", the content continues beyond what you saw — don't claim a list from it is complete.
 - ${UNTRUSTED_DATA_RULE}
 - Never put secrets, API keys, or tokens into web_search or web_fetch.
 - Use at most ${ctx.maxSteps} steps. If unsure, give your best answer and note what you couldn't verify.
 
-YOUR KNOWLEDGE BASE (index of the user's notes):
+YOUR KNOWLEDGE BASE (an abbreviated index of the user's notes — each area's "count" is the true total, so search for what isn't listed):
 ${renderKnowledgeMap(ctx.knowledge)}
 
 CONVERSATION:
@@ -159,7 +166,8 @@ Respond with the next single JSON object now.`;
   renderForceFinal(ctx) {
     return `You are rotli.${namedLine(ctx.userName)} Give your FINAL answer to the user now, in plain prose — no JSON, no tools.
 Base it only on the conversation and your findings below. If they're not enough, answer what you can
-and say plainly what you couldn't verify.
+and say plainly what you couldn't verify. Answer with the concrete names and facts in the findings —
+note titles and [[link]] names are references, not answers, and text between --- lines is filing metadata.
 
 CONVERSATION:
 ${renderConversation(ctx.history, ctx.userText)}
@@ -202,11 +210,11 @@ Tools:
 - {"thought":"…","tool":"create_note","args":{"title":"…","body":"…markdown…"}} — create a NEW note in the user's memex (lands in their intake)
 - {"thought":"…","tool":"open_note","args":{"id":"…"}} — open a note on the user's screen, in a tab
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}
-To answer the user: {"thought":"…","final":"your answer"}
+To answer the user: {"thought":"…","final":"your answer"} — the final text answers directly with the facts found, not with note titles.
 
-Rules: ${webRule} For past decisions, people, or conversations, search_memory first. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
+Rules: ${webRule} For past decisions, people, or conversations, search_memory first. The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); [[name]] is a wikilink to another note (a person, a project, anything), so don't present link names as facts unread. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
 
-KNOWLEDGE BASE INDEX:
+KNOWLEDGE BASE INDEX (abbreviated — each area's "count" is the true total):
 ${renderKnowledgeMap(ctx.knowledge)}
 
 CONVERSATION:
@@ -219,7 +227,7 @@ The next single JSON object:`;
   },
 
   renderForceFinal(ctx) {
-    return `Give your FINAL answer to the user now, in plain prose — no JSON, no tools.${namedLine(ctx.userName)} Base it on the conversation and findings below; say plainly what you couldn't verify.
+    return `Give your FINAL answer to the user now, in plain prose — no JSON, no tools.${namedLine(ctx.userName)} Base it on the conversation and findings below; say plainly what you couldn't verify. Answer with the concrete facts found — note titles and [[link]] names are references, not answers.
 
 CONVERSATION:
 ${renderConversation(ctx.history, ctx.userText)}

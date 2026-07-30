@@ -42,6 +42,52 @@ describe("userName in the prompt", () => {
   });
 });
 
+describe("read-before-answer scaffolding (the 2026-07-29 people-list failure)", () => {
+  test("both adapters teach that search results are pointers, never the content", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      const prompt = adapter.renderPrompt({ ...base });
+      // the model must be told search output is teasers/pointers, not content…
+      expect(prompt).toMatch(/teasers, NEVER the content|pointers, never content/);
+      // …and to READ a note body before answering from it
+      expect(prompt).toMatch(/answer from (what you read|its body)/i);
+    }
+  });
+
+  test("the gemma prompt carries the explicit search → read → answer workflow", () => {
+    const prompt = gemmaAdapter.renderPrompt({ ...base });
+    expect(prompt).toContain("HOW YOU WORK");
+    expect(prompt).toContain("READ before answering");
+    expect(prompt).toContain("Never answer a question about the user's notes straight from search results");
+  });
+
+  test("both adapters explain wikilinks and frontmatter metadata", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      const prompt = adapter.renderPrompt({ ...base });
+      expect(prompt).toContain("[[name]]");
+      expect(prompt).toMatch(/metadata/i);
+    }
+  });
+
+  test("both adapters teach the explicit truncation marker", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      expect(adapter.renderPrompt({ ...base })).toContain("[…truncated");
+    }
+  });
+
+  test("both adapters flag the knowledge index as abbreviated", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      expect(adapter.renderPrompt({ ...base }).toLowerCase()).toContain("abbreviated");
+    }
+  });
+
+  test("force-final prompts steer away from titles and link names as answers", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      const prompt = adapter.renderForceFinal({ history: [], userText: "hi", scratch: [] });
+      expect(prompt).toContain("[[link]] names are references, not answers");
+    }
+  });
+});
+
 describe("untrusted prompt data framing", () => {
   test("knowledge maps cannot close their data delimiter or create prompt roles", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {

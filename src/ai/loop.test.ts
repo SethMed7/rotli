@@ -9,7 +9,7 @@ import { containsPrivateDataOverlap, endpointIsLocal, looksSecret, modelIsOnDevi
 import { runAgent } from "./loop";
 import { extractJsonObject, parseAction } from "./parse";
 import { trimHistory } from "./prompt";
-import { buildIndex, pruneScratch, rankNotes } from "./tools";
+import { buildIndex, pruneScratch, rankNotes, runTool, truncateBody } from "./tools";
 import type { AgentEvent, ChatTurn, Host, RunInput, ToolName } from "./types";
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
@@ -177,6 +177,35 @@ describe("budget", () => {
     expect(big.maxIndexChars).toBeGreaterThan(small.maxIndexChars);
     expect(big.readNoteChars).toBeGreaterThan(small.readNoteChars);
     expect(contextWindowFor({ id: "gemma-3-12b" })).toBeGreaterThan(contextWindowFor({ id: "mystery" }));
+  });
+
+  test("the 128k local family reads whole real-world notes (people-list failure, 2026-07-29)", () => {
+    // a "who's who" index note runs thousands of chars; a 2000-char cap left the
+    // model with frontmatter link stems instead of the roster. Pin the floor.
+    const gemma = budgetFor({ id: "gemma-3-12b-it-qat-4bit" });
+    expect(gemma.readNoteChars).toBeGreaterThanOrEqual(6000);
+    // and the scratchpad must hold at least two full reads plus a search
+    expect(gemma.maxScratchChars).toBeGreaterThanOrEqual(2 * gemma.readNoteChars + 2000);
+  });
+
+  test("truncateBody cuts with an explicit marker; short bodies pass untouched", () => {
+    expect(truncateBody("short note", 100)).toBe("short note");
+    const cut = truncateBody("x".repeat(150), 100);
+    expect(cut).toContain("[…truncated — the remaining 50 characters were not shown]");
+    expect(cut.startsWith("x".repeat(100))).toBe(true);
+  });
+
+  test("read_note observations carry the truncation marker (never a silent cut)", async () => {
+    const { host } = fakeHost([]);
+    const long = `# People\n${"- [[Someone]] — a person\n".repeat(400)}`;
+    const result = await runTool(
+      { ...host, readNote: async () => long },
+      "read_note",
+      { id: "n1" },
+      budgetFor({ id: "gemma-3-12b-it-qat-4bit" }),
+    );
+    expect(result).toContain("[…truncated — the remaining");
+    expect(result.length).toBeLessThan(long.length);
   });
 
   test("trimHistory keeps the newest turns within the cap (#65)", () => {
