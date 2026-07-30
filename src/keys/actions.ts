@@ -5,6 +5,7 @@
 // list shows everything.
 
 import { type BlockToggle, type HeadingLevel, type InlineMark, activeEditor } from "../editor/commands";
+import { openChatForNote } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
 import { notesService } from "../services/notes";
@@ -608,6 +609,40 @@ export function registerDefaultActions(): void {
     global: true, // the OS chord lives in Rust (show_main + rotli:summon-chat);
     // run() keeps palette/dispatch parity for in-app invocation
     run: () => void summonChat(),
+  });
+  // — note ↔ chat: a note owns MANY chats (Seth, 2026-07-30). ⌘⇧C continues
+  //   the most recently touched one (creating the first when none exists);
+  //   the New variant always adds another. The editor's chat chip is the
+  //   full picker; these are its fast paths. —
+  const runNoteChat = (create: boolean) => {
+    if (!notesWorkspaceActive()) return;
+    const id = focusedNoteIdNow();
+    if (!id) return;
+    void notesService
+      .listNotes()
+      .then((all) => {
+        const note = all.find((n) => n.id === id);
+        if (note) return openChatForNote(note, { create });
+      })
+      .catch((error) =>
+        useUiStore
+          .getState()
+          .setRowActionError(
+            `Couldn’t open a chat — ${error instanceof Error ? error.message : String(error)}`,
+          ),
+      );
+  };
+  registerAction({
+    id: "note.chat",
+    title: "Chat with this note",
+    defaultChord: "Meta+Shift+C",
+    run: () => runNoteChat(false),
+  });
+  registerAction({
+    id: "note.chatNew",
+    title: "New chat about this note",
+    defaultChord: null,
+    run: () => runNoteChat(true),
   });
   registerAction({
     id: "chat.all",

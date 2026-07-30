@@ -61,8 +61,8 @@ import { type Measure } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
 import { usePanesStore } from "../state/panes";
 import { renderInline } from "../editor/render";
-import { CloudGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
-import { Character } from "./character";
+import { CheckGlyph, CloudGlyph, CopyGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
+import { Character, QuokkaMark } from "./character";
 import { syncManagedChatMemory } from "../chatMemory/composition";
 import {
   attachedNoteId as resolveAttachedNoteId,
@@ -680,6 +680,8 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const [messages, setMessages] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string>(THINK_WORDS[0]!);
+  // which message's hover Copy just fired — flips its glyph to a ✓ for a beat
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [visionHint, setVisionHint] = useState(false);
   // a failed chats/<slug>.md write — the thread still shows for this session,
@@ -1179,19 +1181,41 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                   </p>
                 </div>
               ) : (
+                // messages are PLAIN text — no per-message author label; the
+                // brand mark appears once at the thread's live edge instead
+                // (Seth, 2026-07-30: match the premium chat grammar). Options
+                // ride each message, revealed on hover/focus.
                 messages.map((m, idx) => {
                   const you = m.speaker === "you";
                   return (
                     <div key={idx} className={you ? "cmsg you" : "cmsg ai"}>
-                      {!you && <div className="cmsg-who">rotli</div>}
                       <div className="cmsg-bubble">{you ? m.text : renderMessage(m.text)}</div>
+                      <div className="cmsg-actions">
+                        <button
+                          type="button"
+                          className="cmsg-act"
+                          aria-label="Copy message"
+                          title="Copy"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(m.text).then(() => {
+                              setCopiedIdx(idx);
+                              window.setTimeout(
+                                () => setCopiedIdx((cur) => (cur === idx ? null : cur)),
+                                1200,
+                              );
+                            });
+                          }}
+                        >
+                          {copiedIdx === idx ? <CheckGlyph size={13} /> : <CopyGlyph size={13} />}
+                        </button>
+                      </div>
                     </div>
                   );
                 })
               )}
               {busy && (
                 <div className="cmsg ai">
-                  <div className="cmsg-who">rotli</div>
+                  <QuokkaMark size={17} className="chat-mark" />
                   <div className="cmsg-bubble cmsg-think" role="status">
                     <span className="cmsg-think-dots" aria-hidden="true">
                       <i />
@@ -1200,6 +1224,11 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                     </span>
                     {status}
                   </div>
+                </div>
+              )}
+              {!busy && messages.length > 0 && messages[messages.length - 1]?.speaker !== "you" && (
+                <div className="chat-endmark" aria-hidden="true">
+                  <QuokkaMark size={17} />
                 </div>
               )}
               {saveErr && (

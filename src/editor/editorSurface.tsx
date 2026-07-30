@@ -28,7 +28,8 @@ import {
   useDocumentSaveError,
   useDocumentLines,
 } from "./model";
-import { openChatForNote } from "../noteChat/composition";
+import { listChatsForNote, openChatForNote, openNoteChat } from "../noteChat/composition";
+import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { backId, forwardId, useNavHistory } from "../state/navHistory";
 import { dispatch } from "../keys/registry";
 import { usePanesStore } from "../state/panes";
@@ -126,6 +127,53 @@ export function EditorSurface({
 
   const rootRef = useRef<HTMLDivElement>(null);
   const aaChipRef = useRef<HTMLButtonElement>(null);
+  const chatChipRef = useRef<HTMLButtonElement>(null);
+
+  /** The chat chip: a note owns MANY chats (Seth, 2026-07-30). No chats yet →
+   * create the first directly; otherwise a picker menu lists them (newest work
+   * first) + "New chat". ⌥-click skips the picker and continues the latest. */
+  const chatChipError = (error: unknown) =>
+    useUiStore
+      .getState()
+      .setRowActionError(
+        `Couldn’t open a chat for “${note?.title || "this note"}” — ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+  const openChatChip = (continueLatest: boolean) => {
+    if (!note) return;
+    const openedNote = note;
+    setChatBusy(true);
+    useUiStore.getState().setRowActionError(null);
+    const run = continueLatest
+      ? openChatForNote(openedNote)
+      : listChatsForNote(openedNote).then((chats) => {
+          if (chats.length === 0) return openChatForNote(openedNote);
+          const items: MenuSpec[] = [
+            ...chats.map((chat) => ({
+              kind: "action" as const,
+              label: `${chat.title || chat.slug}${
+                chat.modifiedMs ? ` — ${relativeLabel(chat.modifiedMs)}` : ""
+              }`,
+              onClick: () => openNoteChat(openedNote, chat.slug),
+            })),
+            { kind: "sep" as const },
+            {
+              kind: "action" as const,
+              label: "New chat about this note",
+              onClick: () => {
+                setChatBusy(true);
+                void openChatForNote(openedNote, { create: true })
+                  .catch(chatChipError)
+                  .finally(() => setChatBusy(false));
+              },
+            },
+          ];
+          const rect = chatChipRef.current?.getBoundingClientRect();
+          useContextMenu.getState().open(rect?.left ?? 0, (rect?.bottom ?? 0) + 4, items);
+        });
+    void run.catch(chatChipError).finally(() => setChatBusy(false));
+  };
 
   const style = useNoteStyle(noteId);
   const formatBarVisible = useUiStore((s) => s.formatBarVisible);
@@ -287,24 +335,16 @@ export function EditorSurface({
           </div>
           <button
             type="button"
+            ref={chatChipRef}
             className="aachip"
             disabled={chatBusy}
-            aria-label="Chat with this note"
-            title="Chat with this note"
-            onClick={() => {
-              setChatBusy(true);
-              useUiStore.getState().setRowActionError(null);
-              void openChatForNote(note)
-                .catch((error) =>
-                  useUiStore
-                    .getState()
-                    .setRowActionError(
-                      `Couldn’t open a chat for “${note.title || "this note"}” — ${
-                        error instanceof Error ? error.message : String(error)
-                      }`,
-                    ),
-                )
-                .finally(() => setChatBusy(false));
+            aria-label="Chats on this note"
+            aria-haspopup="menu"
+            title="Chats on this note — ⌥-click continues the latest"
+            onClick={(event) => openChatChip(event.altKey)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              openChatChip(false);
             }}
           >
             <ChatGlyph size={15} />

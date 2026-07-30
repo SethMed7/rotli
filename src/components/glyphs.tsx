@@ -40,6 +40,17 @@ export function ChevronRight({ size = 10, className }: GlyphProps) {
   );
 }
 
+/** Copy — two offset rounded rects (the universal clipboard-copy mark). Chat
+ * message hover action (2026-07-30). */
+export function CopyGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </Glyph>
+  );
+}
+
 /** Folder row (r1/r2 gates). */
 export function FolderGlyph(props: GlyphProps) {
   return (

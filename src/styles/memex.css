@@ -1484,12 +1484,58 @@ body:has(.document-editor) [role="dialog"] input:disabled {
 .cmsg.ai {
   align-items: flex-start;
 }
-.cmsg-who {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+/* hover options under a message (2026-07-30: messages are plain text, no
+   per-message author label — the quokka mark sits once at the thread's live
+   edge instead). Absolutely positioned into the inter-message gap so nothing
+   reflows; keyboard focus reveals them too. */
+.cmsg {
+  position: relative;
+}
+.cmsg-actions {
+  position: absolute;
+  bottom: -19px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  z-index: 2;
+  transition: opacity var(--motion-exit) var(--motion-ease);
+}
+.cmsg.ai .cmsg-actions {
+  left: 0;
+}
+.cmsg.you .cmsg-actions {
+  right: 0;
+}
+.cmsg:hover .cmsg-actions,
+.cmsg-actions:focus-within {
+  opacity: 1;
+}
+.cmsg-act {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 18px;
+  border: none;
+  background: none;
+  padding: 0;
+  border-radius: var(--r-control);
   color: var(--text-muted);
-  padding: 0 5px;
+  cursor: pointer;
+}
+.cmsg-act:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+/* the one brand moment in a thread: the compact quokka mark at the live edge —
+   ahead of a streaming reply, or resting after the last one. Accent-tinted,
+   still, quiet. */
+.chat-mark,
+.chat-endmark {
+  color: var(--accent-text);
+}
+.chat-endmark {
+  display: flex;
+  margin: 14px 0 4px;
 }
 .cmsg-bubble {
   max-width: 82%;

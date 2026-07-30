@@ -227,20 +227,31 @@ export function useNoteMenu() {
             usePanesStore.getState().openToSide(isBoard ? "canvas" : isFile ? "file" : "note", note.id),
         });
         if (isNote) {
+          // a note owns MANY chats (2026-07-30): the first verb continues the
+          // most recent one (or starts the first); the second always adds one.
+          // The editor's chat chip is the full picker.
+          const chatError = (err: unknown) =>
+            useUiStore
+              .getState()
+              .setRowActionError(
+                `Couldn’t open a chat for “${note.title || "this note"}” — ${
+                  err instanceof Error ? err.message : String(err)
+                }`,
+              );
           items.push({
             kind: "action" as const,
             label: "Chat with this note",
             onClick: () => {
               useUiStore.getState().setRowActionError(null);
-              void openChatForNote(note).catch((err) =>
-                useUiStore
-                  .getState()
-                  .setRowActionError(
-                    `Couldn’t open a chat for “${note.title || "this note"}” — ${
-                      err instanceof Error ? err.message : String(err)
-                    }`,
-                  ),
-              );
+              void openChatForNote(note).catch(chatError);
+            },
+          });
+          items.push({
+            kind: "action" as const,
+            label: "New chat about this note",
+            onClick: () => {
+              useUiStore.getState().setRowActionError(null);
+              void openChatForNote(note, { create: true }).catch(chatError);
             },
           });
         }
