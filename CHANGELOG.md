@@ -8,6 +8,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.54.0] - 2026-07-30
+
+### Added
+
+- **A note owns many chats now.** The editor's chat chip opens a picker —
+  every chat on the note, newest work first, plus "New chat about this note";
+  ⌥-click (or ⌘⇧C) skips the picker and continues the latest. Additional
+  chats get their own slugs and "· 2"-style titles, so a second conversation
+  never lands in (or overwrites) the first. The note context menu grows
+  "New chat about this note", and both verbs are rebindable actions.
+- **Read your briefs inside Breve.** The Briefs page now opens with the
+  latest brief rendered right there — older/newer stepping, kind + date +
+  reading time, and a finite close: "That's the whole brief — distilled from
+  your topics. Next: …". Library rows load into the same reader; leaving
+  Breve is only the explicit "Open in Notes".
+- **ROADMAP.md** — the planned-features home: the email Inbox front's return,
+  mobile and tablet apps, and the handwriting-to-text notebook experience.
+
+### Changed
+
+- **Chat messages read like a premium chat surface.** The per-message "rotli"
+  label is gone — replies are plain text; hovering a message reveals its
+  options (Copy, with a ✓ beat); the quokka mark appears once at the thread's
+  live edge, ahead of a streaming reply or resting after the last one.
+- **Breve reorganized, reading-first.** The rail is Briefs · Routines ·
+  Watchlist · Settings — Models and Configure merged into one Settings home,
+  which also hosts the legacy-migration steps. The watchlist arrives as calm
+  folded groups (search auto-expands; your open groups survive saves).
+- **The Inbox placeholder left the sidebar.** rotli shows two fronts — Chat ·
+  Notes — until the mail integration is real (see ROADMAP.md). Capture,
+  `wiki/_inbox`, and the Librarian's intake are untouched.
+
+### Fixed
+
+- The onboarding hint for ⌥C said captures land in "Inbox" — they land in
+  **Captures**, and the hint says so now.
+- Two settings forms editing Breve config at once can no longer clobber each
+  other's saves or silently drop an unsaved draft on navigation.
+
 ## [0.53.0] - 2026-07-30
 
 ### Added
