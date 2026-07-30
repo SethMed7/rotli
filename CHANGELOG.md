@@ -10,6 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Chat folders.** Right-click a chat → Move to folder to group the Chat
+  section into collapsible folders — organization is virtual (chats never move
+  on disk), folders rename and delete from their own menu, and a renamed chat
+  keeps its folder.
+- **⌘N speaks digits.** The chooser tab is a centered grid with a number on
+  every card — ⌘N then 1 opens a chat, 2 a Markdown note, 3 a Document, and so
+  on. Chat joined the chooser as a first-class card.
+
+### Fixed
+
+- **Local replies no longer freeze the app.** The model transport ran on the
+  main thread, so every on-device generation beachballed the whole window and
+  even your just-sent message painted late — it now runs on a worker, keeping
+  the app responsive (and send instant) while a model thinks.
+- Clicking All chats no longer leaves the previously open chat highlighted
+  beneath it — one selection at a time.
+
 ## [0.46.1] - 2026-07-29
 
 ### Fixed

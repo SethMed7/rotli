@@ -750,6 +750,43 @@ fn write_chat_at(root: &Path, slug: &str, contents: &str) -> Result<String, Stri
     Ok(path.to_string_lossy().to_string())
 }
 
+/// The chat-folder manifest — a REBUILDABLE `.rotli` sidecar grouping the flat
+/// `chats/` surface into user folders (chats never move on disk; delete the
+/// file and the list is simply flat again). Fixed relative path, so there is
+/// no traversal surface. Absent reads as "" — TS owns the shape.
+#[tauri::command]
+pub fn memex_chat_folders(app: tauri::AppHandle, root: String) -> Result<String, String> {
+    let root = registered_root(&app, &root)?;
+    match fs::read_to_string(root.join(".rotli/chat-folders.json")) {
+        Ok(contents) => Ok(contents),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(e) => Err(format!("read chat folders: {e}")),
+    }
+}
+
+/// Write the chat-folder manifest. Same debug read-only guard as every memex
+/// write; contents must be valid JSON and index-sized (it's a projection, not
+/// a store).
+#[tauri::command]
+pub fn memex_write_chat_folders(
+    app: tauri::AppHandle,
+    root: String,
+    contents: String,
+) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Err("the production memex is mounted read-only in development".into());
+    }
+    let root = registered_root(&app, &root)?;
+    if contents.len() > 262_144 {
+        return Err("the chat-folders manifest is unexpectedly large — refusing to write it.".into());
+    }
+    serde_json::from_str::<serde_json::Value>(&contents)
+        .map_err(|e| format!("chat folders must be valid JSON: {e}"))?;
+    let dir = root.join(".rotli");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    atomic_write(&dir.join("chat-folders.json"), &contents)
+}
+
 /// Rename a chat: `chats/<old>.md` → `chats/<new>.md`. Both slugs are re-validated
 /// on the wire (lowercase-alnum-dash, no separators, no `..`), so a crafted slug
 /// can never escape `chats/`. Returns the new safe slug the caller re-binds to.

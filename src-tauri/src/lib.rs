@@ -1117,6 +1117,8 @@ pub fn run() {
             memex::memex_read_contract,
             memex::memex_read,
             memex::memex_list_chats,
+            memex::memex_chat_folders,
+            memex::memex_write_chat_folders,
             memex::memex_write_chat,
             memex::memex_rename_chat,
             memex::memex_delete_chat,

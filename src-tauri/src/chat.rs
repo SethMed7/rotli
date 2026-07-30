@@ -251,8 +251,8 @@ pub struct WireMsg {
 /// gets a real messages array, the Bearer key (fixes the 401), and image parts.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)] // the wire command mirrors the chat request shape 1:1
-pub fn chat_messages(
-    state: tauri::State<crate::organizer::OrganizerState>,
+pub async fn chat_messages(
+    state: tauri::State<'_, crate::organizer::OrganizerState>,
     messages: Vec<WireMsg>,
     endpoint: Option<String>,
     model: Option<String>,
@@ -261,27 +261,36 @@ pub fn chat_messages(
     temperature: Option<f32>,
     max_tokens: Option<u32>,
 ) -> Result<String, String> {
-    // Chat AND vision ride this command — holding the yield guard here closes
-    // the whole interactive surface to daemon contention (doc §2).
-    let _interactive = state.0.interactive_guard();
-    let endpoint = endpoint.unwrap_or_else(|| DEFAULT_ENDPOINT.to_string());
-    let model = model.unwrap_or_else(|| DEFAULT_MODEL.to_string());
-    // Destination clamp (audit 2026-07, egress #3): the webview may only name
-    // KNOWN endpoints — anything else is refused before any bytes ride.
-    endpoint_permitted(&endpoint)?;
-    // #2's SEND-side backstop (review, 2026-07): corpus_read_ai refuses secure
-    // text to a non-local endpoint, but THIS command is the transport that
-    // actually ships bytes — so the invariant is re-derived at the egress too.
-    egress_allowed(&endpoint, &model, &messages)?;
-    let api = api.unwrap_or_else(|| DEFAULT_API.to_string());
-    let base = endpoint.trim_end_matches('/');
-    let temperature = temperature.unwrap_or(0.4);
-    let max_tokens = max_tokens.unwrap_or(1024);
-    if api == "openai" {
-        messages_openai(base, &model, &messages, temperature, max_tokens, &endpoint)
-    } else {
-        messages_generate(base, &model, &messages, format_json.unwrap_or(false), temperature, max_tokens, &endpoint, CHAT_TIMEOUT)
-    }
+    // ASYNC command: a sync command runs on the MAIN thread, and this one holds
+    // a blocking HTTP request for a whole model generation — the entire app
+    // beachballed for every local reply (Seth, 2026-07-30). The blocking work
+    // moves to a worker; the main thread keeps painting.
+    let handle = state.0.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        // Chat AND vision ride this command — holding the yield guard here closes
+        // the whole interactive surface to daemon contention (doc §2).
+        let _interactive = handle.interactive_guard();
+        let endpoint = endpoint.unwrap_or_else(|| DEFAULT_ENDPOINT.to_string());
+        let model = model.unwrap_or_else(|| DEFAULT_MODEL.to_string());
+        // Destination clamp (audit 2026-07, egress #3): the webview may only name
+        // KNOWN endpoints — anything else is refused before any bytes ride.
+        endpoint_permitted(&endpoint)?;
+        // #2's SEND-side backstop (review, 2026-07): corpus_read_ai refuses secure
+        // text to a non-local endpoint, but THIS command is the transport that
+        // actually ships bytes — so the invariant is re-derived at the egress too.
+        egress_allowed(&endpoint, &model, &messages)?;
+        let api = api.unwrap_or_else(|| DEFAULT_API.to_string());
+        let base = endpoint.trim_end_matches('/');
+        let temperature = temperature.unwrap_or(0.4);
+        let max_tokens = max_tokens.unwrap_or(1024);
+        if api == "openai" {
+            messages_openai(base, &model, &messages, temperature, max_tokens, &endpoint)
+        } else {
+            messages_generate(base, &model, &messages, format_json.unwrap_or(false), temperature, max_tokens, &endpoint, CHAT_TIMEOUT)
+        }
+    })
+    .await
+    .map_err(|e| format!("chat worker: {e}"))?
 }
 
 /// The transport accepts only KNOWN destinations (audit 2026-07, egress #3):

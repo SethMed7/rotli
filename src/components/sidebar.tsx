@@ -22,6 +22,20 @@ import {
   useRef,
   useState,
 } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  CHAT_FOLDERS_KEY,
+  EMPTY_CHAT_FOLDERS,
+  type ChatFoldersManifest,
+  assignChatToFolder,
+  createChatFolder,
+  deleteChatFolder,
+  groupChats,
+  invalidateChatFolders,
+  loadChatFolders,
+  renameChatFolder,
+  saveChatFolders,
+} from "../services/chatFolders";
 import { buildStorageTree } from "../services/storageTree";
 import {
   type DropPos,
@@ -380,6 +394,170 @@ export function Sidebar() {
   const quickNoteIds = useUiStore((s) => s.quickNoteIds);
   // the LIMITED Chat view's cap — a Settings knob (5/10/15), default 5 (#17)
   const chatSidebarLimit = useUiStore((s) => s.chatSidebarLimit);
+
+  // — chat FOLDERS: virtual grouping over the flat chats/ surface (Seth,
+  // 2026-07-30) — a rebuildable .rotli sidecar per instance; chats never move
+  // on disk. Expansion rides expandedDests under reserved chatfolder: ids. —
+  const chatFoldersQuery = useQuery({
+    queryKey: [...CHAT_FOLDERS_KEY, activeMemex?.root ?? ""],
+    enabled: !!activeMemex && isTauri(),
+    queryFn: () => loadChatFolders(activeMemex!),
+  });
+  const chatFoldersManifest = chatFoldersQuery.data ?? EMPTY_CHAT_FOLDERS;
+  const groupedChats = useMemo(
+    () => groupChats(chatList, chatFoldersManifest),
+    [chatList, chatFoldersManifest],
+  );
+  const [renamingChatFolderId, setRenamingChatFolderId] = useState<string | null>(null);
+  // read-modify-write from a FRESH load so two quick menu actions never
+  // clobber each other through a stale react-query snapshot
+  const updateChatFolders = (
+    mutate: (manifest: ChatFoldersManifest) => ChatFoldersManifest,
+    after?: () => void,
+  ) => {
+    if (!activeMemex) return;
+    setRowActionError(null);
+    void loadChatFolders(activeMemex)
+      .then((fresh) => saveChatFolders(activeMemex, mutate(fresh)))
+      .then(() => invalidateChatFolders())
+      .then(() => after?.())
+      .catch((err) =>
+        setRowActionError(
+          `Couldn’t update chat folders — ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+  };
+
+  // one chat row, shared by folder groups and the loose list below them
+  const renderChatRow = (c: (typeof chatList)[number], inFolder: boolean) =>
+    chatRename.renamingChatSlug === c.slug ? (
+      <InlineRenameInput
+        key={c.slug}
+        className="sb-chatrename"
+        defaultValue={c.title || c.slug}
+        ariaLabel="Rename chat"
+        onCommit={(value) => chatRename.commit(c.slug, value)}
+        onCancel={chatRename.cancel}
+      />
+    ) : (
+      <button
+        type="button"
+        key={c.slug}
+        /* a chat row lights only while the PANES actually show it — never
+           alongside an active All-chats (or other) view (Seth, 2026-07-30:
+           two highlights at once read as wrong) */
+        className={`sb-chatrow${inFolder ? " in-folder" : ""}${
+          contentView === "panes" && focusedChatSlug === c.slug ? " sel" : ""
+        }`}
+        onClick={() => openChatRow(c.slug)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          // failures (e.g. a read-only brain) land in the sidebar's inline
+          // error note — the menu is gone by the time they reject (#11
+          // pattern; reviewer, 2026-07-08)
+          const runChatOp = (verb: string, op: Promise<void>) => {
+            setRowActionError(null);
+            void op
+              .then(() => invalidateMemex())
+              .catch((err) =>
+                setRowActionError(
+                  `Couldn't ${verb} this chat — ${err instanceof Error ? err.message : String(err)}`,
+                ),
+              );
+          };
+          const assignedFolder = chatFoldersManifest.assignments[c.slug];
+          openContextMenu(e.clientX, e.clientY, [
+            {
+              kind: "action" as const,
+              label: c.pinned ? "Unpin from top" : "Pin to top",
+              checked: c.pinned,
+              onClick: () => {
+                if (activeMemex) runChatOp("pin", pinChat(activeMemex, c.slug, !c.pinned));
+              },
+            },
+            {
+              kind: "action" as const,
+              label: "Rename…",
+              onClick: () => chatRename.start(c.slug),
+            },
+            {
+              kind: "drill" as const,
+              label: "Move to folder",
+              items: [
+                ...chatFoldersManifest.folders.map((folder) => ({
+                  kind: "action" as const,
+                  label: folder.name,
+                  checked: assignedFolder === folder.id,
+                  checkedMark: "highlight" as const,
+                  onClick: () => updateChatFolders((m) => assignChatToFolder(m, c.slug, folder.id)),
+                })),
+                ...(assignedFolder
+                  ? [
+                      {
+                        kind: "action" as const,
+                        label: "Remove from folder",
+                        onClick: () => updateChatFolders((m) => assignChatToFolder(m, c.slug, null)),
+                      },
+                    ]
+                  : []),
+                ...(chatFoldersManifest.folders.length > 0 ? [{ kind: "sep" as const }] : []),
+                {
+                  kind: "action" as const,
+                  label: "New folder…",
+                  onClick: () => {
+                    // create + assign in one write, then open the rename box
+                    let createdId: string | null = null;
+                    updateChatFolders(
+                      (m) => {
+                        const created = createChatFolder(m, "New folder");
+                        createdId = created.id;
+                        return assignChatToFolder(created.manifest, c.slug, created.id);
+                      },
+                      () => {
+                        if (createdId) setRenamingChatFolderId(createdId);
+                      },
+                    );
+                  },
+                },
+              ],
+            },
+            {
+              kind: "action" as const,
+              // the chat IS a file on disk (chats/<slug>.md) — surface that
+              // truth right in the row menu
+              label: "Copy file path",
+              onClick: () => {
+                if (activeMemex) {
+                  void navigator.clipboard.writeText(`${activeMemex.root}/chats/${c.slug}.md`);
+                }
+              },
+            },
+            { kind: "sep" as const },
+            {
+              kind: "action" as const,
+              label: "Archive",
+              onClick: () => {
+                if (activeMemex) runChatOp("archive", archiveChat(activeMemex, c.slug));
+              },
+            },
+            {
+              kind: "action" as const,
+              label: "Delete",
+              danger: true,
+              onClick: () => {
+                if (activeMemex) runChatOp("delete", deleteChat(activeMemex, c.slug));
+              },
+            },
+          ]);
+        }}
+        title={c.title || c.slug}
+      >
+        <ChatGlyph size={13} />
+        <span className="fname">{c.title || c.slug}</span>
+        {c.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
+      </button>
+    );
 
   // Captures count mirrors BoardSurface's curated-note rule: a staged note
   // placed in Main or starred for Quick access is a full note, not a capture.
@@ -1404,93 +1582,65 @@ export function Sidebar() {
               ) : chatList.length === 0 ? (
                 <p className="sb-empty">No chats yet.</p>
               ) : (
-                chatList.slice(0, chatSidebarLimit).map((c) =>
-                  chatRename.renamingChatSlug === c.slug ? (
-                    <InlineRenameInput
-                      key={c.slug}
-                      className="sb-chatrename"
-                      defaultValue={c.title || c.slug}
-                      ariaLabel="Rename chat"
-                      onCommit={(value) => chatRename.commit(c.slug, value)}
-                      onCancel={chatRename.cancel}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      key={c.slug}
-                      className={`sb-chatrow${focusedChatSlug === c.slug ? " sel" : ""}`}
-                      onClick={() => openChatRow(c.slug)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        // failures (e.g. a read-only brain) land in the sidebar's
-                        // inline error note — the menu is gone by the time they
-                        // reject (#11 pattern; reviewer, 2026-07-08)
-                        const runChatOp = (verb: string, op: Promise<void>) => {
-                          setRowActionError(null);
-                          void op
-                            .then(() => invalidateMemex())
-                            .catch((err) =>
-                              setRowActionError(
-                                `Couldn't ${verb} this chat — ${err instanceof Error ? err.message : String(err)}`,
-                              ),
-                            );
-                        };
-                        openContextMenu(e.clientX, e.clientY, [
-                          {
-                            kind: "action" as const,
-                            label: c.pinned ? "Unpin from top" : "Pin to top",
-                            checked: c.pinned,
-                            onClick: () => {
-                              if (activeMemex) runChatOp("pin", pinChat(activeMemex, c.slug, !c.pinned));
-                            },
-                          },
-                          {
-                            kind: "action" as const,
-                            label: "Rename…",
-                            onClick: () => chatRename.start(c.slug),
-                          },
-                          {
-                            kind: "action" as const,
-                            // the chat IS a file on disk (chats/<slug>.md) —
-                            // surface that truth right in the row menu
-                            label: "Copy file path",
-                            onClick: () => {
-                              if (activeMemex) {
-                                void navigator.clipboard.writeText(`${activeMemex.root}/chats/${c.slug}.md`);
-                              }
-                            },
-                          },
-                          { kind: "sep" as const },
-                          {
-                            kind: "action" as const,
-                            label: "Archive",
-                            onClick: () => {
-                              if (activeMemex) runChatOp("archive", archiveChat(activeMemex, c.slug));
-                            },
-                          },
-                          {
-                            kind: "action" as const,
-                            label: "Delete",
-                            danger: true,
-                            onClick: () => {
-                              if (activeMemex) runChatOp("delete", deleteChat(activeMemex, c.slug));
-                            },
-                          },
-                        ]);
-                      }}
-                      title={c.title || c.slug}
-                    >
-                      <ChatGlyph size={13} />
-                      <span className="fname">{c.title || c.slug}</span>
-                      {c.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
-                    </button>
-                  ),
-                )
+                <>
+                  {groupedChats.folders.map(({ folder, chats }) => {
+                    const folderKey = `chatfolder:${folder.id}`;
+                    const open = expandedDests[folderKey] ?? true;
+                    return (
+                      <div key={folder.id} className="sb-chatfolder">
+                        {renamingChatFolderId === folder.id ? (
+                          <InlineRenameInput
+                            className="sb-chatrename"
+                            defaultValue={folder.name}
+                            ariaLabel="Rename chat folder"
+                            onCommit={(value) => {
+                              setRenamingChatFolderId(null);
+                              updateChatFolders((m) => renameChatFolder(m, folder.id, value));
+                            }}
+                            onCancel={() => setRenamingChatFolderId(null)}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            className="sb-chatrow sb-chatfolder-row"
+                            aria-expanded={open}
+                            onClick={() => setDestExpanded(folderKey, !open)}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openContextMenu(e.clientX, e.clientY, [
+                                {
+                                  kind: "action" as const,
+                                  label: "Rename…",
+                                  onClick: () => setRenamingChatFolderId(folder.id),
+                                },
+                                { kind: "sep" as const },
+                                {
+                                  kind: "action" as const,
+                                  // frees the chats back to the list — files never move
+                                  label: "Delete folder",
+                                  danger: true,
+                                  onClick: () => updateChatFolders((m) => deleteChatFolder(m, folder.id)),
+                                },
+                              ]);
+                            }}
+                            title={folder.name}
+                          >
+                            <FolderGlyph size={13} />
+                            <span className="fname">{folder.name}</span>
+                            <span className="sb-chatfolder-n">{chats.length}</span>
+                          </button>
+                        )}
+                        {open && chats.map((c) => renderChatRow(c, true))}
+                      </div>
+                    );
+                  })}
+                  {groupedChats.loose.slice(0, chatSidebarLimit).map((c) => renderChatRow(c, false))}
+                </>
               )}
-              {chatList.length > chatSidebarLimit && (
+              {groupedChats.loose.length > chatSidebarLimit && (
                 <button type="button" className="sb-chat-more" onClick={openAllChats}>
-                  +{chatList.length - chatSidebarLimit} more
+                  +{groupedChats.loose.length - chatSidebarLimit} more
                 </button>
               )}
             </div>

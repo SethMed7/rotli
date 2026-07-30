@@ -649,6 +649,24 @@
   cursor: pointer;
   position: relative;
 }
+/* chat FOLDERS (Seth, 2026-07-30) — virtual grouping; the folder row is a
+   disclosure, its chats indent one step beneath it */
+.sb-chatfolder {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sb-chatfolder-row .fname {
+  font-weight: 600;
+}
+.sb-chatfolder-n {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.sb-chatrow.in-folder {
+  padding-left: 30px;
+}
 /* inline rename over a chat row (Seth #4, 2026-07-08) — same footprint as the row */
 .sb-chatrename {
   width: 100%;

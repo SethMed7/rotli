@@ -1231,6 +1231,13 @@ export function memexRead(root: string, rel: string): Promise<string> {
 export function memexListChats(root: string): Promise<MemexChatSummary[]> {
   return memexInvoke("memex_list_chats", { root });
 }
+/** The chat-folder manifest (a rebuildable .rotli sidecar) — "" when absent. */
+export function memexChatFolders(root: string): Promise<string> {
+  return memexInvoke("memex_chat_folders", { root });
+}
+export function memexWriteChatFolders(root: string, contents: string): Promise<void> {
+  return memexInvoke("memex_write_chat_folders", { root, contents });
+}
 export function memexWriteChat(root: string, slug: string, contents: string): Promise<string> {
   return memexInvoke("memex_write_chat", { root, slug, contents });
 }

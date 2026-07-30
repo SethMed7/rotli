@@ -9,6 +9,12 @@ import { activeInstance } from "../memex/config";
 // and every output passes the Rust safe_slug wire validator.
 import { slugify } from "../memex/contract";
 import { renameChat } from "../memex/service";
+import {
+  invalidateChatFolders,
+  loadChatFolders,
+  migrateChatFolderSlug,
+  saveChatFolders,
+} from "./chatFolders";
 import { invalidateMemex, useMemexConfig } from "../memex/useMemex";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
@@ -29,6 +35,17 @@ export function useChatRename() {
       try {
         const finalSlug = await renameChat(active, oldSlug, newSlug);
         retargetChat(oldSlug, finalSlug);
+        // the chat keeps its folder — the assignment key follows the slug
+        try {
+          const manifest = await loadChatFolders(active);
+          const migrated = migrateChatFolderSlug(manifest, oldSlug, finalSlug);
+          if (migrated !== manifest) {
+            await saveChatFolders(active, migrated);
+            await invalidateChatFolders();
+          }
+        } catch {
+          /* the grouping sidecar is best-effort — a rename never fails on it */
+        }
         await invalidateMemex();
       } catch {
         /* read-only, gone, or name taken — leave the chat as it was */
