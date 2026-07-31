@@ -1,10 +1,36 @@
 # Breve: editable routines + per-vault scoping (design notes)
 
-Status: **investigated, not built** (2026-07-31). Seth's asks: (1) add/remove
-routines, give them purposes/reminders/prompts, see and edit the brief system
-prompt; (2) Breve state should be tied to the vault — per-vault briefs,
-watchlist, and routines, with shared configuration defaults. This doc records
-the code-verified map so either epic can start cold.
+Status: **BUILT** (2026-07-31, same day). What shipped:
+
+- **Custom routines** — the seven built-ins are locked-shape and disable-only;
+  users add **custom briefs** (scheduled research on their own prompt) and
+  **reminders** (their text delivered as-is), daily-at-a-time, slug ids
+  (≤ 20 routines total). `BreveRoutine.prompt` carries the instructions —
+  required on customs, optional extra instructions on the built-in briefs
+  (appended to the wrapper PROMPT). The scheduler dispatches custom ids on
+  `kind` → `custom-brief.sh` / `reminder.ts`; the routine's id/label/prompt/
+  stem ride the job env. Custom stems (`YYYY-MM-DD-<slug>`) pass `brief_stem`
+  and surface in Briefs with the slug as their kind. Signal delivery for
+  text-only routines uses `send-signal-text.ts --receipt <stem>.signal` (an
+  exact-name claim satisfying `verifyRun`); email reuses `send-brief.ts`
+  (PDF-less).
+- **Brief prompt surface** — `breve_brief_skill` / `breve_write_brief_skill`
+  expose the materialized SKILL.md; edits write `.rotli/routines/
+  skill.custom.md` (sync-immune) and the scheduler points
+  `ROTLI_BREVE_SKILL` at it per job — applies within one poll. Reset returns
+  to the shipped default. UI: Routines → "Brief instructions".
+- **Vault-scoping** — per-vault state was already structural (per-root homes +
+  the PR #32 `BREVE_KNOWLEDGE`/`BREVE_STORAGE` pins). Added: vault-agnostic
+  **shared defaults** (`<app-data>/breve-shared-defaults/`) — saves of the
+  routine config and delivery settings mirror into it, and a fresh vault's
+  Breve home seeds from it copy-if-absent, so a new vault starts from the
+  current setup and diverges freely. One supervisor follows the ACTIVE vault
+  (vault switches relaunch the app, which also makes per-root React Query
+  keys unnecessary — the cache dies with the process). Simultaneous multi-
+  vault supervisors remain out of scope (single Signal bot number, single
+  launchd agent).
+
+The original investigation below is kept for the record.
 
 ## Where things stand today
 

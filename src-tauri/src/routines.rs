@@ -105,6 +105,48 @@ fn relocate_legacy_bundle(home: &Path, backup_dir: &Path) -> Result<Option<PathB
 }
 
 /// Install/update executable runtime code while preserving mutable data.
+/// The vault-agnostic Breve defaults dir (app data, outside every vault):
+/// saves mirror INTO it, fresh vault homes seed FROM it — "configurations can
+/// be separate but default should be same" (Seth, 2026-07-31). Both sides are
+/// best-effort: defaults sharing must never fail a save or a vault open.
+fn shared_defaults_dir(app: &AppHandle) -> Option<PathBuf> {
+    app.path().app_data_dir().ok().map(|dir| dir.join("breve-shared-defaults"))
+}
+
+pub fn mirror_shared_default(app: &AppHandle, name: &str, source: &Path) {
+    let Some(dir) = shared_defaults_dir(app) else { return };
+    if fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let _ = fs::copy(source, dir.join(name));
+}
+
+/// Seed a vault's Breve from the vault-agnostic defaults (Seth, 2026-07-31:
+/// "configurations can be separate but default should be same") — copy-if-
+/// absent only, so a diverged vault keeps its own values forever. Callers
+/// control ORDER: at takeover this runs AFTER the legacy migration, so the
+/// real legacy files always outrank the shared mirror (review, 2026-07-31).
+pub fn seed_shared_defaults(app: &AppHandle, corpus_root: &Path) {
+    let home = corpus_root.join(MANAGED_DIR);
+    seed_from_shared(app, "recipients.json", &home.join("recipients.json"));
+    seed_from_shared(app, "signal.json", &home.join("signal.json"));
+    seed_from_shared(app, "config.json", &corpus_root.join(ROUTINE_CONFIG));
+}
+
+pub fn seed_from_shared(app: &AppHandle, name: &str, target: &Path) {
+    if target.exists() {
+        return;
+    }
+    let Some(shared) = shared_defaults_dir(app).map(|dir| dir.join(name)) else { return };
+    if !shared.is_file() {
+        return;
+    }
+    if let Some(parent) = target.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::copy(&shared, target);
+}
+
 pub fn sync_runtime(app: &AppHandle, corpus_root: &Path) -> Result<PathBuf, String> {
     let source = source_root(app)?;
     let home = corpus_root.join(MANAGED_DIR);

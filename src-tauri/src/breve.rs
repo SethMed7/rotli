@@ -98,6 +98,12 @@ pub struct BreveRoutine {
     pub enabled: bool,
     pub schedule: BreveSchedule,
     pub lanes: Vec<String>,
+    /// User instructions riding the routine (2026-07-31): REQUIRED on custom
+    /// routines (the brief's research ask, or the reminder's text), optional
+    /// extra instructions on the built-in briefs. Defaulted so pre-existing
+    /// configs keep deserializing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -454,6 +460,7 @@ fn default_routines(enabled: bool, times: &BreveDeliveryTimes, lead: u32, overri
         enabled,
         schedule: BreveSchedule::DailyAt { hhmm: hhmm.into(), lead_minutes },
         lanes: vec!["inApp".into(), "signal".into(), "email".into()],
+        prompt: None,
     };
     vec![
         daily("morning", "Morning brief", &times.morning, overrides.morning.unwrap_or(lead)),
@@ -461,19 +468,19 @@ fn default_routines(enabled: bool, times: &BreveDeliveryTimes, lead: u32, overri
         daily("night", "Nightcap", &times.night, overrides.night.unwrap_or(lead)),
         BreveRoutine {
             id: "creators".into(), label: "Creator alerts".into(), kind: "creators".into(), enabled,
-            schedule: BreveSchedule::EverySecs { secs: 3_600 }, lanes: vec!["signal".into()],
+            schedule: BreveSchedule::EverySecs { secs: 3_600 }, lanes: vec!["signal".into()], prompt: None,
         },
         BreveRoutine {
             id: "watchers".into(), label: "Page watchers".into(), kind: "watchers".into(), enabled,
-            schedule: BreveSchedule::EverySecs { secs: 1_800 }, lanes: vec!["signal".into()],
+            schedule: BreveSchedule::EverySecs { secs: 1_800 }, lanes: vec!["signal".into()], prompt: None,
         },
         BreveRoutine {
             id: "doctor".into(), label: "Health check".into(), kind: "doctor".into(), enabled,
-            schedule: BreveSchedule::EverySecs { secs: 1_800 }, lanes: vec!["inApp".into(), "signal".into()],
+            schedule: BreveSchedule::EverySecs { secs: 1_800 }, lanes: vec!["inApp".into(), "signal".into()], prompt: None,
         },
         BreveRoutine {
             id: "signal".into(), label: "Signal listener".into(), kind: "signal".into(), enabled,
-            schedule: BreveSchedule::AlwaysOn, lanes: vec!["signal".into()],
+            schedule: BreveSchedule::AlwaysOn, lanes: vec!["signal".into()], prompt: None,
         },
     ]
 }
@@ -604,20 +611,19 @@ fn validate_config(config: &BreveConfig) -> Result<(), String> {
     {
         return Err("Breve PDF colors must use six-digit hex values".into());
     }
-    let allowed_ids: HashSet<&str> = ["morning", "lunch", "night", "creators", "watchers", "doctor", "signal"]
-        .into_iter()
-        .collect();
-    if config.routines.len() != 7 {
-        return Err("Breve config must contain exactly seven routines".into());
+    // Routines (reworked 2026-07-31): the seven BUILT-INS must all exist with
+    // their locked kind+schedule shapes (disable, never delete — the scheduler
+    // and its state file key on them); CUSTOM routines are user-created
+    // scheduled work — a custom brief or a reminder, at a time of day, with
+    // required instructions.
+    if config.routines.len() > MAX_ROUTINES {
+        return Err(format!("Breve config supports at most {MAX_ROUTINES} routines"));
     }
     let mut seen = HashSet::new();
     let allowed_lanes: HashSet<&str> = ["inApp", "signal", "email"].into_iter().collect();
     for routine in &config.routines {
-        if !allowed_ids.contains(routine.id.as_str()) || !seen.insert(routine.id.as_str()) {
-            return Err(format!("unknown or duplicate Breve routine: {}", routine.id));
-        }
-        if !matches!(routine.kind.as_str(), "brief" | "creators" | "watchers" | "doctor" | "signal") {
-            return Err(format!("invalid Breve routine kind: {}", routine.kind));
+        if !seen.insert(routine.id.as_str()) {
+            return Err(format!("duplicate Breve routine: {}", routine.id));
         }
         if routine.label.trim().is_empty()
             || routine.label.len() > 96
@@ -632,21 +638,70 @@ fn validate_config(config: &BreveConfig) -> Result<(), String> {
             BreveSchedule::AlwaysOn => {}
             _ => return Err(format!("invalid schedule for Breve routine: {}", routine.id)),
         }
-        let shape_ok = match routine.id.as_str() {
-            "morning" | "lunch" | "night" => {
-                routine.kind == "brief" && matches!(&routine.schedule, BreveSchedule::DailyAt { .. })
+        if routine.prompt.as_deref().is_some_and(|p| p.trim().is_empty() || p.len() > 4000) {
+            return Err(format!("Breve routine instructions must be 1–4000 characters: {}", routine.id));
+        }
+        if BUILTIN_ROUTINE_IDS.contains(&routine.id.as_str()) {
+            let shape_ok = match routine.id.as_str() {
+                "morning" | "lunch" | "night" => {
+                    routine.kind == "brief" && matches!(&routine.schedule, BreveSchedule::DailyAt { .. })
+                }
+                "creators" => {
+                    routine.kind == "creators" && matches!(&routine.schedule, BreveSchedule::EverySecs { .. })
+                }
+                "watchers" => {
+                    routine.kind == "watchers" && matches!(&routine.schedule, BreveSchedule::EverySecs { .. })
+                }
+                "doctor" => routine.kind == "doctor" && matches!(&routine.schedule, BreveSchedule::EverySecs { .. }),
+                "signal" => routine.kind == "signal" && matches!(&routine.schedule, BreveSchedule::AlwaysOn),
+                _ => false,
+            };
+            if !shape_ok {
+                return Err(format!("Breve routine has the wrong kind or schedule: {}", routine.id));
             }
-            "creators" => routine.kind == "creators" && matches!(&routine.schedule, BreveSchedule::EverySecs { .. }),
-            "watchers" => routine.kind == "watchers" && matches!(&routine.schedule, BreveSchedule::EverySecs { .. }),
-            "doctor" => routine.kind == "doctor" && matches!(&routine.schedule, BreveSchedule::EverySecs { .. }),
-            "signal" => routine.kind == "signal" && matches!(&routine.schedule, BreveSchedule::AlwaysOn),
-            _ => false,
-        };
-        if !shape_ok {
-            return Err(format!("Breve routine has the wrong kind or schedule: {}", routine.id));
+        } else {
+            if !valid_routine_slug(&routine.id) {
+                return Err(format!(
+                    "custom Breve routine ids are 1–40 lowercase letters, digits, and dashes: {}",
+                    routine.id
+                ));
+            }
+            if !matches!(routine.kind.as_str(), "brief" | "reminder") {
+                return Err(format!("custom Breve routines are a brief or a reminder: {}", routine.id));
+            }
+            if !matches!(&routine.schedule, BreveSchedule::DailyAt { .. }) {
+                return Err(format!("custom Breve routines run at a time of day: {}", routine.id));
+            }
+            if routine.prompt.as_deref().is_none_or(|p| p.trim().is_empty()) {
+                return Err(format!("custom Breve routine needs instructions: {}", routine.id));
+            }
+        }
+    }
+    for id in BUILTIN_ROUTINE_IDS {
+        if !seen.contains(id) {
+            return Err(format!("Breve config is missing the built-in routine: {id}"));
         }
     }
     Ok(())
+}
+
+/// The seven routines the scheduler + its state file key on — always present,
+/// disable-only. Everything else in the config is a user CUSTOM routine.
+const BUILTIN_ROUTINE_IDS: [&str; 7] = ["morning", "lunch", "night", "creators", "watchers", "doctor", "signal"];
+const MAX_ROUTINES: usize = 20;
+
+/// Custom routine ids double as brief stems (`YYYY-MM-DD-<id>.md`) and job
+/// keys — plain slugs only, no leading/trailing dash.
+fn valid_routine_slug(id: &str) -> bool {
+    (1..=40).contains(&id.len())
+        && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        && !id.starts_with('-')
+        && !id.ends_with('-')
+        // a custom stem must never READ as a slot stem: send-brief.ts derives
+        // the email's parse shape from the -lunch/-night suffix (review,
+        // 2026-07-31 — "team-lunch" would ship an empty, mislabeled email)
+        && !id.ends_with("-lunch")
+        && !id.ends_with("-night")
 }
 
 fn strip_frontmatter(text: &str) -> &str {
@@ -698,11 +753,23 @@ fn watchlist_counts(markdown: &str) -> (usize, usize) {
 
 fn brief_stem(name: &str) -> Option<String> {
     let stem = name.strip_suffix(".md")?;
-    Regex::new(r"^\d{4}-\d{2}-\d{2}(?:-lunch|-night)?$").ok()?.is_match(stem).then(|| stem.to_string())
+    // date alone (morning) · -lunch/-night · or a CUSTOM routine's slug
+    // (2026-07-31) — the slug grammar matches valid_routine_slug, so a custom
+    // brief/reminder lands in the Briefs UI. Dots stay excluded, so sidecars
+    // like `2026-07-31.audio.txt` can never read as briefs.
+    Regex::new(r"^\d{4}-\d{2}-\d{2}(?:-[a-z0-9][a-z0-9-]{0,39})?$")
+        .ok()?
+        .is_match(stem)
+        .then(|| stem.to_string())
 }
 
 fn brief_from(stem: String, markdown: &str, imported: bool, audio_path: Option<String>) -> BreveBrief {
-    let kind = if stem.ends_with("-lunch") { "lunch" } else if stem.ends_with("-night") { "night" } else { "morning" };
+    // kind = the stem suffix: the three slots keep their names; a custom
+    // routine's briefs carry its slug (the UI shows it as a plain tag)
+    let kind = match stem.get(10..) {
+        Some(suffix) if suffix.starts_with('-') => suffix[1..].to_string(),
+        _ => "morning".to_string(),
+    };
     let title = strip_frontmatter(markdown)
         .lines()
         .find_map(|line| line.strip_prefix("# ").map(str::trim))
@@ -714,7 +781,7 @@ fn brief_from(stem: String, markdown: &str, imported: bool, audio_path: Option<S
         path: imported.then(|| format!("{BRIEFS_DIR}/{stem}.md")),
         stem,
         title,
-        kind: kind.into(),
+        kind,
         imported,
         audio_path,
     }
@@ -1024,6 +1091,11 @@ pub fn breve_write_delivery_settings(
         }),
     )?;
     settings.resend_key_configured = keychain::get_secret(keychain::BREVE_RESEND_ACCOUNT).is_some();
+    // mirror to the vault-agnostic defaults (2026-07-31): a NEW vault's Breve
+    // seeds from these so delivery works there out of the box; the Resend key
+    // itself stays in the Keychain, which is already machine-global
+    routines::mirror_shared_default(&app, "recipients.json", &home.join("recipients.json"));
+    routines::mirror_shared_default(&app, "signal.json", &home.join("signal.json"));
     // signal-daemon reads its identity allowlist once at process start. A saved
     // identity change therefore restarts Rotli's one supervisor so the new
     // values take effect immediately, without creating any launchd jobs.
@@ -1169,8 +1241,100 @@ pub fn breve_write_config(
     }
     let root = active_root(&state)?;
     write_json(&root.join(CONFIG_FILE), &config)?;
+    // mirror to the vault-agnostic defaults so a NEW vault's Breve starts
+    // from the current setup (Seth, 2026-07-31: "configurations can be
+    // separate but default should be same") — best-effort, never blocks
+    routines::mirror_shared_default(&app, "config.json", &root.join(CONFIG_FILE));
     let legacy = legacy_root();
     Ok(snapshot_at(&root, legacy.as_deref()))
+}
+
+/// The brief instructions surface (Seth, 2026-07-31: "the briefs have a
+/// system prompt let me see that prompt and I should be able to modify
+/// them"). `default_text` is the materialized SKILL.md the wrappers use;
+/// a user edit lives at `.rotli/routines/skill.custom.md` — OUTSIDE the
+/// managed `skills/` tree that sync_runtime overwrites every launch — and
+/// the scheduler points `ROTLI_BREVE_SKILL` at it per job, so an edit
+/// applies within one poll, no relaunch.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BreveBriefSkill {
+    pub text: String,
+    pub is_custom: bool,
+    pub default_text: String,
+}
+
+/// Rel path of the user's brief-instructions override (survives sync_runtime).
+pub const SKILL_CUSTOM_REL: &str = ".rotli/routines/skill.custom.md";
+const SKILL_MAX_BYTES: usize = 65_536;
+/// Source-tree copy — the display fallback when no materialized skill exists
+/// (dev, or a vault before its first supervisor start).
+const SKILL_SOURCE: &str = include_str!("../../breve-runtime/skills/breve/SKILL.md");
+static DEV_SKILL_CUSTOM: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+
+fn brief_skill_at(root: &Path, dev_custom: Option<String>) -> BreveBriefSkill {
+    let home = root.join(routines::MANAGED_DIR);
+    let materialized = home.join("skills/breve/SKILL.md");
+    // the source fallback still carries the {{BREVE_HOME}} placeholder —
+    // substitute it like sync_runtime would, or a save of the displayed text
+    // would hand the wrappers literal template paths (review, 2026-07-31)
+    let default_text = fs::read_to_string(&materialized)
+        .unwrap_or_else(|_| SKILL_SOURCE.replace("{{BREVE_HOME}}", &home.to_string_lossy()));
+    let custom = if cfg!(debug_assertions) {
+        dev_custom
+    } else {
+        fs::read_to_string(root.join(SKILL_CUSTOM_REL)).ok()
+    };
+    BreveBriefSkill {
+        is_custom: custom.is_some(),
+        text: custom.unwrap_or_else(|| default_text.clone()),
+        default_text,
+    }
+}
+
+#[tauri::command]
+pub fn breve_brief_skill(state: tauri::State<'_, CorpusState>) -> Result<BreveBriefSkill, String> {
+    let root = active_root(&state)?;
+    let dev = DEV_SKILL_CUSTOM.get_or_init(|| Mutex::new(None));
+    let dev_custom = dev.lock().map_err(|_| "dev skill lock poisoned")?.clone();
+    Ok(brief_skill_at(&root, dev_custom))
+}
+
+/// `text: Some(...)` writes the override; `None` resets to the default.
+/// Dev saves stay in memory only (the Breve dev rule — production
+/// configuration is never written from a dev session).
+#[tauri::command]
+pub fn breve_write_brief_skill(
+    state: tauri::State<'_, CorpusState>,
+    text: Option<String>,
+) -> Result<BreveBriefSkill, String> {
+    if let Some(body) = &text {
+        if body.trim().is_empty() {
+            return Err("Brief instructions can't be empty — use Reset to go back to the default.".into());
+        }
+        if body.len() > SKILL_MAX_BYTES {
+            return Err("Brief instructions are too long (64 KB maximum).".into());
+        }
+    }
+    let root = active_root(&state)?;
+    if cfg!(debug_assertions) {
+        let dev = DEV_SKILL_CUSTOM.get_or_init(|| Mutex::new(None));
+        *dev.lock().map_err(|_| "dev skill lock poisoned")? = text.clone();
+        return Ok(brief_skill_at(&root, text));
+    }
+    let path = root.join(SKILL_CUSTOM_REL);
+    match &text {
+        Some(body) => {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            crate::fsutil::atomic_write(&path, body, ".rotli-skill-")?;
+        }
+        None => {
+            let _ = fs::remove_file(&path);
+        }
+    }
+    Ok(brief_skill_at(&root, None))
 }
 
 #[tauri::command]
@@ -1485,10 +1649,26 @@ pub fn breve_takeover(
         return Ok(dev_breve_snapshot(&app));
     }
     let root = active_memex_write_root(&state)?;
-    let legacy = legacy_root().ok_or("HOME is unavailable; legacy Breve cannot be located")?;
-    if !legacy.is_dir() {
-        return Err(format!("legacy Breve was not found at {}", legacy.display()));
-    }
+    // Legacy-LESS activation (2026-07-31): a fresh vault has no ~/breve to
+    // take over — "Start Breve in this vault" scaffolds the managed runtime,
+    // seeds from the shared defaults (so delivery + routines match the
+    // current setup), and starts the supervisor. The legacy path is unchanged.
+    let legacy = legacy_root().filter(|legacy| legacy.is_dir());
+    let Some(legacy) = legacy else {
+        let home = routines::sync_runtime(&app, &root)?;
+        routines::seed_shared_defaults(&app, &root);
+        if read_json::<BreveConfig>(&root.join(CONFIG_FILE)).is_none() {
+            write_json(&root.join(CONFIG_FILE), &default_config(true))?;
+        }
+        initialize_scheduler_state(&root, &home)?;
+        install_rotli_login_agent()?;
+        write_json(
+            &root.join(routines::MANAGED_MARKER),
+            &ManagedMarker { version: 1, taken_over_at: now_stamp(), legacy_root: None },
+        )?;
+        app.state::<BreveSupervisor>().start(&app, root.clone())?;
+        return Ok(snapshot_at(&root, None));
+    };
     import_legacy_at(&root, &legacy)?;
     if let Some(mut config) = read_json::<BreveConfig>(&root.join(CONFIG_FILE)) {
         if config.travel.is_none() {
@@ -1499,6 +1679,9 @@ pub fn breve_takeover(
     }
     let home = routines::sync_runtime(&app, &root)?;
     migrate_private_runtime(&legacy, &home, &root)?;
+    // AFTER the migration on purpose: legacy originals outrank the shared
+    // mirror; the seed only fills what legacy lacked (review, 2026-07-31)
+    routines::seed_shared_defaults(&app, &root);
     initialize_scheduler_state(&root, &home)?;
     disable_legacy_agents(&home)?;
     install_rotli_login_agent()?;
@@ -1704,6 +1887,83 @@ mod tests {
         config = default_config(true);
         config.routines[1].id = "morning".into();
         assert!(validate_config(&config).is_err());
+    }
+
+    fn custom_routine(id: &str, kind: &str) -> BreveRoutine {
+        BreveRoutine {
+            id: id.into(),
+            label: "Crypto watch".into(),
+            kind: kind.into(),
+            enabled: true,
+            schedule: BreveSchedule::DailyAt { hhmm: "09:00".into(), lead_minutes: 0 },
+            lanes: vec!["inApp".into(), "signal".into()],
+            prompt: Some("Track notable movements and flag anything big.".into()),
+        }
+    }
+
+    /// Custom routines (2026-07-31): briefs and reminders at a time of day,
+    /// with required instructions; built-ins stay locked and disable-only.
+    #[test]
+    fn config_accepts_custom_briefs_and_reminders_with_rules() {
+        let mut config = default_config(true);
+        config.routines.push(custom_routine("crypto-watch", "brief"));
+        config.routines.push(custom_routine("standup-nudge", "reminder"));
+        validate_config(&config).expect("custom brief + reminder validate");
+
+        // instructions are REQUIRED on customs
+        let mut bad = config.clone();
+        bad.routines.last_mut().unwrap().prompt = None;
+        assert!(validate_config(&bad).is_err(), "custom without prompt must refuse");
+
+        // custom kinds are brief | reminder only
+        let mut bad = config.clone();
+        bad.routines.last_mut().unwrap().kind = "doctor".into();
+        assert!(validate_config(&bad).is_err(), "custom doctor must refuse");
+
+        // custom schedules are dailyAt only
+        let mut bad = config.clone();
+        bad.routines.last_mut().unwrap().schedule = BreveSchedule::EverySecs { secs: 3600 };
+        assert!(validate_config(&bad).is_err(), "custom everySecs must refuse");
+
+        // slug law: uppercase / underscores / edge dashes / slot-suffix
+        // impersonation refuse
+        for id in ["Crypto", "crypto_watch", "-crypto", "crypto-", "team-lunch", "movie-night"] {
+            let mut bad = config.clone();
+            bad.routines.last_mut().unwrap().id = id.into();
+            assert!(validate_config(&bad).is_err(), "bad slug {id:?} must refuse");
+        }
+
+        // optional extra instructions on a BUILT-IN brief are allowed…
+        let mut extra = config.clone();
+        extra.routines[0].prompt = Some("Lead with chess news today.".into());
+        validate_config(&extra).expect("built-in brief with extra instructions");
+        // …but an oversize prompt refuses anywhere
+        extra.routines[0].prompt = Some("x".repeat(4001));
+        assert!(validate_config(&extra).is_err(), "oversize prompt must refuse");
+
+        // the routine cap holds
+        let mut too_many = config.clone();
+        for n in 0..14 {
+            too_many.routines.push(custom_routine(&format!("extra-{n}"), "reminder"));
+        }
+        assert!(validate_config(&too_many).is_err(), "more than 20 routines must refuse");
+    }
+
+    /// Custom stems land in the Briefs surface with the routine slug as kind;
+    /// sidecar shapes stay excluded.
+    #[test]
+    fn brief_stems_accept_custom_slugs() {
+        assert_eq!(brief_stem("2026-07-31-crypto-watch.md").as_deref(), Some("2026-07-31-crypto-watch"));
+        assert_eq!(brief_stem("2026-07-31-lunch.md").as_deref(), Some("2026-07-31-lunch"));
+        assert_eq!(brief_stem("2026-07-31.audio.txt"), None);
+        assert_eq!(brief_stem("2026-07-31-Crypto.md"), None, "uppercase is not a stem");
+        let brief = brief_from("2026-07-31-crypto-watch".into(), "# Crypto watch\n", true, None);
+        assert_eq!(brief.kind, "crypto-watch");
+        assert_eq!(brief.date, "2026-07-31");
+        let lunch = brief_from("2026-07-31-lunch".into(), "# Pivot\n", true, None);
+        assert_eq!(lunch.kind, "lunch");
+        let morning = brief_from("2026-07-31".into(), "# Brief\n", true, None);
+        assert_eq!(morning.kind, "morning");
     }
 
     #[test]

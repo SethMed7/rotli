@@ -11,8 +11,10 @@ import {
   breveStoreResendKey,
   breveTakeover,
   breveRetireLegacy,
+  breveBriefSkill,
   breveTestEmail,
   breveTestSignal,
+  breveWriteBriefSkill,
   breveWriteDeliverySettings,
   breveWriteConfig,
   chatModels,
@@ -579,7 +581,26 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
 
 type BriefSlot = "morning" | "lunch" | "night";
 
+/** The seven built-ins the scheduler keys on — everything else is a user
+ * CUSTOM routine (removable, prompt-required). Mirrors Rust's
+ * BUILTIN_ROUTINE_IDS. */
+const BUILTIN_ROUTINE_IDS = new Set([
+  "morning",
+  "lunch",
+  "night",
+  "creators",
+  "watchers",
+  "doctor",
+  "signal",
+]);
+function isCustomRoutine(routine: BreveRoutine): boolean {
+  return !BUILTIN_ROUTINE_IDS.has(routine.id);
+}
+
 function routineBriefSlot(routine: BreveRoutine): BriefSlot | null {
+  // custom routines never map to an arrival slot — a custom "night watch"
+  // must not ride the built-in night arrival's delivery-time lockstep
+  if (isCustomRoutine(routine)) return null;
   const text = `${routine.id} ${routine.label}`.toLowerCase();
   if (text.includes("morning")) return "morning";
   if (text.includes("lunch") || text.includes("pivot")) return "lunch";
@@ -649,6 +670,89 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
     }
   };
 
+  // legacy-less Breve activation for a fresh vault (2026-07-31)
+  const [activateState, setActivateState] = useState<SaveState>("idle");
+  const [activateError, setActivateError] = useState("");
+  const activate = async () => {
+    setActivateState("saving");
+    setActivateError("");
+    try {
+      const next = await breveTakeover();
+      queryClient.setQueryData(BREVE_QUERY_KEY, next);
+      setActivateState("saved");
+    } catch (e) {
+      setActivateError(e instanceof Error ? e.message : String(e));
+      setActivateState("error");
+    }
+  };
+
+  // ── custom routines (Seth, 2026-07-31): add/remove + per-routine prompts ──
+  const [promptOpen, setPromptOpen] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addLabel, setAddLabel] = useState("");
+  const [addKind, setAddKind] = useState<"brief" | "reminder">("brief");
+  const [addTime, setAddTime] = useState("09:00");
+  const [addPrompt, setAddPrompt] = useState("");
+  const [addLanes, setAddLanes] = useState<string[]>(["inApp", "signal"]);
+
+  // instructions apply to custom routines AND the built-in briefs
+  const promptable = (routine: BreveRoutine) =>
+    isCustomRoutine(routine) || routineBriefSlot(routine) !== null;
+  // clearing must REMOVE the field (an empty string fails Rust validation,
+  // and exactOptionalPropertyTypes forbids prompt: undefined)
+  const setRoutinePrompt = (id: string, value: string) =>
+    setConfig((current) => ({
+      ...current,
+      routines: current.routines.map((routine) => {
+        if (routine.id !== id) return routine;
+        const { prompt: _drop, ...rest } = routine;
+        return value ? { ...rest, prompt: value } : rest;
+      }),
+    }));
+  const removeRoutine = (id: string) => {
+    if (promptOpen === id) setPromptOpen(null);
+    setConfig((current) => ({
+      ...current,
+      routines: current.routines.filter((routine) => routine.id !== id),
+    }));
+  };
+  const addRoutine = () => {
+    const base = addLabel
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 36)
+      // the slice can re-expose a trailing dash; slot suffixes are reserved
+      // (Rust refuses them — see valid_routine_slug)
+      .replace(/-+$/g, "")
+      .replace(/-(lunch|night)$/g, "-$1x");
+    if (!base || !addPrompt.trim()) return;
+    let id = base;
+    let n = 2;
+    while (config.routines.some((routine) => routine.id === id)) id = `${base}-${n++}`;
+    setConfig((current) => ({
+      ...current,
+      routines: [
+        ...current.routines,
+        {
+          id,
+          label: addLabel.trim(),
+          kind: addKind,
+          enabled: true,
+          schedule: { kind: "dailyAt", hhmm: addTime, leadMinutes: 0 },
+          lanes: addLanes,
+          prompt: addPrompt.trim(),
+        },
+      ],
+    }));
+    setAddOpen(false);
+    setAddLabel("");
+    setAddPrompt("");
+    setAddKind("brief");
+    setAddTime("09:00");
+    setAddLanes(["inApp", "signal"]);
+  };
+
   return (
     <div className="breve-page">
       <PageHead
@@ -664,7 +768,25 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
               ? "The previous Breve scheduler is still in charge. Changes are preserved here, but Rotli does not deliver scheduled briefs yet."
               : "Rotli stores these routines, but its delivery scheduler is not active yet."}
         </p>
+        {/* legacy-less activation (2026-07-31): a fresh vault has nothing to
+            "take over" — this scaffolds the managed runtime, seeds it from the
+            shared defaults, and starts the supervisor for THIS vault. */}
+        {snapshot.scheduler === "none" && !snapshot.legacyRoot && (
+          <button
+            type="button"
+            className="ghostbtn primary"
+            disabled={activateState === "saving"}
+            onClick={() => void activate()}
+          >
+            {activateState === "saving" ? "Starting…" : "Start Breve in this vault"}
+          </button>
+        )}
       </div>
+      {activateError && (
+        <p className="file-err" role="alert">
+          ⚠ {activateError}
+        </p>
+      )}
 
       <div className="breve-config-toolbar">
         <label>
@@ -765,80 +887,296 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
             const lanes = [...new Set(["inApp", "signal", "email", ...routine.lanes])];
             const slot = routineBriefSlot(routine);
             return (
-              <div
-                className={routine.enabled ? "breve-routine-row" : "breve-routine-row off"}
-                key={routine.id}
-              >
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={routine.enabled}
-                  aria-label={`${routine.enabled ? "Disable" : "Enable"} ${routine.label}`}
-                  className={routine.enabled ? "breve-routine-toggle on" : "breve-routine-toggle"}
-                  onClick={() => patchRoutine(routine.id, { enabled: !routine.enabled })}
-                >
-                  <span aria-hidden="true" />
-                </button>
-                <div className="breve-routine-main">
-                  <strong>{routine.label}</strong>
-                  <span>{formatNextRoutine(routine, now, config.timezone)}</span>
-                </div>
-                <div className="breve-schedule-control">
-                  {routine.schedule.kind === "dailyAt" ? (
-                    <span className="breve-schedule-reference">
-                      {slot ? `${slot.charAt(0).toUpperCase() + slot.slice(1)} arrival` : "Daily"}
-                    </span>
-                  ) : routine.schedule.kind === "everySecs" ? (
-                    <label>
-                      Every
-                      <input
-                        type="number"
-                        min="1"
-                        aria-label={`${routine.label} interval in minutes`}
-                        value={Math.max(1, Math.round(routine.schedule.secs / 60))}
-                        onChange={(e) =>
-                          patchRoutine(routine.id, {
-                            schedule: {
-                              kind: "everySecs",
-                              secs: Math.max(60, Number(e.target.value) * 60 || 60),
-                            },
-                          })
-                        }
-                      />
-                      min
-                    </label>
-                  ) : (
-                    <span>Listener</span>
-                  )}
-                </div>
-                <fieldset className="breve-lanes">
-                  <legend className="sr-only">{routine.label} delivery lanes</legend>
-                  {lanes.map((lane) => {
-                    const checked = routine.lanes.includes(lane);
-                    return (
-                      <label key={lane}>
+              <div key={routine.id} className="breve-routine-item">
+                <div className={routine.enabled ? "breve-routine-row" : "breve-routine-row off"}>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={routine.enabled}
+                    aria-label={`${routine.enabled ? "Disable" : "Enable"} ${routine.label}`}
+                    className={routine.enabled ? "breve-routine-toggle on" : "breve-routine-toggle"}
+                    onClick={() => patchRoutine(routine.id, { enabled: !routine.enabled })}
+                  >
+                    <span aria-hidden="true" />
+                  </button>
+                  <div className="breve-routine-main">
+                    <strong>
+                      {routine.label}
+                      {isCustomRoutine(routine) && (
+                        <span className="breve-routine-tag">
+                          {routine.kind === "reminder" ? "reminder" : "custom brief"}
+                        </span>
+                      )}
+                    </strong>
+                    <span>{formatNextRoutine(routine, now, config.timezone)}</span>
+                    {promptable(routine) && (
+                      <button
+                        type="button"
+                        className="breve-routine-promptbtn"
+                        aria-expanded={promptOpen === routine.id}
+                        onClick={() => setPromptOpen(promptOpen === routine.id ? null : routine.id)}
+                      >
+                        {routine.prompt ? "Instructions ✎" : "Add instructions…"}
+                      </button>
+                    )}
+                  </div>
+                  <div className="breve-schedule-control">
+                    {routine.schedule.kind === "dailyAt" ? (
+                      slot ? (
+                        <span className="breve-schedule-reference">
+                          {`${slot.charAt(0).toUpperCase() + slot.slice(1)} arrival`}
+                        </span>
+                      ) : (
+                        <label>
+                          At
+                          <input
+                            type="time"
+                            aria-label={`${routine.label} time of day`}
+                            value={routine.schedule.hhmm}
+                            onChange={(e) =>
+                              patchRoutine(routine.id, {
+                                schedule: {
+                                  kind: "dailyAt",
+                                  hhmm: e.target.value,
+                                  leadMinutes:
+                                    routine.schedule.kind === "dailyAt" ? routine.schedule.leadMinutes : 0,
+                                },
+                              })
+                            }
+                          />
+                        </label>
+                      )
+                    ) : routine.schedule.kind === "everySecs" ? (
+                      <label>
+                        Every
                         <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() =>
+                          type="number"
+                          min="1"
+                          aria-label={`${routine.label} interval in minutes`}
+                          value={Math.max(1, Math.round(routine.schedule.secs / 60))}
+                          onChange={(e) =>
                             patchRoutine(routine.id, {
-                              lanes: checked
-                                ? routine.lanes.filter((value) => value !== lane)
-                                : [...routine.lanes, lane],
+                              schedule: {
+                                kind: "everySecs",
+                                secs: Math.max(60, Number(e.target.value) * 60 || 60),
+                              },
                             })
                           }
                         />
-                        {lane === "inApp" ? "Rotli" : lane}
+                        min
                       </label>
-                    );
-                  })}
-                </fieldset>
+                    ) : (
+                      <span>Listener</span>
+                    )}
+                  </div>
+                  <fieldset className="breve-lanes">
+                    <legend className="sr-only">{routine.label} delivery lanes</legend>
+                    {lanes.map((lane) => {
+                      const checked = routine.lanes.includes(lane);
+                      return (
+                        <label key={lane}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              patchRoutine(routine.id, {
+                                lanes: checked
+                                  ? routine.lanes.filter((value) => value !== lane)
+                                  : [...routine.lanes, lane],
+                              })
+                            }
+                          />
+                          {lane === "inApp" ? "Rotli" : lane}
+                        </label>
+                      );
+                    })}
+                  </fieldset>
+                </div>
+                {promptOpen === routine.id && promptable(routine) && (
+                  <div className="breve-routine-prompt">
+                    <label>
+                      <span>
+                        {routine.kind === "reminder"
+                          ? "What should the reminder say?"
+                          : isCustomRoutine(routine)
+                            ? "What should this brief research?"
+                            : "Extra instructions for this brief (optional)"}
+                      </span>
+                      <textarea
+                        rows={3}
+                        maxLength={4000}
+                        value={routine.prompt ?? ""}
+                        onChange={(e) => setRoutinePrompt(routine.id, e.target.value)}
+                      />
+                    </label>
+                    {isCustomRoutine(routine) && (
+                      <button
+                        type="button"
+                        className="ghostbtn quiet breve-routine-remove"
+                        onClick={() => removeRoutine(routine.id)}
+                      >
+                        Remove routine
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
+        {addOpen ? (
+          <div className="breve-add-routine">
+            <div className="breve-add-grid">
+              <label>
+                <span>Name</span>
+                <input
+                  value={addLabel}
+                  placeholder="Crypto watch"
+                  onChange={(e) => setAddLabel(e.target.value)}
+                />
+              </label>
+              <label>
+                <span>Type</span>
+                <select value={addKind} onChange={(e) => setAddKind(e.target.value as "brief" | "reminder")}>
+                  <option value="brief">Research brief</option>
+                  <option value="reminder">Reminder</option>
+                </select>
+              </label>
+              <label>
+                <span>Time</span>
+                <input type="time" value={addTime} onChange={(e) => setAddTime(e.target.value)} />
+              </label>
+            </div>
+            <label className="breve-add-prompt">
+              <span>{addKind === "brief" ? "What should it research?" : "What should it say?"}</span>
+              <textarea
+                rows={3}
+                maxLength={4000}
+                value={addPrompt}
+                placeholder={
+                  addKind === "brief"
+                    ? "Track notable movements in… and flag anything that…"
+                    : "Time to review the weekly goals."
+                }
+                onChange={(e) => setAddPrompt(e.target.value)}
+              />
+            </label>
+            <fieldset className="breve-lanes breve-add-lanes">
+              <legend className="sr-only">Delivery lanes for the new routine</legend>
+              {["inApp", "signal", "email"].map((lane) => (
+                <label key={lane}>
+                  <input
+                    type="checkbox"
+                    checked={addLanes.includes(lane)}
+                    onChange={() =>
+                      setAddLanes((current) =>
+                        current.includes(lane)
+                          ? current.filter((value) => value !== lane)
+                          : [...current, lane],
+                      )
+                    }
+                  />
+                  {lane === "inApp" ? "Rotli" : lane}
+                </label>
+              ))}
+            </fieldset>
+            <div className="breve-add-actions">
+              <button type="button" className="ghostbtn quiet" onClick={() => setAddOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="ghostbtn primary"
+                disabled={!addLabel.trim() || !addPrompt.trim()}
+                onClick={addRoutine}
+              >
+                Add routine
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" className="ghostbtn breve-add-open" onClick={() => setAddOpen(true)}>
+            Add a routine…
+          </button>
+        )}
       </section>
+
+      <BriefSkillEditor />
     </div>
+  );
+}
+
+/** The brief system prompt, surfaced (Seth, 2026-07-31: "the briefs have a
+ * system prompt let me see that prompt and I should be able to modify them").
+ * Edits write a sync-immune override; Reset returns to the shipped default.
+ * Applies to the next scheduled brief — no restart needed. */
+function BriefSkillEditor() {
+  const queryClient = useQueryClient();
+  const skill = useQuery({ queryKey: ["breve", "brief-skill"], queryFn: breveBriefSkill, staleTime: 60_000 });
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [error, setError] = useState("");
+  const text = draft ?? skill.data?.text ?? "";
+  const dirty = draft !== null && draft !== (skill.data?.text ?? "");
+  useBreveDraftGuard(dirty);
+
+  const commit = async (value: string | null) => {
+    setSaveState("saving");
+    setError("");
+    try {
+      const next = await breveWriteBriefSkill(value);
+      queryClient.setQueryData(["breve", "brief-skill"], next);
+      setDraft(null);
+      setSaveState("saved");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setSaveState("error");
+    }
+  };
+
+  return (
+    <section className="breve-section" aria-labelledby="breve-skill-title">
+      <div className="breve-section-head copy">
+        <div>
+          <h3 id="breve-skill-title">Brief instructions</h3>
+          <p>
+            The playbook every brief follows — voice, quality bar, structure, delivery rules.
+            {skill.data?.isCustom ? " You've customized it." : " This is the shipped default."}
+          </p>
+        </div>
+        <button type="button" className="ghostbtn" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {open ? "Hide" : "View & edit"}
+        </button>
+      </div>
+      {open && (
+        <div className="breve-skill-editor">
+          <textarea
+            rows={18}
+            spellCheck={false}
+            value={text}
+            onChange={(e) => setDraft(e.target.value)}
+            aria-label="Brief instructions"
+          />
+          <div className="breve-add-actions">
+            <SaveNote state={saveState} error={error} dirty={dirty} />
+            {skill.data?.isCustom && (
+              <button type="button" className="ghostbtn quiet" onClick={() => void commit(null)}>
+                Reset to default
+              </button>
+            )}
+            <button
+              type="button"
+              className="ghostbtn primary"
+              disabled={!dirty || saveState === "saving"}
+              onClick={() => void commit(text)}
+            >
+              {saveState === "saving" ? "Saving…" : "Save instructions"}
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -1477,10 +1477,34 @@ export type BreveRoutineSchedule =
 export interface BreveRoutine {
   id: string;
   label: string;
-  kind: "brief" | "creators" | "watchers" | "doctor" | "signal";
+  /** Built-ins use the five job kinds; CUSTOM routines (2026-07-31) are a
+   * "brief" (scheduled custom-prompt research) or a "reminder". */
+  kind: "brief" | "creators" | "watchers" | "doctor" | "signal" | "reminder";
   enabled: boolean;
   schedule: BreveRoutineSchedule;
   lanes: string[];
+  /** User instructions: required on custom routines, optional extra
+   * instructions on the built-in briefs. */
+  prompt?: string;
+}
+
+/** The brief system-prompt surface: the materialized default SKILL.md plus a
+ * user override that survives runtime syncs (see breve_brief_skill). */
+export interface BreveBriefSkill {
+  text: string;
+  isCustom: boolean;
+  defaultText: string;
+}
+
+export async function breveBriefSkill(): Promise<BreveBriefSkill> {
+  if (!isTauri()) return { text: "", isCustom: false, defaultText: "" };
+  return invoke<BreveBriefSkill>("breve_brief_skill");
+}
+
+/** `text` = the override to write; `null` resets to the shipped default. */
+export async function breveWriteBriefSkill(text: string | null): Promise<BreveBriefSkill> {
+  if (!isTauri()) return { text: text ?? "", isCustom: text !== null, defaultText: "" };
+  return invoke<BreveBriefSkill>("breve_write_brief_skill", { text });
 }
 
 export type BrevePdfThemePreset = "charcoal" | "warmLight" | "warmDark" | "paper" | "custom";
@@ -1515,7 +1539,9 @@ export interface BreveConfig {
 export interface BreveBrief {
   stem: string;
   title: string;
-  kind: "morning" | "lunch" | "night";
+  /** "morning" | "lunch" | "night" for the slots; a custom routine's briefs
+   * carry its slug (2026-07-31). */
+  kind: string;
   date: string;
   imported: boolean;
   path?: string;

@@ -60,12 +60,13 @@ for (const path of [
   "breve-runtime/scripts/morning-brief.sh",
   "breve-runtime/scripts/lunch-brief.sh",
   "breve-runtime/scripts/night-brief.sh",
+  "breve-runtime/scripts/custom-brief.sh",
 ]) {
   const text = source(path);
   const calls = [...text.matchAll(/bun\s+"\$BREVE\/scripts\/(?:notify|send-signal-text)\.ts"/g)];
   for (const call of calls) {
     const invocation = text.slice(call.index, call.index + 240);
-    if (!invocation.includes("--idempotency-key")) {
+    if (!invocation.includes("--idempotency-key") && !invocation.includes("--receipt")) {
       failures.push(`${path}: owner notification is missing a durable idempotency key`);
     }
   }

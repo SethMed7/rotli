@@ -33,6 +33,12 @@ LOG="$LOG_DIR/$(date +%F).log"
 # the same SKILL.md file directly — same steps, same MARKDOWN output, so any provider yields the brief).
 TASK="drain the inbox, generate today's brief as MARKDOWN only into $BREVE/briefs/ (Breve renders the readable newsletter HTML + PDF from the markdown — do NOT write the HTML or PDF yourself). If a brief for today already exists, refresh it instead of duplicating. Do NOT email or send anything — audio generation and the email send happen in the wrapper script after you finish. HARD RULE: everything except $BREVE and your memex is strictly read-only — never edit, commit, or push any other repo; flag needed changes in the brief instead. Do not take any other write actions."
 PROMPT="Read the Breve instructions at $SKILL and follow them end to end: $TASK"
+# Optional per-routine extra instructions from the user (Rotli Routines UI).
+if [ -n "${ROTLI_ROUTINE_PROMPT:-}" ]; then
+  PROMPT="$PROMPT
+
+Additional instructions from the user (follow them; they refine, never replace, the structure above): $ROTLI_ROUTINE_PROMPT"
+fi
 PROMPT_AGENT="$PROMPT"
 
 if [ "$1" = "--test" ]; then

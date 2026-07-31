@@ -1256,6 +1256,8 @@ pub fn run() {
             breve::breve_snapshot,
             breve::breve_import_legacy,
             breve::breve_write_config,
+            breve::breve_brief_skill,
+            breve::breve_write_brief_skill,
             breve::breve_write_watchlist,
             breve::breve_delivery_settings,
             breve::breve_write_delivery_settings,

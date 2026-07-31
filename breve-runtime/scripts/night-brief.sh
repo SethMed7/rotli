@@ -41,6 +41,13 @@ Source constraint: do not re-summarize what morning/lunch already said — go de
 Output ONLY the markdown file (${TODAY}-night.md) — Breve renders the readable HTML + PDF from it and the wrapper handles audio/email/Signal. Do NOT write HTML, PDF, or send anything.
 HARD RULE: everything except $BREVE and your memex is strictly read-only — never edit, commit, or push. Flag needed changes in the brief instead."
 
+# Optional per-routine extra instructions from the user (Rotli Routines UI).
+if [ -n "${ROTLI_ROUTINE_PROMPT:-}" ]; then
+  PROMPT="$PROMPT
+
+Additional instructions from the user (follow them; they refine, never replace, the structure above): $ROTLI_ROUTINE_PROMPT"
+fi
+
 if [ "$1" = "--test" ]; then
   PROMPT="Confirm the Breve night plumbing works: print the current date and time, confirm you can read $BREVE/briefs/${TODAY}.md (print its first heading or say 'morning brief not found'), and stop. Do not generate a brief."
 fi

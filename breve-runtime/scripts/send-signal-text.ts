@@ -25,8 +25,13 @@ const flag = (name: string) => {
 let text = flag("--message") ?? "";
 const file = flag("--file");
 if (file) {
-  const md = await Bun.file(file).text().catch(() => null);
-  if (md === null) { console.error(`ERR cannot read ${file}`); process.exit(1); }
+  const md = await Bun.file(file)
+    .text()
+    .catch(() => null);
+  if (md === null) {
+    console.error(`ERR cannot read ${file}`);
+    process.exit(1);
+  }
   const flat = md
     .replace(/^#+\s*(.+)$/gm, (_, h) => `▌${h.toUpperCase()}`)
     .replace(/\*\*([^*]+)\*\*/g, "$1")
@@ -36,19 +41,29 @@ if (file) {
     .trim();
   text = [flag("--prefix"), flat].filter(Boolean).join("\n\n");
 }
-if (!text.trim()) { console.error("ERR nothing to send"); process.exit(1); }
+if (!text.trim()) {
+  console.error("ERR nothing to send");
+  process.exit(1);
+}
 if (text.length > 8000) text = text.slice(0, 8000) + "\n… (truncated)";
 
 let delivery: DeliveryClaim | null = null;
+// --receipt claims an EXACT receipt name (e.g. "<stem>.signal") — the shape
+// the scheduler's verifyRun checks for dailyAt routines (custom briefs and
+// reminders, 2026-07-31). --idempotency-key keeps the notifications/ lane.
+const receiptName = flag("--receipt")?.trim();
 const idempotencyKey = flag("--idempotency-key")?.trim();
-if (idempotencyKey) {
-  delivery = await claimDelivery(BREVE, `notifications/${safeLockKey(idempotencyKey)}.signal`);
+if (receiptName || idempotencyKey) {
+  delivery = receiptName
+    ? await claimDelivery(BREVE, receiptName)
+    : await claimDelivery(BREVE, `notifications/${safeLockKey(idempotencyKey!)}.signal`);
+  const claimLabel = receiptName ?? idempotencyKey;
   if (delivery.status === "delivered") {
-    console.log(`OK notification ${idempotencyKey} already recorded`);
+    console.log(`OK delivery ${claimLabel} already recorded`);
     process.exit(0);
   }
   if (delivery.status === "busy") {
-    console.error(`ERR notification ${idempotencyKey} is already in progress`);
+    console.error(`ERR delivery ${claimLabel} is already in progress`);
     process.exit(75);
   }
   process.on("exit", () => {
@@ -57,7 +72,10 @@ if (idempotencyKey) {
 }
 
 for (let i = 0; i < 4; i++) {
-  const p = Bun.spawn(["signal-cli", "-a", bot, "send", owner, "-m", text], { stdout: "ignore", stderr: "pipe" });
+  const p = Bun.spawn(["signal-cli", "-a", bot, "send", owner, "-m", text], {
+    stdout: "ignore",
+    stderr: "pipe",
+  });
   const err = await new Response(p.stderr).text();
   if ((await p.exited) === 0) {
     try {

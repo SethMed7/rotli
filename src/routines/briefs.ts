@@ -30,8 +30,14 @@ export const EMPTY_BREVE_SNAPSHOT: BreveSnapshot = {
 
 /** A stable display order independent of filesystem enumeration. */
 export function sortBriefs(briefs: readonly BreveBrief[]): BreveBrief[] {
-  const kindOrder = { morning: 0, lunch: 1, night: 2 } as const;
-  return [...briefs].sort((a, b) => b.date.localeCompare(a.date) || kindOrder[a.kind] - kindOrder[b.kind]);
+  // custom-routine briefs (any other kind) sort after the three slots, by name
+  const kindOrder: Record<string, number> = { morning: 0, lunch: 1, night: 2 };
+  return [...briefs].sort(
+    (a, b) =>
+      b.date.localeCompare(a.date) ||
+      (kindOrder[a.kind] ?? 3) - (kindOrder[b.kind] ?? 3) ||
+      a.kind.localeCompare(b.kind),
+  );
 }
 
 export function nextRoutineEpoch(routine: BreveRoutine, nowMs: number, timezone: string): number | null {

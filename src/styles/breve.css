@@ -875,6 +875,121 @@
 .breve-routine-row.off .breve-lanes {
   opacity: 0.58;
 }
+/* — custom routines (2026-07-31): the item wraps a row + its optional
+   instructions panel; the divider moves to the item so the panel sits
+   inside the row's band — */
+.breve-routine-item {
+  border-bottom: 1px solid var(--border);
+}
+.breve-routine-item .breve-routine-row {
+  border-bottom: none;
+}
+.breve-routine-tag {
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 1px 7px;
+  vertical-align: 1px;
+}
+.breve-routine-promptbtn {
+  border: none;
+  background: none;
+  padding: 0;
+  margin-top: 2px;
+  width: fit-content;
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.breve-routine-promptbtn:hover {
+  color: var(--text);
+}
+.breve-routine-prompt {
+  padding: 0 0 14px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 640px;
+}
+.breve-routine-prompt label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.breve-routine-prompt textarea,
+.breve-add-prompt textarea,
+.breve-skill-editor textarea {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 8px 10px;
+  resize: vertical;
+}
+.breve-routine-remove {
+  align-self: flex-start;
+}
+.breve-add-open {
+  margin-top: 12px;
+}
+.breve-add-routine {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 640px;
+}
+.breve-add-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.8fr;
+  gap: 12px;
+}
+.breve-add-grid label,
+.breve-add-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.breve-add-grid input,
+.breve-add-grid select {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 6px 9px;
+}
+.breve-add-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.breve-skill-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.breve-skill-editor textarea {
+  width: 100%;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
 .breve-routine-toggle {
   position: relative;
   width: 29px;

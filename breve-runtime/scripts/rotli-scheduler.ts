@@ -8,9 +8,9 @@
  * alive with bounded restart backoff. Durable state prevents duplicate sends
  * across Rotli restarts.
  */
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { BREVE, BRIEFS } from "./paths";
 import { effectiveTz, minutesNowIn, todayIn } from "./timectx";
 import { dailyDue, dailySlot, intervalDue, parseHm, schedulerParentGone } from "./scheduler-core";
@@ -26,6 +26,9 @@ type Routine = {
   enabled: boolean;
   schedule: DailySchedule | IntervalSchedule | AlwaysSchedule;
   lanes: string[];
+  /** User instructions (2026-07-31): required on custom routines, optional
+   * extra instructions on the built-in briefs. Passed to jobs via env. */
+  prompt?: string;
 };
 type Config = {
   timezone: string;
@@ -35,7 +38,14 @@ type Config = {
   travel?: { start: string; end: string; tz: string } | null;
   routines: Routine[];
 };
-type JobState = { lastStarted?: string; lastSlot?: string; pendingSlot?: string; lastFinished?: string; lastOk?: boolean; lastError?: string };
+type JobState = {
+  lastStarted?: string;
+  lastSlot?: string;
+  pendingSlot?: string;
+  lastFinished?: string;
+  lastOk?: boolean;
+  lastError?: string;
+};
 type State = { version: 1; jobs: Record<string, JobState> };
 
 const CONFIG = process.env.ROTLI_BREVE_CONFIG ?? join(BREVE, "settings.json");
@@ -62,11 +72,15 @@ mkdirSync(BRIEFS, { recursive: true });
 function log(message: string) {
   const line = `${new Date().toISOString()} ${message}`;
   console.log(line);
-  try { appendFileSync(LOG, `${line}\n`); } catch {}
+  try {
+    appendFileSync(LOG, `${line}\n`);
+  } catch {}
 }
 
 async function readJson<T>(path: string): Promise<T | null> {
-  return Bun.file(path).json().catch(() => null) as Promise<T | null>;
+  return Bun.file(path)
+    .json()
+    .catch(() => null) as Promise<T | null>;
 }
 
 async function loadConfig(): Promise<Config | null> {
@@ -94,13 +108,20 @@ function stemFor(routine: Routine, slot: string): string {
   return routine.id === "morning" ? slot : `${slot}-${routine.id}`;
 }
 
-async function verifyRun(routine: Routine, slot: string | undefined, code: number): Promise<string | undefined> {
+async function verifyRun(
+  routine: Routine,
+  slot: string | undefined,
+  code: number,
+): Promise<string | undefined> {
   if (code !== 0) return `exit ${code}`;
   if (!slot || routine.schedule.kind !== "dailyAt") return undefined;
   const stem = stemFor(routine, slot);
   if (!(await Bun.file(join(BRIEFS, `${stem}.md`)).exists())) return `missing generated brief ${stem}.md`;
   for (const lane of ["signal", "email"] as const) {
-    if (routine.lanes.includes(lane) && !(await Bun.file(join(BREVE, "delivery-receipts", `${stem}.${lane}`)).exists())) {
+    if (
+      routine.lanes.includes(lane) &&
+      !(await Bun.file(join(BREVE, "delivery-receipts", `${stem}.${lane}`)).exists())
+    ) {
       return `missing ${lane} delivery receipt for ${stem}`;
     }
   }
@@ -109,15 +130,35 @@ async function verifyRun(routine: Routine, slot: string | undefined, code: numbe
 
 function commandFor(routine: Routine): string[] | null {
   switch (routine.id) {
-    case "morning": return ["/bin/bash", join(BREVE, "scripts", "morning-brief.sh")];
-    case "lunch": return ["/bin/bash", join(BREVE, "scripts", "lunch-brief.sh")];
-    case "night": return ["/bin/bash", join(BREVE, "scripts", "night-brief.sh")];
-    case "creators": return ["bun", join(BREVE, "scripts", "creator-alerts.ts")];
-    case "watchers": return ["bun", join(BREVE, "scripts", "watcher-check.ts")];
-    case "doctor": return ["bun", join(BREVE, "scripts", "breve-doctor.ts")];
-    case "signal": return ["bun", join(BREVE, "scripts", "signal-daemon.ts")];
-    default: return null;
+    case "morning":
+      return ["/bin/bash", join(BREVE, "scripts", "morning-brief.sh")];
+    case "lunch":
+      return ["/bin/bash", join(BREVE, "scripts", "lunch-brief.sh")];
+    case "night":
+      return ["/bin/bash", join(BREVE, "scripts", "night-brief.sh")];
+    case "creators":
+      return ["bun", join(BREVE, "scripts", "creator-alerts.ts")];
+    case "watchers":
+      return ["bun", join(BREVE, "scripts", "watcher-check.ts")];
+    case "doctor":
+      return ["bun", join(BREVE, "scripts", "breve-doctor.ts")];
+    case "signal":
+      return ["bun", join(BREVE, "scripts", "signal-daemon.ts")];
+    default:
+      // CUSTOM routines (2026-07-31): user-created, dispatched on KIND — the
+      // routine's specifics (id/label/prompt/stem) ride the job env below.
+      if (routine.kind === "brief") return ["/bin/bash", join(BREVE, "scripts", "custom-brief.sh")];
+      if (routine.kind === "reminder") return ["bun", join(BREVE, "scripts", "reminder.ts")];
+      return null;
   }
+}
+
+/** The user's brief-instructions override (rotli writes it beside the config;
+ * it survives runtime syncs). Checked per JOB spawn so an edit applies within
+ * one poll — no supervisor restart. */
+function skillOverride(): string | undefined {
+  const custom = join(dirname(CONFIG), "skill.custom.md");
+  return existsSync(custom) ? custom : undefined;
 }
 
 async function runOne(routine: Routine, state: State, slot?: string) {
@@ -128,10 +169,18 @@ async function runOne(routine: Routine, state: State, slot?: string) {
     return;
   }
   const command = commandFor(routine);
-  if (!command) { jobLock.release(); return; }
+  if (!command) {
+    jobLock.release();
+    return;
+  }
   const started = new Date().toISOString();
   try {
-    state.jobs[routine.id] = { ...state.jobs[routine.id], lastStarted: started, ...(slot ? { pendingSlot: slot } : {}), lastError: undefined };
+    state.jobs[routine.id] = {
+      ...state.jobs[routine.id],
+      lastStarted: started,
+      ...(slot ? { pendingSlot: slot } : {}),
+      lastError: undefined,
+    };
     await saveState(state);
     log(`[${routine.id}] start: ${command.join(" ")}`);
     const proc = Bun.spawn(command, {
@@ -142,6 +191,11 @@ async function runOne(routine: Routine, state: State, slot?: string) {
         ROTLI_BREVE_CONFIG: CONFIG,
         ROTLI_BREVE_LANES: routine.lanes.join(","),
         ROTLI_SCHEDULED: "1",
+        ROTLI_ROUTINE_ID: routine.id,
+        ROTLI_ROUTINE_LABEL: routine.label,
+        ROTLI_ROUTINE_PROMPT: routine.prompt ?? "",
+        ROTLI_ROUTINE_STEM: slot ? stemFor(routine, slot) : "",
+        ...(skillOverride() ? { ROTLI_BREVE_SKILL: skillOverride() } : {}),
       },
       stdout: "pipe",
       stderr: "pipe",
@@ -176,7 +230,9 @@ async function runOne(routine: Routine, state: State, slot?: string) {
 function stopChild(id: string) {
   const proc = running.get(id);
   if (!proc) return;
-  try { proc.kill("SIGTERM"); } catch {}
+  try {
+    proc.kill("SIGTERM");
+  } catch {}
   running.delete(id);
 }
 
@@ -225,12 +281,18 @@ async function ensureSignal(routine: Routine | undefined, state: State) {
 
 async function tick(state: State) {
   const config = await loadConfig();
-  if (!config) { log(`config unavailable: ${CONFIG}`); return; }
+  if (!config) {
+    log(`config unavailable: ${CONFIG}`);
+    return;
+  }
   const tz = effectiveTz(config as Parameters<typeof effectiveTz>[0]);
   const today = todayIn(tz);
   const nowMinutes = minutesNowIn(tz);
   const now = Date.now();
-  await ensureSignal(config.routines.find((r) => r.id === "signal"), state);
+  await ensureSignal(
+    config.routines.find((r) => r.id === "signal"),
+    state,
+  );
 
   for (const routine of config.routines) {
     if (!routine.enabled || routine.id === "signal" || running.has(routine.id)) continue;
@@ -242,7 +304,7 @@ async function tick(state: State) {
       if (delivery == null) continue;
       const fire = (delivery - routine.schedule.leadMinutes + 1440) % 1440;
       const slot = dailySlot(today, nowMinutes, delivery, fire);
-      if (job.lastSlot !== slot && await verifyRun(routine, slot, 0) === undefined) {
+      if (job.lastSlot !== slot && (await verifyRun(routine, slot, 0)) === undefined) {
         state.jobs[routine.id] = {
           ...job,
           lastSlot: slot,
@@ -283,11 +345,15 @@ function stop(terminateGroup = false) {
   // standby can then recover it as stale without overlapping the old group.
   if (!terminateGroup) schedulerLock?.release();
   schedulerLock = null;
-  log(terminateGroup ? "Rotli scheduler owner disappeared; stopping process group" : "Rotli scheduler stopped");
+  log(
+    terminateGroup ? "Rotli scheduler owner disappeared; stopping process group" : "Rotli scheduler stopped",
+  );
   if (terminateGroup) {
     // The scheduler is the group leader. This also reaches grandchildren of
     // shell jobs that a direct Child.kill cannot reliably reap.
-    try { process.kill(-process.pid, "SIGTERM"); } catch {}
+    try {
+      process.kill(-process.pid, "SIGTERM");
+    } catch {}
   }
   setTimeout(() => process.exit(0), 250);
 }
@@ -328,4 +394,8 @@ async function main() {
   tickTimer = setInterval(() => void tick(state).catch((e) => log(`tick error: ${e}`)), POLL_MS);
 }
 
-if (import.meta.main) void main().catch((e) => { log(`fatal: ${e}`); process.exit(1); });
+if (import.meta.main)
+  void main().catch((e) => {
+    log(`fatal: ${e}`);
+    process.exit(1);
+  });
