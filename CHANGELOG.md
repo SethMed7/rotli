@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.60.0] - 2026-07-31
+
+### Changed
+
+- **"Run now" is a real audit.** Beyond new and changed notes, it now checks
+  every note for missing metadata — a note "processed once" whose summary,
+  tags, or links never landed gets caught and filled in. Nothing hides.
+- **The log shows its work.** Click any history row for a real diff — the
+  old value struck out, the new one beneath it, moves shown as from → to —
+  with the note itself one link away.
+- The Librarian's settings control is a labeled button, not a bare gear.
+
 ## [0.59.0] - 2026-07-31
 
 ### Changed
