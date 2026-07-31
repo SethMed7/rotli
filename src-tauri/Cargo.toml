@@ -46,3 +46,13 @@ security-framework = "3"                                        # Keychain-backe
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSResponder"] }
 objc2-foundation = { version = "0.3", features = ["NSData"] }
+
+# Size diet (2026-07-31): the release binary embeds the whole frontend dist, and
+# without a profile the code portion shipped 16 codegen units, no LTO, and 51k
+# symbols (4.8 MB __LINKEDIT). panic = "abort" is deliberately ABSENT:
+# document_conversion.rs relies on catch_unwind to turn pdf-extract panics on
+# malformed PDFs into a user-facing error instead of a process abort.
+[profile.release]
+codegen-units = 1
+lto = "thin"
+strip = "symbols"

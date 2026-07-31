@@ -73,7 +73,11 @@ fi
 APP="src-tauri/target/release/bundle/macos/rotli.app"
 TARGZ="$APP.tar.gz"
 SIG="$APP.tar.gz.sig"
-DIST="dist"
+# NOT "dist": dist/ is Tauri's frontendDist and gets EMBEDDED in the Rust
+# binary. Staging the ~55 MB dmg/tar.gz feed there meant any `cargo build`
+# without a fresh `vite build` (which clears dist/) would bake the previous
+# release's artifacts into the app itself. Size-diet fix, 2026-07-31.
+DIST="dist-release"
 DMG="$DIST/rotli_${VER}_aarch64.dmg"
 DL_URL="https://github.com/${RELEASES_REPO}/releases/download/v${VER}/rotli.app.tar.gz"
 

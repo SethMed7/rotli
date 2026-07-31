@@ -3,8 +3,11 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import {
   bundleBudgetViolations,
+  LAZY_LOCALE_STUB_ID,
+  LAZY_LOCALE_STUB_SOURCE,
   MAX_LAZY_CHUNK_KIB,
   shouldIgnoreBuildWarning,
+  shouldStubLazyLocale,
 } from "./scripts/build-policy.mjs";
 
 // @ts-expect-error process is a nodejs global
@@ -14,7 +17,29 @@ const appVersion = JSON.parse(readFileSync("package.json", "utf8")).version as s
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // ~6 MB of vendor per-locale lazy chunks (Univer hyphenation dictionaries,
+    // Excalidraw UI translations) collapse into one empty stub — see
+    // shouldStubLazyLocale in scripts/build-policy.mjs (perf audit finding 17).
+    {
+      name: "rotli-prune-lazy-locales",
+      // Vendor lazy-loader tables reach Rollup through resolveDynamicImport
+      // (a core plugin resolves them there, so a plain resolveId never fires
+      // for these specifiers); the static-import hook stays as a backstop.
+      resolveDynamicImport(source: unknown, importer: string) {
+        return typeof source === "string" && shouldStubLazyLocale(source, importer)
+          ? LAZY_LOCALE_STUB_ID
+          : null;
+      },
+      resolveId(source: string, importer: string | undefined) {
+        return shouldStubLazyLocale(source, importer) ? LAZY_LOCALE_STUB_ID : null;
+      },
+      load(id: string) {
+        return id === LAZY_LOCALE_STUB_ID ? LAZY_LOCALE_STUB_SOURCE : null;
+      },
+    },
+  ],
 
   // Excalidraw reads `process.env.IS_PREACT` at runtime; Vite strips `process`,
   // so define the symbol (we use React, not Preact) to avoid a runtime
