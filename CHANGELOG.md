@@ -8,6 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.55.0] - 2026-07-31
+
+### Added
+
+- **Watch the Librarian work — and stop it.** "Run now" opens a live band that
+  narrates each note the organizer is looking at ("Looking at "X" — 3 of 12",
+  titles only, never content), with a Stop button that finishes the current
+  note and hands control back. A last-run summary line replaces the mystery.
+- **Meet the Librarian.** A first-visit explainer says exactly what it may
+  touch (a note's location and its metadata — never its words), what it always
+  skips (locked notes, secure notes, your Main), how each trust level differs,
+  and that secrets are found by on-device patterns, not AI. Re-open it anytime
+  from the ? in the Librarian's header.
+- **Empty Trash.** The Trash browser gains an armed two-step Empty Trash;
+  items land in the macOS Trash, so "forever" stays honest. The sidebar Trash
+  row wears an alert badge when it piles up.
+- **Journal hygiene.** Clear logs older than 30 days, or all history (armed
+  two-step — cleared entries take their Undo with them). Pending suggestions
+  always survive a clear.
+
+### Changed
+
+- **The Librarian reads like a page, not a wall.** The mascot emoji is gone;
+  suggestions group per note ("«X» — 4 suggestions: links · tags · summary ·
+  area") with Approve all / Dismiss all; history folds into days with the
+  long tail behind View all.
+- **You always know what's waiting.** The sidebar's Librarian button wears a
+  red badge when a sensitive-data decision needs you, or a tinted count of
+  suggestions awaiting approval — Suggest mode is never a silent queue.
+- **Tidy vs Organize, finally clear.** The captions now state their one real
+  difference: Organize also keeps each area's overview page fresh by itself.
+
+### Fixed
+
+- Journal entries and `filed_by` stamps now name the model that actually did
+  the organizing — a Claude-organized run used to be recorded as the local
+  model.
+
 ## [0.54.0] - 2026-07-30
 
 ### Added
