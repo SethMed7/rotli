@@ -31,13 +31,15 @@ function ensureSprite(): void {
   const svg = host.querySelector("svg");
   if (!svg) return;
 
+  // Hex compare must be case-insensitive: the sprite freezes uppercase
+  // attributes while the tokens are authored lowercase.
   const tokens = getComputedStyle(document.documentElement);
-  const clay = tokens.getPropertyValue("--rotli-clay").trim();
-  const olive = tokens.getPropertyValue("--rotli-olive").trim();
+  const clay = tokens.getPropertyValue("--rotli-clay").trim().toLowerCase();
+  const olive = tokens.getPropertyValue("--rotli-olive").trim().toLowerCase();
 
   for (const el of svg.querySelectorAll<SVGElement>("[stroke], [fill]")) {
     for (const attr of ["stroke", "fill"] as const) {
-      const value = el.getAttribute(attr);
+      const value = el.getAttribute(attr)?.toLowerCase();
       if (value === clay) el.style.setProperty(attr, "var(--icon-clay)");
       else if (value === olive) el.style.setProperty(attr, "var(--icon-olive)");
     }

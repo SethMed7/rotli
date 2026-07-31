@@ -32,4 +32,28 @@ describe("collapseAllDests", () => {
     expect(d[SEC_CHAT]).toBe(false); // stays folded — collapse-all must not open things
     expect(d[SEC_MAIN]).toBe(true); // an open section stays exactly as the user left it
   });
+
+  // Two-stage collapse (Seth, 2026-07-31): folders first, sections second.
+  test("stage 1 folds trees only; stage 2 folds the sections", () => {
+    const ids = ["main:Review", "chatfolder:abc"];
+    useUiStore.getState().collapseAllDests(ids);
+    let d = useUiStore.getState().expandedDests;
+    expect(d["main:Review"]).toBe(false);
+    expect(d["chatfolder:abc"]).toBe(false); // chat folders fold too (missed pre-07-31)
+    expect(d[SEC_MAIN]).toBe(true); // sections untouched on stage 1
+
+    useUiStore.getState().collapseAllDests(ids);
+    d = useUiStore.getState().expandedDests;
+    expect(d["sec:notes"]).toBe(false); // stage 2: the sections themselves fold
+    expect(d[SEC_CHAT]).toBe(false);
+  });
+
+  test("an explicitly-open dest row keeps the press on stage 1", () => {
+    // Inbox:true is the only thing open — the press must fold it, not sections
+    useUiStore.setState({ expandedDests: { "sec:notes": true, Inbox: true, "main:Review": false } });
+    useUiStore.getState().collapseAllDests(["main:Review"]);
+    const d = useUiStore.getState().expandedDests;
+    expect(d.Inbox).toBeUndefined(); // folded by omission
+    expect(d["sec:notes"]).toBe(true); // section survives stage 1
+  });
 });

@@ -864,12 +864,15 @@
 .act-waiting {
   color: var(--accent-text);
 }
-/* the standing status strip — rung · model · last pass · ⚙ (2026-07-31) */
+/* the standing status strip — rung · model · last pass · ⚙ (2026-07-31).
+   Positive top margin: the labeled settings pill is the strip's tallest item,
+   so the strip's top edge is the pill's border — it needs clearance from the
+   header's border-bottom, not a negative pull over it. */
 .act-strip {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin: -2px 22px 10px;
+  margin: 10px 22px 10px;
   font-size: 11.5px;
   color: var(--text-muted);
 }

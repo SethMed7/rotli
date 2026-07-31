@@ -16,6 +16,7 @@ import { approveProposal, dismissProposal, undoAction } from "../services/brainJ
 import { daysSinceMidnight, relativeLabel } from "../lib/dateLabels";
 import {
   corpusJournalPrune,
+  corpusResolveRef,
   corpusSetSecure,
   onOrganizerProgress,
   organizerDismissSecure,
@@ -216,6 +217,14 @@ export function ActivitySurface() {
   // converges on its next pass (the acted-on file moved or was dismissed)
   const [acted, setActed] = useState<ReadonlySet<string>>(new Set());
   const openNote = usePanesStore((s) => s.openNote);
+  // Journal rows can be path-addressed (an _index.md has no frontmatter ULID),
+  // but openNote is an id-only door — resolve rel→wire-id first, or the tab
+  // opens on an unresolvable id and renders "Untitled" (Seth, 2026-07-31).
+  const openRef = (ref: string) => {
+    void corpusResolveRef(ref)
+      .then((id) => openNote(id))
+      .catch(() => openNote(ref));
+  };
   const review = deriveSecureReview(
     hints.filter((h) => !acted.has(h.rel)),
     repair,
@@ -547,7 +556,7 @@ export function ActivitySurface() {
                   type="button"
                   className="act-desc"
                   title="Open the note"
-                  onClick={() => openNote(h.rel)}
+                  onClick={() => openRef(h.rel)}
                 >
                   “{h.title}”
                 </button>
@@ -710,7 +719,7 @@ export function ActivitySurface() {
                             type="button"
                             className="act-desc"
                             title="Open the note"
-                            onClick={() => openNote(g.rows[0]?.noteUlid ?? g.rows[0]?.noteId ?? g.key)}
+                            onClick={() => openRef(g.rows[0]?.noteUlid ?? g.rows[0]?.noteId ?? g.key)}
                           >
                             <strong>“{g.title || "Area overview"}”</strong> — {g.rows.length} suggestions:{" "}
                             {g.rows.map(fieldWord).join(" · ")}
@@ -746,7 +755,7 @@ export function ActivitySurface() {
                                   className="act-desc"
                                   title="Open the note"
                                   // the ULID survives filings/renames; the rel is a fallback
-                                  onClick={() => openNote(a.noteUlid ?? a.noteId)}
+                                  onClick={() => openRef(a.noteUlid ?? a.noteId)}
                                 >
                                   {describeAction(a, true)}
                                 </button>
@@ -862,7 +871,7 @@ export function ActivitySurface() {
                           <button
                             type="button"
                             className="act-linkbtn act-detail-open"
-                            onClick={() => openNote(a.noteUlid ?? a.noteId)}
+                            onClick={() => openRef(a.noteUlid ?? a.noteId)}
                           >
                             Open the note
                           </button>

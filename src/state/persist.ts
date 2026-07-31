@@ -738,9 +738,11 @@ async function gcPersistedMaps(): Promise<void> {
     const ui = useUiStore.getState();
     const kept = pruneMap(
       ui.expandedDests,
-      // root markers ("vault:", "<rootid>:") and the synthetic Storage
-      // grouping rows aren't in listFolders — keep them by shape
-      (k) => valid.has(k) || k.endsWith(":") || k.startsWith("Storage/"),
+      // root markers ("vault:", "<rootid>:"), the synthetic Storage grouping
+      // rows, and chat VIRTUAL folders aren't in listFolders — keep them by
+      // shape (chatfolder:* pruning silently re-expanded folded chat folders
+      // on every relaunch — review, 2026-07-31)
+      (k) => valid.has(k) || k.endsWith(":") || k.startsWith("Storage/") || k.startsWith("chatfolder:"),
     );
     if (kept !== ui.expandedDests) useUiStore.setState({ expandedDests: kept });
   } catch {

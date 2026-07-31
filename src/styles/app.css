@@ -271,13 +271,20 @@
   right: 0;
   transform: none;
 }
-/* the sidebar header hugs the WINDOW'S left edge — its tips extend rightward
-   over the content area, so a narrow sidebar can never clip them offscreen
-   (Seth, 2026-07-28: "hovers close to edge break out of screen") */
+/* the sidebar header hugs the WINDOW'S left edge — leading tips anchor left
+   (Seth, 2026-07-28: "hovers close to edge break out of screen"). But .sidebar
+   is overflow:hidden, so a left-anchored tip on the TRAILING buttons gets
+   sliced at the sidebar's right edge (Seth, 2026-07-31: "Colla…" clipped) —
+   those carry .tb-trail (notes mode only; Breve left-packs the row, see
+   sidebar.tsx) and anchor right so the tip extends INTO the sidebar box. */
 .nl-top .icobtn .tip {
   left: 0;
   right: auto;
   transform: none;
+}
+.nl-top .icobtn.tb-trail .tip {
+  left: auto;
+  right: 0;
 }
 /* — module switcher popover (r5 approved; r7 final) — */
 .modpop {

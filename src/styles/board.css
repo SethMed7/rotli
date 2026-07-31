@@ -421,25 +421,63 @@ span.fdr-col {
   white-space: nowrap;
 }
 
-/* — the Tasks surface (decision 2026-07-25): open checkboxes grouped by note.
-   Quiet list grammar; the checkbox is the one interactive accent. — */
+/* — the Tasks surface (decision 2026-07-25; regroomed 2026-07-31): open
+   checkboxes grouped by note. Quiet list grammar; the checkbox is the one
+   interactive accent, the group header is visibly a NOTE (glyph + count +
+   open affordance). Reading measure capped — no full-width lines. — */
+.task-intro {
+  margin: 2px 22px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 640px;
+}
 .tasks .task-group {
-  padding: 6px 22px 10px;
+  padding: 8px 22px 12px;
+  max-width: 720px;
 }
 .task-note {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   border: none;
   background: none;
   padding: 2px 0;
   color: var(--text-muted);
   font: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
+  max-width: 100%;
 }
 .task-note:hover {
   color: var(--text);
+}
+.task-note-icon {
+  flex: 0 0 auto;
+}
+.task-note-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-note-count {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 0 6px;
+  color: var(--text-muted);
+}
+.task-note-go {
+  flex: 0 0 auto;
+  opacity: 0;
+  transition: opacity 120ms var(--motion-ease);
+}
+.task-note:hover .task-note-go {
+  opacity: 1;
 }
 .task-list {
   margin: 2px 0 0;
@@ -450,9 +488,14 @@ span.fdr-col {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 4px 0;
+  padding: 4px 6px;
+  margin: 0 -6px;
+  border-radius: var(--r-control);
   color: var(--text);
   font-size: 13px;
+}
+.task-row:hover {
+  background: var(--hov);
 }
 .task-row.done .task-text {
   color: var(--text-muted);
@@ -476,8 +519,11 @@ span.fdr-col {
   background: var(--hov);
 }
 .task-text {
+  /* one line per task; the full (joined) text lives in the title tooltip */
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .board-head {

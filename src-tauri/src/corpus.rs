@@ -1672,6 +1672,51 @@ fn open_task_text(trimmed: &str) -> Option<&str> {
     (!rest.is_empty()).then_some(rest)
 }
 
+/// A hard-wrapped checkbox reads as ONE task: an indented, non-list, non-fence
+/// line directly under a `- [ ]` row is its continuation. Without this, the
+/// Tasks surface cut wrapped items at the first newline (Seth, 2026-07-31:
+/// "…set as `X` on the").
+fn task_continuation(raw: &str) -> Option<&str> {
+    let trimmed = raw.trim_start();
+    if trimmed.is_empty() {
+        return None;
+    }
+    // CHAR count, not bytes — a single NBSP is 2 bytes and must not read as
+    // a two-space indent
+    let indent_chars = raw[..raw.len() - trimmed.len()].chars().count();
+    if indent_chars < 2 && !raw.starts_with('\t') {
+        return None;
+    }
+    // a nested list item, checkbox, fence, heading, blockquote, or table row
+    // starts its own block — never a wrapped continuation of the task text
+    if trimmed.starts_with("- ")
+        || trimmed.starts_with("* ")
+        || trimmed.starts_with("+ ")
+        || trimmed.starts_with("```")
+        || trimmed.starts_with("~~~")
+        || trimmed.starts_with('#')
+        || trimmed.starts_with('>')
+        || trimmed.starts_with('|')
+    {
+        return None;
+    }
+    Some(trimmed)
+}
+
+/// The FULL text of the task whose checkbox sits at `start`: the `- [ ]` line
+/// plus any wrapped continuations, space-joined. `tasks()` reports it and
+/// `toggle_task` re-validates against it, so the projection and the toggle
+/// stay in lockstep by construction.
+fn joined_task_text(lines: &[&str], start: usize) -> Option<String> {
+    let mut text = open_task_text(lines.get(start)?.trim_start())?.to_string();
+    for raw in lines.iter().skip(start + 1) {
+        let Some(cont) = task_continuation(raw) else { break };
+        text.push(' ');
+        text.push_str(cont);
+    }
+    Some(text)
+}
+
 /// rank asc (title hits first) → recency desc → id asc (deterministic wire).
 fn sort_hits(hits: &mut [SearchHit]) {
     hits.sort_by(|a, b| {
@@ -3470,9 +3515,9 @@ impl CorpusStore {
                 continue;
             }
             let Some(text) = cache.texts.get(&meta.id) else { continue };
-            let body = &text.body;
+            let lines: Vec<&str> = text.body.lines().collect();
             let mut fenced = false;
-            for (line, raw_line) in body.lines().enumerate() {
+            for (line, raw_line) in lines.iter().enumerate() {
                 let trimmed = raw_line.trim_start();
                 if trimmed.starts_with("```") {
                     fenced = !fenced;
@@ -3481,12 +3526,13 @@ impl CorpusStore {
                 if fenced {
                     continue;
                 }
-                if let Some(text) = open_task_text(trimmed) {
+                if open_task_text(trimmed).is_some() {
+                    let text = joined_task_text(&lines, line).expect("checkbox matched above");
                     out.push(TaskItem {
                         note_id: meta.id.clone(),
                         note_title: meta.title.clone(),
                         line,
-                        text: text.to_string(),
+                        text,
                     });
                 }
             }
@@ -3511,7 +3557,8 @@ impl CorpusStore {
         let stale = || "This task changed since the list was made — it refreshes on its own.".to_string();
         let lines: Vec<&str> = body.lines().collect();
         let Some(current) = lines.get(line) else { return Err(stale()) };
-        if open_task_text(current.trim_start()) != Some(expect) {
+        // validate against the JOINED text — the same shape tasks() reported
+        if joined_task_text(&lines, line).as_deref() != Some(expect) {
             return Err(stale());
         }
         let mut new_lines: Vec<String> = lines.iter().map(|s| (*s).to_string()).collect();
@@ -3563,6 +3610,28 @@ impl CorpusStore {
             return Ok(id_or_rel.to_string());
         }
         self.path_of(id_or_rel)
+    }
+
+    /// The reverse bridge for OPEN lanes: rel → canonical WIRE id. The
+    /// Librarian journal stores path-addressed rows (an `_index.md` carries no
+    /// frontmatter ULID — organizer.rs writes `note_ulid: None`), but tabs and
+    /// title lookups key on wire ids: a `.md` note's ULID, a board/file's rel.
+    /// Accepts either shape so "Open the note" can name any journal row.
+    pub fn wire_id_of(&mut self, id_or_rel: &str) -> Result<String, String> {
+        let rel = self.resolve_note_rel(id_or_rel)?;
+        if !rel.ends_with(".md") {
+            return Ok(rel); // boards/files already travel as their rel
+        }
+        if let Some((id, _)) = self.index.iter().find(|(_, r)| **r == rel) {
+            return Ok(id.clone());
+        }
+        // not indexed yet (fresh walk state): one list() rebuilds, then retry
+        self.list()?;
+        self.index
+            .iter()
+            .find(|(_, r)| **r == rel)
+            .map(|(id, _)| id.clone())
+            .ok_or_else(|| format!("note not found: {id_or_rel}"))
     }
 
     pub fn read(&mut self, id: &str) -> Result<NoteDoc, String> {
@@ -4495,7 +4564,11 @@ impl CorpusStore {
     /// test path — tests must not touch the user's real Trash). The command
     /// wrapper additionally requires the note to already live under Trash/.
     pub fn purge(&mut self, id: &str) -> Result<(), String> {
-        let rel = self.path_of(id)?;
+        // resolve_note_rel, not path_of: Trash holds path-id'd boards/files
+        // (kind != note never enters the ULID index), and Empty Trash must
+        // delete those too (2026-07-31 — "Emptied 0 of 35").
+        let rel = self.resolve_note_rel(id)?;
+        let stale_ulid = self.index.iter().find(|(_, r)| **r == rel).map(|(k, _)| k.clone());
         self.writable(&rel)?;
         let abs = self.abs(&rel);
         let name = Path::new(&rel)
@@ -4503,7 +4576,12 @@ impl CorpusStore {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| format!("{id}.md"));
         self.trash_existing_path(&abs, &name, &rel)?;
+        // drop the index entry whichever shape the caller held — a purge-by-rel
+        // would otherwise leave a stale ULID→rel entry until the next list()
         self.index.remove(id);
+        if let Some(ulid) = stale_ulid {
+            self.index.remove(&ulid);
+        }
         self.persist_index();
         Ok(())
     }
@@ -5978,7 +6056,9 @@ pub fn corpus_rename_board(
 pub fn corpus_purge(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| {
-        let note_rel = s.path_of(&rel)?;
+        // resolve_note_rel: notes arrive as ULIDs, boards/files as rel paths —
+        // both must purge (the trash-IN lane is two-laned; so is this gate).
+        let note_rel = s.resolve_note_rel(&rel)?;
         // both trash spellings: the app root uses `Trash/`, the memex layout's
         // sink is lowercase `trash/` (matches is_hidden_root — review F6)
         let in_trash = ["Trash", "trash"]
@@ -5989,6 +6069,21 @@ pub fn corpus_purge(state: tauri::State<'_, CorpusState>, id: String) -> Result<
         }
         s.purge(&rel)
     })
+}
+
+/// Rel→wire-id resolve (Librarian "Open the note": journal rows may be
+/// path-addressed; tabs/titles key on wire ids). Read-only.
+#[tauri::command]
+pub fn corpus_resolve_ref(
+    state: tauri::State<'_, CorpusState>,
+    target: String,
+) -> Result<String, String> {
+    let (root, rel) = split_root_id(&target);
+    // recompose the root prefix — the wire contract everywhere else in this
+    // file (a bare id from a non-default root would route the open back to
+    // the DEFAULT store)
+    let id = state.route(&root, |s| s.wire_id_of(&rel))?;
+    Ok(compose_root_id(&root, &id))
 }
 
 #[tauri::command]
@@ -7382,6 +7477,26 @@ mod tests {
     }
 
     #[test]
+    fn purge_deletes_path_id_files_in_trash() {
+        // Empty Trash regression (2026-07-31 "Emptied 0 of 35"): boards/files
+        // are path-id'd and never enter the ULID index — purge must accept
+        // a rel like trash/storage/rotli/x.xlsx, not just note ULIDs.
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+
+        let doc = store.create_managed_file("stale.xlsx", b"xlsx").unwrap();
+        let trashed = store.move_file_to_sink(&doc, "Trash").unwrap();
+        assert_eq!(trashed, "trash/storage/rotli/stale.xlsx");
+
+        store.purge(&trashed).unwrap();
+        assert!(!root.join(&trashed).exists(), "purge removes the file from trash/");
+        assert!(store.list().unwrap().notes.iter().all(|n| n.id != trashed));
+    }
+
+    #[test]
     fn journal_prune_keeps_pending_and_recent_drops_old_resolved() {
         let (_dir, store) = bare();
         let now = (OffsetDateTime::now_utc().unix_timestamp()) * 1000;
@@ -8152,7 +8267,7 @@ mod tests {
         let note = store
             .create(
                 "Inbox",
-                "# Plan\n\n- [ ] call the bank\n- [x] already done\n- [ ]\n```\n- [ ] not a task — code\n```\n* [ ] second style\n",
+                "# Plan\n\n- [ ] call the bank\n  about the wire\n- [x] already done\n- [ ]\n```\n- [ ] not a task — code\n```\n* [ ] second style\n",
             )
             .unwrap();
         // a task in a sink is not a nag
@@ -8161,12 +8276,14 @@ mod tests {
 
         let tasks = store.tasks().unwrap();
         let texts: Vec<&str> = tasks.iter().map(|t| t.text.as_str()).collect();
-        assert_eq!(texts, vec!["call the bank", "second style"], "{tasks:?}");
+        // the wrapped continuation joins into ONE task (2026-07-31)
+        assert_eq!(texts, vec!["call the bank about the wire", "second style"], "{tasks:?}");
         assert!(tasks.iter().all(|t| t.note_id == note.id));
         assert_eq!(tasks[0].note_title, "Plan");
 
-        // checking off rewrites exactly that line, through the write path
-        store.toggle_task(&note.id, tasks[0].line, "call the bank").unwrap();
+        // checking off rewrites exactly the checkbox line, through the write
+        // path — validated against the joined text tasks() reported
+        store.toggle_task(&note.id, tasks[0].line, "call the bank about the wire").unwrap();
         let body = store.read(&note.id).unwrap().body;
         assert!(body.contains("- [x] call the bank"), "{body}");
         assert!(body.contains("* [ ] second style"), "other tasks untouched: {body}");

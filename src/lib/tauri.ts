@@ -939,6 +939,14 @@ export async function corpusPurge(id: string): Promise<void> {
   await invoke("corpus_purge", { id });
 }
 
+/** Rel→wire-id bridge for OPEN lanes: Librarian journal rows may be
+ * path-addressed (an _index.md has no frontmatter ULID), but tabs and title
+ * lookups key on wire ids. Passes wire ids through unchanged. */
+export async function corpusResolveRef(target: string): Promise<string> {
+  if (!isTauri()) return target;
+  return invoke<string>("corpus_resolve_ref", { target });
+}
+
 /** Toggle the per-note SECURE flag (secrets → never sent remote, gitignored). */
 export async function corpusSetSecure(id: string, secure: boolean): Promise<void> {
   if (!isTauri()) return;

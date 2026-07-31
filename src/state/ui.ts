@@ -212,12 +212,14 @@ interface UiState {
    * tab when "Show in Brain" is invoked from another row. */
   revealNoteId: string | null;
   revealFocusedNote: (mode?: "auto" | "brain", noteId?: string) => void;
-  /** Collapse every expanded destination + folder at once (the sidebar's
-   * collapse-all toolbar button). `defaultOpenIds` are the rows that read the
-   * map with an OPEN default (Main folders, the Brain header) — they get an
-   * explicit `false`, or wiping the map would EXPAND them (#83, audit
-   * 2026-07). The three sections stay open by design (an all-empty sidebar
-   * helps nobody). */
+  /** TWO-STAGE collapse (the sidebar's collapse-all toolbar button, Seth
+   * 2026-07-31): while any folder/dest tree is open, a press folds the TREES
+   * and leaves the sections alone; once everything inside is folded, the next
+   * press folds the sections themselves (sec:chat / sec:notes).
+   * `defaultOpenIds` are the rows that read the map with an OPEN default
+   * (Main folders, chat folders, the Brain header) — they get an explicit
+   * `false`, or wiping the map would EXPAND them (#83, audit 2026-07), and
+   * they're also how stage 1 knows those trees are still open. */
   collapseAllDests: (defaultOpenIds?: string[]) => void;
 
   /** Folders-rail selection (window-level). */
@@ -532,15 +534,25 @@ export const useUiStore = create<UiState>((set, get) => ({
       revealNoteId: noteId ?? null,
     })),
   collapseAllDests: (defaultOpenIds = []) =>
-    set((s) => ({
-      expandedDests: {
+    set((s) => {
+      // Stage detection is namespace-aware: default-OPEN rows (main:*,
+      // chatfolder:*, Brain) count as open unless explicitly false; every
+      // other non-section key counts only when explicitly true (absent means
+      // closed for dest rows like Inbox).
+      const anyTreeOpen =
+        defaultOpenIds.some((id) => s.expandedDests[id] !== false) ||
+        Object.entries(s.expandedDests).some(([id, open]) => !id.startsWith("sec:") && open === true);
+      const treesFolded = {
         // section fold states (sec:*) are the user's own arrangement —
-        // collapse-all folds the TREES; it must never REOPEN a folded section
+        // stage 1 folds the TREES; it must never REOPEN a folded section
         // (replacing the map wiped them back to default-open — Seth, 2026-07-27)
         ...Object.fromEntries(Object.entries(s.expandedDests).filter(([id]) => id.startsWith("sec:"))),
         ...Object.fromEntries(defaultOpenIds.map((id) => [id, false])),
-      },
-    })),
+      };
+      if (anyTreeOpen) return { expandedDests: treesFolded };
+      // stage 2 (everything inside already folded): fold the sections too
+      return { expandedDests: { ...treesFolded, [SEC_CHAT]: false, [SEC_NOTES]: false } };
+    }),
 
   selectedFolderId: ALL_NOTES,
   setSelectedFolderId: (id) => set({ selectedFolderId: id }),

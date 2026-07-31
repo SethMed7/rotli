@@ -1174,6 +1174,7 @@ pub fn run() {
             corpus::corpus_journal_read,
             corpus::corpus_journal_prune,
             corpus::corpus_purge,
+            corpus::corpus_resolve_ref,
             corpus::corpus_set_secure,
             corpus::corpus_secure_repair_scan,
             corpus::corpus_secure_repair_apply,

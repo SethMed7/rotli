@@ -1591,7 +1591,10 @@ export function Sidebar() {
             content into an exact folder. */}
         <button
           type="button"
-          className="icobtn"
+          /* tb-trail right-anchors the tip inside the sidebar's overflow box —
+             notes mode only: in Breve these buttons sit left-packed and a
+             right-anchored tip would clip at the LEFT edge (review 2026-07-31) */
+          className={sidebarMode === "breve" ? "icobtn" : "icobtn tb-trail"}
           aria-label={sidebarMode === "breve" ? "New is unavailable in Breve" : "New…"}
           disabled={sidebarMode === "breve"}
           onClick={openNewItemMenu}
@@ -1603,7 +1606,7 @@ export function Sidebar() {
         </button>
         <button
           type="button"
-          className="icobtn"
+          className={sidebarMode === "breve" ? "icobtn" : "icobtn tb-trail"}
           aria-label={sidebarMode === "breve" ? "New folder is unavailable in Breve" : "New folder"}
           disabled={sidebarMode === "breve"}
           onClick={() => {
@@ -1624,18 +1627,27 @@ export function Sidebar() {
         </button>
         {/* New board lives in the New… dropdown (Seth, 2026-07-28) — its own
             header icon was one too many for a narrow sidebar */}
-        {/* collapse-all — fold every expanded section/folder at once (VS Code's
-            collapse icon; handy once folders nest deep). Kept last, like the IDE. */}
+        {/* collapse-all — TWO-STAGE (Seth, 2026-07-31): first press folds the
+            open folders/trees, a second press folds the sections themselves.
+            Kept last, like the IDE. */}
         <button
           type="button"
-          className="icobtn"
+          className={sidebarMode === "breve" ? "icobtn" : "icobtn tb-trail"}
           aria-label={
             sidebarMode === "breve" ? "Collapse all is unavailable in Breve" : "Collapse all folders"
           }
           disabled={sidebarMode === "breve"}
-          /* default-OPEN rows (Main folders, the Brain header) need an explicit
-             false — wiping the map alone re-EXPANDED them (#83, audit 2026-07) */
-          onClick={() => collapseAllDests([...mainFolderIds(activeTree), "Brain"])}
+          /* default-OPEN rows (Main folders, CHAT folders) need an explicit
+             false — wiping the map alone re-EXPANDED them (#83, audit 2026-07;
+             chat folders were missed until 2026-07-31). "Brain" is NOT passed:
+             nothing renders it as default-open anymore, and treating it as
+             open made the first press a no-op on a fully-folded sidebar. */
+          onClick={() =>
+            collapseAllDests([
+              ...mainFolderIds(activeTree),
+              ...groupedChats.folders.map(({ folder }) => `chatfolder:${folder.id}`),
+            ])
+          }
         >
           <FoldGlyph size={16} />
           <span className="tip" aria-hidden="true">
