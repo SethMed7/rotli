@@ -187,6 +187,13 @@
   color: var(--text-muted);
   font-size: 11.5px;
 }
+/* the spoken version — sits between the bar and the prose, full measure */
+.breve-reader-audio {
+  display: block;
+  width: 100%;
+  height: 36px;
+  margin: -6px 0 16px;
+}
 .breve-reader-nav {
   display: inline-flex;
   gap: 2px;

@@ -18,6 +18,8 @@ import {
   chatModels,
   cliDetect,
   corpusFileText,
+  corpusResolveRef,
+  fileAssetUrl,
   isTauri,
   type BreveDeliverySettings,
   type BrevePdfPalette,
@@ -246,6 +248,27 @@ function briefDateLabel(date: string): string {
   }).format(new Date(`${date}T12:00:00`));
 }
 
+/** The brief's spoken version (storage/breveAudios/<stem>.mp3) as an inline
+ * player — the asset URL resolves async, so the player appears once ready and
+ * simply stays hidden if the file can't resolve. */
+function BriefAudio({ path }: { path: string }) {
+  const url = useQuery({
+    queryKey: ["breve", "brief-audio", path],
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: () => fileAssetUrl(path),
+  });
+  if (!url.data) return null;
+  return (
+    <audio
+      className="breve-reader-audio"
+      controls
+      preload="metadata"
+      src={url.data}
+      aria-label="Listen to this brief"
+    />
+  );
+}
+
 function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
   const openNote = usePanesStore((s) => s.openNote);
   const setSidebarMode = useUiStore((s) => s.setSidebarMode);
@@ -381,12 +404,18 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
               title="Open the brief note in the editor"
               onClick={() => {
                 setSidebarMode("notes");
-                openNote(current.path!);
+                // briefs travel as REL paths but openNote is an id-only door —
+                // resolve to the note's wire ULID first, or the tab opens on an
+                // unresolvable id and renders "Untitled" (Seth, 2026-07-31)
+                void corpusResolveRef(current.path!)
+                  .then((id) => openNote(id))
+                  .catch(() => openNote(current.path!));
               }}
             >
               Open in Notes
             </button>
           </div>
+          {current.audioPath && <BriefAudio path={current.audioPath} />}
           {body.isLoading ? (
             <BreveSkeleton label="Opening the brief" />
           ) : body.isError ? (

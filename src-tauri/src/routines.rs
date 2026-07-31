@@ -159,6 +159,13 @@ fn scheduler_command(root: &Path) -> Result<Child, String> {
         .env("ROTLI_BREVE_HOME", &home)
         .env("ROTLI_BREVE_CONFIG", root.join(ROUTINE_CONFIG))
         .env("ROTLI_BREVE_SKILL", home.join("skills/breve/SKILL.md"))
+        // Pin the runtime's knowledge + storage lanes to THIS vault so the
+        // brief/audio paths agree with rotli by construction — config.ts
+        // honors these over config.local.json, whose example points at
+        // ~/memex-storage (review, 2026-07-31: the audio player would be a
+        // silent no-op on a default configuration).
+        .env("BREVE_KNOWLEDGE", root)
+        .env("BREVE_STORAGE", root.join("storage"))
         // The scheduler exits its entire process group if this owner vanishes
         // without a graceful Tauri Exit event (crash, SIGKILL, updater, etc.).
         .env("ROTLI_PARENT_PID", std::process::id().to_string())

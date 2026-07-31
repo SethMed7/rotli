@@ -1519,6 +1519,9 @@ export interface BreveBrief {
   date: string;
   imported: boolean;
   path?: string;
+  /** Vault-relative path of the spoken version (storage/breveAudios/<stem>.mp3)
+   * when the runtime produced one — the reader shows a player. */
+  audioPath?: string;
 }
 
 export interface BreveSnapshot {

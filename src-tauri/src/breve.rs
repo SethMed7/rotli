@@ -198,6 +198,11 @@ pub struct BreveBrief {
     pub imported: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// Vault-relative path of the brief's spoken version when one exists
+    /// (`storage/breveAudios/<stem>.mp3`, the runtime's deterministic lane) —
+    /// the reader shows a player for it (Seth, 2026-07-31).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audio_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -359,9 +364,9 @@ fn dev_breve_snapshot(app: &tauri::AppHandle) -> BreveSnapshot {
         creators: Vec::new(),
         pages: Vec::new(),
         briefs: vec![
-            BreveBrief { stem: "2026-07-10".into(), title: "Breve — July 10, 2026".into(), kind: "morning".into(), date: "2026-07-10".into(), imported: true, path: None },
-            BreveBrief { stem: "2026-07-10-lunch".into(), title: "Breve — July 10, 2026 · Lunchtime".into(), kind: "lunch".into(), date: "2026-07-10".into(), imported: true, path: None },
-            BreveBrief { stem: "2026-07-09-night".into(), title: "Breve — July 9, 2026 · The Archive".into(), kind: "night".into(), date: "2026-07-09".into(), imported: true, path: None },
+            BreveBrief { stem: "2026-07-10".into(), title: "Breve — July 10, 2026".into(), kind: "morning".into(), date: "2026-07-10".into(), imported: true, path: None, audio_path: None },
+            BreveBrief { stem: "2026-07-10-lunch".into(), title: "Breve — July 10, 2026 · Lunchtime".into(), kind: "lunch".into(), date: "2026-07-10".into(), imported: true, path: None, audio_path: None },
+            BreveBrief { stem: "2026-07-09-night".into(), title: "Breve — July 9, 2026 · The Archive".into(), kind: "night".into(), date: "2026-07-09".into(), imported: true, path: None, audio_path: None },
         ],
         artifact_count: 208,
         imported: true,
@@ -696,7 +701,7 @@ fn brief_stem(name: &str) -> Option<String> {
     Regex::new(r"^\d{4}-\d{2}-\d{2}(?:-lunch|-night)?$").ok()?.is_match(stem).then(|| stem.to_string())
 }
 
-fn brief_from(stem: String, markdown: &str, imported: bool) -> BreveBrief {
+fn brief_from(stem: String, markdown: &str, imported: bool, audio_path: Option<String>) -> BreveBrief {
     let kind = if stem.ends_with("-lunch") { "lunch" } else if stem.ends_with("-night") { "night" } else { "morning" };
     let title = strip_frontmatter(markdown)
         .lines()
@@ -711,10 +716,14 @@ fn brief_from(stem: String, markdown: &str, imported: bool) -> BreveBrief {
         title,
         kind: kind.into(),
         imported,
+        audio_path,
     }
 }
 
-fn scan_briefs(dir: &Path, imported: bool) -> Vec<BreveBrief> {
+/// `vault_root` (the corpus root) enables audio detection — the runtime's
+/// spoken version lives at `storage/breveAudios/<stem>.mp3`. None for legacy
+/// scans, whose audio never lived in the vault's storage lane.
+fn scan_briefs(dir: &Path, imported: bool, vault_root: Option<&Path>) -> Vec<BreveBrief> {
     let mut out = Vec::new();
     let Ok(entries) = fs::read_dir(dir) else { return out };
     for entry in entries.flatten() {
@@ -724,7 +733,10 @@ fn scan_briefs(dir: &Path, imported: bool) -> Vec<BreveBrief> {
         let Some(name) = entry.file_name().to_str().map(str::to_string) else { continue };
         let Some(stem) = brief_stem(&name) else { continue };
         let Some(markdown) = read_text(&entry.path()) else { continue };
-        out.push(brief_from(stem, &markdown, imported));
+        let audio_rel = format!("storage/breveAudios/{stem}.mp3");
+        let audio_path =
+            vault_root.filter(|root| root.join(&audio_rel).is_file()).map(|_| audio_rel);
+        out.push(brief_from(stem, &markdown, imported, audio_path));
     }
     out.sort_by(|a, b| b.stem.cmp(&a.stem));
     out
@@ -794,10 +806,10 @@ fn snapshot_at(active_root: &Path, legacy: Option<&Path>) -> BreveSnapshot {
         .or_else(|| legacy.and_then(|root| read_json(&root.join("watchers.json"))))
         .unwrap_or_default();
 
-    let mut briefs = scan_briefs(&active_root.join(BRIEFS_DIR), true);
+    let mut briefs = scan_briefs(&active_root.join(BRIEFS_DIR), true, Some(&active_root));
     let mut seen: HashSet<String> = briefs.iter().map(|brief| brief.stem.clone()).collect();
     if let Some(legacy) = legacy {
-        for brief in scan_briefs(&legacy.join("briefs"), false) {
+        for brief in scan_briefs(&legacy.join("briefs"), false, None) {
             if seen.insert(brief.stem.clone()) {
                 briefs.push(brief);
             }
@@ -1443,7 +1455,7 @@ pub(crate) fn install_rotli_login_agent() -> Result<(), String> {
 
 fn initialize_scheduler_state(root: &Path, home: &Path) -> Result<(), String> {
     let mut jobs = serde_json::Map::new();
-    let briefs = scan_briefs(&root.join(BRIEFS_DIR), true);
+    let briefs = scan_briefs(&root.join(BRIEFS_DIR), true, None);
     for id in ["morning", "lunch", "night"] {
         if let Some(brief) = briefs.iter().find(|brief| brief.kind == id) {
             jobs.insert(
