@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.59.0] - 2026-07-31
+
+### Changed
+
+- **Onboarding shows its keyboard.** Every pickable card wears its number,
+  and a quiet hint above the footer says what the keys do — 1–9 pick, arrows
+  move, ⏎ selects (again to continue), ⌘⏎ selects and continues.
+
 ## [0.58.0] - 2026-07-31
 
 ### Added
