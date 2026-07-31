@@ -15,7 +15,7 @@
 import { type EditorState, type Range, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
 import { noteIdFacet } from "./livePreview";
-import { MIN_TABLE_COL_PX, tableWidthKey, useTableWidthsStore } from "../state/tableWidths";
+import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, tableWidthKey, useTableWidthsStore } from "../state/tableWidths";
 import {
   type Align,
   type TableBlock,
@@ -97,12 +97,18 @@ function openTableMenu(
     closeTableMenu();
     view.focus();
   };
-  const item = (label: string, run: () => void, danger = false) => {
+  const item = (label: string, run: () => void, opts?: { danger?: boolean; icon?: string }) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = danger ? "rotli-tblmenu-item danger" : "rotli-tblmenu-item";
+    b.className = opts?.danger ? "rotli-tblmenu-item danger" : "rotli-tblmenu-item";
     b.setAttribute("role", "menuitem");
-    b.textContent = label;
+    if (opts?.icon) {
+      const ico = document.createElement("span");
+      ico.className = "rotli-tblmenu-ico";
+      ico.innerHTML = opts.icon;
+      b.appendChild(ico);
+    }
+    b.appendChild(document.createTextNode(label));
     b.addEventListener("mousedown", (e) => e.preventDefault());
     b.addEventListener("click", run);
     menu.appendChild(b);
@@ -111,23 +117,21 @@ function openTableMenu(
   if (kind === "row") {
     item("Add row above", () => act((t) => addRowBelow(t, index - 1)));
     item("Add row below", () => act((t) => addRowBelow(t, index)));
-    item("Move up", () => act((t) => moveRow(t, index, -1)));
-    item("Move down", () => act((t) => moveRow(t, index, 1)));
-    item("Delete row", () => act((t) => deleteRow(t, index)), true);
+    item("Move up", () => act((t) => moveRow(t, index, -1)), { icon: MOVE_UP });
+    item("Move down", () => act((t) => moveRow(t, index, 1)), { icon: MOVE_DOWN });
+    item("Delete row", () => act((t) => deleteRow(t, index)), { danger: true });
   } else {
-    // alignment first — a small segmented row (the delimiter cell rewrite)
+    // alignment first — a small segmented row (the delimiter cell rewrite).
+    // Docs-style line glyphs (2026-07-31): instantly readable, not arrows.
     const seg = document.createElement("div");
     seg.className = "rotli-tblmenu-align";
-    for (const [label, a] of [
-      ["⟸", "left"],
-      ["⟺", "center"],
-      ["⟹", "right"],
-    ] as const) {
+    for (const a of ["left", "center", "right"] as const) {
       const b = document.createElement("button");
       b.type = "button";
       b.className = align === a ? "rotli-tblalign sel" : "rotli-tblalign";
       b.title = `Align ${a}`;
-      b.textContent = label;
+      b.setAttribute("aria-label", `Align ${a}`);
+      b.innerHTML = ALIGN_ICONS[a];
       b.addEventListener("mousedown", (e) => e.preventDefault());
       b.addEventListener("click", () => act((t) => setColAlign(t, index, align === a ? "" : a)));
       seg.appendChild(b);
@@ -135,9 +139,9 @@ function openTableMenu(
     menu.appendChild(seg);
     item("Add column left", () => act((t) => addColRight(t, index - 1)));
     item("Add column right", () => act((t) => addColRight(t, index)));
-    item("Move left", () => act((t) => moveCol(t, index, -1)));
-    item("Move right", () => act((t) => moveCol(t, index, 1)));
-    item("Delete column", () => act((t) => deleteCol(t, index)), true);
+    item("Move left", () => act((t) => moveCol(t, index, -1)), { icon: MOVE_LEFT });
+    item("Move right", () => act((t) => moveCol(t, index, 1)), { icon: MOVE_RIGHT });
+    item("Delete column", () => act((t) => deleteCol(t, index)), { danger: true });
   }
 
   document.body.appendChild(backdrop);
@@ -152,6 +156,22 @@ function openTableMenu(
 }
 
 // ─── the widget ──────────────────────────────────────────────────────────────
+
+// menu glyphs (2026-07-31, Seth: "use standard icons — instantly understood").
+// The Docs-style horizontal-lines family for alignment, arrow+lines for the
+// move verbs. Raw SVG strings (this widget is imperative DOM, no React) in the
+// shared 24-viewBox / 1.7-stroke voice of formatGlyphs.tsx.
+const svg = (paths: string) =>
+  `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+const ALIGN_ICONS: Record<"left" | "center" | "right", string> = {
+  left: svg('<path d="M4 6h16M4 10h9M4 14h16M4 18h9"/>'),
+  center: svg('<path d="M4 6h16M7.5 10h9M4 14h16M7.5 18h9"/>'),
+  right: svg('<path d="M4 6h16M11 10h9M4 14h16M11 18h9"/>'),
+};
+const MOVE_LEFT = svg('<path d="M13 6h7M13 12h7M13 18h7"/><path d="M9 12H3m3-3-3 3 3 3"/>');
+const MOVE_RIGHT = svg('<path d="M4 6h7M4 12h7M4 18h7"/><path d="M15 12h6m-3-3 3 3-3 3"/>');
+const MOVE_UP = svg('<path d="M6 13h12M6 17h12M6 21h12"/><path d="M12 9V3M9 6l3-3 3 3"/>');
+const MOVE_DOWN = svg('<path d="M6 3h12M6 7h12M6 11h12"/><path d="M12 15v6m-3-3 3 3 3-3"/>');
 
 // chip glyphs — the block-handle grip voice, sized for an 18px chip
 const GRIP_V =
@@ -296,6 +316,22 @@ class TableWidget extends WidgetType {
     if (userWidths && userWidths.length === this.cols) applyColWidths(userWidths);
     else userWidths = null;
 
+    // ── row HEIGHTS (2026-07-31, the column story's twin): drag a row's
+    //    bottom edge; heights act as minimums (content can still grow a row),
+    //    double-click an edge resets. Same key, sibling record. ──
+    const rowCount = (this.header ? 1 : 0) + this.rows.length;
+    let userHeights: number[] | null = widthKey
+      ? (useTableWidthsStore.getState().heights[widthKey]?.slice() ?? null)
+      : null;
+    const applyRowHeights = (rows: number[] | null) => {
+      const trs = Array.from(table.rows);
+      trs.forEach((tr, i) => {
+        tr.style.height = rows?.[i] != null ? `${rows[i]}px` : "";
+      });
+    };
+    if (userHeights && userHeights.length === rowCount) applyRowHeights(userHeights);
+    else userHeights = null;
+
     /** The column boundary under the pointer (within 5px of a cell edge), or
      * -1. Boundary i sits between column i and i+1 — the last edge is the
      * add-column zone, not a resize. */
@@ -320,6 +356,70 @@ class TableWidget extends WidgetType {
       if (!reference) return [];
       return Array.from(reference.cells).map((cell) => cell.getBoundingClientRect().width);
     };
+    /** The row boundary under the pointer (within 5px of a row's bottom edge),
+     * or -1. Boundary i resizes rendered row i (thead first); the LAST row's
+     * bottom edge stays the add-row zone, mirroring the column rule. */
+    const rowBoundaryAt = (e: MouseEvent): number => {
+      if (!widthKey) return -1;
+      const cell = (e.target as HTMLElement).closest?.("td,th");
+      if (!(cell instanceof HTMLTableCellElement)) return -1;
+      const tr = cell.parentElement;
+      if (!(tr instanceof HTMLTableRowElement)) return -1;
+      const row = Array.prototype.indexOf.call(table.rows, tr);
+      if (row < 0) return -1;
+      const rect = cell.getBoundingClientRect();
+      // same synthetic-(0,0)-mousedown guard as the column path
+      if (e.clientX < rect.left || e.clientX > rect.right) return -1;
+      if (e.clientY < rect.top - RESIZE_EDGE || e.clientY > rect.bottom + RESIZE_EDGE) return -1;
+      if (rect.bottom - e.clientY <= RESIZE_EDGE && row < rowCount - 1) return row;
+      if (e.clientY - rect.top <= RESIZE_EDGE && row > 0) return row - 1;
+      return -1;
+    };
+    const currentRowHeights = (): number[] =>
+      Array.from(table.rows).map((tr) => tr.getBoundingClientRect().height);
+    const startRowResize = (e: MouseEvent, boundary: number) => {
+      if (!widthKey) return;
+      // two arrays on purpose (review: transient-height persistence): `visual`
+      // is the live snapshot so nothing jumps DURING the drag; `persisted`
+      // carries only rows the user explicitly dragged — every other row keeps
+      // the harmless MIN floor, so a cell editor's temporarily inflated row
+      // can never be baked into settings.json by dragging a different edge.
+      const visual = currentRowHeights();
+      if (visual.length !== rowCount) return;
+      const persisted =
+        userHeights?.length === rowCount
+          ? userHeights.slice()
+          : Array.from({ length: rowCount }, () => MIN_TABLE_ROW_PX);
+      const startH = visual[boundary] ?? 0;
+      const startY = e.clientY;
+      let dragged = Math.max(MIN_TABLE_ROW_PX, startH);
+      wrap.classList.add("rotli-tbl-resizing");
+      const onMove = (ev: MouseEvent) => {
+        dragged = Math.max(MIN_TABLE_ROW_PX, startH + ev.clientY - startY);
+        const next = visual.slice();
+        next[boundary] = dragged;
+        applyRowHeights(next);
+      };
+      const onUp = () => {
+        cleanupResize();
+        persisted[boundary] = dragged;
+        userHeights = persisted;
+        // re-apply the PERSISTED shape — a transiently inflated row snaps back
+        // now, not on the next surprise widget rebuild
+        applyRowHeights(persisted);
+        useTableWidthsStore.getState().setTableHeights(widthKey, persisted);
+      };
+      const cleanupResize = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        wrap.classList.remove("rotli-tbl-resizing");
+        this.dropResizeCleanup = null;
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      this.dropResizeCleanup = cleanupResize;
+    };
+
     const startColResize = (e: MouseEvent, boundary: number) => {
       if (!widthKey) return;
       const startWidths = userWidths?.length === this.cols ? userWidths.slice() : currentColWidths();
@@ -350,14 +450,22 @@ class TableWidget extends WidgetType {
     };
     table.addEventListener("mousemove", (e) => {
       if (e.buttons) return; // an active drag owns the cursor
-      table.style.cursor = boundaryAt(e) >= 0 ? "col-resize" : "";
+      // column boundaries win the corner (they came first; rows are the twin)
+      table.style.cursor = boundaryAt(e) >= 0 ? "col-resize" : rowBoundaryAt(e) >= 0 ? "row-resize" : "";
     });
     table.addEventListener("dblclick", (e) => {
-      if (boundaryAt(e) < 0 || !widthKey) return;
-      e.preventDefault();
-      userWidths = null;
-      applyColWidths(null);
-      useTableWidthsStore.getState().setTableWidths(widthKey, null);
+      if (!widthKey) return;
+      if (boundaryAt(e) >= 0) {
+        e.preventDefault();
+        userWidths = null;
+        applyColWidths(null);
+        useTableWidthsStore.getState().setTableWidths(widthKey, null);
+      } else if (rowBoundaryAt(e) >= 0) {
+        e.preventDefault();
+        userHeights = null;
+        applyRowHeights(null);
+        useTableWidthsStore.getState().setTableHeights(widthKey, null);
+      }
     });
 
     // ── click a cell → edit INSIDE the rendered table ─────────────────────
@@ -539,11 +647,17 @@ class TableWidget extends WidgetType {
     table.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
       if (e.target instanceof HTMLTextAreaElement) return;
-      // a press on a column boundary RESIZES — it must never open the cell editor
+      // a press on a boundary RESIZES — it must never open the cell editor
       const boundary = boundaryAt(e);
       if (boundary >= 0) {
         e.preventDefault();
         startColResize(e, boundary);
+        return;
+      }
+      const rowBoundary = rowBoundaryAt(e);
+      if (rowBoundary >= 0) {
+        e.preventDefault();
+        startRowResize(e, rowBoundary);
         return;
       }
       const cell = (e.target as HTMLElement).closest?.("td,th");

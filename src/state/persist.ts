@@ -45,7 +45,7 @@ import {
   type NoteStyle,
   useNoteStyleStore,
 } from "./noteStyle";
-import { MIN_TABLE_COL_PX, noteIdOfWidthKey, useTableWidthsStore } from "./tableWidths";
+import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, noteIdOfWidthKey, useTableWidthsStore } from "./tableWidths";
 import { hydrateMain, useMainStore } from "./main";
 import { hydrateViews, useViewsStore } from "./views";
 import { findLeaf, leaves, usePanesStore } from "./panes";
@@ -235,6 +235,8 @@ interface PersistedSettings {
   noteStyles: Record<string, NoteStyle>;
   /** Per-table column widths (noteId-keyed view state) — NEVER in the .md. */
   tableWidths: Record<string, number[]>;
+  /** Per-table row heights (2026-07-31), same keying + pruning as widths. */
+  tableHeights: Record<string, number[]>;
 }
 
 /** Keys the file carried that this build doesn't know — a hand-set daemon knob
@@ -267,7 +269,7 @@ export function parseSettings(raw: string): PersistedSettings {
         : DEFAULT_NOTE_STYLE.size;
     noteStyles[id] = { size, measure: asEnum(s.measure, MEASURES, DEFAULT_NOTE_STYLE.measure) };
   }
-  // table column widths — only arrays of finite positive numbers survive
+  // table column widths + row heights — only arrays of finite positive numbers
   const tableWidths: Record<string, number[]> = {};
   for (const [key, cols] of Object.entries(record(data.tableWidths))) {
     if (
@@ -276,6 +278,16 @@ export function parseSettings(raw: string): PersistedSettings {
       cols.every((w) => typeof w === "number" && Number.isFinite(w) && w > 0)
     ) {
       tableWidths[key] = cols.map((w) => Math.max(MIN_TABLE_COL_PX, Math.round(w)));
+    }
+  }
+  const tableHeights: Record<string, number[]> = {};
+  for (const [key, rows] of Object.entries(record(data.tableHeights))) {
+    if (
+      Array.isArray(rows) &&
+      rows.length > 0 &&
+      rows.every((h) => typeof h === "number" && Number.isFinite(h) && h > 0)
+    ) {
+      tableHeights[key] = rows.map((h) => Math.max(MIN_TABLE_ROW_PX, Math.round(h)));
     }
   }
   // expandedDests — keep only boolean entries; missing → seed Inbox + Vault so
@@ -417,6 +429,7 @@ export function parseSettings(raw: string): PersistedSettings {
     bindings,
     noteStyles,
     tableWidths,
+    tableHeights,
   };
 }
 
@@ -490,7 +503,7 @@ function applySettings(s: PersistedSettings): void {
   });
   useBindingsStore.setState({ overrides: s.bindings });
   useNoteStyleStore.setState({ styles: s.noteStyles });
-  useTableWidthsStore.setState({ widths: s.tableWidths });
+  useTableWidthsStore.setState({ widths: s.tableWidths, heights: s.tableHeights });
 }
 
 /** Settings that live OUTSIDE the webview: window behavior, Dock policy, and
@@ -619,11 +632,16 @@ async function hydrateViewstate(): Promise<void> {
   if (kept.length !== Object.keys(styles).length) {
     useNoteStyleStore.setState({ styles: Object.fromEntries(kept) });
   }
-  // same discipline for table column widths (key prefix = note id)
+  // same discipline for table column widths + row heights (key prefix = note id)
   const widths = useTableWidthsStore.getState().widths;
   const keptWidths = Object.entries(widths).filter(([key]) => alive.has(noteIdOfWidthKey(key)));
   if (keptWidths.length !== Object.keys(widths).length) {
     useTableWidthsStore.setState({ widths: Object.fromEntries(keptWidths) });
+  }
+  const heights = useTableWidthsStore.getState().heights;
+  const keptHeights = Object.entries(heights).filter(([key]) => alive.has(noteIdOfWidthKey(key)));
+  if (keptHeights.length !== Object.keys(heights).length) {
+    useTableWidthsStore.setState({ heights: Object.fromEntries(keptHeights) });
   }
 
   const root = validPane(data.root, alive);
@@ -823,6 +841,7 @@ function settingsSnapshot(): string {
     bindings: useBindingsStore.getState().overrides,
     noteStyles: useNoteStyleStore.getState().styles,
     tableWidths: useTableWidthsStore.getState().widths,
+    tableHeights: useTableWidthsStore.getState().heights,
   };
   // unknown keys ride under the known ones (known always win) — see #35
   return JSON.stringify({ ...settingsPassthrough, ...snapshot });

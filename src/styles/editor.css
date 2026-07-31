@@ -1261,7 +1261,8 @@
   font-size: 0.95em;
   line-height: 1.5;
   width: auto;
-  max-width: 100%;
+  /* no max-width (2026-07-31): a wide table SCROLLS inside .rotli-tbl-scroll
+     instead of squeezing its columns below readability */
 }
 .rotli-md-table th,
 .rotli-md-table td {
@@ -1427,6 +1428,9 @@
   flex-direction: column;
 }
 .rotli-tblmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   text-align: left;
   background: none;
   border: none;
@@ -1436,6 +1440,15 @@
   padding: 7px 10px;
   border-radius: var(--r-inner);
   cursor: pointer;
+}
+.rotli-tblmenu-ico {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  color: var(--text-muted);
+}
+.rotli-tblmenu-item:hover .rotli-tblmenu-ico {
+  color: var(--text);
 }
 .rotli-tblmenu-item:hover {
   background: var(--hov);
@@ -1453,12 +1466,13 @@
 }
 .rotli-tblalign {
   flex: 1;
-  padding: 3px 0;
+  display: grid;
+  place-items: center;
+  padding: 4px 0;
   border: 1px solid var(--border);
   border-radius: var(--r-inner);
   background: none;
   color: var(--text-muted);
-  font-size: 11px;
   line-height: 1;
   cursor: pointer;
 }

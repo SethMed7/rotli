@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { MIN_TABLE_COL_PX, noteIdOfWidthKey, tableWidthKey, useTableWidthsStore } from "./tableWidths";
+import {
+  MIN_TABLE_COL_PX,
+  MIN_TABLE_ROW_PX,
+  noteIdOfWidthKey,
+  tableWidthKey,
+  useTableWidthsStore,
+} from "./tableWidths";
 
 describe("table column widths (per-note view state)", () => {
   test("keys round-trip the note id and survive odd signatures", () => {
@@ -14,5 +20,16 @@ describe("table column widths (per-note view state)", () => {
     expect(useTableWidthsStore.getState().widths[key]).toEqual([MIN_TABLE_COL_PX, 241, 300]);
     useTableWidthsStore.getState().setTableWidths(key, null);
     expect(useTableWidthsStore.getState().widths[key]).toBeUndefined();
+  });
+
+  test("row heights ride the same key: clamp, round, null clears (2026-07-31)", () => {
+    const key = tableWidthKey("n", "h#0");
+    useTableWidthsStore.getState().setTableHeights(key, [4, 41.4, 90]);
+    expect(useTableWidthsStore.getState().heights[key]).toEqual([MIN_TABLE_ROW_PX, 41, 90]);
+    // widths and heights clear independently — resetting columns keeps rows
+    useTableWidthsStore.getState().setTableWidths(key, null);
+    expect(useTableWidthsStore.getState().heights[key]).toEqual([MIN_TABLE_ROW_PX, 41, 90]);
+    useTableWidthsStore.getState().setTableHeights(key, null);
+    expect(useTableWidthsStore.getState().heights[key]).toBeUndefined();
   });
 });
