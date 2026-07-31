@@ -45,6 +45,9 @@ const STEPS = [
 ] as const;
 type Step = (typeof STEPS)[number];
 
+/** Steps whose cards the keyboard can pick — drives the footer key hint. */
+const CARD_STEPS: ReadonlySet<Step> = new Set(["appearance", "dock", "behavior", "memory", "brain"]);
+
 const GLOBAL_HOTKEYS: { id: string; label: string; hint: string }[] = [
   { id: "app.toggleWindow", label: "Open rotli", hint: "Summon or hide the window from anywhere." },
   {
@@ -728,6 +731,20 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             steps — it sits in exactly the same place the whole way through (Seth,
             2026-07-07). Skip lives on the LEFT so its coming and going can't nudge
             the right cluster either. */}
+        {/* the keyboard is visible, not hidden (Seth, 2026-07-31): a quiet
+            context-aware hint above the footer says exactly what the keys do */}
+        <div className="onb-keyhint" aria-hidden="true">
+          {CARD_STEPS.has(step) ? (
+            <>
+              <kbd>1</kbd>–<kbd>9</kbd> pick a card · <kbd>←</kbd>
+              <kbd>→</kbd> move · <kbd>⏎</kbd> select, again to continue · <kbd>⌘⏎</kbd> select & continue
+            </>
+          ) : (
+            <>
+              <kbd>⏎</kbd> continue
+            </>
+          )}
+        </div>
         <div className="onb-foot">
           <div className="onb-lead">
             <div className="onb-dots" aria-hidden="true">

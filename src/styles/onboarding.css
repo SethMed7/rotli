@@ -138,6 +138,36 @@
   gap: 12px;
   margin-top: 4px;
 }
+/* the keyboard is NOT hidden (Seth, 2026-07-31): every pickable card wears its
+   number — press it and the card selects. Pure CSS counters, so the badges
+   always match the keyboard handler's DOM order. */
+.onb-choices,
+.famrow {
+  counter-reset: onbcard;
+}
+.onb-choice,
+.famcard {
+  position: relative;
+}
+.onb-choice::after,
+.famcard::after {
+  counter-increment: onbcard;
+  content: counter(onbcard);
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
 .onb-choice {
   display: flex;
   flex-direction: column;
@@ -168,6 +198,29 @@
 .onb-choice-desc {
   font-size: 12px;
   line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* the standing key hint — context-aware, quiet, above the footer */
+.onb-keyhint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 18px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.onb-keyhint kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  font-family: inherit;
+  font-size: 10.5px;
   color: var(--text-muted);
 }
 
