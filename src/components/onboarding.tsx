@@ -268,16 +268,32 @@ function MemexStep() {
   const plainPath =
     pending?.kind === "use" && !found.some((d) => d.root === pending.path) ? pending.path : null;
 
+  // one picker at a time: the async vault lane (2026-07-31) keeps the webview
+  // live while the panel is up, so without this guard both picker buttons
+  // could each open an NSOpenPanel and the SECOND resolution would win
+  const [pickerBusy, setPickerBusy] = useState(false);
   const createNew = async () => {
-    const path = await pickFolder();
-    if (path) setPendingChoice({ kind: "init", path });
+    if (pickerBusy) return;
+    setPickerBusy(true);
+    try {
+      const path = await pickFolder();
+      if (path) setPendingChoice({ kind: "init", path });
+    } finally {
+      setPickerBusy(false);
+    }
   };
   // named without a "use" prefix on purpose — it's a plain async helper, not a
   // hook, but eslint's rules-of-hooks treats any use[A-Z]-named function called
   // from a callback as a hook-in-callback violation
   const pickPlainFolder = async () => {
-    const path = await pickFolder();
-    if (path) setPendingChoice({ kind: "use", path, label: path.split("/").pop() ?? path });
+    if (pickerBusy) return;
+    setPickerBusy(true);
+    try {
+      const path = await pickFolder();
+      if (path) setPendingChoice({ kind: "use", path, label: path.split("/").pop() ?? path });
+    } finally {
+      setPickerBusy(false);
+    }
   };
 
   return (
@@ -326,6 +342,7 @@ function MemexStep() {
             type="button"
             className={isInit ? "onb-choice sel" : "onb-choice"}
             aria-pressed={isInit}
+            disabled={pickerBusy}
             onClick={() => void createNew()}
           >
             <span className="onb-choice-title">Create a new vault…</span>
@@ -352,6 +369,7 @@ function MemexStep() {
             type="button"
             className={plainPath ? "onb-choice sel" : "onb-choice"}
             aria-pressed={!!plainPath}
+            disabled={pickerBusy}
             onClick={() => void pickPlainFolder()}
           >
             <span className="onb-choice-title">Use a plain folder…</span>

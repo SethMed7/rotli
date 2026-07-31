@@ -1028,23 +1028,31 @@ fn memex_validate_blocking(app: &tauri::AppHandle, root: &str) -> Result<Validat
 
 /// Native folder picker that returns a path WITHOUT moving anything (for
 /// "Connect to existing…" / "New separate brain…").
+/// ASYNC command (vault-lane pass, 2026-07-31): `blocking_pick_folder` parks
+/// the calling thread on a channel while the panel runs — on the main thread
+/// that was the beachball. It runs on a worker now (the dialog plugin marshals
+/// the panel itself to the main runloop).
 #[tauri::command]
-pub fn memex_pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
-    let picked = app
-        .dialog()
-        .file()
-        .set_title("Choose a memex folder")
-        .blocking_pick_folder();
-    match picked {
-        Some(fp) => Ok(Some(
-            fp.into_path()
-                .map_err(|e| e.to_string())?
-                .to_string_lossy()
-                .to_string(),
-        )),
-        None => Ok(None),
-    }
+pub async fn memex_pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri_plugin_dialog::DialogExt;
+        let picked = app
+            .dialog()
+            .file()
+            .set_title("Choose a memex folder")
+            .blocking_pick_folder();
+        match picked {
+            Some(fp) => Ok(Some(
+                fp.into_path()
+                    .map_err(|e| e.to_string())?
+                    .to_string_lossy()
+                    .to_string(),
+            )),
+            None => Ok(None),
+        }
+    })
+    .await
+    .map_err(|e| format!("picker worker failed ({e})"))?
 }
 
 // ─── tests ─────────────────────────────────────────────────────────────────────

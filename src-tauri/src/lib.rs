@@ -599,8 +599,32 @@ fn corpus_reveal(app: AppHandle) {
 /// work folder without it living in your brain. Picks natively when no path is given;
 /// generates a unique slug id from the folder name. Relaunches so it surfaces.
 /// Returns false when the picker is cancelled.
+/// One-at-a-time lane for vault/registry mutations. The async conversion
+/// (2026-07-31) moved the vault commands off the main thread — which had been
+/// their implicit serialization. Every corpus.json change is an unguarded
+/// read→modify→write span, so two concurrent commands could silently drop each
+/// other's writes (picker open in one worker, Settings "Add a folder…" in
+/// another). Every command that mutates the registry or the corpus path holds
+/// this for its whole span — the still-sync ones too, or they race the workers.
+static VAULT_LANE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn vault_lane() -> std::sync::MutexGuard<'static, ()> {
+    // a poisoned lane (a panicked worker) must not brick every later vault
+    // action — the span it guarded is over either way
+    VAULT_LANE.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// ASYNC command (vault-lane pass, 2026-07-31): the blocking picker + registry
+/// rewrite ran on the main thread and beachballed the window — worker now.
 #[tauri::command]
-fn corpus_add_folder(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+async fn corpus_add_folder(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || corpus_add_folder_blocking(app, path))
+        .await
+        .map_err(|e| format!("vault worker failed ({e})"))?
+}
+
+fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+    let _lane = vault_lane();
     if cfg!(debug_assertions) {
         return Err("Location changes are disabled while the production memex is mounted read-only in development.".into());
     }
@@ -632,6 +656,7 @@ fn corpus_add_folder(app: AppHandle, path: Option<String>) -> Result<bool, Strin
 /// on disk are NEVER touched — only the binding is dropped. Relaunches.
 #[tauri::command]
 fn corpus_forget_folder(app: AppHandle, id: String) -> Result<(), String> {
+    let _lane = vault_lane();
     if cfg!(debug_assertions) {
         return Err("Location changes are disabled while the production memex is mounted read-only in development.".into());
     }
@@ -733,8 +758,17 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
 /// PLAIN folder — a memex is never scattered by a move) else start fresh; a plain
 /// folder with files → use it as-is, never merged. Relaunches into the new
 /// corpus. Returns false when the picker is cancelled.
+/// ASYNC command (vault-lane pass, 2026-07-31): the blocking picker plus a
+/// possible whole-vault `relocate` ran on the main thread — worker now.
 #[tauri::command]
-fn corpus_choose_folder(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+async fn corpus_choose_folder(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || corpus_choose_folder_blocking(app, path))
+        .await
+        .map_err(|e| format!("vault worker failed ({e})"))?
+}
+
+fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+    let _lane = vault_lane();
     if cfg!(debug_assertions) {
         return Err("The production memex is the fixed read-only source in development.".into());
     }
@@ -782,8 +816,17 @@ fn corpus_choose_folder(app: AppHandle, path: Option<String>) -> Result<bool, St
 /// Onboarding "create a new brain": scaffold a fresh memex at `path` and make it
 /// your corpus — the corpus IS a memex (your folder is your brain). Relaunches
 /// into it. `path` is an absolute folder (the native picker creates/names it).
+/// ASYNC command (vault-lane pass, 2026-07-31): scaffold + settings carry +
+/// config rewrite ran on the main thread right behind the picker — worker now.
 #[tauri::command]
-fn corpus_init_memex(app: AppHandle, path: String) -> Result<(), String> {
+async fn corpus_init_memex(app: AppHandle, path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || corpus_init_memex_blocking(app, path))
+        .await
+        .map_err(|e| format!("vault worker failed ({e})"))?
+}
+
+fn corpus_init_memex_blocking(app: AppHandle, path: String) -> Result<(), String> {
+    let _lane = vault_lane();
     if cfg!(debug_assertions) {
         return Err("Creating or replacing the primary memex is disabled in development.".into());
     }
@@ -801,8 +844,17 @@ fn corpus_init_memex(app: AppHandle, path: String) -> Result<(), String> {
 /// the vault being left registered as a connected library (one click away in
 /// the switcher), and relaunch into the practice vault. The current vault's
 /// FILES are never touched — this is a switch plus a courtesy registration.
+/// ASYNC command (vault-lane pass, 2026-07-31): scaffold + registry writes ran
+/// on the main thread — worker now.
 #[tauri::command]
-fn corpus_create_practice_vault(app: AppHandle) -> Result<(), String> {
+async fn corpus_create_practice_vault(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || corpus_create_practice_vault_blocking(app))
+        .await
+        .map_err(|e| format!("vault worker failed ({e})"))?
+}
+
+fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<(), String> {
+    let _lane = vault_lane();
     if cfg!(debug_assertions) {
         return Err("Creating or replacing the primary memex is disabled in development.".into());
     }
@@ -843,8 +895,17 @@ fn corpus_create_practice_vault(app: AppHandle) -> Result<(), String> {
 /// Connect a brain (a memex) to read — and write into per its perms. Validates +
 /// stamps via the memex module, registers it in corpus.json, makes it active, and
 /// relaunches so its sidebar row appears. False when the picker is cancelled.
+/// ASYNC command (vault-lane pass, 2026-07-31): the blocking picker + memex
+/// stamp + registry write ran on the main thread — worker now.
 #[tauri::command]
-fn corpus_connect_brain(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+async fn corpus_connect_brain(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || corpus_connect_brain_blocking(app, path))
+        .await
+        .map_err(|e| format!("vault worker failed ({e})"))?
+}
+
+fn corpus_connect_brain_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
+    let _lane = vault_lane();
     if cfg!(debug_assertions) {
         return Err("The production memex is already mounted as the single read-only source in development.".into());
     }
@@ -883,6 +944,7 @@ fn corpus_connect_brain(app: AppHandle, path: Option<String>) -> Result<bool, St
 /// Relaunches so its sidebar row disappears.
 #[tauri::command]
 fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
+    let _lane = vault_lane();
     if cfg!(debug_assertions) {
         return Err("The production memex binding cannot be changed in development.".into());
     }
@@ -896,6 +958,7 @@ fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
 /// refetches the config.
 #[tauri::command]
 fn corpus_set_active_brain(app: AppHandle, id: String) -> Result<(), String> {
+    let _lane = vault_lane();
     if cfg!(debug_assertions) {
         return Err("The production memex is the fixed read-only source in development.".into());
     }
@@ -910,6 +973,7 @@ fn corpus_set_active_brain(app: AppHandle, id: String) -> Result<(), String> {
 /// perms whenever it binds again.
 #[tauri::command]
 fn corpus_set_brain_perms(app: AppHandle, id: String, perms: memex::MemexPerms) -> Result<(), String> {
+    let _lane = vault_lane();
     if cfg!(debug_assertions) {
         return Err("Production memex permissions cannot be changed in development.".into());
     }

@@ -49,6 +49,11 @@ const GEN_MAX_TOKENS: u32 = 512;
 /// How long a reconciliation-sweep NUDGE settles before the sweep runs — an
 /// approval spree (or app launch) folds to one disk walk, not one per click.
 const SWEEP_SETTLE: Duration = Duration::from_secs(3);
+/// Startup grace before the boot reconciliation sweep may be consumed — keeps
+/// its corpus-mutex traffic off the first paint after a (re)launch, which is
+/// exactly when every root walks cold (Seth, 2026-07-31: vault-switch
+/// beachballs). See `OrganizerInner::sweep_hold`.
+const STARTUP_SWEEP_HOLD: Duration = Duration::from_secs(45);
 /// How long to sleep between gate re-checks WHILE work is pending (the gates —
 /// idle/AC/thermal — have no event source; this is the only timed retry, and it
 /// exists only while something is actually staged). An idle corpus never ticks.
@@ -211,6 +216,13 @@ pub(crate) struct OrganizerInner {
     /// frontend approval lands (its writes are suppress-marked — no watcher
     /// event ever arrives), and when trust turns back on. NEVER on a timer.
     sweep_at: Mutex<Option<Instant>>,
+    /// Don't CONSUME the owed startup sweep before this instant (one-shot,
+    /// 2026-07-31): right after a vault switch every root walks cold, and the
+    /// boot sweep's corpus-mutex traffic contended first paint into visible
+    /// beachballs. A real planner input — the sweep stays owed and the worker
+    /// sleeps the remainder; queue runs during the grace don't drag it along.
+    /// Run-now bypasses (an explicit click is the user's own timing).
+    sweep_hold: Mutex<Option<Instant>>,
     /// Chat-yield semaphore: >0 while an interactive model call is in flight.
     interactive: AtomicUsize,
 }
@@ -266,6 +278,7 @@ impl OrganizerHandle {
             model_label: Mutex::new(chat::DEFAULT_MODEL.to_string()),
             progress: Mutex::new(None),
             sweep_at: Mutex::new(None),
+            sweep_hold: Mutex::new(None),
             interactive: AtomicUsize::new(0),
         }))
     }
@@ -993,6 +1006,9 @@ pub(crate) enum Wait {
 /// The one scheduling decision, pure so it's table-testable. Inputs are ages /
 /// remainders sampled by the worker:
 ///   `sweep_age`   — Some(time since the last sweep nudge) when a sweep is owed
+///   `sweep_hold_left` — Some(remaining startup grace) while the owed BOOT
+///                   sweep is held (sweep_hold); stretches only the SWEEP's
+///                   wait — queue work keeps its own schedule
 ///   `newest_age`  — Some(age of the NEWEST queue entry) when the queue holds work
 ///   `cycle_owed`  — a sweep ran but its follow-up cycle hasn't (index diff pending)
 ///   `backoff_left`— Some(remaining) while the model-offline backoff runs
@@ -1007,6 +1023,7 @@ pub(crate) fn plan_wait(
     trust_off: bool,
     run_now: bool,
     sweep_age: Option<Duration>,
+    sweep_hold_left: Option<Duration>,
     newest_age: Option<Duration>,
     cycle_owed: bool,
     quiet: Duration,
@@ -1028,7 +1045,10 @@ pub(crate) fn plan_wait(
     }
     let mut waits: Vec<Duration> = Vec::new();
     if let Some(age) = sweep_age {
-        waits.push(SWEEP_SETTLE.saturating_sub(age));
+        // the startup hold stretches only the sweep's own wait (queue work
+        // below keeps its schedule) — one wakeup at expiry, not a 3s poll
+        let settle = SWEEP_SETTLE.saturating_sub(age);
+        waits.push(settle.max(sweep_hold_left.unwrap_or(Duration::ZERO)));
     }
     if newest_age.is_some() || cycle_owed {
         // burst debounce: wait until the NEWEST enqueue is quiet-old, so a
@@ -2029,8 +2049,10 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
         }));
     }
     // startup owes ONE reconciliation sweep (edits made while rotli was closed
-    // never reached the queue) — after that, events only.
+    // never reached the queue) — after that, events only. The hold keeps the
+    // sweep's corpus-mutex traffic off the FIRST paint (see sweep_hold's doc).
     *handle.0.sweep_at.lock().unwrap() = Some(Instant::now());
+    *handle.0.sweep_hold.lock().unwrap() = Some(Instant::now() + STARTUP_SWEEP_HOLD);
     std::thread::spawn(move || {
         let inner: &OrganizerInner = &handle.0;
         // RefCell: the per-candidate gates closure must be able to REFRESH the
@@ -2066,6 +2088,11 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                 *inner.trust.lock().unwrap() == Trust::Off,
                 inner.run_now.load(Ordering::SeqCst),
                 inner.sweep_at.lock().unwrap().map(|t| t.elapsed()),
+                inner
+                    .sweep_hold
+                    .lock()
+                    .unwrap()
+                    .map(|t| t.saturating_duration_since(Instant::now())),
                 inner.queue.lock().unwrap().values().map(|t| t.elapsed()).min(),
                 cycle_owed,
                 quiet,
@@ -2118,8 +2145,21 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
             // leash retry instead of silently eating the user's explicit click.
             let run_now = inner.run_now.load(Ordering::SeqCst);
             // the owed reconciliation sweep (diff-only, disk-local, no model) —
-            // startup / Run-now / an approval nudge / trust turned back on
-            if inner.sweep_at.lock().unwrap().take().is_some() || run_now {
+            // startup / Run-now / an approval nudge / trust turned back on.
+            // The one-shot startup hold gates the take: while held, a queue
+            // run proceeds WITHOUT dragging the boot sweep along; an explicit
+            // Run-now bypasses (the user's own timing).
+            let hold_over = {
+                let mut hold = inner.sweep_hold.lock().unwrap();
+                match *hold {
+                    Some(t) if !run_now && Instant::now() < t => false,
+                    _ => {
+                        *hold = None;
+                        true
+                    }
+                }
+            };
+            if (hold_over && inner.sweep_at.lock().unwrap().take().is_some()) || run_now {
                 let state_json = corpus_state
                     .route(&root_id, |s| s.dot_read("organizer"))
                     .unwrap_or_else(|_| "{}".into());
@@ -2885,17 +2925,17 @@ mod tests {
         // the energy law: an idle corpus schedules ZERO wakeups (no tick, no
         // timer, no settings read, no pmset shell-out) until an event arrives.
         assert_eq!(
-            plan_wait(false, false, None, None, false, DEFAULT_QUIET, None, None),
+            plan_wait(false, false, None, None, None, false, DEFAULT_QUIET, None, None),
             Wait::Park
         );
         // closed gates alone (no pending work) must not schedule a retry tick
         assert_eq!(
-            plan_wait(false, false, None, None, false, DEFAULT_QUIET, None, Some(GATE_RECHECK)),
+            plan_wait(false, false, None, None, None, false, DEFAULT_QUIET, None, Some(GATE_RECHECK)),
             Wait::Park
         );
         // a lingering backoff alone (queue drained meanwhile) parks too
         assert_eq!(
-            plan_wait(false, false, None, None, false, DEFAULT_QUIET, Some(BACKOFF_MAX), None),
+            plan_wait(false, false, None, None, None, false, DEFAULT_QUIET, Some(BACKOFF_MAX), None),
             Wait::Park
         );
         // Off parks EVERYTHING — a full queue, an owed sweep, a stored nudge
@@ -2904,6 +2944,7 @@ mod tests {
                 true,
                 true,
                 Some(Duration::ZERO),
+                None,
                 Some(Duration::from_secs(999)),
                 true,
                 DEFAULT_QUIET,
@@ -2920,12 +2961,12 @@ mod tests {
         // newest enqueue 1s old → one timed wake when the burst settles; every
         // further edit re-news the age, so a typing spree = ONE run at the end
         assert_eq!(
-            plan_wait(false, false, None, Some(Duration::from_secs(1)), false, quiet, None, None),
+            plan_wait(false, false, None, None, Some(Duration::from_secs(1)), false, quiet, None, None),
             Wait::For(Duration::from_secs(44))
         );
         // quiet elapsed → ripe
         assert_eq!(
-            plan_wait(false, false, None, Some(quiet), false, quiet, None, None),
+            plan_wait(false, false, None, None, Some(quiet), false, quiet, None, None),
             Wait::Run
         );
         // Run-now bypasses quiet, settle, AND the model backoff (never chat —
@@ -2935,6 +2976,7 @@ mod tests {
                 false,
                 true,
                 Some(Duration::ZERO),
+                None,
                 Some(Duration::ZERO),
                 false,
                 quiet,
@@ -2946,12 +2988,12 @@ mod tests {
         // …but a nudge blocked by a closed gate is QUEUED, not consumed (#29):
         // the leash remainder times the retry (no busy-spin against a chat)…
         assert_eq!(
-            plan_wait(false, true, None, None, false, quiet, None, Some(GATE_RECHECK)),
+            plan_wait(false, true, None, None, None, false, quiet, None, Some(GATE_RECHECK)),
             Wait::For(GATE_RECHECK)
         );
         // …and once the leash decays the pending nudge actually runs
         assert_eq!(
-            plan_wait(false, true, None, None, false, quiet, None, Some(Duration::ZERO)),
+            plan_wait(false, true, None, None, None, false, quiet, None, Some(Duration::ZERO)),
             Wait::Run
         );
     }
@@ -2962,39 +3004,85 @@ mod tests {
         // an owed sweep settles SWEEP_SETTLE from the nudge (approval sprees
         // fold to one disk walk), then runs
         assert_eq!(
-            plan_wait(false, false, Some(Duration::from_secs(1)), None, false, quiet, None, None),
+            plan_wait(false, false, Some(Duration::from_secs(1)), None, None, false, quiet, None, None),
             Wait::For(SWEEP_SETTLE - Duration::from_secs(1))
         );
+        // the startup hold stretches the owed sweep's wait to the remainder —
+        // ONE wakeup at expiry, never a 3s settle poll (2026-07-31)
         assert_eq!(
-            plan_wait(false, false, Some(SWEEP_SETTLE), None, false, quiet, None, None),
+            plan_wait(
+                false,
+                false,
+                Some(Duration::ZERO),
+                Some(Duration::from_secs(45)),
+                None,
+                false,
+                quiet,
+                None,
+                None
+            ),
+            Wait::For(Duration::from_secs(45))
+        );
+        // an expired hold (saturated to zero) falls back to plain settle math
+        assert_eq!(
+            plan_wait(
+                false,
+                false,
+                Some(SWEEP_SETTLE),
+                Some(Duration::ZERO),
+                None,
+                false,
+                quiet,
+                None,
+                None
+            ),
+            Wait::Run
+        );
+        // a held sweep must NOT delay queue work — the queue's own wait wins
+        assert_eq!(
+            plan_wait(
+                false,
+                false,
+                Some(Duration::ZERO),
+                Some(Duration::from_secs(45)),
+                Some(quiet),
+                false,
+                quiet,
+                None,
+                None
+            ),
+            Wait::Run
+        );
+        assert_eq!(
+            plan_wait(false, false, Some(SWEEP_SETTLE), None, None, false, quiet, None, None),
             Wait::Run
         );
         // model offline: the backoff stretches a ripe queue's wait — no retry
         // storm against a dead server
         assert_eq!(
-            plan_wait(false, false, None, Some(quiet), false, quiet, Some(Duration::from_secs(30)), None),
+            plan_wait(false, false, None, None, Some(quiet), false, quiet, Some(Duration::from_secs(30)), None),
             Wait::For(Duration::from_secs(30))
         );
         // gates closed with work pending → the bounded GATE_RECHECK leash
         // (the ONLY timed retry that exists, and only while work is staged)
         assert_eq!(
-            plan_wait(false, false, None, Some(quiet), false, quiet, None, Some(GATE_RECHECK)),
+            plan_wait(false, false, None, None, Some(quiet), false, quiet, None, Some(GATE_RECHECK)),
             Wait::For(GATE_RECHECK)
         );
         // the leash is a REMAINDER: mid-leash re-plans wait only what's left…
         assert_eq!(
-            plan_wait(false, false, None, Some(quiet), false, quiet, None, Some(Duration::from_secs(30))),
+            plan_wait(false, false, None, None, Some(quiet), false, quiet, None, Some(Duration::from_secs(30))),
             Wait::For(Duration::from_secs(30))
         );
         // …and an EXPIRED leash runs — the gates get re-probed instead of the
         // blocked attempt re-waiting the full leash forever (the starvation bug)
         assert_eq!(
-            plan_wait(false, false, None, Some(quiet), false, quiet, None, Some(Duration::ZERO)),
+            plan_wait(false, false, None, None, Some(quiet), false, quiet, None, Some(Duration::ZERO)),
             Wait::Run
         );
         // an owed post-sweep cycle alone (empty queue) still runs — frontend
         // approvals are suppress-marked, the index diff must catch up
-        assert_eq!(plan_wait(false, false, None, None, true, quiet, None, None), Wait::Run);
+        assert_eq!(plan_wait(false, false, None, None, None, true, quiet, None, None), Wait::Run);
     }
 
     #[test]
@@ -3200,7 +3288,7 @@ mod tests {
         assert!(sweep(&root, &st).is_empty(), "a converged corpus has no sweep candidates");
         assert!(handle.0.queue.lock().unwrap().is_empty(), "nothing left staged");
         assert_eq!(
-            plan_wait(false, false, None, None, false, DEFAULT_QUIET, None, None),
+            plan_wait(false, false, None, None, None, false, DEFAULT_QUIET, None, None),
             Wait::Park,
             "idle corpus ⇒ Park: zero scheduled wakeups"
         );
