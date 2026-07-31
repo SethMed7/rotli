@@ -168,6 +168,12 @@ export function ActivitySurface() {
   const [introOpen, setIntroOpen] = useState(false);
   const [showAllDays, setShowAllDays] = useState(false);
   const [clearAllArmed, setClearAllArmed] = useState(false);
+  const [dismissAllArmed, setDismissAllArmed] = useState(false);
+  const pendingCount = deriveJournal(journal.data ?? []).pending.length;
+  // an armed Dismiss-all must never survive a turnover of WHAT it would
+  // dismiss — new proposals arriving would face a pre-armed red button for
+  // suggestions the user never saw (review F3)
+  useEffect(() => setDismissAllArmed(false), [pendingCount]);
   const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
   const [stopRequested, setStopRequested] = useState(false);
   const [live, setLive] = useState<LiveRun>({
@@ -213,20 +219,24 @@ export function ActivitySurface() {
           }));
         } else {
           setStopRequested(false);
-          // an all-zero cycle (e.g. a raw-vault early return) closes the band
-          // without a misleading "Last run: 0 applied" line (review F8)
-          const worthTelling =
-            (p.applied ?? 0) + (p.proposals ?? 0) + (p.requeued ?? 0) > 0 || p.stopped === true;
+          const did = (p.applied ?? 0) + (p.proposals ?? 0) + (p.requeued ?? 0) > 0;
           setLive((l) => ({
             ...l,
             active: false,
             current: null,
+            // a REAL cycle (we saw its start) always answers — an explicit
+            // Run now that finds nothing must never read as a dead button
+            // (Seth, 2026-07-31). An end WITHOUT a start (a dormant
+            // early-return cycle, review F8) PRESERVES whatever summary is
+            // showing — it must never erase the answer under the user's eyes.
             summary:
-              p.error || !worthTelling
-                ? null // the status line carries any error
-                : `${p.applied ?? 0} applied · ${p.proposals ?? 0} proposed${
-                    p.stopped ? " · stopped by you" : ""
-                  }`,
+              p.error || !l.active
+                ? l.summary // the status line carries any error
+                : did || p.stopped
+                  ? `${p.applied ?? 0} applied · ${p.proposals ?? 0} proposed${
+                      p.stopped ? " · stopped by you" : ""
+                    }`
+                  : "Nothing new to organize — everything is already filed. Suggestions below still wait for your approval.",
           }));
           void invalidateJournal();
           void invalidateNotes();
@@ -279,6 +289,42 @@ export function ActivitySurface() {
       console.warn("journal action failed", e);
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
+      setBusy(null);
+    }
+  };
+
+  /** The whole Waiting lane in one deliberate click (Seth, 2026-07-31: "clean
+   * up of everything pending"). Sequential, continue-on-error — each row keeps
+   * its freshness guard, a stale row is skipped and counted, never a batch
+   * abort halfway with no report. */
+  const runAllPending = async (op: (a: BrainAction) => Promise<void>, verb: string) => {
+    setBusy("all-pending");
+    setErr(null);
+    setNote(null);
+    setDismissAllArmed(false);
+    let done = 0;
+    let skipped = 0;
+    let lastError: string | null = null;
+    try {
+      for (const a of pending) {
+        try {
+          await op(a);
+          done += 1;
+        } catch (e) {
+          skipped += 1; // usually a freshness guard — the note changed since
+          lastError = e instanceof Error ? e.message : String(e);
+        }
+        if ((done + skipped) % 10 === 0) setNote(`${verb} ${done + skipped} of ${pending.length}…`);
+      }
+      setNote(`${verb} ${done}${skipped > 0 ? ` · ${skipped} skipped (changed since proposed)` : ""}.`);
+      // NOTHING succeeded — that's a systemic failure, not N stale rows; say
+      // the real error instead of a false freshness story (review F4)
+      if (done === 0 && lastError) setErr(lastError);
+      await invalidateNotes();
+      await invalidateJournal();
+    } finally {
+      // finally, not tail — a failed invalidation must never wedge the lane
+      // at "Working…" (review F4)
       setBusy(null);
     }
   };
@@ -428,7 +474,7 @@ export function ActivitySurface() {
                 <button
                   type="button"
                   className="act-undo act-approve"
-                  disabled={busy === h.rel}
+                  disabled={busy !== null}
                   onClick={() => actOnHint(h.rel, () => corpusSetSecure(h.rel, true))}
                 >
                   Make secure
@@ -436,7 +482,7 @@ export function ActivitySurface() {
                 <button
                   type="button"
                   className="act-undo"
-                  disabled={busy === h.rel}
+                  disabled={busy !== null}
                   onClick={() => actOnHint(h.rel, () => organizerDismissSecure(h.rel))}
                 >
                   Not sensitive
@@ -481,7 +527,7 @@ export function ActivitySurface() {
           <button
             type="button"
             className="act-undo act-approve"
-            disabled={busy === "secure-repair"}
+            disabled={busy !== null}
             onClick={() => {
               setBusy("secure-repair");
               setErr(null);
@@ -515,9 +561,48 @@ export function ActivitySurface() {
           {/* ── Waiting for you: one row per NOTE, its suggestions folded ── */}
           {groups.length > 0 && (
             <>
-              <h3 className="act-section">
-                Waiting for you <span className="act-section-n">{pending.length}</span>
-              </h3>
+              <div className="act-section act-section-row">
+                <h3 className="act-section-title">
+                  Waiting for you <span className="act-section-n">{pending.length}</span>
+                </h3>
+                {brainOn && (
+                  <button
+                    type="button"
+                    className="act-undo act-approve"
+                    disabled={busy !== null}
+                    onClick={() => void runAllPending(approveProposal, "Approved")}
+                  >
+                    {busy === "all-pending" ? "Working…" : `Approve all ${pending.length}`}
+                  </button>
+                )}
+                {dismissAllArmed ? (
+                  <>
+                    <button type="button" className="act-undo" onClick={() => setDismissAllArmed(false)}>
+                      Keep
+                    </button>
+                    <button
+                      type="button"
+                      className="act-undo act-stop"
+                      disabled={busy !== null}
+                      onClick={() => {
+                        setDismissAllArmed(false);
+                        void runAllPending(dismissProposal, "Dismissed");
+                      }}
+                    >
+                      Dismiss all {pending.length}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="act-undo"
+                    disabled={busy !== null}
+                    onClick={() => setDismissAllArmed(true)}
+                  >
+                    Dismiss all…
+                  </button>
+                )}
+              </div>
               <ul className="recent-list">
                 {groups.map((g) => {
                   const open = openGroups.has(g.key) || g.rows.length === 1;
@@ -555,7 +640,7 @@ export function ActivitySurface() {
                             <button
                               type="button"
                               className="act-undo act-approve"
-                              disabled={busy === g.key}
+                              disabled={busy !== null}
                               onClick={() => void runGroup(g, approveProposal)}
                             >
                               Approve all
@@ -564,7 +649,7 @@ export function ActivitySurface() {
                           <button
                             type="button"
                             className="act-undo"
-                            disabled={busy === g.key}
+                            disabled={busy !== null}
                             onClick={() => void runGroup(g, dismissProposal)}
                           >
                             Dismiss all
@@ -594,7 +679,7 @@ export function ActivitySurface() {
                                     className="act-undo act-approve"
                                     // the group batch may be mid-flight on this
                                     // exact row — no concurrent twin (review F3)
-                                    disabled={busy === a.id || busy === g.key}
+                                    disabled={busy !== null}
                                     onClick={() => void run(a, approveProposal)}
                                   >
                                     Approve
@@ -603,7 +688,7 @@ export function ActivitySurface() {
                                 <button
                                   type="button"
                                   className="act-undo"
-                                  disabled={busy === a.id || busy === g.key}
+                                  disabled={busy !== null}
                                   onClick={() => void run(a, dismissProposal)}
                                 >
                                   Dismiss
@@ -655,7 +740,7 @@ export function ActivitySurface() {
                             <button
                               type="button"
                               className="act-undo"
-                              disabled={busy === a.id}
+                              disabled={busy !== null}
                               onClick={() => void run(a, undoAction)}
                             >
                               Undo
@@ -682,12 +767,7 @@ export function ActivitySurface() {
               {history.length > LOG_NUDGE_AT && (
                 <p>The journal holds {history.length} entries — clearing old logs keeps things quick.</p>
               )}
-              <button
-                type="button"
-                className="act-undo"
-                disabled={busy === "prune"}
-                onClick={() => prune(30)}
-              >
+              <button type="button" className="act-undo" disabled={busy !== null} onClick={() => prune(30)}>
                 Clear logs older than 30 days
               </button>
               {/* cleared history takes its Undo with it — an armed two-step,
@@ -700,7 +780,7 @@ export function ActivitySurface() {
                   <button
                     type="button"
                     className="act-undo act-stop"
-                    disabled={busy === "prune"}
+                    disabled={busy !== null}
                     onClick={() => {
                       setClearAllArmed(false);
                       prune(0);
@@ -713,7 +793,7 @@ export function ActivitySurface() {
                 <button
                   type="button"
                   className="act-undo"
-                  disabled={busy === "prune"}
+                  disabled={busy !== null}
                   onClick={() => setClearAllArmed(true)}
                 >
                   Clear all history…
