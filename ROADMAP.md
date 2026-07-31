@@ -42,6 +42,30 @@ becomes searchable, linkable, and organizable by the Librarian.
 - Pages are assets; recognized text is a note linked to its page.
 - Boards and notebooks converge: sketch, write, and type on one surface.
 
+## Publish to Substack — waiting on the official channel
+
+A note-level verb, not a surface: write in rotli's calm, clutter-free editor,
+then publish straight to Substack — no browser tab, no editor noise, no
+distraction between finishing a piece and shipping it. That's the whole point:
+rotli stays the clean place to write and think; Substack is just where it lands.
+
+**Deliberately parked (decided 2026-07-31).** Substack has no official publish
+API; every existing route is reverse-engineered private endpoints or browser
+automation — hacky, fragile, and against the spirit of their ToS, so we don't
+build on it. The official story is moving our way: Substack shipped a read-only
+analytics MCP on 2026-07-07 (`mcp.substack.com`, Bestseller publications only),
+and CEO Chris Best has said publicly that MCP write/act capabilities are coming.
+When the official write channel ships, this feature lights up through it.
+
+- Trigger: Substack's official MCP gains write/publish (watchlisted in Breve;
+  follow @chrisbest for the announcement).
+- Design already sketched: publish is a ⋯-menu/palette verb; draft-first (never
+  auto-publish); credentials in Keychain; `secure:` notes blocked by the
+  existing remote gate; state in `.rotli/`, never frontmatter; built behind a
+  provider abstraction so Ghost/Buttondown (real, stable APIs) can follow.
+- Interim option if wanted sooner: "Copy for Substack" (rich-HTML clipboard) —
+  touches no endpoints, can't break, zero ToS exposure.
+
 ## Returning ideas parked earlier
 
 - **Feature A — secure organization** (needs its own session with injection

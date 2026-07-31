@@ -864,6 +864,26 @@
 .act-waiting {
   color: var(--accent-text);
 }
+/* the standing status strip — rung · model · last pass · ⚙ (2026-07-31) */
+.act-strip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: -2px 22px 10px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.act-strip-main {
+  color: var(--text);
+  font-weight: 600;
+}
+.act-strip-sep {
+  color: var(--border);
+}
+.act-gear {
+  margin-left: auto;
+}
+
 /* the LIVE band — the daemon narrating what it's touching right now */
 .act-live {
   display: flex;

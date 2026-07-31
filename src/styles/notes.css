@@ -128,6 +128,19 @@
   color: var(--danger);
   font-weight: 600;
 }
+/* the ambient working dot (2026-07-31): pulses on the footer Librarian button
+   while a cycle or adopt batch runs — the "it IS doing something" signal.
+   Reuses memex.css's act-live-pulse keyframes; base.css reduced-motion
+   freezes it. */
+.sb-work-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--accent-text);
+  animation: act-live-pulse 1.6s ease-in-out infinite;
+}
+
 /* the quiet counterpart — pending approvals on the Librarian footer button
    (visible as a real pill so Suggest mode is never a silent queue) */
 .count.pill {

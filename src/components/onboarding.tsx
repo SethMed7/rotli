@@ -6,7 +6,7 @@
 // by hand. Shown by App.tsx while ui.onboarded is false (Tauri only); "Reset &
 // re-onboard" in Settings → General brings it back.
 
-import { type KeyboardEvent, useEffect, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Character } from "./character";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
@@ -490,8 +490,80 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const pending = useMemexStore((s) => s.pendingChoice);
   const needsLocation = step === "memory" && !pending?.path;
 
+  // ── keyboard flow (Seth, 2026-07-31): the whole setup without a mouse.
+  //    1-9 pick the nth card · arrows move between cards · Enter selects the
+  //    focused card (Enter again continues) · ⌘⏎ selects AND continues.
+  //    Component-scope key handling, same precedent as the ⌘K palette. ──
+  const rootRef = useRef<HTMLDivElement>(null);
+  const advance = () => {
+    if (needsLocation) return;
+    if (i === last) finish();
+    else go(1);
+  };
+  useEffect(() => {
+    // keys must land somewhere useful on every step — the name step's input
+    // autofocuses itself; everywhere else the card container takes focus
+    if (step === "name") return;
+    const active = document.activeElement;
+    if (!active || active === document.body) rootRef.current?.focus();
+  }, [step]);
+  const stepCards = (): HTMLButtonElement[] =>
+    Array.from(rootRef.current?.querySelectorAll<HTMLButtonElement>(".onb-choice, .famcard") ?? []);
+  const onFlowKeys = (e: KeyboardEvent<HTMLDivElement>) => {
+    const t = e.target as HTMLElement;
+    // inputs own their keys (the name field, the chord recorder)
+    if (t.closest("input, textarea") || t.isContentEditable) return;
+    const cards = stepCards();
+    // bare digits only — ⌘1..⌘9 belong to the system/app, never card picks (F6)
+    const digit = e.metaKey || e.ctrlKey || e.altKey ? Number.NaN : Number.parseInt(e.key, 10);
+    if (digit >= 1 && digit <= cards.length) {
+      e.preventDefault();
+      const card = cards[digit - 1];
+      card?.focus();
+      card?.click();
+      return;
+    }
+    if (["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(e.key) && cards.length > 0) {
+      e.preventDefault();
+      const cur = cards.findIndex((c) => c === document.activeElement);
+      const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1;
+      const next =
+        cur < 0
+          ? cards[delta > 0 ? 0 : cards.length - 1]
+          : cards[(cur + delta + cards.length) % cards.length];
+      next?.focus();
+      return;
+    }
+    if (e.key !== "Enter") return;
+    const onCard = t.closest?.(".onb-choice, .famcard");
+    if (e.metaKey) {
+      // ⌘⏎ — select whatever is focused (if unselected) and move on
+      e.preventDefault();
+      if (onCard instanceof HTMLButtonElement && onCard.getAttribute("aria-pressed") !== "true") {
+        onCard.click();
+      }
+      advance();
+      return;
+    }
+    if (onCard) {
+      // a SELECTED card's Enter means "and continue"; an unselected card's
+      // Enter falls through to the native button click (= select)
+      if (onCard.getAttribute("aria-pressed") === "true") {
+        e.preventDefault();
+        advance();
+      }
+      return;
+    }
+    // Enter anywhere neutral advances; real buttons (Back/Continue/Skip/chord
+    // rows) keep their native Enter behavior
+    if (t.tagName !== "BUTTON") {
+      e.preventDefault();
+      advance();
+    }
+  };
+
   return (
-    <div className="onb">
+    <div className="onb" ref={rootRef} tabIndex={-1} onKeyDown={onFlowKeys}>
       <div className="onb-drag" data-tauri-drag-region />
       <div className="onb-card">
         {step === "welcome" && (

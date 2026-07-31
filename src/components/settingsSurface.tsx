@@ -1163,7 +1163,7 @@ const TRUST_CAPTIONS: Record<OrganizerTrust, string> = {
   suggest: "Nothing happens by itself. Every change waits in the Librarian for your approval.",
   tidy: "Files new captures and fills in metadata by itself. Each area's overview page still waits for your OK — that's the one thing Organize adds.",
   organize:
-    "Everything Tidy does, plus it keeps each area's overview page fresh on its own (the default) — all journaled, all undoable.",
+    "Everything Tidy does, plus it keeps each area's overview page fresh on its own (the default) — all journaled, all undoable. Metadata suggestions never pile up: leftovers apply themselves.",
 };
 
 function BrainPane() {
@@ -2262,6 +2262,14 @@ function PluginsPane() {
 
 export function SettingsSurface() {
   const [pane, setPane] = useState<SettingsPane>("general");
+  // a surface elsewhere asked for a SPECIFIC pane (the Librarian's gear →
+  // Settings → Librarian, 2026-07-31) — consume the one-shot request
+  const paneRequest = useUiStore((s) => s.settingsPaneRequest);
+  useEffect(() => {
+    if (!paneRequest) return;
+    if (NAV.some((p) => p.id === paneRequest)) setPane(paneRequest as SettingsPane);
+    useUiStore.getState().setSettingsPaneRequest(null);
+  }, [paneRequest]);
 
   return (
     <div className="settings">

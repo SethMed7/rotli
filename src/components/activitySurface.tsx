@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type BrainAction, canUndo, deriveJournal, describeAction } from "../services/brainJournal";
 import { approveProposal, dismissProposal, undoAction } from "../services/brainJournalComposition";
-import { daysSinceMidnight } from "../lib/dateLabels";
+import { daysSinceMidnight, relativeLabel } from "../lib/dateLabels";
 import {
   corpusJournalPrune,
   corpusSetSecure,
@@ -36,7 +36,20 @@ import { useTransientPopover } from "../lib/popover";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { Character } from "./character";
-import { ChevronRight } from "./glyphs";
+import { ChevronRight, GearGlyph } from "./glyphs";
+
+/** The status strip's plain words for the trust rung + organizing model. */
+const TRUST_WORDS: Record<string, string> = {
+  off: "Off",
+  suggest: "Suggest — everything waits for your OK",
+  tidy: "Tidy — new captures file themselves",
+  organize: "Organize — working by itself in the background",
+};
+const MODEL_WORDS: Record<string, string> = {
+  local: "On this Mac",
+  claude: "Claude Sonnet 5",
+  gemini35: "Gemini 3.5 Flash",
+};
 
 /** History longer than this earns the quiet "clear old logs" nudge (§4.8:
  * show, never nag — one line, two buttons, no badge). */
@@ -132,7 +145,8 @@ function LibrarianIntro({ onClose }: { onClose: () => void }) {
           <br />
           <em>Suggest</em> — nothing happens until you approve it here. · <em>Tidy</em> — files new captures
           and fills metadata by itself; area overview pages still wait for your OK. · <em>Organize</em> — Tidy
-          plus keeps each area&rsquo;s overview page fresh, all on its own.
+          plus keeps each area&rsquo;s overview page fresh, all on its own; metadata suggestions never pile
+          up. Only one thing always waits for you at every rung: filing a note it isn&rsquo;t sure about.
         </p>
         <button type="button" className="ghostbtn primary lib-intro-ok" onClick={onClose}>
           Got it
@@ -157,6 +171,8 @@ export function ActivitySurface() {
   // journal HISTORY stays (it happened), and security surfaces (secure-note
   // repair, the review lane) are vault properties that never turn off.
   const brainOn = useUiStore((s) => s.brainEnabled);
+  const trust = useUiStore((s) => s.organizerTrust);
+  const model = useUiStore((s) => s.organizerModel);
   const introSeen = useUiStore((s) => s.librarianIntroSeen);
   const setIntroSeen = useUiStore((s) => s.setLibrarianIntroSeen);
   const status = useOrganizerStatus().data;
@@ -176,6 +192,10 @@ export function ActivitySurface() {
   useEffect(() => setDismissAllArmed(false), [pendingCount]);
   const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
   const [stopRequested, setStopRequested] = useState(false);
+  // the explicit Run now must react INSTANTLY (Seth, 2026-07-31: "issues with
+  // visually seeing something is even happening") — the band shows on click,
+  // and a fallback timer explains the one case a start can't come (a chat)
+  const runNowTimer = useRef<number | null>(null);
   const [live, setLive] = useState<LiveRun>({
     active: false,
     total: 0,
@@ -205,6 +225,10 @@ export function ActivitySurface() {
   useEffect(
     () =>
       onOrganizerProgress((p) => {
+        if (runNowTimer.current !== null) {
+          window.clearTimeout(runNowTimer.current);
+          runNowTimer.current = null;
+        }
         if (p.phase === "start") {
           // a stale Stop request (pressed against a phantom busy) must not
           // wedge the button into "Stopping…" for the next real run (review F1)
@@ -316,7 +340,11 @@ export function ActivitySurface() {
         }
         if ((done + skipped) % 10 === 0) setNote(`${verb} ${done + skipped} of ${pending.length}…`);
       }
-      setNote(`${verb} ${done}${skipped > 0 ? ` · ${skipped} skipped (changed since proposed)` : ""}.`);
+      // at Organize the background adopter may have beaten this batch to some
+      // rows — "already applied" is the honest story, not a complaint (F3)
+      setNote(
+        `${verb} ${done}${skipped > 0 ? ` · ${skipped} skipped (already applied or changed since)` : ""}.`,
+      );
       // NOTHING succeeded — that's a systemic failure, not N stale rows; say
       // the real error instead of a false freshness story (review F4)
       if (done === 0 && lastError) setErr(lastError);
@@ -411,7 +439,17 @@ export function ActivitySurface() {
               style={{ marginLeft: "auto" }}
               title="Run one organizer pass now (it never interrupts a chat)"
               onClick={() => {
-                setLive((l) => ({ ...l, summary: null }));
+                // the band appears ON CLICK — never a dead-feeling button;
+                // the daemon's start event refines it, and the one case a
+                // start can't come (an in-flight chat) explains itself
+                setNote(null);
+                setLive({ active: true, total: 0, seen: 0, current: null, summary: null });
+                if (runNowTimer.current !== null) window.clearTimeout(runNowTimer.current);
+                runNowTimer.current = window.setTimeout(() => {
+                  runNowTimer.current = null;
+                  setLive((l) => (l.active && l.seen === 0 && l.total === 0 ? { ...l, active: false } : l));
+                  setNote("Queued — the pass starts the moment any in-flight chat finishes.");
+                }, 8000);
                 organizerRunOnce().then(
                   () => void invalidateJournal(),
                   (e) => setErr(e instanceof Error ? e.message : String(e)),
@@ -422,6 +460,39 @@ export function ActivitySurface() {
             </button>
           ))}
       </header>
+      {/* the standing status strip: what the Librarian IS right now — rung,
+          model, last pass — with its settings ONE click away (Seth,
+          2026-07-31: "no way to see my librarian settings from here") */}
+      {brainOn && status?.running && (
+        <div className="act-strip">
+          <span className="act-strip-main">{TRUST_WORDS[trust] ?? trust}</span>
+          <span className="act-strip-sep" aria-hidden="true">
+            ·
+          </span>
+          <span>{MODEL_WORDS[model] ?? model}</span>
+          {status.lastRunAt && Number.isFinite(Date.parse(status.lastRunAt)) && (
+            <>
+              <span className="act-strip-sep" aria-hidden="true">
+                ·
+              </span>
+              <span title={status.lastRunAt}>last pass {relativeLabel(Date.parse(status.lastRunAt))}</span>
+            </>
+          )}
+          <button
+            type="button"
+            className="act-help act-gear"
+            aria-label="Librarian settings"
+            title="Librarian settings"
+            onClick={() => {
+              const ui = useUiStore.getState();
+              ui.setSettingsPaneRequest("brain");
+              ui.setSettingsOpen(true);
+            }}
+          >
+            <GearGlyph size={13} />
+          </button>
+        </div>
+      )}
       {/* the LIVE band — the daemon narrating exactly what it's touching */}
       {running && (
         <div className="act-live" role="status">

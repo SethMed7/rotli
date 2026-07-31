@@ -397,6 +397,11 @@ interface UiState {
    * button in the surface re-opens it anytime. Persisted. */
   librarianIntroSeen: boolean;
   setLibrarianIntroSeen: (seen: boolean) => void;
+  /** A one-shot request for WHICH Settings pane opens next (2026-07-31: the
+   * Librarian's gear jumps straight to Settings → Librarian). Consumed by the
+   * Settings surface on open; null = the surface's own last pane. */
+  settingsPaneRequest: string | null;
+  setSettingsPaneRequest: (pane: string | null) => void;
 
   /** A newer signed build is on the feed — set once by App.tsx's quiet on-mount
    * check (CARL rule 2: no auto-download, no modal). Just lets Settings → General
@@ -567,7 +572,10 @@ export const useUiStore = create<UiState>((set, get) => ({
   setPreviewItem: (item) => set({ previewItem: item }),
 
   settingsOpen: false,
-  setSettingsOpen: (open) => set({ settingsOpen: open }),
+  // closing also clears any un-consumed pane request — a gear click that was
+  // Esc'd before the lazy surface mounted must not redirect the NEXT open (F8)
+  setSettingsOpen: (open) =>
+    set(open ? { settingsOpen: true } : { settingsOpen: false, settingsPaneRequest: null }),
 
   contentView: "panes",
   setContentView: (view) => set({ contentView: view }),
@@ -642,6 +650,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setOrganizerQuietSecs: (n) => set({ organizerQuietSecs: n }),
   librarianIntroSeen: false,
   setLibrarianIntroSeen: (seen) => set({ librarianIntroSeen: seen }),
+  settingsPaneRequest: null,
+  setSettingsPaneRequest: (pane) => set({ settingsPaneRequest: pane }),
 
   updateAvailable: false,
   setUpdateAvailable: (on) => set({ updateAvailable: on }),

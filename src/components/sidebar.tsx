@@ -71,6 +71,7 @@ import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { InlineRenameInput } from "./inlineRenameInput";
 import { useNoteMenu } from "./useNoteMenu";
 import { deriveJournal } from "../services/brainJournal";
+import { useOrganizerLive } from "../state/organizerLive";
 import {
   useCorpusRoots,
   useFolders,
@@ -352,6 +353,9 @@ export function Sidebar() {
   // DISK SCAN poll too — repair only feeds the leftover line, not this badge
   // (review F7; perf-audit family #12-14)
   const secureConfirms = (useSecureHints().data ?? []).filter((h) => !h.flagged).length;
+  // the ambient Librarian working signal — pulses the footer dot (2026-07-31)
+  const organizerWorking = useOrganizerLive((s) => s.active);
+  const organizerCurrent = useOrganizerLive((s) => s.current);
   // open checkboxes across the corpus — the Tasks smart row's count
   const openTaskCount = useTasks().data?.length ?? 0;
   // raw vault (vault-vs-brain, 2026-07-26): the Brain section's copy changes —
@@ -2122,18 +2126,24 @@ export function Sidebar() {
               type="button"
               className="sb-footbtn"
               title={
-                secureConfirms > 0
-                  ? `${secureConfirms} sensitive-data ${secureConfirms === 1 ? "decision waits" : "decisions wait"} for you`
-                  : pendingProposals > 0
-                    ? `${pendingProposals} ${pendingProposals === 1 ? "suggestion waits" : "suggestions wait"} for your approval`
-                    : brainEnabledUi
-                      ? "See and undo the Librarian's work"
-                      : "The Librarian's journal"
+                organizerWorking
+                  ? `Organizing${organizerCurrent ? ` — looking at “${organizerCurrent}”` : "…"}`
+                  : secureConfirms > 0
+                    ? `${secureConfirms} sensitive-data ${secureConfirms === 1 ? "decision waits" : "decisions wait"} for you`
+                    : pendingProposals > 0
+                      ? `${pendingProposals} ${pendingProposals === 1 ? "suggestion waits" : "suggestions wait"} for your approval`
+                      : brainEnabledUi
+                        ? "See and undo the Librarian's work"
+                        : "The Librarian's journal"
               }
               onClick={() => usePanesStore.getState().openActivity()}
             >
               <ActivityGlyph size={14} />
               <span className="fname">Librarian</span>
+              {/* the ambient working dot (Seth, 2026-07-31): the Librarian's
+                  work is visible from anywhere — pulses while a cycle or an
+                  adopt batch runs, from the SAME narration the surface shows */}
+              {organizerWorking && <span className="sb-work-dot" aria-hidden="true" />}
               {/* RED = a sensitive-data decision waits (never auto-resolved);
                   otherwise the pending-approval count so Suggest mode is
                   never a silent queue */}

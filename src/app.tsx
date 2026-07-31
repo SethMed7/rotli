@@ -35,6 +35,7 @@ import {
   onCaptureSave,
   onCorpusChanged,
   onOpenRequest,
+  onOrganizerProgress,
   onQuickSet,
   onRebind,
   onSummonChat,
@@ -56,6 +57,8 @@ import {
   writeNote,
 } from "./memex/service";
 import { summonChat } from "./services/chatSummon";
+import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
+import { useOrganizerLive } from "./state/organizerLive";
 import { flushSettingsNow } from "./state/persist";
 import { hydrateMain } from "./state/main";
 import { hydrateViews } from "./state/views";
@@ -256,12 +259,35 @@ function MainShell() {
   }, []);
 
   // the daemon journaled (a proposal or an auto-applied action) — refetch the
-  // journal (Activity + the sidebar badge) AND the notes an apply may have moved
+  // journal (Activity + the sidebar badge) AND the notes an apply may have
+  // moved. At Organize, stale metadata suggestions also adopt themselves
+  // (Seth, 2026-07-31: "it is working for me in the back") — same guarded
+  // approve lane the buttons use, journaled and undoable.
   useEffect(
     () =>
       onBrainJournal(() => {
         void invalidateJournal();
         void invalidateNotes();
+        void adoptPendingAtOrganize();
+      }),
+    [],
+  );
+  // and once at startup — a backlog left by an older version clears itself
+  useEffect(() => {
+    if (!isTauri()) return;
+    void adoptPendingAtOrganize();
+  }, []);
+
+  // the ambient working signal (Seth, 2026-07-31): the daemon's narration
+  // feeds a tiny store the sidebar's footer dot reads — the Librarian's work
+  // is visible from anywhere, not only inside its surface
+  useEffect(
+    () =>
+      onOrganizerProgress((p) => {
+        const live = useOrganizerLive.getState();
+        if (p.phase === "start") live.setLive(true);
+        else if (p.phase === "note") live.setLive(true, p.title ?? null);
+        else live.setLive(false);
       }),
     [],
   );
