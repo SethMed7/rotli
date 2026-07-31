@@ -21,7 +21,9 @@ tauri-build = { version = "2", features = [] }
 # macos-private-api: groundwork for the transparent always-on-top capture card (1c).
 tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api", "protocol-asset"] }
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-deep-link = "2"                                     # rotli:// links (CLI/MCP → the app)
 tauri-plugin-dialog = "2"                                        # native folder picker (move the corpus)
+percent-encoding = "2"                                           # deep-link id encoding (already transitive)
 tauri-plugin-updater = "2"                                       # in-app updates (signed feed → download + relaunch)
 tauri-plugin-process = "2"                                       # relaunch() after an update installs
 ureq = { version = "2", features = ["json"] }                   # Chat front: POST the on-device model from Rust (the webview CSP blocks localhost)

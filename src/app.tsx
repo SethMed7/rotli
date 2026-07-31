@@ -38,6 +38,7 @@ import {
   onQuickSet,
   onRebind,
   onSummonChat,
+  onSummonSearch,
   onThemeSet,
   setAppIcon,
   setDockVisible,
@@ -267,6 +268,9 @@ function MainShell() {
 
   // ⌥A fired OS-side (Rust already showed the window) — land in a chat
   useEffect(() => onSummonChat(() => void summonChat()), []);
+
+  // ⌥F fired OS-side — land in the ⌘K palette ("find", ⌥A's search twin)
+  useEffect(() => onSummonSearch(() => useUiStore.getState().setPaletteOpen(true)), []);
 
   // external file drop. Tauri's OS drag-drop gives PATHS + the drop position. An
   // IMAGE dropped over the editor is imported into storage/ AND inserted at the

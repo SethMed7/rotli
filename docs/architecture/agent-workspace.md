@@ -103,6 +103,16 @@ Rotli. The main webview consumes and deletes the request and routes it through
 `openSummary`, exactly like a sidebar or palette selection. The mailbox never
 contains note content.
 
+The app also registers the `rotli://` URL scheme (2026-07-31). A clicked
+`rotli://open?id=…&kind=note|board|file` link rides the SAME mailbox lane: the
+running app validates the link (ids only — ULID or in-corpus relative path,
+percent-encoded; hostile shapes are ignored), writes the mailbox, surfaces the
+window, and lets the webview consume it. Note/create/query/board results and
+`rotli open` include a ready-made `deepLink` field so agents can print a
+clickable way back into the app alongside the disk path. Items in connected
+(non-default) roots carry no `deepLink` — the open lane serves the default
+workspace only, so a link would be a dead click.
+
 ## Context and output limits
 
 - CLI output is structured JSON and may return full note/board bodies when the

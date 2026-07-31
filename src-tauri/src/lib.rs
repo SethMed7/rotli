@@ -48,6 +48,7 @@ const DEFAULT_MAIN_TOGGLE: &str = "Alt+Space";
 const DEFAULT_CAPTURE: &str = "Alt+C";
 const DEFAULT_QUICK: &str = "Alt+Q";
 const DEFAULT_CHAT_SUMMON: &str = "Alt+A";
+const DEFAULT_SEARCH_SUMMON: &str = "Alt+F"; // "find" — summon the window with ⌘K open
 
 /// Clicking the tray icon steals focus from the window, so blur fires (and
 /// hides it) *before* the tray click arrives. Within this grace window the
@@ -105,6 +106,112 @@ mod reopen_tests {
     }
 }
 
+/// Validate one `rotli://open?id=…&kind=…` link into `(id, kind)`. Pure so the
+/// refusal law is unit-tested: ids only (ULID or in-corpus relative path —
+/// resolution happens inside the corpus), kind from the open lane's allowlist,
+/// and hostile shapes (absolute paths, traversal, control chars) are None.
+fn parse_deep_link(url: &tauri::Url) -> Option<(String, String)> {
+    if url.scheme() != "rotli" || url.host_str() != Some("open") {
+        return None;
+    }
+    let mut id = String::new();
+    let mut kind = "note".to_string();
+    for (k, v) in url.query_pairs() {
+        match k.as_ref() {
+            "id" => id = v.into_owned(),
+            "kind" => kind = v.into_owned(),
+            _ => {}
+        }
+    }
+    if id.is_empty() || id.len() > 512 {
+        return None;
+    }
+    // `..` only as a FULL path segment — `draft..final.md` is a legal filename
+    // (review F2); backslashes and control chars stay refused outright.
+    if id.starts_with('/')
+        || id.split('/').any(|seg| seg == "..")
+        || id.contains('\\')
+        || id.chars().any(char::is_control)
+    {
+        return None;
+    }
+    if !matches!(kind.as_str(), "note" | "board" | "file") {
+        return None;
+    }
+    Some((id, kind))
+}
+
+/// One accepted deep link → write the one-shot mailbox at the default root,
+/// surface the window, and let the webview consume it (the exact flow of
+/// `rotli open`, minus the redundant `open -a rotli` — we ARE the app).
+fn handle_deep_link(app: &AppHandle, url: &tauri::Url) {
+    let Some((id, kind)) = parse_deep_link(url) else {
+        return;
+    };
+    let Ok(root) = app.state::<corpus::CorpusState>().default_root_path() else {
+        return;
+    };
+    let path = root.join(".rotli").join("workspace-open.json");
+    let Some(parent) = path.parent() else { return };
+    if std::fs::create_dir_all(parent).is_err() {
+        return;
+    }
+    let body = serde_json::json!({ "id": id, "kind": kind }).to_string();
+    if fsutil::atomic_write(&path, &body, ".rotli-open-").is_err() {
+        return;
+    }
+    show_main(app);
+    let _ = app.emit_to("main", "rotli:open-request", ());
+}
+
+#[cfg(test)]
+mod deep_link_tests {
+    use super::parse_deep_link;
+
+    fn parse(s: &str) -> Option<(String, String)> {
+        parse_deep_link(&s.parse::<tauri::Url>().unwrap())
+    }
+
+    #[test]
+    fn accepts_ulid_and_rel_path_ids_with_kinds() {
+        assert_eq!(
+            parse("rotli://open?id=01J8Z9ABCDEF"),
+            Some(("01J8Z9ABCDEF".into(), "note".into()))
+        );
+        assert_eq!(
+            parse("rotli://open?id=wiki%2Fprojects%2Fplan.md&kind=note"),
+            Some(("wiki/projects/plan.md".into(), "note".into()))
+        );
+        assert_eq!(
+            parse("rotli://open?id=Board%2Fsketch.excalidraw&kind=board"),
+            Some(("Board/sketch.excalidraw".into(), "board".into()))
+        );
+    }
+
+    #[test]
+    fn refuses_hostile_or_malformed_links() {
+        assert_eq!(parse("rotli://open"), None); // no id
+        assert_eq!(parse("rotli://open?id=%2Fetc%2Fpasswd"), None); // absolute
+        assert_eq!(parse("rotli://open?id=..%2F..%2Fsecrets.md"), None); // traversal
+        // fully percent-encoded traversal decodes BEFORE the checks — pinned
+        // so the decode-then-validate ordering can never regress
+        assert_eq!(parse("rotli://open?id=%2e%2e%2f%2e%2e%2fsecrets.md"), None);
+        assert_eq!(parse("rotli://open?id=wiki%2F..%2Fsecrets.md"), None); // mid-path segment
+        assert_eq!(parse("rotli://open?id=a&kind=chat"), None); // kind not in the lane
+        assert_eq!(parse("rotli://elsewhere?id=a"), None); // unknown verb
+        assert_eq!(parse("https://open?id=a"), None); // wrong scheme
+    }
+
+    #[test]
+    fn dots_inside_a_filename_are_not_traversal() {
+        // review F2: `..` as a SUBSTRING is legal — only a full `..` segment is
+        assert_eq!(
+            parse("rotli://open?id=wiki%2Fdraft..final.md"),
+            Some(("wiki/draft..final.md".into(), "note".into()))
+        );
+    }
+}
+
 /// The OS-registered accelerators, per global registry action (rebindable
 /// from the frontend via the `set_summon_shortcut` command).
 struct GlobalChords {
@@ -116,6 +223,8 @@ struct GlobalChords {
     quick: Mutex<Option<String>>,
     /// `chat.summon` — surface the main window and land in a chat ("ask").
     chat: Mutex<Option<String>>,
+    /// `palette.summon` — surface the main window with ⌘K search open ("find").
+    search: Mutex<Option<String>>,
 }
 
 /// When the main window was last hidden because it lost focus.
@@ -910,6 +1019,7 @@ fn set_summon_shortcut(
         "app.toggleWindow" => chords.main_toggle.lock().unwrap(),
         "quick.summon" => chords.quick.lock().unwrap(),
         "chat.summon" => chords.chat.lock().unwrap(),
+        "palette.summon" => chords.search.lock().unwrap(),
         other => return Err(format!("unknown global action: {other}")),
     };
     if let Some(old) = current.as_deref() {
@@ -936,6 +1046,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -967,6 +1078,14 @@ pub fn run() {
                         // chat, not hide the app); the webview picks/creates the chat
                         show_main(app);
                         let _ = app.emit_to("main", "rotli:summon-chat", ());
+                        return;
+                    }
+                    let search = chords.search.lock().unwrap().clone();
+                    if search.as_deref().is_some_and(matches) {
+                        // ⌥F: same SHOW-never-toggle law — "find" must always land
+                        // you in the palette; the webview opens ⌘K
+                        show_main(app);
+                        let _ = app.emit_to("main", "rotli:summon-search", ());
                     }
                 })
                 .build(),
@@ -976,6 +1095,7 @@ pub fn run() {
             main_toggle: Mutex::new(Some(DEFAULT_MAIN_TOGGLE.to_string())),
             quick: Mutex::new(Some(DEFAULT_QUICK.to_string())),
             chat: Mutex::new(Some(DEFAULT_CHAT_SUMMON.to_string())),
+            search: Mutex::new(Some(DEFAULT_SEARCH_SUMMON.to_string())),
         })
         .manage(LastBlurHide(Mutex::new(None)))
         .manage(LastPanelSummon(Mutex::new(None)))
@@ -1244,6 +1364,29 @@ pub fn run() {
                 organizer::spawn_organizer(app.handle().clone(), organizer_handle, mx_id, mx_root);
             }
 
+            // rotli:// deep links (2026-07-31): a clicked link rides the SAME
+            // one-shot mailbox lane `rotli open` uses — the webview consumes it
+            // through rotli:open-request. Ids only, validated in
+            // parse_deep_link; a link can never name an arbitrary disk path,
+            // and a malformed link is ignored, never an error surface.
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let handle = app.handle().clone();
+                app.deep_link().on_open_url(move |event| {
+                    for url in event.urls() {
+                        handle_deep_link(&handle, &url);
+                    }
+                });
+                // cold start: a click LAUNCHED the app — sweep the URLs that
+                // arrived before this listener existed (plugin-recommended)
+                let handle = app.handle().clone();
+                if let Ok(Some(urls)) = app.deep_link().get_current() {
+                    for url in urls {
+                        handle_deep_link(&handle, &url);
+                    }
+                }
+            }
+
             // ⌥Space opens the app; ⌥C is the one-breath capture (both rebindable).
             // Best-effort: another app owning a chord (launchers love ⌥Space)
             // must DEGRADE — the app still launches, the chord stays rebindable
@@ -1255,6 +1398,7 @@ pub fn run() {
                     (DEFAULT_CAPTURE, &chords.capture),
                     (DEFAULT_QUICK, &chords.quick),
                     (DEFAULT_CHAT_SUMMON, &chords.chat),
+                    (DEFAULT_SEARCH_SUMMON, &chords.search),
                 ] {
                     if let Err(e) = app.global_shortcut().register(chord) {
                         eprintln!("rotli: global shortcut {chord} unavailable ({e}) — rebind it in Settings");

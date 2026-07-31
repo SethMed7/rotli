@@ -610,6 +610,14 @@ export function registerDefaultActions(): void {
     // run() keeps palette/dispatch parity for in-app invocation
     run: () => void summonChat(),
   });
+  registerAction({
+    id: "palette.summon",
+    title: "Summon search",
+    defaultChord: "Alt+F", // "find" — the ⌥-letter global family's search twin
+    global: true, // Rust shows the window + emits rotli:summon-search;
+    // in-app it force-OPENS the palette (never toggles — same law as ⌥A)
+    run: () => useUiStore.getState().setPaletteOpen(true),
+  });
   // — note ↔ chat: a note owns MANY chats (Seth, 2026-07-30). ⌘⇧C continues
   //   the most recently touched one (creating the first when none exists);
   //   the New variant always adds another. The editor's chat chip is the

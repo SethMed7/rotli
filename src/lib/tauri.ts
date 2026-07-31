@@ -1199,6 +1199,14 @@ export function onBrainJournal(cb: () => void): () => void {
   return () => void unlisten.then((fn) => fn());
 }
 
+/** Rust → main window: the ⌥F global chord fired — surface the window with the
+ * ⌘K palette open ("find", the search twin of ⌥A's "ask"). */
+export function onSummonSearch(cb: () => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen("rotli:summon-search", () => cb());
+  return () => void unlisten.then((fn) => fn());
+}
+
 /** One live organizer-progress beat (2026-07-31): the daemon narrates a cycle
  * — start (queue size), each note it looks at (title only, never content),
  * and the end tally. The Activity surface renders these as the working feed. */

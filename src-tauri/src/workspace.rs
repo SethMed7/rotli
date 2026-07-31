@@ -54,6 +54,44 @@ struct NoteReadResult {
     note: NoteDoc,
     revision: String,
     document: MarkdownDocument,
+    /// Clickable `rotli://open?…` link for THIS item (2026-07-31) — agents
+    /// print it so the human can jump straight into the app. None when a
+    /// working link can't be minted (connected roots — the open lane serves
+    /// the default root only; ids the parser can't round-trip).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    deep_link: Option<String>,
+}
+
+/// Whether the deep-link parser can round-trip this id (review F2): `..` as a
+/// full segment and backslashes are refused on the way IN, so a link carrying
+/// them would be a silent dead click — never mint one.
+fn deep_linkable(wire_id: &str) -> bool {
+    !wire_id.contains('\\')
+        && !wire_id.split('/').any(|seg| seg == "..")
+        && !wire_id.chars().any(char::is_control)
+}
+
+/// The clickable `rotli://open?id=…&kind=…` form of one wire id. The id is
+/// percent-encoded (rel-path ids carry `/`); kind mirrors the open lane.
+fn deep_link_for(wire_id: &str, kind: &str) -> String {
+    use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+    // encode everything that could confuse a URL or a terminal linkifier;
+    // keep unreserved chars readable
+    const SET: &AsciiSet = &CONTROLS
+        .add(b' ')
+        .add(b'"')
+        .add(b'#')
+        .add(b'%')
+        .add(b'&')
+        .add(b'+')
+        .add(b'/')
+        .add(b':')
+        .add(b'<')
+        .add(b'=')
+        .add(b'>')
+        .add(b'?')
+        .add(b'\\');
+    format!("rotli://open?id={}&kind={kind}", utf8_percent_encode(wire_id, SET))
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -103,6 +141,8 @@ struct NoteQueryRow {
     path: String,
     filename: String,
     snippet: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    deep_link: Option<String>,
     metadata: BTreeMap<String, Vec<String>>,
 }
 
@@ -122,6 +162,8 @@ struct BoardReadResult {
     outline: Vec<BoardOutlineItem>,
     description: String,
     tags: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    deep_link: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -300,8 +342,10 @@ impl Workspace {
             }
             let mut visible_metadata = metadata;
             visible_metadata.remove("text");
+            let wire_id = self.wire(&meta.id);
             rows.push(NoteQueryRow {
-                id: self.wire(&meta.id),
+                deep_link: self.deep_link_of(&wire_id, "note"),
+                id: wire_id,
                 title: meta.title,
                 path: rel.clone(),
                 filename: Path::new(&rel)
@@ -332,11 +376,20 @@ impl Workspace {
         note.id = self.wire(&note.id);
         note.folder_id = self.wire(&note.folder_id);
         note.disk_folder_id = self.wire(&note.disk_folder_id);
+        let deep_link = self.deep_link_of(&note.id, "note");
         Ok(NoteReadResult {
             document: markdown_document(&note.body),
             note,
             revision: revision(&bytes),
+            deep_link,
         })
+    }
+
+    /// Mint the clickable link only when it will actually WORK (review F1):
+    /// the open lane serves the default root, so a connected-root link would
+    /// be a dead click; ids the parser can't round-trip get no link either.
+    fn deep_link_of(&self, wire_id: &str, kind: &str) -> Option<String> {
+        (self.root.is_default && deep_linkable(wire_id)).then(|| deep_link_for(wire_id, kind))
     }
 
     fn update_note(
@@ -799,12 +852,14 @@ impl Workspace {
             .to_string();
         board.id = self.wire(&board.id);
         board.folder_id = self.wire(&board.folder_id);
+        let deep_link = self.deep_link_of(&board.id, "board");
         Ok(BoardReadResult {
             board,
             revision,
             outline,
             description,
             tags,
+            deep_link,
         })
     }
 
@@ -888,7 +943,12 @@ impl Workspace {
                 return Err("macOS could not open the Rotli app".into());
             }
         }
-        Ok(json!({ "queued": true, "id": local_id, "kind": kind }))
+        Ok(json!({
+            "queued": true,
+            "id": local_id,
+            "kind": kind,
+            "deepLink": self.deep_link_of(&self.wire(local_id), kind),
+        }))
     }
 }
 
@@ -2021,7 +2081,8 @@ fn workspace_policy() -> Value {
         "privacy": "Secure, locked, and secret-shaped Markdown is omitted or refused. Board scenes have no secure classification and must not contain secrets.",
         "mutations": "Write tools require client-side approval. Complete replacement, removal, move, view reassignment, and board action tools advertise destructiveHint so a host can require confirmation.",
         "limits": { "requestBytes": MCP_MAX_REQUEST_BYTES, "outputBytes": MCP_MAX_OUTPUT_BYTES, "boardActions": crate::board::BOARD_MAX_ACTIONS },
-        "transport": "The MCP server uses local stdio only and opens no network listener."
+        "transport": "The MCP server uses local stdio only and opens no network listener.",
+        "links": "deepLink fields carry rotli://open?id=…&kind=… URLs. The app validates ids inside the corpus only; a link can never name an arbitrary disk path. Show the link to the human when you create or reference an item."
     })
 }
 
@@ -2238,7 +2299,13 @@ rotli mcp config                                                 # Claude/Codex 
 
 Note bodies are text/markdown without YAML frontmatter; Rotli owns frontmatter.
 Every update requires the revision returned by read. Notes created in a memex
-land in wiki/_inbox and are referenced from Main immediately."#;
+land in wiki/_inbox and are referenced from Main immediately.
+
+Read/create/query/board results include a clickable deepLink
+(rotli://open?id=...&kind=note|board|file) that surfaces the item in the app;
+`rotli open` returns the same link. Print it so humans can jump to the item.
+Items in connected (non-default) roots carry no deepLink — the open lane
+serves the default workspace only."#;
 
 fn run_mcp() -> Result<(), String> {
     let stdin = io::stdin();
@@ -2695,6 +2762,7 @@ fn paged_note(result: NoteReadResult, offset: usize, max_chars: usize) -> Result
         },
         "revision": result.revision,
         "document": result.document,
+        "deepLink": result.deep_link,
         "page": { "offset": offset, "nextOffset": if end < chars.len() { Some(end) } else { None }, "totalChars": chars.len() }
     }))
 }
@@ -2713,6 +2781,33 @@ mod tests {
             is_default: true,
         })
         .unwrap()
+    }
+
+    #[test]
+    fn deep_links_mint_only_round_trippable_ids() {
+        // review F2: a link the parser would refuse is a silent dead click —
+        // never mint one. `..` inside a filename is fine; a `..` segment isn't.
+        assert!(deep_linkable("wiki/draft..final.md"));
+        assert!(!deep_linkable("wiki/../secrets.md"));
+        assert!(!deep_linkable("odd\\name.md"));
+    }
+
+    #[test]
+    fn deep_links_encode_rel_path_ids_and_stay_clickable() {
+        assert_eq!(
+            deep_link_for("01J8Z9ABCDEF", "note"),
+            "rotli://open?id=01J8Z9ABCDEF&kind=note"
+        );
+        // rel-path ids: `/` and `:` (root prefixes) must be encoded, so the
+        // URL survives terminals and round-trips through parse_deep_link
+        assert_eq!(
+            deep_link_for("wiki/projects/plan.md", "note"),
+            "rotli://open?id=wiki%2Fprojects%2Fplan.md&kind=note"
+        );
+        assert_eq!(
+            deep_link_for("vault:Board/sketch.excalidraw", "board"),
+            "rotli://open?id=vault%3ABoard%2Fsketch.excalidraw&kind=board"
+        );
     }
 
     #[test]
