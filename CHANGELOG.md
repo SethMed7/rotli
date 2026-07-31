@@ -8,6 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.56.0] - 2026-07-31
+
+### Added
+
+- **rotli:// links — a clickable path into the app.** When Claude, Codex, or
+  any agent manages a note through the rotli CLI/MCP, the result now carries a
+  `deepLink` (`rotli://open?id=…`) beside the disk path. Click it anywhere —
+  terminal, chat, another app — and rotli surfaces with that note open. Links
+  are ids only, validated hard (traversal, absolute paths, and hostile shapes
+  are ignored), and clicking one can never touch anything outside your vault.
+  Works cold too: a click launches the app and still lands on the note.
+- **⌥F — find from anywhere.** The ⌥-letter family's search twin: one global
+  chord summons rotli with the ⌘K palette already open. Rebindable like every
+  chord.
+- **Rows resize like columns.** Drag a row's bottom edge in a rendered table
+  to set its height (a minimum — content still grows it); double-click the
+  edge to reset. Persisted per table on this Mac, the .md never changes.
+
+### Changed
+
+- **Table menus wear standard icons.** Alignment is the familiar
+  horizontal-lines trio (left/center/right) instead of arrow glyphs, and the
+  Move actions carry arrow+lines icons — instantly readable.
+- **Wide tables scroll, not squeeze.** A table wider than the editor column
+  now scrolls horizontally inside its own container instead of crushing its
+  columns below readability.
+
 ## [0.55.0] - 2026-07-31
 
 ### Added
