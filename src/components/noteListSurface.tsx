@@ -8,7 +8,7 @@
 // corpus_search (title > body rank, highlighted-match snippet, debounced); the
 // instant title/snippet filter covers the debounce window and boards.
 
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { useNoteSearch, useSearchableNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import type { NoteSummary, SearchHit } from "../types";
@@ -46,12 +46,24 @@ export function NoteListSurface({
   const searchData = useNoteSearch(query).data;
   const hits = query.trim().length >= 2 ? searchData : undefined;
 
+  // stable row callback so the memoized NoteListRow skips unchanged rows
+  const onOpenRow = useCallback(
+    (note: NoteSummary, newTab: boolean) => openSummary(note, { newTab }),
+    [openSummary],
+  );
+
   const q = query.trim().toLowerCase();
+  // The sort depends only on the corpus — split from `rows` so a search
+  // keystroke (q/hits) filters the already-sorted list instead of re-sorting
+  // everything per keypress (perf audit 2026-07-30, finding 12).
+  const sorted = useMemo(
+    () =>
+      // pinned notes float to the top (Seth, 2026-07-06), then most-recent first
+      [...notes].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt),
+    [notes],
+  );
+  const byId = useMemo(() => new Map(notes.map((n) => [n.id, n])), [notes]);
   const rows = useMemo<ListRow[]>(() => {
-    // pinned notes float to the top (Seth, 2026-07-06), then most-recent first
-    const sorted = [...notes].sort(
-      (a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt,
-    );
     if (!q) return sorted.map((note) => ({ note }));
     const local = sorted.filter(
       (n) => n.title.toLowerCase().includes(q) || n.snippet.toLowerCase().includes(q),
@@ -60,7 +72,6 @@ export function NoteListSurface({
     // hits first (title rank, then recency — Rust's order), then the instant
     // local matches search missed (boards; a hit outside this list's scope
     // still opens fine — Archive is findable by search, browsed via its row)
-    const byId = new Map(notes.map((n) => [n.id, n]));
     const seen = new Set(hits.map((h) => h.id));
     return [
       ...hits.map((h) => ({
@@ -80,7 +91,7 @@ export function NoteListSurface({
       })),
       ...local.filter((n) => !seen.has(n.id)).map((note) => ({ note })),
     ];
-  }, [notes, q, hits]);
+  }, [sorted, byId, q, hits]);
 
   return (
     <div className="board allnotes">
@@ -125,7 +136,7 @@ export function NoteListSurface({
                     <MatchText text={r.hit.snippet} start={r.hit.matchStart} len={r.hit.matchLen} />
                   ) : undefined
                 }
-                onOpen={(note, newTab) => openSummary(note, { newTab })}
+                onOpen={onOpenRow}
                 onContextMenu={openMenu}
               />
             ))}

@@ -111,11 +111,8 @@ export function EditorSurface({
   autoFocus?: boolean;
 }) {
   const note = useNote(noteId).data;
-  const docLines = useDocumentLines(noteId);
   const dirty = useDocumentDirty(noteId);
   const saveError = useDocumentSaveError(noteId);
-  const queryLines = useMemo(() => note?.body.split("\n"), [note?.body]);
-  const lines = docLines ?? queryLines;
 
   const [aaOpen, setAaOpen] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
@@ -257,6 +254,12 @@ export function EditorSurface({
     [noteId],
   );
 
+  // Stable identities so the memoized CmEditor ignores parent re-renders
+  // (caret ctx, header measurements) — the keystroke path no longer re-renders
+  // this surface at all (perf audit 2026-07-30, finding 8).
+  const onCmContext = useCallback((line: string | null, selStart: number) => setCtx({ line, selStart }), []);
+  const onFmRead = useCallback(() => corpusRawFrontmatter(noteId), [noteId]);
+
   // the buffer exists as soon as the note loads — edits always hit one buffer.
   // When disk changes UNDER us (agent / another editor) and this buffer is
   // clean, adopt the new body so Main and Captures never show two versions of
@@ -287,10 +290,8 @@ export function EditorSurface({
     return () => ro.disconnect();
   }, []);
 
-  if (!note || !lines) return <div className="editor" ref={rootRef} />;
+  if (!note) return <div className="editor" ref={rootRef} />;
 
-  const text = lines.join("\n");
-  const wordCount = text.split(/\s+/).filter(Boolean).length;
   const fontSize = focusMode ? FOCUS_SIZE : style.size;
   const measureWidth = focusMode ? FOCUS_MEASURE : MEASURE_MAX_WIDTH[style.measure];
   const brainFolder = noteDiskFolder(note);
@@ -314,7 +315,7 @@ export function EditorSurface({
               once the corpus confirmed them. No spinners. */}
           <div className="status-inline">
             <span className={dirty ? "dot-ok dirty" : "dot-ok"} />
-            {text.length.toLocaleString()} chars
+            <CharCount noteId={noteId} fallbackBody={note.body} />
             <span className="sep" />
             <UpdatedAt ts={note.updatedAt} />
             <span className="sep" />
@@ -386,19 +387,15 @@ export function EditorSurface({
         fontSize={fontSize}
         measureWidth={measureWidth}
         initialText={note.body}
-        onContext={(line, selStart) => setCtx({ line, selStart })}
+        onContext={onCmContext}
         fmRaw={focusMode ? null : fmRaw}
         fmPath={diskPath}
         fmGen={fmGen}
         fmErr={fmErr}
         onFmCommit={commitFm}
-        onFmRead={() => corpusRawFrontmatter(noteId)}
+        onFmRead={onFmRead}
       />
-      {focusMode && (
-        <div className="fwc" aria-hidden="true">
-          {wordCount.toLocaleString()} words
-        </div>
-      )}
+      {focusMode && <FocusWordCount noteId={noteId} fallbackBody={note.body} />}
       {formatBarVisible && (
         <BottomSlot>
           <FormatBar ctx={ctx} narrow={narrow} />
@@ -406,4 +403,39 @@ export function EditorSurface({
       )}
     </div>
   );
+}
+
+/** Focus mode's word count, isolated: it is the ONLY consumer of the live
+ * buffer at this level, so per-keystroke recomputes stay inside this leaf
+ * instead of re-rendering the whole editor shell (finding 8: the shell did
+ * join + split + a word-count regex over the full document per keystroke,
+ * with the count displayed only in focus mode). */
+function FocusWordCount({ noteId, fallbackBody }: { noteId: string; fallbackBody: string }) {
+  const lines = useDocumentLines(noteId);
+  const wordCount = useMemo(() => {
+    let words = 0;
+    for (const line of lines ?? fallbackBody.split("\n")) {
+      words += line.split(/\s+/).filter(Boolean).length;
+    }
+    return words;
+  }, [lines, fallbackBody]);
+  return (
+    <div className="fwc" aria-hidden="true">
+      {wordCount.toLocaleString()} words
+    </div>
+  );
+}
+
+/** The header's live char count — the other always-on buffer consumer. Same
+ * isolation as FocusWordCount: per-keystroke recomputes re-render this span,
+ * not the editor shell. */
+function CharCount({ noteId, fallbackBody }: { noteId: string; fallbackBody: string }) {
+  const lines = useDocumentLines(noteId);
+  const chars = useMemo(() => {
+    if (!lines) return fallbackBody.length;
+    let total = lines.length ? lines.length - 1 : 0; // the joining newlines
+    for (const line of lines) total += line.length;
+    return total;
+  }, [lines, fallbackBody]);
+  return <>{chars.toLocaleString()} chars</>;
 }

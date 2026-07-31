@@ -83,8 +83,22 @@ export function useNotes(folderId?: string) {
  * useNotes(), so these are cache reads of the one corpus_list, not extra
  * fetches. Returns the lists (undefined until each loads) plus `complete` —
  * true only when the roots list AND every note listing have SUCCEEDED.
- * combine returns plain arrays (not a Map) so TanStack's structural sharing
- * keeps the identity stable across renders when nothing changed. */
+ * TanStack's structural sharing keeps each LIST's identity stable when its
+ * content is unchanged, but a refetch cycle still hands combine new result
+ * wrappers (isFetching flips), so combine's .map() minted a fresh `lists`
+ * array per 400ms sync tick — and every downstream useMemo (note index,
+ * searchable notes, tab titles, list sorts, wikilink re-decoration)
+ * re-derived while typing (perf audit 2026-07-30, the findings-8/9/11/12
+ * shared trigger). stableLists reuses the previous array whenever every
+ * element is identical. */
+let lastUniverseLists: (NoteSummary[] | undefined)[] = [];
+function stableLists(next: (NoteSummary[] | undefined)[]): (NoteSummary[] | undefined)[] {
+  if (next.length === lastUniverseLists.length && next.every((list, i) => list === lastUniverseLists[i]))
+    return lastUniverseLists;
+  lastUniverseLists = next;
+  return next;
+}
+
 function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: boolean } {
   const roots = useCorpusRoots();
   // the vault marker ("vault:") is already one of the reserved five — the Set
@@ -110,7 +124,7 @@ function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: bo
       queryFn: () => notesService.listNotes(folderId),
     })),
     combine: (results) => ({
-      lists: results.map((r) => r.data),
+      lists: stableLists(results.map((r) => r.data)),
       complete: rootsReady && results.every((r) => r.isSuccess),
     }),
   });

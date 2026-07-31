@@ -2,13 +2,18 @@
 // the whole row a button that opens the note/board/file. Extracted (Seth,
 // 2026-06-30) so the two list surfaces share the exact same markup.
 
-import type { MouseEvent, ReactNode } from "react";
+import { type MouseEvent, type ReactNode, memo } from "react";
 import type { NoteSummary } from "../types";
 import { longDateLabel } from "../lib/dateLabels";
 import { startMainAddDrag } from "../lib/mainAddDrag";
 import { glyphForNote, PinGlyph } from "./glyphs";
 
-export function NoteListRow({
+// memo: list surfaces render hundreds of rows and re-render per search
+// keystroke / corpus invalidation — with stable summaries and callbacks the
+// unchanged rows skip (perf audit 2026-07-30, finding 12).
+export const NoteListRow = memo(NoteListRowImpl);
+
+function NoteListRowImpl({
   note,
   snippetNode,
   selected,

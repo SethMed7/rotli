@@ -11,7 +11,7 @@
 // One view per (noteId, pane); EditorSurface keys it by noteId so it remounts on
 // a note switch (fresh caret/scroll, no bleed).
 
-import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { Compartment, EditorSelection, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, placeholder } from "@codemirror/view";
@@ -80,7 +80,12 @@ interface PickerState {
  * Matches the content's 90px bottom padding reserve. */
 const FORMAT_BAR_SCROLL_MARGIN = 88;
 
-export function CmEditor({
+// memo: the parent editor shell re-renders on caret ctx + header measurement
+// state; with stable props this CM host must not re-render per caret move
+// (perf audit 2026-07-30, finding 8).
+export const CmEditor = memo(CmEditorImpl);
+
+function CmEditorImpl({
   noteId,
   paneId,
   autoFocus = false,
@@ -218,15 +223,27 @@ export function CmEditor({
   // "if I delete then it should show like that")
   const archivedNotes = useNotes(DEST.archive).data;
 
-  useEffect(() => {
+  // Resolution reads only id + title + aliases, so the rebuild-and-redecorate
+  // effect keys on THAT fingerprint — not on array identity, which churns per
+  // save cycle while typing (snippet/updatedAt change) and used to force a
+  // whole-document wikilink decoration recompute each time (perf audit
+  // 2026-07-30, finding 9).
+  const wikilinkSource = useMemo(() => {
     const archived = (archivedNotes ?? []).filter((n) => n.kind !== "file");
-    setWikilinkNotes(archived.length ? [...searchableNotes, ...archived] : searchableNotes);
+    const list = archived.length ? [...searchableNotes, ...archived] : searchableNotes;
+    const key = list.map((n) => `${n.id} ${n.title} ${(n.aliases ?? []).join("")}`).join("\n");
+    return { list, key };
+  }, [searchableNotes, archivedNotes]);
+  const wikilinkSourceRef = useRef(wikilinkSource);
+  wikilinkSourceRef.current = wikilinkSource;
+  useEffect(() => {
+    setWikilinkNotes(wikilinkSourceRef.current.list);
     // re-decorate: the resolved-vs-missing wikilink look reads this index,
     // which lands async after the view first painted — an explicit (no-move)
     // selection transaction is the cheapest "selectionSet" rebuild trigger
     const view = viewRef.current;
     if (view) view.dispatch({ selection: view.state.selection });
-  }, [searchableNotes, archivedNotes]);
+  }, [wikilinkSource.key]);
   // the slash key-handler reads live state through this ref (the CM dom handler
   // is created once, but it must see the current query/index)
   const slashRef = useRef<{ open: boolean; handle: (e: KeyboardEvent) => boolean }>({

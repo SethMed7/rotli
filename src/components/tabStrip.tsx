@@ -41,7 +41,10 @@ function boardLabel(boardId: string): string {
   return fileName(boardId).replace(/\.excalidraw$/i, "") || "Board";
 }
 
-function tabLabel(tab: Tab, titles: Map<string, string>): string {
+/** Narrow title accessor — an O(1) view over the note index, never a copy. */
+type TitleLookup = { get: (id: string) => string | undefined };
+
+function tabLabel(tab: Tab, titles: TitleLookup): string {
   // surfaceKind dispatch — grows with the union ('chat' …)
   switch (tab.surfaceKind) {
     case "note":
@@ -89,11 +92,10 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   // hidden "Board" root) or an archived/trashed one; useNotes() alone read
   // those tabs as "Untitled".
   const noteIndex = useNoteIndex();
-  const titles = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const [id, n] of noteIndex) m.set(id, n.title);
-    return m;
-  }, [noteIndex]);
+  // Direct O(1) lookups per tab — the old per-render Map copy of EVERY note's
+  // title was O(all-notes) × per pane strip × per invalidation (perf audit
+  // 2026-07-30, finding 11).
+  const titles = useMemo<TitleLookup>(() => ({ get: (id) => noteIndex.get(id)?.title }), [noteIndex]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fade, setFade] = useState({ left: false, right: false });
