@@ -191,6 +191,15 @@ export function ActivitySurface() {
   // suggestions the user never saw (review F3)
   useEffect(() => setDismissAllArmed(false), [pendingCount]);
   const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
+  // expanded history rows — a log row's click shows before → after (2026-07-31)
+  const [expandedRows, setExpandedRows] = useState<ReadonlySet<string>>(new Set());
+  const toggleRow = (id: string) =>
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [stopRequested, setStopRequested] = useState(false);
   // the explicit Run now must react INSTANTLY (Seth, 2026-07-31: "issues with
   // visually seeing something is even happening") — the band shows on click,
@@ -478,18 +487,18 @@ export function ActivitySurface() {
               <span title={status.lastRunAt}>last pass {relativeLabel(Date.parse(status.lastRunAt))}</span>
             </>
           )}
+          {/* labeled, not a bare icon (Seth, 2026-07-31: "hard to see and
+              understand till I click") */}
           <button
             type="button"
-            className="act-help act-gear"
-            aria-label="Librarian settings"
-            title="Librarian settings"
+            className="act-undo act-strip-settings"
             onClick={() => {
               const ui = useUiStore.getState();
               ui.setSettingsPaneRequest("brain");
               ui.setSettingsOpen(true);
             }}
           >
-            <GearGlyph size={13} />
+            <GearGlyph size={12} /> Librarian settings
           </button>
         </div>
       )}
@@ -789,14 +798,27 @@ export function ActivitySurface() {
               <ul className="recent-list">
                 {day.rows.map((a) => {
                   const undone = a.status === "reverted";
+                  const expanded = expandedRows.has(a.id);
                   return (
                     <li key={a.id}>
                       <div className={undone ? "act-row done" : "act-row"}>
                         <button
                           type="button"
+                          className="act-disclose"
+                          aria-expanded={expanded}
+                          aria-label={`${expanded ? "Hide" : "Show"} what changed`}
+                          onClick={() => toggleRow(a.id)}
+                        >
+                          <ChevronRight size={11} className={expanded ? "open" : undefined} />
+                        </button>
+                        {/* a log row's click SAYS WHAT IT DID (Seth, 2026-07-31)
+                            — the before → after lives right here; the note
+                            itself is one link away inside the detail */}
+                        <button
+                          type="button"
                           className="act-desc"
-                          title="Open the note"
-                          onClick={() => openNote(a.noteUlid ?? a.noteId)}
+                          title={expanded ? "Hide what changed" : "Show what changed"}
+                          onClick={() => toggleRow(a.id)}
                         >
                           {describeAction(a, false)}
                         </button>
@@ -819,6 +841,33 @@ export function ActivitySurface() {
                           )
                         )}
                       </div>
+                      {expanded && (
+                        <div className="act-detail">
+                          {a.action === "field" ? (
+                            <>
+                              <div className="act-diff-was">{a.before.trim() ? a.before : "(empty)"}</div>
+                              <div className="act-diff-now">{a.after.trim() ? a.after : "(empty)"}</div>
+                            </>
+                          ) : a.action === "file" ? (
+                            <div className="act-diff-move">
+                              moved from <code>{a.before || "?"}</code> to <code>{a.after || "?"}</code>
+                            </div>
+                          ) : a.action === "index" ? (
+                            <div className="act-diff-move">
+                              the area&rsquo;s overview page was regenerated from its members
+                            </div>
+                          ) : (
+                            <div className="act-diff-move">a one-time repair</div>
+                          )}
+                          <button
+                            type="button"
+                            className="act-linkbtn act-detail-open"
+                            onClick={() => openNote(a.noteUlid ?? a.noteId)}
+                          >
+                            Open the note
+                          </button>
+                        </div>
+                      )}
                     </li>
                   );
                 })}

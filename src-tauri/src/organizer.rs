@@ -1852,6 +1852,50 @@ fn sweep(root: &Path, state: &OrganizerFile) -> Vec<String> {
         .collect()
 }
 
+/// Run-now's AUDIT half (Seth, 2026-07-31: "run now is an audit to make sure
+/// nothing was left or missed"). The hash diff answers "did I process this
+/// body once?" — an audit asks the different question "is anything MISSING?":
+/// a note whose enrich metadata never landed (the model returned nothing, or
+/// a field was removed later without a body edit) stays invisible to the
+/// diff forever. Returns rels whose coverage should be re-opened so the next
+/// cycle re-models them; secure and locked notes are excluded exactly like
+/// the cycle itself would exclude them. The never-clobber baseline
+/// (`last_fields`) is untouched — user-owned values stay theirs.
+fn audit_gaps(root: &Path, state: &OrganizerFile) -> Vec<String> {
+    let mut rels = Vec::new();
+    collect_md(root, "wiki", &mut rels);
+    rels.into_iter()
+        .filter(|rel| candidate_rel(rel))
+        .filter(|rel| match snapshot_note(root, rel) {
+            Ok(s) => {
+                if s.locked || s.secure {
+                    return false;
+                }
+                // already queued for a normal reason? the sweep has it
+                if !(classify_covered(&s, state) && enrich_covered(&s, state)) {
+                    return false;
+                }
+                ENRICH_FIELDS
+                    .iter()
+                    .any(|k| s.fields.get(*k).is_none_or(|v| v.trim().is_empty()))
+            }
+            Err(_) => false,
+        })
+        .collect()
+}
+
+/// Re-open the audit gaps' coverage in `state` so `skip_reason` and
+/// `enrich_covered` let the next cycle model them again.
+fn reopen_coverage(root: &Path, state: &mut OrganizerFile, gaps: &[String]) {
+    for rel in gaps {
+        let Ok(snap) = snapshot_note(root, rel) else { continue };
+        if let Some(ns) = state.notes.get_mut(&state_key(&snap)) {
+            ns.hash.clear();
+            ns.proposed.enrich.clear();
+        }
+    }
+}
+
 fn collect_md(root: &Path, prefix: &str, out: &mut Vec<String>) {
     let Ok(entries) = std::fs::read_dir(root.join(prefix)) else { return };
     for entry in entries.filter_map(|e| e.ok()) {
@@ -2079,8 +2123,21 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                 let state_json = corpus_state
                     .route(&root_id, |s| s.dot_read("organizer"))
                     .unwrap_or_else(|_| "{}".into());
-                let state = parse_state(&state_json);
-                let abs: Vec<PathBuf> = sweep(&root, &state).into_iter().map(|r| root.join(r)).collect();
+                let mut state = parse_state(&state_json);
+                let mut targets = sweep(&root, &state);
+                if run_now {
+                    // the explicit nudge is an AUDIT (Seth, 2026-07-31): also
+                    // re-open coverage for covered notes whose metadata is
+                    // missing, so "processed once" can never hide a gap
+                    let gaps = audit_gaps(&root, &state);
+                    if !gaps.is_empty() {
+                        reopen_coverage(&root, &mut state, &gaps);
+                        let _ = corpus_state
+                            .route(&root_id, |s| s.dot_write("organizer", &state_pretty(&state)));
+                        targets.extend(gaps);
+                    }
+                }
+                let abs: Vec<PathBuf> = targets.into_iter().map(|r| root.join(r)).collect();
                 handle.enqueue(&root, &abs);
                 cycle_owed = true;
             }
@@ -2671,6 +2728,43 @@ mod tests {
         assert!(parse_classify("{\"confidence\": 0.9}", &vocab).is_none());
         // a missing confidence is 0, not a rejection (the area is still valid)
         assert_eq!(parse_classify("{\"area\": \"Projects\"}", &vocab).unwrap().confidence, 0.0);
+    }
+
+    #[test]
+    fn audit_gaps_reopens_only_covered_notes_missing_metadata() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().to_path_buf();
+        fs::create_dir_all(root.join("wiki/Projects")).unwrap();
+        let write = |name: &str, text: &str| fs::write(root.join("wiki/Projects").join(name), text).unwrap();
+        write(
+            "complete.md",
+            "---\nsummary: done\ntags: a, b\nlinks: \"[[x]]\"\n---\n# Complete\nbody\n",
+        );
+        write("gap.md", "---\ntags: a\n---\n# Gap\nbody without summary or links\n");
+        write("secret-gap.md", "---\nsecure: true\n---\n# Secret\nno fields either\n");
+
+        // mark every note COVERED (hash + enrich recorded) — the diff sweep
+        // would find nothing; only the audit sees the missing metadata
+        let mut state = OrganizerFile::default();
+        for name in ["complete.md", "gap.md", "secret-gap.md"] {
+            let rel = format!("wiki/Projects/{name}");
+            let snap = snapshot_note(&root, &rel).unwrap();
+            let mut ns = NoteState::default();
+            ns.hash = snap.body_hash.clone();
+            ns.proposed.enrich = snap.body_hash.clone();
+            state.notes.insert(state_key(&snap), ns);
+        }
+        assert!(sweep(&root, &state).is_empty(), "the plain diff sweep sees nothing");
+
+        let gaps = audit_gaps(&root, &state);
+        assert_eq!(gaps, vec!["wiki/Projects/gap.md".to_string()], "complete + secure excluded");
+
+        reopen_coverage(&root, &mut state, &gaps);
+        let snap = snapshot_note(&root, "wiki/Projects/gap.md").unwrap();
+        let ns = state.notes.get(&state_key(&snap)).unwrap();
+        assert!(ns.hash.is_empty() && ns.proposed.enrich.is_empty(), "coverage re-opened");
+        // and the next sweep now picks it up like any unprocessed note
+        assert_eq!(sweep(&root, &state), vec!["wiki/Projects/gap.md".to_string()]);
     }
 
     #[test]
