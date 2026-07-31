@@ -3,11 +3,13 @@
 // reusing the folder-trash ports so notes and files ride their own lanes;
 // errors land in the sidebar's inline lane, partial progress stays honest.
 
-import { corpusFileStat, corpusMoveFileToSink } from "../lib/tauri";
+import { corpusFileStat, corpusMoveFileToSink, corpusPurge } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
+import { DEST } from "./destinations";
 import { trashVirtualFolderItems } from "./folderTrash";
 import { invalidateNotes } from "./hooks";
 import { trashNoteWithImages } from "./noteLifecycle";
+import { notesService } from "./notes";
 
 export async function trashSystemSelection(): Promise<void> {
   const ui = useUiStore.getState();
@@ -28,4 +30,32 @@ export async function trashSystemSelection(): Promise<void> {
   } finally {
     await invalidateNotes();
   }
+}
+
+/** Empty Trash (2026-07-31) — the ONLY hard-delete flow. Every item is purged
+ * through `corpus_purge`, which re-checks in Rust that the note already lives
+ * under Trash/ and routes the file into the macOS Trash (recoverable, never
+ * oblivion). Partial failures stay honest: progress is reported, nothing
+ * pretends the batch was atomic. */
+export async function emptyTrash(): Promise<{ purged: number; failed: number }> {
+  const ui = useUiStore.getState();
+  ui.setRowActionError(null);
+  const items = await notesService.listNotes(DEST.trash);
+  let purged = 0;
+  const failures: string[] = [];
+  for (const item of items) {
+    try {
+      await corpusPurge(item.id);
+      purged += 1;
+    } catch (err) {
+      failures.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+  await invalidateNotes();
+  if (failures.length > 0) {
+    ui.setRowActionError(
+      `Emptied ${purged} of ${items.length} — ${failures.length} couldn’t be deleted (${failures[0]}).`,
+    );
+  }
+  return { purged, failed: failures.length };
 }

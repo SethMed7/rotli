@@ -838,9 +838,195 @@
 .act-row.done {
   opacity: 0.5;
 }
-.act-brain {
+/* shared band inset — replaces the old per-element inline padding */
+.act-pad {
+  padding: 0 22px 8px;
+}
+/* the ? help button — quiet ring, opens the explainer */
+.act-help {
   flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.act-help:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+.act-waiting {
+  color: var(--accent-text);
+}
+/* the LIVE band — the daemon narrating what it's touching right now */
+.act-live {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 22px 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  font-size: 12.5px;
+}
+.act-live-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--accent-text);
+  animation: act-live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes act-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.act-live-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.act-stop {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+/* section + day headers — the day fold keeps 400 rows readable */
+.act-section {
+  margin: 14px 22px 2px;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.act-day {
+  margin: 10px 22px 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.act-section-n {
+  margin-left: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+/* a grouped proposal row (one note, N suggestions) + its expanded children */
+.act-disclose {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.act-disclose svg {
+  transition: transform var(--motion-exit) var(--motion-ease);
+}
+.act-disclose svg.open {
+  transform: rotate(90deg);
+}
+.act-sub .act-row {
+  padding-left: 46px;
+}
+.act-viewall {
+  display: block;
+  margin: 8px 22px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.act-viewall:hover {
+  text-decoration: underline;
+}
+/* journal hygiene — logs are disposable, pending never is */
+.act-logcare {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 22px 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.act-logcare p {
+  flex: 1 1 100%;
+  margin: 0 0 2px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.act-logcare-hint {
+  opacity: 0.85;
+}
+/* the first-visit explainer — a plain centered card, no blur/shadow (theme law) */
+.lib-intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--ground) 62%, transparent);
+}
+.lib-intro {
+  width: min(520px, calc(100vw - 48px));
+  max-height: min(78vh, 640px);
+  overflow-y: auto;
+  padding: 22px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+}
+.lib-intro h3 {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+}
+.lib-intro p,
+.lib-intro li {
   font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.lib-intro p {
+  margin: 0 0 10px;
+}
+.lib-intro-rules {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+.lib-intro-trust {
+  color: var(--text-muted);
+}
+.lib-intro-trust em {
+  color: var(--text);
+  font-style: normal;
+  font-weight: 600;
+}
+.lib-intro-ok {
+  margin-top: 4px;
 }
 .act-desc {
   flex: 1 1 auto;

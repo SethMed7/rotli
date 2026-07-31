@@ -75,6 +75,7 @@ import {
   useCorpusRoots,
   useFolders,
   useJournal,
+  useSecureHints,
   useTasks,
   useMainGcIds,
   useNoteIndex,
@@ -195,6 +196,10 @@ function CaptureBoardGlyph({ size = 16 }: { size?: number }) {
  * front (removed from the sidebar 2026-07-30, see ROADMAP.md; Seth, 2026-06-26).
  * The ⌥C one-breath capture lands as a staged note in wiki/_inbox/
  * (inbox.md is not a rotli write surface — #96, audit 2026-07). */
+/** Trash rows at or past this count wear the alert badge — a quiet "worth
+ * emptying" nudge, never a modal (Seth, 2026-07-31). */
+const TRASH_NUDGE_AT = 40;
+
 const DEST_ROWS: { id: Destination; label: string; Glyph: typeof InboxGlyph }[] = [
   // "Capture" (DEST.inbox) is GONE — captures have ONE home now, the "Captures"
   // row under Notes (Seth, 2026-06-30). Staged notes (wiki/_inbox) project there.
@@ -338,8 +343,15 @@ export function Sidebar() {
     () => searchableNotes.map(projectNoteToBrain).filter((n): n is NoteSummary => n !== null),
     [searchableNotes],
   );
-  // unreviewed daemon proposals — the quiet badge on the Activity link (§4.4.2)
+  // unreviewed daemon proposals — the badge on the Librarian link (§4.4.2);
+  // sensitive-data decisions waiting on the user wear the RED variant instead
+  // (Seth, 2026-07-31: "or I will never know")
   const pendingProposals = deriveJournal(useJournal().data ?? []).pending.length;
+  // detector-only hints awaiting a decision (deriveSecureReview's `confirm`,
+  // inlined so the always-mounted sidebar doesn't anchor the secure-repair
+  // DISK SCAN poll too — repair only feeds the leftover line, not this badge
+  // (review F7; perf-audit family #12-14)
+  const secureConfirms = (useSecureHints().data ?? []).filter((h) => !h.flagged).length;
   // open checkboxes across the corpus — the Tasks smart row's count
   const openTaskCount = useTasks().data?.length ?? 0;
   // raw vault (vault-vs-brain, 2026-07-26): the Brain section's copy changes —
@@ -2060,17 +2072,25 @@ export function Sidebar() {
           {visibleDestRows.map(({ id, label, Glyph }) => {
             const destNotes = notesByDest[id] ?? [];
             const selected = contentView === "system" && systemRoot === id;
+            // a piled-up Trash earns the alert badge (Seth, 2026-07-31) — the
+            // browser's Empty Trash… is one click behind it
+            const trashFull = id === DEST.trash && destNotes.length >= TRASH_NUDGE_AT;
             return (
               <button
                 key={id}
                 type="button"
                 className={`frow${selected ? " sel" : ""}`}
+                title={
+                  trashFull ? `${destNotes.length} items — open Trash to review and empty it` : undefined
+                }
                 onClick={() => openSystemRoot(id)}
                 {...rowProps({ id, kind: "folder" })}
               >
                 <Glyph size={14.5} />
                 <span className="fname">{label}</span>
-                {destNotes.length > 0 && <span className="count">{destNotes.length}</span>}
+                {destNotes.length > 0 && (
+                  <span className={trashFull ? "count alert" : "count"}>{destNotes.length}</span>
+                )}
               </button>
             );
           })}
@@ -2101,12 +2121,27 @@ export function Sidebar() {
             <button
               type="button"
               className="sb-footbtn"
-              title={brainEnabledUi ? "See and undo the Librarian's work" : "The Librarian's journal"}
+              title={
+                secureConfirms > 0
+                  ? `${secureConfirms} sensitive-data ${secureConfirms === 1 ? "decision waits" : "decisions wait"} for you`
+                  : pendingProposals > 0
+                    ? `${pendingProposals} ${pendingProposals === 1 ? "suggestion waits" : "suggestions wait"} for your approval`
+                    : brainEnabledUi
+                      ? "See and undo the Librarian's work"
+                      : "The Librarian's journal"
+              }
               onClick={() => usePanesStore.getState().openActivity()}
             >
               <ActivityGlyph size={14} />
               <span className="fname">Librarian</span>
-              {pendingProposals > 0 && <span className="count">{pendingProposals}</span>}
+              {/* RED = a sensitive-data decision waits (never auto-resolved);
+                  otherwise the pending-approval count so Suggest mode is
+                  never a silent queue */}
+              {secureConfirms > 0 ? (
+                <span className="count alert">{secureConfirms}</span>
+              ) : (
+                pendingProposals > 0 && <span className="count pill">{pendingProposals}</span>
+              )}
             </button>
             <button
               type="button"

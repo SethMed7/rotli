@@ -25,6 +25,7 @@ import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
 import { fileAssetUrl } from "../lib/tauri";
 import { DEST } from "../services/destinations";
 import { invalidateFolders, useFolders, useNoteIndex, useNotes, useSearchableNotes } from "../services/hooks";
+import { emptyTrash } from "../services/systemTrash";
 import { notesService } from "../services/notes";
 import {
   type FolderEntry,
@@ -137,6 +138,19 @@ function ItemTile({ n, selected, handlers }: { n: NoteSummary; selected: boolean
 export function SystemSurface({ rootId }: { rootId: string }) {
   const root = ROOTS[rootId] ?? { title: rootId, prefix: rootId };
   const isLibrary = rootId === "Brain";
+  const isTrash = rootId === DEST.trash;
+  // Empty Trash (2026-07-31): whole-root count (not just the cwd listing) +
+  // the armed two-step's state; the purge lane re-validates each item in Rust
+  const trashCount = (useNotes(DEST.trash).data ?? []).length;
+  const [emptyArmed, setEmptyArmed] = useState(false);
+  const [emptying, setEmptying] = useState(false);
+  const runEmptyTrash = () => {
+    setEmptying(true);
+    void emptyTrash().finally(() => {
+      setEmptying(false);
+      setEmptyArmed(false);
+    });
+  };
   // Library = the projected wiki notes + the protected lane; every other root
   // is its own subtree straight from the notes service
   const destData = useNotes(isLibrary ? DEST.secure : rootId).data;
@@ -370,6 +384,25 @@ export function SystemSurface({ rootId }: { rootId: string }) {
           sortItem("created", "Date created"),
         ],
       },
+      // Empty Trash (2026-07-31): the confirm lives INSIDE the drill — two
+      // deliberate clicks, and every item still lands in the macOS Trash
+      ...(isTrash && trashCount > 0
+        ? [
+            { kind: "sep" as const },
+            {
+              kind: "drill" as const,
+              label: "Empty Trash…",
+              items: [
+                {
+                  kind: "action" as const,
+                  danger: true,
+                  label: `Delete ${trashCount} ${trashCount === 1 ? "item" : "items"} forever (they land in the macOS Trash)`,
+                  onClick: () => void runEmptyTrash(),
+                },
+              ],
+            },
+          ]
+        : []),
     ];
     useContextMenu.getState().open(e.clientX, e.clientY, items);
   };
@@ -631,6 +664,31 @@ export function SystemSurface({ rootId }: { rootId: string }) {
             <NewFolderGlyph size={15} />
           </button>
         )}
+        {/* Empty Trash (2026-07-31): armed two-step, header-visible — every
+            item still lands in the macOS Trash, so "forever" stays honest */}
+        {isTrash &&
+          trashCount > 0 &&
+          (emptyArmed ? (
+            <>
+              <button type="button" className="ghostbtn quiet" onClick={() => setEmptyArmed(false)}>
+                Keep
+              </button>
+              <button
+                type="button"
+                className="ghostbtn fdr-empty-confirm"
+                disabled={emptying}
+                onClick={runEmptyTrash}
+              >
+                {emptying
+                  ? "Emptying…"
+                  : `Delete ${trashCount} ${trashCount === 1 ? "item" : "items"} (recoverable in the macOS Trash)`}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="ghostbtn" onClick={() => setEmptyArmed(true)}>
+              Empty Trash…
+            </button>
+          ))}
         {/* the view switcher wears Finder's icons (Seth, 2026-07-28: "the
             proper icons people are used to"); the words live in the tooltips */}
         <div className="file-mode-tabs" role="tablist" aria-label="View" style={{ marginLeft: "auto" }}>

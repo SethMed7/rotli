@@ -18,7 +18,7 @@ to defaults instead of triggering a content rewrite.
 | `.rotli/views.json` | `version: 1` | Portable named subset arrangements | Unsupported newer versions stay read-only; names are identifiers; writes synchronize singular Markdown `view_tag` membership |
 | `.rotli/settings.json` | `v: 1` | Explicit user settings | Parse defensively, preserve unknown keys, default invalid values safely |
 | `.rotli/viewstate.json` | No explicit version today | Rebuildable presentation state | Invalid/missing data restores a pristine view; never blocks content access |
-| `.rotli/brain-journal.jsonl` | Record shape by code contract | Recovery/undo evidence | Append atomically; tolerate an incomplete final record; never rewrite prose |
+| `.rotli/brain-journal.jsonl` | Record shape by code contract | Recovery/undo evidence | Append atomically; tolerate an incomplete final record; never rewrite prose. User-invoked pruning (2026-07-31) may drop RESOLVED ids older than a cutoff; every line of a pending (`proposed`) id survives any prune |
 | `.rotli/workspace-open.json` | Transient mailbox shape | Rebuildable/transient | Consume once and delete; it may contain identifiers, never note content |
 | DOCX/XLSX/Excalidraw adapters | Conventional format version + adapter behavior | User-owned durable files | Preserve unknown package/scene content; create backups before lossy migration |
 | Breve runtime/config | Runtime package version and documented boundary | Managed runtime plus user config | Mirror contracts explicitly; do not import across the app/runtime boundary |

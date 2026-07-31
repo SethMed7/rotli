@@ -2145,9 +2145,6 @@ pub struct CorpusStore {
     suppress: SuppressSet,
     /// OS trash in production; tests flip this to use `.rotli/trash/` so they
     /// never touch the user's real Trash. Either way: never a hard delete.
-    /// (allow(dead_code): only read by `purge`, whose command was unregistered
-    /// in the 2026-07 audit (#68) — both stay for the future "Empty Trash".)
-    #[allow(dead_code)]
     os_trash: bool,
     /// How this root is shaped (Increment 3). LegacyRotli = today's behavior in
     /// every respect; Memex gates folders/ownership/scope. Decided at `open()`.
@@ -4045,6 +4042,55 @@ impl CorpusStore {
         Ok(fs::read_to_string(path).unwrap_or_default())
     }
 
+    /// Prune resolved journal entries older than `keep_days` (0 = all of them).
+    /// PENDING work is sacred: every line of an id whose LATEST status is
+    /// "proposed" survives regardless of age — pruning must never eat an
+    /// unanswered question. Resolved ids (applied/reverted/dismissed) keep all
+    /// their lines while the latest is younger than the cutoff, else drop them
+    /// all. The journal is the deletable per-machine sidecar, so this is pure
+    /// hygiene — and a real perf fix, since every append rewrites the file.
+    /// Returns the number of lines removed.
+    pub fn journal_prune(&self, keep_days: u32) -> Result<usize, String> {
+        self.mutation_allowed()?;
+        let path = self.guard_rel(&format!("{DOT_DIR}/brain-journal.jsonl"))?;
+        let text = fs::read_to_string(&path).unwrap_or_default();
+        if text.is_empty() {
+            return Ok(0);
+        }
+        let cutoff_ms = OffsetDateTime::now_utc().unix_timestamp() * 1000
+            - i64::from(keep_days) * 86_400_000;
+        // fold: latest status + ts per id (last line wins, same as the frontend)
+        let mut latest: HashMap<String, (String, i64)> = HashMap::new();
+        for line in text.lines() {
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else { continue };
+            let Some(id) = v.get("id").and_then(|x| x.as_str()) else { continue };
+            let status = v.get("status").and_then(|x| x.as_str()).unwrap_or("").to_string();
+            let ts = v.get("ts").and_then(serde_json::Value::as_i64).unwrap_or(0);
+            latest.insert(id.to_string(), (status, ts));
+        }
+        let keep = |line: &str| -> bool {
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else {
+                return true; // never eat a line we can't read
+            };
+            let Some(id) = v.get("id").and_then(|x| x.as_str()) else { return true };
+            match latest.get(id) {
+                Some((status, ts)) => status == "proposed" || *ts >= cutoff_ms,
+                None => true,
+            }
+        };
+        let kept: Vec<&str> = text.lines().filter(|l| keep(l)).collect();
+        let removed = text.lines().count() - kept.len();
+        if removed == 0 {
+            return Ok(0);
+        }
+        let mut out = kept.join("\n");
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        atomic_write(&path, &out)?;
+        Ok(removed)
+    }
+
     /// Shared Main-manifest seam for the GUI and headless workspace adapters.
     /// Main is durable user work, so every writer also preserves the `.gitignore`
     /// exception that keeps `.rotli/main.json` committable.
@@ -4443,13 +4489,11 @@ impl CorpusStore {
         self.move_note(id, "Trash").map(|_| ())
     }
 
-    /// The ONLY hard delete — a future "Empty Trash". The note actually leaves
-    /// the corpus: OS trash first, `.rotli/trash/` as the fallback (and as the
-    /// test path — tests must not touch the user's real Trash).
-    /// (allow(dead_code): its `corpus_purge` command was UNREGISTERED in the
-    /// 2026-07 audit (#68) — an exposed, unreachable destructive command is the
-    /// wrong default. The method + its test stay for when Empty Trash ships.)
-    #[allow(dead_code)]
+    /// The ONLY hard delete — Empty Trash (shipped 2026-07-31; audit #68 kept
+    /// it unregistered while it had no caller). The note actually leaves the
+    /// corpus: OS trash first, `.rotli/trash/` as the fallback (and as the
+    /// test path — tests must not touch the user's real Trash). The command
+    /// wrapper additionally requires the note to already live under Trash/.
     pub fn purge(&mut self, id: &str) -> Result<(), String> {
         let rel = self.path_of(id)?;
         self.writable(&rel)?;
@@ -5721,6 +5765,22 @@ pub fn corpus_journal_read(state: tauri::State<'_, CorpusState>) -> Result<Strin
     state.route(&default_id, |s| s.journal_read())
 }
 
+/// Prune resolved journal entries older than `keep_days` (0 = clear all
+/// resolved history). Pending proposals always survive. Returns lines removed.
+#[tauri::command]
+pub fn corpus_journal_prune(
+    state: tauri::State<'_, CorpusState>,
+    keep_days: u32,
+) -> Result<usize, String> {
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |s| s.journal_prune(keep_days))
+}
+
 /// Toggle the per-note SECURE flag (secrets detected → never sent remote + gitignored).
 #[tauri::command]
 pub fn corpus_set_secure(
@@ -5909,10 +5969,27 @@ pub fn corpus_rename_board(
     state.route(&root, |s| s.rename_board(&rel, &name)).map(|m| prefix_meta(&root, m))
 }
 
-// The `corpus_purge` command (the only hard-delete lane) was UNREGISTERED and
-// removed in the 2026-07 audit (#68): an exposed, unreachable destructive command
-// is the wrong default. The store's `purge` + its tests stay — re-add the command
-// when "Empty Trash" ships a caller.
+/// The `corpus_purge` command was unregistered in the 2026-07 audit (#68)
+/// while it had no caller. Empty Trash ships one now (2026-07-31), so the
+/// lane returns — NARROWER than before: only a note already in the Trash
+/// root may be purged, so a miscall can never hard-delete a live note. The
+/// file still lands in the OS Trash (recoverable), never oblivion.
+#[tauri::command]
+pub fn corpus_purge(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| {
+        let note_rel = s.path_of(&rel)?;
+        // both trash spellings: the app root uses `Trash/`, the memex layout's
+        // sink is lowercase `trash/` (matches is_hidden_root — review F6)
+        let in_trash = ["Trash", "trash"]
+            .iter()
+            .any(|t| note_rel == *t || note_rel.starts_with(&format!("{t}/")));
+        if !in_trash {
+            return Err("only items already in Trash can be deleted forever".into());
+        }
+        s.purge(&rel)
+    })
+}
 
 #[tauri::command]
 pub fn corpus_create_folder(
@@ -7302,6 +7379,37 @@ mod tests {
             .filter_map(|e| e.ok())
             .collect();
         assert_eq!(trashed.len(), 1);
+    }
+
+    #[test]
+    fn journal_prune_keeps_pending_and_recent_drops_old_resolved() {
+        let (_dir, store) = bare();
+        let now = (OffsetDateTime::now_utc().unix_timestamp()) * 1000;
+        let old = now - 90 * 86_400_000; // ~90 days ago
+        // pending-old: latest status "proposed" → survives ANY prune.
+        // resolved-old: proposed→applied long ago → dropped (both lines).
+        // resolved-new: applied yesterday → survives a 30-day prune.
+        for line in [
+            format!(r#"{{"id":"pend","ts":{old},"status":"proposed"}}"#),
+            format!(r#"{{"id":"oldr","ts":{old},"status":"proposed"}}"#),
+            format!(r#"{{"id":"oldr","ts":{old},"status":"applied"}}"#),
+            format!(r#"{{"id":"newr","ts":{},"status":"applied"}}"#, now - 86_400_000),
+        ] {
+            store.journal_append(&line).unwrap();
+        }
+        let removed = store.journal_prune(30).unwrap();
+        assert_eq!(removed, 2, "both lines of the old resolved id go");
+        let kept = store.journal_read().unwrap();
+        assert!(kept.contains(r#""id":"pend""#), "pending is sacred:\n{kept}");
+        assert!(kept.contains(r#""id":"newr""#), "recent resolved stays:\n{kept}");
+        assert!(!kept.contains(r#""id":"oldr""#), "old resolved is gone:\n{kept}");
+        // keep_days = 0 clears ALL resolved history, pending still survives
+        store.journal_prune(0).unwrap();
+        let kept = store.journal_read().unwrap();
+        assert!(kept.contains(r#""id":"pend""#));
+        assert!(!kept.contains(r#""id":"newr""#));
+        // idempotent: nothing left to remove
+        assert_eq!(store.journal_prune(0).unwrap(), 0);
     }
 
     #[test]

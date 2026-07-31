@@ -119,6 +119,24 @@
   font-size: 11px;
   color: var(--text-muted);
 }
+/* the ALERT badge (2026-07-31): something waits on the user — a sensitive-data
+   decision on the Librarian, a piled-up Trash. Tinted pill, never a modal. */
+.count.alert {
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+  font-weight: 600;
+}
+/* the quiet counterpart — pending approvals on the Librarian footer button
+   (visible as a real pill so Suggest mode is never a silent queue) */
+.count.pill {
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
 /* per-section "+" pair (new note · new folder): ALWAYS visible on folder rows
    (Seth, 2026-07-25, from the Zen reference: "the icons are always there, not
    only on hover — it's just cleaner"). Whisper-quiet at rest (calm pass,

@@ -1,15 +1,28 @@
-// Brain Activity — the AI-Filer change journal (design §4.4.3). Every Filer action
-// (file a note, set an AI field, refresh an area overview) is logged and REVERSIBLE
-// here. Phase 3 rows are your own manual "file this note"; Phase 4's daemon appends
-// the same shape — PROPOSALS land in the pending lane on top and apply only on an
-// explicit Approve (the frontend never auto-applies). This is the trust surface:
-// see everything the AI wants to do or has done, and undo any of it.
+// The Librarian — the AI-Filer change journal (design §4.4.3). Every Filer
+// action (file a note, set an AI field, refresh an area overview) is logged and
+// REVERSIBLE here. PROPOSALS wait in the "Waiting for you" lane and apply only
+// on an explicit Approve (the frontend never auto-applies). This is the trust
+// surface: see everything the AI wants to do or has done, and undo any of it.
+//
+// 2026-07-31 rework (Seth): no per-row mascot, proposals grouped per note,
+// history folded into days (recent first, the long tail behind View all), a
+// first-visit explainer modal (re-openable via the ? button), a LIVE run band
+// (the daemon narrates each note it looks at; Stop hands control back), and
+// journal hygiene (prune resolved history; pending is sacred).
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type BrainAction, canUndo, deriveJournal, describeAction } from "../services/brainJournal";
 import { approveProposal, dismissProposal, undoAction } from "../services/brainJournalComposition";
 import { daysSinceMidnight } from "../lib/dateLabels";
-import { corpusSetSecure, organizerDismissSecure, organizerRunOnce, secureRepairApply } from "../lib/tauri";
+import {
+  corpusJournalPrune,
+  corpusSetSecure,
+  onOrganizerProgress,
+  organizerDismissSecure,
+  organizerRunOnce,
+  organizerStop,
+  secureRepairApply,
+} from "../lib/tauri";
 import {
   invalidateJournal,
   invalidateNotes,
@@ -19,17 +32,123 @@ import {
   useSecureRepair,
 } from "../services/hooks";
 import { deriveSecureReview } from "../services/secureReview";
+import { useTransientPopover } from "../lib/popover";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { Character } from "./character";
+import { ChevronRight } from "./glyphs";
+
+/** History longer than this earns the quiet "clear old logs" nudge (§4.8:
+ * show, never nag — one line, two buttons, no badge). */
+const LOG_NUDGE_AT = 300;
+/** How many day groups show before the long tail folds behind View all. */
+const RECENT_DAYS = 2;
 
 function when(ts: number): string {
   const d = new Date(ts);
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function dayLabel(ts: number): string {
   const days = daysSinceMidnight(ts);
-  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  if (days <= 0) return time;
-  if (days === 1) return `Yesterday ${time}`;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  return new Date(ts).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(days > 300 ? { year: "numeric" } : {}),
+  });
+}
+
+/** One note's pending proposals, folded to a single row ("4 suggestions —
+ * links · tags · summary · area") the user can approve or dismiss together. */
+interface PendingGroup {
+  key: string;
+  title: string;
+  ts: number;
+  rows: BrainAction[];
+}
+
+function groupPending(pending: BrainAction[]): PendingGroup[] {
+  const byNote = new Map<string, PendingGroup>();
+  for (const a of pending) {
+    const key = a.noteUlid ?? a.noteId;
+    const g = byNote.get(key);
+    if (g) {
+      g.rows.push(a);
+      g.ts = Math.max(g.ts, a.ts);
+    } else {
+      byNote.set(key, { key, title: a.noteTitle, ts: a.ts, rows: [a] });
+    }
+  }
+  return [...byNote.values()].sort((a, b) => b.ts - a.ts);
+}
+
+function fieldWord(a: BrainAction): string {
+  if (a.action === "file") return "file it";
+  if (a.action === "index") return "area overview";
+  return a.field === "suggested_area" ? "area" : (a.field ?? "field");
+}
+
+/** The first-visit explainer — everything the Librarian may and may NOT do,
+ * in one card. Re-openable any time from the header's ? button. */
+function LibrarianIntro({ onClose }: { onClose: () => void }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  useTransientPopover([cardRef], true, onClose);
+  return (
+    <div className="lib-intro-overlay">
+      <div
+        className="lib-intro"
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="About the Librarian"
+      >
+        <h3>Meet the Librarian</h3>
+        <p>
+          Your vault is a folder of plain files. The Librarian keeps it tidy: it files new captures into the
+          Library&rsquo;s areas and fills in organizational metadata, so you never have to.
+        </p>
+        <ul className="lib-intro-rules">
+          <li>
+            <strong>It only moves files and edits metadata</strong> — summary, tags, links, area. It never
+            rewrites a single word inside your notes.
+          </li>
+          <li>
+            <strong>It always skips</strong> locked notes, secure notes, and your hand-arranged Main. Those
+            are yours alone.
+          </li>
+          <li>
+            <strong>Secrets are found by patterns, not AI.</strong> The secret detector is on-device pattern
+            matching (key shapes, card numbers, SSNs) — no model reads your notes to find them. A model only
+            reads a note to organize it, and only the model you chose in Settings.
+          </li>
+          <li>
+            <strong>Everything is journaled and undoable</strong> — this page is the whole record.
+          </li>
+        </ul>
+        <p className="lib-intro-trust">
+          <strong>How much may it do?</strong> That&rsquo;s the ladder in Settings → Librarian:
+          <br />
+          <em>Suggest</em> — nothing happens until you approve it here. · <em>Tidy</em> — files new captures
+          and fills metadata by itself; area overview pages still wait for your OK. · <em>Organize</em> — Tidy
+          plus keeps each area&rsquo;s overview page fresh, all on its own.
+        </p>
+        <button type="button" className="ghostbtn primary lib-intro-ok" onClick={onClose}>
+          Got it
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The daemon's live narration — one rolling window of what it's touching. */
+interface LiveRun {
+  active: boolean;
+  total: number;
+  seen: number;
+  current: string | null;
+  summary: string | null;
 }
 
 export function ActivitySurface() {
@@ -38,11 +157,26 @@ export function ActivitySurface() {
   // journal HISTORY stays (it happened), and security surfaces (secure-note
   // repair, the review lane) are vault properties that never turn off.
   const brainOn = useUiStore((s) => s.brainEnabled);
+  const introSeen = useUiStore((s) => s.librarianIntroSeen);
+  const setIntroSeen = useUiStore((s) => s.setLibrarianIntroSeen);
   const status = useOrganizerStatus().data;
   const repair = useSecureRepair().data ?? [];
   const hints = useSecureHints().data ?? [];
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [introOpen, setIntroOpen] = useState(false);
+  const [showAllDays, setShowAllDays] = useState(false);
+  const [clearAllArmed, setClearAllArmed] = useState(false);
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
+  const [stopRequested, setStopRequested] = useState(false);
+  const [live, setLive] = useState<LiveRun>({
+    active: false,
+    total: 0,
+    seen: 0,
+    current: null,
+    summary: null,
+  });
   // rows the user just acted on — hidden immediately; the daemon's own set
   // converges on its next pass (the acted-on file moved or was dismissed)
   const [acted, setActed] = useState<ReadonlySet<string>>(new Set());
@@ -50,6 +184,55 @@ export function ActivitySurface() {
   const review = deriveSecureReview(
     hints.filter((h) => !acted.has(h.rel)),
     repair,
+  );
+
+  // the explainer greets the FIRST visit; the ? button brings it back anytime
+  useEffect(() => {
+    if (!introSeen) setIntroOpen(true);
+  }, [introSeen]);
+  const closeIntro = () => {
+    setIntroOpen(false);
+    if (!introSeen) setIntroSeen(true);
+  };
+
+  // the daemon's narration (titles only) — the "watch it work" feed
+  useEffect(
+    () =>
+      onOrganizerProgress((p) => {
+        if (p.phase === "start") {
+          // a stale Stop request (pressed against a phantom busy) must not
+          // wedge the button into "Stopping…" for the next real run (review F1)
+          setStopRequested(false);
+          setLive({ active: true, total: p.total ?? 0, seen: 0, current: null, summary: null });
+        } else if (p.phase === "note") {
+          setLive((l) => ({
+            ...l,
+            active: true,
+            seen: l.seen + 1,
+            current: p.title || p.rel || null,
+          }));
+        } else {
+          setStopRequested(false);
+          // an all-zero cycle (e.g. a raw-vault early return) closes the band
+          // without a misleading "Last run: 0 applied" line (review F8)
+          const worthTelling =
+            (p.applied ?? 0) + (p.proposals ?? 0) + (p.requeued ?? 0) > 0 || p.stopped === true;
+          setLive((l) => ({
+            ...l,
+            active: false,
+            current: null,
+            summary:
+              p.error || !worthTelling
+                ? null // the status line carries any error
+                : `${p.applied ?? 0} applied · ${p.proposals ?? 0} proposed${
+                    p.stopped ? " · stopped by you" : ""
+                  }`,
+          }));
+          void invalidateJournal();
+          void invalidateNotes();
+        }
+      }),
+    [],
   );
 
   const actOnHint = (rel: string, op: () => Promise<void>) => {
@@ -67,6 +250,22 @@ export function ActivitySurface() {
 
   const actions = journal.data ?? null;
   const { pending, history } = deriveJournal(actions ?? []);
+  const groups = useMemo(() => groupPending(pending), [pending]);
+
+  // history folded into day groups, newest first — the recent days render,
+  // the long tail waits behind "View all"
+  const days = useMemo(() => {
+    const out: { label: string; rows: BrainAction[] }[] = [];
+    for (const a of history) {
+      const label = dayLabel(a.ts);
+      const last = out[out.length - 1];
+      if (last && last.label === label) last.rows.push(a);
+      else out.push({ label, rows: [a] });
+    }
+    return out;
+  }, [history]);
+  const visibleDays = showAllDays ? days : days.slice(0, RECENT_DAYS);
+  const hiddenDayCount = days.length - RECENT_DAYS;
 
   // one busy/err funnel for approve/dismiss/undo — same pattern as Phase 3 undo
   const run = async (a: BrainAction, op: (a: BrainAction) => Promise<void>) => {
@@ -84,47 +283,131 @@ export function ActivitySurface() {
     }
   };
 
+  /** Approve/dismiss one note's whole group, sequentially — each row keeps its
+   * own freshness guard; the first failure stops and surfaces. */
+  const runGroup = async (g: PendingGroup, op: (a: BrainAction) => Promise<void>) => {
+    setBusy(g.key);
+    setErr(null);
+    try {
+      for (const a of g.rows) await op(a);
+      await invalidateNotes();
+      await invalidateJournal();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      await invalidateJournal(); // partial progress is real — show it
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const prune = (keepDays: number) => {
+    setBusy("prune");
+    setErr(null);
+    setNote(null);
+    corpusJournalPrune(keepDays)
+      .then(async (removed) => {
+        setNote(
+          removed > 0
+            ? `Cleared ${removed} old log ${removed === 1 ? "entry" : "entries"}.`
+            : "Nothing old enough to clear.",
+        );
+        await invalidateJournal();
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(null));
+  };
+
+  const running = live.active || status?.busy === true;
+
   return (
     <div className="board activity">
+      {introOpen && <LibrarianIntro onClose={closeIntro} />}
       <header className="board-head">
-        <h2 className="board-title">Librarian Activity</h2>
-        <span className="board-count">{pending.length + history.length}</span>
+        <h2 className="board-title">Librarian</h2>
+        {pending.length > 0 && (
+          <span className="board-count act-waiting" title="Suggestions waiting for you">
+            {pending.length} waiting
+          </span>
+        )}
+        <button
+          type="button"
+          className="act-help"
+          aria-label="What is the Librarian?"
+          title="What is the Librarian?"
+          onClick={() => setIntroOpen(true)}
+        >
+          ?
+        </button>
         {/* the daemon is event-driven and sleeps when idle — this is the
             explicit nudge (one pass now, then back to sleep). Hidden when the
             worker never spawned (not a memex) or the ladder is Off. */}
-        {brainOn && status?.running && status.trust !== "off" && (
-          <button
-            type="button"
-            className="act-undo"
-            style={{ marginLeft: "auto" }}
-            title="Run one organizer pass now (it never interrupts a chat)"
-            onClick={() => {
-              organizerRunOnce().then(
-                () => void invalidateJournal(),
-                (e) => setErr(e instanceof Error ? e.message : String(e)),
-              );
-            }}
-          >
-            Run now
-          </button>
-        )}
+        {brainOn &&
+          status?.running &&
+          status.trust !== "off" &&
+          (running ? (
+            <button
+              type="button"
+              className="act-undo act-stop"
+              style={{ marginLeft: "auto" }}
+              disabled={stopRequested}
+              title="Finish the current note, then stop — the rest stays queued"
+              onClick={() => {
+                setStopRequested(true);
+                organizerStop().catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+              }}
+            >
+              {stopRequested ? "Stopping…" : "Stop"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="act-undo"
+              style={{ marginLeft: "auto" }}
+              title="Run one organizer pass now (it never interrupts a chat)"
+              onClick={() => {
+                setLive((l) => ({ ...l, summary: null }));
+                organizerRunOnce().then(
+                  () => void invalidateJournal(),
+                  (e) => setErr(e instanceof Error ? e.message : String(e)),
+                );
+              }}
+            >
+              Run now
+            </button>
+          ))}
       </header>
-      {err && (
-        <p className="file-err" style={{ padding: "0 22px 8px" }}>
-          ⚠ {err}
+      {/* the LIVE band — the daemon narrating exactly what it's touching */}
+      {running && (
+        <div className="act-live" role="status">
+          <span className="act-live-dot" aria-hidden="true" />
+          <span className="act-live-text">
+            {live.current
+              ? `Looking at “${live.current}”${live.total > 0 ? ` — ${live.seen} of ${live.total}` : ""}`
+              : "Organizing…"}
+          </span>
+        </div>
+      )}
+      {!running && live.summary && (
+        <p className="brain-hint act-pad" role="status">
+          Last run: {live.summary}
+        </p>
+      )}
+      {err && <p className="file-err act-pad">⚠ {err}</p>}
+      {note && (
+        <p className="brain-hint act-pad" role="status">
+          {note}
         </p>
       )}
       {/* quiet daemon-status lines — show, never nag (§4.8) */}
       {brainOn && status?.modelOffline && (
-        <p className="brain-hint" style={{ padding: "0 22px 8px" }}>
-          Paused — local model offline. {status.queued} waiting.
-        </p>
+        <p className="brain-hint act-pad">Paused — local model offline. {status.queued} waiting.</p>
       )}
       {/* the secure-review confirm lane (feature B, decision 2026-07-22): the
           detector PROPOSES, the user disposes — nothing is ever auto-marked
-          from here. "Not sensitive" is remembered for that exact content. */}
+          from here. "Not sensitive" is remembered for that exact content.
+          ALWAYS the surface's first business (Seth, 2026-07-31). */}
       {review.confirm.length > 0 && (
-        <div className="brain-hint" style={{ padding: "0 22px 8px" }}>
+        <div className="brain-hint act-pad act-secure-band">
           <p style={{ margin: 0 }}>
             {review.confirm.length === 1
               ? "1 note looks like it holds sensitive data"
@@ -164,7 +447,7 @@ export function ActivitySurface() {
         </div>
       )}
       {review.flaggedLeftover > 0 && (
-        <p className="brain-hint" style={{ padding: "0 22px 8px" }}>
+        <p className="brain-hint act-pad">
           {review.flaggedLeftover} secure {review.flaggedLeftover === 1 ? "note awaits" : "notes await"} your
           review — the AI won’t read or move {review.flaggedLeftover === 1 ? "it" : "them"}.
         </p>
@@ -173,7 +456,7 @@ export function ActivitySurface() {
           previewable — the list IS the preview, one deliberate click applies,
           and Rust re-validates every note on disk before its protected move. */}
       {repair.length > 0 && (
-        <div className="brain-hint" style={{ padding: "0 22px 8px" }}>
+        <div className="brain-hint act-pad">
           <p style={{ margin: 0 }}>
             {repair.length === 1
               ? "1 secure note still sits in intake"
@@ -229,91 +512,216 @@ export function ActivitySurface() {
         </div>
       ) : (
         <div className="board-scroll">
-          {pending.length > 0 && (
-            <ul className="recent-list">
-              {pending.map((a) => (
-                <li key={a.id}>
-                  <div className="act-row">
-                    <span className="act-brain" aria-hidden="true">
-                      🧠
-                    </span>
-                    <button
-                      type="button"
-                      className="act-desc"
-                      title="Open the note"
-                      // the ULID survives filings/renames; the rel is a fallback
-                      onClick={() => openNote(a.noteUlid ?? a.noteId)}
-                    >
-                      {describeAction(a, true)}
-                    </button>
-                    <span className="act-time">{when(a.ts)}</span>
-                    {/* raw vault: Approve would hit the Rust refusal — only
-                        Dismiss (journal-only) remains actionable */}
-                    {brainOn && (
-                      <button
-                        type="button"
-                        /* the affirmative action gets the quiet accent — no more
-                           identical ghost twins (#84, audit 2026-07) */
-                        className="act-undo act-approve"
-                        disabled={busy === a.id}
-                        onClick={() => void run(a, approveProposal)}
-                      >
-                        Approve
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="act-undo"
-                      disabled={busy === a.id}
-                      onClick={() => void run(a, dismissProposal)}
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+          {/* ── Waiting for you: one row per NOTE, its suggestions folded ── */}
+          {groups.length > 0 && (
+            <>
+              <h3 className="act-section">
+                Waiting for you <span className="act-section-n">{pending.length}</span>
+              </h3>
+              <ul className="recent-list">
+                {groups.map((g) => {
+                  const open = openGroups.has(g.key) || g.rows.length === 1;
+                  return (
+                    <li key={g.key}>
+                      {g.rows.length > 1 && (
+                        <div className="act-row act-group">
+                          <button
+                            type="button"
+                            className="act-disclose"
+                            aria-expanded={openGroups.has(g.key)}
+                            aria-label={`${openGroups.has(g.key) ? "Collapse" : "Expand"} suggestions for ${g.title}`}
+                            onClick={() =>
+                              setOpenGroups((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(g.key)) next.delete(g.key);
+                                else next.add(g.key);
+                                return next;
+                              })
+                            }
+                          >
+                            <ChevronRight size={11} className={openGroups.has(g.key) ? "open" : undefined} />
+                          </button>
+                          <button
+                            type="button"
+                            className="act-desc"
+                            title="Open the note"
+                            onClick={() => openNote(g.rows[0]?.noteUlid ?? g.rows[0]?.noteId ?? g.key)}
+                          >
+                            <strong>“{g.title || "Area overview"}”</strong> — {g.rows.length} suggestions:{" "}
+                            {g.rows.map(fieldWord).join(" · ")}
+                          </button>
+                          <span className="act-time">{when(g.ts)}</span>
+                          {brainOn && (
+                            <button
+                              type="button"
+                              className="act-undo act-approve"
+                              disabled={busy === g.key}
+                              onClick={() => void runGroup(g, approveProposal)}
+                            >
+                              Approve all
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="act-undo"
+                            disabled={busy === g.key}
+                            onClick={() => void runGroup(g, dismissProposal)}
+                          >
+                            Dismiss all
+                          </button>
+                        </div>
+                      )}
+                      {open && (
+                        <ul className={g.rows.length > 1 ? "recent-list act-sub" : "recent-list"}>
+                          {g.rows.map((a) => (
+                            <li key={a.id}>
+                              <div className="act-row">
+                                <button
+                                  type="button"
+                                  className="act-desc"
+                                  title="Open the note"
+                                  // the ULID survives filings/renames; the rel is a fallback
+                                  onClick={() => openNote(a.noteUlid ?? a.noteId)}
+                                >
+                                  {describeAction(a, true)}
+                                </button>
+                                <span className="act-time">{when(a.ts)}</span>
+                                {/* raw vault: Approve would hit the Rust refusal — only
+                                    Dismiss (journal-only) remains actionable */}
+                                {brainOn && (
+                                  <button
+                                    type="button"
+                                    className="act-undo act-approve"
+                                    // the group batch may be mid-flight on this
+                                    // exact row — no concurrent twin (review F3)
+                                    disabled={busy === a.id || busy === g.key}
+                                    onClick={() => void run(a, approveProposal)}
+                                  >
+                                    Approve
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="act-undo"
+                                  disabled={busy === a.id || busy === g.key}
+                                  onClick={() => void run(a, dismissProposal)}
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
-          <ul className="recent-list">
-            {history.map((a) => {
-              const undone = a.status === "reverted";
-              return (
-                <li key={a.id}>
-                  <div className={undone ? "act-row done" : "act-row"}>
-                    <span className="act-brain" aria-hidden="true">
-                      🧠
-                    </span>
-                    <button
-                      type="button"
-                      className="act-desc"
-                      title="Open the note"
-                      onClick={() => openNote(a.noteUlid ?? a.noteId)}
-                    >
-                      {describeAction(a, false)}
-                    </button>
-                    <span className="act-time">{when(a.ts)}</span>
-                    {undone ? (
-                      <span className="act-undone">undone</span>
-                    ) : (
-                      /* raw vault: Undo replays a Brain move and would hit the
-                         Rust refusal — history stays readable, not actionable */
-                      brainOn &&
-                      canUndo(a) && (
+          {/* ── History: recent days open, the long tail behind View all ── */}
+          {days.length > 0 && (
+            <h3 className="act-section">
+              History <span className="act-section-n">{history.length}</span>
+            </h3>
+          )}
+          {visibleDays.map((day) => (
+            <div key={day.label}>
+              <h4 className="act-day">
+                {day.label} <span className="act-section-n">{day.rows.length}</span>
+              </h4>
+              <ul className="recent-list">
+                {day.rows.map((a) => {
+                  const undone = a.status === "reverted";
+                  return (
+                    <li key={a.id}>
+                      <div className={undone ? "act-row done" : "act-row"}>
                         <button
                           type="button"
-                          className="act-undo"
-                          disabled={busy === a.id}
-                          onClick={() => void run(a, undoAction)}
+                          className="act-desc"
+                          title="Open the note"
+                          onClick={() => openNote(a.noteUlid ?? a.noteId)}
                         >
-                          Undo
+                          {describeAction(a, false)}
                         </button>
-                      )
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                        <span className="act-time">{when(a.ts)}</span>
+                        {undone ? (
+                          <span className="act-undone">undone</span>
+                        ) : (
+                          /* raw vault: Undo replays a Brain move and would hit the
+                             Rust refusal — history stays readable, not actionable */
+                          brainOn &&
+                          canUndo(a) && (
+                            <button
+                              type="button"
+                              className="act-undo"
+                              disabled={busy === a.id}
+                              onClick={() => void run(a, undoAction)}
+                            >
+                              Undo
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+          {hiddenDayCount > 0 && (
+            <button type="button" className="act-viewall" onClick={() => setShowAllDays(!showAllDays)}>
+              {showAllDays
+                ? "Show recent days only"
+                : `View all — ${hiddenDayCount} more ${hiddenDayCount === 1 ? "day" : "days"}`}
+            </button>
+          )}
+          {/* journal hygiene: these are just logs — pending is never touched */}
+          {history.length > 0 && (
+            <div className="act-logcare">
+              {history.length > LOG_NUDGE_AT && (
+                <p>The journal holds {history.length} entries — clearing old logs keeps things quick.</p>
+              )}
+              <button
+                type="button"
+                className="act-undo"
+                disabled={busy === "prune"}
+                onClick={() => prune(30)}
+              >
+                Clear logs older than 30 days
+              </button>
+              {/* cleared history takes its Undo with it — an armed two-step,
+                  same grammar as Empty Trash (review F2) */}
+              {clearAllArmed ? (
+                <>
+                  <button type="button" className="act-undo" onClick={() => setClearAllArmed(false)}>
+                    Keep
+                  </button>
+                  <button
+                    type="button"
+                    className="act-undo act-stop"
+                    disabled={busy === "prune"}
+                    onClick={() => {
+                      setClearAllArmed(false);
+                      prune(0);
+                    }}
+                  >
+                    Remove {history.length} entries — their Undo goes with them
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="act-undo"
+                  disabled={busy === "prune"}
+                  onClick={() => setClearAllArmed(true)}
+                >
+                  Clear all history…
+                </button>
+              )}
+              <p className="act-logcare-hint">Cleared entries can no longer be undone from here.</p>
+            </div>
+          )}
         </div>
       )}
     </div>

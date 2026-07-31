@@ -192,6 +192,20 @@ pub(crate) struct OrganizerInner {
     running: AtomicBool,
     /// The Settings "Run now" nudge — bypasses quiet/idle/AC/thermal, never chat.
     run_now: AtomicBool,
+    /// The Activity Stop button (2026-07-31): finish the current note, requeue
+    /// the rest. Cleared when the next cycle starts; it cannot abort an
+    /// in-flight model call, only the next boundary.
+    stop_now: AtomicBool,
+    /// A cycle is executing right now — drives the Activity live band.
+    cycle_busy: AtomicBool,
+    /// The journal/filed_by label for the lane that ACTUALLY ran this cycle —
+    /// set by the worker per cycle (2026-07-31: a Claude-organized run used to
+    /// be stamped as the local model). Tests leave the default.
+    model_label: Mutex<String>,
+    /// Live progress sink for the Activity surface — installed once by
+    /// spawn_organizer (a Tauri event emitter); None in tests. Called outside
+    /// every corpus lock.
+    progress: Mutex<Option<Box<dyn Fn(serde_json::Value) + Send>>>,
     /// A reconciliation sweep is owed (Some = when it was last nudged, for the
     /// settle debounce). Event-driven only: set at startup, on Run-now, when a
     /// frontend approval lands (its writes are suppress-marked — no watcher
@@ -219,6 +233,16 @@ impl Drop for InteractiveGuard {
     }
 }
 
+impl OrganizerInner {
+    /// Fire one live-progress event at the Activity surface; a no-op in tests
+    /// (no sink installed). Never called while holding a corpus lock.
+    fn emit_progress(&self, v: serde_json::Value) {
+        if let Some(f) = self.progress.lock().unwrap().as_ref() {
+            f(v);
+        }
+    }
+}
+
 impl Default for OrganizerHandle {
     fn default() -> Self {
         Self::new()
@@ -237,6 +261,10 @@ impl OrganizerHandle {
             status: Mutex::new(StatusSnapshot::default()),
             running: AtomicBool::new(false),
             run_now: AtomicBool::new(false),
+            stop_now: AtomicBool::new(false),
+            cycle_busy: AtomicBool::new(false),
+            model_label: Mutex::new(chat::DEFAULT_MODEL.to_string()),
+            progress: Mutex::new(None),
             sweep_at: Mutex::new(None),
             interactive: AtomicUsize::new(0),
         }))
@@ -1123,6 +1151,8 @@ pub(crate) struct CycleReport {
     pub errors: usize,
     pub model_offline: bool,
     pub journal_written: bool,
+    /// The user pressed Stop mid-cycle — the rest of the queue was left intact.
+    pub stopped: bool,
 }
 
 /// What one classify candidate resolved to inside the write `route()`.
@@ -1161,6 +1191,7 @@ pub(crate) fn run_cycle(
     transport: &dyn Fn(&str) -> Result<String, String>,
 ) -> Result<CycleReport, String> {
     let mut report = CycleReport::default();
+    let model_label = inner.model_label.lock().unwrap().clone();
     let knobs = read_knobs(corpus_state, root_id, inner);
     if inner.brain_off.load(Ordering::SeqCst) {
         // a RAW vault has no Brain at all (vault-vs-brain, 2026-07-26) —
@@ -1180,6 +1211,7 @@ pub(crate) fn run_cycle(
     // a sorted snapshot of the queue — deterministic pass order
     let mut rels: Vec<String> = inner.queue.lock().unwrap().keys().cloned().collect();
     rels.sort();
+    inner.emit_progress(serde_json::json!({ "phase": "start", "total": rels.len() }));
 
     let mut vocab: Option<Vec<(String, String)>> = None;
     let mut peers: Option<Vec<(String, String)>> = None; // enrich link haystack, once per cycle
@@ -1191,6 +1223,13 @@ pub(crate) fn run_cycle(
             inner.queue.lock().unwrap().clear();
             inner.status.lock().unwrap().secure_pending.clear();
             return Ok(report);
+        }
+        // the Activity Stop button — nothing more is processed; the remaining
+        // candidates stay queued for the next run, exactly like a closed gate
+        if inner.stop_now.load(Ordering::SeqCst) {
+            report.stopped = true;
+            report.requeued += 1;
+            continue;
         }
         // trust is LIVE per candidate — `organizer_set_trust` can downgrade the
         // rung mid-cycle (each model call is up to 45s; a long queue must not
@@ -1254,6 +1293,11 @@ pub(crate) fn run_cycle(
 
         let mut rel = rel;
         let mut snap = snap;
+        // the live feed's "what it's looking at right now" line — titles only,
+        // never body content (the same boundary every surface keeps)
+        inner.emit_progress(
+            serde_json::json!({ "phase": "note", "title": snap.title, "rel": rel }),
+        );
 
         // ── Job A — Classify (`wiki/_inbox` staging only) ─────────────────────
         if rel.starts_with("wiki/_inbox/") && !classify_covered(&snap, &state) {
@@ -1363,7 +1407,7 @@ pub(crate) fn run_cycle(
                                     Verb::FileStaged => {
                                         // the Filer gates re-read `locked` FRESH inside these
                                         s.set_ai_field(&rel, "area", &area)?;
-                                        s.set_ai_field(&rel, "filed_by", chat::DEFAULT_MODEL)?;
+                                        s.set_ai_field(&rel, "filed_by", &model_label)?;
                                         s.set_ai_field(&rel, "filed_at", &stamp)?;
                                         let meta = s.file_note(&rel)?;
                                         let new_rel = s.resolve_note_rel(&meta.id)?;
@@ -1394,12 +1438,7 @@ pub(crate) fn run_cycle(
                                 .map(|n| n.proposed.file_row.clone())
                                 .unwrap_or_default();
                             supersede(s, &old_row)?;
-                            s.journal_append(&journal_line(
-                                &row,
-                                &row_ulid,
-                                ts,
-                                chat::DEFAULT_MODEL,
-                            ))?;
+                            s.journal_append(&journal_line(&row, &row_ulid, ts, &model_label))?;
                             {
                                 // every fallible write landed — NOW record the pass.
                                 // Entry-mutate (never insert-clobber) so a prior
@@ -1517,6 +1556,13 @@ pub(crate) fn run_cycle(
             inner.status.lock().unwrap().secure_pending.clear();
             return Ok(report);
         }
+        // Stop lands mid-candidate too — enrich is one more model call away
+        if inner.stop_now.load(Ordering::SeqCst) {
+            inner.queue.lock().unwrap().insert(rel, Instant::now());
+            report.stopped = true;
+            report.requeued += 1;
+            continue;
+        }
         let peers = peers.get_or_insert_with(|| list_peers(root));
         let self_stem =
             rel.rsplit('/').next().unwrap_or(&rel).trim_end_matches(".md").to_string();
@@ -1625,7 +1671,7 @@ pub(crate) fn run_cycle(
                     proposed += 1;
                     new_rows.push(row_ulid.clone());
                 }
-                s.journal_append(&journal_line(&row, &row_ulid, now_ms(), chat::DEFAULT_MODEL))?;
+                s.journal_append(&journal_line(&row, &row_ulid, now_ms(), &model_label))?;
             }
             let ns = state.notes.entry(key.clone()).or_default();
             ns.hash = snap.body_hash.clone();
@@ -1655,9 +1701,10 @@ pub(crate) fn run_cycle(
     }
 
     // ── Job C — RefreshIndex (deterministic; behind the same gates) ──────────
-    // trust re-sampled: a mid-cycle Off must park the index job too
+    // trust re-sampled: a mid-cycle Off must park the index job too; a Stop
+    // parks it outright — the user asked for hands off NOW
     let trust = *inner.trust.lock().unwrap();
-    if trust != Trust::Off && gates() {
+    if trust != Trust::Off && !report.stopped && gates() {
         refresh_indexes(corpus_state, root_id, root, trust, &mut state, &mut report)?;
     }
 
@@ -1929,6 +1976,14 @@ fn app_backgrounded(app: &tauri::AppHandle) -> bool {
 /// daemon's only territory; no memex ⇒ this is never called.
 pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: String, root: PathBuf) {
     handle.0.running.store(true, Ordering::SeqCst);
+    // install the live-progress sink — run_cycle narrates through it and the
+    // Activity surface listens ("rotli:organizer-progress"); titles only
+    {
+        let progress_app = app.clone();
+        *handle.0.progress.lock().unwrap() = Some(Box::new(move |v: serde_json::Value| {
+            let _ = progress_app.emit_to("main", "rotli:organizer-progress", v);
+        }));
+    }
     // startup owes ONE reconciliation sweep (edits made while rotli was closed
     // never reached the queue) — after that, events only.
     *handle.0.sweep_at.lock().unwrap() = Some(Instant::now());
@@ -2086,8 +2141,30 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                     chat::complete_local(&msgs, true, 0.0, GEN_MAX_TOKENS, MODEL_TIMEOUT)
                 }
             };
-            match run_cycle(&corpus_state, &root_id, &root, inner, &gates, &transport) {
+            // journal/filed_by must name the lane that ACTUALLY runs — a
+            // Claude-organized cycle used to be stamped as the local model
+            *inner.model_label.lock().unwrap() = match org_model {
+                OrgModel::Claude => "claude-sonnet".to_string(),
+                OrgModel::Gemini35 => "gemini-3.5-flash".to_string(),
+                OrgModel::Local => chat::DEFAULT_MODEL.to_string(),
+            };
+            // a Stop belongs to the cycle it interrupted, never to the next
+            // one — cleared BEFORE busy goes up, so no press can slip into the
+            // gap and be silently eaten while the UI shows busy (review F5)
+            inner.stop_now.store(false, Ordering::SeqCst);
+            inner.cycle_busy.store(true, Ordering::SeqCst);
+            let cycle = run_cycle(&corpus_state, &root_id, &root, inner, &gates, &transport);
+            inner.cycle_busy.store(false, Ordering::SeqCst);
+            match cycle {
                 Ok(report) => {
+                    inner.emit_progress(serde_json::json!({
+                        "phase": "end",
+                        "applied": report.applied,
+                        "proposals": report.proposals,
+                        "requeued": report.requeued,
+                        "secureSkipped": report.secure_skipped,
+                        "stopped": report.stopped,
+                    }));
                     cycle_owed = false; // the owed post-sweep cycle ran
                     // gate-blocked candidates were left queued with their OLD
                     // enqueue stamps (quiet already elapsed) — without the flag
@@ -2119,6 +2196,8 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                     }
                 }
                 Err(e) => {
+                    // the live band must close on a failed cycle too
+                    inner.emit_progress(serde_json::json!({ "phase": "end", "error": true }));
                     inner.status.lock().unwrap().last_error = Some(e);
                 }
             }
@@ -2138,6 +2217,8 @@ pub struct OrganizerStatus {
     last_error: Option<String>,
     secure_skipped: usize,
     model_offline: bool,
+    /// A cycle is executing right now (the Activity live band's anchor).
+    busy: bool,
 }
 
 #[tauri::command]
@@ -2154,7 +2235,23 @@ pub fn organizer_status(state: tauri::State<OrganizerState>) -> OrganizerStatus 
         // content, not the last cycle's tally (which zeroes on any small cycle)
         secure_skipped: st.secure_pending.len(),
         model_offline: st.model_offline,
+        busy: inner.cycle_busy.load(Ordering::SeqCst),
     }
+}
+
+/// The Activity Stop button — finish the current note, requeue the rest.
+/// Cannot abort an in-flight model call (45–120 s worst case); the flag is
+/// honored at every candidate boundary and mid-candidate before enrich.
+#[tauri::command]
+pub fn organizer_stop(state: tauri::State<OrganizerState>) -> Result<(), String> {
+    let inner = &state.0 .0;
+    if !inner.running.load(Ordering::SeqCst) {
+        return Err("the organizer isn't running — your notes folder isn't a memex".into());
+    }
+    inner.stop_now.store(true, Ordering::SeqCst);
+    // an unstarted queued nudge dies with the stop — the user said hands off
+    inner.run_now.store(false, Ordering::SeqCst);
+    Ok(())
 }
 
 /// The manual nudge — bypasses quiet/idle/AC/thermal (never an in-flight chat).

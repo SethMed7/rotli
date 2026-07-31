@@ -305,6 +305,12 @@
   padding: 4px 9px;
 }
 
+/* the Empty-Trash confirm — the one danger-tinted control in the browser */
+.fdr-empty-confirm {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
 /* the New-folder-here input row + its quiet error line */
 .fdr-newbtn {
   margin-left: 2px;

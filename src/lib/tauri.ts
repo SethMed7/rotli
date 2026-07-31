@@ -833,6 +833,8 @@ export interface OrganizerStatus {
    * daemon never read them; the UI tells the user to review them personally. */
   secureSkipped: number;
   modelOffline: boolean;
+  /** A cycle is executing right now (drives the Activity live band). */
+  busy: boolean;
 }
 
 export async function organizerStatus(): Promise<OrganizerStatus> {
@@ -845,6 +847,7 @@ export async function organizerStatus(): Promise<OrganizerStatus> {
       lastError: null,
       secureSkipped: 0,
       modelOffline: false,
+      busy: false,
     };
   }
   return invoke<OrganizerStatus>("organizer_status");
@@ -854,6 +857,13 @@ export async function organizerStatus(): Promise<OrganizerStatus> {
 export async function organizerRunOnce(): Promise<void> {
   if (!isTauri()) return;
   await invoke("organizer_run_once");
+}
+
+/** The Activity Stop button — finish the current note, requeue the rest. It
+ * cannot abort an in-flight model call; it lands at the next boundary. */
+export async function organizerStop(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("organizer_stop");
 }
 
 /** Immediate in-memory Brain flip (vault-vs-brain, 2026-07-26) — OFF stops an
@@ -913,6 +923,20 @@ export async function corpusJournalAppend(line: string): Promise<void> {
 export async function corpusJournalRead(): Promise<string> {
   if (!isTauri()) return "";
   return invoke<string>("corpus_journal_read");
+}
+
+/** Prune resolved journal entries older than keepDays (0 = all resolved
+ * history). Pending proposals always survive. Returns lines removed. */
+export async function corpusJournalPrune(keepDays: number): Promise<number> {
+  if (!isTauri()) return 0;
+  return invoke<number>("corpus_journal_prune", { keepDays });
+}
+
+/** Empty-Trash lane (the ONLY hard delete; Rust re-checks the note already
+ * lives in Trash). The file lands in the OS Trash — recoverable, never gone. */
+export async function corpusPurge(id: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_purge", { id });
 }
 
 /** Toggle the per-note SECURE flag (secrets → never sent remote, gitignored). */
@@ -1172,6 +1196,28 @@ export function onOpenRequest(cb: () => void): () => void {
 export function onBrainJournal(cb: () => void): () => void {
   if (!isTauri()) return () => {};
   const unlisten = listen("rotli:brain-journal", () => cb());
+  return () => void unlisten.then((fn) => fn());
+}
+
+/** One live organizer-progress beat (2026-07-31): the daemon narrates a cycle
+ * — start (queue size), each note it looks at (title only, never content),
+ * and the end tally. The Activity surface renders these as the working feed. */
+export interface OrganizerProgress {
+  phase: "start" | "note" | "end";
+  total?: number;
+  title?: string;
+  rel?: string;
+  applied?: number;
+  proposals?: number;
+  requeued?: number;
+  secureSkipped?: number;
+  stopped?: boolean;
+  error?: boolean;
+}
+
+export function onOrganizerProgress(cb: (p: OrganizerProgress) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen<OrganizerProgress>("rotli:organizer-progress", (e) => cb(e.payload));
   return () => void unlisten.then((fn) => fn());
 }
 

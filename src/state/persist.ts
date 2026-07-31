@@ -206,6 +206,8 @@ interface PersistedSettings {
   /** Idle delay (seconds) before the organizer scans a just-touched note. The
    * Rust daemon's `organizerQuietSecs` knob; default 300 (5 min). */
   organizerQuietSecs: number;
+  /** The Librarian's first-visit explainer was shown (2026-07-31). */
+  librarianIntroSeen: boolean;
   /** First-run onboarding gate — false until the flow is finished/skipped. */
   onboarded: boolean;
   /** The app version onboarding last completed at (the onboardingVersion gate). */
@@ -389,6 +391,7 @@ export function parseSettings(raw: string): PersistedSettings {
       data.organizerQuietSecs >= 0
         ? data.organizerQuietSecs
         : 300,
+    librarianIntroSeen: asBool(data.librarianIntroSeen, false),
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
     // not this one — treat that as already-onboarded so we don't re-run first-run
     // onboarding on existing users (same migration shape as expandedDests above)
@@ -471,6 +474,7 @@ function applySettings(s: PersistedSettings): void {
     organizerTrust: s.organizerTrust,
     organizerModel: s.organizerModel,
     organizerQuietSecs: s.organizerQuietSecs,
+    librarianIntroSeen: s.librarianIntroSeen,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
     quickNoteIds: s.quickNoteIds,
@@ -803,6 +807,7 @@ function settingsSnapshot(): string {
     organizerTrust: ui.organizerTrust,
     organizerModel: ui.organizerModel,
     organizerQuietSecs: ui.organizerQuietSecs,
+    librarianIntroSeen: ui.librarianIntroSeen,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
     quickNoteIds: ui.quickNoteIds,

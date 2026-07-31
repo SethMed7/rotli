@@ -1154,14 +1154,16 @@ function LocationPane() {
 // design — Phase 4 ships the 4-level radio + the reassurance copy; capability
 // checkboxes, Pause, and Reset Brain are the Phase-5 control panel (§4.8). ———
 
-/** What each rung lets the daemon auto-APPLY — proposals always flow to
- * Activity regardless (except Off, which is fully dormant). */
+/** What each rung lets the daemon auto-APPLY — proposals always flow to the
+ * Librarian regardless (except Off, which is fully dormant). Tidy vs Organize
+ * (Seth, 2026-07-31 — "they look the same"): the ONLY difference today is the
+ * per-area overview page — Tidy proposes its refresh, Organize applies it. */
 const TRUST_CAPTIONS: Record<OrganizerTrust, string> = {
   off: "Dormant — it does nothing at all.",
-  suggest: "Applies nothing. Everything it wants to do waits in Activity for your OK.",
-  tidy: "Files brand-new captures and fills in metadata on its own; bigger moves still wait for you.",
+  suggest: "Nothing happens by itself. Every change waits in the Librarian for your approval.",
+  tidy: "Files new captures and fills in metadata by itself. Each area's overview page still waits for your OK — that's the one thing Organize adds.",
   organize:
-    "Files and tidies everything on its own (the default) — every action journaled in Activity and undoable.",
+    "Everything Tidy does, plus it keeps each area's overview page fresh on its own (the default) — all journaled, all undoable.",
 };
 
 function BrainPane() {
@@ -2206,6 +2208,11 @@ function SecurityPane() {
       <p className="setnote">
         <b>The Librarian never touches them.</b> rotli&rsquo;s organizer skips secure notes entirely — it
         doesn&rsquo;t read, move, or tag them, even when it&rsquo;s allowed to read other notes.
+      </p>
+      <p className="setnote">
+        <b>Secrets are found by patterns, not AI.</b> The detector is on-device pattern matching — key shapes,
+        card numbers (checksum-verified), SSNs — so no model ever reads a note to decide whether it&rsquo;s
+        sensitive. A model reads a note only to organize or answer about it, and only the model you chose.
       </p>
       <span className="mplabel">Leaving and repairs</span>
       <p className="setnote">

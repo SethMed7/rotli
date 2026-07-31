@@ -393,6 +393,10 @@ interface UiState {
   /** Idle delay (seconds) before the organizer scans a just-touched note. */
   organizerQuietSecs: number;
   setOrganizerQuietSecs: (n: number) => void;
+  /** The Librarian's first-visit explainer was shown (2026-07-31) — the ?
+   * button in the surface re-opens it anytime. Persisted. */
+  librarianIntroSeen: boolean;
+  setLibrarianIntroSeen: (seen: boolean) => void;
 
   /** A newer signed build is on the feed — set once by App.tsx's quiet on-mount
    * check (CARL rule 2: no auto-download, no modal). Just lets Settings → General
@@ -636,6 +640,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setOrganizerModel: (m) => set({ organizerModel: m }),
   organizerQuietSecs: 300,
   setOrganizerQuietSecs: (n) => set({ organizerQuietSecs: n }),
+  librarianIntroSeen: false,
+  setLibrarianIntroSeen: (seen) => set({ librarianIntroSeen: seen }),
 
   updateAvailable: false,
   setUpdateAvailable: (on) => set({ updateAvailable: on }),
