@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.58.0] - 2026-07-31
+
+### Added
+
+- **You can always see the Librarian working.** The sidebar's Librarian
+  button pulses a quiet dot whenever anything runs — a scheduled pass or the
+  background adopter — with the current note's title in its tooltip. Inside
+  the Librarian, a standing status strip shows the trust level, the
+  organizing model, and the last pass, with settings one gear-click away.
+- **Onboarding by keyboard.** Numbers pick a card, arrows move between them,
+  Enter selects (Enter again continues), ⌘⏎ selects and continues.
+
+### Changed
+
+- **Organize truly works in the background now.** Metadata suggestions no
+  longer pile up in the Waiting lane at Organize — leftovers apply
+  themselves through the same guarded, journaled, undoable lane the Approve
+  buttons use. The one thing that always waits for you, at every trust
+  level: filing a note the Librarian isn't sure about.
+- "Run now" lights up the moment you click it, and explains itself when it
+  has to wait for an in-flight chat.
+
 ## [0.57.0] - 2026-07-31
 
 ### Added
