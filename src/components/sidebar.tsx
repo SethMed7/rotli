@@ -462,7 +462,8 @@ export function Sidebar() {
   // manifest write the row menu uses; anywhere else abandons. The dragged row
   // dims, the hovered folder tints, the title rides as a ghost. —
   type ChatDrop =
-    { kind: "folder"; id: string } | { kind: "row"; slug: string; folderId: string; after: boolean };
+    | { kind: "folder"; id: string }
+    | { kind: "row"; slug: string; folderId: string; after: boolean };
   const [chatDragSlug, setChatDragSlug] = useState<string | null>(null);
   const [chatDrop, setChatDrop] = useState<ChatDrop | null>(null);
   const didChatDragRef = useRef(false);

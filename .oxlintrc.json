@@ -1,0 +1,46 @@
+{
+  // Wired into `bun run lint` as lint:oxlint (migrated from ESLint 2026-07-31 —
+  // eslint/typescript-eslint/eslint-plugin-react-hooks removed; same rule set,
+  // ~90x faster syntax pass, type-aware pass via the oxlint-tsgolint sidecar).
+  // Scoped by the CLI invocation to src/, e2e/, and playwright.config.ts —
+  // scripts/ and src-tauri/ are untouched.
+  //
+  // breve-runtime/scripts/**/*.ts was measured (re-measured 2026-07-17) at 76
+  // findings against the same core rules (71 no-explicit-any, 4
+  // no-floating-promises, 1 no-misused-promises) — over the 15-site adoption
+  // threshold, so it is DEFERRED, not silently skipped; the count + rationale
+  // are recorded in CONTRIBUTING.md's lint paragraph.
+  //
+  // typescript-eslint's naming-convention has no oxlint equivalent; the same
+  // identifier-casing invariant is held by scripts/check-naming.mjs (check:naming).
+  //
+  // Only these rules run: the default correctness category is off so the rule
+  // set stays measured-before-adoption, exactly as the ESLint config was.
+  // Propose additions in a PR; the config must not grow silently.
+  "plugins": ["typescript", "react"],
+  "categories": {
+    "correctness": "off"
+  },
+  "rules": {
+    // Type-aware (require `--type-aware` + oxlint-tsgolint; without the flag
+    // they silently no-op — the flag lives in the lint:oxlint script).
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-explicit-any": "error",
+    // bun:test exposes test() and it() as aliases; the suite standardized on
+    // test() (2026-07-18 sweep — 14 it()-only files converted, 0 mixed). One
+    // spelling, mechanically held.
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          { "name": "bun:test", "importNames": ["it"], "message": "use test(), not it() — the suite's one spelling" }
+        ]
+      }
+    ],
+    // React rules never fire in e2e/ (no React there), so one flat config
+    // covers both file groups without overrides.
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "error"
+  }
+}

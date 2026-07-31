@@ -400,7 +400,9 @@ export type DropZone = DetachDir | "center";
  * insertion line and the pane-body zone highlight (Seth, 2026-06-15: the tab
  * drag is pointer-based, not HTML5, so it fires in the macOS WKWebView shell). */
 export type DropPreview =
-  { kind: "strip"; paneId: string; index: number } | { kind: "zone"; leafId: string; zone: DropZone } | null;
+  | { kind: "strip"; paneId: string; index: number }
+  | { kind: "zone"; leafId: string; zone: DropZone }
+  | null;
 
 interface PanesState {
   root: PaneNode;

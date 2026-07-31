@@ -22,6 +22,7 @@
         "folder naming",
         "syntax",
         "prettier",
+        "oxfmt",
         "regression",
         "evals",
         "testing",
@@ -76,9 +77,9 @@
         },
         {
           "id": 4,
-          "text": "Every bug fix starts with a failing reproduction. Features cover success, refusal/failure, and meaningful boundaries. AI behavior adds deterministic offline evals; cross-surface gestures add E2E when unit tests cannot prove wiring. bun run check includes TypeScript, Prettier, ESLint, mechanical guards, all Bun tests, named evals, and runtime/design regressions.",
+          "text": "Every bug fix starts with a failing reproduction. Features cover success, refusal/failure, and meaningful boundaries. AI behavior adds deterministic offline evals; cross-surface gestures add E2E when unit tests cannot prove wiring. bun run check includes TypeScript, oxfmt, oxlint, mechanical guards, all Bun tests, named evals, and runtime/design regressions.",
           "added": "2026-07-20",
-          "last_reviewed": "2026-07-20",
+          "last_reviewed": "2026-07-31",
           "source": "docs/development/testing.md"
         },
         {
@@ -111,9 +112,9 @@
         },
         {
           "id": 9,
-          "text": "Review findings become mechanical guards: when Greptile or any reviewer flags a CLASS of issue (not a one-off), the same PR lands a guard for that class — a check script assertion, eslint restriction, parity fixture, or the tracked .githooks/pre-commit (staged-file Prettier + conflict markers; enable with git config core.hooksPath .githooks). Precedents: check:security's tool local-vs-egress classification, check:ipc, the hook's formatting guard.",
+          "text": "Review findings become mechanical guards: when Greptile or any reviewer flags a CLASS of issue (not a one-off), the same PR lands a guard for that class — a check script assertion, oxlint restriction, parity fixture, or the tracked .githooks/pre-commit (staged-file oxfmt + conflict markers; enable with git config core.hooksPath .githooks). Precedents: check:security's tool local-vs-egress classification, check:ipc, the hook's formatting guard.",
           "added": "2026-07-30",
-          "last_reviewed": "2026-07-30",
+          "last_reviewed": "2026-07-31",
           "source": "CONTRIBUTING.md"
         }
       ],

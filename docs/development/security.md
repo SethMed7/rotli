@@ -154,7 +154,8 @@ All are outside Rotli's own `src/`. The current `bun audit` reports twelve findi
 - **lodash-es** ≤ 4.17.22 (two high/moderate families: template-key code
   injection and prototype pollution) — through Univer, Mermaid, and Excalidraw.
 - **brace-expansion** 2.0.0–2.1.1 (high exponential-expansion DoS) — through
-  ESLint/typescript-eslint build tooling and exceljs's archive path.
+  exceljs's archive path (the ESLint/typescript-eslint carrier left with the
+  2026-07-31 oxlint migration).
 - **nanoid** < 3.3.8 and **uuid** < 11.1.1 (moderate) — library-internal ID
   generation through Excalidraw, Univer, Vite, exceljs, and Mermaid.
 - **sharp** < 0.35.0 (high libvips image-processing family) — through the

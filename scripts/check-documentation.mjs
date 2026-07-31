@@ -108,11 +108,12 @@ if (existsSync(join(root, "package.json"))) {
 
   const requiredScriptSteps = {
     lint: [
-      "tsc --noEmit",
+      "bun run typecheck",
       "bun run format:check",
       "bun run check:structure",
       "bun run check:docs",
-      "bun run lint:eslint",
+      "bun run check:naming",
+      "bun run lint:oxlint",
     ],
     "test:regression": [
       "bun run test",

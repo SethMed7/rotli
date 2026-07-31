@@ -19,8 +19,10 @@
     "test:tooling": "bun test scripts/*.test.ts",
     "test:breve": "bun breve-runtime/tests/test-actions.ts && bun breve-runtime/tests/test-intents.ts && bun breve-runtime/tests/test-timectx.ts && bun breve-runtime/tests/test-retention.ts && bun breve-runtime/tests/test-pdf-theme.ts && bun breve-runtime/tests/test-doctor-findings.ts && bun test ./breve-runtime/tests/test-secret-stdin.ts ./breve-runtime/tests/test-process-lock.ts ./breve-runtime/tests/test-delivery-claim.ts ./breve-runtime/tests/test-watcher-failure.ts ./breve-runtime/tests/test-safe-fetch-fixtures.ts ./breve-runtime/tests/test-markdown-text.ts ./breve-runtime/tests/test-config-locality.ts",
     "test:regression": "bun run test && bun run test:evals && bun run check:breve-runtime && bun run check:design-system",
-    "lint": "tsc --noEmit && bun run format:check && bun run check:code-shape && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:security && bun run check:docs && bun run lint:eslint",
-    "lint:eslint": "eslint src e2e playwright.config.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "bun run typecheck && bun run format:check && bun run check:code-shape && bun run check:naming && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:security && bun run check:docs && bun run lint:oxlint",
+    "lint:oxlint": "oxlint --type-aware --report-unused-disable-directives-severity=error src e2e playwright.config.ts",
+    "check:naming": "bun scripts/check-naming.mjs",
     "check:code-shape": "bun scripts/check-code-shape.mjs",
     "check:hex": "bun scripts/check-hex.mjs",
     "check:architecture": "bun scripts/check-architecture.mjs",
@@ -35,8 +37,8 @@
     "check:dup": "bun scripts/check-duplication.mjs",
     "check:breve-runtime": "bun build breve-runtime/scripts/*.ts --target bun --outdir $(mktemp -d) && tsc --noEmit -p breve-runtime && bash -n breve-runtime/scripts/morning-brief.sh && bash -n breve-runtime/scripts/lunch-brief.sh && bash -n breve-runtime/scripts/night-brief.sh && bash -n breve-runtime/scripts/custom-brief.sh && bun run check:breve-contract",
     "check": "bun run lint && bun run test:regression",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" playwright.config.ts",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" playwright.config.ts"
+    "format": "oxfmt \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" playwright.config.ts",
+    "format:check": "oxfmt --check \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" playwright.config.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -85,11 +87,10 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.6.0",
     "bun-types": "^1.3.14",
-    "eslint": "^10.7.0",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "prettier": "^3.6.2",
+    "oxfmt": "^0.61.0",
+    "oxlint": "^1.76.0",
+    "oxlint-tsgolint": "^7.0.2001",
     "typescript": "~5.8.3",
-    "typescript-eslint": "^8.64.0",
     "vite": "^7.0.4"
   },
   "trustedDependencies": [

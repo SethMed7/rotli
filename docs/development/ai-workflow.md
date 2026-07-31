@@ -41,7 +41,7 @@ require translating the project into a new set of duplicated rules.
    centralized and dependencies pointed inward.
 4. **Prove:** reproduce bugs with a failing test; cover feature success,
    refusal/failure, and boundary cases; add deterministic offline evals for AI
-   behavior. Run Prettier plus the focused test or guard while iterating, then
+   behavior. Run oxfmt plus the focused test or guard while iterating, then
    the full validation matrix. Evidence levels and command ownership are in
    [`testing.md`](testing.md).
 5. **Handoff:** summarize changes, exact validation results, remaining warnings,

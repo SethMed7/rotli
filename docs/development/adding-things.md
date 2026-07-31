@@ -23,7 +23,7 @@ path referenced in this document exists.
 | TS↔Rust shared constant/policy | **MUST** get a `scripts/fixtures/parity.json` entry plus assertions in BOTH hand-written parity suites — `src-tauri/src/parity_tests.rs` (cargo test) and `src/lib/parity.test.ts` (bun test). Values live in named constants, never inline literals; no hand-mirroring without a fixture. Security policies (egress, endpoint locality) stay **independently implemented** on each side and share adversarial/behavioral fixtures instead: the `scripts/fixtures/egress-fixtures.json` and `scripts/fixtures/markdown-strip.json` pattern | `bun run check:parity` + both test suites |
 | Breve runtime code | `breve-runtime/scripts/` — MIRROR-NOT-IMPORT across the app boundary; **within** breve-runtime, plain imports of package-local helpers (e.g. `breve-runtime/scripts/markdown-text.ts`) are the rule, not mirroring. Values shared with the app get a parity fixture entry | `bun run check:parity`, `bun run check:breve-contract` |
 | Network call (ureq / fetch / network CLI) | Prefer an existing seam (`web_fetch`, `safe-fetch.ts`, `chat_messages`, `llm.ts`). A genuinely new call site MUST be declared in `scripts/fixtures/egress-allowlist.json` with its destination class + guard; off-machine destinations add adversarial rows to `scripts/fixtures/egress-fixtures.json`. Full procedure in [`security.md`](security.md#adding-a-network-call-procedure) | `bun run check:security` |
-| Tests | Co-located `*.test.ts` next to the module (`breve-runtime/tests/` for runtime tests). bun:test declarations use `test(...)`, never the `it(...)` alias — one spelling across the suite | `bun run check:code-shape` (no focus/skip, no test imports from production); ESLint `no-restricted-imports` bans importing `it` from `bun:test` |
+| Tests | Co-located `*.test.ts` next to the module (`breve-runtime/tests/` for runtime tests). bun:test declarations use `test(...)`, never the `it(...)` alias — one spelling across the suite | `bun run check:code-shape` (no focus/skip, no test imports from production); oxlint `no-restricted-imports` bans importing `it` from `bun:test` |
 | Any new file or folder (naming) | Follow `SYNTAX.md`: `src/` camelCase; `scripts/`, `e2e/`, `docs/`, and `breve-runtime/` kebab-case; `src-tauri/src/` Rust modules snake_case. The 2026-07-18 sweep renamed outliers instead of grandfathering | `bun run check:structure` |
 | Executable script / checker | `scripts/<kebab-name>.mjs` (or `.sh`), wired into a `package.json` script AND the `lint`/`check`/CI chain in the same change — an orphan checker is a silent third state. Its command joins the map in [`testing.md`](testing.md) | `bun run check:docs` (orphan + chain + command-map guards), `bun run check:structure` (name) |
 | tsconfig / strictness flag | Three compilers typecheck the repo (root, `tsconfig.e2e.json`, `breve-runtime/tsconfig.json`). Load-bearing strictness flags must be enabled in all three or carry a dated, measured divergence entry in `scripts/check-structure.mjs` (today only breve-runtime diverges: `exactOptionalPropertyTypes` 11, `noUnusedLocals` 9, `noUnusedParameters` 3, `noUncheckedIndexedAccess` 86 errors, measured 2026-07-18) | `bun run check:structure` |
@@ -72,13 +72,13 @@ broad ignore rules cannot sweep it).
 Recorded so these decisions are not re-litigated from scratch. Each may be
 revisited with new measurements; none may be adopted silently.
 
-- **Import ordering/grouping (eslint-plugin-import or simple-import-sort):**
-  rejected. A new dependency (and, for plugin-import, a TS resolver with real
-  per-lint cost) to enforce an aesthetic with no measured drift harm. Follows
-  the same measured-threshold discipline recorded in `eslint.config.mjs`.
-- **eslint-disable budget counter:** rejected. Five disables exist;
-  `reportUnusedDisableDirectives: "error"` already deletes dead ones. A counter
-  constant makes every legitimate disable a two-edit chore — nag, not signal.
+- **Import ordering/grouping (oxlint's import plugin or simple-import-sort):**
+  rejected. Enforces an aesthetic with no measured drift harm. Follows the
+  same measured-threshold discipline recorded in `.oxlintrc.json`.
+- **lint-disable budget counter:** rejected. A handful of disables exist;
+  `--report-unused-disable-directives-severity=error` already deletes dead
+  ones. A counter constant makes every legitimate disable a two-edit chore —
+  nag, not signal.
 - **stylelint:** rejected as a toolchain. The one rule it would carry
   (kebab-case class selectors, measured at 0 violations) was folded into
   `scripts/check-design-system.mjs` instead — no new dependency.

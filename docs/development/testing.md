@@ -30,8 +30,9 @@ stays complete — every `package.json` script must appear in this document):
 |---|---|
 | `bun run dev` / `bun run preview` | Vite dev server against the seeded demo corpus / preview of the built bundle |
 | `bun run tauri dev` | The native desktop app (`bun run tauri` is the Tauri CLI passthrough) |
-| `bun run format` / `bun run format:check` | Prettier write / verify (`format:check` rides the `lint` chain) |
-| `bun run lint:eslint` | The ESLint layer alone (`src`, `e2e`, `playwright.config.ts`) — part of `lint` |
+| `bun run format` / `bun run format:check` | oxfmt write / verify (`format:check` rides the `lint` chain) |
+| `bun run typecheck` | The real TypeScript compiler over `src` (`tsc --noEmit`) — the type-correctness source of truth, first step of `lint` (e2e and breve-runtime have their own tsc lanes: `check:e2e-types`, `check:breve-runtime`) |
+| `bun run lint:oxlint` | The oxlint layer alone (`src`, `e2e`, `playwright.config.ts`; type-aware via `oxlint-tsgolint`) — part of `lint` |
 | `bun run check:dup` | Advisory duplication miner over `scripts/dup-judgments.json` — run on demand, deliberately not a gate |
 | `bun run build:mac` | Local signed `.app` bundle (predmg clean + `tauri build`) |
 | `bun run release` | `scripts/release.sh` — gate, sign, notarize, staple, publish; only under an explicitly authorized release |
@@ -127,8 +128,8 @@ and the invariant that the same item remains visible from global Main.
 | Cross-surface gesture or keyboard flow | Focused policy tests plus Playwright when component-local tests cannot prove real wiring |
 | Architecture, syntax, security, or documentation law | A deterministic checker and a checker fixture proving the forbidden case is rejected |
 
-Run Prettier and the smallest type/test/check target while editing. Before
-handoff, `bun run check` reruns TypeScript, `format:check`, ESLint, every
+Run oxfmt and the smallest type/test/check target while editing. Before
+handoff, `bun run check` reruns TypeScript, `format:check`, oxlint, every
 mechanical contract, the full Bun suite, named evals, and runtime/design
 regressions.
 
@@ -160,6 +161,11 @@ regressions.
 - `check:structure` enforces per-tree file/folder naming and dependency
   invariants (including the SheetJS/`xlsx` ban — the exceljs codec owns every
   spreadsheet path).
+- `check:naming` holds the identifier-casing contract over `src/` (variables
+  camelCase/UPPER_CASE/PascalCase with leading-underscore discards and dunder
+  build globals exempt; type-likes PascalCase; no I-prefixed interfaces) —
+  the former typescript-eslint `naming-convention` rule, which oxlint does not
+  implement.
 - `check:ipc` keeps TypeScript invocations and registered Rust handlers aligned,
   and requires multi-segment snake_case command names.
 - `check:hex` bans raw color literals (hex and `rgb()`/`hsl()` functional forms)

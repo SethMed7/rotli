@@ -1,0 +1,9 @@
+{
+  "printWidth": 110,
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "src-tauri/",
+    "docs/",
+    "dist/"
+  ]
+}

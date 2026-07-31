@@ -14,9 +14,10 @@ staged=$(git diff --cached --name-only --diff-filter=ACM || true)
 while IFS= read -r f; do
   case "$f" in
     *.ts | *.tsx)
-      if ! git show ":$f" | bunx prettier --stdin-filepath "$f" --check >/dev/null 2>&1; then
-        echo "✗ pre-commit: the STAGED content of $f is not Prettier-formatted."
-        echo "  bunx prettier --write \"$f\" && git add \"$f\"   (or: bun run format)"
+      # oxfmt's --check can't read stdin, so format the index blob and compare.
+      if ! cmp -s <(git show ":$f") <(git show ":$f" | bunx oxfmt --stdin-filepath "$f" 2>/dev/null); then
+        echo "✗ pre-commit: the STAGED content of $f is not oxfmt-formatted."
+        echo "  bunx oxfmt \"$f\" && git add \"$f\"   (or: bun run format)"
         exit 1
       fi
       ;;

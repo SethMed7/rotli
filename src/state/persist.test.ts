@@ -308,6 +308,7 @@ describe("createPersistDrain — settings survive a transient write failure", ()
     const landed: string[] = [];
     let fail = true;
     const drain = createPersistDrain(
+      // oxlint-disable-next-line typescript/no-misused-promises -- tsgolint preview misreads comma-expression arrow bodies as a Promise in a boolean conditional
       (_key, payload) => (fail ? Promise.reject(new Error("io")) : (landed.push(payload), Promise.resolve())),
       { settings: () => "A", viewstate: () => "" },
       { settings: "init", viewstate: "" },
@@ -323,6 +324,7 @@ describe("createPersistDrain — settings survive a transient write failure", ()
   test("a landed payload is not rewritten", async () => {
     let writes = 0;
     const drain = createPersistDrain(
+      // oxlint-disable-next-line typescript/no-misused-promises -- tsgolint preview misreads comma-expression arrow bodies as a Promise in a boolean conditional
       () => (writes++, Promise.resolve()),
       { settings: () => "A", viewstate: () => "" },
       { settings: "init", viewstate: "" },
@@ -337,8 +339,10 @@ describe("createPersistDrain — settings survive a transient write failure", ()
     let failures = 0;
     const landed: string[] = [];
     const drain = createPersistDrain(
+      // oxlint-disable typescript/no-misused-promises -- tsgolint preview misreads comma-expression arrow bodies as a Promise in a boolean conditional
       (key, payload) =>
         key === "viewstate" ? Promise.reject(new Error("io")) : (landed.push(payload), Promise.resolve()),
+      // oxlint-enable typescript/no-misused-promises
       { settings: () => "S", viewstate: () => "V" },
       { settings: "init-s", viewstate: "init-v" },
       () => failures++,

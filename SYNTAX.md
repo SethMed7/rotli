@@ -78,9 +78,9 @@ imports.
 
 ## Formatting and checks
 
-Prettier is authoritative for TypeScript/TSX under `src/`, E2E TypeScript, and
-`playwright.config.ts`, with a 110-column target. TypeScript strict checking and
-ESLint enforce semantic and naming rules. `check:structure` enforces per-tree
+oxfmt is authoritative for TypeScript/TSX under `src/`, E2E TypeScript, and
+`playwright.config.ts`, with a 110-column target. TypeScript strict checking,
+oxlint, and `check:naming` enforce semantic and naming rules. `check:structure` enforces per-tree
 file and folder naming; `check:design-system`, `check:hex`, and `check:ipc`
 enforce CSS and command conventions.
 

@@ -49,7 +49,8 @@ export interface MermaidFlowchart {
 }
 
 export type MermaidFlowchartParseResult =
-  { ok: true; model: MermaidFlowchart } | { ok: false; reason: string; line?: number };
+  | { ok: true; model: MermaidFlowchart }
+  | { ok: false; reason: string; line?: number };
 
 const ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_-]*/;
 const COLOR_PATTERN = /^(?:#[0-9a-f]{3,8}|[a-z]+)$/i;

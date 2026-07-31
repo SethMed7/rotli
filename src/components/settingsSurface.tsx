@@ -102,7 +102,14 @@ import { CORPUS_INSTANCE_ID, type MemexInstance, type Perms } from "../memex/con
 import { NEW_ITEM_DEFINITIONS } from "../newItems/model";
 
 type SettingsPane =
-  "general" | "hotkeys" | "appearance" | "brain" | "security" | "models" | "location" | "plugins";
+  | "general"
+  | "hotkeys"
+  | "appearance"
+  | "brain"
+  | "security"
+  | "models"
+  | "location"
+  | "plugins";
 
 const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = [
   { id: "general", label: "General", glyph: LaptopGlyph },

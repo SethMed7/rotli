@@ -72,7 +72,7 @@ process in [`docs/decisions/README.md`](docs/decisions/README.md).
 
 [`SYNTAX.md`](SYNTAX.md) defines file, folder, identifier, Rust, IPC, CSS, and
 test naming. [`DESIGN.md`](DESIGN.md) defines the product interaction contract.
-`check:structure`, ESLint, Prettier, and the design-system checks enforce their
+`check:structure`, oxlint, oxfmt, and the design-system checks enforce their
 mechanical rules. Markdown is the only surface with slash commands and embed
 syntax.
 
@@ -83,9 +83,12 @@ enforces each rule, including the dependency-conflict procedure — is defined i
 
 ## Formatting and linting
 
-Prettier at `printWidth` 110 is the adopted TypeScript formatter and
-`format:check` is part of `lint`. Use `bun run format` for the formatter-owned
-trees, and keep unrelated format churn out of behavioral commits. Run
+oxfmt at `printWidth` 110 (`.oxfmtrc.json`) is the adopted TypeScript
+formatter and `format:check` is part of `lint`. It replaced Prettier
+2026-07-31 with a measured 6-file / 19-line drift over 342 files (oxfmt
+breaks long union types one-member-per-line; Prettier at 1.9s vs oxfmt at
+~50ms on the same tree). Use `bun run format` for the formatter-owned trees,
+and keep unrelated format churn out of behavioral commits. Run
 `git config blame.ignoreRevsFile .git-blame-ignore-revs` once locally so
 historical format-only changes stay out of blame (GitHub honors it automatically).
 
@@ -96,22 +99,34 @@ structural rewrapping, not line width — while only ~300 of ~18,500 Rust lines
 exceed 100 columns. `cargo clippy --all-targets -- -D warnings` is the Rust
 gate; do not run `cargo fmt` or commit its output.
 
-ESLint rules live in `eslint.config.mjs` and are deliberately minimal
-(floating/misused promises, `no-explicit-any`, react-hooks, identifier casing
-via `naming-convention` — adopted 2026-07-18 at a measured 0 real violations —
-and a ban on bun:test's `it` alias: the suite spells every test `test(...)`).
-Propose additions
-in a PR; the config must not grow silently. TypeScript stays pinned `~5.8.3`
-because typescript-eslint 8.x crashes on TS 7. Biome remains the preferred
-long-term two-package footprint: re-benchmark when `noFloatingPromises` leaves
-its nursery (at adoption time it missed 3 of 8 real floating-promise sites).
+Type correctness and linting are separate layers: `bun run typecheck`
+(`tsc --noEmit`, the compiler as source of truth — first step of `lint`, with
+`check:e2e-types` and `check:breve-runtime` as the sibling tsc lanes for
+their trees) and the oxlint layer below. Editors get the same type feedback
+live from the TS language server, independent of the lint gate.
+Lint rules live in `.oxlintrc.json` (oxlint; migrated from ESLint 2026-07-31 —
+measured on this repo at 7.0s ESLint vs ~0.5s oxlint `--type-aware`) and are
+deliberately minimal (floating/misused promises, `no-explicit-any`,
+react-hooks, and a ban on bun:test's `it` alias: the suite spells every test
+`test(...)`). The type-aware rules run through the `oxlint-tsgolint` sidecar,
+which is preview-quality: it misreads comma-expression arrow bodies as
+misused promises (three suppressed sites in `src/state/persist.test.ts` —
+re-measure on oxlint upgrades and drop the suppressions when fixed).
+Identifier casing (typescript-eslint's `naming-convention`, adopted
+2026-07-18 at a measured 0 real violations) has no oxlint equivalent and is
+held by `scripts/check-naming.mjs` (`check:naming`). Propose additions in a
+PR; the config must not grow silently. TypeScript's `~5.8.3` pin existed
+because typescript-eslint 8.x crashes on TS 7; tsgolint removed that blocker,
+so the pin is now only conservatism — revalidate the toolchain before bumping.
+The old "Biome as the long-term two-package footprint" plan is superseded by
+this migration.
 `breve-runtime/scripts/` is measured but deferred at 76 findings (71
 `no-explicit-any`, 4 `no-floating-promises`, 1 `no-misused-promises`;
 re-measured 2026-07-17) — over the 15-site adoption threshold; revisit once
 the `any` debt shrinks. Git hooks are deliberately MINIMAL: the tracked
-`.githooks/pre-commit` runs only staged-file Prettier + a conflict-marker
-grep (sub-second — the old "measure eslint latency first" concern is why
-eslint/tsc stay out of it). Enable once per clone with
+`.githooks/pre-commit` runs only staged-file oxfmt + a conflict-marker
+grep (sub-second — the old "measure lint latency first" concern is why
+lint/tsc stay out of it). Enable once per clone with
 `git config core.hooksPath .githooks`; full enforcement remains the `lint`
 chain locally plus CI, and `git commit --no-verify` stays available for
 genuine emergencies.
@@ -120,7 +135,7 @@ genuine emergencies.
 
 When a review (Greptile or otherwise) flags a CLASS of issue — not a one-off
 typo — land a mechanical guard for that class in the same PR: a
-`scripts/check-*.mjs` assertion, an eslint restriction, a parity fixture, or a
+`scripts/check-*.mjs` assertion, an oxlint restriction, a parity fixture, or a
 hook line. Precedents: `check:security`'s tool local-vs-egress classification
 (caught the next new tools automatically), the IPC contract check, and this
 hook's formatting/conflict guards. A review that only fixes the instance
