@@ -8,6 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.61.0] - 2026-07-31
+
+### Added
+
+- **Your own routines.** Routines → "Add a routine…" creates a **custom
+  brief** — Breve researches your prompt on schedule, with the same care as
+  the morning brief — or a **reminder** that delivers your words at a chosen
+  time. Custom briefs land in the Briefs list under their own name. The three
+  daily briefs also take **extra instructions** now, and every routine that
+  speaks for you shows an Instructions editor.
+- **The brief playbook, in your hands.** Routines → "Brief instructions"
+  shows the exact system prompt every brief follows — edit it and the next
+  brief uses your version (no restart), or reset to the shipped default.
+- **Breve in every vault.** A fresh vault offers "Start Breve in this vault":
+  one click brings your delivery setup and routines along (shared defaults),
+  and each vault's briefs, watchlist, and routines stay its own.
+- **Briefs speak.** Each brief with a spoken version shows an inline audio
+  player in the reader.
+
+### Fixed
+
+- **Creating or switching vaults no longer freezes the app.** The folder
+  picker and the whole vault lane moved off the main thread, and the
+  Librarian's boot sweep waits out the first paint.
+- **Empty Trash empties everything** — trashed files and boards (not just
+  notes) now delete; "Emptied 0 of 35" is gone.
+- **The Librarian's "Open the note" opens the note** (area overviews used to
+  land on an empty Untitled tab), and the same fix reaches the Briefs
+  reader's "Open in Notes".
+- **Collapse-all is two-stage**: first press folds open folders (chat folders
+  included — and they stay folded across relaunches now), second press folds
+  the sections themselves. Its tooltip no longer clips at the sidebar edge.
+- **Tasks reads cleanly**: wrapped checkboxes show their full text, bold and
+  code marks render instead of leaking `**`, and every group header shows
+  which note it is — glyph, count, and a click-through.
+- **Theme polish**: the warm accent no longer leaks into Paper/Charcoal icons,
+  and the Librarian's settings button sits clear of its divider.
+
 ## [0.60.0] - 2026-07-31
 
 ### Changed
