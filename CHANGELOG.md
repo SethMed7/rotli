@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
-## [Unreleased]
+## [0.65.0] - 2026-08-01
 
 ### Added
 
@@ -43,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Files · Librarian · Settings row at the very bottom stays put, under both
   Home and Chat. Pressing Collapse all twice still folds everything — the
   second press now tucks the System area away instead of the old sections.
+- **The build got about nine times faster.** Rotli's bundler moved to
+  rolldown and its typechecker to the Go-native TypeScript compiler, so a
+  production build drops from ~10.4s to ~1.2s and a full typecheck from ~3.5s
+  to ~0.8s. Nothing about the app changes — the same bundle ships, slightly
+  smaller — but every fix now reaches you sooner. Babel and esbuild left the
+  toolchain entirely, and a new dead-weight gate keeps unused code and
+  undeclared dependencies from accumulating.
 
 ### Fixed
 
@@ -55,16 +62,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   phrased a tool argument as a nested object instead of plain text, the
   search ran on the literal text "[object Object]" and quietly came back
   empty. It now says what went wrong so the model can correct itself.
-
-### Changed
-
-- **The build got about nine times faster.** Rotli's bundler moved to
-  rolldown and its typechecker to the Go-native TypeScript compiler, so a
-  production build drops from ~10.4s to ~1.2s and a full typecheck from ~3.5s
-  to ~0.8s. Nothing about the app changes — the same bundle ships, slightly
-  smaller — but every fix now reaches you sooner. Babel and esbuild left the
-  toolchain entirely, and a new dead-weight gate keeps unused code and
-  undeclared dependencies from accumulating.
 
 ## [0.64.0] - 2026-08-01
 
