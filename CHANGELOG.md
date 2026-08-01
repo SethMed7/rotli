@@ -8,6 +8,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.62.0] - 2026-07-31
+
+### Changed
+
+- **Half the size.** The installed app went from 40 MB to 20 MB. The Chinese
+  handwriting font for boards is no longer bundled (CJK board text falls back
+  to a system font), the binary sheds its debug symbols, and ~6 MB of
+  hyphenation dictionaries and interface translations no code path could ever
+  load are gone.
+- **Typing got lighter.** Keystrokes no longer re-render the editor shell,
+  re-scan the whole document, or wake the tab strip and note lists — the
+  background sync tick that re-derived everything four times a second while
+  you typed is quiet now. Most noticeable in long notes and multi-pane
+  layouts.
+- **Chat stays smooth in long threads.** Settled messages no longer re-render
+  while you type your next one, and the sidebar's chat list no longer reads
+  entire transcripts just to show titles.
+- **The Librarian reports instantly.** Activity status, the queue count, and
+  the secure-note badge update on real events instead of a once-a-minute
+  check.
+- **The whole toolchain moved to oxc** (oxlint + oxfmt + the tsc lane split
+  out): the full lint gate dropped from ~12s to ~2s, formatting from ~2s to
+  ~50ms. Dev-facing, but it guards every release.
+
+### Fixed
+
+- **Quit can't outrun a board save anymore.** A pending board write now holds
+  the quit handshake until its bytes land, and closed boards no longer pile
+  up quit work for the app's lifetime.
+- **A failed Librarian cycle shows its error** — the status strip could
+  previously miss it in a race and show nothing.
+- **Releases can't embed release artifacts.** The updater feed used to stage
+  inside the folder that gets baked into the binary; a stale build could have
+  shipped 55 MB of the previous release inside the app.
+
 ## [0.61.0] - 2026-07-31
 
 ### Added
