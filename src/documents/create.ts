@@ -1,10 +1,9 @@
 import JSZip from "jszip";
 import { DOCUMENT_CREATE_EXTENSION } from "./kinds";
-import { blankDocumentDraft, type DocumentBlock, type DocumentDraft } from "./model";
+import { blankDocumentDraft, type DocumentDraft } from "./model";
 import type { DocumentEncoder } from "./ports";
 import { GENERATED_DOCX_THEME } from "./theme";
 
-export type DocxBlock = DocumentBlock;
 export type DocxTemplate = DocumentDraft;
 
 function xml(text: string): string {
