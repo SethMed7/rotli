@@ -40,6 +40,31 @@ test("the chooser answers a bare digit press — no click needed", async ({ page
   await expect(page.locator(".cm-content").last()).toBeVisible();
 });
 
+test("the chooser fills its pane instead of collapsing to a sliver", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("choose type");
+  await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
+
+  const chooser = page.locator(".ni-surface");
+  await expect(chooser).toBeVisible();
+  const body = page.locator("[data-pane-body]").first();
+  const bodyBox = await body.boundingBox();
+  const surfaceBox = await chooser.boundingBox();
+  const innerBox = await chooser.locator(".ni-inner").boundingBox();
+  const cardBox = await chooser.getByRole("button", { name: "New Chat" }).boundingBox();
+  if (!bodyBox || !surfaceBox || !innerBox || !cardBox) throw new Error("chooser has no layout");
+
+  // the surface is a flex child of .pane-body — it must GROW to the pane, not
+  // shrink to its (size-contained, therefore zero) content width
+  expect(surfaceBox.width).toBeGreaterThan(bodyBox.width - 2);
+  // and the content column inside it is a real column, not a 4-character sliver
+  expect(innerBox.width).toBeGreaterThan(300);
+  // cards are cards: wide enough for their label, tall enough for glyph + copy
+  expect(cardBox.width).toBeGreaterThan(120);
+  expect(cardBox.height).toBeGreaterThan(60);
+});
+
 test("a Mermaid diagram item is born with the starter fence", async ({ page }) => {
   await gotoApp(page);
   await page.getByRole("button", { name: /Search notes and actions/ }).click();

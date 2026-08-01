@@ -166,8 +166,14 @@ interface PersistedSettings {
   blockHandles2: boolean;
   /** The user's name (onboarding / Settings → General); "" = unset. */
   userName: string;
-  /** The on-device model the Chat surface uses (id from ~/.memex/ai); null = default. */
+  /** The model a NEW chat starts on — the last one picked anywhere (id from
+   * ~/.memex/ai or a connected lane); null = the model store's default. */
   chatModelId: string | null;
+  /** Per-chat model pick, keyed like chatWeb (slug; session keys never persist).
+   * ADDITIVE (2026-08-01): an older build ignores this key and falls back to
+   * chatModelId, which newer builds keep writing — so a downgrade lands on the
+   * last model picked, exactly the pre-per-chat behavior. */
+  chatModel: Record<string, string>;
   /** Per-chat web-search toggle (the composer globe), keyed by chat slug. The
    * session-scoped unsaved-chat keys ("unsaved:<paneId>", and the legacy "" key)
    * never persist — a stored one flipped the silent-egress default for every
@@ -339,6 +345,15 @@ export function parseSettings(raw: string): PersistedSettings {
     blockHandles2: asBool(data.blockHandles2, true),
     userName: typeof data.userName === "string" ? data.userName : "",
     chatModelId: typeof data.chatModelId === "string" ? data.chatModelId : null,
+    chatModel: (() => {
+      // ids are opaque strings (a model registry entry or a preset id) — shape
+      // is all we can validate; a non-string entry is dropped, not guessed
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(record(data.chatModel))) {
+        if (typeof v === "string" && v !== "") out[k] = v;
+      }
+      return persistableChatMap(out);
+    })(),
     chatWeb: (() => {
       const out: Record<string, boolean> = {};
       const src = data.chatWeb;
@@ -472,6 +487,7 @@ function applySettings(s: PersistedSettings): void {
     blockHandles: s.blockHandles2,
     userName: s.userName,
     chatModelId: s.chatModelId,
+    chatModel: s.chatModel,
     chatWeb: s.chatWeb,
     chatMeasure: s.chatMeasure,
     chatNoteOpen: s.chatNoteOpen,
@@ -719,6 +735,8 @@ async function gcPersistedMaps(): Promise<void> {
       if (kept !== ui.chatWeb) useUiStore.setState({ chatWeb: kept });
       const keptMeasure = pruneMap(ui.chatMeasure, liveKey);
       if (keptMeasure !== ui.chatMeasure) useUiStore.setState({ chatMeasure: keptMeasure });
+      const keptModel = pruneMap(ui.chatModel, liveKey);
+      if (keptModel !== ui.chatModel) useUiStore.setState({ chatModel: keptModel });
     }
   } catch {
     // an unreadable chats/ anywhere — keep everything
@@ -812,6 +830,7 @@ function settingsSnapshot(): string {
     blockHandles2: ui.blockHandles,
     userName: ui.userName,
     chatModelId: ui.chatModelId,
+    chatModel: persistableChatMap(ui.chatModel),
     chatWeb: persistableChatMap(ui.chatWeb),
     chatMeasure: persistableChatMap(ui.chatMeasure),
     chatNoteOpen: ui.chatNoteOpen,

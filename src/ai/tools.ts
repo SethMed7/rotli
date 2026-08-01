@@ -32,6 +32,29 @@ export function stripLeadingFrontmatter(body: string): string {
   return body.slice(m[0].length).replace(/^\n+/, "");
 }
 
+/** Frame the `links:` line inside a READ note's metadata fence. That one line
+ * reads like a roster — a run of [[names]] — but it mixes people, projects and
+ * reference indiscriminately, and a small model kept answering "who are the
+ * people in my vault" straight out of it (2026-08-01: the project "caminorx"
+ * landed in a list of Seth's family). Same move as `truncateBody`: name the
+ * hazard IN the observation, where the model is actually looking, and let the
+ * prompts teach the rule. The line keeps its `key: value` shape, so a model
+ * that echoes the fence back into update_note still hits
+ * stripLeadingFrontmatter — no annotation can reach a note's body. */
+export function frameLinksMetadata(body: string): string {
+  const fence = body.match(/^---[ \t]*\n([\s\S]*?)\n---[ \t]*\n?/);
+  if (!fence) return body;
+  const block = fence[1] ?? "";
+  const framed = block.replace(
+    /^(links[ \t]*:[ \t]*)(?!\(pointers\b)(\S.*)$/im,
+    "$1(pointers to other notes — a mix of people, projects and reference; NOT a list of anything, never answer from them) $2",
+  );
+  if (framed === block) return body;
+  const head = fence[0];
+  const at = head.indexOf(block);
+  return `${head.slice(0, at)}${framed}${head.slice(at + block.length)}${body.slice(head.length)}`;
+}
+
 /** Truncate a READ body (note / memory / file) with an EXPLICIT marker. A bare
  * "…" read as end-of-content and the model presented partial lists as complete
  * (the 2026-07-29 people-list failure); the marker names what was cut so the
@@ -70,6 +93,67 @@ export function rankNotes(notes: CorpusNoteMeta[], query: string, limit: number)
   }
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, limit).map((s) => s.hit);
+}
+
+/** Is this query worth matching against folder paths? A folder is named with a
+ * word, not a sentence — matching a phrase against paths only adds noise, and
+ * a 1-2 char query matches half the tree. Exported so a caller can skip the
+ * corpus listing entirely when the answer is no. */
+export function folderQuery(query: string): boolean {
+  const q = query.trim();
+  return q.length >= 3 && !/\s/.test(q);
+}
+
+/** Notes whose FOLDER path matches the query. The user's own organization is a
+ * first-class retrieval signal that rotli's full-text search cannot see:
+ * corpus_search (corpus.rs `search_match`) matches TITLE and BODY only, so
+ * "people" never reaches the notes IN `wiki/people/**` — a person note's body
+ * doesn't contain the word "people". Asked for a roster the model could reach
+ * only the two index notes sitting beside them, and answered out of one's
+ * metadata (2026-08-01). Boards/files are skipped for parity with rankNotes. */
+export function folderHits(notes: CorpusNoteMeta[], query: string, limit: number): NoteHit[] {
+  if (!folderQuery(query)) return [];
+  const q = query.trim().toLowerCase();
+  return notes
+    .filter((n) => n.kind !== "board" && n.kind !== "file" && (n.folderId || "").toLowerCase().includes(q))
+    .sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id))
+    .slice(0, limit)
+    .map((n) => ({ id: n.id, title: n.title, snippet: n.snippet, folder: n.folderId || "" }));
+}
+
+/** Merge folder matches into full-text hits: TITLE hits (rank 0) first, then
+ * the folder matches, then body-only hits — deduped, capped at `limit`. That
+ * is the title > folder > body weighting rankNotes has always used, restored
+ * on the Rust search path the AI actually rides. */
+export function mergeFolderHits(
+  ranked: { hit: NoteHit; rank: number }[],
+  folder: NoteHit[],
+  limit: number,
+): NoteHit[] {
+  const out: NoteHit[] = [];
+  const seen = new Set<string>();
+  const push = (hit: NoteHit) => {
+    if (seen.has(hit.id)) return;
+    seen.add(hit.id);
+    out.push(hit);
+  };
+  for (const r of ranked) if (r.rank === 0) push(r.hit);
+  for (const hit of folder) push(hit);
+  for (const r of ranked) if (r.rank !== 0) push(r.hit);
+  return out.slice(0, limit);
+}
+
+/** Does this hit look like an AREA INDEX — the Filer's generated `_index.md`,
+ * whose H1 (and therefore title) is the bare area name? Its body is the one
+ * complete roster of what's filed in that area, and nothing else in a search
+ * result says so: note ids are opaque ULIDs (the `.rotli` index stamps one even
+ * on a frontmatter-less file), and it shares its folder with the area's
+ * hand-written README. Asked "who are the people in my vault", the model read
+ * the README — a note that names nobody — and answered from its metadata
+ * because the roster beside it looked like just another hit (2026-08-01). */
+export function isAreaIndex(title: string, folder: string): boolean {
+  const area = folder.split("/").filter(Boolean).pop() ?? "";
+  return area !== "" && title.trim().toLowerCase() === area.toLowerCase();
 }
 
 /** Keep the scratchpad under a char budget so it can't grow unbounded across steps.
@@ -138,9 +222,17 @@ export async function runTool(
             title: hit.title,
             snippet: hit.snippet,
             source: "note" as const,
+            ...(isAreaIndex(hit.title, hit.folder) ? { role: "area-index" as const } : {}),
           }));
-      return hits.length
-        ? JSON.stringify(hits.map((hit) => ({ ...hit, snippet: truncate(hit.snippet, budget.snippetChars) })))
+      // the area index leads here too — same rule as search_notes, since this
+      // is the tool the prompts name first
+      const ordered = [...hits].sort(
+        (a, b) => Number(b.role === "area-index") - Number(a.role === "area-index"),
+      );
+      return ordered.length
+        ? JSON.stringify(
+            ordered.map((hit) => ({ ...hit, snippet: truncate(hit.snippet, budget.snippetChars) })),
+          )
         : "no matching notes or chats — try fewer or different keywords.";
     }
     case "read_memory": {
@@ -151,17 +243,28 @@ export async function runTool(
         : id.startsWith("chat:")
           ? "error: this host cannot read prior chats."
           : await host.readNote(id);
-      return truncateBody(body, budget.readNoteChars);
+      return truncateBody(frameLinksMetadata(body), budget.readNoteChars);
     }
     case "search_notes": {
       const q = String(args.query ?? "").trim();
       if (q === "") return 'error: search_notes needs a non-empty "query".';
       const hits = await host.searchNotes(q, budget.maxHits);
       if (hits.length === 0) return "no matching notes — try different words, or the web if it's on.";
-      const trimmed = hits.map((h) => ({
+      // an area's generated index leads its equals: it is the best first read
+      // for any question ABOUT that area, and the alternative — a hand-written
+      // README with the friendlier title — often names nothing at all.
+      // Array.sort is stable, so every other hit keeps its rank order.
+      const ordered = [...hits].sort(
+        (a, b) => Number(isAreaIndex(b.title, b.folder)) - Number(isAreaIndex(a.title, a.folder)),
+      );
+      const trimmed = ordered.map((h) => ({
         id: h.id,
         title: h.title,
         folder: h.folder,
+        // name the roster where the model is choosing what to read — the
+        // `role:"area-index"` shape docs/design/local-model-retrieval-notes.md
+        // §4.1 specified; both prompts say what the role means
+        ...(isAreaIndex(h.title, h.folder) ? { role: "area-index" } : {}),
         snippet: truncate(h.snippet, budget.snippetChars),
       }));
       return JSON.stringify(trimmed);
@@ -169,7 +272,7 @@ export async function runTool(
     case "read_note": {
       const id = String(args.id ?? "").trim();
       if (id === "") return 'error: read_note needs an "id" from search_notes or the index.';
-      return truncateBody(await host.readNote(id), budget.readNoteChars);
+      return truncateBody(frameLinksMetadata(await host.readNote(id)), budget.readNoteChars);
     }
     case "create_note": {
       const title = String(args.title ?? "").trim();

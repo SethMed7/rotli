@@ -252,7 +252,9 @@ pub struct WireMsg {
 #[tauri::command]
 #[allow(clippy::too_many_arguments)] // the wire command mirrors the chat request shape 1:1
 pub async fn chat_messages(
+    app: tauri::AppHandle,
     state: tauri::State<'_, crate::organizer::OrganizerState>,
+    compute: tauri::State<'_, crate::compute::ComputeState>,
     messages: Vec<WireMsg>,
     endpoint: Option<String>,
     model: Option<String>,
@@ -260,12 +262,14 @@ pub async fn chat_messages(
     format_json: Option<bool>,
     temperature: Option<f32>,
     max_tokens: Option<u32>,
+    request_id: Option<String>,
 ) -> Result<String, String> {
     // ASYNC command: a sync command runs on the MAIN thread, and this one holds
     // a blocking HTTP request for a whole model generation — the entire app
     // beachballed for every local reply (Seth, 2026-07-30). The blocking work
     // moves to a worker; the main thread keeps painting.
     let handle = state.0.clone();
+    let compute = compute.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         // Chat AND vision ride this command — holding the yield guard here closes
         // the whole interactive surface to daemon contention (doc §2).
@@ -283,11 +287,27 @@ pub async fn chat_messages(
         let base = endpoint.trim_end_matches('/');
         let temperature = temperature.unwrap_or(0.4);
         let max_tokens = max_tokens.unwrap_or(1024);
-        if api == "openai" {
-            messages_openai(base, &model, &messages, temperature, max_tokens, &endpoint)
-        } else {
-            messages_generate(base, &model, &messages, format_json.unwrap_or(false), temperature, max_tokens, &endpoint, CHAT_TIMEOUT)
+        let dispatch = || {
+            if api == "openai" {
+                messages_openai(base, &model, &messages, temperature, max_tokens, &endpoint)
+            } else {
+                messages_generate(base, &model, &messages, format_json.unwrap_or(false), temperature, max_tokens, &endpoint, CHAT_TIMEOUT)
+            }
+        };
+        // COMPUTE GUARDRAILS (Seth, 2026-08-01 — docs/design/local-compute-guardrails.md):
+        // the LOCAL lane shares one model slot on one Mac, so admission is gated
+        // on MEASURED headroom, never a chat count. A request that doesn't fit
+        // queues here (the surface says so, and the user can prioritize it)
+        // instead of piling generations onto a Mac that can't hold them. Remote
+        // endpoints skip this entirely — they have provider-side capacity.
+        if !endpoint_is_local(&endpoint) {
+            return dispatch();
         }
+        let knobs = crate::compute::knobs_from(&app);
+        // an id-less caller (a lane-verification ping) still queues fairly; it
+        // just isn't cancellable from the surface, having nothing to cancel by
+        let request_id = request_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        crate::compute::with_slot(&compute, &request_id, &model, &knobs, dispatch)
     })
     .await
     .map_err(|e| format!("chat worker: {e}"))?

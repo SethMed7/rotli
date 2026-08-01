@@ -762,11 +762,13 @@
 }
 
 /* list/task markers (widgets) — fill the line's hanging indent so the first line's
-   text and every wrapped line align to the same left edge; the glyph is centered so
-   it sits close to the text instead of adrift at the far left */
+   text and every wrapped line align to the same left edge; the column is narrower
+   than one nesting step (listGeometry.ts) so the glyph hugs its text instead of
+   drifting to the far left of the level. Nesting is spacing only — rotli never
+   draws Obsidian's vertical indent-guide rules (Seth, 2026-08-01). */
 .rotli-marker {
   display: inline-block;
-  width: 1.3em;
+  width: 1.15em; /* mirrors MARKER_EM in listGeometry.ts */
   text-align: center;
   color: var(--text-muted);
 }
@@ -774,6 +776,8 @@
   font-variant-numeric: tabular-nums;
 }
 .rotli-check {
+  /* 1.1em + 0.5em gap = CHECK_EM (listGeometry.ts): a task's text lands on the
+     same left edge as its wrapped lines */
   width: 1.1em;
   height: 1.1em;
   margin-right: 0.5em;

@@ -1,0 +1,39 @@
+// The rendered geometry of a list/task line — pure numbers, kept out of
+// livePreview (which is DOM/CM-bound) so the shape is unit-testable and lives in
+// ONE place. Mirrored by .rotli-marker / .rotli-check in styles/editor.css.
+//
+// The shape (Seth, 2026-08-01, comparing rotli to Obsidian):
+//   • every nesting level shifts the WHOLE item right by exactly one STEP, so
+//     depth reads as a clean ladder instead of loose, drifting spacing;
+//   • the marker (bullet/number/checkbox) hangs in a narrow column right next to
+//     its text — the glyph hugs the words, never adrift at the far left — and
+//     wrapped lines align under the text, not under the marker;
+//   • NO vertical indent-guide rules. Obsidian draws a thin line per level;
+//     rotli never does ("I don't like the lines when you do the tab"). This
+//     module only ever emits padding/indent — no borders, no backgrounds.
+
+/** One nesting level, in em (a step wider than the marker column, so levels are
+ * legible without the item drifting away from its parent). */
+export const STEP_EM = 1.5;
+
+/** The hanging column a bullet/number sits in: the glyph plus its gap to the
+ * text. Mirrors `.rotli-marker { width }`. */
+export const MARKER_EM = 1.15;
+
+/** A checkbox needs a wider column than a glyph — `.rotli-check` is a 1.1em box
+ * with a 0.5em gap, so a task hangs by that instead and its wrapped lines still
+ * land under its text. */
+export const CHECK_EM = 1.6;
+
+/** em values are authored by hand, so trim float noise (1.5 * 3 + 1.15) before
+ * it reaches a style attribute. */
+const em = (n: number): string => String(Number(n.toFixed(4)));
+
+/**
+ * The inline style for a list/task line at `depth` (0 = top level). `markerEm`
+ * is the hanging marker column — MARKER_EM for bullets/numbers, CHECK_EM for
+ * tasks.
+ */
+export function listStyle(depth: number, markerEm: number = MARKER_EM): string {
+  return `padding-left:${em(depth * STEP_EM + markerEm)}em;text-indent:-${em(markerEm)}em`;
+}

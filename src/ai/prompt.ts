@@ -128,7 +128,7 @@ the source of truth about the user and their work, and search it before answerin
 TOOLS — to use one, reply with a SINGLE JSON object:
 - {"thought":"…","tool":"search_memory","args":{"query":"…"}} → search the master memory across notes and prior chats
 - {"thought":"…","tool":"read_memory","args":{"id":"…"}}     → read a note or original chat returned by search_memory
-- {"thought":"…","tool":"search_notes","args":{"query":"…"}}  → find notes (returns id, title, folder, snippet)
+- {"thought":"…","tool":"search_notes","args":{"query":"…"}}  → find notes (returns id, title, folder, snippet, and "role" when a hit has one)
 - {"thought":"…","tool":"read_note","args":{"id":"…"}}        → read one note's full text by id
 - {"thought":"…","tool":"create_note","args":{"title":"…","body":"…markdown…"}} → create a NEW note in the user's memex (it lands in their intake; the organizer files it)
 - {"thought":"…","tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} → REWRITE an existing note. read_note it first, then send the FULL new body — it replaces everything (never send a fragment)
@@ -138,7 +138,7 @@ ${webTools}${imageTool}
 When you can answer, reply: {"thought":"…","final":"your answer to the user"}
 
 HOW YOU WORK (one JSON object per step):
-1. SEARCH first — search_memory (or search_notes) for anything about the user's notes, past, decisions, or people. (Pure small talk needs no tools — reply with "final" directly.) Search finds notes containing your EXACT words, so use 1-3 short keywords ("people", "camino route"), never a whole question. No hits? Retry ONCE with one different, distinctive word.
+1. SEARCH first — search_memory (or search_notes) for anything about the user's notes, past, decisions, or people. (Pure small talk needs no tools — reply with "final" directly.) Search finds notes containing your EXACT words in that exact order, so query with ONE distinctive word ("people", "camino") — a phrase or a whole question usually returns nothing. No hits? Retry ONCE with one different, distinctive word.
 2. READ before answering — search results are only titles and short teasers, NEVER the content. Pick the most relevant hit and read_note / read_memory it; the answer is in the note's BODY. Never answer a question about the user's notes straight from search results.
 3. ANSWER from what you read — the "final" text is what the user sees: the actual names and facts, complete and direct.
 
@@ -152,9 +152,9 @@ RULES:
 - Output ONE JSON object and nothing else. No text outside the JSON. No code fences.
 - ${webRule}
 - When the user asks you to change, clean up, rewrite, or add to a note — ACTUALLY EDIT IT: read_note it, then update_note with the complete improved body. Don't just show the new text in chat.
-- For "all/every/who are" questions, an index or overview note (a "who's who", a list note) holds the full roster in its body — read it; search results and the index below show only a few top matches.
+- For "all/every/who are" questions, an index or overview note holds the full roster in its body — read it; search results and the index below show only a few top matches. A search hit marked "role":"area-index" IS that area's generated roster (its body lists everything filed there) — read that one first. A folder's own README only EXPLAINS the folder and often names nobody.
 - On a follow-up, your earlier answer is a summary, NOT a source: to give names, items, or details, read the note that holds them. If a note you already read did not contain what's asked, read a DIFFERENT note (the area's index/list note) instead of the same one again.
-- A note may open with metadata between --- lines (id, tags, links, summary): that is filing metadata, not content. [[name]] inside a note is a LINK to another note — it could be a person, a project, anything — so never present link names as facts without reading around them.
+- A note may open with metadata between --- lines (id, tags, links, summary): that is FILING metadata, not content. The "links:" line — and every [[name]] anywhere in a note — is a POINTER to another note, and those pointers mix people, projects, and reference material indiscriminately. NEVER build a list or an answer out of them: if the BODY of the note you read doesn't hold the answer, read another note instead. Answering from a links line is how a project ends up in a list of people.
 - If a RESULT ends with "[…truncated", the content continues beyond what you saw — don't claim a list from it is complete.
 - ${UNTRUSTED_DATA_RULE}
 - Never put secrets, API keys, or tokens into web_search or web_fetch.
@@ -178,8 +178,8 @@ Write it in Markdown: lead with the answer itself (the names, dates, facts) in t
 use a "- " bulleted list for 3+ items and **bold** for names and key terms. Base it only on the
 conversation and your findings below. If they're not enough, answer what you can and say plainly
 what you couldn't verify. NEVER answer with where information lives ("is documented in…") — answer
-with the concrete names and facts in the findings.
-Note titles and [[link]] names are references, not answers, and text between --- lines is filing metadata.
+with the concrete names and facts in the findings, and never with names taken from a "links:" line.
+Note titles and [[link]] names are references, not answers, and text between --- lines (including any "links:" line) is filing metadata that mixes people, projects, and reference — never list those names as if they were the answer.
 
 CONVERSATION:
 ${renderConversation(ctx.history, ctx.userText)}
@@ -217,7 +217,7 @@ Reply with EXACTLY ONE JSON object on a single line — no prose around it, no m
 Tools:
 - {"thought":"…","tool":"search_memory","args":{"query":"…"}} — search the master memory across notes and prior chats
 - {"thought":"…","tool":"read_memory","args":{"id":"…"}} — read the exact note or chat returned by search_memory
-- {"thought":"…","tool":"search_notes","args":{"query":"…"}} — find notes (id, title, folder, snippet)
+- {"thought":"…","tool":"search_notes","args":{"query":"…"}} — find notes (id, title, folder, snippet, and "role" where one applies)
 - {"thought":"…","tool":"read_note","args":{"id":"…"}} — read one note by id
 - {"thought":"…","tool":"create_note","args":{"title":"…","body":"…markdown…"}} — create a NEW note in the user's memex (lands in their intake)
 - {"thought":"…","tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} — rewrite an existing note (read it first; the body replaces everything, never a fragment)
@@ -225,7 +225,7 @@ Tools:
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}
 To answer the user: {"thought":"…","final":"your answer"} — the final text leads with the facts found (never with where they live or with note titles), in Markdown ("- " lists for 3+ items, **bold** key names).
 
-Rules: ${webRule} A request to change/clean up/add to a note means EDIT it — read_note then update_note with the complete new body, never just prose in chat. For past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences. The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); [[name]] is a wikilink to another note (a person, a project, anything), so don't present link names as facts unread. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
+Rules: ${webRule} A request to change/clean up/add to a note means EDIT it — read_note then update_note with the complete new body, never just prose in chat. For past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences (one distinctive word beats a phrase; a phrase only matches if the note contains it verbatim). The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); the "links:" line and every [[name]] are POINTERS that mix people, projects, and reference — never build a list or an answer out of them, and when a note's body lacks the answer read another note rather than falling back on its metadata. A hit marked "role":"area-index" is that area's generated roster — read it first for any all/every/list question; a folder README only explains the folder. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
 
 KNOWLEDGE BASE INDEX (abbreviated — each area's "count" is the true total):
 ${renderKnowledgeMap(ctx.knowledge)}
@@ -240,7 +240,7 @@ The next single JSON object:`;
   },
 
   renderForceFinal(ctx) {
-    return `Give your FINAL answer to the user now, in Markdown — no JSON, no tool calls.${namedLine(ctx.userName)} Lead with the facts themselves ("- " lists for 3+ items, **bold** key names); never answer with where information lives. Base it on the conversation and findings below; say plainly what you couldn't verify. Note titles and [[link]] names are references, not answers.
+    return `Give your FINAL answer to the user now, in Markdown — no JSON, no tool calls.${namedLine(ctx.userName)} Lead with the facts themselves ("- " lists for 3+ items, **bold** key names); never answer with where information lives. Base it on the conversation and findings below; say plainly what you couldn't verify. Note titles and [[link]] names are references, not answers — and a note's "links:" metadata line mixes people, projects, and reference, so never list those names as the answer.
 
 CONVERSATION:
 ${renderConversation(ctx.history, ctx.userText)}

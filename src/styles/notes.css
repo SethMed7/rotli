@@ -1023,6 +1023,21 @@
   min-height: 0;
   position: relative;
 }
+/* the focused-pane ring (Seth, 2026-08-01: "keep a visible highlight around
+   the pane you're actively in, at all times"). A 1px accent frame drawn on an
+   overlay pseudo — inset, inert, and outside layout, so nothing reflows when
+   focus moves. Softened to 60% of the accent so it states "you are here"
+   without framing the work. Multi-pane ONLY: the lone pane has no sibling to
+   be mistaken for, and the same gate gives the landing light below its
+   stronger, momentary version of this exact frame. */
+.panes.multi .pane.focused::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+}
 /* the focus landing light (Seth, 2026-07-30): when a hotkey (or click) moves
    focus in a split, the arriving pane wears a brief accent outline that fades
    — a border, not a glow (flat law). pointer-events: none keeps it inert. */
@@ -1055,11 +1070,15 @@
 /* Every surface root must GROW to fill the pane row — otherwise a surface with
    no intrinsic flex (chat, file) collapses to its content width and pins left,
    dead space on the right, and its own internal `margin:0 auto` has no room to
-   center. The note editor always had this; chat/file did not (Seth, 2026-07-01). */
+   center. The note editor always had this; chat/file did not (Seth, 2026-07-01).
+   The ⌘N chooser needs it MOST: `container-type: inline-size` size-contains it,
+   so its content contributes ZERO width and it collapsed to bare padding — a
+   ~48px sliver pinned left, headline wrapping four characters a line. */
 .pane-body > .editor,
 .pane-body > .chat-surface,
 .pane-body > .file-surface,
 .pane-body > .canvas-surface,
+.pane-body > .ni-surface,
 .pane-body > .board {
   flex: 1;
   min-width: 0;
@@ -1325,7 +1344,8 @@
   font-weight: 500;
   color: var(--text-muted);
   position: relative;
-  cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */ /* draggable — drag to reorder / move / split */
+  cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */
+  /* draggable — drag to reorder / move / split */
   z-index: 1;
 }
 .tab:active {

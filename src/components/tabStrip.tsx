@@ -2,10 +2,11 @@
 // "single-tab pane shows zero tab chrome" Apple-Notes default is retired, so a
 // lone tab is still visible and closeable. 34px on ground, 1px bottom border;
 // tabs 96–208px, always-labeled + type glyph; active = surface fill merging
-// into the editor; close × on active/hover only; labeled + button; focus = 2px
-// clay top edge on the focused pane's active tab, multi-pane only (CSS
-// `.panes.multi`). Overflow compresses to the 96px floor, then horizontally
-// scrolls behind linen fade masks — no dropdown.
+// into the editor; close × on active/hover only; labeled + button. Focus is
+// marked at the PANE level (the 1px accent ring on `.pane.focused`, multi-pane
+// only — the 2026-07-30 removal of the tab's clay top edge moved the cue there);
+// unfocused panes also dim their strips. Overflow compresses to the 96px floor,
+// then horizontally scrolls behind linen fade masks — no dropdown.
 //
 // Tabs drag with POINTER events (Seth, 2026-06-15: HTML5 drag is dead in the
 // macOS WKWebView shell): drag within a strip to reorder, onto another strip to

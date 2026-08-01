@@ -68,9 +68,14 @@ function LeafView({ node }: { node: LeafNode }) {
   );
   const tab = activeTabOf(node);
 
-  // the focus landing light (Seth, 2026-07-30: hotkey pane-focus "needs some
-  // sort of quick visual highlight") — when focus ARRIVES here, a brief accent
-  // outline fades out. Multi-pane only; the lone pane has nowhere else to be.
+  // `focused` drives two cues, both multi-pane only (the lone pane has nowhere
+  // else to be), both drawn in CSS off the `focused` class — that class is the
+  // DOM marker for "you are here" and is load-bearing, not decoration:
+  //   · the resident ring — a 1px accent frame that stays for as long as this
+  //     pane holds focus (Seth, 2026-08-01), `.panes.multi .pane.focused::before`
+  //   · the landing light — the same frame at 2px, flashed once on ARRIVAL
+  //     (Seth, 2026-07-30: hotkey pane-focus "needs some sort of quick visual
+  //     highlight"), gated by the `flash` state below
   const focused = node.id === focusedPaneId;
   const multi = usePanesStore((s) => s.root.kind === "split");
   const [flash, setFlash] = useState(false);

@@ -166,15 +166,17 @@
   font-size: 9px;
   opacity: 0.7;
 }
+/* Fixed + portaled to <body>, placed by anchoredPopover() in viewport
+   coordinates (left/top/max-height come in inline). It was pane-relative with a
+   62vh cap, which clipped the list against the window's top edge in a split —
+   the composer is only at the window's bottom when the pane is full height. */
 .chat-modelpop {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  z-index: 30;
+  position: fixed;
+  z-index: 40;
   min-width: 240px;
   max-width: 320px;
-  max-height: 62vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1880,6 +1882,35 @@ body:has(.document-editor) [role="dialog"] input:disabled {
   35% {
     opacity: 1;
   }
+}
+/* waiting on this Mac's compute, not on the model — the local lane queues a
+   send that doesn't fit measured headroom, and says so
+   (docs/design/local-compute-guardrails.md). No pulsing dots: nothing is
+   working yet, and pretending otherwise would be the dishonest read. */
+.cmsg-queued {
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.cmsg-queued-text {
+  font-style: italic;
+}
+.cmsg-queued-btn {
+  padding: 2px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-style: normal;
+  cursor: pointer;
+  transition: background var(--motion-exit) var(--motion-ease);
+}
+.cmsg-queued-btn:hover {
+  background: var(--hov);
+}
+.cmsg-queued-btn:active {
+  background: var(--act);
 }
 /* a failed chats/<slug>.md write — inline under the thread (#11, audit 2026-07) */
 .chat-save-err {

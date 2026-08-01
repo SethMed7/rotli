@@ -8,6 +8,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [Unreleased]
+
+### Added
+
+- **Every chat keeps its own model.** Two chats side by side can now run two
+  different models at once: the chip under the composer shows *that* chat's
+  model, sends from that chat use it, and it stays with the chat across
+  relaunches. Picking a model no longer reaches into every other open chat. A
+  brand-new chat still starts on the last model you picked, so nothing changes
+  if you only ever use one.
+- **On-device chats wait their turn instead of bogging down your Mac.** Run as
+  many local chats as you like — before each reply starts, rotli checks how much
+  memory this Mac actually has free right now and how big that model is. If
+  there's room it just goes; if there isn't, the message says *"queued — not
+  enough compute headroom right now"* and waits, with a **Prioritize** button to
+  run it next. Stopping or leaving a queued message takes it back out of the
+  line. There's no fixed limit on how many chats you can have open — a roomy Mac
+  runs several at once, a smaller one runs them one after another. Claude, Codex
+  and Gemini are unaffected.
+
+### Fixed
+
+- **"List the people in my vault" answers with your people.** The on-device
+  model used to open the `people/` README — a note that explains how the folder
+  is organized and names nobody — and read its list of links out loud, so a
+  *project* could end up in a list of your family. Three things changed: notes
+  filed under a folder you name ("people", "projects") now turn up in the
+  model's search instead of only notes that spell that word out; the area's
+  generated index — the note that actually lists everyone — is marked as such
+  and offered first; and a note's `links:` line is labelled as pointers, not an
+  answer. Asked for a roster, rotli now reads the roster.
+
+- **The model picker opens fully in a split.** In a stacked layout the list
+  used to open upward past the top of the window and come back clipped — a menu
+  starting mid-air over the conversation. It now measures the room its chip
+  actually has, flips below when there's more space there, and scrolls inside
+  itself instead of running off-screen.
+- **Tab indents the line again.** Pressing Tab on a line that wasn't already a
+  list item pushed two invisible spaces in at the cursor instead of moving the
+  line, so writing the text first and then reaching for Tab left the line where
+  it was — and a `-` typed next stranded at the end (`test  -`, rendered
+  literally, no bullet). Tab now shifts the whole line one level, cursor and
+  all, exactly like Shift-Tab has always brought it back. Tab inside a fenced
+  code block still types a soft tab at the cursor, and Tab with text selected
+  indents the line instead of replacing what you selected.
+
+### Changed
+
+- **Nested bullets read as a clean ladder.** Each level now shifts the whole
+  item by one even step, and the bullet, number, or checkbox sits in a narrower
+  column right beside its words instead of drifting off to the left. Wrapped
+  lines in a task line up under the task's text. No vertical indent lines —
+  nesting is spacing, nothing drawn.
+
 ## [0.62.0] - 2026-07-31
 
 ### Changed

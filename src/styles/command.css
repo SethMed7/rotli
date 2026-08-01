@@ -1616,6 +1616,12 @@
 [data-focus="true"] .split > .cell:not(:has(.pane.focused)) {
   display: none;
 }
+/* …so the focused-pane ring has nothing left to distinguish itself FROM —
+   chrome leaves in focus mode, and a frame around the only visible pane is
+   chrome. (Outranks the .panes.multi rule that draws it.) */
+[data-focus="true"] .panes.multi .pane.focused::before {
+  display: none;
+}
 /* word count, bottom-right at 60%, gone while typing */
 .fwc {
   position: absolute;

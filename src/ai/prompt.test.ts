@@ -74,7 +74,12 @@ describe("read-before-answer scaffolding (the 2026-07-29 people-list failure)", 
     // keywords and the gemma one the retry-once-with-a-different-word move.
     const gemma = gemmaAdapter.renderPrompt({ ...base });
     expect(gemma).toContain("EXACT words");
-    expect(gemma).toContain("never a whole question");
+    expect(gemma).toContain("whole question");
+    // ONE word, not "1-3 keywords": the engine is substring, so a multi-word
+    // query only matches text that is adjacent in the note. The old example
+    // ("camino route") taught the exact query shape that returns nothing —
+    // live eval 2026-08-01 watched gemma try it twice and give up.
+    expect(gemma).toContain("ONE distinctive word");
     expect(frontierAdapter.renderPrompt({ ...base })).toContain("short keywords, not sentences");
   });
 
@@ -85,6 +90,21 @@ describe("read-before-answer scaffolding (the 2026-07-29 people-list failure)", 
     const prompt = gemmaAdapter.renderPrompt({ ...base });
     expect(prompt).toContain("your earlier answer is a summary, NOT a source");
     expect(prompt).toContain("read a DIFFERENT note");
+  });
+
+  test("both adapters forbid answering from a frontmatter links: line", () => {
+    // the 2026-08-01 failure: asked for "the people in my vault", gemma read
+    // the people/ README — a note whose BODY names nobody — and answered with
+    // its `links:` line, so the project "caminorx" landed in a list of people.
+    // Both prompts must name the hazard AND prescribe the recovery (read a
+    // different note, the area's generated _index), not just caution about it.
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      const prompt = adapter.renderPrompt({ ...base });
+      expect(prompt).toContain('"links:" line');
+      expect(prompt).toMatch(/never build a list or an? answer out of them/i);
+      // and both must say what the retrieval layer's area-index marker means
+      expect(prompt).toContain('"role":"area-index"');
+    }
   });
 
   test("both adapters teach the explicit truncation marker", () => {
@@ -103,6 +123,9 @@ describe("read-before-answer scaffolding (the 2026-07-29 people-list failure)", 
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
       const prompt = adapter.renderForceFinal({ history: [], userText: "hi", scratch: [] });
       expect(prompt).toContain("[[link]] names are references, not answers");
+      // the forced final is the OTHER exit from a run — it must carry the same
+      // links-line ban as renderPrompt (2026-08-01)
+      expect(prompt).toMatch(/links:/);
     }
   });
 });

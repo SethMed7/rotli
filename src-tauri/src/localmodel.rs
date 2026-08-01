@@ -344,7 +344,10 @@ pub struct SystemProfile {
     pub free_disk_gb: f64,
 }
 
-fn sysctl(name: &str) -> Option<String> {
+/// pub(crate): the compute guardrails (compute.rs) read this Mac's live memory
+/// signals through the same subprocess seam — no new dependency, one place that
+/// knows sysctl isn't on a GUI app's PATH.
+pub(crate) fn sysctl(name: &str) -> Option<String> {
     // GUI apps don't get the login-shell PATH — sysctl lives in /usr/sbin
     let out = Command::new("/usr/sbin/sysctl").args(["-n", name]).output().ok()?;
     if !out.status.success() {
@@ -388,6 +391,22 @@ fn system_profile_blocking() -> Result<SystemProfile, String> {
         cpu_cores,
         free_disk_gb,
     })
+}
+
+/// The working footprint of a registered model in MB — its weights, as recorded
+/// at install time (`approxMB`). The compute guardrails price a cold load with
+/// it; `None` (unregistered, or a registry with no size) sends the caller to its
+/// deliberately pessimistic fallback knob rather than to an optimistic guess.
+pub(crate) fn model_footprint_mb(id: &str) -> Option<u64> {
+    let reg = read_registry().ok()?;
+    let mb = reg
+        .get("models")?
+        .as_array()?
+        .iter()
+        .find(|m| m.get("id").and_then(|v| v.as_str()) == Some(id))?
+        .get("approxMB")?
+        .as_u64()?;
+    (mb > 0).then_some(mb)
 }
 
 /// The `provider` + on-disk `path` of a registered model by id.

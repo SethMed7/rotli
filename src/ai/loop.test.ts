@@ -9,7 +9,18 @@ import { containsPrivateDataOverlap, endpointIsLocal, looksSecret, modelIsOnDevi
 import { runAgent } from "./loop";
 import { extractJsonObject, parseAction } from "./parse";
 import { trimHistory } from "./prompt";
-import { buildIndex, pruneScratch, rankNotes, runTool, stripLeadingFrontmatter, truncateBody } from "./tools";
+import {
+  buildIndex,
+  folderHits,
+  frameLinksMetadata,
+  isAreaIndex,
+  mergeFolderHits,
+  pruneScratch,
+  rankNotes,
+  runTool,
+  stripLeadingFrontmatter,
+  truncateBody,
+} from "./tools";
 import type { AgentEvent, ChatTurn, Host, RunInput, ToolName } from "./types";
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
@@ -138,6 +149,102 @@ describe("retrieval", () => {
     ];
     const hits = rankNotes(notes, "pricing", 5);
     expect(hits.map((h) => h.id)).toEqual(["a"]);
+  });
+
+  // ── the 2026-08-01 roster failure ───────────────────────────────────────────
+  // Asked "give me a list of the people in my vault", gemma read wiki/people's
+  // README — a note whose body names nobody — and answered out of its `links:`
+  // metadata, so the project "caminorx" landed in a list of Seth's family. The
+  // three pins below cover the three holes that made that possible.
+
+  test("folderHits reaches the notes filed under an area (corpus_search sees only title+body)", () => {
+    const notes = [
+      note({ id: "p1", title: "Aliyah Grace Medina", folderId: "wiki/people/family" }),
+      note({ id: "p2", title: "Subh", folderId: "wiki/people/work", updatedAt: 5 }),
+      note({ id: "x1", title: "Breve — July 31", folderId: "wiki/reference/briefs" }),
+      note({ id: "b1", title: "canvas", folderId: "wiki/people", kind: "board" }),
+    ];
+    expect(folderHits(notes, "people", 5).map((h) => h.id)).toEqual(["p2", "p1"]); // recency, no board
+    // a phrase, or a 1-2 char stub, is not a folder name — no listing scan
+    expect(folderHits(notes, "who are my people", 5)).toEqual([]);
+    expect(folderHits(notes, "pe", 5)).toEqual([]);
+  });
+
+  test("mergeFolderHits keeps title > folder > body and dedupes", () => {
+    const hit = (id: string) => ({ id, title: id, snippet: "", folder: "wiki/people" });
+    const merged = mergeFolderHits(
+      [
+        { hit: hit("body"), rank: 1 },
+        { hit: hit("title"), rank: 0 },
+      ],
+      [hit("folder"), hit("title")],
+      5,
+    );
+    expect(merged.map((h) => h.id)).toEqual(["title", "folder", "body"]);
+  });
+
+  test("isAreaIndex spots the Filer's generated roster by title == area name", () => {
+    expect(isAreaIndex("people", "wiki/people")).toBe(true);
+    expect(isAreaIndex("people/ — who's who in Seth's world", "wiki/people")).toBe(false);
+    expect(isAreaIndex("people", "")).toBe(false);
+  });
+
+  test("search_notes leads with the area index and says what it is", async () => {
+    const { host } = fakeHost([]);
+    const result = await runTool(
+      {
+        ...host,
+        searchNotes: async () => [
+          { id: "readme", title: "people/ — who's who in Seth's world", snippet: "", folder: "wiki/people" },
+          { id: "idx", title: "people", snippet: "", folder: "wiki/people" },
+        ],
+      },
+      "search_notes",
+      { query: "people" },
+      budgetFor({ id: "gemma-3-12b-it-qat-4bit" }),
+    );
+    const hits = JSON.parse(result) as { id: string; role?: string }[];
+    expect(hits.map((h) => h.id)).toEqual(["idx", "readme"]);
+    expect(hits[0]?.role).toBe("area-index");
+    expect(hits[1]?.role).toBeUndefined();
+  });
+
+  test("search_memory carries and leads with the area index too", async () => {
+    // the prompts name search_memory FIRST, so the roster marker has to ride
+    // this lane as well — the in-app host sets it from the hit's folder
+    const { host } = fakeHost([]);
+    const result = await runTool(
+      {
+        ...host,
+        searchMemory: async () => [
+          { id: "chat:x", title: "a chat", snippet: "", source: "chat" as const },
+          { id: "idx", title: "people", snippet: "", source: "note" as const, role: "area-index" as const },
+        ],
+      },
+      "search_memory",
+      { query: "people" },
+      budgetFor({ id: "gemma-3-12b-it-qat-4bit" }),
+    );
+    expect((JSON.parse(result) as { id: string }[]).map((h) => h.id)).toEqual(["idx", "chat:x"]);
+  });
+
+  test("frameLinksMetadata warns on the links: line and leaves the body alone", () => {
+    const framed = frameLinksMetadata(
+      "---\nid: 01X\nlinks: [[marisol-medina]], [[caminorx]]\nsummary: who's who\n---\n\n# people/\n\nlinks: not metadata down here\n",
+    );
+    expect(framed).toContain("links: (pointers to other notes");
+    expect(framed).toContain("[[marisol-medina]], [[caminorx]]");
+    expect(framed).toContain("\n\n# people/\n\nlinks: not metadata down here\n");
+    // idempotent (a re-read must not stack warnings) and a no-op without a fence
+    expect(frameLinksMetadata(framed)).toBe(framed);
+    expect(frameLinksMetadata("# plain\n\nno frontmatter\n")).toBe("# plain\n\nno frontmatter\n");
+  });
+
+  test("a framed note still strips cleanly on the update_note write boundary", () => {
+    // the annotation must never be able to reach a note's body: the line keeps
+    // its `key: value` shape, so an echoed fence is still recognized metadata
+    const framed = frameLinksMetadata("---\nid: 01X\nlinks: [[a]], [[b]]\n---\n\n# Note\n\nBody.\n");
+    expect(stripLeadingFrontmatter(framed)).toBe("# Note\n\nBody.\n");
   });
 
   test("buildIndex groups by folder/area with ids when it fits", () => {

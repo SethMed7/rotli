@@ -23,6 +23,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { makeTauriHost } from "../ai/host";
 import { modelIsOnDevice } from "../ai/guard";
@@ -43,15 +44,19 @@ import { hasSecureContext } from "../memex/contract";
 import { useInstanceChats, useMemexConfig, useSetChatAttachedTo, useWriteChat } from "../memex/useMemex";
 import {
   type ChatModelInfo,
+  type LocalQueueEntry,
   chatModels,
   cliCancel,
   cliDetect,
   corpusFrontmatter,
   fileAssetUrl,
   isTauri,
+  localQueueCancel,
+  localQueuePrioritize,
+  onLocalQueue,
 } from "../lib/tauri";
 import { fileName } from "../lib/fileKind";
-import { useTransientPopover } from "../lib/popover";
+import { type AnchoredPlacement, anchoredPopover, useTransientPopover } from "../lib/popover";
 import {
   assignChatToFolder,
   invalidateChatFolders,
@@ -60,7 +65,7 @@ import {
 } from "../services/chatFolders";
 import { invalidateNotes, useNoteIndex } from "../services/hooks";
 import { type Measure } from "../state/noteStyle";
-import { useUiStore } from "../state/ui";
+import { chatKey, chatModelFor, useUiStore } from "../state/ui";
 import { usePanesStore } from "../state/panes";
 import { renderInline } from "../editor/render";
 import { CheckGlyph, CloudGlyph, CopyGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
@@ -350,7 +355,14 @@ function modelKindGlyph(kind: ModelKind) {
 /** The per-chat model picker — a quiet popover (same grammar as MeasureMenu)
  * grouped On this Mac · Connected · Presets, with a local-vs-"leaves your Mac"
  * cue and a vision badge. Replaces the bare native <select> (Seth, 2026-07-08
- * model UX pass, phase 2). */
+ * model UX pass, phase 2).
+ *
+ * The list is PORTALED to <body> and placed in viewport coordinates
+ * (anchoredPopover). It used to be a pane-relative absolute box with a 62vh
+ * cap: in a split the composer sits mid-window, so the list opened upward
+ * straight past the window's top edge and came back clipped — a menu starting
+ * mid-air over the transcript (Seth, 2026-08-01). Same idiom as the shared
+ * context-menu host: fixed, clamped, measured. */
 function ModelPicker({
   groups,
   picked,
@@ -364,10 +376,54 @@ function ModelPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [box, setBox] = useState<AnchoredPlacement | null>(null);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
   useTransientPopover([popRef, anchorRef], open, () => setOpen(false));
+
+  // Place against the trigger's VIEWPORT rect, remeasuring while the list is
+  // open: its own size changes (the fallback notice, a lane finishing its
+  // probe), the window resizes, and any ancestor can scroll under it.
+  useLayoutEffect(() => {
+    if (!open) {
+      setBox(null);
+      return;
+    }
+    const place = () => {
+      const anchor = anchorRef.current?.getBoundingClientRect();
+      const pop = popRef.current;
+      if (!anchor || !pop) return;
+      const next = anchoredPopover(
+        { top: anchor.top, bottom: anchor.bottom, left: anchor.left },
+        // scrollHeight is the list's UNCAPPED height — measuring offsetHeight
+        // would just re-read the cap we applied last pass and never flip back
+        { width: pop.offsetWidth, height: pop.scrollHeight },
+        { width: window.innerWidth, height: window.innerHeight },
+      );
+      // applying max-height resizes the list, which re-fires the observer —
+      // settling on the same numbers ends it instead of re-rendering forever
+      setBox((cur) =>
+        cur &&
+        cur.left === next.left &&
+        cur.top === next.top &&
+        cur.maxHeight === next.maxHeight &&
+        cur.placement === next.placement
+          ? cur
+          : next,
+      );
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    if (popRef.current) observer.observe(popRef.current);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
 
   const localIds = new Set(groups.local.map((m) => m.id));
   const connectedIds = new Set(groups.connected.map((m) => m.id));
@@ -486,59 +542,76 @@ function ModelPicker({
           fallback
         </span>
       )}
-      {open && (
-        <div className="chat-modelpop" ref={popRef} role="menu" aria-label="Model" onKeyDown={onMenuKeyDown}>
-          {fallbackFrom && (
-            <div className="chat-modelpop-notice">
-              Saved model <b>{shortModelLabel(fallbackFrom)}</b> is unavailable. Using the fallback shown in
-              the composer.
-            </div>
-          )}
-          {sections.map((s) => (
-            <div className="chat-modelpop-group" key={s.key}>
-              <div className="chat-modelpop-grouplabel">
-                <span className="chat-modelpop-groupico">{modelKindGlyph(s.kind)}</span>
-                <span>{s.label}</span>
+      {open &&
+        createPortal(
+          <div
+            className="chat-modelpop"
+            ref={popRef}
+            role="menu"
+            aria-label="Model"
+            data-placement={box?.placement ?? "up"}
+            onKeyDown={onMenuKeyDown}
+            style={{
+              left: box?.left ?? 0,
+              top: box?.top ?? 0,
+              maxHeight: box?.maxHeight,
+              // the first pass measures; showing it before it is placed would
+              // flash the list in the window's top-left corner
+              visibility: box ? undefined : "hidden",
+            }}
+          >
+            {fallbackFrom && (
+              <div className="chat-modelpop-notice">
+                Saved model <b>{shortModelLabel(fallbackFrom)}</b> is unavailable. Using the fallback shown in
+                the composer.
               </div>
-              {s.hint && <div className="chat-modelpop-grouphint">{s.hint}</div>}
-              {s.items.map((m) => {
-                rowIndex += 1;
-                const index = rowIndex;
-                const sel = m.id === picked?.id;
-                return (
-                  <button
-                    type="button"
-                    key={`${m.provider}:${m.id}`}
-                    ref={(node) => {
-                      rowRefs.current[index] = node;
-                    }}
-                    className={sel ? "chat-modelrow sel" : "chat-modelrow"}
-                    role="menuitemradio"
-                    aria-checked={sel}
-                    tabIndex={activeIndex === index ? 0 : -1}
-                    onFocus={() => setActiveIndex(index)}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onClick={() => {
-                      onPick(m.id);
-                      setOpen(false);
-                    }}
-                  >
-                    <span className="chat-modelrow-name">{shortModelLabel(m.label)}</span>
-                    {m.vision && (
-                      <span className="chat-modelrow-tag" title="Can see attached images">
-                        <EyeGlyph size={13} />
-                      </span>
-                    )}
-                    {(m.localDefault || m.isDefault) && (
-                      <span className="chat-modelrow-tag def">default</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
+            )}
+            {sections.map((s) => (
+              <div className="chat-modelpop-group" key={s.key}>
+                <div className="chat-modelpop-grouplabel">
+                  <span className="chat-modelpop-groupico">{modelKindGlyph(s.kind)}</span>
+                  <span>{s.label}</span>
+                </div>
+                {s.hint && <div className="chat-modelpop-grouphint">{s.hint}</div>}
+                {s.items.map((m) => {
+                  rowIndex += 1;
+                  const index = rowIndex;
+                  const sel = m.id === picked?.id;
+                  return (
+                    <button
+                      type="button"
+                      key={`${m.provider}:${m.id}`}
+                      ref={(node) => {
+                        rowRefs.current[index] = node;
+                      }}
+                      className={sel ? "chat-modelrow sel" : "chat-modelrow"}
+                      role="menuitemradio"
+                      aria-checked={sel}
+                      tabIndex={activeIndex === index ? 0 : -1}
+                      onFocus={() => setActiveIndex(index)}
+                      onMouseEnter={() => setActiveIndex(index)}
+                      onClick={() => {
+                        onPick(m.id);
+                        setOpen(false);
+                      }}
+                    >
+                      <span className="chat-modelrow-name">{shortModelLabel(m.label)}</span>
+                      {m.vision && (
+                        <span className="chat-modelrow-tag" title="Can see attached images">
+                          <EyeGlyph size={13} />
+                        </span>
+                      )}
+                      {(m.localDefault || m.isDefault) && (
+                        <span className="chat-modelrow-tag def">default</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -631,8 +704,13 @@ const ChatMessage = memo(function ChatMessage({
 
 export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: string | null }) {
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
-  const chatModelId = useUiStore((s) => s.chatModelId);
-  const setChatModelId = useUiStore((s) => s.setChatModelId);
+  // the seed a NEW chat starts on (the last model picked anywhere) + the
+  // per-chat map that owns every chat's actual choice
+  const chatModelSeed = useUiStore((s) => s.chatModelId);
+  const setChatModelSeed = useUiStore((s) => s.setChatModelId);
+  const chatModelMap = useUiStore((s) => s.chatModel);
+  const setChatModel = useUiStore((s) => s.setChatModel);
+  const clearChatModel = useUiStore((s) => s.clearChatModel);
   const chatWeb = useUiStore((s) => s.chatWeb);
   const setChatWeb = useUiStore((s) => s.setChatWeb);
   const clearChatWeb = useUiStore((s) => s.clearChatWeb);
@@ -705,6 +783,11 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const secureChat = secureAttachmentHint || secureContext;
   const groups: ModelGroups = secureChat ? { ...allGroups, connected: [], presets: [] } : allGroups;
   const modelList = flattenModels(groups);
+  // THIS chat's model — its own pick, or the new-chat seed until it has one.
+  // Independent per chat (Seth, 2026-08-01): two chat panes side by side each
+  // send to their own model, and picking in one never moves the other.
+  const chatKeyId = chatKey(chatSlug, paneId);
+  const chatModelId = chatModelFor(chatModelMap, chatKeyId, chatModelSeed);
   const savedPick = modelList.find((m) => m.id === chatModelId);
   const fallbackPick = modelList.find((m) => m.isDefault) ?? modelList[0] ?? null;
   // A persisted remote choice must not silently become the local default while
@@ -712,6 +795,23 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const waitingForSavedPick = !!chatModelId && !catalogSettled && (!savedPick || savedPick.api === "preset");
   const picked = waitingForSavedPick ? null : (savedPick ?? fallbackPick);
   const fallbackFrom = catalogSettled && chatModelId && !savedPick && fallbackPick ? chatModelId : null;
+  // Pin the resolved model onto this chat as soon as the catalog is settled: an
+  // inherited seed becomes THIS chat's own choice, so a pick made in another
+  // pane (which also moves the seed, for the next new chat) can't move it.
+  // Guarded on catalogSettled so a still-probing remote lane is never pinned as
+  // the local fallback.
+  const resolvedModelId = picked?.id ?? null;
+  const chatOwnsModel = chatModelMap[chatKeyId] !== undefined;
+  useEffect(() => {
+    if (!catalogSettled || !resolvedModelId || chatOwnsModel) return;
+    setChatModel(chatKeyId, resolvedModelId);
+  }, [catalogSettled, resolvedModelId, chatOwnsModel, chatKeyId, setChatModel]);
+
+  /** Pick a model FOR THIS CHAT, and seed the next new chat with it. */
+  const pickModel = (id: string) => {
+    setChatModel(chatKeyId, id);
+    setChatModelSeed(id);
+  };
 
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -747,6 +847,10 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const runSeq = useRef(0);
   // what Stop gives back to the composer — the sent prompt returns intact
   const lastSentRef = useRef<{ text: string; images: string[] } | null>(null);
+  // this turn's place in the local-compute queue, or null when it's actually
+  // generating. Local models share one Mac: a send that doesn't fit measured
+  // headroom WAITS rather than piling on (docs/design/local-compute-guardrails.md).
+  const [queued, setQueued] = useState<LocalQueueEntry | null>(null);
 
   // stable across renders so the memoized message rows keep skipping — the ✓
   // beat is undone only if that same row is still the copied one.
@@ -761,8 +865,9 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
 
   // per-chat web toggle (the composer globe) — keyed by slug; a not-yet-saved chat
   // rides a PANE-scoped key (session-only, never persisted): a shared "" key leaked
-  // one globe click into every future fresh chat across relaunches (#7, audit 2026-07)
-  const webKey = chatSlug ?? `unsaved:${paneId}`;
+  // one globe click into every future fresh chat across relaunches (#7, audit 2026-07).
+  // The model map above rides the very same key.
+  const webKey = chatKeyId;
   const globeOn = secureChat ? false : (chatWeb[webKey] ?? false);
   // per-chat measure rides the same key; missing = the tuned comfort column
   const measure: Measure = chatMeasure[webKey] ?? "comfort";
@@ -1008,6 +1113,9 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
         const m = chatMeasure[webKey];
         if (m) setChatMeasure(res.slug, m); // carry the measure the same way
         clearChatMeasure(webKey);
+        const pinnedModel = chatModelMap[webKey] ?? picked.id;
+        setChatModel(res.slug, pinnedModel); // and the model this chat runs on
+        clearChatModel(webKey);
         setTitle("");
       }
       setSaveErr(null);
@@ -1042,13 +1150,44 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     return () => clearInterval(t);
   }, [busy]);
 
+  // The local-compute queue narrates itself (every admission/wait/prioritize/
+  // cancel carries the whole snapshot), so keep only THIS turn's row. The
+  // callback reads the live ref, so it never needs re-subscribing.
+  useEffect(() => {
+    if (!isTauri()) return;
+    return onLocalQueue((q) => {
+      const id = requestRef.current;
+      setQueued(id ? (q.waiting.find((w) => w.requestId === id) ?? null) : null);
+    });
+  }, []);
+
+  // a turn that isn't live can't still be waiting in line
+  useEffect(() => {
+    if (!busy) setQueued(null);
+  }, [busy]);
+
+  // leaving the chat with a message still in line takes it back out — a QUEUED
+  // send is genuinely cancellable (a running one is orphaned, as before)
+  useEffect(
+    () => () => {
+      const id = requestRef.current;
+      if (id) void localQueueCancel(id).catch(() => {});
+    },
+    [],
+  );
+
   /** Stop (Seth, 2026-07-30): orphan the run, kill any CLI child, and hand the
    * prompt back to the composer — the optimistic user bubble comes off the
    * thread since the turn will never be answered or persisted. */
   const stopTurn = () => {
     runSeq.current++;
-    if (requestRef.current) void cliCancel(requestRef.current).catch(() => {});
+    if (requestRef.current) {
+      void cliCancel(requestRef.current).catch(() => {});
+      // and take it out of the local-compute line if that's where it was
+      void localQueueCancel(requestRef.current).catch(() => {});
+    }
     requestRef.current = null;
+    setQueued(null);
     setBusy(false);
     setMessages((p) => (p.length > 0 && p[p.length - 1]?.speaker === "you" ? p.slice(0, -1) : p));
     const sent = lastSentRef.current;
@@ -1246,14 +1385,35 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
               {busy && (
                 <div className="cmsg ai">
                   <QuokkaMark size={17} className="chat-mark" />
-                  <div className="cmsg-bubble cmsg-think" role="status">
-                    <span className="cmsg-think-dots" aria-hidden="true">
-                      <i />
-                      <i />
-                      <i />
-                    </span>
-                    {status}
-                  </div>
+                  {queued ? (
+                    // waiting on measured compute headroom, not thinking — say
+                    // which, and offer the jump-the-line the user actually has
+                    <div className="cmsg-bubble cmsg-think cmsg-queued" role="status">
+                      <span className="cmsg-queued-text">{queued.reason}</span>
+                      {queued.position > 0 && (
+                        <button
+                          type="button"
+                          className="cmsg-queued-btn"
+                          title="Run this one next, ahead of the others waiting"
+                          onClick={() => {
+                            const id = requestRef.current;
+                            if (id) void localQueuePrioritize(id).catch(() => {});
+                          }}
+                        >
+                          Prioritize
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="cmsg-bubble cmsg-think" role="status">
+                      <span className="cmsg-think-dots" aria-hidden="true">
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                      {status}
+                    </div>
+                  )}
                 </div>
               )}
               {!busy && messages.length > 0 && messages[messages.length - 1]?.speaker !== "you" && (
@@ -1323,7 +1483,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                             type="button"
                             className="chat-vision-pick"
                             onClick={() => {
-                              setChatModelId(m.id);
+                              pickModel(m.id);
                               setVisionHint(false);
                             }}
                           >
@@ -1377,7 +1537,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                         picked={picked ?? null}
                         fallbackFrom={fallbackFrom}
                         onPick={(id) => {
-                          setChatModelId(id);
+                          pickModel(id);
                           setVisionHint(false);
                         }}
                       />

@@ -34,6 +34,12 @@ function press(view: FakeView, key: string, shift = false): boolean {
   return false;
 }
 
+/** Typing a run of characters (CM's default input) — lets a test replay a whole
+ * keystroke flow, not just one command. */
+function typeText(view: FakeView, s: string): void {
+  view.dispatch(view.state.replaceSelection(s));
+}
+
 const text = (view: FakeView) => view.state.doc.toString();
 const head = (view: FakeView) => view.state.selection.main.head;
 
@@ -180,5 +186,58 @@ describe("tab-indented lists (foreign notes)", () => {
     const v = viewOf(doc, doc.length);
     expect(press(v, "Tab", true)).toBe(true);
     expect(text(v)).toBe("- [ ] a\n- [x] b");
+  });
+});
+
+// Seth, 2026-08-01 (still on v0.62.0): bullets, then a third line that had left
+// the list — typing the text FIRST and then pressing Tab shoved two invisible
+// spaces in at the caret instead of moving the line, so the "- " typed next
+// stranded at the end and the line read literally as "test  -". Tab indents the
+// LINE now, like ⇧Tab has always outdented any line; only fenced code keeps the
+// soft tab at the caret (indentation there is the user's code).
+describe("Tab indents the LINE, not the caret", () => {
+  test("the reported flow: bullets, leave the list, type, Tab — nothing strands", () => {
+    const v = viewOf("", 0);
+    typeText(v, "- hello");
+    press(v, "Enter");
+    typeText(v, "okay");
+    press(v, "Enter");
+    press(v, "Enter"); // the empty-item exit ramp → a plain line
+    typeText(v, "test");
+    expect(press(v, "Tab")).toBe(true);
+    expect(text(v)).toBe("- hello\n- okay\n  test");
+    typeText(v, "!"); // the caret rode the shift instead of sitting behind it
+    expect(text(v)).toBe("- hello\n- okay\n  test!");
+  });
+
+  test("a paragraph indents from column 0 and the caret lands after the indent", () => {
+    const v = viewOf("test", 0);
+    expect(press(v, "Tab")).toBe(true);
+    expect(text(v)).toBe("  test");
+    expect(head(v)).toBe(2);
+  });
+
+  test("an empty line still takes a plain two-space indent", () => {
+    const v = viewOf("", 0);
+    expect(press(v, "Tab")).toBe(true);
+    expect(text(v)).toBe("  ");
+    expect(head(v)).toBe(2);
+  });
+
+  test("Tab with text selected indents the line instead of eating the selection", () => {
+    const v = viewOf("test", 4, 1); // "est" selected
+    expect(press(v, "Tab")).toBe(true);
+    expect(text(v)).toBe("  test");
+  });
+
+  test("nesting a bullet is unchanged (the app's own flow)", () => {
+    const v = viewOf("", 0);
+    typeText(v, "- hello");
+    press(v, "Enter");
+    typeText(v, "okay");
+    press(v, "Enter");
+    press(v, "Tab");
+    typeText(v, "test");
+    expect(text(v)).toBe("- hello\n- okay\n  - test");
   });
 });

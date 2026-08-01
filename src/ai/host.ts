@@ -21,7 +21,14 @@ import {
 import { SHEET_BIN, SHEET_TEXT } from "../sheets/kinds";
 import { extOf } from "../lib/fileKind";
 import { workbookToCsv } from "../sheets/view";
-import { rankNotes, stripLeadingFrontmatter } from "./tools";
+import {
+  folderHits,
+  folderQuery,
+  isAreaIndex,
+  mergeFolderHits,
+  rankNotes,
+  stripLeadingFrontmatter,
+} from "./tools";
 import { contextWindowFor } from "./budget";
 import { buildModelMap } from "../memex/modelMap";
 import { activeInstance } from "../memex/config";
@@ -121,12 +128,22 @@ export function makeTauriHost(
           prompt: flattenWire(messages),
         });
       }
-      const wireOpts: { model: string; endpoint: string; api: string; formatJson?: boolean } = {
+      const wireOpts: {
+        model: string;
+        endpoint: string;
+        api: string;
+        formatJson?: boolean;
+        requestId?: string;
+      } = {
         model: model.id,
         endpoint: model.endpoint,
         api: model.api,
       };
       if (formatJson !== undefined) wireOpts.formatJson = formatJson;
+      // the LOCAL lane keys its compute queue by this same turn id, so a
+      // queued message can be prioritized or taken back from the composer
+      // (docs/design/local-compute-guardrails.md). Remote lanes ignore it.
+      if (opts?.requestId) wireOpts.requestId = opts.requestId;
       return chatMessages(messages, wireOpts);
     },
     async searchNotes(query, limit) {
@@ -137,12 +154,37 @@ export function makeTauriHost(
       // through read_file). rankNotes stays as the fallback so the browser twin
       // (and a search error) still answer from the listing.
       try {
-        const hits = await corpusSearch(query, limit);
-        const readable = await aiReadableHits(
-          hits.filter((hit) => hit.kind === "note"),
-          model,
+        // corpus_search reads titles and bodies; the user's FOLDERS are a
+        // signal it can't see, so a one-word query also collects the notes
+        // filed under a matching area (2026-08-01 — "people" never reached
+        // wiki/people/**, and the model answered from an index note's
+        // metadata). corpusList rides the same cached walk search does.
+        const wantsFolders = folderQuery(query);
+        const [hits, listed] = await Promise.all([
+          corpusSearch(query, limit),
+          wantsFolders ? corpusList().then((l) => l.notes) : Promise.resolve([]),
+        ]);
+        const found = hits.filter((hit) => hit.kind === "note");
+        const byFolder = wantsFolders ? folderHits(listed, query, limit) : [];
+        // ONE batched readability probe over BOTH lanes (perf audit #4) — a
+        // second probe would double the IPC on every one-word search
+        const permitted = new Set(
+          (await aiReadableHits([...found.map((h) => ({ id: h.id })), ...byFolder], model)).map(
+            (hit) => hit.id,
+          ),
         );
-        return readable.map((h) => ({ id: h.id, title: h.title, snippet: h.snippet, folder: h.folderId }));
+        const ranked = found
+          .filter((h) => permitted.has(h.id))
+          .map((h) => ({
+            hit: { id: h.id, title: h.title, snippet: h.snippet, folder: h.folderId },
+            rank: h.rank,
+          }));
+        if (!wantsFolders) return ranked.map((r) => r.hit);
+        return mergeFolderHits(
+          ranked,
+          byFolder.filter((h) => permitted.has(h.id)),
+          limit,
+        );
       } catch {
         const { notes } = await corpusList();
         const ranked = rankNotes(notes, query, limit);
@@ -248,6 +290,9 @@ export function makeTauriHost(
         title: hit.title,
         snippet: hit.snippet,
         source: "note" as const,
+        // the roster marker rides this lane too (2026-08-01) — corpus hits
+        // carry the folder, so the area index is identifiable here as well
+        ...(isAreaIndex(hit.title, hit.folderId) ? { role: "area-index" as const } : {}),
       }));
       const instance = activeInstance(await loadConfig());
       if (!instance) return noteHits.slice(0, limit);

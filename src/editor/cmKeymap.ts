@@ -3,9 +3,9 @@
 // through activeEditor()). Mirrors the old EditorSurface grammar exactly:
 //   Enter   — carry the list marker onto the next line; on an EMPTY item clear
 //             it (the exit ramp); numbered lists count up.
-//   Tab     — indent (nest a list) by 2 spaces; only LIST lines nest, a plain
-//             line gets a soft 2-space tab (the old "Tab on a paragraph shoved
-//             invisible spaces and felt glitchy" is gone).
+//   Tab     — indent the LINE by 2 spaces (a list line nests); only fenced code
+//             gets a soft 2-space tab at the caret, since indentation inside a
+//             fence is the user's code.
 //   ⇧Tab    — outdent up to 2 leading spaces.
 //   Space   — "[ ]"/"[]" at line start becomes a task.
 //   In a TABLE (Seth, 2026-07-01): Tab/⇧Tab hop to the next/previous cell
@@ -14,7 +14,7 @@
 //   the last row exits below the table — so the pipes never need
 //   hand-navigation and Enter can't split a row.
 
-import { EditorSelection, type EditorState, type Line } from "@codemirror/state";
+import { EditorSelection, type EditorState, type Line, type TransactionSpec } from "@codemirror/state";
 import type { Command, EditorView, KeyBinding } from "@codemirror/view";
 import { lineInFence, scanFences } from "./fences";
 import {
@@ -128,20 +128,27 @@ const tabIndent: Command = (view) => {
     view.dispatch({ changes, userEvent: "input.indent" });
     return true;
   }
-  // a list line nests; a plain (or fenced-code) line gets a soft tab at the caret
-  if (!inFence(view, startLine) && listPrefixOf(startLine.text)) {
-    const indent = leadingIndent(startLine.text);
-    view.dispatch({
-      changes: {
-        from: startLine.from,
-        to: startLine.from + indent.length,
-        insert: `  ${indent.replace(/\t/g, "  ")}`,
-      },
-      userEvent: "input.indent",
-    });
-  } else {
+  // fenced code is grammar-free — indentation there is the user's code, so Tab
+  // stays a soft tab at the caret
+  if (inFence(view, startLine)) {
     view.dispatch(state.replaceSelection("  "));
+    return true;
   }
+  // every other line INDENTS (list or prose): ⇧Tab has always outdented any
+  // line, so Tab has to be its mirror. Shoving two spaces in at the caret was
+  // the bug Seth kept hitting (2026-08-01) — typing "test" and then pressing Tab
+  // left "test  ", and the "- " typed next stranded at the end ("test  - ",
+  // rendered literally, no bullet) instead of nesting the line.
+  const indent = leadingIndent(startLine.text);
+  const insert = `  ${indent.replace(/\t/g, "  ")}`;
+  const spec: TransactionSpec = {
+    changes: { from: startLine.from, to: startLine.from + indent.length, insert },
+    userEvent: "input.indent",
+  };
+  // the caret rides the shift — an insertion AT the caret (column 0, or an empty
+  // line) would otherwise strand it BEFORE the new indent
+  if (range.empty) spec.selection = EditorSelection.cursor(range.head + insert.length - indent.length);
+  view.dispatch(spec);
   return true;
 };
 

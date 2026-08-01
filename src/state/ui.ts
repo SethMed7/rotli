@@ -56,6 +56,20 @@ export function clampChatSidebarLimit(n: unknown): number {
   return typeof n === "number" && CHAT_SIDEBAR_LIMITS.includes(n) ? n : DEFAULT_CHAT_SIDEBAR_LIMIT;
 }
 
+/** The per-chat key every chat-scoped map uses: the saved slug, or a
+ * PANE-scoped session key while the chat is still unsaved (never a shared ""
+ * key — that leaked one chat's choice into every future fresh chat, #7). */
+export function chatKey(slug: string | null, paneId: string): string {
+  return slug ?? `unsaved:${paneId}`;
+}
+
+/** Which model a chat runs on: its own pick, else the new-chat seed. Pure
+ * (exported for tests) — a chat that has never been pinned inherits, a chat
+ * that has been pinned is immune to picks made in other panes. */
+export function chatModelFor(map: Record<string, string>, key: string, seed: string | null): string | null {
+  return map[key] ?? seed;
+}
+
 /** The folders rail selection: the two smart rows or a real folder id. */
 export const ALL_NOTES = "all";
 export const RECENT = "recent";
@@ -322,10 +336,21 @@ interface UiState {
   userName: string;
   setUserName: (name: string) => void;
 
-  /** The on-device model id the Chat surface sends to, picked from the memex-ai
-   * store (~/.memex/ai/registry.json). null = use the store's default. Persisted. */
+  /** The model a BRAND-NEW chat starts on — the last model picked anywhere.
+   * null = the model store's own default. A chat that has made (or inherited)
+   * its own pick reads `chatModel` below instead; this is only the seed.
+   * Persisted. */
   chatModelId: string | null;
   setChatModelId: (id: string | null) => void;
+  /** Per-chat model pick (Seth, 2026-08-01: two chat panes must be able to run
+   * different models at once), keyed exactly like chatWeb — the chat slug, or
+   * "unsaved:<paneId>" until the first send binds it. Missing key = the
+   * `chatModelId` seed; the chat surface pins its own entry as soon as the
+   * model catalog settles, so a pick in one pane can never move another pane's
+   * chat. Persisted (unsaved keys excluded, like every per-chat map). */
+  chatModel: Record<string, string>;
+  setChatModel: (key: string, id: string) => void;
+  clearChatModel: (key: string) => void;
   /** Per-chat web-search toggle (the composer globe), keyed by chat slug. Off by
    * default; only an enabled chat may use the web_search/web_fetch tools. Persisted —
    * except the session-scoped "unsaved:<paneId>" keys: a not-yet-saved chat's choice
@@ -611,6 +636,15 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   chatModelId: null,
   setChatModelId: (id) => set({ chatModelId: id }),
+  chatModel: {},
+  setChatModel: (key, id) =>
+    set((s) => (s.chatModel[key] === id ? s : { chatModel: { ...s.chatModel, [key]: id } })),
+  clearChatModel: (key) =>
+    set((s) => {
+      if (!(key in s.chatModel)) return s;
+      const { [key]: _gone, ...rest } = s.chatModel;
+      return { chatModel: rest };
+    }),
   chatWeb: {},
   setChatWeb: (slug, on) => set((s) => ({ chatWeb: { ...s.chatWeb, [slug]: on } })),
   clearChatWeb: (key) =>

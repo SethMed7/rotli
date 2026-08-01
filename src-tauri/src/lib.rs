@@ -14,6 +14,7 @@
 mod board;
 mod breve;
 mod chat;
+mod compute;
 mod containment;
 mod corpus;
 mod document_conversion;
@@ -1170,6 +1171,7 @@ pub fn run() {
         .manage(QuitFlush { pending: Mutex::new(0), cv: Condvar::new() })
         .manage(provider::ProviderState::default())
         .manage(localmodel::LocalModelState::default())
+        .manage(compute::ComputeState::default())
         // the app-menu ⌘Q replacement (see setup) — tray menu events have their
         // own handler; the ids are distinct so double-dispatch can't double-quit
         .on_menu_event(|app, event| {
@@ -1280,6 +1282,9 @@ pub fn run() {
             localmodel::local_model_default,
             localmodel::local_model_uninstall,
             localmodel::system_profile,
+            compute::local_queue_status,
+            compute::local_queue_prioritize,
+            compute::local_queue_cancel,
             keychain::secret_store,
             keychain::secret_exists,
             keychain::secret_delete,
@@ -1427,6 +1432,19 @@ pub fn run() {
                     eprintln!("rotli: Breve scheduler unavailable ({e})");
                 }
             }
+            // The local-compute queue narrates itself: every admission, wait,
+            // prioritize and cancel emits the whole snapshot, so the chat
+            // surface renders a queued message's honest state instead of
+            // inferring it (docs/design/local-compute-guardrails.md).
+            {
+                let queue_app = app.handle().clone();
+                app.state::<compute::ComputeState>().0.install_sink(Box::new(
+                    move |v: serde_json::Value| {
+                        let _ = queue_app.emit_to("main", "rotli:local-queue", v);
+                    },
+                ));
+            }
+
             // Manage the handle either way (the commands must answer), but only
             // spawn the worker when a memex root exists — organizer_status then
             // reports running:false on a plain corpus.

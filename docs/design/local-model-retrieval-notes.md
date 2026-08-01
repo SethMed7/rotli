@@ -393,14 +393,45 @@ Both are pinned in `src/ai/prompt.test.ts`; before/after deltas on the
 affected sweep cases are recorded in §2 (net +1 correct, +1 partial, no
 regressions — real but marginal, which is the point: the rest needs code).
 
+### Shipped 2026-08-01 — F2 (the live roster failure)
+
+Seth hit F2 in the app: "give me a list of the people in my vault" answered
+with four names, one of them a *project*. The saved transcript shows why —
+gemma read `wiki/people/README.md` (a note whose body names nobody) and
+emitted its frontmatter `links:` line verbatim, project included. Three
+things shipped together, reproduced first as the `roster` case in
+`scripts/eval-local-chat.ts` (whose fixture now carries a real vault's shape:
+a name-free README decoy beside the Filer's `_index`, 40+ filler notes so the
+map truncates, corpus_search's substring/rank ranking, and ULID ids):
+
+1. **`role:"area-index"` on search hits** (§4.1) — `isAreaIndex` marks the
+   hit whose title IS its area name (the Filer's generated `_index.md`), on
+   both `search_notes` and `search_memory`, and those hits now lead the result
+   list. Both prompts say what the role means. Nothing else in a hit
+   distinguished the roster from the README beside it.
+2. **Folder-aware `search_notes`** — `corpus_search` matches title and body
+   only, so "people" never reached the notes *in* `wiki/people/**`. A
+   one-word query now also collects the area's members (`folderHits`), spliced
+   between title hits and body hits (`mergeFolderHits`) — the title > folder >
+   body weighting `rankNotes` always had, restored on the Rust path.
+3. **`links:` framed on read** (§4.2's hazard, kept cheaper than a rewrite) —
+   `frameLinksMetadata` annotates that one metadata line in read
+   observations, the same "name the hazard in the observation" move
+   `truncateBody` makes. It keeps `key: value` shape, so the update_note
+   write boundary still strips it.
+
+Live eval, gemma-3-12b, the new realistic fixture: roster+people 0/2 before,
+2/2 after; the other three cases unchanged. §4.1's other half (carrying
+`summary` on hits) and §4.3's map work are still open.
+
 ### 0.47-sized (each tied to an observed failure)
 
 - **Tokenized AND search in Rust `corpus_search`** (F1) — "breve rotli" must
   match a note titled "Breve → rotli". Prompt teaching only shrinks the
   failure; the engine is the fix. Keep exact-phrase as a quoted operator.
-- **Summary-carrying hits + `role:"area-index"`** (F2, §4.1) — surface the
-  Filer's existing `summary` on `search_notes`/`search_memory` hits and mark
-  generated `_index` notes; budget cost is bounded by `snippetChars`.
+- **Summary-carrying hits** (F2, §4.1) — surface the Filer's existing
+  `summary` on `search_notes`/`search_memory` hits; budget cost is bounded by
+  `snippetChars`. (The `role:"area-index"` half shipped 2026-08-01, above.)
 - **Map shape work** (§4.3): lifecycle filter (no Trash), serial-area
   compression (71 same-shaped briefs → one line), area-index pinning. All in
   `modelMap.ts` + the host's list mapping — unit-testable pure code.

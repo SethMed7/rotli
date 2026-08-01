@@ -25,6 +25,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { parseBlock } from "./render";
+import { CHECK_EM, listStyle } from "./listGeometry";
 import { scanFences } from "./fences";
 import { lineInTable, scanTables } from "./tables";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
@@ -572,13 +573,6 @@ function scanInline(
   }
 }
 
-const HANG_EM = 1.3;
-
-function listStyle(depth: number, extra = 0): string {
-  const hang = HANG_EM + extra;
-  return `padding-left:${depth * HANG_EM + hang}em;text-indent:-${hang}em`;
-}
-
 function hidePrefix(
   from: number,
   to: number,
@@ -701,7 +695,8 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
           decos.push(
             Decoration.line({
               class: block.done ? "rotli-task done" : "rotli-task",
-              attributes: { style: listStyle(depth) },
+              // a checkbox hangs in a wider column than a glyph
+              attributes: { style: listStyle(depth, CHECK_EM) },
             }).range(ls),
           );
           hidePrefix(ls, prefixEnd, new CheckboxWidget(!!block.done), decos, atomics);

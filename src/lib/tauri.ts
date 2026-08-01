@@ -390,6 +390,10 @@ export function chatMessages(
     formatJson?: boolean;
     temperature?: number;
     maxTokens?: number;
+    /** The turn's cancel key. On a LOCAL endpoint it also keys the compute
+     * queue — the id a queued message is prioritized or cancelled by
+     * (docs/design/local-compute-guardrails.md). Remote lanes ignore it. */
+    requestId?: string;
   },
 ): Promise<string> {
   return aiInvoke("chat_messages", {
@@ -400,7 +404,51 @@ export function chatMessages(
     formatJson: opts?.formatJson,
     temperature: opts?.temperature,
     maxTokens: opts?.maxTokens,
+    requestId: opts?.requestId,
   });
+}
+
+// ── local compute guardrails (docs/design/local-compute-guardrails.md) ───────
+
+/** One local request the guardrails are tracking. `reason` is the honest,
+ * user-facing copy for a waiting entry (empty while running). */
+export interface LocalQueueEntry {
+  requestId: string;
+  model: string;
+  reason: string;
+  position: number;
+}
+
+export interface LocalQueueSnapshot {
+  waiting: LocalQueueEntry[];
+  running: LocalQueueEntry[];
+}
+
+/** The live local-compute queue — hydrate on mount, then follow
+ * `onLocalQueue`. Concurrent local chats are allowed; what's gated is each
+ * inference request, on MEASURED headroom rather than a chat count. */
+export function localQueueStatus(): Promise<LocalQueueSnapshot> {
+  return aiInvoke("local_queue_status");
+}
+
+/** Jump a queued local message to the front of the line. */
+export function localQueuePrioritize(requestId: string): Promise<void> {
+  return aiInvoke("local_queue_prioritize", { requestId });
+}
+
+/** Take a queued local message back (Stop, or closing the chat). A message
+ * that's already generating is unaffected — that run is orphaned instead. */
+export function localQueueCancel(requestId: string): Promise<void> {
+  return aiInvoke("local_queue_cancel", { requestId });
+}
+
+/** Rust → main window: the local-compute queue changed (an admission, a new
+ * wait, a prioritize, a cancel). Carries the whole snapshot, so the surface
+ * never has to infer state. */
+export function onLocalQueue(cb: (q: LocalQueueSnapshot) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen<LocalQueueSnapshot>("rotli:local-queue", (e) => cb(e.payload));
+  return () => void unlisten.then((fn) => fn());
 }
 
 // ── connected models (the subscription CLIs + the Gemini key lane) ───────────

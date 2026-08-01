@@ -35,6 +35,10 @@ export interface MemoryHit {
   title: string;
   snippet: string;
   source: "note" | "chat";
+  /** "area-index" — the Filer's generated `_index` note for an area, whose body
+   * is the one complete roster of what's filed there. Nothing else in a hit
+   * distinguishes it from the area's hand-written README (2026-08-01). */
+  role?: "area-index";
 }
 
 /** A web result surfaced by web_search. */
