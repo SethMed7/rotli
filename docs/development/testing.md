@@ -15,8 +15,8 @@ direction, runtime wiring, and owning documentation must agree.
 | `bun run test:tooling` | Fixture tests that prove repository linters detect forbidden code shapes |
 | `bun run test:e2e` | Playwright regression layer — drives the real browser twin (chromium) against `vite dev`'s seeded demo corpus |
 | `bun run test:e2e:ui` | The same specs in Playwright's interactive UI runner, for local debugging |
-| `bun run check:e2e-types` | Strict-typecheck `e2e/` and `playwright.config.ts` (`tsgo -p tsconfig.e2e.json`) — not folded into the root `tsgo --noEmit` because that config's `include` is `src` only |
-| `bun run check:breve-runtime` | Bundle every runtime entry point, strict-typecheck the runtime (`tsgo -p breve-runtime`), validate shell syntax, and verify scheduler/delivery wiring |
+| `bun run check:e2e-types` | Strict-typecheck `e2e/` and `playwright.config.ts` (`tsc -p tsconfig.e2e.json`) — not folded into the root `tsc --noEmit` because that config's `include` is `src` only |
+| `bun run check:breve-runtime` | Bundle every runtime entry point, strict-typecheck the runtime (`tsc -p breve-runtime`), validate shell syntax, and verify scheduler/delivery wiring |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Rust lint gate — warnings fail CI |
 | `bun run test:regression` | All Bun behavior tests plus Breve runtime and design-system checks |
 | `bun run check` | Required JavaScript/TypeScript gate: lint plus the regression suite |
@@ -31,8 +31,8 @@ stays complete — every `package.json` script must appear in this document):
 | `bun run dev` / `bun run preview` | Vite dev server against the seeded demo corpus / preview of the built bundle |
 | `bun run tauri dev` | The native desktop app (`bun run tauri` is the Tauri CLI passthrough) |
 | `bun run format` / `bun run format:check` | oxfmt write / verify over `src`, `e2e`, `scripts`, `playwright.config.ts` — the same trees the pre-commit hook enforces, with import sorting on (`breve-runtime` keeps hand-aligned tables and stays outside). `format:check` rides the `lint` chain |
-| `bun run typecheck` | The TypeScript compiler over `src` (`tsgo --noEmit`, the Go-native port) — the type-correctness source of truth, first step of `lint` (e2e and breve-runtime have their own tsgo lanes: `check:e2e-types`, `check:breve-runtime`) |
-| `bun run typecheck:tsc` | The same check on stock `tsc` — the escape hatch when `tsgo` (a preview compiler) disagrees with the JavaScript implementation; both must stay green |
+| `bun run typecheck` | The TypeScript compiler over `src` (`tsc --noEmit` — `typescript@7`, the Go port) — the type-correctness source of truth, first step of `lint` (e2e and breve-runtime have their own lanes: `check:e2e-types`, `check:breve-runtime`) |
+| `bun run typecheck:tsc6` | All three scopes re-checked on `typescript6` (`npm:typescript@~6.0.3`, the last JavaScript TypeScript) — the independent second implementation, not merely a slower one; must stay green alongside the `tsc` lanes. Called by explicit path because `typescript@7` owns `node_modules/.bin/tsc` |
 | `bun run lint:oxlint` | The oxlint layer alone (`src`, `e2e`, `breve-runtime`, `playwright.config.ts`; oxlint's `correctness` category plus the hand-picked rules, type-aware via `oxlint-tsgolint`) — part of `lint` |
 | `bun run check:knip` | Dead-weight gate — unreferenced files, exports, and dependencies, plus undeclared imports and binaries (`knip.json`); part of `lint` |
 | `bun run check:dup` | Advisory duplication miner over `scripts/dup-judgments.json` — run on demand, deliberately not a gate |

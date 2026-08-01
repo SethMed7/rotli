@@ -1,0 +1,8 @@
+{
+  // typescript@7 is the Go port and ships no tsserver.js, so the stock
+  // "Use Workspace Version" target (node_modules/typescript/lib) cannot serve an
+  // editor. Point the workspace TS server at the npm-aliased TypeScript 6 —
+  // the last JS implementation, installed on purpose as the second opinion
+  // behind `typecheck:tsc6`. See CONTRIBUTING.md ("Two TypeScripts, on purpose").
+  "typescript.tsdk": "node_modules/typescript6/lib"
+}

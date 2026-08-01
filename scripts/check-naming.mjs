@@ -9,7 +9,11 @@
 // Scope matches the old rule: src/**/*.{ts,tsx} only.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join, relative } from "node:path";
-import ts from "typescript";
+// `typescript6` is the npm-aliased TypeScript 6 (see CONTRIBUTING): the last JS
+// implementation, and the only one that still exports the syntactic AST API at
+// the package root. typescript@7 is the Go port — its `exports["."]` resolves to
+// lib/version.cjs, so a default import there has no `createSourceFile` at all.
+import ts from "typescript6";
 
 const root = process.env.ROTLI_CHECK_ROOT ?? process.cwd();
 const violations = [];

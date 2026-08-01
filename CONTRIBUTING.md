@@ -100,18 +100,46 @@ exceed 100 columns. `cargo clippy --all-targets -- -D warnings` is the Rust
 gate; do not run `cargo fmt` or commit its output.
 
 Type correctness and linting are separate layers: `bun run typecheck`
-(`tsgo --noEmit`, the compiler as source of truth — first step of `lint`, with
-`check:e2e-types` and `check:breve-runtime` as the sibling tsgo lanes for
-their trees) and the oxlint layer below. Editors get the same type feedback
-live from the TS language server, independent of the lint gate.
-`tsgo` is `@typescript/native-preview`, the Go port of `tsc` (measured on this
-repo 2026-08-01: 3.5s → 0.8s over `src`). It is a PREVIEW compiler, so stock
-`typescript` — the JavaScript implementation, held at 6.x for the reasons in
-the pin note below — stays installed and `bun run typecheck:tsc` runs the
-identical check on it. The point of that second lane is that it is an
-INDEPENDENT implementation, not merely a slower one; both must stay green.
-When the two disagree, fix the code unless the divergence is demonstrably a
-`tsgo` bug, and record it here.
+(`tsc --noEmit`, the compiler as source of truth — first step of `lint`, with
+`check:e2e-types` and `check:breve-runtime` as the sibling lanes for their
+trees) and the oxlint layer below.
+`tsc` is `typescript@7`, the Go port, which since 7.0.0 IS stock TypeScript
+rather than a preview alongside it. The `@typescript/native-preview` (`tsgo`)
+package was retired 2026-08-01 when `typescript@7.0.2` shipped the same engine
+under the name everything already resolves: measured on this repo, `tsgo`
+0.33s vs `typescript@7` 0.35s over `src` — the same number twice — against
+3.5s for the JavaScript implementation. Both accept `-p` and `--noEmit`
+identically and both were verified clean on all three tsconfigs before the
+swap.
+
+**Two TypeScripts, on purpose.** `devDependencies` carries `typescript`
+(`~7.0.2`) AND `typescript6` (`npm:typescript@~6.0.3`), and the second one is
+not legacy debt — it is load-bearing in three places:
+
+- **The second opinion.** `bun run typecheck:tsc6` (plus `:e2e` and `:breve`)
+  runs the same three checks on the last JavaScript TypeScript. A cross-check
+  is only worth its runtime if it is an INDEPENDENT implementation; now that
+  `tsc` is the Go port, 6.x is the only thing left that qualifies. All lanes
+  must stay green. When the two disagree, fix the code unless the divergence is
+  demonstrably a compiler bug, and record it here.
+- **`check:naming`** imports the syntactic AST API from `typescript6`.
+  `typescript@7`'s `exports["."]` resolves to `lib/version.cjs`, so a default
+  import yields `{version, versionMajorMinor}` and no `createSourceFile` at
+  all; the AST moved to an explicitly `unstable/` subpath. Importing the alias
+  keeps the guard on a stable API instead of chasing an unstable one.
+- **Editors.** `typescript@7` ships no `tsserver`, so VS Code's stock "Use
+  Workspace Version" target (`node_modules/typescript/lib`) cannot serve an
+  editor at all. `.vscode/settings.json` therefore points `typescript.tsdk` at
+  `node_modules/typescript6/lib`, which does ship `tsserver.js` (verified
+  responding at 6.0.3). Editors get 6.x language service; the gate runs 7.
+  That split is expected on the 7 line, not a misconfiguration — if you want
+  7-native editor feedback, that is the `@typescript/native-preview` VS Code
+  extension's job, not the workspace TS version's.
+
+Note both packages install a `tsc` bin and `typescript` wins
+`node_modules/.bin/tsc`, which is why the 6 lanes call
+`node_modules/typescript6/bin/tsc` by explicit path rather than relying on
+`PATH` order.
 Dead weight is mechanical, not a review chore: `check:knip` (`knip.json`) fails
 the `lint` chain on an unreferenced file, export, or dependency and on an import
 or binary that was never declared. It runs with `ignoreExportsUsedInFile`, so
@@ -143,28 +171,20 @@ Identifier casing (typescript-eslint's `naming-convention`, adopted
 2026-07-18 at a measured 0 real violations) has no oxlint equivalent and is
 held by `scripts/check-naming.mjs` (`check:naming`). Propose additions in a
 PR; the config must not grow silently.
-TypeScript moved `~5.8.3` → `~6.0.3` on 2026-08-01 and the bump cost zero code
-changes: all three tsc project scopes (root, `tsconfig.e2e.json`,
-`breve-runtime`), the full `lint` chain, 1010 unit / 28 tooling / 34 Breve
-tests, the build and all 61 e2e specs passed unedited. The old pin was
-justified — typescript-eslint 8.x crashed on TS 7 — but tsgolint had already
-removed that carrier, so by then only conservatism held it.
-`~6.0.3` is a deliberate stop, not a waypoint to 7. `typescript@7` is the Go
-port, which makes it a different package rather than a newer one: measured on
-7.0.2, its `exports["."]` resolves to `lib/version.cjs`, so
-`import ts from "typescript"` yields `{version, versionMajorMinor}` and nothing
-else; it ships no `tsserver` bin and no JS compiler, only per-platform native
-binaries behind `getExePath`, with the AST surface moved to an explicitly
-`unstable/` subpath. Two things here rest on 6.x being what it is. First,
-`check:naming` walks the syntactic AST via `import ts from "typescript"`
-(`createSourceFile`, `forEachChild`, `getLineAndCharacterOfPosition`) — on 7
-that import has no `createSourceFile` at all, so the guard must be ported to
-`typescript/unstable/ast` BEFORE the bump, not after the break. Second, and
-the larger one: `tsgo` is already on the 7 line (`7.0.0-dev`), so moving
-`typescript` to 7 would aim both lanes at the same Go compiler and collapse
-`typecheck:tsc` from a cross-check into a tautology. 6.0.3 is the last
-JavaScript TypeScript; hold it until the naming guard is ported and there is a
-considered answer for what supplies the second implementation.
+TypeScript went `~5.8.3` → `~6.0.3` → `~7.0.2` across two PRs on 2026-08-01,
+and neither step required a single code change: all three project scopes, the
+full `lint` chain, 1010 unit / 28 tooling / 34 Breve tests, the build and all
+61 e2e specs passed unedited on both. The `~5.8.3` pin had been justified by
+typescript-eslint 8.x crashing on TS 7, but tsgolint removed that carrier, so
+by the end only conservatism held it.
+What the 7 step actually cost was not compile errors but the assumption that
+`typescript` is one package with one job. It is now two — see "Two TypeScripts,
+on purpose" above — because on the 7 line the compiler, the language service,
+and the programmatic AST stopped shipping together. `~7.0.2` is the gate and
+what editors and generic resolution see; `typescript6` supplies the
+independent cross-check, the `check:naming` AST, and the editor's tsserver.
+Keep both pins `~` (patch-only) and re-measure the three roles above before
+either moves.
 The old "Biome as the long-term two-package footprint" plan is superseded by
 this migration.
 `breve-runtime/` is IN the lint scope as of 2026-08-01 — its long-standing
