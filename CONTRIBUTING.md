@@ -100,10 +100,20 @@ exceed 100 columns. `cargo clippy --all-targets -- -D warnings` is the Rust
 gate; do not run `cargo fmt` or commit its output.
 
 Type correctness and linting are separate layers: `bun run typecheck`
-(`tsc --noEmit`, the compiler as source of truth — first step of `lint`, with
-`check:e2e-types` and `check:breve-runtime` as the sibling tsc lanes for
+(`tsgo --noEmit`, the compiler as source of truth — first step of `lint`, with
+`check:e2e-types` and `check:breve-runtime` as the sibling tsgo lanes for
 their trees) and the oxlint layer below. Editors get the same type feedback
 live from the TS language server, independent of the lint gate.
+`tsgo` is `@typescript/native-preview`, the Go port of `tsc` (measured on this
+repo 2026-08-01: 3.5s → 0.8s over `src`). It is a PREVIEW compiler, so stock
+`typescript` stays installed and `bun run typecheck:tsc` runs the identical
+check on it — both must stay green. When the two disagree, fix the code unless
+the divergence is demonstrably a `tsgo` bug, and record it here.
+Dead weight is mechanical, not a review chore: `check:knip` (`knip.json`) fails
+the `lint` chain on an unreferenced file, export, or dependency and on an import
+or binary that was never declared. It runs with `ignoreExportsUsedInFile`, so
+"exported but only read inside its own module" is a style call left to review,
+while "referenced nowhere at all" is a gate.
 Lint rules live in `.oxlintrc.json` (oxlint; migrated from ESLint 2026-07-31 —
 measured on this repo at 7.0s ESLint vs ~0.5s oxlint `--type-aware`) and are
 deliberately minimal (floating/misused promises, `no-explicit-any`,
@@ -111,7 +121,9 @@ react-hooks, and a ban on bun:test's `it` alias: the suite spells every test
 `test(...)`). The type-aware rules run through the `oxlint-tsgolint` sidecar,
 which is preview-quality: it misreads comma-expression arrow bodies as
 misused promises (three suppressed sites in `src/state/persist.test.ts` —
-re-measure on oxlint upgrades and drop the suppressions when fixed).
+re-measure on oxlint upgrades and drop the suppressions when fixed; still
+reproducing 2026-08-01 on oxlint 1.76.0 + oxlint-tsgolint 7.0.2001, both
+latest, so the three stay).
 Identifier casing (typescript-eslint's `naming-convention`, adopted
 2026-07-18 at a measured 0 real violations) has no oxlint equivalent and is
 held by `scripts/check-naming.mjs` (`check:naming`). Propose additions in a

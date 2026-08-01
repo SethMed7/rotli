@@ -113,6 +113,7 @@ if (existsSync(join(root, "package.json"))) {
       "bun run check:structure",
       "bun run check:docs",
       "bun run check:naming",
+      "bun run check:knip",
       "bun run lint:oxlint",
     ],
     "test:regression": [

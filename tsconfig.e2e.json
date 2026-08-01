@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
@@ -13,7 +13,11 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // playwright.config.ts reads process.env (CI detection) and runs under Node.
+    // tsc used to pick @types/node up implicitly off node_modules/@types; tsgo
+    // does not, so the dependency is declared here instead of relied on.
+    "types": ["node"]
   },
   "include": ["playwright.config.ts", "e2e/**/*.ts"]
 }

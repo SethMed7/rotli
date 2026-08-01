@@ -1,6 +1,23 @@
+// `vite` resolves to rolldown-vite (see package.json) — the Rust bundler behind
+// Vite, measured on this repo 2026-08-01 at 10.4s → 1.1s for a production build
+// with both custom plugins below still executing.
+//
+// MINIFIER: rolldown-vite defaults to oxc's minifier and `build.minify` is left
+// on that default deliberately, not by omission. Verified against the esbuild
+// baseline on the same tree: gzipped JS 4,941,746 → 4,866,582 bytes (−1.5%),
+// gzipped CSS 87,672 → 86,915 (−0.9%), one katex chunk either way, startup graph
+// 1002.7 → 998.0 KiB, e2e 56/56. esbuild is no longer installed at all (it is an
+// optional peer of rolldown-vite), so pinning back to it would mean re-adding a
+// dependency — and its advisory — for a strictly larger bundle.
 import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+// plugin-react-oxc is the Babel-free React plugin for the Vite 7 line; it prints
+// an upstream deprecation notice because the same transform now ships inside
+// @vitejs/plugin-react 6, which requires Vite 8. Revisit together with a Vite 8
+// upgrade — on Vite 7 this is still the only Babel-free option. Dropping Babel
+// also drops the React Compiler until oxc ships native support (accepted; the
+// memoization findings were hand-fixed in #36/#37).
+import react from "@vitejs/plugin-react-oxc";
 import {
   bundleBudgetViolations,
   LAZY_LOCALE_STUB_ID,

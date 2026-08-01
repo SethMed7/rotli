@@ -587,17 +587,6 @@ export function TrashGlyph(props: GlyphProps) {
   );
 }
 
-/** Inbox = email section header — a simple envelope (the word "Inbox" means mail
- * now; the note-capture tray keeps InboxGlyph, relabeled "Capture"). */
-export function MailGlyph(props: GlyphProps) {
-  return (
-    <Glyph {...props}>
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-      <path d="m3.5 7 8.5 6 8.5-6" />
-    </Glyph>
-  );
-}
-
 /** Chat section header — a rounded speech bubble. */
 export function ChatGlyph(props: GlyphProps) {
   return (

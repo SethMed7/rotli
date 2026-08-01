@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/**/*.test.ts",
+    "e2e/**/*.spec.ts",
+    "scripts/*.mjs",
+    "scripts/*.test.ts",
+    "scripts/eval-*.ts",
+    "breve-runtime/scripts/*.ts",
+    "breve-runtime/tests/*.ts"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts", "scripts/**/*.{ts,mjs}", "breve-runtime/**/*.ts"],
+  "ignoreBinaries": ["mktemp"],
+  "ignoreExportsUsedInFile": true
+}

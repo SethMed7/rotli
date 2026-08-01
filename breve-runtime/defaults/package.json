@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@huggingface/transformers": "^3.5.1",
     "imapflow": "^1.4.0",
     "kokoro-js": "^1.2.1"
   },

@@ -16,15 +16,7 @@ import type {
   SheetModelTab,
 } from "./types";
 
-export type {
-  SheetBorderSide,
-  SheetModel,
-  SheetModelCell,
-  SheetModelMerge,
-  SheetModelStyle,
-  SheetModelTab,
-  SheetThemeMode,
-} from "./types";
+export type { SheetModel } from "./types";
 
 // ── unit + enum maps ──────────────────────────────────────────────────────────
 

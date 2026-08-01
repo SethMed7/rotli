@@ -163,7 +163,7 @@ Contributing or working with an AI coding tool? Start with
 [`CONTRIBUTING.md`](CONTRIBUTING.md), [`AGENTS.md`](AGENTS.md), and the
 [`documentation map`](docs/README.md).
 
-**Stack** — Tauri v2 · React 18 · Vite · TypeScript strict · Bun · Zustand + TanStack Query · plain CSS driven entirely by the in-repo brand kit (`src/brand/`, v1.0.0 — the single source of truth for colors, type, and logo, enforced by `bun run check:hex`). Local-first is the architecture, not a feature: nothing phones home, nothing needs an account, offline is the default.
+**Stack** — Tauri v2 · React 18 · Vite (rolldown) · TypeScript strict · Bun · Zustand + TanStack Query · plain CSS driven entirely by the in-repo brand kit (`src/brand/`, v1.0.0 — the single source of truth for colors, type, and logo, enforced by `bun run check:hex`). Local-first is the architecture, not a feature: nothing phones home, nothing needs an account, offline is the default.
 
 ## Where it's going
 

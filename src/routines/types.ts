@@ -1,22 +1,11 @@
 // Routines — the scheduled jobs rotli inherits from Breve (briefs, creator/page
-// watchers, the self-heal "doctor", and the always-on Signal listener). These
-// are the pure frontend mirrors of the Rotli-managed runtime contract.
+// watchers, the self-heal "doctor", and the always-on Signal listener). Only the
+// pure scheduling shape lives here; the routine record itself is the Tauri
+// adapter's contract type (BreveRoutine* in src/lib/tauri.ts), so this file does
+// not keep a second, drifting mirror of it.
 //
 // The live supervisor/runtime lives in src-tauri/src/routines.rs and
 // breve-runtime/scripts/rotli-scheduler.ts.
-
-/** Which Breve subsystem a routine drives. */
-export type RoutineKind = "brief" | "creators" | "watchers" | "doctor" | "signal";
-
-/** The three daily brief drops (verbatim from Breve — see breve-merge.md §2.1). */
-export type BriefKind = "morning" | "lunch" | "night";
-
-/**
- * Delivery lanes a routine may use. Opt-in + detected like the AI-Model lanes
- * (breve-merge.md §11.3); `inApp` is always available (the brief becomes a memex
- * note regardless).
- */
-export type Lane = "signal" | "email" | "inApp";
 
 /**
  * When a routine fires.
@@ -30,12 +19,3 @@ export type Lane = "signal" | "email" | "inApp";
 export type Schedule =
   | { kind: "dailyAt"; hhmm: string; leadMinutes: number }
   | { kind: "everySecs"; secs: number };
-
-/** One scheduled job. */
-export interface Routine {
-  id: string;
-  kind: RoutineKind;
-  schedule: Schedule;
-  lanes: Lane[];
-  enabled: boolean;
-}

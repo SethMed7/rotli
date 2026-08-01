@@ -163,9 +163,12 @@ The 2026-07 audit escalated five product-behavior findings. Disposition:
    step caps, secure-note exclusion, and secret scan remain independent layers.
    Paraphrased semantic leakage is a residual risk for the quarterly review.
 
-### Supply-chain advisories (transitive-only, tracked; reviewed 2026-07-21)
+### Supply-chain advisories (transitive-only, tracked; reviewed 2026-08-01)
 
-All are outside Rotli's own `src/`. The current `bun audit` reports twelve findings:
+All are outside Rotli's own `src/`. The current `bun audit` reports sixteen
+findings (9 high, 6 moderate, 1 low) — one fewer than before the rolldown-vite
+migration, which removed the esbuild carrier outright and introduced no new
+advisory of its own:
 
 - **DOMPurify** ≤ 3.4.11 (low custom-element sanitizer callback bypass) —
   through Mermaid. Rotli keeps Mermaid at `securityLevel: "strict"` and does
@@ -179,12 +182,18 @@ All are outside Rotli's own `src/`. The current `bun audit` reports twelve findi
   2026-07-31 oxlint migration).
 - **nanoid** < 3.3.8 and **uuid** < 11.1.1 (moderate) — library-internal ID
   generation through Excalidraw, Univer, Vite, exceljs, and Mermaid.
-- **sharp** < 0.35.0 (high libvips image-processing family) — through the
-  optional Kokoro/Transformers local voice stack.
+- **postcss** ≤ 8.5.17 (high, source-map path traversal) — through Vite's CSS
+  pipeline. Build-time only, over first-party stylesheets.
+- **sharp** < 0.35.0 (high libvips image-processing family) and **tar**
+  ≤ 7.5.20 (moderate uncontrolled recursion) — through the optional
+  Kokoro/Transformers local voice stack (`@huggingface/transformers` →
+  `onnxruntime-node`).
 - **immutable** < 4.3.9 (two high denial-of-service families) — through Sass in
   Excalidraw/Vite's build dependency graph.
-- **esbuild** 0.27.3–0.28.0 (low, Windows dev-server arbitrary file read) —
-  through Vite; Rotli's shipped macOS bundle does not expose the dev server.
+
+**esbuild** left the tree entirely with the 2026-08-01 rolldown-vite migration
+(rolldown-vite keeps esbuild as an *optional* peer and Rotli does not install
+it), retiring its low Windows dev-server advisory.
 
 The direct `@excalidraw/mermaid-to-excalidraw` 2.2.2 dependency is the narrow
 board-engine conversion seam. Excalidraw already supplied the same version

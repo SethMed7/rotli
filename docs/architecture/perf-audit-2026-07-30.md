@@ -181,6 +181,10 @@ ground-truth list.)
    `Promise.all` the `gcPersistedMaps` `listChats` loop.
 6. **Dead code/CSS removal** — finding 25's list (~420+ LOC) + document or
    unify the `endpointIsLocal` mirror.
+   *Status 2026-08-01: the TypeScript half of this class is now a standing
+   mechanical guard, not a periodic sweep — `check:knip` fails the `lint` chain
+   on a zero-reference export, file, or dependency and on an undeclared import.
+   Orphaned CSS is out of its reach and stays a manual item.*
 7. **Drop `@resvg/resvg-js`** — zero imports.
 
 ### Structural workstreams (0.49)

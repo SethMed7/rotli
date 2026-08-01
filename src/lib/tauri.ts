@@ -433,13 +433,6 @@ export interface LocalQueueSnapshot {
   running: LocalQueueEntry[];
 }
 
-/** The live local-compute queue — hydrate on mount, then follow
- * `onLocalQueue`. Concurrent local chats are allowed; what's gated is each
- * inference request, on MEASURED headroom rather than a chat count. */
-export function localQueueStatus(): Promise<LocalQueueSnapshot> {
-  return aiInvoke("local_queue_status");
-}
-
 /** Jump a queued local message to the front of the line. */
 export function localQueuePrioritize(requestId: string): Promise<void> {
   return aiInvoke("local_queue_prioritize", { requestId });
