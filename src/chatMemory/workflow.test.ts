@@ -21,6 +21,25 @@ describe("syncChatMemory", () => {
     expect(calls).toEqual(["create", "attach"]);
   });
 
+  test("an ATTACHED chat keeps its note even when the note can't be resolved", async () => {
+    const calls: string[] = [];
+    const repository: ChatMemoryRepository = {
+      findByStem: async () => null, // the attached note is out of this listing's reach
+      create: async (body) => (calls.push("create"), { id: "n", stem: "memory-note", body }),
+      update: async () => void calls.push("update"),
+      attach: async () => void calls.push("attach"),
+    };
+    await syncChatMemory(repository, {
+      title: "Chat",
+      chatSlug: "chat",
+      attachedStem: "the-note-this-chat-was-opened-from",
+      turns: [{ speaker: "you", text: "a turn" }],
+    });
+    // never "attach" — re-pointing would orphan the chat from its note, and the
+    // editor's chat chip lists a note's chats by exactly that pointer
+    expect(calls).toEqual(["create"]);
+  });
+
   test("updates an existing note idempotently", async () => {
     let body = "# Chat\n";
     let updates = 0;

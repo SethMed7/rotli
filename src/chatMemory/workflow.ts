@@ -58,7 +58,13 @@ export async function syncChatMemory(
   if (!note) {
     const body = mergeChatMemory("", input.title, input.chatSlug, content);
     note = await repository.create(body);
-    await repository.attach(note.stem);
+    // A chat that already points at a note KEEPS pointing at it. `attachedTo`
+    // is the note→chats link the editor's chat chip lists from; re-pointing it
+    // at a freshly written memory note orphaned every chat from the note it was
+    // opened on, so the chip listed nothing, fell through to "continue the
+    // deterministic chat", and Seth got the same chat with no picker forever
+    // (2026-08-01). Only an unattached chat adopts its memory note.
+    if (!input.attachedStem) await repository.attach(note.stem);
     return note;
   }
   const next = mergeChatMemory(note.body, input.title, input.chatSlug, content);

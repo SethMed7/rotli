@@ -19,7 +19,15 @@ import { EditorSurface } from "../editor/editorSurface";
 import { ChatSurface } from "./chatSurface";
 import { ActivitySurface } from "./activitySurface";
 import { FileSurface } from "./fileSurface";
-import { activeTabOf, leaves, refitColumns, usePanesStore } from "../state/panes";
+import {
+  MIN_PANE_HEIGHT,
+  MIN_PANE_WIDTH,
+  activeTabOf,
+  clampSplitSizes,
+  leaves,
+  refitColumns,
+  usePanesStore,
+} from "../state/panes";
 import { dispatch } from "../keys/registry";
 import type { LeafNode, PaneNode, SplitNode } from "../types";
 import { Character } from "./character";
@@ -132,9 +140,40 @@ function LeafView({ node }: { node: LeafNode }) {
   );
 }
 
+/** A split's per-child floor, as a fraction of its REAL box — never more than an
+ * even share, or a container already smaller than the floor would refuse to
+ * resize at all. Width and height carry different floors (a column needs room
+ * for a note's measure; a row needs room for a surface's fixed chrome). */
+function minFracOf(node: SplitNode, total: number): number {
+  const floorPx = node.dir === "row" ? MIN_PANE_WIDTH : MIN_PANE_HEIGHT;
+  return Math.min(floorPx / total, 1 / node.children.length);
+}
+
 function SplitView({ node }: { node: SplitNode }) {
   const setSplitSizes = usePanesStore((s) => s.setSplitSizes);
   const containerRef = useRef<HTMLDivElement>(null);
+  // The live re-fit, Seth 2026-08-01: the floors used to be enforced only at
+  // split time and during a drag, so shrinking the window — or the sidebar, or
+  // a parent split — quietly crushed a pane past the point where its own chrome
+  // fits, and surfaces started painting into the pane next door. The observer
+  // watches the split's real box and re-applies the ONE size law.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(() => {
+      const rect = container.getBoundingClientRect();
+      const total = node.dir === "row" ? rect.width : rect.height;
+      if (total <= 0) return;
+      const current = node.children.map((_, i) => node.sizes[i] ?? 1 / node.children.length);
+      const fitted = clampSplitSizes(current, minFracOf(node, total));
+      if (fitted.every((s, i) => Math.abs(s - (current[i] ?? 0)) < 0.001)) return;
+      setSplitSizes(node.id, fitted);
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+    // the tree object is replaced on every store write, so the observer always
+    // closes over the current sizes
+  }, [node, setSplitSizes]);
 
   const startDrag = (index: number) => (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -146,7 +185,7 @@ function SplitView({ node }: { node: SplitNode }) {
     if (total <= 0) return;
     const startPos = node.dir === "row" ? event.clientX : event.clientY;
     const startSizes = [...node.sizes];
-    const minFrac = Math.min((node.dir === "row" ? 320 : 160) / total, 0.5);
+    const minFrac = minFracOf(node, total);
     divider.classList.add("dragging");
     divider.setPointerCapture(event.pointerId);
 
@@ -200,7 +239,11 @@ function SplitView({ node }: { node: SplitNode }) {
           className="divider"
           role="separator"
           aria-orientation={node.dir === "row" ? "vertical" : "horizontal"}
-          title="Drag to resize — double-click to even out"
+          // aria-label, NOT title (Seth, 2026-08-01): a native tooltip on the
+          // one element you hover while judging a layout parks a yellow slab
+          // over the very content you are sizing. The resize cursor and the
+          // accent line the divider lights on hover already say "drag me".
+          aria-label="Drag to resize — double-click to even out"
           onPointerDown={startDrag(i - 1)}
           // Finder/IDE muscle memory: double-click a divider → even split
           onDoubleClick={() =>

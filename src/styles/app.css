@@ -377,10 +377,23 @@ body[data-surface="capture"] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* `safe` centering (Seth, 2026-08-01 fit sweep): a plain `center` pushes the
+     stage's top out of the box when the pane is shorter than the quokka, and
+     overflow at the START edge is unreachable by any scroll. Safe centering
+     parks it at the top instead, so the scroll below can actually reach it. */
+  justify-content: safe center;
   text-align: center;
   padding: 24px;
   gap: 6px;
+  min-height: 0;
+  overflow: auto;
+}
+/* the mascot yields before the words: in a short pane the illustration scales
+   down (viewBox letterboxing does the work) instead of pushing the message it
+   decorates out of the box (Seth, 2026-08-01 fit sweep) */
+.list-empty > .quokka {
+  flex: 0 1 auto;
+  min-height: 0;
 }
 
 /* — all tabs closed: the lone pane's quokka rest state (Seth, 2026-07-28) —

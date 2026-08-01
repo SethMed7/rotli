@@ -29,8 +29,14 @@ import {
 } from "./navHistory";
 import { useUiStore } from "./ui";
 
-const MIN_PANE_WIDTH = 320;
-const MIN_PANE_HEIGHT = 160;
+export const MIN_PANE_WIDTH = 320;
+/** The height floor is CHROME-derived, not a round number (Seth, 2026-08-01:
+ * "the way everything resizes and fits as a whole"). A pane owes its surface
+ * room for a 34px tab strip plus the tallest fixed chrome any surface carries —
+ * chat's title row + composer, ~150px once both compress — plus a usable sliver
+ * of content. Below that the surface has nowhere to put its own parts and they
+ * start landing on each other; 160 was under the chat composer alone. */
+export const MIN_PANE_HEIGHT = 220;
 /** Fallback width when the ui store hasn't seeded one yet — matches ui.ts's
  * sidebarWidth init (Seth, 2026-06-13: one sidebar, not two rails). */
 const SIDEBAR_WIDTH = 240;
@@ -63,6 +69,37 @@ function makeNewItemTab(): Tab {
  * `.noteId` read funnels through so a CanvasTab never crashes NoteTab code. */
 function tabNoteId(tab: Tab): string | null {
   return tab.surfaceKind === "note" ? tab.noteId : null;
+}
+
+/** The ONE size law for a split's children (Seth, 2026-08-01). Fractions that
+ * sum to 1, none below `minFrac` — the surplus is taken from the siblings that
+ * can spare it, in proportion to how much they have above the floor, so a drag
+ * or a window shrink squeezes the roomy pane instead of crushing the small one.
+ * When the container is too small for every child to clear the floor there is
+ * no honest answer but an even split, so that's what it gives.
+ *
+ * Pure and total: the divider drag and the live re-fit both go through here, so
+ * "how small may a pane get" is stated once. */
+export function clampSplitSizes(sizes: number[], minFrac: number): number[] {
+  const n = sizes.length;
+  if (n === 0) return sizes;
+  const even = 1 / n;
+  if (minFrac * n >= 1) return sizes.map(() => even);
+  const total = sizes.reduce((a, b) => a + b, 0) || 1;
+  const next = sizes.map((s) => s / total);
+  // repeated passes: lifting one child to the floor can push another under it
+  for (let pass = 0; pass < n; pass += 1) {
+    const deficit = next.reduce((sum, s) => sum + Math.max(minFrac - s, 0), 0);
+    if (deficit <= 1e-6) break;
+    const slack = next.reduce((sum, s) => sum + Math.max(s - minFrac, 0), 0);
+    if (slack <= 1e-6) return sizes.map(() => even);
+    for (let i = 0; i < n; i += 1) {
+      const size = next[i] ?? even;
+      if (size < minFrac) next[i] = minFrac;
+      else next[i] = size - (deficit * (size - minFrac)) / slack;
+    }
+  }
+  return next;
 }
 
 /** Window shrank below the split floors? Collapse the sidebar — the same quiet

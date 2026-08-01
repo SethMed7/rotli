@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Panes fit, whatever the size.** A pane is a hard box now: shrink the
+  window, drag a divider to the edge, stack two chats — chrome compresses
+  and scrolls instead of bleeding into the pane below. Panes keep a
+  usable minimum height (derived from what a chat actually needs, not a
+  guess), re-fit live as the window changes, chat titles make room for
+  their buttons instead of sliding under them, and empty states scale
+  the quokka down before clipping the words.
+
 - **Every chat keeps its own model.** Two chats side by side can now run two
   different models at once: the chip under the composer shows *that* chat's
   model, sends from that chat use it, and it stays with the chat across
@@ -30,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The note's chat button offers your chats again.** Clicking it lists every
+  chat on the note plus "New chat" — it used to fall into the same chat every
+  time because each message quietly re-pointed the chat at a freshly minted
+  notes file (that's also where those duplicate "chat about …" notes came
+  from; no more of those). Conversation notes now land in the note you
+  chatted from, in their own managed section, instead of spawning orphans.
 - **"List the people in my vault" answers with your people.** The on-device
   model used to open the `people/` README — a note that explains how the folder
   is organized and names nobody — and read its list of links out loud, so a

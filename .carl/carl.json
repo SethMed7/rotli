@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-07-30",
+  "last_modified": "2026-08-01T14:17:02.560Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -652,5 +652,15 @@
       "decisions": []
     }
   },
-  "staging": []
+  "staging": [
+    {
+      "id": "stg-001",
+      "proposed_domain": "ROTLI_SHELL",
+      "rule_text": "A pane is a BOX: .pane-body clips, so no surface paints into the pane next door — a surface that cannot fit compresses its chrome then scrolls inside its own box, and popovers needing the window are portaled + fixed. Pane sizing has ONE law, clampSplitSizes(sizes, minFrac) over MIN_PANE_WIDTH 320 / chrome-derived MIN_PANE_HEIGHT 220, applied at split time, during a divider drag, and live via a ResizeObserver per split. Dividers carry aria-label, never title.",
+      "rationale": "2026-08-01 fit sweep: at the old 160px floor a stacked chat's composer overhung its pane ~75px onto the pane below's strip and title. Locked by e2e/pane-resize-fit.spec.ts + clampSplitSizes unit tests.",
+      "source": "src/state/panes.ts",
+      "proposed_at": "2026-08-01T14:17:02.559Z",
+      "status": "pending"
+    }
+  ]
 }

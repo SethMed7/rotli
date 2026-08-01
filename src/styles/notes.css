@@ -1066,6 +1066,14 @@
   min-width: 0;
   min-height: 0;
   position: relative;
+  /* A pane is a BOX (Seth, 2026-08-01): whatever a surface does inside it, it
+     may never paint into the pane next door. Without this, a surface taller
+     than its pane — a chat's composer in a short stacked pane — spilled past
+     the pane's edge and landed on the neighbour's tab strip and title row.
+     Surfaces that cannot fit scroll INSIDE this box instead; popovers that
+     genuinely need the whole window are portaled + fixed (the chat model
+     picker), never escapees of an ancestor's overflow. */
+  overflow: hidden;
 }
 /* Every surface root must GROW to fill the pane row — otherwise a surface with
    no intrinsic flex (chat, file) collapses to its content width and pins left,

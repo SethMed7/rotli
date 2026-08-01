@@ -2,6 +2,7 @@ import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
 import { listChats, setChatAttachedTo, writeNote } from "../memex/service";
 import { invalidateMemex } from "../memex/useMemex";
 import { invalidateNotes } from "../services/hooks";
+import { isChatsPath } from "../services/destinations";
 import { notesService } from "../services/notes";
 import { attachedNoteId, type MemoryTurn } from "./model";
 import { syncChatMemory, type ChatMemoryNote, type ComposeChatNotes } from "./workflow";
@@ -27,8 +28,16 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       .trim();
   const repository = {
     async findByStem(stem: string): Promise<ChatMemoryNote | null> {
-      const summaries = await notesService.listNotes();
-      const id = attachedNoteId(stem, summaries);
+      // Scope the lookup to THIS brain's root. The unscoped "All notes" listing
+      // drops every note in a connected brain (isVault: ids are "<brain>:…"),
+      // so a chat attached to a vault note resolved to nothing — and every turn
+      // minted one more duplicate memory note (2026-08-01). The corpus instance
+      // has no prefix and keeps the unscoped listing.
+      const summaries = await notesService.listNotes(prefix || undefined);
+      const id = attachedNoteId(
+        stem,
+        summaries.filter((note) => !isChatsPath(note.folderId)),
+      );
       if (!id) return null;
       const note = await notesService.getNote(id);
       return note ? { id, stem, body: note.body } : null;

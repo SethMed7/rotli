@@ -7,6 +7,13 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  /* the surface measures ITSELF so its chrome can compress when the pane goes
+     short (a stacked split in a small window) — see the @container rule at the
+     end of the chat block. Size containment is safe here: the box comes from
+     the pane (flex: 1 + height: 100%), never from its contents. */
+  container-type: size;
+  container-name: chat;
+  overflow: hidden;
 }
 
 .chat-head {
@@ -15,6 +22,7 @@
   gap: 10px;
   padding: 13px 24px;
   flex: 0 0 auto;
+  min-width: 0;
   /* align the title to the same centered column as the thread + composer (Seth,
      2026-07-01) — the whole chat reads as one centered column, no divider line.
      The column is the per-chat measure (--chat-measure, set inline by the
@@ -23,13 +31,17 @@
   max-width: calc(var(--chat-measure, 740px) + 48px);
   margin: 0 auto;
 }
-/* header tools (right-pinned): the width picker + the attached-note toggle */
+/* header tools (right-pinned): the width picker + the attached-note toggle.
+   `flex: 0 0 auto` is load-bearing (Seth, 2026-08-01): the cluster keeps its
+   full width and the TITLE is what yields — icons must never end up sitting on
+   the words. */
 .chat-head-tools {
   position: relative;
   margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex: 0 0 auto;
 }
 .chat-measure-pop {
   position: absolute;
@@ -40,6 +52,8 @@
   flex-direction: column;
   gap: 3px;
   padding: 6px;
+  max-height: calc(100cqh - 64px);
+  overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--r-card);
@@ -71,7 +85,10 @@
   right: 0;
   z-index: 30;
   width: 264px;
-  max-height: 320px;
+  /* never taller than the pane it opens in — the surface is a size container,
+     so the drawer scrolls instead of being cut off by the pane's edge in a
+     short split (Seth, 2026-08-01 fit sweep) */
+  max-height: min(320px, calc(100cqh - 64px));
   overflow-y: auto;
   padding: 10px;
   background: var(--surface);
@@ -122,9 +139,15 @@
   margin: 0;
   color: var(--text);
 }
+/* the instance label yields SECOND (after the title, before the tools) */
 .chat-head .chat-inst {
   font-size: 12px;
   color: var(--text-muted);
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 /* the model selecter — what we have in the memex ai (~/.memex/ai). Pinned to the
    right of the chat header so it reads as "this conversation runs on <model>". */
@@ -137,12 +160,16 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  flex: 0 0 auto;
+  /* shrinkable (Seth, 2026-08-01 fit sweep): in a narrow pane the model pill
+     ellipsizes rather than shoving Send + the tool buttons out of the box */
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .chat-model-trigger {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-width: 0;
   max-width: 220px;
   padding: 3px 9px;
   border: 1px solid var(--border);
@@ -564,6 +591,33 @@
   font-size: 12px;
   cursor: pointer;
   text-decoration: underline;
+}
+
+/* — the short-pane fit (Seth, 2026-08-01) —
+   Two stacked chats in a small window give each surface ~200px. The thread
+   scrolls, but the title row and the composer are fixed rows: at full padding
+   they alone outgrew the pane and the composer spilled onto the pane below.
+   So the chrome COMPRESSES first — tighter rows, a shorter draft box — and only
+   the thread gives up space after that. Nothing is hidden and nothing moves;
+   the same parts simply take less room. */
+@container chat (max-height: 340px) {
+  .chat-head {
+    padding: 7px 16px;
+  }
+  .chat-scroll {
+    padding: 10px 16px;
+  }
+  .chat-composer {
+    padding: 6px 16px 10px;
+  }
+  .chat-box .chat-msg {
+    max-height: 76px;
+  }
+}
+@container chat (max-height: 230px) {
+  .chat-box .chat-msg {
+    max-height: 48px;
+  }
 }
 
 /* ── the file surface — in-app audio/pdf/image/text viewers ─────────────────── */
@@ -1925,6 +1979,10 @@ body:has(.document-editor) [role="dialog"] input:disabled {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* the title is the FIRST thing to give way in a narrow header — it ellipsizes
+     down to nothing rather than pushing the tool cluster over itself */
+  flex: 0 1 auto;
+  min-width: 0;
 }
 /* empty state: centered character + hint */
 .chat-newhint {

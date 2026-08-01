@@ -9,6 +9,7 @@ import { useNavHistory } from "./navHistory";
 import {
   activeTabOf,
   boardTabOpen,
+  clampSplitSizes,
   fileTabOpen,
   findLeaf,
   leaves,
@@ -652,5 +653,47 @@ describe("preview tabs", () => {
     expect(pane?.tabs).toHaveLength(2); // A + the one preview slot
     const preview = pane?.tabs.find((t) => t.preview);
     expect(preview?.surfaceKind).toBe("file");
+  });
+});
+
+// The ONE size law for a split (Seth, 2026-08-01: "the way everything resizes
+// and fits as a whole"). Both the divider drag and the live re-fit go through
+// clampSplitSizes, so a pane can never be squeezed under the height its own
+// chrome needs — and when the box genuinely cannot hold every child at the
+// floor, the honest answer is an even split, not a crushed pane.
+describe("clampSplitSizes — no pane below its floor", () => {
+  const sum = (sizes: number[]) => sizes.reduce((a, b) => a + b, 0);
+
+  test("leaves a split that already clears the floor alone", () => {
+    expect(clampSplitSizes([0.5, 0.5], 0.25)).toEqual([0.5, 0.5]);
+  });
+
+  test("lifts an under-floor pane and takes it from the roomy sibling", () => {
+    const out = clampSplitSizes([0.95, 0.05], 0.3);
+    expect(out[1]).toBeCloseTo(0.3, 5);
+    expect(out[0]).toBeCloseTo(0.7, 5);
+    expect(sum(out)).toBeCloseTo(1, 5);
+  });
+
+  test("takes from the siblings with the most to spare, not evenly", () => {
+    const out = clampSplitSizes([0.7, 0.25, 0.05], 0.2);
+    expect(out.every((s) => s >= 0.2 - 1e-6)).toBe(true);
+    expect(sum(out)).toBeCloseTo(1, 5);
+    // the 0.7 pane gave up far more than the 0.25 one
+    expect(0.7 - (out[0] ?? 0)).toBeGreaterThan(0.25 - (out[1] ?? 0));
+  });
+
+  test("a box too small for every child at the floor evens out instead of crushing", () => {
+    expect(clampSplitSizes([0.9, 0.1], 0.6)).toEqual([0.5, 0.5]);
+  });
+
+  test("normalizes sizes that do not sum to 1", () => {
+    const out = clampSplitSizes([2, 2], 0.25);
+    expect(sum(out)).toBeCloseTo(1, 5);
+    expect(out[0]).toBeCloseTo(0.5, 5);
+  });
+
+  test("is total for an empty split", () => {
+    expect(clampSplitSizes([], 0.3)).toEqual([]);
   });
 });
