@@ -45,6 +45,15 @@ path, a destination clamp on the model transport, and prompt-injection framing
 so tool results are data and never instructions. `check:security` is the
 tripwire that keeps a future change from silently widening any of these.
 
+The full-text **search index** (`.rotli/search/`, Tantivy) is a DERIVED,
+gitignored, rebuildable at-rest asset that now holds secure-note content (tokens
++ positions). It is not an egress path: `corpus_search` is the user lane, and the
+only AI-facing search command re-applies `read_for_ai` per hit in Rust before any
+hit leaves, so a stale or wrong index classification cannot leak. It inherits the
+secure notes' at-rest protection (account isolation + FileVault) and is excluded
+from every diagnostics path. Full record: egress threat model O7, design in
+[`../design/tantivy-search.md`](../design/tantivy-search.md).
+
 ## The egress map (destination class → data → guard)
 
 | Path | Destination | Data | Guard |

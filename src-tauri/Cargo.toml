@@ -40,6 +40,10 @@ tempfile = "3"                                                   # atomic writes
 trash = "5"                                                     # delete = OS trash, never a hard rm
 uuid = { version = "1", features = ["v4"] }                     # mx_<uuid> ids for a rotli-initiated memex
 security-framework = "3"                                        # Keychain-backed secrets (Gemini API key) — never argv/ps/config
+# Full-text search index (adapter: src/search_index.rs). DERIVED + gitignored +
+# rebuildable — never a database (the .md files stay durable truth). Large dep;
+# binary-size impact measured in the PR. NOT on check:structure's denied-DB list.
+tantivy = "0.26.1"
 
 # macOS-only: swap the Dock/app icon at runtime (Settings → Appearance → App icon)
 [target.'cfg(target_os = "macos")'.dependencies]

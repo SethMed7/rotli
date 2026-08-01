@@ -28,6 +28,7 @@ mod organizer;
 mod parity_tests;
 mod provider;
 mod routines;
+mod search_index;
 mod secret;
 mod web;
 mod workspace;

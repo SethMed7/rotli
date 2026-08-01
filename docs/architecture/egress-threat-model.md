@@ -214,6 +214,41 @@ whole surface, which degrades honest errors everywhere to blunt one rarely-usefu
 guess. If O3 is fixed (ids and paths stop leaking to the headless agent), the
 guessing input dries up and this loses most of its remaining value.
 
+### O7 — the full-text index is a new at-rest asset (recorded, not a leak)
+
+The Tantivy search index (`.rotli/search/`, design in
+[`../design/tantivy-search.md`](../design/tantivy-search.md)) is a new place
+secure-note content lives on disk: its inverted index holds the tokens **and
+positions** of every indexed note, secure ones included, which makes a secure
+note's vocabulary and word order substantially recoverable from the index files.
+This is stated plainly rather than glossed. Three things bound it:
+
+- **It is not an egress path.** `CorpusStore::search` is the user lane and
+  returns secure hits as it always has; the only AI-facing search command,
+  `corpus_search_ai`, re-applies `read_for_ai` **per hit in Rust** — reading the
+  note's frontmatter from disk — before any hit crosses the boundary. The index
+  changed how the candidate set is produced, not what the AI lane may keep. The
+  index stores a `secure` classification bit for self-description, but it is
+  **never the gate**: a stale or wrong bit cannot leak, because the verdict is
+  re-derived from disk. Tested by
+  `the_index_is_not_the_gate_a_stale_secure_bit_still_refuses_remotely` — a note
+  secure on disk but flagged non-secure in the index still yields zero remote
+  hits.
+- **At rest** it inherits exactly the secure notes' protection (ROTLI_SECURITY
+  rule 1: macOS account isolation + FileVault). It is DERIVED and rebuildable —
+  deleting it loses nothing.
+- **Gitignored + diagnostics-excluded.** It sits under `.rotli/`, which a vault
+  `.gitignore` ignores as `.rotli/*` (the only un-ignore exceptions are
+  `main.json` and `views.json`), so it is never committed, and it is not read by
+  any support-bundle/diagnostics path — the same as the rest of `.rotli/` derived
+  state (`index.json`, the journal, organizer state).
+
+The **secure-prose ledger stays walk-fed and warm**: this change did not replace
+the walk with index-driven listing. `corpus_list`, `tasks`, and
+`warm_secure_ledger` still walk, and `search` still calls `ensure_walked` (which
+feeds the ledger) before it touches the index, so the egress ledger cannot go
+cold because search now uses an index.
+
 ### O5 — residual limits, by design
 
 - **The ledger stops only bulk verbatim copying.** ≤4-word chunking, paraphrase,

@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Search got fast and smart.** Finding a note no longer scans every note on
+  every keystroke — Rotli now keeps a real search index, so search stays quick
+  as your vault grows from hundreds of notes to thousands. It also got smarter:
+  typing two words finds the notes that have both, a half-typed word matches as
+  you go, a small typo still lands the note you meant, and wrapping a phrase in
+  "quotes" finds those exact words in order. The index is Rotli's own private
+  cache next to your notes — it's rebuilt from your Markdown whenever it's
+  needed and never something you have to think about; your files stay the only
+  thing that's real. Secure notes are handled exactly as before: they show up in
+  your own searches and never in anything a cloud model can see.
+
 ### Changed
 
 - **The sidebar has a Home and a Chat, and you pick one.** The stacked "Chat"

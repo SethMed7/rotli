@@ -204,3 +204,52 @@ fn a_cooperating_model_cannot_edit_a_locked_note_for_the_attacker() {
     let after = v.store.read(&note.id).unwrap().body;
     assert!(after.contains("approve nothing"), "{after}");
 }
+
+/// The index is a NEW place secure prose lives — but it is not the gate, and this
+/// drives the adversarial version of that claim. Force the index to believe a
+/// note is ordinary while it is SECURE on disk (write the flag behind the store's
+/// back, so no generation bump re-syncs the index), then confirm a remote read is
+/// refused anyway. `read_for_ai` re-derives the verdict from DISK — the source of
+/// truth — so a stale, or outright wrong, index classification cannot leak a thing.
+/// If this ever fails, the Tantivy index has become a bypass around the matrix.
+#[test]
+fn the_index_is_not_the_gate_a_stale_secure_bit_still_refuses_remotely() {
+    let tmp = TempDir::new().unwrap();
+    let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    store.os_trash = false;
+    let note = store.create("Inbox", "# Plan\n\nthe quarterly figure stays between us").unwrap();
+
+    // the first search indexes the note as NON-secure — which it genuinely is now
+    let hits = store.search("quarterly figure", 50, true).unwrap();
+    assert!(hits.iter().any(|h| h.id == note.id), "eval setup: the note must match");
+    assert!(store.read_for_ai(&note.id, false).is_ok(), "eval setup: ordinary, remote-readable");
+
+    // mark it secure ON DISK, bypassing the store so NO generation bump fires —
+    // the index keeps its stale `secure = false` bit for this id
+    let rel = store.index.get(&note.id).expect("indexed id after the walk").clone();
+    let abs = store.abs(&rel);
+    let on_disk = std::fs::read_to_string(&abs).unwrap();
+    let secured = on_disk.replacen("---\n", "---\nsecure: true\n", 1);
+    assert_ne!(secured, on_disk, "eval setup: the secure flag was actually inserted");
+    std::fs::write(&abs, secured).unwrap();
+
+    // the authoritative gate reads DISK, so the remote read is refused now, and the
+    // refusal never quotes the body
+    let refusal = store.read_for_ai(&note.id, false).unwrap_err();
+    assert!(refusal.contains("secure"), "{refusal}");
+    assert!(!refusal.contains("quarterly"), "a refusal must never quote the body: {refusal}");
+
+    // the user lane still LISTS the note (it is in the index with the stale bit) —
+    // so the leak WOULD happen if the AI lane trusted the index. Filtering the same
+    // hits through the per-hit gate, as corpus_search_ai does in Rust, drops it.
+    let hits = store.search("quarterly figure", 50, true).unwrap();
+    let remote_visible: Vec<&str> = hits
+        .iter()
+        .filter(|h| store.read_for_ai(&h.id, false).is_ok())
+        .map(|h| h.id.as_str())
+        .collect();
+    assert!(
+        !remote_visible.contains(&note.id.as_str()),
+        "the stale index bit leaked a secure note: {remote_visible:?}"
+    );
+}

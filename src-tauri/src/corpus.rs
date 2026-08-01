@@ -1748,6 +1748,24 @@ fn joined_task_text(lines: &[&str], start: usize) -> Option<String> {
     Some(text)
 }
 
+/// A leading-context snippet for a hit the index found by TOKEN/FUZZY match but
+/// `search_match` cannot frame (no contiguous substring to highlight). Newlines
+/// flatten to spaces, ~140 chars, "…" if clipped. Never used by the substring
+/// lane — only the Tantivy fallback path.
+fn leading_snippet(body: &str) -> String {
+    const MAX: usize = 140;
+    let flat: String = body
+        .chars()
+        .map(|c| if matches!(c, '\n' | '\r' | '\t') { ' ' } else { c })
+        .collect();
+    let flat = flat.trim();
+    let mut out: String = flat.chars().take(MAX).collect();
+    if flat.chars().count() > MAX {
+        out.push('…');
+    }
+    out
+}
+
 /// rank asc (title hits first) → recency desc → id asc (deterministic wire).
 fn sort_hits(hits: &mut [SearchHit]) {
     hits.sort_by(|a, b| {
@@ -2264,6 +2282,13 @@ pub struct CorpusStore {
     /// suppress-set generation is unchanged. Holds the sorted list AND each
     /// note's parsed text so search()/tasks() stop re-reading every file.
     list_cache: Option<ListCache>,
+    /// The Tantivy full-text index (adapter in search_index.rs) — DERIVED,
+    /// gitignored, rebuildable. `None` when this store cannot host one (a
+    /// read-only mount, or an open error): `search` then uses the substring scan,
+    /// the guaranteed-correct floor. Never a source of truth; `corpus_search_ai`
+    /// re-gates every hit through `read_for_ai` from disk, so the index is not the
+    /// visibility boundary (docs/design/tantivy-search.md).
+    search_index: Option<crate::search_index::SearchIndex>,
 }
 
 /// One walked note's parsed text, cached beside its meta.
@@ -2434,8 +2459,10 @@ impl CorpusStore {
             band_read_only: false,
             perms_read_only: read_only,
             list_cache: None,
+            search_index: None,
         };
         store.load_index();
+        store.init_search_index();
         // Scaffold the six reserved sidebar destinations every open (idempotent),
         // so existing corpora gain them too. (Seth, 2026-06-13)
         if !read_only {
@@ -2474,9 +2501,26 @@ impl CorpusStore {
             band_read_only,
             perms_read_only: read_only,
             list_cache: None,
+            search_index: None,
         };
         store.load_index();
+        store.init_search_index();
         Ok(store)
+    }
+
+    /// Open (or wipe+recreate) this root's Tantivy index at `.rotli/search`. Left
+    /// `None` — falling back to the substring scan — when the store may not write
+    /// its sidecar (read-only mount, out-of-band contract) or when the index fails
+    /// to open. The index is DERIVED and rebuildable; a failure here is degraded
+    /// search speed, never a broken app or lost data.
+    fn init_search_index(&mut self) {
+        if self.mutation_allowed().is_err() {
+            return; // read-only store → substring fallback, no index writes
+        }
+        let Ok(dir) = self.guard_rel(&format!("{DOT_DIR}/search")) else {
+            return;
+        };
+        self.search_index = crate::search_index::SearchIndex::open_or_create(&dir).ok();
     }
 
     /// Apply a connected brain's USER-SET "read-only" perms to the live store —
@@ -3714,10 +3758,173 @@ impl CorpusStore {
         limit: usize,
         include_reference: bool,
     ) -> Result<Vec<SearchHit>, String> {
-        let mut hits: Vec<SearchHit> = Vec::new();
         if query.trim().is_empty() {
-            return Ok(hits);
+            return Ok(Vec::new());
         }
+        // Feed the secure-prose ledger and fill the walk cache BEFORE the index is
+        // consulted — the ledger is walk-fed (audit 2026-08-01, GAP 2), and the
+        // Tantivy path must never let that go cold. The walk is generation-gated,
+        // so at a steady corpus this is a cache hit.
+        self.ensure_walked()?;
+        // Tantivy governs MEMBERSHIP (infix/tokenized/phrase/fuzzy), `search_match`
+        // owns PRESENTATION (snippet, offsets, rank) — so the SearchHit wire
+        // contract and its TS twin are unchanged. The index membership is a
+        // SUPERSET of the old substring lane for any query with alphanumeric
+        // tokens (infix ⊇ prefix ⊇ exact; verifier 2026-08-01). A query with NO
+        // such token (punctuation only) has no index term to match but the old
+        // `find_ci` could still match it literally, so it goes straight to the
+        // substring lane — keeping "never fewer results than substring" true for
+        // EVERY query. If the index is absent or errors, the substring scan is the
+        // guaranteed-correct floor (docs/design/tantivy-search.md).
+        let indexable = query.chars().any(char::is_alphanumeric);
+        if indexable && self.search_index.is_some() {
+            if let Ok(hits) = self.search_indexed(query, limit, include_reference) {
+                return Ok(hits);
+            }
+        }
+        self.search_substring(query, limit, include_reference)
+    }
+
+    /// The Tantivy lane: sync the index to the current walk (only when the corpus
+    /// generation moved — riding the same suppress-marked watcher every other
+    /// cache does), query it for candidate ids, then re-derive each hit's
+    /// snippet/offsets/rank with `search_match` so the wire is byte-for-byte the
+    /// substring lane's for any query that IS a substring, and a sensible rank-1
+    /// fallback for a purely tokenized/fuzzy hit.
+    fn search_indexed(
+        &mut self,
+        query: &str,
+        limit: usize,
+        include_reference: bool,
+    ) -> Result<Vec<SearchHit>, String> {
+        let mut idx = self.search_index.take().ok_or("no search index")?;
+        let generation = self.suppress.generation();
+        let outcome = (|| {
+            if idx.synced_generation() != Some(generation) {
+                let docs = self.collect_index_docs();
+                idx.sync(generation, &docs)?;
+            }
+            // over-fetch so post-filtering (Trash, chats, reference, and the AI
+            // per-hit gate upstream) still fills the requested page
+            let over = limit.saturating_mul(5).clamp(limit.max(1), 500);
+            idx.query(query, over)
+        })();
+        // ALWAYS restore the index, success or failure, before propagating.
+        self.search_index = Some(idx);
+        let ids = outcome?;
+        Ok(self.hits_from_ids(query, &ids, limit, include_reference))
+    }
+
+    /// The searchable set, projected for indexing from the walk cache: kind Note,
+    /// never Trash, never a Memex root's chats/ — identical scope to the substring
+    /// lane, plus the Reference lane (gated at query time by `include_reference`).
+    fn collect_index_docs(&self) -> Vec<crate::search_index::IndexDoc> {
+        let cache = self.list_cache.as_ref().expect("ensure_walked fills the cache");
+        let layout = self.layout;
+        let mut docs = Vec::new();
+        for meta in cache.list.notes.iter().chain(cache.reference.iter()) {
+            if meta.kind != NoteKind::Note
+                || is_trash_folder(&meta.folder_id)
+                || (layout == Layout::Memex && is_chats_folder(&meta.folder_id))
+            {
+                continue;
+            }
+            let Some(text) = cache.texts.get(&meta.id) else {
+                continue;
+            };
+            let meta_text = if meta.aliases.is_empty() {
+                text.metadata.clone()
+            } else {
+                format!("{}\n{}", text.metadata, meta.aliases.join("\n"))
+            };
+            docs.push(crate::search_index::IndexDoc {
+                id: meta.id.clone(),
+                title: meta.title.clone(),
+                body: text.body.clone(),
+                meta: meta_text,
+                secure: text.secure,
+            });
+        }
+        docs
+    }
+
+    /// Turn ranked candidate ids into `SearchHit`s. Applies the SAME scope
+    /// predicates as the substring lane (reusing the same functions, so the two
+    /// cannot drift) and gates the Reference lane on `include_reference`.
+    fn hits_from_ids(
+        &self,
+        query: &str,
+        ids: &[String],
+        limit: usize,
+        include_reference: bool,
+    ) -> Vec<SearchHit> {
+        let cache = self.list_cache.as_ref().expect("ensure_walked fills the cache");
+        let layout = self.layout;
+        let mut lut: HashMap<&str, (&NoteMeta, bool)> = HashMap::new();
+        for m in cache.list.notes.iter() {
+            lut.insert(m.id.as_str(), (m, false));
+        }
+        for m in cache.reference.iter() {
+            lut.entry(m.id.as_str()).or_insert((m, true));
+        }
+        let mut hits: Vec<SearchHit> = Vec::new();
+        for id in ids {
+            let Some(&(meta, is_ref)) = lut.get(id.as_str()) else {
+                continue;
+            };
+            if is_ref && !include_reference {
+                continue;
+            }
+            if meta.kind != NoteKind::Note
+                || is_trash_folder(&meta.folder_id)
+                || (layout == Layout::Memex && is_chats_folder(&meta.folder_id))
+            {
+                continue;
+            }
+            let text = cache.texts.get(id);
+            let m = text
+                .and_then(|t| {
+                    search_match(query, &meta.title, &t.body, &meta.snippet)
+                        .or_else(|| search_match(query, &meta.title, &t.metadata, &meta.snippet))
+                })
+                .or_else(|| search_match(query, &meta.title, &meta.aliases.join("\n"), &meta.snippet))
+                .unwrap_or_else(|| SearchMatch {
+                    // a purely tokenized/fuzzy hit — nothing contiguous to frame.
+                    // Rank it a body hit with a leading snippet and no highlight
+                    // span, so it renders honestly and sorts after exact hits.
+                    rank: 1,
+                    snippet: leading_snippet(
+                        text.map(|t| t.body.as_str()).unwrap_or(meta.snippet.as_str()),
+                    ),
+                    match_start: 0,
+                    match_len: 0,
+                });
+            hits.push(SearchHit {
+                id: meta.id.clone(),
+                title: meta.title.clone(),
+                folder_id: meta.folder_id.clone(),
+                kind: meta.kind,
+                rank: m.rank,
+                snippet: m.snippet,
+                match_start: m.match_start,
+                match_len: m.match_len,
+                updated_at: meta.updated_at,
+            });
+        }
+        sort_hits(&mut hits);
+        hits.truncate(limit);
+        hits
+    }
+
+    /// The substring scan — the pre-Tantivy behavior, kept verbatim as the
+    /// guaranteed-correct fallback for a read-only store or an index error.
+    fn search_substring(
+        &mut self,
+        query: &str,
+        limit: usize,
+        include_reference: bool,
+    ) -> Result<Vec<SearchHit>, String> {
+        let mut hits: Vec<SearchHit> = Vec::new();
         // the cached walk already parsed every note (audit 2026-07-30, #5:
         // search was a DOUBLE full read — list() then re-read+parse per body)
         self.ensure_walked()?;
@@ -7623,6 +7830,53 @@ mod tests {
         assert!(body_hit.snippet.contains("wire limit"));
         // blank query is empty, never everything
         assert!(store.search("  ", 50, false).unwrap().is_empty());
+    }
+
+    #[test]
+    fn store_search_index_reflects_edits_incrementally() {
+        // the store's Tantivy lane rides the corpus generation: an edit bumps it,
+        // the next search re-syncs only the changed doc, the old term is gone, and
+        // a move to Trash drops the note from search — all through store.search,
+        // never touching the substring fallback.
+        let (_dir, mut store) = bare();
+        let n = store.create("Inbox", "# Notes\n\nthe kelpie surfaced at dawn\n").unwrap();
+        assert_eq!(store.search("kelpie", 50, false).unwrap().len(), 1, "indexed on first search");
+
+        store.write(&n.id, "# Notes\n\nthe selkie surfaced at dawn\n").unwrap();
+        assert!(store.search("kelpie", 50, false).unwrap().is_empty(), "edited-away term gone");
+        let hits = store.search("selkie", 50, false).unwrap();
+        assert_eq!(hits.len(), 1, "the new term is found");
+        assert_eq!(hits[0].id, n.id);
+
+        store.move_note(&n.id, "Trash").unwrap();
+        assert!(store.search("selkie", 50, false).unwrap().is_empty(), "trashed note leaves search");
+    }
+
+    #[test]
+    fn store_search_index_membership_is_a_superset_of_the_substring_lane() {
+        // The substring lane is the correctness ORACLE: the Tantivy membership set
+        // must never be SMALLER than it (verifier 2026-08-01, the infix regression).
+        // This diffs the two lanes over the mid-word cases prefix matching used to
+        // drop, plus multi-word and whole-word queries, and asserts index ⊇ substring.
+        let (_dir, mut store) = bare();
+        store.create("Inbox", "# Router\n\nsteps to reconfigure the router later\n").unwrap();
+        store.create("Notes", "# Session\n\nhow to reauthenticate the session\n").unwrap();
+        store.create("Inbox", "# Carbon\n\nreduce the carbon footprint this year\n").unwrap();
+        store.create("Notes", "# Garden\n\nunrelated notes about gardens\n").unwrap();
+        for q in ["config", "auth", "print", "reconfigure", "footprint", "the router", "session"] {
+            let idx: std::collections::HashSet<String> =
+                store.search(q, 200, true).unwrap().into_iter().map(|h| h.id).collect();
+            let sub: std::collections::HashSet<String> =
+                store.search_substring(q, 200, true).unwrap().into_iter().map(|h| h.id).collect();
+            assert!(
+                sub.is_subset(&idx),
+                "index lost recall for {q:?}: substring={sub:?} index={idx:?}"
+            );
+            // and the infix cases prove the lanes AGREE here, not just that idx is bigger
+            if matches!(q, "config" | "auth" | "print") {
+                assert!(!sub.is_empty(), "oracle setup: {q:?} must match mid-word");
+            }
+        }
     }
 
     #[test]
