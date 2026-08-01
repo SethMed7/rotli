@@ -296,26 +296,29 @@ export function useJournal() {
 }
 
 /** Live daemon status (Activity's secure-skip + offline lines, Settings → Brain).
- * Rides the journal invalidation beat — and the daemon emits `rotli:brain-journal`
- * on STATUS-ONLY changes too (secrets skipped, model offline/back). The slow
- * poll is the backstop for anything eventless (the queue count while offline,
- * an error set outside a cycle) — the app-wide staleTime is ∞, so without it
- * this surface would never refresh on its own. */
+ * Rides the journal invalidation beat — the daemon emits `rotli:brain-journal`
+ * on STATUS-ONLY changes too (secrets skipped, model offline/back), every cycle
+ * boundary emits `rotli:organizer-progress`, and the watcher that grows the
+ * queue emits `rotli:corpus-changed`. All three are invalidation sources in
+ * App.tsx, so the 60s backstop poll was pure duplication (perf audit
+ * 2026-07-30, finding 23). */
 export function useOrganizerStatus() {
-  return useQuery({ queryKey: keys.organizer, queryFn: organizerStatus, refetchInterval: 60_000 });
+  return useQuery({ queryKey: keys.organizer, queryFn: organizerStatus });
 }
 
 /** Legacy secure-intake notes awaiting the explicit repair (decision
  * 2026-07-22) — the Activity pane's preview. Rides the journal invalidation
- * beat; the slow poll matches the organizer-status backstop. */
+ * beat (event-driven; see useOrganizerStatus). */
 export function useSecureRepair() {
-  return useQuery({ queryKey: keys.secureRepair, queryFn: secureRepairScan, refetchInterval: 60_000 });
+  return useQuery({ queryKey: keys.secureRepair, queryFn: secureRepairScan });
 }
 
 /** The secure-review rows (feature B): detector-only notes awaiting the user's
- * Make secure / Not sensitive answer, plus flagged leftovers. Same beat. */
+ * Make secure / Not sensitive answer, plus flagged leftovers. Same beat — and
+ * this one is mounted for the app's lifetime (the sidebar badge), so its poll
+ * was the one that never stopped. */
 export function useSecureHints() {
-  return useQuery({ queryKey: keys.secureHints, queryFn: organizerSecureHints, refetchInterval: 60_000 });
+  return useQuery({ queryKey: keys.secureHints, queryFn: organizerSecureHints });
 }
 
 /** The Tasks projection (decision 2026-07-25) — every open checkbox, derived

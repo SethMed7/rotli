@@ -1389,13 +1389,17 @@ pub fn run() {
                         let org = is_target
                             .then(|| (organizer_handle.clone(), store.root().to_path_buf()));
                         if let Err(e) = corpus::spawn_watcher(watch_root, suppress, move |paths| {
-                            let _ = handle.emit_to("main", "rotli:corpus-changed", ());
                             // the memex root also feeds the daemon's queue — the
                             // watcher already dropped .rotli/, dot-files and our
-                            // own suppressed writes, so no echo can land here
+                            // own suppressed writes, so no echo can land here.
+                            // Enqueue BEFORE the event: the frontend refetches the
+                            // queue depth on corpus-changed (finding 23), and a
+                            // refetch that wins the old ordering read the
+                            // pre-enqueue count.
                             if let Some((org, org_root)) = &org {
                                 org.enqueue(org_root, paths);
                             }
+                            let _ = handle.emit_to("main", "rotli:corpus-changed", ());
                         }) {
                             eprintln!(
                                 "rotli: corpus watcher unavailable for root {} ({e}) — external edits won't auto-refresh",

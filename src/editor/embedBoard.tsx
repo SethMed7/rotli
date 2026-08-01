@@ -35,9 +35,9 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
 
   const saver = useMemo(() => createCorpusBoardSaver(boardId, setSaveErr), [boardId]);
 
-  useEffect(() => {
-    onQuitFlush(() => saver.flush());
-  }, [saver]);
+  // cleanup returns the unregister — same leak class as the full board surface
+  // (perf audit 2026-07-30, finding 22): one closure per embed mount otherwise
+  useEffect(() => onQuitFlush(() => saver.flush()), [saver]);
 
   useEffect(() => {
     if (!isTauri()) {
@@ -76,7 +76,7 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
       });
     return () => {
       cancelled = true;
-      saver.flush();
+      void saver.flush(); // unmount can't await; the quit-flush registration holds the ack
     };
   }, [boardId, saver]);
 

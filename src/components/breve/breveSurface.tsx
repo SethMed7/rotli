@@ -615,7 +615,11 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
   const [base, setBase] = useState(snapshot.config);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState("");
-  const dirty = JSON.stringify(config) !== JSON.stringify(base);
+  // serialize only when a side actually changes — the draft-guard dirty check
+  // ran two full stringifies per keystroke (perf audit 2026-07-30, finding 24)
+  const configJson = useMemo(() => JSON.stringify(config), [config]);
+  const baseJson = useMemo(() => JSON.stringify(base), [base]);
+  const dirty = configJson !== baseJson;
   const now = Date.now();
   useBreveDraftGuard(dirty);
 
@@ -1203,7 +1207,10 @@ function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; e
   const [base, setBase] = useState(snapshot.config);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState("");
-  const dirty = JSON.stringify(config.modelPolicy) !== JSON.stringify(base.modelPolicy);
+  // per-side memo, not per render (perf audit 2026-07-30, finding 24)
+  const policyJson = useMemo(() => JSON.stringify(config.modelPolicy), [config.modelPolicy]);
+  const basePolicyJson = useMemo(() => JSON.stringify(base.modelPolicy), [base.modelPolicy]);
+  const dirty = policyJson !== basePolicyJson;
   const duplicateFallback =
     new Set(config.modelPolicy.fallbacks).size !== config.modelPolicy.fallbacks.length;
   const modelValidation = config.modelPolicy.fallbacks.includes(config.modelPolicy.primary)
@@ -1674,9 +1681,14 @@ function ConfigureView({ snapshot, embedded = false }: { snapshot: BreveSnapshot
   const [test, setTest] = useState<DeliveryTest>(null);
   const [removeKeyArmed, setRemoveKeyArmed] = useState(false);
 
-  const deliveryDirty =
-    !!draft && !!base && (JSON.stringify(draft) !== JSON.stringify(base) || !!apiKey.trim());
-  const configDirty = JSON.stringify(config.pdfTheme) !== JSON.stringify(configBase.pdfTheme);
+  // four stringifies per keystroke across two drafts — memo per side
+  // (perf audit 2026-07-30, finding 24)
+  const draftJson = useMemo(() => JSON.stringify(draft), [draft]);
+  const baseJson = useMemo(() => JSON.stringify(base), [base]);
+  const themeJson = useMemo(() => JSON.stringify(config.pdfTheme), [config.pdfTheme]);
+  const baseThemeJson = useMemo(() => JSON.stringify(configBase.pdfTheme), [configBase.pdfTheme]);
+  const deliveryDirty = !!draft && !!base && (draftJson !== baseJson || !!apiKey.trim());
+  const configDirty = themeJson !== baseThemeJson;
   const dirty = deliveryDirty || configDirty;
   const themeValidation = pdfThemeValidation(config.pdfTheme);
   useBreveDraftGuard(dirty);

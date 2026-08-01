@@ -13,7 +13,10 @@ staged=$(git diff --cached --name-only --diff-filter=ACM || true)
 
 while IFS= read -r f; do
   case "$f" in
-    *.ts | *.tsx)
+    # formatter-owned trees only — the same scope as format:check. breve-runtime/
+    # keeps hand-aligned column tables and is deliberately outside oxfmt's reach
+    # (measured 2026-07-31: 49/50 differing files there were never formatter-clean).
+    src/*.ts | src/*.tsx | e2e/*.ts | scripts/*.ts | playwright.config.ts)
       # oxfmt's --check can't read stdin, so format the index blob and compare.
       if ! cmp -s <(git show ":$f") <(git show ":$f" | bunx oxfmt --stdin-filepath "$f" 2>/dev/null); then
         echo "✗ pre-commit: the STAGED content of $f is not oxfmt-formatted."

@@ -84,7 +84,19 @@ export function containsPrivateDataOverlap(outbound: string, localData: readonly
  * flag (#2, audit 2026-07). Unparseable ⇒ false (fail closed). Rust re-derives
  * this at BOTH seams as the backstop: `corpus_read_ai` (the read) and
  * `chat_messages` (the send — a non-local endpoint refuses a secret-shaped
- * transcript even if a TS path read it locally first). */
+ * transcript even if a TS path read it locally first).
+ *
+ * MIRROR-NOT-IMPORT — this locality rule is written THREE times on purpose, so
+ * no boundary inherits another's security policy by import:
+ *   • here (the app's pre-flight check)
+ *   • `src-tauri/src/chat.rs` endpoint_is_local (the Rust backstop)
+ *   • `breve-runtime/scripts/config.ts` llmEndpointIsLocal (Breve's local tier)
+ * The three stay in lockstep by FIXTURE, not by sharing code: the agreed
+ * verdicts live in `scripts/fixtures/parity.json` → `endpointLocality`, and each
+ * side asserts them independently (`src/lib/parity.test.ts`,
+ * `src-tauri/src/parity_tests.rs`, `breve-runtime/tests/test-config-locality.ts`).
+ * Change the rule here and you must change all three + the fixture, or one of
+ * those three suites fails. */
 export function endpointIsLocal(endpoint: string): boolean {
   let url: URL;
   try {

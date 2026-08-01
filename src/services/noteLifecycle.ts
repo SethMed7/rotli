@@ -50,9 +50,20 @@ async function cascadeImages(noteId: string, body: string, sink: "Archive" | "Tr
   if (!isTauri()) return;
   if (!useUiStore.getState().tidyImagesWithNote) return;
   const rootId = rootIdOf(noteId);
-  for (const rel of noteImageRels(body)) {
-    const referenced = await referencedElsewhere(rel, noteId, (query) => corpusSearch(query, 25));
-    if (referenced) continue;
+  const rels = noteImageRels(body);
+  // Every reference check is its own full-corpus walk (perf audit 2026-07-30,
+  // finding 16). Each image searches for its OWN file name, so one search can't
+  // stand in for K. The batch issues all K checks up front — but corpus_search
+  // is still a sync main-thread command under the registry mutex (audit
+  // findings 2/5), so the walks execute serially today; the batch removes only
+  // the per-await scheduling gaps and starts overlapping the moment that
+  // command goes async. referencedElsewhere never rejects (a failure reads as
+  // "referenced"), so the batch stays as conservative as the serial loop was.
+  const referenced = await Promise.all(
+    rels.map((rel) => referencedElsewhere(rel, noteId, (query) => corpusSearch(query, 25))),
+  );
+  for (const [index, rel] of rels.entries()) {
+    if (referenced[index]) continue;
     const wireId = rootId === "default" ? rel : `${rootId}:${rel}`;
     // best-effort per image: one gone/read-only file must not block the rest
     await corpusMoveFileToSink(wireId, sink).catch(() => {});

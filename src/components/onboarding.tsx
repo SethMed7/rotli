@@ -401,8 +401,12 @@ function ModelsStep() {
   const [justInstalled, setJustInstalled] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Same install poll as Settings' LocalModelsSection, same key on purpose: a
+  // tick walks a GB-scale dir, so one download must never be watched twice
+  // (perf audit 2026-07-30, finding 23). `enabled` keeps the interval alive
+  // only while this step's download runs.
   const progress = useQuery({
-    queryKey: ["onb-install", starter?.name],
+    queryKey: ["local-install", starter?.name],
     queryFn: () => (installing && starter ? localModelInstallProgress(starter.name) : Promise.resolve(null)),
     enabled: installing && !!starter,
     refetchInterval: 1000,

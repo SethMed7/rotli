@@ -168,6 +168,9 @@ struct StatusSnapshot {
     model_offline: bool,
 }
 
+/// The Activity surface's progress callback shape (a Tauri event emitter).
+type ProgressSink = Box<dyn Fn(serde_json::Value) + Send>;
+
 pub(crate) struct OrganizerInner {
     /// rel path → enqueued-at. A HashMap so a hot note dedupes to one entry.
     queue: Mutex<HashMap<String, Instant>>,
@@ -210,7 +213,7 @@ pub(crate) struct OrganizerInner {
     /// Live progress sink for the Activity surface — installed once by
     /// spawn_organizer (a Tauri event emitter); None in tests. Called outside
     /// every corpus lock.
-    progress: Mutex<Option<Box<dyn Fn(serde_json::Value) + Send>>>,
+    progress: Mutex<Option<ProgressSink>>,
     /// A reconciliation sweep is owed (Some = when it was last nudged, for the
     /// settle debounce). Event-driven only: set at startup, on Run-now, when a
     /// frontend approval lands (its writes are suppress-marked — no watcher
@@ -2180,6 +2183,16 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                 let abs: Vec<PathBuf> = targets.into_iter().map(|r| root.join(r)).collect();
                 handle.enqueue(&root, &abs);
                 cycle_owed = true;
+                // The sweep's enqueue has no watcher/journal event behind it, and
+                // the frontend rides events only now (finding 23) — surface the new
+                // queue depth even when the gates then hold the cycle (on battery
+                // they can hold indefinitely; "0 waiting" must not lie meanwhile).
+                if !abs.is_empty() {
+                    inner.emit_progress(serde_json::json!({
+                        "phase": "queued",
+                        "queued": inner.queue.lock().unwrap().len(),
+                    }));
+                }
             }
 
             if inner.queue.lock().unwrap().is_empty() && !cycle_owed && !run_now {
@@ -2293,9 +2306,12 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                     }
                 }
                 Err(e) => {
+                    // write the error BEFORE the event: the frontend refetches
+                    // organizer_status on "end", and a refetch that wins the old
+                    // ordering read a status with no error in it
+                    inner.status.lock().unwrap().last_error = Some(e);
                     // the live band must close on a failed cycle too
                     inner.emit_progress(serde_json::json!({ "phase": "end", "error": true }));
-                    inner.status.lock().unwrap().last_error = Some(e);
                 }
             }
         }
@@ -2789,9 +2805,14 @@ mod tests {
         for name in ["complete.md", "gap.md", "secret-gap.md"] {
             let rel = format!("wiki/Projects/{name}");
             let snap = snapshot_note(&root, &rel).unwrap();
-            let mut ns = NoteState::default();
-            ns.hash = snap.body_hash.clone();
-            ns.proposed.enrich = snap.body_hash.clone();
+            let ns = NoteState {
+                hash: snap.body_hash.clone(),
+                proposed: ProposedState {
+                    enrich: snap.body_hash.clone(),
+                    ..ProposedState::default()
+                },
+                ..NoteState::default()
+            };
             state.notes.insert(state_key(&snap), ns);
         }
         assert!(sweep(&root, &state).is_empty(), "the plain diff sweep sees nothing");

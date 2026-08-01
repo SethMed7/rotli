@@ -6,7 +6,7 @@
 // the chord is taken).
 
 import { useQuery } from "@tanstack/react-query";
-import { type KeyboardEvent, useEffect, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -283,23 +283,30 @@ function HotkeysPane() {
   };
 
   const q = query.trim().toLowerCase();
-  const matches = (action: KeyAction): boolean => {
-    if (!q) return true;
-    const chord = chordOf(action);
-    return (
-      action.title.toLowerCase().includes(q) ||
-      action.id.toLowerCase().includes(q) ||
-      (chord !== null && formatChord(chord).toLowerCase().includes(q))
-    );
-  };
-  const actions = allActions();
-  const grouped = HK_SECTIONS.map((section) => ({
-    ...section,
-    actions: actions.filter((a) => a.id.startsWith(`${section.prefix}.`) && matches(a)),
-  })).filter((section) => section.actions.length > 0);
-  const ungrouped = actions.filter(
-    (a) => !HK_SECTIONS.some((s) => a.id.startsWith(`${s.prefix}.`)) && matches(a),
-  );
+  // the whole registry gets re-sectioned only when the search text or a binding
+  // moves — recording a chord and showing a conflict note used to redo it too
+  // (perf audit 2026-07-30, finding 24)
+  const { grouped, ungrouped } = useMemo(() => {
+    const matches = (action: KeyAction): boolean => {
+      if (!q) return true;
+      const chord = resolveChord(overrides, action.id, action.defaultChord);
+      return (
+        action.title.toLowerCase().includes(q) ||
+        action.id.toLowerCase().includes(q) ||
+        (chord !== null && formatChord(chord).toLowerCase().includes(q))
+      );
+    };
+    const actions = allActions();
+    return {
+      grouped: HK_SECTIONS.map((section) => ({
+        ...section,
+        actions: actions.filter((a) => a.id.startsWith(`${section.prefix}.`) && matches(a)),
+      })).filter((section) => section.actions.length > 0),
+      ungrouped: actions.filter(
+        (a) => !HK_SECTIONS.some((s) => a.id.startsWith(`${s.prefix}.`)) && matches(a),
+      ),
+    };
+  }, [q, overrides]);
 
   const row = (action: KeyAction) => {
     const recording = recordingId === action.id;
@@ -1363,7 +1370,11 @@ function LocalModelsSection({ installed, onChanged }: { installed: ChatModelInfo
   const [scan, setScan] = useState<SystemProfile | null>(null);
   const [scanErr, setScanErr] = useState<string | null>(null);
 
-  // poll the byte total while a download runs (mirrors the organizer poll)
+  // Poll the byte total while a download runs. Each tick walks a GB-scale dir,
+  // so the interval exists ONLY for the life of an install: `enabled` is the
+  // gate, and the key is the one Onboarding's starter install uses so the two
+  // surfaces can never run two walks over the same dir (perf audit 2026-07-30,
+  // finding 23). Nothing polls at rest.
   const progress = useQuery({
     queryKey: ["local-install", installing?.name],
     queryFn: () => (installing ? localModelInstallProgress(installing.name) : Promise.resolve(null)),
@@ -1919,8 +1930,13 @@ function ModelsPane() {
     staleTime: Infinity,
   });
   // every model a preset may reference: local + the ENABLED connected lanes,
-  // minus anything blocked inside a lane
-  const available = flattenModels(mergedModels(local.data ?? [], aiProviders, [], blockedModels));
+  // minus anything blocked inside a lane. Memoized: this pane re-renders per
+  // keystroke in the "what do you use it for" box, and the merge had no reason
+  // to run again (perf audit 2026-07-30, finding 24).
+  const available = useMemo(
+    () => flattenModels(mergedModels(local.data ?? [], aiProviders, [], blockedModels)),
+    [local.data, aiProviders, blockedModels],
+  );
 
   const [draft, setDraft] = useState<HybridPreset | null>(null);
   const [usage, setUsage] = useState("");

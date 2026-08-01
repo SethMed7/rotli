@@ -135,11 +135,16 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   // flush any pending save when the board changes or the surface unmounts —
   // and on ⌘Q/tray-Quit, which can fire inside the debounce window (the
   // quit-flush handshake; boards never registered before and could lose the
-  // last strokes)
-  useEffect(() => () => saver.flush(), [saver]);
-  useEffect(() => {
-    onQuitFlush(() => saver.flush());
-  }, [saver]);
+  // last strokes). The registration unregisters with the effect: a live surface
+  // still flushes at quit, a dead one no longer pins its scene (perf audit
+  // 2026-07-30, finding 22).
+  useEffect(
+    () => () => {
+      void saver.flush(); // unmount can't await; quit-flush below holds the ack
+    },
+    [saver],
+  );
+  useEffect(() => onQuitFlush(() => saver.flush()), [saver]);
 
   // the freshest scene parts ride a ref; serialization runs inside the saver's
   // debounce (at most once per drain) — it used to run per onChange, i.e. per

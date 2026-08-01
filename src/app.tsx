@@ -223,6 +223,10 @@ function MainShell() {
         void invalidateNotes();
         void hydrateMain();
         void hydrateViews();
+        // the same watcher callback that emits this ALSO feeds the daemon's
+        // queue, so the organizer status ("N waiting") moves here — event, not
+        // a 60s poll (perf audit 2026-07-30, finding 23)
+        void invalidateJournal();
       }),
     [],
   );
@@ -288,6 +292,11 @@ function MainShell() {
         if (p.phase === "start") live.setLive(true);
         else if (p.phase === "note") live.setLive(true, p.title ?? null);
         else live.setLive(false);
+        // a cycle boundary is where daemon STATUS moves (busy, the queue
+        // draining, last run/error, the secure-skip set) — Activity and the
+        // sidebar badge read it from this event instead of a 60s poll (perf
+        // audit 2026-07-30, finding 23). Per-note ticks carry no status change.
+        if (p.phase !== "note") void invalidateJournal();
       }),
     [],
   );
@@ -303,7 +312,7 @@ function MainShell() {
   // caret as a `![](storage:…)` link; everything else just lands in storage/.
   useEffect(() => {
     if (!isTauri()) return;
-    let unlisten: (() => void) | undefined;
+    let stopped = false;
     const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|bmp|svg|heic|heif|tiff?)$/i;
     const handleDrop = async (paths: string[], px: number, py: number) => {
       const dpr = window.devicePixelRatio || 1;
@@ -334,18 +343,24 @@ function MainShell() {
       }
       await invalidateNotes();
     };
-    void getCurrentWebview()
-      .onDragDropEvent((event) => {
-        if (event.payload.type === "drop" && event.payload.paths.length > 0) {
-          void handleDrop(event.payload.paths, event.payload.position.x, event.payload.position.y).catch(
-            () => {},
-          );
-        }
-      })
-      .then((un) => {
-        unlisten = un;
-      });
-    return () => unlisten?.();
+    // the registration is async: on a fast unmount the `.then` hadn't run yet,
+    // so a cleanup that read a not-yet-assigned `unlisten` unregistered nothing
+    // and leaked the listener (perf audit 2026-07-30, finding 26). Hold the
+    // PROMISE and resolve it in cleanup; `stopped` keeps a drop that lands in
+    // the same gap from touching an unmounted tree.
+    const listening = getCurrentWebview().onDragDropEvent((event) => {
+      if (stopped) return;
+      if (event.payload.type === "drop" && event.payload.paths.length > 0) {
+        void handleDrop(event.payload.paths, event.payload.position.x, event.payload.position.y).catch(
+          () => {},
+        );
+      }
+    });
+    void listening.catch(() => {});
+    return () => {
+      stopped = true;
+      void listening.then((un) => un()).catch(() => {});
+    };
   }, []);
 
   // fs mode: the window opens on the freshest note. The in-memory seed decides

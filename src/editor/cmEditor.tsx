@@ -173,11 +173,18 @@ function CmEditorImpl({
     });
   }, []);
 
-  const spellComp = useRef(new Compartment()).current;
-  const focusComp = useRef(new Compartment()).current;
-  const viewModeComp = useRef(new Compartment()).current;
-  const blockComp = useRef(new Compartment()).current;
-  const fmComp = useRef(new Compartment()).current;
+  // the reconfigurable slots, built once for the view's life — lazy init, not
+  // `useRef(new Compartment())`: a ref's argument is evaluated on every render,
+  // so that idiom constructed five throwaway Compartments per keystroke
+  // (perf audit 2026-07-30, finding 24)
+  const [comps] = useState(() => ({
+    spell: new Compartment(),
+    focus: new Compartment(),
+    viewMode: new Compartment(),
+    block: new Compartment(),
+    fm: new Compartment(),
+  }));
+  const { spell: spellComp, focus: focusComp, viewMode: viewModeComp, block: blockComp, fm: fmComp } = comps;
 
   // the raw-metadata banner reads live values through refs (the view is built
   // once; the compartment effect below swaps the widget when disk truth moves)
@@ -629,7 +636,9 @@ function CmEditorImpl({
     };
   }, [slash, pickSlash]);
 
-  const items = filterSlashItems(slash.query);
+  // only the query narrows the menu — re-filtering on every editor render was
+  // pure churn (perf audit 2026-07-30, finding 24)
+  const items = useMemo(() => filterSlashItems(slash.query), [slash.query]);
   return (
     <div className="rotli-cm-wrap" style={{ fontSize: `${fontSize}px` }}>
       <div

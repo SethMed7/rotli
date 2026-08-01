@@ -92,8 +92,10 @@ export interface BoardSaver {
   schedule(build: () => string): void;
   /** Write immediately (metadata edits don't ride the Excalidraw onChange). */
   saveNow(body: string): void;
-  /** Cancel the timer and write anything pending (unmount / board switch). */
-  flush(): void;
+  /** Cancel the timer and write anything pending (unmount / board switch).
+   * Returns the write's settling promise so quit-flush can HOLD the ack on it —
+   * a discarded promise acked quit before the board's bytes landed. */
+  flush(): Promise<void>;
 }
 
 /** Debounced writer behind every board save path, so pending-body semantics and
@@ -140,7 +142,7 @@ export function createBoardSaver(
       void put(body);
     },
     flush() {
-      void task.flush();
+      return task.flush();
     },
   };
 }

@@ -470,14 +470,6 @@
   cursor: default;
   opacity: 0.35;
 }
-.chat-send-spin {
-  animation: chat-send-spin 0.9s linear infinite;
-}
-@keyframes chat-send-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 
 /* composer tool buttons — web globe · image attach (line-art, theme-aware) */
 .chat-tool {

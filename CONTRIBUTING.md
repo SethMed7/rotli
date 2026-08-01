@@ -124,7 +124,9 @@ this migration.
 `no-explicit-any`, 4 `no-floating-promises`, 1 `no-misused-promises`;
 re-measured 2026-07-17) — over the 15-site adoption threshold; revisit once
 the `any` debt shrinks. Git hooks are deliberately MINIMAL: the tracked
-`.githooks/pre-commit` runs only staged-file oxfmt + a conflict-marker
+`.githooks/pre-commit` runs only staged-file oxfmt (scoped to the
+formatter-owned trees — src/, e2e/, scripts/, playwright.config.ts;
+breve-runtime/ keeps hand-aligned tables and stays outside) + a conflict-marker
 grep (sub-second — the old "measure lint latency first" concern is why
 lint/tsc stay out of it). Enable once per clone with
 `git config core.hooksPath .githooks`; full enforcement remains the `lint`

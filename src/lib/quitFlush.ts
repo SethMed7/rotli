@@ -19,10 +19,17 @@ import { isTauri } from "./tauri";
 type Flusher = () => Promise<void> | void;
 const flushers = new Set<Flusher>();
 
-/** Register work that must finish before the process exits. Never removed —
- * registrants live for the session (the module-level Map pattern). */
-export function onQuitFlush(fn: Flusher): void {
+/** Register work that must finish before the process exits; returns the
+ * unregister (the subscribeDocument idiom). Module-level registrants live for
+ * the session and simply drop it. Per-mount registrants MUST call it on
+ * unmount: board surfaces used to leak one closure — pinning the dead scene it
+ * captured — per board opened or switched, and quit then fanned out over all of
+ * them (perf audit 2026-07-30, finding 22). */
+export function onQuitFlush(fn: Flusher): () => void {
   flushers.add(fn);
+  return () => {
+    flushers.delete(fn);
+  };
 }
 
 /** Run every registered flusher; resolves when ALL settle (a rejection is a

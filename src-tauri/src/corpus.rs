@@ -4815,6 +4815,9 @@ fn validate_component(name: &str) -> Result<(), String> {
 
 /// Recursive scan. Skips dot-entries everywhere (`.rotli`, `.DS_Store`, temp
 /// files). Unreadable / non-UTF-8 files are skipped, never fatal.
+// The params ARE the recursion's accumulators — bundling them into a struct
+// would rename, not reduce, the coupling.
+#[allow(clippy::too_many_arguments)]
 fn walk(
     layout: Layout,
     root: &Path,

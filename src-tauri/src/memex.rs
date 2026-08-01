@@ -538,6 +538,33 @@ pub fn memex_list_chats(app: tauri::AppHandle, root: String) -> Result<Vec<ChatS
     list_chats_at(&root)
 }
 
+/// The first 41 lines of a file — exactly the window `fm()` can ever read
+/// (opening `---` + its 40-line backstop). Chat listings need only
+/// title/source/attachedTo/pinned, but transcripts grow unbounded, and
+/// read_to_string dragged the whole body in per chat per listing (perf
+/// audit 2026-07-30, finding 27). A 32 KiB byte cap backstops pathological
+/// single-line files. One deliberate divergence from the old whole-file read:
+/// a chat whose BODY is non-UTF-8 used to lose its frontmatter too
+/// (read_to_string failed → ""); the head read now returns it, so such a chat
+/// gains its real title/pinned instead of the "Untitled" fallback.
+fn frontmatter_head(p: &Path) -> String {
+    use std::io::{BufRead, BufReader, Read};
+    let Ok(f) = fs::File::open(p) else {
+        return String::new();
+    };
+    let mut reader = BufReader::new(f).take(32 * 1024);
+    let mut head = String::new();
+    let mut line = String::new();
+    for _ in 0..41 {
+        line.clear();
+        match reader.read_line(&mut line) {
+            Ok(0) | Err(_) => break,
+            Ok(_) => head.push_str(&line),
+        }
+    }
+    head
+}
+
 fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
     let dir = root.join("chats");
     let mut out = Vec::new();
@@ -555,7 +582,7 @@ fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
             if slug.eq_ignore_ascii_case("readme") {
                 continue;
             }
-            let text = fs::read_to_string(&p).unwrap_or_default();
+            let text = frontmatter_head(&p);
             let modified_ms = fs::metadata(&p)
                 .and_then(|m| m.modified())
                 .ok()

@@ -873,7 +873,7 @@ fn snapshot_at(active_root: &Path, legacy: Option<&Path>) -> BreveSnapshot {
         .or_else(|| legacy.and_then(|root| read_json(&root.join("watchers.json"))))
         .unwrap_or_default();
 
-    let mut briefs = scan_briefs(&active_root.join(BRIEFS_DIR), true, Some(&active_root));
+    let mut briefs = scan_briefs(&active_root.join(BRIEFS_DIR), true, Some(active_root));
     let mut seen: HashSet<String> = briefs.iter().map(|brief| brief.stem.clone()).collect();
     if let Some(legacy) = legacy {
         for brief in scan_briefs(&legacy.join("briefs"), false, None) {

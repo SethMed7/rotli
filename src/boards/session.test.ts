@@ -118,11 +118,11 @@ describe("createBoardSaver", () => {
     });
     expect(writes).toEqual([]); // debounced — nothing until the timer or a flush
     expect(builds).toBe(0); // and NOTHING serialized yet either
-    saver.flush();
+    await saver.flush();
     await tick();
     expect(writes).toEqual(["v2"]);
     expect(builds).toBe(1);
-    saver.flush(); // pending already drained — no duplicate write
+    await saver.flush(); // pending already drained — no duplicate write
     await tick();
     expect(writes).toEqual(["v2"]);
   });
@@ -137,15 +137,15 @@ describe("createBoardSaver", () => {
     });
     saver.prime("loaded");
     saver.schedule(() => "loaded");
-    saver.flush();
+    await saver.flush();
     await tick();
     expect(writes).toEqual([]); // unchanged → skipped
     saver.schedule(() => "drawn");
-    saver.flush();
+    await saver.flush();
     await tick();
     expect(writes).toEqual(["drawn"]);
     saver.schedule(() => "drawn"); // unchanged since the last save
-    saver.flush();
+    await saver.flush();
     await tick();
     expect(writes).toEqual(["drawn"]);
   });
@@ -163,7 +163,7 @@ describe("createBoardSaver", () => {
     saver.schedule(() => {
       throw new Error("scene too large");
     });
-    saver.flush();
+    await saver.flush();
     await tick();
     expect(writes).toEqual([]);
     expect(results).toEqual(["scene too large"]);
@@ -179,7 +179,7 @@ describe("createBoardSaver", () => {
     saver.saveNow("meta");
     await tick();
     expect(writes).toEqual(["meta"]);
-    saver.flush();
+    await saver.flush();
     await tick();
     expect(writes).toEqual(["meta", "pending"]);
   });

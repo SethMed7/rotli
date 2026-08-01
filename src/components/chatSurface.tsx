@@ -16,6 +16,8 @@ import {
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
+  memo,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -591,6 +593,42 @@ function renderMessage(text: string): ReactNode {
   return out;
 }
 
+// memo: renderMessage re-parses a whole message's markdown on every render, and
+// the surface re-renders on every composer keystroke and every thinking-status
+// tick. With a primitive `text` prop and a stable onCopy, settled messages skip
+// the parse; a message whose text changed still re-renders (perf audit
+// 2026-07-30, finding 10).
+const ChatMessage = memo(function ChatMessage({
+  text,
+  you,
+  index,
+  copied,
+  onCopy,
+}: {
+  text: string;
+  you: boolean;
+  index: number;
+  copied: boolean;
+  onCopy: (index: number, text: string) => void;
+}) {
+  return (
+    <div className={you ? "cmsg you" : "cmsg ai"}>
+      <div className="cmsg-bubble">{you ? text : renderMessage(text)}</div>
+      <div className="cmsg-actions">
+        <button
+          type="button"
+          className="cmsg-act"
+          aria-label="Copy message"
+          title="Copy"
+          onClick={() => onCopy(index, text)}
+        >
+          {copied ? <CheckGlyph size={13} /> : <CopyGlyph size={13} />}
+        </button>
+      </div>
+    </div>
+  );
+});
+
 export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: string | null }) {
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const chatModelId = useUiStore((s) => s.chatModelId);
@@ -709,6 +747,15 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const runSeq = useRef(0);
   // what Stop gives back to the composer — the sent prompt returns intact
   const lastSentRef = useRef<{ text: string; images: string[] } | null>(null);
+
+  // stable across renders so the memoized message rows keep skipping — the ✓
+  // beat is undone only if that same row is still the copied one.
+  const onCopyMessage = useCallback((idx: number, text: string) => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopiedIdx(idx);
+      window.setTimeout(() => setCopiedIdx((cur) => (cur === idx ? null : cur)), 1200);
+    });
+  }, []);
 
   const writable = active?.perms === "chats+inbox";
 
@@ -1185,33 +1232,16 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                 // brand mark appears once at the thread's live edge instead
                 // (Seth, 2026-07-30: match the premium chat grammar). Options
                 // ride each message, revealed on hover/focus.
-                messages.map((m, idx) => {
-                  const you = m.speaker === "you";
-                  return (
-                    <div key={idx} className={you ? "cmsg you" : "cmsg ai"}>
-                      <div className="cmsg-bubble">{you ? m.text : renderMessage(m.text)}</div>
-                      <div className="cmsg-actions">
-                        <button
-                          type="button"
-                          className="cmsg-act"
-                          aria-label="Copy message"
-                          title="Copy"
-                          onClick={() => {
-                            void navigator.clipboard.writeText(m.text).then(() => {
-                              setCopiedIdx(idx);
-                              window.setTimeout(
-                                () => setCopiedIdx((cur) => (cur === idx ? null : cur)),
-                                1200,
-                              );
-                            });
-                          }}
-                        >
-                          {copiedIdx === idx ? <CheckGlyph size={13} /> : <CopyGlyph size={13} />}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
+                messages.map((m, idx) => (
+                  <ChatMessage
+                    key={idx}
+                    text={m.text}
+                    you={m.speaker === "you"}
+                    index={idx}
+                    copied={copiedIdx === idx}
+                    onCopy={onCopyMessage}
+                  />
+                ))
               )}
               {busy && (
                 <div className="cmsg ai">

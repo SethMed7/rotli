@@ -52,8 +52,15 @@ const LLM_PROVIDER_DEFAULTS: Record<string, { endpoint: string; model: string; l
 
 /** Is a model ENDPOINT loopback-local? The Breve local-model tier promises page text, Signal
  *  conversation text, and memex-derived prompts stay on the machine — so its endpoint MUST be
- *  loopback. Mirrors src/ai/guard.ts endpointIsLocal + Rust chat.rs endpoint_is_local (independent
- *  implementations, parity.json endpointLocality verdicts). Unparseable ⇒ false (fail closed). */
+ *  loopback. Unparseable ⇒ false (fail closed).
+ *
+ *  MIRROR-NOT-IMPORT across the app boundary — the same locality rule is written THREE times so that
+ *  no boundary inherits another's security policy by import: src/ai/guard.ts endpointIsLocal (the
+ *  app's pre-flight check) · src-tauri/src/chat.rs endpoint_is_local (the Rust backstop) · this one
+ *  (Breve's local tier). They stay in lockstep by FIXTURE, never by shared code: the agreed verdicts
+ *  live in scripts/fixtures/parity.json → endpointLocality, and each side asserts them independently
+ *  (src/lib/parity.test.ts · src-tauri/src/parity_tests.rs · breve-runtime/tests/test-config-locality.ts).
+ *  Change the rule here and you must change all three + the fixture, or one of those suites fails. */
 export function llmEndpointIsLocal(endpoint: string): boolean {
   let url: URL;
   try { url = new URL(endpoint); } catch { return false; }

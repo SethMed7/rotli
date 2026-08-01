@@ -26,6 +26,20 @@ describe("runQuitFlushers", () => {
     expect(ran.sort()).toEqual(["async", "rejector", "sync", "thrower"]);
   });
 
+  test("an unregistered flusher no longer runs — per-mount cleanup must not leak", async () => {
+    const ran: string[] = [];
+    const unregister = onQuitFlush(() => {
+      ran.push("unmounted-board");
+    });
+    const keep = onQuitFlush(() => {
+      ran.push("still-mounted");
+    });
+    unregister();
+    await runQuitFlushers();
+    keep();
+    expect(ran).toEqual(["still-mounted"]);
+  });
+
   test("holds the ack until a SLOW async flusher's write actually lands", async () => {
     // the data-safety contract behind the editor/persist registrations: the
     // returned promise must be awaited, not fire-and-forgotten

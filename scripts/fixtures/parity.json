@@ -47,7 +47,7 @@
       }
     },
     "endpointLocality": {
-      "sourceOfTruth": "behavioral: src-tauri/src/chat.rs endpoint_is_local ↔ src/ai/guard.ts endpointIsLocal (independent implementations, fixture-aligned verdicts)",
+      "sourceOfTruth": "behavioral: src-tauri/src/chat.rs endpoint_is_local ↔ src/ai/guard.ts endpointIsLocal ↔ breve-runtime/scripts/config.ts endpointIsLocal (independent implementations, fixture-aligned verdicts; the Breve side asserts via breve-runtime/tests/test-config-locality.ts)",
       "value": [
         { "url": "http://localhost:11435", "local": true },
         { "url": "http://LOCALHOST:11435/api", "local": true },
