@@ -59,9 +59,24 @@ exception.
   one. The editor header may
   expose the existing session back/forward trail beside the date, using compact
   adjacent-note labels rather than duplicating the sidebar's folder hierarchy.
-- The sidebar ends in a pinned utility footer — Files · Librarian · Settings on
-  one quiet row; section disclosure chevrons ride the row's right edge so icons
-  and labels start flush left.
+- The sidebar has one front switcher and one body. A two-segment pill under the
+  vault header picks the active front — Home (the notes world: All notes,
+  Captures, Tasks, the Main/named-view tree) or Chat (New chat, All chats, chat
+  folders, every chat). Neither front collapses and neither is nested inside the
+  other: the chosen one owns the whole body and scrolls on its own. The pill is
+  an ordered list of fronts, so a Home dashboard block or the parked email Inbox
+  joins without another information-architecture change. Breve is a mode, not a
+  front — it replaces the switcher rather than nesting one.
+- The System zone (Library · Assets · Archive · Trash, plus added external
+  folders) stays pinned below the body and belongs to Home; its header is a
+  disclosure so the whole zone can be folded away. The sidebar ends in a pinned
+  utility footer — Files · Librarian · Settings on one quiet row — which is
+  app-level and shows under every front. Section and zone disclosure chevrons
+  ride the row's right edge so icons and labels start flush left.
+- A reveal must move the sidebar to the front that can render it before it
+  reveals: an explicit note reveal lands on Home, and opening a chat, note,
+  board, or file pulls the front to match the focused tab. A reveal into a front
+  that cannot show the row is a silent failure, not a no-op.
 - The System browser is a spatial Finder with four views — Icons, List,
   Columns, Gallery — switched by the standard Finder icons (words live in
   tooltips). Image assets show real thumbnails wherever a tile or filmstrip

@@ -250,6 +250,7 @@ export function registerDefaultActions(): void {
       ui.setFocusMode(false);
       ui.setSettingsOpen(false);
       ui.setSidebarMode("notes");
+      ui.setSidebarView("home"); // Captures is a Home row
       ui.setContentView(ui.contentView === "board" ? "panes" : "board");
     },
   });
@@ -574,29 +575,45 @@ export function registerDefaultActions(): void {
     });
   }
 
+  // — the FRONTS (Seth's IA, 2026-08-01): ⌃1 Home, ⌃2 Chat. The sidebar's
+  //   switcher and these chords are the same gesture, so a keyboard user never
+  //   has to reach for the pill (docs/design/sidebar-home-chat.md). —
   registerAction({
     id: "modules.notes",
-    title: "Go to Notes",
+    title: "Go to Home",
     defaultChord: "Ctrl+1",
     run: () => {
       const ui = useUiStore.getState();
       ui.setSettingsOpen(false);
       ui.setSidebarMode("notes");
+      ui.setSidebarView("home");
       ui.setContentView("panes"); // back to the note panes
     },
   });
-
-  // Chat is the middle left-menu section (no longer a dropdown module). The
-  // palette/⌃2 opens a fresh chat in the content area; the sidebar drives chat
-  // selection directly. Both reach ⌘K and are rebindable.
   registerAction({
-    id: "chat.new",
-    title: "New chat",
+    id: "modules.chat",
+    title: "Go to Chat",
     defaultChord: "Ctrl+2",
     run: () => {
       const ui = useUiStore.getState();
       ui.setSettingsOpen(false);
       ui.setSidebarMode("notes");
+      ui.setSidebarView("chat");
+    },
+  });
+
+  // Chat is a FRONT now, not a section. ⌃⇧2 opens a fresh chat pane (it moved
+  // off ⌃2 so the two fronts could own ⌃1/⌃2 — bindings persist by action id,
+  // so an existing override is untouched). Both reach ⌘K and are rebindable.
+  registerAction({
+    id: "chat.new",
+    title: "New chat",
+    defaultChord: "Ctrl+Shift+2",
+    run: () => {
+      const ui = useUiStore.getState();
+      ui.setSettingsOpen(false);
+      ui.setSidebarMode("notes");
+      ui.setSidebarView("chat");
       // chat is a PANE surface now — open a fresh chat pane. The old contentView
       // "chat" was retired and rendered nothing (Seth, 2026-06-30 — audit).
       usePanesStore.getState().openChat(null);
@@ -660,6 +677,7 @@ export function registerDefaultActions(): void {
       const ui = useUiStore.getState();
       ui.setSettingsOpen(false);
       ui.setSidebarMode("notes");
+      ui.setSidebarView("chat");
       // open the All-chats content view (the Chat-front twin of All notes)
       ui.setContentView("allChats");
     },

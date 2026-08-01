@@ -45,18 +45,6 @@ export type OrganizerModel = "local" | "claude" | "gemini35";
 
 export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local", "claude", "gemini35"];
 
-/** How many recent chats the sidebar Chat section shows before "All chats" takes
- * over — the accordion is a LIMITED view. 5 (default) / 10 / 15 (Seth's decision
- * 2026-07-03: the old flat 12 was too much). */
-export const CHAT_SIDEBAR_LIMITS: readonly number[] = [5, 10, 15];
-export const DEFAULT_CHAT_SIDEBAR_LIMIT = 5;
-
-/** Coerce any stored / hand-set value to an allowed chat cap; unknown → default.
- * Pure (exported for the persist parse + its tests). */
-export function clampChatSidebarLimit(n: unknown): number {
-  return typeof n === "number" && CHAT_SIDEBAR_LIMITS.includes(n) ? n : DEFAULT_CHAT_SIDEBAR_LIMIT;
-}
-
 /** The per-chat key every chat-scoped map uses: the saved slug, or a
  * PANE-scoped session key while the chat is still unsaved (never a shared ""
  * key — that leaked one chat's choice into every future fresh chat, #7). */
@@ -93,16 +81,21 @@ export type SidebarMode = "notes" | "breve";
  * (the former Models + Configure views merged). */
 export type BreveView = "briefs" | "routines" | "watchlist" | "settings";
 
-/** The top-level left-menu sections (Seth's decided IA, 2026-06-26): Chat ·
- * Notes. Each is a collapsible accordion; its open state lives in expandedDests
- * under these reserved ids (so it persists like a destination). The Inbox
- * (email) front was removed 2026-07-30 until the mail integration is real —
- * see ROADMAP.md; its persisted "sec:inbox" key stays valid in persist.ts so
- * user state survives the eventual restore. */
-export const SEC_CHAT = "sec:chat";
-export const SEC_NOTES = "sec:notes";
-/** The MAIN section's own collapse key (2026-07-26: Main is collapsible). */
-export const SEC_MAIN = "sec:main";
+/** The sidebar's FRONTS (Seth, 2026-08-01, from Claude Desktop's Home|Code
+ * pill): a two-segment switcher under the vault header replaces the old stacked
+ * "Chat ›" / "Notes ›" accordions. Home is the notes world — and eventually a
+ * dashboard; Chat is the chat world. Each front owns the whole sidebar body and
+ * scrolls on its own; neither collapses. A THIRD front (the parked email Inbox)
+ * joins by adding one entry here — see docs/design/sidebar-home-chat.md. */
+export type SidebarView = "home" | "chat";
+
+/** The SYSTEM zone's collapse key (Seth, 2026-08-01: "allow me to collapse the
+ * system area just to clean up the sidebar more"). Lives in expandedDests under
+ * a reserved "sec:" id so it persists like a destination; default OPEN.
+ * The retired section keys ("sec:chat", "sec:notes", and the parked email
+ * front's "sec:inbox") are no longer rendered by anything — persist.ts keeps
+ * every "sec:"-shaped key by SHAPE so a downgrade still finds its state. */
+export const SEC_SYSTEM = "sec:system";
 
 /** Sidebar width clamp — small enough to tuck away, never wide enough to eat
  * the editor (one rail now, not two — Seth, 2026-06-13). */
@@ -202,6 +195,10 @@ interface UiState {
    * navigation + right workspace while preserving the user's open panes. */
   sidebarMode: SidebarMode;
   setSidebarMode: (mode: SidebarMode) => void;
+  /** Which FRONT the sidebar shows in notes mode: Home (the notes world) or
+   * Chat. Persisted, so the app reopens where you left it. */
+  sidebarView: SidebarView;
+  setSidebarView: (view: SidebarView) => void;
   breveView: BreveView;
   setBreveView: (view: BreveView) => void;
   /** Transient edit guard for Breve forms. Never persisted: drafts live only
@@ -229,8 +226,9 @@ interface UiState {
   revealFocusedNote: (mode?: "auto" | "brain", noteId?: string) => void;
   /** TWO-STAGE collapse (the sidebar's collapse-all toolbar button, Seth
    * 2026-07-31): while any folder/dest tree is open, a press folds the TREES
-   * and leaves the sections alone; once everything inside is folded, the next
-   * press folds the sections themselves (sec:chat / sec:notes).
+   * and leaves the zones alone; once everything inside is folded, the next
+   * press folds the SYSTEM zone itself (sec:system — the fronts replaced the
+   * old sec:chat / sec:notes sections, 2026-08-01).
    * `defaultOpenIds` are the rows that read the map with an OPEN default
    * (Main folders, chat folders, the Brain header) — they get an explicit
    * `false`, or wiping the map would EXPAND them (#83, audit 2026-07), and
@@ -244,6 +242,13 @@ interface UiState {
    * the browser answers by opening its create-folder input at its cwd. */
   systemFolderNonce: number;
   requestSystemFolder: () => void;
+  /** Bumped by the sidebar header's New-folder button when the panes (not a
+   * System browser) are showing — the ACTIVE FRONT answers: Home opens its
+   * inline Main-folder input, Chat mints a chat folder and renames it inline.
+   * The header lives in the shell, the input lives in the front, so the nonce
+   * is the seam (the requestSystemFolder pattern). Transient. */
+  sidebarFolderNonce: number;
+  requestSidebarFolder: () => void;
   /** The System browser's current multi-selection (Finder gestures: ⌘/⇧-click,
    * rubber band) — item SUMMARIES so ⌘⌫'s registry action can trash kind-aware
    * without reaching back into a component. */
@@ -371,10 +376,6 @@ interface UiState {
    * this pane, or a right split beside the chat. Persisted. */
   chatNoteOpen: "tab" | "split";
   setChatNoteOpen: (v: "tab" | "split") => void;
-  /** How many recent chats the sidebar Chat section shows before "All chats"
-   * (5/10/15, default 5 — Seth, 2026-07-03). Persisted. */
-  chatSidebarLimit: number;
-  setChatSidebarLimit: (n: number) => void;
   /** Connected subscription models (Settings → AI Models): which lanes are
    * enabled. A lane must ALSO detect as installed+authed to serve. Persisted. */
   aiProviders: Record<ProviderId, boolean>;
@@ -532,6 +533,8 @@ export const useUiStore = create<UiState>((set, get) => ({
       return;
     set({ sidebarMode: mode, ...(mode === "breve" ? {} : { breveDirty: false }) });
   },
+  sidebarView: "home",
+  setSidebarView: (view) => set({ sidebarView: view }),
   breveView: "briefs",
   setBreveView: (view) => {
     const current = get();
@@ -547,11 +550,10 @@ export const useUiStore = create<UiState>((set, get) => ({
   breveDirty: false,
   setBreveDirty: (dirty) => set({ breveDirty: dirty }),
 
-  // the sections open by default, plus the Capture(Inbox) + Vault dests
-  // inside Notes — so a fresh window shows the full section tree.
+  // the System zone open by default, plus the Capture(Inbox) + Vault dests
+  // inside Home — so a fresh window shows the full tree.
   expandedDests: {
-    [SEC_CHAT]: true,
-    [SEC_NOTES]: true,
+    [SEC_SYSTEM]: true,
     Inbox: true,
     "vault:": true,
   },
@@ -561,11 +563,15 @@ export const useUiStore = create<UiState>((set, get) => ({
   revealNonce: 0,
   revealMode: "auto",
   revealNoteId: null,
+  // an explicit reveal always points at NOTE content, so it moves the sidebar
+  // to Home first — revealing into a front that can't render the row is a
+  // silent no-op (Seth's IA, 2026-08-01). Doing it HERE covers every caller.
   revealFocusedNote: (mode = "auto", noteId) =>
     set((s) => ({
       revealNonce: s.revealNonce + 1,
       revealMode: mode,
       revealNoteId: noteId ?? null,
+      sidebarView: "home" as SidebarView,
     })),
   collapseAllDests: (defaultOpenIds = []) =>
     set((s) => {
@@ -577,21 +583,25 @@ export const useUiStore = create<UiState>((set, get) => ({
         defaultOpenIds.some((id) => s.expandedDests[id] !== false) ||
         Object.entries(s.expandedDests).some(([id, open]) => !id.startsWith("sec:") && open === true);
       const treesFolded = {
-        // section fold states (sec:*) are the user's own arrangement —
-        // stage 1 folds the TREES; it must never REOPEN a folded section
+        // zone fold states (sec:*) are the user's own arrangement —
+        // stage 1 folds the TREES; it must never REOPEN a folded zone
         // (replacing the map wiped them back to default-open — Seth, 2026-07-27)
         ...Object.fromEntries(Object.entries(s.expandedDests).filter(([id]) => id.startsWith("sec:"))),
         ...Object.fromEntries(defaultOpenIds.map((id) => [id, false])),
       };
       if (anyTreeOpen) return { expandedDests: treesFolded };
-      // stage 2 (everything inside already folded): fold the sections too
-      return { expandedDests: { ...treesFolded, [SEC_CHAT]: false, [SEC_NOTES]: false } };
+      // stage 2 (everything inside already folded): fold the SYSTEM zone —
+      // the one remaining sec:* surface now that the fronts replaced the
+      // Chat/Notes accordions (2026-08-01)
+      return { expandedDests: { ...treesFolded, [SEC_SYSTEM]: false } };
     }),
 
   selectedFolderId: ALL_NOTES,
   setSelectedFolderId: (id) => set({ selectedFolderId: id }),
   systemFolderNonce: 0,
   requestSystemFolder: () => set((s) => ({ systemFolderNonce: s.systemFolderNonce + 1 })),
+  sidebarFolderNonce: 0,
+  requestSidebarFolder: () => set((s) => ({ sidebarFolderNonce: s.sidebarFolderNonce + 1 })),
   systemSelection: [],
   setSystemSelection: (items) => set({ systemSelection: items }),
   activeView: null,
@@ -672,8 +682,6 @@ export const useUiStore = create<UiState>((set, get) => ({
     }),
   chatNoteOpen: "tab",
   setChatNoteOpen: (v) => set({ chatNoteOpen: v }),
-  chatSidebarLimit: DEFAULT_CHAT_SIDEBAR_LIMIT,
-  setChatSidebarLimit: (n) => set({ chatSidebarLimit: clampChatSidebarLimit(n) }),
   aiProviders: { claude: false, codex: false, agy: false, gemini: false },
   setAiProvider: (id, on) => set((s) => ({ aiProviders: { ...s.aiProviders, [id]: on } })),
   hybridPresets: [],

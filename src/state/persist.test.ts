@@ -13,7 +13,6 @@ import {
   unknownSettingsKeys,
   validTab,
 } from "./persist";
-import { clampChatSidebarLimit } from "./ui";
 
 describe("userName", () => {
   test("defaults to empty and survives a round-trip", () => {
@@ -35,29 +34,36 @@ describe("raw Markdown syntax palette", () => {
   });
 });
 
-describe("chatSidebarLimit (#17 — chat list cap)", () => {
-  test("defaults a missing key to 5", () => {
-    expect(parseSettings("{}").chatSidebarLimit).toBe(5);
+describe("sidebarView (the Home/Chat front, 2026-08-01)", () => {
+  test("defaults a missing key to Home", () => {
+    expect(parseSettings("{}").sidebarView).toBe("home");
   });
 
-  test("keeps every allowed cap (5/10/15)", () => {
-    for (const n of [5, 10, 15]) {
-      expect(parseSettings(JSON.stringify({ chatSidebarLimit: n })).chatSidebarLimit).toBe(n);
-    }
+  test("round-trips Chat and rejects an unknown front", () => {
+    expect(parseSettings('{"sidebarView":"chat"}').sidebarView).toBe("chat");
+    expect(parseSettings('{"sidebarView":"dashboard"}').sidebarView).toBe("home");
+    expect(parseSettings('{"sidebarView":7}').sidebarView).toBe("home");
   });
 
-  test("coerces an out-of-set value (hand-edit / future build) to the default", () => {
-    expect(parseSettings('{"chatSidebarLimit":12}').chatSidebarLimit).toBe(5);
-    expect(parseSettings('{"chatSidebarLimit":0}').chatSidebarLimit).toBe(5);
-    expect(parseSettings('{"chatSidebarLimit":"10"}').chatSidebarLimit).toBe(5);
+  test("a retired chatSidebarLimit rides the unknown-key passthrough", () => {
+    // the 5/10/15 cap is gone with the Chat accordion (the front shows every
+    // chat) — but a downgrade must still find the user's value (#35)
+    expect(unknownSettingsKeys('{"chatSidebarLimit":10}').chatSidebarLimit).toBe(10);
   });
 
-  test("clampChatSidebarLimit is pure + safe on junk", () => {
-    expect(clampChatSidebarLimit(10)).toBe(10);
-    expect(clampChatSidebarLimit(7)).toBe(5);
-    expect(clampChatSidebarLimit(undefined)).toBe(5);
-    expect(clampChatSidebarLimit(null)).toBe(5);
-    expect(clampChatSidebarLimit("15")).toBe(5);
+  test("a fresh config seeds the System zone OPEN", () => {
+    // an empty expandedDests means "first run" — the System zone must arrive
+    // unfolded, or Library/Assets/Archive/Trash would be hidden out of the box
+    expect(parseSettings("{}").expandedDests["sec:system"]).toBe(true);
+  });
+
+  test("a stored System fold survives the parse untouched", () => {
+    const raw = JSON.stringify({ expandedDests: { "sec:system": false, "sec:notes": false } });
+    const dests = parseSettings(raw).expandedDests;
+    expect(dests["sec:system"]).toBe(false);
+    // the retired section key is preserved, not seeded over — a downgrade
+    // (or the parked Inbox front's return) finds its state where it left it
+    expect(dests["sec:notes"]).toBe(false);
   });
 });
 

@@ -1921,8 +1921,6 @@ function ModelsPane() {
   const setImageEngine = useUiStore((s) => s.setImageEngine);
   const chatNoteOpen = useUiStore((s) => s.chatNoteOpen);
   const setChatNoteOpen = useUiStore((s) => s.setChatNoteOpen);
-  const chatSidebarLimit = useUiStore((s) => s.chatSidebarLimit);
-  const setChatSidebarLimit = useUiStore((s) => s.setChatSidebarLimit);
 
   const blockedModels = useUiStore((s) => s.blockedModels);
   const local = useQuery({
@@ -2161,22 +2159,6 @@ function ModelsPane() {
             ["split", "Splits to the right"],
           ]}
           onPick={setChatNoteOpen}
-        />
-      </section>
-
-      <section className="aisection">
-        <h4 className="set-subhead">Chats in the sidebar</h4>
-        <p className="setnote">
-          How many recent chats the sidebar shows before <b>All chats</b> takes over:
-        </p>
-        <Seg
-          value={String(chatSidebarLimit)}
-          options={[
-            ["5", "5"],
-            ["10", "10"],
-            ["15", "15"],
-          ]}
-          onPick={(v) => setChatSidebarLimit(Number(v))}
         />
       </section>
     </>

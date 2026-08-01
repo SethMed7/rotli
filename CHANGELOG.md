@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The sidebar has a Home and a Chat, and you pick one.** The stacked "Chat"
+  and "Notes" sections are gone. A small two-segment switcher now sits under
+  your vault name: **Home** is your notes — All notes, Captures, Tasks and the
+  Main tree you arrange yourself — and **Chat** is your chats, folders and all.
+  Whichever you pick gets the whole sidebar and just scrolls, so you no longer
+  fold one away to see the other, and Chat no longer stops at five recent
+  conversations with a "+7 more" — every chat is right there. Rotli reopens on
+  the side you were last using. `⌃1` goes Home, `⌃2` goes to Chat, and New chat
+  moved to `⌃⇧2`; every one of those is still yours to rebind. Opening
+  something always brings the right side forward — click a note and you land in
+  Home, open a chat and you land in Chat — so "show me where this is" never
+  points at a panel you can't see. Settings lost its "Chats in the sidebar"
+  count, which no longer had anything to limit.
+- **The System area folds away.** Library, Assets, Archive and Trash now sit
+  under a heading you can click shut when you want a quieter sidebar; the
+  Files · Librarian · Settings row at the very bottom stays put, under both
+  Home and Chat. Pressing Collapse all twice still folds everything — the
+  second press now tucks the System area away instead of the old sections.
+
 ### Fixed
 
 - **Breve's mail reader and Signal listener got two real crashes removed.**

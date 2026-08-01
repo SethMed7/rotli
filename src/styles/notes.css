@@ -7,11 +7,9 @@
 /* — interactive rows render as buttons; strip the UA chrome — */
 .frow,
 .snrow,
-.sb-section,
 .sb-chatnew,
 .sb-chatrow,
 .sb-chat-empty,
-.sb-chat-more,
 .fsec-add,
 .fsec-view,
 .view-editor-save,
@@ -90,6 +88,63 @@
   min-height: 0;
   overflow-y: auto;
   padding: 4px 8px 12px;
+}
+
+/* — the FRONT switcher (Seth, 2026-08-01, from Claude Desktop's Home|Code
+   pill): two segments in one quiet trough directly under the vault header.
+   The trough is the recessed tone, the ACTIVE segment is the raised surface —
+   hierarchy by surface contrast, no shadow, no glow (DESIGN.md flat material). — */
+.sb-switch {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+  margin: 0 12px 8px;
+  padding: 2px;
+  border-radius: var(--r-tab);
+  background: var(--tint);
+}
+.sb-switch-seg {
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: none;
+  font: inherit;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sb-switch-seg svg {
+  flex: 0 0 auto;
+}
+.sb-switch-seg:hover {
+  color: var(--text);
+}
+.sb-switch-seg.sel {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+.sb-switch-seg.sel svg {
+  color: var(--accent-text);
+}
+.sb-switch-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-switch-n {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 /* — destination / folder / smart rows (shared .frow grammar) — */
@@ -523,66 +578,6 @@
   padding: 14px 10px 5px;
 }
 
-/* — the top-level left-menu sections (Chat · Notes), Seth's IA 2026-06-26.
-   A section header is a prominent, full-width disclosure row: bolder than a
-   folder row, with the section glyph + a soft top rule between sections so
-   they read as distinct zones. — */
-.sb-section {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 9px 10px;
-  margin-top: 4px;
-  border-radius: var(--r-control);
-  font-family: var(--font-display);
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--text);
-  cursor: pointer;
-  position: relative;
-}
-.sb-section + .sb-section,
-.sb-chat + .sb-section {
-  border-top: 1px solid var(--border);
-  margin-top: 6px;
-  padding-top: 12px;
-}
-.sb-section:hover {
-  background: var(--hov);
-}
-.sb-section > svg:not(.fchev svg) {
-  color: var(--accent-text);
-  flex: 0 0 auto;
-}
-.sb-section .fname {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-}
-.sb-section .count {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-/* the disclosure chevron rides the RIGHT edge (Seth, 2026-07-28) — quiet at
-   rest, and the left inset stays flush for the glyph + label */
-.sb-section .fchev {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 12px;
-  color: var(--text-muted);
-  opacity: 0.6;
-  transition: transform var(--motion-exit) var(--motion-ease);
-}
-.sb-section .fchev.open {
-  transform: rotate(90deg);
-}
-
 /* — a failed row-menu action (file-to-brain, board rename): an inline,
    dismissible error note pinned above the tree (#11, audit 2026-07) — */
 .sb-error {
@@ -720,8 +715,7 @@
 .sb-chatrow.sel .sb-chatpin {
   color: var(--on-accent);
 }
-.sb-chat-empty,
-.sb-chat-more {
+.sb-chat-empty {
   text-align: left;
   background: none;
   border: none;
@@ -734,8 +728,7 @@
 }
 /* interactive rows share ONE hover grammar: the --hov wash (audit 2026-07-30;
    these two darkened their text only, unlike every sibling row) */
-.sb-chat-empty:hover,
-.sb-chat-more:hover {
+.sb-chat-empty:hover {
   background: var(--hov);
   color: var(--text);
 }
@@ -1659,6 +1652,45 @@
   padding: 6px 10px 3px;
   font-size: 10px;
 }
+/* the zone header is a DISCLOSURE now (Seth, 2026-08-01: "allow me to collapse
+   the system area just to clean up the sidebar more") — the label keeps its
+   .fsec voice, the chevron rides the right edge like every other section */
+.sb-syshdr {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+.sb-syshdr .fsec {
+  flex: 1;
+  min-width: 0;
+}
+.sb-syshdr:hover {
+  background: var(--hov);
+}
+.sb-syshdr:hover .fsec {
+  color: var(--text);
+}
+.sb-syshdr .fchev {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 12px;
+  margin-right: 8px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  transition: transform var(--motion-exit) var(--motion-ease);
+}
+.sb-syshdr .fchev.open {
+  transform: rotate(90deg);
+}
 .sb-system .frow {
   padding: 3.5px 10px;
   font-size: 12.5px;
@@ -1681,11 +1713,13 @@
 }
 /* — the utility footer (Seth, 2026-07-28, Obsidian reference): Files ·
    Librarian · Settings split one quiet row under the System rows — */
+/* the footer sits OUTSIDE the System zone since the fronts landed (2026-08-01):
+   it shows under Home and Chat alike, so it owns its own inset + hairline */
 .sb-foot {
+  flex: 0 0 auto;
   display: flex;
   gap: 2px;
-  margin-top: 4px;
-  padding-top: 5px;
+  padding: 5px 8px 6px;
   border-top: 1px solid var(--border);
 }
 .sb-footbtn {

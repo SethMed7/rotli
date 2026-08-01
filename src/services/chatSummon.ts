@@ -27,6 +27,7 @@ export async function summonChat(): Promise<void> {
   // chat is a pane surface — Settings would sit on top of it (mirrors chat.new)
   useUiStore.getState().setSettingsOpen(false);
   useUiStore.getState().setSidebarMode("notes");
+  useUiStore.getState().setSidebarView("chat"); // the summon lands on the Chat front
   const panes = usePanesStore.getState();
   const leaf = findLeaf(panes.root, panes.focusedPaneId) ?? leaves(panes.root)[0];
   const existing = leaf?.tabs.find((t) => t.surfaceKind === "chat");

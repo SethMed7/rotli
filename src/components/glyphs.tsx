@@ -597,6 +597,18 @@ export function ChatGlyph(props: GlyphProps) {
   );
 }
 
+/** The HOME front's mark (Seth's IA, 2026-08-01) — a plain house. Home is the
+ * notes world today and a dashboard eventually, so the glyph says "where you
+ * land", not "notes" (the stacked-pages mark still labels the Library row). */
+export function HomeGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19v-8.5Z" />
+      <path d="M9.5 20.5v-6h5v6" />
+    </Glyph>
+  );
+}
+
 /** Notes section header — a stacked-pages mark (the corpus). */
 export function NotesStackGlyph(props: GlyphProps) {
   return (

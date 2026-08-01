@@ -33,6 +33,7 @@ fix both in the same change.
 | Egress map, security checks, and the threat model | [`development/security.md`](development/security.md) |
 | Assets, actors, trust boundaries, and residual risk | [`security/threat-model.md`](security/threat-model.md) |
 | What each class of model may see and edit (secure vs locked, reference lanes) | [`design/ai-visibility-matrix.md`](design/ai-visibility-matrix.md) |
+| Sidebar information architecture (Home/Chat fronts, System zone, front keys) | [`design/sidebar-home-chat.md`](design/sidebar-home-chat.md) |
 | Durable schemas, compatibility, migrations, and downgrade behavior | [`architecture/compatibility-and-migrations.md`](architecture/compatibility-and-migrations.md) |
 | Release integrity, provenance, SBOM, keys, and rollback | [`operations/release-and-supply-chain.md`](operations/release-and-supply-chain.md) |
 | Privacy-safe support, diagnostics, backup, and incident triage | [`operations/support-and-diagnostics.md`](operations/support-and-diagnostics.md) |

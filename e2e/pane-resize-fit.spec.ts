@@ -85,11 +85,13 @@ async function escapingChrome(page: import("@playwright/test").Page) {
   });
 }
 
-/** Open a chat tab in the focused pane through the sidebar's own New chat row. */
+/** Open a chat tab in the focused pane through the sidebar's own New chat row.
+ * The sidebar opens on the Home front (2026-08-01), so the Chat segment of the
+ * switcher is the way in — the same click a user makes. */
 async function openChatPane(page: import("@playwright/test").Page) {
   await gotoApp(page);
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
   const newChat = page.locator(".sb-chatnew");
-  if (!(await newChat.isVisible())) await page.locator(".sb-sec", { hasText: "Chat" }).first().click();
   await newChat.click();
   await expect(page.locator(".chat-surface")).toHaveCount(1);
 }

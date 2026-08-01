@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-08-01T15:18:45.370Z",
+  "last_modified": "2026-08-01T19:59:00.439Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -678,6 +678,15 @@
       "rationale": "ROTLI_MODELS said nothing about what a model class may READ or WRITE, so agents inferred it from the stale ROTLI_MEMEX rule 1. Seth's 2026-08-01 matrix makes class the deciding axis for visibility and makes edit authority class-independent.",
       "source": "docs/design/ai-visibility-matrix.md",
       "proposed_at": "2026-08-01T15:18:45.370Z",
+      "status": "pending"
+    },
+    {
+      "id": "stg-004",
+      "proposed_domain": "ROTLI_SHELL",
+      "rule_text": "The sidebar: one-row header, then a two-segment FRONT switcher — Home (All notes · Captures · Tasks · Main tree) and Chat (New chat · All chats · folders · every chat, uncapped). The active front owns the whole scrolling body; neither collapses. Breve is a MODE replacing the switcher. Under Home sits the collapsible SYSTEM zone (sec:system, default open); the Files · Librarian · Settings footer shows under every front. Persisted: sidebarView + expandedDests['sec:system']. Chords ⌃1 Home / ⌃2 Chat / ⌃⇧2 New chat; reveals switch fronts first. Parts live in src/components/sidebar/.",
+      "rationale": "Rule 1 still describes the retired Chat/Notes accordions and an uncollapsible System zone. The 2026-08-01 IA replaced both, split sidebar.tsx, and moved chat.new off ⌃2.",
+      "source": "docs/design/sidebar-home-chat.md",
+      "proposed_at": "2026-08-01T19:59:00.439Z",
       "status": "pending"
     }
   ]

@@ -52,7 +52,6 @@ import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
 import {
   ALL_NOTES,
   type BreveView,
-  clampChatSidebarLimit,
   clampSidebarWidth,
   clampSidebarZoom,
   ORGANIZER_MODELS,
@@ -61,8 +60,8 @@ import {
   type OrganizerTrust,
   RECENT,
   RESERVED_DESTS,
-  SEC_CHAT,
-  SEC_NOTES,
+  SEC_SYSTEM,
+  type SidebarView,
   type ThemeFamily,
   type ThemeSetting,
   type SyntaxPalette,
@@ -183,8 +182,6 @@ interface PersistedSettings {
   chatMeasure: Record<string, Measure>;
   /** Where a chat's attached note opens: a new tab (default) or a right split. */
   chatNoteOpen: "tab" | "split";
-  /** Sidebar Chat section cap (5/10/15, default 5). */
-  chatSidebarLimit: number;
   /** Connected subscription lanes (Settings → AI Models); all off by default —
    * a chat never leaves the Mac without the user flipping a lane on. */
   aiProviders: Record<ProviderId, boolean>;
@@ -238,6 +235,9 @@ interface PersistedSettings {
   sidebarZoom: number;
   /** Which high-level sidebar lens and Breve section reopen on launch. */
   sidebarMode: "notes" | "breve";
+  /** Which sidebar FRONT reopens on launch: Home (notes) or Chat. ADDITIVE
+   * (2026-08-01) — an older build ignores the key and opens its own default. */
+  sidebarView: SidebarView;
   breveView: BreveView;
   expandedDests: Record<string, boolean>;
   /** Hotkey overrides keyed by action id; null = explicitly unbound. */
@@ -311,9 +311,8 @@ export function parseSettings(raw: string): PersistedSettings {
     if (typeof open === "boolean") expandedDests[id] = open;
   }
   if (Object.keys(expandedDests).length === 0) {
-    // the left-menu sections + the Capture(Inbox) & Vault dests inside Notes
-    expandedDests[SEC_CHAT] = true;
-    expandedDests[SEC_NOTES] = true;
+    // the System zone + the Capture(Inbox) & Vault dests inside Home
+    expandedDests[SEC_SYSTEM] = true;
     expandedDests.Inbox = true;
     expandedDests["vault:"] = true;
   }
@@ -379,8 +378,6 @@ export function parseSettings(raw: string): PersistedSettings {
       return persistableChatMap(out);
     })(),
     chatNoteOpen: data.chatNoteOpen === "split" ? "split" : "tab",
-    // 5/10/15 only; any other value (hand-edit, future build) → default 5
-    chatSidebarLimit: clampChatSidebarLimit(data.chatSidebarLimit),
     // booleans only, unknown lanes ignored — the safe default is every lane OFF
     aiProviders: (() => {
       const src = record(data.aiProviders);
@@ -440,6 +437,8 @@ export function parseSettings(raw: string): PersistedSettings {
     sidebarWidth: clampSidebarWidth(typeof data.sidebarWidth === "number" ? data.sidebarWidth : 240),
     sidebarZoom: clampSidebarZoom(typeof data.sidebarZoom === "number" ? data.sidebarZoom : 1),
     sidebarMode: data.sidebarMode === "breve" ? "breve" : "notes",
+    // Home is the safe default front — a fresh (or unknown) value opens on notes
+    sidebarView: data.sidebarView === "chat" ? "chat" : "home",
     breveView:
       data.breveView === "watchlist" || data.breveView === "routines" || data.breveView === "settings"
         ? data.breveView
@@ -498,7 +497,6 @@ function applySettings(s: PersistedSettings): void {
     chatWeb: s.chatWeb,
     chatMeasure: s.chatMeasure,
     chatNoteOpen: s.chatNoteOpen,
-    chatSidebarLimit: s.chatSidebarLimit,
     aiProviders: s.aiProviders,
     hybridPresets: s.hybridPresets,
     blockedModels: s.blockedModels,
@@ -522,6 +520,7 @@ function applySettings(s: PersistedSettings): void {
     sidebarWidth: s.sidebarWidth,
     sidebarZoom: s.sidebarZoom,
     sidebarMode: s.sidebarMode,
+    sidebarView: s.sidebarView,
     breveView: s.breveView,
     expandedDests: s.expandedDests,
   });
@@ -752,10 +751,6 @@ async function gcPersistedMaps(): Promise<void> {
   try {
     const folders = await notesService.listFolders();
     const valid = new Set<string>([
-      "sec:inbox", // the removed Inbox front's persisted key — kept valid so
-      // the user's open/closed state survives the front's return (ROADMAP.md)
-      SEC_CHAT,
-      SEC_NOTES,
       "Brain", // the Brain section header keys its accordion here
       ...RESERVED_DESTS,
       ...folders.map((f) => f.id),
@@ -768,7 +763,15 @@ async function gcPersistedMaps(): Promise<void> {
       // rows, and chat VIRTUAL folders aren't in listFolders — keep them by
       // shape (chatfolder:* pruning silently re-expanded folded chat folders
       // on every relaunch — review, 2026-07-31)
-      (k) => valid.has(k) || k.endsWith(":") || k.startsWith("Storage/") || k.startsWith("chatfolder:"),
+      // "sec:*" zone keys are kept by SHAPE, not by name: sec:system is live,
+      // and the retired sec:chat / sec:notes / sec:inbox keys must survive so a
+      // downgrade (or the parked Inbox front's return) finds its fold state
+      (k) =>
+        valid.has(k) ||
+        k.startsWith("sec:") ||
+        k.endsWith(":") ||
+        k.startsWith("Storage/") ||
+        k.startsWith("chatfolder:"),
     );
     if (kept !== ui.expandedDests) useUiStore.setState({ expandedDests: kept });
   } catch {
@@ -842,7 +845,6 @@ function settingsSnapshot(): string {
     chatWeb: persistableChatMap(ui.chatWeb),
     chatMeasure: persistableChatMap(ui.chatMeasure),
     chatNoteOpen: ui.chatNoteOpen,
-    chatSidebarLimit: ui.chatSidebarLimit,
     aiProviders: ui.aiProviders,
     hybridPresets: ui.hybridPresets,
     blockedModels: ui.blockedModels,
@@ -866,6 +868,7 @@ function settingsSnapshot(): string {
     sidebarWidth: ui.sidebarWidth,
     sidebarZoom: ui.sidebarZoom,
     sidebarMode: ui.sidebarMode,
+    sidebarView: ui.sidebarView,
     breveView: ui.breveView,
     expandedDests: ui.expandedDests,
     bindings: useBindingsStore.getState().overrides,
