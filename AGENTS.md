@@ -31,9 +31,9 @@ changelog entries, generated output, and Carl sessions are historical only.
   and describe the format as unsupported until that workflow exists.
 - The memex owns portable knowledge structure, metadata, prompts, protocols, and
   capability maps—not provider calls or agent orchestration.
-- Secure notes fail closed. Remote models never receive secure content; local
-  access requires explicit permission. Preserve independent TypeScript and Rust
-  enforcement.
+- Secure notes fail closed: remote models never see them; on-device models do
+  unless a knob says no. Locked = no AI edits it, every class reads it. TS and
+  Rust enforce both independently.
 - Breve is a Rotli capability. Rotli owns its UI, runtime, configuration,
   lifecycle, and scheduler integration.
 - Environments: Warm Light, Warm Dark, Paper, and Charcoal. Paper/Charcoal are

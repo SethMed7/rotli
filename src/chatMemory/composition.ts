@@ -1,4 +1,5 @@
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
+import { type ChatModelInfo, corpusFrontmatter, corpusWriteAi, isTauri } from "../lib/tauri";
 import { listChats, setChatAttachedTo, writeNote } from "../memex/service";
 import { invalidateMemex } from "../memex/useMemex";
 import { invalidateNotes } from "../services/hooks";
@@ -16,6 +17,32 @@ export interface ManagedChatMemoryInput {
   /** The model that rewrites the conversation notes each turn (optional —
    * without it, existing notes are kept and new notes get the topics digest). */
   composeNotes?: ComposeChatNotes;
+  /** The chat's model. The per-turn note rewrite is an AI WRITE, so it rides
+   * `corpus_write_ai` — Rust re-derives locality, re-runs the read gate, and
+   * refuses a locked note (docs/design/ai-visibility-matrix.md). Absent ⇒ the
+   * write is treated as remote, which is the fail-closed direction. */
+  model?: Pick<ChatModelInfo, "id" | "endpoint">;
+}
+
+/** Rewrite a note on behalf of the chat's model — the per-turn conversation-note
+ * sync. This is an AI WRITE, so it takes the AI write lane, not the human
+ * editor's: LOCKED is refused here (fail-fast; an unreadable protection state
+ * counts as refused) AND again inside `corpus_write_ai`, because neither layer
+ * trusts the other (docs/design/ai-visibility-matrix.md). */
+export async function updateNoteAsAi(
+  id: string,
+  body: string,
+  model?: Pick<ChatModelInfo, "id" | "endpoint">,
+): Promise<void> {
+  const frontmatter = await corpusFrontmatter(id).catch(() => null);
+  if (!frontmatter) {
+    throw new Error("This note's protection state couldn't be read, so the chat didn't rewrite it.");
+  }
+  if (frontmatter.locked) {
+    throw new Error("This note is locked — no AI may edit it, so the chat left it alone.");
+  }
+  // no model ⇒ treat the write as REMOTE, the fail-closed direction
+  await corpusWriteAi(id, body, model ?? { id: "", endpoint: "" });
 }
 
 export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Promise<ChatMemoryNote> {
@@ -46,7 +73,14 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       const created = await writeNote({ instance: input.instance, body });
       return { id: `${prefix}${created.id}`, stem: created.stem, body };
     },
-    update: async (id: string, body: string) => void (await notesService.updateNote(id, body)),
+    // browser mode has no corpus, so the twin keeps the in-memory service
+    update: async (id: string, body: string) => {
+      if (!isTauri()) {
+        await notesService.updateNote(id, body);
+        return;
+      }
+      await updateNoteAsAi(id, body, input.model);
+    },
     attach: (stem: string) => setChatAttachedTo(input.instance, input.chatSlug, stem),
   };
   const note = await syncChatMemory(repository, {

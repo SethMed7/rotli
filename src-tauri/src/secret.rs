@@ -56,7 +56,12 @@ pub fn looks_secure(text: &str) -> bool {
 pub fn protected_for_remote(text: &str) -> bool {
     looks_secure(text)
         || text.lines().any(|line| {
-            matches!(line.trim(), "secure: true" | "local_ai_allowed: true")
+            let line = line.trim();
+            // ANY local_ai_allowed decision — true OR false — only ever appears
+            // on a secure note (set_local_ai_access refuses to write it
+            // elsewhere), so both values mark the text as protected (2026-08-01:
+            // the bit became tri-state when local visibility became the default).
+            line == "secure: true" || line.starts_with("local_ai_allowed:")
         })
 }
 
@@ -114,6 +119,8 @@ mod tests {
     fn secure_note_markers_are_protected_at_remote_egress() {
         assert!(protected_for_remote("---\nsecure: true\n---\nCall notes"));
         assert!(protected_for_remote("local_ai_allowed: true\nordinary prose"));
+        // the DENY value marks a secure note just as surely as the allow value
+        assert!(protected_for_remote("local_ai_allowed: false\nordinary prose"));
         assert!(!protected_for_remote("ordinary prose about security"));
     }
 }

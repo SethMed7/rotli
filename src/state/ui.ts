@@ -411,6 +411,14 @@ interface UiState {
    * Flipping it NEVER moves or rewrites a file. */
   brainEnabled: boolean;
   setBrainEnabled: (on: boolean) => void;
+  /** The vault-wide default for secure ⇄ on-device AI visibility (Seth,
+   * 2026-08-01): true = a model running on this Mac may read secure notes.
+   * A per-note `local_ai_allowed` line overrides it in either direction, and
+   * NO value here ever opens a secure note to a remote model. Persisted
+   * per-vault in settings.json; Rust reads the same field independently
+   * (docs/design/ai-visibility-matrix.md). */
+  secureLocalAi: boolean;
+  setSecureLocalAi: (on: boolean) => void;
   organizerTrust: OrganizerTrust;
   setOrganizerTrust: (t: OrganizerTrust) => void;
   /** Which model the organizer runs (design §4; Seth, 2026-07-03). Persisted;
@@ -688,6 +696,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   // note's LOCATION + METADATA — journaled and undoable — never the words.
   brainEnabled: true,
   setBrainEnabled: (on) => set({ brainEnabled: on }),
+  secureLocalAi: true,
+  setSecureLocalAi: (on) => set({ secureLocalAi: on }),
   organizerTrust: "organize",
   setOrganizerTrust: (t) => set({ organizerTrust: t }),
   organizerModel: "local",

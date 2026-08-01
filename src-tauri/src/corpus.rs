@@ -2116,7 +2116,14 @@ pub enum Surface {
     NoteRW,
     /// Surfaced but read-only this increment (Memex: `wiki/**.md`).
     NoteRO,
-    /// Never surfaced, never written (Memex: self/history/MAP/inbox + control).
+    /// The brain's MEMORY lanes (Memex: identity/ personality/ history/ MAP.md
+    /// inbox.md). NOT in the user's Notes tree and never writable by any lane —
+    /// but RETRIEVABLE by the AI's own tools (search / knowledge map / read),
+    /// for BOTH model classes (Seth, 2026-08-01: "it shouldn't be invisible").
+    /// See docs/design/ai-visibility-matrix.md.
+    Reference,
+    /// Never surfaced, never written, never retrievable (Memex: memex.json,
+    /// users.json, STRUCTURE/CONFIG/README docs, clients/, scripts/, …).
     Hidden,
 }
 
@@ -2124,10 +2131,12 @@ pub enum Surface {
 /// separators ("" = the root itself).
 ///
 /// LegacyRotli surfaces everything read-write (today's behavior). Memex surfaces
-/// ONLY `wiki/` (read-only) + `chats/` (read-write) and hides the brain's memory
-/// (identity/personality/history/MAP/inbox) and every memex-vault control file. Top-level memex-vault
-/// docs (STRUCTURE.md, CONFIG.md, …) are `.md`, so this rule — not the dot-filter
-/// — is what keeps them out of the Notes tree.
+/// ONLY `wiki/` (read-only) + `chats/` (read-write) in the Notes tree, marks the
+/// brain's memory (identity/personality/history/MAP/inbox) `Reference` — out of
+/// the tree but reachable by the AI's retrieval tools — and hides every
+/// memex-vault control file. Top-level memex-vault docs (STRUCTURE.md,
+/// CONFIG.md, …) are `.md`, so this rule — not the dot-filter — is what keeps
+/// them out of the Notes tree.
 fn surfaced(layout: Layout, rel: &str) -> Surface {
     if layout == Layout::LegacyRotli {
         return Surface::NoteRW;
@@ -2173,11 +2182,29 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
     if rel == "storage" || rel.starts_with("storage/") {
         return Surface::NoteRO;
     }
-    // everything else inside a memex is hidden from the Notes tree and unwritable:
-    // identity/ personality/ history/ archive/ trash/, MAP.md, inbox.md, and all control
-    // files (memex.json, users.json, *.local.json, *.json at root, clients/,
-    // scripts/, STRUCTURE/CONFIG/README/CHANGELOG/ASSETS .md, …).
+    // The brain's MEMORY lanes: out of the Notes tree, unwritable — but the AI
+    // may retrieve them (Seth, 2026-08-01). Directories are matched with their
+    // trailing slash so a sibling like "identity-notes/" never rides this rule.
+    if is_reference_lane(rel) {
+        return Surface::Reference;
+    }
+    // everything else inside a memex is hidden from BOTH the Notes tree and the
+    // AI, and is unwritable: every control file (memex.json, users.json,
+    // *.local.json, *.json at root, clients/, scripts/,
+    // STRUCTURE/CONFIG/README/CHANGELOG/ASSETS/GUIDE/QUERY .md, …).
     Surface::Hidden
+}
+
+/// The memex lanes that hold the user's own KNOWLEDGE outside `wiki/` — the
+/// whole-person identity layer, the AI's working model of them, the by-day
+/// conversation stream, the always-loaded index, and the capture zone. Named
+/// once so the surface predicate and the docs agree. Vault plumbing
+/// (memex.json, STRUCTURE.md, scripts/, clients/, …) is deliberately NOT here.
+fn is_reference_lane(rel: &str) -> bool {
+    const DIRS: [&str; 3] = ["identity", "personality", "history"];
+    const FILES: [&str; 2] = ["MAP.md", "inbox.md"];
+    DIRS.iter().any(|d| rel == *d || rel.starts_with(&format!("{d}/")))
+        || FILES.contains(&rel)
 }
 
 pub struct CorpusStore {
@@ -2227,6 +2254,11 @@ struct CachedNoteText {
 struct ListCache {
     generation: u64,
     list: CorpusList,
+    /// The `Surface::Reference` lane, collected on the SAME walk but kept in a
+    /// separate vector on purpose: the user-facing `CorpusList` cannot contain a
+    /// reference note by construction, so no filter has to be correct for the
+    /// sidebar to stay clean. Only the AI lanes ask for these.
+    reference: Vec<NoteMeta>,
     texts: HashMap<String, CachedNoteText>,
 }
 
@@ -2678,10 +2710,6 @@ impl CorpusStore {
         let mut fm = fm_opt.unwrap_or_default();
         let locked = fm.foreign.iter().any(|l| locked_field(l) == Some(true));
         let mut secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
-        let local_ai_allowed = fm
-            .foreign
-            .iter()
-            .any(|l| local_ai_allowed_field(l) == Some(true));
         // auto-flag: secrets detected + not yet marked → set secure:true + gitignore.
         // The detector is the regex pass today; the local LLM refines it later.
         // BEST-EFFORT on this READ path: persist + gitignore, but a write/gitignore
@@ -2697,6 +2725,13 @@ impl CorpusStore {
             }
             secure = true;
         }
+        // the EFFECTIVE on-device verdict, not the raw bit (2026-08-01): note
+        // override → vault knob → the default (allow). Resolved AFTER the
+        // auto-flag so a just-detected note answers for its real state, and only
+        // ASKED for a secure note — an ordinary note is readable by every class
+        // by definition, and the vault knob has nothing to say about it. Policy
+        // lives here alone; the note menu never re-derives it in the webview.
+        let local_ai_allowed = !secure || self.secure_readable_locally(&fm);
         let fields = fm
             .foreign
             .iter()
@@ -3125,9 +3160,13 @@ impl CorpusStore {
             .map_err(|e| format!("The note moved to the protected lane, but journaling failed: {e}"))
     }
 
-    /// Grant or revoke secure-note access for loopback-local AI. This is valid
-    /// only while the note is secure; remote endpoints remain blocked in
-    /// read_for_ai regardless of the flag.
+    /// Pin this note's on-device AI visibility, overriding the vault default.
+    /// Valid only while the note is secure — an ordinary note is visible to
+    /// every class of model by definition, so there is nothing here to say. The
+    /// line is written EXPLICITLY in both directions (`true` / `false`) rather
+    /// than removed, so the note's intent is legible on disk and in `git diff`;
+    /// an ABSENT line means "follow the vault knob" (2026-08-01). Remote
+    /// endpoints stay blocked in `read_for_ai` regardless of this flag.
     fn set_local_ai_access(&mut self, id_or_rel: &str, allowed: bool) -> Result<(), String> {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
@@ -3137,22 +3176,35 @@ impl CorpusStore {
         let mut fm = fm.unwrap_or_default();
         let explicitly_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
         let secure = explicitly_secure || looks_secure(body);
-        if allowed && !secure {
+        if !secure {
             return Err("Local AI access is only meaningful for a secure note".into());
         }
         fm.foreign.retain(|l| local_ai_allowed_field(l).is_none());
-        if allowed {
-            if !explicitly_secure {
-                fm.foreign.push("secure: true".to_string());
-                self.gitignore_add(rel)?;
-            }
-            fm.foreign.push("local_ai_allowed: true".to_string());
+        // pin the classification either way: a detector-secure note that now
+        // carries an explicit access decision must carry the flag it decides on
+        if !explicitly_secure {
+            fm.foreign.push("secure: true".to_string());
+            self.gitignore_add(rel)?;
         }
+        fm.foreign.push(format!("local_ai_allowed: {allowed}"));
         atomic_write(&path, &compose_document(&fm, body))
     }
 
-    /// Read a note FOR an AI model. A SECURE note is always refused remotely and
-    /// is refused locally unless `local_ai_allowed: true` was explicitly set.
+    /// Read a note FOR an AI model — the ONE read gate every AI lane passes
+    /// (docs/design/ai-visibility-matrix.md).
+    ///
+    /// * A `Hidden` path is refused outright: vault plumbing is not knowledge,
+    ///   and no model has a reason to read `memex.json` or `STRUCTURE.md`. A
+    ///   `Reference` path (identity/, personality/, history/, MAP.md, inbox.md)
+    ///   IS readable — that is the 2026-08-01 flip.
+    /// * A SECURE note is ALWAYS refused to a remote/frontier model. No knob
+    ///   changes that and none will exist.
+    /// * A SECURE note is readable by a registered on-device model BY DEFAULT
+    ///   (Seth, 2026-08-01: "only local AI can see secure notes" — see, not
+    ///   "see if separately permitted"). Two knobs can still say no: the note's
+    ///   own `local_ai_allowed: false`, and the vault's `secureLocalAi: false`.
+    ///   The per-note bit wins over the vault default in BOTH directions.
+    ///
     /// The `secure:` flag is checked first; when it's ABSENT the secret DETECTOR
     /// runs on the body too (#21, audit 2026-07) — the auto-flag only fires when
     /// the metadata panel is opened, so a never-inspected note with detectable
@@ -3164,28 +3216,83 @@ impl CorpusStore {
         model_is_local: bool,
     ) -> Result<String, String> {
         let rel = &self.resolve_note_rel(id_or_rel)?;
+        if surfaced(self.layout, rel) == Surface::Hidden {
+            return Err(format!("not available to AI: {rel}"));
+        }
         let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
         let fm = fm.unwrap_or_default();
         let secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
             || looks_secure(body);
         if secure {
+            // remote FIRST and unconditionally — the refusal must never depend
+            // on, or leak the state of, a local-visibility knob
             if !model_is_local {
-                return Err(
-                    "This note is secure and can never be sent to a remote model.".into(),
-                );
+                return Err("This note is secure and can never be sent to a remote model.".into());
             }
-            let allowed = fm
-                .foreign
-                .iter()
-                .any(|l| local_ai_allowed_field(l) == Some(true));
-            if !allowed {
+            if !self.secure_readable_locally(&fm) {
                 return Err(
-                    "This secure note is private from AI. Explicitly allow Local AI access to use it on this Mac.".into(),
+                    "This secure note is hidden from AI — turn Local AI access back on for it (or for this vault) to use it here."
+                        .into(),
                 );
             }
         }
         Ok(text)
+    }
+
+    /// May an ON-DEVICE model read this secure note? Default yes (2026-08-01);
+    /// the note's explicit `local_ai_allowed` bit wins, else the vault knob.
+    /// Never consulted for a remote model — remote is refused unconditionally.
+    fn secure_readable_locally(&self, fm: &Frontmatter) -> bool {
+        match fm.foreign.iter().find_map(|l| local_ai_allowed_field(l)) {
+            Some(explicit) => explicit,
+            None => self.secure_local_ai(),
+        }
+    }
+
+    /// The vault-wide default for secure ⇄ on-device visibility, read from the
+    /// settings sidecar per call exactly like `brain_enabled`. A MISSING file or
+    /// field means ON (the documented default, and today's behavior for every
+    /// existing vault). A REAL read error fails CLOSED: an unreadable consent
+    /// boundary must never resolve permissively.
+    fn secure_local_ai(&self) -> bool {
+        let Ok(settings) = self.dot_read("settings") else {
+            return false; // NotFound is Ok("{}") — this is a genuine IO fault
+        };
+        serde_json::from_str::<serde_json::Value>(&settings)
+            .ok()
+            .and_then(|v| v.get("secureLocalAi").and_then(serde_json::Value::as_bool))
+            .unwrap_or(true)
+    }
+
+    /// WRITE a note on behalf of an interactive AI model — `update_note` and the
+    /// per-turn chat-memory sync. Two gates, in order:
+    ///   1. the same `read_for_ai` gate the model passed to SEE it (a model may
+    ///      never edit what it may not read), and
+    ///   2. **LOCKED** — no AI of any class edits a locked note. "Local" buys
+    ///      visibility, never edit authority (Seth, 2026-08-01).
+    ///
+    /// Then the SAME `writable()` surface gate the user's own editor passes — so
+    /// the AI's write surface is exactly the human's minus locked notes, never
+    /// wider. The USER's own `write` is untouched: locking protects a note from
+    /// models, not from its author.
+    pub(crate) fn write_for_ai(
+        &mut self,
+        id_or_rel: &str,
+        body: &str,
+        model_is_local: bool,
+    ) -> Result<NoteMeta, String> {
+        let rel = self.resolve_note_rel(id_or_rel)?;
+        let text = self.read_for_ai(&rel, model_is_local)?;
+        let fm = parse_document(&text).0.unwrap_or_default();
+        if fm.foreign.iter().any(|line| locked_field(line) == Some(true)) {
+            return Err(
+                "This note is locked — no AI may edit it. Unlock it from the note's menu first."
+                    .into(),
+            );
+        }
+        self.writable(&rel)?;
+        self.write_resolved(id_or_rel, body, rel)
     }
 
     /// The headless workspace adapters are remote-agent surfaces. They share the
@@ -3412,12 +3519,23 @@ impl CorpusStore {
         }
         let mut folders: Vec<FolderMeta> = Vec::new();
         let mut notes: Vec<NoteMeta> = Vec::new();
+        let mut reference: Vec<NoteMeta> = Vec::new();
         let mut texts: HashMap<String, CachedNoteText> = HashMap::new();
         let reverse: HashMap<String, String> =
             self.index.iter().map(|(id, p)| (p.clone(), id.clone())).collect();
         let mut new_index: HashMap<String, String> = HashMap::new();
 
-        walk(self.layout, &self.root, "", &reverse, &mut new_index, &mut folders, &mut notes, &mut texts)?;
+        walk(
+            self.layout,
+            &self.root,
+            "",
+            &reverse,
+            &mut new_index,
+            &mut folders,
+            &mut notes,
+            &mut reference,
+            &mut texts,
+        )?;
 
         if new_index != self.index {
             self.index = new_index;
@@ -3433,8 +3551,19 @@ impl CorpusStore {
                 .then(b.updated_at.cmp(&a.updated_at))
                 .then(a.id.cmp(&b.id))
         });
-        self.list_cache = Some(ListCache { generation, list: CorpusList { folders, notes }, texts });
+        reference.sort_by(|a, b| b.updated_at.cmp(&a.updated_at).then(a.id.cmp(&b.id)));
+        self.list_cache =
+            Some(ListCache { generation, list: CorpusList { folders, notes }, reference, texts });
         Ok(())
+    }
+
+    /// The `Surface::Reference` lane — the brain's memory notes, which the AI
+    /// may retrieve and the Notes tree never shows (2026-08-01; see
+    /// docs/design/ai-visibility-matrix.md). Ids ARE relative paths, so
+    /// `resolve_note_rel`'s passthrough reads them without an index entry.
+    pub fn reference_notes(&mut self) -> Result<Vec<NoteMeta>, String> {
+        self.ensure_walked()?;
+        Ok(self.list_cache.as_ref().expect("ensure_walked fills the cache").reference.clone())
     }
 
     /// Case-insensitive FULL-TEXT search over this root's notes: one `list()`
@@ -3446,7 +3575,20 @@ impl CorpusStore {
     /// stays findable) — Archive and staged/wiki/Vault notes stay findable.
     /// `secure:` notes stay in: search is a LOCAL user read (contract v3.7
     /// gates AI reads, not the user's own eyes); bodies are never logged.
-    pub fn search(&mut self, query: &str, limit: usize) -> Result<Vec<SearchHit>, String> {
+    ///
+    /// `include_reference` adds the `Surface::Reference` lane (identity/,
+    /// personality/, history/, MAP.md, inbox.md). It defaults to FALSE at the
+    /// command boundary, so ⌘K, backlinks, and every other user caller keep
+    /// exactly today's scope; only the AI host asks for the wider corpus
+    /// (2026-08-01, docs/design/ai-visibility-matrix.md). Per-hit READABILITY is
+    /// still decided by `read_for_ai` through the permission probe — this only
+    /// decides what exists to rank.
+    pub fn search(
+        &mut self,
+        query: &str,
+        limit: usize,
+        include_reference: bool,
+    ) -> Result<Vec<SearchHit>, String> {
         let mut hits: Vec<SearchHit> = Vec::new();
         if query.trim().is_empty() {
             return Ok(hits);
@@ -3456,7 +3598,8 @@ impl CorpusStore {
         self.ensure_walked()?;
         let layout = self.layout;
         let cache = self.list_cache.as_ref().expect("ensure_walked fills the cache");
-        for meta in &cache.list.notes {
+        let reference: &[NoteMeta] = if include_reference { &cache.reference } else { &[] };
+        for meta in cache.list.notes.iter().chain(reference) {
             if meta.kind != NoteKind::Note
                 || is_trash_folder(&meta.folder_id)
                 || (layout == Layout::Memex && is_chats_folder(&meta.folder_id))
@@ -4381,9 +4524,10 @@ impl CorpusStore {
             return Err(format!("not a board: {id}"));
         }
         // reads honor the same memex scope as writes: never return a board that
-        // lives under a hidden root (self/history/MAP/inbox) the listing walk
-        // would never surface — this is the only corpus read that could leak one.
-        if surfaced(self.layout, id) == Surface::Hidden {
+        // lives under a lane the Notes tree would never surface — this is the
+        // only corpus read that could leak one. Reference lanes are text-only
+        // for retrieval; a board there is not a browsable surface either.
+        if !matches!(surfaced(self.layout, id), Surface::NoteRW | Surface::NoteRO) {
             return Err(format!("not available here: {id}"));
         }
         let abs = self.guard_rel(id)?;
@@ -4826,6 +4970,7 @@ fn walk(
     new_index: &mut HashMap<String, String>,
     folders: &mut Vec<FolderMeta>,
     notes: &mut Vec<NoteMeta>,
+    reference: &mut Vec<NoteMeta>,
     texts: &mut HashMap<String, CachedNoteText>,
 ) -> Result<(), String> {
     let dir = if prefix.is_empty() { root.to_path_buf() } else { root.join(prefix) };
@@ -4846,10 +4991,53 @@ fn walk(
             Err(_) => continue,
         };
         // The scope gate (Increment 3): in Memex layout only wiki/ + chats/ are
-        // surfaced; self/history/MAP/inbox + every control file are Hidden, so
-        // the brain's memory and memex-vault's root docs never appear as notes. A
-        // Hidden DIRECTORY is not descended into. LegacyRotli surfaces all.
-        if surfaced(layout, &rel) == Surface::Hidden {
+        // surfaced in the Notes tree; every control file is Hidden, so
+        // memex-vault's root docs never appear as notes. A Hidden DIRECTORY is
+        // not descended into. LegacyRotli surfaces all.
+        let surface = surfaced(layout, &rel);
+        if surface == Surface::Hidden {
+            continue;
+        }
+        // The REFERENCE lane (2026-08-01): identity/ personality/ history/
+        // MAP.md inbox.md are collected for the AI's retrieval tools only. They
+        // never become folder rows or tree notes, they never enter the ULID
+        // index (id IS the rel path, like a board), and no write lane accepts
+        // them — `writable()` still refuses every non-NoteRW surface.
+        if surface == Surface::Reference {
+            if kind.is_dir() {
+                walk(layout, root, &rel, reverse, new_index, folders, notes, reference, texts)?;
+            } else if kind.is_file() && name.ends_with(".md") {
+                let abs = entry.path();
+                let Ok(text) = fs::read_to_string(&abs) else { continue };
+                let (fm, raw) = parse_document(&text);
+                let had_fm = fm.is_some();
+                let body = match &fm {
+                    Some(_) => editor_body(raw),
+                    None => raw,
+                };
+                let fm = fm.unwrap_or_default();
+                texts.insert(
+                    rel.clone(),
+                    CachedNoteText {
+                        body: body.to_string(),
+                        metadata: if had_fm { searchable_metadata(&fm) } else { String::new() },
+                    },
+                );
+                let (file_created, file_updated) = file_stamps(&abs);
+                reference.push(NoteMeta {
+                    id: rel.clone(),
+                    title: title_of(body),
+                    snippet: snippet_of(body),
+                    aliases: Vec::new(),
+                    folder_id: prefix.to_string(),
+                    disk_folder_id: prefix.to_string(),
+                    created_at: fm.created.as_deref().and_then(stamp_to_ms).unwrap_or(file_created),
+                    updated_at: fm.updated.as_deref().and_then(stamp_to_ms).unwrap_or(file_updated),
+                    pinned: false,
+                    origin: None,
+                    kind: NoteKind::Note,
+                });
+            }
             continue;
         }
         if kind.is_dir() {
@@ -4877,7 +5065,7 @@ fn walk(
                     parent_id,
                 });
             }
-            walk(layout, root, &rel, reverse, new_index, folders, notes, texts)?;
+            walk(layout, root, &rel, reverse, new_index, folders, notes, reference, texts)?;
         } else if kind.is_file() && name.ends_with(".md") {
             let abs = entry.path();
             let Ok(text) = fs::read_to_string(&abs) else { continue };
@@ -5275,8 +5463,12 @@ pub fn corpus_search(
     state: tauri::State<'_, CorpusState>,
     query: String,
     limit: Option<usize>,
+    include_reference: Option<bool>,
 ) -> Result<Vec<SearchHit>, String> {
     let cap = limit.unwrap_or(50).clamp(1, 200);
+    // default FALSE: ⌘K and every other user caller keep today's scope. Only the
+    // AI host opts into the reference lane (docs/design/ai-visibility-matrix.md).
+    let include_reference = include_reference.unwrap_or(false);
     let mut reg = state.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
     let mut ids: Vec<String> = reg.stores.keys().cloned().collect();
     ids.sort();
@@ -5288,7 +5480,7 @@ pub fn corpus_search(
     let mut hits: Vec<SearchHit> = Vec::new();
     for id in ids {
         let store = reg.stores.get_mut(&id).expect("id from keys");
-        for mut h in store.search(&query, cap)? {
+        for mut h in store.search(&query, cap, include_reference)? {
             h.folder_id = compose_root_id(&id, &h.folder_id);
             if id != default_id {
                 h.id = compose_root_id(&id, &h.id);
@@ -5964,6 +6156,59 @@ pub async fn corpus_readable_ids(
     })
     .await
     .map_err(|e| format!("permission probe worker failed ({e})"))?
+}
+
+/// The reference lane's metas — the brain's memory notes (identity/,
+/// personality/, history/, MAP.md, inbox.md), which the Notes tree never shows
+/// and the AI's retrieval tools now reach for BOTH model classes (2026-08-01,
+/// docs/design/ai-visibility-matrix.md). Metas only: readability is still
+/// decided per note by `read_for_ai` through `corpus_readable_ids`.
+#[tauri::command]
+pub fn corpus_reference_notes(state: tauri::State<'_, CorpusState>) -> Result<Vec<NoteMeta>, String> {
+    let mut reg = state.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+    let mut ids: Vec<String> = reg.stores.keys().cloned().collect();
+    ids.sort();
+    if let Some(pos) = ids.iter().position(|i| *i == reg.default_id) {
+        let d = ids.remove(pos);
+        ids.insert(0, d);
+    }
+    let mut notes: Vec<NoteMeta> = Vec::new();
+    for id in ids {
+        let store = reg.stores.get_mut(&id).expect("id from keys");
+        for meta in store.reference_notes()? {
+            let mut meta = prefix_meta(&id, meta);
+            // a reference id IS a rel path, but its kind is Note — so
+            // `prefix_meta` (which only prefixes board/file ids) leaves it bare.
+            // Prefix it here or a later read on a CONNECTED vault would route to
+            // the default root. compose_root_id is a no-op for the default root.
+            meta.id = compose_root_id(&id, &meta.id);
+            notes.push(meta);
+        }
+    }
+    Ok(notes)
+}
+
+/// WRITE a note on behalf of an interactive AI model. Rust re-derives the
+/// model's locality, re-runs the read gate, and refuses a LOCKED note — the
+/// second, independent layer behind the TypeScript host's own refusals
+/// (docs/design/ai-visibility-matrix.md).
+#[tauri::command]
+pub fn corpus_write_ai(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    body: String,
+    model_id: String,
+    endpoint: String,
+) -> Result<NoteMeta, String> {
+    let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.write_for_ai(&rel, &body, model_is_local)).map(|mut m| {
+        m = prefix_meta(&root, m);
+        if m.kind == NoteKind::Note {
+            m.id = compose_root_id(&root, &m.id);
+        }
+        m
+    })
 }
 
 #[tauri::command]
@@ -7033,7 +7278,7 @@ mod tests {
             .aliases
             .iter()
             .any(|alias| alias == "the-3-stage-infrastructure-plan"));
-        assert_eq!(store.search("myela-stage-plan", 10).unwrap().len(), 1);
+        assert_eq!(store.search("myela-stage-plan", 10, false).unwrap().len(), 1);
         assert!(store.root().join(rel).is_file(), "listing must remain read-only");
     }
 
@@ -7140,7 +7385,7 @@ mod tests {
         let c = store.create("Inbox", "# Old wire limit note\n\ndead\n").unwrap();
         store.move_note(&c.id, "Trash").unwrap();
 
-        let hits = store.search("wire limit", 50).unwrap();
+        let hits = store.search("wire limit", 50, false).unwrap();
         let ids: Vec<&str> = hits.iter().map(|h| h.id.as_str()).collect();
         assert!(ids.contains(&a.id.as_str()), "title hit found");
         assert!(ids.contains(&b.id.as_str()), "BODY hit found — full-text works");
@@ -7152,7 +7397,7 @@ mod tests {
         assert_eq!(body_hit.rank, 1);
         assert!(body_hit.snippet.contains("wire limit"));
         // blank query is empty, never everything
-        assert!(store.search("  ", 50).unwrap().is_empty());
+        assert!(store.search("  ", 50, false).unwrap().is_empty());
     }
 
     #[test]
@@ -7189,7 +7434,7 @@ mod tests {
         // chats/ transcripts are excluded).
         let (_dir, mut store) = bare();
         let n = store.create("chats", "# Chat ideas\n\nthe kelpie fragment\n").unwrap();
-        let hits = store.search("kelpie", 50).unwrap();
+        let hits = store.search("kelpie", 50, false).unwrap();
         assert_eq!(hits.len(), 1, "plain-root chats/ note is searchable: {hits:?}");
         assert_eq!(hits[0].id, n.id);
     }
@@ -7210,11 +7455,11 @@ mod tests {
         store.os_trash = false;
 
         // the staged note (projected to "Board") hits; the chat transcript never does
-        let hits = store.search("kelpie", 50).unwrap();
+        let hits = store.search("kelpie", 50, false).unwrap();
         assert_eq!(hits.len(), 1, "staged yes, chats no: {hits:?}");
         assert_eq!(hits[0].folder_id, "Board");
         // curated wiki bodies stay findable (read-only ≠ unsearchable)
-        assert!(!store.search("A wiki note", 50).unwrap().is_empty());
+        assert!(!store.search("A wiki note", 50, false).unwrap().is_empty());
     }
 
     #[test]
@@ -7229,10 +7474,10 @@ mod tests {
         )
         .unwrap();
         let mut store = CorpusStore::open(root).unwrap();
-        let hits = store.search("cedar", 10).unwrap();
+        let hits = store.search("cedar", 10, false).unwrap();
         assert_eq!(hits.len(), 1);
         assert!(hits[0].snippet.contains("tags"));
-        assert!(store.search("cedar-hidden", 10).unwrap().is_empty());
+        assert!(store.search("cedar-hidden", 10, false).unwrap().is_empty());
     }
 
     #[test]
@@ -7883,15 +8128,17 @@ mod tests {
         let fm = store.read_frontmatter(&note.id).unwrap();
         assert!(fm.secure);
         assert_eq!(fm.id, note.id);
-        // Secure defaults private from every model. Local access is explicit;
-        // remote access remains impossible after the opt-in.
+        // Secure is a VISIBILITY control against REMOTE (2026-08-01). An
+        // on-device model reads it by default; a remote model never can, in any
+        // knob state.
         assert!(store.read_for_ai(&note.id, false).is_err());
-        assert!(store.read_for_ai(&note.id, true).is_err());
+        assert!(store.read_for_ai(&note.id, true).is_ok());
         store.set_local_ai_access(&note.id, true).unwrap();
         assert!(store.read_for_ai(&note.id, true).is_ok());
         assert!(store.read_for_ai(&note.id, false).is_err());
         store.set_local_ai_access(&note.id, false).unwrap();
         assert!(store.read_for_ai(&note.id, true).is_err());
+        assert!(store.read_for_ai(&note.id, false).is_err());
         store.set_secure(&note.id, false).unwrap();
 
         // write_index — the one file the filer overwrites wholesale.
@@ -8342,10 +8589,12 @@ mod tests {
         // detectable secret, NO secure: flag (the panel was never opened)
         let hot = store.create("Inbox", "# Stripe\n\ncard 4242424242424242").unwrap();
         assert!(store.read_for_ai(&hot.id, false).is_err(), "unflagged secret must refuse remote");
-        assert!(store.read_for_ai(&hot.id, true).is_err(), "local access is opt-in");
+        assert!(store.read_for_ai(&hot.id, true).is_ok(), "on-device reads a secure note by default");
+        store.set_local_ai_access(&hot.id, false).unwrap();
+        assert!(store.read_for_ai(&hot.id, true).is_err(), "an explicit per-note DENY closes it locally");
         store.set_local_ai_access(&hot.id, true).unwrap();
         assert!(store.read_for_ai(&hot.id, true).is_ok(), "explicitly allowed local access passes");
-        assert!(store.read_for_ai(&hot.id, false).is_err(), "remote stays blocked after local opt-in");
+        assert!(store.read_for_ai(&hot.id, false).is_err(), "remote stays blocked in every knob state");
         // a clean note passes remote
         let clean = store.create("Inbox", "# Groceries\n\neggs, milk").unwrap();
         assert!(store.read_for_ai(&clean.id, false).is_ok());
@@ -8367,9 +8616,10 @@ mod tests {
         for note in [&quick, &secure_folder] {
             let fm = store.read_frontmatter(&note.id).unwrap();
             assert!(fm.secure);
-            assert!(!fm.local_ai_allowed);
+            // the EFFECTIVE verdict: on-device access is the 2026-08-01 default
+            assert!(fm.local_ai_allowed);
             assert!(store.read_for_ai(&note.id, false).is_err());
-            assert!(store.read_for_ai(&note.id, true).is_err());
+            assert!(store.read_for_ai(&note.id, true).is_ok());
             let rel = store.path_of(&note.id).unwrap();
             let ignored = fs::read_to_string(store.root.join(".gitignore")).unwrap();
             assert!(ignored.lines().any(|line| line.trim() == rel));
@@ -8382,7 +8632,127 @@ mod tests {
         let moved = store.create("Inbox", "# Move me\n").unwrap();
         store.move_note(&moved.id, "Secure notes/Calls").unwrap();
         assert!(store.read_frontmatter(&moved.id).unwrap().secure);
-        assert!(store.read_for_ai(&moved.id, true).is_err());
+        assert!(store.read_for_ai(&moved.id, true).is_ok());
+        assert!(store.read_for_ai(&moved.id, false).is_err());
+    }
+
+    /// THE matrix, asserted end to end on the Rust layer (2026-08-01,
+    /// docs/design/ai-visibility-matrix.md). A frontier-context request receives
+    /// NOTHING secure from read, the batch probe, search, or the reference lane
+    /// — even when it names the note directly.
+    #[test]
+    fn a_frontier_request_never_receives_secure_content_by_any_route() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        let secret = store
+            .create_with_policy("Secure notes", "# Vault code\n\nthe kelpie passphrase", true)
+            .unwrap();
+        let open = store.create("Inbox", "# Kelpie\n\nan ordinary kelpie note").unwrap();
+
+        // READ, named directly — the only answer a remote model ever gets
+        let refusal = store.read_for_ai(&secret.id, false).unwrap_err();
+        assert!(refusal.contains("secure"), "{refusal}");
+        assert!(!refusal.contains("passphrase"), "a refusal must never quote the body");
+        // the same id IS readable on-device — proving the refusal is about the
+        // model class, not a missing file
+        assert!(store.read_for_ai(&secret.id, true).is_ok());
+
+        // SEARCH — the hit exists in the raw index (search is a user lane), and
+        // the per-hit read gate is what removes it for a remote model. That is
+        // exactly what `corpus_readable_ids` does with `read_for_ai`.
+        let hits = store.search("kelpie", 50, true).unwrap();
+        assert!(hits.iter().any(|h| h.id == secret.id), "test setup: both notes match");
+        let remote_visible: Vec<String> = hits
+            .iter()
+            .filter(|h| store.read_for_ai(&h.id, false).is_ok())
+            .map(|h| h.id.clone())
+            .collect();
+        assert_eq!(remote_visible, vec![open.id.clone()]);
+        // and the same filter run for an on-device model keeps BOTH
+        let local_visible = hits
+            .iter()
+            .filter(|h| store.read_for_ai(&h.id, true).is_ok())
+            .count();
+        assert_eq!(local_visible, hits.len());
+    }
+
+    /// The vault-level knob (`secureLocalAi`) and the per-note override, and
+    /// which one wins. Neither can ever open a secure note to a remote model.
+    #[test]
+    fn secure_local_visibility_knobs_layer_note_over_vault() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        let note = store.create_with_policy("Secure notes", "# Private\n\nbody", true).unwrap();
+
+        // default: no settings file at all ⇒ on-device may read
+        assert!(store.read_for_ai(&note.id, true).is_ok());
+        // vault knob OFF ⇒ closed locally, still closed remotely
+        store.dot_write("settings", "{\"secureLocalAi\":false}").unwrap();
+        assert!(store.read_for_ai(&note.id, true).is_err());
+        assert!(store.read_for_ai(&note.id, false).is_err());
+        // an explicit per-note ALLOW overrides the vault's no
+        store.set_local_ai_access(&note.id, true).unwrap();
+        assert!(store.read_for_ai(&note.id, true).is_ok());
+        assert!(store.read_for_ai(&note.id, false).is_err());
+        // and an explicit per-note DENY overrides the vault's yes
+        store.dot_write("settings", "{\"secureLocalAi\":true}").unwrap();
+        store.set_local_ai_access(&note.id, false).unwrap();
+        assert!(store.read_for_ai(&note.id, true).is_err());
+        assert!(store.read_for_ai(&note.id, false).is_err());
+        // the decision is written EXPLICITLY, both ways, so it is legible on disk
+        let rel = store.path_of(&note.id).unwrap();
+        let text = fs::read_to_string(store.abs(&rel)).unwrap();
+        assert!(text.lines().any(|l| l.trim() == "local_ai_allowed: false"), "{text}");
+        // a NON-secure note has nothing to say here, and the vault knob never
+        // narrows an ordinary note (every class reads those by definition)
+        store.dot_write("settings", "{\"secureLocalAi\":false}").unwrap();
+        let open = store.create("Inbox", "# Open\n\nbody").unwrap();
+        assert!(store.set_local_ai_access(&open.id, false).is_err());
+        assert!(store.read_frontmatter(&open.id).unwrap().local_ai_allowed);
+        assert!(store.read_for_ai(&open.id, true).is_ok());
+        assert!(store.read_for_ai(&open.id, false).is_ok());
+    }
+
+    /// LOCKED is an EDIT control, not a visibility one: every class SEES a
+    /// locked note and no class edits it. The user's own write lane is
+    /// untouched — locking protects a note from models, not from its author.
+    #[test]
+    fn locked_notes_are_readable_by_every_model_and_editable_by_none() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        let note = store.create("Inbox", "# Plan\n\noriginal body").unwrap();
+        store.set_locked(&note.id, true).unwrap();
+
+        // SEE: both classes
+        assert!(store.read_for_ai(&note.id, true).is_ok());
+        assert!(store.read_for_ai(&note.id, false).is_ok());
+        // EDIT: neither class
+        for local in [true, false] {
+            let err = store.write_for_ai(&note.id, "# Plan\n\nrewritten", local).unwrap_err();
+            assert!(err.contains("locked"), "{err}");
+        }
+        let rel = store.path_of(&note.id).unwrap();
+        assert!(fs::read_to_string(store.abs(&rel)).unwrap().contains("original body"));
+        // the human's own save still works
+        assert!(store.write(&note.id, "# Plan\n\nmy own edit").is_ok());
+        // unlocked, an AI write lands
+        store.set_locked(&note.id, false).unwrap();
+        assert!(store.write_for_ai(&note.id, "# Plan\n\nAI edit", true).is_ok());
+    }
+
+    /// A secure note is EDITABLE by the class that can see it (secure gates
+    /// visibility, not authorship) and refused to the class that cannot.
+    #[test]
+    fn write_for_ai_follows_the_same_read_gate() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        let note = store.create_with_policy("Secure notes", "# Private\n\nbody", true).unwrap();
+        assert!(store.write_for_ai(&note.id, "# Private\n\nremote edit", false).is_err());
+        assert!(store.write_for_ai(&note.id, "# Private\n\nlocal edit", true).is_ok());
     }
 
     /// #22 (audit 2026-07): set_field is the USER lane — it must refuse the AI
@@ -8599,13 +8969,22 @@ mod tests {
     #[test]
     fn surfaced_scopes_a_memex_to_wiki_and_chats() {
         let m = Layout::Memex;
-        // hidden: the brain's memory + every control/root doc
+        // hidden: every control/root doc — plumbing, not knowledge
         assert_eq!(surfaced(m, "STRUCTURE.md"), Surface::Hidden);
         assert_eq!(surfaced(m, "memex.json"), Surface::Hidden);
         assert_eq!(surfaced(m, "self/x.md"), Surface::Hidden);
-        assert_eq!(surfaced(m, "inbox.md"), Surface::Hidden);
-        assert_eq!(surfaced(m, "MAP.md"), Surface::Hidden);
-        assert_eq!(surfaced(m, "history/2026/x.md"), Surface::Hidden);
+        assert_eq!(surfaced(m, "clients/x.md"), Surface::Hidden);
+        assert_eq!(surfaced(m, "scripts/organize.ts"), Surface::Hidden);
+        // REFERENCE (2026-08-01): out of the Notes tree, reachable by the AI
+        assert_eq!(surfaced(m, "inbox.md"), Surface::Reference);
+        assert_eq!(surfaced(m, "MAP.md"), Surface::Reference);
+        assert_eq!(surfaced(m, "history/2026/x.md"), Surface::Reference);
+        assert_eq!(surfaced(m, "identity"), Surface::Reference);
+        assert_eq!(surfaced(m, "identity/00-identity.md"), Surface::Reference);
+        assert_eq!(surfaced(m, "personality/04-principles.md"), Surface::Reference);
+        // a SIBLING whose name merely starts with a lane name is not the lane
+        assert_eq!(surfaced(m, "identity-drafts/x.md"), Surface::Hidden);
+        assert_eq!(surfaced(m, "MAP.md.bak"), Surface::Hidden);
         // storage/ — the binary asset store: surfaced READ-ONLY (the Storage front),
         // never writable via the note path (writable() refuses NoteRO, asserted below).
         assert_eq!(surfaced(m, "storage"), Surface::NoteRO);
@@ -8620,6 +8999,64 @@ mod tests {
         // LegacyRotli surfaces everything read-write (today)
         assert_eq!(surfaced(Layout::LegacyRotli, "STRUCTURE.md"), Surface::NoteRW);
         assert_eq!(surfaced(Layout::LegacyRotli, "self/x.md"), Surface::NoteRW);
+    }
+
+    /// The 2026-08-01 flip: the brain's memory lanes are RETRIEVABLE by the AI
+    /// for BOTH model classes, while staying out of the user's Notes tree and
+    /// out of every write lane (docs/design/ai-visibility-matrix.md).
+    #[test]
+    fn reference_lanes_are_ai_retrievable_and_never_in_the_notes_tree() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        fs::create_dir_all(root.join("identity")).unwrap();
+        fs::create_dir_all(root.join("personality")).unwrap();
+        fs::write(root.join("identity/00-identity.md"), "# Identity\n\nSeth is a quokkanaut.\n")
+            .unwrap();
+        fs::write(root.join("personality/04-principles.md"), "# Principles\n\nquokkanaut rules\n")
+            .unwrap();
+        fs::write(root.join("history/2026/day.md"), "# A day\n\nquokkanaut log\n").ok();
+        fs::create_dir_all(root.join("history/2026")).unwrap();
+        fs::write(root.join("history/2026/day.md"), "# A day\n\nquokkanaut log\n").unwrap();
+
+        let mut store = CorpusStore::open(root).unwrap();
+        store.os_trash = false;
+
+        // NOT in the Notes tree: no note rows, no folder rows
+        let list = store.list().unwrap();
+        assert!(!list.notes.iter().any(|n| n.id.starts_with("identity/")));
+        assert!(!list.notes.iter().any(|n| n.title == "Identity"));
+        for hidden in ["identity", "personality", "history", "history/2026"] {
+            assert!(!list.folders.iter().any(|f| f.id == hidden), "{hidden} became a folder row");
+        }
+        assert!(list.notes.iter().any(|n| n.title == "A wiki note"), "the wiki note still lists");
+
+        // retrievable through the AI's own lane
+        let reference = store.reference_notes().unwrap();
+        for rel in ["identity/00-identity.md", "personality/04-principles.md", "MAP.md", "inbox.md"]
+        {
+            assert!(reference.iter().any(|n| n.id == rel), "{rel} missing from the reference lane");
+        }
+        assert!(!reference.iter().any(|n| n.id == "STRUCTURE.md"), "control docs stay hidden");
+        assert!(!reference.iter().any(|n| n.id == "memex.json"));
+
+        // search: OUT by default, IN when the AI asks — and READABLE by BOTH classes
+        assert!(store.search("quokkanaut", 50, false).unwrap().is_empty());
+        let hits = store.search("quokkanaut", 50, true).unwrap();
+        assert!(hits.iter().any(|h| h.id == "identity/00-identity.md"));
+        assert!(hits.iter().any(|h| h.id == "personality/04-principles.md"));
+        assert!(hits.iter().any(|h| h.id == "history/2026/day.md"));
+        for hit in &hits {
+            assert!(store.read_for_ai(&hit.id, true).is_ok(), "on-device must read {}", hit.id);
+            assert!(store.read_for_ai(&hit.id, false).is_ok(), "frontier must read {}", hit.id);
+        }
+        assert!(store.read_for_ai("identity/00-identity.md", false).unwrap().contains("quokkanaut"));
+
+        // still unwritable by every lane, and control files stay unreadable
+        assert!(store.write_for_ai("identity/00-identity.md", "# Pwned\n", true).is_err());
+        assert!(store.write("identity/00-identity.md", "# Pwned\n").is_err());
+        assert!(store.read_for_ai("STRUCTURE.md", true).is_err());
+        assert!(store.read_for_ai("memex.json", false).is_err());
     }
 
     #[test]
@@ -9001,7 +9438,7 @@ mod tests {
         let (_dir, mut store) = bare();
         store.create("", "# Groceries\n\noat milk\n\n- [ ] buy the good butter\n").unwrap();
         // both projections answer from the SAME cached walk — and stay correct
-        let hits = store.search("oat milk", 10).unwrap();
+        let hits = store.search("oat milk", 10, false).unwrap();
         assert_eq!(hits.len(), 1, "cached body missed a search hit");
         let tasks = store.tasks().unwrap();
         assert_eq!(tasks.len(), 1);
@@ -9009,8 +9446,8 @@ mod tests {
         // an edit refreshes what they see
         let id = hits[0].id.clone();
         store.write(&id, "# Groceries\n\nalmond milk\n").unwrap();
-        assert!(store.search("oat milk", 10).unwrap().is_empty(), "stale cached body served");
-        assert_eq!(store.search("almond milk", 10).unwrap().len(), 1);
+        assert!(store.search("oat milk", 10, false).unwrap().is_empty(), "stale cached body served");
+        assert_eq!(store.search("almond milk", 10, false).unwrap().len(), 1);
         assert!(store.tasks().unwrap().is_empty(), "checked-off task survived in the cache");
     }
 

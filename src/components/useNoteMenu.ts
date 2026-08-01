@@ -426,7 +426,9 @@ export function useNoteMenu() {
           });
           items.push({
             kind: "action" as const,
-            label: fm?.locked ? "Unlock — let the AI organize it" : "Lock from the AI",
+            // LOCKED is an EDIT control — every model still READS a locked note
+            // (Seth, 2026-08-01; docs/design/ai-visibility-matrix.md)
+            label: fm?.locked ? "Unlock — let the AI edit it" : "Lock — no AI may edit it",
             checked: !!fm?.locked,
             // protection states wear the LOCK, not the star (Seth, 2026-07-29)
             checkedMark: "lock" as const,
@@ -447,9 +449,12 @@ export function useNoteMenu() {
             });
           }
           if (fm?.secure) {
+            // `localAiAllowed` is the EFFECTIVE verdict Rust resolved (note
+            // override → the vault knob → allow). On-device access is the
+            // default since 2026-08-01, so the common verb here is now HIDE.
             items.push({
               kind: "action" as const,
-              label: fm.localAiAllowed ? "Revoke Local AI access" : "Allow Local AI on this Mac",
+              label: fm.localAiAllowed ? "Hide from on-device AI too" : "Let on-device AI read it",
               checked: fm.localAiAllowed,
               onClick: () =>
                 runFm("change Local AI access", corpusSetLocalAiAccess(note.id, !fm.localAiAllowed)),

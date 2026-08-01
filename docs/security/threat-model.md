@@ -19,17 +19,20 @@ or a compromised dependency behaves adversarially:
    application database.
 2. Secure or secret-shaped Markdown never reaches a remote model, web tool, or
    external workspace agent through a Rotli-controlled send path.
-3. On-device model access to a secure note is denied unless that note explicitly
-   allows it. The organizer never receives that permission.
-4. Every filesystem mutation stays inside a registered root and a declared
+3. On-device model access to a secure note is permitted by default and can be
+   withdrawn per note or per vault; it is the LOCAL tier that is allowed, never
+   a remote one. The organizer never receives that permission.
+4. No AI of any class edits a note marked `locked`. Locking withholds edit
+   authority, not visibility — every class may still read it.
+5. Every filesystem mutation stays inside a registered root and a declared
    write lane after Rust independently validates the path and operation.
-5. Credentials remain in the macOS Keychain and never enter note files, settings,
+6. Credentials remain in the macOS Keychain and never enter note files, settings,
    process arguments, logs, or model prompts.
-6. Untrusted content is treated as data. It cannot grant itself tools, widen an
+7. Untrusted content is treated as data. It cannot grant itself tools, widen an
    endpoint, choose an arbitrary local path, or turn a failed security check into
    an allow decision.
-7. Release updates are accepted only through the pinned, signed updater path.
-8. A failure to parse security state fails closed; a failure to parse rebuildable
+8. Release updates are accepted only through the pinned, signed updater path.
+9. A failure to parse security state fails closed; a failure to parse rebuildable
    presentation state falls back to a safe default without damaging content.
 
 ## Assets and data classes
@@ -106,6 +109,8 @@ transport, credential, or filesystem authority directly.
 | Prompt injection asks a model to reveal notes or run code | Structured untrusted model map, fenced/defused tool results, tool allowlists, explicit network capabilities, secret + private-prose overlap egress checks, bounded loops, secure-note exclusion, sandboxed CLI argv | Paraphrased semantic leakage through permitted web arguments; security review |
 | Secret-shaped text reaches a remote destination | Independent TypeScript/Rust detection, final-prompt scan, endpoint locality gate | Images are consented attachments and not OCR-scanned; documented accepted gap |
 | Secure content appears in search, metrics, or an agent response | Filter before mapping/search/read; fail-closed metadata parsing; remote policy for every agent | Board scenes have no secure classification; users must not store secrets in agent-managed boards |
+| An AI edits a note the user locked | Locked refusal at every AI write path on both layers (`corpus_write_ai`, the host's `update_note`, chat-memory sync, workspace agents, the organizer) | A locked note is still readable by every model; locking is not confidentiality |
+| A local chat launders secure prose into a note a remote chat later reads | One-way `secureContext` chat taint; tainted `create_note` is stamped secure; tainted `update_note` may edit only secure notes; a tainted loose chat writes no memory note; remote egress refuses tainted transcripts | A user who manually copies secure text into an open note is out of scope |
 | A crafted path or writable-lane symlink escapes the corpus | Per-component no-follow metadata, canonical registered-root containment, path/extension checks, declared Rust write lanes, contained atomic-temp parents | Same-user replacement races and a fully compromised Rust host are out of scope |
 | A fetched URL reaches loopback, metadata services, or private networks | Scheme/host limits, vetted DNS resolution, IP pinning, same-host redirects, response caps | Breve owner-configured fetch retains a documented DNS-rebinding residual |
 | A malicious document/board exploits a codec or exhausts resources | Vendor code behind adapters, package preservation tests, PDF source/extracted-text caps and panic refusal, parity-pinned Excalidraw byte/element/action/string/coordinate/depth limits, dependency audit | Complex third-party parsers retain supply-chain and decompression/resource-exhaustion risk |

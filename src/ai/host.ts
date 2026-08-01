@@ -13,7 +13,9 @@ import {
   corpusList,
   corpusReadAi,
   corpusReadableIds,
+  corpusReferenceNotes,
   corpusSearch,
+  corpusWriteAi,
   generateImage as tauriGenerateImage,
   webFetch as tauriWebFetch,
   webSearch as tauriWebSearch,
@@ -36,7 +38,6 @@ import { listChats, loadConfig, readChat as readMemexChat } from "../memex/servi
 import { hasSecureContext } from "../memex/contract";
 import { invalidateMemex } from "../memex/useMemex";
 import { createRoutedNote } from "../services/createNote";
-import { notesService } from "../services/notes";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import { memoryKeywords, mergeKeywordHits, rankChatMemories } from "../chatMemory/retrieval";
@@ -159,10 +160,19 @@ export function makeTauriHost(
         // filed under a matching area (2026-08-01 — "people" never reached
         // wiki/people/**, and the model answered from an index note's
         // metadata). corpusList rides the same cached walk search does.
+        // includeReference: the brain's memory lanes (identity/, personality/,
+        // history/, MAP.md, inbox.md) are RETRIEVABLE by both model classes
+        // since 2026-08-01 — reachable, not preloaded. Ranking and the budget
+        // still decide what actually enters the context
+        // (docs/design/ai-visibility-matrix.md).
         const wantsFolders = folderQuery(query);
         const [hits, listed] = await Promise.all([
-          corpusSearch(query, limit),
-          wantsFolders ? corpusList().then((l) => l.notes) : Promise.resolve([]),
+          corpusSearch(query, limit, true),
+          wantsFolders
+            ? Promise.all([corpusList().then((l) => l.notes), corpusReferenceNotes()]).then(
+                ([notes, reference]) => [...notes, ...reference],
+              )
+            : Promise.resolve([]),
         ]);
         const found = hits.filter((hit) => hit.kind === "note");
         const byFolder = wantsFolders ? folderHits(listed, query, limit) : [];
@@ -186,8 +196,11 @@ export function makeTauriHost(
           limit,
         );
       } catch {
-        const { notes } = await corpusList();
-        const ranked = rankNotes(notes, query, limit);
+        const [{ notes }, reference] = await Promise.all([
+          corpusList(),
+          corpusReferenceNotes().catch(() => []),
+        ]);
+        const ranked = rankNotes([...notes, ...reference], query, limit);
         return aiReadableHits(ranked, model);
       }
     },
@@ -228,49 +241,57 @@ export function makeTauriHost(
       } — tell the user it's there, and offer open_note to show it.`;
     },
     async updateNote(id, body) {
-      // EDIT rides the human editor's own lane (notesService.updateNote →
-      // corpus_write: frontmatter preserved, updated bumped, aliases follow a
-      // retitle) — but ONLY after the same read gate every AI read passes:
-      // Rust's corpus_read_ai refuses secure notes to remote models and
-      // ungranted local ones, and its refusal is final here too. The read also
-      // marks the chat's secure taint exactly like read_note.
+      // EDIT rides the AI write lane (corpus_write_ai: the read gate, then the
+      // LOCKED refusal, then the ordinary write — frontmatter preserved, updated
+      // bumped, aliases follow a retitle) — but ONLY after the same read gate
+      // every AI read passes: Rust's corpus_read_ai refuses secure notes to
+      // remote models and knob-denied local ones, and its refusal is final here
+      // too. The read also marks the chat's secure taint exactly like read_note.
       try {
         const text = await corpusReadAi(id, model);
         void text;
       } catch (e) {
         return `blocked: ${e instanceof Error ? e.message : String(e)}`;
       }
-      // ONE frontmatter read serves both the taint marking and the secure-
-      // context check below (Greptile PR #19: the second fetch doubled the IPC
-      // hop on exactly the "edit a private note" path). Unknowable = secure.
-      const needsFrontmatter = !!opts?.onSecureNoteRead || opts?.isSecureContext?.() === true;
+      // ONE frontmatter read serves the taint marking, the LOCK check, and the
+      // secure-context check below (Greptile PR #19: the second fetch doubled
+      // the IPC hop on exactly the "edit a private note" path). Unknowable =
+      // secure AND locked — fail closed on both axes.
       let frontmatter: Awaited<ReturnType<typeof corpusFrontmatter>> | null = null;
       let frontmatterUnknown = false;
-      if (needsFrontmatter) {
-        try {
-          frontmatter = await corpusFrontmatter(id);
-        } catch {
-          frontmatterUnknown = true;
-        }
+      try {
+        frontmatter = await corpusFrontmatter(id);
+      } catch {
+        frontmatterUnknown = true;
       }
-      if (opts?.onSecureNoteRead && (frontmatterUnknown || !frontmatter || frontmatter.secure === true)) {
+      // LOCKED is an EDIT control that binds EVERY model class — "local" buys
+      // visibility, never edit authority (Seth, 2026-08-01). Rust refuses this
+      // again inside corpus_write_ai; neither layer trusts the other.
+      if (frontmatterUnknown || !frontmatter || frontmatter.locked === true) {
+        return frontmatterUnknown || !frontmatter
+          ? "blocked: this note's protection state couldn't be read, so it can't be edited."
+          : "blocked: this note is locked — no AI may edit it. The user can unlock it from the note's menu.";
+      }
+      if (opts?.onSecureNoteRead && frontmatter.secure === true) {
         opts.onSecureNoteRead();
       }
       // the create_note taint law's edit twin (PR #4 P1): a chat carrying
       // secure-note content must not launder prose into an OPEN note — it may
       // only edit notes that are THEMSELVES secure. (Re-evaluated AFTER the
       // taint call above, against the same one frontmatter read.)
-      if (opts?.isSecureContext?.() === true) {
-        if (frontmatterUnknown || !frontmatter || frontmatter.secure !== true) {
-          return "blocked: this chat carries secure-note content, so it can only edit notes that are themselves secure. Use create_note instead — the new note will be marked secure.";
-        }
+      if (opts?.isSecureContext?.() === true && frontmatter.secure !== true) {
+        return "blocked: this chat carries secure-note content, so it can only edit notes that are themselves secure. Use create_note instead — the new note will be marked secure.";
       }
       // the model reads full file text (fences included) and often echoes the
       // frontmatter back — the write lane preserves metadata itself, so only
       // CONTENT crosses (a passed-through fence would duplicate inside the body)
       const content = stripLeadingFrontmatter(body);
       if (!content.trim()) return "error: the new body was only metadata — send the note's full content.";
-      await notesService.updateNote(id, `${content}\n`.replace(/\n+$/, "\n"));
+      try {
+        await corpusWriteAi(id, `${content}\n`.replace(/\n+$/, "\n"), model);
+      } catch (e) {
+        return `blocked: ${e instanceof Error ? e.message : String(e)}`;
+      }
       await Promise.all([invalidateNotes(), invalidateMemex()]);
       return `updated note ${id} — its content is replaced with your new text. An open tab refreshes live (the user's own unsaved edits there always win). Tell the user what you changed.`;
     },
@@ -280,7 +301,9 @@ export function makeTauriHost(
     },
     async searchMemory(query, limit) {
       const queries = [query, ...memoryKeywords(query)].slice(0, 7);
-      const noteResults = await Promise.all(queries.map((part) => corpusSearch(part, limit).catch(() => [])));
+      const noteResults = await Promise.all(
+        queries.map((part) => corpusSearch(part, limit, true).catch(() => [])),
+      );
       const readableNoteHits = await aiReadableHits(
         mergeKeywordHits(noteResults).filter((hit) => hit.kind === "note"),
         model,
@@ -380,11 +403,16 @@ export function makeTauriHost(
       });
     },
     async knowledgeMap(maxChars) {
-      const { notes } = await corpusList();
-      // Titles are knowledge too. Apply the same secure-note gate before the
-      // model sees the master map: remote models never see secure entries, and
-      // a local model sees them only after explicit per-note permission.
-      const readable = await aiReadableHits(notes, model);
+      // the map spans the Notes tree AND the brain's memory lanes — a model that
+      // can't see identity/ in the map never learns to ask for it (2026-08-01)
+      const [{ notes }, reference] = await Promise.all([
+        corpusList(),
+        corpusReferenceNotes().catch(() => []),
+      ]);
+      // Titles are knowledge too. Apply the same read gate before the model sees
+      // the master map: remote models never see secure entries, and an on-device
+      // model sees them unless a knob says otherwise.
+      const readable = await aiReadableHits([...notes, ...reference], model);
       return buildModelMap(readable, contextWindowFor(model), maxChars);
     },
   };

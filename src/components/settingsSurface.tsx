@@ -2200,10 +2200,13 @@ memex — NOT this repo. The README is the ONLY doc that stays in the repo.
 • Do not create or leave project docs in this repo's docs/ folder.`;
 
 /** The secure-note explainer (decision 2026-07-22, feature C) — plain language
- * distilled from the memex data contract's fail-closed list. Copy lives here;
- * the contract stays the spec. Deliberately explainer-only: the secure-note
- * organization consent knob ships WITH that feature, not before it. */
+ * distilled from the memex data contract's fail-closed list, plus the ONE knob
+ * this boundary has (2026-08-01: the vault-wide secure ⇄ on-device default).
+ * Copy lives here; the contract stays the spec. There is deliberately no knob
+ * of any kind for remote models — that refusal is not configurable. */
 function SecurityPane() {
+  const secureLocalAi = useUiStore((s) => s.secureLocalAi);
+  const setSecureLocalAi = useUiStore((s) => s.setSecureLocalAi);
   return (
     <>
       <PaneHead title="Security" char="local" />
@@ -2224,13 +2227,27 @@ function SecurityPane() {
         is enforced twice, independently, and there is no setting that overrides it.
       </p>
       <p className="setnote">
-        <b>On-device models are opt-in per note.</b> A model running on this Mac may read a secure note only
-        after you allow <i>Local AI access</i> on that specific note. A cloud model behind a localhost proxy
-        still counts as remote and stays blocked.
+        <b>Models running on this Mac can read them.</b> That&rsquo;s the point of a local model: nothing it
+        reads can leave. A cloud model behind a localhost proxy still counts as remote and stays blocked.
+      </p>
+      <Toggle
+        on={secureLocalAi}
+        onChange={() => setSecureLocalAi(!secureLocalAi)}
+        title={secureLocalAi ? "On-device AI can read secure notes" : "Secure notes are hidden from all AI"}
+        desc={
+          secureLocalAi
+            ? "A model running on this Mac sees your secure notes, so you can ask about them without anything leaving the machine. Any single note can still opt out from its own menu."
+            : "Not even an on-device model reads them. You can still allow a specific note from its menu."
+        }
+      />
+      <p className="setnote">
+        <b>Locked is a different control.</b> Locking a note doesn&rsquo;t hide it — every model can still
+        read it. It means <b>no AI may edit it</b>, ever, cloud or on-device. Secure hides; locked protects.
       </p>
       <p className="setnote">
         <b>The Librarian never touches them.</b> rotli&rsquo;s organizer skips secure notes entirely — it
-        doesn&rsquo;t read, move, or tag them, even when it&rsquo;s allowed to read other notes.
+        doesn&rsquo;t read, move, or tag them, even when it&rsquo;s allowed to read other notes. It skips
+        locked notes too.
       </p>
       <p className="setnote">
         <b>Secrets are found by patterns, not AI.</b> The detector is on-device pattern matching — key shapes,

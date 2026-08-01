@@ -310,9 +310,13 @@ impl Workspace {
     }
 
     fn search_remote(&mut self, query: &str, limit: usize) -> Result<Vec<SearchHit>, String> {
+        // include_reference: false — the headless workspace keeps its narrower
+        // surface. The 2026-08-01 reference lane is the interactive chat's
+        // retrieval scope; widening an external agent's reach is a separate
+        // decision (docs/design/ai-visibility-matrix.md).
         let mut hits = self
             .store
-            .search(query, limit.saturating_mul(4).max(limit))?;
+            .search(query, limit.saturating_mul(4).max(limit), false)?;
         hits.retain(|hit| self.store.read_for_ai(&hit.id, false).is_ok());
         hits.truncate(limit.min(100));
         for hit in &mut hits {

@@ -238,6 +238,22 @@ const FIXTURE_NOTES: FixtureNote[] = [
     folderId: "wiki/reference",
     body: "---\nid: 01JXCOFFEE\ntags: [reference]\nsummary: Espresso dial-in log for the Gaggia.\n---\n\n# Espresso dial-in\n\n18g in, 36g out, 27s. Distractor note.\n",
   },
+  // ── the REFERENCE lane (2026-08-01, docs/design/ai-visibility-matrix.md) ──
+  // Reference notes are ids-as-paths and live OUTSIDE wiki/. They used to be
+  // invisible to every model; they are now retrievable, so the eval must prove
+  // a real local model actually reaches them when the answer lives there.
+  {
+    id: "identity/03-work-now.md",
+    title: "Work now",
+    folderId: "identity",
+    body: "---\nid: 01JXWORKNOW\ntags: [identity]\nsummary: What Seth does for work right now.\n---\n\n# Work now\n\nSeth is VP of Engineering at Myela. He owns the three product pillars'\nengineering: Payments, AI, and Health. Day to day he splits time between the\nneural monorepo and the Agent-Portal clones.\n",
+  },
+  {
+    id: "personality/05-preferences.md",
+    title: "Preferences",
+    folderId: "personality",
+    body: "---\nid: 01JXPREFS\ntags: [personality]\nsummary: How Seth likes to work.\n---\n\n# Preferences\n\nSeth prefers Bun over Node for every TypeScript project, minimal abstraction\nover clever patterns, and short focused functions. He wants tools that feel\ncalm, not busy.\n",
+  },
 ];
 
 // ── the fixture Host ──────────────────────────────────────────────────────────
@@ -419,6 +435,23 @@ const CASES: EvalCase[] = [
     name: "follow",
     turns: ["who are the people in my vault?", "list ALL of them, one per line, with who they are"],
     score: scorePeople,
+  },
+  {
+    // the 2026-08-01 flip: identity/ and personality/ used to be invisible to
+    // every model, so this question had no reachable answer. The deterministic
+    // tests prove the plumbing; only THIS proves a real local model retrieves
+    // it (docs/design/ai-visibility-matrix.md).
+    name: "identity",
+    turns: ["what do I do for work, and what runtime do I prefer?"],
+    score(final) {
+      const low = final.toLowerCase();
+      const work = ["vp of engineering", "myela"].filter((k) => low.includes(k));
+      const runtime = low.includes("bun");
+      return {
+        pass: work.length >= 1 && runtime,
+        detail: `work facts: [${work.join(", ") || "none"}]; named Bun: ${runtime}`,
+      };
+    },
   },
   {
     name: "decide",

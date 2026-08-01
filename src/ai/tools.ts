@@ -202,6 +202,65 @@ export function statusFor(tool: ToolName): string {
   }
 }
 
+/** A miss must hand the model its next move, not a dead end: the substring
+ * engine finds nothing for "runtime" even when a note titled "Preferences"
+ * holds the answer, and a small model will not travel back up to the map
+ * buried in its prompt — observations are where it is actually looking. So a
+ * zero-hit search carries a compact title index with it (same budgeted map
+ * the prompt uses, smaller cap). Map failure degrades to the plain miss. */
+async function emptySearchObservation(host: Host, query: string): Promise<string> {
+  // Harvest-only budget: generous so AREA entries survive the map's own
+  // truncation (we discard the note titles and render just names+counts,
+  // so the observation stays small regardless).
+  const MAP_CHARS = 8000;
+  const index = await host.knowledgeMap(MAP_CHARS).catch(() => "");
+  const base = `no matching notes for "${query}" — the search needs a word the note actually contains.`;
+  if (!index.trim()) return `${base} Try one different, distinctive word.`;
+  // Area names are COMPLETE at any vault size (a title list truncates and the
+  // needed title loses the lottery — measured: a 700-char map dropped the
+  // personality lane entirely). Search matches folder names too, so "pick the
+  // area, search its one word" always lands; the area's generated index then
+  // leads the hits (role:"area-index").
+  const areas = areaLines(index);
+  if (areas) {
+    // Directive-first: a small model reads "no matching notes" as terminal and
+    // apologizes even with the roll-call attached. Lead with the required next
+    // action and a literal example step; the miss is a clause, not the verdict.
+    return (
+      `DO NOT answer "not found" yet — the word "${query}" appears in no note, but the answer is likely FILED under an area below. ` +
+      `REQUIRED NEXT STEP: pick the area that would hold it and search that area's word (folder names match), like {"tool":"search_notes","args":{"query":"personality"}}. ` +
+      `The vault's areas:\n${areas}`
+    );
+  }
+  return `${base} These note titles exist — pick the one whose TITLE fits the question and search that exact title word:\n${index}`;
+}
+
+/** "personality (1 · Preferences) · wiki/people (13 · people) · …" from the
+ * model-map JSON — each area carries its LEADING note title so the model can
+ * string-match the question's words ("prefer" → Preferences) instead of
+ * judging which folder a fact lives in. Empty string when the map isn't the
+ * JSON shape (caller falls back to the raw index). */
+function areaLines(mapJson: string): string {
+  try {
+    const parsed = JSON.parse(mapJson) as {
+      areas?: { name?: unknown; count?: unknown; notes?: { title?: unknown }[] }[];
+    };
+    if (!Array.isArray(parsed.areas) || parsed.areas.length === 0) return "";
+    return parsed.areas
+      .filter((a) => typeof a.name === "string" && a.name)
+      .map((a) => {
+        const count = typeof a.count === "number" ? a.count : "?";
+        const lead = Array.isArray(a.notes)
+          ? a.notes.find((n) => typeof n.title === "string" && n.title)
+          : undefined;
+        return lead ? `${String(a.name)} (${count} · ${String(lead.title)})` : `${String(a.name)} (${count})`;
+      })
+      .join(" · ");
+  } catch {
+    return "";
+  }
+}
+
 /** Dispatch one tool call to the host, honoring the model's `budget` (hit count,
  * snippet/body caps). Always resolves to an observation string — a tool error becomes
  * feedback the model sees, never a thrown exception. */
@@ -233,7 +292,7 @@ export async function runTool(
         ? JSON.stringify(
             ordered.map((hit) => ({ ...hit, snippet: truncate(hit.snippet, budget.snippetChars) })),
           )
-        : "no matching notes or chats — try fewer or different keywords.";
+        : await emptySearchObservation(host, q);
     }
     case "read_memory": {
       const id = String(args.id ?? "").trim();
@@ -249,7 +308,7 @@ export async function runTool(
       const q = String(args.query ?? "").trim();
       if (q === "") return 'error: search_notes needs a non-empty "query".';
       const hits = await host.searchNotes(q, budget.maxHits);
-      if (hits.length === 0) return "no matching notes — try different words, or the web if it's on.";
+      if (hits.length === 0) return emptySearchObservation(host, q);
       // an area's generated index leads its equals: it is the best first read
       // for any question ABOUT that area, and the alternative — a hand-written
       // README with the friendlier title — often names nothing at all.

@@ -1249,6 +1249,8 @@ pub fn run() {
             corpus::corpus_set_local_ai_access,
             corpus::corpus_read_ai,
             corpus::corpus_readable_ids,
+            corpus::corpus_reference_notes,
+            corpus::corpus_write_ai,
             corpus::corpus_write,
             corpus::corpus_create,
             corpus::corpus_delete,

@@ -1069,6 +1069,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
             chatSlug,
             ...(memoryStem ? { attachedStem: memoryStem } : {}),
             ...(composeNotes ? { composeNotes } : {}),
+            model: picked,
             turns: memoryTurns,
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }
@@ -1087,6 +1088,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
             title: memoryTitle,
             chatSlug: res.slug,
             ...(composeNotes ? { composeNotes } : {}),
+            model: picked,
             turns: memoryTurns,
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }

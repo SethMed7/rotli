@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-08-01T14:17:02.560Z",
+  "last_modified": "2026-08-01T15:18:45.370Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -660,6 +660,24 @@
       "rationale": "2026-08-01 fit sweep: at the old 160px floor a stacked chat's composer overhung its pane ~75px onto the pane below's strip and title. Locked by e2e/pane-resize-fit.spec.ts + clampSplitSizes unit tests.",
       "source": "src/state/panes.ts",
       "proposed_at": "2026-08-01T14:17:02.559Z",
+      "status": "pending"
+    },
+    {
+      "id": "stg-002",
+      "proposed_domain": "ROTLI_MEMEX",
+      "rule_text": "Secure and locked are independent (supersedes rule 1). SECURE = visibility vs remote: frontier models never receive secure titles, snippets, bodies, or hits, under any setting; on-device models read them BY DEFAULT, withdrawable per note (local_ai_allowed tri-state) or per vault (secureLocalAi). LOCKED = editing: no AI of any class edits a locked note; every class still reads it. The organizer still skips both. Brain memory lanes (identity/, personality/, history/, MAP.md, inbox.md) are Surface::Reference — AI-retrievable, never in the Notes tree, never writable; vault plumbing stays Hidden.",
+      "rationale": "Rule 1 is stale: it required explicit local_ai_allowed for on-device reads and conflated locked with secure. Seth's 2026-08-01 directive flipped the local default and split the two axes; reference lanes replaced the blanket Hidden gating. Implemented and tested on both layers.",
+      "source": "docs/design/ai-visibility-matrix.md",
+      "proposed_at": "2026-08-01T15:18:36.448Z",
+      "status": "pending"
+    },
+    {
+      "id": "stg-003",
+      "proposed_domain": "ROTLI_MODELS",
+      "rule_text": "Model CLASS decides data access, and class is derived from the endpoint plus the provider registry — never an asserted flag. An on-device model (loopback + mlx/llamacpp/ollama) may see secure notes; a frontier model never may, localhost proxy or not. Class buys VISIBILITY only: no class edits a locked note, and every AI write rides corpus_write_ai (read gate, then locked refusal). Headless workspace agents count as remote for content policy even when their process is local.",
+      "rationale": "ROTLI_MODELS said nothing about what a model class may READ or WRITE, so agents inferred it from the stale ROTLI_MEMEX rule 1. Seth's 2026-08-01 matrix makes class the deciding axis for visibility and makes edit authority class-independent.",
+      "source": "docs/design/ai-visibility-matrix.md",
+      "proposed_at": "2026-08-01T15:18:45.370Z",
       "status": "pending"
     }
   ]

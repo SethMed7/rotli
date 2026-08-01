@@ -261,9 +261,18 @@ export function corpusList(): Promise<CorpusListPayload> {
 /** FULL-TEXT note search (corpus_search): Rust walks + reads + matches every
  * root — title > body ranking with a highlighted-match snippet (char offsets;
  * see SearchHit in src/types.ts). A local user read: secure notes stay in,
- * bodies are never logged. */
-export function corpusSearch(query: string, limit?: number): Promise<SearchHit[]> {
-  return corpusInvoke("corpus_search", limit === undefined ? { query } : { query, limit });
+ * bodies are never logged.
+ *
+ * `includeReference` widens the corpus to the brain's memory lanes (identity/,
+ * personality/, history/, MAP.md, inbox.md). Default FALSE — ⌘K and every other
+ * user surface keeps today's scope; only src/ai/host.ts opts in
+ * (docs/design/ai-visibility-matrix.md). Rust defaults it false too. */
+export function corpusSearch(query: string, limit?: number, includeReference = false): Promise<SearchHit[]> {
+  return corpusInvoke("corpus_search", {
+    query,
+    ...(limit === undefined ? {} : { limit }),
+    ...(includeReference ? { includeReference: true } : {}),
+  });
 }
 
 export function corpusRead(id: string): Promise<CorpusNoteDoc> {
@@ -781,7 +790,9 @@ export interface FrontmatterView {
   locked: boolean;
   /** Secrets detected (auto-flagged) → never sent to a remote model + gitignored. */
   secure: boolean;
-  /** Explicit opt-in for a secure note to be read by loopback-local AI. */
+  /** The EFFECTIVE verdict for loopback-local AI on a secure note (note override
+   * → vault `secureLocalAi` knob → the default, allow). Rust resolves the policy
+   * once; the UI only reflects it (2026-08-01). */
   localAiAllowed: boolean;
   /** Pinned to the top of every list (pinned → updated → id sort). */
   pinned: boolean;
@@ -1058,9 +1069,36 @@ export async function secureRepairApply(): Promise<SecureRepairReport> {
   return invoke<SecureRepairReport>("corpus_secure_repair_apply");
 }
 
+/** The brain's memory lanes as AI-retrievable metas (identity/, personality/,
+ * history/, MAP.md, inbox.md) — never part of corpusList, so no user surface can
+ * accidentally show them. Metas only; per-note readability is still the Rust
+ * read gate's answer (docs/design/ai-visibility-matrix.md). */
+export function corpusReferenceNotes(): Promise<CorpusNoteMeta[]> {
+  return corpusInvoke("corpus_reference_notes");
+}
+
+/** WRITE a note on behalf of an AI model. Rust re-derives locality, re-runs the
+ * read gate, and refuses a LOCKED note — the independent second layer behind
+ * the host's own refusals. Use this for EVERY AI write path; `corpusWrite` is
+ * the human editor's lane. */
+export function corpusWriteAi(
+  id: string,
+  body: string,
+  model: Pick<ChatModelInfo, "id" | "endpoint">,
+): Promise<CorpusNoteMeta> {
+  return corpusInvoke("corpus_write_ai", {
+    id,
+    body,
+    modelId: model.id,
+    endpoint: model.endpoint,
+  });
+}
+
 /** Read a note for an AI model. Rust requires both a loopback endpoint and a
  * matching registered on-device model; a localhost frontier proxy fails closed.
- * Secure notes additionally require explicit per-note Local AI permission. */
+ * A secure note is refused to a remote model always, and to an on-device model
+ * only when a knob says so (note `local_ai_allowed: false`, or the vault's
+ * `secureLocalAi: false`). */
 export async function corpusReadAi(
   id: string,
   model: Pick<ChatModelInfo, "id" | "endpoint">,

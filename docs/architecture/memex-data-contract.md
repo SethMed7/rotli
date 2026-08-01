@@ -160,7 +160,9 @@ The Rust corpus boundary independently validates every write.
   `view_tag`, `locked`, and the secure-note controls. Rotli manages `view_tag`
   through the named-view workflow so the Markdown and reference tree cannot
   drift. `local_ai_allowed` is a Rotli-managed permission bit, never a
-  provider-owned field.
+  provider-owned field. It is TRI-STATE since 2026-08-01: absent means "follow
+  the vault's `secureLocalAi` default", `true` pins on-device access on, `false`
+  pins it off. It is written only on a secure note.
 - The Brain filer owns only its declared enrichment fields: `area`, `summary`,
   `tags`, and `links`.
 - Unknown frontmatter is preserved byte-for-byte. Reserved provenance cannot be
@@ -238,6 +240,9 @@ notes and prior chat transcripts.
    note after each turn while preserving user text outside the block.
 2. **Map:** Model Mapping 0 is the master, capability-sized table of contents.
    It provides prioritized areas and direct ids where the model can afford them.
+   Since 2026-08-01 its scope is the Notes tree PLUS the reference lanes, so a
+   model can learn that `identity/` exists and ask for it. The map stays a
+   table of contents: reachability, never bulk preloading.
 3. **Retrieve:** `search_memory` expands a natural-language question into
    inspectable keywords, merges exact-phrase and keyword full-text note hits,
    and ranks raw chat matches by title/body relevance. Results carry provenance
@@ -258,8 +263,8 @@ than approved by prompt text.
 Starting a chat from a Markdown note reuses the chat already attached to that
 note or creates one durable chat with a stable note-derived identity. Each turn
 preloads the attached note through the same host read gate as `read_note`, so a
-remote model still cannot receive secure content and local access still requires
-the note's explicit permission. Secure-note chats use opaque attachment metadata,
+remote model still cannot receive secure content and local access still follows
+the note-then-vault knob chain. Secure-note chats use opaque attachment metadata,
 offer only on-device models, and disable web/image egress; an unreadable security
 state blocks the turn rather than guessing.
 
@@ -282,15 +287,37 @@ but it must remain rebuildable, optional, and behind the retrieval port.
 - Quick captures and notes created from the Quick Note window are secure at
   birth. The user may deliberately remove protection from the note menu or the
   Quick Note shield control.
+- **`secure` and `locked` are independent controls on different axes
+  (2026-08-01).** `secure` governs VISIBILITY against remote models; `locked`
+  governs EDITING by every model. Neither implies the other. The full matrix and
+  its threat cases are recorded in
+  [`../design/ai-visibility-matrix.md`](../design/ai-visibility-matrix.md).
 - Secure titles, snippets, and bodies are excluded from model maps and search
-  observations. Remote/frontier models can never read them. A loopback-local
-  model registered to a recognized on-device runtime can read one only after
-  the user enables `local_ai_allowed: true` for that note; the default is
-  denied. A frontier provider behind a localhost proxy still fails this gate.
+  observations for remote/frontier models, which can never read them under any
+  setting. A loopback-local model registered to a recognized on-device runtime
+  reads secure notes **by default**; two knobs may withdraw that — the note's own
+  `local_ai_allowed: false`, and the vault's `secureLocalAi: false` in
+  `.rotli/settings.json` (missing ⇒ enabled; an IO error ⇒ disabled). An explicit
+  `local_ai_allowed` line overrides the vault knob in either direction. No knob
+  exists, or will exist, that opens a secure note to a remote model. A frontier
+  provider behind a localhost proxy still fails this gate.
+- **`locked: true` refuses every AI edit** — interactive chat (`update_note`),
+  the per-turn chat-memory sync, the headless workspace agents, and the
+  organizer. Both layers enforce it: TypeScript fails fast and Rust refuses
+  again inside `corpus_write_ai`. A locked note stays fully READABLE by every
+  class of model, and the user's own editor is unaffected.
 - Secure files are gitignored at creation and the ignore entry follows later
-  moves. Locked notes are never modified by the organizer. The organizer skips
-  secure notes even if interactive local access was granted.
+  moves. The organizer skips secure notes regardless of interactive local
+  access, and skips locked notes entirely.
 - Remote organizer choices apply only to non-secure, unlocked notes.
+- **Lanes (2026-08-01).** In a memex, `wiki/` and `chats/` are the Notes tree.
+  The brain's memory lanes — `identity/`, `personality/`, `history/`, `MAP.md`,
+  `inbox.md` — are `Surface::Reference`: never in the Notes tree, never writable
+  by any lane, and **retrievable by both classes of model** through the AI's
+  search / knowledge-map / read tools. Reference note ids are relative paths.
+  Vault plumbing (`memex.json`, `users.json`, `STRUCTURE.md`, `CONFIG.md`,
+  `clients/`, `scripts/`, …) stays `Hidden` from the tree AND from every model;
+  `read_for_ai` refuses a Hidden path outright.
 - **Product vocabulary (2026-07-26):** the organizer layer is branded the
   **Librarian** and its organized area (the `wiki/` tree) the **Library**; a
   connected vault is a **Linked library**. These are display names only —
@@ -320,8 +347,10 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   skips every secure note. Any future implementation must follow the revised
   [local-only proposal](../decisions/2026-07-22-secure-organizer-and-sheet-metadata.md):
   remote providers receive no secure-derived envelope, and both default-off
-  global consent and explicit `local_ai_allowed: true` are required for a
-  registered on-device model.
+  global consent and on-device visibility (`local_ai_allowed` not pinned off,
+  and the vault's `secureLocalAi` on) are required for a registered on-device
+  model. Note that ORGANIZING a secure note remains a separate consent from
+  READING one: the 2026-08-01 flip widened reading only.
 - A non-secure note whose content fires the secret detector enters the
   Librarian journal's **secure review** instead of being silently modeled around: the
   organizer skips it and the pane offers *Make secure* (the existing protected

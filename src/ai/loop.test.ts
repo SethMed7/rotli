@@ -662,3 +662,44 @@ test("stripLeadingFrontmatter never eats prose between thematic breaks (Greptile
   // a real metadata fence (key: value + yaml list lines) still strips
   expect(stripLeadingFrontmatter("---\nid: x\ntags:\n- a\n- b\n---\n\n# T\nbody")).toBe("# T\nbody");
 });
+
+test("a zero-hit search hands the model the title index, not a dead end", async () => {
+  const budget = budgetFor({ id: "gemma-3-12b-it-qat-4bit" });
+  const mapJson = JSON.stringify({
+    kind: "rotli.model-map",
+    areas: [
+      { name: "personality", count: 2, notes: [{ title: "Preferences" }] },
+      { name: "wiki/people", count: 13, notes: [] },
+    ],
+  });
+  const { host } = fakeHost([], {
+    searchNotes: async () => [],
+    searchMemory: async () => [],
+    knowledgeMap: async () => mapJson,
+  });
+  const observation = await runTool(host, "search_notes", { query: "runtime" }, budget);
+  expect(observation).toContain('DO NOT answer "not found" yet');
+  // the COMPLETE area roll-call rides in the observation — names + counts
+  expect(observation).toContain("personality (2 \u00b7 Preferences)"); // leading title rides along
+  expect(observation).toContain("wiki/people (13)");
+  // search_memory misses ride the same recovery
+  const viaMemory = await runTool(host, "search_memory", { query: "runtime" }, budget);
+  expect(viaMemory).toContain("personality (2");
+  // a non-JSON map degrades to the raw title index, still not a dead end
+  const { host: rawMap } = fakeHost([], {
+    searchNotes: async () => [],
+    knowledgeMap: async () => "## Personality\n- Preferences",
+  });
+  const rawFallback = await runTool(rawMap, "search_notes", { query: "runtime" }, budget);
+  expect(rawFallback).toContain("Preferences");
+  // map failure degrades to the plain miss, never a throw
+  const { host: broken } = fakeHost([], {
+    searchNotes: async () => [],
+    knowledgeMap: async () => {
+      throw new Error("map down");
+    },
+  });
+  const fallback = await runTool(broken, "search_notes", { query: "runtime" }, budget);
+  expect(fallback).toContain('no matching notes for "runtime"');
+  expect(fallback).toContain("one different, distinctive word");
+});

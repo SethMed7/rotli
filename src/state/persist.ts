@@ -204,6 +204,11 @@ interface PersistedSettings {
    * organizer and corpus filer gate read this same field independently.
    * Missing ⇒ true — an untouched vault behaves exactly like today. */
   brainEnabled: boolean;
+  /** The vault-wide default for secure ⇄ on-device AI visibility (2026-08-01).
+   * true = a model running on this Mac may read secure notes; a per-note
+   * `local_ai_allowed` line overrides it either way. Remote models are refused
+   * regardless, always. Missing ⇒ true (docs/design/ai-visibility-matrix.md). */
+  secureLocalAi: boolean;
   /** The organizer daemon's §4.3 trust rung; the Rust daemon re-reads this file
    * each cycle, so persisting here IS the durable knob. Default: suggest. */
   organizerTrust: OrganizerTrust;
@@ -408,6 +413,8 @@ export function parseSettings(raw: string): PersistedSettings {
     // the Brain master switch (vault-vs-brain, 2026-07-26): a MISSING field
     // means ON — every existing vault keeps today's behavior untouched
     brainEnabled: asBool(data.brainEnabled, true),
+    // secure ⇄ on-device visibility: a MISSING field means ON, matching Rust
+    secureLocalAi: asBool(data.secureLocalAi, true),
     organizerTrust: asEnum(data.organizerTrust, ORGANIZER_TRUSTS, "organize"),
     // default LOCAL (on-device) so organizing never leaves the Mac unless chosen
     organizerModel: asEnum(data.organizerModel, ORGANIZER_MODELS, "local"),
@@ -500,6 +507,7 @@ function applySettings(s: PersistedSettings): void {
     appIcon: s.appIcon,
     fileMetadata: s.fileMetadata,
     brainEnabled: s.brainEnabled,
+    secureLocalAi: s.secureLocalAi,
     organizerTrust: s.organizerTrust,
     organizerModel: s.organizerModel,
     organizerQuietSecs: s.organizerQuietSecs,
@@ -843,6 +851,7 @@ function settingsSnapshot(): string {
     appIcon: ui.appIcon,
     fileMetadata: ui.fileMetadata,
     brainEnabled: ui.brainEnabled,
+    secureLocalAi: ui.secureLocalAi,
     organizerTrust: ui.organizerTrust,
     organizerModel: ui.organizerModel,
     organizerQuietSecs: ui.organizerQuietSecs,

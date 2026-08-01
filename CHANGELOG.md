@@ -8,6 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [Unreleased]
+
+### Changed
+
+- **A dead-end search hands the model a map instead.** When the on-device
+  model searches a word no note contains ("runtime"), the miss now returns
+  the vault's complete area list — each with its leading note title — and
+  tells the model to search the area that would hold the answer. In live
+  runs the model then finds "Preferences" and answers with the truth; when
+  it still can't, it says "I couldn't find that in your notes" — the
+  answer-every-part-from-a-read rule now forbids a guess dressed as a fact.
+- **Chat can reach your identity notes now.** The parts of a vault that hold who
+  you are — `identity/`, `personality/`, your daily `history/`, `MAP.md`, and
+  `inbox.md` — used to be invisible to every model, so "what do I do for work?"
+  had no reachable answer. Chat can now find and read them the same careful way
+  it finds anything else: search it, open the one note that matters. It is still
+  retrieval, not stuffing — nothing preloads your vault. They stay out of the
+  Notes sidebar, and no AI can write to them.
+
+- **Secure and locked finally mean two different things.**
+  **Secure** hides a note from cloud models — completely, no setting, no
+  exception. Models running on your own Mac *can* now read secure notes by
+  default, which is the point of running one: nothing it reads leaves the
+  machine. Any single note can still opt out from its menu, and the whole vault
+  can from Settings → Security.
+  **Locked** is not about hiding. A locked note is one **no AI may edit** —
+  cloud or on-device, in chat or by the Librarian. Everyone can read it; nobody
+  but you can change it. The note menu and the Security pane now say exactly
+  that.
+
+- Secure notes a chat has read still can't leak sideways: a chat that has seen
+  one can only write into notes that are themselves secure, and its transcript
+  can never be handed to a cloud model afterwards.
+
 ## [0.63.0] - 2026-08-01
 
 ### Added

@@ -5,6 +5,27 @@ models never see secret-shaped content, and secrets live only in the Keychain.
 This document is the map of how data leaves the machine, the mechanical guards
 that keep it that way, and the residual risks a maintainer still owns.
 
+## What each class of model may see and change
+
+Two independent controls, on two axes (Seth, 2026-08-01):
+
+- **`secure` is a VISIBILITY control against remote.** A frontier/API model
+  never receives a secure note's title, snippet, body, or search hit. An
+  on-device model reads them by default; the note's `local_ai_allowed` and the
+  vault's `secureLocalAi` can withdraw that. No knob opens one to a remote model.
+- **`locked` is an EDIT control.** No AI of any class edits a locked note.
+  Every class still reads it.
+- The brain's memory lanes (`identity/`, `personality/`, `history/`, `MAP.md`,
+  `inbox.md`) are retrievable by both classes through the AI's search / map /
+  read tools, and writable by none.
+
+Both layers enforce all of the above independently: TypeScript fails fast, Rust
+is the authority, and neither trusts the other. The matrix, the enforcement map
+per seam, and the threat cases are in
+[`../design/ai-visibility-matrix.md`](../design/ai-visibility-matrix.md); the
+normative rules stay in
+[`../architecture/memex-data-contract.md`](../architecture/memex-data-contract.md).
+
 ## Threat model summary
 
 The canonical asset, actor, boundary, abuse-case, and residual-risk model lives

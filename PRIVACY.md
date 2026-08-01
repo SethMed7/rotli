@@ -33,10 +33,15 @@ The destination inventory and guards are documented in
 an account service, crash upload, sync, or another destination requires an
 explicit privacy and threat-model change before implementation.
 
-## Secure notes
+## Secure notes and locked notes
 
 Secure notes are excluded from remote models, remote search observations, and
-the organizer. Recognized on-device models require explicit per-note permission.
+the organizer. Recognized on-device models — which cannot make a network call —
+read them by default; that can be turned off for one note from its menu or for
+the whole vault in Settings → Security. Nothing turns it on for a remote model.
+
+Locked notes are a separate control: no AI of any kind may edit a locked note,
+cloud or on-device. Locking withholds editing, not reading.
 
 Secure notes are plain local files in a protected lane, not an encrypted vault.
 Filesystem encryption is provided by macOS/FileVault when enabled. Users should
