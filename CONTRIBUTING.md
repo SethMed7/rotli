@@ -106,9 +106,12 @@ their trees) and the oxlint layer below. Editors get the same type feedback
 live from the TS language server, independent of the lint gate.
 `tsgo` is `@typescript/native-preview`, the Go port of `tsc` (measured on this
 repo 2026-08-01: 3.5s → 0.8s over `src`). It is a PREVIEW compiler, so stock
-`typescript` stays installed and `bun run typecheck:tsc` runs the identical
-check on it — both must stay green. When the two disagree, fix the code unless
-the divergence is demonstrably a `tsgo` bug, and record it here.
+`typescript` — the JavaScript implementation, held at 6.x for the reasons in
+the pin note below — stays installed and `bun run typecheck:tsc` runs the
+identical check on it. The point of that second lane is that it is an
+INDEPENDENT implementation, not merely a slower one; both must stay green.
+When the two disagree, fix the code unless the divergence is demonstrably a
+`tsgo` bug, and record it here.
 Dead weight is mechanical, not a review chore: `check:knip` (`knip.json`) fails
 the `lint` chain on an unreferenced file, export, or dependency and on an import
 or binary that was never declared. It runs with `ignoreExportsUsedInFile`, so
@@ -139,9 +142,29 @@ latest, so the three stay).
 Identifier casing (typescript-eslint's `naming-convention`, adopted
 2026-07-18 at a measured 0 real violations) has no oxlint equivalent and is
 held by `scripts/check-naming.mjs` (`check:naming`). Propose additions in a
-PR; the config must not grow silently. TypeScript's `~5.8.3` pin existed
-because typescript-eslint 8.x crashes on TS 7; tsgolint removed that blocker,
-so the pin is now only conservatism — revalidate the toolchain before bumping.
+PR; the config must not grow silently.
+TypeScript moved `~5.8.3` → `~6.0.3` on 2026-08-01 and the bump cost zero code
+changes: all three tsc project scopes (root, `tsconfig.e2e.json`,
+`breve-runtime`), the full `lint` chain, 1010 unit / 28 tooling / 34 Breve
+tests, the build and all 61 e2e specs passed unedited. The old pin was
+justified — typescript-eslint 8.x crashed on TS 7 — but tsgolint had already
+removed that carrier, so by then only conservatism held it.
+`~6.0.3` is a deliberate stop, not a waypoint to 7. `typescript@7` is the Go
+port, which makes it a different package rather than a newer one: measured on
+7.0.2, its `exports["."]` resolves to `lib/version.cjs`, so
+`import ts from "typescript"` yields `{version, versionMajorMinor}` and nothing
+else; it ships no `tsserver` bin and no JS compiler, only per-platform native
+binaries behind `getExePath`, with the AST surface moved to an explicitly
+`unstable/` subpath. Two things here rest on 6.x being what it is. First,
+`check:naming` walks the syntactic AST via `import ts from "typescript"`
+(`createSourceFile`, `forEachChild`, `getLineAndCharacterOfPosition`) — on 7
+that import has no `createSourceFile` at all, so the guard must be ported to
+`typescript/unstable/ast` BEFORE the bump, not after the break. Second, and
+the larger one: `tsgo` is already on the 7 line (`7.0.0-dev`), so moving
+`typescript` to 7 would aim both lanes at the same Go compiler and collapse
+`typecheck:tsc` from a cross-check into a tautology. 6.0.3 is the last
+JavaScript TypeScript; hold it until the naming guard is ported and there is a
+considered answer for what supplies the second implementation.
 The old "Biome as the long-term two-package footprint" plan is superseded by
 this migration.
 `breve-runtime/` is IN the lint scope as of 2026-08-01 — its long-standing
