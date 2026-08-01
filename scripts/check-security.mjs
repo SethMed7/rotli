@@ -104,6 +104,44 @@ function stripComments(src) {
   }
 }
 
+// ── (a″) every declared egress SITE still calls the egress gate ───────────────
+//
+// The 2026-08-01 audit found this class three times over: an outbound lane that
+// bounded its DESTINATION (a scheme allowlist, a fixed search host, a provider
+// allowlist) while bounding its CONTENT not at all. `open_url` handed the OS any
+// URL a compromised webview named; the organizer's remote lane sent any prompt
+// the daemon built. Both were one function away from correct and neither was
+// caught by anything mechanical. So: each function named in the fixture must
+// reference `blocked_for_remote`, and the file's other outbound functions are
+// caught by the ureq allowlist above.
+{
+  const sites = allow.rust.gatedEgressSites ?? {};
+  const GATE = "blocked_for_remote";
+  for (const [rel, fns] of Object.entries(sites)) {
+    if (rel.startsWith("_")) continue;
+    const code = stripComments(read(rel));
+    for (const fn of fns) {
+      // the function's body: from its signature to the next top-level `}`
+      const start = code.search(new RegExp(`fn\\s+${fn}\\s*[(<]`));
+      if (start < 0) {
+        failures.push(
+          `${rel}: declared egress site "${fn}" no longer exists. ` +
+            `If it was renamed or removed, update egress-allowlist.json rust.gatedEgressSites in the same change.`,
+        );
+        continue;
+      }
+      const end = code.indexOf("\n}", start);
+      const body = code.slice(start, end < 0 ? code.length : end);
+      if (!body.includes(GATE)) {
+        failures.push(
+          `${rel}: ${fn} is a declared egress site but does not call crate::secret::${GATE}. ` +
+            `An outbound lane must bound its CONTENT, not only its destination (docs/architecture/egress-threat-model.md).`,
+        );
+      }
+    }
+  }
+}
+
 // ── (a′) the TS agent-loop egress-tool set is complete ────────────────────────
 //
 // Every ToolName that isn't a known LOCAL tool must be in EGRESS_TOOLS, so a

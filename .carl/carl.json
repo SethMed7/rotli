@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-08-01T19:59:00.439Z",
+  "last_modified": "2026-08-01T20:45:28.688Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -687,6 +687,15 @@
       "rationale": "Rule 1 still describes the retired Chat/Notes accordions and an uncollapsible System zone. The 2026-08-01 IA replaced both, split sidebar.tsx, and moved chat.new off ⌃2.",
       "source": "docs/design/sidebar-home-chat.md",
       "proposed_at": "2026-08-01T19:59:00.439Z",
+      "status": "pending"
+    },
+    {
+      "id": "stg-005",
+      "proposed_domain": "ROTLI_MEMEX",
+      "rule_text": "Replace rule 1. Secure notes fail closed; remote models never receive their titles, snippets, bodies or hits, and on-device models read them BY DEFAULT (local_ai_allowed / secureLocalAi may deny, never grant remote). Rust APPLIES the filter, not just the verdict: AI retrieval goes through corpus_search_ai / corpus_notes_ai, and every seam putting caller text on a network calls secret::blocked_for_remote (markers + the walk-fed secure-prose ledger), declared in egress-allowlist.json gatedEgressSites.",
+      "rationale": "Rule 1 is stale: \"on-device models require explicit local_ai_allowed\" was inverted on 2026-08-01 (default allow), and it omits what the egress audit made load-bearing — TypeScript was applying the search/map/laundering/taint filters, so Rust supplied verdicts it did not enforce. Nine gaps, all closed in Rust.",
+      "source": "docs/architecture/egress-threat-model.md",
+      "proposed_at": "2026-08-01T20:45:28.688Z",
       "status": "pending"
     }
   ]

@@ -81,11 +81,21 @@ void mock.module("../lib/tauri", () => ({
     folders: [],
     notes: rows.filter((r) => !r.reference).map(meta),
   }),
-  corpusReferenceNotes: async () => rows.filter((r) => r.reference).map(meta),
-  corpusSearch: async (query: string, limit?: number, includeReference = false) => {
+  // The AI lanes are GATED IN RUST since 2026-08-01 (GAP 1): the command
+  // itself applies `read_for_ai` per hit, so the fake enforces `readable`
+  // here — a secure row never crosses the boundary for a frontier model, with
+  // or without a probe call afterwards.
+  corpusNotesAi: async (model: ChatModelInfo) => rows.filter((r) => readable(r, model)).map(meta),
+  corpusSearchAi: async (
+    query: string,
+    limit: number | undefined,
+    includeReference: boolean,
+    model: ChatModelInfo,
+  ) => {
     const q = query.toLowerCase();
     return rows
       .filter((r) => (includeReference ? true : !r.reference))
+      .filter((r) => readable(r, model))
       .filter((r) => `${r.title} ${r.body}`.toLowerCase().includes(q))
       .slice(0, limit ?? 50)
       .map<SearchHit>((r) => ({

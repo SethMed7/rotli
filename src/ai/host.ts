@@ -13,10 +13,10 @@ import {
   corpusFileText,
   corpusFrontmatter,
   corpusList,
+  corpusNotesAi,
   corpusReadAi,
   corpusReadableIds,
-  corpusReferenceNotes,
-  corpusSearch,
+  corpusSearchAi,
   corpusWriteAi,
   generateImage as tauriGenerateImage,
   webFetch as tauriWebFetch,
@@ -167,12 +167,8 @@ export function makeTauriHost(
         // (docs/design/ai-visibility-matrix.md).
         const wantsFolders = folderQuery(query);
         const [hits, listed] = await Promise.all([
-          corpusSearch(query, limit, true),
-          wantsFolders
-            ? Promise.all([corpusList().then((l) => l.notes), corpusReferenceNotes()]).then(
-                ([notes, reference]) => [...notes, ...reference],
-              )
-            : Promise.resolve([]),
+          corpusSearchAi(query, limit, true, model),
+          wantsFolders ? corpusNotesAi(model) : Promise.resolve([]),
         ]);
         const found = hits.filter((hit) => hit.kind === "note");
         const byFolder = wantsFolders ? folderHits(listed, query, limit) : [];
@@ -196,11 +192,9 @@ export function makeTauriHost(
           limit,
         );
       } catch {
-        const [{ notes }, reference] = await Promise.all([
-          corpusList(),
-          corpusReferenceNotes().catch(() => []),
-        ]);
-        const ranked = rankNotes([...notes, ...reference], query, limit);
+        // the browser twin and a search error still answer from the listing —
+        // through the GATED listing, so the fallback is not a way around it
+        const ranked = rankNotes(await corpusNotesAi(model), query, limit);
         return aiReadableHits(ranked, model);
       }
     },
@@ -302,7 +296,7 @@ export function makeTauriHost(
     async searchMemory(query, limit) {
       const queries = [query, ...memoryKeywords(query)].slice(0, 7);
       const noteResults = await Promise.all(
-        queries.map((part) => corpusSearch(part, limit, true).catch(() => [])),
+        queries.map((part) => corpusSearchAi(part, limit, true, model).catch(() => [])),
       );
       const readableNoteHits = await aiReadableHits(
         mergeKeywordHits(noteResults).filter((hit) => hit.kind === "note"),
@@ -405,14 +399,10 @@ export function makeTauriHost(
     async knowledgeMap(maxChars) {
       // the map spans the Notes tree AND the brain's memory lanes — a model that
       // can't see identity/ in the map never learns to ask for it (2026-08-01)
-      const [{ notes }, reference] = await Promise.all([
-        corpusList(),
-        corpusReferenceNotes().catch(() => []),
-      ]);
-      // Titles are knowledge too. Apply the same read gate before the model sees
-      // the master map: remote models never see secure entries, and an on-device
-      // model sees them unless a knob says otherwise.
-      const readable = await aiReadableHits([...notes, ...reference], model);
+      // Titles are knowledge too, so the map rides the GATED listing: Rust
+      // drops every entry this model class may not read before the metas cross
+      // the boundary. The probe below is the fail-fast mirror, not the gate.
+      const readable = await aiReadableHits(await corpusNotesAi(model), model);
       return buildModelMap(readable, contextWindowFor(model), maxChars);
     },
   };

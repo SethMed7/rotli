@@ -1033,6 +1033,15 @@ fn searchable_metadata(fm: &Frontmatter) -> String {
         .join("\n")
 }
 
+/// Is this walked note protected content? The same three-way rule
+/// `read_for_ai` applies — the explicit flag, the chat taint marker, or the
+/// body detector for a note whose metadata panel was never opened.
+fn walked_secure(fm: &Frontmatter, body: &str) -> bool {
+    fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+        || fm.foreign.iter().any(|l| secure_context_field(l) == Some(true))
+        || looks_secure(body)
+}
+
 /// Serialize: our four facts first, then every foreign line verbatim, then the
 /// raw body exactly as given (callers pass the separating blank line).
 pub fn compose_document(fm: &Frontmatter, raw_body: &str) -> String {
@@ -1108,6 +1117,28 @@ const AI_KEYS: [&str; 8] = [
 pub(crate) fn secure_field(line: &str) -> Option<bool> {
     let (k, v) = line.split_once(':')?;
     (k.trim() == "secure").then(|| v.trim() != "false")
+}
+
+/// Does this whole document carry `locked: true`? The lock check written once,
+/// for callers that hold the file text rather than a parsed `Frontmatter`.
+pub(crate) fn has_locked_frontmatter(text: &str) -> bool {
+    parse_document(text)
+        .0
+        .unwrap_or_default()
+        .foreign
+        .iter()
+        .any(|line| locked_field(line) == Some(true))
+}
+
+/// The CHAT taint marker (`src/memex/contract.ts` writes it, one-way): this
+/// transcript was fed by a secure note, so it IS secure content wearing a
+/// different key. A memex root surfaces `chats/**.md` as ordinary notes, so
+/// without this the headless remote agent could read a tainted transcript
+/// straight out of the notes lane — `secure_field` never matched the longer
+/// key (audit 2026-08-01, GAP 3; the matrix promises this at T2 step 5).
+pub(crate) fn secure_context_field(line: &str) -> Option<bool> {
+    let (k, v) = line.split_once(':')?;
+    (k.trim() == "secureContext").then(|| v.trim() == "true")
 }
 
 /// Explicit permission for a loopback-local model to read a secure note.
@@ -2249,6 +2280,12 @@ struct CachedNoteText {
     body: String,
     /// The searchable frontmatter projection ("" when the note has none).
     metadata: String,
+    /// Decided on the WALK, from the same rule `read_for_ai` applies: the
+    /// `secure:` flag, the chat taint marker, or the body detector. It cannot
+    /// be re-derived from `metadata`, which is an 8-key search projection that
+    /// deliberately omits protection state. The secure-prose ledger is fed
+    /// from this (audit 2026-08-01, GAP 2).
+    secure: bool,
 }
 
 struct ListCache {
@@ -3223,6 +3260,7 @@ impl CorpusStore {
         let (fm, body) = parse_document(&text);
         let fm = fm.unwrap_or_default();
         let secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+            || fm.foreign.iter().any(|l| secure_context_field(l) == Some(true))
             || looks_secure(body);
         if secure {
             // remote FIRST and unconditionally — the refusal must never depend
@@ -3236,6 +3274,12 @@ impl CorpusStore {
                         .into(),
                 );
             }
+            // The read is ALLOWED, and it is about to put secure prose into an
+            // on-device model's context. Remember it: from here on, every egress
+            // seam refuses outbound text that quotes this body, whatever the
+            // (untrusted) agent loop asks for. This is the ONE recording site —
+            // the same choke point that decided the read.
+            crate::secret::remember_secure_text(body);
         }
         Ok(text)
     }
@@ -3284,10 +3328,27 @@ impl CorpusStore {
     ) -> Result<NoteMeta, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
         let text = self.read_for_ai(&rel, model_is_local)?;
-        let fm = parse_document(&text).0.unwrap_or_default();
+        let (fm, target_body) = parse_document(&text);
+        let fm = fm.unwrap_or_default();
         if fm.foreign.iter().any(|line| locked_field(line) == Some(true)) {
             return Err(
                 "This note is locked — no AI may edit it. Unlock it from the note's menu first."
+                    .into(),
+            );
+        }
+        // THE LAUNDERING RULE, in Rust (docs/design/ai-visibility-matrix.md T2:
+        // "secure content flows only into secure containers"). The TS host has
+        // enforced this since PR #4 by tracking the CHAT's secure taint — but a
+        // chat id is a webview assertion, so a compromised loop could read a
+        // secure note on-device and then write its prose into an open note that
+        // a frontier model reads five minutes later. Rust cannot see chats; it
+        // CAN see that the incoming body is protected content, so it refuses to
+        // let protected prose land anywhere it would stop being protected.
+        let target_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+            || looks_secure(target_body);
+        if !target_secure && crate::secret::blocked_for_remote(body) {
+            return Err(
+                "This text came out of a secure note, so it can only be written into a note that is itself secure. Use create_note instead — the new note will be marked secure."
                     .into(),
             );
         }
@@ -3316,6 +3377,35 @@ impl CorpusStore {
             self.writable(&rel)?;
         }
         self.write_resolved(id, body, rel)
+    }
+
+    /// May a remote agent rewrite this note's FRONTMATTER (a view tag)? The
+    /// surface predicate is the whole answer: `Reference` and `Hidden` are
+    /// documented as written by no lane, ever, and a bare existence check let
+    /// the workspace's view lane write both (audit 2026-08-01, GAP 7).
+    pub(crate) fn agent_frontmatter_writable(&self, rel: &str) -> Result<(), String> {
+        self.mutation_allowed()?;
+        match surfaced(self.layout, rel) {
+            Surface::NoteRW | Surface::NoteRO => Ok(()),
+            Surface::Reference => {
+                Err("that note is part of the brain's memory and no agent may write it".into())
+            }
+            Surface::Hidden => Err(format!("not available to AI: {rel}")),
+        }
+    }
+
+    /// May a remote agent SEE that this path exists at all? Folders and
+    /// surfaced files carry no frontmatter, so nothing per-item marks them —
+    /// the surface predicate is the only policy they have, and the workspace
+    /// listing lane was applying none (audit 2026-08-01, GAP 8). The corpus
+    /// root ("") is always listable; it is the tree the agent was handed.
+    pub(crate) fn agent_listable(&mut self, id_or_rel: &str) -> bool {
+        let (_, rel) = split_root_id(id_or_rel);
+        if rel.is_empty() {
+            return true;
+        }
+        let rel = self.resolve_note_rel(&rel).unwrap_or(rel);
+        !matches!(surfaced(self.layout, &rel), Surface::Hidden | Surface::Reference)
     }
 
     pub(crate) fn move_for_remote_agent(
@@ -3505,6 +3595,26 @@ impl CorpusStore {
         Ok(self.list_cache.as_ref().expect("ensure_walked fills the cache").list.clone())
     }
 
+    /// Warm the secure-prose ledger for this root at STARTUP, before any egress
+    /// command can run (audit follow-up 2026-08-01, finding #2).
+    ///
+    /// The ledger is fed by the corpus WALK (`ensure_walked` hashes every secure
+    /// note's prose), but `open`/`open_with_mode` deliberately do NOT walk — they
+    /// load the persisted index and return. So in a fresh process, until a root's
+    /// first `list`/`search`, the ledger held none of that root's secure prose —
+    /// and the ungated editor/file lanes (`corpus_read`, `corpus_file_text`,
+    /// `corpus_file_bytes`) can hand a secure note's frontmatter-stripped body
+    /// straight to a remote lane. A connected brain the user never browses this
+    /// session might never walk at all. That is a real boot race, and this is
+    /// what closes it: the lib.rs setup loop walks every registered root once, so
+    /// the ledger is warm before the first command. It is the SAME walk the first
+    /// sidebar paint would do — this only moves it earlier, warming the list
+    /// cache the perf audit wants. Non-fatal for the caller to skip: `read_for_ai`
+    /// is still the primary gate; the ledger is the defense-in-depth layer.
+    pub fn warm_secure_ledger(&mut self) -> Result<(), String> {
+        self.ensure_walked()
+    }
+
     /// Walk the disk ONLY when the change generation moved (perf audit
     /// 2026-07-30, #1: with staleTime ∞ + broad invalidation, ~9 uncached
     /// walks rode every editor tick). Internal writes bump the generation at
@@ -3552,6 +3662,21 @@ impl CorpusStore {
                 .then(a.id.cmp(&b.id))
         });
         reference.sort_by(|a, b| b.updated_at.cmp(&a.updated_at).then(a.id.cmp(&b.id)));
+        // Feed the secure-prose ledger from the WALK, not from a read (audit
+        // 2026-08-01, GAP 2). Deriving it from `read_for_ai` alone would have
+        // left the real hole open: `corpus_read` — the editor's ungated read —
+        // returns the frontmatter-STRIPPED body, so prose fetched that way and
+        // handed to a remote lane carries no `secure: true` marker for the
+        // egress detector to find. The vault itself is the honest source: if a
+        // note in this corpus is secure, its prose may not leave, whichever
+        // command went and got it. This holds from PROCESS START because the
+        // lib.rs setup loop calls `warm_secure_ledger` (this same walk) on every
+        // registered root before any command runs — otherwise a never-browsed
+        // root's secure prose would be absent until its first list (the boot
+        // race, follow-up finding #2). Idempotent, so re-walks cost nothing.
+        for text in texts.values().filter(|t| t.secure) {
+            crate::secret::remember_secure_text(&text.body);
+        }
         self.list_cache =
             Some(ListCache { generation, list: CorpusList { folders, notes }, reference, texts });
         Ok(())
@@ -5021,6 +5146,7 @@ fn walk(
                     CachedNoteText {
                         body: body.to_string(),
                         metadata: if had_fm { searchable_metadata(&fm) } else { String::new() },
+                        secure: walked_secure(&fm, body),
                     },
                 );
                 let (file_created, file_updated) = file_stamps(&abs);
@@ -5097,6 +5223,7 @@ fn walk(
                 CachedNoteText {
                     body: body.to_string(),
                     metadata: if had_fm { searchable_metadata(&fm) } else { String::new() },
+                    secure: walked_secure(&fm, body),
                 },
             );
             let title = title_of(body);
@@ -5394,6 +5521,11 @@ fn prefix_meta(root_id: &str, mut m: NoteMeta) -> NoteMeta {
 
 #[tauri::command]
 pub fn corpus_list(state: tauri::State<'_, CorpusState>) -> Result<CorpusList, String> {
+    corpus_list_inner(&state)
+}
+
+/// The aggregation half of `corpus_list`, shared with `corpus_notes_ai`.
+fn corpus_list_inner(state: &CorpusState) -> Result<CorpusList, String> {
     // Aggregate across every registered root, prefixing each emitted folder_id /
     // board id via compose_root_id (default bare). Note ulids stay bare for the
     // default root; a non-default root prefixes its ulids too so reads route back.
@@ -5465,6 +5597,17 @@ pub fn corpus_search(
     limit: Option<usize>,
     include_reference: Option<bool>,
 ) -> Result<Vec<SearchHit>, String> {
+    corpus_search_inner(&state, &query, limit, include_reference)
+}
+
+/// The ranking half of `corpus_search`, shared with the model-gated
+/// `corpus_search_ai` so the two lanes cannot rank differently.
+fn corpus_search_inner(
+    state: &CorpusState,
+    query: &str,
+    limit: Option<usize>,
+    include_reference: Option<bool>,
+) -> Result<Vec<SearchHit>, String> {
     let cap = limit.unwrap_or(50).clamp(1, 200);
     // default FALSE: ⌘K and every other user caller keep today's scope. Only the
     // AI host opts into the reference lane (docs/design/ai-visibility-matrix.md).
@@ -5480,7 +5623,7 @@ pub fn corpus_search(
     let mut hits: Vec<SearchHit> = Vec::new();
     for id in ids {
         let store = reg.stores.get_mut(&id).expect("id from keys");
-        for mut h in store.search(&query, cap, include_reference)? {
+        for mut h in store.search(query, cap, include_reference)? {
             h.folder_id = compose_root_id(&id, &h.folder_id);
             if id != default_id {
                 h.id = compose_root_id(&id, &h.id);
@@ -5491,6 +5634,77 @@ pub fn corpus_search(
     sort_hits(&mut hits);
     hits.truncate(cap);
     Ok(hits)
+}
+
+/// The AI's search lane — `corpus_search` with the read gate applied IN RUST.
+///
+/// `corpus_search` above is a USER surface (⌘K, backlinks): it ranks the whole
+/// corpus, secure notes included, because the user may see their own notes. The
+/// AI's copy may not. Until 2026-08-01 the AI lane called `corpus_search` and
+/// then filtered the ids through `corpus_readable_ids` — Rust supplied the
+/// verdict but TYPESCRIPT applied it, so a compromised agent loop could simply
+/// skip the second call and hand a frontier model the titles and body snippets
+/// of every secure note that matched. The matrix promises a frontier model
+/// never receives a secure note's "title, snippet, body, hit"; that promise now
+/// holds at the command boundary, where the untrusted side cannot reach past it
+/// (audit 2026-08-01, GAP 1).
+///
+/// Same filter as the probe — `read_for_ai` per hit — so the two lanes cannot
+/// drift. One IPC round trip instead of two, which is also strictly faster.
+#[tauri::command]
+pub async fn corpus_search_ai(
+    app: tauri::AppHandle,
+    query: String,
+    limit: Option<usize>,
+    include_reference: Option<bool>,
+    model_id: String,
+    endpoint: String,
+) -> Result<Vec<SearchHit>, String> {
+    let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let state = app.state::<CorpusState>();
+        let hits = corpus_search_inner(&state, &query, limit, include_reference)?;
+        let mut permitted = Vec::with_capacity(hits.len());
+        for hit in hits {
+            let (root, rel) = split_root_id(&hit.id);
+            if state.route(&root, |s| s.read_for_ai(&rel, model_is_local)).is_ok() {
+                permitted.push(hit);
+            }
+        }
+        Ok(permitted)
+    })
+    .await
+    .map_err(|e| format!("ai search worker failed ({e})"))?
+}
+
+/// The AI's LISTING lane — every note meta the model may retrieve, Notes tree
+/// plus the reference lanes, filtered by the same gate. Feeds the knowledge map
+/// and the folder-name fallback, which are the other two routes by which a
+/// secure note's TITLE could otherwise reach a frontier model's context.
+#[tauri::command]
+pub async fn corpus_notes_ai(
+    app: tauri::AppHandle,
+    model_id: String,
+    endpoint: String,
+) -> Result<Vec<NoteMeta>, String> {
+    let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let state = app.state::<CorpusState>();
+        let listed = corpus_list_inner(&state)?;
+        let reference = corpus_reference_notes_inner(&state)?;
+        let mut permitted = Vec::new();
+        for meta in listed.notes.into_iter().chain(reference) {
+            let (root, rel) = split_root_id(&meta.id);
+            if state.route(&root, |s| s.read_for_ai(&rel, model_is_local)).is_ok() {
+                permitted.push(meta);
+            }
+        }
+        Ok(permitted)
+    })
+    .await
+    .map_err(|e| format!("ai listing worker failed ({e})"))?
 }
 
 #[tauri::command]
@@ -6163,8 +6377,12 @@ pub async fn corpus_readable_ids(
 /// and the AI's retrieval tools now reach for BOTH model classes (2026-08-01,
 /// docs/design/ai-visibility-matrix.md). Metas only: readability is still
 /// decided per note by `read_for_ai` through `corpus_readable_ids`.
-#[tauri::command]
-pub fn corpus_reference_notes(state: tauri::State<'_, CorpusState>) -> Result<Vec<NoteMeta>, String> {
+/// The reference lane's metas. There is deliberately NO ungated command for
+/// this: the only caller is `corpus_notes_ai`, which applies the read gate per
+/// note. The bare `corpus_reference_notes` command was retired on 2026-08-01 —
+/// an AI-only retrieval surface with no model argument is exactly the shape
+/// this audit was closing (docs/architecture/egress-threat-model.md).
+fn corpus_reference_notes_inner(state: &CorpusState) -> Result<Vec<NoteMeta>, String> {
     let mut reg = state.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
     let mut ids: Vec<String> = reg.stores.keys().cloned().collect();
     ids.sort();
@@ -6553,6 +6771,13 @@ pub fn corpus_views_write(
 }
 
 // ─── tests ───────────────────────────────────────────────────────────────────
+
+/// The prompt-injection evals — a fully cooperating, fully compromised caller
+/// driven against the real gates. Kept in its own file because it is a
+/// deliverable, not a unit test (docs/architecture/egress-threat-model.md).
+#[cfg(test)]
+#[path = "injection_evals.rs"]
+mod injection_evals;
 
 #[cfg(test)]
 mod tests {
@@ -8741,6 +8966,194 @@ mod tests {
         // unlocked, an AI write lands
         store.set_locked(&note.id, false).unwrap();
         assert!(store.write_for_ai(&note.id, "# Plan\n\nAI edit", true).is_ok());
+    }
+
+    /// AUDIT 2026-08-01, GAP 2 — the compromised-loop shape. The agent loop can
+    /// call ANY command: it does not have to use `corpus_read_ai`, whose result
+    /// still carries the `secure: true` marker the egress detector looks for.
+    /// It can call the editor's ungated `corpus_read`, which returns the body
+    /// with the frontmatter STRIPPED, and hand that to a remote lane as
+    /// innocent-looking prose. So the ledger is fed by the WALK, not by a read:
+    /// if a secure note exists in this vault, its prose cannot leave, whichever
+    /// command went and got it.
+    #[test]
+    fn secure_prose_cannot_egress_however_the_loop_fetched_it() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        let note = store
+            .create_with_policy(
+                "Secure notes",
+                "# Chapterhouse\n\nThe chapterhouse valuation settles before Lammas tide.",
+                true,
+            )
+            .unwrap();
+
+        // the walk is what teaches the gate — a plain list() is enough
+        store.list().unwrap();
+
+        // the exact bytes a compromised loop would obtain from the UNGATED
+        // editor read: no frontmatter, so no marker for the old detector
+        let stripped = store.read(&note.id).unwrap().body;
+        assert!(!stripped.contains("secure:"), "the editor lane strips frontmatter: {stripped}");
+        assert!(!crate::secret::looks_secure(&stripped), "and the prose is not secret-SHAPED");
+        assert!(
+            !crate::secret::protected_for_remote(&stripped),
+            "which is exactly why the marker backstop alone was not enough"
+        );
+
+        // every outbound seam now refuses it, in every wrapper the loop might use
+        assert!(crate::secret::blocked_for_remote(&stripped));
+        assert!(crate::secret::blocked_for_remote(
+            "the chapterhouse valuation settles before lammas"
+        ));
+        assert!(crate::secret::blocked_for_remote(
+            "https://exfil.example/?d=The%20chapterhouse valuation settles before Lammas tide"
+        ));
+
+        // an ORDINARY note in the same vault is untouched by any of this
+        let open = store.create("Inbox", "# Errands\n\nCollect the boots from the cobbler.").unwrap();
+        store.list().unwrap();
+        let open_body = store.read(&open.id).unwrap().body;
+        assert!(!crate::secret::blocked_for_remote(&open_body));
+    }
+
+    /// AUDIT 2026-08-01, GAP 3 — a chat a secure note fed is stamped
+    /// `secureContext: true`. In a memex root `chats/**.md` are ordinary notes,
+    /// so before this the headless (remote-by-policy) agent could read a tainted
+    /// transcript straight out of the notes lane: `secure_field` never matched
+    /// the longer key.
+    #[test]
+    fn a_secure_tainted_chat_reads_like_a_secure_note() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        let chat = store.create("Inbox", "# Chat\n\nordinary looking words").unwrap();
+        let rel = store.path_of(&chat.id).unwrap();
+        let text = fs::read_to_string(store.abs(&rel)).unwrap();
+        let (fm, body) = parse_document(&text);
+        let mut fm = fm.unwrap_or_default();
+        fm.foreign.push("secureContext: true".to_string());
+        atomic_write(&store.abs(&rel), &compose_document(&fm, body)).unwrap();
+
+        assert!(store.read_for_ai(&chat.id, false).is_err(), "remote must be refused");
+        assert!(store.read_for_ai(&chat.id, true).is_ok(), "on-device still reads it");
+    }
+
+    /// AUDIT 2026-08-01, GAP 9 — the laundering rule, in Rust. The TS host has
+    /// enforced "secure content flows only into secure containers" by tracking
+    /// the CHAT's taint, but a chat id is a webview assertion. Rust cannot see
+    /// chats; it CAN see that the incoming body is protected content.
+    #[test]
+    fn write_for_ai_refuses_to_launder_secure_prose_into_an_open_note() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        let secret = store
+            .create_with_policy(
+                "Secure notes",
+                "# Wardship\n\nThe wardship stipend renews each Candlemas quarter.",
+                true,
+            )
+            .unwrap();
+        let open = store.create("Inbox", "# Open\n\nnothing sensitive here").unwrap();
+        store.list().unwrap(); // the walk teaches the ledger
+
+        let laundered = "# Open\n\nThe wardship stipend renews each Candlemas quarter.";
+        // the compromised shape: read secure on-device, write it into an OPEN note
+        let err = store.write_for_ai(&open.id, laundered, true).unwrap_err();
+        assert!(err.contains("secure"), "{err}");
+        let rel = store.path_of(&open.id).unwrap();
+        assert!(
+            fs::read_to_string(store.abs(&rel)).unwrap().contains("nothing sensitive"),
+            "the open note must be untouched"
+        );
+
+        // the SAME text into a SECURE container is fine — that is the rule, not
+        // a blanket refusal
+        assert!(store.write_for_ai(&secret.id, laundered, true).is_ok());
+        // and an ordinary edit to the open note still lands
+        assert!(store.write_for_ai(&open.id, "# Open\n\nbuy more oats", true).is_ok());
+    }
+
+    /// AUDIT 2026-08-01, GAP 7 — a view tag REWRITES frontmatter, so it is an AI
+    /// write and takes the write gate. The workspace's view lane checked only
+    /// that the path resolved.
+    #[test]
+    fn agent_frontmatter_writes_stop_at_the_reference_and_hidden_lanes() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path().join("memex");
+        fs::create_dir_all(root.join("wiki")).unwrap();
+        fs::create_dir_all(root.join("identity")).unwrap();
+        fs::write(root.join("memex.json"), "{\"id\":\"mx_test\",\"contract\":\"3.7\"}").unwrap();
+        fs::write(root.join("wiki/open.md"), "# Open\n").unwrap();
+        fs::write(root.join("identity/00-identity.md"), "# Me\n").unwrap();
+        fs::write(root.join("STRUCTURE.md"), "# Layout\n").unwrap();
+        let store = CorpusStore::open(root).unwrap();
+        assert_eq!(store.layout, Layout::Memex, "test setup: this must open as a memex");
+
+        // curated wiki notes DO take a view tag (view inheritance is a feature)
+        assert!(store.agent_frontmatter_writable("wiki/open.md").is_ok());
+        // the brain's memory lanes are written by no lane, ever
+        let err = store.agent_frontmatter_writable("identity/00-identity.md").unwrap_err();
+        assert!(err.contains("memory"), "{err}");
+        // and vault plumbing is not even acknowledged
+        assert!(store.agent_frontmatter_writable("STRUCTURE.md").is_err());
+    }
+
+    /// AUDIT FOLLOW-UP 2026-08-01, finding #2 — the LAZY-LEDGER boot race. The
+    /// ledger is fed by the walk, and `open` does not walk. So a fresh process
+    /// that reads a secure note through an UNGATED lane (`corpus_read` /
+    /// `corpus_file_text`, both directly webview-invokable) before that root's
+    /// first list would hand its stripped body to a remote lane with a cold
+    /// ledger. This proves the STARTUP WARM — not a `list()` — closes it.
+    #[test]
+    fn the_startup_warm_closes_the_ungated_read_egress_race() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path().join("corpus");
+        // author a secure note, capturing its id, then drop the authoring store
+        let secure_id = {
+            let mut authoring = CorpusStore::open(root.clone()).unwrap();
+            authoring.os_trash = false;
+            authoring
+                .create_with_policy(
+                    "Secure notes",
+                    "# Escrow\n\nThe Wexford escrow releases on the feast of Saint Swithin.",
+                    true,
+                )
+                .unwrap()
+                .id
+        };
+        // simulate the process boundary: a FRESH store that has only loaded its
+        // index (open does not walk). The ledger is process-global and shared
+        // with every parallel test, so this test never resets it — its secure
+        // phrase is globally UNIQUE instead, so "absent before the warm" holds
+        // without clobbering another test's entries.
+        let mut store = CorpusStore::open(root).unwrap();
+        store.os_trash = false;
+
+        // the exact bytes the ungated editor lane hands the webview — the body
+        // with frontmatter stripped, no marker for the detector to find
+        let stripped = store.read(&secure_id).unwrap().body;
+        assert!(!crate::secret::looks_secure(&stripped), "not secret-SHAPED");
+        // BEFORE the warm the ledger has never seen this root's prose, so the
+        // race is real — this is the hole the startup walk exists to close,
+        // asserted so a regression (e.g. open() starting to walk, or the warm
+        // being dropped) shows up here
+        assert!(
+            !crate::secret::blocked_for_remote(&stripped),
+            "cold ledger: without the warm the stripped body would egress"
+        );
+
+        // the STARTUP action — the same call lib.rs makes per root, NOT a list()
+        store.warm_secure_ledger().unwrap();
+
+        // now the stripped body cannot leave by any seam, whichever ungated
+        // command fetched it
+        assert!(crate::secret::blocked_for_remote(&stripped));
+        assert!(crate::secret::blocked_for_remote(
+            "the wexford escrow releases on the feast of saint swithin"
+        ));
     }
 
     /// A secure note is EDITABLE by the class that can see it (secure gates

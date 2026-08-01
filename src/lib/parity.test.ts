@@ -14,7 +14,7 @@ import {
 } from "../../breve-runtime/scripts/cli-paths";
 import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "../../breve-runtime/scripts/keychain-names";
 import fixture from "../../scripts/fixtures/parity.json";
-import { endpointIsLocal } from "../ai/guard";
+import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { DOCUMENT_CONVERTIBLE_EXTS } from "../documents/kinds";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
@@ -74,6 +74,22 @@ describe("parity.json ↔ TS constants", () => {
     expect(claude).toEqual(entries.cliBinCandidates.value.claude);
     expect(codex).toEqual(entries.cliBinCandidates.value.codex);
     expect(agy).toEqual(entries.cliBinCandidates.value.agy);
+  });
+
+  test("secureOverlap", () => {
+    const { source, matches, clean } = entries.secureOverlap.value;
+    for (const outbound of matches) {
+      expect({ outbound, overlaps: containsPrivateDataOverlap(outbound, [source]) }).toEqual({
+        outbound,
+        overlaps: true,
+      });
+    }
+    for (const outbound of clean) {
+      expect({ outbound, overlaps: containsPrivateDataOverlap(outbound, [source]) }).toEqual({
+        outbound,
+        overlaps: false,
+      });
+    }
   });
 
   test("endpointLocality", () => {

@@ -130,3 +130,26 @@ fn endpoint_locality_fixtures_agree() {
         assert_eq!(crate::chat::endpoint_is_local(url), expected, "endpoint_is_local({url:?})");
     }
 }
+
+/// The verbatim-phrase egress rule, asserted against the SAME fixture the TS
+/// mirror uses. Rust's side is stateful (a process-local ledger of secure
+/// prose) where TS's takes the source as an argument, so this teaches the
+/// ledger the fixture's source note and then asks the same questions.
+#[test]
+fn secure_overlap() {
+    let value = entry("secureOverlap");
+    let source = value["source"].as_str().expect("fixture source is a string");
+    crate::secret::remember_secure_text(source);
+    for outbound in string_list(&value["matches"]) {
+        assert!(
+            crate::secret::echoes_secure_text(&outbound),
+            "fixture says this overlaps the source note: {outbound}"
+        );
+    }
+    for outbound in string_list(&value["clean"]) {
+        assert!(
+            !crate::secret::echoes_secure_text(&outbound),
+            "fixture says this does NOT overlap: {outbound}"
+        );
+    }
+}

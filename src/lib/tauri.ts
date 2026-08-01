@@ -1067,10 +1067,6 @@ export async function secureRepairApply(): Promise<SecureRepairReport> {
  * history/, MAP.md, inbox.md) — never part of corpusList, so no user surface can
  * accidentally show them. Metas only; per-note readability is still the Rust
  * read gate's answer (docs/design/ai-visibility-matrix.md). */
-export function corpusReferenceNotes(): Promise<CorpusNoteMeta[]> {
-  return corpusInvoke("corpus_reference_notes");
-}
-
 /** WRITE a note on behalf of an AI model. Rust re-derives locality, re-runs the
  * read gate, and refuses a LOCKED note — the independent second layer behind
  * the host's own refusals. Use this for EVERY AI write path; `corpusWrite` is
@@ -1110,6 +1106,43 @@ export async function corpusReadableIds(
 ): Promise<string[]> {
   if (!isTauri()) return [];
   return invoke<string[]>("corpus_readable_ids", { ids, modelId: model.id, endpoint: model.endpoint });
+}
+
+/** The AI's SEARCH lane — `corpus_search` with the read gate applied in RUST,
+ * per hit, before anything crosses the IPC boundary.
+ *
+ * Use this and never `corpusSearch` from an AI path. `corpusSearch` is a user
+ * surface: it ranks the whole corpus, secure notes included, because the user
+ * may see their own notes. Filtering that list on THIS side was the old shape
+ * (search, then `corpusReadableIds`), and it made the webview — the untrusted
+ * side of the boundary — the thing standing between a frontier model and a
+ * secure note's title and snippet (audit 2026-08-01, GAP 1). Rust now answers
+ * the narrower question directly. One round trip instead of two. */
+export async function corpusSearchAi(
+  query: string,
+  limit: number | undefined,
+  includeReference: boolean,
+  model: Pick<ChatModelInfo, "id" | "endpoint">,
+): Promise<SearchHit[]> {
+  if (!isTauri()) return [];
+  return invoke<SearchHit[]>("corpus_search_ai", {
+    query,
+    ...(limit === undefined ? {} : { limit }),
+    ...(includeReference ? { includeReference: true } : {}),
+    modelId: model.id,
+    endpoint: model.endpoint,
+  });
+}
+
+/** The AI's LISTING lane — every note meta this model may retrieve, Notes tree
+ * plus the reference lanes, gated in Rust. Feeds the knowledge map and the
+ * folder-name fallback, the other two routes by which a secure note's TITLE
+ * could reach a frontier model's context. */
+export async function corpusNotesAi(
+  model: Pick<ChatModelInfo, "id" | "endpoint">,
+): Promise<CorpusNoteMeta[]> {
+  if (!isTauri()) return [];
+  return invoke<CorpusNoteMeta[]>("corpus_notes_ai", { modelId: model.id, endpoint: model.endpoint });
 }
 
 // ——— the unified Location model (corpus.json) — ONE folder = your notes = your

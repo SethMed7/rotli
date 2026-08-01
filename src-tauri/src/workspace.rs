@@ -285,12 +285,19 @@ impl Workspace {
                     .read_board(&meta.id)
                     .map(|b| Self::board_egress_allowed(&b.body).is_ok())
                     .unwrap_or(false),
-                _ => true,
+                // a surfaced FILE carries no frontmatter to mark, so the
+                // surface predicate is the whole policy: never offer a remote
+                // agent something out of a Hidden lane (audit 2026-08-01).
+                _ => self.store.agent_listable(&meta.id),
             };
             if visible {
                 kept.push(meta);
             }
         }
+        let folders = folders
+            .into_iter()
+            .filter(|folder| self.store.agent_listable(&folder.id))
+            .collect();
         let mut list = CorpusList {
             notes: kept,
             folders,
@@ -404,6 +411,17 @@ impl Workspace {
     ) -> Result<NoteMeta, String> {
         validate_editor_markdown(body)?;
         require_revision(expected_revision)?;
+        // THE READ GATE FIRST (audit 2026-08-01, GAP 6). `compare_revision`
+        // reports "expected X, found fnv1a64:<hash>" — an unkeyed hash of the
+        // note's complete on-disk bytes. Running it before the gate turned
+        // `update_note` into a CONTENT-CHANGE oracle over notes the agent may not
+        // read: a remote agent could poll a secure note's revision and watch it
+        // change. With the gate first, a secure note refuses before its hash is
+        // ever computed. (The coarser path-EXISTENCE bit — "not found" vs
+        // "secure" — remains, as it does for every read-by-id lane; that residual
+        // is conceded in docs/architecture/egress-threat-model.md. What closes
+        // here is the change-detection oracle, which is the part that leaked.)
+        self.store.read_for_ai(local_id, false)?;
         let rel = self.store.resolve_note_rel(local_id)?;
         let current =
             fs::read(self.store.root().join(&rel)).map_err(|e| format!("read {rel}: {e}"))?;
@@ -666,15 +684,43 @@ impl Workspace {
         Ok(manifest)
     }
 
+    /// May this remote agent stamp a view tag onto `item_id`? The same two
+    /// questions every other agent write asks — may it READ the thing, and is
+    /// the thing LOCKED — plus the surface check, since a view tag is written
+    /// into the note file itself. Boards and files carry no frontmatter and are
+    /// skipped by the sync, so they only need the read gate.
+    fn view_writable(&mut self, item_id: &str) -> Result<(), String> {
+        let text = self.store.read_for_ai(item_id, false)?;
+        let rel = self.store.resolve_note_rel(item_id)?;
+        if !rel.ends_with(".md") {
+            return Ok(()); // no frontmatter to write; the read gate is the whole gate
+        }
+        if crate::corpus::has_locked_frontmatter(&text) {
+            return Err("note is locked — an external agent may not tag it into a view".into());
+        }
+        self.store.agent_frontmatter_writable(&rel)
+    }
+
     fn view_assign(
         &mut self,
         item_id: &str,
         target: Option<&str>,
         parent_id: &str,
     ) -> Result<ViewsManifest, String> {
-        // Resolve first so a typo cannot become a durable orphan. Boards and
-        // files resolve here too; the corpus sync gate will simply skip tags.
-        self.store.resolve_note_rel(item_id)?;
+        // Assigning a view REWRITES the note's frontmatter (`views_write` →
+        // `with_view_tag` → `atomic_write`), so it is an AI write and takes the
+        // AI write gate — which existence-checking alone did not (audit
+        // 2026-08-01, GAP 7). Without it a remote agent could stamp frontmatter
+        // into a note it may not read, a note the user LOCKED, or a Reference /
+        // Hidden lane note the matrix says no lane ever writes. The gate runs
+        // FIRST — it resolves the id itself (through `read_for_ai`), so a typo
+        // still cannot become a durable orphan and nothing touches disk before
+        // the read verdict. NOTE the residual: `read_for_ai` must resolve a path
+        // to read its frontmatter, so a non-existent id errors "not found" while
+        // a secure one errors "secure" — a path-EXISTENCE differential (never a
+        // content one). It is pervasive across every AI lane that reads by id and
+        // is accepted as low-severity; see docs/architecture/egress-threat-model.md.
+        self.view_writable(item_id)?;
         if target.is_some() {
             self.main_add(item_id, MAIN_ROOT)?;
         }
@@ -3345,6 +3391,74 @@ mod tests {
         assert!(workspace
             .create_note("Token", "sk-ant-abcdefghijklmnop", MAIN_ROOT)
             .is_err());
+    }
+
+    /// AUDIT 2026-08-01, GAP 6 — `compare_revision` reports the FNV-1a hash of
+    /// the note's complete on-disk bytes. Running it before the read gate made
+    /// `update_note` a CHANGE-DETECTION oracle over notes the remote agent may
+    /// not read: poll the revision, watch it move. The gate now runs first, so
+    /// the hash is never computed for a note the agent can't read. (The coarser
+    /// not-found-vs-secure existence bit remains, as everywhere; the leak that
+    /// closes is the hash, asserted below.)
+    #[test]
+    fn a_stale_revision_never_leaks_a_secure_notes_hash() {
+        let temp = TempDir::new().unwrap();
+        let mut workspace = test_workspace(&temp);
+        let secure = workspace
+            .store
+            .create_with_policy("Secure notes", "# Private\n\nthe body", true)
+            .unwrap();
+
+        let err = workspace.update_note(&secure.id, "# Private\n\nnew", "fnv1a64:0").unwrap_err();
+        assert!(err.contains("secure"), "{err}");
+        assert!(!err.contains("found"), "a refusal must not carry the revision: {err}");
+        assert!(!err.contains("fnv1a64:"), "and must not carry the hash: {err}");
+
+        // an ORDINARY note still reports its conflict — the oracle closed, the
+        // feature intact
+        let open = workspace.create_note("Open", "body", MAIN_ROOT).unwrap();
+        let err = workspace.update_note(&open.id, "new", "fnv1a64:0").unwrap_err();
+        assert!(err.contains("revision conflict"), "{err}");
+    }
+
+    /// AUDIT 2026-08-01, GAP 7 — `view_assign` rewrites the target note's
+    /// frontmatter, so it is an AI write. It used to check only that the path
+    /// resolved, which let a remote agent stamp a note it may not read, a note
+    /// the user LOCKED, or a lane the matrix says no lane writes — and confirm
+    /// a guessed secure path existed by watching the call succeed.
+    #[test]
+    fn assigning_a_view_takes_the_agent_write_gate() {
+        let temp = TempDir::new().unwrap();
+        let mut workspace = test_workspace(&temp);
+        workspace.view_create("Reading").unwrap();
+
+        let secure = workspace
+            .store
+            .create_with_policy("Secure notes", "# Private\n\nbody", true)
+            .unwrap();
+        let err = workspace.view_assign(&secure.id, Some("Reading"), MAIN_ROOT).unwrap_err();
+        assert!(err.contains("secure"), "{err}");
+
+        let locked = workspace.create_note("Locked", "body", MAIN_ROOT).unwrap();
+        let rel = workspace.store.resolve_note_rel(&locked.id).unwrap();
+        let path = workspace.store.root().join(&rel);
+        let raw = fs::read_to_string(&path).unwrap().replace("---\n\n", "locked: true\n---\n\n");
+        fs::write(&path, raw).unwrap();
+        let err = workspace.view_assign(&locked.id, Some("Reading"), MAIN_ROOT).unwrap_err();
+        assert!(err.contains("locked"), "{err}");
+
+        // a guessed non-existent path is also refused — no view tag lands, no
+        // frontmatter is written. It does NOT hide the path-existence differential
+        // (this errors "not found" where an existing secure path errors "secure");
+        // that residual is conceded in the threat model, not claimed closed here.
+        // What matters is that neither reveals CONTENT and neither writes.
+        assert!(workspace
+            .view_assign("Secure notes/Guessed.md", Some("Reading"), MAIN_ROOT)
+            .is_err());
+
+        // an ordinary note still assigns
+        let open = workspace.create_note("Open", "body", MAIN_ROOT).unwrap();
+        assert!(workspace.view_assign(&open.id, Some("Reading"), MAIN_ROOT).is_ok());
     }
 
     #[test]

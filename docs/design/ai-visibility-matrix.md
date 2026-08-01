@@ -121,17 +121,26 @@ other is removed, bypassed, or compromised.
 |---|---|---|
 | Read | `read_for_ai` | Hidden-surface refusal · secure ⇒ remote never · secure ⇒ local unless per-note deny or vault knob off |
 | Read probe | `corpus_readable_ids` | the exact same `read_for_ai` per id; bodies never returned |
-| Search | `Store::search(.., include_reference)` | reference lane only when asked; per-hit readability is still decided by the probe |
-| Map | `corpus_reference_notes` + `corpus_list` | metas only; the probe filters them |
+| Search | `corpus_search_ai` | the reference lane only when asked, then **`read_for_ai` per hit, in Rust** — the AI never receives an unfiltered hit list (hardened 2026-08-01) |
+| Map | `corpus_notes_ai` | Notes tree + reference metas, filtered by the same gate before they cross the boundary |
+| Ledger | `secret::remember_secure_text` (fed by the corpus walk) | every secure note's verbatim prose, so an egress seam can refuse it even after the frontmatter was stripped |
 | **AI write** | `corpus_write_ai` → `write_for_ai` | the read gate first, then **locked refusal**, then the ordinary write |
 | Agent write | `write_for_remote_agent` / `move_for_remote_agent` | read gate as remote + locked refusal (unchanged) |
 | Filer write | `filer_writable` | locked + secure refusal (unchanged) |
 | Organizer | `snapshot_note` / `auto_applies` | skips secure and locked (unchanged) |
-| Send | `chat::egress_allowed` | a non-local endpoint refuses secret-shaped or secure-marked transcripts |
-| Web | `web.rs` `looks_secure` | secret-shaped queries/URLs never leave |
+| Send | `chat::egress_allowed` | a non-local endpoint refuses secret-shaped, secure-marked, or secure-ECHOING transcripts |
+| CLI send | `provider::cli_complete` / `generate_image` | the same predicate on the connected-model and image lanes |
+| Organizer send | `provider::organizer_egress_allowed` | the remote organizer lane's own backstop behind `skip_reason` (added 2026-08-01) |
+| Web | `web.rs` `blocked_for_remote` | search queries, fetch URLs, **and `open_url`** never carry protected content |
+| Agent list | `agent_listable` | files and folders a remote agent may not see are not offered |
+| Agent tag | `agent_frontmatter_writable` | a view tag is an AI write, so it takes the AI write gate |
 
 Locality is re-derived at every seam from the endpoint + the provider registry
 (`chat::model_is_local`), never from a caller-supplied boolean.
+
+The adversarial audit of these seams — every egress path, its verdict, the nine
+gaps it found, and the ones deliberately left open — is
+[`../architecture/egress-threat-model.md`](../architecture/egress-threat-model.md).
 
 ### Layer 2 — TypeScript (`src/`), the fail-fast mirror
 
@@ -148,6 +157,11 @@ Locality is re-derived at every seam from the endpoint + the provider registry
 
 The TS layer's job is to fail fast and to keep the model's context honest. It is
 never the only thing standing between a frontier model and a secure note.
+
+That last sentence was aspirational until 2026-08-01. The audit found five
+places where TypeScript WAS the only thing standing there — the search and map
+filters, the laundering rule, the chat-taint filter, and the prose-overlap check
+— and moved each verdict into Rust. See the threat model for the list.
 
 ## Knobs (per `~/memex-vault/CONFIG.md`'s Configuration Rule)
 

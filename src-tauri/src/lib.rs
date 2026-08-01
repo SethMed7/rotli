@@ -1249,7 +1249,8 @@ pub fn run() {
             corpus::corpus_set_local_ai_access,
             corpus::corpus_read_ai,
             corpus::corpus_readable_ids,
-            corpus::corpus_reference_notes,
+            corpus::corpus_search_ai,
+            corpus::corpus_notes_ai,
             corpus::corpus_write_ai,
             corpus::corpus_write,
             corpus::corpus_create,
@@ -1410,6 +1411,21 @@ pub fn run() {
                         }) {
                             eprintln!(
                                 "rotli: corpus watcher unavailable for root {} ({e}) — external edits won't auto-refresh",
+                                root.id
+                            );
+                        }
+                        // FEED THE SECURE-PROSE LEDGER before this root can
+                        // serve any egress command (audit follow-up 2026-08-01,
+                        // finding #2). open() loads the index but does NOT walk,
+                        // so without this a fresh process holds none of a
+                        // never-browsed root's secure prose and the ungated file
+                        // lanes could launder its stripped body out before the
+                        // first list. Non-fatal: read_for_ai is still the primary
+                        // gate; a warm failure only loses the backstop, and the
+                        // walk also warms the list cache the perf audit wants.
+                        if let Err(e) = store.warm_secure_ledger() {
+                            eprintln!(
+                                "rotli: could not warm the secure-note ledger for root {} ({e}) — egress backstop degraded to read_for_ai only",
                                 root.id
                             );
                         }

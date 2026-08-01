@@ -25,6 +25,7 @@ fix both in the same change.
 | FileSurface capability matrix | [`architecture/file-surface-capability-audit-2026-07-11.md`](architecture/file-surface-capability-audit-2026-07-11.md) |
 | Current system-wide findings and priorities | [`architecture/system-audit-2026-07-29.md`](architecture/system-audit-2026-07-29.md) |
 | Performance audit (async · imports · bundle) | [`architecture/perf-audit-2026-07-30.md`](architecture/perf-audit-2026-07-30.md) |
+| Egress threat model (can secure content reach a remote model?) | [`architecture/egress-threat-model.md`](architecture/egress-threat-model.md) |
 | Code organization audit | [`architecture/code-audit.md`](architecture/code-audit.md) |
 | Managed Breve runtime | [`../breve-runtime/README.md`](../breve-runtime/README.md) |
 | Brand implementation | [`../src/brand/README.md`](../src/brand/README.md) |

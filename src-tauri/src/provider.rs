@@ -358,6 +358,23 @@ fn run_registered(
 /// lane so tuning one never moves the other.
 pub const ORGANIZER_CLAUDE_MODEL: &str = "sonnet";
 
+/// The organizer's transcript backstop. Until 2026-08-01 the organizer was the
+/// ONE remote seam with a single line of defense: `skip_reason` dropped secure
+/// and locked notes before a prompt was built, and nothing checked the prompt
+/// itself. Every other remote seam is double-gated, and the two content paths
+/// that never passed `skip_reason` — an area's `_index.md` description line,
+/// which `candidate_rel` excludes from snapshotting, and the enrich prompt
+/// built after a filing move without a fresh secure re-read — are exactly the
+/// kind of thing a backstop exists to catch (audit 2026-08-01, GAP 5).
+pub(crate) fn organizer_egress_allowed(prompt: &str) -> Result<(), String> {
+    if crate::secret::blocked_for_remote(prompt) {
+        return Err(
+            "organizer prompt carries protected content — refusing the remote lane".into(),
+        );
+    }
+    Ok(())
+}
+
 /// Synchronous one-shot Claude completion for the ORGANIZER daemon, which runs
 /// on its own `std::thread` (no `ProviderState`, no cancellation registry). A
 /// tool-less `claude -p --model sonnet --output-format json`, prompt on stdin,
@@ -367,7 +384,9 @@ pub const ORGANIZER_CLAUDE_MODEL: &str = "sonnet";
 /// already treats as model-offline (requeue + backoff) — the note is never lost.
 /// Secure/locked notes never reach here: the daemon filters them before any
 /// transport call, so a REMOTE lane still honors the on-device promise for them.
+/// `organizer_egress_allowed` is the SECOND, independent line — see it below.
 pub fn organizer_claude_complete(prompt: &str, timeout: Duration) -> Result<String, String> {
+    organizer_egress_allowed(prompt)?;
     let bin = resolve_bin(spec("claude")?).ok_or("the claude CLI isn't installed")?;
     let (args, _via) = build_args("claude", ORGANIZER_CLAUDE_MODEL, prompt, timeout.as_secs())?;
     let mut cmd = Command::new(&bin);
@@ -397,6 +416,7 @@ pub fn organizer_claude_complete(prompt: &str, timeout: Duration) -> Result<Stri
 /// allowlist, sandbox argv, timeout runner, output parser, and global one-at-a-
 /// time gate used by chat; only the fixed model choice differs.
 pub fn organizer_gemini_complete(prompt: &str, timeout: Duration) -> Result<String, String> {
+    organizer_egress_allowed(prompt)?;
     const MODEL: &str = "Gemini 3.5 Flash (Medium)";
     let bin = resolve_bin(spec("agy")?).ok_or("the Antigravity CLI isn't installed")?;
     let (args, via) = build_args("agy", MODEL, prompt, timeout.as_secs())?;
@@ -451,7 +471,7 @@ pub async fn cli_complete(
     timeout_ms: Option<u64>,
 ) -> Result<String, String> {
     // the CLI lane is remote by definition — same egress law as chat.rs
-    if crate::secret::protected_for_remote(&prompt) {
+    if crate::secret::blocked_for_remote(&prompt) {
         return Err(
             "This conversation carries secret-shaped content and can't be sent to a connected model — switch to a local model to continue."
                 .into(),
@@ -544,6 +564,28 @@ fn image_sandbox_enabled() -> bool {
 mod image_sandbox_tests {
     use super::*;
 
+    /// AUDIT 2026-08-01, GAP 5 — the organizer was the ONE remote seam with a
+    /// single line of defense. `skip_reason` drops secure and locked notes
+    /// before a prompt is built, but two content paths never pass it: an area
+    /// `_index.md` description (excluded from snapshotting) and the enrich
+    /// prompt built after a filing move without a fresh secure re-read.
+    #[test]
+    fn the_organizer_lane_refuses_a_protected_prompt() {
+        assert!(organizer_egress_allowed("Classify this note about oats").is_ok());
+        // secret-shaped, e.g. leaked through an _index.md description line
+        assert!(organizer_egress_allowed("summary: sk-ant-abcdefghijklmnop").is_err());
+        // a marker that survived into the prompt
+        assert!(organizer_egress_allowed("---\nsecure: true\n---\nfile this").is_err());
+        // and ordinary prose the vault knows is secure
+        crate::secret::remember_secure_text(
+            "The Ravensworth trust distribution pauses until probate concludes.",
+        );
+        assert!(organizer_egress_allowed(
+            "Classify: the ravensworth trust distribution pauses until probate"
+        )
+        .is_err());
+    }
+
     #[test]
     fn profile_denies_home_and_allows_only_the_job_paths() {
         let p = agy_sandbox_profile("/Users/x", "/Users/x/memex/storage/chats/s", "/Users/x/.local/bin");
@@ -588,7 +630,7 @@ pub async fn generate_image(
     prompt: String,
     engine: String,
 ) -> Result<String, String> {
-    if crate::secret::protected_for_remote(&prompt) {
+    if crate::secret::blocked_for_remote(&prompt) {
         return Err("That prompt carries secret-shaped content — it won't be sent to an image engine.".into());
     }
     if engine != "codex" && engine != "agy" {

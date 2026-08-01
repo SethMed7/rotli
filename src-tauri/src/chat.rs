@@ -357,7 +357,7 @@ fn egress_allowed(endpoint: &str, model: &str, messages: &[WireMsg]) -> Result<(
     }
     if messages
         .iter()
-        .any(|m| crate::secret::protected_for_remote(&m.content))
+        .any(|m| crate::secret::blocked_for_remote(&m.content))
     {
         return Err(
             "This conversation carries secret-shaped content and can't be sent to a remote model — switch to a local model to continue.".into(),

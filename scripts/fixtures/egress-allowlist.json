@@ -16,6 +16,22 @@
       "web.rs": "web_search (DuckDuckGo lite/html — query only, secret-scanned) + web_fetch (arbitrary public web via the vetted_resolve SSRF-blocked agent, same-host redirects, byte+URL caps)",
       "chat.rs": "the on-device / Gemini model bridge — endpoint_permitted clamps the destination to registered loopback model servers or the pinned Gemini base; egress_allowed refuses secret-shaped transcripts to non-local endpoints",
       "breve.rs": "breve_test_email — Resend send to the literal https://api.resend.com/emails host, Keychain Bearer, configured recipients only"
+    },
+    "gatedEgressSites": {
+      "_comment": "Every Rust function that puts CALLER-SUPPLIED text on a network — a model transport, a CLI provider, or a web lane — must ask crate::secret::blocked_for_remote (the marker scan + the secure-prose ledger). Adding an outbound lane without the gate is the class the 2026-08-01 audit found three times: open_url had no content gate at all, the organizer's remote lane had none, and web_search had no size bound. check-security.mjs asserts each function below still calls the gate.",
+      "src-tauri/src/web.rs": [
+        "web_search_blocking",
+        "web_fetch_blocking",
+        "open_url"
+      ],
+      "src-tauri/src/chat.rs": [
+        "egress_allowed"
+      ],
+      "src-tauri/src/provider.rs": [
+        "cli_complete",
+        "generate_image",
+        "organizer_egress_allowed"
+      ]
     }
   },
   "breveRuntime": {
