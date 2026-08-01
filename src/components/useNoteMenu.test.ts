@@ -2,6 +2,7 @@
 // on the TITLE line, never on a frontmatter fence or a thematic break.
 
 import { describe, expect, test } from "bun:test";
+
 import { copyBody } from "./useNoteMenu";
 
 describe("copyBody", () => {

@@ -5,11 +5,12 @@
 // updatedAt moves and the list/snippets refresh. Tabs hold only view state.
 
 import { useCallback, useSyncExternalStore } from "react";
+
 import { onQuitFlush } from "../lib/quitFlush";
 import { applyNoteWrite } from "../services/hooks";
 import { markNoteDraftChanged } from "../services/noteDrafts";
-import { keepTabsFor } from "../state/panes";
 import { notesService } from "../services/notes";
+import { keepTabsFor } from "../state/panes";
 import type { Note } from "../types";
 
 const SYNC_DEBOUNCE_MS = 400;

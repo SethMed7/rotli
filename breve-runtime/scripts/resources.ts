@@ -6,10 +6,10 @@
  * on the LOCAL tier; fetched bytes are untrusted. SCHEDULED auto-pull-into-briefs is a deferred phase —
  * this module is on-demand + listing only.
  */
-import { loadResources, type Resource } from "./config";
+import { loadResources, type Resource, type ResourceDefaults } from "./config";
 
 // Entry values win over registry defaults; everything still passes the safe-fetch guard at fetch time.
-function withDefaults(r: Resource, defaults: Record<string, any>): Resource {
+function withDefaults(r: Resource, defaults: ResourceDefaults): Resource {
   return {
     cadence: defaults.cadence ?? "on-demand",
     tier: defaults.tier ?? "local",

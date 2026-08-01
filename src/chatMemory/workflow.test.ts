@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { syncChatMemory, type ChatMemoryRepository } from "./workflow";
+
 import { CHAT_NOTES_HEADING } from "./model";
+import { syncChatMemory, type ChatMemoryRepository } from "./workflow";
 
 describe("syncChatMemory", () => {
   test("creates and attaches the one background note when absent", async () => {

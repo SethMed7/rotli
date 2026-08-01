@@ -1,18 +1,18 @@
+import { trackNewDocumentDraft } from "../documents/draftComposition";
+import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
 /** Composition root for item creation. Product rules stay in model/workflow. */
 import { invalidateMemex } from "../memex/useMemex";
 import { createRoutedNote } from "../services/createNote";
 import { DEST, isHidden, isStorageLane, isVault } from "../services/destinations";
 import { invalidateNotes } from "../services/hooks";
 import { MAIN_ROOT, addNoteToMainAt, mainFolderIds, mainParentOfNote } from "../services/mainTree";
+import { trackNewNoteDraft } from "../services/noteDrafts";
 import { inboxFolderId } from "../services/notes";
-import { useMainStore } from "../state/main";
-import { useViewsStore } from "../state/views";
 import { assignItemToView, assignedView, viewTree } from "../services/viewTree";
+import { useMainStore } from "../state/main";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
-import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
-import { trackNewDocumentDraft } from "../documents/draftComposition";
-import { trackNewNoteDraft } from "../services/noteDrafts";
+import { useViewsStore } from "../state/views";
 import type { NewItemKind } from "./model";
 import { createNewItem, type CreatedItem, type NewItemCreator, type NewItemPresenter } from "./workflow";
 

@@ -3,7 +3,9 @@
 // body verbatim, and the pre-existing langs + skip rules still hold.
 
 import { describe, expect, test } from "bun:test";
+
 import { Text } from "@codemirror/state";
+
 import { TARGET_LANGS, innerCode, lineInFence, scanFences } from "./fences";
 
 function doc(...lines: string[]): Text {

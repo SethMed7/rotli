@@ -5,7 +5,7 @@
  * conversations — including the exact exchanges that have failed for Seth — and
  * asserts where each message routes. Run: bun scripts/test-intents.ts
  */
-import { normalizeAmPm, briefAsk, briefRegenMatch, bareFollowup, wantsLastAsText, topicBriefMatch, urlRequest, watchIntentMatch, schedulePairs, scheduleChangeGate, parseWhen, audioResearchAsk, inboxAsk, accountOf, inboxScope, mailSearchAsk, saveAttachmentIntent, folderFromCaption, slugifyTopic, stripStepNarration, modelDirective } from "../scripts/intents";
+import { normalizeAmPm, briefAsk, briefRegenMatch, bareFollowup, wantsLastAsText, topicBriefMatch, urlRequest, watchIntentMatch, schedulePairs, scheduleChangeGate, parseWhen, audioResearchAsk, inboxAsk, inboxScope, mailSearchAsk, saveAttachmentIntent, folderFromCaption, slugifyTopic, stripStepNarration, modelDirective } from "../scripts/intents";
 
 // Mirrors handle()'s ordering for the pure layers (flows with state are exercised live).
 function route(text: string): string {

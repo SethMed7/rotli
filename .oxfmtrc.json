@@ -1,6 +1,23 @@
 {
   "printWidth": 110,
+  // Import sorting (2026-08-01). oxfmt's sorter follows eslint-plugin-perfectionist;
+  // `sortSideEffects` stays at its default `false`, so bare `import "..."` statements
+  // are never reordered among themselves.
+  //
+  // That alone is not enough where side-effect order is load-bearing: a plain value
+  // import may still be hoisted ACROSS a side-effect block, changing module
+  // evaluation order. The three files whose bare CSS imports carry real cascade
+  // coupling — `@excalidraw/excalidraw/index.css` must precede `styles/canvas.css`,
+  // and the Univer preset stylesheets sit ahead of their engines — therefore opt out
+  // of sorting entirely and keep their hand-ordered import blocks.
+  "sortImports": true,
   "sortPackageJson": false,
+  "overrides": [
+    {
+      "files": ["src/app.tsx", "src/sheets/engine/univer.tsx", "src/documents/engine/univer.ts"],
+      "options": { "sortImports": false }
+    }
+  ],
   "ignorePatterns": [
     "src-tauri/",
     "docs/",

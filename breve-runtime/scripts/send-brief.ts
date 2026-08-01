@@ -67,7 +67,7 @@ if (kind === "lunch") {
   let headlineBlock = sectionBody(md, /Headline/);
   if (!headlineBlock) {
     console.error("morning brief missing ## Headline — using first paragraph");
-    headlineBlock = md.split("\n").find((l) => l.trim() && !/^[#>*\-]/.test(l.trim())) ?? "";
+    headlineBlock = md.split("\n").find((l) => l.trim() && !/^[#>*-]/.test(l.trim())) ?? "";
   }
   headline = stripMd(headlineBlock);
   // Action items = the bullet titles under the "Action Items" section (the real alerts, not story heads).

@@ -3,8 +3,9 @@
 // sprite and render via <Icon>.
 
 import type { ReactNode } from "react";
-import { IMAGE_EXTS, extOf } from "../lib/fileKind";
+
 import { DOCUMENT_EXTS } from "../documents/kinds";
+import { IMAGE_EXTS, extOf } from "../lib/fileKind";
 
 interface GlyphProps {
   size?: number | undefined;

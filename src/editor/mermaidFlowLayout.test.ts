@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { MERMAID_VISUAL_NODE_SIZE, layoutMermaidFlowchart, trimMermaidEdge } from "./mermaidFlowLayout";
+
 import type { MermaidFlowchart } from "./mermaidFlowchart";
+import { MERMAID_VISUAL_NODE_SIZE, layoutMermaidFlowchart, trimMermaidEdge } from "./mermaidFlowLayout";
 
 const MODEL: MermaidFlowchart = {
   direction: "LR",

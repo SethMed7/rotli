@@ -3,6 +3,7 @@
 // full-width search at the top. Click a row to open the chat in a pane.
 
 import { useMemo, useState } from "react";
+
 import { activeInstance } from "../memex/config";
 import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
 import { usePanesStore } from "../state/panes";

@@ -3,6 +3,7 @@
 // right-click Sort-by menu.
 
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 test("Gallery view: filmstrip selection, arrow keys, Enter opens", async ({ page }) => {

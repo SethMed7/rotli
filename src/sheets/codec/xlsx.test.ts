@@ -1,9 +1,11 @@
 // xlsx codec helpers.
 
 import { describe, expect, test } from "bun:test";
+
 import ExcelJS from "exceljs";
-import { b64FromBytes, b64FromText, bytesFromB64, fillFromCsvRows } from "./xlsx";
+
 import { hexFromArgb } from "./colors";
+import { b64FromBytes, b64FromText, bytesFromB64, fillFromCsvRows } from "./xlsx";
 
 const HASH = "#";
 

@@ -7,6 +7,26 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { type KeyboardEvent, useEffect, useMemo, useState } from "react";
+
+import { makeTauriHost } from "../ai/host";
+import { suggestPresets } from "../ai/hybrid";
+import {
+  CLI_CATALOG,
+  type HybridPreset,
+  type LocalCatalogEntry,
+  PROVIDER_IDS,
+  PROVIDER_LABELS,
+  type ProviderId,
+  STARTER_PRESETS,
+  fitLabel,
+  flattenModels,
+  installableCatalog,
+  isValidRepo,
+  mergedModels,
+  nameFromRepo,
+  scanVerdict,
+} from "../ai/models";
+import { verifyLane } from "../ai/verify";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -50,32 +70,26 @@ import {
   setHideOnBlur,
   systemProfile,
 } from "../lib/tauri";
-import { makeTauriHost } from "../ai/host";
-import { suggestPresets } from "../ai/hybrid";
+import { CORPUS_INSTANCE_ID, type MemexInstance, type Perms } from "../memex/config";
 import {
-  CLI_CATALOG,
-  type HybridPreset,
-  type LocalCatalogEntry,
-  PROVIDER_IDS,
-  PROVIDER_LABELS,
-  type ProviderId,
-  STARTER_PRESETS,
-  fitLabel,
-  flattenModels,
-  installableCatalog,
-  isValidRepo,
-  mergedModels,
-  nameFromRepo,
-  scanVerdict,
-} from "../ai/models";
-import { verifyLane } from "../ai/verify";
-import { queryClient } from "../services/query";
-import { usePanesStore } from "../state/panes";
-import { useFolders } from "../services/hooks";
+  useChooseFolder,
+  useConnectBrain,
+  useDetectMemex,
+  useForgetBrain,
+  useMemexConfig,
+  useRunValidate,
+  useSetActiveMemex,
+  useSetMemexPerms,
+} from "../memex/useMemex";
+import { NEW_ITEM_DEFINITIONS } from "../newItems/model";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
+import { useFolders } from "../services/hooks";
+import { queryClient } from "../services/query";
 import { resetAndReonboard } from "../state/onboarding";
+import { usePanesStore } from "../state/panes";
 import { setQuickFolderSynced } from "../state/quick";
 import { ACCENT_COLORS, type AppIcon, type OrganizerTrust, SOLID_THEMES, useUiStore } from "../state/ui";
+import { Character, type CharacterName, QuokkaMark } from "./character";
 import {
   CheckGlyph,
   CloudGlyph,
@@ -87,19 +101,6 @@ import {
   ShieldGlyph,
   SunGlyph,
 } from "./glyphs";
-import { Character, type CharacterName, QuokkaMark } from "./character";
-import {
-  useChooseFolder,
-  useConnectBrain,
-  useDetectMemex,
-  useForgetBrain,
-  useMemexConfig,
-  useRunValidate,
-  useSetActiveMemex,
-  useSetMemexPerms,
-} from "../memex/useMemex";
-import { CORPUS_INSTANCE_ID, type MemexInstance, type Perms } from "../memex/config";
-import { NEW_ITEM_DEFINITIONS } from "../newItems/model";
 
 type SettingsPane =
   | "general"

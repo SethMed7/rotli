@@ -9,6 +9,7 @@
 // surface can start a Main-add drag by calling this on a row's pointerdown.
 
 import type { PointerEvent as ReactPointerEvent } from "react";
+
 import { inheritFolderView } from "../newItems/composition";
 import { MAIN_ROOT, addNoteToMain, type DropPos, mainParentOfNote, moveInTree } from "../services/mainTree";
 import { useMainStore } from "../state/main";

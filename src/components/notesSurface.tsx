@@ -7,19 +7,20 @@
 // persists via .rotli/settings.json.
 
 import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
-import { useNotes } from "../services/hooks";
+import { Suspense, lazy } from "react";
+
 import { DEST } from "../services/destinations";
+import { useNotes } from "../services/hooks";
 import { useUiStore } from "../state/ui";
 import { AllChatsSurface } from "./allChatsSurface";
-import { SystemSurface } from "./systemSurface";
-import { TasksSurface } from "./tasksSurface";
 import { BoardSurface } from "./boardSurface";
 import { EmptyState } from "./emptyState";
 import { ClockGlyph } from "./glyphs";
 import { NoteListSurface } from "./noteListSurface";
-import { Sidebar } from "./sidebar";
 import { PaneTree } from "./paneTree";
-import { Suspense, lazy } from "react";
+import { Sidebar } from "./sidebar";
+import { SystemSurface } from "./systemSurface";
+import { TasksSurface } from "./tasksSurface";
 
 // Breve is a whole product surface most note sessions never enter — split it
 // off the entry chunk like paneTree's CanvasSurface (perf audit 2026-07-30, #18)

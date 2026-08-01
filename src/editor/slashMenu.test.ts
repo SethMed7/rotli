@@ -2,6 +2,7 @@
 // fit the menu and above genuinely has more room (short Quick Note windows).
 
 import { describe, expect, test } from "bun:test";
+
 import { SLASH_FLIP_THRESHOLD, slashPlacement } from "./slashMenu";
 
 describe("slashPlacement", () => {

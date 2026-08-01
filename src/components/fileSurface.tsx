@@ -18,6 +18,16 @@ import {
   useRef,
   useState,
 } from "react";
+
+import {
+  DOCX_EDITABLE,
+  DOCUMENT_CONVERTIBLE,
+  DOCUMENT_EDIT_MAX_BYTES,
+  DOCUMENT_EXTS,
+  DOCUMENT_OPEN_WITH_APPS,
+} from "../documents/kinds";
+import { clamp } from "../lib/clamp";
+import { IMAGE_EXTS, extOf, fileName } from "../lib/fileKind";
 import {
   type FileStat,
   corpusFileBytes,
@@ -31,15 +41,6 @@ import {
   fileAssetUrl,
   isTauri,
 } from "../lib/tauri";
-import {
-  DOCX_EDITABLE,
-  DOCUMENT_CONVERTIBLE,
-  DOCUMENT_EDIT_MAX_BYTES,
-  DOCUMENT_EXTS,
-  DOCUMENT_OPEN_WITH_APPS,
-} from "../documents/kinds";
-import { clamp } from "../lib/clamp";
-import { IMAGE_EXTS, extOf, fileName } from "../lib/fileKind";
 import { deriveSheetFacts, describeShape, formatStamp, sizeLine } from "../sheets/facts";
 import { SHEET_BIN, SHEET_EDITABLE, SHEET_EDIT_MAX_BYTES, SHEET_TEXT } from "../sheets/kinds";
 import { type SheetTable, parseWorkbook } from "../sheets/view";

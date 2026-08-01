@@ -8,21 +8,22 @@
 // persists them. Renders standalone in a plain browser for review.
 
 import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+
 import { EditorSurface } from "../editor/editorSurface";
 import { useTransientPopover } from "../lib/popover";
 import { setQuickHandle } from "../lib/quickHandle";
 import { corpusFrontmatter, corpusSetSecure, onQuickShow, startWindowDrag } from "../lib/tauri";
+import { createRoutedNote } from "../services/createNote";
 import { isChatsPath, isVault, isWikiPath } from "../services/destinations";
 import { invalidateNotes, useSearchableNotes } from "../services/hooks";
 import { inboxFolderId, notesService } from "../services/notes";
-import { createRoutedNote } from "../services/createNote";
 import { usePanesStore } from "../state/panes";
 import { pruneQuick, setQuickActive, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { ContextMenu } from "./contextMenu";
-import { IconButton } from "./iconButton";
 import { PlusGlyph, SearchGlyph, ShieldGlyph, glyphForNote } from "./glyphs";
+import { IconButton } from "./iconButton";
 
 /** activeEditor() resolves through the panes store's focusedPaneId; the quick
  * webview has no pane tree, so we pin it to this id and register the editor

@@ -4,6 +4,7 @@
 // navigates there, the row carries the one active state — never just the root.
 
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 test.use({ viewport: { width: 1280, height: 900 } });

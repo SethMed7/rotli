@@ -10,12 +10,12 @@
 // below-confidence filing guess, and a guess never files itself (§6.4) — it
 // keeps waiting for a human at every rung.
 
+import { useOrganizerLive } from "../state/organizerLive";
+import { useUiStore } from "../state/ui";
 import { deriveJournal } from "./brainJournal";
 import { approveProposal } from "./brainJournalComposition";
 import { readJournal } from "./brainJournalStore";
 import { invalidateJournal, invalidateNotes } from "./hooks";
-import { useOrganizerLive } from "../state/organizerLive";
-import { useUiStore } from "../state/ui";
 
 let running = false;
 

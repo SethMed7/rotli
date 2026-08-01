@@ -3,8 +3,9 @@
 
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
-import { DEFAULT_BREVE_PDF_THEME } from "../brand/brevePdfThemes";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+
+import { DEFAULT_BREVE_PDF_THEME } from "../brand/brevePdfThemes";
 import type { SearchHit } from "../types";
 
 export function isTauri(): boolean {

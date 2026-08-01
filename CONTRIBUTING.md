@@ -115,10 +115,22 @@ or binary that was never declared. It runs with `ignoreExportsUsedInFile`, so
 "exported but only read inside its own module" is a style call left to review,
 while "referenced nowhere at all" is a gate.
 Lint rules live in `.oxlintrc.json` (oxlint; migrated from ESLint 2026-07-31 —
-measured on this repo at 7.0s ESLint vs ~0.5s oxlint `--type-aware`) and are
-deliberately minimal (floating/misused promises, `no-explicit-any`,
-react-hooks, and a ban on bun:test's `it` alias: the suite spells every test
-`test(...)`). The type-aware rules run through the `oxlint-tsgolint` sidecar,
+measured on this repo at 7.0s ESLint vs ~0.5s oxlint `--type-aware`). The
+hand-picked layer stays deliberately minimal (floating/misused promises,
+`no-explicit-any`, react-hooks, and a ban on bun:test's `it` alias: the suite
+spells every test `test(...)`), and as of 2026-08-01 it sits on top of oxlint's
+whole `correctness` category — measured before adoption, as this config
+demands. That measurement found 80 findings across 9 rules; 62 were fixed, 13
+are permitted by a rule option (`no-misused-spread` with `allow: ["string"]`,
+because `[...text]` code-point iteration is a documented contract here), and
+one rule is deferred: `await-thenable`, 18 findings, every one the
+`await expect(...).rejects/.resolves` idiom. oxlint is literally right there —
+bun's matcher enforces eagerly and returns a non-thenable — but the `await` is
+the portable jest/vitest spelling and is what keeps those assertions enforcing
+if bun ever aligns with jest, so stripping it from 18 security assertions to
+satisfy a linter was the wrong trade. Every other correctness rule is at zero
+and now guards for free.
+The type-aware rules run through the `oxlint-tsgolint` sidecar,
 which is preview-quality: it misreads comma-expression arrow bodies as
 misused promises (three suppressed sites in `src/state/persist.test.ts` —
 re-measure on oxlint upgrades and drop the suppressions when fixed; still
@@ -132,10 +144,19 @@ because typescript-eslint 8.x crashes on TS 7; tsgolint removed that blocker,
 so the pin is now only conservatism — revalidate the toolchain before bumping.
 The old "Biome as the long-term two-package footprint" plan is superseded by
 this migration.
-`breve-runtime/scripts/` is measured but deferred at 76 findings (71
-`no-explicit-any`, 4 `no-floating-promises`, 1 `no-misused-promises`;
-re-measured 2026-07-17) — over the 15-site adoption threshold; revisit once
-the `any` debt shrinks. Git hooks are deliberately MINIMAL: the tracked
+`breve-runtime/` is IN the lint scope as of 2026-08-01 — its long-standing
+deferral (76 findings, last re-measured 2026-07-17) is retired because the debt
+was paid, not waived. The 71 `any`s became real types: the shapes Breve reads
+off wires it does not own (signal-cli envelopes, the local model's generate
+response, the file-backed watcher/creator/pending rows, and `mail.ts`'s own
+stdout contract) now live in `breve-runtime/scripts/wire-types.ts`, and
+`errText` gives caught values one honest rendering instead of `[object Object]`
+in `failures.log`. Typing them is what exposed the two real bugs the `any` had
+been hiding: `mail.ts read <uid>` built its output row from imapflow's `false`
+return for a uid the mailbox does not hold, and the Signal dispatcher indexed
+`voiceAtt.id` on a branch the compiler could not prove was reachable. Because
+`breve-runtime/` keeps hand-aligned column tables, it stays OUTSIDE oxfmt —
+lint fixes there must not reformat whole files. Git hooks are deliberately MINIMAL: the tracked
 `.githooks/pre-commit` runs only staged-file oxfmt (scoped to the
 formatter-owned trees — src/, e2e/, scripts/, playwright.config.ts;
 breve-runtime/ keeps hand-aligned tables and stays outside) + a conflict-marker

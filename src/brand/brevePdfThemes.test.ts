@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { BREVE_PDF_PRESETS, contrastRatio, validateBrevePdfPalette } from "./brevePdfThemes";
 
 describe("Breve PDF design system", () => {

@@ -4,12 +4,11 @@
 // dispatcher only fires the actions for its own surface, and the Settings
 // list shows everything.
 
+import {
+  closeFocusedPaneWithDraftCleanup,
+  closeFocusedTabWithDraftCleanup,
+} from "../documents/draftComposition";
 import { type BlockToggle, type HeadingLevel, type InlineMark, activeEditor } from "../editor/commands";
-import { openChatForNote } from "../noteChat/composition";
-import { summonChat } from "../services/chatSummon";
-import { invalidateNotes, lifecycleError } from "../services/hooks";
-import { notesService } from "../services/notes";
-import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLifecycle";
 import { captureHandle } from "../lib/captureHandle";
 import { quickHandle } from "../lib/quickHandle";
 import {
@@ -21,15 +20,16 @@ import {
   toggleMainWindow,
   toggleQuickWindow,
 } from "../lib/tauri";
-import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
 import { createManagedItem } from "../newItems/composition";
-import {
-  closeFocusedPaneWithDraftCleanup,
-  closeFocusedTabWithDraftCleanup,
-} from "../documents/draftComposition";
 import type { NewItemKind } from "../newItems/model";
-import { navigate } from "../state/navHistory";
+import { openChatForNote } from "../noteChat/composition";
+import { summonChat } from "../services/chatSummon";
+import { invalidateNotes, lifecycleError } from "../services/hooks";
+import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLifecycle";
+import { notesService } from "../services/notes";
 import { trashSystemSelection } from "../services/systemTrash";
+import { navigate } from "../state/navHistory";
+import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
 import { findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
 import { cycleQuick, removeQuickNote } from "../state/quick";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";

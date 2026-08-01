@@ -3,6 +3,7 @@
 // cancels. Renames via useRenameNote (rewrites the note's first line).
 
 import { useEffect, useRef, useState } from "react";
+
 import { useRenameNote } from "../services/hooks";
 import { useUiStore } from "../state/ui";
 

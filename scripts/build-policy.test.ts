@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { bundleBudgetViolations, shouldIgnoreBuildWarning, shouldStubLazyLocale } from "./build-policy.mjs";
 
 function chunk(fileName: string, sizeKib: number, options: { entry?: boolean; imports?: string[] } = {}) {

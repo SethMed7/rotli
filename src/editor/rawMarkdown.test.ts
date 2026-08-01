@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+
 import { Text } from "@codemirror/state";
+
 import { classifyRawMarkdown } from "./rawMarkdownSyntax";
 
 function slices(source: string, className: string): string[] {

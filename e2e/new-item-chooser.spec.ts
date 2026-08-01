@@ -3,6 +3,7 @@
 // palette action (real controls; CI has no Meta key for the chord).
 
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 test("the chooser tab offers every kind and becomes what you pick", async ({ page }) => {

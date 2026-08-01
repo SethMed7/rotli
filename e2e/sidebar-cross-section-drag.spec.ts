@@ -5,6 +5,7 @@
 // same reference-not-move contract as the old inline-tree drag.
 
 import { expect, test } from "@playwright/test";
+
 import { centerOf, gotoApp, pointerDrag } from "./support";
 
 test.use({ viewport: { width: 1280, height: 900 } });

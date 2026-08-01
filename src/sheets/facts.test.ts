@@ -4,6 +4,7 @@
 // probe or stamp is missing rather than a fabricated value.
 
 import { describe, expect, test } from "bun:test";
+
 import type { FileStat } from "../lib/tauri";
 import {
   deriveSheetFacts,

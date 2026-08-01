@@ -7,6 +7,7 @@
 // wiring between the two — not just the reducer — fails CI.
 
 import { expect, test } from "@playwright/test";
+
 import { edgePoint, gotoApp, pointerDrag } from "./support";
 
 test("dragging a tab past the last tab lands it at the very end, not before it", async ({ page }) => {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { memoryKeywords, mergeKeywordHits, rankChatMemories } from "./retrieval";
 
 describe("master memory retrieval", () => {

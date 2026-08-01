@@ -4,6 +4,7 @@
 // paragraphs: no bullet, dead Shift-Tab, Tab inserting a soft tab).
 
 import { describe, expect, test } from "bun:test";
+
 import { parseBlock } from "./render";
 
 describe("parseBlock — tab-tolerant list indents", () => {

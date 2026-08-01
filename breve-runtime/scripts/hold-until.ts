@@ -11,7 +11,7 @@ import { loadSettings, effectiveTz, minutesNowIn, parseHM } from "./timectx";
 
 const meal = (process.argv[2] ?? "morning") as "morning" | "lunch" | "night";
 const s = await loadSettings();
-const arrival = parseHM((s.deliveryTimes as any)[meal]);   // minutes since midnight
+const arrival = parseHM(s.deliveryTimes[meal]);   // minutes since midnight
 const now = minutesNowIn(effectiveTz(s));                   // minutes since midnight, effective tz
 let secs = (arrival - now) * 60;
 if (!Number.isFinite(secs) || secs < 0) secs = 0;

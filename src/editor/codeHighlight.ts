@@ -9,10 +9,11 @@
 
 import { type Extension, type Range, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
-import { highlightTree, tagHighlighter, tags } from "@lezer/highlight";
 import type { Parser } from "@lezer/common";
-import { scanFences } from "./fences";
+import { highlightTree, tagHighlighter, tags } from "@lezer/highlight";
+
 import { normalizeFenceLang } from "./codeLangs";
+import { scanFences } from "./fences";
 
 // ── language registry (lazy) ──────────────────────────────────────────────────
 

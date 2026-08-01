@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Breve's mail reader and Signal listener got two real crashes removed.**
+  Asking Breve to read an email by an id its mailbox no longer holds threw
+  instead of saying it couldn't find it, and one path through the Signal
+  message handler could trip over an attachment it assumed was there. Both
+  surfaced when the runtime's untyped edges were given real types.
+- **Chat no longer searches your notes for nothing.** When a local model
+  phrased a tool argument as a nested object instead of plain text, the
+  search ran on the literal text "[object Object]" and quietly came back
+  empty. It now says what went wrong so the model can correct itself.
+
 ### Changed
 
 - **The build got about nine times faster.** Rotli's bundler moved to

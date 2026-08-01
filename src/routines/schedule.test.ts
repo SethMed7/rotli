@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { nextRun, parseHhmm } from "./schedule";
 import type { Schedule } from "./types";
 

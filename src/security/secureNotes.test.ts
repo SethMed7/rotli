@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { creationIsSecure, SECURE_NOTES_FOLDER } from "./secureNotes";
 
 describe("secure-note creation policy", () => {

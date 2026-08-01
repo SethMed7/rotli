@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { menuUsesCheckGutter, type MenuSpec } from "./contextMenu";
 
 describe("context menu alignment", () => {

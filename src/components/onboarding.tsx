@@ -6,9 +6,10 @@
 // by hand. Shown by App.tsx while ui.onboarded is false (Tauri only); "Reset &
 // re-onboard" in Settings → General brings it back.
 
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Character } from "./character";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+
+import { LOCAL_CATALOG } from "../ai/models";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import { conflictFor, getAction, rebind, setDispatchSuspended } from "../keys/registry";
@@ -21,12 +22,12 @@ import {
   organizerSetBrain,
   organizerSetTrust,
 } from "../lib/tauri";
-import { LOCAL_CATALOG } from "../ai/models";
-import { LaptopGlyph } from "./glyphs";
-import { useDetectMemex } from "../memex/useMemex";
 import { pickFolder } from "../memex/service";
+import { useDetectMemex } from "../memex/useMemex";
 import { useMemexStore } from "../state/memex";
 import { SOLID_THEMES, type ThemeFamily, useUiStore } from "../state/ui";
+import { Character } from "./character";
+import { LaptopGlyph } from "./glyphs";
 import { AccentRow } from "./settingsSurface";
 
 // Appearance FIRST (right after the greeting) so you pick a theme before walking the

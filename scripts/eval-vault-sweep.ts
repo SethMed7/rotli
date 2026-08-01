@@ -23,10 +23,11 @@
 // running local model server + an installed workspace CLI.
 
 import { tmpdir } from "node:os";
-import { runAgent } from "../src/ai/loop";
+
 import { contextWindowFor } from "../src/ai/budget";
-import { buildModelMap, type ModelMapNote } from "../src/memex/modelMap";
+import { runAgent } from "../src/ai/loop";
 import type { AgentEvent, ChatTurn, Host, NoteHit } from "../src/ai/types";
+import { buildModelMap, type ModelMapNote } from "../src/memex/modelMap";
 
 const ENDPOINT = "http://localhost:11435"; // loopback ONLY — mirrors DEFAULT_ENDPOINT in chat.rs
 const DEFAULT_CLI = "/Applications/Rotli.app/Contents/MacOS/rotli";
@@ -152,12 +153,14 @@ function makeCliHost(
       return hits
         .filter((h) => h.kind === "note")
         .slice(0, limit)
-        .map((h): NoteHit => ({
-          id: h.id,
-          title: h.title,
-          snippet: h.snippet ?? "",
-          folder: h.folderId ?? "",
-        }));
+        .map(
+          (h): NoteHit => ({
+            id: h.id,
+            title: h.title,
+            snippet: h.snippet ?? "",
+            folder: h.folderId ?? "",
+          }),
+        );
     },
     async readNote(id) {
       const d = (await cliJson(cli, ["notes", "read", id])) as {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import type { NoteSummary } from "../types";
 import {
   type MainNode,

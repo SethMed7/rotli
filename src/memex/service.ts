@@ -29,6 +29,8 @@ import {
   memexWriteChat,
   memexWriteNote,
 } from "../lib/tauri";
+import { titleOf } from "../services/derive";
+import { type MemexConfig, type MemexInstance, type Perms, fromCorpusConfig } from "./config";
 import {
   type ChatMsg,
   type NoteMeta,
@@ -47,8 +49,6 @@ import {
   today,
   ulid,
 } from "./contract";
-import { type MemexConfig, type MemexInstance, type Perms, fromCorpusConfig } from "./config";
-import { titleOf } from "../services/derive";
 
 export type { DetectedMemex } from "../lib/tauri";
 

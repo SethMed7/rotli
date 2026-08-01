@@ -6,6 +6,7 @@
 // alone.
 
 import { describe, expect, test } from "bun:test";
+
 import { applyBlockToggle, applyBlockToggleAll, blockToggleActive } from "./commands";
 
 describe("applyBlockToggle on indented lines", () => {

@@ -4,6 +4,7 @@
 // `captureOrder` — distinct from the tab/Main gestures the other specs cover.
 
 import { expect, test } from "@playwright/test";
+
 import { edgePoint, gotoApp, pointerDrag } from "./support";
 
 test("dragging a capture card onto another card's left half reorders before it", async ({ page }) => {

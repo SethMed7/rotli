@@ -109,6 +109,11 @@ export async function renderMp3(script: string, mp3Path: string, voices: Record<
     device: "cpu",
   });
 
+  // Kokoro types `voice` as a literal union of its bundled voice names, but
+  // Breve's map is user-configurable (VOICES + the per-call override), so the
+  // name only becomes known at runtime. Narrow to Kokoro's own voice type at
+  // this single boundary rather than losing the parameter's shape entirely.
+  type KokoroVoice = NonNullable<Parameters<typeof tts.generate>[1]>["voice"];
   const V = { ...VOICES, ...voices };
   const segments = parseSegments(script);
   const CHUNK_GAP = new Float32Array(Math.round(SR * 0.35)); // breath between chunks
@@ -118,7 +123,7 @@ export async function renderMp3(script: string, mp3Path: string, voices: Record<
   let done = 0;
   for (const seg of segments) {
     for (const chunk of chunkText(seg.text)) {
-      const audio = await tts.generate(respell(chunk), { voice: V[seg.voice] as any });
+      const audio = await tts.generate(respell(chunk), { voice: V[seg.voice] as KokoroVoice });
       parts.push(audio.audio as Float32Array, CHUNK_GAP);
       if (++done % 5 === 0) console.log(`[tts] ${done}/${totalChunks} (${seg.voice})…`);
     }

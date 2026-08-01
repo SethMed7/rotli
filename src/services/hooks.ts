@@ -3,6 +3,7 @@
 
 import { keepPreviousData, useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+
 import { replaceTitleLine } from "../lib/noteTitle";
 import {
   type CorpusRoot,
@@ -15,16 +16,16 @@ import {
   organizerStatus,
   secureRepairScan,
 } from "../lib/tauri";
+import { useUiStore } from "../state/ui";
+import type { Note, NoteSummary } from "../types";
 import { readJournal } from "./brainJournalStore";
 import { summaryOrder } from "./derive";
 import { DEST, isChats, isChatsPath, isSink } from "./destinations";
-import { memexRootMarkers } from "./fsNotes";
 import { trashVirtualFolderItems } from "./folderTrash";
+import { memexRootMarkers } from "./fsNotes";
+import { archiveNoteWithImages, trashNoteWithImages } from "./noteLifecycle";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
-import { archiveNoteWithImages, trashNoteWithImages } from "./noteLifecycle";
-import { useUiStore } from "../state/ui";
-import type { Note, NoteSummary } from "../types";
 
 /** Surface a lifecycle failure inline instead of swallowing it — the memex write
  * gate can refuse a move, and a silent rejection reads as "nothing happened"

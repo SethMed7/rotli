@@ -15,10 +15,9 @@ import {
   useRef,
   useState,
 } from "react";
+
 import { EditorSurface } from "../editor/editorSurface";
-import { ChatSurface } from "./chatSurface";
-import { ActivitySurface } from "./activitySurface";
-import { FileSurface } from "./fileSurface";
+import { dispatch } from "../keys/registry";
 import {
   MIN_PANE_HEIGHT,
   MIN_PANE_WIDTH,
@@ -28,9 +27,11 @@ import {
   refitColumns,
   usePanesStore,
 } from "../state/panes";
-import { dispatch } from "../keys/registry";
 import type { LeafNode, PaneNode, SplitNode } from "../types";
+import { ActivitySurface } from "./activitySurface";
 import { Character } from "./character";
+import { ChatSurface } from "./chatSurface";
+import { FileSurface } from "./fileSurface";
 import { NewItemSurface } from "./newItemSurface";
 import { TabStrip } from "./tabStrip";
 

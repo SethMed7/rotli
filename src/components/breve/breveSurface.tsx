@@ -1,6 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+
+import { CLI_CATALOG, PROVIDER_IDS, PROVIDER_LABELS, type ProviderId } from "../../ai/models";
+import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../../brand/brevePdfThemes";
+import { type Block, parseBlock, renderInline } from "../../editor/render";
 import {
   type BreveRoutine,
   type BreveSnapshot,
@@ -28,12 +32,6 @@ import {
   type BrevePdfTheme,
   type BrevePdfThemePreset,
 } from "../../lib/tauri";
-import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../../brand/brevePdfThemes";
-import { CLI_CATALOG, PROVIDER_IDS, PROVIDER_LABELS, type ProviderId } from "../../ai/models";
-import { useUiStore } from "../../state/ui";
-import { usePanesStore } from "../../state/panes";
-import { type Block, parseBlock, renderInline } from "../../editor/render";
-import { CheckGlyph, ChevronRight, ClockGlyph, LockGlyph, SearchGlyph, XGlyph } from "../glyphs";
 import {
   EMPTY_BREVE_SNAPSHOT,
   formatNextRoutine,
@@ -41,7 +39,9 @@ import {
   nextRoutineEpoch,
   sortBriefs,
 } from "../../routines/briefs";
-import { BREVE_QUERY_KEY, useBreveSnapshot } from "./useBreve";
+import { usePanesStore } from "../../state/panes";
+import { useUiStore } from "../../state/ui";
+import { CheckGlyph, ChevronRight, ClockGlyph, LockGlyph, SearchGlyph, XGlyph } from "../glyphs";
 import {
   BreveSkeleton,
   EmptyMessage,
@@ -51,6 +51,7 @@ import {
   type SaveState,
 } from "./breveShared";
 import { WatchlistView } from "./breveWatchlist";
+import { BREVE_QUERY_KEY, useBreveSnapshot } from "./useBreve";
 
 function SourceStrip({ snapshot }: { snapshot: BreveSnapshot }) {
   const label =

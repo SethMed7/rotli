@@ -40,10 +40,15 @@ export function priorityOrder(a: ModelMapNote, b: ModelMapNote): number {
 }
 
 function dataField(value: string, cap = MAX_MAP_FIELD_CHARS): string {
-  return value
-    .normalize("NFKC")
-    .replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029\u202A-\u202E\u2066-\u2069]/g, "�")
-    .slice(0, cap);
+  return (
+    value
+      .normalize("NFKC")
+      // The control characters ARE the subject here: C0/C1 and bidi overrides
+      // are scrubbed out of model-facing text.
+      // oxlint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029\u202A-\u202E\u2066-\u2069]/g, "�")
+      .slice(0, cap)
+  );
 }
 
 function structuredJson(value: unknown): string {

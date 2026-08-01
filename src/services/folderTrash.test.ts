@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
+
 import type { NoteSummary } from "../types";
 import { trashVirtualFolderItems } from "./folderTrash";
 

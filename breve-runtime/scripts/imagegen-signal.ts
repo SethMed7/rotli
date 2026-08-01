@@ -50,7 +50,7 @@ Then print ONLY that absolute path as the final line of your response.`;
     [codex, "exec", "--skip-git-repo-check", "-s", "workspace-write", "-c", "mcp_servers={}", "--add-dir", STORE, "-C", STORE, "-"],
     { stdin: "pipe", stdout: "pipe", stderr: "pipe" }
   );
-  p.stdin.write(prompt);
+  await p.stdin.write(prompt);
   await p.stdin.end();
   await new Response(p.stdout).text();
   code = await p.exited;

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 const themes = ["Warm Light", "Warm Dark", "Paper", "Charcoal"] as const;

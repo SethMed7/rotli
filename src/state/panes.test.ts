@@ -4,6 +4,7 @@
 // directions. (Cross-pane moves are exercised via the same clamped-splice path.)
 
 import { beforeEach, describe, expect, test } from "bun:test";
+
 import type { LeafNode, PaneNode, Tab } from "../types";
 import { useNavHistory } from "./navHistory";
 import {

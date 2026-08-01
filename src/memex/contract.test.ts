@@ -4,6 +4,7 @@
 // these fail first — re-sync contract.ts, don't loosen the test.
 
 import { describe, expect, test } from "bun:test";
+
 import {
   AI_KEYS,
   USER_KEYS,

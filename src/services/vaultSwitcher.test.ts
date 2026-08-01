@@ -4,6 +4,7 @@
 // switch is actually possible.
 
 import { describe, expect, test } from "bun:test";
+
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
 import { buildVaultMenu, vaultDisplayName } from "./vaultSwitcher";
 
@@ -58,10 +59,10 @@ describe("buildVaultMenu", () => {
     );
     const actions = items.filter((i) => i.kind === "action");
     expect(actions[0]).toMatchObject({ label: "my-vault", checked: true, checkedMark: "highlight" });
-    actions[0]!.kind === "action" && actions[0]!.onClick();
+    if (actions[0]!.kind === "action") actions[0]!.onClick();
     expect(calls.switched).toEqual([]);
     expect(actions[1]).toMatchObject({ label: "memex-vault", checked: false });
-    actions[1]!.kind === "action" && actions[1]!.onClick();
+    if (actions[1]!.kind === "action") actions[1]!.onClick();
     expect(calls.switched).toEqual(["/Users/seth/memex-vault"]);
   });
 
@@ -80,7 +81,7 @@ describe("buildVaultMenu", () => {
     expect(hint && hint.kind === "action" ? hint.disabled : false).toBe(true);
 
     const connect = multi.find((i) => i.kind === "action" && i.label.startsWith("Connect"));
-    connect!.kind === "action" && connect!.onClick();
+    if (connect!.kind === "action") connect!.onClick();
     expect(calls.connected).toBe(1);
   });
 
@@ -105,7 +106,7 @@ describe("buildVaultMenu", () => {
     expect(labels[1]).toBe("work-vault");
 
     const create = items.find((i) => i.kind === "action" && i.label === "New vault…");
-    create!.kind === "action" && create!.onClick();
+    if (create!.kind === "action") create!.onClick();
     expect(calls.created).toBe(1);
   });
 });

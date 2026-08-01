@@ -124,8 +124,19 @@ export const knowledgePath = (): string => memexBase();
 // this up" by importing mounts.ts — that re-introduces module-load coupling and crashes Breve when the
 // memex is missing or its engine has drifted. These track the FROZEN file-format contract
 // (users.json / mode); the accessMode fail-closed table below must stay byte-identical to mounts.ts.
+/** One partition owner in users.json. */
+export type MemexUser = { name: string; role?: string; path?: string; powers?: string[] };
+
+/** The memex partition registry + access policy (users.json). */
+export type MemexRegistry = {
+  primary?: string;
+  mode?: "local" | "open" | "secure";
+  auth?: { stepUp?: string[] };
+  users: MemexUser[];
+};
+
 /** Read the memex partition registry + access POLICY (the WHERE + the rules). Null when single-tenant. */
-export function readMemexRegistry(): { primary?: string; mode?: "local" | "open" | "secure"; auth?: { stepUp?: string[] }; users: { name: string; role?: string; path?: string; powers?: string[] }[] } | null {
+export function readMemexRegistry(): MemexRegistry | null {
   try {
     const reg = JSON.parse(readFileSync(join(memexBase(), "users.json"), "utf8"));
     return Array.isArray(reg?.users) ? reg : null;
@@ -153,7 +164,7 @@ export function readMemexIdentities(): Record<string, { phone?: string; uuid?: s
 
 /** The memex instance identity card (memex.json): { id, contract, apps }. null if not stamped. Breve
  *  pins to this id so a swapped/wrong memex is noticed, and checks the contract before relying on it. */
-export function memexInfo(): { id?: string; contract?: string; apps?: Record<string, any> } | null {
+export function memexInfo(): { id?: string; contract?: string; selfHeal?: boolean; apps?: Record<string, unknown> } | null {
   try {
     const r = JSON.parse(readFileSync(join(memexBase(), "memex.json"), "utf8"));
     return r && typeof r.id === "string" ? r : null;
@@ -223,8 +234,11 @@ export type Resource = {
   cadence?: string; tier?: string; trust?: string; favorite?: boolean; reference?: string; enabled?: boolean;
 };
 
+/** Registry-wide fallbacks a Resource entry may override, same field set as Resource. */
+export type ResourceDefaults = Partial<Omit<Resource, "name" | "url">>;
+
 /** Read the resources registry (defaults + entries). Returns empty if absent — Breve degrades gracefully. */
-export function loadResources(): { defaults: Record<string, any>; resources: Resource[] } {
+export function loadResources(): { defaults: ResourceDefaults; resources: Resource[] } {
   try {
     const r = JSON.parse(readFileSync(resourcesPath(), "utf8"));
     return { defaults: r.defaults ?? {}, resources: Array.isArray(r.resources) ? r.resources : [] };

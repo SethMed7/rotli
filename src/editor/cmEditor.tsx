@@ -11,13 +11,21 @@
 // One view per (noteId, pane); EditorSurface keys it by noteId so it remounts on
 // a note switch (fresh caret/scroll, no bleed).
 
-import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { Compartment, EditorSelection, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, placeholder } from "@codemirror/view";
+import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import { clamp } from "../lib/clamp";
+import { DEST } from "../services/destinations";
+import { useNotes, useSearchableNotes } from "../services/hooks";
+import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useUiStore } from "../state/ui";
+import type { NoteSummary } from "../types";
+import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
+import { blockRender } from "./blockRender";
 import { rotliKeymap } from "./cmKeymap";
+import { codeHighlight } from "./codeHighlight";
 import {
   type EditorHandle,
   applyBlockToggle,
@@ -27,16 +35,12 @@ import {
   toggleInlineMark,
   unregisterEditor,
 } from "./commands";
-import { blockRender } from "./blockRender";
 import { fmBlock } from "./fmBlock";
-import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
-import { tableRender } from "./tableRender";
-import { rawMarkdown } from "./rawMarkdown";
 import { focusDim } from "./focusMode";
 import { linkOpener, livePreview, noteIdFacet } from "./livePreview";
-import { codeHighlight } from "./codeHighlight";
-import { stripMarkdown } from "./stripMarkdown";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
+import { rawMarkdown } from "./rawMarkdown";
+import { pickerFence, slashInsertion } from "./slashActions";
 import {
   type SlashItem,
   type SlashPickerMode,
@@ -45,14 +49,11 @@ import {
   slashPlacement,
   slashQueryAtCaret,
 } from "./slashMenu";
-import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { SlashPicker } from "./slashPicker";
-import { pickerFence, slashInsertion } from "./slashActions";
+import { stripMarkdown } from "./stripMarkdown";
+import { tableRender } from "./tableRender";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
 import { setWikilinkNotes } from "./wikilinkIndex";
-import { useNotes, useSearchableNotes } from "../services/hooks";
-import { DEST } from "../services/destinations";
-import type { NoteSummary } from "../types";
 
 interface SlashState {
   open: boolean;

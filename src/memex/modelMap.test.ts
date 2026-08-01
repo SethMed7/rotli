@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { buildModelMap, modelMapPolicy, priorityOrder, type ModelMapNote } from "./modelMap";
 
 const note = (id: string, updatedAt: number, pinned = false): ModelMapNote => ({

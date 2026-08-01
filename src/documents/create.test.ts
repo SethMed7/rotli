@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
+
 import JSZip from "jszip";
-import { blankDocumentTemplate, createDocxBase64 } from "./create";
+
 import { decodeDocx } from "./codec/docx";
+import { blankDocumentTemplate, createDocxBase64 } from "./create";
 import { GENERATED_DOCX_THEME } from "./theme";
 import { documentFileName } from "./workflow";
 

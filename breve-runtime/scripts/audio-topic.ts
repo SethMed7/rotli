@@ -54,7 +54,7 @@ const proc = Bun.spawn(sandboxed([CLAUDE_BIN, "-p", "--model", "sonnet", "--dang
   stderr: "pipe",
   env: GH_PAT ? { ...process.env, GH_TOKEN: GH_PAT } : process.env,
 });
-proc.stdin.write(PROMPT);
+await proc.stdin.write(PROMPT);
 await proc.stdin.end();
 const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
 await proc.exited;

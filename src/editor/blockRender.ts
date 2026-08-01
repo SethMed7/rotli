@@ -19,20 +19,21 @@
 
 import { type EditorState, type Range, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, WidgetType } from "@codemirror/view";
+
 import { createEditableBoardFromMermaid } from "../boards/composition";
 import { isTauri } from "../lib/tauri";
-import { useUiStore } from "../state/ui";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
+import { useUiStore } from "../state/ui";
+import { installEmbedControls } from "./embedControls";
+import { mountBoardEmbed, mountDocumentEmbed, mountSheetEmbed } from "./embedHosts";
+import { type FenceBlock, type LangKey, innerCode, scanFences } from "./fences";
+import { mermaidErrorMessage, renderMermaidElement } from "./mermaidRender";
 import {
   type MermaidViewport,
   fitMermaidViewport,
   panMermaidViewport,
   zoomMermaidViewportAt,
 } from "./mermaidViewport";
-import { type FenceBlock, type LangKey, innerCode, scanFences } from "./fences";
-import { mountBoardEmbed, mountDocumentEmbed, mountSheetEmbed } from "./embedHosts";
-import { installEmbedControls } from "./embedControls";
-import { mermaidErrorMessage, renderMermaidElement } from "./mermaidRender";
 import { mountMermaidWorkspace } from "./mermaidWorkspace";
 import { sanitizeSvg } from "./svgSanitizer";
 

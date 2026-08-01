@@ -6,20 +6,29 @@
  * exclusively to Rotli, so legacy install/uninstall actions are rejected.
  */
 import { stat } from "node:fs/promises";
+import type { PendingAction } from "./wire-types";
 
-export const plainName = (s: any) => typeof s === "string" && /^[\w.-]+$/.test(s) && !s.includes("..");
+export const plainName = (s: unknown): boolean => typeof s === "string" && /^[\w.-]+$/.test(s) && !s.includes("..");
 
-export function describeAction(a: any): string {
+/** The validator's input is whatever a model wrote into pending-action.json, so
+ * it arrives as `unknown`. Anything that is not a JSON object validates as the
+ * empty action and falls through to the "unknown action" refusal. */
+function asAction(input: unknown): PendingAction {
+  return typeof input === "object" && input !== null && !Array.isArray(input) ? (input as PendingAction) : {};
+}
+
+export function describeAction(a: PendingAction): string {
   switch (a.action) {
     case "install-launchd": return `install + load scheduled job ${a.plist}`;
     case "uninstall-launchd": return `unload + remove scheduled job ${a.label}`;
     case "chmod-script": return `make scripts/${a.script} executable`;
-    case "run-script": return `run scripts/${a.script} ${(a.args ?? []).join(" ")}`.trim();
+    case "run-script": return `run scripts/${a.script} ${Array.isArray(a.args) ? a.args.join(" ") : ""}`.trim();
     default: return JSON.stringify(a).slice(0, 200);
   }
 }
 
-export async function validateAction(breveRoot: string, a: any): Promise<string | null> {
+export async function validateAction(breveRoot: string, input: unknown): Promise<string | null> {
+  const a = asAction(input);
   switch (a.action) {
     case "install-launchd": {
       return "Rotli owns Breve scheduling; individual launchd jobs are disabled";
@@ -31,7 +40,7 @@ export async function validateAction(breveRoot: string, a: any): Promise<string 
       if (!plainName(a.script)) return "script must be a plain filename in breve/scripts/";
       if (!(await Bun.file(`${breveRoot}/scripts/${a.script}`).exists())) return `scripts/${a.script} not found`;
       if (a.action === "run-script" && a.args !== undefined &&
-          !(Array.isArray(a.args) && a.args.every((x: any) => typeof x === "string" && /^[\w@.=:-]*$/.test(x))))
+          !(Array.isArray(a.args) && a.args.every((x: unknown) => typeof x === "string" && /^[\w@.=:-]*$/.test(x))))
         return "args must be simple flag/word strings";
       return null;
     }

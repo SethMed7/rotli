@@ -11,6 +11,7 @@
 //
 // Still Increment 1: one-shot (no streaming), no @-context yet.
 
+import { useQueries, useQuery } from "@tanstack/react-query";
 import {
   type CSSProperties,
   type KeyboardEvent,
@@ -24,9 +25,9 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { useQueries, useQuery } from "@tanstack/react-query";
-import { makeTauriHost } from "../ai/host";
+
 import { modelIsOnDevice } from "../ai/guard";
+import { makeTauriHost } from "../ai/host";
 import { presetFor, runHybrid } from "../ai/hybrid";
 import { runAgent } from "../ai/loop";
 import {
@@ -38,10 +39,15 @@ import {
   mergedModels,
 } from "../ai/models";
 import type { ChatTurn, RunInput } from "../ai/types";
-import { CORPUS_INSTANCE_ID, activeInstance } from "../memex/config";
-import { markChatSecureContext, readChat, writeNote } from "../memex/service";
-import { hasSecureContext } from "../memex/contract";
-import { useInstanceChats, useMemexConfig, useSetChatAttachedTo, useWriteChat } from "../memex/useMemex";
+import { syncManagedChatMemory } from "../chatMemory/composition";
+import {
+  attachedNoteId as resolveAttachedNoteId,
+  buildChatNotesPrompt,
+  type MemoryTurn,
+} from "../chatMemory/model";
+import { renderInline } from "../editor/render";
+import { fileName } from "../lib/fileKind";
+import { type AnchoredPlacement, anchoredPopover, useTransientPopover } from "../lib/popover";
 import {
   type ChatModelInfo,
   type LocalQueueEntry,
@@ -55,8 +61,11 @@ import {
   localQueuePrioritize,
   onLocalQueue,
 } from "../lib/tauri";
-import { fileName } from "../lib/fileKind";
-import { type AnchoredPlacement, anchoredPopover, useTransientPopover } from "../lib/popover";
+import { CORPUS_INSTANCE_ID, activeInstance } from "../memex/config";
+import { hasSecureContext } from "../memex/contract";
+import { markChatSecureContext, readChat, writeNote } from "../memex/service";
+import { useInstanceChats, useMemexConfig, useSetChatAttachedTo, useWriteChat } from "../memex/useMemex";
+import { rememberedChatNote, rememberChatNote } from "../noteChat/session";
 import {
   assignChatToFolder,
   invalidateChatFolders,
@@ -65,18 +74,10 @@ import {
 } from "../services/chatFolders";
 import { invalidateNotes, useNoteIndex } from "../services/hooks";
 import { type Measure } from "../state/noteStyle";
-import { chatKey, chatModelFor, useUiStore } from "../state/ui";
 import { usePanesStore } from "../state/panes";
-import { renderInline } from "../editor/render";
-import { CheckGlyph, CloudGlyph, CopyGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
+import { chatKey, chatModelFor, useUiStore } from "../state/ui";
 import { Character, QuokkaMark } from "./character";
-import { syncManagedChatMemory } from "../chatMemory/composition";
-import {
-  attachedNoteId as resolveAttachedNoteId,
-  buildChatNotesPrompt,
-  type MemoryTurn,
-} from "../chatMemory/model";
-import { rememberedChatNote, rememberChatNote } from "../noteChat/session";
+import { CheckGlyph, CloudGlyph, CopyGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
 
 interface Msg {
   speaker: string;
@@ -102,7 +103,10 @@ function parseMessages(body: string): Msg[] {
 function readAsDataURL(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
+    // readAsDataURL always yields a string; narrow rather than String()-ing the
+    // union, which would hand a caller the literal "[object ArrayBuffer]".
+    r.onload = () =>
+      typeof r.result === "string" ? resolve(r.result) : reject(new Error("couldn't read the image"));
     r.onerror = () => reject(r.error ?? new Error("couldn't read the image"));
     r.readAsDataURL(file);
   });

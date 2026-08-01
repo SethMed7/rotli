@@ -15,6 +15,7 @@
 // three ride the same pure/total tree helpers — never mutate inputs.
 
 import { create } from "zustand";
+
 import { clamp } from "../lib/clamp";
 import { initialNoteId, ulid } from "../services/notes";
 import type { LeafNode, PaneNode, SplitDir, Tab } from "../types";

@@ -13,6 +13,7 @@
 // that creates a tab. Peach tint + the 3px clay ::before is the one selection
 // grammar, shared with the panes.
 
+import { useQuery } from "@tanstack/react-query";
 import {
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -22,7 +23,30 @@ import {
   useRef,
   useState,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
+
+import { dispatch } from "../keys/registry";
+import { createDragGhost } from "../lib/dragGhost";
+import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
+import { createPointerDragSession } from "../lib/pointerDrag";
+import { type CorpusRoot, corpusForgetFolder, isTauri, revealCorpus } from "../lib/tauri";
+import { activeInstance } from "../memex/config";
+import {
+  archiveChat,
+  deleteChat,
+  initMemexAsCorpus,
+  pickFolder,
+  pinChat,
+  revealChat,
+} from "../memex/service";
+import {
+  invalidateMemex,
+  useChooseFolder,
+  useConnectBrain,
+  useInstanceChats,
+  useMemexConfig,
+} from "../memex/useMemex";
+import { openNewItemMenu } from "../newItems/menu";
+import { deriveJournal } from "../services/brainJournal";
 import {
   CHAT_FOLDERS_KEY,
   EMPTY_CHAT_FOLDERS,
@@ -37,7 +61,20 @@ import {
   saveChatFolders,
   setChatFolderOrder,
 } from "../services/chatFolders";
-import { buildStorageTree } from "../services/storageTree";
+import { useChatRename } from "../services/chatRename";
+import { DEST, type Destination, isRootMarker } from "../services/destinations";
+import {
+  useCorpusRoots,
+  useFolders,
+  useJournal,
+  useSecureHints,
+  useTasks,
+  useMainGcIds,
+  useNoteIndex,
+  useNotes,
+  useSearchableNotes,
+  useTrashItems,
+} from "../services/hooks";
 import {
   type DropPos,
   MAIN_ROOT,
@@ -54,9 +91,8 @@ import {
   removeFromMain,
   renameFolderInMain,
 } from "../services/mainTree";
-import { type MenuSpec, useContextMenu } from "../state/contextMenu";
-import { useMainStore } from "../state/main";
-import { useViewsStore } from "../state/views";
+import { buildStorageTree } from "../services/storageTree";
+import { buildVaultMenu, vaultDisplayName } from "../services/vaultSwitcher";
 import {
   createNamedView,
   deleteNamedView,
@@ -67,25 +103,9 @@ import {
   viewNameError,
   viewTree,
 } from "../services/viewTree";
-import { QUICK_MAX, togglePinQuick } from "../state/quick";
-import { InlineRenameInput } from "./inlineRenameInput";
-import { useNoteMenu } from "./useNoteMenu";
-import { deriveJournal } from "../services/brainJournal";
+import { type MenuSpec, useContextMenu } from "../state/contextMenu";
+import { useMainStore } from "../state/main";
 import { useOrganizerLive } from "../state/organizerLive";
-import {
-  useCorpusRoots,
-  useFolders,
-  useJournal,
-  useSecureHints,
-  useTasks,
-  useMainGcIds,
-  useNoteIndex,
-  useNotes,
-  useSearchableNotes,
-  useTrashItems,
-} from "../services/hooks";
-import { type CorpusRoot, corpusForgetFolder, isTauri, revealCorpus } from "../lib/tauri";
-import { DEST, type Destination, isRootMarker } from "../services/destinations";
 import {
   sidebarItemId,
   useFocusedChatSlug,
@@ -93,31 +113,12 @@ import {
   useFocusedTab,
   usePanesStore,
 } from "../state/panes";
+import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { ALL_NOTES, SEC_CHAT, SEC_NOTES, TASKS, useUiStore } from "../state/ui";
-import { activeInstance } from "../memex/config";
-import {
-  invalidateMemex,
-  useChooseFolder,
-  useConnectBrain,
-  useInstanceChats,
-  useMemexConfig,
-} from "../memex/useMemex";
-import { buildVaultMenu, vaultDisplayName } from "../services/vaultSwitcher";
-import {
-  archiveChat,
-  deleteChat,
-  initMemexAsCorpus,
-  pickFolder,
-  pinChat,
-  revealChat,
-} from "../memex/service";
-import { useChatRename } from "../services/chatRename";
-import type { Folder, NoteSummary } from "../types";
-import { dispatch } from "../keys/registry";
-import { openNewItemMenu } from "../newItems/menu";
-import { createDragGhost } from "../lib/dragGhost";
-import { createPointerDragSession } from "../lib/pointerDrag";
-import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
+import { useViewsStore } from "../state/views";
+import type { NoteSummary } from "../types";
+import { BreveSidebar } from "./breve/breveSidebar";
+import { QuokkaMark } from "./character";
 import {
   ArchiveGlyph,
   ChatGlyph,
@@ -142,10 +143,10 @@ import {
   VaultGlyph,
 } from "./glyphs";
 import { Icon } from "./icon";
-import { type RovingRow, useRovingList } from "./sidebar/useRovingList";
+import { InlineRenameInput } from "./inlineRenameInput";
 import { noteDisplayTitle } from "./sidebar/noteDisplayTitle";
-import { BreveSidebar } from "./breve/breveSidebar";
-import { QuokkaMark } from "./character";
+import { type RovingRow, useRovingList } from "./sidebar/useRovingList";
+import { useNoteMenu } from "./useNoteMenu";
 
 /** Collapse-all glyph — two chevrons folding toward the center ("fold the tree
  * up"). Inline like RestoreGlyph; same 1.7 stroke / 24-viewBox family. */
@@ -1248,11 +1249,6 @@ export function Sidebar() {
     }
     return folders.filter((f) => f.parentId === parentId);
   };
-  const countFor = (folder: Folder, destNotes: NoteSummary[]): number => {
-    const own = destNotes.filter((n) => n.folderId === folder.id).length;
-    return own + childrenOf(folder.id).reduce((sum, c) => sum + countFor(c, destNotes), 0);
-  };
-
   // the live filter narrows the compact rows by title OR snippet (applied per
   // section — including Main, which the first filter pass skipped entirely)
   const q = filter.trim().toLowerCase();

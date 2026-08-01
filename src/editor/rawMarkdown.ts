@@ -6,6 +6,7 @@
 
 import { type Range, StateField, type Text } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView } from "@codemirror/view";
+
 import { classifyRawMarkdown } from "./rawMarkdownSyntax";
 
 function build(doc: Text): DecorationSet {

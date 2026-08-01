@@ -3,6 +3,7 @@
 // pure functions, so this is where the coverage belongs.
 
 import { describe, expect, test } from "bun:test";
+
 import {
   EMPTY_NAV,
   NAV_CAP,

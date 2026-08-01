@@ -4,6 +4,7 @@
 // all depend on.
 
 import { describe, expect, test } from "bun:test";
+
 import { chordFromEvent, formatChord, keyFromCode, normalizeChord, toAccelerator } from "./chords";
 
 // A minimal KeyboardEvent stand-in — chordFromEvent only reads .code and the

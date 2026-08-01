@@ -5,7 +5,9 @@
 // per-cell source spans (click-to-edit + Tab hopping), and cell navigation.
 
 import { describe, expect, test } from "bun:test";
+
 import { Text } from "@codemirror/state";
+
 import {
   type TableShape,
   addColRight,

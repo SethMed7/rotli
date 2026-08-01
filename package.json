@@ -22,7 +22,7 @@
     "typecheck": "tsgo --noEmit",
     "typecheck:tsc": "tsc --noEmit",
     "lint": "bun run typecheck && bun run format:check && bun run check:code-shape && bun run check:naming && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:security && bun run check:knip && bun run check:docs && bun run lint:oxlint",
-    "lint:oxlint": "oxlint --type-aware --report-unused-disable-directives-severity=error src e2e playwright.config.ts",
+    "lint:oxlint": "oxlint --type-aware --report-unused-disable-directives-severity=error src e2e breve-runtime playwright.config.ts",
     "check:naming": "bun scripts/check-naming.mjs",
     "check:code-shape": "bun scripts/check-code-shape.mjs",
     "check:hex": "bun scripts/check-hex.mjs",
@@ -39,8 +39,8 @@
     "check:dup": "bun scripts/check-duplication.mjs",
     "check:breve-runtime": "bun build breve-runtime/scripts/*.ts --target bun --outdir $(mktemp -d) && tsgo --noEmit -p breve-runtime && bash -n breve-runtime/scripts/morning-brief.sh && bash -n breve-runtime/scripts/lunch-brief.sh && bash -n breve-runtime/scripts/night-brief.sh && bash -n breve-runtime/scripts/custom-brief.sh && bun run check:breve-contract",
     "check": "bun run lint && bun run test:regression",
-    "format": "oxfmt \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" playwright.config.ts",
-    "format:check": "oxfmt --check \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" playwright.config.ts"
+    "format": "oxfmt \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" \"scripts/**/*.ts\" playwright.config.ts",
+    "format:check": "oxfmt --check \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" \"scripts/**/*.ts\" playwright.config.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -100,7 +100,6 @@
     "vite": "npm:rolldown-vite@7.3.1"
   },
   "trustedDependencies": [
-    "esbuild",
     "onnxruntime-node",
     "protobufjs",
     "sharp"

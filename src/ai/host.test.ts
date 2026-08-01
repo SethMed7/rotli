@@ -15,6 +15,7 @@
 // the REAL module and afterAll puts the real ones back.
 
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
+
 import * as realTauri from "../lib/tauri";
 import type { ChatModelInfo, CorpusNoteMeta, FrontmatterView } from "../lib/tauri";
 import type { SearchHit } from "../types";

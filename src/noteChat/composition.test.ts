@@ -15,12 +15,13 @@
 // break whichever test file loads next.
 
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import type { MemexInstance } from "../memex/config";
-import type { NoteSummary } from "../types";
+
 import { syncChatMemory } from "../chatMemory/workflow";
-import { findAttachedChats } from "./model";
 import * as realTauri from "../lib/tauri";
+import type { MemexInstance } from "../memex/config";
 import * as realService from "../memex/service";
+import type { NoteSummary } from "../types";
+import { findAttachedChats } from "./model";
 
 const INSTANCE: MemexInstance = {
   id: "vault",

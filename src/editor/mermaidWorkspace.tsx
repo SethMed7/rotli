@@ -9,8 +9,8 @@ import {
   useState,
 } from "react";
 import { createRoot } from "react-dom/client";
+
 import { mermaidErrorMessage, renderMermaidElement } from "./mermaidRender";
-import { MermaidVisualEditor } from "./mermaidVisualEditor";
 import {
   type MermaidPoint,
   type MermaidViewport,
@@ -18,6 +18,7 @@ import {
   panMermaidViewport,
   zoomMermaidViewportAt,
 } from "./mermaidViewport";
+import { MermaidVisualEditor } from "./mermaidVisualEditor";
 
 type WorkspaceMode = "view" | "visual" | "code";
 type RenderStatus = "loading" | "ready" | "empty" | "error";
@@ -26,13 +27,13 @@ interface MermaidWorkspaceProps {
   code: string;
   dark: boolean;
   conversionAvailable: boolean;
-  onApply(code: string): string | null;
-  onConvertToExcalidraw(code: string): Promise<void>;
+  onApply: (code: string) => string | null;
+  onConvertToExcalidraw: (code: string) => Promise<void>;
   /** Convert AND swap the note's mermaid fence for a ```board embed — returns
    * an error message when the fence went stale, null on success. */
-  onConvertAndEmbed?(code: string): Promise<string | null>;
-  onClose(): void;
-  onRequestCloseReady?(requestClose: () => void): void;
+  onConvertAndEmbed?: (code: string) => Promise<string | null>;
+  onClose: () => void;
+  onRequestCloseReady?: (requestClose: () => void) => void;
 }
 
 export type MermaidWorkspaceOptions = MermaidWorkspaceProps;

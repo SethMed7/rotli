@@ -3,12 +3,13 @@
 
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
+
 import { fileName } from "../lib/fileKind";
+import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
-import { parseCsvExact } from "./csv";
 import { type Workbook, bytesFromB64, fillFromCsvRows, loadXlsx, newWorkbook } from "./codec/xlsx";
+import { parseCsvExact } from "./csv";
 import {
   type SheetHandle,
   type SheetModel,

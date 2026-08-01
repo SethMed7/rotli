@@ -2,6 +2,7 @@
 // a copy should read like what you SEE, with no stray ** around bold.
 
 import { describe, expect, test } from "bun:test";
+
 import fixture from "../../scripts/fixtures/markdown-strip.json";
 import { stripMarkdown } from "./stripMarkdown";
 

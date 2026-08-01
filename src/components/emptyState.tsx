@@ -5,10 +5,10 @@
 // binding (⌥C by default — the 2026-06-12 summon law: ⌥Space opens the app,
 // capture has its own chord), so a rebind never makes the copy lie.
 
-import { Character } from "./character";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
 import { dispatch, getAction } from "../keys/registry";
+import { Character } from "./character";
 import { PlusGlyph } from "./glyphs";
 
 export function EmptyState() {

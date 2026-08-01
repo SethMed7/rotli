@@ -8,6 +8,9 @@
  */
 import { existsSync } from "node:fs";
 
+/** Bun.spawn options, minus the argv these wrappers supply themselves. */
+type SpawnOptions = Parameters<typeof Bun.spawn>[1];
+
 // Bun.which first (respects PATH when set), then known install dirs, else null.
 export function resolveBin(name: string, fallbacks: string[] = []): string | null {
   const expand = (p: string) =>
@@ -25,7 +28,7 @@ export const signalCli = () => resolveBin("signal-cli", ["/opt/homebrew/bin/sign
 export const bunBin = () => resolveBin("bun", [`${process.env.HOME}/.bun/bin/bun`, "/opt/homebrew/bin/bun"]);
 
 // Spawn that returns null instead of throwing when argv[0] is missing/unresolvable.
-export function safeSpawn(argv: string[], opts?: any): Bun.Subprocess | null {
+export function safeSpawn(argv: string[], opts?: SpawnOptions): Bun.Subprocess | null {
   if (!argv[0]) return null;
   try {
     return Bun.spawn(argv, opts);

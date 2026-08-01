@@ -12,6 +12,7 @@
 import { safeFetchText, isYouTubeUrl } from "./safe-fetch";
 import { runModel, findAgy } from "./run-model";
 import { LLM } from "./llm";
+import type { GenerateResponse } from "./wire-types";
 
 const [mode, url] = process.argv.slice(2);
 if (!["summary", "read"].includes(mode) || !/^https?:\/\//.test(url ?? "")) {
@@ -28,7 +29,7 @@ async function gemma(prompt: string): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: LLM.model, stream: false, think: false, options: { num_ctx: 16384 }, prompt }),
   });
-  return (((await res.json()) as any).response ?? "").trim();
+  return (((await res.json()) as GenerateResponse).response ?? "").trim();
 }
 
 let out = "";

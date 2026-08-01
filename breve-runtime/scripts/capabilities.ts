@@ -62,7 +62,7 @@ export function fulfill(cap: string): { tool: string; configured: boolean } | nu
 export function ensureCapability(
   model: string,
   cap: string
-): { ok: true; via: "native" | string } | { ok: false; alert: string } {
+): { ok: true; via: string } | { ok: false; alert: string } {
   if (modelCan(model, cap)) return { ok: true, via: "native" };
   const f = fulfill(cap);
   if (f?.configured) return { ok: true, via: f.tool };

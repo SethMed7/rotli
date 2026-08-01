@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
+
 import type { NoteSummary } from "../types";
-import { filterPickerNotes, slashPickerCanCreate } from "./slashPicker";
-import { filterSlashItems, SLASH_ITEMS } from "./slashMenu";
 import { pickerFence, slashInsertion } from "./slashActions";
+import { filterSlashItems, SLASH_ITEMS } from "./slashMenu";
+import { filterPickerNotes, slashPickerCanCreate } from "./slashPicker";
 
 const file = (id: string): NoteSummary => ({
   id,

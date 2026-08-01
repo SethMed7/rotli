@@ -5,6 +5,7 @@
 // scoped, not disabled. Observed through the DEV-exposed __rotli.queryClient.
 
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 declare global {

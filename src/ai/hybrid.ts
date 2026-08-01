@@ -6,9 +6,9 @@
 // or an unparseable choice degrades to the first route.
 
 import type { ChatModelInfo } from "../lib/tauri";
+import { runAgent } from "./loop";
 import { type HybridPreset, PRESET_PREFIX } from "./models";
 import { extractJsonObject } from "./parse";
-import { runAgent } from "./loop";
 import type { AgentEvent, Host, RunInput } from "./types";
 
 /** The preset behind a dropdown pick (`preset:<id>`), or null. */

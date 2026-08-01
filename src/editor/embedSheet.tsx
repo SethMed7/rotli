@@ -7,10 +7,11 @@
 // next surface); save failures surface inline instead of .catch(()=>{}).
 
 import { useEffect, useRef, useState } from "react";
-import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
+
 import { extOf, fileName } from "../lib/fileKind";
-import { parseCsvExact } from "../sheets/csv";
+import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
 import { type Workbook, bytesFromB64, fillFromCsvRows, loadXlsx, newWorkbook } from "../sheets/codec/xlsx";
+import { parseCsvExact } from "../sheets/csv";
 import {
   type SheetHandle,
   type SheetModel,

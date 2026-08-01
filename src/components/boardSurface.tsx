@@ -8,16 +8,17 @@
 // contentView model (setContentView("panes")).
 
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+
 import { relativeLabel } from "../lib/dateLabels";
 import { createDragGhost } from "../lib/dragGhost";
 import { createPointerDragSession } from "../lib/pointerDrag";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
 import { mainNoteIds } from "../services/mainTree";
-import { notesService } from "../services/notes";
 import { archiveNoteWithImages } from "../services/noteLifecycle";
-import { useFocusedNoteId, usePanesStore } from "../state/panes";
+import { notesService } from "../services/notes";
 import { useMainStore } from "../state/main";
+import { useFocusedNoteId, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { pendingRevealKey } from "./captureReveal";
 import { Character } from "./character";

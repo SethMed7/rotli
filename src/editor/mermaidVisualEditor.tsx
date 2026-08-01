@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+
 import {
   MERMAID_FLOW_DIRECTIONS,
   MERMAID_NODE_SHAPES,
@@ -39,9 +40,9 @@ interface MermaidVisualEditorProps {
   applyError: string;
   dirty: boolean;
   source: string;
-  onApply(): void;
-  onChange(source: string): void;
-  onEditCode(): void;
+  onApply: () => void;
+  onChange: (source: string) => void;
+  onEditCode: () => void;
 }
 
 type VisualSelection = { kind: "node" | "edge"; id: string } | null;
@@ -109,7 +110,7 @@ function ColorControl({
   label: string;
   property: keyof MermaidNodeStyle;
   value: string | undefined;
-  onChange(property: keyof MermaidNodeStyle, value: string | undefined): void;
+  onChange: (property: keyof MermaidNodeStyle, value: string | undefined) => void;
 }) {
   return (
     <fieldset className="rotli-mermaid-color-control">
@@ -159,9 +160,9 @@ function MermaidNodeInspector({
   onUpdate,
 }: {
   node: MermaidFlowNode;
-  onConnect(): void;
-  onDelete(): void;
-  onUpdate(next: MermaidFlowNode): void;
+  onConnect: () => void;
+  onDelete: () => void;
+  onUpdate: (next: MermaidFlowNode) => void;
 }) {
   const updateStyle = (property: keyof MermaidNodeStyle, value: string | undefined) => {
     const style = { ...node.style, [property]: value };
@@ -214,8 +215,8 @@ function MermaidEdgeInspector({
   onUpdate,
 }: {
   edge: MermaidFlowEdge;
-  onDelete(): void;
-  onUpdate(next: MermaidFlowEdge): void;
+  onDelete: () => void;
+  onUpdate: (next: MermaidFlowEdge) => void;
 }) {
   return (
     <div className="rotli-mermaid-inspector-fields">

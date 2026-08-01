@@ -4,6 +4,9 @@
 // connected lanes existed).
 
 import { describe, expect, test } from "bun:test";
+
+import type { ChatModelInfo } from "../lib/tauri";
+import { parseHybridPresets } from "../state/persist";
 import { budgetFor, contextWindowFor } from "./budget";
 import {
   CLI_CATALOG,
@@ -22,9 +25,7 @@ import {
   nameFromRepo,
   presetModel,
 } from "./models";
-import { parseHybridPresets } from "../state/persist";
 import { adapterFor, frontierAdapter, gemmaAdapter } from "./prompt";
-import type { ChatModelInfo } from "../lib/tauri";
 
 const local: ChatModelInfo[] = [
   {

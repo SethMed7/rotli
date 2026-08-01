@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 const DIAGRAM_NOTE = `# Diagram workspace

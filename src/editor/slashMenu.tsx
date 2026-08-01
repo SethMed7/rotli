@@ -12,6 +12,7 @@
 // vocabulary — same SVG voice, same 15px size.
 
 import type { ReactNode } from "react";
+
 import { DOCUMENT_SEARCH_KEYWORDS } from "../documents/kinds";
 import type { BlockToggle } from "./commands";
 import { bulletGlyph, checklistGlyph, codeGlyph, numberedGlyph, quoteGlyph } from "./formatGlyphs";
@@ -330,8 +331,8 @@ export function SlashMenu({
 }: {
   query: string;
   selectedIndex: number;
-  onHover(index: number): void;
-  onPick(item: SlashItem): void;
+  onHover: (index: number) => void;
+  onPick: (item: SlashItem) => void;
 }) {
   const items = filterSlashItems(query);
   return (

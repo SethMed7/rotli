@@ -9,6 +9,7 @@
 // commit calls moveTab / detachTab. Cancels on Esc / pointercancel.
 
 import type { PointerEvent as ReactPointerEvent } from "react";
+
 import type { DropPos } from "../services/mainTree";
 import { type DropZone, leaves, usePanesStore } from "../state/panes";
 import { createDragGhost } from "./dragGhost";

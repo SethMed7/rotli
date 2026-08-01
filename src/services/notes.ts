@@ -15,11 +15,11 @@ import { DEST, isChats, isHidden, isRootMarker, isSink, isTrash, isVault } from 
  * "vault:chats/…" counts as Chat-front transcripts here, exactly like fs mode
  * with a plain corpus + a connected brain. */
 const MEMEX_MARKERS: ReadonlySet<string> = new Set([DEST.vault]);
+import type { NoteCreationPolicy } from "../security/secureNotes";
 import { snippetOf, summaryOrder, titleOf } from "./derive";
 import { FsNotesService } from "./fsNotes";
-import { searchMatch, sortHits } from "./search";
-import type { NoteCreationPolicy } from "../security/secureNotes";
 import type { NotesService } from "./notesPort";
+import { searchMatch, sortHits } from "./search";
 
 /** Ulid-style id: time-sortable prefix + random tail (Crockford base32). */
 const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";

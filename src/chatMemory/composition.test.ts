@@ -7,6 +7,7 @@
 // REAL module and afterAll puts it back.
 
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
+
 import * as realTauri from "../lib/tauri";
 import type { FrontmatterView } from "../lib/tauri";
 

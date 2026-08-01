@@ -10,11 +10,11 @@ import { join, resolve, sep } from "node:path";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, renameSync, existsSync, readdirSync } from "node:fs";
 import { BREVE, BRIEFS, AUDIOS, PDFS, VIEWS, CAPTURES } from "./paths";
-import { inboxPath, knowledgePath, knowledgePathFor, inboxPathFor, assetsPathFor, readMemexRegistry, accessMode, memexInfo, DEFAULT_USER } from "./config";
+import { knowledgePath, knowledgePathFor, inboxPathFor, assetsPathFor, readMemexRegistry, accessMode, memexInfo, DEFAULT_USER, type MemexRegistry } from "./config";
 import { policyFor } from "./policy";
 import { LLM, warmup } from "./llm";
-import { sandboxed, sandboxActive, rootsForPartition, type SandboxRoots } from "./sandbox";
-import { resolvePrincipal, canUse, hasPower, keyOf, reloadAccess, memexUsers, boundPhone, boundUuid, type Principal, type Power } from "./users";
+import { sandboxed, rootsForPartition, type SandboxRoots } from "./sandbox";
+import { resolvePrincipal, canUse, hasPower, keyOf, reloadAccess, memexUsers, boundPhone, boundUuid, type Principal } from "./users";
 import { getActiveUser, setActiveUser } from "./session";
 import { verifyPassphrase, passphraseReady, newCode, emailCode, audit } from "./auth";
 import { readSecret } from "./secret";
@@ -22,10 +22,16 @@ import { cleaned as deterministicClean } from "./voice-clean";
 import { brainPack } from "./brain-context";
 import { renderResourceList, resolveResource } from "./resources";
 import { loadSettings, saveSettings, effectiveTz, travelExpired, todayIn, minutesNowIn, parseHM, resolveTz, leadFor, type Settings } from "./timectx";
-import { normalizeAmPm, mealOf, briefAsk, briefRegenMatch, briefQueueMatch, bareFollowup, wantsLastAsText, topicBriefMatch, urlRequest, watchIntentMatch, parseWhen, schedulePairs, scheduleChangeGate, audioResearchAsk, inboxAsk, accountOf, inboxScope, mailSearchAsk, modelDirective, saveAttachmentIntent, folderFromCaption, slugifyTopic, stripStepNarration, type ModelTier, type Meal, type BriefFormat } from "./intents";
+import { normalizeAmPm, briefAsk, briefRegenMatch, briefQueueMatch, bareFollowup, wantsLastAsText, topicBriefMatch, urlRequest, watchIntentMatch, parseWhen, schedulePairs, scheduleChangeGate, audioResearchAsk, inboxAsk, accountOf, inboxScope, mailSearchAsk, modelDirective, saveAttachmentIntent, folderFromCaption, slugifyTopic, stripStepNarration, type ModelTier, type Meal, type BriefFormat } from "./intents";
 import { validateAction, describeAction, previewScript } from "./actions";
 import { rotate } from "./logrotate";
 import { acquireProcessLock } from "./process-lock";
+import { errText } from "./err-text";
+import type {
+  GenerateResponse, SignalAttachment, SignalEnvelope, Watcher, Creator,
+  PendingAction, PendingVoice, PendingEmail, PendingSuggestion, TravelClassification,
+  UnreadReport, MailSearchReport,
+} from "./wire-types";
 
 // The owner's time context (home tz + travel mode) — cached, refreshed every 5 min.
 let CFG: Settings = await loadSettings();
@@ -187,7 +193,7 @@ async function runClaude(model: string, prompt: string, extraArgs: string[]): Pr
     stderr: "pipe",
     env: GH_PAT ? { ...process.env, GH_TOKEN: GH_PAT } : process.env,
   });
-  proc.stdin.write(prompt);
+  await proc.stdin.write(prompt);
   await proc.stdin.end();
   const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
   await proc.exited;
@@ -276,7 +282,7 @@ async function askGemma(text: string): Promise<string> {
         think: false,
       }),
     });
-    const j: any = await res.json();
+    const j = (await res.json()) as GenerateResponse;
     return (j.response ?? "").trim() || "(local model gave no response)";
   } catch (e) {
     logFail("gemma", `ollama unreachable: ${String(e).slice(0, 120)}`); // don't throw — let self-heal handle it
@@ -309,8 +315,8 @@ async function askGemmaJudge(text: string): Promise<{ answer: string; confidence
         },
       }),
     });
-    const jr: any = await res.json();
-    return JSON.parse(jr.response);
+    const jr = (await res.json()) as GenerateResponse;
+    return JSON.parse(jr.response ?? "null");
   } catch (e) {
     logFail("gemma-judge", String(e));
     return null;
@@ -505,7 +511,7 @@ function atomicWriteJson(path: string, value: unknown): void {
 function writeIdentity(name: string, handle: { phone?: string; uuid?: string; email?: string }): boolean {
   try {
     const path = join(knowledgePath(), "identities.local.json");
-    let ids: any = {};
+    let ids: Record<string, { phone?: string; uuid?: string; email?: string }> = {};
     try { ids = JSON.parse(readFileSync(path, "utf8")); } catch { /* new file */ }
     ids[name] = { ...(ids[name] ?? {}), ...handle };
     atomicWriteJson(path, ids);
@@ -513,12 +519,19 @@ function writeIdentity(name: string, handle: { phone?: string; uuid?: string; em
   } catch (e) { logFail("write-identity", String(e)); return false; }
 }
 
+/** The three access modes /mode accepts, as a predicate so the command's own
+ * validation narrows the string it writes back into the registry. */
+const ACCESS_MODES = ["local", "open", "secure"] as const;
+function isAccessMode(v: string): v is (typeof ACCESS_MODES)[number] {
+  return (ACCESS_MODES as readonly string[]).includes(v);
+}
+
 /** Patch the memex users.json policy (mode/auth) atomically. Returns false if there's no registry. */
-function updateMemexPolicy(patch: (p: any) => void): boolean {
+function updateMemexPolicy(patch: (p: MemexRegistry) => void): boolean {
   try {
     const path = join(knowledgePath(), "users.json");
     if (!existsSync(path)) return false;
-    const p = JSON.parse(readFileSync(path, "utf8"));
+    const p = JSON.parse(readFileSync(path, "utf8")) as MemexRegistry;
     patch(p);
     atomicWriteJson(path, p);
     return true;
@@ -565,7 +578,7 @@ async function handleCommand(text: string): Promise<boolean> {
     case "/mode": {
       const m = arg.trim().toLowerCase();
       if (!m) { await send(`Access mode: ${accessMode()}\nSet with /mode local|open|secure.\n• local — one user, no auth\n• open — multi-user, isolated, free switching\n• secure — RBAC + step-up auth to enter a bound space`); return true; }
-      if (!["local", "open", "secure"].includes(m)) { await send("Usage: /mode local | open | secure"); return true; }
+      if (!isAccessMode(m)) { await send("Usage: /mode local | open | secure"); return true; }
       if (!updateMemexPolicy((p) => { p.mode = m; })) { await send("Couldn't update the mode (no memex registry? run /user-add first)."); return true; }
       audit(`MODE → ${m}`);
       await send(`✓ Access mode → ${m}.`);
@@ -584,7 +597,7 @@ async function handleCommand(text: string): Promise<boolean> {
       const reg = readMemexRegistry();
       const us = reg?.users ?? [];
       const lines = us.length
-        ? us.map((u: any) => `• ${u.name} — ${u.role ?? "member"}${u.name === reg?.primary ? " (you · home)" : ""}`).join("\n")
+        ? us.map((u) => `• ${u.name} — ${u.role ?? "member"}${u.name === reg?.primary ? " (you · home)" : ""}`).join("\n")
         : "• seth — admin (you · home)";
       await send(`👥 Users\n${lines}\n\nAdd: /user-add <name>  ·  Switch: /use <name>`);
       return true;
@@ -596,7 +609,7 @@ async function handleCommand(text: string): Promise<boolean> {
       // Refuse the primary/admin partition: it resolves to the whole brain (flat root), so binding a
       // member to it would expose every partition — and the heal-path would let it through silently.
       const reg0 = readMemexRegistry();
-      if (reg0 && (name === reg0.primary || reg0.users?.some((u: any) => u.name === name && u.role === "admin"))) {
+      if (reg0 && (name === reg0.primary || reg0.users.some((u) => u.name === name && u.role === "admin"))) {
         await send(`Refusing — "${name}" is the primary/admin partition (it spans the whole brain). Pick a new persona name.`);
         return true;
       }
@@ -661,7 +674,7 @@ async function handleCommand(text: string): Promise<boolean> {
     case "/watch-page":
     case "/watchers": {
       const WATCHERS = join(BREVE, "watchers.json");
-      const list: any[] = (await Bun.file(WATCHERS).json().catch(() => [])) ?? [];
+      const list: Watcher[] = (await Bun.file(WATCHERS).json().catch(() => [])) ?? [];
       if (cmd.toLowerCase() === "/watchers" && rest[0]?.toLowerCase() === "remove" && rest[1]) {
         const idx = list.findIndex((w) => String(w.id) === rest[1]);
         if (idx < 0) { await send(`No watcher #${rest[1]}.`); return true; }
@@ -712,7 +725,7 @@ async function handleCommand(text: string): Promise<boolean> {
     }
     case "/creators": {
       const CREATORS = join(BREVE, "creators.json");
-      const list: any[] = await Bun.file(CREATORS).json().catch(() => []);
+      const list: Creator[] = await Bun.file(CREATORS).json().catch(() => []);
       const sub = rest[0]?.toLowerCase();
       if (sub === "add" && rest[1]) {
         const handle = rest[1].startsWith("@") ? rest[1] : `@${rest[1]}`;
@@ -730,7 +743,7 @@ async function handleCommand(text: string): Promise<boolean> {
       }
       if (sub === "remove" && rest.length > 1) {
         const q = rest.slice(1).join(" ").toLowerCase();
-        const idx = list.findIndex((c) => c.name.toLowerCase().includes(q) || c.handle.toLowerCase().includes(q));
+        const idx = list.findIndex((c) => (c.name ?? "").toLowerCase().includes(q) || (c.handle ?? "").toLowerCase().includes(q));
         if (idx < 0) { await send(`No creator matching "${q}".`); return true; }
         const [gone] = list.splice(idx, 1);
         await Bun.write(CREATORS, JSON.stringify(list, null, 2));
@@ -774,8 +787,6 @@ function startTyping(): () => void {
   };
 }
 
-const HEAVY = /^deep:/i;
-const HEAVY_VERBS = /\b(research|investigate|analyze|compare|draft|write up|build|plan|summarize the|review)\b/i;
 
 // ── Brief retrieval (PDF / audio over Signal) ────────────────────────────────
 // Durable record → the memex history/ (distilled digest). briefs/ is an ephemeral cache (today's
@@ -1035,7 +1046,7 @@ async function handleBriefRegenerate(text: string): Promise<boolean> {
 }
 
 // "audio" / "pdf" / "the voice version" right after a brief exchange = that brief, that format.
-async function handleBareFollowup(text: string, opts: { asVoice?: boolean } = {}): Promise<boolean> {
+async function handleBareFollowup(text: string, _opts: { asVoice?: boolean } = {}): Promise<boolean> {
   const fmt = bareFollowup(text);
   if (!fmt) return false;
   if (fmt === "text") return false; // "as text" handler owns text replays
@@ -1061,25 +1072,26 @@ const AWAITING_ACTION = join(BREVE, "signal", "awaiting-action.json");
 
 // For run/chmod actions, show the ACTUAL script content (size + mtime + first lines + a fresh-edit
 // warning) so a confirm approves substance, not just a path — the model could write+stage in one turn.
-async function actionPreview(a: any): Promise<string> {
-  if (a.action === "run-script" || a.action === "chmod-script") {
+async function actionPreview(a: PendingAction): Promise<string> {
+  if ((a.action === "run-script" || a.action === "chmod-script") && a.script) {
     return `\n\n${await previewScript(BREVE, a.script)}`;
   }
   return "";
 }
 
-async function runAction(a: any): Promise<string> {
+async function runAction(a: PendingAction): Promise<string> {
   const sh = async (cmd: string[]) => {
     const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
     const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
     return { code: await p.exited, txt: (out + "\n" + err).trim() };
   };
+  if (!a.script) return "⚠ unknown action";
   switch (a.action) {
     case "chmod-script":
       await sh(["chmod", "+x", join(BREVE, "scripts", a.script)]);
       return `✓ scripts/${a.script} is now executable.`;
     case "run-script": {
-      const r = await sh(["/bin/bash", join(BREVE, "scripts", a.script), ...(a.args ?? [])]);
+      const r = await sh(["/bin/bash", join(BREVE, "scripts", a.script), ...(Array.isArray(a.args) ? a.args.map(String) : [])]);
       return `${r.code === 0 ? "✓" : "⚠"} scripts/${a.script} exited ${r.code}.\n${r.txt.slice(-500)}`;
     }
   }
@@ -1091,7 +1103,7 @@ async function maybeProposeAction() {
   if (!hasPower(ctx().principal, "actions")) return; // only the admin may stage/run setup actions
   const f = Bun.file(PENDING_ACTION);
   if (!(await f.exists())) return;
-  const a: any = await f.json().catch(() => null);
+  const a = (await f.json().catch(() => null)) as PendingAction | null;
   await $unlink(PENDING_ACTION).catch(() => {});
   if (!a?.action) return;
   const err = await validateAction(BREVE, a);
@@ -1110,7 +1122,7 @@ async function handleActionConfirm(text: string): Promise<boolean> {
     return true;
   }
   if (t !== "confirm") return false; // anything else flows through normally; action stays pending
-  const a: any = await f.json().catch(() => null);
+  const a = (await f.json().catch(() => null)) as PendingAction | null;
   await $unlink(AWAITING_ACTION).catch(() => {});
   if (!a) return false;
   const err = await validateAction(BREVE, a); // re-validate at run time
@@ -1119,7 +1131,7 @@ async function handleActionConfirm(text: string): Promise<boolean> {
   try {
     await send(await runAction(a));
   } catch (e) {
-    logFail("action", `${describeAction(a)} → ${e}`);
+    logFail("action", `${describeAction(a)} → ${errText(e)}`);
     await send("⚠ The action errored — I've logged it.");
   }
   return true;
@@ -1142,7 +1154,7 @@ async function handleScheduleChange(rawText: string, opts: { asVoice?: boolean }
   if (!scheduleChangeGate(text.toLowerCase(), pairs.length) || !pairs.length) return false;
   await refreshCfg();
   for (const [meal, mins] of pairs)
-    (CFG.deliveryTimes as any)[meal] = `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+    CFG.deliveryTimes[meal] = `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
   await saveSettings(CFG);
   const result = await applySchedule();
   await say(`✓ Schedule updated — briefs arrive at these times (generation starts ${leadFor(CFG, "morning")} min before morning, which is held until its arrival; ${CFG.leadMinutes} min before lunch/night):\n${result}`);
@@ -1179,10 +1191,10 @@ async function handleTravel(text: string, opts: { asVoice?: boolean } = {}): Pro
         },
       }),
     });
-    const j = JSON.parse(((await res.json()) as any).response);
+    const j = JSON.parse((await res.json() as GenerateResponse).response ?? "{}") as TravelClassification;
     if (!j.is_travel_announcement) return false;
-    const tz = resolveTz(j.timezone);
-    if (!tz || !/^\d{4}-\d{2}-\d{2}$/.test(j.start) || !/^\d{4}-\d{2}-\d{2}$/.test(j.end)) {
+    const tz = j.timezone ? resolveTz(j.timezone) : null;
+    if (!tz || !j.start || !j.end || !/^\d{4}-\d{2}-\d{2}$/.test(j.start) || !/^\d{4}-\d{2}-\d{2}$/.test(j.end)) {
       await say(`I got the travel part but not the details — tell me like: "I'll be traveling June 20 to June 27 in Pacific time."`);
       return true;
     }
@@ -1232,7 +1244,10 @@ async function handleReminder(rawText: string, opts: { asVoice?: boolean } = {})
 }
 
 // Fires due reminders even across daemon restarts (file-backed). Checked every 30s.
-setInterval(async () => {
+// The tick is a named async function invoked with `void` so setInterval keeps its
+// void-returning contract: an async callback handed straight to setInterval would
+// make every rejection an unhandled one, and this daemon must not die on a tick.
+async function tickReminders(): Promise<void> {
   try {
     const rs = await readReminders();
     const due = rs.filter((r) => r.due <= Date.now());
@@ -1240,7 +1255,8 @@ setInterval(async () => {
     await writeReminders(rs.filter((r) => r.due > Date.now()));
     for (const r of due) await send(`⏰ Reminder: ${r.text}`);
   } catch (e) { logFail("reminders", String(e)); }
-}, 30_000);
+}
+setInterval(() => void tickReminders(), 30_000);
 
 // Casual watcher asks: "watch <url> and tell me when the weights drop"
 async function handleWatchIntent(text: string, opts: { asVoice?: boolean } = {}): Promise<boolean> {
@@ -1248,7 +1264,7 @@ async function handleWatchIntent(text: string, opts: { asVoice?: boolean } = {})
   if (!m) return false;
   const say = (msg: string) => (opts.asVoice ? sendVoiceReply(msg) : send(msg));
   const WATCHERS = join(BREVE, "watchers.json");
-  const list: any[] = (await Bun.file(WATCHERS).json().catch(() => [])) ?? [];
+  const list: Watcher[] = (await Bun.file(WATCHERS).json().catch(() => [])) ?? [];
   const id = (list.at(-1)?.id ?? 0) + 1;
   list.push({ id, url: m.url, condition: m.condition });
   await Bun.write(WATCHERS, JSON.stringify(list, null, 2));
@@ -1307,11 +1323,11 @@ async function handleMailSearch(text: string, opts: { asVoice?: boolean } = {}):
   });
   const [out, errOut] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
   if ((await p.exited) !== 0) { await say(`📭 Couldn't search: ${errOut.replace(/^ERR /, "").slice(0, 120)}`); return true; }
-  let data: any;
-  try { data = JSON.parse(out); } catch { await say("📭 Search returned something unreadable — logged it."); logFail("mail-search", out.slice(0, 200)); return true; }
+  let data: MailSearchReport;
+  try { data = JSON.parse(out) as MailSearchReport; } catch { await say("📭 Search returned something unreadable — logged it."); logFail("mail-search", out.slice(0, 200)); return true; }
   if (!data.matches?.length) { await say(`📭 Nothing in ${data.account} matching "${m.query}" (last 30 days).`); return true; }
-  const lines = data.matches.slice(0, 6).map((x: any) =>
-    `• ${new Date(x.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} — ${x.from?.split("<")[0]?.trim()}: ${x.subject}`);
+  const lines = data.matches.slice(0, 6).map((x) =>
+    `• ${x.date ? new Date(x.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"} — ${x.from?.split("<")[0]?.trim()}: ${x.subject}`);
   await say(`📬 ${data.matches.length} match(es) in ${data.account} for "${m.query}":\n${lines.join("\n")}`);
   return true;
 }
@@ -1361,8 +1377,8 @@ async function runInboxTriage(account: string, opts: { asVoice?: boolean } = {})
     await say(`📭 ${hint}`);
     return true;
   }
-  let data: any;
-  try { data = JSON.parse(out); } catch { await say("📭 Mailbox replied with something unreadable — logged it."); logFail("inbox", out.slice(0, 200)); return true; }
+  let data: UnreadReport;
+  try { data = JSON.parse(out) as UnreadReport; } catch { await say("📭 Mailbox replied with something unreadable — logged it."); logFail("inbox", out.slice(0, 200)); return true; }
   const errNames = Object.keys(data.errors ?? {});
   const errNote = errNames.length ? ` (couldn't reach: ${errNames.join(", ")})` : "";
   if (errNames.length) logFail("inbox-accounts", JSON.stringify(data.errors).slice(0, 300));
@@ -1379,11 +1395,11 @@ ${JSON.stringify(data.messages)}
 Write a spoken-style triage, max 130 words: "${data.unread} unread — ${perAccount}." then the 2-4 that actually matter (which account — sender — what it's about — why it matters), then one line lumping the rest (newsletters/notifications). Plain prose, no markdown.`,
       }),
     });
-    const j: any = await res.json();
+    const j = (await res.json()) as GenerateResponse;
     const summary = (j.response ?? "").trim();
-    await say((summary || `📬 ${data.unread} unread (${perAccount}) — top: ${data.messages.slice(0, 3).map((m: any) => m.subject).join(" · ")}`) + errNote);
+    await say((summary || `📬 ${data.unread} unread (${perAccount}) — top: ${data.messages.slice(0, 3).map((m) => m.subject).join(" · ")}`) + errNote);
   } catch {
-    await say(`📬 ${data.unread} unread (${perAccount}) — top: ${data.messages.slice(0, 3).map((m: any) => `${m.from?.split("<")[0]?.trim()}: ${m.subject}`).join(" · ")}${errNote}`);
+    await say(`📬 ${data.unread} unread (${perAccount}) — top: ${data.messages.slice(0, 3).map((m) => `${m.from?.split("<")[0]?.trim()}: ${m.subject}`).join(" · ")}${errNote}`);
   }
   return true;
 }
@@ -1400,7 +1416,7 @@ async function handleSuggestionFlow(text: string, opts: { asVoice?: boolean } = 
   const yes = /^(yes|yeah|yep|sure|ok(ay)?|add it|watch it|keep an eye)\b/.test(t) || t === "y";
   const no = /^(no|nah|nope|skip|pass|not now|don'?t)\b/.test(t) || t === "n";
   if (!yes && !no) return false;
-  const sug: any = await f.json().catch(() => null);
+  const sug = (await f.json().catch(() => null)) as PendingSuggestion | null;
   await $unlink(PENDING_SUG).catch(() => {});
   if (!sug?.name) return false;
   // Stale suggestions (>2 days) shouldn't swallow an unrelated "yes"
@@ -1458,7 +1474,7 @@ async function parakeetTranscribe(wav: string): Promise<string> {
   const out = await new Response(p.stdout).text();
   if ((await p.exited) !== 0) return "";
   const j = out.match(/\{[\s\S]*\}/);
-  try { return j ? filterHallucination(String((JSON.parse(j[0]) as any).text ?? "")) : ""; } catch { return ""; }
+  try { return j ? filterHallucination(String((JSON.parse(j[0]) as { text?: string }).text ?? "")) : ""; } catch { return ""; }
 }
 
 async function transcribeVoice(attachmentId: string): Promise<string | null> {
@@ -1489,7 +1505,7 @@ async function transcribeVoice(attachmentId: string): Promise<string | null> {
 // — while PRESERVING intent, names, and commands. Guarded so a bad rewrite never replaces the
 // original, and skipped for short/command-like notes (e.g. "morning brief") that need no cleanup.
 async function polishTranscript(raw: string): Promise<string> {
-  if (/^\s*[\/]/.test(raw)) return raw; // explicit "/command" — leave verbatim
+  if (/^\s*\//.test(raw)) return raw; // explicit "/command" — leave verbatim
   if (raw.length < 40) return deterministicClean(raw); // short note → deterministic tidy, skip the LLM
   try {
     const res = await fetch(`${LLM.endpoint}/api/generate`, {
@@ -1503,7 +1519,7 @@ async function polishTranscript(raw: string): Promise<string> {
         prompt: `Rewrite this dictated voice message as one clean, clear prompt. Remove filler words (um, uh, like, you know), false starts, and repetition; merge self-corrections (if he says "two, actually three", keep three); fix obvious speech-to-text slips. PRESERVE his exact meaning, intent, names, numbers, and any commands or model names — do NOT answer it, do NOT add or invent anything, do NOT add commentary. Output ONLY the cleaned message text.\n\nDictated: ${raw}\n\nCleaned:`,
       }),
     });
-    const j: any = await res.json();
+    const j = (await res.json()) as GenerateResponse;
     const cleaned = (j.response ?? "").trim().replace(/^["'`]|["'`]$/g, "");
     // Guards: must be non-empty and not wildly longer (a hallucinated answer) — else keep the raw words.
     if (!cleaned || cleaned.length > raw.length * 1.6 || cleaned.startsWith("(")) return deterministicClean(raw);
@@ -1565,8 +1581,8 @@ async function classifyCapture(caption: string): Promise<{ save: boolean; folder
         format: { type: "object", properties: { save: { type: "boolean" }, folder: { type: "string" } }, required: ["save", "folder"] },
       }),
     });
-    const j: any = await res.json();
-    return JSON.parse(j.response);
+    const j = (await res.json()) as GenerateResponse;
+    return JSON.parse(j.response ?? "null");
   } catch (e) { logFail("capture-classify", String(e)); return null; }
 }
 
@@ -1600,7 +1616,7 @@ async function doCapture(atts: MediaAtt[], slug: string) {
 // An image landed with no usable folder; remember it so the owner's next message can name it.
 let pendingCapture: { atts: MediaAtt[]; at: number } | null = null;
 
-async function handleMedia(rawAtts: any[], caption: string | undefined) {
+async function handleMedia(rawAtts: SignalAttachment[], caption: string | undefined) {
   // Members are knowledge-only (no file-save flow / global capture state). Route any caption to chat.
   if (!ctx().isAdmin) {
     const cap0 = (caption ?? "").trim();
@@ -1652,7 +1668,8 @@ async function handlePendingCapture(text: string): Promise<boolean> {
 // ── /voice — pick the voice Breve talks to the owner with (test → CONFIRM or back) ─
 const VOICE_PREF = join(BREVE, "signal", "voice-pref.json");
 const PENDING_VOICE = join(BREVE, "signal", "pending-voice.json");
-let chatVoice: string = ((await Bun.file(VOICE_PREF).json().catch(() => null)) as any)?.chatVoice ?? "af_heart";
+let chatVoice: string =
+  ((await Bun.file(VOICE_PREF).json().catch(() => null)) as { chatVoice?: string } | null)?.chatVoice ?? "af_heart";
 
 // Curated from Kokoro's bundled English voices (best graded first per family).
 const VOICE_MENU: Array<[string, string]> = [
@@ -1700,7 +1717,7 @@ async function sampleVoice(id: string) {
 async function handleVoicePick(text: string): Promise<boolean> {
   const f = Bun.file(PENDING_VOICE);
   if (!(await f.exists())) return false;
-  const pending: any = await f.json().catch(() => null);
+  const pending = (await f.json().catch(() => null)) as PendingVoice | null;
   if (!pending || Date.now() - (pending.at ?? 0) > 15 * 60_000) { await $unlink(PENDING_VOICE).catch(() => {}); return false; }
   const t = text.trim().toLowerCase();
   if (/^(back|cancel|keep|nvm|stop)\b/.test(t)) {
@@ -1819,11 +1836,11 @@ function config_recipient(): string {
 }
 const isSelf = (e: string) => e === config_recipient();
 
-async function readPending(): Promise<any | null> {
+async function readPending(): Promise<PendingEmail | null> {
   const f = Bun.file(PENDING);
   return (await f.exists()) ? f.json() : null;
 }
-async function writePending(p: any) { await Bun.write(PENDING, JSON.stringify(p)); }
+async function writePending(p: PendingEmail) { await Bun.write(PENDING, JSON.stringify(p)); }
 async function clearPending() { try { await $unlink(PENDING); } catch {} }
 async function $unlink(p: string) { const { unlink } = await import("node:fs/promises"); await unlink(p); }
 
@@ -2080,7 +2097,7 @@ async function handle(text: string, opts: { asVoice?: boolean } = {}) {
     else await send(reply);
     await maybeProposeAction(); // if the model staged a setup action, ask the owner now
   } catch (e) {
-    logFail("handle", `"${text.slice(0, 50)}" → ${e}`);
+    logFail("handle", `"${text.slice(0, 50)}" → ${errText(e)}`);
     await send("⚠ That one hit an error on my end — I've logged it. Mind trying again?");
   }
 }
@@ -2098,7 +2115,7 @@ log(`Breve Signal daemon up — bot ${bot}, owner ${owner}`);
     log("memex: no identity stamped (single-tenant/legacy) — running in local mode, fine");
   }
   // Self-heal: recreate any MISSING structure (never overwrite/delete), unless selfHeal is off.
-  if ((mx as any)?.selfHeal !== false) {
+  if (mx?.selfHeal !== false) {
     try {
       const healScript = join(knowledgePath(), "scripts", "heal.ts");
       if (existsSync(healScript)) {
@@ -2135,11 +2152,11 @@ function releaseSlot() {
 
 // Dispatch one owner envelope (fire-and-forget). Journals first; on SUCCESS removes the journal
 // file. A slot is held for the whole handle and freed in finally so backpressure stays honest.
-function dispatchEnv(env: any, replayFile?: string) {
+function dispatchEnv(env: SignalEnvelope, replayFile?: string) {
   const msg = env?.dataMessage?.message;
-  const atts: any[] = env?.dataMessage?.attachments ?? [];
-  const voiceAtt = atts.find((a: any) => /^audio\//.test(a?.contentType ?? ""));
-  const mediaAtts = atts.filter((a: any) => !/^audio\//.test(a?.contentType ?? ""));
+  const atts: SignalAttachment[] = env?.dataMessage?.attachments ?? [];
+  const voiceAtt = atts.find((a) => /^audio\//.test(a?.contentType ?? ""));
+  const mediaAtts = atts.filter((a) => !/^audio\//.test(a?.contentType ?? ""));
   if (!msg && !voiceAtt && !mediaAtts.length) return;
 
   // Journal before dispatch (skip when replaying — the file already exists).
@@ -2152,7 +2169,7 @@ function dispatchEnv(env: any, replayFile?: string) {
     } catch (e) { logFail("queue-write", String(e)); jfile = ""; }
   }
   const done = (label: string) => (e?: unknown) => {
-    if (e) logFail(label, String(e));
+    if (e) logFail(label, errText(e));
     else if (jfile) $unlink(jfile).catch(() => {}); // drop the journal only on clean handling
   };
 
@@ -2167,15 +2184,18 @@ function dispatchEnv(env: any, replayFile?: string) {
     // Image/PDF (with or without a caption) → file it. Takes precedence over the caption text
     // so a shared photo isn't mis-routed as a bare chat message (the 2026-06-17 drop bug).
     log(`media from ${who} (${inFlight} in flight): ${mediaAtts.length} file(s)${msg ? " + caption" : ""}`);
-    als.run(c, () => handleMedia(mediaAtts, msg)).then(() => done("dispatch-media")(), done("dispatch-media")).finally(releaseSlot);
+    als.run(c, () => handleMedia(mediaAtts, msg ?? undefined)).then(() => done("dispatch-media")(), done("dispatch-media")).finally(releaseSlot);
   } else if (msg) {
     log(`msg from ${who} (${inFlight} in flight): ${msg.slice(0, 60)}`);
     warmup().catch(() => {}); // warm-on-intent: pre-touch the default local model so the reply is hot
     als.run(c, () => handle(msg)).then(() => done("dispatch")(), done("dispatch")).finally(releaseSlot);
-  } else {
+  } else if (voiceAtt) {
     log(`voice note from ${who} (${inFlight} in flight): ${voiceAtt.id}`);
     warmup().catch(() => {}); // warm-on-intent: the transcript will reach the local model shortly
     als.run(c, () => handleVoice(String(voiceAtt.id))).then(() => done("dispatch-voice")(), done("dispatch-voice")).finally(releaseSlot);
+  } else {
+    // unreachable: the guard above returns unless one of the three exists.
+    releaseSlot();
   }
 }
 
@@ -2191,13 +2211,13 @@ setInterval(() => { void rotateGuarded(); }, 6 * 60 * 60_000);
 try {
   for (const name of readdirSync(QUEUE).filter((n) => n.endsWith(".json")).sort()) {
     try {
-      const env = JSON.parse(readFileSync(join(QUEUE, name), "utf8"));
-      const atts: any[] = env?.dataMessage?.attachments ?? [];
+      const env = JSON.parse(readFileSync(join(QUEUE, name), "utf8")) as SignalEnvelope;
+      const atts: SignalAttachment[] = env?.dataMessage?.attachments ?? [];
       if (!env?.dataMessage?.message && !atts.length) { await $unlink(join(QUEUE, name)).catch(() => {}); continue; }
       log(`replaying queued envelope ${name}`);
       await acquireSlot();
       dispatchEnv(env, join(QUEUE, name));
-    } catch (e) { logFail("queue-replay", `${name}: ${e}`); }
+    } catch (e) { logFail("queue-replay", `${name}: ${errText(e)}`); }
   }
 } catch (e) { logFail("queue-replay", String(e)); }
 
@@ -2207,14 +2227,14 @@ while (true) {
     const { out } = await runSignalCli(["-o", "json", "receive", "--timeout", "3"], true);
     for (const line of out.split("\n")) {
       if (!line.trim()) continue;
-      let env: any;
-      try { env = JSON.parse(line).envelope; } catch { continue; }
+      let env: SignalEnvelope;
+      try { env = (JSON.parse(line) as { envelope?: SignalEnvelope }).envelope ?? {}; } catch { continue; }
       const src = env?.sourceNumber ?? null;
       const srcUuid = env?.sourceUuid ?? null;
       const msg = env?.dataMessage?.message;
-      const atts: any[] = env?.dataMessage?.attachments ?? [];
-      const voiceAtt = atts.find((a: any) => /^audio\//.test(a?.contentType ?? ""));
-      const mediaAtts = atts.filter((a: any) => !/^audio\//.test(a?.contentType ?? ""));
+      const atts: SignalAttachment[] = env?.dataMessage?.attachments ?? [];
+      const voiceAtt = atts.find((a) => /^audio\//.test(a?.contentType ?? ""));
+      const mediaAtts = atts.filter((a) => !/^audio\//.test(a?.contentType ?? ""));
       if (!msg && !voiceAtt && !mediaAtts.length) continue;
       // Hard allowlist: only whitelisted senders (access.json bindings; or the legacy owner when no
       // access.json) are processed. dispatchEnv re-resolves + scopes the turn to the sender's partition.

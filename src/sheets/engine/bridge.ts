@@ -6,6 +6,7 @@
 // Mutate-don't-regenerate preserves unmodeled workbook features (pivots, charts…).
 
 import type { Borders, Cell, CellValue, Workbook, Worksheet } from "exceljs";
+
 import { hexFromArgb } from "../codec/colors";
 import type {
   SheetBorderSide,

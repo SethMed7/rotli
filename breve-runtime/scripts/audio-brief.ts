@@ -17,6 +17,7 @@ import { renderMp3, parseSegments } from "./tts";
 import { stripMarkdown } from "./markdown-text";
 import { BRIEFS, AUDIOS } from "./paths";
 import { LLM } from "./llm";
+import type { GenerateResponse } from "./wire-types";
 
 // 1. Resolve issue
 const stemArg = process.argv[2];
@@ -106,7 +107,7 @@ ${src}
 THE SPOKEN SCRIPT:`,
       }),
     });
-    const j: any = await res.json();
+    const j = (await res.json()) as GenerateResponse;
     const out = (j.response ?? "").trim();
     return out.length > 300 ? out : null;
   } catch {

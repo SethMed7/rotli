@@ -3,6 +3,7 @@
 // NEVER written into the document. Heading levels live on the format bar.
 
 import { type RefObject, useRef } from "react";
+
 import { useTransientPopover } from "../lib/popover";
 import {
   MAX_TEXT_SIZE,

@@ -5,6 +5,7 @@
 // or more data rows — ending at a blank line or any non-`|` line.
 
 import type { Text } from "@codemirror/state";
+
 import { clamp } from "../lib/clamp";
 import { lineInFence, scanFences } from "./fences";
 

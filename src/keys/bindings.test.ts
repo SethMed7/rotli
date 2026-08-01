@@ -3,6 +3,7 @@
 // use the default"). resolveChord is the one place that distinction is read.
 
 import { beforeEach, describe, expect, test } from "bun:test";
+
 import { resolveChord, useBindingsStore } from "./bindings";
 
 describe("resolveChord", () => {

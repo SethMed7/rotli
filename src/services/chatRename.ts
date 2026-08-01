@@ -4,20 +4,21 @@
 // disk (memex_rename_chat) and re-points any open chat tab to the new slug.
 
 import { useCallback } from "react";
+
 import { activeInstance } from "../memex/config";
 // the ONE chat-slug generator — same law as chat creation (60-cap included),
 // and every output passes the Rust safe_slug wire validator.
 import { slugify } from "../memex/contract";
 import { renameChat } from "../memex/service";
+import { invalidateMemex, useMemexConfig } from "../memex/useMemex";
+import { usePanesStore } from "../state/panes";
+import { useUiStore } from "../state/ui";
 import {
   invalidateChatFolders,
   loadChatFolders,
   migrateChatFolderSlug,
   saveChatFolders,
 } from "./chatFolders";
-import { invalidateMemex, useMemexConfig } from "../memex/useMemex";
-import { usePanesStore } from "../state/panes";
-import { useUiStore } from "../state/ui";
 
 export function useChatRename() {
   const renamingChatSlug = useUiStore((s) => s.renamingChatSlug);

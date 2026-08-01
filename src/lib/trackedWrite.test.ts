@@ -4,6 +4,7 @@
 // believed the old tree was the saved one.
 
 import { describe, expect, test } from "bun:test";
+
 import { createTrackedWrite } from "./trackedWrite";
 
 function deferred(): { promise: Promise<void>; resolve: () => void; reject: (e: Error) => void } {

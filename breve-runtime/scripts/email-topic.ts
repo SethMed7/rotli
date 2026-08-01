@@ -11,6 +11,7 @@ import { readSecret } from "./secret";
 import { runModel, STRICT_MCP, CLAUDE_BIN } from "./run-model";
 import { pdfThemeVariables, readPdfTheme } from "./pdf-theme";
 import { effectiveTz, loadSettings, todayIn } from "./timectx";
+import type { ResendResponse } from "./wire-types";
 
 const [format, recipient, ...topicParts] = process.argv.slice(2);
 const topic = topicParts.join(" ").trim();
@@ -30,7 +31,8 @@ Output ONLY an HTML fragment (no <html>/<head>/<body>, no markdown fences): one 
 const proc = runModel([CLAUDE_BIN, "-p", "--model", "sonnet", "--dangerously-skip-permissions", ...STRICT_MCP], {
   cwd: process.env.HOME, stdin: "pipe", stdout: "pipe", stderr: "pipe",
 });
-proc.stdin.write(prompt); await proc.stdin.end();
+await proc.stdin.write(prompt);
+await proc.stdin.end();
 let body = (await new Response(proc.stdout).text()).trim();
 await proc.exited;
 body = body.replace(/^```html?\s*/i, "").replace(/```\s*$/, "").trim();
@@ -41,7 +43,7 @@ const kicker = `<div style="font-family:Helvetica,Arial,sans-serif;font-size:10p
 const foot = `<p style="color:${palette.muted};font-size:11px;margin-top:24px;font-family:Helvetica,Arial,sans-serif">Requested via Signal · ${todayIn(effectiveTz(await loadSettings()))}</p>`;
 
 let html: string;
-let attachments: any[] = [];
+let attachments: { filename: string; content: string }[] = [];
 
 if (format === "pdf") {
   const slug = (topic.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "brief").slice(0, 40);
@@ -67,6 +69,6 @@ const res = await fetch("https://api.resend.com/emails", {
   headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
   body: JSON.stringify({ from: config.from, to: [recipient], subject, html, attachments }),
 });
-const j: any = await res.json();
+const j = (await res.json()) as ResendResponse;
 if (!res.ok) { console.log("ERR " + (j?.message || res.status)); process.exit(1); }
 console.log("OK " + (j.id || ""));

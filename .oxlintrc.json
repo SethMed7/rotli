@@ -2,26 +2,48 @@
   // Wired into `bun run lint` as lint:oxlint (migrated from ESLint 2026-07-31 —
   // eslint/typescript-eslint/eslint-plugin-react-hooks removed; same rule set,
   // ~90x faster syntax pass, type-aware pass via the oxlint-tsgolint sidecar).
-  // Scoped by the CLI invocation to src/, e2e/, and playwright.config.ts —
-  // scripts/ and src-tauri/ are untouched.
+  // Scoped by the CLI invocation to src/, e2e/, breve-runtime/, and
+  // playwright.config.ts — scripts/ and src-tauri/ are untouched. scripts/ is
+  // oxfmt-owned but not yet lint-owned; a measurement 2026-08-01 put it at 6
+  // findings (3 no-unused-vars, 3 require-array-sort-compare), so it is a small
+  // deliberate follow-up, not a hidden gap.
   //
-  // breve-runtime/scripts/**/*.ts was measured (re-measured 2026-07-17) at 76
-  // findings against the same core rules (71 no-explicit-any, 4
-  // no-floating-promises, 1 no-misused-promises) — over the 15-site adoption
-  // threshold, so it is DEFERRED, not silently skipped; the count + rationale
-  // are recorded in CONTRIBUTING.md's lint paragraph.
+  // breve-runtime/ JOINED the lint scope 2026-08-01. Its long-standing deferral
+  // (76 findings, last re-measured 2026-07-17) is retired: the debt was paid,
+  // not waived. The 71 `any`s became real types — the wire shapes Breve does not
+  // own now live in breve-runtime/scripts/wire-types.ts — and typing them
+  // surfaced two real latent crashes (see CONTRIBUTING.md's lint paragraph).
   //
   // typescript-eslint's naming-convention has no oxlint equivalent; the same
   // identifier-casing invariant is held by scripts/check-naming.mjs (check:naming).
   //
-  // Only these rules run: the default correctness category is off so the rule
-  // set stays measured-before-adoption, exactly as the ESLint config was.
-  // Propose additions in a PR; the config must not grow silently.
+  // The `correctness` category is ON as of 2026-08-01 — measured first, exactly
+  // as this config demands. The measurement (correctness=error over src/, e2e/,
+  // playwright.config.ts) found 80 findings across 9 rules; 62 were fixed and
+  // the rules adopted, 18 are one deferred rule, recorded below. Everything
+  // else in the category is at zero and now guards for free. Propose additions
+  // in a PR; the config must not grow silently.
   "plugins": ["typescript", "react"],
   "categories": {
-    "correctness": "off"
+    "correctness": "error"
   },
   "rules": {
+    // ── correctness-category adjustments (measured 2026-08-01) ───────────────
+    // DEFERRED — 18 findings, every one the `await expect(...).rejects/.resolves`
+    // idiom in bun:test. oxlint is literally right (bun's matcher enforces
+    // eagerly and returns a non-thenable, verified with a probe), but the
+    // `await` is the portable jest/vitest spelling and is what keeps these
+    // assertions enforcing if bun ever aligns with jest and returns a promise.
+    // Stripping it from 18 locked/secure-refusal and revision-conflict
+    // assertions to satisfy a linter trades a real safety margin for tidiness.
+    "typescript/await-thenable": "off",
+    // ADOPTED with `allow: ["string"]`. All 13 findings were deliberate
+    // code-point iteration (`[...text]`), which is this repo's documented
+    // contract — noteSlugify mirrors Rust's 60-Unicode-scalar cap and
+    // derive.test.ts asserts 200 emoji truncate to 140 code points. The allow
+    // keeps the real bug class (spreading a Promise, function, or class
+    // instance) while permitting the intended string behavior.
+    "typescript/no-misused-spread": ["error", { "allow": ["string"] }],
     // Type-aware (require `--type-aware` + oxlint-tsgolint; without the flag
     // they silently no-op — the flag lives in the lint:oxlint script).
     "typescript/no-floating-promises": "error",

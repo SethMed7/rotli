@@ -12,6 +12,19 @@ export function truncate(s: string, max: number): string {
   return s.length <= max ? s : `${s.slice(0, max)}…`;
 }
 
+/** Read one model-supplied tool argument as text. The model fills these in, so
+ * every value is genuinely `unknown`: a small model that answers with
+ * `{"query": {"text": "kaya"}}` instead of `{"query": "kaya"}` used to reach
+ * `String()` and search the memex for the literal "[object Object]" — a silent
+ * miss the model could never diagnose. Only real scalars convert; anything else
+ * becomes "" so the caller's existing empty-check returns the honest
+ * `error: … needs a non-empty "query"` feedback the model can correct. */
+function argText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
 /** Strip a LEADING frontmatter fence from a model-authored note body. The
  * model reads notes as full file text (fences included), so a faithful
  * rewrite often echoes the metadata back — but the write lane (corpus_write)
@@ -272,7 +285,7 @@ export async function runTool(
 ): Promise<string> {
   switch (tool) {
     case "search_memory": {
-      const q = String(args.query ?? "").trim();
+      const q = argText(args.query).trim();
       if (q === "") return 'error: search_memory needs a non-empty "query".';
       const hits = host.searchMemory
         ? await host.searchMemory(q, budget.maxHits)
@@ -295,7 +308,7 @@ export async function runTool(
         : await emptySearchObservation(host, q);
     }
     case "read_memory": {
-      const id = String(args.id ?? "").trim();
+      const id = argText(args.id).trim();
       if (!id) return 'error: read_memory needs an "id" from search_memory.';
       const body = host.readMemory
         ? await host.readMemory(id)
@@ -305,7 +318,7 @@ export async function runTool(
       return truncateBody(frameLinksMetadata(body), budget.readNoteChars);
     }
     case "search_notes": {
-      const q = String(args.query ?? "").trim();
+      const q = argText(args.query).trim();
       if (q === "") return 'error: search_notes needs a non-empty "query".';
       const hits = await host.searchNotes(q, budget.maxHits);
       if (hits.length === 0) return emptySearchObservation(host, q);
@@ -329,21 +342,21 @@ export async function runTool(
       return JSON.stringify(trimmed);
     }
     case "read_note": {
-      const id = String(args.id ?? "").trim();
+      const id = argText(args.id).trim();
       if (id === "") return 'error: read_note needs an "id" from search_notes or the index.';
       return truncateBody(frameLinksMetadata(await host.readNote(id)), budget.readNoteChars);
     }
     case "create_note": {
-      const title = String(args.title ?? "").trim();
-      const body = String(args.body ?? args.text ?? args.content ?? "").trim();
+      const title = argText(args.title).trim();
+      const body = argText(args.body ?? args.text ?? args.content).trim();
       if (title === "" && body === "") {
         return 'error: create_note needs a "title" and a markdown "body".';
       }
       return await host.createNote(title, body);
     }
     case "update_note": {
-      const id = String(args.id ?? "").trim();
-      const body = String(args.body ?? args.text ?? args.content ?? "").trim();
+      const id = argText(args.id).trim();
+      const body = argText(args.body ?? args.text ?? args.content).trim();
       if (id === "" || body === "") {
         return 'error: update_note needs an "id" and the COMPLETE new markdown "body" (it replaces the whole note — read_note first).';
       }
@@ -351,18 +364,18 @@ export async function runTool(
       return await host.updateNote(id, body);
     }
     case "open_note": {
-      const id = String(args.id ?? "").trim();
+      const id = argText(args.id).trim();
       if (id === "") return 'error: open_note needs an "id" from search_notes or the index.';
       if (!host.openNote) return "error: this host cannot open notes on screen.";
       return await host.openNote(id);
     }
     case "read_file": {
-      const q = String(args.query ?? args.name ?? args.file ?? "").trim();
+      const q = argText(args.query ?? args.name ?? args.file).trim();
       if (q === "") return 'error: read_file needs a "query" — the filename (e.g. report.csv).';
       return truncateBody(await host.readFile(q), budget.readNoteChars * 2);
     }
     case "web_search": {
-      const q = String(args.query ?? "").trim();
+      const q = argText(args.query).trim();
       if (q === "") return 'error: web_search needs a "query".';
       const hits = await host.webSearch(q, budget.maxHits);
       if (hits.length === 0) return "no web results.";
@@ -374,12 +387,12 @@ export async function runTool(
       return JSON.stringify(trimmed);
     }
     case "web_fetch": {
-      const url = String(args.url ?? "").trim();
+      const url = argText(args.url).trim();
       if (url === "") return 'error: web_fetch needs a "url".';
       return truncate(await host.webFetch(url, budget.webFetchChars), budget.webFetchChars);
     }
     case "generate_image": {
-      const prompt = String(args.prompt ?? "").trim();
+      const prompt = argText(args.prompt).trim();
       if (prompt === "") return 'error: generate_image needs a "prompt" describing the image.';
       const rel = await host.generateImage(prompt);
       return `saved: ${rel} — it's in this chat's assets. Tell the user it's ready (mention the filename).`;

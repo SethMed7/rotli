@@ -13,6 +13,7 @@
 // first paint.
 
 import { useEffect, useState } from "react";
+
 import logoMark from "../assets/characters/_logo-bold.svg?raw";
 import type { CharacterName } from "./characterArt";
 

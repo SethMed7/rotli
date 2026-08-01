@@ -1,4 +1,5 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
+
 import { dispatch } from "../keys/registry";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { NEW_ITEM_DEFINITIONS } from "./model";

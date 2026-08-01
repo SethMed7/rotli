@@ -2,6 +2,7 @@
 // footer promise). Written against the browser twin's seeded demo corpus.
 
 import { type Page, expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 /** The app registers ⌘K (Meta) only — a synthesized Ctrl+K does nothing on the

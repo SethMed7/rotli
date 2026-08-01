@@ -51,7 +51,7 @@ let text =
 if (kind === "morning") {
   const sugFile = Bun.file(join(BRIEFS, `${date}.suggestion.json`));
   if (await sugFile.exists()) {
-    const sug: any = await sugFile.json().catch(() => null);
+    const sug = (await sugFile.json().catch(() => null)) as { name?: string; why?: string } | null;
     if (sug?.name) {
       text += `\n\n📡 Radar: ${sug.name} — ${sug.why}\nKeep an eye on it? Reply yes or no.`;
       await Bun.write(join(BREVE, "signal", "pending-suggestion.json"), JSON.stringify({ ...sug, date }));

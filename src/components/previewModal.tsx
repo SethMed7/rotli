@@ -6,13 +6,14 @@
 // Esc / outside click close through the transient stack, like every popover.
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
+
 import { type Block, parseBlock, renderInline } from "../editor/render";
-import { extOf, fileName } from "../lib/fileKind";
-import { corpusFileText, fileAssetUrl, isTauri } from "../lib/tauri";
 import { longDateLabel } from "../lib/dateLabels";
+import { extOf, fileName } from "../lib/fileKind";
 import { useTransientPopover } from "../lib/popover";
-import { kindLabel } from "../services/systemBrowser";
+import { corpusFileText, fileAssetUrl, isTauri } from "../lib/tauri";
 import { notesService } from "../services/notes";
+import { kindLabel } from "../services/systemBrowser";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { kindOf } from "./fileSurface";

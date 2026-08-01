@@ -13,9 +13,10 @@ import { appendFileSync } from "node:fs";
 import { BREVE, BRIEFS, AUDIOS, PDFS } from "./paths";
 import { knowledgePath, launchdOrg } from "./config";
 import { loadSettings, effectiveTz, todayIn, minutesNowIn, parseHM } from "./timectx";
-import { bunBin, signalCli, safeSpawn, sendSignal } from "./bin";
+import { bunBin, sendSignal } from "./bin";
 import { LLM } from "./llm";
 import { findingFingerprints, newFindings } from "./doctor-findings";
+import { errText } from "./err-text";
 
 // DRY: run every check but skip all healing side-effects (no kickstart/open/Signal/state write).
 const DRY = process.env.BREVE_DOCTOR_DRY === "1";
@@ -50,7 +51,7 @@ async function sh(cmd: string[]): Promise<{ code: number; out: string }> {
     const [o, e] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
     return { code: await p.exited, out: (o + "\n" + e).trim() };
   } catch (err) {
-    return { code: 127, out: `${cmd[0]} not found or failed: ${err}` };
+    return { code: 127, out: `${cmd[0]} not found or failed: ${errText(err)}` };
   }
 }
 
@@ -82,8 +83,8 @@ async function checkLocalModel() {
   if (DRY) { findings.push(`${name} is DOWN — would restart it (DRY).`); return; }
   await sh(["launchctl", "kickstart", "-k", `gui/${process.getuid!()}/${LLM.launchdLabel}`]);
   await Bun.sleep(5000);
-  (await up()) ? healed.push(`${name} was down — restarted it (local tier back).`)
-              : findings.push(`${name} is DOWN and restart failed — local tier is offline (chat falls back to Claude).`);
+  if (await up()) healed.push(`${name} was down — restarted it (local tier back).`);
+  else findings.push(`${name} is DOWN and restart failed — local tier is offline (chat falls back to Claude).`);
 }
 
 // ── 2b. Proton Bridge alive? (only the proton mailbox depends on it) ─────────
@@ -99,8 +100,8 @@ async function checkBridge() {
   if (DRY) { findings.push("Proton Bridge is down — would reopen it (DRY)."); return; }
   await sh(["open", "-g", "-a", "Proton Mail Bridge"]); // -g: launch without stealing focus
   await Bun.sleep(8000);
-  (await up()) ? healed.push("Proton Bridge was closed — reopened it (proton mail back).")
-              : findings.push("Proton Bridge is down and won't relaunch — proton mail is offline (gmail/msd unaffected).");
+  if (await up()) healed.push("Proton Bridge was closed — reopened it (proton mail back).");
+  else findings.push("Proton Bridge is down and won't relaunch — proton mail is offline (gmail/msd unaffected).");
 }
 
 // ── 3. Expected daily artifacts (output-producing → propose, never auto-run) ─

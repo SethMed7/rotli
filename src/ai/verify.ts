@@ -3,8 +3,8 @@
 // proves a binary + a credential exist; a ping proves the whole path). Run
 // once in the background when a lane is toggled on, and from the Test button.
 
-import { GEMINI_OPENAI_BASE, LANE_PING_MODEL, type ProviderId } from "./models";
 import { chatMessages, cliComplete } from "../lib/tauri";
+import { GEMINI_OPENAI_BASE, LANE_PING_MODEL, type ProviderId } from "./models";
 
 const PING = "Reply with exactly: OK";
 /** A verification must never camp — a stuck CLI reports as a failure. */

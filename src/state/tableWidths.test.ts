@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import {
   MIN_TABLE_COL_PX,
   MIN_TABLE_ROW_PX,

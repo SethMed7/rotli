@@ -5,9 +5,10 @@
 // re-derive per tick), while a visible row change (title) patches + re-sorts.
 
 import { afterEach, describe, expect, test } from "bun:test";
+
+import type { Note, NoteSummary } from "../types";
 import { applyNoteWrite, keys } from "./hooks";
 import { queryClient } from "./query";
-import type { Note, NoteSummary } from "../types";
 
 const NOW = 1_800_000_000_000;
 

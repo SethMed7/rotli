@@ -4,8 +4,10 @@
 // run REAL exceljs write→load cycles — no mocks, no Univer runtime.
 
 import { describe, expect, test } from "bun:test";
+
 import ExcelJS from "exceljs";
 import type { Workbook } from "exceljs";
+
 import {
   type SheetModel,
   applyModelToWorkbook,
@@ -215,7 +217,7 @@ describe("simulated Univer edits land in the reloaded file", () => {
     const wb2 = await reload(wb);
     expect(wb2.worksheets.map((w) => w.name)).toEqual(["Numbers", "Fresh"]);
     const ws = must(wb2.getWorksheet("Numbers"), "renamed sheet");
-    expect((ws.model?.merges as string[]).includes("A10:D10")).toBe(true);
+    expect(must(ws.model, "worksheet model").merges).toContain("A10:D10");
     expect(Math.round(must(ws.getColumn(1).width, "width"))).toBe(40); // 300px ÷ 7.5
     expect(Math.round(must(ws.getRow(10).height, "height"))).toBe(45); // 60px × 3/4
     expect(must(wb2.getWorksheet("Fresh"), "new sheet").getCell("A1").value).toBe("hello");

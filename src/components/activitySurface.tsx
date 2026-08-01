@@ -11,9 +11,9 @@
 // journal hygiene (prune resolved history; pending is sacred).
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type BrainAction, canUndo, deriveJournal, describeAction } from "../services/brainJournal";
-import { approveProposal, dismissProposal, undoAction } from "../services/brainJournalComposition";
+
 import { daysSinceMidnight, relativeLabel } from "../lib/dateLabels";
+import { useTransientPopover } from "../lib/popover";
 import {
   corpusJournalPrune,
   corpusResolveRef,
@@ -24,6 +24,8 @@ import {
   organizerStop,
   secureRepairApply,
 } from "../lib/tauri";
+import { type BrainAction, canUndo, deriveJournal, describeAction } from "../services/brainJournal";
+import { approveProposal, dismissProposal, undoAction } from "../services/brainJournalComposition";
 import {
   invalidateJournal,
   invalidateNotes,
@@ -33,7 +35,6 @@ import {
   useSecureRepair,
 } from "../services/hooks";
 import { deriveSecureReview } from "../services/secureReview";
-import { useTransientPopover } from "../lib/popover";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { Character } from "./character";

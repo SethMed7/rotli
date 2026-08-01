@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { svgAttributeAllowed } from "./svgSanitizer";
 
 describe("strict SVG attribute policy", () => {

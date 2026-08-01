@@ -6,6 +6,9 @@
 // returnFocus that hands the cursor back to the row (the RowMenu unification).
 
 import { useCallback } from "react";
+
+import { discardBlankNote } from "../documents/draftComposition";
+import { noteDiskFolder } from "../lib/noteLocation";
 import {
   corpusFileStat,
   corpusFrontmatter,
@@ -19,26 +22,24 @@ import {
   corpusSetSecure,
   isTauri,
 } from "../lib/tauri";
-import { discardBlankNote } from "../documents/draftComposition";
-import { isEmptyNote } from "../services/mainDismiss";
-import { markNoteDraftChanged } from "../services/noteDrafts";
-import { DEST, isSink } from "../services/destinations";
+import { openChatForNote } from "../noteChat/composition";
+import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
 import { createRoutedNote } from "../services/createNote";
-import { notesService } from "../services/notes";
+import { DEST, isSink } from "../services/destinations";
 import { invalidateNotes, useArchiveNote, useRestoreNote, useTrashNote } from "../services/hooks";
 import { useMainGcIds } from "../services/hooks";
+import { isEmptyNote } from "../services/mainDismiss";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
+import { markNoteDraftChanged } from "../services/noteDrafts";
+import { notesService } from "../services/notes";
+import { assignItemToView, assignedView, projectionMenuAction } from "../services/viewTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useMainStore } from "../state/main";
-import { useViewsStore } from "../state/views";
-import { assignItemToView, assignedView, projectionMenuAction } from "../services/viewTree";
 import { usePanesStore } from "../state/panes";
 import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
+import { useViewsStore } from "../state/views";
 import type { NoteSummary } from "../types";
-import { noteDiskFolder } from "../lib/noteLocation";
-import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
-import { openChatForNote } from "../noteChat/composition";
 
 /** What the opener hands us — a real MouseEvent qualifies, and a keyboard
  * opener passes a plain {clientX, clientY} built from its row's rect. */

@@ -5,6 +5,7 @@
 // register with the quit-flush handshake so ⌘Q can't drop the last strokes.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import { createCorpusBoardSaver, loadBoard } from "../boards/composition";
 import { type BoardInitialData, BoardCanvas } from "../boards/engine/excalidraw";
 import { type BoardMeta, EMPTY_BOARD_META, EMPTY_SCENE, serializeBoardScene } from "../boards/session";

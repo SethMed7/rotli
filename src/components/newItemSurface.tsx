@@ -9,9 +9,10 @@
 // focused surface's own onKeyDown; nothing here listens on window).
 
 import { useEffect, useRef } from "react";
+
+import { dispatch } from "../keys/registry";
 import { createManagedItem } from "../newItems/composition";
 import { NEW_ITEM_DEFINITIONS, type NewItemKind } from "../newItems/model";
-import { dispatch } from "../keys/registry";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { BoardGlyph, ChatGlyph, DocumentGlyph, FileGlyph, NewFileGlyph } from "./glyphs";

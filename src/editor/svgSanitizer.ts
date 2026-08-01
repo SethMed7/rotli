@@ -104,6 +104,9 @@ export function svgAttributeAllowed(name: string, value: string, namespace: stri
   if (/^on/i.test(name) || name === "style" || name === "href" || name === "src") return false;
   if (name === "fill" || name === "stroke") return SAFE_PAINT.test(value.trim());
   if (LOCAL_REFERENCE_ATTRIBUTES.has(name)) return LOCAL_REFERENCE.test(value.trim());
+  // The control characters ARE the subject here: an untrusted SVG attribute
+  // carrying them is rejected outright.
+  // oxlint-disable-next-line no-control-regex
   return PLAIN_ATTRIBUTES.has(name) && !/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(value);
 }
 

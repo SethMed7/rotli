@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { nextMermaidNodeId, parseMermaidFlowchart, serializeMermaidFlowchart } from "./mermaidFlowchart";
 
 const portableColor = (value: string) => `#${value}`;

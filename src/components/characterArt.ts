@@ -11,8 +11,8 @@
 
 import aiChat from "../assets/characters/ai_chat.svg?raw";
 import base from "../assets/characters/base.svg?raw";
-import board from "../assets/characters/excalidraw_board.svg?raw";
 import celebrating from "../assets/characters/celebrating.svg?raw";
+import board from "../assets/characters/excalidraw_board.svg?raw";
 import inbox from "../assets/characters/inbox.svg?raw";
 import knowledge from "../assets/characters/knowledge_system.svg?raw";
 import notes from "../assets/characters/notes.svg?raw";

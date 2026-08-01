@@ -1,11 +1,12 @@
 // UI state only (the Zustand law). Data lives behind src/services/.
 
+import { create } from "zustand";
+
 import type { HybridPreset, ProviderId } from "../ai/models";
 import { DEFAULT_NEW_ITEM_KIND, type NewItemKind } from "../newItems/model";
 import { inboxFolderId } from "../services/notes";
-import type { Measure } from "./noteStyle";
 import type { NoteSummary } from "../types";
-import { create } from "zustand";
+import type { Measure } from "./noteStyle";
 
 export type ThemeSetting = "light" | "dark" | "system";
 

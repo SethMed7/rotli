@@ -4,6 +4,7 @@
 // lane can act on surface as the passive count.
 
 import { describe, expect, test } from "bun:test";
+
 import type { SecureHint } from "../lib/tauri";
 import { deriveSecureReview } from "./secureReview";
 

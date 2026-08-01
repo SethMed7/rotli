@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { EMPTY_SCENE, createBoardSaver, parseBoardBody, serializeBoardScene } from "./session";
 
 const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));

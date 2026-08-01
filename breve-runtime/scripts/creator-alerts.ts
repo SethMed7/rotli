@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { BREVE } from "./paths";
 import { sendSignal as sendSig } from "./bin";
 import { tryAcquireProcessLock } from "./process-lock";
+import { errText } from "./err-text";
 
 const DRY = process.env.BREVE_DRY === "1";
 const SIGNAL_ENABLED = (process.env.ROTLI_BREVE_LANES ?? "signal").split(",").includes("signal");
@@ -51,7 +52,7 @@ for (const c of creators) {
     if (!res.ok) { console.error(`[creators] ${c.name}: HTTP ${res.status}`); continue; }
     xml = await res.text();
   } catch (e) {
-    console.error(`[creators] ${c.name}: ${e}`);
+    console.error(`[creators] ${c.name}: ${errText(e)}`);
     continue;
   }
   const entries = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map((m) => m[1]);

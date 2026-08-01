@@ -10,6 +10,7 @@
 // commits — stays in the caller's closures via the callbacks below.
 
 import type { PointerEvent as ReactPointerEvent } from "react";
+
 import type { DragGhost } from "./dragGhost";
 
 /** Manhattan travel that turns a press into a drag — the shared default. */

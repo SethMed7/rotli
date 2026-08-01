@@ -10,8 +10,8 @@ import {
   corpusWriteFileBytes,
 } from "../lib/tauri";
 import { invalidateMemex } from "../memex/useMemex";
-import { MAIN_ROOT, addNoteToMainAt } from "../services/mainTree";
 import { invalidateNotes } from "../services/hooks";
+import { MAIN_ROOT, addNoteToMainAt } from "../services/mainTree";
 import { useMainStore } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { convertLegacyDocument } from "./conversion";

@@ -117,7 +117,7 @@ export async function localGenerate(req: GenReq): Promise<string> {
 }
 
 /** Generate + JSON.parse — for structured-output callers that pass a `format` schema. */
-export async function localGenerateJSON<T = any>(req: GenReq): Promise<T> {
+export async function localGenerateJSON<T = unknown>(req: GenReq): Promise<T> {
   return JSON.parse(await localGenerate(req)) as T;
 }
 

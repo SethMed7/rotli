@@ -16,26 +16,27 @@
 // last one leaves the lone pane in the quokka rest state (Seth, 2026-07-28).
 
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useBoardRename } from "../services/boardRename";
-import { useChatRename } from "../services/chatRename";
+
 import {
   closeOtherTabsWithDraftCleanup,
   closeTabWithDraftCleanup,
   closeTabsRightWithDraftCleanup,
 } from "../documents/draftComposition";
-import { fileName } from "../lib/fileKind";
-import { InlineRenameInput } from "./inlineRenameInput";
-import { startTabDrag } from "../lib/tabDrag";
 import { newItemInTab } from "../keys/actions";
+import { fileName } from "../lib/fileKind";
+import { startTabDrag } from "../lib/tabDrag";
 import { newItemDefinition } from "../newItems/model";
-import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
+import { useBoardRename } from "../services/boardRename";
+import { useChatRename } from "../services/chatRename";
 import { useNoteIndex } from "../services/hooks";
+import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useMainStore } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { LeafNode, Tab } from "../types";
 import { ChatGlyph, ClockGlyph, ExcalidrawGlyph, FileGlyph, PlusGlyph, XGlyph, glyphForNote } from "./glyphs";
+import { InlineRenameInput } from "./inlineRenameInput";
 
 /** A board's display label = its filename minus the .excalidraw extension. */
 function boardLabel(boardId: string): string {

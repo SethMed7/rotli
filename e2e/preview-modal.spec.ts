@@ -3,6 +3,7 @@
 // peek; Esc and × close it; Open escalates to the real surface.
 
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 test("row-menu Preview opens the peek, Esc closes, Space reopens", async ({ page }) => {

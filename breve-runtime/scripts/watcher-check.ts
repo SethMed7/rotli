@@ -14,10 +14,12 @@ import { sendSignal as sendSig } from "./bin";
 import { LLM } from "./llm";
 import { tryAcquireProcessLock } from "./process-lock";
 import { nextWatcherFailure, resetWatcherFailure } from "./watcher-failure";
+import { errText } from "./err-text";
+import type { GenerateResponse, Watcher } from "./wire-types";
 
 const { bot, owner } = await Bun.file(join(BREVE, "signal.json")).json();
 const WATCHERS = join(BREVE, "watchers.json");
-const watchers: any[] = (await Bun.file(WATCHERS).json().catch(() => [])) ?? [];
+const watchers: Watcher[] = (await Bun.file(WATCHERS).json().catch(() => [])) ?? [];
 if (!watchers.length) { console.log("[watchers] none configured"); process.exit(0); }
 const DRY = process.env.BREVE_DRY === "1"; // skip sends when dry-running
 const SIGNAL_ENABLED = (process.env.ROTLI_BREVE_LANES ?? "signal").split(",").includes("signal");
@@ -34,7 +36,7 @@ async function sendSignal(text: string): Promise<boolean> {
   return await sendSig(bot, owner, text);
 }
 
-const keep: any[] = [];
+const keep: Watcher[] = [];
 for (const w of watchers) {
   // SSRF-guarded fetch + local strip (https-only, no private hosts, bounded same-host redirects, byte cap).
   const r = await safeFetchText(w.url, { maxChars: 8000 });
@@ -66,14 +68,14 @@ for (const w of watchers) {
           },
         }),
       });
-      const j = JSON.parse(((await res.json()) as any).response);
+      const j = JSON.parse((await res.json() as GenerateResponse).response ?? "{}") as { met?: boolean; evidence?: string };
       if (j.met) {
         await sendSignal(`👁 Watch hit! "${w.condition}"\n${j.evidence?.slice(0, 300) ?? ""}\n${w.url}\n(This watcher is done — re-add it if you want to keep watching.)`);
         console.log(`[watchers] #${w.id} met — removed`);
         continue; // one-shot: drop it
       }
     } catch (e) {
-      console.error(`[watchers] gemma judge failed for #${w.id}: ${e}`);
+      console.error(`[watchers] gemma judge failed for #${w.id}: ${errText(e)}`);
     }
     keep.push(w);
   } else {

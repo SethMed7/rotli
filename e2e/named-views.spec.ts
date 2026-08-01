@@ -3,6 +3,7 @@
 // the active view and right-click assignment never removes the Main reference.
 
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 test("named views keep Main global and make Command-T context-sensitive", async ({ page }) => {

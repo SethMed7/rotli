@@ -7,6 +7,7 @@
 // wiring of the same drop contract.
 
 import { expect, test } from "@playwright/test";
+
 import { centerOf, gotoApp, pointerDrag } from "./support";
 
 test("dragging an All-notes row into Main adds it there", async ({ page }) => {

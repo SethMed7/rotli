@@ -6,6 +6,7 @@
 // the injectable deps seam — no Tauri shell needed.
 
 import { describe, expect, test } from "bun:test";
+
 import type { CorpusNoteMeta, FrontmatterView } from "../lib/tauri";
 import {
   type BrainAction,

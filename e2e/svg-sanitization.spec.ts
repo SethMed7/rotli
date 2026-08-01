@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 test("SVG fences remove active content and external resources before rendering", async ({ page }) => {

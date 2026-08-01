@@ -5,6 +5,7 @@
 // exact text first, so a stale row refuses instead of flipping the wrong line.
 
 import { useState } from "react";
+
 import { stripMarkdown } from "../editor/stripMarkdown";
 import { corpusToggleTask } from "../lib/tauri";
 import { invalidateNotes, useTasks } from "../services/hooks";

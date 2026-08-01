@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { type MovePlan, planLineMove, snapOutOfBlocks } from "./imgMove";
 
 /** Apply a plan's original-coordinate changes the way CM6 does (simultaneous):

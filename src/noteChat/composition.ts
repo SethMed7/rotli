@@ -1,17 +1,17 @@
+import { noteDiskFolder } from "../lib/noteLocation";
 /** Open, create, or list the durable chats attached to one Markdown note. A
  * note owns MANY chats (Seth, 2026-07-30): the default open continues the most
  * recently touched one; `create` starts another; the editor's chat chip lists
  * them all. */
 import { corpusFrontmatter, corpusNotePath } from "../lib/tauri";
 import { activeInstance } from "../memex/config";
-import { invalidateMemex } from "../memex/useMemex";
-import { listChats, loadConfig, setChatAttachedTo, writeChat } from "../memex/service";
 import type { MemexInstance } from "../memex/config";
+import { listChats, loadConfig, setChatAttachedTo, writeChat } from "../memex/service";
+import { invalidateMemex } from "../memex/useMemex";
+import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
-import { noteDiskFolder } from "../lib/noteLocation";
-import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
 import {
   type AttachedChatSummary,
   findAttachedChats,

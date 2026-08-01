@@ -3,8 +3,11 @@
 
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
 import { editManagedDocument } from "../documents/composition";
 import { markDocumentDraftChanged } from "../documents/draftComposition";
+import type { DocumentEngineHandle } from "../documents/engine/univer";
+import type { EditableDocument } from "../documents/model";
 import {
   deleteParkedDocument,
   getParkedDocument,
@@ -13,8 +16,6 @@ import {
   unregisterLiveDocument,
   type ReadyDocumentSession,
 } from "../documents/session";
-import type { EditableDocument } from "../documents/model";
-import type { DocumentEngineHandle } from "../documents/engine/univer";
 import { corpusFileStat } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { documentInsertionRange, documentTableRanges, isDocumentContentMutation } from "./policy";
 
 describe("DOCX Univer adapter policy", () => {

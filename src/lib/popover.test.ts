@@ -5,6 +5,7 @@
 // The height budget must come from the anchor's real space, never the window's.
 
 import { describe, expect, test } from "bun:test";
+
 import { anchoredPopover } from "./popover";
 
 const VIEW = { width: 1200, height: 900 };

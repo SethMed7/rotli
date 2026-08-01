@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { noteImageRels, referencedElsewhere } from "./noteLifecycle";
 
 describe("image cascade (images follow their note into Archive/Trash)", () => {

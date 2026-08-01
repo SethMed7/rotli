@@ -131,10 +131,11 @@ export async function acquireProcessLock(
   const waitMs = Math.max(0, options.waitMs ?? 0);
   const pollMs = Math.max(10, options.pollMs ?? 100);
   const deadline = Date.now() + waitMs;
-  do {
+  // both exits are inside the body: the lock, or the deadline.
+  for (;;) {
     const lock = tryAcquireProcessLock(root, key, options);
     if (lock) return lock;
     if (Date.now() >= deadline) return null;
     await Bun.sleep(Math.min(pollMs, Math.max(1, deadline - Date.now())));
-  } while (true);
+  }
 }

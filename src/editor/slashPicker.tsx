@@ -1,16 +1,17 @@
 // Picker sub-mode for slash ops that need a note/board/sheet target before insert.
 
 import { type KeyboardEvent, useEffect, useMemo, useState } from "react";
-import { corpusManagedFileCreationAvailable, isTauri } from "../lib/tauri";
+
+import { PlusGlyph, glyphForNote } from "../components/glyphs";
+import { DOCX_EDITABLE } from "../documents/kinds";
 import { extOf, fileName } from "../lib/fileKind";
-import { useNotes, useSearchableNotes } from "../services/hooks";
+import { corpusManagedFileCreationAvailable, isTauri } from "../lib/tauri";
+import { createManagedItem } from "../newItems/composition";
 import { DEST } from "../services/destinations";
+import { useNotes, useSearchableNotes } from "../services/hooks";
 import { inboxFolderId } from "../services/notes";
 import { SHEET_EDITABLE } from "../sheets/kinds";
-import { DOCX_EDITABLE } from "../documents/kinds";
 import type { NoteSummary } from "../types";
-import { PlusGlyph, glyphForNote } from "../components/glyphs";
-import { createManagedItem } from "../newItems/composition";
 import type { SlashPickerMode } from "./slashMenu";
 
 function fuzzy(query: string, text: string): boolean {
@@ -62,9 +63,9 @@ export function SlashPicker({
 }: {
   mode: SlashPickerMode;
   selectedIndex: number;
-  onHover(index: number): void;
-  onPick(note: NoteSummary): void;
-  onClose(): void;
+  onHover: (index: number) => void;
+  onPick: (note: NoteSummary) => void;
+  onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [creationAvailable, setCreationAvailable] = useState<boolean | null>(null);

@@ -5,6 +5,7 @@
 // routes there while a browser is open).
 
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 test.use({ viewport: { width: 1280, height: 900 } });

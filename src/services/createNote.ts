@@ -6,9 +6,9 @@
 
 import { CORPUS_INSTANCE_ID, activeInstance, isWritable } from "../memex/config";
 import { loadConfig, writeNote } from "../memex/service";
+import { creationIsSecure, isSecureNotesFolder } from "../security/secureNotes";
 import { VAULT_MARKER, isHidden, isStorageLane, isVault, isWikiPath } from "./destinations";
 import { notesService } from "./notes";
-import { creationIsSecure, isSecureNotesFolder } from "../security/secureNotes";
 
 export type Route = { kind: "memex"; shelf?: string[] } | { kind: "local"; folder: string };
 

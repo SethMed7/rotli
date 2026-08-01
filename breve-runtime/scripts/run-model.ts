@@ -15,6 +15,9 @@ import { existsSync } from "node:fs";
 import { AGY_BIN_CANDIDATES, CLAUDE_BIN_CANDIDATES, CODEX_BIN_CANDIDATES, expandHome } from "./cli-paths";
 import { sandboxed } from "./sandbox";
 
+/** Bun.spawn options, minus the argv these wrappers supply themselves. */
+type SpawnOptions = Parameters<typeof Bun.spawn>[1];
+
 const HOME = process.env.HOME!;
 
 function firstExisting(candidates: readonly string[]): string | null {
@@ -24,7 +27,7 @@ function firstExisting(candidates: readonly string[]): string | null {
 /** Spawn a model subprocess under the write+read sandbox. argv[0] must be an absolute program path. */
 // Callers always pipe the stdio they touch, so pin the piped shape (FileSink
 // stdin, ReadableStream stdout/stderr) instead of the loose default unions.
-export function runModel(argv: string[], opts?: any): Bun.Subprocess<"pipe", "pipe", "pipe"> {
+export function runModel(argv: string[], opts?: SpawnOptions): Bun.Subprocess<"pipe", "pipe", "pipe"> {
   return Bun.spawn(sandboxed(argv), opts) as Bun.Subprocess<"pipe", "pipe", "pipe">;
 }
 

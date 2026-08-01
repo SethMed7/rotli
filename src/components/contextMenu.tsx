@@ -10,6 +10,7 @@
 // back to the opener on close.
 
 import { type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
+
 import { useTransientPopover } from "../lib/popover";
 import { menuUsesCheckGutter, type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { ChevronRight, LockGlyph } from "./glyphs";

@@ -6,6 +6,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
+
 import { breveWriteWatchlist, openUrl, type BreveSnapshot } from "../../lib/tauri";
 import type { WatchItem } from "../../routines/watchlist";
 import { ChevronRight, ExternalLinkGlyph, PlusGlyph, SearchGlyph, XGlyph } from "../glyphs";

@@ -5,6 +5,7 @@
 // archive/trash/restore lifecycle.
 
 import { describe, expect, test } from "bun:test";
+
 import { DEST } from "./destinations";
 import { InMemoryNotesService, ulid } from "./notes";
 

@@ -8,19 +8,18 @@
 // the transient stack (the registry's app.hide), not an ad-hoc listener.
 
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+
 import { useBindingsStore, resolveChord } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
 import { type KeyAction, allActions, dispatch, getAction } from "../keys/registry";
 import { useTransientPopover } from "../lib/popover";
-import { useFolders, useNoteIndex, useNoteSearch, useSearchableNotes } from "../services/hooks";
 import { activeInstance } from "../memex/config";
 import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
+import { useFolders, useNoteIndex, useNoteSearch, useSearchableNotes } from "../services/hooks";
 import { useMruStore } from "../state/mru";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import type { NoteSummary, SearchHit } from "../types";
-import { Icon } from "./icon";
-import { MatchText } from "./matchText";
 import {
   glyphForNote,
   ChatGlyph,
@@ -31,6 +30,8 @@ import {
   SplitGlyph,
   SunGlyph,
 } from "./glyphs";
+import { Icon } from "./icon";
+import { MatchText } from "./matchText";
 
 /** Simple subsequence match — instant, forgiving, no scoring (no metric gates). */
 function fuzzy(query: string, text: string): boolean {

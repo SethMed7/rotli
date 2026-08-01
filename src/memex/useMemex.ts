@@ -2,10 +2,11 @@
 // the service directly (the same law as services/hooks.ts for notes).
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+
 import { queryClient } from "../services/query";
 import type { MemexInstance, Perms } from "./config";
-import * as svc from "./service";
 import type { ChatMsg } from "./contract";
+import * as svc from "./service";
 
 export const memexKeys = {
   config: ["memex", "config"] as const,

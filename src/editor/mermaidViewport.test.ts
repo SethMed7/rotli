@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import {
   MERMAID_MAX_SCALE,
   MERMAID_MIN_SCALE,

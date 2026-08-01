@@ -18,6 +18,7 @@ import {
   useRef,
   useState,
 } from "react";
+
 import { longDateLabel } from "../lib/dateLabels";
 import { IMAGE_EXTS, extOf } from "../lib/fileKind";
 import { startMainAddDrag } from "../lib/mainAddDrag";
@@ -25,7 +26,6 @@ import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
 import { fileAssetUrl } from "../lib/tauri";
 import { DEST } from "../services/destinations";
 import { invalidateFolders, useFolders, useNoteIndex, useNotes, useSearchableNotes } from "../services/hooks";
-import { emptyTrash } from "../services/systemTrash";
 import { notesService } from "../services/notes";
 import {
   type FolderEntry,
@@ -41,6 +41,7 @@ import {
   rerootDiskPath,
   sortFolderListing,
 } from "../services/systemBrowser";
+import { emptyTrash } from "../services/systemTrash";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
@@ -397,7 +398,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
                   kind: "action" as const,
                   danger: true,
                   label: `Delete ${trashCount} ${trashCount === 1 ? "item" : "items"} forever (they land in the macOS Trash)`,
-                  onClick: () => void runEmptyTrash(),
+                  onClick: () => runEmptyTrash(),
                 },
               ],
             },

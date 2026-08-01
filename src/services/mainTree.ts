@@ -9,8 +9,8 @@
 // { folders, notes } the sidebar's existing renderFolderTree consumes (mirrors
 // buildStorageTree). Orphan ids (a note deleted out from under Main) are dropped.
 
-import { isSink, isVault } from "./destinations";
 import type { Folder, NoteSummary } from "../types";
+import { isSink, isVault } from "./destinations";
 
 /** The Main root marker id — top-level Main folders/notes hang off this (like the
  * "wiki" Brain root or the "Storage" destination). */

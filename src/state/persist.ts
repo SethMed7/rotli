@@ -14,7 +14,6 @@
 // in-memory demo corpus stays exactly as it was (the seam's whole point).
 
 import { type HybridPreset, PROVIDER_IDS, type ProviderId } from "../ai/models";
-import { DEFAULT_NEW_ITEM_KIND, NEW_ITEM_KINDS, type NewItemKind } from "../newItems/model";
 import { useBindingsStore } from "../keys/bindings";
 import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
@@ -32,11 +31,12 @@ import {
   setHideOnBlur,
 } from "../lib/tauri";
 import { listChats, loadConfig } from "../memex/service";
+import { DEFAULT_NEW_ITEM_KIND, NEW_ITEM_KINDS, type NewItemKind } from "../newItems/model";
 import { mainFolderIds } from "../services/mainTree";
 import { inboxFolderId, notesService } from "../services/notes";
 import type { PaneNode, Tab } from "../types";
+import { hydrateMain, useMainStore } from "./main";
 import { MRU_CAP, useMruStore } from "./mru";
-import { QUICK_MAX } from "./quick";
 import {
   DEFAULT_NOTE_STYLE,
   MAX_TEXT_SIZE,
@@ -45,10 +45,9 @@ import {
   type NoteStyle,
   useNoteStyleStore,
 } from "./noteStyle";
-import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, noteIdOfWidthKey, useTableWidthsStore } from "./tableWidths";
-import { hydrateMain, useMainStore } from "./main";
-import { hydrateViews, useViewsStore } from "./views";
 import { findLeaf, leaves, usePanesStore } from "./panes";
+import { QUICK_MAX } from "./quick";
+import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, noteIdOfWidthKey, useTableWidthsStore } from "./tableWidths";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
 import {
   ALL_NOTES,
@@ -70,6 +69,7 @@ import {
   useUiStore,
 } from "./ui";
 import { ACCENT_COLORS, type AccentColor } from "./ui";
+import { hydrateViews, useViewsStore } from "./views";
 
 const SAVE_DEBOUNCE_MS = 500;
 

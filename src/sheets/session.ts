@@ -1,11 +1,11 @@
 // Parked dirty sheet sessions + hide/quit flush (#4). Engine-agnostic — only
 // knows SheetModel + exceljs codec; never imports @univerjs/*.
 
-import type { Workbook } from "./codec/xlsx";
 import { onQuitFlush } from "../lib/quitFlush";
 import { corpusWriteFileBytes } from "../lib/tauri";
-import { csvTextFromRows } from "./csv";
+import type { Workbook } from "./codec/xlsx";
 import { b64FromBytes, b64FromText, saveXlsx } from "./codec/xlsx";
+import { csvTextFromRows } from "./csv";
 import { type SheetModel, applyModelToWorkbook, csvRowsFromSnapshot } from "./engine";
 
 export type SheetFileMode = "xlsx" | "csv";

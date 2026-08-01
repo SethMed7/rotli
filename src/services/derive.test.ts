@@ -6,6 +6,7 @@
 // (corpus.rs) and MUST stay in lockstep with them.
 
 import { describe, expect, test } from "bun:test";
+
 import { snippetOf, summaryOrder, titleOf } from "./derive";
 
 describe("titleOf — first non-empty line, markdown stripped (mirrors Rust title_of)", () => {

@@ -3,6 +3,7 @@
 // browser twin ranks/frames a hit differently than the shell.
 
 import { describe, expect, test } from "bun:test";
+
 import type { SearchHit } from "../types";
 import { searchMatch, sortHits } from "./search";
 

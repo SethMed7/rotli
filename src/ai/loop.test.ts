@@ -3,6 +3,7 @@
 // tolerance, the web gate, the egress guard, force-final) is deterministic.
 
 import { describe, expect, test } from "bun:test";
+
 import type { CorpusNoteMeta } from "../lib/tauri";
 import { budgetFor, contextWindowFor } from "./budget";
 import { containsPrivateDataOverlap, endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
@@ -634,6 +635,37 @@ describe("update_note tool", () => {
     expect(await runTool(readOnly, "update_note", { id: "n1", body: "x" }, budget)).toContain(
       "cannot edit notes",
     );
+  });
+});
+
+// Tool arguments are whatever the MODEL emitted, so every value is genuinely
+// unknown. A small model that nests its argument ({"query": {"text": "kaya"}})
+// used to reach String() and search for the literal "[object Object]" — a
+// silent miss it could never diagnose. A non-scalar must read as absent so the
+// existing empty-check returns correctable feedback instead.
+describe("tool arguments that are not scalars", () => {
+  const budget = budgetFor({ id: "gemma-3-12b-it-qat-4bit" });
+
+  test("a nested object argument errors instead of searching [object Object]", async () => {
+    const { host, calls } = fakeHost([]);
+    const observation = await runTool(host, "search_memory", { query: { text: "kaya" } }, budget);
+    expect(observation).toContain("error:");
+    expect(observation).not.toContain("[object Object]");
+    expect(calls.searchMemory).toEqual([]);
+  });
+
+  test("an array id errors instead of reading [object Object]", async () => {
+    const { host, calls } = fakeHost([]);
+    const observation = await runTool(host, "read_memory", { id: ["n1"] }, budget);
+    expect(observation).toContain("error:");
+    expect(observation).not.toContain("[object Object]");
+    expect(calls.readMemory).toEqual([]);
+  });
+
+  test("real scalars still pass through", async () => {
+    const { host, calls } = fakeHost([]);
+    await runTool(host, "search_memory", { query: "kaya" }, budget);
+    expect(calls.searchMemory).toEqual(["kaya"]);
   });
 });
 

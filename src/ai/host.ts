@@ -3,6 +3,8 @@
 // retrieval (the memex knowledge base), and the web primitives. Everything above this
 // file is host-agnostic and liftable into the shared ~/.memex/ai client layer.
 
+import { memoryKeywords, mergeKeywordHits, rankChatMemories } from "../chatMemory/retrieval";
+import { extOf } from "../lib/fileKind";
 import {
   type ChatModelInfo,
   chatMessages,
@@ -20,9 +22,18 @@ import {
   webFetch as tauriWebFetch,
   webSearch as tauriWebSearch,
 } from "../lib/tauri";
+import { activeInstance } from "../memex/config";
+import { hasSecureContext } from "../memex/contract";
+import { buildModelMap } from "../memex/modelMap";
+import { listChats, loadConfig, readChat as readMemexChat } from "../memex/service";
+import { invalidateMemex } from "../memex/useMemex";
+import { createRoutedNote } from "../services/createNote";
+import { invalidateNotes } from "../services/hooks";
 import { SHEET_BIN, SHEET_TEXT } from "../sheets/kinds";
-import { extOf } from "../lib/fileKind";
 import { workbookToCsv } from "../sheets/view";
+import { usePanesStore } from "../state/panes";
+import { contextWindowFor } from "./budget";
+import { looksSecret, modelIsOnDevice } from "./guard";
 import {
   folderHits,
   folderQuery,
@@ -31,17 +42,6 @@ import {
   rankNotes,
   stripLeadingFrontmatter,
 } from "./tools";
-import { contextWindowFor } from "./budget";
-import { buildModelMap } from "../memex/modelMap";
-import { activeInstance } from "../memex/config";
-import { listChats, loadConfig, readChat as readMemexChat } from "../memex/service";
-import { hasSecureContext } from "../memex/contract";
-import { invalidateMemex } from "../memex/useMemex";
-import { createRoutedNote } from "../services/createNote";
-import { invalidateNotes } from "../services/hooks";
-import { usePanesStore } from "../state/panes";
-import { memoryKeywords, mergeKeywordHits, rankChatMemories } from "../chatMemory/retrieval";
-import { looksSecret, modelIsOnDevice } from "./guard";
 import type { CompleteReq, Host } from "./types";
 
 /** Mirror of Rust `flatten_messages`: the loop sends ONE user message (the

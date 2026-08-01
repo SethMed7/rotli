@@ -2,7 +2,9 @@
 // never be silent, TSV must parse multi-column, and xlsx bytes must round-trip.
 
 import { describe, expect, test } from "bun:test";
+
 import ExcelJS from "exceljs";
+
 import { b64FromBytes, saveXlsx } from "./codec/xlsx";
 import { parseWorkbook, workbookToCsv } from "./view";
 

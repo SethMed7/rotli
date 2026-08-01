@@ -4,6 +4,7 @@
 // for popovers that must escape a pane: anchoredPopover() below.
 
 import { type RefObject, useEffect, useRef } from "react";
+
 import { useUiStore } from "../state/ui";
 
 /** `refs` = the popover plus its anchor (so toggling the anchor doesn't

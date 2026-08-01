@@ -5,6 +5,7 @@
 // silently RE-EXPANDED any section the user had folded.
 
 import { beforeEach, describe, expect, test } from "bun:test";
+
 import { SEC_CHAT, SEC_MAIN, useUiStore } from "./ui";
 
 describe("collapseAllDests", () => {

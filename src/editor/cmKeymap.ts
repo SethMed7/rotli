@@ -16,6 +16,7 @@
 
 import { EditorSelection, type EditorState, type Line, type TransactionSpec } from "@codemirror/state";
 import type { Command, EditorView, KeyBinding } from "@codemirror/view";
+
 import { lineInFence, scanFences } from "./fences";
 import {
   type CellRef,

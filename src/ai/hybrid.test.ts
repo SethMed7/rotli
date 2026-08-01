@@ -3,6 +3,7 @@
 // deterministic. runHybrid drives the REAL runAgent under each route.
 
 import { describe, expect, test } from "bun:test";
+
 import type { ChatModelInfo } from "../lib/tauri";
 import { parseRouteChoice, parseSuggestions, presetFor, runHybrid, suggestPresets } from "./hybrid";
 import type { HybridPreset } from "./models";

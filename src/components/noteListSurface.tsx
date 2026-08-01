@@ -9,6 +9,7 @@
 // instant title/snippet filter covers the debounce window and boards.
 
 import { type ReactNode, useCallback, useMemo, useState } from "react";
+
 import { useNoteSearch, useSearchableNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import type { NoteSummary, SearchHit } from "../types";

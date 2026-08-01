@@ -4,6 +4,7 @@
 // corpus.rs is_hidden_root. Board is hidden from listings but is NOT a sink.
 
 import { describe, expect, test } from "bun:test";
+
 import {
   DEST,
   destContains,

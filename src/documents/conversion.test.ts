@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { convertLegacyDocument } from "./conversion";
 
 describe("legacy document conversion workflow", () => {

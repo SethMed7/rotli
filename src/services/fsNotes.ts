@@ -15,11 +15,11 @@ import {
   corpusSearch,
   corpusWrite,
 } from "../lib/tauri";
-import type { Folder, Note, NoteSummary, SearchHit } from "../types";
-import { DEST, isChats, isHidden, isRootMarker, isVault, memexMarkersOf } from "./destinations";
-import { snippetOf, titleOf } from "./derive";
-import type { NotesService } from "./notesPort";
 import type { NoteCreationPolicy } from "../security/secureNotes";
+import type { Folder, Note, NoteSummary, SearchHit } from "../types";
+import { snippetOf, titleOf } from "./derive";
+import { DEST, isChats, isHidden, isRootMarker, isVault, memexMarkersOf } from "./destinations";
+import type { NotesService } from "./notesPort";
 
 /** corpus.rs says "note not found: <id>" for a stale/unknown id. */
 function isNotFound(err: unknown): boolean {

@@ -3,6 +3,7 @@
 // never a vertical indent-guide rule.
 
 import { describe, expect, test } from "bun:test";
+
 import { CHECK_EM, MARKER_EM, STEP_EM, listStyle } from "./listGeometry";
 
 /** padding-left, in em, out of a style string. */

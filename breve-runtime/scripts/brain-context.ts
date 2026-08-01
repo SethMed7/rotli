@@ -9,7 +9,11 @@ import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { knowledgePath } from "./config";
 
-let _packer: ((model: string, opts: any) => { text: string }) | null | undefined;
+type ContextPack = (
+  model: string,
+  opts: { focus?: string; budgetTokens?: number; assemble?: boolean; root?: string },
+) => { text: string };
+let _packer: ContextPack | null | undefined;
 
 async function packer() {
   if (_packer !== undefined) return _packer;
@@ -17,7 +21,7 @@ async function packer() {
   // Brain/client genuinely absent — expected on a fresh checkout; stay quiet.
   if (!existsSync(clientPath)) { _packer = null; return _packer; }
   try {
-    const mod: any = await import(clientPath);
+    const mod = (await import(clientPath)) as { contextPack?: ContextPack };
     _packer = mod.contextPack ?? null;
     // Present but no export = a partial/broken engine; surface it instead of silently losing context.
     if (!_packer) console.error(`[brain-context] client.ts present but exports no contextPack — brain context disabled`);

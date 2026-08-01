@@ -4,6 +4,7 @@
 // to fire again, or the board resets a multi-select mid-flight.
 
 import { describe, expect, test } from "bun:test";
+
 import { pendingRevealKey } from "./captureReveal";
 
 describe("pendingRevealKey", () => {

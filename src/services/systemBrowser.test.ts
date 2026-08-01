@@ -4,6 +4,7 @@
 // breadcrumb, empty directories are real, and search flattens across the root.
 
 import { describe, expect, test } from "bun:test";
+
 import type { NoteSummary } from "../types";
 import {
   breadcrumbOf,

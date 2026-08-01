@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import {
   EMBED_MAX_HEIGHT,
   EMBED_MIN_HEIGHT,

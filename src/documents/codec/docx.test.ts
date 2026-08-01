@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+
 import JSZip from "jszip";
+
 import { createDocxBase64 } from "../create";
 import { decodeDocx, encodeDocx } from "./docx";
 

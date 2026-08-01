@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { flatCssViolations } from "./design-system-policy.mjs";
 
 describe("flat CSS policy", () => {

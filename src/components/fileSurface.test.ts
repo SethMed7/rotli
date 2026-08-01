@@ -6,6 +6,7 @@
 // (the frame inherits the app CSP) while relative URLs still resolve.
 
 import { describe, expect, test } from "bun:test";
+
 import { ZOOM_MAX, ZOOM_MIN, clampZoom, fitScale, htmlPreviewDoc, kindOf, zoomStep } from "./fileSurface";
 
 describe("kindOf", () => {

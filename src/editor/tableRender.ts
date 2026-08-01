@@ -14,8 +14,9 @@
 
 import { type EditorState, type Range, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
-import { noteIdFacet } from "./livePreview";
+
 import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, tableWidthKey, useTableWidthsStore } from "../state/tableWidths";
+import { noteIdFacet } from "./livePreview";
 import {
   type Align,
   type TableBlock,

@@ -13,12 +13,12 @@
 // NOT a test: excluded from `bun test` (no .test.ts suffix) because it needs a
 // running local model server. The deterministic pins live in src/ai/*.test.ts.
 
-import { runAgent } from "../src/ai/loop";
 import { contextWindowFor } from "../src/ai/budget";
+import { runAgent } from "../src/ai/loop";
 import { folderHits, mergeFolderHits, stripLeadingFrontmatter } from "../src/ai/tools";
-import { buildModelMap, type ModelMapNote } from "../src/memex/modelMap";
-import type { CorpusNoteMeta } from "../src/lib/tauri";
 import type { AgentEvent, ChatTurn, Host, NoteHit } from "../src/ai/types";
+import type { CorpusNoteMeta } from "../src/lib/tauri";
+import { buildModelMap, type ModelMapNote } from "../src/memex/modelMap";
 
 const ENDPOINT = "http://localhost:11435"; // loopback ONLY — mirrors DEFAULT_ENDPOINT in chat.rs
 

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { centerOf, gotoApp, pointerDrag } from "./support";
 
 test("sidebar folder menus align labels and keep explicit Trash reachable", async ({ page }) => {

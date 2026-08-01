@@ -3,6 +3,7 @@
 // silently refusing the close, and the rest-state actions lead back in.
 
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 test("closing every tab shows the quokka rest state, and reopen brings the tab back", async ({ page }) => {

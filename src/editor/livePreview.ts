@@ -24,15 +24,16 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
-import { parseBlock } from "./render";
-import { CHECK_EM, listStyle } from "./listGeometry";
-import { scanFences } from "./fences";
-import { lineInTable, scanTables } from "./tables";
-import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
+
 import { type DragGhost, createImageDragGhost } from "../lib/dragGhost";
 import { openUrl, resolveImageSrc, rootIdOf } from "../lib/tauri";
 import { locateLostImage } from "../services/imageRepair";
 import { usePanesStore } from "../state/panes";
+import { scanFences } from "./fences";
+import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
+import { CHECK_EM, listStyle } from "./listGeometry";
+import { parseBlock } from "./render";
+import { lineInTable, scanTables } from "./tables";
 import { editorLinkOpensOnClick, WIKILINK_RE } from "./wikilink";
 import { resolveWikilinkTarget } from "./wikilinkIndex";
 

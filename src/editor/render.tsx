@@ -5,6 +5,7 @@
 // (the r3 marks law), [text](url) links. No raw HTML passthrough beyond <u>.
 
 import type { MouseEvent, ReactNode } from "react";
+
 import { openUrl } from "../lib/tauri";
 
 export type BlockKind = "h1" | "h2" | "h3" | "bullet" | "numbered" | "task" | "quote" | "para" | "blank";

@@ -7,8 +7,10 @@
 // and Tab is never stuck on a ragged table row.
 
 import { describe, expect, test } from "bun:test";
+
 import { EditorSelection, EditorState, type TransactionSpec } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
+
 import { rotliKeymap } from "./cmKeymap";
 
 type FakeView = EditorView & { state: EditorState };

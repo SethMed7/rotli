@@ -2,6 +2,7 @@
 // rejecting flusher never blocks the rest (or the ack — quit must not hang).
 
 import { describe, expect, test } from "bun:test";
+
 import { onQuitFlush, runQuitFlushers } from "./quitFlush";
 
 describe("runQuitFlushers", () => {

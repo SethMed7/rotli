@@ -5,18 +5,24 @@
 // is still the source of truth (debounced save, dirty dot); CmEditor edits it.
 
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { relativeLabel } from "../lib/dateLabels";
-import { corpusNoteAbsolutePath, corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
-import { invalidateNotes, useNote, useNoteIndex } from "../services/hooks";
-import { markNoteDraftChanged } from "../services/noteDrafts";
-import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
-import { useUiStore } from "../state/ui";
-import { AaPanel } from "./aaPanel";
+
 import { ChatGlyph, ChevronRight, MetaGlyph } from "../components/glyphs";
 import { useNoteMenu } from "../components/useNoteMenu";
-import { useMainStore } from "../state/main";
-import { mainHasNote } from "../services/mainTree";
+import { dispatch } from "../keys/registry";
+import { relativeLabel } from "../lib/dateLabels";
 import { brainLocationLabel, noteDiskFolder, noteLocationLabel } from "../lib/noteLocation";
+import { corpusNoteAbsolutePath, corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
+import { listChatsForNote, openChatForNote, openNoteChat } from "../noteChat/composition";
+import { invalidateNotes, useNote, useNoteIndex } from "../services/hooks";
+import { mainHasNote } from "../services/mainTree";
+import { markNoteDraftChanged } from "../services/noteDrafts";
+import { type MenuSpec, useContextMenu } from "../state/contextMenu";
+import { useMainStore } from "../state/main";
+import { backId, forwardId, useNavHistory } from "../state/navHistory";
+import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
+import { usePanesStore } from "../state/panes";
+import { useUiStore } from "../state/ui";
+import { AaPanel } from "./aaPanel";
 import { BottomSlot } from "./bottomSlot";
 import { CmEditor } from "./cmEditor";
 import { FormatBar } from "./formatBar";
@@ -28,11 +34,6 @@ import {
   useDocumentSaveError,
   useDocumentLines,
 } from "./model";
-import { listChatsForNote, openChatForNote, openNoteChat } from "../noteChat/composition";
-import { type MenuSpec, useContextMenu } from "../state/contextMenu";
-import { backId, forwardId, useNavHistory } from "../state/navHistory";
-import { dispatch } from "../keys/registry";
-import { usePanesStore } from "../state/panes";
 
 /** Below this pane width the format bar collapses its end groups into ⋯. */
 const FORMAT_BAR_COLLAPSE_PX = 440;

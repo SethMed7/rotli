@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { missingScriptSteps, missingTokens } from "./documentation-contract.mjs";
 
 describe("documentation contract helpers", () => {

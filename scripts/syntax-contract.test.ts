@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { matchesSyntaxName } from "./syntax-contract.mjs";
 
 describe("syntax naming contract", () => {
@@ -14,4 +15,3 @@ describe("syntax naming contract", () => {
     expect(matchesSyntaxName("parityTests", "snakeCase")).toBe(false);
   });
 });
-

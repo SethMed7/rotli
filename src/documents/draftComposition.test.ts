@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+
 import { mainHasNote } from "../services/mainTree";
 import { useMainStore } from "../state/main";
 import { findLeaf, usePanesStore } from "../state/panes";

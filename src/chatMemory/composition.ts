@@ -1,9 +1,9 @@
-import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
 import { type ChatModelInfo, corpusFrontmatter, corpusWriteAi, isTauri } from "../lib/tauri";
+import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
 import { listChats, setChatAttachedTo, writeNote } from "../memex/service";
 import { invalidateMemex } from "../memex/useMemex";
-import { invalidateNotes } from "../services/hooks";
 import { isChatsPath } from "../services/destinations";
+import { invalidateNotes } from "../services/hooks";
 import { notesService } from "../services/notes";
 import { attachedNoteId, type MemoryTurn } from "./model";
 import { syncChatMemory, type ChatMemoryNote, type ComposeChatNotes } from "./workflow";

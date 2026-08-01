@@ -10,9 +10,9 @@
 
 import { corpusMoveFileToSink, corpusSearch, isTauri, rootIdOf } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
+import type { Note } from "../types";
 import { imageSrcToRel } from "./imageRepair";
 import { notesService } from "./notes";
-import type { Note } from "../types";
 
 const IMAGE_MD_RE = /!\[[^\]]*\]\(([^)\s]+)\)/g;
 

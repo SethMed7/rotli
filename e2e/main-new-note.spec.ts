@@ -3,6 +3,7 @@
 // the memex intake lane; Main receives an immediate reference.
 
 import { expect, test } from "@playwright/test";
+
 import { centerOf, gotoApp, pointerDrag } from "./support";
 
 test("Command-T from a Main note creates a new note in Main immediately", async ({ page }) => {

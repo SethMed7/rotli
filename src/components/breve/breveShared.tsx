@@ -5,8 +5,9 @@
 
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import { CheckGlyph } from "../glyphs";
+
 import { useUiStore } from "../../state/ui";
+import { CheckGlyph } from "../glyphs";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
 

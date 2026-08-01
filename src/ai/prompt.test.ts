@@ -3,6 +3,7 @@
 // prompts must not move).
 
 import { describe, expect, test } from "bun:test";
+
 import { frontierAdapter, gemmaAdapter } from "./prompt";
 
 const base = {

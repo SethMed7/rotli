@@ -10,15 +10,16 @@
 // they just no longer have a home in the bar.
 
 import type { MouseEvent } from "react";
+
 import { dispatch } from "../keys/registry";
-import { openNewItemMenu } from "../newItems/menu";
 import { startWindowDrag, toggleMaximize } from "../lib/tauri";
+import { openNewItemMenu } from "../newItems/menu";
+import { canBack, canForward, useNavHistory } from "../state/navHistory";
 import { SOLID_THEMES, useUiStore } from "../state/ui";
+import { QuokkaMark } from "./character";
+import { ChevronRight, PlusGlyph, SidebarGlyph, SplitDownGlyph, SplitRightGlyph, SunGlyph } from "./glyphs";
 import { Icon } from "./icon";
 import { IconButton } from "./iconButton";
-import { QuokkaMark } from "./character";
-import { canBack, canForward, useNavHistory } from "../state/navHistory";
-import { ChevronRight, PlusGlyph, SidebarGlyph, SplitDownGlyph, SplitRightGlyph, SunGlyph } from "./glyphs";
 
 /** One size for every titlebar icon so the bar reads as one cohesive row
  * (Seth, 2026-06-15). */

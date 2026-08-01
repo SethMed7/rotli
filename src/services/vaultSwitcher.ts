@@ -8,8 +8,8 @@
 //     says so honestly instead of pretending it's instant;
 //   · connect/settings ride below a separator, system actions after content.
 
-import type { MenuSpec } from "../state/contextMenu";
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
+import type { MenuSpec } from "../state/contextMenu";
 
 export interface VaultMenuHandlers {
   /** Repoint the notes folder to this root (relaunches on success). */

@@ -3,14 +3,18 @@
 // when the window hides or the quit handshake fires". The run callback is
 // responsible for its own dedup/no-op check; flush always invokes it.
 
+// Declared as function PROPERTIES, not method shorthand: these are passed
+// around unbound (`store.subscribe(saver.schedule)`), so they must never depend
+// on `this`, and property syntax is what makes the compiler check them
+// contravariantly under strictFunctionTypes.
 export interface DebouncedTask {
   /** (Re)arm the trailing timer. */
-  schedule(): void;
+  schedule: () => void;
   /** Cancel the timer and run immediately; resolves when the run settles.
    * Errors are swallowed — a failed flush must never hang a quit or unload. */
-  flush(): Promise<void>;
+  flush: () => Promise<void>;
   /** Drop the pending timer without running. */
-  cancel(): void;
+  cancel: () => void;
 }
 
 export function createDebouncedTask(ms: number, run: () => Promise<void> | void): DebouncedTask {

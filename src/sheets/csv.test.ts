@@ -1,6 +1,7 @@
 // parseCsvExact — round-trip fidelity for the edit path.
 
 import { describe, expect, test } from "bun:test";
+
 import { csvTextFromRows, parseCsvExact } from "./csv";
 
 describe("parseCsvExact", () => {

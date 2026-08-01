@@ -5,8 +5,9 @@
 // anywhere), which is exactly the pre-change expectation for a fresh chat.
 
 import { beforeEach, describe, expect, test } from "bun:test";
-import { chatKey, chatModelFor, useUiStore } from "./ui";
+
 import { parseSettings } from "./persist";
+import { chatKey, chatModelFor, useUiStore } from "./ui";
 
 describe("chatKey — the per-chat map key", () => {
   test("a saved chat keys by slug; an unsaved one rides its PANE", () => {

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 test("DOCX list paragraphs use Univer's registered presets", async ({ page }) => {

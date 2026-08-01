@@ -14,21 +14,24 @@
  */
 import { join } from "node:path";
 import { BREVE } from "./paths";
-import { ImapFlow } from "imapflow";
+import { ImapFlow, type FetchMessageObject } from "imapflow";
 import { readSecret } from "./secret";
+import { errText } from "./err-text";
+
+import type { MailAccount, EnvelopeRow, UnreadReport } from "./wire-types";
 
 const argv = process.argv.slice(2);
 const cmd = argv[0];
 const limitIdx = argv.indexOf("--limit");
 const LIMIT = limitIdx >= 0 ? parseInt(argv[limitIdx + 1]) || 15 : 15;
-const args = argv.slice(1).filter((a, i) => a !== "--limit" && argv[argv.indexOf("--limit") + 1] !== a);
+const args = argv.slice(1).filter((a) => a !== "--limit" && argv[argv.indexOf("--limit") + 1] !== a);
 
-const accounts: any[] = await Bun.file(join(BREVE, "mail-accounts.json")).json().catch(() => []);
+const accounts: MailAccount[] = await Bun.file(join(BREVE, "mail-accounts.json")).json().catch(() => []);
 if (!accounts.length) { console.error("ERR no accounts in mail-accounts.json"); process.exit(1); }
 // the account may appear anywhere in the args; everything else is the query/uid
 const accountName = args.find((a) => accounts.some((acc) => acc.name === a)) ?? (cmd === "unread" ? args[0] : undefined);
 
-async function connect(account: any): Promise<ImapFlow> {
+async function connect(account: MailAccount): Promise<ImapFlow> {
   const pass = await readSecret(account.keychain).catch(() => {
     throw new Error(`no Keychain entry '${account.keychain}' — security add-generic-password -s ${account.keychain} -a seth -w <password> "$HOME/Library/Keychains/breve.keychain-db"`);
   });
@@ -47,11 +50,11 @@ async function connect(account: any): Promise<ImapFlow> {
   return client;
 }
 
-function envelopeRow(msg: any) {
+function envelopeRow(msg: FetchMessageObject): EnvelopeRow {
   return {
     uid: msg.uid,
     date: msg.envelope?.date,
-    from: msg.envelope?.from?.map((f: any) => `${f.name || ""} <${f.address}>`.trim()).join(", "),
+    from: msg.envelope?.from?.map((f) => `${f.name || ""} <${f.address}>`.trim()).join(", "),
     subject: msg.envelope?.subject ?? "(no subject)",
     seen: msg.flags?.has("\\Seen") ?? false,
   };
@@ -65,7 +68,7 @@ if (cmd === "unread") {
     accountName === "personal" ? accounts.filter((a) => ["proton", "gmail"].includes(a.name))
     : accountName && accountName !== "all" ? accounts.filter((a) => a.name === accountName)
     : accounts;
-  const result: any = { unread: 0, accounts: {}, errors: {}, messages: [] };
+  const result: UnreadReport = { unread: 0, accounts: {}, errors: {}, messages: [] };
   for (const acc of wanted) {
     if (acc.user.startsWith("FILL_ME_IN")) { result.errors[acc.name] = "address not configured"; continue; }
     try {
@@ -85,11 +88,11 @@ if (cmd === "unread") {
       } finally {
         await client.logout().catch(() => {});
       }
-    } catch (e: any) {
-      result.errors[acc.name] = String(e?.message ?? e).slice(0, 140);
+    } catch (e) {
+      result.errors[acc.name] = errText(e).slice(0, 140);
     }
   }
-  result.messages.sort((a: any, b: any) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime());
+  result.messages.sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime());
   result.messages = result.messages.slice(0, LIMIT * 2);
   console.log(JSON.stringify(result, null, 1));
   process.exit(0);
@@ -107,7 +110,7 @@ try {
     if (!q) { console.error("ERR search needs a query"); process.exit(1); }
     const since = new Date(Date.now() - 30 * 86400_000);
     const uids = (await client.search({ or: [{ subject: q }, { from: q }, { body: q }], since }, { uid: true })) || [];
-    const out: any[] = [];
+    const out: EnvelopeRow[] = [];
     const pick = (uids ?? []).slice(-LIMIT);
     if (pick.length) {
       for await (const msg of client.fetch(pick, { uid: true, envelope: true, flags: true }, { uid: true })) out.push(envelopeRow(msg));
@@ -117,7 +120,10 @@ try {
     const uid = parseInt(args[0]);
     if (!uid) { console.error("ERR read needs a uid"); process.exit(1); }
     const msg = await client.fetchOne(String(uid), { uid: true, envelope: true, bodyStructure: true, source: true }, { uid: true });
-    const raw = (msg && msg.source ? msg.source : "").toString();
+    // imapflow answers `false` for a uid the mailbox does not hold — the row
+    // builder below would have thrown on it.
+    if (!msg) { console.error(`ERR uid ${uid} not found in ${account.name}`); process.exit(1); }
+    const raw = (msg.source ?? "").toString();
     // crude text extraction: prefer text/plain part; fall back to stripped html
     let body = raw.split(/\r?\n\r?\n/).slice(1).join("\n\n");
     body = body

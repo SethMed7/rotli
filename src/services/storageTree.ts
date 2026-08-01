@@ -6,8 +6,8 @@
 // loose files sit at the Storage top, i.e. "flat"). Pure functions of the fields the
 // sidebar already has per file (id relpath, title, updatedAt), so it's deterministic.
 
-import type { Folder, NoteSummary } from "../types";
 import { DOCUMENT_EXTS } from "../documents/kinds";
+import type { Folder, NoteSummary } from "../types";
 
 export type StorageGrouping = "type" | "date" | "folder";
 

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { normalizeFenceLang } from "./codeLangs";
 
 describe("code fence language normalization", () => {

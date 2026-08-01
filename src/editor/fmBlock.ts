@@ -7,8 +7,8 @@
 // through the guarded corpus_write_frontmatter_raw lane: Rust keeps the typed
 // lines verbatim, restores id/owner/created, and refuses read-only notes.
 
-import { Decoration, EditorView, WidgetType } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
+import { Decoration, EditorView, WidgetType } from "@codemirror/view";
 
 class FmBlockWidget extends WidgetType {
   constructor(

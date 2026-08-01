@@ -5,6 +5,7 @@
 // the new id so the board keeps showing.
 
 import { useCallback } from "react";
+
 import { corpusRenameBoard } from "../lib/tauri";
 import { renameMainRef } from "../state/main";
 import { usePanesStore } from "../state/panes";

@@ -4,6 +4,7 @@
 // ⌘-click toggles, and the empty-space marquee gathers folder tiles too.
 
 import { expect, test } from "@playwright/test";
+
 import { gotoApp } from "./support";
 
 test.use({ viewport: { width: 1280, height: 900 } });

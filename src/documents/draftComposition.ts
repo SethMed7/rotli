@@ -15,8 +15,8 @@ import { findLeaf, keepTabsFor, leaves, tabsRightOf, usePanesStore } from "../st
 import { removeQuickNote } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import type { Tab } from "../types";
-import { deleteParkedDocument, unregisterLiveDocument } from "./session";
 import { PristineDocumentDrafts } from "./draftLifecycle";
+import { deleteParkedDocument, unregisterLiveDocument } from "./session";
 
 const drafts = new PristineDocumentDrafts();
 

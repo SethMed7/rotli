@@ -3,9 +3,10 @@
 // 2026-06-30) so the two list surfaces share the exact same markup.
 
 import { type MouseEvent, type ReactNode, memo } from "react";
-import type { NoteSummary } from "../types";
+
 import { longDateLabel } from "../lib/dateLabels";
 import { startMainAddDrag } from "../lib/mainAddDrag";
+import type { NoteSummary } from "../types";
 import { glyphForNote, PinGlyph } from "./glyphs";
 
 // memo: list surfaces render hundreds of rows and re-render per search

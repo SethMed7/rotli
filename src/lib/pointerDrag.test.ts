@@ -5,7 +5,9 @@
 // dispatching synthetic pointer/keyboard events at the captured listeners.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+
 import type { PointerEvent as ReactPointerEvent } from "react";
+
 import type { DragGhost } from "./dragGhost";
 import { type PointerDragOptions, createPointerDragSession } from "./pointerDrag";
 

@@ -2,6 +2,7 @@
 // keep their in-note order, and duplicate titles never merge across ids.
 
 import { describe, expect, test } from "bun:test";
+
 import type { TaskItem } from "../lib/tauri";
 import { groupTasks } from "./tasksView";
 
