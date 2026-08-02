@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [Unreleased]
+
+### Changed
+
+- **The build toolchain reached current.** Rotli moved to Vite 8, which now
+  carries its Rust bundler (Rolldown) natively — the same fast builds, minus a
+  temporary alias and a deprecated plugin. Nothing about the app changes: the
+  bundle ships a touch smaller and one known security advisory drops out of the
+  build's dependencies.
+
 ## [0.65.0] - 2026-08-01
 
 ### Added

@@ -172,11 +172,12 @@ The 2026-07 audit escalated five product-behavior findings. Disposition:
    step caps, secure-note exclusion, and secret scan remain independent layers.
    Paraphrased semantic leakage is a residual risk for the quarterly review.
 
-### Supply-chain advisories (transitive-only, tracked; reviewed 2026-08-01)
+### Supply-chain advisories (transitive-only, tracked; reviewed 2026-08-02)
 
-All are outside Rotli's own `src/`. The current `bun audit` reports sixteen
-findings (9 high, 6 moderate, 1 low) — one fewer than before the rolldown-vite
-migration, which removed the esbuild carrier outright and introduced no new
+All are outside Rotli's own `src/`. The current `bun audit` reports fifteen
+findings (8 high, 6 moderate, 1 low) — one fewer than before the Vite 8 upgrade,
+which bundles Rolldown natively (retiring the `rolldown-vite` alias) and pulls a
+newer `postcss` that clears the source-map advisory below, introducing no new
 advisory of its own:
 
 - **DOMPurify** ≤ 3.4.11 (low custom-element sanitizer callback bypass) —
@@ -191,8 +192,6 @@ advisory of its own:
   2026-07-31 oxlint migration).
 - **nanoid** < 3.3.8 and **uuid** < 11.1.1 (moderate) — library-internal ID
   generation through Excalidraw, Univer, Vite, exceljs, and Mermaid.
-- **postcss** ≤ 8.5.17 (high, source-map path traversal) — through Vite's CSS
-  pipeline. Build-time only, over first-party stylesheets.
 - **sharp** < 0.35.0 (high libvips image-processing family) and **tar**
   ≤ 7.5.20 (moderate uncontrolled recursion) — through the optional
   Kokoro/Transformers local voice stack (`@huggingface/transformers` →
@@ -201,8 +200,8 @@ advisory of its own:
   Excalidraw/Vite's build dependency graph.
 
 **esbuild** left the tree entirely with the 2026-08-01 rolldown-vite migration
-(rolldown-vite keeps esbuild as an *optional* peer and Rotli does not install
-it), retiring its low Windows dev-server advisory.
+and stays out under Vite 8 (Vite keeps esbuild as an *optional* peer and Rotli
+does not install it), so its low Windows dev-server advisory remains retired.
 
 The direct `@excalidraw/mermaid-to-excalidraw` 2.2.2 dependency is the narrow
 board-engine conversion seam. Excalidraw already supplied the same version
