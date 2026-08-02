@@ -195,18 +195,29 @@ checker. Do not add a convention that only exists in prose.
 
 ## CI lanes
 
-- **Static contracts (Linux):** types and all lint/architecture/documentation
-  checks, reported independently for fast diagnosis.
-- **Focused design system (Linux):** semantic colors and four-environment theme
+All five lanes run on a **self-hosted macOS runner** (`[self-hosted, macOS,
+ARM64, rotli]`) — GitHub-hosted minutes are billing-blocked, so the whole gate
+runs on a spare Mac at zero minutes, on every push and PR. Setup + hardening:
+[`ci-runner.md`](ci-runner.md). The runner holds no signing keys; `release.sh`
+signs and notarizes locally.
+
+- **Static contracts:** types and all lint/architecture/documentation checks,
+  reported independently for fast diagnosis.
+- **Focused design system:** semantic colors and four-environment theme
   regressions.
-- **Browser E2E (Linux):** `bun run check:e2e-types` plus the Playwright suite
-  (chromium) against `vite dev`'s seeded demo corpus.
-- **Dependency audit (Linux, advisory):** `bun audit` plus RustSec. Findings stay
+- **Browser E2E:** `bun run check:e2e-types` plus the Playwright suite (chromium)
+  against `vite dev`'s seeded demo corpus.
+- **Dependency audit (advisory):** `bun audit` plus RustSec. Findings stay
   visible without failing the workflow while the tracked transitive-only debt
   remains; the Rust action receives the narrow `checks: write` permission it
   needs to publish its report.
-- **Full regression (macOS):** Bun behavior tests, deterministic AI evals,
-  Breve runtime checks, Rust tests, and the production build.
+- **Full regression:** Bun behavior tests, deterministic AI evals, Breve runtime
+  checks, Rust tests, and the production build.
+
+One runner runs the lanes serially; a second `rotli`-labelled runner
+parallelizes them. `release.sh --publish` gates on the Regression **conclusion**
+for the exact release commit (a failed run blocks; a missing run warns unless
+`--require-ci`) — see [`ci-runner.md`](ci-runner.md#how-releases-use-it).
 
 CI does not prove native visual quality or real external delivery. Handoffs must
 state those remaining checks explicitly.

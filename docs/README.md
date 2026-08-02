@@ -31,6 +31,7 @@ fix both in the same change.
 | Brand implementation | [`../src/brand/README.md`](../src/brand/README.md) |
 | AI-assisted development workflow | [`development/ai-workflow.md`](development/ai-workflow.md) |
 | Testing, linting, and regression evidence | [`development/testing.md`](development/testing.md) |
+| The self-hosted CI runner (setup + hardening) | [`development/ci-runner.md`](development/ci-runner.md) |
 | Egress map, security checks, and the threat model | [`development/security.md`](development/security.md) |
 | Assets, actors, trust boundaries, and residual risk | [`security/threat-model.md`](security/threat-model.md) |
 | What each class of model may see and edit (secure vs locked, reference lanes) | [`design/ai-visibility-matrix.md`](design/ai-visibility-matrix.md) |
