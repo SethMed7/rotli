@@ -522,6 +522,51 @@ describe("runAgent", () => {
     expect(calls.webSearch).toEqual([]);
   });
 
+  test("web research flows freely: a follow-up web call may echo a PRIOR web result", async () => {
+    // the 2026-08-03 live-eval bug: a web_search RESULT is public, off-device
+    // content, but the overlap guard counted it as "private text from the memex"
+    // — so the natural research flow (search, then fetch/refine using what the
+    // search returned) got falsely blocked. The model researched the web, then
+    // couldn't open the very page its own search surfaced.
+    const phrase = "coalition for responsible frontier research initiative";
+    const { host, calls } = fakeHost(
+      [
+        '{"tool":"web_search","args":{"query":"frontier ai letter"}}',
+        // the model refines using words the FIRST (public) result returned
+        `{"tool":"web_search","args":{"query":"${phrase} signatories"}}`,
+        '{"final":"Researched it on the web."}',
+      ],
+      {
+        webSearch: async (q) => {
+          calls.webSearch.push(q);
+          return [
+            { title: "The letter", url: "https://example.com/letter", snippet: `Signed by the ${phrase}.` },
+          ];
+        },
+      },
+    );
+    const { final } = await run(host, { history: [], userText: "who signed the letter?", web: true });
+    expect(final).toContain("Researched it");
+    // BOTH searches reached the host — the second was NOT blocked as "private"
+    expect(calls.webSearch).toEqual(["frontier ai letter", `${phrase} signatories`]);
+  });
+
+  test("a note read still guards a later web call that echoes its PRIVATE prose", async () => {
+    // the fix narrows the private set to exclude WEB results only — memex reads
+    // stay protected, so this exfil attempt is still blocked (regression guard).
+    const privateBody = "The unannounced acquisition plan moves the research team to Montreal next spring.";
+    const { host, calls } = fakeHost(
+      [
+        '{"tool":"read_note","args":{"id":"n1"}}',
+        '{"tool":"web_search","args":{"query":"acquisition plan moves the research team to Montreal"}}',
+        '{"final":"kept it local"}',
+      ],
+      { readNote: async () => privateBody },
+    );
+    await run(host, { history: [], userText: "research this", web: true });
+    expect(calls.webSearch).toEqual([]); // still blocked
+  });
+
   test("generate_image dispatches only when imageTool is on", async () => {
     const { host, calls } = fakeHost([
       '{"tool":"generate_image","args":{"prompt":"a warm quokka sticker"}}',

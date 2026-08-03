@@ -188,12 +188,18 @@ export function pruneScratch(scratch: ScratchStep[], maxChars: number): ScratchS
   return out;
 }
 
-export function statusFor(tool: ToolName): string {
+/** A short, human label for a live tool step — enriched with the call's own
+ * argument (the query, the fetched host, the filename) so a multi-step research
+ * answer shows LIFE ("searching the web for 'frontier ai'…") instead of one long
+ * generic "thinking". `args` is model-supplied and untrusted, so the value is
+ * clipped and never rendered as markup — the chat surface prints it as text. */
+export function statusFor(tool: ToolName, args?: Record<string, unknown>): string {
+  const q = args ? clipStatusArg(argText(args.query)) : "";
   switch (tool) {
     case "search_notes":
-      return "searching your notes…";
+      return q ? `searching your notes for “${q}”…` : "searching your notes…";
     case "search_memory":
-      return "searching your memory…";
+      return q ? `searching your memory for “${q}”…` : "searching your memory…";
     case "read_note":
       return "reading a note…";
     case "create_note":
@@ -204,14 +210,37 @@ export function statusFor(tool: ToolName): string {
       return "opening the note…";
     case "read_memory":
       return "reading a memory…";
-    case "read_file":
-      return "reading a file…";
+    case "read_file": {
+      const name = args ? clipStatusArg(argText(args.query ?? args.name ?? args.file)) : "";
+      return name ? `reading “${name}”…` : "reading a file…";
+    }
     case "web_search":
-      return "searching the web…";
-    case "web_fetch":
-      return "reading a web page…";
+      return q ? `searching the web for “${q}”…` : "searching the web…";
+    case "web_fetch": {
+      const host = args ? webHost(argText(args.url)) : "";
+      return host ? `reading ${host}…` : "reading a web page…";
+    }
     case "generate_image":
       return "generating an image…";
+  }
+}
+
+/** Clip a status argument to a short, single-line snippet (untrusted model
+ * text — newlines/controls stripped, capped). */
+function clipStatusArg(value: string): string {
+  const s = value.replace(/\s+/g, " ").trim();
+  return s.length > 42 ? `${s.slice(0, 42)}…` : s;
+}
+
+/** The bare host of a fetch URL for the status line ("example.com"), or "" when
+ * it isn't a parseable http(s) URL. */
+function webHost(url: string): string {
+  try {
+    const u = new URL(url.trim());
+    if (u.protocol !== "http:" && u.protocol !== "https:") return "";
+    return u.hostname.replace(/^www\./, "");
+  } catch {
+    return "";
   }
 }
 

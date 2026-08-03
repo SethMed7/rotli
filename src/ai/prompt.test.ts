@@ -131,6 +131,41 @@ describe("read-before-answer scaffolding (the 2026-07-29 people-list failure)", 
   });
 });
 
+// Freshness reasoning (2026-08-03): the model must REASON about staleness, not
+// pattern-match a keyword. Both adapters teach it to weigh whether a question
+// needs information more current than its notes/training — and to act
+// differently by globe state (search the web ON, say it can't confirm OFF).
+// It must never auto-enable the web (the globe stays the user's control).
+describe("freshness / recency reasoning", () => {
+  test("both adapters teach freshness reasoning in both globe states", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      const on = adapter.renderPrompt({ ...base, web: true });
+      const off = adapter.renderPrompt({ ...base, web: false });
+      // framed around whether it's an outside-WORLD question, in both states
+      expect(on).toContain("WORLD");
+      expect(off).toContain("WORLD");
+      // it's framed as a judgement ("decide"/"judge whether"), not a literal
+      // trigger word list the model matches on
+      expect(on).toMatch(/decide|judge whether/i);
+      expect(on.toLowerCase()).toMatch(/cutoff|stale|current than your training/);
+    }
+  });
+
+  test("globe ON steers to the web for current facts; globe OFF steers to an honest can't-confirm", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      const on = adapter.renderPrompt({ ...base, web: true });
+      const off = adapter.renderPrompt({ ...base, web: false });
+      // ON: reach for web_search and cite; do not answer stale from memory
+      expect(on).toContain("web_search");
+      // OFF: never present a stale fact as current, and invite the globe —
+      // and it must acknowledge the web is off rather than direct a search
+      expect(off.toLowerCase()).toMatch(/can'?t (confirm|verify)|out of date|stale/);
+      expect(off.toLowerCase()).toContain("globe");
+      expect(off.toLowerCase()).toContain("web is off for this chat");
+    }
+  });
+});
+
 describe("untrusted prompt data framing", () => {
   test("knowledge maps cannot close their data delimiter or create prompt roles", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {

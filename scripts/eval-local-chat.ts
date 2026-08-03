@@ -349,11 +349,34 @@ function makeFixtureHost(modelId: string, log: StepLog[]): Host {
     async readFile(query) {
       return `no file matching "${query}". Use the exact filename (e.g. report.csv).`;
     },
-    async webSearch() {
-      throw new Error("web is off for this eval");
+    // Canned "current" web (a stand-in for pacingthefrontier.com and its ilk):
+    // the globe-ON case proves the model REACHES for these; the globe-OFF case
+    // never calls them (the loop drops web tools when web is off). Nothing
+    // actually leaves the machine — these are fixtures.
+    async webSearch(query) {
+      webCalls.push(`web_search ${query}`);
+      return [
+        {
+          title: "Pacing the Frontier — an open letter on frontier AI",
+          url: "https://www.pacingthefrontier.com/",
+          snippet:
+            "An open letter urging a measured pace on frontier AI, signed by researchers and industry leaders.",
+        },
+        {
+          title: "Frontier AI slowdown letter gathers signatures",
+          url: "https://example.org/frontier-letter-coverage",
+          snippet: "Coverage of the pacing-the-frontier letter and who has signed it.",
+        },
+      ];
     },
-    async webFetch() {
-      throw new Error("web is off for this eval");
+    async webFetch(url) {
+      webCalls.push(`web_fetch ${url}`);
+      return [
+        "Pacing the Frontier — an open letter.",
+        "The letter calls for a measured, safety-first pace on frontier AI development.",
+        "Signatories include Yoshua Bengio, Stuart Russell, and Jan Leike, among many others.",
+        "It was published in 2026 and continues to gather signatures.",
+      ].join("\n");
     },
     async generateImage() {
       throw new Error("images are off for this eval");
@@ -374,12 +397,16 @@ function makeFixtureHost(modelId: string, log: StepLog[]): Host {
 // update_note calls recorded per case (reset in runCase) — the edit case
 // scores the WRITE, not just the final prose.
 const lastUpdates: Array<{ id: string; body: string }> = [];
+// web tool calls recorded per case (reset in runCase) — the web cases score
+// whether the model REACHED for the web (globe on) or stayed off it (globe off).
+const webCalls: string[] = [];
 
 // ── cases + scoring ───────────────────────────────────────────────────────────
 
 interface EvalCase {
   name: string;
   turns: string[]; // each run as a user turn; prior turns become history
+  web?: boolean; // the chat's globe — web tools are offered only when true
   score(final: string): { pass: boolean; detail: string };
 }
 
@@ -484,6 +511,60 @@ const CASES: EvalCase[] = [
       };
     },
   },
+  {
+    // FRESHNESS reasoning, globe OFF (2026-08-03). A recency question with NO
+    // literal trigger word ("latest"/"current"/"today") — the model must REASON
+    // that this is an outside-world, time-sensitive fact its notes can't confirm,
+    // and say so + point at the web, NOT fabricate a confident current answer.
+    name: "web-off",
+    web: false,
+    turns: ["who signed the frontier AI slowdown letter?"],
+    score(final) {
+      const low = final.toLowerCase();
+      // it must NOT have called the web (it can't — globe off)
+      const calledWeb = webCalls.length > 0;
+      // desired shape: acknowledges it can't confirm current info from notes and
+      // points at the web/globe, rather than asserting names as fact
+      const hedges = [
+        "can't",
+        "cannot",
+        "don't have",
+        "do not have",
+        "not in your notes",
+        "out of date",
+        "stale",
+        "up to date",
+        "up-to-date",
+        "current",
+        "web",
+        "globe",
+        "internet",
+      ].some((h) => low.includes(h));
+      return {
+        pass: hedges && !calledWeb,
+        detail: `hedged/offered-web: ${hedges}; web called (should be false): ${calledWeb}`,
+      };
+    },
+  },
+  {
+    // FRESHNESS reasoning, globe ON (2026-08-03). The SAME recency question —
+    // the model must REASON it needs current info and web_search for it, then
+    // answer from what it fetched (the canned pacing-the-frontier fixture).
+    name: "web-on",
+    web: true,
+    turns: ["who signed the frontier AI slowdown letter?"],
+    score(final) {
+      const low = final.toLowerCase();
+      const searched = webCalls.some((c) => c.startsWith("web_search"));
+      // a fact only present in the FETCHED source (not in the notes) proves it
+      // answered from the web
+      const fromWeb = ["bengio", "russell", "leike", "pacing the frontier"].filter((k) => low.includes(k));
+      return {
+        pass: searched && fromWeb.length >= 1,
+        detail: `web_search called: ${searched}; facts from fetched source: [${fromWeb.join(", ") || "none"}]`,
+      };
+    },
+  },
 ];
 
 // ── runner ────────────────────────────────────────────────────────────────────
@@ -491,6 +572,7 @@ const CASES: EvalCase[] = [
 async function runCase(c: EvalCase, modelId: string, logDir: string): Promise<boolean> {
   const log: StepLog[] = [];
   lastUpdates.length = 0;
+  webCalls.length = 0;
   const host = makeFixtureHost(modelId, log);
   const history: ChatTurn[] = [];
   let final = "";
@@ -501,7 +583,7 @@ async function runCase(c: EvalCase, modelId: string, logDir: string): Promise<bo
     const gen = runAgent(host, {
       history: [...history],
       userText,
-      web: false,
+      web: c.web ?? false,
       model: { id: modelId },
       userName: "Seth",
     });

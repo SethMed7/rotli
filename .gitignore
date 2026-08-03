@@ -33,3 +33,4 @@ playwright-report/
 test-results/
 .claude/
 dist-release
+.eval-local-chat/

@@ -145,10 +145,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     }
     if (
       EGRESS_TOOLS.includes(parsed.tool) &&
-      containsPrivateDataOverlap(JSON.stringify(parsed.args), [
-        knowledge,
-        ...scratch.map((entry) => entry.result),
-      ])
+      containsPrivateDataOverlap(JSON.stringify(parsed.args), privateScratch(knowledge, scratch))
     ) {
       consecutiveBad += 1;
       scratch.push({
@@ -162,7 +159,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     consecutiveBad = 0; // a genuinely NEW, allowed call — the model is working
 
     yield { type: "tool", tool: parsed.tool, args: parsed.args };
-    yield { type: "status", text: statusFor(parsed.tool) };
+    yield { type: "status", text: statusFor(parsed.tool, parsed.args) };
 
     let result: string;
     try {
@@ -203,6 +200,20 @@ async function forceFinal(host: Host, input: RunInput, scratch: ScratchStep[]): 
   } catch (e) {
     return `⚠ ${errMsg(e, "couldn't reach the model")}`;
   }
+}
+
+/** The set of locally-retrieved PRIVATE text the overlap guard protects: the
+ * knowledge map plus every scratch RESULT that came from the memex — but NOT the
+ * results of prior WEB tools. A web_search / web_fetch result is already PUBLIC,
+ * off-device content, so echoing it into a follow-up web call (the natural
+ * research flow: search → fetch a URL from the results) is not a privacy leak.
+ * Counting it as private falsely blocked exactly that flow — the model
+ * researched the web, then couldn't open the page its own search returned
+ * (live eval 2026-08-03). The secret-pattern guard (looksSecret) still covers
+ * every arg regardless, and note/memory reads stay private here. */
+function privateScratch(knowledge: string, scratch: ScratchStep[]): string[] {
+  const fromWeb = (action: string): boolean => WEB_TOOLS.some((tool) => action.startsWith(tool));
+  return [knowledge, ...scratch.filter((s) => !fromWeb(s.action)).map((s) => s.result)];
 }
 
 function errMsg(e: unknown, fallback: string): string {

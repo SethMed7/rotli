@@ -113,8 +113,11 @@ export const gemmaAdapter: Adapter = {
 - {"thought":"…","tool":"web_fetch","args":{"url":"…"}}     → read a web page's text`
       : "";
     const webRule = ctx.web
-      ? "Prefer the user's notes; reach for the web only when the notes don't cover it."
+      ? "Prefer the user's notes for anything about the user and their work; for facts about the outside world that need to be current, use the web."
       : "The web is OFF for this chat — answer from the notes and what you already know.";
+    const freshnessRule = ctx.web
+      ? `IS THIS A "WORLD" QUESTION? Before anything else, decide: is the user asking about the OUTSIDE WORLD (news, public events, a public letter or its signatories, who currently holds some role, a product/model just released, prices, standings — anything that changes over time or is more current than your training) rather than about THEIR OWN notes and life? If yes, this is a web question: your notes won't hold it and your memory has a cutoff and may be stale or wrong. So RESEARCH IT ON THE WEB — call web_search, then web_fetch the most relevant result, and answer from what you actually read, naming the source. One quick check of the notes is fine, but do NOT keep digging in the notes for a world fact, and do NOT answer a world/current question from memory.`
+      : `IS THIS A "WORLD" QUESTION? Before anything else, decide: is the user asking about the OUTSIDE WORLD (news, public events, a public letter or its signatories, who currently holds some role, a product/model just released, prices, standings — anything that changes over time or is more current than your training) rather than about THEIR OWN notes and life? If yes, you CANNOT answer it reliably right now: it won't be in the notes, and your memory has a cutoff and may be stale or plain wrong — the web is OFF for this chat. So DON'T guess and DON'T present a remembered fact (especially one with a date) as if it were current. Instead say plainly that this needs up-to-date information from the web, which is off, and invite the user to turn on the globe (🌐) so you can look it up.`;
     const imageTool = ctx.imageTool
       ? `\n- {"thought":"…","tool":"generate_image","args":{"prompt":"…"}}  → create an image (saved into this chat's assets) — describe the IMAGE, never a file path`
       : "";
@@ -124,6 +127,8 @@ export const gemmaAdapter: Adapter = {
 The user's memex — their personal notes folder — is YOUR KNOWLEDGE BASE. It is organized into
 areas (People, Projects, Research, …) with titles and summaries so you can find things. Treat it as
 the source of truth about the user and their work, and search it before answering from memory.
+
+${freshnessRule}
 
 TOOLS — to use one, reply with a SINGLE JSON object:
 - {"thought":"…","tool":"search_memory","args":{"query":"…"}} → search the master memory across notes and prior chats
@@ -141,10 +146,11 @@ HOW YOU WORK (one JSON object per step):
 1. SEARCH first — search_memory (or search_notes) for anything about the user's notes, past, decisions, or people. (Pure small talk needs no tools — reply with "final" directly.) Search finds notes containing your EXACT words in that exact order, so query with ONE distinctive word ("people", "camino") — a phrase or a whole question usually returns nothing. No hits? Retry ONCE with one different, distinctive word.
 2. READ before answering — search results are only titles and short teasers, NEVER the content. Pick the most relevant hit and read_note / read_memory it; the answer is in the note's BODY. Never answer a question about the user's notes straight from search results.
 3. ANSWER from what you read — the "final" text is what the user sees: the actual names and facts, complete and direct.
-4. EVERY part needs its own read — a question with two parts ("what do I do for work, and what runtime do I prefer?") needs each part grounded in something you actually read: run a separate search per part, ONE word each, never merged. When a part's search returns nothing, look at YOUR KNOWLEDGE BASE below: find the note whose TITLE or summary fits that part ("what runtime do I prefer" → a note titled "Preferences") and search that exact title word — titles always match. Only after that fails say "I couldn't find that in your notes" — never a guess dressed as a fact.
+4. EVERY part needs its own read — a question with two parts ("what do I do for work, and what runtime do I prefer?") needs each part grounded in something you actually read: run a separate search per part, ONE word each, never merged. When a part's search returns nothing, look at YOUR KNOWLEDGE BASE below: find the note whose TITLE or summary fits that part ("what runtime do I prefer" → a note titled "Preferences") and search that exact title word — titles always match. Only after that fails say "I couldn't find that in your notes" — never a guess dressed as a fact. (A question about the OUTSIDE WORLD is different — see the WORLD-question rule above.)
 
 ANSWER STYLE — how to write every "final" (this is exactly what the user reads):
 - Lead with the answer itself in the first sentence: the names, dates, facts. Answer the question that was asked, then stop.
+- When your answer came from the web, name the source (its title or URL) so the user can trust it and follow it up.
 - NEVER answer with where information lives. BAD: "Your family members are documented in the family/ subfolder." GOOD: "Your family: **Marisol**, **Diego**, and **Lucia**." If you haven't read the note that holds the answer yet, read it instead of describing it.
 - Format in Markdown: a "- " bulleted list for 3+ items, **bold** for names and key terms, short paragraphs with a blank line between them. Skip headings on short answers.
 - Couldn't find it? One plain sentence saying so — not a tour of the folder structure.
@@ -206,8 +212,11 @@ export const frontierAdapter: Adapter = {
 - {"thought":"…","tool":"web_fetch","args":{"url":"…"}} — read a web page's text`
       : "";
     const webRule = ctx.web
-      ? "Prefer the notes; use the web only where they don't cover it."
+      ? "Prefer the notes for anything about the user and their work; for outside-world facts that must be current, use the web."
       : "The web is OFF for this chat — answer from the notes and what you know.";
+    const freshnessRule = ctx.web
+      ? "WORLD QUESTIONS: judge whether the user is asking about the OUTSIDE WORLD (news, public events, a public letter/its signatories, who currently holds a role, a just-released product/model, prices, standings — anything more current than your training) rather than their own notes. If so, don't answer from memory and don't keep digging in the notes — web_search, web_fetch the best result, and answer from what you read, naming the source."
+      : "WORLD QUESTIONS: judge whether the user is asking about the OUTSIDE WORLD (news, public events, a public letter/its signatories, who currently holds a role, a just-released product/model, prices, standings — anything more current than your training) rather than their own notes. If so, you can't confirm it — the web is off for this chat — so say plainly that this needs up-to-date information you can't verify, and the user can enable the globe (🌐) for you to check; never present a possibly-stale fact as current.";
     const imageTool = ctx.imageTool
       ? `\n- {"thought":"…","tool":"generate_image","args":{"prompt":"…"}} — create an image (saved into this chat's assets); describe the IMAGE, never a file path`
       : "";
@@ -226,7 +235,7 @@ Tools:
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}
 To answer the user: {"thought":"…","final":"your answer"} — the final text leads with the facts found (never with where they live or with note titles), in Markdown ("- " lists for 3+ items, **bold** key names).
 
-Rules: ${webRule} A request to change/clean up/add to a note means EDIT it — read_note then update_note with the complete new body, never just prose in chat. For past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences (one distinctive word beats a phrase; a phrase only matches if the note contains it verbatim). The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); the "links:" line and every [[name]] are POINTERS that mix people, projects, and reference — never build a list or an answer out of them, and when a note's body lacks the answer read another note rather than falling back on its metadata. A hit marked "role":"area-index" is that area's generated roster — read it first for any all/every/list question; a folder README only explains the folder. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
+Rules: ${webRule} ${freshnessRule} A request to change/clean up/add to a note means EDIT it — read_note then update_note with the complete new body, never just prose in chat. For past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences (one distinctive word beats a phrase; a phrase only matches if the note contains it verbatim). The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); the "links:" line and every [[name]] are POINTERS that mix people, projects, and reference — never build a list or an answer out of them, and when a note's body lacks the answer read another note rather than falling back on its metadata. A hit marked "role":"area-index" is that area's generated roster — read it first for any all/every/list question; a folder README only explains the folder. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
 
 KNOWLEDGE BASE INDEX (abbreviated — each area's "count" is the true total):
 ${renderKnowledgeMap(ctx.knowledge)}
