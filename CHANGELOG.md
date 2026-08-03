@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.71.0] - 2026-08-03
+
+### Fixed
+
+- **Numbered checklists finally look like checklists.** A step written as
+  `1. [ ] Generate the new key` used to show the `[ ]` as literal text — only
+  dash checkboxes rendered. Numbered steps now get a real checkbox next to their
+  number, clicking it checks the step off, Enter continues the list with the
+  next number and an empty box, and open numbered steps show up in Tasks like
+  every other checkbox.
+- **Notes the Librarian has filed stay editable.** In a memex, a note the
+  Librarian moved out of the intake area into its curated home (say
+  `wiki/engineering/`) hit "this location is read-only" on every save — the
+  editor kept your text and retried forever, but the save could never land. The
+  whole `wiki/` tree is now a writable surface for your own edits: filing a note
+  organizes it, it doesn't freeze it. The brain's memory lanes, control files,
+  and read-only vault settings are as protected as before, and the Librarian
+  still owns its metadata keys exclusively.
+
 ## [0.70.0] - 2026-08-03
 
 ### Changed

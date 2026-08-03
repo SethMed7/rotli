@@ -90,6 +90,13 @@ describe("numbered lists renumber on Enter (#9)", () => {
     expect(press(v, "Enter")).toBe(true);
     expect(text(v)).toBe("- alpha\n- \n- beta");
   });
+
+  test("an ordered task continues counting up AND resets to unchecked (2026-08-03)", () => {
+    const doc = "1. [x] done step\n2. [ ] next step";
+    const v = viewOf(doc, doc.indexOf("done step") + 9);
+    expect(press(v, "Enter")).toBe(true);
+    expect(text(v)).toBe("1. [x] done step\n2. [ ] \n3. [ ] next step");
+  });
 });
 
 describe("the empty-item exit ramp needs the caret past the marker (#11)", () => {

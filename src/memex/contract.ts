@@ -368,7 +368,8 @@ export const SPINE = {
   identity: "identity",
   personality: "personality",
   wiki: "wiki",
-  /** The note staging area (v3.5) — the ONLY part of wiki/ rotli writes. */
+  /** The note staging area (v3.5) — where NEW rotli notes land before the
+   * Brain files them (all of wiki/ is writable for edits since 2026-08-03). */
   wikiInbox: "wiki/_inbox",
   /** Protected note home. It lives inside the Brain but is never an organizer
    * area and is categorically unavailable to remote AI. */
@@ -383,8 +384,10 @@ export const SPINE = {
 
 /** Whether rotli may WRITE this spine-relative path under the given perms. The
  *  belt to the Rust path-guard's braces: identity/personality/history/MAP are NEVER
- *  writable; the REST of wiki/ (curated notes) is read-only — only its wiki/_inbox/
- *  staging is writable (v3.5), alongside chats/**.
+ *  writable; ALL of wiki/ is writable since 2026-08-03 (a Librarian-filed note must
+ *  stay editable — the read-only curated era ended when filing became automatic),
+ *  alongside chats/**. wiki/_secure rides the wiki rule; it stays model-gated on
+ *  READ and is never an organizer area.
  *
  *  `inbox.md` is NOT a rotli write surface (#96, audit 2026-07): no rotli code has
  *  ever appended it — quick captures land as staged notes in wiki/_inbox/ — so the
@@ -396,8 +399,7 @@ export function canWrite(relPath: string, perms: Perms): boolean {
   const p = relPath.replace(/^\/+/, "");
   if (p.includes("..")) return false;
   if (p === SPINE.chats || p.startsWith(`${SPINE.chats}/`)) return true;
-  if (p === SPINE.wikiInbox || p.startsWith(`${SPINE.wikiInbox}/`)) return true;
-  if (p === SPINE.wikiSecure || p.startsWith(`${SPINE.wikiSecure}/`)) return true;
+  if (p === SPINE.wiki || p.startsWith(`${SPINE.wiki}/`)) return true;
   return false;
 }
 

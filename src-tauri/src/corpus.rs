@@ -1695,12 +1695,27 @@ fn is_archive_folder(folder: &str) -> bool {
     folder == "Archive" || folder.starts_with("Archive/")
 }
 
-/// An open `- [ ]` / `* [ ]` checkbox line's own text (None for anything else,
-/// including checked boxes and empty checkboxes — nothing to show or toggle).
+/// An open `- [ ]` / `* [ ]` / `1. [ ]` checkbox line's own text (None for
+/// anything else, including checked boxes and empty checkboxes — nothing to
+/// show or toggle). Ordered tasks are GFM's numbered task items, rendered by
+/// the editor since 2026-08.
 fn open_task_text(trimmed: &str) -> Option<&str> {
-    let rest = trimmed.strip_prefix("- [ ]").or_else(|| trimmed.strip_prefix("* [ ]"))?;
+    let rest = trimmed
+        .strip_prefix("- [ ]")
+        .or_else(|| trimmed.strip_prefix("* [ ]"))
+        .or_else(|| strip_ordered_prefix(trimmed)?.strip_prefix(" [ ]").map(str::trim_start))?;
     let rest = rest.trim();
     (!rest.is_empty()).then_some(rest)
+}
+
+/// Strip a `1.` ordered-list marker (digits + dot), returning the rest — which
+/// still carries its leading space. None when the line isn't an ordered item.
+fn strip_ordered_prefix(trimmed: &str) -> Option<&str> {
+    let digits = trimmed.chars().take_while(|c| c.is_ascii_digit()).count();
+    if digits == 0 {
+        return None;
+    }
+    trimmed[digits..].strip_prefix('.')
 }
 
 /// A hard-wrapped checkbox reads as ONE task: an indented, non-list, non-fence
@@ -1718,8 +1733,9 @@ fn task_continuation(raw: &str) -> Option<&str> {
     if indent_chars < 2 && !raw.starts_with('\t') {
         return None;
     }
-    // a nested list item, checkbox, fence, heading, blockquote, or table row
-    // starts its own block — never a wrapped continuation of the task text
+    // a nested list item (bulleted or `1.` ordered), checkbox, fence, heading,
+    // blockquote, or table row starts its own block — never a wrapped
+    // continuation of the task text
     if trimmed.starts_with("- ")
         || trimmed.starts_with("* ")
         || trimmed.starts_with("+ ")
@@ -1728,6 +1744,7 @@ fn task_continuation(raw: &str) -> Option<&str> {
         || trimmed.starts_with('#')
         || trimmed.starts_with('>')
         || trimmed.starts_with('|')
+        || strip_ordered_prefix(trimmed).is_some_and(|rest| rest.starts_with(' '))
     {
         return None;
     }
@@ -2130,10 +2147,11 @@ const WELCOME_BODY: &str = "# Welcome to rotli\n\nThis folder is your corpus —
 /// `root/memex.json` for a valid `mx_` id.
 ///   • `LegacyRotli` — today's `~/Documents/rotli`: reserved folders, first-run,
 ///     everything writable. BYTE-IDENTICAL to before Increment 3.
-///   • `Memex` — the root IS someone's memex spine (for Seth, `~/memex-vault`). Only
-///     `chats/` is writable + surfaced read-write; `wiki/` is read-only; `identity/`,
-///     `personality/`, `history/`, `MAP.md`, `inbox.md` and every control file stay HIDDEN. No
-///     reserved folders are scaffolded, no first-run seeding ever runs.
+///   • `Memex` — the root IS someone's memex spine (for Seth, `~/memex-vault`).
+///     `chats/` and `wiki/` are writable + surfaced read-write; `identity/`,
+///     `personality/`, `history/`, `MAP.md`, `inbox.md` stay out of the tree (Reference)
+///     and every control file stays HIDDEN. No reserved folders are scaffolded, no
+///     first-run seeding ever runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Layout {
     Memex,
@@ -2161,9 +2179,10 @@ pub fn is_memex_root(root: &Path) -> bool {
 /// refuse forbidden paths.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Surface {
-    /// A normal, editable note (LegacyRotli: everything; Memex: `chats/**.md`).
+    /// A normal, editable note (LegacyRotli: everything; Memex: `wiki/**.md` +
+    /// `chats/**.md`).
     NoteRW,
-    /// Surfaced but read-only this increment (Memex: `wiki/**.md`).
+    /// Surfaced but read-only (Memex: `storage/**` foreign binaries).
     NoteRO,
     /// The brain's MEMORY lanes (Memex: identity/ personality/ history/ MAP.md
     /// inbox.md). NOT in the user's Notes tree and never writable by any lane —
@@ -2180,7 +2199,7 @@ pub enum Surface {
 /// separators ("" = the root itself).
 ///
 /// LegacyRotli surfaces everything read-write (today's behavior). Memex surfaces
-/// ONLY `wiki/` (read-only) + `chats/` (read-write) in the Notes tree, marks the
+/// ONLY `wiki/` + `chats/` (both read-write) in the Notes tree, marks the
 /// brain's memory (identity/personality/history/MAP/inbox) `Reference` — out of
 /// the tree but reachable by the AI's retrieval tools — and hides every
 /// memex-vault control file. Top-level memex-vault docs (STRUCTURE.md,
@@ -2195,14 +2214,14 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
     if rel == "chats" || rel.starts_with("chats/") {
         return Surface::NoteRW;
     }
-    // wiki/_inbox — rotli's note STAGING (v3.5): writable, so a projected note can
-    // be edited in place. Must precede the wiki/ rule below (which is read-only).
-    if rel == "wiki/_inbox" || rel.starts_with("wiki/_inbox/") {
-        return Surface::NoteRW;
-    }
-    // wiki/_secure — protected USER content inside the Brain. It is writable
-    // for its owner, but never an organizer area and still model-gated on read.
-    if rel == "wiki/_secure" || rel.starts_with("wiki/_secure/") {
+    // wiki/ — the brain's knowledge tree, WRITABLE (2026-08-03). The read-only
+    // era ("this increment") ended when the Librarian began filing staged notes
+    // into curated areas: a note the filer organizes must stay editable, not
+    // silently become read-only the moment it leaves wiki/_inbox (the save
+    // banner retried forever). This covers _inbox staging and _secure alike;
+    // _secure stays model-gated on READ and never an organizer area, and the
+    // organizer still skips secure + locked notes.
+    if rel == "wiki" || rel.starts_with("wiki/") {
         return Surface::NoteRW;
     }
     // Archive/ + Trash/ — rotli's LIFECYCLE sinks (capitalized, matching the TS
@@ -2212,10 +2231,6 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
     // Without this, archive/trash silently no-op in a memex (Seth, 2026-07-07).
     if is_hidden_root(rel) {
         return Surface::NoteRW;
-    }
-    // wiki/ — browsable folders; the curated rest is read-only (only _inbox writes)
-    if rel == "wiki" || rel.starts_with("wiki/") {
-        return Surface::NoteRO;
     }
     // storage/excalidraw/ — the memex's BOARD lane (Seth, 2026-07-07). Excalidraw
     // scenes rotli creates + edits live here, so they're WRITABLE even though the
@@ -2919,7 +2934,7 @@ impl CorpusStore {
     /// keeps the typed lines verbatim but restores the reserved provenance keys
     /// (id/owner/created) from the file; the body is untouched and `updated` is
     /// NOT bumped (a metadata edit never reorders the list). Gated by the same
-    /// user-writability as every editor save — curated wiki/** refuses (v3.7).
+    /// user-writability as every editor save (wiki/** included since 2026-08-03).
     /// Because `secure:` can be typed here, the gitignore stays in step the same
     /// way set_secure keeps it (secure ⇒ gitignored, cleared ⇒ un-ignored).
     fn write_frontmatter_raw(&mut self, id_or_rel: &str, block: &str) -> Result<(), String> {
@@ -3562,9 +3577,10 @@ impl CorpusStore {
 
     /// The ownership choke point (Increment 3). Called at the TOP of every
     /// mutating method, before any disk touch. LegacyRotli → Ok for everything
-    /// (today). Memex → Ok ONLY for `chats/**` (and creating the `chats/` dir);
-    /// every other path returns a user-facing Err that the TS layer renders.
-    /// `rel == ""` is the corpus root — writable only in LegacyRotli.
+    /// (today). Memex → Ok ONLY for the NoteRW lanes (`wiki/**`, `chats/**`,
+    /// lifecycle sinks, the board lane); every other path returns a user-facing
+    /// Err that the TS layer renders. `rel == ""` is the corpus root — writable
+    /// only in LegacyRotli.
     fn mutation_allowed(&self) -> Result<(), String> {
         // #3 (audit 2026-07): perms + contract band are enforced HERE, not only in
         // the TS canWrite — a user-set read-only brain and an out-of-band contract
@@ -3595,7 +3611,7 @@ impl CorpusStore {
         match surfaced(self.layout, rel) {
             Surface::NoteRW => Ok(()),
             _ => Err(format!(
-                "this location is read-only to rotli in a memex — it writes chats, note staging, and boards (refused: {})",
+                "this location is read-only to rotli in a memex — it writes wiki notes, chats, and boards (refused: {})",
                 if rel.is_empty() { "<root>" } else { rel }
             )),
         }
@@ -3970,8 +3986,9 @@ impl CorpusStore {
         Ok(hits)
     }
 
-    /// The Tasks projection (decision 2026-07-25): every open `- [ ]` checkbox
-    /// across ordinary Markdown notes, in corpus list order. Derived per call —
+    /// The Tasks projection (decision 2026-07-25): every open checkbox
+    /// (`- [ ]` / `* [ ]` / `1. [ ]`) across ordinary Markdown notes, in
+    /// corpus list order. Derived per call —
     /// Markdown stays the only truth. Trash/Archive/chats/boards excluded;
     /// fenced code skipped; secure and locked notes INCLUDED (this is the
     /// user's own local screen, and the surface is not agent-exposed).
@@ -7348,6 +7365,9 @@ mod tests {
         assert_eq!(archived, "archive/storage/rotli/draft.docx");
         assert_eq!(store.restore_file(&archived).unwrap(), doc);
 
+        // the FILE lifecycle stays a storage-lane affair even though wiki/ is a
+        // writable NOTE lane (2026-08-03): a binary parked in wiki/ is outside
+        // Rotli storage, so the sink move still refuses it.
         fs::create_dir_all(root.join("wiki/projects")).unwrap();
         fs::write(root.join("wiki/projects/reference.pdf"), b"keep").unwrap();
         assert!(store.move_file_to_sink("wiki/projects/reference.pdf", "Trash").is_err());
@@ -7548,16 +7568,18 @@ mod tests {
         assert!(on_disk.contains("tags: [kept]"), "typed key lands");
         assert!(on_disk.ends_with("\n# Raw\n\nBody.\n"), "body byte-exact:\n{on_disk}");
 
-        // Memex: the curated brain refuses (the USER gate — same as every save);
-        // rotli's own chats/ surface accepts
+        // Memex: wiki + chats both accept (the USER gate — same as every save;
+        // wiki writable since 2026-08-03), Reference/Hidden lanes still refuse
         let dir = TempDir::new().unwrap();
         let brain = dir.path().join("brain");
         seed_memex(&brain);
         let mut mx = CorpusStore::open(brain).unwrap();
         mx.os_trash = false;
-        assert!(mx.write_frontmatter_raw("wiki/note.md", "---\ntags: [x]\n---\n").is_err());
+        mx.write_frontmatter_raw("wiki/note.md", "---\ntags: [x]\n---\n").unwrap();
+        assert_eq!(mx.raw_frontmatter("wiki/note.md").unwrap(), "---\ntags: [x]\n---\n");
         mx.write_frontmatter_raw("chats/welcome.md", "---\ntags: [x]\n---\n").unwrap();
         assert_eq!(mx.raw_frontmatter("chats/welcome.md").unwrap(), "---\ntags: [x]\n---\n");
+        assert!(mx.write_frontmatter_raw("MAP.md", "---\ntags: [x]\n---\n").is_err());
     }
 
     #[test]
@@ -8541,9 +8563,9 @@ mod tests {
         assert!(!root.join(DOT_DIR).exists());
     }
 
-    // contract v3.7 — the FILER lane is disjoint from the USER lane: the user still
-    // can't write the curated brain, and the filer can ONLY write the brain, only
-    // AI keys, and never a locked note.
+    // contract v3.7 — the FILER lane is disjoint from the USER lane by KEY
+    // ownership: the filer can ONLY write the brain, only AI keys, and never a
+    // locked note (paths overlap since wiki became user-writable, 2026-08-03).
     #[test]
     fn filer_lane_is_disjoint_and_files_notes() {
         let dir = TempDir::new().unwrap();
@@ -8554,9 +8576,10 @@ mod tests {
         store.os_trash = false;
         assert_eq!(store.layout, Layout::Memex);
 
-        // USER lane UNCHANGED — still closed to the curated brain.
-        assert!(store.writable("wiki/note.md").is_err());
-        assert!(store.writable("wiki/Projects/x.md").is_err());
+        // USER lane: the curated brain is writable too (2026-08-03) — the lanes
+        // stay disjoint by KEY ownership (AI_KEYS below), not by path anymore.
+        assert!(store.writable("wiki/note.md").is_ok());
+        assert!(store.writable("wiki/Projects/x.md").is_ok());
 
         // FILER lane — the brain is writable, everything else refused.
         assert!(store.filer_writable("wiki").is_ok());
@@ -9024,7 +9047,7 @@ mod tests {
         let note = store
             .create(
                 "Inbox",
-                "# Plan\n\n- [ ] call the bank\n  about the wire\n- [x] already done\n- [ ]\n```\n- [ ] not a task — code\n```\n* [ ] second style\n",
+                "# Plan\n\n- [ ] call the bank\n  about the wire\n- [x] already done\n- [ ]\n```\n- [ ] not a task — code\n```\n* [ ] second style\n1. [ ] rotate the key\n2. [x] ordered but done\n3. plain step, not a task\n",
             )
             .unwrap();
         // a task in a sink is not a nag
@@ -9033,8 +9056,13 @@ mod tests {
 
         let tasks = store.tasks().unwrap();
         let texts: Vec<&str> = tasks.iter().map(|t| t.text.as_str()).collect();
-        // the wrapped continuation joins into ONE task (2026-07-31)
-        assert_eq!(texts, vec!["call the bank about the wire", "second style"], "{tasks:?}");
+        // the wrapped continuation joins into ONE task (2026-07-31); `1. [ ]`
+        // ordered tasks project too (2026-08-03), checked/plain ordered lines don't
+        assert_eq!(
+            texts,
+            vec!["call the bank about the wire", "second style", "rotate the key"],
+            "{tasks:?}"
+        );
         assert!(tasks.iter().all(|t| t.note_id == note.id));
         assert_eq!(tasks[0].note_title, "Plan");
 
@@ -9045,7 +9073,14 @@ mod tests {
         assert!(body.contains("- [x] call the bank"), "{body}");
         assert!(body.contains("* [ ] second style"), "other tasks untouched: {body}");
         assert!(body.contains("- [ ] not a task — code"), "fenced text untouched: {body}");
-        assert_eq!(store.tasks().unwrap().len(), 1, "a checked task leaves the list");
+        assert_eq!(store.tasks().unwrap().len(), 2, "a checked task leaves the list");
+
+        // an ordered task toggles the same way — replacen hits the box, not the number
+        let ordered = store.tasks().unwrap().into_iter().find(|t| t.text == "rotate the key").unwrap();
+        store.toggle_task(&note.id, ordered.line, "rotate the key").unwrap();
+        let body = store.read(&note.id).unwrap().body;
+        assert!(body.contains("1. [x] rotate the key"), "{body}");
+        assert_eq!(store.tasks().unwrap().len(), 1);
 
         // stale refusal: the note changed since the list was built
         let err = store.toggle_task(&note.id, tasks[0].line, "call the bank").unwrap_err();
@@ -9472,8 +9507,10 @@ mod tests {
         }
         // reserved keys stay refused (existing behavior)
         assert!(store.set_field(&rel, "locked", "true").is_err());
-        // the CURATED wiki is not user-writable — set_field must refuse it too
-        assert!(store.set_field("wiki/note.md", "topic", "x").is_err());
+        // the curated wiki is user-writable (2026-08-03): a USER key lands, but
+        // AI keys stay the filer's alone even there
+        assert!(store.set_field("wiki/note.md", "topic", "x").is_ok());
+        assert!(store.set_field("wiki/note.md", "area", "x").is_err());
     }
 
     /// #3 (audit 2026-07): the contract band and a brain's user-set read-only
@@ -9684,13 +9721,15 @@ mod tests {
         // never writable via the note path (writable() refuses NoteRO, asserted below).
         assert_eq!(surfaced(m, "storage"), Surface::NoteRO);
         assert_eq!(surfaced(m, "storage/graph.png"), Surface::NoteRO);
-        // surfaced: chats + lifecycle sinks writable, wiki read-only
+        // surfaced: chats + wiki + lifecycle sinks all writable (wiki since
+        // 2026-08-03 — a Librarian-filed note stays editable)
         assert_eq!(surfaced(m, "chats/x.md"), Surface::NoteRW);
         assert_eq!(surfaced(m, "chats"), Surface::NoteRW);
         assert_eq!(surfaced(m, "archive"), Surface::NoteRW);
         assert_eq!(surfaced(m, "trash/storage/file.pdf"), Surface::NoteRW);
-        assert_eq!(surfaced(m, "wiki/x.md"), Surface::NoteRO);
-        assert_eq!(surfaced(m, "wiki"), Surface::NoteRO);
+        assert_eq!(surfaced(m, "wiki/x.md"), Surface::NoteRW);
+        assert_eq!(surfaced(m, "wiki/engineering/filed.md"), Surface::NoteRW);
+        assert_eq!(surfaced(m, "wiki"), Surface::NoteRW);
         // LegacyRotli surfaces everything read-write (today)
         assert_eq!(surfaced(Layout::LegacyRotli, "STRUCTURE.md"), Surface::NoteRW);
         assert_eq!(surfaced(Layout::LegacyRotli, "self/x.md"), Surface::NoteRW);
@@ -9763,17 +9802,18 @@ mod tests {
         store.os_trash = false;
         assert_eq!(store.layout, Layout::Memex);
 
-        // forbidden: self/history/MAP/wiki/inbox + control files + the root
+        // forbidden: self/history/MAP/inbox + control files + the root
         assert!(store.writable("self/identity.md").is_err());
         assert!(store.writable("history/x.md").is_err());
         assert!(store.writable("MAP.md").is_err());
-        assert!(store.writable("wiki/note.md").is_err());
         assert!(store.writable("inbox.md").is_err());
         assert!(store.writable("memex.json").is_err());
         assert!(store.writable("").is_err());
-        // allowed: chats and anything under it
+        // allowed: chats, wiki (curated included — 2026-08-03), lifecycle sinks
         assert!(store.writable("chats").is_ok());
         assert!(store.writable("chats/new.md").is_ok());
+        assert!(store.writable("wiki/note.md").is_ok());
+        assert!(store.writable("wiki/engineering/filed.md").is_ok());
         assert!(store.writable("archive").is_ok());
         assert!(store.writable("trash/storage/file.pdf").is_ok());
     }

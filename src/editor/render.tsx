@@ -1,6 +1,6 @@
 // The tiny line renderer — a pure function of the line text (r1 frame A is
 // the pixel truth for rendered output). Blocks: # ## ### headings, - bullets,
-// 1. numbered, - [ ]/- [x] tasks, > quotes. Inline marks: **bold**, *italic*,
+// 1. numbered, - [ ]/- [x] and 1. [ ] (ordered) tasks, > quotes. Inline marks: **bold**, *italic*,
 // ~~strike~~, `code`, ==highlight== (always peach tint), <u>underline</u>
 // (the r3 marks law), [text](url) links. No raw HTML passthrough beyond <u>.
 
@@ -17,12 +17,15 @@ export interface Block {
   prefixLen: number;
   text: string;
   done?: boolean;
+  /** The `1.` glyph of a numbered item — also set on an ORDERED task
+   * (`1. [ ] x`), which parses as kind "task" with a marker. */
   marker?: string;
   /** Leading-space count for a nested list item (0 = top level). 2 spaces/level. */
   indent?: number;
 }
 
 const TASK_RE = /^- \[([ xX])\] /;
+const ORDERED_TASK_RE = /^(\d+)\. \[([ xX])\] /;
 const NUMBERED_RE = /^(\d+)\. /;
 const HEADING_RE = /^(#{1,3}) /;
 
@@ -52,6 +55,18 @@ export function parseBlock(line: string): Block {
     };
   if (body.startsWith("- "))
     return { kind: "bullet", prefixLen: indentChars.length + 2, text: body.slice(2), indent };
+  // GFM's ordered task ("1. [ ] x") — a task that keeps its number as marker;
+  // must win over the plain numbered rule below
+  const ot = ORDERED_TASK_RE.exec(body);
+  if (ot)
+    return {
+      kind: "task",
+      prefixLen: indentChars.length + ot[0].length,
+      text: body.slice(ot[0].length),
+      done: ot[2] !== " ",
+      marker: `${ot[1]}.`,
+      indent,
+    };
   const n = NUMBERED_RE.exec(body);
   if (n)
     return {

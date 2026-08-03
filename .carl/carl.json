@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-08-01T20:45:28.688Z",
+  "last_modified": "2026-08-03T22:03:24.182Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -696,6 +696,15 @@
       "rationale": "Rule 1 is stale: \"on-device models require explicit local_ai_allowed\" was inverted on 2026-08-01 (default allow), and it omits what the egress audit made load-bearing — TypeScript was applying the search/map/laundering/taint filters, so Rust supplied verdicts it did not enforce. Nine gaps, all closed in Rust.",
       "source": "docs/architecture/egress-threat-model.md",
       "proposed_at": "2026-08-01T20:45:28.688Z",
+      "status": "pending"
+    },
+    {
+      "id": "stg-006",
+      "proposed_domain": "ROTLI_MEMEX",
+      "rule_text": "Interactive lane writes chats/ and ALL of wiki/ (2026-08-03 — a filed note stays editable); never identity/personality/history/MAP.md/control files. Filer lane still owns AI metadata keys exclusively. TS and Rust enforce independently.",
+      "rationale": "Rule 0's \"does not rewrite curated wiki via interactive lane\" is stale: curated wiki flipped NoteRO→NoteRW (corpus.rs surfaced + canWrite) so Librarian-filed notes stop failing saves forever.",
+      "source": "AI proposal",
+      "proposed_at": "2026-08-03T22:03:24.181Z",
       "status": "pending"
     }
   ]

@@ -144,12 +144,12 @@ export function applyHeading(line: string, level: HeadingLevel): PrefixEdit {
 
 // ——— block prefixes ———
 
-const ANY_BLOCK_PREFIX = /^(- \[[ xX]\] |- |\d+\. |> )/;
+const ANY_BLOCK_PREFIX = /^(\d+\. \[[ xX]\] |- \[[ xX]\] |- |\d+\. |> )/;
 
 const BLOCK_RULES: Record<BlockToggle, { add: string; test: RegExp }> = {
   quote: { add: "> ", test: /^> / },
   bullet: { add: "- ", test: /^- (?!\[[ xX]\] )/ },
-  numbered: { add: "1. ", test: /^\d+\. / },
+  numbered: { add: "1. ", test: /^\d+\. (?!\[[ xX]\] )/ },
   checklist: { add: "- [ ] ", test: /^- \[[ xX]\] / },
 };
 

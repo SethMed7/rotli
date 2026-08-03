@@ -31,7 +31,7 @@ import { locateLostImage } from "../services/imageRepair";
 import { usePanesStore } from "../state/panes";
 import { scanFences } from "./fences";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
-import { CHECK_EM, listStyle } from "./listGeometry";
+import { CHECK_EM, listStyle, MARKER_EM } from "./listGeometry";
 import { parseBlock } from "./render";
 import { lineInTable, scanTables } from "./tables";
 import { editorLinkOpensOnClick, WIKILINK_RE } from "./wikilink";
@@ -212,11 +212,16 @@ class NumberWidget extends WidgetType {
 }
 
 class CheckboxWidget extends WidgetType {
-  constructor(readonly done: boolean) {
+  /** `marker` carries the `1.` glyph of an ORDERED task ("1. [ ] x") — rendered
+   * before the box so the step number survives; null for a plain `- [ ]`. */
+  constructor(
+    readonly done: boolean,
+    readonly marker: string | null = null,
+  ) {
     super();
   }
   eq(o: CheckboxWidget) {
-    return o.done === this.done;
+    return o.done === this.done && o.marker === this.marker;
   }
   toDOM(view: EditorView) {
     const btn = document.createElement("button");
@@ -231,12 +236,19 @@ class CheckboxWidget extends WidgetType {
       e.preventDefault();
       const pos = view.posAtDOM(btn);
       const line = view.state.doc.lineAt(pos);
-      const m = /^(\s*)- \[([ xX])\] /.exec(line.text);
+      const m = /^(\s*(?:-|\d+\.) )\[([ xX])\] /.exec(line.text);
       if (!m) return;
-      const next = m[2] === " " ? `${m[1]}- [x] ` : `${m[1]}- [ ] `;
+      const next = m[2] === " " ? `${m[1]}[x] ` : `${m[1]}[ ] `;
       view.dispatch({ changes: { from: line.from, to: line.from + m[0].length, insert: next } });
     });
-    return btn;
+    if (!this.marker) return btn;
+    const wrap = document.createElement("span");
+    const num = document.createElement("span");
+    num.className = "rotli-marker num";
+    num.textContent = this.marker;
+    num.setAttribute("aria-hidden", "true");
+    wrap.append(num, btn);
+    return wrap;
   }
   ignoreEvent() {
     return false;
@@ -696,11 +708,12 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
           decos.push(
             Decoration.line({
               class: block.done ? "rotli-task done" : "rotli-task",
-              // a checkbox hangs in a wider column than a glyph
-              attributes: { style: listStyle(depth, CHECK_EM) },
+              // a checkbox hangs in a wider column than a glyph; an ordered
+              // task ("1. [ ]") hangs by its number PLUS the checkbox
+              attributes: { style: listStyle(depth, block.marker ? MARKER_EM + CHECK_EM : CHECK_EM) },
             }).range(ls),
           );
-          hidePrefix(ls, prefixEnd, new CheckboxWidget(!!block.done), decos, atomics);
+          hidePrefix(ls, prefixEnd, new CheckboxWidget(!!block.done, block.marker ?? null), decos, atomics);
           if (block.done && line.to > prefixEnd) {
             decos.push(Decoration.mark({ class: "rotli-done" }).range(prefixEnd, line.to));
           }

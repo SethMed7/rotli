@@ -34,7 +34,7 @@ export function setWriteNoteBodyForTests(fn: typeof writeNoteBody | null): void 
 // ——— checkbox signature: the Tasks projection walks the corpus (corpus_tasks),
 // so a body sync invalidates it ONLY when the note's checkbox lines actually
 // changed — steady typing never pays that walk (perf audit 2026-07-30, #4/#5).
-const TASK_LINE = /^\s*[-*+]\s+\[[ xX]\]/;
+const TASK_LINE = /^\s*(?:[-*+]|\d+\.)\s+\[[ xX]\]/;
 const taskSigs = new Map<string, string>();
 
 function taskSignature(lines: readonly string[]): string {

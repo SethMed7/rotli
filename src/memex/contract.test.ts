@@ -275,9 +275,10 @@ describe("the AI Filer lane (v3.7) — mirror of Rust filer_writable/AI_KEYS", (
     expect(canFile("inbox.md")).toBe(false);
     expect(canFile("wiki/../etc")).toBe(false);
   });
-  test("the user lane and the filer lane are DISJOINT", () => {
-    // user writes chats/_inbox, never the curated brain; the filer the reverse
-    expect(canWrite("wiki/Projects/x.md", "chats+inbox")).toBe(false);
+  test("the user lane and the filer lane stay distinct", () => {
+    // paths overlap on wiki/ since 2026-08-03 (both may write it); disjointness
+    // now lives in KEY ownership (AI_KEYS) — but the filer still never writes chats
+    expect(canWrite("wiki/Projects/x.md", "chats+inbox")).toBe(true);
     expect(canFile("wiki/Projects/x.md")).toBe(true);
     expect(canWrite("chats/x.md", "chats+inbox")).toBe(true);
     expect(canFile("chats/x.md")).toBe(false);
@@ -301,13 +302,15 @@ describe("canWrite (mirror of the Rust write-guard)", () => {
     // the dead allowance was narrowed out (audit 2026-07 #96)
     expect(canWrite("inbox.md", "chats+inbox")).toBe(false);
   });
-  test("staging and secure homes are writable; curated wiki + identity/personality/history/MAP are not", () => {
+  test("all of wiki/ is writable (2026-08-03); identity/personality/history/MAP are not", () => {
     expect(canWrite("wiki/_inbox/pricing-decision-01jtes.md", "chats+inbox")).toBe(true);
     expect(canWrite("wiki/_inbox", "chats+inbox")).toBe(true);
     expect(canWrite("wiki/_secure/private.md", "chats+inbox")).toBe(true);
     expect(canFile("wiki/_secure/private.md")).toBe(false);
-    expect(canWrite("wiki/x.md", "chats+inbox")).toBe(false); // curated wiki — read-only
-    expect(canWrite("wiki/projects/x.md", "chats+inbox")).toBe(false);
+    // curated wiki — writable, so a Librarian-filed note stays editable
+    expect(canWrite("wiki/x.md", "chats+inbox")).toBe(true);
+    expect(canWrite("wiki/projects/x.md", "chats+inbox")).toBe(true);
+    expect(canWrite("wiki", "chats+inbox")).toBe(true);
     expect(canWrite("identity/x.md", "chats+inbox")).toBe(false);
     expect(canWrite("personality/x.md", "chats+inbox")).toBe(false);
     expect(canWrite("history/2026/x.md", "chats+inbox")).toBe(false);

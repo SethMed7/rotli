@@ -35,16 +35,17 @@ function inFence(view: EditorView, line: Line): boolean {
 }
 
 /** The list grammar (column-0 markers, optional leading indent), identical to
- * the renderer's: bullets, numbered (count up), tasks (reset to unchecked),
- * quotes. Returns the marker for the NEXT line and whether the item is empty. */
+ * the renderer's: bullets, numbered (count up), tasks (reset to unchecked —
+ * ordered tasks count up AND reset), quotes. Returns the marker for the NEXT
+ * line and whether the item is empty. */
 function listPrefixOf(line: string): { prefixLen: number; next: string; empty: boolean } | null {
-  const m = line.match(/^([ \t]*)((?:- \[[ xX]\] |- |\d+\. |> ))(.*)$/);
+  const m = line.match(/^([ \t]*)((?:\d+\. \[[ xX]\] |- \[[ xX]\] |- |\d+\. |> ))(.*)$/);
   if (!m) return null;
   const indent = m[1] ?? "";
   const prefix = m[2] ?? "";
   const content = m[3] ?? "";
-  const num = prefix.match(/^(\d+)\. $/);
-  const marker = num ? `${Number(num[1]) + 1}. ` : prefix.replace(/\[[xX]\]/, "[ ]");
+  const num = prefix.match(/^(\d+)\. (\[[ xX]\] )?$/);
+  const marker = num ? `${Number(num[1]) + 1}. ${num[2] ? "[ ] " : ""}` : prefix.replace(/\[[xX]\]/, "[ ]");
   return {
     prefixLen: indent.length + prefix.length,
     next: indent + marker,
@@ -56,7 +57,7 @@ function listPrefixOf(line: string): { prefixLen: number; next: string; empty: b
  * (2 → 3 → …) so the list never shows duplicate numbers. Deeper-indented items
  * ride along untouched; anything else (blank, bullet, prose) ends the list. */
 function renumberAfter(state: EditorState, line: Line, nextMarker: string) {
-  const marker = /^( *)(\d+)\. $/.exec(nextMarker);
+  const marker = /^( *)(\d+)\. (?:\[[ xX]\] )?$/.exec(nextMarker);
   if (!marker) return [];
   const indent = marker[1]?.length ?? 0;
   let num = Number(marker[2]);

@@ -33,3 +33,42 @@ describe("parseBlock — tab-tolerant list indents", () => {
     expect(b.indent).toBe(2);
   });
 });
+
+// GFM's ordered task ("1. [ ] x") is a TASK that keeps its number as marker —
+// before 2026-08-03 it parsed as plain numbered and showed a literal "[ ]"
+// (Seth's KEK-rotation checklist).
+describe("parseBlock — ordered tasks", () => {
+  test("an open ordered task is a task with its number as marker", () => {
+    const b = parseBlock("1. [ ] Generate the new key");
+    expect(b.kind).toBe("task");
+    expect(b.done).toBe(false);
+    expect(b.marker).toBe("1.");
+    expect(b.prefixLen).toBe("1. [ ] ".length);
+    expect(b.text).toBe("Generate the new key");
+  });
+
+  test("a checked ordered task is done; multi-digit numbers keep their glyph", () => {
+    expect(parseBlock("2. [x] restart the API").done).toBe(true);
+    expect(parseBlock("12. [X] later step").marker).toBe("12.");
+  });
+
+  test("indented ordered tasks nest like every other list kind", () => {
+    const b = parseBlock("  3. [ ] re-seal");
+    expect(b.kind).toBe("task");
+    expect(b.indent).toBe(2);
+    expect(b.prefixLen).toBe(2 + "3. [ ] ".length);
+  });
+
+  test("a plain numbered item and a bullet task are untouched", () => {
+    expect(parseBlock("1. no box here").kind).toBe("numbered");
+    expect(parseBlock("1. no box here").marker).toBe("1.");
+    const t = parseBlock("- [ ] todo");
+    expect(t.kind).toBe("task");
+    expect(t.marker).toBeUndefined();
+  });
+
+  test("a malformed box stays a numbered item, literal", () => {
+    expect(parseBlock("1. [] not gfm").kind).toBe("numbered");
+    expect(parseBlock("1.[ ] no space").kind).toBe("para");
+  });
+});

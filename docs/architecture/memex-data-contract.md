@@ -311,6 +311,12 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   access, and skips locked notes entirely.
 - Remote organizer choices apply only to non-secure, unlocked notes.
 - **Lanes (2026-08-01).** In a memex, `wiki/` and `chats/` are the Notes tree.
+  Both are writable through the interactive lane — all of `wiki/` since
+  2026-08-03: the Librarian files staged notes into curated areas, and a filed
+  note must stay editable rather than silently turning read-only the moment it
+  leaves `wiki/_inbox/` (before that, only `_inbox` staging and `_secure`
+  wrote). `wiki/_secure/` stays model-gated on read and is never an organizer
+  area; the filer lane still owns the AI metadata keys exclusively.
   The brain's memory lanes — `identity/`, `personality/`, `history/`, `MAP.md`,
   `inbox.md` — are `Surface::Reference`: never in the Notes tree, never writable
   by any lane, and **retrievable by both classes of model** through the AI's

@@ -38,7 +38,7 @@ function NotePeek({ body }: { body: string }) {
     else if (b.kind === "bullet" || b.kind === "task" || b.kind === "numbered")
       blocks.push(
         <div key={key} className="pv-li" style={{ paddingLeft: `${(b.indent ?? 0) + 1.2}em` }}>
-          <span className="pv-marker">{b.kind === "numbered" ? (b.marker ?? "•") : "•"}</span>
+          <span className="pv-marker">{b.marker ?? "•"}</span>
           {renderInline(b.text)}
         </div>,
       );
