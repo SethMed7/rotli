@@ -115,6 +115,13 @@ export class InMemoryNotesService implements NotesService {
     return scoped.map(({ body: _body, ...summary }) => summary).sort(summaryOrder);
   }
 
+  /** The WHOLE corpus, unfiltered — the browser twin of the fs adapter's
+   * single-fetch source for the note universe. Order is irrelevant (the universe
+   * filters into per-folder views); no sort. */
+  async listAll(): Promise<NoteSummary[]> {
+    return [...this.notes.values()].map(({ body: _body, ...summary }) => summary);
+  }
+
   /** The browser twin of Rust corpus_search: same scope (never Trash, never
    * chats/ — Archive/staged/Vault stay findable), same pure grammar
    * (search.ts searchMatch/sortHits), same cap. In-memory notes are all

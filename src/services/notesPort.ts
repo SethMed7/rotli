@@ -10,6 +10,10 @@ export interface NotesService {
   deleteFolder(id: string): Promise<void>;
   /** No folderId means all visible notes; a folder includes descendants. */
   listNotes(folderId?: string): Promise<NoteSummary[]>;
+  /** The WHOLE corpus, unfiltered (hidden roots, Vault, chats/, files included).
+   * The single-fetch source the note universe filters into its per-folder views
+   * client-side, instead of listing once per view. */
+  listAll(): Promise<NoteSummary[]>;
   /** Full-text title/body search. Trust-boundary filtering remains independent
    * in the filesystem/Rust adapter and AI host. */
   searchNotes(query: string, limit?: number): Promise<SearchHit[]>;

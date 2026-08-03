@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import type { Note, NoteSummary } from "../types";
-import { applyNoteWrite, keys } from "./hooks";
+import { UNIVERSE_KEY, applyNoteWrite, keys } from "./hooks";
 import { queryClient } from "./query";
 
 const NOW = 1_800_000_000_000;
@@ -63,6 +63,21 @@ describe("applyNoteWrite", () => {
     queryClient.setQueryData(keys.notes(undefined), [summary("a")]);
     await applyNoteWrite(note("a", { title: "Renamed", updatedAt: NOW }));
     expect(queryClient.getQueryData<NoteSummary[]>(keys.notes("Storage"))).toBe(other);
+  });
+
+  test("the note universe's single whole-corpus entry stays fresh with no extra wiring", async () => {
+    // useNoteUniverse now fetches the whole corpus ONCE under a reserved folderId
+    // sentinel, keyed inside ["notes"] — so applyNoteWrite patches it exactly like
+    // any per-folder list, keeping the Main index / tab titles live mid-type.
+    const flat = [summary("a", { updatedAt: NOW - 500_000 }), summary("b", { updatedAt: NOW - 100_000 })];
+    queryClient.setQueryData(keys.notes(UNIVERSE_KEY), flat);
+    // a row-invisible body edit leaves the whole-corpus entry identity untouched
+    await applyNoteWrite(note("a", { updatedAt: NOW - 495_000, body: "# Title a\n\nSnippet a\nmore" }));
+    expect(queryClient.getQueryData<NoteSummary[]>(keys.notes(UNIVERSE_KEY))).toBe(flat);
+    // a title change patches the note in place inside the single entry
+    await applyNoteWrite(note("a", { title: "Renamed", updatedAt: NOW }));
+    const patched = queryClient.getQueryData<NoteSummary[]>(keys.notes(UNIVERSE_KEY))!;
+    expect(patched.find((n) => n.id === "a")).toMatchObject({ title: "Renamed", updatedAt: NOW });
   });
 
   test("tasksChanged invalidates ONLY the tasks projection", async () => {

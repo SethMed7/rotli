@@ -488,6 +488,19 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   } | null>(null);
   const marqueeBase = useRef<NoteSummary[]>([]);
   const marqueeBaseFolders = useRef<string[]>([]);
+  // Snapshot of every selectable cell in host CONTENT-space (scroll-invariant),
+  // taken ONCE at pointer-down: a marquee drag doesn't reflow the list, so we
+  // hit-test against this instead of re-running querySelectorAll +
+  // getBoundingClientRect per element on EVERY pointermove (perf audit 2026-08).
+  type MarqueeCell = {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+    noteId: string | undefined;
+    folderPath: string | undefined;
+  };
+  const marqueeCells = useRef<MarqueeCell[]>([]);
   const marqueeDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest("button, input, [data-note-id]")) return;
@@ -495,6 +508,23 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     const r = host.getBoundingClientRect();
     const x = e.clientX - r.left + host.scrollLeft;
     const y = e.clientY - r.top + host.scrollTop;
+    // measure every cell ONCE, in content-space, so scroll during the drag
+    // doesn't invalidate the snapshot
+    marqueeCells.current = [...host.querySelectorAll<HTMLElement>("[data-note-id], [data-folder-path]")].map(
+      (el) => {
+        const b = el.getBoundingClientRect();
+        const left = b.left - r.left + host.scrollLeft;
+        const top = b.top - r.top + host.scrollTop;
+        return {
+          left,
+          top,
+          right: left + b.width,
+          bottom: top + b.height,
+          noteId: el.dataset.noteId,
+          folderPath: el.dataset.folderPath,
+        };
+      },
+    );
     marqueeBase.current = e.metaKey ? selection : [];
     marqueeBaseFolders.current = e.metaKey ? folderSel : [];
     if (!e.metaKey) {
@@ -521,30 +551,27 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       height: Math.abs(y - start.y),
     };
     setMarqueeRect(rect);
-    // Set-based dedup — this loop reruns per pointermove (Greptile, PR #18)
+    // Set-based dedup — this loop reruns per pointermove (Greptile, PR #18).
+    // Hit-tests the pointer-down snapshot (marqueeCells), not a fresh DOM walk.
     const picked: NoteSummary[] = [...marqueeBase.current];
     const pickedIds = new Set(picked.map((n) => n.id));
     const pickedFolders: string[] = [...marqueeBaseFolders.current];
     const pickedFolderSet = new Set(pickedFolders);
-    for (const el of host.querySelectorAll<HTMLElement>("[data-note-id], [data-folder-path]")) {
-      const b = el.getBoundingClientRect();
-      const bx = b.left - r.left + host.scrollLeft;
-      const by = b.top - r.top + host.scrollTop;
+    for (const cell of marqueeCells.current) {
       const hit =
-        bx < rect.left + rect.width &&
-        bx + b.width > rect.left &&
-        by < rect.top + rect.height &&
-        by + b.height > rect.top;
+        cell.left < rect.left + rect.width &&
+        cell.right > rect.left &&
+        cell.top < rect.top + rect.height &&
+        cell.bottom > rect.top;
       if (!hit) continue;
-      const folderPath = el.dataset.folderPath;
-      if (folderPath) {
-        if (!pickedFolderSet.has(folderPath)) {
-          pickedFolderSet.add(folderPath);
-          pickedFolders.push(folderPath);
+      if (cell.folderPath) {
+        if (!pickedFolderSet.has(cell.folderPath)) {
+          pickedFolderSet.add(cell.folderPath);
+          pickedFolders.push(cell.folderPath);
         }
         continue;
       }
-      const n = el.dataset.noteId ? itemById.get(el.dataset.noteId) : undefined;
+      const n = cell.noteId ? itemById.get(cell.noteId) : undefined;
       if (n && !pickedIds.has(n.id)) {
         pickedIds.add(n.id);
         picked.push(n);

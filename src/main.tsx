@@ -4,7 +4,7 @@ import ReactDOM from "react-dom/client";
 
 import App from "./app";
 import { queryClient } from "./services/query";
-import { attachPersistence, hydratePersistedState } from "./state/persist";
+import { attachPersistence, hydratePersistedState, runDeferredMaintenance } from "./state/persist";
 
 // Excalidraw otherwise fetches its fonts from a CDN (unpkg). For an offline
 // desktop app (Tauri, no network) point its asset path at the app origin so it
@@ -31,6 +31,12 @@ async function bootstrap(rootEl: HTMLElement): Promise<void> {
     </React.StrictMode>,
   );
   attachPersistence(); // the one debounced writer (main window + Tauri only)
+  // Orphan-map GC runs every launch but NOT before paint — kick it once the
+  // browser is idle after the first render (perf audit 2026-08). It self-guards
+  // to the main surface + hydrated Main, so a stray early call is a safe no-op.
+  const kickMaintenance = () => void runDeferredMaintenance();
+  if (typeof requestIdleCallback === "function") requestIdleCallback(kickMaintenance);
+  else setTimeout(kickMaintenance, 0);
 }
 
 void bootstrap(root);

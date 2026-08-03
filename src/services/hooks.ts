@@ -1,7 +1,7 @@
 // The seam components actually consume: TanStack Query hooks over the typed
 // service. No component touches notesService directly.
 
-import { keepPreviousData, useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { replaceTitleLine } from "../lib/noteTitle";
@@ -22,7 +22,7 @@ import { readJournal } from "./brainJournalStore";
 import { summaryOrder } from "./derive";
 import { DEST, isChats, isChatsPath, isSink } from "./destinations";
 import { trashVirtualFolderItems } from "./folderTrash";
-import { memexRootMarkers } from "./fsNotes";
+import { memexRootMarkers, scopeCorpusNotes } from "./fsNotes";
 import { archiveNoteWithImages, trashNoteWithImages } from "./noteLifecycle";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
@@ -50,6 +50,13 @@ export const keys = {
   secureHints: ["secure-hints"] as const,
   tasks: ["tasks"] as const,
 };
+
+/** The note universe's whole-corpus fetch rides a reserved folderId sentinel so
+ * it shares the `["notes"]` invalidation umbrella (invalidateNotes refetches it,
+ * applyNoteWrite patches it) while never colliding with a real folder id — real
+ * ids are ULIDs, paths, or "<root>:" markers, none of which start with NUL. */
+export const UNIVERSE_KEY = "\u0000universe";
+const EMPTY_MARKERS: ReadonlySet<string> = new Set();
 
 /** The connected brains, as sidebar roots (their `vault:`-style rows). Tauri-only.
  * The set only changes on a relaunch (connecting/forgetting a brain restarts), so
@@ -80,18 +87,25 @@ export function useNotes(folderId?: string) {
 /** Every listing that can hold a note — the default view, the roots it hides
  * (Board = STAGED wiki/_inbox notes, Archive, Trash), the external Vault, AND
  * every ADDED root ("<rootid>:" — a note there is as real as a vault note: its
- * Main ref must survive GC, its tab needs a title). Same query keys as
- * useNotes(), so these are cache reads of the one corpus_list, not extra
- * fetches. Returns the lists (undefined until each loads) plus `complete` —
- * true only when the roots list AND every note listing have SUCCEEDED.
- * TanStack's structural sharing keeps each LIST's identity stable when its
- * content is unchanged, but a refetch cycle still hands combine new result
- * wrappers (isFetching flips), so combine's .map() minted a fresh `lists`
- * array per 400ms sync tick — and every downstream useMemo (note index,
- * searchable notes, tab titles, list sorts, wikilink re-decoration)
- * re-derived while typing (perf audit 2026-07-30, the findings-8/9/11/12
- * shared trigger). stableLists reuses the previous array whenever every
- * element is identical. */
+ * Main ref must survive GC, its tab needs a title).
+ *
+ * ONE query, not seven (perf audit 2026-08): this fanned out `useQueries` over
+ * 7+ folderIds, and each `listNotes(folderId)` walks the WHOLE corpus
+ * (corpus_list) then filters — so an invalidation serialized the whole corpus
+ * across the IPC boundary once PER view. It now fetches the whole corpus ONCE
+ * (`listAll`, a flat NoteSummary[] under the `["notes"]` prefix so
+ * applyNoteWrite/invalidateNotes keep patching it unchanged) and derives the 7
+ * views client-side with the SAME scope rule listNotes uses (`scopeCorpusNotes`,
+ * zero drift). Returns the lists (undefined until the corpus loads) plus
+ * `complete` — true only when the roots list, the corpus, AND the memex markers
+ * have all SUCCEEDED.
+ *
+ * TanStack's structural sharing keeps the raw corpus identity stable when its
+ * content is unchanged, so the deriving useMemo doesn't recompute per 400ms sync
+ * tick; stableLists then reuses the previous lists array whenever every derived
+ * view is identical, keeping every downstream useMemo (note index, searchable
+ * notes, tab titles, list sorts, wikilink re-decoration) from re-deriving while
+ * typing (the findings-8/9/11/12 shared trigger). */
 let lastUniverseLists: (NoteSummary[] | undefined)[] = [];
 function stableLists(next: (NoteSummary[] | undefined)[]): (NoteSummary[] | undefined)[] {
   if (next.length === lastUniverseLists.length && next.every((list, i) => list === lastUniverseLists[i]))
@@ -100,15 +114,16 @@ function stableLists(next: (NoteSummary[] | undefined)[]): (NoteSummary[] | unde
   return next;
 }
 
-function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: boolean } {
-  const roots = useCorpusRoots();
+/** The folderIds every note universe view covers, in stable order. undefined is
+ * the All-Notes sentinel; the trailing entries are the root markers. */
+function universeFolderIds(roots: CorpusRoot[] | undefined): (string | undefined)[] {
   // the vault marker ("vault:") is already one of the reserved five — the Set
   // dedupes it so the vault brain doesn't ride twice
   const markers = new Set([
     DEST.vault,
-    ...(roots.data ?? []).filter((r) => r.id !== "default").map((r) => `${r.id}:`),
+    ...(roots ?? []).filter((r) => r.id !== "default").map((r) => `${r.id}:`),
   ]);
-  const folderIds: (string | undefined)[] = [
+  return [
     undefined,
     DEST.board,
     // Binary files stay out of ordinary note search below, but belong in the
@@ -118,17 +133,43 @@ function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: bo
     DEST.trash,
     ...markers,
   ];
-  const rootsReady = roots.isSuccess;
-  return useQueries({
-    queries: folderIds.map((folderId) => ({
-      queryKey: keys.notes(folderId),
-      queryFn: () => notesService.listNotes(folderId),
-    })),
-    combine: (results) => ({
-      lists: stableLists(results.map((r) => r.data)),
-      complete: rootsReady && results.every((r) => r.isSuccess),
-    }),
+}
+
+function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: boolean } {
+  const roots = useCorpusRoots();
+  // which roots' chats/ means transcripts — session-static, like the roots list;
+  // consulted ONLY for the All-Notes view's chats/ exclusion. Shares the key with
+  // useSearchableNotes so the markers resolve once.
+  const memexQ = useQuery({
+    queryKey: keys.memexRoots,
+    queryFn: (): Promise<ReadonlySet<string>> | ReadonlySet<string> =>
+      isTauri() ? memexRootMarkers() : new Set([DEST.vault]),
+    staleTime: Infinity,
   });
+  // the WHOLE corpus, once — a flat listing keyed under ["notes"] so the mutation
+  // helpers (applyNoteWrite patch, invalidateNotes) treat it exactly like a
+  // per-folder list and keep it fresh with no extra wiring.
+  const corpus = useQuery({
+    queryKey: keys.notes(UNIVERSE_KEY),
+    queryFn: () => notesService.listAll(),
+  });
+  const rootData = roots.data;
+  const memex = memexQ.data;
+  const raw = corpus.data;
+  const lists = useMemo(() => {
+    const folderIds = universeFolderIds(rootData);
+    if (!raw) return stableLists(folderIds.map(() => undefined));
+    return stableLists(
+      folderIds.map((folderId) =>
+        // the All-Notes view needs the markers; until they load it isn't ready
+        // (mirrors the old listNotes(undefined), which awaited them) — every
+        // scoped view resolves from the corpus alone
+        !folderId && !memex ? undefined : scopeCorpusNotes(raw, folderId, memex ?? EMPTY_MARKERS),
+      ),
+    );
+  }, [raw, memex, rootData]);
+  const complete = roots.isSuccess && corpus.isSuccess && memexQ.isSuccess;
+  return { lists, complete };
 }
 
 /** The ONE id → summary index over EVERY note that exists. useNotes() alone is

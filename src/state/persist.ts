@@ -719,6 +719,22 @@ export function pruneMap<T>(m: Record<string, T>, keep: (k: string) => boolean):
  * expandedDests keys whose folder/Main row is gone (#78). Conservative on
  * purpose — a failed read skips ITS prune entirely (the useMainGcIds lesson:
  * better to keep a stale boolean than to drop live state on an error). */
+/** Set once Main has hydrated on the main surface — gates the deferred GC so it
+ * never runs before its dependency (the Main manifest) is in place, and never on
+ * a non-main surface. */
+let mainMapsReady = false;
+
+/** Post-first-render maintenance: the orphan-map GC that used to be awaited
+ * before the first paint (perf audit 2026-08). main.tsx kicks this AFTER the
+ * initial render so it never delays pixels; it still runs every launch. No-op
+ * until Main has hydrated (mainMapsReady) — the same dependency the awaited call
+ * had — and a no-op on any non-main surface. Keeps gcPersistedMaps's own
+ * keep-on-error semantics (it swallows read failures internally). */
+export async function runDeferredMaintenance(): Promise<void> {
+  if (!mainMapsReady) return;
+  await gcPersistedMaps();
+}
+
 async function gcPersistedMaps(): Promise<void> {
   // chatWeb — live slugs are the UNION of every configured brain's chats/
   // listing, not just the active one's (review, 2026-07): pruning against the
@@ -811,7 +827,13 @@ export async function hydratePersistedState(): Promise<void> {
       // activeView/selection against BOTH hydrated manifests, so it waits.
       await Promise.all([hydrateMain(), hydrateViews()]);
       await hydrateViewstate();
-      await gcPersistedMaps(); // needs the hydrated Main manifest (#78)
+      // gcPersistedMaps (orphan UI-map GC) needs the hydrated Main manifest
+      // (#78) but NOT the first paint — it walks listChats over every instance
+      // + a folder listing. Deferred off the pre-paint critical path
+      // (runDeferredMaintenance, kicked after first render); arming it here
+      // records that Main hydrated so the deferred pass is safe to run (perf
+      // audit 2026-08).
+      mainMapsReady = true;
       applyShellSideEffects(settings);
     }
   } catch {

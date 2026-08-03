@@ -399,10 +399,15 @@ export function makeTauriHost(
     async knowledgeMap(maxChars) {
       // the map spans the Notes tree AND the brain's memory lanes — a model that
       // can't see identity/ in the map never learns to ask for it (2026-08-01)
-      // Titles are knowledge too, so the map rides the GATED listing: Rust
-      // drops every entry this model class may not read before the metas cross
-      // the boundary. The probe below is the fail-fast mirror, not the gate.
-      const readable = await aiReadableHits(await corpusNotesAi(model), model);
+      // Titles are knowledge too, so the map rides the GATED listing: `corpus_notes_ai`
+      // IS the gate — Rust runs `read_for_ai` per meta (corpus.rs corpus_notes_ai)
+      // and drops every entry this model class may not read BEFORE the metas cross
+      // the IPC boundary, so a secure note never reaches this list for a frontier
+      // model. The old aiReadableHits pass here re-ran `read_for_ai` over the very
+      // same ids through `corpus_readable_ids` — pure duplication on THIS path.
+      // (The SEARCH lane still probes: it unions folder-name hits the listing gate
+      // never saw, so those need their own read check.) (perf audit, 2026-08)
+      const readable = await corpusNotesAi(model);
       return buildModelMap(readable, contextWindowFor(model), maxChars);
     },
   };

@@ -115,6 +115,37 @@
   font-size: 11px;
   pointer-events: none;
 }
+/* The embed's quiet status lines — SHARED by the board AND sheet embeds, so they
+   live in this eager sheet, not the lazy canvas.css (a sheet's save-error must be
+   styled even when no board ever loaded). view-only notice (the embed's own tab
+   holds the pen) + the save-failure strip. */
+.rotli-embed-viewonly {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 4px 10px;
+  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.rotli-embed-saveerr {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 7;
+  max-width: calc(100% - 24px);
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--danger, var(--accent-text)) 35%, transparent);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--danger, var(--accent-text));
+  font-size: 11.5px;
+}
 .rotli-render-embed[data-lang="document"] .rotli-render-body {
   height: 340px;
   background: color-mix(in srgb, var(--surface-2) 88%, var(--text));

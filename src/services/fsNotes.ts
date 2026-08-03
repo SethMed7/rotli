@@ -26,6 +26,40 @@ function isNotFound(err: unknown): boolean {
   return err instanceof Error && err.message.includes("note not found");
 }
 
+const EMPTY_MARKERS: ReadonlySet<string> = new Set();
+
+/** The ONE per-folder scoping rule, shared by `listNotes` and the note universe
+ * so the single-fetch path and the per-folder path can never drift. Pure — no
+ * IPC. `memex` is the memex-root marker set, consulted ONLY for the All-Notes
+ * (no folderId) case; the scoped cases are pure prefix tests.
+ *
+ * • no folderId → All Notes: everything EXCEPT the hidden roots, the external
+ *   Vault (browsed only via its own row), AND chats/ transcripts — in a memex
+ *   layout chats/*.md are writable notes, but the Chat front owns them; letting
+ *   them ride here was the "chats leak into All notes" bug. Layout-gated: a
+ *   PLAIN root's folder named "chats" stays in.
+ * • a ROOT MARKER ("vault:") → the whole external root (wiki/ + chats/), by prefix.
+ * • a hidden root (Archive/Trash) → only its own subtree, nothing leaks elsewhere.
+ * • any normal folder → its subtree, minus hidden (defensive). */
+export function scopeCorpusNotes(
+  notes: NoteSummary[],
+  folderId: string | undefined,
+  memex: ReadonlySet<string>,
+): NoteSummary[] {
+  if (!folderId) {
+    return notes.filter((n) => !isHidden(n.folderId) && !isVault(n.folderId) && !isChats(n.folderId, memex));
+  }
+  if (isRootMarker(folderId)) {
+    return notes.filter((n) => n.folderId.startsWith(folderId));
+  }
+  if (isHidden(folderId)) {
+    return notes.filter((n) => n.folderId === folderId || n.folderId.startsWith(`${folderId}/`));
+  }
+  return notes.filter(
+    (n) => !isHidden(n.folderId) && (n.folderId === folderId || n.folderId.startsWith(`${folderId}/`)),
+  );
+}
+
 /** The MEMEX root markers ("" = the local corpus when it's a memex, "<id>:" per
  * connected brain) — the only roots whose chats/ means Chat-front transcripts.
  * Cached for the session: the Location config only changes across a relaunch
@@ -58,33 +92,19 @@ export class FsNotesService implements NotesService {
 
   async listNotes(folderId?: string): Promise<NoteSummary[]> {
     const { notes } = await corpusList();
-    // All Notes (no folderId): everything EXCEPT the hidden roots, the external
-    // Vault (browsed only via its own row, never mixed into the local "All
-    // notes" pick) AND chats/ transcripts — in a memex layout chats/*.md
-    // surface as writable notes, but the Chat front (All chats) owns that
-    // domain; letting them ride here was the "chats leak into All notes" bug.
-    // Layout-gated: a PLAIN root's folder named "chats" is just a folder.
-    if (!folderId) {
-      const memex = await memexRootMarkers();
-      return notes.filter(
-        (n) => !isHidden(n.folderId) && !isVault(n.folderId) && !isChats(n.folderId, memex),
-      );
-    }
-    // A non-default ROOT MARKER ("vault:") scopes to the whole external root —
-    // its surfaced subtree (wiki/ + chats/) is everything prefixed with it.
-    if (isRootMarker(folderId)) {
-      return notes.filter((n) => n.folderId.startsWith(folderId));
-    }
-    // Asking for a hidden root (Archive/Trash) is the ONLY way to see it:
-    // scope to that root's subtree and nothing leaks elsewhere.
-    if (isHidden(folderId)) {
-      return notes.filter((n) => n.folderId === folderId || n.folderId.startsWith(`${folderId}/`));
-    }
-    // Any normal folder: everything under it, minus hidden (defensive — a note
-    // can't sit under both, but the exclusion is the single source of truth).
-    return notes.filter(
-      (n) => !isHidden(n.folderId) && (n.folderId === folderId || n.folderId.startsWith(`${folderId}/`)),
-    );
+    // the All-Notes case is the only one that needs the memex markers (its
+    // chats/ exclusion is layout-gated); every scoped case is a pure prefix test
+    const memex = folderId ? EMPTY_MARKERS : await memexRootMarkers();
+    return scopeCorpusNotes(notes, folderId, memex);
+  }
+
+  /** The WHOLE corpus, unfiltered — every note across every root (hidden roots,
+   * the external Vault, chats/, binary files included). The single-fetch source
+   * the note universe (services/hooks.ts) filters into its per-folder views
+   * client-side, instead of walking corpus_list once per view. */
+  async listAll(): Promise<NoteSummary[]> {
+    const { notes } = await corpusList();
+    return notes;
   }
 
   /** FULL-TEXT search — Rust walks + reads + matches (corpus_search), same

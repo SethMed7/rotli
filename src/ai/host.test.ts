@@ -228,8 +228,21 @@ describe("SECURE is a visibility control against remote", () => {
 
   test("a failed permission probe means NOTHING is readable — fail closed, never open", async () => {
     probeThrows = true;
+    // SEARCH unions folder-name hits the listing gate never saw, so it probes
+    // read_for_ai over the union — a downed probe fails that whole lane closed.
     expect(await makeTauriHost(LOCAL).searchNotes("kelpie", 10)).toEqual([]);
-    expect(await makeTauriHost(FRONTIER).knowledgeMap(4000)).not.toContain("Kelpie");
+  });
+
+  test("the knowledge map's gate is corpus_notes_ai ALONE — a downed probe cannot leak, nor over-hide", async () => {
+    // knowledgeMap no longer runs the redundant corpus_readable_ids probe: its
+    // sole gate is corpus_notes_ai, which drops every unreadable meta in Rust.
+    // Prove independence by breaking the probe and asserting the map is unchanged:
+    // the SECURE title stays out (gated by corpus_notes_ai) and the OPEN note is
+    // still present (not fail-closed to empty the way the probe path would be).
+    probeThrows = true;
+    const map = await makeTauriHost(FRONTIER).knowledgeMap(4000);
+    expect(map).not.toContain("Kelpie passphrase"); // secure title — still gated
+    expect(map).toContain("Kelpie plan"); // open note — probe state is irrelevant
   });
 });
 

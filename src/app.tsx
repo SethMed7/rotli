@@ -10,8 +10,10 @@ import "./styles/onboarding.css";
 import "./styles/board.css";
 import "./styles/memex.css";
 import "./styles/breve.css";
-import "@excalidraw/excalidraw/index.css";
-import "./styles/canvas.css";
+// Excalidraw's vendor stylesheet (~144 KB raw / 23 KB gz) + canvas.css are no
+// longer eager here — they load with the lazy board engine (boards/engine/
+// excalidraw.tsx), so a session that never opens a board never pays for them at
+// startup (perf audit 2026-08).
 import { Suspense, lazy } from "react";
 import { CaptureCard } from "./components/captureCard";
 import { NotesSurface } from "./components/notesSurface";

@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [Unreleased]
+
+### Changed
+
+- **The app opens a touch quicker, and it stays smooth while it works.** A board's
+  drawing engine no longer loads its styles at startup, so a session that never
+  opens a board starts leaner; a bit of first-launch housekeeping now waits until
+  after the window is on screen. On-device chat starts answering sooner — it no
+  longer double-checks which notes it's allowed to read before building its map of
+  your notes. And a few background chores (listing notes, searching, gathering
+  tasks) moved off the main thread, so the window keeps responding while they run,
+  and drag-selecting in the file browser stays smooth.
+
 ## [0.68.0] - 2026-08-03
 
 ### Changed

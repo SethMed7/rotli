@@ -5726,9 +5726,20 @@ fn prefix_meta(root_id: &str, mut m: NoteMeta) -> NoteMeta {
     m
 }
 
+/// ASYNC + spawn_blocking (perf audit 2026-08): on a cache miss `corpus_list`
+/// runs a full multi-root disk walk under the corpus mutex. As a sync command
+/// that ran on Tauri's main thread, janking the UI; the walk now runs on a
+/// worker so the main thread stays responsive. TS callers already `await` the
+/// invoke, so no caller change.
 #[tauri::command]
-pub fn corpus_list(state: tauri::State<'_, CorpusState>) -> Result<CorpusList, String> {
-    corpus_list_inner(&state)
+pub async fn corpus_list(app: tauri::AppHandle) -> Result<CorpusList, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let state = app.state::<CorpusState>();
+        corpus_list_inner(&state)
+    })
+    .await
+    .map_err(|e| format!("corpus list worker failed ({e})"))?
 }
 
 /// The aggregation half of `corpus_list`, shared with `corpus_notes_ai`.
@@ -5770,14 +5781,22 @@ fn corpus_list_inner(state: &CorpusState) -> Result<CorpusList, String> {
 /// The Tasks projection over the DEFAULT corpus (decision 2026-07-25): every
 /// open checkbox, derived per call. Read-only.
 #[tauri::command]
-pub fn corpus_tasks(state: tauri::State<'_, CorpusState>) -> Result<Vec<TaskItem>, String> {
-    let default_id = state
-        .0
-        .lock()
-        .map_err(|_| "corpus lock poisoned".to_string())?
-        .default_id
-        .clone();
-    state.route(&default_id, |s| s.tasks())
+pub async fn corpus_tasks(app: tauri::AppHandle) -> Result<Vec<TaskItem>, String> {
+    // ASYNC + spawn_blocking (perf audit 2026-08): the projection reads (and on a
+    // cache miss walks) the default corpus under the mutex — off the main thread.
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let state = app.state::<CorpusState>();
+        let default_id = state
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?
+            .default_id
+            .clone();
+        state.route(&default_id, |s| s.tasks())
+    })
+    .await
+    .map_err(|e| format!("corpus tasks worker failed ({e})"))?
 }
 
 /// Check one open task off — re-validated against its exact text, written
@@ -5797,14 +5816,23 @@ pub fn corpus_toggle_task(
 /// id-prefixing discipline as `corpus_list` (default root first, ulids prefixed
 /// only for non-default roots so an open routes back). `limit` caps the MERGED
 /// result (default 50); hits re-sort rank→recency after the merge.
+/// ASYNC + spawn_blocking (perf audit 2026-08): full-text search reads (and on a
+/// cache miss walks) every root under the mutex — run it on a worker so a ⌘K
+/// keystroke never janks the main thread. TS callers already `await`.
 #[tauri::command]
-pub fn corpus_search(
-    state: tauri::State<'_, CorpusState>,
+pub async fn corpus_search(
+    app: tauri::AppHandle,
     query: String,
     limit: Option<usize>,
     include_reference: Option<bool>,
 ) -> Result<Vec<SearchHit>, String> {
-    corpus_search_inner(&state, &query, limit, include_reference)
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let state = app.state::<CorpusState>();
+        corpus_search_inner(&state, &query, limit, include_reference)
+    })
+    .await
+    .map_err(|e| format!("corpus search worker failed ({e})"))?
 }
 
 /// The ranking half of `corpus_search`, shared with the model-gated

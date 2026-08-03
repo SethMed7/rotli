@@ -54,37 +54,11 @@
   line-height: 1.45;
 }
 
-/* The ```board embed's quiet status lines: view-only notice (the board's own
-   tab holds the pen) and the save-failure strip (mirrors .canvas-save-err). */
+/* The board embed's positioning context. Its quiet status lines
+   (.rotli-embed-viewonly / .rotli-embed-saveerr) are SHARED with the sheet embed
+   and live in the eager render.css so a sheet is styled without a board chunk. */
 .rotli-embed-board-inner {
   position: relative;
-}
-.rotli-embed-viewonly {
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
-  z-index: 6;
-  padding: 4px 10px;
-  border-radius: var(--r-control);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  color: var(--text-muted);
-  font-size: 11.5px;
-  white-space: nowrap;
-}
-.rotli-embed-saveerr {
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
-  z-index: 7;
-  max-width: calc(100% - 24px);
-  padding: 5px 10px;
-  border: 1px solid color-mix(in srgb, var(--danger, var(--accent-text)) 35%, transparent);
-  border-radius: var(--r-control);
-  background: var(--surface);
-  color: var(--danger, var(--accent-text));
-  font-size: 11.5px;
 }
 
 /* The browser (no-shell) + loading/error placeholders — quiet, centered, warm. */

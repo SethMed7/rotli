@@ -7,6 +7,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { DEST } from "./destinations";
+import { scopeCorpusNotes } from "./fsNotes";
 import { InMemoryNotesService, ulid } from "./notes";
 
 // A fresh service seeded with the local reserved roots + two nested Storage
@@ -302,5 +303,60 @@ describe("the external Vault root (Track 2) — browse-only, prefix-scoped", () 
     expect(svc.createNote("vault:wiki", "# nope")).rejects.toThrow();
     const local = await svc.createNote(DEST.inbox, "# local");
     expect(svc.moveNote(local.id, "vault:wiki")).rejects.toThrow();
+  });
+});
+
+// The note universe (services/hooks.ts) used to walk corpus_list once PER view
+// (7+ IPC serializations per invalidation); it now fetches the whole corpus ONCE
+// (listAll) and derives each view client-side with scopeCorpusNotes — the SAME
+// scope rule listNotes uses. These lock the equivalence: every view derived off
+// the single fetch must equal what listNotes(folderId) returns today.
+describe("note universe — one fetch, per-folder views (perf audit 2026-08)", () => {
+  const MEMEX: ReadonlySet<string> = new Set([DEST.vault]);
+  const TS = 1_700_000_000_000;
+
+  function universeService(): InMemoryNotesService {
+    const svc = new InMemoryNotesService();
+    svc.seedReserved(DEST.inbox, DEST.inbox);
+    svc.seedReserved(DEST.board, DEST.board);
+    svc.seedReserved(DEST.storage, DEST.storage);
+    svc.seedReserved(`${DEST.storage}/Work`, "Work", DEST.storage);
+    svc.seedReserved(DEST.archive, DEST.archive);
+    svc.seedReserved(DEST.trash, DEST.trash);
+    svc.seedReserved("vault:wiki", "wiki", null);
+    svc.seedReserved("vault:chats", "chats", null);
+    svc.seedNote(DEST.inbox, "# inbox note", { createdAt: TS, updatedAt: TS });
+    svc.seedNote(`${DEST.storage}/Work`, "# nested work", { createdAt: TS, updatedAt: TS });
+    svc.seedNote(DEST.board, "# staged card", { createdAt: TS, updatedAt: TS });
+    svc.seedNote(DEST.archive, "# archived", { createdAt: TS, updatedAt: TS, origin: DEST.inbox });
+    svc.seedNote(DEST.trash, "# trashed", { createdAt: TS, updatedAt: TS, origin: DEST.inbox });
+    svc.seedNote("vault:wiki", "# vault wiki note", { createdAt: TS, updatedAt: TS });
+    svc.seedNote("vault:chats", "# a transcript", { createdAt: TS, updatedAt: TS });
+    return svc;
+  }
+
+  const idset = (ns: { id: string }[]) => ns.map((n) => n.id).sort();
+
+  test("each view off the ONE listAll() equals listNotes(folderId) today", async () => {
+    const svc = universeService();
+    const raw = await svc.listAll();
+    // exactly the folderIds useNoteUniverse covers (undefined = All Notes, the
+    // hidden roots, and the vault: root marker)
+    const folderIds = [undefined, DEST.board, DEST.storage, DEST.archive, DEST.trash, DEST.vault];
+    for (const folderId of folderIds) {
+      const viaOneFetch = scopeCorpusNotes(raw, folderId, MEMEX);
+      const viaListNotes = await svc.listNotes(folderId);
+      expect(idset(viaOneFetch)).toEqual(idset(viaListNotes));
+    }
+  });
+
+  test("All Notes off the single fetch excludes hidden roots, the Vault, and chats/", async () => {
+    const svc = universeService();
+    const all = scopeCorpusNotes(await svc.listAll(), undefined, MEMEX);
+    const folders = new Set(all.map((n) => n.folderId));
+    expect(folders.has(DEST.inbox)).toBe(true);
+    expect(folders.has(`${DEST.storage}/Work`)).toBe(true);
+    expect([...folders].some((f) => f === DEST.archive || f === DEST.trash || f === DEST.board)).toBe(false);
+    expect([...folders].some((f) => f.startsWith("vault:"))).toBe(false);
   });
 });
