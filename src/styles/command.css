@@ -1680,15 +1680,30 @@
   color: var(--danger, var(--accent-text));
 }
 /* the "highlight" checked mark — an exclusive selector's active row (the Main
-   view switcher): state as background, no checkmark gutter, flush labels.
-   Accent-mixed + a solid accent bar so the current choice reads at a glance in
-   ALL FOUR themes — the plain --tint wash disappeared on the dark surfaces
-   (Seth, 2026-07-27). */
+   view switcher): state as background, no checkmark gutter, flush labels. This
+   is the ONE active-item state, translated for a DENSE dropdown (audit extended
+   2026-08-03): the note row + front switcher wear a SOLID accent pill, but a
+   solid fill on a menu row reads heavy and hurts scanning — worst in Paper
+   (near-black accent) and Charcoal (near-white accent), where a whole row would
+   go black/cream among plain rows. So the same accent identity arrives here as
+   a strengthened accent wash PLUS a solid --accent bar down the leading edge —
+   the accent, unmistakably, without the density cost. Not a third look: the
+   same accent, lighter weight. */
 .ctxmenu-item.active,
 .ctxmenu-item.active:hover:not(:disabled) {
   position: relative;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
   font-weight: 600;
+}
+.ctxmenu-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 var(--r-inner) var(--r-inner) 0;
+  background: var(--accent);
 }
 .ctxmenu-item svg {
   flex: 0 0 auto;

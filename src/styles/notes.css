@@ -127,13 +127,20 @@
 .sb-switch-seg:hover {
   color: var(--text);
 }
+/* the active segment rides the ONE active-item state — the same solid accent
+   pill the open note + open chat wear (consistency audit extended 2026-08-03;
+   the old surface/border segment was a third active treatment). It sits in the
+   .sb-switch --tint trough; label + glyph flip to --on-accent for contrast. */
 .sb-switch-seg.sel {
-  background: var(--surface);
-  border-color: var(--border);
-  color: var(--text);
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--on-accent);
 }
 .sb-switch-seg.sel svg {
-  color: var(--accent-text);
+  color: var(--on-accent);
+}
+.sb-switch-seg.sel .sb-switch-n {
+  color: var(--on-accent);
 }
 .sb-switch-label {
   overflow: hidden;

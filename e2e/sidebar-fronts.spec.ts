@@ -111,9 +111,8 @@ test("the switcher reads from semantic tokens in all four environments", async (
       probe.style.cssText = [
         "position:fixed",
         "visibility:hidden",
-        "background:var(--surface)",
-        "color:var(--text)",
-        "border:1px solid var(--border)",
+        "background:var(--accent)",
+        "color:var(--on-accent)",
       ].join(";");
       document.body.append(probe);
       const actual = getComputedStyle(node);
@@ -125,7 +124,7 @@ test("the switcher reads from semantic tokens in all four environments", async (
       const result = {
         background: [actual.backgroundColor, semantic.backgroundColor],
         text: [actual.color, semantic.color],
-        border: [actual.borderTopColor, semantic.borderTopColor],
+        border: actual.borderTopColor,
         trough: [trough.backgroundColor, getComputedStyle(troughProbe).backgroundColor],
       };
       probe.remove();
@@ -133,11 +132,13 @@ test("the switcher reads from semantic tokens in all four environments", async (
       return result;
     });
 
-    // the raised segment IS the surface tone on the recessed tint trough —
-    // hierarchy by contrast, never by a shadow (DESIGN.md flat material)
+    // the active segment IS the ONE active-item state: the solid accent pill the
+    // open note + open chat wear, sitting in the recessed --tint trough — same
+    // active language everywhere, hierarchy by contrast never a shadow.
     expect(colors.background[0]).toBe(colors.background[1]);
     expect(colors.text[0]).toBe(colors.text[1]);
-    expect(colors.border[0]).toBe(colors.border[1]);
+    // border folds into the fill — no ring competing with the pill
+    expect(colors.border).toBe("rgba(0, 0, 0, 0)");
     expect(colors.trough[0]).toBe(colors.trough[1]);
     expect(colors.background[0]).not.toBe(colors.trough[0]);
 
