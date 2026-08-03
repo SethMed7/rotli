@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.68.0] - 2026-08-03
+
+### Changed
+
+- **On-device chat can reach the web when it should.** Ask it something that
+  needs current information — the latest on a topic, who signed a letter, what
+  just shipped — and it now recognizes its notes may be out of date instead of
+  answering from them as if they were current. With the globe on, it searches
+  and reads the web and answers from what it found, with sources. With the globe
+  off, it tells you it'd need the web and leaves turning it on to you. It reasons
+  about this rather than watching for a magic word, so it also catches questions
+  that don't say "latest" out loud.
+- **On-device chat shows its work.** A multi-step answer now narrates what it's
+  doing — "searching your notes", "reading <note>", "searching the web" — so a
+  long answer feels like progress instead of a frozen pause.
+- **The rotli mark stays crisp when it's small.** The quokka in the titlebar,
+  tabs, and chat no longer smears into a blur at small sizes — same drawing,
+  lines that hold their weight.
+
 ## [0.67.0] - 2026-08-03
 
 ### Changed
