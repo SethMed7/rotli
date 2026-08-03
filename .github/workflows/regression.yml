@@ -1,15 +1,30 @@
 name: Regression suite
 
-# Runs on a SELF-HOSTED macOS runner (label set `[self-hosted, macOS, ARM64, rotli]`).
-# GitHub-hosted minutes for this private repo are billing-blocked, and hosted
-# macOS is the expensive tier anyway — so the whole gate runs on a spare Apple-
-# Silicon Mac at zero minutes, always-on instead of "runs when someone remembers"
-# (docs/development/ci-runner.md is the setup + hardening runbook). The runner
-# holds NO signing/notary keys: release.sh still signs and notarizes locally.
-# One runner executes these jobs serially; register a second `rotli`-labelled
-# runner to parallelize. If Linux billing is later enabled, the bun-only jobs
-# (static-contracts, design-system, e2e, dependency-audit) can move back to
-# `ubuntu-latest` to offload the Mac — full-regression must stay macOS (Tauri).
+# SPLIT GATE — OS-agnostic lanes on LINUX, the macOS-only Rust on macOS.
+#
+# Everything bun/node/vite/playwright is OS-agnostic and runs on a self-hosted
+# LINUX runner (Railway; docs/development/ci-runner.md is the deploy runbook).
+# Running these OFF a Mac matters twice over: it costs zero GitHub minutes AND
+# it is how rotli — which Seth only builds on a Mac — validates non-Mac
+# behavior as the app goes cross-platform.
+#
+# ONLY the ~37 macOS-cfg'd Rust gates need macOS: a Linux `cargo build` compiles
+# a DIFFERENT binary, so `cargo clippy` + `cargo test` stay on the self-hosted
+# macOS runner (`cargo-macos`). Note `bun run build` is VITE (JS) — Linux-fine;
+# the native Tauri build lives in release.sh, never in CI.
+#
+# The runner holds NO signing/notary keys: release.sh still signs and notarizes
+# locally. `secrets.GITHUB_TOKEN` is minted per-run and expires with the run.
+#
+# ── Switching the Linux lanes to GitHub-hosted (if billing is ever enabled) ──
+# The Linux `runs-on` is a plain label array. To offload the Railway runner onto
+# GitHub's cheap Linux tier, replace every occurrence of
+#     [self-hosted, linux, X64, rotli]
+# with
+#     ubuntu-latest
+# (one find/replace) and delete the Railway service. Nothing else changes —
+# `playwright install --with-deps chromium` already provisions the apt deps.
+# The macOS `cargo-macos` job must stay self-hosted (Tauri needs a real Mac).
 
 on:
   push:
@@ -25,9 +40,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ── LINUX lanes (self-hosted Railway runner: [self-hosted, linux, X64, rotli]) ──
+
   static-contracts:
     name: Types, lint, and architecture contracts
-    runs-on: [self-hosted, macOS, ARM64, rotli]
+    runs-on: [self-hosted, linux, X64, rotli]
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -38,7 +55,7 @@ jobs:
 
   design-system:
     name: Themes and design system
-    runs-on: [self-hosted, macOS, ARM64, rotli]
+    runs-on: [self-hosted, linux, X64, rotli]
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -51,7 +68,7 @@ jobs:
 
   e2e:
     name: Browser E2E (Playwright)
-    runs-on: [self-hosted, macOS, ARM64, rotli]
+    runs-on: [self-hosted, linux, X64, rotli]
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -59,8 +76,9 @@ jobs:
           bun-version: 1.3.3
       - run: bun install --frozen-lockfile
       - run: bun run check:e2e-types
-      # macOS Playwright needs no apt system deps, so no `--with-deps` (Linux-only).
-      - run: bunx playwright install chromium
+      # Linux needs the browser AND its apt system libs — `--with-deps` installs
+      # both. (On the old macOS runner the system deps were a no-op.)
+      - run: bunx playwright install --with-deps chromium
       - run: bun run test:e2e
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -69,9 +87,29 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  bun-regression:
+    name: App, Breve, and production build
+    runs-on: [self-hosted, linux, X64, rotli]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+      - run: bun install --frozen-lockfile
+      # Everything in test:regression is bun/node — the Rust half of the old
+      # full-regression job moved to `cargo-macos` below.
+      - run: bun run test:regression
+      # `bun run build` is Vite (JS) — Linux-fine. The native Tauri build is in
+      # release.sh, not here.
+      - run: bun run build
+        env:
+          # Vite's large Univer/Excalidraw graph exceeds Node's ~2 GB default
+          # heap while rendering chunks.
+          NODE_OPTIONS: --max-old-space-size=4096
+
   dependency-audit:
     name: Dependency vulnerability audit (advisory)
-    runs-on: [self-hosted, macOS, ARM64, rotli]
+    runs-on: [self-hosted, linux, X64, rotli]
     permissions:
       contents: read
       # rustsec/audit-check publishes its report as a check run. The workflow's
@@ -92,9 +130,10 @@ jobs:
       - name: bun audit (JS/TS)
         continue-on-error: true
         run: bun audit
-      # rustsec/audit-check installs and runs cargo-audit inside the runner — no
-      # local cargo-audit install needed by any contributor. Advisory for now
-      # (same rationale); flip `ignore`/failure policy when the Rust tree is clean.
+      # rustsec/audit-check installs cargo-audit and reads Cargo.lock for
+      # advisories — it does NOT compile the crate, so it runs fine on Linux (no
+      # cargo toolchain needed). Advisory for now (same rationale); flip
+      # `ignore`/failure policy when the Rust tree is clean.
       - name: cargo audit (Rust)
         continue-on-error: true
         uses: rustsec/audit-check@v2
@@ -105,26 +144,23 @@ jobs:
           # include glib. Tracked with its dependency path in security.md.
           ignore: RUSTSEC-2024-0429
 
-  full-regression:
-    name: App, Breve, Rust, and production build
+  # ── macOS lane (self-hosted Mac: [self-hosted, macOS, ARM64, rotli]) ──
+  # The ONLY OS-locked gate. ~37 macOS-cfg'd Rust gates mean a Linux cargo build
+  # is a different binary, so this must run on a real Mac. Until a Mac runner is
+  # registered it simply QUEUES — harmless and non-blocking: release.sh's gate
+  # treats a missing/pending Regression run as a warn, not a block. Seth can
+  # register a Mac runner later (docs/development/ci-runner.md keeps that
+  # section), OR this goes green on its own once the Rust is cross-platform.
+  cargo-macos:
+    name: Rust (clippy + tests)
     runs-on: [self-hosted, macOS, ARM64, rotli]
     steps:
       - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.3
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
-      - run: bun install --frozen-lockfile
-      - run: bun run test:regression
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml
-      - run: bun run build
-        env:
-          # Vite's large Univer/Excalidraw graph exceeds Node's ~2 GB default
-          # heap while rendering chunks.
-          NODE_OPTIONS: --max-old-space-size=4096
