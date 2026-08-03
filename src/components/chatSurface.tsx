@@ -822,6 +822,15 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const [messages, setMessages] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string>(THINK_WORDS[0]!);
+  // the on-device answer forming token-by-token — shown live in the assistant
+  // row while it streams, then replaced by the settled message. The ref mirrors
+  // it so Stop can keep whatever partial text arrived without a stale closure.
+  const [streamingText, setStreamingText] = useState("");
+  const streamRef = useRef("");
+  const setStreaming = useCallback((next: string) => {
+    streamRef.current = next;
+    setStreamingText(next);
+  }, []);
   // which message's hover Copy just fired — flips its glyph to a ✓ for a beat
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [images, setImages] = useState<string[]>([]);
@@ -902,11 +911,11 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     };
   }, [active, chatSlug]);
 
-  // keep the newest message in view
+  // keep the newest message in view — including the live streaming row as it grows
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight });
-  }, [messages, busy]);
+  }, [messages, busy, streamingText]);
 
   // the composer grows with its content (WKWebView has no field-sizing) —
   // the CSS max-height caps it around seven lines, then it scrolls inside
@@ -968,6 +977,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     setMessages((p) => [...p, { speaker: "you", text: userText }]);
     setBusy(true);
     setStatus(THINK_WORDS[0]!);
+    setStreaming("");
     const myRun = ++runSeq.current;
 
     const requestId = crypto.randomUUID();
@@ -1017,6 +1027,10 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
           // the loop's generic thinking beats join the rotating vocabulary;
           // real tool statuses ("searching notes…") pass through untouched
           setStatus(/^thinking…/.test(ev.text) ? nextThinkWord() : ev.text);
+        } else if (ev.type === "delta") {
+          // the on-device answer, arriving as it's written — append to the live
+          // row (a tool step or the thought scaffolding emits no deltas)
+          setStreaming(streamRef.current + ev.text);
         } else if (ev.type === "final") reply = ev.text;
       }
     } catch (e) {
@@ -1024,6 +1038,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     }
     if (runSeq.current !== myRun) return; // stopped mid-generation — the reply lands nowhere
     requestRef.current = null;
+    setStreaming(""); // the settled message row takes over from the live one
     setBusy(false);
 
     const failed = reply.startsWith("⚠");
@@ -1182,19 +1197,30 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     [],
   );
 
-  /** Stop (Seth, 2026-07-30): orphan the run, kill any CLI child, and hand the
-   * prompt back to the composer — the optimistic user bubble comes off the
-   * thread since the turn will never be answered or persisted. */
+  /** Stop (Seth, 2026-07-30): orphan the run, kill any CLI child, abort a local
+   * stream, and free the surface. If the on-device answer had already begun
+   * streaming, KEEP that partial text as the answer (the user asked to stop, not
+   * to erase what arrived); otherwise the turn never produced anything, so the
+   * optimistic user bubble comes off and the prompt returns to the composer. */
   const stopTurn = () => {
     runSeq.current++;
     if (requestRef.current) {
       void cliCancel(requestRef.current).catch(() => {});
-      // and take it out of the local-compute line if that's where it was
+      // take it out of the local-compute line if it was waiting AND flag a
+      // running local stream to abort mid-token (drops the socket, frees the slot)
       void localQueueCancel(requestRef.current).catch(() => {});
     }
     requestRef.current = null;
     setQueued(null);
     setBusy(false);
+    const partial = streamRef.current;
+    setStreaming("");
+    if (partial) {
+      // an answer was forming — settle it as the assistant turn (in-session only;
+      // a stopped turn isn't persisted, matching a failed one)
+      setMessages((p) => [...p, { speaker: "rotli", text: partial }]);
+      return;
+    }
     setMessages((p) => (p.length > 0 && p[p.length - 1]?.speaker === "you" ? p.slice(0, -1) : p));
     const sent = lastSentRef.current;
     if (sent) {
@@ -1388,7 +1414,15 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                   />
                 ))
               )}
-              {busy && (
+              {busy &&
+                streamingText && (
+                  // the on-device answer, forming token-by-token — a live
+                  // assistant row that grows until the settled message replaces it
+                  <div className="cmsg ai">
+                    <div className="cmsg-bubble">{renderMessage(streamingText)}</div>
+                  </div>
+                )}
+              {busy && !streamingText && (
                 <div className="cmsg ai">
                   <QuokkaMark size={17} className="chat-mark" />
                   {queued ? (

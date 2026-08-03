@@ -1,7 +1,7 @@
 // Tauri seam — every Tauri API call in the frontend goes through here, guarded
 // by isTauri(), so the whole UI renders in a plain browser (vite dev, no shell).
 
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -415,6 +415,38 @@ export function chatMessages(
     temperature: opts?.temperature,
     maxTokens: opts?.maxTokens,
     requestId: opts?.requestId,
+  });
+}
+
+/** Streaming twin of `chatMessages`, ON-DEVICE ONLY: the local model server
+ * streams NDJSON tokens, each delivered through a Tauri Channel to `onToken`;
+ * the promise resolves with the full reply. Same compute-queue admission and
+ * cancel key as `chatMessages` (Stop aborts the running stream via
+ * `localQueueCancel`). No `api` — a streaming endpoint is always the local
+ * generate wire. */
+export function chatMessagesStream(
+  messages: ChatWireMsg[],
+  onToken: (token: string) => void,
+  opts?: {
+    model?: string;
+    endpoint?: string;
+    formatJson?: boolean;
+    temperature?: number;
+    maxTokens?: number;
+    requestId?: string;
+  },
+): Promise<string> {
+  const channel = new Channel<string>();
+  channel.onmessage = onToken;
+  return aiInvoke("chat_messages_stream", {
+    messages,
+    model: opts?.model,
+    endpoint: opts?.endpoint,
+    formatJson: opts?.formatJson,
+    temperature: opts?.temperature,
+    maxTokens: opts?.maxTokens,
+    requestId: opts?.requestId,
+    onToken: channel,
   });
 }
 

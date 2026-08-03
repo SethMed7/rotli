@@ -313,6 +313,76 @@ pub async fn chat_messages(
     .map_err(|e| format!("chat worker: {e}"))?
 }
 
+/// STREAMING completion, ON-DEVICE ONLY (the "answers as it thinks" path). Same
+/// gates and compute admission as `chat_messages`, but it asks the MLX server
+/// for `stream:true` and forwards each NDJSON token to the webview over a Tauri
+/// Channel as it arrives, then returns the full reply. Kept separate from
+/// `chat_messages`/`complete_local` so the organizer's buffered path is
+/// untouched. A remote endpoint is refused — remote lanes carry their own
+/// streaming and never ride this command. Stop aborts mid-stream via the compute
+/// queue's abort flag (`local_queue_cancel`), which drops the connection and
+/// frees the model slot; whatever text already arrived is kept by the surface.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)] // mirrors the chat request shape 1:1
+pub async fn chat_messages_stream(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::organizer::OrganizerState>,
+    compute: tauri::State<'_, crate::compute::ComputeState>,
+    messages: Vec<WireMsg>,
+    endpoint: Option<String>,
+    model: Option<String>,
+    format_json: Option<bool>,
+    temperature: Option<f32>,
+    max_tokens: Option<u32>,
+    request_id: Option<String>,
+    on_token: tauri::ipc::Channel<String>,
+) -> Result<String, String> {
+    let handle = state.0.clone();
+    let compute = compute.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _interactive = handle.interactive_guard();
+        let endpoint = endpoint.unwrap_or_else(|| DEFAULT_ENDPOINT.to_string());
+        let model = model.unwrap_or_else(|| DEFAULT_MODEL.to_string());
+        endpoint_permitted(&endpoint)?;
+        // Streaming is on-device only. A non-local endpoint (a frontier proxy,
+        // a bring-your-own-key base) is refused outright — this command never
+        // ships bytes off the machine, so the egress detector isn't even the
+        // relevant seam here; the destination class is.
+        if !endpoint_is_local(&endpoint) {
+            return Err("streaming is only available for on-device models.".into());
+        }
+        // Symmetric with chat_messages: a local model passes, but keep the seam.
+        egress_allowed(&endpoint, &model, &messages)?;
+        let base = endpoint.trim_end_matches('/').to_string();
+        let temperature = temperature.unwrap_or(0.4);
+        let max_tokens = max_tokens.unwrap_or(1024);
+        let request_id = request_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        let format_json = format_json.unwrap_or(false);
+        let knobs = crate::compute::knobs_from(&app);
+        let dispatch = || {
+            messages_generate_stream(
+                &base,
+                &model,
+                &messages,
+                format_json,
+                temperature,
+                max_tokens,
+                &endpoint,
+                CHAT_TIMEOUT,
+                &on_token,
+                &compute,
+                &request_id,
+            )
+        };
+        let result = crate::compute::with_slot(&compute, &request_id, &model, &knobs, dispatch);
+        // whether it finished, errored, or was aborted, drop the abort flag
+        compute.0.clear_abort(&request_id);
+        result
+    })
+    .await
+    .map_err(|e| format!("chat stream worker: {e}"))?
+}
+
 /// The transport accepts only KNOWN destinations (audit 2026-07, egress #3):
 /// a loopback endpoint (on-device by construction), a registry-declared
 /// provider endpoint, or the pinned Gemini compatibility base. `endpoint` is
@@ -426,6 +496,78 @@ fn messages_generate(
         .unwrap_or("")
         .trim()
         .to_string())
+}
+
+/// Streaming twin of `messages_generate`: POST with `stream:true` and read the
+/// server's NDJSON line-by-line, forwarding each token over `on_token` as it
+/// arrives and accumulating the full reply to return. Between tokens it polls
+/// the compute abort flag — a Stop drops out of the loop, and returning drops
+/// the reader (closing the connection) so the MLX server sees the hang-up and
+/// frees its model slot; the partial text gathered so far is still returned.
+#[allow(clippy::too_many_arguments)] // carries the full request shape + the sink
+fn messages_generate_stream(
+    base: &str,
+    model: &str,
+    messages: &[WireMsg],
+    format_json: bool,
+    temperature: f32,
+    max_tokens: u32,
+    endpoint: &str,
+    timeout: Duration,
+    on_token: &tauri::ipc::Channel<String>,
+    compute: &crate::compute::ComputeState,
+    request_id: &str,
+) -> Result<String, String> {
+    use std::io::BufRead;
+    let url = format!("{base}/api/generate");
+    let mut body = serde_json::json!({
+        "model": model,
+        "stream": true,
+        "prompt": flatten_messages(messages),
+        "options": { "temperature": temperature, "num_predict": max_tokens },
+    });
+    let images = generate_images(messages);
+    if !images.is_empty() {
+        body["images"] = serde_json::json!(images);
+    }
+    if format_json {
+        body["format"] = serde_json::Value::String("json".to_string());
+    }
+    let resp = ureq::post(&url)
+        .timeout(timeout)
+        .send_json(body)
+        .map_err(|e| format!("local model unreachable ({e}) — is it running on {endpoint}?"))?;
+    let reader = std::io::BufReader::new(resp.into_reader());
+    let mut full = String::new();
+    for line in reader.lines() {
+        // Stop, mid-stream: quit reading — the drop below closes the socket and
+        // the server frees its slot; the surface keeps `full` so far.
+        if compute.0.is_aborted(request_id) {
+            break;
+        }
+        let Ok(line) = line else { break };
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Ok(chunk) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue; // tolerate a stray non-JSON line
+        };
+        if let Some(err) = chunk.get("error").and_then(|v| v.as_str()) {
+            return Err(format!("model error: {err}"));
+        }
+        if let Some(tok) = chunk.get("response").and_then(|v| v.as_str()) {
+            if !tok.is_empty() {
+                full.push_str(tok);
+                // a receiver that's already gone (Stop) just drops this token
+                let _ = on_token.send(tok.to_string());
+            }
+        }
+        if chunk.get("done").and_then(|v| v.as_bool()).unwrap_or(false) {
+            break;
+        }
+    }
+    Ok(full)
 }
 
 /// Every attachment in the transcript as RAW base64 for the generate body — the

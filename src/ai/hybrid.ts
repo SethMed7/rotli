@@ -114,6 +114,10 @@ export async function* runHybrid(
         ...input,
         userText,
         model: { id: model.id, api: model.api },
+        // a preset runs one or more inner legs (route + maybe a fallback); only
+        // the OUTER final is the turn's answer, so inner legs stay buffered —
+        // their tokens must not stream into the surface as if they were it.
+        stream: false,
       });
       for await (const ev of events) {
         if (ev.type === "final") final = ev.text;

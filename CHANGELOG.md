@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [Unreleased]
+
+### Changed
+
+- **On-device chat answers as it thinks — words appear as they're written instead
+  of all at once.** The local model used to hold its whole reply until it was
+  finished, so you'd watch a spinner and then get the answer in one drop. Now the
+  answer streams in as it's generated, and **Stop** ends it mid-sentence while
+  keeping whatever had already arrived. Only the on-device model streams; the
+  connected lanes and the background organizer are unchanged.
+
 ## [0.69.0] - 2026-08-03
 
 ### Changed

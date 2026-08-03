@@ -63,6 +63,12 @@ export interface CompleteReq {
 /** The one seam that touches rotli/Tauri. Swap it to run the engine elsewhere. */
 export interface Host {
   complete(req: CompleteReq): Promise<string>;
+  /** Stream a completion token-by-token (on-device models only). Yields each raw
+   * token segment and returns the full reply — the loop feeds tokens through the
+   * final-answer extractor so the surface renders the answer as it's written.
+   * Optional: hosts that can't stream (remote/CLI lanes, portable hosts) omit it
+   * and the loop falls back to `complete`. */
+  stream?(req: CompleteReq): AsyncGenerator<string, string, void>;
   /** Rank the user's notes for a query (their memex is the knowledge base). */
   searchNotes(query: string, limit: number): Promise<NoteHit[]>;
   /** Read one note by id. Secure notes require explicit local-AI permission;
@@ -109,10 +115,13 @@ export interface ScratchStep {
   result: string;
 }
 
-/** What the loop yields as it runs (no token streaming → status IS the feedback). */
+/** What the loop yields as it runs. A `delta` carries the next slice of the
+ * final answer as the on-device model writes it — the surface appends it to the
+ * live row; the terminating `final` is the authoritative, complete answer. */
 export type AgentEvent =
   | { type: "status"; text: string }
   | { type: "tool"; tool: ToolName; args: Record<string, unknown> }
+  | { type: "delta"; text: string }
   | { type: "final"; text: string };
 
 export interface RunInput {
@@ -136,4 +145,8 @@ export interface RunInput {
   imageTool?: boolean;
   /** The user's name for prompt personalization — omit when unset. */
   userName?: string;
+  /** Stream the final answer token-by-token when the host supports it (default
+   * true). The hybrid layer sets this false — its legs run to completion and
+   * only the outer final is surfaced, so an inner leg mustn't stream deltas. */
+  stream?: boolean;
 }

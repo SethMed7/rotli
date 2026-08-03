@@ -1275,6 +1275,7 @@ pub fn run() {
             breve::breve_retire_legacy,
             chat::chat_models,
             chat::chat_messages,
+            chat::chat_messages_stream,
             provider::cli_detect,
             provider::cli_complete,
             provider::cli_cancel,

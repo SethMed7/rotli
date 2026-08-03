@@ -348,6 +348,11 @@ pub struct Shared {
     cv: Condvar,
     /// Installed once at app setup; `None` in tests so nothing is emitted.
     sink: Mutex<Option<Sink>>,
+    /// Request ids asked to abort mid-flight. A streaming generation polls this
+    /// between tokens and stops (dropping the connection frees the model slot);
+    /// a plain buffered call can't be interrupted, so this is a no-op for it.
+    /// Populated by `cancel` (Stop), cleared when the streamer finishes.
+    aborts: Mutex<std::collections::HashSet<String>>,
 }
 
 /// Tauri-managed handle (`Clone` so commands and workers share one queue).
@@ -419,6 +424,10 @@ impl Shared {
     }
 
     pub(crate) fn cancel(&self, id: &str) -> Result<(), String> {
+        // Also flag a RUNNING streamer to abort: `Inner::cancel` only marks a
+        // WAITING entry, but a streaming generation is already running — it
+        // polls the abort set and stops (Stop, mid-stream).
+        self.request_abort(id);
         let mut g = self.inner.lock().map_err(|_| "compute queue lock poisoned".to_string())?;
         g.cancel(id); // unknown / already-running id = no-op, never an error
         let snap = g.snapshot();
@@ -426,6 +435,26 @@ impl Shared {
         drop(g);
         self.cv.notify_all();
         Ok(())
+    }
+
+    /// Flag a request for mid-stream abort (see `aborts`). Idempotent.
+    pub(crate) fn request_abort(&self, id: &str) {
+        if let Ok(mut set) = self.aborts.lock() {
+            set.insert(id.to_string());
+        }
+    }
+
+    /// Has this request been asked to abort? Polled between streamed tokens.
+    pub(crate) fn is_aborted(&self, id: &str) -> bool {
+        self.aborts.lock().map(|set| set.contains(id)).unwrap_or(false)
+    }
+
+    /// Clear a request's abort flag — the streamer calls this when it finishes
+    /// (naturally or aborted) so the set never grows without bound.
+    pub(crate) fn clear_abort(&self, id: &str) {
+        if let Ok(mut set) = self.aborts.lock() {
+            set.remove(id);
+        }
     }
 
     /// Wait until this request may run, then hand back a `Ticket`. `read_mem`

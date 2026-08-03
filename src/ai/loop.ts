@@ -2,15 +2,19 @@
 //
 // Drives a small on-device model through a JSON tool-use loop over the user's memex
 // (its knowledge base) and, when the chat's globe is on, the web. Yields status as it
-// goes (no token streaming, so per-step status IS the feedback). Persistence is the
+// works through its tool steps, then STREAMS the final answer token-by-token (`delta`
+// events) when the host supports it, closing with the authoritative `final`. Streaming
+// is opt-out (RunInput.stream === false) and only ever surfaces the confirmed final
+// answer — a tool step's JSON scaffolding never reaches the user. Persistence is the
 // caller's job — only the final answer is written to the chat file.
 
 import { budgetFor } from "./budget";
 import { containsPrivateDataOverlap, looksSecret } from "./guard";
 import { extractJsonObject, parseAction } from "./parse";
 import { adapterFor, trimHistory } from "./prompt";
+import { type FinalExtractor, makeFinalExtractor } from "./stream";
 import { pruneScratch, runTool, statusFor } from "./tools";
-import type { AgentEvent, Host, RunInput, ScratchStep, ToolName } from "./types";
+import type { AgentEvent, CompleteReq, Host, RunInput, ScratchStep, ToolName } from "./types";
 
 const NOTE_TOOLS: ToolName[] = [
   "search_memory",
@@ -28,10 +32,40 @@ const IMAGE_TOOLS: ToolName[] = ["generate_image"];
 // (an image prompt ships to a remote engine exactly like a web query)
 const EGRESS_TOOLS: ToolName[] = [...WEB_TOOLS, ...IMAGE_TOOLS];
 
+/** One generation, streamed through the final-answer extractor when the host
+ * supports it. Yields `delta` events for the confirmed final answer as it
+ * arrives; returns the full raw reply plus the extractor (null when buffered) so
+ * the caller can trust the extractor's classification. `proseIsFinal` marks the
+ * force-final generation (bare Markdown expected). Falls back to a single
+ * buffered `complete` when streaming is off or unavailable. */
+async function* generate(
+  host: Host,
+  req: CompleteReq,
+  useStream: boolean,
+  proseIsFinal: boolean,
+): AsyncGenerator<AgentEvent, { raw: string; extractor: FinalExtractor | null }, void> {
+  if (!useStream || !host.stream) {
+    return { raw: await host.complete(req), extractor: null };
+  }
+  const extractor = makeFinalExtractor(proseIsFinal);
+  const stream = host.stream(req);
+  let step = await stream.next();
+  while (!step.done) {
+    const delta = extractor.push(step.value);
+    if (delta) yield { type: "delta", text: delta };
+    step = await stream.next();
+  }
+  return { raw: step.value, extractor };
+}
+
 export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<AgentEvent, void, void> {
   const budget = budgetFor(input.model); // the client's rules, sized to THIS model
   const adapter = adapterFor(input.model); // gemma (local default) or frontier
   const maxSteps = input.maxSteps ?? budget.maxSteps;
+  // stream the final answer token-by-token when the picked host can (on-device
+  // models). The hybrid layer opts out (input.stream === false) so an inner
+  // leg's tokens don't surface as the turn's answer.
+  const useStream = input.stream !== false;
   const allowed: ReadonlySet<ToolName> = new Set<ToolName>([
     ...NOTE_TOOLS,
     ...(input.web ? WEB_TOOLS : []),
@@ -89,10 +123,28 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
         : { role: "user" as const, content: prompt };
 
     let raw: string;
+    let extractor: FinalExtractor | null;
     try {
-      raw = await host.complete({ messages: [message], formatJson: adapter.wantsFormatJson });
+      const gen = generate(
+        host,
+        { messages: [message], formatJson: adapter.wantsFormatJson },
+        useStream,
+        false,
+      );
+      const out = yield* gen;
+      raw = out.raw;
+      extractor = out.extractor;
     } catch (e) {
       yield { type: "final", text: `⚠ ${errMsg(e, "couldn't reach the model")}` };
+      return;
+    }
+
+    // the extractor already streamed this answer's tokens — trust its
+    // classification so the terminating `final` matches exactly what the user
+    // watched appear (and a truncated JSON that won't re-parse still lands as
+    // the answer we showed, not a wasted step).
+    if (extractor && extractor.mode === "final") {
+      yield { type: "final", text: extractor.finalText };
       return;
     }
 
@@ -172,13 +224,19 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
 
   // step budget spent (or two strikes) → force a final answer from what we have.
   yield { type: "status", text: "wrapping up…" };
-  yield {
-    type: "final",
-    text: await forceFinal(host, input, pruneScratch(scratch, budget.maxScratchChars)),
-  };
+  const forced = yield* forceFinal(host, input, pruneScratch(scratch, budget.maxScratchChars), useStream);
+  yield { type: "final", text: forced };
 }
 
-async function forceFinal(host: Host, input: RunInput, scratch: ScratchStep[]): Promise<string> {
+/** The force-final generation, streamed. The prompt asks for bare Markdown, so
+ * prose streams verbatim; a model that still wraps it in `{"final":…}` is
+ * extracted the same way. Yields `delta` events; returns the answer text. */
+async function* forceFinal(
+  host: Host,
+  input: RunInput,
+  scratch: ScratchStep[],
+  useStream: boolean,
+): AsyncGenerator<AgentEvent, string, void> {
   const prompt = adapterFor(input.model).renderForceFinal({
     history: input.history,
     userText: input.userText,
@@ -186,7 +244,11 @@ async function forceFinal(host: Host, input: RunInput, scratch: ScratchStep[]): 
     ...(input.userName ? { userName: input.userName } : {}),
   });
   try {
-    const raw = await host.complete({ messages: [{ role: "user", content: prompt }] });
+    const out = yield* generate(host, { messages: [{ role: "user", content: prompt }] }, useStream, true);
+    if (out.extractor && out.extractor.mode === "final") {
+      return out.extractor.finalText.trim() || "I couldn't find enough to answer that confidently.";
+    }
+    const raw = out.raw;
     const obj = extractJsonObject(raw);
     if (obj !== null) {
       try {

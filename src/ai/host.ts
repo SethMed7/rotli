@@ -8,6 +8,7 @@ import { extOf } from "../lib/fileKind";
 import {
   type ChatModelInfo,
   chatMessages,
+  chatMessagesStream,
   cliComplete,
   corpusFileBytes,
   corpusFileText,
@@ -33,7 +34,8 @@ import { SHEET_BIN, SHEET_TEXT } from "../sheets/kinds";
 import { workbookToCsv } from "../sheets/view";
 import { usePanesStore } from "../state/panes";
 import { contextWindowFor } from "./budget";
-import { looksSecret, modelIsOnDevice } from "./guard";
+import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
+import { channelStream } from "./stream";
 import {
   folderHits,
   folderQuery,
@@ -117,7 +119,7 @@ export function makeTauriHost(
     isSecureContext?: () => boolean;
   },
 ): Host {
-  return {
+  const host: Host = {
     complete({ messages, formatJson }) {
       // the connected lanes: one tool-less subprocess per step (Rust owns the
       // allowlist + sandbox flags). Stateless — the prompt carries everything.
@@ -411,4 +413,22 @@ export function makeTauriHost(
       return buildModelMap(readable, contextWindowFor(model), maxChars);
     },
   };
+
+  // Token streaming is on-device ONLY: the local generate wire (MLX) speaks
+  // Ollama NDJSON. The CLI/OpenAI lanes have their own transports and stay
+  // buffered here, so `stream` is present only for a local model — the loop
+  // falls back to `complete` for everything else.
+  if (model.api === "generate" && endpointIsLocal(model.endpoint)) {
+    host.stream = ({ messages, formatJson }) =>
+      channelStream((onToken) =>
+        chatMessagesStream(messages, onToken, {
+          model: model.id,
+          endpoint: model.endpoint,
+          ...(formatJson !== undefined ? { formatJson } : {}),
+          ...(opts?.requestId ? { requestId: opts.requestId } : {}),
+        }),
+      );
+  }
+
+  return host;
 }
