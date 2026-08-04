@@ -944,6 +944,11 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   // flag, and the aliveRef tells a completing run whether its reply was WATCHED
   // (surface still mounted) or should flip the row to unread.
   const aliveRef = useRef(true);
+  // busy, readable from effects without joining their deps: the send-time bind
+  // flips chatSlug mid-run, and the reload-on-slug-change effect must NOT
+  // clobber the live thread (or the run's secure taint) from the disk file —
+  // which at that moment holds only the just-sent user turn.
+  const busyRef = useRef(false);
   useEffect(() => {
     aliveRef.current = true;
     useChatRuns.getState().clearUnread(chatKeyId);
@@ -952,8 +957,12 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     };
   }, [chatKeyId]);
 
-  // load THIS pane's chat (by slug), or clear for a fresh chat
+  // load THIS pane's chat (by slug), or clear for a fresh chat. A LIVE run owns
+  // the surface: the send-time bind changes chatSlug mid-turn, and reloading
+  // then would wipe the streaming thread and reset the run's secure taint from
+  // a file that only holds the user turn so far.
   useEffect(() => {
+    if (busyRef.current) return;
     let cancelled = false;
     if (active && chatSlug) {
       readChat(active, chatSlug)
@@ -1040,19 +1049,93 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     }));
     setMessages((p) => [...p, { speaker: "you", text: userText }]);
     setBusy(true);
-    useChatRuns.getState().markRunning(chatKeyId); // the sidebar row starts pulsing
+    busyRef.current = true;
     setStatus(THINK_WORDS[0]!);
     setStreaming("");
     const myRun = ++runSeq.current;
 
+    // — persist the user turn NOW (Seth, 2026-08-03: "once sent, instantly I
+    // should see it in the left bar"): the chat file exists (or bumps its
+    // mtime) before the model even starts, so the sidebar row appears at the
+    // top, pulsing, the moment Send is pressed. A brand-new chat binds its tab
+    // HERE, synchronously with the send — which also retires the old
+    // completion-time bind race (the reply used to bind to whatever chat tab
+    // was active in the pane by then). If the write fails (read-only vault,
+    // disk trouble), the run continues in-memory and the completion path falls
+    // back to the old persist-at-the-end shape — same net behavior as before.
+    const sentTitle = title.trim() || deriveTitle(userText);
+    let sentSlug: string | null = chatSlug;
+    let sentPersisted = false;
+    try {
+      if (chatSlug) {
+        await write.mutateAsync({
+          instance: active,
+          existingSlug: chatSlug,
+          title: storedTitle ?? chatSlug,
+          messages: [{ speaker: "you", text: userText }],
+        });
+      } else {
+        const res = await write.mutateAsync({
+          instance: active,
+          title: sentTitle,
+          messages: [{ speaker: "you", text: userText }],
+        });
+        sentSlug = res.slug;
+        bindChat(paneId, res.slug); // this tab IS that chat, from the send on
+        // view inheritance: a chat born while a named view is active belongs to
+        // that view (Seth, 2026-08-03: organize chats by work vs personal)
+        const bornInView = useUiStore.getState().activeView;
+        if (bornInView) {
+          const views = useViewsStore.getState();
+          if (views.hydrated && views.writable) {
+            views.setManifest(assignChatToView(views.manifest, res.slug, bornInView));
+          }
+        }
+        // folder inheritance (Seth, 2026-07-30): a new chat opened FROM a
+        // foldered chat files itself into the same folder. Best-effort — a
+        // manifest hiccup must never fail the send.
+        const originSlug = useUiStore.getState().newChatOrigin;
+        useUiStore.getState().setNewChatOrigin(null);
+        if (originSlug) {
+          try {
+            const manifest = await loadChatFolders(active);
+            const folderId = manifest.assignments[originSlug];
+            if (folderId) {
+              await saveChatFolders(active, assignChatToFolder(manifest, res.slug, folderId));
+              await invalidateChatFolders();
+            }
+          } catch {
+            /* the chat still saved — folder filing is recoverable by hand */
+          }
+        }
+        // the saved chat's maps ride the VAULT-scoped key (2026-08-03)
+        const savedKey = chatKey(active.id, res.slug, paneId);
+        if (globeOn) setChatWeb(savedKey, true); // carry the globe to the saved chat
+        clearChatWeb(webKey); // the pane-scoped unsaved key is spent (#7)
+        const m = chatMeasure[webKey];
+        if (m) setChatMeasure(savedKey, m); // carry the measure the same way
+        clearChatMeasure(webKey);
+        const pinnedModel = chatModelMap[webKey] ?? picked.id;
+        setChatModel(savedKey, pinnedModel); // and the model this chat runs on
+        clearChatModel(webKey);
+        setTitle("");
+      }
+      sentPersisted = true;
+      setSaveErr(null);
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : String(e));
+    }
+    const runKey = sentSlug ? chatKey(active.id, sentSlug, paneId) : chatKeyId;
+    useChatRuns.getState().markRunning(runKey); // the sidebar row starts pulsing
+
     const requestId = crypto.randomUUID();
     requestRef.current = requestId;
     const model = { id: picked.id, api: picked.api };
-    // the image tool needs a pinned assets dir — a SAVED chat only — and its
-    // engine's lane enabled; the globe doesn't gate it
+    // the image tool needs a pinned assets dir — a SAVED chat only (which a
+    // just-sent fresh chat now is) — and its engine's lane enabled
     const image =
-      !attachedSecure && chatSlug && aiProviders[imageEngine]
-        ? { root: active.root, slug: chatSlug, engine: imageEngine }
+      !attachedSecure && sentSlug && aiProviders[imageEngine]
+        ? { root: active.root, slug: sentSlug, engine: imageEngine }
         : undefined;
     const userName = useUiStore.getState().userName.trim();
     const runInput: RunInput = {
@@ -1108,6 +1191,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     requestRef.current = null;
     setStreaming(""); // the settled message row takes over from the live one
     setBusy(false);
+    busyRef.current = false;
 
     const failed = reply.startsWith("⚠");
     if (!reply) reply = "(the model returned nothing)";
@@ -1116,14 +1200,16 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     // persistence + note-memory pass): watched clears, unwatched flips unread.
     // A failed turn always clears — its ⚠ only lives in this mounted session,
     // so an unread badge would point at nothing.
-    useChatRuns.getState().settleRun(chatKeyId, failed || aliveRef.current);
-    if (failed) return; // a failed turn isn't persisted
+    useChatRuns.getState().settleRun(runKey, failed || aliveRef.current);
+    if (failed) return; // a failed REPLY isn't persisted (the sent user turn already is)
 
-    // persist the turn (user + assistant) to chats/<slug>.md
+    // persist the assistant turn to chats/<slug>.md (the user turn landed at
+    // send time; when THAT write failed, this fallback writes both)
     const turn: Msg[] = [
       { speaker: "you", text: userText },
       { speaker: "rotli", text: reply },
     ];
+    const diskTurn: Msg[] = sentPersisted ? [{ speaker: "rotli", text: reply }] : turn;
     const memoryTurns = [...messages, ...turn];
     // the notes-keeping model: the same pick as the chat rewrites the attached
     // note's "Conversation notes" each turn (a preset routes per-leg, so it
@@ -1138,17 +1224,19 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
               ],
             });
     try {
-      if (chatSlug) {
-        const sum = chats.data?.find((c) => c.slug === chatSlug);
-        const memoryTitle = sum?.title ?? chatSlug;
+      if (sentSlug) {
+        // the normal path: the chat exists on disk (pre-existing, or created
+        // at send time above) — append this turn's remainder
+        const sum = chats.data?.find((c) => c.slug === sentSlug);
+        const memoryTitle = sum?.title ?? (chatSlug ? sentSlug : sentTitle);
         await write.mutateAsync({
           instance: active,
-          existingSlug: chatSlug,
+          existingSlug: sentSlug,
           title: memoryTitle,
-          messages: turn,
+          messages: diskTurn,
         });
         if (secureReadRef.current) {
-          await markChatSecureContext(active, chatSlug).catch(() => {});
+          await markChatSecureContext(active, sentSlug).catch(() => {});
         }
         const memoryStem = (sum?.attachedTo ?? "").replace(/^\[\[|\]\]$/g, "").trim();
         // a TAINTED loose chat writes no memory note — its prose must not
@@ -1158,7 +1246,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
           await syncManagedChatMemory({
             instance: active,
             title: memoryTitle,
-            chatSlug,
+            chatSlug: sentSlug,
             ...(memoryStem ? { attachedStem: memoryStem } : {}),
             ...(composeNotes ? { composeNotes } : {}),
             model: picked,
@@ -1166,10 +1254,11 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }
       } else {
-        const memoryTitle = title.trim() || deriveTitle(userText);
+        // fallback: the send-time create failed — the old persist-at-the-end
+        // shape, so a transient write error still costs nothing
         const res = await write.mutateAsync({
           instance: active,
-          title: memoryTitle,
+          title: sentTitle,
           messages: turn,
         });
         if (secureReadRef.current) {
@@ -1177,7 +1266,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
         } else {
           await syncManagedChatMemory({
             instance: active,
-            title: memoryTitle,
+            title: sentTitle,
             chatSlug: res.slug,
             ...(composeNotes ? { composeNotes } : {}),
             model: picked,
@@ -1185,35 +1274,8 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }
         bindChat(paneId, res.slug); // this tab now IS that chat
-        // the run signal + an unread flag follow the unsaved key to the slug,
-        // so the fresh sidebar row shows the right state (2026-08-03)
-        useChatRuns.getState().retargetRun(chatKeyId, chatKey(active.id, res.slug, paneId));
-        // view inheritance: a chat born while a named view is active belongs to
-        // that view (Seth, 2026-08-03: organize chats by work vs personal)
-        const bornInView = useUiStore.getState().activeView;
-        if (bornInView) {
-          const views = useViewsStore.getState();
-          if (views.hydrated && views.writable) {
-            views.setManifest(assignChatToView(views.manifest, res.slug, bornInView));
-          }
-        }
-        // folder inheritance (Seth, 2026-07-30): a new chat opened FROM a
-        // foldered chat files itself into the same folder on first save.
-        // Best-effort — a manifest hiccup must never fail the send.
-        const originSlug = useUiStore.getState().newChatOrigin;
-        useUiStore.getState().setNewChatOrigin(null);
-        if (originSlug) {
-          try {
-            const manifest = await loadChatFolders(active);
-            const folderId = manifest.assignments[originSlug];
-            if (folderId) {
-              await saveChatFolders(active, assignChatToFolder(manifest, res.slug, folderId));
-              await invalidateChatFolders();
-            }
-          } catch {
-            /* the chat still saved — folder filing is recoverable by hand */
-          }
-        }
+        // the run signal + an unread flag follow the unsaved key to the slug
+        useChatRuns.getState().retargetRun(runKey, chatKey(active.id, res.slug, paneId));
         // the saved chat's maps ride the VAULT-scoped key (2026-08-03)
         const savedKey = chatKey(active.id, res.slug, paneId);
         if (globeOn) setChatWeb(savedKey, true); // carry the globe to the saved chat
@@ -1296,6 +1358,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     requestRef.current = null;
     setQueued(null);
     setBusy(false);
+    busyRef.current = false;
     useChatRuns.getState().settleRun(chatKeyId, true); // a stop is watched by definition
     const partial = streamRef.current;
     setStreaming("");

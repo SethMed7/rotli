@@ -198,6 +198,29 @@ fn codex_scratch_dir() -> Result<String, String> {
     Ok(dir.to_string_lossy().to_string())
 }
 
+/// agy has no `--cd`, so its chat spawns get an empty CWD the ordinary way —
+/// `Command::current_dir`. Even if the model reaches for a native tool there
+/// is nothing to see (the app's own cwd could be anywhere, including HOME).
+fn agy_scratch_dir() -> Result<String, String> {
+    let dir = std::env::temp_dir().join("rotli-agy");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("couldn't create the agy scratch dir: {e}"))?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
+/// Did an empty agy reply die on its NATIVE tool-permission prompt? Gemini
+/// occasionally ignores the JSON protocol and reaches for agy's own tools; in
+/// headless print mode the permission prompt auto-denies and the run aborts
+/// with empty stdout (Seth, 2026-08-03: "jetski: no output produced — a tool
+/// required the 'command' permission…"). This signature gates the one retry.
+fn agy_tool_denied(stderr: &str) -> bool {
+    let s = stderr.to_ascii_lowercase();
+    s.contains("auto-denied") || (s.contains("permission") && s.contains("no output produced"))
+}
+
+/// The retry's override: pinned ABOVE the prompt so it reads as the outermost
+/// instruction. The JSON protocol inside the prompt stays the only action path.
+const AGY_NO_TOOLS_OVERRIDE: &str = "IMPORTANT: You have NO native tools, no shell, and no filesystem access in this environment — never request tool permissions. Reply ONLY according to the protocol in the message below.\n\n";
+
 // ── output parsers (pure) ─────────────────────────────────────────────────────
 
 /// `claude -p --output-format json` → one JSON document with `result` (+
@@ -486,14 +509,39 @@ pub async fn cli_complete(
     tauri::async_runtime::spawn_blocking(move || {
         // agy: strictly one at a time (parallel runs hang) — hold the gate
         let _agy = (provider == "agy").then(|| AGY_GATE.lock().unwrap());
+        let agy_cwd = (provider == "agy").then(|| agy_scratch_dir()).transpose()?;
         let mut cmd = Command::new(&bin);
         cmd.args(&args);
+        if let Some(cwd) = &agy_cwd {
+            cmd.current_dir(cwd);
+        }
         let payload = matches!(via, PromptVia::Stdin).then_some(prompt.as_str());
         let (stdout, stderr, ok) = run_registered(&children, &request_id, cmd, payload, timeout)?;
         let parsed = match provider.as_str() {
             "claude" => parse_claude_json(&stdout),
             "codex" => parse_codex_jsonl(&stdout),
             _ => parse_agy_text(&stdout, &stderr),
+        };
+        // agy's known abort: the model ignored the JSON protocol, reached for a
+        // NATIVE tool, and headless auto-denial killed the run with empty
+        // stdout. ONE retry with an explicit no-native-tools override pinned
+        // above the prompt recovers the turn (2026-08-03). The AGY_GATE is
+        // still held; run_registered re-registers the same request id, which
+        // the watchdog's matching-token design already supports.
+        let parsed = match parsed {
+            Err(first_err) if provider == "agy" && agy_tool_denied(&stderr) => {
+                let hardened = format!("{AGY_NO_TOOLS_OVERRIDE}{prompt}");
+                let (retry_args, _) = build_args(&provider, &model, &hardened, timeout.as_secs())?;
+                let mut retry = Command::new(&bin);
+                retry.args(&retry_args);
+                if let Some(cwd) = &agy_cwd {
+                    retry.current_dir(cwd);
+                }
+                let (out2, err2, _ok2) = run_registered(&children, &request_id, retry, None, timeout)?;
+                parse_agy_text(&out2, &err2)
+                    .map_err(|second| format!("{first_err} — and the no-tools retry: {second}"))
+            }
+            other => other,
         };
         match parsed {
             Ok(text) => Ok(text),
@@ -929,5 +977,19 @@ mod tests {
         assert_eq!(expand_home("/opt/homebrew/bin/codex").unwrap(), PathBuf::from("/opt/homebrew/bin/codex"));
         let home = std::env::var("HOME").unwrap();
         assert_eq!(expand_home("~/.local/bin/claude").unwrap(), PathBuf::from(home).join(".local/bin/claude"));
+    }
+
+    /// The retry gate fires on agy's real headless-denial signature (Seth's
+    /// 2026-08-03 screenshot) and stays quiet on ordinary emptiness/noise.
+    #[test]
+    fn agy_denial_signature_gates_the_retry() {
+        assert!(agy_tool_denied(
+            "jetski: no output produced — a tool required the \"command\" permission that headless mode cannot prompt for, so it was auto-denied. Add an allow-rule under permissions.allow in settings.json (e.g. command(<target>)). Alternatively, re-run with --dangerously-skip-permissions to auto-approve all tools."
+        ));
+        assert!(agy_tool_denied("tool request auto-denied in headless mode"));
+        assert!(!agy_tool_denied(""));
+        assert!(!agy_tool_denied("network timeout talking to the model"));
+        // "permission" alone (e.g. a file-permission chmod complaint) is not the gate
+        assert!(!agy_tool_denied("permission denied reading cli.log"));
     }
 }

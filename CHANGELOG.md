@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.73.0] - 2026-08-03
+
+### Fixed
+
+- **A sent chat appears in the sidebar instantly.** Your message is saved the
+  moment you press Send — so a brand-new chat shows up in the left bar right
+  away, at the top, already pulsing while it thinks, and an existing chat
+  jumps to the top on send instead of on reply. Your own message is also never
+  lost anymore if the model fails mid-answer. (A new chat's tab also claims
+  its identity at send time, closing a race where a reply could land on the
+  wrong tab.)
+- **The Gemini (Antigravity) lane no longer dies on "agy returned nothing…
+  auto-denied".** The cloud model occasionally reached for the CLI's own
+  tools, which headless mode silently denies — aborting the whole turn. rotli
+  now spawns that lane in an empty scratch directory, tells the model plainly
+  it has no native tools, and when the abort signature still appears, retries
+  once with a hard override. Permissions stay denied — nothing was loosened.
+
 ## [0.72.0] - 2026-08-03
 
 ### Added
