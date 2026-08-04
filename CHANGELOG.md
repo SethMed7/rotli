@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **You can see which chat is working, at the top of the list.** A chat that's
+  answering now floats into a **Working** lane above everything — folders
+  included — so you never hunt for it. The working dot was also invisible on
+  the chat you were actually looking at: a selected row fills with the accent
+  color, and the dot was that same color. It now flips to the contrasting ink,
+  like every other marker on a selected row.
+
 - **Boards can be deleted again.** Deleting a board failed with “note not
   found”, naming a file sitting right there in your sidebar — boards are
   tracked by their file path while notes are tracked by an internal id, and the

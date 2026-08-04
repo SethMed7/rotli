@@ -75,8 +75,12 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   const visibleSlugs = activeView ? new Set(viewChats(viewsManifest, activeView)) : null;
   const inView = (c: MemexChatSummary) => visibleSlugs === null || visibleSlugs.has(c.slug);
 
-  // the Unread lane — every unwatched reply across folders, newest first
-  // (chatList is already pinned-then-recency), acting as a view onto the list
+  // the top lanes — views onto the list, not folders (rows also stay in their
+  // real folder below). WORKING first (Seth, 2026-08-04: "a loading icon that
+  // shows the chat is working, and it should be at the top"): a chat that is
+  // answering right now floats above everything, including folders, so you
+  // never hunt for it. Then UNREAD — replies that landed while you were away.
+  const workingChats = chatList.filter((c) => inView(c) && runs[runKeyOf(c.slug)] === "running");
   const unreadChats = chatList.filter((c) => inView(c) && runs[runKeyOf(c.slug)] === "unread");
 
   // the header's New-folder button, while Chat is the active front, mints a
@@ -377,6 +381,18 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           <p className="sb-empty">No chats yet.</p>
         ) : (
           <>
+            {/* the Working lane (2026-08-04) — only while something is actually
+                running, so the sidebar stays quiet the rest of the time */}
+            {workingChats.length > 0 && (
+              <div className="sb-chatfolder sb-chatworking">
+                <div className="sb-chatrow sb-chatfolder-row unreadhead" aria-hidden="true">
+                  <span className="sb-chatrun running" />
+                  <span className="fname">Working</span>
+                  <span className="sb-chatfolder-n">{workingChats.length}</span>
+                </div>
+                {workingChats.map((c) => renderChatRow(c, null))}
+              </div>
+            )}
             {/* the Unread lane (2026-08-03): every reply that landed while you
                 were elsewhere, newest first — a view onto the list, not a
                 folder; rows also stay in their real folder below */}

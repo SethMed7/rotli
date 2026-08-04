@@ -704,6 +704,13 @@
 .sb-chatrun.running {
   animation: sb-chatrun-breathe 1.6s ease-in-out infinite;
 }
+/* THE bug Seth hit (2026-08-04): the chat you're watching is the `sel` row, and
+   `sel` fills with --accent — so an --accent dot on it was invisible exactly
+   when it mattered most. On a selected row the dot flips to the on-accent ink,
+   the same rule .sb-chatpin and .sb-chatmodel already follow. */
+.sb-chatrow.sel .sb-chatrun {
+  background: var(--on-accent);
+}
 @keyframes sb-chatrun-breathe {
   0%,
   100% {
@@ -744,15 +751,18 @@
 }
 /* the Unread lane header — reads like a folder row but is a label, not a
    control */
-.sb-chatunread .unreadhead {
+.sb-chatunread .unreadhead,
+.sb-chatworking .unreadhead {
   cursor: default;
   color: var(--text-muted);
   font-weight: 500;
 }
-.sb-chatunread .unreadhead .sb-chatrun {
+.sb-chatunread .unreadhead .sb-chatrun,
+.sb-chatworking .unreadhead .sb-chatrun {
   margin-left: 0;
 }
-.sb-chatunread .unreadhead:hover {
+.sb-chatunread .unreadhead:hover,
+.sb-chatworking .unreadhead:hover {
   background: none;
 }
 .sb-chatnew {
