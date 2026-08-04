@@ -1892,6 +1892,36 @@ body:has(.document-editor) [role="dialog"] input:disabled {
 .cmsg-bubble strong {
   font-weight: 600;
 }
+/* generative UI (Seth, 2026-08-03): tables + mermaid render as real structures
+   in a reply. The wrap scrolls sideways so a wide table never breaks the
+   thread column; the diagram inherits the theme via the shared renderer. */
+.cmsg-tablewrap {
+  margin: 7px 0;
+  overflow-x: auto;
+}
+.cmsg-table {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.cmsg-table th,
+.cmsg-table td {
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.cmsg-table th {
+  font-weight: 600;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+.cmsg-mermaid {
+  margin: 7px 0;
+  overflow-x: auto;
+}
+.cmsg-mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
 .cmsg-code {
   margin: 7px 0;
   padding: 8px 11px;

@@ -3,6 +3,7 @@
 // retrieval (the memex knowledge base), and the web primitives. Everything above this
 // file is host-agnostic and liftable into the shared ~/.memex/ai client layer.
 
+import { createEditableBoardFromMermaid } from "../boards/composition";
 import { memoryKeywords, mergeKeywordHits, rankChatMemories } from "../chatMemory/retrieval";
 import { extOf } from "../lib/fileKind";
 import {
@@ -17,6 +18,7 @@ import {
   corpusNotesAi,
   corpusReadAi,
   corpusReadableIds,
+  corpusRenameBoard,
   corpusSearchAi,
   corpusWriteAi,
   generateImage as tauriGenerateImage,
@@ -397,6 +399,24 @@ export function makeTauriHost(
         prompt,
         engine,
       });
+    },
+    async drawBoard(title, mermaid) {
+      // the create_note taint law's BOARD twin: boards are never secure-gated
+      // files, so a secure-context chat may not launder its prose into one
+      if (opts?.isSecureContext?.() === true) {
+        return "blocked: this chat carries secure-note content, and boards are not protected files — put the diagram in a secure note (as a ```mermaid fence) instead.";
+      }
+      try {
+        // mermaid is the wire format on purpose (local models write it far more
+        // reliably than raw Excalidraw JSON); the conversion runs entirely local
+        const boardId = await createEditableBoardFromMermaid(mermaid, { open: false });
+        const named = title ? await corpusRenameBoard(boardId, title).catch(() => null) : null;
+        usePanesStore.getState().openCanvas(named?.id ?? boardId, { newTab: true });
+        await Promise.all([invalidateNotes(), invalidateMemex()]);
+        return `created the board${title ? ` "${title}"` : ""} from your diagram and opened it on screen — a fully editable visual copy. Tell the user it's there and that they can rearrange it freely.`;
+      } catch (e) {
+        return `error: the diagram didn't convert — ${e instanceof Error ? e.message : String(e)}. Keep to a simple flowchart (named nodes, arrows, short labels) and try ONCE more; if it fails again, give the user the \`\`\`mermaid fence in your final answer instead.`;
+      }
     },
     async knowledgeMap(maxChars) {
       // the map spans the Notes tree AND the brain's memory lanes — a model that

@@ -222,6 +222,8 @@ export function statusFor(tool: ToolName, args?: Record<string, unknown>): strin
     }
     case "generate_image":
       return "generating an image…";
+    case "draw_board":
+      return "drawing the board…";
   }
 }
 
@@ -425,6 +427,14 @@ export async function runTool(
       if (prompt === "") return 'error: generate_image needs a "prompt" describing the image.';
       const rel = await host.generateImage(prompt);
       return `saved: ${rel} — it's in this chat's assets. Tell the user it's ready (mention the filename).`;
+    }
+    case "draw_board": {
+      const source = argText(args.mermaid ?? args.code ?? args.definition).trim();
+      if (source === "") {
+        return 'error: draw_board needs "mermaid" — Mermaid flowchart source (e.g. "flowchart TD\\n  A --> B").';
+      }
+      if (!host.drawBoard) return "error: this host cannot draw boards.";
+      return host.drawBoard(argText(args.title).trim(), source);
     }
   }
 }

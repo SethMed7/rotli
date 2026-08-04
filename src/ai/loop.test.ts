@@ -780,3 +780,45 @@ test("a zero-hit search hands the model the title index, not a dead end", async 
   expect(fallback).toContain('no matching notes for "runtime"');
   expect(fallback).toContain("one different, distinctive word");
 });
+
+// draw_board (generative UI, 2026-08-03): mermaid in, editable board out —
+// gated by capability (host may lack it) and validated before the host runs.
+describe("draw_board tool", () => {
+  const budget = budgetFor({ id: "gemma-3-12b-it-qat-4bit" });
+
+  test("passes title + mermaid through to the host's converter", async () => {
+    const { host } = fakeHost([]);
+    const seen: string[] = [];
+    const result = await runTool(
+      {
+        ...host,
+        drawBoard: async (title, mermaid) => {
+          seen.push(title, mermaid);
+          return "created the board";
+        },
+      },
+      "draw_board",
+      { title: "KEK rotation", mermaid: "flowchart TD\n  A --> B" },
+      budget,
+    );
+    expect(result).toBe("created the board");
+    expect(seen).toEqual(["KEK rotation", "flowchart TD\n  A --> B"]);
+  });
+
+  test("missing mermaid source errors before the host is touched", async () => {
+    const { host } = fakeHost([]);
+    const result = await runTool(
+      { ...host, drawBoard: async () => "never" },
+      "draw_board",
+      { title: "empty" },
+      budget,
+    );
+    expect(result).toContain("error: draw_board needs");
+  });
+
+  test("a host without the capability says so instead of throwing", async () => {
+    const { host } = fakeHost([]);
+    const result = await runTool(host, "draw_board", { mermaid: "flowchart TD\n  A --> B" }, budget);
+    expect(result).toBe("error: this host cannot draw boards.");
+  });
+});

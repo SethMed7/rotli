@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Views reach the chat area.** Organize chats by work vs personal: assign a
   chat to a named view from its row menu, switch views to see only that view's
   chats, and a chat started while a view is active joins it automatically.
+- **Replies show real tables and diagrams.** A markdown table in an answer
+  renders as an actual table, and a `mermaid` flowchart renders as the drawn
+  diagram — right in the chat. The assistant is encouraged to use both (in
+  replies and in the notes it writes) when they genuinely clarify.
+- **The assistant can draw on a board.** Ask for a visual diagram and the model
+  can turn a flowchart into a real, fully editable Excalidraw board saved with
+  your boards and opened on screen. Under the hood the model writes Mermaid —
+  which even small on-device models do reliably — and rotli converts it
+  locally; nothing leaves the Mac, and chats carrying secure-note content
+  can't put their prose on a board.
 
 ### Changed
 

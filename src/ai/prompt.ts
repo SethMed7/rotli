@@ -18,6 +18,8 @@ export interface PromptCtx {
   maxSteps: number;
   /** Offer the generate_image tool (a connected engine is configured). */
   imageTool?: boolean;
+  /** Offer the draw_board tool (desktop app; local mermaid→board conversion). */
+  boardTool?: boolean;
   /** The user's name (Settings → General / onboarding) — omit when unset. */
   userName?: string;
 }
@@ -121,6 +123,9 @@ export const gemmaAdapter: Adapter = {
     const imageTool = ctx.imageTool
       ? `\n- {"thought":"…","tool":"generate_image","args":{"prompt":"…"}}  → create an image (saved into this chat's assets) — describe the IMAGE, never a file path`
       : "";
+    const boardTool = ctx.boardTool
+      ? `\n- {"thought":"…","tool":"draw_board","args":{"title":"…","mermaid":"flowchart TD\\n  A[Start] --> B[Done]"}} → turn a Mermaid flowchart into an editable visual board saved with the user's boards and shown on screen. Use it when the user asks for a board, canvas, or visual diagram they can edit. Keep to a simple flowchart: named nodes, arrows, short labels, one direction (TD or LR).`
+      : "";
 
     return `You are rotli, a warm, concise assistant running entirely on the user's Mac.${namedLine(ctx.userName)}
 
@@ -139,7 +144,7 @@ TOOLS — to use one, reply with a SINGLE JSON object:
 - {"thought":"…","tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} → REWRITE an existing note. read_note it first, then send the FULL new body — it replaces everything (never send a fragment)
 - {"thought":"…","tool":"open_note","args":{"id":"…"}}        → open a note on the user's screen, in a tab
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} → read a file by name (text, or a spreadsheet as CSV)
-${webTools}${imageTool}
+${webTools}${imageTool}${boardTool}
 When you can answer, reply: {"thought":"…","final":"your answer to the user"}
 
 HOW YOU WORK (one JSON object per step):
@@ -154,6 +159,7 @@ ANSWER STYLE — how to write every "final" (this is exactly what the user reads
 - When your answer came from the web, name the source (its title or URL) so the user can trust it and follow it up.
 - NEVER answer with where information lives. BAD: "Your family members are documented in the family/ subfolder." GOOD: "Your family: **Marisol**, **Diego**, and **Lucia**." If you haven't read the note that holds the answer yet, read it instead of describing it.
 - Format in Markdown: a "- " bulleted list for 3+ items, **bold** for names and key terms, short paragraphs with a blank line between them. Skip headings on short answers.
+- STRUCTURE when it genuinely clarifies: a Markdown table (| col | col |) for comparisons and anything column-shaped; a \`\`\`mermaid flowchart fence for a process, flow, or architecture. Both render as a real table/diagram right in the chat — and they work the same inside notes you create_note or update_note. Prose stays the default; never force a table onto two facts.
 - Couldn't find it? One plain sentence saying so — not a tour of the folder structure.
 
 RULES:
@@ -221,6 +227,9 @@ export const frontierAdapter: Adapter = {
     const imageTool = ctx.imageTool
       ? `\n- {"thought":"…","tool":"generate_image","args":{"prompt":"…"}} — create an image (saved into this chat's assets); describe the IMAGE, never a file path`
       : "";
+    const boardTool = ctx.boardTool
+      ? `\n- {"thought":"…","tool":"draw_board","args":{"title":"…","mermaid":"flowchart TD\\n  A --> B"}} — turn a Mermaid flowchart into an editable visual board (use when the user asks for a board/canvas/editable diagram; keep it a simple flowchart)`
+      : "";
 
     return `You are rotli's reasoning engine. The user's memex — their personal notes folder, indexed below — is your knowledge base; search it before answering from memory.${namedLine(ctx.userName)}
 
@@ -233,8 +242,8 @@ Tools:
 - {"thought":"…","tool":"create_note","args":{"title":"…","body":"…markdown…"}} — create a NEW note in the user's memex (lands in their intake)
 - {"thought":"…","tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} — rewrite an existing note (read it first; the body replaces everything, never a fragment)
 - {"thought":"…","tool":"open_note","args":{"id":"…"}} — open a note on the user's screen, in a tab
-- {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}
-To answer the user: {"thought":"…","final":"your answer"} — the final text leads with the facts found (never with where they live or with note titles), in Markdown ("- " lists for 3+ items, **bold** key names).
+- {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}${boardTool}
+To answer the user: {"thought":"…","final":"your answer"} — the final text leads with the facts found (never with where they live or with note titles), in Markdown ("- " lists for 3+ items, **bold** key names; a | table | for comparisons and a \`\`\`mermaid flowchart for processes both render in chat and in notes — use them when they clarify).
 
 Rules: ${webRule} ${freshnessRule} A request to change/clean up/add to a note means EDIT it — read_note then update_note with the complete new body, never just prose in chat. For past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences (one distinctive word beats a phrase; a phrase only matches if the note contains it verbatim). The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); the "links:" line and every [[name]] are POINTERS that mix people, projects, and reference — never build a list or an answer out of them, and when a note's body lacks the answer read another note rather than falling back on its metadata. A hit marked "role":"area-index" is that area's generated roster — read it first for any all/every/list question; a folder README only explains the folder. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
 

@@ -19,7 +19,8 @@ export type ToolName =
   | "read_file"
   | "web_search"
   | "web_fetch"
-  | "generate_image";
+  | "generate_image"
+  | "draw_board";
 
 /** A note the model can read, surfaced by search_notes / the index. */
 export interface NoteHit {
@@ -96,6 +97,12 @@ export interface Host {
   /** Generate an image into this chat's assets via a connected engine. Returns
    * the saved corpus-relative path (the observation the model reports). */
   generateImage(prompt: string): Promise<string>;
+  /** Turn Mermaid flowchart source into an editable Excalidraw board in the
+   * user's boards and show it (generative UI, 2026-08-03). Mermaid is the wire
+   * format on purpose: every model — especially local ones — writes it far
+   * more reliably than raw Excalidraw JSON; the conversion is local. Optional
+   * — headless/portable hosts skip it. */
+  drawBoard?(title: string, mermaid: string): Promise<string>;
   /** A compact index of the knowledge base so the model sees what exists up front.
    * Bounded by `maxChars`: a full per-note index if it fits, else an areas map. */
   knowledgeMap(maxChars: number): Promise<string>;
@@ -143,6 +150,8 @@ export interface RunInput {
   /** Offer the generate_image tool (a connected engine is set up + the chat is
    * saved, so its assets dir is well-defined). Independent of the web globe. */
   imageTool?: boolean;
+  /** Offer the draw_board tool (the desktop app; conversion is fully local). */
+  boardTool?: boolean;
   /** The user's name for prompt personalization — omit when unset. */
   userName?: string;
   /** Stream the final answer token-by-token when the host supports it (default

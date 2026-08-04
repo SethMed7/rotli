@@ -28,6 +28,8 @@ const NOTE_TOOLS: ToolName[] = [
 ];
 const WEB_TOOLS: ToolName[] = ["web_search", "web_fetch"];
 const IMAGE_TOOLS: ToolName[] = ["generate_image"];
+// local mermaid→Excalidraw conversion — a creation tool, never egress
+const BOARD_TOOLS: ToolName[] = ["draw_board"];
 // every tool whose ARGS leave the device — the secret guard covers them all
 // (an image prompt ships to a remote engine exactly like a web query)
 const EGRESS_TOOLS: ToolName[] = [...WEB_TOOLS, ...IMAGE_TOOLS];
@@ -70,6 +72,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     ...NOTE_TOOLS,
     ...(input.web ? WEB_TOOLS : []),
     ...(input.imageTool ? IMAGE_TOOLS : []),
+    ...(input.boardTool ? BOARD_TOOLS : []),
   ]);
 
   let knowledge = "";
@@ -113,6 +116,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       scratch: pruneScratch(scratch, budget.maxScratchChars),
       maxSteps,
       ...(input.imageTool ? { imageTool: true } : {}),
+      ...(input.boardTool ? { boardTool: true } : {}),
       ...(input.userName ? { userName: input.userName } : {}),
     });
 

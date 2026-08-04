@@ -45,6 +45,7 @@ import {
   buildChatNotesPrompt,
   type MemoryTurn,
 } from "../chatMemory/model";
+import { renderMermaidElement } from "../editor/mermaidRender";
 import { renderInline } from "../editor/render";
 import { fileName } from "../lib/fileKind";
 import { type AnchoredPlacement, anchoredPopover, useTransientPopover } from "../lib/popover";
@@ -65,6 +66,7 @@ import { CORPUS_INSTANCE_ID, activeInstance } from "../memex/config";
 import { hasSecureContext } from "../memex/contract";
 import { markChatSecureContext, readChat, writeNote } from "../memex/service";
 import { useInstanceChats, useMemexConfig, useSetChatAttachedTo, useWriteChat } from "../memex/useMemex";
+import { splitMessageBlocks } from "../noteChat/chatMessageBlocks";
 import { rememberedChatNote, rememberChatNote } from "../noteChat/session";
 import {
   assignChatToFolder,
@@ -638,39 +640,86 @@ const THINK_WORDS = [
 
 const isThinkWord = (s: string): boolean => (THINK_WORDS as readonly string[]).includes(s);
 
-/** Render an assistant message as light markdown: ``` fenced code → <pre>, every
- * other line via the editor's inline renderer (bold/italic/code/links), blank
- * lines kept as gaps. Source-of-truth stays the .md; this is display only. */
+/** A mermaid fence in a reply, rendered as the real diagram (generative UI,
+ * Seth 2026-08-03). Async render off the shared editor engine; while it loads
+ * — or when the source doesn't parse (a model mid-stream, or plain wrong) —
+ * the source shows as code, so nothing ever blanks out. */
+function ChatMermaid({ code }: { code: string }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [failed, setFailed] = useState(false);
+  const renderSeq = useRef(0);
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const seq = ++renderSeq.current;
+    setFailed(false);
+    const dark = ["dark", "charcoal"].includes(document.documentElement.dataset.theme ?? "");
+    void renderMermaidElement(code, { dark, id: `rotli-chat-mermaid-${seq}-${Date.now()}` })
+      .then((element) => {
+        if (renderSeq.current === seq) host.replaceChildren(element);
+      })
+      .catch(() => {
+        if (renderSeq.current === seq) setFailed(true);
+      });
+    return () => {
+      host.replaceChildren();
+    };
+  }, [code]);
+  return failed ? (
+    <pre className="cmsg-code">
+      <code>{code}</code>
+    </pre>
+  ) : (
+    <div className="cmsg-mermaid" ref={hostRef} />
+  );
+}
+
+/** Render an assistant message as light markdown: ``` fenced code → <pre>,
+ * ```mermaid → the rendered diagram, GFM tables → real tables, every other
+ * line via the editor's inline renderer (bold/italic/code/links), blank lines
+ * kept as gaps. Source-of-truth stays the .md; this is display only. */
 function renderMessage(text: string): ReactNode {
-  const out: ReactNode[] = [];
-  const lines = text.split("\n");
-  let i = 0;
-  let key = 0;
-  while (i < lines.length) {
-    const line = lines[i] ?? "";
-    if (line.trimStart().startsWith("```")) {
-      const code: string[] = [];
-      i++;
-      while (i < lines.length && !(lines[i] ?? "").trimStart().startsWith("```")) {
-        code.push(lines[i] ?? "");
-        i++;
-      }
-      i++; // skip the closing fence
-      out.push(
-        <pre key={key++} className="cmsg-code">
-          <code>{code.join("\n")}</code>
-        </pre>,
-      );
-    } else {
-      out.push(
-        <div key={key++} className="cmsg-line">
-          {line ? renderInline(line) : " "}
-        </div>,
-      );
-      i++;
+  return splitMessageBlocks(text).map((block, key) => {
+    switch (block.kind) {
+      case "code":
+        return (
+          <pre key={key} className="cmsg-code">
+            <code>{block.code}</code>
+          </pre>
+        );
+      case "mermaid":
+        return <ChatMermaid key={key} code={block.code} />;
+      case "table":
+        return (
+          <div key={key} className="cmsg-tablewrap">
+            <table className="cmsg-table">
+              <thead>
+                <tr>
+                  {block.header.map((cell, c) => (
+                    <th key={c}>{renderInline(cell)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {block.rows.map((row, r) => (
+                  <tr key={r}>
+                    {row.map((cell, c) => (
+                      <td key={c}>{renderInline(cell)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      case "lines":
+        return block.lines.map((line, l) => (
+          <div key={`${key}-${l}`} className="cmsg-line">
+            {line ? renderInline(line) : " "}
+          </div>
+        ));
     }
-  }
-  return out;
+  });
 }
 
 // memo: renderMessage re-parses a whole message's markdown on every render, and
@@ -1014,6 +1063,9 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       ...(attachedNoteId ? { noteId: attachedNoteId } : {}),
       ...(imgs.length > 0 ? { images: imgs } : {}),
       ...(image ? { imageTool: true } : {}),
+      // the board tool is local conversion — offered whenever the desktop
+      // bridge exists (the host re-checks the secure taint at call time)
+      ...(isTauri() ? { boardTool: true } : {}),
       ...(userName ? { userName } : {}),
     };
 
