@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.74.0] - 2026-08-04
 
+### Fixed
+
+- **Boards can be deleted again.** Deleting a board failed with “note not
+  found”, naming a file sitting right there in your sidebar — boards are
+  tracked by their file path while notes are tracked by an internal id, and the
+  delete path only knew how to look up notes. Since deleting is a move to
+  Trash, the same gap silently broke moving and archiving a board too. Boards
+  now move as plain files — their contents are never rewritten — and restoring
+  one from Trash puts it back exactly where it came from.
+
+### Added
+
+- **Hold ⌘ and the shortcuts appear right on the buttons.** Instead of a panel
+  you have to read and translate back to the screen, each shortcut now shows as
+  a small badge pinned to the control it actually drives — so you can see it and
+  go straight there. How the hold behaves is yours: **Settings → Hotkeys → Hold
+  ⌘** offers badges on the controls (the new default), the original grouped
+  list, or nothing at all.
+- **One key flips between Home and Chat** (⌃\`). ⌃1 and ⌃2 still jump straight
+  to either front, and all three are rebindable like every other shortcut.
+
 ### Changed
 
 - **A new chat opens ready to be named.** The title field takes the caret the

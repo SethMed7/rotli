@@ -11,10 +11,21 @@ interface IconButtonProps {
    * window). */
   className?: string;
   disabled?: boolean;
+  /** The registry action this button mirrors — hold ⌘ badges its chord onto the
+   * button itself (Seth, 2026-08-04). Omit for buttons no chord drives. */
+  hotkey?: string;
   children: ReactNode;
 }
 
-export function IconButton({ label, onClick, pressed, className, disabled, children }: IconButtonProps) {
+export function IconButton({
+  label,
+  onClick,
+  pressed,
+  className,
+  disabled,
+  hotkey,
+  children,
+}: IconButtonProps) {
   const cls = ["icobtn", pressed && "railon", className].filter(Boolean).join(" ");
   return (
     <button
@@ -23,6 +34,7 @@ export function IconButton({ label, onClick, pressed, className, disabled, child
       aria-label={label}
       aria-pressed={pressed}
       disabled={disabled}
+      data-hotkey={hotkey}
       onClick={onClick}
     >
       {children}

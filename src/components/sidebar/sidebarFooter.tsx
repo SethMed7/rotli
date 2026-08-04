@@ -74,7 +74,13 @@ export function SidebarFooter() {
           pendingProposals > 0 && <span className="count pill">{pendingProposals}</span>
         )}
       </button>
-      <button type="button" className="sb-footbtn" title="Settings" onClick={() => dispatch("app.settings")}>
+      <button
+        type="button"
+        className="sb-footbtn"
+        title="Settings"
+        data-hotkey="app.settings"
+        onClick={() => dispatch("app.settings")}
+      >
         <Icon name="rotli-settings" size={14} />
         <span className="fname">Settings</span>
       </button>

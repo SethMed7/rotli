@@ -45,6 +45,14 @@ export type OrganizerModel = "local" | "claude" | "gemini35";
 
 export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local", "claude", "gemini35"];
 
+/** How holding ⌘ reveals the keyboard map (Seth, 2026-08-04: "I'd prefer little
+ * boxes around the UI so I can visually see and instantly toggle exactly where
+ * I want to go"). `badges` pins each chord to the control it drives; `panel` is
+ * the grouped list; `off` disables the peek entirely. */
+export type HotkeyPeek = "badges" | "panel" | "off";
+
+export const HOTKEY_PEEKS: readonly HotkeyPeek[] = ["badges", "panel", "off"];
+
 /** The per-chat key every chat-scoped map uses: `<instanceId>:<slug>` for a
  * saved chat, or a PANE-scoped session key while the chat is still unsaved
  * (never a shared "" key — that leaked one chat's choice into every future
@@ -403,6 +411,11 @@ interface UiState {
    * this pane, or a right split beside the chat. Persisted. */
   chatNoteOpen: "tab" | "split";
   setChatNoteOpen: (v: "tab" | "split") => void;
+  /** What holding ⌘ reveals (Seth, 2026-08-04). `badges` pins each chord to the
+   * control it drives, right where the eye already is; `panel` is the original
+   * grouped shortcut map; `off` disables the peek. Persisted. */
+  hotkeyPeek: HotkeyPeek;
+  setHotkeyPeek: (v: HotkeyPeek) => void;
   /** Connected subscription models (Settings → AI Models): which lanes are
    * enabled. A lane must ALSO detect as installed+authed to serve. Persisted. */
   aiProviders: Record<ProviderId, boolean>;
@@ -709,6 +722,8 @@ export const useUiStore = create<UiState>((set, get) => ({
     }),
   chatNoteOpen: "tab",
   setChatNoteOpen: (v) => set({ chatNoteOpen: v }),
+  hotkeyPeek: "badges",
+  setHotkeyPeek: (v) => set({ hotkeyPeek: v }),
   aiProviders: { claude: false, codex: false, agy: false, gemini: false },
   setAiProvider: (id, on) => set((s) => ({ aiProviders: { ...s.aiProviders, [id]: on } })),
   hybridPresets: [],

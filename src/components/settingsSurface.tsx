@@ -239,6 +239,8 @@ const HK_SECTIONS: { prefix: string; label: string }[] = [
 
 function HotkeysPane() {
   const overrides = useBindingsStore((s) => s.overrides);
+  const hotkeyPeek = useUiStore((s) => s.hotkeyPeek);
+  const setHotkeyPeek = useUiStore((s) => s.setHotkeyPeek);
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [note, setNote] = useState<{ id: string; text: string } | null>(null);
   const [query, setQuery] = useState("");
@@ -346,6 +348,22 @@ function HotkeysPane() {
     <>
       <PaneHead title="Hotkeys" char="notes" />
       <p className="lead">Every shortcut in rotli is yours to rebind. Click a chord, press the new keys.</p>
+      <section className="hksection">
+        <div className="hkhead">Hold ⌘</div>
+        <p className="setnote">
+          Hold ⌘ for a moment and rotli shows you what you can press — as badges pinned to the controls
+          themselves, or as one grouped list.
+        </p>
+        <Seg
+          value={hotkeyPeek}
+          options={[
+            ["badges", "Badges on the controls"],
+            ["panel", "One grouped list"],
+            ["off", "Show nothing"],
+          ]}
+          onPick={setHotkeyPeek}
+        />
+      </section>
       <input
         type="search"
         className="hksearch"

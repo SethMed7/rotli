@@ -149,6 +149,7 @@ export function Sidebar() {
           className={sidebarMode === "breve" ? "icobtn railon sb-breve-toggle" : "icobtn sb-breve-toggle"}
           aria-label={sidebarMode === "breve" ? "Back to Rotli home" : "Open Breve"}
           aria-pressed={sidebarMode === "breve"}
+          data-hotkey="view.breve"
           onClick={() => dispatch("view.breve")}
         >
           {sidebarMode === "breve" ? <QuokkaMark size={17} /> : <CoffeeGlyph size={16} />}

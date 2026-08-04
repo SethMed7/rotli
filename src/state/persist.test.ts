@@ -202,6 +202,15 @@ describe("parseSettings — the AI Models keys (Seth, 2026-07-02)", () => {
     expect(parseSettings('{"chatNoteOpen":"window"}').chatNoteOpen).toBe("tab");
     expect(parseSettings('{"chatNoteOpen":"split"}').chatNoteOpen).toBe("split");
   });
+
+  test("hotkeyPeek round-trips; anything unknown reads as badges, never off", () => {
+    // an absent/typo'd value must not silently REMOVE a discoverability aid —
+    // only an explicit "off" turns the hold-⌘ peek off (Seth, 2026-08-04)
+    expect(parseSettings("{}").hotkeyPeek).toBe("badges");
+    expect(parseSettings('{"hotkeyPeek":"nonsense"}').hotkeyPeek).toBe("badges");
+    expect(parseSettings('{"hotkeyPeek":"panel"}').hotkeyPeek).toBe("panel");
+    expect(parseSettings('{"hotkeyPeek":"off"}').hotkeyPeek).toBe("off");
+  });
 });
 
 describe("parseHybridPresets — shape-validated, invalid entries dropped", () => {

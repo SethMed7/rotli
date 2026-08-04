@@ -354,7 +354,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   return (
     <div className="sb-rows" aria-label="Chat" style={{ zoom }}>
       <div className="sb-chat">
-        <button type="button" className="sb-chatnew" onClick={() => openChat(null)}>
+        <button type="button" className="sb-chatnew" data-hotkey="chat.new" onClick={() => openChat(null)}>
           <PlusGlyph size={14} />
           <span>New chat</span>
         </button>
@@ -363,6 +363,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           /* highlight "All chats" only when its content view is active — so it
              never lights up alongside an open chat row (Seth, 2026-07-01) */
           className={`sb-chatrow all${contentView === "allChats" ? " sel" : ""}`}
+          data-hotkey="chat.all"
           onClick={() => setContentView("allChats")}
         >
           <SearchGlyph size={14} />

@@ -602,6 +602,25 @@ export function registerDefaultActions(): void {
     },
   });
 
+  // …and ONE key to flip between them (Seth, 2026-08-04: "toggle through the
+  // home and chat with hotkeys"). ⌃1/⌃2 stay the direct jumps; this is the
+  // no-look switch for when you just want the other front.
+  registerAction({
+    id: "modules.toggleFront",
+    title: "Switch sidebar front (Home ↔ Chat)",
+    defaultChord: "Ctrl+Backquote",
+    run: () => {
+      const ui = useUiStore.getState();
+      ui.setSettingsOpen(false);
+      ui.setSidebarMode("notes");
+      const next = ui.sidebarView === "chat" ? "home" : "chat";
+      ui.setSidebarView(next);
+      // Home means the note panes; Chat leaves the content view alone (its own
+      // rows drive it), mirroring modules.notes / modules.chat exactly.
+      if (next === "home") ui.setContentView("panes");
+    },
+  });
+
   // Chat is a FRONT now, not a section. ⌃⇧2 opens a fresh chat pane (it moved
   // off ⌃2 so the two fronts could own ⌃1/⌃2 — bindings persist by action id,
   // so an existing override is untouched). Both reach ⌘K and are rebindable.

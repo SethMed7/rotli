@@ -16,9 +16,24 @@ const SIDEBAR_FRONTS: {
   label: string;
   Glyph: typeof HomeGlyph;
   hint: string;
+  /** The registry action this segment mirrors — hold ⌘ badges the chord onto
+   * the segment itself (Seth, 2026-08-04). */
+  action: string;
 }[] = [
-  { id: "home", label: "Home", Glyph: HomeGlyph, hint: "Your notes — All notes, Captures, Tasks and Main" },
-  { id: "chat", label: "Chat", Glyph: ChatGlyph, hint: "Your chats — folders and full history" },
+  {
+    id: "home",
+    label: "Home",
+    Glyph: HomeGlyph,
+    hint: "Your notes — All notes, Captures, Tasks and Main",
+    action: "modules.notes",
+  },
+  {
+    id: "chat",
+    label: "Chat",
+    Glyph: ChatGlyph,
+    hint: "Your chats — folders and full history",
+    action: "modules.chat",
+  },
 ];
 
 export function SidebarSwitcher({
@@ -37,7 +52,7 @@ export function SidebarSwitcher({
     // sidebar's own content, not a tabpanel, and the pane tab strip already
     // owns the one tablist in the window (the app's segmented-control grammar)
     <div className="sb-switch" role="group" aria-label="Sidebar front">
-      {SIDEBAR_FRONTS.map(({ id, label, Glyph, hint }) => {
+      {SIDEBAR_FRONTS.map(({ id, label, Glyph, hint, action }) => {
         const active = value === id;
         return (
           <button
@@ -45,6 +60,7 @@ export function SidebarSwitcher({
             type="button"
             aria-pressed={active}
             title={hint}
+            data-hotkey={action}
             className={active ? "sb-switch-seg sel" : "sb-switch-seg"}
             onClick={() => onPick(id)}
           >

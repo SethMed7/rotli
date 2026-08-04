@@ -1810,3 +1810,32 @@
 .rename-btn.primary:hover {
   background: color-mix(in srgb, var(--on-accent) 12%, var(--accent));
 }
+
+/* — hotkey BADGES (Seth, 2026-08-04): the alternative to the whichkey panel —
+   each chord pinned to the control it drives, so the eye never leaves the UI.
+   No scrim: the point is to read the badges AGAINST the live app. Same law as
+   .whichkey — pointer-events:none so it can never eat a click, and the layer
+   sits below the palette. */
+.hkbadges {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  pointer-events: none;
+  animation: wk-in var(--motion-enter) var(--motion-ease);
+}
+.hkbadge {
+  position: absolute;
+  /* the accent chip reads as an overlay ON the control, not as its own UI */
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: var(--r-inner);
+  padding: 1px 5px;
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  /* a themed hairline instead of a raw shadow — keeps the badge legible over a
+     same-accent control without introducing a color literal (check:hex) */
+  border: 1px solid var(--border-strong);
+}

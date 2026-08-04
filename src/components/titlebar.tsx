@@ -61,6 +61,7 @@ export function Titlebar() {
         <IconButton
           className="tb-lead"
           label={sidebarCollapsed ? "Show sidebar — ⌘0" : "Hide sidebar — ⌘0"}
+          hotkey="chrome.toggleSidebars"
           onClick={() => dispatch("chrome.toggleSidebars")}
         >
           <SidebarGlyph size={TB_ICON} />

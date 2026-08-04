@@ -111,7 +111,12 @@ export function useNoteMenu() {
       const y = e.clientY;
 
       void (async () => {
-        const isFile = note.kind === "file";
+        // Boards restore like FILES, not like notes (2026-08-04): a board is
+        // addressed by its path and carries no frontmatter, so it has no origin
+        // breadcrumb for the note lane to read — the sink-relative restore is
+        // its only correct way home. Trashing one is now possible (the note
+        // lane used to refuse it outright), so its return trip must work too.
+        const isFile = note.kind === "file" || note.kind === "board";
         // an archived/trashed note: open + Restore only — the lifecycle actions
         // don't apply until it's back (mirrors the retired RowMenu's split).
         // Gate on isSink (Archive/Trash), NOT isHidden: a STAGED capture lives

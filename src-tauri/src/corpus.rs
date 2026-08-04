@@ -2688,7 +2688,11 @@ impl CorpusStore {
             Layout::Memex => original_rel.starts_with("storage/"),
             Layout::LegacyRotli => original_rel.starts_with("Storage/"),
         };
-        if !in_storage || !self.abs(rel).is_file() {
+        // a BOARD restores by this lane too (2026-08-04): it is path-addressed
+        // with no frontmatter origin, so the sink-relative path is its only way
+        // home — and in LegacyRotli boards live in `Board/`, outside storage.
+        let is_board = original_rel.ends_with(".excalidraw");
+        if (!in_storage && !is_board) || !self.abs(rel).is_file() {
             return Err(format!("file has no restorable storage origin: {rel}"));
         }
         let name = Path::new(original_rel)
@@ -4280,14 +4284,90 @@ impl CorpusStore {
     /// `target_folder == ""` means the corpus root (no validation, no dir).
     /// Filenames collide safely (free_name); the id is the through-line.
     pub fn move_note(&mut self, id: &str, target_folder: &str) -> Result<NoteMeta, String> {
-        let rel = self.path_of(id)?;
+        // resolve_note_rel, not path_of: a BOARD (and any surfaced file) travels
+        // as its rel path and never enters the ULID index, so path_of refused it
+        // outright — "note not found: storage/excalidraw/untitled-2.excalidraw"
+        // for an item sitting right there in the tree. Trash IS a move, so that
+        // one lookup broke board delete, archive, and move alike (Seth,
+        // 2026-08-04: "I don't understand why I can't delete something that is
+        // showing in my view").
+        let rel = self.resolve_note_rel(id)?;
         let target_folder = lifecycle_disk_folder(self.layout, target_folder);
         // BOTH ends must be writable: the note's current file (a self/ note may
         // not leave) AND its destination folder (only chats/ accepts notes in a
         // memex). LegacyRotli waves both through.
         self.writable(&rel)?;
         self.writable(&target_folder)?;
+        if !rel.ends_with(".md") {
+            // Into a SINK, an opaque item keeps its original path underneath it
+            // (`trash/storage/excalidraw/x`) — that breadcrumb IS how
+            // `restore_file` finds its way home, since a board carries no
+            // frontmatter `origin`. A move to a real folder just lands there.
+            let dest = if is_hidden_root(&target_folder) {
+                let origin_folder = folder_of(&rel);
+                if origin_folder.is_empty() {
+                    target_folder.clone()
+                } else {
+                    format!("{target_folder}/{origin_folder}")
+                }
+            } else {
+                target_folder.clone()
+            };
+            return self.relocate_opaque(&rel, &dest);
+        }
         self.relocate(id, &rel, &target_folder)
+    }
+
+    /// Move a NON-markdown item (a board, a surfaced file) between folders
+    /// without touching its bytes, and hand back its fresh meta.
+    ///
+    /// `relocate` is the MARKDOWN machinery: it parses frontmatter, derives the
+    /// title from the body, renames to a slug of that title, and composes a
+    /// frontmatter block back into the file. Correct for a `.md` note; for a
+    /// board's JSON it would retitle the file after the first line of the scene
+    /// and write YAML into it — silent corruption. So the non-markdown lane
+    /// moves the file and nothing else; a board's identity IS its path
+    /// (`rename_board` has always worked this way).
+    fn relocate_opaque(&mut self, rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
+        let abs = self.abs(rel);
+        if !abs.is_file() {
+            return Err(format!("not found: {rel}"));
+        }
+        let name = Path::new(rel)
+            .file_name()
+            .map(|value| value.to_string_lossy().into_owned())
+            .ok_or_else(|| format!("file has no name: {rel}"))?;
+        if !target_folder.is_empty() {
+            validate_rel(target_folder)?;
+            fs::create_dir_all(self.abs(target_folder))
+                .map_err(|e| format!("create folder {target_folder}: {e}"))?;
+        }
+        let target_rel = self.free_name(target_folder, &name, None);
+        let target_abs = self.abs(&target_rel);
+        // both paths are OUR writes — neither should echo back as external
+        self.suppress.mark(&abs);
+        self.suppress.mark(&target_abs);
+        if target_abs != abs {
+            fs::rename(&abs, &target_abs).map_err(|e| format!("move {rel}: {e}"))?;
+        }
+        let (created_at, updated_at) = file_stamps(&target_abs);
+        let is_board = target_rel.ends_with(".excalidraw");
+        let folder = folder_of(&target_rel);
+        Ok(NoteMeta {
+            id: target_rel.clone(),
+            title: if is_board { board_title(&target_rel) } else { name },
+            snippet: String::new(),
+            aliases: Vec::new(),
+            // boards/files carry no frontmatter, so the shelf projection has
+            // nothing to read — the lifecycle/storage mapping is the whole answer
+            folder_id: project_folder(self.layout, &folder, &Frontmatter::default()),
+            disk_folder_id: folder,
+            created_at,
+            updated_at,
+            pinned: false,
+            origin: None,
+            kind: if is_board { NoteKind::Board } else { NoteKind::File },
+        })
     }
 
     /// The shared move machinery behind `move_note` (USER gate) and `file_note`
@@ -5046,8 +5126,15 @@ impl CorpusStore {
         // memex there is no writable `Trash`, so move_note's target gate refuses
         // it — gate here too so the error is explicit (chats aren't deleted into
         // the brain's sinks this increment).
-        let rel = self.path_of(id)?;
+        // resolve_note_rel, not path_of — boards/files travel as rel paths and
+        // never enter the ULID index (2026-08-04). move_note re-gates both ends
+        // and routes non-markdown through the opaque lane.
+        let rel = self.resolve_note_rel(id)?;
         self.writable(&rel)?;
+        // hand move_note the CALLER's id, never the resolved rel: for a `.md`
+        // note the id is its ULID and `relocate` stamps it back into the
+        // frontmatter + the index — passing a rel here would rewrite the note's
+        // identity to its path (caught by create_read_write_delete_cycle).
         self.move_note(id, "Trash").map(|_| ())
     }
 
@@ -9816,6 +9903,46 @@ mod tests {
         assert!(store.writable("wiki/engineering/filed.md").is_ok());
         assert!(store.writable("archive").is_ok());
         assert!(store.writable("trash/storage/file.pdf").is_ok());
+    }
+
+    /// Seth, 2026-08-04: "⚠ Couldn't delete this note — note not found:
+    /// storage/excalidraw/untitled-2.excalidraw … I don't understand why I
+    /// can't delete something that is showing in my view."
+    ///
+    /// A board is addressed by its REL path and never enters the ULID index, so
+    /// the note lane's `path_of` refused it outright — trash IS a move, so board
+    /// delete/archive/move were all dead. And had it resolved, `relocate` would
+    /// have composed frontmatter INTO the board's JSON and retitled the file
+    /// after the scene's first line. The opaque lane moves the bytes untouched.
+    #[test]
+    fn a_board_trashes_and_restores_without_touching_its_bytes() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+
+        let board = store.create_board("storage/excalidraw", None).unwrap();
+        let scene = fs::read_to_string(root.join(&board.id)).unwrap();
+        assert!(board.id.ends_with(".excalidraw"));
+
+        // the exact failing call: trash is move_note(id, "Trash")
+        let trashed = store.move_note(&board.id, "Trash").unwrap();
+        assert!(!root.join(&board.id).is_file(), "the board left its lane");
+        assert_eq!(trashed.kind, NoteKind::Board);
+        // bytes are IDENTICAL — no frontmatter composed into the JSON
+        assert_eq!(fs::read_to_string(root.join(&trashed.id)).unwrap(), scene);
+        // …and the filename survived (relocate would have slugified the JSON)
+        assert!(trashed.id.ends_with("untitled.excalidraw"), "{}", trashed.id);
+
+        // the round trip: it goes back where it came from
+        let restored = store.restore_file(&trashed.id).unwrap();
+        assert_eq!(restored, board.id);
+        assert_eq!(fs::read_to_string(root.join(&restored)).unwrap(), scene);
+
+        // delete() — the sibling lane — resolves a board rel too
+        store.delete(&board.id).unwrap();
+        assert!(!root.join(&board.id).is_file());
     }
 
     #[test]

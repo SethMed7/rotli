@@ -23,6 +23,7 @@ import { ContextMenu } from "./components/contextMenu";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
 import { Titlebar } from "./components/titlebar";
+import { HotkeyBadges } from "./components/hotkeyBadges";
 import { WhichKey } from "./components/whichKey";
 import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
@@ -148,10 +149,13 @@ function MainShell() {
   // while the palette or settings own the keyboard, so it never doubles up; the
   // hook releases the moment a real chord fires (Seth, 2026-06-13).
   const [whichKey, setWhichKey] = useState(false);
+  // WHAT the hold reveals is the user's call (Seth, 2026-08-04): badges pinned
+  // to the controls themselves (default), the original grouped panel, or off.
+  const hotkeyPeek = useUiStore((s) => s.hotkeyPeek);
   useHeldModifier({
     modifier: "Meta",
     delayMs: 500,
-    enabled: !paletteOpen && !settingsOpen && !showOnboarding,
+    enabled: hotkeyPeek !== "off" && !paletteOpen && !settingsOpen && !showOnboarding,
     onHold: () => setWhichKey(true),
     onRelease: () => setWhichKey(false),
   });
@@ -488,7 +492,8 @@ function MainShell() {
       </main>
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
       <PreviewModal />
-      {whichKey && <WhichKey onClose={() => setWhichKey(false)} />}
+      {whichKey &&
+        (hotkeyPeek === "badges" ? <HotkeyBadges /> : <WhichKey onClose={() => setWhichKey(false)} />)}
       <ContextMenu />
       <RenameDialog />
     </div>

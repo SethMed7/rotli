@@ -54,6 +54,8 @@ import {
   type BreveView,
   clampSidebarWidth,
   clampSidebarZoom,
+  HOTKEY_PEEKS,
+  type HotkeyPeek,
   ORGANIZER_MODELS,
   ORGANIZER_TRUSTS,
   type OrganizerModel,
@@ -208,6 +210,8 @@ interface PersistedSettings {
   chatMeasure: Record<string, Measure>;
   /** Where a chat's attached note opens: a new tab (default) or a right split. */
   chatNoteOpen: "tab" | "split";
+  /** What holding ⌘ reveals: inline badges (default), the grouped panel, or off. */
+  hotkeyPeek: HotkeyPeek;
   /** Connected subscription lanes (Settings → AI Models); all off by default —
    * a chat never leaves the Mac without the user flipping a lane on. */
   aiProviders: Record<ProviderId, boolean>;
@@ -404,6 +408,11 @@ export function parseSettings(raw: string): PersistedSettings {
       return persistableChatMap(out);
     })(),
     chatNoteOpen: data.chatNoteOpen === "split" ? "split" : "tab",
+    // an unknown/absent value reads as the default rather than disabling the
+    // peek — a typo in the file must never silently remove a discoverability aid
+    hotkeyPeek: HOTKEY_PEEKS.includes(data.hotkeyPeek as HotkeyPeek)
+      ? (data.hotkeyPeek as HotkeyPeek)
+      : "badges",
     // booleans only, unknown lanes ignored — the safe default is every lane OFF
     aiProviders: (() => {
       const src = record(data.aiProviders);
@@ -523,6 +532,7 @@ function applySettings(s: PersistedSettings): void {
     chatWeb: s.chatWeb,
     chatMeasure: s.chatMeasure,
     chatNoteOpen: s.chatNoteOpen,
+    hotkeyPeek: s.hotkeyPeek,
     aiProviders: s.aiProviders,
     hybridPresets: s.hybridPresets,
     blockedModels: s.blockedModels,
@@ -901,6 +911,7 @@ function settingsSnapshot(): string {
     chatWeb: persistableChatMap(ui.chatWeb),
     chatMeasure: persistableChatMap(ui.chatMeasure),
     chatNoteOpen: ui.chatNoteOpen,
+    hotkeyPeek: ui.hotkeyPeek,
     aiProviders: ui.aiProviders,
     hybridPresets: ui.hybridPresets,
     blockedModels: ui.blockedModels,
