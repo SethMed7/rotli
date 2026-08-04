@@ -45,11 +45,38 @@ export type OrganizerModel = "local" | "claude" | "gemini35";
 
 export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local", "claude", "gemini35"];
 
-/** The per-chat key every chat-scoped map uses: the saved slug, or a
- * PANE-scoped session key while the chat is still unsaved (never a shared ""
- * key — that leaked one chat's choice into every future fresh chat, #7). */
-export function chatKey(slug: string | null, paneId: string): string {
-  return slug ?? `unsaved:${paneId}`;
+/** The per-chat key every chat-scoped map uses: `<instanceId>:<slug>` for a
+ * saved chat, or a PANE-scoped session key while the chat is still unsaved
+ * (never a shared "" key — that leaked one chat's choice into every future
+ * fresh chat, #7). VAULT-scoped since 2026-08-03: a bare slug collided across
+ * brains sharing one corpus settings.json, so two vaults' same-named chats
+ * shared one model pick / globe / measure. */
+export function chatKey(instanceId: string | null, slug: string | null, paneId: string): string {
+  if (!slug) return `unsaved:${paneId}`;
+  return instanceId ? `${instanceId}:${slug}` : slug;
+}
+
+/** Move a renamed chat's entries in every per-chat map to its new key — a
+ * rename used to orphan the model pick, globe, and measure under the old slug
+ * until the GC deleted them (audit 2026-08-03). */
+export function retargetChatMapKeys(oldKey: string, newKey: string): void {
+  if (oldKey === newKey) return;
+  const s = useUiStore.getState();
+  const move = <T>(m: Record<string, T>): Record<string, T> | null => {
+    if (!(oldKey in m)) return null;
+    const next = { ...m };
+    if (!(newKey in next)) next[newKey] = next[oldKey] as T;
+    delete next[oldKey];
+    return next;
+  };
+  const chatModel = move(s.chatModel);
+  const chatWeb = move(s.chatWeb);
+  const chatMeasure = move(s.chatMeasure);
+  useUiStore.setState({
+    ...(chatModel ? { chatModel } : {}),
+    ...(chatWeb ? { chatWeb } : {}),
+    ...(chatMeasure ? { chatMeasure } : {}),
+  });
 }
 
 /** Which model a chat runs on: its own pick, else the new-chat seed. Pure

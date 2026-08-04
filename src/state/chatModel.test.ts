@@ -6,17 +6,25 @@
 
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import { parseSettings } from "./persist";
-import { chatKey, chatModelFor, useUiStore } from "./ui";
+import { parseSettings, rescopeChatMapKeys } from "./persist";
+import { chatKey, chatModelFor, retargetChatMapKeys, useUiStore } from "./ui";
 
 describe("chatKey — the per-chat map key", () => {
-  test("a saved chat keys by slug; an unsaved one rides its PANE", () => {
-    expect(chatKey("morning-brief", "pane-1")).toBe("morning-brief");
-    expect(chatKey(null, "pane-1")).toBe("unsaved:pane-1");
+  test("a saved chat keys by VAULT + slug; an unsaved one rides its PANE", () => {
+    expect(chatKey("corpus", "morning-brief", "pane-1")).toBe("corpus:morning-brief");
+    expect(chatKey("corpus", null, "pane-1")).toBe("unsaved:pane-1");
+  });
+
+  test("the same slug in two vaults never shares a key (isolation, 2026-08-03)", () => {
+    expect(chatKey("corpus", "notes", "p")).not.toBe(chatKey("brain-2", "notes", "p"));
   });
 
   test("two unsaved chats in two panes never share a key", () => {
-    expect(chatKey(null, "pane-1")).not.toBe(chatKey(null, "pane-2"));
+    expect(chatKey("corpus", null, "pane-1")).not.toBe(chatKey("corpus", null, "pane-2"));
+  });
+
+  test("no resolvable instance degrades to the bare slug (never crashes a chat)", () => {
+    expect(chatKey(null, "morning-brief", "pane-1")).toBe("morning-brief");
   });
 });
 
@@ -81,7 +89,7 @@ describe("the per-chat model map — isolation", () => {
 
   test("an unsaved chat's pick carries to its slug on the first save", () => {
     const { setChatModel, clearChatModel } = useUiStore.getState();
-    const unsaved = chatKey(null, "pane-1");
+    const unsaved = chatKey("corpus", null, "pane-1");
     setChatModel(unsaved, "gpt-5.2");
 
     // the send binds the pane to a slug: carry, then spend the session key
@@ -115,5 +123,60 @@ describe("parseSettings — chatModel (durable, additive, session-key free)", ()
     const s = parseSettings('{"chatModelId":"claude-sonnet-5"}');
     expect(s.chatModel).toEqual({});
     expect(chatModelFor(s.chatModel, "any-chat", s.chatModelId)).toBe("claude-sonnet-5");
+  });
+});
+
+// Vault isolation (Seth, 2026-08-03: "each vault holds their own notes and
+// chats — nothing travels between vaults"). The chat FILES were always scoped
+// per instance root; these lock the per-chat preference maps to the same rule.
+describe("rescopeChatMapKeys — legacy keys re-home to their one owning vault", () => {
+  test("a bare slug owned by exactly one instance gains its prefix", () => {
+    const owners = new Map([["daily", ["corpus"]]]);
+    expect(rescopeChatMapKeys({ daily: "gpt-5.2" }, owners)).toEqual({ "corpus:daily": "gpt-5.2" });
+  });
+
+  test("an AMBIGUOUS slug (two vaults, same chat name) is dropped, never guessed", () => {
+    const owners = new Map([["daily", ["corpus", "brain-2"]]]);
+    expect(rescopeChatMapKeys({ daily: "gpt-5.2" }, owners)).toEqual({});
+  });
+
+  test("already-scoped and session keys pass through; a claimed target is never overwritten", () => {
+    const owners = new Map([["daily", ["corpus"]]]);
+    const m = { "corpus:daily": "claude-sonnet-5", daily: "gpt-5.2", "unsaved:p1": "x" };
+    expect(rescopeChatMapKeys(m, owners)).toEqual({
+      "corpus:daily": "claude-sonnet-5",
+      "unsaved:p1": "x",
+    });
+  });
+
+  test("a fully scoped map returns the SAME reference (no pointless save)", () => {
+    const m = { "corpus:daily": "gpt-5.2" };
+    expect(rescopeChatMapKeys(m, new Map())).toBe(m);
+  });
+});
+
+describe("retargetChatMapKeys — a rename keeps the model/globe/measure", () => {
+  beforeEach(() => {
+    useUiStore.setState({ chatModel: {}, chatWeb: {}, chatMeasure: {} });
+  });
+
+  test("all three maps follow the new key; other chats untouched", () => {
+    useUiStore.setState({
+      chatModel: { "corpus:old": "gpt-5.2", "corpus:other": "gemma-3-12b" },
+      chatWeb: { "corpus:old": true },
+      chatMeasure: { "corpus:old": "wide" },
+    });
+    retargetChatMapKeys("corpus:old", "corpus:new");
+    const s = useUiStore.getState();
+    expect(s.chatModel).toEqual({ "corpus:new": "gpt-5.2", "corpus:other": "gemma-3-12b" });
+    expect(s.chatWeb).toEqual({ "corpus:new": true });
+    expect(s.chatMeasure).toEqual({ "corpus:new": "wide" });
+  });
+
+  test("a key absent from a map leaves that map's reference alone", () => {
+    useUiStore.setState({ chatModel: { "corpus:old": "gpt-5.2" } });
+    const webBefore = useUiStore.getState().chatWeb;
+    retargetChatMapKeys("corpus:old", "corpus:new");
+    expect(useUiStore.getState().chatWeb).toBe(webBefore);
   });
 });

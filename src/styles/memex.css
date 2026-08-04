@@ -1886,6 +1886,12 @@ body:has(.document-editor) [role="dialog"] input:disabled {
 .cmsg-line + .cmsg-line {
   margin-top: 3px;
 }
+/* **bold** in a reply was falling to the browser's default 700 — General Sans
+   Bold, which reads far too heavy against a dark thread (Seth, 2026-08-03:
+   "way too thick"). SemiBold keeps the emphasis without the ink. */
+.cmsg-bubble strong {
+  font-weight: 600;
+}
 .cmsg-code {
   margin: 7px 0;
   padding: 8px 11px;

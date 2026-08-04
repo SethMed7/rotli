@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.72.0] - 2026-08-03
+
+### Fixed
+
+- **Bold text in chat replies no longer shouts.** `**bold**` in an assistant
+  reply was falling to the font's heaviest cut, which read far too thick against
+  a dark thread. Chat bold now uses the same semibold emphasis the rest of the
+  app speaks.
+- **Each vault's chats keep their own settings.** A chat's model pick, web-search
+  globe, and column width were remembered by chat name alone — so two vaults
+  with a same-named chat silently shared one setting. They're now remembered per
+  vault, existing settings migrate automatically, and renaming a chat carries
+  all three along instead of losing them. Isolation is locked in by tests on
+  both the TypeScript and Rust sides: chats and notes never travel between
+  vaults.
+
 ## [0.71.0] - 2026-08-03
 
 ### Fixed

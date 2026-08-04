@@ -1088,6 +1088,34 @@ pub async fn memex_pick_folder(app: tauri::AppHandle) -> Result<Option<String>, 
 mod tests {
     use super::*;
 
+    /// Vault isolation (Seth, 2026-08-03): every chat listing and write is
+    /// rooted — two vaults with the SAME slug never see each other's chats.
+    /// (The wire commands add `registered_root` on top; this locks the fs layer.)
+    #[test]
+    fn chats_never_travel_between_roots() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (a, b) = (tmp.path().join("vault-a"), tmp.path().join("vault-b"));
+        for root in [&a, &b] {
+            fs::create_dir_all(root.join("chats")).unwrap();
+        }
+        write_chat_at(&a, "daily", "---\ntitle: A's daily\n---\nbody a\n").unwrap();
+        write_chat_at(&b, "daily", "---\ntitle: B's daily\n---\nbody b\n").unwrap();
+        write_chat_at(&a, "only-in-a", "---\ntitle: Only A\n---\n").unwrap();
+
+        let list_a = list_chats_at(&a).unwrap();
+        let list_b = list_chats_at(&b).unwrap();
+        assert_eq!(list_a.len(), 2);
+        assert_eq!(list_b.len(), 1);
+        assert!(list_a.iter().any(|c| c.title == "A's daily"));
+        assert_eq!(list_b[0].title, "B's daily");
+        assert!(!list_b.iter().any(|c| c.slug == "only-in-a"));
+        // same slug, distinct files — a write in A never touched B
+        assert!(fs::read_to_string(a.join("chats/daily.md")).unwrap().contains("body a"));
+        assert!(fs::read_to_string(b.join("chats/daily.md")).unwrap().contains("body b"));
+        // and a slug cannot traverse out of its root
+        assert!(write_chat_at(&a, "../escape", "x").is_err());
+    }
+
     #[test]
     fn memex_perms_round_trip_their_wire_strings() {
         for (perms, wire) in [(MemexPerms::ChatsInbox, "chats+inbox"), (MemexPerms::ReadOnly, "read-only")] {

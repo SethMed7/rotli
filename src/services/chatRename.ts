@@ -12,7 +12,7 @@ import { slugify } from "../memex/contract";
 import { renameChat } from "../memex/service";
 import { invalidateMemex, useMemexConfig } from "../memex/useMemex";
 import { usePanesStore } from "../state/panes";
-import { useUiStore } from "../state/ui";
+import { chatKey, retargetChatMapKeys, useUiStore } from "../state/ui";
 import {
   invalidateChatFolders,
   loadChatFolders,
@@ -36,6 +36,9 @@ export function useChatRename() {
       try {
         const finalSlug = await renameChat(active, oldSlug, newSlug);
         retargetChat(oldSlug, finalSlug);
+        // the chat keeps its model pick, globe, and measure — a rename used to
+        // orphan all three under the old key (audit 2026-08-03)
+        retargetChatMapKeys(chatKey(active.id, oldSlug, ""), chatKey(active.id, finalSlug, ""));
         // the chat keeps its folder — the assignment key follows the slug
         try {
           const manifest = await loadChatFolders(active);

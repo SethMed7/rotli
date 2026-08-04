@@ -790,7 +790,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   // THIS chat's model — its own pick, or the new-chat seed until it has one.
   // Independent per chat (Seth, 2026-08-01): two chat panes side by side each
   // send to their own model, and picking in one never moves the other.
-  const chatKeyId = chatKey(chatSlug, paneId);
+  const chatKeyId = chatKey(active?.id ?? null, chatSlug, paneId);
   const chatModelId = chatModelFor(chatModelMap, chatKeyId, chatModelSeed);
   const savedPick = modelList.find((m) => m.id === chatModelId);
   const fallbackPick = modelList.find((m) => m.isDefault) ?? modelList[0] ?? null;
@@ -1129,13 +1129,15 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
             /* the chat still saved — folder filing is recoverable by hand */
           }
         }
-        if (globeOn) setChatWeb(res.slug, true); // carry the globe to the saved chat
+        // the saved chat's maps ride the VAULT-scoped key (2026-08-03)
+        const savedKey = chatKey(active.id, res.slug, paneId);
+        if (globeOn) setChatWeb(savedKey, true); // carry the globe to the saved chat
         clearChatWeb(webKey); // the pane-scoped unsaved key is spent (#7)
         const m = chatMeasure[webKey];
-        if (m) setChatMeasure(res.slug, m); // carry the measure the same way
+        if (m) setChatMeasure(savedKey, m); // carry the measure the same way
         clearChatMeasure(webKey);
         const pinnedModel = chatModelMap[webKey] ?? picked.id;
-        setChatModel(res.slug, pinnedModel); // and the model this chat runs on
+        setChatModel(savedKey, pinnedModel); // and the model this chat runs on
         clearChatModel(webKey);
         setTitle("");
       }

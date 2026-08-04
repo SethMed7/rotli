@@ -107,6 +107,32 @@ function persistableChatMap<T>(m: Record<string, T>): Record<string, T> {
   return Object.fromEntries(Object.entries(m).filter(([k]) => k !== "" && !k.startsWith("unsaved:")));
 }
 
+/** One-time migration of pre-vault-scoping chat-map keys (2026-08-03): a bare
+ * slug re-homes to `<instanceId>:<slug>` when exactly ONE configured instance
+ * has that slug. An ambiguous slug (two vaults, same name — the very collision
+ * the scoping fixes) or an unknown one is left for the prune to drop; a
+ * composite key already claimed keeps its value. Exported for tests. */
+export function rescopeChatMapKeys<T>(
+  m: Record<string, T>,
+  owners: ReadonlyMap<string, readonly string[]>,
+): Record<string, T> {
+  let changed = false;
+  const out: Record<string, T> = {};
+  for (const [k, v] of Object.entries(m)) {
+    if (k.startsWith("unsaved:") || k.includes(":")) {
+      out[k] = v;
+      continue;
+    }
+    const own = owners.get(k);
+    if (own?.length === 1) {
+      const scoped = `${own[0]}:${k}`;
+      if (!(scoped in out) && !(scoped in m)) out[scoped] = v;
+    }
+    changed = true;
+  }
+  return changed ? out : m;
+}
+
 /** Shape-validate the persisted hybrid presets — a hand-edited or future-build
  * entry that doesn't parse is DROPPED, never half-loaded. Exported for tests. */
 export function parseHybridPresets(raw: unknown): HybridPreset[] {
@@ -750,15 +776,23 @@ async function gcPersistedMaps(): Promise<void> {
       // keeps the keep-on-error rule: ONE failed listing rejects and the catch
       // below skips the whole prune
       const lists = await Promise.all(cfg.instances.map((inst) => listChats(inst)));
-      const slugs = new Set<string>();
-      for (const list of lists) for (const c of list) slugs.add(c.slug);
+      // live keys are VAULT-scoped `<instanceId>:<slug>` (2026-08-03); `owners`
+      // re-homes pre-scoping bare-slug keys to the one instance that has the slug
+      const composite = new Set<string>();
+      const owners = new Map<string, string[]>();
+      cfg.instances.forEach((inst, i) => {
+        for (const c of lists[i] ?? []) {
+          composite.add(`${inst.id}:${c.slug}`);
+          owners.set(c.slug, [...(owners.get(c.slug) ?? []), inst.id]);
+        }
+      });
       const ui = useUiStore.getState();
-      const liveKey = (k: string) => slugs.has(k) || k.startsWith("unsaved:");
-      const kept = pruneMap(ui.chatWeb, liveKey);
+      const liveKey = (k: string) => composite.has(k) || k.startsWith("unsaved:");
+      const kept = pruneMap(rescopeChatMapKeys(ui.chatWeb, owners), liveKey);
       if (kept !== ui.chatWeb) useUiStore.setState({ chatWeb: kept });
-      const keptMeasure = pruneMap(ui.chatMeasure, liveKey);
+      const keptMeasure = pruneMap(rescopeChatMapKeys(ui.chatMeasure, owners), liveKey);
       if (keptMeasure !== ui.chatMeasure) useUiStore.setState({ chatMeasure: keptMeasure });
-      const keptModel = pruneMap(ui.chatModel, liveKey);
+      const keptModel = pruneMap(rescopeChatMapKeys(ui.chatModel, owners), liveKey);
       if (keptModel !== ui.chatModel) useUiStore.setState({ chatModel: keptModel });
     }
   } catch {
