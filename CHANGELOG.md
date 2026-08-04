@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [Unreleased]
+
+### Added
+
+- **See what a Breve routine actually does.** Each routine now has a **Workflow**
+  toggle that lays out the real pipeline it runs — the schedule and its
+  head-start, the sandbox, the model and its self-heal fallback, the render,
+  audio and preview steps, the hold until delivery time, and every delivery lane.
+  Lanes you've switched off still appear, greyed, so you can see what *isn't*
+  running as easily as what is. It's read-only in this pass and derived from the
+  real scripts rather than stored, so nothing about your routines changed.
+
 ## [0.74.0] - 2026-08-04
 
 ### Fixed

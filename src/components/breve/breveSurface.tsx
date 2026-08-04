@@ -39,6 +39,7 @@ import {
   nextRoutineEpoch,
   sortBriefs,
 } from "../../routines/briefs";
+import { routinePipeline } from "../../routines/pipeline";
 import { usePanesStore } from "../../state/panes";
 import { useUiStore } from "../../state/ui";
 import { CheckGlyph, ChevronRight, ClockGlyph, LockGlyph, SearchGlyph, XGlyph } from "../glyphs";
@@ -51,6 +52,7 @@ import {
   type SaveState,
 } from "./breveShared";
 import { WatchlistView } from "./breveWatchlist";
+import { RoutinePipelineView } from "./routinePipelineView";
 import { BREVE_QUERY_KEY, useBreveSnapshot } from "./useBreve";
 
 function SourceStrip({ snapshot }: { snapshot: BreveSnapshot }) {
@@ -693,6 +695,8 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
 
   // ── custom routines (Seth, 2026-07-31): add/remove + per-routine prompts ──
   const [promptOpen, setPromptOpen] = useState<string | null>(null);
+  /** Which routine's workflow graph is expanded (2026-08-04). */
+  const [flowOpen, setFlowOpen] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addLabel, setAddLabel] = useState("");
   const [addKind, setAddKind] = useState<"brief" | "reminder">("brief");
@@ -924,6 +928,16 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
                         {routine.prompt ? "Instructions ✎" : "Add instructions…"}
                       </button>
                     )}
+                    {/* Workflow (2026-08-04): what this routine actually runs,
+                        derived from its executor — read-only in this pass */}
+                    <button
+                      type="button"
+                      className="breve-routine-promptbtn"
+                      aria-expanded={flowOpen === routine.id}
+                      onClick={() => setFlowOpen(flowOpen === routine.id ? null : routine.id)}
+                    >
+                      {flowOpen === routine.id ? "Hide workflow" : "Workflow"}
+                    </button>
                   </div>
                   <div className="breve-schedule-control">
                     {routine.schedule.kind === "dailyAt" ? (
@@ -997,6 +1011,7 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
                     })}
                   </fieldset>
                 </div>
+                {flowOpen === routine.id && <RoutinePipelineView pipeline={routinePipeline(routine)} />}
                 {promptOpen === routine.id && promptable(routine) && (
                   <div className="breve-routine-prompt">
                     <label>
