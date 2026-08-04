@@ -165,7 +165,13 @@ const cli = (provider: ProviderId, id: string, label: string): ChatModelInfo => 
   provider,
   endpoint: "", // remote — fails the locality check on purpose (see header)
   api: "cli",
-  vision: false, // v1: CLI transports don't carry the composer's data-URL images
+  // EVERY frontier lane sees images (Seth, 2026-08-04). Each transport gets
+  // there differently and Rust owns the details: codex takes image files
+  // natively (`-i`), claude reads them with a Read-only tool allowlist scoped
+  // to the staged dir, and agy needs its permission prompt skipped — granted
+  // ONLY for a turn that actually carries an image, and contained by the same
+  // seatbelt profile the image lane uses. See provider.rs `build_args`.
+  vision: true,
   isDefault: false,
 });
 

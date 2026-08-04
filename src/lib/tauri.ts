@@ -509,6 +509,10 @@ export function cliComplete(args: {
   model: string;
   prompt: string;
   timeoutMs?: number;
+  /** Attached images as base64/data URLs. Rust stages them as real files and
+   * passes them on lanes with a native image flag (codex `-i`); other lanes
+   * ignore them rather than pretending to see (2026-08-04). */
+  images?: string[];
 }): Promise<string> {
   return aiInvoke("cli_complete", { ...args });
 }

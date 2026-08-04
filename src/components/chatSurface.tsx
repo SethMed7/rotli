@@ -56,11 +56,13 @@ import {
   cliCancel,
   cliDetect,
   corpusFrontmatter,
+  corpusImportFile,
   fileAssetUrl,
   isTauri,
   localQueueCancel,
   localQueuePrioritize,
   onLocalQueue,
+  resolveImageSrc,
 } from "../lib/tauri";
 import { CORPUS_INSTANCE_ID, activeInstance } from "../memex/config";
 import { hasSecureContext } from "../memex/contract";
@@ -82,6 +84,7 @@ import { usePanesStore } from "../state/panes";
 import { chatKey, chatModelFor, useUiStore } from "../state/ui";
 import { useViewsStore } from "../state/views";
 import { Character, QuokkaMark } from "./character";
+import { CHAT_PANE_ATTR, registerChatDrop } from "./chatDrop";
 import { CheckGlyph, CloudGlyph, CopyGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
 
 interface Msg {
@@ -1018,7 +1021,9 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   }, [message]);
 
   const send = async () => {
-    if (!active || !writable || !message.trim() || busy) return;
+    // an image with no words is a real message ("what is this?") — the guard
+    // used to require text, so attaching a picture and pressing send did nothing
+    if (!active || !writable || (!message.trim() && images.length === 0) || busy) return;
     if (!picked) {
       setMessages((p) => [
         ...p,
@@ -1055,9 +1060,18 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       ]);
       return;
     }
-    const userText = message.trim();
+    const typed = message.trim();
     const imgs = images;
-    lastSentRef.current = { text: userText, images: imgs };
+    // An attachment becomes PART OF THE MESSAGE (Seth, 2026-08-04: "like a
+    // #image one like claude does so we can reference it and talk about it").
+    // The token is what makes an image referable afterwards — "what's in image
+    // 2?" — and it's the only trace the transcript keeps, since the bytes
+    // themselves never land in chats/<slug>.md.
+    const userText =
+      imgs.length > 0
+        ? `${imgs.map((_, i) => `[Image #${i + 1}]`).join(" ")}${typed ? `\n${typed}` : ""}`
+        : typed;
+    lastSentRef.current = { text: typed, images: imgs };
     setMessage("");
     setImages([]);
     // history = the prior turns; the new user message rides as runAgent's userText
@@ -1409,6 +1423,32 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     if (datas.length > 0) setImages((prev) => [...prev, ...datas]);
   };
 
+  // — dropped images (Seth, 2026-08-04) — the window handler hands us OS PATHS.
+  // Import each into the vault's asset store first (the same lane a drop
+  // anywhere else uses), then read it back through the asset protocol: the
+  // composer speaks data URLs, and the image becomes a durable vault asset
+  // instead of a byte blob that exists only until you hit send.
+  const attachPaths = useCallback((paths: readonly string[]) => {
+    void (async () => {
+      const datas: string[] = [];
+      for (const path of paths) {
+        try {
+          const rel = await corpusImportFile("default", path);
+          if (!rel) continue;
+          const url = await resolveImageSrc(rel);
+          if (!url) continue;
+          const blob = await fetch(url).then((r) => r.blob());
+          datas.push(await readAsDataURL(new File([blob], "dropped", { type: blob.type })));
+        } catch {
+          /* one unreadable drop must not lose the others */
+        }
+      }
+      if (datas.length > 0) setImages((prev) => [...prev, ...datas]);
+    })();
+  }, []);
+
+  useEffect(() => registerChatDrop(paneId, attachPaths), [paneId, attachPaths]);
+
   // this chat's generated assets: everything under storage/chats/<slug>/ in the
   // active root (wire ids are bare for the corpus, "<rootid>:rel" otherwise)
   const assetPrefix =
@@ -1469,6 +1509,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   return (
     <div
       className="chat-surface"
+      {...{ [CHAT_PANE_ATTR]: paneId }}
       style={{ "--chat-measure": `${CHAT_MEASURE_PX[measure]}px` } as CSSProperties}
     >
       <header className="chat-head">
@@ -1665,7 +1706,10 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                   <div className="chat-attachments">
                     {images.map((src, i) => (
                       <span key={i} className="chat-attachment">
-                        <img src={src} alt="attachment" />
+                        {/* the handle you can talk about — the same number the
+                            sent message carries as [Image #N] (2026-08-04) */}
+                        <span className="chat-attachment-n" aria-hidden="true">{`#${i + 1}`}</span>
+                        <img src={src} alt={`Attached image ${i + 1}`} />
                         <button
                           type="button"
                           className="chat-attachment-x"
@@ -1784,7 +1828,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                       className="chat-send"
                       aria-label={busy ? "Stop" : "Send"}
                       title={busy ? "Stop — cancel this reply and get the prompt back" : undefined}
-                      disabled={busy ? false : !message.trim() || !picked}
+                      disabled={busy ? false : (!message.trim() && images.length === 0) || !picked}
                       onClick={() => {
                         if (busy) stopTurn();
                         else void send();

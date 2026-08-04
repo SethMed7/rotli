@@ -11,6 +11,7 @@ import { budgetFor, contextWindowFor } from "./budget";
 import {
   CLI_CATALOG,
   GEMINI_OPENAI_BASE,
+  type ProviderId,
   type HybridPreset,
   LANE_PING_MODEL,
   LOCAL_CATALOG,
@@ -251,5 +252,45 @@ describe("the frontier/local split (budget + adapter)", () => {
     expect(prompt).toContain("EXACTLY ONE JSON object");
     expect(prompt).toContain("The web is OFF");
     expect(prompt).not.toContain("web_search"); // web off ⇒ the tools aren't offered
+  });
+});
+
+// Which CONNECTED lanes can genuinely see an attached image (Seth, 2026-08-04:
+// "gemini and gpt models should be able to see images"). The flag must track the
+// TRANSPORT's real ability, never the model's marketing capability — a lane that
+// advertises vision it can't deliver silently drops the picture.
+describe("connected-lane vision", () => {
+  const laneOf = (provider: ProviderId) => CLI_CATALOG[provider];
+
+  test("codex carries images — its CLI takes image files natively (-i)", () => {
+    expect(laneOf("codex").length).toBeGreaterThan(0);
+    expect(laneOf("codex").every((m) => m.vision)).toBe(true);
+  });
+
+  test("the Gemini API lane carries images — it rides openai image parts", () => {
+    expect(laneOf("gemini").every((m) => m.vision)).toBe(true);
+  });
+
+  test("EVERY frontier lane sees images — no connected model is blind", () => {
+    // Seth, 2026-08-04: "all frontier models should be able to see images."
+    // Each transport reaches it differently (provider.rs build_args); the
+    // catalog just must not leave one lane silently dropping attachments.
+    for (const provider of PROVIDER_IDS) {
+      expect(laneOf(provider).length).toBeGreaterThan(0);
+      expect(laneOf(provider).every((m) => m.vision)).toBe(true);
+    }
+  });
+
+  test("every vision lane is reachable from the flattened picker", () => {
+    const groups = mergedModels([], { claude: true, codex: true, agy: true, gemini: true }, [], [], {
+      claude: true,
+      codex: true,
+      agy: true,
+      gemini: true,
+    });
+    const visionIds = flattenModels(groups)
+      .filter((m) => m.vision)
+      .map((m) => m.id);
+    expect(visionIds).toEqual(expect.arrayContaining(laneOf("codex").map((m) => m.id)));
   });
 });

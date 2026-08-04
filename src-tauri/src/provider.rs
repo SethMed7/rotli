@@ -125,7 +125,18 @@ enum PromptVia {
 /// The full argv for one completion step — pure, so the exact argument shape
 /// (the security surface) unit-tests. The prompt is the ONLY caller-shaped
 /// value; everything else is literal.
-fn build_args(provider: &str, model: &str, prompt: &str, timeout_secs: u64) -> Result<(Vec<String>, PromptVia), String> {
+/// `imgs` = the attachments staged for THIS turn, or None for an ordinary text
+/// turn. Every image concession below is scoped to `Some` on purpose: a turn
+/// with no picture keeps the tightest posture the lane has always had (Seth,
+/// 2026-08-04 — "all frontier models should be able to see images", without
+/// making every unrelated turn looser).
+fn build_args(
+    provider: &str,
+    model: &str,
+    prompt: &str,
+    timeout_secs: u64,
+    imgs: Option<&ImageFiles>,
+) -> Result<(Vec<String>, PromptVia), String> {
     let s = spec(provider)?;
     if !s.models.contains(&model) {
         return Err(format!("model \"{model}\" isn't in the {provider} allowlist"));
@@ -134,19 +145,19 @@ fn build_args(provider: &str, model: &str, prompt: &str, timeout_secs: u64) -> R
     match provider {
         // print mode, ALL tools off, JSON result envelope, no session litter —
         // the loop replays the transcript, so there is nothing to resume.
-        "claude" => Ok((
-            own(&[
-                "-p",
-                "--tools",
-                "",
-                "--model",
-                model,
-                "--output-format",
-                "json",
-                "--no-session-persistence",
-            ]),
-            PromptVia::Stdin,
-        )),
+        // WITH images: the one concession is `--tools Read` + `--add-dir` scoped
+        // to the staged image dir — the narrowest allowlist that can open a PNG,
+        // and it reverts to `--tools ""` the moment there is no attachment.
+        "claude" => {
+            let mut args = own(&["-p", "--tools"]);
+            args.push(if imgs.is_some() { "Read".into() } else { String::new() });
+            args.extend(own(&["--model", model, "--output-format", "json", "--no-session-persistence"]));
+            if let Some(staged) = imgs {
+                args.push("--add-dir".into());
+                args.push(staged.dir.to_string_lossy().to_string());
+            }
+            Ok((args, PromptVia::Stdin))
+        }
         // exec mode (non-interactive — it never prompts, so there is NO
         // --ask-for-approval flag here; verified against 0.137.0), read-only
         // sandbox, shell tool off, JSONL out, no session litter (--ephemeral);
@@ -169,23 +180,39 @@ fn build_args(provider: &str, model: &str, prompt: &str, timeout_secs: u64) -> R
                     "features.shell_tool=false".into(),
                     "--model".into(),
                     model.into(),
-                    "-".into(),
                 ],
                 PromptVia::Stdin,
             ))
+            .map(|(mut args, via): (Vec<String>, PromptVia)| {
+                // codex takes image FILES natively — no tool or permission
+                // concession needed at all. `-` (stdin) must stay last.
+                for path in imgs.map(|s| s.paths.as_slice()).unwrap_or(&[]) {
+                    args.push("-i".into());
+                    args.push(path.clone());
+                }
+                args.push("-".into());
+                (args, via)
+            })
         }
         // agy has no stdin lane — the prompt is the `-p` value. `--sandbox`
         // keeps it inert; `--print-timeout` mirrors our own deadline.
         "agy" => Ok((
-            vec![
-                "-p".into(),
-                prompt.into(),
-                "--model".into(),
-                model.into(),
-                "--sandbox".into(),
-                "--print-timeout".into(),
-                format!("{}s", timeout_secs.max(30)),
-            ],
+            {
+                let mut args: Vec<String> =
+                    vec!["-p".into(), prompt.into(), "--model".into(), model.into()];
+                // agy auto-DENIES its own file read in headless mode, so seeing
+                // an attachment needs this flag. It is granted only for a turn
+                // that actually carries one, and cli_complete additionally wraps
+                // that turn in sandbox-exec pinned to the image dir — so "skip
+                // permissions" is contained by the OS, not merely trusted.
+                if imgs.is_some() {
+                    args.push("--dangerously-skip-permissions".into());
+                }
+                args.push("--sandbox".into());
+                args.push("--print-timeout".into());
+                args.push(format!("{}s", timeout_secs.max(30)));
+                args
+            },
             PromptVia::Args,
         )),
         _ => Err(format!("unknown provider \"{provider}\"")),
@@ -219,6 +246,66 @@ fn agy_scratch_dir() -> Result<String, String> {
     let dir = std::env::temp_dir().join("rotli-agy");
     std::fs::create_dir_all(&dir).map_err(|e| format!("couldn't create the agy scratch dir: {e}"))?;
     Ok(dir.to_string_lossy().to_string())
+}
+
+/// Attached images, written to disk for a lane whose CLI takes image FILES.
+/// Held as a value so the temp dir is removed when the turn ends, whatever
+/// happens — an attachment must not linger in /tmp after the answer.
+struct ImageFiles {
+    dir: std::path::PathBuf,
+    paths: Vec<String>,
+}
+
+impl Drop for ImageFiles {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.dir);
+    }
+}
+
+/// Decode the composer's base64 (raw, or a `data:image/…;base64,` URL) into
+/// real PNG files. Returns None when there is nothing to write.
+fn write_image_files(images: &[String]) -> Result<Option<ImageFiles>, String> {
+    if images.is_empty() {
+        return Ok(None);
+    }
+    use base64::Engine as _;
+    let dir = std::env::temp_dir().join(format!("rotli-img-{}", ulid::Ulid::new().to_string().to_lowercase()));
+    std::fs::create_dir_all(&dir).map_err(|e| format!("couldn't stage the attached images: {e}"))?;
+    // own the dir from here on, so ANY early return below still cleans it up
+    let mut staged = ImageFiles { dir: dir.clone(), paths: Vec::new() };
+    for (i, raw) in images.iter().enumerate() {
+        // a data URL carries its own header — take what follows the comma
+        let payload = raw.split_once(',').map(|(_, rest)| rest).unwrap_or(raw.as_str());
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(payload.trim())
+            .map_err(|_| "an attached image wasn't valid base64".to_string())?;
+        let path = dir.join(format!("image-{}.png", i + 1));
+        std::fs::write(&path, &bytes).map_err(|e| format!("couldn't stage an attached image: {e}"))?;
+        staged.paths.push(path.to_string_lossy().to_string());
+    }
+    Ok(Some(staged))
+}
+
+/// Lanes that read an attached image from a PATH rather than a native flag, so
+/// the prompt has to name the files. codex takes `-i <FILE>` instead.
+fn reads_images_from_path(provider: &str) -> bool {
+    matches!(provider, "claude" | "agy")
+}
+
+/// The line prepended to a turn that carries attachments, for the path-reading
+/// lanes. It ties the files to the `[Image #N]` tokens the composer already put
+/// in the message, so "what's in image 2?" resolves.
+fn image_preamble(paths: &[String]) -> String {
+    let list = paths
+        .iter()
+        .enumerate()
+        .map(|(i, p)| format!("[Image #{}] = {p}", i + 1))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        "The user attached {} image(s). Read these files to see them — they are what the [Image #N] references in the message mean:\n{list}\n",
+        paths.len()
+    )
 }
 
 /// Did an empty agy reply die on its NATIVE tool-permission prompt? Gemini
@@ -425,7 +512,8 @@ pub(crate) fn organizer_egress_allowed(prompt: &str) -> Result<(), String> {
 pub fn organizer_claude_complete(prompt: &str, timeout: Duration) -> Result<String, String> {
     organizer_egress_allowed(prompt)?;
     let bin = resolve_bin(spec("claude")?).ok_or("the claude CLI isn't installed")?;
-    let (args, _via) = build_args("claude", ORGANIZER_CLAUDE_MODEL, prompt, timeout.as_secs())?;
+    // the organizer lane never carries attachments — always the tightest posture
+    let (args, _via) = build_args("claude", ORGANIZER_CLAUDE_MODEL, prompt, timeout.as_secs(), None)?;
     let mut cmd = Command::new(&bin);
     cmd.args(&args);
     // a private, single-entry registry — the organizer has no shared children map
@@ -456,7 +544,7 @@ pub fn organizer_gemini_complete(prompt: &str, timeout: Duration) -> Result<Stri
     organizer_egress_allowed(prompt)?;
     const MODEL: &str = "Gemini 3.5 Flash (Medium)";
     let bin = resolve_bin(spec("agy")?).ok_or("the Antigravity CLI isn't installed")?;
-    let (args, via) = build_args("agy", MODEL, prompt, timeout.as_secs())?;
+    let (args, via) = build_args("agy", MODEL, prompt, timeout.as_secs(), None)?;
     let mut cmd = Command::new(&bin);
     cmd.args(&args);
     let children: Arc<Mutex<HashMap<String, Running>>> = Arc::new(Mutex::new(HashMap::new()));
@@ -506,6 +594,9 @@ pub async fn cli_complete(
     model: String,
     prompt: String,
     timeout_ms: Option<u64>,
+    // `images`: base64 payloads (raw or data: URL) the composer attached. Only
+    // lanes with a NATIVE image flag carry them — see `image_args`.
+    images: Option<Vec<String>>,
 ) -> Result<String, String> {
     // the CLI lane is remote by definition — same egress law as chat.rs
     if crate::secret::blocked_for_remote(&prompt) {
@@ -515,16 +606,50 @@ pub async fn cli_complete(
         );
     }
     let timeout = Duration::from_millis(timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS));
-    let (args, via) = build_args(&provider, &model, &prompt, timeout.as_secs())?;
     let bin = resolve_bin(spec(&provider)?)
         .ok_or_else(|| format!("{provider} isn't installed (checked its usual homes)"))?;
+    // staged for the whole turn; the temp dir is removed when this drops
+    let staged = write_image_files(images.as_deref().unwrap_or(&[]))?;
+    // the path-reading lanes need the files NAMED in the prompt; codex gets
+    // them as argv instead, so its prompt is untouched
+    let prompt = match &staged {
+        Some(s) if reads_images_from_path(&provider) => {
+            format!("{}\n{prompt}", image_preamble(&s.paths))
+        }
+        _ => prompt,
+    };
+    let (args, via) = build_args(&provider, &model, &prompt, timeout.as_secs(), staged.as_ref())?;
+    let has_images = staged.is_some();
 
     let children = Arc::clone(&state.children);
     tauri::async_runtime::spawn_blocking(move || {
         // agy: strictly one at a time (parallel runs hang) — hold the gate
+        // `staged` must live until the child has READ the files — moving it in
+        // here (rather than letting it drop at the end of the outer fn) is what
+        // keeps the temp dir alive for the whole run.
+        // moved in so the temp dir outlives the child that reads it
+        let staged = staged;
         let _agy = (provider == "agy").then(|| AGY_GATE.lock().unwrap());
         let agy_cwd = (provider == "agy").then(|| agy_scratch_dir()).transpose()?;
-        let mut cmd = Command::new(&bin);
+        // An agy turn carrying an image runs with permissions skipped, so the OS
+        // — not trust — is what contains it: the same seatbelt profile the image
+        // lane uses, pinned to the staged image dir. $HOME reads are denied
+        // except that dir, agy's own state, and the binary's home.
+        let mut cmd = match (&staged, provider.as_str()) {
+            (Some(s), "agy") if image_sandbox_enabled() => {
+                let home = std::env::var("HOME").unwrap_or_default();
+                let bin_dir = std::path::Path::new(&bin)
+                    .parent()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .filter(|p| !p.is_empty() && p != "/")
+                    .unwrap_or_else(|| "/var/empty".into());
+                let dir = s.dir.to_string_lossy().to_string();
+                let mut c = Command::new("/usr/bin/sandbox-exec");
+                c.arg("-p").arg(agy_sandbox_profile(&home, &dir, &bin_dir)).arg(&bin);
+                c
+            }
+            _ => Command::new(&bin),
+        };
         cmd.args(&args);
         if let Some(cwd) = &agy_cwd {
             cmd.current_dir(cwd);
@@ -543,9 +668,17 @@ pub async fn cli_complete(
         // still held; run_registered re-registers the same request id, which
         // the watchdog's matching-token design already supports.
         let parsed = match parsed {
+            // …but NEVER when the turn carries an image: reading it REQUIRES a
+            // tool, so the no-tools override would guarantee the failure it is
+            // meant to cure (2026-08-04).
+            Err(first_err) if provider == "agy" && has_images && agy_tool_denied(&stderr) => {
+                Err(format!(
+                    "{first_err} — Antigravity denied its own image read. Attach the image to a different frontier model, or check its permissions."
+                ))
+            }
             Err(first_err) if provider == "agy" && agy_tool_denied(&stderr) => {
                 let hardened = format!("{AGY_NO_TOOLS_OVERRIDE}{prompt}");
-                let (retry_args, _) = build_args(&provider, &model, &hardened, timeout.as_secs())?;
+                let (retry_args, _) = build_args(&provider, &model, &hardened, timeout.as_secs(), None)?;
                 let mut retry = Command::new(&bin);
                 retry.args(&retry_args);
                 if let Some(cwd) = &agy_cwd {
@@ -878,15 +1011,15 @@ mod tests {
 
     #[test]
     fn allowlist_refuses_unknown_provider_and_model() {
-        assert!(build_args("ollama", "x", "p", 60).is_err());
-        assert!(build_args("claude", "gpt-5.5", "p", 60).is_err());
-        assert!(build_args("codex", "sonnet", "p", 60).is_err());
-        assert!(build_args("agy", "Claude Sonnet 4.6 (Thinking)", "p", 60).is_err());
+        assert!(build_args("ollama", "x", "p", 60, None).is_err());
+        assert!(build_args("claude", "gpt-5.5", "p", 60, None).is_err());
+        assert!(build_args("codex", "sonnet", "p", 60, None).is_err());
+        assert!(build_args("agy", "Claude Sonnet 4.6 (Thinking)", "p", 60, None).is_err());
     }
 
     #[test]
     fn claude_args_are_toolless_json_print_mode() {
-        let (args, via) = build_args("claude", "sonnet", "ignored", 60).unwrap();
+        let (args, via) = build_args("claude", "sonnet", "ignored", 60, None).unwrap();
         assert_eq!(
             args,
             vec!["-p", "--tools", "", "--model", "sonnet", "--output-format", "json", "--no-session-persistence"]
@@ -896,7 +1029,7 @@ mod tests {
 
     #[test]
     fn codex_args_are_sandboxed_jsonl_with_stdin_prompt() {
-        let (args, via) = build_args("codex", "gpt-5.6-sol", "ignored", 60).unwrap();
+        let (args, via) = build_args("codex", "gpt-5.6-sol", "ignored", 60, None).unwrap();
         assert_eq!(via, PromptVia::Stdin);
         assert_eq!(args[0], "exec");
         assert!(args.contains(&"--json".to_string()));
@@ -912,7 +1045,7 @@ mod tests {
 
     #[test]
     fn agy_args_embed_the_prompt_and_sandbox() {
-        let (args, via) = build_args("agy", "Gemini 3.5 Flash (Medium)", "hello there", 240).unwrap();
+        let (args, via) = build_args("agy", "Gemini 3.5 Flash (Medium)", "hello there", 240, None).unwrap();
         assert_eq!(via, PromptVia::Args);
         assert_eq!(args[0], "-p");
         assert_eq!(args[1], "hello there");
@@ -1009,6 +1142,69 @@ mod tests {
         // traversal never reaches the filesystem — safe_slug refuses first
         assert!(image_destination(&root, "../../etc").is_err());
         assert!(image_destination(&root, "a/b").is_err());
+    }
+
+    /// Every frontier lane can see an image (Seth, 2026-08-04) — but the
+    /// concessions that allow it are scoped to a turn that ACTUALLY carries
+    /// one. A text turn must keep the byte-identical tight posture it always
+    /// had; this is the test that keeps that true.
+    #[test]
+    fn image_concessions_apply_only_to_a_turn_that_carries_an_image() {
+        let dir = std::env::temp_dir().join("rotli-img-test");
+        let _ = std::fs::create_dir_all(&dir);
+        let staged = ImageFiles {
+            dir: dir.clone(),
+            paths: vec![dir.join("image-1.png").to_string_lossy().to_string()],
+        };
+
+        // — claude: tools OFF without an image, a READ-ONLY allowlist with one —
+        let (plain, _) = build_args("claude", "sonnet", "p", 60, None).unwrap();
+        let at = plain.iter().position(|a| a == "--tools").unwrap();
+        assert_eq!(plain[at + 1], "", "a text turn keeps ALL tools off");
+        assert!(!plain.iter().any(|a| a == "--add-dir"));
+
+        let (withimg, _) = build_args("claude", "sonnet", "p", 60, Some(&staged)).unwrap();
+        let at = withimg.iter().position(|a| a == "--tools").unwrap();
+        assert_eq!(withimg[at + 1], "Read", "the narrowest allowlist that opens a PNG");
+        let at = withimg.iter().position(|a| a == "--add-dir").unwrap();
+        assert_eq!(withimg[at + 1], dir.to_string_lossy(), "scoped to the staged dir only");
+
+        // — codex: native image args, and "-" must stay LAST (it is stdin) —
+        let (plain, _) = build_args("codex", "gpt-5.6-sol", "p", 60, None).unwrap();
+        assert!(!plain.iter().any(|a| a == "-i"));
+        assert_eq!(plain.last().unwrap(), "-");
+        let (withimg, _) = build_args("codex", "gpt-5.6-sol", "p", 60, Some(&staged)).unwrap();
+        assert_eq!(withimg.last().unwrap(), "-", "stdin marker stays last");
+        let at = withimg.iter().position(|a| a == "-i").unwrap();
+        assert_eq!(withimg[at + 1], staged.paths[0]);
+        // codex needs NO tool/permission concession at all
+        assert!(!withimg.iter().any(|a| a == "--dangerously-skip-permissions"));
+
+        // — agy: permissions skipped ONLY with an image, sandbox always on —
+        let (plain, _) = build_args("agy", "Gemini 3.5 Flash (Medium)", "p", 60, None).unwrap();
+        assert!(
+            !plain.iter().any(|a| a == "--dangerously-skip-permissions"),
+            "a text turn must never skip permissions"
+        );
+        assert!(plain.iter().any(|a| a == "--sandbox"));
+        let (withimg, _) =
+            build_args("agy", "Gemini 3.5 Flash (Medium)", "p", 60, Some(&staged)).unwrap();
+        assert!(withimg.iter().any(|a| a == "--dangerously-skip-permissions"));
+        assert!(withimg.iter().any(|a| a == "--sandbox"), "sandbox is never traded away");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The preamble ties each staged file to the `[Image #N]` token the composer
+    /// puts in the message, so "what's in image 2?" resolves for a path lane.
+    #[test]
+    fn the_image_preamble_numbers_files_from_one() {
+        let text = image_preamble(&["/tmp/a.png".into(), "/tmp/b.png".into()]);
+        assert!(text.contains("[Image #1] = /tmp/a.png"));
+        assert!(text.contains("[Image #2] = /tmp/b.png"));
+        assert!(text.contains("2 image(s)"));
+        assert!(reads_images_from_path("claude") && reads_images_from_path("agy"));
+        assert!(!reads_images_from_path("codex"), "codex takes files as argv");
     }
 
     /// The retry gate fires on agy's real headless-denial signature (Seth's

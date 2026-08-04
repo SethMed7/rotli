@@ -536,6 +536,21 @@
   position: relative;
   display: inline-flex;
 }
+/* the reference handle (2026-08-04): the same number the sent message carries
+   as [Image #N], so a preview and its mention are obviously the same thing */
+.chat-attachment-n {
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  z-index: 1;
+  padding: 0 4px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+}
 .chat-attachment img {
   width: 46px;
   height: 46px;

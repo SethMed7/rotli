@@ -23,6 +23,7 @@ import { ContextMenu } from "./components/contextMenu";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
 import { Titlebar } from "./components/titlebar";
+import { chatDropAt } from "./components/chatDrop";
 import { HotkeyBadges } from "./components/hotkeyBadges";
 import { WhichKey } from "./components/whichKey";
 import { registerDefaultActions } from "./keys/actions";
@@ -325,6 +326,18 @@ function MainShell() {
       const x = px / dpr;
       const y = py / dpr;
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
+      // a CHAT under the pointer claims the images first (Seth, 2026-08-04):
+      // before this, a drop on a chat found no editor and fell through to the
+      // storage branch — the file landed in the vault and never attached.
+      const chatAttach = el ? chatDropAt(el) : null;
+      if (chatAttach) {
+        const dropped = paths.filter((p) => IMAGE_EXT.test(p));
+        const rest = paths.filter((p) => !IMAGE_EXT.test(p));
+        if (dropped.length > 0) chatAttach(dropped);
+        if (rest.length > 0) await Promise.all(rest.map((p) => corpusImportFile("default", p)));
+        await invalidateNotes();
+        return;
+      }
       const view = el ? EditorView.findFromDOM(el) : null;
       const images = view ? paths.filter((p) => IMAGE_EXT.test(p)) : [];
       const toStorage = view ? paths.filter((p) => !IMAGE_EXT.test(p)) : paths;

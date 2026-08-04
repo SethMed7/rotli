@@ -126,11 +126,14 @@ export function makeTauriHost(
       // the connected lanes: one tool-less subprocess per step (Rust owns the
       // allowlist + sandbox flags). Stateless — the prompt carries everything.
       if (model.api === "cli") {
+        // attachments ride the FIRST message, exactly like the openai lane
+        const attached = messages.flatMap((m) => m.images ?? []);
         return cliComplete({
           requestId: opts?.requestId ?? crypto.randomUUID(),
           provider: model.provider,
           model: model.id,
           prompt: flattenWire(messages),
+          ...(attached.length > 0 ? { images: attached } : {}),
         });
       }
       const wireOpts: {

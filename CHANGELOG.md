@@ -10,8 +10,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Dropping an image on a chat attaches it.** It used to land in your vault and
+  never reach the chat. Dropped images now attach to the chat under the cursor —
+  and they're saved into your assets on the way in, so they stay referenceable
+  instead of vanishing when the message is sent.
+- **You can send an image with no words.** "What is this?" needed typed text
+  before the send button would do anything.
+
 ### Added
 
+- **Every connected model can see your images** — Claude, GPT and Gemini alike.
+  Each one gets there differently under the hood, and the extra access each
+  needs is granted **only for a message that actually carries an image**: an
+  ordinary text conversation keeps exactly the locked-down setup it always had.
+  Whether a local model can see images stays a property of that model, read from
+  your AI store — so a text-only local model is never asked to look at something
+  it can't.
+- **An attached image is part of the message.** Each attachment shows a numbered
+  preview above the composer and appears in the sent message as `[Image #1]`, so
+  you can talk about it afterwards — "what's in image 2?" — and the conversation
+  keeps a record that it was there.
 - **See what a Breve routine actually does.** Each routine now has a **Workflow**
   toggle that lays out the real pipeline it runs — the schedule and its
   head-start, the sandbox, the model and its self-heal fallback, the render,
