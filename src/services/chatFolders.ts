@@ -12,6 +12,9 @@ import { queryClient } from "./query";
 export interface ChatFolder {
   id: string;
   name: string;
+  /** A pinned folder floats above the others (Seth, 2026-08-03). Additive
+   * field: absent reads as unpinned. */
+  pinned?: boolean;
 }
 
 export interface ChatFoldersManifest {
@@ -20,10 +23,10 @@ export interface ChatFoldersManifest {
   /** chat slug → folder id. Slugs that no longer exist are ignored on render
    * and pruned on the next write. */
   assignments: Record<string, string>;
-  /** folder id → the user's MANUAL order of its chat slugs (drag-reorder,
-   * Seth 2026-07-30). Additive v1 field: absent/unknown folders mean "no
-   * manual order — keep the list's own (recency) order"; slugs not listed
-   * sort after the ordered ones in list order. */
+  /** LEGACY (retired 2026-08-03): the old per-folder manual drag order.
+   * Response recency now rules inside folders too, so this no longer affects
+   * rendering — it stays parsed + serialized so older builds reopening the
+   * manifest lose nothing. */
   order: Record<string, string[]>;
 }
 
@@ -41,10 +44,12 @@ export function parseChatFolders(raw: string): ChatFoldersManifest {
   try {
     const parsed = JSON.parse(raw) as Partial<ChatFoldersManifest>;
     if (parsed?.version !== 1 || !Array.isArray(parsed.folders)) return structuredClone(EMPTY_CHAT_FOLDERS);
-    const folders = parsed.folders.filter(
-      (folder): folder is ChatFolder =>
-        !!folder && typeof folder.id === "string" && typeof folder.name === "string",
-    );
+    const folders = parsed.folders
+      .filter(
+        (folder): folder is ChatFolder =>
+          !!folder && typeof folder.id === "string" && typeof folder.name === "string",
+      )
+      .map((folder) => (folder.pinned === true ? folder : { id: folder.id, name: folder.name }));
     const ids = new Set(folders.map((folder) => folder.id));
     const assignments: Record<string, string> = {};
     for (const [slug, folderId] of Object.entries(parsed.assignments ?? {})) {
@@ -94,6 +99,21 @@ export function renameChatFolder(
   };
 }
 
+/** Pin/unpin a folder — pinned folders float above the rest (2026-08-03). */
+export function setChatFolderPinned(
+  manifest: ChatFoldersManifest,
+  id: string,
+  pinned: boolean,
+): ChatFoldersManifest {
+  if (!manifest.folders.some((folder) => folder.id === id)) return manifest;
+  return {
+    ...manifest,
+    folders: manifest.folders.map((folder) =>
+      folder.id !== id ? folder : pinned ? { ...folder, pinned: true } : { id: folder.id, name: folder.name },
+    ),
+  };
+}
+
 /** Deleting a folder frees its chats back to the loose list — never touches files. */
 export function deleteChatFolder(manifest: ChatFoldersManifest, id: string): ChatFoldersManifest {
   return {
@@ -104,18 +124,6 @@ export function deleteChatFolder(manifest: ChatFoldersManifest, id: string): Cha
     ),
     order: Object.fromEntries(Object.entries(manifest.order).filter(([folderId]) => folderId !== id)),
   };
-}
-
-/** Replace one folder's manual chat order wholesale — the drag-reorder commit.
- * The caller hands the full rendered order; unknown slugs are kept (they prune
- * naturally when the folder re-renders without them). */
-export function setChatFolderOrder(
-  manifest: ChatFoldersManifest,
-  folderId: string,
-  slugs: string[],
-): ChatFoldersManifest {
-  if (!manifest.folders.some((folder) => folder.id === folderId)) return manifest;
-  return { ...manifest, order: { ...manifest.order, [folderId]: slugs } };
 }
 
 /** Assign a chat to a folder (null clears it back to the loose list). */
@@ -156,10 +164,15 @@ export interface GroupedChats<T> {
   loose: T[];
 }
 
-/** Project the flat chat list through the manifest: folders (in manifest
- * order) with their chats, then everything unassigned, list order kept.
- * A folder with a MANUAL order sorts its chats by it; slugs it doesn't list
- * (newly filed chats) keep their list-order position after the ordered ones. */
+/** Project the flat chat list through the manifest: PINNED folders first, then
+ * the rest in manifest order, each with its chats in LIST order, then
+ * everything unassigned.
+ *
+ * List order is the caller's pinned-then-recency sort, and it now rules inside
+ * folders too (Seth, 2026-08-03: "the moment I get a response it should move
+ * to the top of the folder / top of the left bar"). The old per-folder MANUAL
+ * drag order is retired by that ask — the `order` field stays parsed for
+ * manifest compatibility but no longer changes rendering. */
 export function groupChats<T extends { slug: string }>(
   chats: readonly T[],
   manifest: ChatFoldersManifest,
@@ -172,17 +185,9 @@ export function groupChats<T extends { slug: string }>(
     if (bucket) bucket.push(chat);
     else loose.push(chat);
   }
+  const ranked = [...manifest.folders].sort((a, b) => Number(b.pinned === true) - Number(a.pinned === true));
   return {
-    folders: manifest.folders.map((folder) => {
-      const unsorted = byFolder.get(folder.id) ?? [];
-      const manual = manifest.order[folder.id];
-      if (!manual || manual.length === 0) return { folder, chats: unsorted };
-      const pos = new Map(manual.map((slug, i) => [slug, i] as const));
-      const chatsSorted = [...unsorted].sort(
-        (a, b) => (pos.get(a.slug) ?? Infinity) - (pos.get(b.slug) ?? Infinity),
-      );
-      return { folder, chats: chatsSorted };
-    }),
+    folders: ranked.map((folder) => ({ folder, chats: byFolder.get(folder.id) ?? [] })),
     loose,
   };
 }

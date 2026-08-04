@@ -4,12 +4,14 @@
 // there is no cap and no "+N more": the list just scrolls
 // (docs/design/sidebar-home-chat.md). Lifted wholesale out of sidebar.tsx.
 
+import { useQuery } from "@tanstack/react-query";
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 
+import { modelLabel } from "../../ai/models";
 import { dispatch } from "../../keys/registry";
 import { createDragGhost } from "../../lib/dragGhost";
 import { createPointerDragSession } from "../../lib/pointerDrag";
-import { type MemexChatSummary, isTauri } from "../../lib/tauri";
+import { type MemexChatSummary, chatModels, isTauri } from "../../lib/tauri";
 import { archiveChat, deleteChat, pinChat, revealChat } from "../../memex/service";
 import { invalidateMemex } from "../../memex/useMemex";
 import {
@@ -17,20 +19,22 @@ import {
   createChatFolder,
   deleteChatFolder,
   renameChatFolder,
-  setChatFolderOrder,
+  setChatFolderPinned,
 } from "../../services/chatFolders";
 import { useChatRename } from "../../services/chatRename";
+import { assignChatToView, chatAssignedView, viewChats } from "../../services/viewTree";
+import { useChatRuns } from "../../state/chatRuns";
 import { useContextMenu } from "../../state/contextMenu";
 import { useFocusedChatSlug, usePanesStore } from "../../state/panes";
-import { useUiStore } from "../../state/ui";
+import { chatKey, useUiStore } from "../../state/ui";
+import { useViewsStore } from "../../state/views";
 import { ChevronRight, ChatGlyph, FolderGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
 import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
 
-/** Where a dragged chat would land: into a folder, or beside a chat row. */
-type ChatDrop =
-  | { kind: "folder"; id: string }
-  | { kind: "row"; slug: string; folderId: string; after: boolean };
+/** Where a dragged chat would land: a folder row (assignment — positional
+ * reordering retired 2026-08-03, response recency rules). */
+type ChatDrop = { kind: "folder"; id: string };
 
 export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: number }) {
   const { activeMemex, chatList, manifest, grouped, update } = chats;
@@ -45,6 +49,35 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   const focusedChatSlug = useFocusedChatSlug();
   const chatRename = useChatRename();
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+
+  // run signals (2026-08-03): pulsing while a chat answers, a dot once a reply
+  // landed unwatched. Keys are vault-scoped, same as every per-chat map.
+  const runs = useChatRuns((s) => s.runs);
+  const clearUnread = useChatRuns((s) => s.clearUnread);
+  const runKeyOf = (slug: string) => chatKey(activeMemex?.id ?? null, slug, "");
+
+  // the per-chat model chip — the same cached catalog query the chat surface
+  // uses; CLI labels resolve from the static catalog even when a lane is off
+  const models = useQuery({
+    queryKey: ["chat", "models"],
+    queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
+    staleTime: Infinity,
+  });
+  const hybridPresets = useUiStore((s) => s.hybridPresets);
+  const chatModelMap = useUiStore((s) => s.chatModel);
+
+  // chats participate in named views (2026-08-03): an active view narrows the
+  // chat front to its own chats, exactly like Home narrows the notes tree
+  const activeView = useUiStore((s) => s.activeView);
+  const viewsManifest = useViewsStore((s) => s.manifest);
+  const viewsWritable = useViewsStore((s) => s.writable && s.hydrated);
+  const setViewsManifest = useViewsStore((s) => s.setManifest);
+  const visibleSlugs = activeView ? new Set(viewChats(viewsManifest, activeView)) : null;
+  const inView = (c: MemexChatSummary) => visibleSlugs === null || visibleSlugs.has(c.slug);
+
+  // the Unread lane — every unwatched reply across folders, newest first
+  // (chatList is already pinned-then-recency), acting as a view onto the list
+  const unreadChats = chatList.filter((c) => inView(c) && runs[runKeyOf(c.slug)] === "unread");
 
   // the header's New-folder button, while Chat is the active front, mints a
   // CHAT folder and opens its rename inline — the nonce is the seam between
@@ -93,40 +126,16 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
       },
       onMove: (x, y) => {
         const el = document.elementFromPoint(x, y) as HTMLElement | null;
-        const row = el?.closest("[data-chat-infolder]") as HTMLElement | null;
-        const rowSlug = row?.dataset.chatSlug;
-        const rowFolder = row?.dataset.chatInfolder;
-        if (row && rowSlug && rowFolder && rowSlug !== slug) {
-          const rect = row.getBoundingClientRect();
-          target = {
-            kind: "row",
-            slug: rowSlug,
-            folderId: rowFolder,
-            after: rect.height === 0 ? true : y > rect.top + rect.height / 2,
-          };
-          setDrop(target);
-          return;
-        }
         const folderRow = el?.closest("[data-chatfolder-id]") as HTMLElement | null;
         const folderId = folderRow?.dataset.chatfolderId;
         target = folderId ? { kind: "folder", id: folderId } : null;
         setDrop(target);
       },
       onDrop: () => {
+        // assignment only — positional reordering retired 2026-08-03 (response
+        // recency owns the order inside a folder now)
         const d = target;
-        if (!d) return;
-        if (d.kind === "folder") {
-          update((m) => assignChatToFolder(m, slug, d.id));
-          return;
-        }
-        // reorder: rebuild the folder's RENDERED order with the dragged slug
-        // spliced beside the target, then commit assignment + order together
-        const group = grouped.folders.find(({ folder }) => folder.id === d.folderId);
-        const slugs = (group?.chats ?? []).map((c) => c.slug).filter((s) => s !== slug);
-        const at = slugs.indexOf(d.slug);
-        if (at < 0) return;
-        slugs.splice(d.after ? at + 1 : at, 0, slug);
-        update((m) => setChatFolderOrder(assignChatToFolder(m, slug, d.folderId), d.folderId, slugs));
+        if (d) update((m) => assignChatToFolder(m, slug, d.id));
       },
       onEnd: () => {
         setDragSlug(null);
@@ -151,18 +160,16 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         type="button"
         key={c.slug}
         data-chat-slug={c.slug}
-        data-chat-infolder={folderId ?? undefined}
         /* a chat row lights only while the PANES actually show it — never
            alongside an active All-chats (or other) view (Seth, 2026-07-30:
            two highlights at once read as wrong) */
         className={`sb-chatrow${folderId ? " in-folder" : ""}${
           contentView === "panes" && focusedChatSlug === c.slug ? " sel" : ""
-        }${dragSlug === c.slug ? " dragging" : ""}${
-          drop?.kind === "row" && drop.slug === c.slug ? (drop.after ? " mdrop-after" : " mdrop-before") : ""
-        }`}
+        }${dragSlug === c.slug ? " dragging" : ""}`}
         onPointerDown={(e) => startChatDrag(e, c.slug, c.title || c.slug)}
         onClick={() => {
           if (didDragRef.current) return;
+          clearUnread(runKeyOf(c.slug));
           openChat(c.slug);
         }}
         onContextMenu={(e) => {
@@ -250,6 +257,33 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
                 },
               ],
             },
+            // chats organize by named view too (2026-08-03): work vs personal
+            ...(viewsManifest.views.length > 0 && viewsWritable
+              ? [
+                  {
+                    kind: "drill" as const,
+                    label: "Move to view",
+                    items: [
+                      ...viewsManifest.views.map((view) => ({
+                        kind: "action" as const,
+                        label: view.name,
+                        checked: chatAssignedView(viewsManifest, c.slug) === view.name,
+                        checkedMark: "highlight" as const,
+                        onClick: () => setViewsManifest(assignChatToView(viewsManifest, c.slug, view.name)),
+                      })),
+                      ...(chatAssignedView(viewsManifest, c.slug)
+                        ? [
+                            {
+                              kind: "action" as const,
+                              label: "Remove from view",
+                              onClick: () => setViewsManifest(assignChatToView(viewsManifest, c.slug, null)),
+                            },
+                          ]
+                        : []),
+                    ],
+                  },
+                ]
+              : []),
             {
               kind: "action" as const,
               label: "Show in Finder",
@@ -297,6 +331,22 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
       >
         <ChatGlyph size={14} />
         <span className="fname">{c.title || c.slug}</span>
+        {(() => {
+          // run signal first (it's the newest fact), then the model chip
+          const run = runs[runKeyOf(c.slug)];
+          const ownModel = chatModelMap[runKeyOf(c.slug)];
+          return (
+            <>
+              {run === "running" && (
+                <span className="sb-chatrun running" role="status" aria-label="Answering…" />
+              )}
+              {run === "unread" && <span className="sb-chatrun unread" aria-label="New reply" />}
+              {ownModel && !run && (
+                <span className="sb-chatmodel">{modelLabel(ownModel, models.data ?? [], hybridPresets)}</span>
+              )}
+            </>
+          );
+        })()}
         {c.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
       </button>
     );
@@ -326,7 +376,24 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           <p className="sb-empty">No chats yet.</p>
         ) : (
           <>
-            {grouped.folders.map(({ folder, chats: folderChats }) => {
+            {/* the Unread lane (2026-08-03): every reply that landed while you
+                were elsewhere, newest first — a view onto the list, not a
+                folder; rows also stay in their real folder below */}
+            {unreadChats.length > 0 && (
+              <div className="sb-chatfolder sb-chatunread">
+                <div className="sb-chatrow sb-chatfolder-row unreadhead" aria-hidden="true">
+                  <span className="sb-chatrun unread" />
+                  <span className="fname">Unread</span>
+                  <span className="sb-chatfolder-n">{unreadChats.length}</span>
+                </div>
+                {unreadChats.map((c) => renderChatRow(c, null))}
+              </div>
+            )}
+            {grouped.folders.map(({ folder, chats: allFolderChats }) => {
+              // an active view narrows every group to its own chats; a folder
+              // with none simply doesn't render while the view is on
+              const folderChats = allFolderChats.filter(inView);
+              if (visibleSlugs !== null && folderChats.length === 0) return null;
               const folderKey = chatFolderKey(folder.id);
               const open = expandedDests[folderKey] ?? true;
               return (
@@ -357,6 +424,12 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
                         openContextMenu(e.clientX, e.clientY, [
                           {
                             kind: "action" as const,
+                            label: folder.pinned ? "Unpin from top" : "Pin to top",
+                            checked: folder.pinned === true,
+                            onClick: () => update((m) => setChatFolderPinned(m, folder.id, !folder.pinned)),
+                          },
+                          {
+                            kind: "action" as const,
                             label: "Rename…",
                             onClick: () => setRenamingFolderId(folder.id),
                           },
@@ -380,6 +453,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
                       </span>
                       <FolderGlyph size={14} />
                       <span className="fname">{folder.name}</span>
+                      {folder.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
                       <span className="sb-chatfolder-n">{folderChats.length}</span>
                     </button>
                   )}
@@ -389,7 +463,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
             })}
             {/* every loose chat — the front owns the whole body, so the old
                 5/10/15 cap and its "+N more" row are retired (2026-08-01) */}
-            {grouped.loose.map((c) => renderChatRow(c, null))}
+            {grouped.loose.filter(inView).map((c) => renderChatRow(c, null))}
           </>
         )}
       </div>

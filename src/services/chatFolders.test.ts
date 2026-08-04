@@ -9,8 +9,8 @@ import {
   migrateChatFolderSlug,
   parseChatFolders,
   renameChatFolder,
-  setChatFolderOrder,
   serializeChatFolders,
+  setChatFolderPinned,
 } from "./chatFolders";
 
 describe("chat folders (virtual grouping over flat chats/)", () => {
@@ -70,53 +70,60 @@ describe("chat folders (virtual grouping over flat chats/)", () => {
   });
 });
 
-// Manual in-folder order (Seth, 2026-07-30: "within a folder I should be able
-// to reorganize things") — an additive v1 field; absent order keeps list order.
-describe("chat folder manual order", () => {
+// In-folder order = the LIST's order (Seth, 2026-08-03: "the moment I get a
+// response it should move to the top of the folder"). The legacy manual-order
+// field still parses (older builds lose nothing) but no longer changes
+// rendering.
+describe("chat folder ordering — response recency rules", () => {
   const chats = [{ slug: "a" }, { slug: "b" }, { slug: "c" }, { slug: "d" }];
 
-  test("no manual order keeps the list's own order", () => {
+  test("folder chats keep the list's own order (pinned-then-recency upstream)", () => {
     let { manifest, id } = createChatFolder(EMPTY_CHAT_FOLDERS, "Work");
     for (const slug of ["a", "b", "c"]) manifest = assignChatToFolder(manifest, slug, id);
     expect(groupChats(chats, manifest).folders[0]?.chats.map((c) => c.slug)).toEqual(["a", "b", "c"]);
   });
 
-  test("setChatFolderOrder reorders; unlisted (new) chats keep list order after", () => {
+  test("a legacy manual order parses but no longer reorders the render", () => {
     let { manifest, id } = createChatFolder(EMPTY_CHAT_FOLDERS, "Work");
     for (const slug of ["a", "b", "c", "d"]) manifest = assignChatToFolder(manifest, slug, id);
-    manifest = setChatFolderOrder(manifest, id, ["c", "a"]);
-    expect(groupChats(chats, manifest).folders[0]?.chats.map((c) => c.slug)).toEqual(["c", "a", "b", "d"]);
-  });
-
-  test("order survives a serialize/parse round-trip; unknown folders and junk are dropped", () => {
-    let { manifest, id } = createChatFolder(EMPTY_CHAT_FOLDERS, "Work");
-    manifest = assignChatToFolder(manifest, "a", id);
-    manifest = setChatFolderOrder(manifest, id, ["a"]);
-    const reparsed = parseChatFolders(
-      serializeChatFolders(manifest).replace('"order": {', '"order": {"cf-ghost": ["x"], "bad": 7, '),
-    );
-    expect(reparsed.order).toEqual({ [id]: ["a"] });
-    // setting order on an unknown folder is a no-op
-    expect(setChatFolderOrder(manifest, "cf-nope", ["a"])).toEqual(manifest);
+    const withOrder = { ...manifest, order: { [id]: ["c", "a"] } };
+    const reparsed = parseChatFolders(serializeChatFolders(withOrder));
+    expect(reparsed.order).toEqual({ [id]: ["c", "a"] }); // survives for old builds
+    expect(groupChats(chats, reparsed).folders[0]?.chats.map((c) => c.slug)).toEqual(["a", "b", "c", "d"]);
   });
 
   test("a legacy manifest without order parses to an empty order map", () => {
     const legacy = parseChatFolders('{"version":1,"folders":[{"id":"cf-1","name":"W"}],"assignments":{}}');
     expect(legacy.order).toEqual({});
   });
+});
 
-  test("a renamed chat keeps its manual position", () => {
-    let { manifest, id } = createChatFolder(EMPTY_CHAT_FOLDERS, "Work");
-    manifest = assignChatToFolder(manifest, "old", id);
-    manifest = assignChatToFolder(manifest, "b", id);
-    manifest = setChatFolderOrder(manifest, id, ["b", "old"]);
-    const migrated = migrateChatFolderSlug(manifest, "old", "new");
-    expect(migrated.order[id]).toEqual(["b", "new"]);
+// Pinned folders (Seth, 2026-08-03): a pinned folder floats above the rest,
+// manifest order preserved within each band.
+describe("pinned chat folders", () => {
+  test("pin floats a folder to the top; unpin returns it to manifest order", () => {
+    let manifest = createChatFolder(EMPTY_CHAT_FOLDERS, "Work").manifest;
+    const personal = createChatFolder(manifest, "Personal");
+    manifest = personal.manifest;
+    const pinned = setChatFolderPinned(manifest, personal.id, true);
+    expect(groupChats([], pinned).folders.map((f) => f.folder.name)).toEqual(["Personal", "Work"]);
+    const unpinned = setChatFolderPinned(pinned, personal.id, false);
+    expect(groupChats([], unpinned).folders.map((f) => f.folder.name)).toEqual(["Work", "Personal"]);
+    // unpin strips the field entirely — the manifest stays clean on disk
+    expect(unpinned.folders.find((f) => f.id === personal.id)).toEqual({
+      id: personal.id,
+      name: "Personal",
+    });
+    expect(setChatFolderPinned(manifest, "cf-nope", true)).toEqual(manifest);
   });
 
-  test("deleting a folder drops its order entry", () => {
-    let { manifest, id } = createChatFolder(EMPTY_CHAT_FOLDERS, "Work");
-    manifest = setChatFolderOrder(manifest, id, ["a"]);
-    expect(deleteChatFolder(manifest, id).order).toEqual({});
+  test("pinned survives serialize/parse; junk pinned values read unpinned", () => {
+    const { manifest, id } = createChatFolder(EMPTY_CHAT_FOLDERS, "Work");
+    const pinned = setChatFolderPinned(manifest, id, true);
+    expect(parseChatFolders(serializeChatFolders(pinned)).folders[0]?.pinned).toBe(true);
+    const junk = parseChatFolders(
+      `{"version":1,"folders":[{"id":"cf-1","name":"W","pinned":"yes"}],"assignments":{}}`,
+    );
+    expect(junk.folders[0]?.pinned).toBeUndefined();
   });
 });

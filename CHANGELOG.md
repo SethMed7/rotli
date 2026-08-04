@@ -10,6 +10,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.72.0] - 2026-08-03
 
+### Added
+
+- **The chat sidebar now works like a real multi-chat cockpit.** Fire off
+  several chats and switch freely: a chat that's answering breathes a small
+  dot on its row, a reply that lands while you're elsewhere flips it to an
+  **unread** dot and collects it in a new **Unread** lane at the top — so you
+  always know which chat to click. Chats order by response recency (newest
+  reply on top, inside folders too), and leaving a chat no longer cancels a
+  send that was waiting in line — it finishes and lights up its row.
+- **Pin chat folders.** A folder's right-click menu can pin it above the rest.
+- **Every chat row shows its model.** The model a chat runs on sits quietly at
+  the row's right edge.
+- **Views reach the chat area.** Organize chats by work vs personal: assign a
+  chat to a named view from its row menu, switch views to see only that view's
+  chats, and a chat started while a view is active joins it automatically.
+
+### Changed
+
+- Reordering chats inside a folder by hand is retired — response recency now
+  owns the order (pinned chats still float first). Dragging a chat onto a
+  folder still files it there.
+
 ### Fixed
 
 - **Bold text in chat replies no longer shouts.** `**bold**` in an assistant

@@ -38,8 +38,29 @@ Now the sidebar has **one top switcher and one body**:
 - **Home** is today's Notes world: All notes · Captures · Tasks · the Main /
   named-view tree, then the System zone and the footer. "Home, which is notes
   essentially and eventually a dashboard."
-- **Chat** is the chat world: New chat · All chats · chat folders · every chat,
-  then the footer.
+- **Chat** is the chat world: New chat · All chats · an **Unread** lane (when
+  any reply landed unwatched) · chat folders · every chat, then the footer.
+  Since 2026-08-03 the front carries live signals and organization:
+  - **Run signals** — a chat that is answering breathes a small accent dot on
+    its row; a reply that settles while you're elsewhere flips it to a solid
+    **unread** dot, and those chats also collect in the Unread lane at the top
+    (a view onto the list, not a folder). Opening the chat spends the flag.
+    State lives in `src/state/chatRuns.ts`, session-only — the transcript on
+    disk is the durable truth. Navigating away no longer cancels a queued
+    turn; it completes, persists, and flips its row.
+  - **Order is response recency** — pinned chats first, then most-recent
+    activity, inside folders too ("the moment I get a response it moves to the
+    top"). The old per-folder manual drag order is retired (the manifest field
+    still parses for older builds); dragging a chat onto a folder still files
+    it there.
+  - **Pinned folders** — a chat folder's context menu can pin it above the
+    others (`pinned` on the `chat-folders.json` entry).
+  - **Model chip** — a row shows its chat's own model pick (quiet, right-
+    aligned) when the chat isn't currently running/unread.
+  - **Views** — chats join named views (`chats: [slug]` on the view in
+    `views.json`, singular membership like notes): the row menu's "Move to
+    view", an active view narrows the front to its chats, and a chat born
+    while a view is active belongs to it.
 - Neither view is collapsible. Each owns the whole body and scrolls on its own
   (`.sb-rows`) — the "infinite scroll" in Seth's words.
 - **System** (Library · Assets · Archive · Trash, plus any added external

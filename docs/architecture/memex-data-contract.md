@@ -11,6 +11,11 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   uniquely named reference trees with their own virtual folders. Main retains
   every item assigned to a named view; switching views changes navigation and
   creation context, never physical storage.
+- **Chats join named views (2026-08-03).** A view may carry a `chats` list of
+  chat slugs (additive field, absent = none; singular membership like notes).
+  Chats have no frontmatter `view_tag` — the list is their whole membership —
+  and Rust round-trips the field verbatim. The active view narrows the Chat
+  front to its own chats; a chat created while a view is active joins it.
 - A Markdown note may belong to one named view. Rotli synchronizes the exact
   view name into managed `view_tag` metadata on assignment, rename, deletion,
   UI, CLI, and MCP writes. View names are unique case-insensitively and use

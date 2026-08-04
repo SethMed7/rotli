@@ -16,6 +16,11 @@ import {
 export interface NamedView {
   name: string;
   tree: MainNode[];
+  /** Chat slugs belonging to this view (Seth, 2026-08-03: "bring the views
+   * into the chat area — organize chats by work vs personal"). Additive field:
+   * absent reads as none. Chats are files without frontmatter view_tags; this
+   * list is their whole view membership, and Rust round-trips it verbatim. */
+  chats?: string[];
 }
 
 export interface ViewsManifest {
@@ -96,9 +101,14 @@ export function parseViewsManifest(raw: string): ParsedViewsManifest {
       if (!candidate || typeof candidate !== "object") continue;
       const item = candidate as { name?: unknown; tree?: unknown };
       if (typeof item.name !== "string" || viewNameError(item.name, views)) continue;
+      const chatsRaw = (candidate as { chats?: unknown }).chats;
+      const chats = Array.isArray(chatsRaw)
+        ? [...new Set(chatsRaw.filter((slug): slug is string => typeof slug === "string" && !!slug.trim()))]
+        : [];
       views.push({
         name: item.name.trim(),
         tree: Array.isArray(item.tree) ? item.tree.flatMap(sanitizeNode) : [],
+        ...(chats.length > 0 ? { chats } : {}),
       });
     }
   }
@@ -132,6 +142,56 @@ export function renameNamedView(manifest: ViewsManifest, current: string, value:
 export function deleteNamedView(manifest: ViewsManifest, name: string): ViewsManifest {
   if (!manifest.views.some((view) => view.name === name)) return manifest;
   return { ...manifest, views: manifest.views.filter((view) => view.name !== name) };
+}
+
+// ── chats in views (2026-08-03) ──────────────────────────────────────────────
+
+/** The view a chat belongs to, or null for Main-only. A chat lives in at most
+ * one view — the same singular-membership law notes follow. */
+export function chatAssignedView(manifest: ViewsManifest, slug: string): string | null {
+  return manifest.views.find((view) => view.chats?.includes(slug))?.name ?? null;
+}
+
+/** This view's chat slugs ("" / unknown view = none). */
+export function viewChats(manifest: ViewsManifest, name: string): readonly string[] {
+  return manifest.views.find((view) => view.name === name)?.chats ?? [];
+}
+
+/** Assign a chat to a named view (null returns it to Main-only). Enforces
+ * singular membership by removing the slug from every other view first. */
+export function assignChatToView(
+  manifest: ViewsManifest,
+  slug: string,
+  viewName: string | null,
+): ViewsManifest {
+  if (viewName !== null && !manifest.views.some((view) => view.name === viewName)) return manifest;
+  if (chatAssignedView(manifest, slug) === viewName) return manifest;
+  return {
+    ...manifest,
+    views: manifest.views.map((view) => {
+      const kept = (view.chats ?? []).filter((s) => s !== slug);
+      const next = view.name === viewName ? [...kept, slug] : kept;
+      const { chats: _drop, ...rest } = view;
+      return next.length > 0 ? { ...rest, chats: next } : rest;
+    }),
+  };
+}
+
+/** A renamed chat keeps its view — the slug follows in place. */
+export function migrateChatViewSlug(
+  manifest: ViewsManifest,
+  oldSlug: string,
+  newSlug: string,
+): ViewsManifest {
+  if (chatAssignedView(manifest, oldSlug) === null) return manifest;
+  return {
+    ...manifest,
+    views: manifest.views.map((view) =>
+      view.chats?.includes(oldSlug)
+        ? { ...view, chats: view.chats.map((s) => (s === oldSlug ? newSlug : s)) }
+        : view,
+    ),
+  };
 }
 
 export function setNamedViewTree(

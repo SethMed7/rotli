@@ -13,12 +13,14 @@ import { renameChat } from "../memex/service";
 import { invalidateMemex, useMemexConfig } from "../memex/useMemex";
 import { usePanesStore } from "../state/panes";
 import { chatKey, retargetChatMapKeys, useUiStore } from "../state/ui";
+import { useViewsStore } from "../state/views";
 import {
   invalidateChatFolders,
   loadChatFolders,
   migrateChatFolderSlug,
   saveChatFolders,
 } from "./chatFolders";
+import { migrateChatViewSlug } from "./viewTree";
 
 export function useChatRename() {
   const renamingChatSlug = useUiStore((s) => s.renamingChatSlug);
@@ -39,6 +41,12 @@ export function useChatRename() {
         // the chat keeps its model pick, globe, and measure — a rename used to
         // orphan all three under the old key (audit 2026-08-03)
         retargetChatMapKeys(chatKey(active.id, oldSlug, ""), chatKey(active.id, finalSlug, ""));
+        // …and its named-view membership (chats in views, 2026-08-03)
+        const views = useViewsStore.getState();
+        if (views.hydrated && views.writable) {
+          const migrated = migrateChatViewSlug(views.manifest, oldSlug, finalSlug);
+          if (migrated !== views.manifest) views.setManifest(migrated);
+        }
         // the chat keeps its folder — the assignment key follows the slug
         try {
           const manifest = await loadChatFolders(active);

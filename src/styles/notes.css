@@ -689,6 +689,72 @@
   color: var(--text-muted);
   flex: 0 0 auto;
 }
+/* run signals (Seth, 2026-08-03: "know to click on it") — an answering chat
+   breathes, a landed-unwatched reply holds a solid accent dot. One dot, 7px,
+   right-aligned; the breath is a soft opacity swell, no movement (motion
+   restraint — DESIGN-STANDARDS). */
+.sb-chatrun {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.sb-chatrun.running {
+  animation: sb-chatrun-breathe 1.6s ease-in-out infinite;
+}
+@keyframes sb-chatrun-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-chatrun.running {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+/* a dot pushes the pin off `margin-left:auto` duty */
+.sb-chatrun ~ .sb-chatpin {
+  margin-left: 0;
+}
+/* the per-chat model chip (Seth, 2026-08-03) — a quiet right-aligned label,
+   hidden while a run signal owns the row's right edge (the JSX renders one or
+   the other), clipped before it can crowd the title */
+.sb-chatmodel {
+  margin-left: auto;
+  flex: 0 1 auto;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.sb-chatmodel ~ .sb-chatpin {
+  margin-left: 0;
+}
+.sb-chatrow.sel .sb-chatmodel {
+  color: var(--on-accent);
+}
+/* the Unread lane header — reads like a folder row but is a label, not a
+   control */
+.sb-chatunread .unreadhead {
+  cursor: default;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.sb-chatunread .unreadhead .sb-chatrun {
+  margin-left: 0;
+}
+.sb-chatunread .unreadhead:hover {
+  background: none;
+}
 .sb-chatnew {
   color: var(--accent-text);
   font-weight: 600;

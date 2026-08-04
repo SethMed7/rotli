@@ -309,3 +309,20 @@ export const STARTER_PRESETS: HybridPreset[] = [
 export function flattenModels(g: ModelGroups): ChatModelInfo[] {
   return [...g.local, ...g.connected, ...g.presets];
 }
+
+/** A model id's human label wherever one is known — the local store's listing,
+ * any CLI lane's catalog (enabled or not: a sidebar badge should still read
+ * well for a lane that's currently off), or a hybrid preset's name — else the
+ * raw id. For the sidebar's per-chat model chip (Seth, 2026-08-03). */
+export function modelLabel(
+  id: string,
+  local: readonly ChatModelInfo[],
+  presets: readonly HybridPreset[],
+): string {
+  return (
+    local.find((m) => m.id === id)?.label ??
+    PROVIDER_IDS.flatMap((p) => CLI_CATALOG[p]).find((m) => m.id === id)?.label ??
+    presets.find((p) => p.id === id)?.name ??
+    id
+  );
+}

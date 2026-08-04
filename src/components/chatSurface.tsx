@@ -73,9 +73,12 @@ import {
   saveChatFolders,
 } from "../services/chatFolders";
 import { invalidateNotes, useNoteIndex } from "../services/hooks";
+import { assignChatToView } from "../services/viewTree";
+import { useChatRuns } from "../state/chatRuns";
 import { type Measure } from "../state/noteStyle";
 import { usePanesStore } from "../state/panes";
 import { chatKey, chatModelFor, useUiStore } from "../state/ui";
+import { useViewsStore } from "../state/views";
 import { Character, QuokkaMark } from "./character";
 import { CheckGlyph, CloudGlyph, CopyGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
 
@@ -888,6 +891,18 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const canVision = picked?.vision ?? false;
   const visionModels = modelList.filter((m) => m.vision);
 
+  // the sidebar's run signals (2026-08-03): opening this chat spends its unread
+  // flag, and the aliveRef tells a completing run whether its reply was WATCHED
+  // (surface still mounted) or should flip the row to unread.
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    useChatRuns.getState().clearUnread(chatKeyId);
+    return () => {
+      aliveRef.current = false;
+    };
+  }, [chatKeyId]);
+
   // load THIS pane's chat (by slug), or clear for a fresh chat
   useEffect(() => {
     let cancelled = false;
@@ -976,6 +991,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     }));
     setMessages((p) => [...p, { speaker: "you", text: userText }]);
     setBusy(true);
+    useChatRuns.getState().markRunning(chatKeyId); // the sidebar row starts pulsing
     setStatus(THINK_WORDS[0]!);
     setStreaming("");
     const myRun = ++runSeq.current;
@@ -1044,6 +1060,11 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     const failed = reply.startsWith("⚠");
     if (!reply) reply = "(the model returned nothing)";
     setMessages((p) => [...p, { speaker: "rotli", text: reply }]);
+    // the answer is IN — settle the sidebar signal now (not after the slower
+    // persistence + note-memory pass): watched clears, unwatched flips unread.
+    // A failed turn always clears — its ⚠ only lives in this mounted session,
+    // so an unread badge would point at nothing.
+    useChatRuns.getState().settleRun(chatKeyId, failed || aliveRef.current);
     if (failed) return; // a failed turn isn't persisted
 
     // persist the turn (user + assistant) to chats/<slug>.md
@@ -1112,6 +1133,18 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }
         bindChat(paneId, res.slug); // this tab now IS that chat
+        // the run signal + an unread flag follow the unsaved key to the slug,
+        // so the fresh sidebar row shows the right state (2026-08-03)
+        useChatRuns.getState().retargetRun(chatKeyId, chatKey(active.id, res.slug, paneId));
+        // view inheritance: a chat born while a named view is active belongs to
+        // that view (Seth, 2026-08-03: organize chats by work vs personal)
+        const bornInView = useUiStore.getState().activeView;
+        if (bornInView) {
+          const views = useViewsStore.getState();
+          if (views.hydrated && views.writable) {
+            views.setManifest(assignChatToView(views.manifest, res.slug, bornInView));
+          }
+        }
         // folder inheritance (Seth, 2026-07-30): a new chat opened FROM a
         // foldered chat files itself into the same folder on first save.
         // Best-effort — a manifest hiccup must never fail the send.
@@ -1189,15 +1222,11 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     if (!busy) setQueued(null);
   }, [busy]);
 
-  // leaving the chat with a message still in line takes it back out — a QUEUED
-  // send is genuinely cancellable (a running one is orphaned, as before)
-  useEffect(
-    () => () => {
-      const id = requestRef.current;
-      if (id) void localQueueCancel(id).catch(() => {});
-    },
-    [],
-  );
+  // Leaving the chat NO LONGER cancels a queued send (flip, Seth 2026-08-03:
+  // fire off several chats and switch between them — the sidebar's run/unread
+  // signals carry the result back). A queued or running turn survives unmount,
+  // lands on disk through the same closure, and flips its row to unread.
+  // Deliberate abandonment stays one click away: open the chat and Stop.
 
   /** Stop (Seth, 2026-07-30): orphan the run, kill any CLI child, abort a local
    * stream, and free the surface. If the on-device answer had already begun
@@ -1215,6 +1244,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     requestRef.current = null;
     setQueued(null);
     setBusy(false);
+    useChatRuns.getState().settleRun(chatKeyId, true); // a stop is watched by definition
     const partial = streamRef.current;
     setStreaming("");
     if (partial) {

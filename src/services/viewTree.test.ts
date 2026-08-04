@@ -2,15 +2,19 @@ import { describe, expect, test } from "bun:test";
 
 import {
   EMPTY_VIEWS,
+  assignChatToView,
   assignItemToView,
   assignedView,
+  chatAssignedView,
   createNamedView,
   deleteNamedView,
+  migrateChatViewSlug,
   parseViewsManifest,
   projectionMenuAction,
   renameNamedView,
   setNamedViewTree,
   transferTreeItemToView,
+  viewChats,
   viewNameError,
   viewTree,
 } from "./viewTree";
@@ -102,5 +106,52 @@ describe("named view membership", () => {
     expect(viewTree(manifest, "OpenSource")).toEqual([]);
     expect(viewTree(manifest, "Myela")).toEqual(main);
     expect(main).toEqual([{ folder: "Rotli", children: [{ note: "a" }, { note: "b" }] }]);
+  });
+});
+
+// Chats in views (Seth, 2026-08-03: "bring the views into the chat area so
+// people can organize chats by work vs personal"). Chats key by slug, live in
+// at most one view, and the field round-trips parse/serialize.
+describe("chats in named views", () => {
+  test("assign moves a chat between views; null returns it to Main-only", () => {
+    let manifest = createNamedView(createNamedView(EMPTY_VIEWS, "Work"), "Personal");
+    manifest = assignChatToView(manifest, "gateway-uat", "Work");
+    expect(chatAssignedView(manifest, "gateway-uat")).toBe("Work");
+    expect(viewChats(manifest, "Work")).toEqual(["gateway-uat"]);
+
+    manifest = assignChatToView(manifest, "gateway-uat", "Personal");
+    expect(viewChats(manifest, "Work")).toEqual([]);
+    expect(viewChats(manifest, "Personal")).toEqual(["gateway-uat"]);
+
+    manifest = assignChatToView(manifest, "gateway-uat", null);
+    expect(chatAssignedView(manifest, "gateway-uat")).toBeNull();
+    // an emptied list drops the field — the manifest stays clean on disk
+    expect(manifest.views.every((view) => view.chats === undefined)).toBe(true);
+  });
+
+  test("an unknown target view or a same-state assign is a no-op reference-wise", () => {
+    const manifest = createNamedView(EMPTY_VIEWS, "Work");
+    expect(assignChatToView(manifest, "x", "Nope")).toBe(manifest);
+    expect(assignChatToView(manifest, "x", null)).toBe(manifest);
+  });
+
+  test("chats survive parse/serialize; junk entries and duplicates drop", () => {
+    let manifest = createNamedView(EMPTY_VIEWS, "Work");
+    manifest = assignChatToView(manifest, "daily", "Work");
+    const reparsed = parseViewsManifest(JSON.stringify(manifest));
+    expect(viewChats(reparsed.manifest, "Work")).toEqual(["daily"]);
+    const junk = parseViewsManifest(
+      '{"version":1,"views":[{"name":"Work","tree":[],"chats":["a",7,"","a"]}]}',
+    );
+    expect(viewChats(junk.manifest, "Work")).toEqual(["a"]);
+  });
+
+  test("a renamed chat keeps its view; deleting the view frees its chats", () => {
+    let manifest = createNamedView(EMPTY_VIEWS, "Work");
+    manifest = assignChatToView(manifest, "old-slug", "Work");
+    manifest = migrateChatViewSlug(manifest, "old-slug", "new-slug");
+    expect(viewChats(manifest, "Work")).toEqual(["new-slug"]);
+    expect(migrateChatViewSlug(manifest, "not-assigned", "x")).toBe(manifest);
+    expect(chatAssignedView(deleteNamedView(manifest, "Work"), "new-slug")).toBeNull();
   });
 });
