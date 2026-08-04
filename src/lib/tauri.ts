@@ -565,9 +565,11 @@ export function systemProfile(): Promise<SystemProfile> {
   return aiInvoke("system_profile");
 }
 
-/** Generate an image into a CHAT'S assets (`storage/chats/<slug>/`) via the
- * chosen connected engine. Rust pins the destination from the registered root
- * + slug — the prompt never shapes the path. Returns the corpus-relative path. */
+/** Generate an image via the chosen connected engine. A chat slug lands it in
+ * that chat's assets (`storage/chats/<slug>/`); an EMPTY slug is the NOTES lane
+ * (`storage/images/` — the editor's /image-gen command, 2026-08-04). Rust pins
+ * the destination from the registered root — the prompt never shapes the path.
+ * Returns the corpus-relative path. */
 export function generateImage(args: {
   requestId: string;
   root: string;

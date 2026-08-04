@@ -775,6 +775,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const clearChatMeasure = useUiStore((s) => s.clearChatMeasure);
   const chatNoteOpen = useUiStore((s) => s.chatNoteOpen);
   const imageEngine = useUiStore((s) => s.imageEngine);
+  const isFocusedPane = usePanesStore((s) => s.focusedPaneId === paneId);
   const bindChat = usePanesStore((s) => s.bindChat);
   const openNote = usePanesStore((s) => s.openNote);
   const openFile = usePanesStore((s) => s.openFile);
@@ -899,6 +900,10 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const msgRef = useRef<HTMLTextAreaElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  /** One-shot: a new chat opens with the caret in its title field, and nothing
+   * later steals focus back (Seth, 2026-08-04). */
+  const didFocusTitle = useRef(false);
   // true once THIS chat's history carries secure-note content (loaded marker
   // or a secure read during a live turn) — drives the one-way taint
   const secureReadRef = useRef(false);
@@ -983,6 +988,19 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       cancelled = true;
     };
   }, [active, chatSlug]);
+
+  // A NEW chat opens ready to be NAMED (Seth, 2026-08-04: "by default be in the
+  // top part where I can instantly type the name of the chat") — ⏎ from there
+  // still skips straight to the composer. Deps rather than mount-only because
+  // `writable` resolves with the memex config, so the input may not exist on
+  // the first paint; the ref makes it fire exactly once, so a later config
+  // refetch can never yank focus out of the message box. Only the FOCUSED
+  // pane's chat claims focus — a chat opened into a split must not steal it.
+  useEffect(() => {
+    if (didFocusTitle.current || chatSlug || !writable || !isFocusedPane) return;
+    didFocusTitle.current = true;
+    titleRef.current?.focus();
+  }, [chatSlug, writable, isFocusedPane]);
 
   // keep the newest message in view — including the live streaming row as it grows
   useEffect(() => {
@@ -1627,6 +1645,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
               <div className="chat-composer-inner">
                 {!chatSlug && (
                   <input
+                    ref={titleRef}
                     className="chat-input chat-title-input"
                     placeholder="Chat title (optional — ⏎ skips; your first message names it)…"
                     value={title}

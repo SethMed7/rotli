@@ -37,6 +37,7 @@ import {
 } from "./commands";
 import { fmBlock } from "./fmBlock";
 import { focusDim } from "./focusMode";
+import { ImageGenPopover } from "./imageGenPopover";
 import { linkOpener, livePreview, noteIdFacet } from "./livePreview";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import { rawMarkdown } from "./rawMarkdown";
@@ -68,6 +69,14 @@ interface SlashState {
 interface PickerState {
   mode: SlashPickerMode;
   index: number;
+  left: number;
+  top: number;
+  up: boolean;
+  insertAt: number;
+}
+
+/** The /image-gen popover's anchor (engine + prompt → PNG in storage/images). */
+interface ImageGenState {
   left: number;
   top: number;
   up: boolean;
@@ -225,6 +234,9 @@ function CmEditorImpl({
   const [picker, setPicker] = useState<PickerState | null>(null);
   const pickerRef = useRef<PickerState | null>(null);
   pickerRef.current = picker;
+  const [imageGen, setImageGen] = useState<ImageGenState | null>(null);
+  const imageGenRef = useRef<ImageGenState | null>(null);
+  imageGenRef.current = imageGen;
   const { notes: searchableNotes } = useSearchableNotes();
   // ARCHIVED notes still exist — their wikilinks must keep resolving (and
   // opening); only Trash reads as deleted → the missing look (Seth, 2026-07-28:
@@ -370,7 +382,7 @@ function CmEditorImpl({
       const view = viewRef.current;
       if (!view) return;
       const line = view.state.doc.lineAt(view.state.selection.main.head);
-      if (item.op.kind === "picker") {
+      if (item.op.kind === "picker" || item.op.kind === "imageGen") {
         const coords = view.coordsAtPos(line.from);
         const host = hostRef.current?.getBoundingClientRect();
         const up = coords != null && slashPlacement(coords.top, window.innerHeight - coords.bottom) === "up";
@@ -382,6 +394,11 @@ function CmEditorImpl({
           changes: { from: line.from, to: line.to, insert: "" },
           selection: EditorSelection.cursor(line.from),
         });
+        if (item.op.kind === "imageGen") {
+          setSlash((s) => ({ ...s, open: false }));
+          setImageGen({ insertAt: line.from, left, top, up });
+          return;
+        }
         openPicker(item.op.mode, line.from, left, top, up);
         return;
       }
@@ -410,7 +427,7 @@ function CmEditorImpl({
       onContextRef.current(line.text, r.head - line.from);
     };
     const detectSlash = (view: EditorView) => {
-      if (pickerRef.current) return;
+      if (pickerRef.current || imageGenRef.current) return;
       const r = view.state.selection.main;
       if (!r.empty) {
         setSlash((s) => (s.open ? { ...s, open: false } : s));
@@ -661,7 +678,32 @@ function CmEditorImpl({
           />
         </div>
       )}
-      {slash.open && !picker && (
+      {imageGen && (
+        <div
+          className={imageGen.up ? "rotli-slash-anchor up" : "rotli-slash-anchor"}
+          style={{ left: imageGen.left, top: imageGen.top }}
+        >
+          <ImageGenPopover
+            onDone={(markdown) => {
+              const view = viewRef.current;
+              const at = imageGen.insertAt;
+              setImageGen(null);
+              if (!view) return;
+              const clamped = Math.min(at, view.state.doc.length);
+              view.dispatch({
+                changes: { from: clamped, to: clamped, insert: markdown },
+                selection: EditorSelection.cursor(clamped + markdown.length),
+              });
+              view.focus();
+            }}
+            onClose={() => {
+              setImageGen(null);
+              viewRef.current?.focus();
+            }}
+          />
+        </div>
+      )}
+      {slash.open && !picker && !imageGen && (
         <div
           className={slash.up ? "rotli-slash-anchor up" : "rotli-slash-anchor"}
           style={{ left: slash.left, top: slash.top }}

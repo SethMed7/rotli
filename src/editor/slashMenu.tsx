@@ -36,7 +36,9 @@ export type SlashOp =
   | { kind: "table" }
   | { kind: "divider" }
   | { kind: "fence"; lang: "" | "math" | "mermaid" }
-  | { kind: "picker"; mode: SlashPickerMode };
+  | { kind: "picker"; mode: SlashPickerMode }
+  /** Opens the AI image popover (engine + prompt) — Seth, 2026-08-04. */
+  | { kind: "imageGen" };
 
 export interface SlashItem {
   label: string;
@@ -101,6 +103,24 @@ const mermaidGlyph = (
   </svg>
 );
 
+// a framed picture with a sun + hill — the classic image mark, in the Gl voice
+const imageGenGlyph = (
+  <svg
+    viewBox="0 0 24 24"
+    width={15}
+    height={15}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="9" cy="10" r="1.6" />
+    <path d="M21 15.5 16.5 11 7 20" />
+  </svg>
+);
 const linkGlyph = (
   <svg
     viewBox="0 0 24 24"
@@ -258,6 +278,14 @@ export const SLASH_ITEMS: SlashItem[] = [
     glyph: mermaidGlyph,
     op: { kind: "fence", lang: "mermaid" },
     keywords: ["diagram", "flowchart", "graph"],
+  },
+  {
+    label: "Generate image",
+    group: "Insert",
+    hint: "AI image from a prompt, saved to your assets",
+    glyph: imageGenGlyph,
+    op: { kind: "imageGen" },
+    keywords: ["image-gen", "imagegen", "image", "ai", "picture", "photo", "generate"],
   },
   {
     label: "Link note",

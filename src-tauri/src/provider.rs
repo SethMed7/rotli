@@ -198,6 +198,20 @@ fn codex_scratch_dir() -> Result<String, String> {
     Ok(dir.to_string_lossy().to_string())
 }
 
+/// Where a generated image lands, given the caller's slug. An EMPTY slug is the
+/// NOTES lane (the editor's /image-gen slash command, 2026-08-04): the shared
+/// `storage/images/` asset home a note references as `storage:images/<file>`.
+/// A non-empty slug is the CHAT lane, byte-identical to before. The slug is the
+/// only caller-shaped path component and it passes `safe_slug`, so neither lane
+/// can be steered out of the registered root.
+fn image_destination(root: &std::path::Path, slug: &str) -> Result<(PathBuf, String), String> {
+    if slug.is_empty() {
+        return Ok((root.join("storage").join("images"), "storage/images".to_string()));
+    }
+    let slug = crate::memex::safe_slug(slug)?;
+    Ok((root.join("storage").join("chats").join(&slug), format!("storage/chats/{slug}")))
+}
+
 /// agy has no `--cd`, so its chat spawns get an empty CWD the ordinary way —
 /// `Command::current_dir`. Even if the model reaches for a native tool there
 /// is nothing to see (the app's own cwd could be anywhere, including HOME).
@@ -685,12 +699,11 @@ pub async fn generate_image(
         return Err(format!("unknown image engine \"{engine}\""));
     }
     let root = crate::memex::registered_root(&app, &root)?;
-    let slug = crate::memex::safe_slug(&slug)?;
+    let (dir, rel_prefix) = image_destination(&root, &slug)?;
     let bin = resolve_bin(spec(&engine)?)
         .ok_or_else(|| format!("{engine} isn't installed (checked its usual homes)"))?;
 
-    let dir = root.join("storage").join("chats").join(&slug);
-    std::fs::create_dir_all(&dir).map_err(|e| format!("couldn't create the chat's assets dir: {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("couldn't create the image assets dir: {e}"))?;
     let file = format!("img-{}.png", ulid::Ulid::new().to_string().to_lowercase());
     let abs = dir.join(&file);
     let abs_str = abs.to_string_lossy().to_string();
@@ -772,7 +785,7 @@ pub async fn generate_image(
                 if tail.is_empty() { String::new() } else { format!(" — {tail}") }
             ));
         }
-        Ok(format!("storage/chats/{slug}/{file}"))
+        Ok(format!("{rel_prefix}/{file}"))
     })
     .await
     .map_err(|e| format!("image task failed: {e}"))?
@@ -977,6 +990,25 @@ mod tests {
         assert_eq!(expand_home("/opt/homebrew/bin/codex").unwrap(), PathBuf::from("/opt/homebrew/bin/codex"));
         let home = std::env::var("HOME").unwrap();
         assert_eq!(expand_home("~/.local/bin/claude").unwrap(), PathBuf::from(home).join(".local/bin/claude"));
+    }
+
+    /// The image lanes: chats keep their per-chat assets dir; the editor's
+    /// /image-gen (empty slug) uses the shared notes asset home. Neither lane
+    /// lets a caller-supplied slug escape the root (2026-08-04).
+    #[test]
+    fn image_destination_splits_the_chat_and_notes_lanes() {
+        let root = PathBuf::from("/tmp/vault");
+        let (dir, rel) = image_destination(&root, "").unwrap();
+        assert_eq!(dir, root.join("storage").join("images"));
+        assert_eq!(rel, "storage/images");
+
+        let (dir, rel) = image_destination(&root, "morning-brief").unwrap();
+        assert_eq!(dir, root.join("storage").join("chats").join("morning-brief"));
+        assert_eq!(rel, "storage/chats/morning-brief");
+
+        // traversal never reaches the filesystem — safe_slug refuses first
+        assert!(image_destination(&root, "../../etc").is_err());
+        assert!(image_destination(&root, "a/b").is_err());
     }
 
     /// The retry gate fires on agy's real headless-denial signature (Seth's

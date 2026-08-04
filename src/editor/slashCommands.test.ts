@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { NoteSummary } from "../types";
+import { imageGenMarkdown, readyImageEngines } from "./imageGenPopover";
 import { pickerFence, slashInsertion } from "./slashActions";
 import { filterSlashItems, SLASH_ITEMS } from "./slashMenu";
 import { filterPickerNotes, slashPickerCanCreate } from "./slashPicker";
@@ -34,13 +35,15 @@ describe("slash command catalog", () => {
       "Inline code",
       "Math",
       "Mermaid",
+      "Generate image",
       "Link note",
       "Board",
       "Sheet",
       "Document",
     ]);
     for (const item of SLASH_ITEMS) {
-      if (item.op.kind === "picker") continue;
+      // picker + imageGen open a popover first — no immediate scaffold
+      if (item.op.kind === "picker" || item.op.kind === "imageGen") continue;
       const insertion = slashInsertion(item.op);
       expect(insertion).not.toBeNull();
       expect(insertion?.caret).toBeGreaterThanOrEqual(0);
@@ -125,5 +128,53 @@ describe("slash target filtering", () => {
       "storage/macros.docm",
     ]);
     expect(filterPickerNotes(files, "embedDocument", "legacy")).toEqual([]);
+  });
+});
+
+// /image-gen (Seth, 2026-08-04): "it will only offer models you are actively
+// logged into that can do image gen such as gemini and gpt".
+describe("/image-gen", () => {
+  test("the command is discoverable by the names Seth types", () => {
+    for (const query of ["image-gen", "imagegen", "image", "generate", "picture", "ai"]) {
+      expect(filterSlashItems(query).map((item) => item.label)).toContain("Generate image");
+    }
+  });
+
+  test("it opens a popover rather than inserting a scaffold", () => {
+    const item = SLASH_ITEMS.find((i) => i.label === "Generate image");
+    expect(item?.op).toEqual({ kind: "imageGen" });
+    expect(slashInsertion({ kind: "imageGen" })).toBeNull();
+  });
+
+  test("only ENABLED lanes that are installed AND authenticated are offered", () => {
+    const ready = { installed: true, version: "1", authenticated: true };
+    const noAuth = { installed: true, version: "1", authenticated: false };
+    const missing = { installed: false, version: null, authenticated: false };
+
+    // both signed in → both offered, codex (GPT) first
+    expect(
+      readyImageEngines({ codex: true, agy: true }, { codex: ready, agy: ready }).map((e) => e.id),
+    ).toEqual(["codex", "agy"]);
+    // installed but signed OUT, or not installed → never offered
+    expect(readyImageEngines({ codex: true, agy: true }, { codex: noAuth, agy: missing })).toEqual([]);
+    // lane disabled in Settings → not offered even when the CLI is ready
+    expect(
+      readyImageEngines({ codex: false, agy: true }, { codex: ready, agy: ready }).map((e) => e.id),
+    ).toEqual(["agy"]);
+    // a probe that hasn't resolved yet is not a green light
+    expect(readyImageEngines({ codex: true }, {})).toEqual([]);
+  });
+
+  test("the inserted markdown uses the storage: shorthand and a safe alt", () => {
+    expect(imageGenMarkdown("a quokka on a surfboard", "storage/images/img-01k.png")).toBe(
+      "![a quokka on a surfboard](storage:images/img-01k.png)\n",
+    );
+    // brackets/parens in the prompt would break the markdown link — stripped;
+    // newlines flatten; long prompts clip
+    expect(imageGenMarkdown("a [weird] (prompt)\nwith lines", "storage/images/x.png")).toBe(
+      "![a weird prompt with lines](storage:images/x.png)\n",
+    );
+    const long = imageGenMarkdown("x".repeat(200), "storage/images/x.png");
+    expect(long.slice(2, long.indexOf("]"))).toHaveLength(80);
   });
 });

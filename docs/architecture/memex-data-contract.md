@@ -117,6 +117,16 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
 - Markdown document slash commands list only formats the embedded document
   editor can edit. They may create a blank managed DOCX or embed an existing
   editable DOCX-family file without leaving the parent Markdown tab.
+- **AI image generation has two lanes (2026-08-04), one command.** `generate_image`
+  writes into a Rust-pinned destination under the registered root: a chat slug
+  lands the PNG in that chat's assets (`storage/chats/<slug>/`), and an EMPTY
+  slug is the NOTES lane (`storage/images/`) behind the editor's `/image-gen`
+  slash command, which inserts a Markdown image whose src is the usual
+  `storage:` shorthand for the saved file. The prompt
+  never shapes the path, and the postcondition is unchanged: a non-empty PNG at
+  the pinned path or an error. The command offers only image engines whose lane
+  is enabled AND whose CLI probes installed + authenticated — capability- and
+  login-based, like every other model surface.
 - File-format dependencies stay behind adapters and composition roots so a DOCX
   codec, document editor, workbook codec, or canvas engine can be swapped
   without changing creation commands or UI entry points.

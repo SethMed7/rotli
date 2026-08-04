@@ -10,10 +10,11 @@ export interface SlashInsertion {
 export const MERMAID_STARTER = `flowchart LR
   Start[Start] --> Next[Next step]`;
 
-/** Canonical scaffold for every immediate slash command. Picker commands need
- * a target first and intentionally return null. */
+/** Canonical scaffold for every immediate slash command. Picker commands — and
+ * /image-gen, which needs an engine + prompt — open a popover first and
+ * intentionally return null. */
 export function slashInsertion(op: SlashOp): SlashInsertion | null {
-  if (op.kind === "picker") return null;
+  if (op.kind === "picker" || op.kind === "imageGen") return null;
   if (op.kind === "code") return { insert: "``", caret: 1 };
   if (op.kind === "table") {
     const insert = insertTableText(3, 2);

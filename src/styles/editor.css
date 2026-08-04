@@ -899,6 +899,128 @@
   bottom: calc(100% + 6px);
 }
 
+/* — /image-gen (Seth, 2026-08-04): the AI image popover, same surface voice as
+   the slash menu it replaces at the caret. Engine chips (only lanes you're
+   signed into), a prompt box, then Generate. — */
+.rotli-imagegen {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: min(340px, calc(100vw - 24px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 10px;
+  z-index: 7;
+  animation: pop-in var(--motion-enter) var(--motion-ease);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+.rotli-slash-anchor.up .rotli-imagegen {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.rotli-imagegen-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.rotli-imagegen-engines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.rotli-imagegen-engine {
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-muted);
+  border-radius: var(--r-control);
+  padding: 4px 9px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rotli-imagegen-engine:hover:not(:disabled) {
+  background: var(--hov);
+  color: var(--text);
+}
+/* the chosen engine wears the ONE active state (the tinted row law) */
+.rotli-imagegen-engine.sel {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.rotli-imagegen-engine:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.rotli-imagegen-prompt {
+  display: block;
+  width: 100%;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  background: var(--surface-2, transparent);
+  color: var(--text);
+  font: inherit;
+  padding: 7px 9px;
+  line-height: 1.45;
+}
+.rotli-imagegen-prompt:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.rotli-imagegen-error {
+  margin: 7px 0 0;
+  color: var(--danger, var(--accent-text));
+  font-size: 12px;
+  line-height: 1.45;
+}
+.rotli-imagegen-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+}
+.rotli-imagegen-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.rotli-imagegen-cancel,
+.rotli-imagegen-go {
+  flex: 0 0 auto;
+  border-radius: var(--r-control);
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rotli-imagegen-cancel {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+}
+.rotli-imagegen-cancel:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.rotli-imagegen-go {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.rotli-imagegen-go:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* — the raw-metadata banner ("Show file metadata"): the frontmatter block as
    real monospaced file text above the body — a block widget inside .cm-content,
    so it lives in the writing column and scrolls/pushes the note like text — */

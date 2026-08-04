@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Pre-1.0:** every `0.x` release is **beta / dev work**. `1.0.0` is reserved for the first
 > public launch — `scripts/release.sh` refuses to build a major ≥ 1 unless `--launch` is passed.
 
+## [0.74.0] - 2026-08-04
+
+### Changed
+
+- **A new chat opens ready to be named.** The title field takes the caret the
+  moment a new chat opens, so you can type its name straight away — ⏎ still
+  skips to the message box (and your first message names the chat if you'd
+  rather not). A chat opened into a split pane doesn't steal your focus.
+
+### Added
+
+- **Generate an image right inside a note.** Type `/` in any note and pick
+  **Generate image**: choose which model draws it, describe the picture, and the
+  finished image is saved into your vault and dropped into the note where you
+  were typing. The model list only ever shows engines you're actually signed
+  into — GPT Image through Codex, Nano Banana through Gemini — so there's
+  nothing to pick that can't run. If neither is connected, it says so up front
+  instead of failing partway. Generated note images live together in
+  `storage/images/`; chat-generated images keep their own per-chat home as
+  before.
+
 ## [0.73.0] - 2026-08-03
 
 ### Fixed
