@@ -89,6 +89,7 @@ import { resetAndReonboard } from "../state/onboarding";
 import { usePanesStore } from "../state/panes";
 import { setQuickFolderSynced } from "../state/quick";
 import { ACCENT_COLORS, type AppIcon, type OrganizerTrust, SOLID_THEMES, useUiStore } from "../state/ui";
+import { VOICES } from "../voice/speech";
 import { Character, type CharacterName, QuokkaMark } from "./character";
 import {
   CheckGlyph,
@@ -1938,6 +1939,10 @@ function ModelsPane() {
   const imageEngine = useUiStore((s) => s.imageEngine);
   const setImageEngine = useUiStore((s) => s.setImageEngine);
   const chatNoteOpen = useUiStore((s) => s.chatNoteOpen);
+  const readAloud = useUiStore((s) => s.readAloud);
+  const setReadAloud = useUiStore((s) => s.setReadAloud);
+  const readAloudVoice = useUiStore((s) => s.readAloudVoice);
+  const setReadAloudVoice = useUiStore((s) => s.setReadAloudVoice);
   const setChatNoteOpen = useUiStore((s) => s.setChatNoteOpen);
 
   const blockedModels = useUiStore((s) => s.blockedModels);
@@ -2178,6 +2183,32 @@ function ModelsPane() {
           ]}
           onPick={setChatNoteOpen}
         />
+      </section>
+
+      <section className="aisection">
+        <h4 className="set-subhead">Voice</h4>
+        <p className="setnote">
+          Read replies aloud with a speaker button on each answer. The voice runs on this Mac and is prepared
+          the first time you use it — nothing is downloaded until then, and nothing is sent anywhere.
+        </p>
+        <Seg
+          value={readAloud ? "on" : "off"}
+          options={[
+            ["off", "Off"],
+            ["on", "Read replies aloud"],
+          ]}
+          onPick={(v) => setReadAloud(v === "on")}
+        />
+        {readAloud && (
+          <>
+            <p className="setnote">Voice:</p>
+            <Seg
+              value={readAloudVoice}
+              options={VOICES.map((v) => [v.id, v.label] as [string, string])}
+              onPick={setReadAloudVoice}
+            />
+          </>
+        )}
       </section>
     </>
   );

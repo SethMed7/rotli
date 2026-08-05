@@ -35,6 +35,7 @@ import { DEFAULT_NEW_ITEM_KIND, NEW_ITEM_KINDS, type NewItemKind } from "../newI
 import { mainFolderIds } from "../services/mainTree";
 import { inboxFolderId, notesService } from "../services/notes";
 import type { PaneNode, Tab } from "../types";
+import { DEFAULT_VOICE, VOICES } from "../voice/speech";
 import { hydrateMain, useMainStore } from "./main";
 import { MRU_CAP, useMruStore } from "./mru";
 import {
@@ -212,6 +213,9 @@ interface PersistedSettings {
   chatNoteOpen: "tab" | "split";
   /** What holding ⌘ reveals: inline badges (default), the grouped panel, or off. */
   hotkeyPeek: HotkeyPeek;
+  /** Read replies aloud + the chosen voice (voice tier 0 — no mic, no entitlement). */
+  readAloud: boolean;
+  readAloudVoice: string;
   /** Connected subscription lanes (Settings → AI Models); all off by default —
    * a chat never leaves the Mac without the user flipping a lane on. */
   aiProviders: Record<ProviderId, boolean>;
@@ -413,6 +417,12 @@ export function parseSettings(raw: string): PersistedSettings {
     hotkeyPeek: HOTKEY_PEEKS.includes(data.hotkeyPeek as HotkeyPeek)
       ? (data.hotkeyPeek as HotkeyPeek)
       : "badges",
+    // OFF unless explicitly stored — a voice model must never be fetched
+    // because a config file was unreadable
+    readAloud: data.readAloud === true,
+    readAloudVoice: VOICES.some((v) => v.id === data.readAloudVoice)
+      ? (data.readAloudVoice as string)
+      : DEFAULT_VOICE,
     // booleans only, unknown lanes ignored — the safe default is every lane OFF
     aiProviders: (() => {
       const src = record(data.aiProviders);
@@ -533,6 +543,8 @@ function applySettings(s: PersistedSettings): void {
     chatMeasure: s.chatMeasure,
     chatNoteOpen: s.chatNoteOpen,
     hotkeyPeek: s.hotkeyPeek,
+    readAloud: s.readAloud,
+    readAloudVoice: s.readAloudVoice,
     aiProviders: s.aiProviders,
     hybridPresets: s.hybridPresets,
     blockedModels: s.blockedModels,
@@ -912,6 +924,8 @@ function settingsSnapshot(): string {
     chatMeasure: persistableChatMap(ui.chatMeasure),
     chatNoteOpen: ui.chatNoteOpen,
     hotkeyPeek: ui.hotkeyPeek,
+    readAloud: ui.readAloud,
+    readAloudVoice: ui.readAloudVoice,
     aiProviders: ui.aiProviders,
     hybridPresets: ui.hybridPresets,
     blockedModels: ui.blockedModels,

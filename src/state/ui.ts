@@ -6,6 +6,7 @@ import type { HybridPreset, ProviderId } from "../ai/models";
 import { DEFAULT_NEW_ITEM_KIND, type NewItemKind } from "../newItems/model";
 import { inboxFolderId } from "../services/notes";
 import type { NoteSummary } from "../types";
+import { DEFAULT_VOICE } from "../voice/speech";
 import type { Measure } from "./noteStyle";
 
 export type ThemeSetting = "light" | "dark" | "system";
@@ -411,6 +412,14 @@ interface UiState {
    * this pane, or a right split beside the chat. Persisted. */
   chatNoteOpen: "tab" | "split";
   setChatNoteOpen: (v: "tab" | "split") => void;
+  /** Read replies aloud — the voice tier that needs no microphone and no
+   * entitlement (docs/design/voice.md). Off by default: the voice model is
+   * fetched on FIRST USE, so nobody pays for a voice they never asked for. */
+  readAloud: boolean;
+  setReadAloud: (on: boolean) => void;
+  /** Which Kokoro voice reads. Persisted. */
+  readAloudVoice: string;
+  setReadAloudVoice: (id: string) => void;
   /** What holding ⌘ reveals (Seth, 2026-08-04). `badges` pins each chord to the
    * control it drives, right where the eye already is; `panel` is the original
    * grouped shortcut map; `off` disables the peek. Persisted. */
@@ -724,6 +733,10 @@ export const useUiStore = create<UiState>((set, get) => ({
   setChatNoteOpen: (v) => set({ chatNoteOpen: v }),
   hotkeyPeek: "badges",
   setHotkeyPeek: (v) => set({ hotkeyPeek: v }),
+  readAloud: false,
+  setReadAloud: (on) => set({ readAloud: on }),
+  readAloudVoice: DEFAULT_VOICE,
+  setReadAloudVoice: (id) => set({ readAloudVoice: id }),
   aiProviders: { claude: false, codex: false, agy: false, gemini: false },
   setAiProvider: (id, on) => set((s) => ({ aiProviders: { ...s.aiProviders, [id]: on } })),
   hybridPresets: [],

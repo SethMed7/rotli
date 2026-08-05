@@ -52,6 +52,26 @@ export function CopyGlyph(props: GlyphProps) {
   );
 }
 
+/** Speaker — read this message aloud (voice, 2026-08-04). A cone plus one
+ * sound arc; the STOP state swaps to SquareGlyph rather than a second icon. */
+export function SpeakerGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M11 5 6 9H3v6h3l5 4z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+    </Glyph>
+  );
+}
+
+/** A filled square — "stop", shared by the speaker's stop state. */
+export function SquareGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="6" y="6" width="12" height="12" rx="2" />
+    </Glyph>
+  );
+}
+
 /** Gear — the settings mark (Breve's merged Settings section, 2026-07-30).
  * Same 1.7-stroke family: a ring + eight short spokes, no filled teeth. */
 export function GearGlyph(props: GlyphProps) {

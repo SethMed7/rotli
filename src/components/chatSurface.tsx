@@ -83,9 +83,19 @@ import { type Measure } from "../state/noteStyle";
 import { usePanesStore } from "../state/panes";
 import { chatKey, chatModelFor, useUiStore } from "../state/ui";
 import { useViewsStore } from "../state/views";
+import { takeSentences } from "../voice/sentences";
+import { speaker } from "../voice/speech";
 import { Character, QuokkaMark } from "./character";
 import { CHAT_PANE_ATTR, registerChatDrop } from "./chatDrop";
-import { CheckGlyph, CloudGlyph, CopyGlyph, EyeGlyph, LaptopGlyph } from "./glyphs";
+import {
+  CheckGlyph,
+  CloudGlyph,
+  CopyGlyph,
+  EyeGlyph,
+  LaptopGlyph,
+  SpeakerGlyph,
+  SquareGlyph,
+} from "./glyphs";
 
 interface Msg {
   speaker: string;
@@ -736,12 +746,18 @@ const ChatMessage = memo(function ChatMessage({
   index,
   copied,
   onCopy,
+  onSpeak,
+  speech = "idle",
 }: {
   text: string;
   you: boolean;
   index: number;
   copied: boolean;
   onCopy: (index: number, text: string) => void;
+  /** Absent when reading aloud is off — the button simply doesn't exist. */
+  onSpeak?: (index: number, text: string) => void;
+  /** This row's speech state; only the row being read is ever non-idle. */
+  speech?: "idle" | "preparing" | "speaking";
 }) {
   return (
     <div className={you ? "cmsg you" : "cmsg ai"}>
@@ -756,6 +772,19 @@ const ChatMessage = memo(function ChatMessage({
         >
           {copied ? <CheckGlyph size={13} /> : <CopyGlyph size={13} />}
         </button>
+        {!you && onSpeak && (
+          <button
+            type="button"
+            className={speech === "idle" ? "cmsg-act" : "cmsg-act on"}
+            aria-label={speech === "idle" ? "Read aloud" : "Stop reading"}
+            title={
+              speech === "preparing" ? "Preparing the voice…" : speech === "idle" ? "Read aloud" : "Stop"
+            }
+            onClick={() => onSpeak(index, text)}
+          >
+            {speech === "idle" ? <SpeakerGlyph size={13} /> : <SquareGlyph size={11} />}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -924,6 +953,37 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   // generating. Local models share one Mac: a send that doesn't fit measured
   // headroom WAITS rather than piling on (docs/design/local-compute-guardrails.md).
   const [queued, setQueued] = useState<LocalQueueEntry | null>(null);
+
+  // — read aloud (voice tier 0, 2026-08-04) — one speaker for the whole app, so
+  // starting a read anywhere stops the previous one. Sentences are cut as they
+  // are spoken, which is what lets a long reply start talking immediately.
+  const readAloud = useUiStore((s) => s.readAloud);
+  const readAloudVoice = useUiStore((s) => s.readAloudVoice);
+  const [speech, setSpeech] = useState(() => speaker.snapshot());
+  useEffect(() => speaker.subscribe((state, owner) => setSpeech({ state, owner })), []);
+  useEffect(() => () => speaker.stop(), []); // leaving the chat stops the voice
+  const speechState = speech.state;
+  const speechOwner = speech.owner;
+
+  const onSpeakMessage = useCallback(
+    (idx: number, text: string) => {
+      const owner = `${paneId}:${idx}`;
+      // pressing the button on the row that is speaking = stop
+      if (speaker.snapshot().owner === owner) {
+        speaker.stop();
+        return;
+      }
+      const { speak } = takeSentences(text, true);
+      void speaker
+        .read(
+          owner,
+          speak.map((s) => s.text),
+          readAloudVoice,
+        )
+        .catch((e: unknown) => setSaveErr(e instanceof Error ? e.message : String(e)));
+    },
+    [paneId, readAloudVoice],
+  );
 
   // stable across renders so the memoized message rows keep skipping — the ✓
   // beat is undone only if that same row is still the copied one.
@@ -1617,6 +1677,8 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                     index={idx}
                     copied={copiedIdx === idx}
                     onCopy={onCopyMessage}
+                    {...(readAloud ? { onSpeak: onSpeakMessage } : {})}
+                    speech={speechOwner === `${paneId}:${idx}` ? speechState : "idle"}
                   />
                 ))
               )}

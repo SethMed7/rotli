@@ -1863,6 +1863,14 @@ body:has(.document-editor) [role="dialog"] input:disabled {
   background: var(--hov);
   color: var(--text);
 }
+/* the row being read aloud (voice, 2026-08-04) — the action stays visible even
+   when the pointer leaves, because it is now a STOP control, not a hover affordance */
+.cmsg-act.on {
+  color: var(--accent-text);
+}
+.cmsg:has(.cmsg-act.on) .cmsg-actions {
+  opacity: 1;
+}
 /* the one brand moment in a thread: the compact quokka mark at the live edge —
    ahead of a streaming reply, or resting after the last one. Accent-tinted,
    still, quiet. */
