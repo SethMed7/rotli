@@ -17,6 +17,8 @@
 # Usage:
 #   bash scripts/release.sh            # build + sign + notarize + validate (NO publish)
 #   bash scripts/release.sh --publish  # the above, then gh release to rotli-releases + tag
+#   bash scripts/release.sh --check-ci-only  # verify HEAD's hosted CI evidence, then exit
+#   bash scripts/release.sh --check-ci-only=<full-sha>  # diagnose another commit without releasing it
 set -euo pipefail
 
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # repo root
@@ -38,14 +40,60 @@ UPDATER_KEY="${ROTLI_UPDATER_KEY:-$HOME/.rotli-updater.key}"
 ENTITLEMENTS="src-tauri/entitlements.plist"
 PUBLISH=0
 LAUNCH=0   # --launch unlocks a major≥1 version (the public 1.0 launch); see the guard below
-REQUIRE_CI=0  # --require-ci: refuse to publish unless a SUCCESSFUL Regression run exists for this commit
+REQUIRE_CI=1  # CI evidence is mandatory; --require-ci remains as an explicit/backward-compatible spelling
+CHECK_CI_ONLY=0
+CI_CHECK_COMMIT="$SOURCE_COMMIT"
 for arg in "$@"; do
   case "$arg" in
-    --publish)    PUBLISH=1 ;;
-    --launch)     LAUNCH=1 ;;
-    --require-ci) REQUIRE_CI=1 ;;
+    --publish)       PUBLISH=1 ;;
+    --launch)        LAUNCH=1 ;;
+    --require-ci)    REQUIRE_CI=1 ;;
+    --check-ci-only) CHECK_CI_ONLY=1 ;;
+    --check-ci-only=*)
+      CHECK_CI_ONLY=1
+      CI_CHECK_COMMIT="${arg#*=}"
+      ;;
   esac
 done
+
+verify_ci_conclusion() {
+  local source_commit="$1"
+  local ci_conclusion
+
+  echo "▸ verify CI conclusion for $source_commit"
+  ci_conclusion="$(gh run list --workflow "Regression suite" --branch main \
+    --json headSha,status,conclusion --limit 40 2>/dev/null \
+    | jq -r --arg sha "$source_commit" \
+        'map(select(.headSha == $sha)) | first | if . == null then "none" elif .status != "completed" then "pending" else (.conclusion // "unknown") end' \
+    2>/dev/null || echo "none")"
+  case "$ci_conclusion" in
+    success)
+      echo "  ✓ Regression suite passed for this exact commit" ;;
+    none|pending)
+      echo "✗ no successful completed Regression run found for $source_commit ($ci_conclusion)"
+      [ "$REQUIRE_CI" -eq 1 ] && { echo "  CI evidence is required before release publication"; return 1; }
+      ;;
+    *)
+      # The only emergency escape is explicit and loud. It can override a
+      # completed red conclusion, but never missing or still-pending evidence.
+      if [ "${ROTLI_RELEASE_ALLOW_RED:-0}" = "1" ]; then
+        echo "  ⚠ Regression concluded '$ci_conclusion' for $source_commit — OVERRIDDEN by ROTLI_RELEASE_ALLOW_RED=1"
+      else
+        echo "✗ Regression suite for $source_commit concluded '$ci_conclusion' — refusing to publish a red commit"
+        echo "  Emergency override: ROTLI_RELEASE_ALLOW_RED=1"
+        return 1
+      fi ;;
+  esac
+}
+
+if [ "$CHECK_CI_ONLY" -eq 1 ]; then
+  if ! [[ "$CI_CHECK_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "✗ --check-ci-only requires a full lowercase 40-character commit SHA"
+    exit 1
+  fi
+  verify_ci_conclusion "$CI_CHECK_COMMIT"
+  exit 0
+fi
 
 VER="$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("src-tauri/tauri.conf.json","utf8")).version)')"
 PACKAGE_VER="$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("package.json","utf8")).version)')"
@@ -177,38 +225,9 @@ if [ "$PUBLISH" -eq 1 ]; then
   fi
 
   # ── exact-commit CI evidence (ROTLI_OPERATIONS: release gates on the CI
-  # CONCLUSION VALUE, never an exit code). The self-hosted runner
-  # (docs/development/ci-runner.md) runs the full Regression suite on main.
-  # Migration-safe: a FAILED run always blocks; a MISSING run (runner not yet
-  # live, or still running) only warns — so this never broke a release before
-  # the runner existed. `--require-ci` upgrades "missing" to blocking once the
-  # runner is trusted; a genuine emergency can still ship without it.
-  echo "▸ verify CI conclusion for $SOURCE_COMMIT"
-  ci_conclusion="$(gh run list --workflow "Regression suite" --branch main \
-    --json headSha,status,conclusion --limit 40 2>/dev/null \
-    | jq -r --arg sha "$SOURCE_COMMIT" \
-        'map(select(.headSha == $sha)) | first | if . == null then "none" elif .status != "completed" then "pending" else (.conclusion // "unknown") end' \
-    2>/dev/null || echo "none")"
-  case "$ci_conclusion" in
-    success)
-      echo "  ✓ Regression suite passed for this exact commit" ;;
-    none|pending)
-      echo "  ⚠ no completed Regression run found for $SOURCE_COMMIT ($ci_conclusion) — local gate only"
-      [ "$REQUIRE_CI" -eq 1 ] && { echo "✗ --require-ci: refusing to publish without CI evidence"; exit 1; }
-      echo "  (pass --require-ci to make this blocking once the runner is live)" ;;
-    *)
-      # A red conclusion blocks — EXCEPT the honest escape (the repo's --no-verify
-      # convention): before the runner is live, jobs can conclude 'failure' purely
-      # because no self-hosted runner picked them up. ROTLI_RELEASE_ALLOW_RED=1
-      # ships anyway, loudly, for that migration window / genuine emergency.
-      if [ "${ROTLI_RELEASE_ALLOW_RED:-0}" = "1" ]; then
-        echo "  ⚠ Regression concluded '$ci_conclusion' for $SOURCE_COMMIT — OVERRIDDEN by ROTLI_RELEASE_ALLOW_RED=1"
-      else
-        echo "✗ Regression suite for $SOURCE_COMMIT concluded '$ci_conclusion' — refusing to publish a red commit"
-        echo "  (if this is a no-runner artifact before the runner is live, re-run with ROTLI_RELEASE_ALLOW_RED=1)"
-        exit 1
-      fi ;;
-  esac
+  # CONCLUSION VALUE, never an exit code). GitHub-hosted runners execute the
+  # complete Regression suite on main; missing, pending, and red evidence block.
+  verify_ci_conclusion "$SOURCE_COMMIT"
 
   git tag "v$VER" "$SOURCE_COMMIT"
   git push origin "v$VER"

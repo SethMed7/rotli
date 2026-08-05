@@ -279,23 +279,19 @@ Seth can validate Linux/Windows without owning either, using layers already
 partly in place:
 
 1. **CI is the primary gate — and the split already exists.** The regression
-   suite (`.github/workflows/regression.yml`) has already been reorganized into
-   the exact shape this port needs: every OS-agnostic lane (lint/types/
-   architecture contracts, design-system, Playwright e2e, the bun/Breve
-   regression, `bun run build`, dependency audit) now runs on a **self-hosted
-   Linux runner** (`[self-hosted, linux, X64, rotli]`, on Railway), and the
-   **only** macOS-locked lane is `cargo-macos` — `cargo clippy` + `cargo test` —
-   because a Linux `cargo build` produces a *different* binary (the ~37 macOS-cfg
-   gates). So the entire JS/TS/Vite/Playwright surface is *already being
-   validated on Linux today*, which is precisely how a Mac-only developer proves
-   non-Mac behavior. Playwright's Linux lane already uses `--with-deps` (installs
-   the apt libs the macOS lane didn't need). The remaining gap this port opens is
-   a **Linux `cargo build` lane** (the de-risking first step): add a job that
-   compiles the crate on Linux behind the `cfg` branches with AI stubbed — that
-   turns the compiler into the enumerator of every real seam. Windows adds a
-   `windows-latest` (or self-hosted Windows) lane later. The workflow header even
-   documents the one-line switch to GitHub-hosted `ubuntu-latest` if billing is
-   enabled.
+   suite (`.github/workflows/regression.yml`) runs every OS-agnostic lane
+   (lint/types/architecture contracts, design-system, Playwright e2e, the
+   Bun/Breve regression, `bun run build`, Astro build, dependency audit) on
+   GitHub-hosted `ubuntu-24.04`. The only macOS-locked lane is `rust-macos` —
+   `cargo clippy` + `cargo test` on GitHub-hosted `macos-15` — because a Linux
+   `cargo build` produces a *different* binary across the macOS `cfg` gates. The
+   JS/TS/Vite/Playwright surface is therefore validated on Linux today, which is
+   how a Mac-only developer proves portable behavior. Playwright uses
+   `--with-deps` to install Chromium's Linux system libraries. The remaining gap
+   this port opens is a **Linux `cargo build` lane**: add a job that compiles the
+   crate on Linux behind those `cfg` branches with AI stubbed, turning the
+   compiler into the enumerator of every real seam. Windows adds a
+   `windows-latest` lane later.
 
 2. **A Linux VM/container for manual smoke.** A Docker container or a UTM/Lima
    Linux VM on Seth's Mac runs the AppImage/deb for hands-on verification of the

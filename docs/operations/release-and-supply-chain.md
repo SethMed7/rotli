@@ -35,6 +35,8 @@ authorized operation. Passing local checks does not authorize publication.
 The current script:
 
 - runs the JavaScript/TypeScript proof chain;
+- requires a successful hosted `Regression suite` conclusion for the exact
+  source commit before publication;
 - builds a Developer ID-signed app with hardened runtime;
 - notarizes and staples the app;
 - regenerates and signs the updater archive from the stapled app;
@@ -44,8 +46,6 @@ The current script:
 
 Known hardening gaps before a 1.0 or paid production release:
 
-- require the exact commit's remote CI result, Rust tests, and clippy evidence;
-- pin third-party CI actions to reviewed commit SHAs;
 - add checksums, SBOM, artifact/source provenance, and a release evidence bundle;
 - define beta/stable channels and a signed rollback procedure;
 - record and review the Apple notary log, not only the success status; and
