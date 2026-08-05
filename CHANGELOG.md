@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **A chat row shows its model, not a chat icon.** Every row in Chat was wearing
+  a little speech bubble that told you what you already knew. That slot now
+  carries a small vendor mark for the model answering — so you can see at a
+  glance which chats are on Claude, GPT, Gemini, or your own Mac.
+
+### Fixed
+
+- **One highlight per open chat.** A chat that was working (or unread) appeared
+  twice — once in the lane at the top, once in its real place — and *both* copies
+  lit up as selected. The lanes are notifications, not locations, so only the
+  row in the chat's real home is highlighted now.
+
 ## [0.76.0] - 2026-08-04
 
 

@@ -320,6 +320,22 @@ export function flattenModels(g: ModelGroups): ChatModelInfo[] {
  * any CLI lane's catalog (enabled or not: a sidebar badge should still read
  * well for a lane that's currently off), or a hybrid preset's name — else the
  * raw id. For the sidebar's per-chat model chip (Seth, 2026-08-03). */
+/** Which LANE a model id belongs to ("claude", "codex", "agy", "gemini",
+ * "preset", or a local model's own provider). Undefined when the id matches
+ * nothing rotli knows. Sibling of modelLabel — same three-catalog search, so
+ * the label and the vendor mark can never disagree about a model. */
+export function modelProvider(
+  id: string,
+  local: readonly ChatModelInfo[],
+  presets: readonly HybridPreset[],
+): string | undefined {
+  return (
+    local.find((m) => m.id === id)?.provider ??
+    PROVIDER_IDS.flatMap((p) => CLI_CATALOG[p]).find((m) => m.id === id)?.provider ??
+    (presets.some((p) => `${PRESET_PREFIX}${p.id}` === id) ? "preset" : undefined)
+  );
+}
+
 export function modelLabel(
   id: string,
   local: readonly ChatModelInfo[],

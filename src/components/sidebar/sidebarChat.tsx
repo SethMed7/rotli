@@ -7,7 +7,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 
-import { modelLabel } from "../../ai/models";
+import { modelLabel, modelProvider } from "../../ai/models";
 import { dispatch } from "../../keys/registry";
 import { createDragGhost } from "../../lib/dragGhost";
 import { createPointerDragSession } from "../../lib/pointerDrag";
@@ -28,8 +28,9 @@ import { useContextMenu } from "../../state/contextMenu";
 import { useFocusedChatSlug, usePanesStore } from "../../state/panes";
 import { chatKey, useUiStore } from "../../state/ui";
 import { useViewsStore } from "../../state/views";
-import { ChevronRight, ChatGlyph, FolderGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
+import { ChevronRight, FolderGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
+import { chatMark } from "./chatMark";
 import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
 
 /** Where a dragged chat would land: a folder row (assignment — positional
@@ -65,6 +66,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   });
   const hybridPresets = useUiStore((s) => s.hybridPresets);
   const chatModelMap = useUiStore((s) => s.chatModel);
+  const chatModelId = useUiStore((s) => s.chatModelId);
 
   // chats participate in named views (2026-08-03): an active view narrows the
   // chat front to its own chats, exactly like Home narrows the notes tree
@@ -148,8 +150,12 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     });
   };
 
-  // one chat row, shared by folder groups and the loose list below them
-  const renderChatRow = (c: MemexChatSummary, folderId: string | null) =>
+  // one chat row, shared by folder groups and the loose list below them.
+  // `hoisted` marks the COPY a lane (Working/Unread) lifts to the top: the same
+  // chat still sits in its real place below, and only that one carries the
+  // selected highlight — two lit rows for one open chat read as a bug (Seth,
+  // 2026-08-04: "don't like double active"; same law as the All-chats rule).
+  const renderChatRow = (c: MemexChatSummary, folderId: string | null, hoisted = false) =>
     chatRename.renamingChatSlug === c.slug ? (
       <InlineRenameInput
         key={c.slug}
@@ -168,7 +174,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
            alongside an active All-chats (or other) view (Seth, 2026-07-30:
            two highlights at once read as wrong) */
         className={`sb-chatrow${folderId ? " in-folder" : ""}${
-          contentView === "panes" && focusedChatSlug === c.slug ? " sel" : ""
+          !hoisted && contentView === "panes" && focusedChatSlug === c.slug ? " sel" : ""
         }${dragSlug === c.slug ? " dragging" : ""}`}
         onPointerDown={(e) => startChatDrag(e, c.slug, c.title || c.slug)}
         onClick={() => {
@@ -333,7 +339,21 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         }}
         title={c.title || c.slug}
       >
-        <ChatGlyph size={14} />
+        {(() => {
+          // the left slot carries the MODEL, not a chat glyph: in a list of
+          // nothing but chats, "this is a chat" is the one thing you already
+          // know (Seth, 2026-08-04). A chat with no model picked yet gets a
+          // blank badge — it holds the column, and claims nothing.
+          const id = chatModelMap[runKeyOf(c.slug)] ?? chatModelId;
+          if (!id) return <span className="sb-chatmark none" title="No model picked yet" />;
+          const name = modelLabel(id, models.data ?? [], hybridPresets);
+          const mark = chatMark(modelProvider(id, models.data ?? [], hybridPresets), name);
+          return (
+            <span className={`sb-chatmark ${mark.key}`} title={mark.title} aria-hidden="true">
+              {mark.initial}
+            </span>
+          );
+        })()}
         <span className="fname">{c.title || c.slug}</span>
         {(() => {
           // run signal first (it's the newest fact), then the model chip
@@ -390,7 +410,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
                   <span className="fname">Working</span>
                   <span className="sb-chatfolder-n">{workingChats.length}</span>
                 </div>
-                {workingChats.map((c) => renderChatRow(c, null))}
+                {workingChats.map((c) => renderChatRow(c, null, true))}
               </div>
             )}
             {/* the Unread lane (2026-08-03): every reply that landed while you
@@ -403,7 +423,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
                   <span className="fname">Unread</span>
                   <span className="sb-chatfolder-n">{unreadChats.length}</span>
                 </div>
-                {unreadChats.map((c) => renderChatRow(c, null))}
+                {unreadChats.map((c) => renderChatRow(c, null, true))}
               </div>
             )}
             {grouped.folders.map(({ folder, chats: allFolderChats }) => {

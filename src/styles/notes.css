@@ -730,6 +730,62 @@
 .sb-chatrun ~ .sb-chatpin {
   margin-left: 0;
 }
+/* the vendor mark that replaced the chat glyph (Seth, 2026-08-04: "all are
+   chats so having it doesn't make sense anymore"). Same 14px footprint the
+   glyph held, so every row's title still starts on one line. A LETTER, not a
+   logo — rotli doesn't reproduce anyone's trademark, and a real mark would be
+   mush at this size. */
+.sb-chatmark {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  /* transparent by default so the bordered variants below keep the SAME
+     footprint — every row's title must start on one line */
+  border: 1px solid transparent;
+  border-radius: var(--r-inner);
+  display: inline-grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--vendor-ink);
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* one vendor per hue, so the list groups by eye before you read a word */
+.sb-chatmark.anthropic {
+  background: var(--vendor-anthropic);
+}
+.sb-chatmark.openai {
+  background: var(--vendor-openai);
+}
+.sb-chatmark.google {
+  background: var(--vendor-google);
+}
+.sb-chatmark.preset {
+  background: var(--vendor-preset);
+}
+/* on-device is deliberately the quiet one — it's the default, not an event */
+.sb-chatmark.local {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+/* no model picked yet: hold the column, claim nothing */
+.sb-chatmark.none {
+  border-color: var(--border);
+}
+/* the selected row fills with the accent — a tinted badge on top of it would
+   fight, so the mark goes to the row's own ink (the rule .sb-chatrun and
+   .sb-chatmodel already follow) */
+.sb-chatrow.sel .sb-chatmark {
+  background: var(--on-accent);
+  color: var(--accent);
+  border-color: transparent;
+}
+
 /* the per-chat model chip (Seth, 2026-08-03) — a quiet right-aligned label,
    hidden while a run signal owns the row's right edge (the JSX renders one or
    the other), clipped before it can crowd the title */
