@@ -1,30 +1,12 @@
 name: Regression suite
 
-# SPLIT GATE — OS-agnostic lanes on LINUX, the macOS-only Rust on macOS.
+# GitHub-hosted Linux runners cover the portable application, site, browser,
+# and dependency checks. The macOS lane stays deliberately small because its
+# minutes cost roughly 10x Linux minutes; it proves only the native Rust code
+# that cannot be represented by a Linux build.
 #
-# Everything bun/node/vite/playwright is OS-agnostic and runs on a self-hosted
-# LINUX runner (Railway; docs/development/ci-runner.md is the deploy runbook).
-# Running these OFF a Mac matters twice over: it costs zero GitHub minutes AND
-# it is how rotli — which Seth only builds on a Mac — validates non-Mac
-# behavior as the app goes cross-platform.
-#
-# ONLY the ~37 macOS-cfg'd Rust gates need macOS: a Linux `cargo build` compiles
-# a DIFFERENT binary, so `cargo clippy` + `cargo test` stay on the self-hosted
-# macOS runner (`cargo-macos`). Note `bun run build` is VITE (JS) — Linux-fine;
-# the native Tauri build lives in release.sh, never in CI.
-#
-# The runner holds NO signing/notary keys: release.sh still signs and notarizes
-# locally. `secrets.GITHUB_TOKEN` is minted per-run and expires with the run.
-#
-# ── Switching the Linux lanes to GitHub-hosted (if billing is ever enabled) ──
-# The Linux `runs-on` is a plain label array. To offload the Railway runner onto
-# GitHub's cheap Linux tier, replace every occurrence of
-#     [self-hosted, linux, X64, rotli]
-# with
-#     ubuntu-latest
-# (one find/replace) and delete the Railway service. Nothing else changes —
-# `playwright install --with-deps chromium` already provisions the apt deps.
-# The macOS `cargo-macos` job must stay self-hosted (Tauri needs a real Mac).
+# Signing and notarization remain local release responsibilities. No CI runner
+# receives signing or notary credentials.
 
 on:
   push:
@@ -40,103 +22,65 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── LINUX lanes (self-hosted Railway runner: [self-hosted, linux, X64, rotli]) ──
-
-  static-contracts:
-    name: Types, lint, and architecture contracts
-    runs-on: [self-hosted, linux, X64, rotli]
+  quality:
+    name: Quality and production builds
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.3
-      - run: bun install --frozen-lockfile
-      - run: bun run lint
-
-  design-system:
-    name: Themes and design system
-    runs-on: [self-hosted, linux, X64, rotli]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.3
-      - run: bun install --frozen-lockfile
-      - run: bun run check:hex
-      - run: bun run check:design-system
-      - run: bun test src/state/theme.test.ts src/brand/brevePdfThemes.test.ts src/brand/univerTheme.test.ts
+      - run: bun ci
+      - run: bun run check
+      - run: bun run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+      - run: bun ci
+        working-directory: site
+      - run: bun run build
+        working-directory: site
 
   e2e:
     name: Browser E2E (Playwright)
-    runs-on: [self-hosted, linux, X64, rotli]
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.3
-      - run: bun install --frozen-lockfile
+      - run: bun ci
       - run: bun run check:e2e-types
-      # Linux needs the browser AND its apt system libs — `--with-deps` installs
-      # both. (On the old macOS runner the system deps were a no-op.)
       - run: bunx playwright install --with-deps chromium
       - run: bun run test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
 
-  bun-regression:
-    name: App, Breve, and production build
-    runs-on: [self-hosted, linux, X64, rotli]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.3
-      - run: bun install --frozen-lockfile
-      # Everything in test:regression is bun/node — the Rust half of the old
-      # full-regression job moved to `cargo-macos` below.
-      - run: bun run test:regression
-      # `bun run build` is Vite (JS) — Linux-fine. The native Tauri build is in
-      # release.sh, not here.
-      - run: bun run build
-        env:
-          # Vite's large Univer/Excalidraw graph exceeds Node's ~2 GB default
-          # heap while rendering chunks.
-          NODE_OPTIONS: --max-old-space-size=4096
-
   dependency-audit:
     name: Dependency vulnerability audit (advisory)
-    runs-on: [self-hosted, linux, X64, rotli]
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
-      # rustsec/audit-check publishes its report as a check run. The workflow's
-      # top-level read-only token caused the action itself to fail after a valid
-      # scan with "Resource not accessible by integration".
+      # rustsec/audit-check publishes its report as a check run.
       checks: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.3
-      - run: bun install --frozen-lockfile
-      # NON-BLOCKING: the current advisories are all transitive-only and tracked
-      # with dependency paths in docs/development/security.md
-      # under "reported, not fixed". This lane surfaces NEW advisories in the PR
-      # log without failing the merge on upstream churn we don't control. Promote
-      # to blocking once the tree is clean.
+      - run: bun ci
+      # Current transitive advisories are tracked in
+      # docs/development/security.md. Keep both scans visible but advisory
+      # until the dependency trees can be clean without unsafe upgrades.
       - name: bun audit (JS/TS)
         continue-on-error: true
         run: bun audit
-      # rustsec/audit-check installs cargo-audit and reads Cargo.lock for
-      # advisories — it does NOT compile the crate, so it runs fine on Linux (no
-      # cargo toolchain needed). Advisory for now (same rationale); flip
-      # `ignore`/failure policy when the Rust tree is clean.
       - name: cargo audit (Rust)
         continue-on-error: true
-        uses: rustsec/audit-check@v2
+        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: src-tauri
@@ -144,22 +88,15 @@ jobs:
           # include glib. Tracked with its dependency path in security.md.
           ignore: RUSTSEC-2024-0429
 
-  # ── macOS lane (self-hosted Mac: [self-hosted, macOS, ARM64, rotli]) ──
-  # The ONLY OS-locked gate. ~37 macOS-cfg'd Rust gates mean a Linux cargo build
-  # is a different binary, so this must run on a real Mac. Until a Mac runner is
-  # registered it simply QUEUES — harmless and non-blocking: release.sh's gate
-  # treats a missing/pending Regression run as a warn, not a block. Seth can
-  # register a Mac runner later (docs/development/ci-runner.md keeps that
-  # section), OR this goes green on its own once the Rust is cross-platform.
-  cargo-macos:
+  rust-macos:
     name: Rust (clippy + tests)
-    runs-on: [self-hosted, macOS, ARM64, rotli]
+    runs-on: macos-15
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
         with:
           components: clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2.8.2
         with:
           workspaces: src-tauri -> target
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings

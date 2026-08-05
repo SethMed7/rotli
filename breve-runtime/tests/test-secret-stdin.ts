@@ -23,22 +23,24 @@ async function security(...args: string[]): Promise<void> {
 
 let secret: typeof import("../scripts/secret");
 
-beforeAll(async () => {
-  mkdirSync(join(HOME, "Library", "Keychains"), { recursive: true });
-  mkdirSync(join(HOME, ".breve-secrets"), { recursive: true });
-  await Bun.write(join(HOME, ".breve-secrets", "keychain-pw"), UNLOCK_PW);
-  await security("create-keychain", "-p", UNLOCK_PW, KEYCHAIN);
-  // secret.ts resolves its keychain path from HOME at import time
-  process.env.HOME = HOME;
-  secret = await import("../scripts/secret");
-});
+const describeMacos = process.platform === "darwin" ? describe : describe.skip;
 
-afterAll(async () => {
-  await security("delete-keychain", KEYCHAIN).catch(() => {});
-  rmSync(HOME, { recursive: true, force: true });
-});
+describeMacos("breve secret stdin lane", () => {
+  beforeAll(async () => {
+    mkdirSync(join(HOME, "Library", "Keychains"), { recursive: true });
+    mkdirSync(join(HOME, ".breve-secrets"), { recursive: true });
+    await Bun.write(join(HOME, ".breve-secrets", "keychain-pw"), UNLOCK_PW);
+    await security("create-keychain", "-p", UNLOCK_PW, KEYCHAIN);
+    // secret.ts resolves its keychain path from HOME at import time
+    process.env.HOME = HOME;
+    secret = await import("../scripts/secret");
+  });
 
-describe("breve secret stdin lane", () => {
+  afterAll(async () => {
+    await security("delete-keychain", KEYCHAIN).catch(() => {});
+    rmSync(HOME, { recursive: true, force: true });
+  });
+
   test("write → read round-trips a value full of shell-hostile characters", async () => {
     const value = 'se"cret\\va lue-$(echo x)';
     expect(await secret.writeSecret("stdin-test-svc", value)).toBe(true);
@@ -51,7 +53,9 @@ describe("breve secret stdin lane", () => {
     expect(await secret.readSecret("stdin-test-svc")).toBe("");
     await Bun.write(join(HOME, ".breve-secrets", "keychain-pw"), UNLOCK_PW);
   });
+});
 
+describe("breve secret argv contract", () => {
   test("no security call in secret.ts puts the password or value on argv", async () => {
     const source = await Bun.file(new URL("../scripts/secret.ts", import.meta.url)).text();
     // every unlock and add rides securityStdin; `-p`/`add-generic-password`

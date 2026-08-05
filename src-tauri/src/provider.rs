@@ -630,7 +630,7 @@ pub async fn cli_complete(
         // moved in so the temp dir outlives the child that reads it
         let staged = staged;
         let _agy = (provider == "agy").then(|| AGY_GATE.lock().unwrap());
-        let agy_cwd = (provider == "agy").then(|| agy_scratch_dir()).transpose()?;
+        let agy_cwd = (provider == "agy").then(agy_scratch_dir).transpose()?;
         // An agy turn carrying an image runs with permissions skipped, so the OS
         // — not trust — is what contains it: the same seatbelt profile the image
         // lane uses, pinned to the staged image dir. $HOME reads are denied
