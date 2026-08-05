@@ -153,14 +153,12 @@ function makeCliHost(
       return hits
         .filter((h) => h.kind === "note")
         .slice(0, limit)
-        .map(
-          (h): NoteHit => ({
-            id: h.id,
-            title: h.title,
-            snippet: h.snippet ?? "",
-            folder: h.folderId ?? "",
-          }),
-        );
+        .map((h): NoteHit => ({
+          id: h.id,
+          title: h.title,
+          snippet: h.snippet ?? "",
+          folder: h.folderId ?? "",
+        }));
     },
     async readNote(id) {
       const d = (await cliJson(cli, ["notes", "read", id])) as {
