@@ -34,7 +34,7 @@ function stripMarkdown(line: string): string {
     const before = s;
     s = rustTrimStart(s.replace(/^#+/, ""));
     if (s.startsWith(">")) s = rustTrimStart(s.slice(1));
-    for (const marker of ["- ", "* ", "+ ", "[ ] ", "[x] ", "[X] "]) {
+    for (const marker of ["- ", "* ", "+ ", "[ ] ", "[/] ", "[x] ", "[X] "]) {
       if (s.startsWith(marker)) s = s.slice(marker.length);
     }
     if (s === before) break;

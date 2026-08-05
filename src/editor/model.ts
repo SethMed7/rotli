@@ -12,6 +12,7 @@ import { markNoteDraftChanged } from "../services/noteDrafts";
 import { notesService } from "../services/notes";
 import { keepTabsFor } from "../state/panes";
 import type { Note } from "../types";
+import { MARK } from "./taskState";
 
 const SYNC_DEBOUNCE_MS = 400;
 // a failed write retries on its own — waiting for the next keystroke would
@@ -34,7 +35,7 @@ export function setWriteNoteBodyForTests(fn: typeof writeNoteBody | null): void 
 // ——— checkbox signature: the Tasks projection walks the corpus (corpus_tasks),
 // so a body sync invalidates it ONLY when the note's checkbox lines actually
 // changed — steady typing never pays that walk (perf audit 2026-07-30, #4/#5).
-const TASK_LINE = /^\s*(?:[-*+]|\d+\.)\s+\[[ xX]\]/;
+const TASK_LINE = new RegExp(`^\\s*(?:[-*+]|\\d+\\.)\\s+\\[${MARK}\\]`);
 const taskSigs = new Map<string, string>();
 
 function taskSignature(lines: readonly string[]): string {

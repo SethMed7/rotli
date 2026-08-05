@@ -54,6 +54,14 @@ export type HotkeyPeek = "badges" | "panel" | "off";
 
 export const HOTKEY_PEEKS: readonly HotkeyPeek[] = ["badges", "panel", "off"];
 
+/** What a CLICK on a checkbox does (Seth, 2026-08-04, from ZenNotes: "offer
+ * partial complete… click once for in progress and again for complete").
+ * `two` is the classic open⇄done. `three` adds the in-progress stop. Typing
+ * `[/]` yourself always works — this governs the click only. */
+export type TaskCycle = "two" | "three";
+
+export const TASK_CYCLES: readonly TaskCycle[] = ["two", "three"];
+
 /** The per-chat key every chat-scoped map uses: `<instanceId>:<slug>` for a
  * saved chat, or a PANE-scoped session key while the chat is still unsaved
  * (never a shared "" key — that leaked one chat's choice into every future
@@ -425,6 +433,11 @@ interface UiState {
    * grouped shortcut map; `off` disables the peek. Persisted. */
   hotkeyPeek: HotkeyPeek;
   setHotkeyPeek: (v: HotkeyPeek) => void;
+  /** How clicking a checkbox cycles: open⇄done, or through in progress.
+   * Default `two` — the behaviour every existing note was written under.
+   * Persisted. */
+  taskCycle: TaskCycle;
+  setTaskCycle: (v: TaskCycle) => void;
   /** Connected subscription models (Settings → AI Models): which lanes are
    * enabled. A lane must ALSO detect as installed+authed to serve. Persisted. */
   aiProviders: Record<ProviderId, boolean>;
@@ -737,6 +750,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setReadAloud: (on) => set({ readAloud: on }),
   readAloudVoice: DEFAULT_VOICE,
   setReadAloudVoice: (id) => set({ readAloudVoice: id }),
+  taskCycle: "two",
+  setTaskCycle: (v) => set({ taskCycle: v }),
   aiProviders: { claude: false, codex: false, agy: false, gemini: false },
   setAiProvider: (id, on) => set((s) => ({ aiProviders: { ...s.aiProviders, [id]: on } })),
   hybridPresets: [],

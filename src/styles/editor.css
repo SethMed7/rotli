@@ -816,6 +816,18 @@
   font-size: 11px;
   color: var(--check-ink);
 }
+/* — in progress, `[/]` (2026-08-04). Half the box is filled, so "partway" is
+   legible at a glance and from across the room — no glyph to squint at, and it
+   reads the same at every text size because the fill is proportional. The
+   border stays accent-tinted rather than solid: started, not finished. */
+.rotli-check.doing {
+  border-color: var(--accent);
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--accent) 45%, transparent) 50%,
+    transparent 50%
+  );
+}
 .rotli-done {
   color: var(--text-muted);
   text-decoration: line-through;
@@ -1656,4 +1668,29 @@
 .rotli-fold-ph:hover {
   border-color: var(--accent);
   color: var(--accent-text);
+}
+
+/* — parent-task progress (2026-08-04): the "2/4" a parent shows for its
+   subtasks. COMPUTED, never written to the file — so it reads as chrome, not as
+   text you could edit: quiet, small, and set off from the words. */
+.rotli-progress {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.72em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.7;
+  vertical-align: 0.08em;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* every subtask done — the one moment it earns color */
+.rotli-progress.all {
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success);
 }

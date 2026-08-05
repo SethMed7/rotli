@@ -27,6 +27,7 @@ import {
   scanTables,
   tableToText,
 } from "./tables";
+import { MARK } from "./taskState";
 
 /** Fenced code is grammar-free: no list continuation, no task shorthand, no
  * list indent — `[]` or `- item` inside a ``` fence is the user's code. */
@@ -39,12 +40,14 @@ function inFence(view: EditorView, line: Line): boolean {
  * ordered tasks count up AND reset), quotes. Returns the marker for the NEXT
  * line and whether the item is empty. */
 function listPrefixOf(line: string): { prefixLen: number; next: string; empty: boolean } | null {
-  const m = line.match(/^([ \t]*)((?:\d+\. \[[ xX]\] |- \[[ xX]\] |- |\d+\. |> ))(.*)$/);
+  const m = line.match(
+    new RegExp(`^([ \\t]*)((?:\\d+\\. \\[${MARK}\\] |- \\[${MARK}\\] |- |\\d+\\. |> ))(.*)$`),
+  );
   if (!m) return null;
   const indent = m[1] ?? "";
   const prefix = m[2] ?? "";
   const content = m[3] ?? "";
-  const num = prefix.match(/^(\d+)\. (\[[ xX]\] )?$/);
+  const num = prefix.match(new RegExp(`^(\\d+)\\. (\\[${MARK}\\] )?$`));
   const marker = num ? `${Number(num[1]) + 1}. ${num[2] ? "[ ] " : ""}` : prefix.replace(/\[[xX]\]/, "[ ]");
   return {
     prefixLen: indent.length + prefix.length,
@@ -57,7 +60,7 @@ function listPrefixOf(line: string): { prefixLen: number; next: string; empty: b
  * (2 → 3 → …) so the list never shows duplicate numbers. Deeper-indented items
  * ride along untouched; anything else (blank, bullet, prose) ends the list. */
 function renumberAfter(state: EditorState, line: Line, nextMarker: string) {
-  const marker = /^( *)(\d+)\. (?:\[[ xX]\] )?$/.exec(nextMarker);
+  const marker = new RegExp(`^( *)(\\d+)\\. (?:\\[${MARK}\\] )?$`).exec(nextMarker);
   if (!marker) return [];
   const indent = marker[1]?.length ?? 0;
   let num = Number(marker[2]);

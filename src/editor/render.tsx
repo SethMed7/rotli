@@ -7,6 +7,7 @@
 import type { MouseEvent, ReactNode } from "react";
 
 import { openUrl } from "../lib/tauri";
+import { ORDERED_TASK_RE, TASK_RE, type TaskState, taskStateOf } from "./taskState";
 
 export type HeadingKind = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 
@@ -18,7 +19,10 @@ export interface Block {
    * leading indent for a nested list). */
   prefixLen: number;
   text: string;
-  done?: boolean;
+  /** A task's checkbox state — open, doing (`[/]`), or done. Undefined for
+   * every other kind. It replaced a plain boolean on 2026-08-04: a boolean had
+   * nowhere to put "in progress", and made a typed `[/]` render as CHECKED. */
+  state?: TaskState;
   /** The `1.` glyph of a numbered item — also set on an ORDERED task
    * (`1. [ ] x`), which parses as kind "task" with a marker. */
   marker?: string;
@@ -26,8 +30,6 @@ export interface Block {
   indent?: number;
 }
 
-const TASK_RE = /^- \[([ xX])\] /;
-const ORDERED_TASK_RE = /^(\d+)\. \[([ xX])\] /;
 const NUMBERED_RE = /^(\d+)\. /;
 // H1–H6 (widened 2026-08-04 for heading folding). `#### x` used to fall through
 // as a plain paragraph — standard Markdown says it's a heading, and folding
@@ -55,7 +57,7 @@ export function parseBlock(line: string): Block {
       kind: "task",
       prefixLen: indentChars.length + t[0].length,
       text: body.slice(t[0].length),
-      done: t[1] !== " ",
+      state: taskStateOf(t[1] ?? " "),
       indent,
     };
   if (body.startsWith("- "))
@@ -68,7 +70,7 @@ export function parseBlock(line: string): Block {
       kind: "task",
       prefixLen: indentChars.length + ot[0].length,
       text: body.slice(ot[0].length),
-      done: ot[2] !== " ",
+      state: taskStateOf(ot[2] ?? " "),
       marker: `${ot[1]}.`,
       indent,
     };

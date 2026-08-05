@@ -57,8 +57,8 @@ export function TasksSurface() {
           <Character name="celebrating" size={104} className="be-quokka" />
           <p className="be-title">Nothing open</p>
           <p className="be-sub">
-            Any <code>- [ ]</code> checkbox you write in a note shows up here. Check it off from either side —
-            the note is the only truth.
+            Any <code>- [ ]</code> checkbox you write in a note shows up here — including the ones you marked{" "}
+            <code>- [/]</code> as in progress. Check it off from either side; the note is the only truth.
           </p>
         </div>
       ) : (

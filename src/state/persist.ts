@@ -57,6 +57,8 @@ import {
   clampSidebarZoom,
   HOTKEY_PEEKS,
   type HotkeyPeek,
+  TASK_CYCLES,
+  type TaskCycle,
   ORGANIZER_MODELS,
   ORGANIZER_TRUSTS,
   type OrganizerModel,
@@ -216,6 +218,9 @@ interface PersistedSettings {
   /** Read replies aloud + the chosen voice (voice tier 0 — no mic, no entitlement). */
   readAloud: boolean;
   readAloudVoice: string;
+  /** How a checkbox click cycles: `two` = open⇄done (default), `three` adds
+   * the `[/]` in-progress stop. */
+  taskCycle: TaskCycle;
   /** Connected subscription lanes (Settings → AI Models); all off by default —
    * a chat never leaves the Mac without the user flipping a lane on. */
   aiProviders: Record<ProviderId, boolean>;
@@ -423,6 +428,9 @@ export function parseSettings(raw: string): PersistedSettings {
     readAloudVoice: VOICES.some((v) => v.id === data.readAloudVoice)
       ? (data.readAloudVoice as string)
       : DEFAULT_VOICE,
+    // an unknown value keeps the classic two-state click: a garbled file must
+    // never silently change what a click does to someone's tasks
+    taskCycle: TASK_CYCLES.includes(data.taskCycle as TaskCycle) ? (data.taskCycle as TaskCycle) : "two",
     // booleans only, unknown lanes ignored — the safe default is every lane OFF
     aiProviders: (() => {
       const src = record(data.aiProviders);
@@ -545,6 +553,7 @@ function applySettings(s: PersistedSettings): void {
     hotkeyPeek: s.hotkeyPeek,
     readAloud: s.readAloud,
     readAloudVoice: s.readAloudVoice,
+    taskCycle: s.taskCycle,
     aiProviders: s.aiProviders,
     hybridPresets: s.hybridPresets,
     blockedModels: s.blockedModels,
@@ -926,6 +935,7 @@ function settingsSnapshot(): string {
     hotkeyPeek: ui.hotkeyPeek,
     readAloud: ui.readAloud,
     readAloudVoice: ui.readAloudVoice,
+    taskCycle: ui.taskCycle,
     aiProviders: ui.aiProviders,
     hybridPresets: ui.hybridPresets,
     blockedModels: ui.blockedModels,

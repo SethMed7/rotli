@@ -29,11 +29,14 @@ import { type DragGhost, createImageDragGhost } from "../lib/dragGhost";
 import { openUrl, resolveImageSrc, rootIdOf } from "../lib/tauri";
 import { locateLostImage } from "../services/imageRepair";
 import { usePanesStore } from "../state/panes";
+import { useUiStore } from "../state/ui";
 import { scanFences } from "./fences";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
 import { CHECK_EM, listStyle, MARKER_EM } from "./listGeometry";
 import { parseBlock } from "./render";
 import { lineInTable, scanTables } from "./tables";
+import { markOf, nextTaskState, type TaskState, TASK_LINE_RE, taskStateOf } from "./taskState";
+import { type TaskNode, type TaskProgress, taskProgress } from "./taskTree";
 import { editorLinkOpensOnClick, WIKILINK_RE } from "./wikilink";
 import { resolveWikilinkTarget } from "./wikilinkIndex";
 
@@ -195,6 +198,30 @@ class BulletWidget extends WidgetType {
   }
 }
 
+/** A parent task's subtask progress, e.g. "2/4" (2026-08-04). COMPUTED and
+ * appended at the line's end — it is never written into the markdown, exactly
+ * like the checkbox glyph is a rendering of `- [ ]` rather than a replacement
+ * for it. */
+class ProgressWidget extends WidgetType {
+  constructor(
+    readonly done: number,
+    readonly total: number,
+  ) {
+    super();
+  }
+  eq(o: ProgressWidget) {
+    return o.done === this.done && o.total === this.total;
+  }
+  toDOM() {
+    const s = document.createElement("span");
+    s.className = this.done === this.total ? "rotli-progress all" : "rotli-progress";
+    s.textContent = `${this.done}/${this.total}`;
+    // spoken, not decorative — a screen reader should hear the progress
+    s.setAttribute("aria-label", `${this.done} of ${this.total} subtasks done`);
+    return s;
+  }
+}
+
 class NumberWidget extends WidgetType {
   constructor(readonly marker: string) {
     super();
@@ -211,34 +238,47 @@ class NumberWidget extends WidgetType {
   }
 }
 
+/** What each state says out loud, and what a click will do next. Three states
+ * mean "Mark done" is no longer a complete description of the click. */
+const CHECK_LABEL: Record<TaskState, string> = {
+  open: "Not started",
+  doing: "In progress",
+  done: "Done",
+};
+
 class CheckboxWidget extends WidgetType {
   /** `marker` carries the `1.` glyph of an ORDERED task ("1. [ ] x") — rendered
    * before the box so the step number survives; null for a plain `- [ ]`. */
   constructor(
-    readonly done: boolean,
+    readonly state: TaskState,
     readonly marker: string | null = null,
   ) {
     super();
   }
   eq(o: CheckboxWidget) {
-    return o.done === this.done && o.marker === this.marker;
+    return o.state === this.state && o.marker === this.marker;
   }
   toDOM(view: EditorView) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = this.done ? "rotli-check done" : "rotli-check";
+    btn.className = this.state === "open" ? "rotli-check" : `rotli-check ${this.state}`;
     btn.setAttribute("role", "checkbox");
-    btn.setAttribute("aria-checked", String(this.done));
-    btn.setAttribute("aria-label", this.done ? "Mark not done" : "Mark done");
+    // "mixed" is ARIA's own word for a partly-checked box — `[/]` is exactly
+    // that, so assistive tech reads it without rotli inventing a vocabulary
+    btn.setAttribute("aria-checked", this.state === "doing" ? "mixed" : String(this.state === "done"));
+    btn.setAttribute("aria-label", CHECK_LABEL[this.state]);
     // toggle on mousedown without moving the caret — resolve the line at click
     // time via posAtDOM so renumbered/edited lines still hit the right one
     btn.addEventListener("mousedown", (e) => {
       e.preventDefault();
       const pos = view.posAtDOM(btn);
       const line = view.state.doc.lineAt(pos);
-      const m = /^(\s*(?:-|\d+\.) )\[([ xX])\] /.exec(line.text);
+      const m = TASK_LINE_RE.exec(line.text);
       if (!m) return;
-      const next = m[2] === " " ? `${m[1]}[x] ` : `${m[1]}[ ] `;
+      // the setting is read HERE, at click time, so changing it takes effect
+      // in every open editor at once — no remount, no stale extension
+      const threeState = useUiStore.getState().taskCycle === "three";
+      const next = `${m[1]}[${markOf(nextTaskState(taskStateOf(m[2] ?? " "), threeState))}] `;
       view.dispatch({ changes: { from: line.from, to: line.from + m[0].length, insert: next } });
     });
     if (!this.marker) return btn;
@@ -616,11 +656,38 @@ function revealablePrefix(
   }
 }
 
+/** Subtask progress for every parent task, keyed by 1-based line number.
+ *
+ * Scans the WHOLE document, not just the visible ranges: a parent on screen can
+ * easily have its children scrolled below the fold, and a count that changed
+ * with the scroll position would be a lie. Same full-document cost model as
+ * scanFences / scanTables, which already run per build. */
+function scanTaskProgress(doc: EditorView["state"]["doc"]): Map<number, TaskProgress> {
+  const nodes: TaskNode[] = [];
+  let fenced = false;
+  for (let n = 1; n <= doc.lines; n++) {
+    const text = doc.line(n).text;
+    if (text.trimStart().startsWith("```")) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) continue; // a checkbox inside a fence is code
+    const block = parseBlock(text);
+    if (block.kind === "task") {
+      // `[/]` counts as NOT done — a parent's "2/4" must mean four finished
+      // things, not four started ones
+      nodes.push({ line: n, indent: block.indent ?? 0, done: block.state === "done" });
+    }
+  }
+  return taskProgress(nodes);
+}
+
 function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decoration> } {
   const decos: Range<Decoration>[] = [];
   const atomics: Range<Decoration>[] = [];
   const sel = view.state.selection.main;
   const doc = view.state.doc;
+  const progress = scanTaskProgress(doc);
   // blockRender owns the rendered fenced languages; livePreview must leave
   // every fenced line alone (raw code voice, never markdown-styled, and never a
   // decoration that collides with the block widget on the same range). Since
@@ -710,15 +777,32 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
         case "task":
           decos.push(
             Decoration.line({
-              class: block.done ? "rotli-task done" : "rotli-task",
+              class: block.state === "done" ? "rotli-task done" : "rotli-task",
               // a checkbox hangs in a wider column than a glyph; an ordered
               // task ("1. [ ]") hangs by its number PLUS the checkbox
               attributes: { style: listStyle(depth, block.marker ? MARKER_EM + CHECK_EM : CHECK_EM) },
             }).range(ls),
           );
-          hidePrefix(ls, prefixEnd, new CheckboxWidget(!!block.done, block.marker ?? null), decos, atomics);
-          if (block.done && line.to > prefixEnd) {
+          hidePrefix(
+            ls,
+            prefixEnd,
+            new CheckboxWidget(block.state ?? "open", block.marker ?? null),
+            decos,
+            atomics,
+          );
+          // only DONE strikes through: an in-progress task is still live work
+          if (block.state === "done" && line.to > prefixEnd) {
             decos.push(Decoration.mark({ class: "rotli-done" }).range(prefixEnd, line.to));
+          }
+          {
+            // the parent's subtask count, appended AFTER the text (side: 1) so
+            // it never shifts a character of the line the user typed
+            const p = progress.get(line.number);
+            if (p) {
+              decos.push(
+                Decoration.widget({ widget: new ProgressWidget(p.done, p.total), side: 1 }).range(line.to),
+              );
+            }
           }
           if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);

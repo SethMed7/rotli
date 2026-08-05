@@ -1330,7 +1330,9 @@ fn markdown_metrics(body: &str) -> MarkdownMetrics {
             .or_else(|| trimmed.strip_prefix("+ "));
         if let Some(task) = task {
             let lower = task.to_ascii_lowercase();
-            if lower.starts_with("[ ] ") {
+            // `[/]` is in progress — started, but counted with the open ones:
+            // the number is what's LEFT to do (2026-08-04)
+            if lower.starts_with("[ ] ") || lower.starts_with("[/] ") {
                 tasks += 1;
                 open_tasks += 1;
             } else if lower.starts_with("[x] ") {

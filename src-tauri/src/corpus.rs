@@ -1489,7 +1489,7 @@ fn strip_markdown(line: &str) -> String {
         if let Some(rest) = s.strip_prefix('>') {
             s = rest.trim_start();
         }
-        for marker in ["- ", "* ", "+ ", "[ ] ", "[x] ", "[X] "] {
+        for marker in ["- ", "* ", "+ ", "[ ] ", "[/] ", "[x] ", "[X] "] {
             if let Some(rest) = s.strip_prefix(marker) {
                 s = rest;
             }
@@ -1695,17 +1695,47 @@ fn is_archive_folder(folder: &str) -> bool {
     folder == "Archive" || folder.starts_with("Archive/")
 }
 
-/// An open `- [ ]` / `* [ ]` / `1. [ ]` checkbox line's own text (None for
-/// anything else, including checked boxes and empty checkboxes — nothing to
-/// show or toggle). Ordered tasks are GFM's numbered task items, rendered by
-/// the editor since 2026-08.
+/// The UNFINISHED checkbox marks. `[/]` is in progress (2026-08-04) — started
+/// is not finished, so it still belongs on the Tasks surface. Mirrors the
+/// editor's grammar in src/editor/taskState.ts.
+fn strip_open_box(rest: &str) -> Option<&str> {
+    rest.strip_prefix("[ ]").or_else(|| rest.strip_prefix("[/]"))
+}
+
+/// An open `- [ ]` / `* [ ]` / `1. [ ]` checkbox line's own text — or the `[/]`
+/// in-progress form of any of them (None for anything else, including checked
+/// boxes and empty checkboxes: nothing to show or toggle). Ordered tasks are
+/// GFM's numbered task items, rendered by the editor since 2026-08.
 fn open_task_text(trimmed: &str) -> Option<&str> {
     let rest = trimmed
-        .strip_prefix("- [ ]")
-        .or_else(|| trimmed.strip_prefix("* [ ]"))
-        .or_else(|| strip_ordered_prefix(trimmed)?.strip_prefix(" [ ]").map(str::trim_start))?;
+        .strip_prefix("- ")
+        .and_then(strip_open_box)
+        .or_else(|| trimmed.strip_prefix("* ").and_then(strip_open_box))
+        .or_else(|| {
+            strip_open_box(strip_ordered_prefix(trimmed)?.strip_prefix(' ')?).map(str::trim_start)
+        })?;
     let rest = rest.trim();
     (!rest.is_empty()).then_some(rest)
+}
+
+/// Rewrite an open task's checkbox to `[x]`, leaving its words alone.
+///
+/// It targets the box by POSITION — the three chars right after the list
+/// marker — not by searching for "[ ]" in the line. A task whose own text
+/// mentions a bracket pair ("- [/] fix the [ ] case") would otherwise have the
+/// wrong one flipped. None when the line isn't an open task.
+fn check_off(line: &str) -> Option<String> {
+    let trimmed = line.trim_start();
+    let lead = line.len() - trimmed.len();
+    let after_marker = if let Some(rest) = trimmed.strip_prefix("- ").or_else(|| trimmed.strip_prefix("* ")) {
+        trimmed.len() - rest.len()
+    } else {
+        let rest = strip_ordered_prefix(trimmed)?.strip_prefix(' ')?;
+        trimmed.len() - rest.len()
+    };
+    let at = lead + after_marker;
+    strip_open_box(line.get(at..)?)?;
+    Some(format!("{}[x]{}", &line[..at], &line[at + 3..]))
 }
 
 /// Strip a `1.` ordered-list marker (digits + dot), returning the rest — which
@@ -4036,7 +4066,7 @@ impl CorpusStore {
         Ok(out)
     }
 
-    /// Check ONE open task off (`[ ]` → `[x]`) — a real user edit through the
+    /// Check ONE open task off (`[ ]` or `[/]` → `[x]`) — a real user edit through the
     /// ordinary note write path (updated bump, rename aliases, gitignore-follow
     /// all ride along). Re-validates the exact line first: a note edited since
     /// the list was built refuses instead of flipping the wrong line. `line`
@@ -4058,7 +4088,7 @@ impl CorpusStore {
             return Err(stale());
         }
         let mut new_lines: Vec<String> = lines.iter().map(|s| (*s).to_string()).collect();
-        new_lines[line] = current.replacen("[ ]", "[x]", 1);
+        new_lines[line] = check_off(current).ok_or_else(stale)?;
         let mut new_body = new_lines.join("\n");
         if body.ends_with('\n') {
             new_body.push('\n');
@@ -7809,6 +7839,8 @@ mod tests {
         assert_eq!(slugify("###"), "untitled");
         assert_eq!(title_of("\n\n## **Bold** _title_\nrest"), "Bold title");
         assert_eq!(title_of("- [x] ship it\n"), "ship it");
+        // an in-progress task titles by its words too, not "[/] draft…"
+        assert_eq!(title_of("- [/] draft the memo\n"), "draft the memo");
         assert_eq!(
             title_of("Preface\n## Section\n# Canonical title\nBody"),
             "Canonical title"
@@ -9182,6 +9214,46 @@ mod tests {
         assert!(ro.tasks().is_ok());
         let remaining = ro.tasks().unwrap();
         assert!(ro.toggle_task(&note.id, remaining[0].line, "second style").is_err());
+    }
+
+    /// `[/]` — in progress (2026-08-04, from ZenNotes). Started is not
+    /// finished: an in-progress task still belongs on the Tasks surface, and
+    /// checking it off there takes it straight to done.
+    #[test]
+    fn in_progress_tasks_still_project_and_check_off() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        store.os_trash = false;
+        let note = store
+            .create(
+                "Inbox",
+                "# Plan\n\n- [/] drafting the memo\n* [/] second style\n2. [/] ordered, underway\n- [x] done\n",
+            )
+            .unwrap();
+
+        let tasks = store.tasks().unwrap();
+        let texts: Vec<&str> = tasks.iter().map(|t| t.text.as_str()).collect();
+        assert_eq!(texts, vec!["drafting the memo", "second style", "ordered, underway"], "{tasks:?}");
+
+        store.toggle_task(&note.id, tasks[0].line, "drafting the memo").unwrap();
+        let body = store.read(&note.id).unwrap().body;
+        assert!(body.contains("- [x] drafting the memo"), "{body}");
+        assert!(body.contains("* [/] second style"), "others untouched: {body}");
+        assert_eq!(store.tasks().unwrap().len(), 2);
+    }
+
+    /// The box is found by POSITION, not by searching the line for "[ ]" —
+    /// otherwise a task that TALKS about a checkbox gets the wrong one flipped.
+    #[test]
+    fn check_off_targets_the_box_and_never_the_words() {
+        assert_eq!(check_off("- [/] fix the [ ] case").unwrap(), "- [x] fix the [ ] case");
+        assert_eq!(check_off("  - [ ] nested").unwrap(), "  - [x] nested");
+        assert_eq!(check_off("12. [ ] step twelve").unwrap(), "12. [x] step twelve");
+        assert_eq!(check_off("* [/] star").unwrap(), "* [x] star");
+        // already done, or not a task at all
+        assert!(check_off("- [x] done").is_none());
+        assert!(check_off("- plain bullet").is_none());
+        assert!(check_off("just a line").is_none());
     }
 
     /// The legacy corpus layout gets the same repair with its own lane names

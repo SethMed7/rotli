@@ -41,14 +41,14 @@ describe("parseBlock — ordered tasks", () => {
   test("an open ordered task is a task with its number as marker", () => {
     const b = parseBlock("1. [ ] Generate the new key");
     expect(b.kind).toBe("task");
-    expect(b.done).toBe(false);
+    expect(b.state).toBe("open");
     expect(b.marker).toBe("1.");
     expect(b.prefixLen).toBe("1. [ ] ".length);
     expect(b.text).toBe("Generate the new key");
   });
 
   test("a checked ordered task is done; multi-digit numbers keep their glyph", () => {
-    expect(parseBlock("2. [x] restart the API").done).toBe(true);
+    expect(parseBlock("2. [x] restart the API").state).toBe("done");
     expect(parseBlock("12. [X] later step").marker).toBe("12.");
   });
 
@@ -70,5 +70,25 @@ describe("parseBlock — ordered tasks", () => {
   test("a malformed box stays a numbered item, literal", () => {
     expect(parseBlock("1. [] not gfm").kind).toBe("numbered");
     expect(parseBlock("1.[ ] no space").kind).toBe("para");
+  });
+});
+
+// `[/]` — in progress (2026-08-04, from ZenNotes). Until this landed, a typed
+// `[/]` parsed as DONE, because the state was a boolean and anything that
+// wasn't a space counted as checked.
+describe("parseBlock — in progress", () => {
+  test("`- [/]` is doing, not done", () => {
+    const b = parseBlock("- [/] halfway there");
+    expect(b.kind).toBe("task");
+    expect(b.state).toBe("doing");
+    expect(b.text).toBe("halfway there");
+  });
+
+  test("an ordered task can be in progress too", () => {
+    expect(parseBlock("4. [/] drafting").state).toBe("doing");
+  });
+
+  test("a nested one keeps its depth", () => {
+    expect(parseBlock("  - [/] sub").indent).toBe(2);
   });
 });

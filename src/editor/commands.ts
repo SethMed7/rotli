@@ -4,6 +4,7 @@
 // highlight = ==…== (always peach); bold/italic/strike native syntax.
 
 import { usePanesStore } from "../state/panes";
+import { MARK } from "./taskState";
 
 export type InlineMark = "bold" | "italic" | "underline" | "strike" | "code" | "highlight" | "link";
 export type BlockToggle = "quote" | "bullet" | "numbered" | "checklist";
@@ -147,13 +148,13 @@ export function applyHeading(line: string, level: HeadingLevel): PrefixEdit {
 
 // ——— block prefixes ———
 
-const ANY_BLOCK_PREFIX = /^(\d+\. \[[ xX]\] |- \[[ xX]\] |- |\d+\. |> )/;
+const ANY_BLOCK_PREFIX = new RegExp(`^(\\d+\\. \\[${MARK}\\] |- \\[${MARK}\\] |- |\\d+\\. |> )`);
 
 const BLOCK_RULES: Record<BlockToggle, { add: string; test: RegExp }> = {
   quote: { add: "> ", test: /^> / },
-  bullet: { add: "- ", test: /^- (?!\[[ xX]\] )/ },
-  numbered: { add: "1. ", test: /^\d+\. (?!\[[ xX]\] )/ },
-  checklist: { add: "- [ ] ", test: /^- \[[ xX]\] / },
+  bullet: { add: "- ", test: new RegExp(`^- (?!\\[${MARK}\\] )`) },
+  numbered: { add: "1. ", test: new RegExp(`^\\d+\\. (?!\\[${MARK}\\] )`) },
+  checklist: { add: "- [ ] ", test: new RegExp(`^- \\[${MARK}\\] `) },
 };
 
 export function blockToggleActive(line: string, kind: BlockToggle): boolean {

@@ -3,6 +3,9 @@
 // (**, *, ==, ~~, `, <u>, links→their text) and per-line block prefixes (#, -,
 // 1., >, - [ ]) so a copy reads like what you SEE — no stray ** around a bold
 // word. Raw mode copies the source verbatim instead.
+
+import { MARK } from "./taskState";
+
 export function stripMarkdown(text: string): string {
   const inline = (s: string): string => {
     let prev: string;
@@ -25,7 +28,7 @@ export function stripMarkdown(text: string): string {
       inline(
         line
           .replace(/^(\s*)#{1,3}\s+/, "$1")
-          .replace(/^(\s*)- \[[ xX]\]\s+/, "$1")
+          .replace(new RegExp(`^(\\s*)- \\[${MARK}\\]\\s+`), "$1")
           .replace(/^(\s*)[-*+]\s+/, "$1")
           .replace(/^(\s*)\d+\.\s+/, "$1")
           .replace(/^(\s*)>\s+/, "$1"),

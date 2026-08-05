@@ -27,6 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recognized three, so a fourth-level heading rendered as a plain paragraph.
   All six are recognized and styled (deeper levels read as quiet emphasis rather
   than shrinking away).
+- **A parent task shows how far its subtasks have got.** Indent checkboxes under
+  another one and the parent picks up a quiet `2/4` — turning green when they're
+  all done. It counts only the boxes directly beneath it, so the number always
+  matches what you can see, and **it is never written into your file**: your
+  markdown stays exactly what you typed.
+- **A task can be in progress, not just done or not.** Write `- [/]` and rotli
+  draws the box half-filled — started work stops looking identical to work you
+  haven't touched. It still shows on the Tasks surface, because started isn't
+  finished. In Settings → General → Checkboxes you can make a *click* walk
+  through it too: once for in progress, again for done. Typing `[/]` yourself
+  works either way.
 
 ## [0.75.0] - 2026-08-04
 

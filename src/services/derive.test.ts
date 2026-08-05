@@ -21,6 +21,10 @@ describe("titleOf — first non-empty line, markdown stripped (mirrors Rust titl
 
   test("keeps a plain first line untouched", () => {
     expect(titleOf("Plain line\nmore")).toBe("Plain line");
+    // checkbox marks peel like every other block prefix — including `[/]`,
+    // in progress (2026-08-04). Mirrors the Rust title_of vector.
+    expect(titleOf("- [x] ship it\n")).toBe("ship it");
+    expect(titleOf("- [/] draft the memo\n")).toBe("draft the memo");
   });
 
   test("falls back to Untitled only when NOTHING is non-empty", () => {

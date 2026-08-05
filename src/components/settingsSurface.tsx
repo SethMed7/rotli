@@ -512,6 +512,8 @@ function GeneralPane() {
   const userName = useUiStore((s) => s.userName);
   const setUserName = useUiStore((s) => s.setUserName);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
+  const taskCycle = useUiStore((st) => st.taskCycle);
+  const setTaskCycle = useUiStore((st) => st.setTaskCycle);
   const [confirmReset, setConfirmReset] = useState(false);
   const [demo, setDemo] = useState(false);
   useEffect(() => {
@@ -646,6 +648,24 @@ function GeneralPane() {
           onChange={() => setFileMetadata(fileMetadata === "show" ? "hide" : "show")}
         />
       </div>
+
+      <h4 className="sethead">Checkboxes</h4>
+      <p className="lead">
+        A task can be in progress, not just done or not — write <code>- [/]</code> and rotli draws the box
+        half-filled. Choose what a <em>click</em> on the box does.
+      </p>
+      <Seg
+        value={taskCycle}
+        options={[
+          ["two", "Not started ⇄ done"],
+          ["three", "Click once for in progress, again for done"],
+        ]}
+        onPick={setTaskCycle}
+      />
+      <p className="setnote">
+        Either way, typing <code>[/]</code> yourself always works, and a parent task counts only the finished
+        ones in its <code>2/4</code>.
+      </p>
 
       <UpdatesSection />
 
