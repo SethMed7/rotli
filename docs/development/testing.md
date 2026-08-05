@@ -205,9 +205,9 @@ and notarizes locally.
 - **Browser E2E (`ubuntu-24.04`):** `bun run check:e2e-types` plus the Playwright
   Chromium suite against `vite dev`'s seeded demo corpus.
 - **Dependency audit (`ubuntu-24.04`, advisory):** `bun audit` plus RustSec.
-  Findings remain visible while the documented transitive-only debt is accepted;
-  the Rust action alone receives the narrow `checks: write` permission needed to
-  publish its report.
+  Findings remain visible in the job log while the documented transitive-only
+  debt is accepted. Installing the pinned scanner is blocking; only its findings
+  are advisory.
 - **Native Rust (`macos-15`):** `cargo clippy --all-targets -- -D warnings` and
   `cargo test` against the shipped macOS branches.
 

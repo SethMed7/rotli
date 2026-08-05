@@ -226,13 +226,19 @@ fixed at 1.0.103. **glib 0.18.5** (`RUSTSEC-2024-0429`) exists only in Tauri
 is absent from the shipped macOS graph and has no compatible patched GTK3
 release. The audit ignores that exact ID while retaining the dependency path
 here; Tauri's eventual Linux GTK4 move is the removal path. RustSec also reports
-16 unmaintained warnings in that Linux GTK3/UNIC graph.
+17 unmaintained warnings: ten GTK3 crates plus `proc-macro-error` through the
+Linux-only `tauri → gtk/glib` graph; five UNIC crates through
+`tauri-utils → urlpattern`; and `ttf-parser 0.25.1` (`RUSTSEC-2026-0192`)
+through the shipped `pdf-extract → lopdf` parser boundary described above.
+These are maintenance notices rather than reported vulnerabilities. The GTK3
+items leave with Tauri's Linux GTK4 move; the other paths stay under compatible
+lockfile review and the PDF parser's existing size and failure controls.
 
 The `dependency-audit` CI job is deliberately advisory. `continue-on-error` is
-set on both scanners, while `checks: write` lets RustSec publish its check report;
-the missing permission—not an audit finding—was what made regression runs fail
-through 0.33.3. Promote the lane to blocking after upstream updates clear the
-tracked tree.
+set only on the two scans; installing the pinned `cargo-audit` binary remains a
+blocking prerequisite. Results stay in the ordinary job log, so the workflow
+token remains read-only and no separate check-report permission is needed.
+Promote the scans to blocking after upstream updates clear the tracked tree.
 
 ## Quarterly AI security review
 

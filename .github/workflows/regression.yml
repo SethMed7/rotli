@@ -52,7 +52,7 @@ jobs:
       - run: bun run check:e2e-types
       - run: bunx playwright install --with-deps chromium
       - run: bun run test:e2e
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
@@ -62,10 +62,6 @@ jobs:
   dependency-audit:
     name: Dependency vulnerability audit (advisory)
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      # rustsec/audit-check publishes its report as a check run.
-      checks: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -78,15 +74,14 @@ jobs:
       - name: bun audit (JS/TS)
         continue-on-error: true
         run: bun audit
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked --version 0.22.2
       - name: cargo audit (Rust)
         continue-on-error: true
-        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: src-tauri
-          # Linux-only GTK3 in Tauri 2.11; the shipped macOS graph does not
-          # include glib. Tracked with its dependency path in security.md.
-          ignore: RUSTSEC-2024-0429
+        working-directory: src-tauri
+        # Linux-only GTK3 in Tauri 2.11; the shipped macOS graph does not
+        # include glib. Tracked with its dependency path in security.md.
+        run: cargo audit --ignore RUSTSEC-2024-0429
 
   rust-macos:
     name: Rust (clippy + tests)

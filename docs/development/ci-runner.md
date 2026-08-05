@@ -33,8 +33,8 @@ updater signing credentials.
 - Pin every third-party action to a full reviewed commit SHA and retain its
   release tag in a comment.
 - Install JavaScript dependencies from committed lockfiles with `bun ci`.
-- Keep the workflow token read-only by default. Grant `checks: write` only to
-  the RustSec job that publishes a check result.
+- Keep the workflow token read-only. Audit results belong in the job log and do
+  not need permission to create a separate check run.
 - Keep `concurrency.cancel-in-progress` enabled so a superseded branch commit
   does not consume runner time or present stale evidence.
 - Never add signing, notary, updater, Keychain, memex, or production secrets to
