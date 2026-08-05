@@ -37,6 +37,7 @@ import {
 } from "./commands";
 import { fmBlock } from "./fmBlock";
 import { focusDim } from "./focusMode";
+import { headingFolding, toggleHeadingFold } from "./headingFold";
 import { ImageGenPopover } from "./imageGenPopover";
 import { linkOpener, livePreview, noteIdFacet } from "./livePreview";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
@@ -274,6 +275,13 @@ function CmEditorImpl({
   // the format-command seam — operate on the live view's selection/line, reusing
   // the same pure transforms the old editor used (commands.ts)
   const handleRef = useRef<EditorHandle>({
+    toggleFold: () => {
+      const view = viewRef.current;
+      if (view) {
+        toggleHeadingFold(view);
+        view.focus();
+      }
+    },
     toggleMark: (mark) => {
       const view = viewRef.current;
       if (!view) return;
@@ -509,6 +517,10 @@ function CmEditorImpl({
         // URL. Both read source text in raw and beautified modes, so this sits
         // outside the view-mode compartment.
         linkOpener,
+        // heading folding (2026-08-04): sits OUTSIDE the view-mode compartment
+        // so an outline survives toggling raw ⇄ beautified — the fold is a
+        // property of the document you're reading, not of one rendering of it.
+        headingFolding(),
         // per-note widget context: image srcs resolve against THIS note's
         // corpus root; table widgets key persisted column widths by the id
         noteIdFacet.of(noteId),

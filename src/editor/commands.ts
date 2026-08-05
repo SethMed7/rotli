@@ -13,6 +13,9 @@ export interface EditorHandle {
   toggleMark(mark: InlineMark): void;
   setHeading(level: HeadingLevel): void;
   toggleBlock(kind: BlockToggle): void;
+  /** Fold/unfold the section the caret sits in (2026-08-04). Optional so a
+   * surface without folding (the Quick Note window) simply doesn't offer it. */
+  toggleFold?(): void;
 }
 
 // Every mounted editor surface registers its handle under its pane id; the

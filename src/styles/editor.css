@@ -750,6 +750,22 @@
   line-height: 1.45;
   padding: 6px 0 2px;
 }
+/* H4–H6 (2026-08-04): the scale bottoms out at the body size, so deeper levels
+   read as emphasis rather than shrinking into illegibility. */
+.rotli-cm-host .cm-line.rotli-h4,
+.rotli-cm-host .cm-line.rotli-h5,
+.rotli-cm-host .cm-line.rotli-h6 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.06em;
+  line-height: 1.45;
+  padding: 5px 0 2px;
+}
+.rotli-cm-host .cm-line.rotli-h5,
+.rotli-cm-host .cm-line.rotli-h6 {
+  font-size: 1em;
+  color: var(--text-muted);
+}
 .rotli-cm-host .cm-line.rotli-quote {
   border-left: 3px solid var(--quote-bar);
   padding-left: 14px;
@@ -1618,4 +1634,26 @@
   height: 0;
   border-top: 1.5px solid var(--border);
   vertical-align: middle;
+}
+
+/* — heading folding (2026-08-04): the marker left behind by a folded section.
+   Quiet by default, accent on hover — it is a control, and the ONLY way back
+   to the hidden text besides the chord, so it must never read as decoration. */
+.rotli-fold-ph {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.72em;
+  line-height: 1.6;
+  vertical-align: 0.1em;
+  cursor: pointer;
+}
+.rotli-fold-ph:hover {
+  border-color: var(--accent);
+  color: var(--accent-text);
 }

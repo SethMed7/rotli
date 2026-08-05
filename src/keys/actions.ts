@@ -575,6 +575,18 @@ export function registerDefaultActions(): void {
     });
   }
 
+  // Fold the section the caret is in (2026-08-04). ⌥⌘F is Focus mode, so
+  // folding takes ⌥⌘K; rebindable like everything else.
+  registerAction({
+    id: "editor.foldHeading",
+    title: "Fold or unfold this section",
+    defaultChord: "Meta+Alt+K",
+    shared: true,
+    run: () => {
+      if (notesWorkspaceActive()) activeEditor()?.toggleFold?.();
+    },
+  });
+
   // — the FRONTS (Seth's IA, 2026-08-01): ⌃1 Home, ⌃2 Chat. The sidebar's
   //   switcher and these chords are the same gesture, so a keyboard user never
   //   has to reach for the pill (docs/design/sidebar-home-chat.md). —

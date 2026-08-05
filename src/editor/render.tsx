@@ -8,7 +8,9 @@ import type { MouseEvent, ReactNode } from "react";
 
 import { openUrl } from "../lib/tauri";
 
-export type BlockKind = "h1" | "h2" | "h3" | "bullet" | "numbered" | "task" | "quote" | "para" | "blank";
+export type HeadingKind = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+
+export type BlockKind = HeadingKind | "bullet" | "numbered" | "task" | "quote" | "para" | "blank";
 
 export interface Block {
   kind: BlockKind;
@@ -27,14 +29,17 @@ export interface Block {
 const TASK_RE = /^- \[([ xX])\] /;
 const ORDERED_TASK_RE = /^(\d+)\. \[([ xX])\] /;
 const NUMBERED_RE = /^(\d+)\. /;
-const HEADING_RE = /^(#{1,3}) /;
+// H1–H6 (widened 2026-08-04 for heading folding). `#### x` used to fall through
+// as a plain paragraph — standard Markdown says it's a heading, and folding
+// needs the level to know where a section ends.
+const HEADING_RE = /^(#{1,6}) /;
 
 export function parseBlock(line: string): Block {
   if (line.trim() === "") return { kind: "blank", prefixLen: 0, text: "" };
   // headings are never indented (markdown nests lists, not headings)
   const h = HEADING_RE.exec(line);
   if (h?.[1]) {
-    const kind = `h${h[1].length}` as "h1" | "h2" | "h3";
+    const kind = `h${h[1].length}` as HeadingKind;
     return { kind, prefixLen: h[0].length, text: line.slice(h[0].length) };
   }
   // list kinds may carry a leading indent → nesting depth (2 columns per

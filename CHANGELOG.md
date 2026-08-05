@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so nothing is downloaded unless you ask for it. Long answers start speaking
   right away instead of waiting for the whole reply, and code blocks are skipped
   rather than read out character by character. Seven voices to choose from.
+- **Fold a section down to its heading.** Press ⌥⌘K anywhere inside a section
+  and it collapses to its title, leaving a small `⋯` you can click to bring it
+  back — so a long note can be read as an outline. Folding a heading takes its
+  sub-sections with it and stops cleanly at the next heading of the same level,
+  and the fold survives switching between the beautified and raw views.
+- **`####` and deeper are headings now.** Markdown allows six levels; rotli only
+  recognized three, so a fourth-level heading rendered as a plain paragraph.
+  All six are recognized and styled (deeper levels read as quiet emphasis rather
+  than shrinking away).
 
 ## [0.75.0] - 2026-08-04
 

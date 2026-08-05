@@ -684,6 +684,9 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
         case "h1":
         case "h2":
         case "h3":
+        case "h4":
+        case "h5":
+        case "h6":
           decos.push(Decoration.line({ class: `rotli-${block.kind}` }).range(ls));
           revealablePrefix(ls, prefixEnd, lineTouched, decos, atomics);
           scanInline(content, contentBase, sel, decos, atomics);
