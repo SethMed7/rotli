@@ -3,6 +3,7 @@
   "type": "module",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.3.14",
   "description": "Marketing website for rotli — a warm, local-first Mac menu-bar notes app.",
   "scripts": {
     "dev": "astro dev",

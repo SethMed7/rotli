@@ -7,8 +7,10 @@ environments. AI-assisted contributors must also follow `AGENTS.md`.
 ## Prerequisites
 
 - macOS on Apple Silicon for the complete desktop workflow
-- Bun 1.3.3 or the version pinned by CI
-- A current stable Rust toolchain
+- Bun at the exact version in [`.bun-version`](.bun-version) (`packageManager`
+  mirrors it in both JavaScript manifests)
+- Rustup; entering the checkout installs the exact channel and clippy component
+  from [`rust-toolchain.toml`](rust-toolchain.toml)
 - The Tauri v2 macOS prerequisites
 
 Install JavaScript dependencies once:

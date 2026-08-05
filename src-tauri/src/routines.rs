@@ -147,6 +147,17 @@ pub fn seed_from_shared(app: &AppHandle, name: &str, target: &Path) {
     let _ = fs::copy(&shared, target);
 }
 
+fn breve_install_spawn_error(bun: &Path, error: &std::io::Error) -> String {
+    if error.kind() == std::io::ErrorKind::NotFound {
+        format!(
+            "Bun is required to install Breve's pinned dependencies but was not found at {}; install Bun and restart Rotli",
+            bun.display()
+        )
+    } else {
+        format!("install Breve runtime dependencies with {}: {error}", bun.display())
+    }
+}
+
 pub fn sync_runtime(app: &AppHandle, corpus_root: &Path) -> Result<PathBuf, String> {
     let source = source_root(app)?;
     let home = corpus_root.join(MANAGED_DIR);
@@ -162,6 +173,8 @@ pub fn sync_runtime(app: &AppHandle, corpus_root: &Path) -> Result<PathBuf, Stri
     copy_tree(&source.join("defaults"), &home, false)?;
     fs::copy(source.join("defaults/package.json"), home.join("package.json"))
         .map_err(|e| format!("update Breve runtime package: {e}"))?;
+    fs::copy(source.join("defaults/bun.lock"), home.join("bun.lock"))
+        .map_err(|e| format!("update Breve runtime lockfile: {e}"))?;
     for dir in ["briefs", "logs", "signal", "signal/transcripts", "signal/sessions", "signal/queue"] {
         fs::create_dir_all(home.join(dir)).map_err(|e| format!("create Breve {dir}: {e}"))?;
     }
@@ -170,13 +183,16 @@ pub fn sync_runtime(app: &AppHandle, corpus_root: &Path) -> Result<PathBuf, Stri
         fs::write(&skill, text.replace("{{BREVE_HOME}}", &home.to_string_lossy()))
             .map_err(|e| format!("materialize {}: {e}", skill.display()))?;
     }
-    let install = Command::new(find_bun())
-        .args(["install", "--production", "--silent"])
+    let bun = find_bun();
+    let install = Command::new(&bun)
+        .args(["install", "--production", "--frozen-lockfile", "--silent"])
         .current_dir(&home)
         .status()
-        .map_err(|e| format!("install Breve runtime dependencies: {e}"))?;
-    if !install.success() && !home.join("node_modules").is_dir() {
-        return Err("Breve runtime dependencies could not be installed".into());
+        .map_err(|error| breve_install_spawn_error(&bun, &error))?;
+    if !install.success() {
+        return Err(format!(
+            "Breve's frozen dependency install failed with status {install}; its existing node_modules cannot be trusted"
+        ));
     }
     Ok(home)
 }
@@ -382,5 +398,15 @@ mod tests {
         let home = tempdir().unwrap();
         let backups = tempdir().unwrap();
         assert!(relocate_legacy_bundle(home.path(), backups.path()).unwrap().is_none());
+    }
+
+    #[test]
+    fn missing_bun_reports_the_breve_requirement_and_recovery() {
+        let error = std::io::Error::new(std::io::ErrorKind::NotFound, "missing");
+        let message = breve_install_spawn_error(Path::new("/missing/bun"), &error);
+
+        assert!(message.contains("Bun is required to install Breve's pinned dependencies"));
+        assert!(message.contains("/missing/bun"));
+        assert!(message.contains("install Bun and restart Rotli"));
     }
 }

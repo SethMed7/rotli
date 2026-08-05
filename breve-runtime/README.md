@@ -21,6 +21,13 @@ Private installation files (`signal.json`, mail/recipient/access configuration),
 logs, transcripts, pending actions, and scheduler state live only under
 `.rotli/breve/` and remain gitignored with other `.rotli` state.
 
+Production dependencies are a separate deployment boundary. The committed
+`defaults/bun.lock` is copied beside the managed runtime's `package.json`, and
+Rotli runs a production-only frozen install. A missing Bun executable or any
+lockfile/install failure stops Breve startup with an explicit error; an old
+`node_modules` directory is never accepted as proof that the pinned graph is
+current. Bundling Bun itself remains separate future hardening.
+
 Exactly one scheduler may own a managed Breve home. The scheduler claims an
 atomic, crash-recoverable process lock before loading state; additional Rotli
 processes stand by without starting jobs or Signal. Rotli passes its PID to the
@@ -47,5 +54,5 @@ cross-process lock contention and stale-owner recovery. `bun run
 check:breve-runtime` bundles every TypeScript entry point, validates the three
 shell pipelines, and runs a wiring contract that requires scheduler ownership,
 parent-death monitoring, per-job and producer locks, delivery claims, and
-idempotent owner warnings. Tests never contact Signal, email, model providers,
+idempotent owner warnings, plus the frozen dependency install. Tests never contact Signal, email, model providers,
 or watcher targets; real delivery remains an explicitly authorized live check.

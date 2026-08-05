@@ -30,6 +30,16 @@ requireMatch(
   /\.env\("ROTLI_PARENT_PID",\s*std::process::id\(\)\.to_string\(\)\)/,
   "Rotli must pass its PID to the scheduler",
 );
+requireMatch(
+  "src-tauri/src/routines.rs",
+  /source\.join\("defaults\/bun\.lock"\),\s*home\.join\("bun\.lock"\)/,
+  "Rotli must materialize Breve's committed lockfile beside its runtime manifest",
+);
+requireMatch(
+  "src-tauri/src/routines.rs",
+  /\.args\(\["install",\s*"--production",\s*"--frozen-lockfile",\s*"--silent"\]\)/,
+  "Breve production dependencies must use a frozen install",
+);
 
 for (const path of [
   "breve-runtime/scripts/send-brief.ts",
@@ -77,4 +87,6 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log("check:breve-contract ok — scheduler ownership, job locks, delivery claims, and alert idempotency are wired end to end");
+console.log(
+  "check:breve-contract ok — frozen dependencies, scheduler ownership, job locks, delivery claims, and alert idempotency are wired end to end",
+);

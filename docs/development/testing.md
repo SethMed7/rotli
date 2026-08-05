@@ -198,7 +198,9 @@ checker. Do not add a convention that only exists in prose.
 The `Regression suite` runs four jobs in parallel on explicitly versioned
 GitHub-hosted images. Setup, security, and release integration are documented in
 [`ci-runner.md`](ci-runner.md). CI receives no signing keys; `release.sh` signs
-and notarizes locally.
+and notarizes locally. Bun comes from `.bun-version`; Rustup resolves
+`rust-toolchain.toml`, so local, CI, and release builds share the same toolchain
+inputs.
 
 - **Quality and production builds (`ubuntu-24.04`):** frozen root install,
   `bun run check`, the Vite production build, and a frozen Astro site build.

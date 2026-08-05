@@ -110,6 +110,42 @@ const deniedDependencies = [
 ];
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const jsDependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
+
+// Toolchain versions have one repository-owned source each. Manifests expose
+// Bun's pin to package-aware tooling; CI and release consumers must read the
+// files instead of carrying independent version strings.
+const bunVersion = readFileSync(join(root, ".bun-version"), "utf8").trim();
+const rustToolchain = readFileSync(join(root, "rust-toolchain.toml"), "utf8");
+const rustVersion = rustToolchain.match(/^channel\s*=\s*"([^"]+)"/m)?.[1];
+const sitePackage = JSON.parse(readFileSync(join(root, "site/package.json"), "utf8"));
+for (const [path, manifest] of [
+  ["package.json", packageJson],
+  ["site/package.json", sitePackage],
+]) {
+  if (manifest.packageManager !== `bun@${bunVersion}`) {
+    violations.push(`${path}: packageManager must match .bun-version (${bunVersion})`);
+  }
+}
+if (!/^\d+\.\d+\.\d+$/.test(bunVersion)) violations.push(".bun-version: expected an exact semver");
+if (!rustVersion || !/^\d+\.\d+\.\d+$/.test(rustVersion)) {
+  violations.push("rust-toolchain.toml: channel must be an exact semver");
+}
+if (!/components\s*=\s*\[[^\]]*"clippy"/.test(rustToolchain)) {
+  violations.push("rust-toolchain.toml: the pinned toolchain must include clippy");
+}
+const regressionWorkflow = readFileSync(join(root, ".github/workflows/regression.yml"), "utf8");
+const bunSetupCount = (regressionWorkflow.match(/uses:\s*oven-sh\/setup-bun@/g) ?? []).length;
+const bunPinConsumerCount = (regressionWorkflow.match(/bun-version-file:\s*\.bun-version/g) ?? []).length;
+if (bunSetupCount === 0 || bunPinConsumerCount !== bunSetupCount) {
+  violations.push("regression.yml: every Bun setup must read .bun-version");
+}
+if (!regressionWorkflow.includes("rustup show active-toolchain")) {
+  violations.push("regression.yml: Rust setup must let rustup read rust-toolchain.toml");
+}
+const releaseScript = readFileSync(join(root, "scripts/release.sh"), "utf8");
+for (const pin of [".bun-version", "rust-toolchain.toml", "make-release-evidence.mjs"]) {
+  if (!releaseScript.includes(pin)) violations.push(`scripts/release.sh: must consume ${pin}`);
+}
 for (const dependency of deniedDependencies) {
   if (dependency in jsDependencies) violations.push(`package.json: database dependency ${dependency}`);
 }
@@ -161,5 +197,5 @@ if (violations.length) {
 }
 
 console.log(
-  "check:structure ok — per-tree file/folder naming, tsconfig strictness parity, no database, Breve dependency ranges aligned",
+  "check:structure ok — naming, strictness, pinned toolchains, no database, and Breve dependency ranges aligned",
 );

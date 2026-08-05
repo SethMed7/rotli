@@ -58,16 +58,21 @@ done
 
 verify_ci_conclusion() {
   local source_commit="$1"
+  local ci_runs
   local ci_conclusion
 
   echo "▸ verify CI conclusion for $source_commit"
-  ci_conclusion="$(gh run list --workflow "Regression suite" --branch main \
-    --json headSha,status,conclusion --limit 40 2>/dev/null \
+  ci_runs="$(gh run list --workflow "Regression suite" --branch main \
+    --json headSha,status,conclusion,url --limit 40 2>/dev/null || echo '[]')"
+  ci_conclusion="$(printf '%s' "$ci_runs" \
     | jq -r --arg sha "$source_commit" \
         'map(select(.headSha == $sha)) | first | if . == null then "none" elif .status != "completed" then "pending" else (.conclusion // "unknown") end' \
     2>/dev/null || echo "none")"
+  CI_RUN_URL="$(printf '%s' "$ci_runs" | jq -r --arg sha "$source_commit" 'map(select(.headSha == $sha)) | first | .url // empty')"
+  CI_RUN_RESULT="$ci_conclusion"
   case "$ci_conclusion" in
     success)
+      [ -n "$CI_RUN_URL" ] || { echo "✗ successful Regression run has no immutable URL"; return 1; }
       echo "  ✓ Regression suite passed for this exact commit" ;;
     none|pending)
       echo "✗ no successful completed Regression run found for $source_commit ($ci_conclusion)"
@@ -77,6 +82,7 @@ verify_ci_conclusion() {
       # The only emergency escape is explicit and loud. It can override a
       # completed red conclusion, but never missing or still-pending evidence.
       if [ "${ROTLI_RELEASE_ALLOW_RED:-0}" = "1" ]; then
+        [ -n "$CI_RUN_URL" ] || { echo "✗ completed Regression run has no immutable URL"; return 1; }
         echo "  ⚠ Regression concluded '$ci_conclusion' for $source_commit — OVERRIDDEN by ROTLI_RELEASE_ALLOW_RED=1"
       else
         echo "✗ Regression suite for $source_commit concluded '$ci_conclusion' — refusing to publish a red commit"
@@ -94,6 +100,27 @@ if [ "$CHECK_CI_ONLY" -eq 1 ]; then
   verify_ci_conclusion "$CI_CHECK_COMMIT"
   exit 0
 fi
+
+PINNED_BUN="$(tr -d '[:space:]' < .bun-version)"
+PINNED_RUST="$(awk -F '"' '/^[[:space:]]*channel[[:space:]]*=/ { print $2; exit }' rust-toolchain.toml)"
+command -v bun >/dev/null 2>&1 || {
+  echo "✗ Bun $PINNED_BUN is required; install the version pinned in .bun-version"
+  exit 1
+}
+ACTUAL_BUN="$(bun --version)"
+[ "$ACTUAL_BUN" = "$PINNED_BUN" ] || {
+  echo "✗ Bun version mismatch: expected $PINNED_BUN from .bun-version, found $ACTUAL_BUN"
+  exit 1
+}
+command -v rustc >/dev/null 2>&1 || {
+  echo "✗ Rust $PINNED_RUST is required; rustup reads rust-toolchain.toml automatically"
+  exit 1
+}
+ACTUAL_RUST="$(rustc --version | awk '{ print $2 }')"
+[ "$ACTUAL_RUST" = "$PINNED_RUST" ] || {
+  echo "✗ Rust version mismatch: expected $PINNED_RUST from rust-toolchain.toml, found $ACTUAL_RUST"
+  exit 1
+}
 
 VER="$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("src-tauri/tauri.conf.json","utf8")).version)')"
 PACKAGE_VER="$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("package.json","utf8")).version)')"
@@ -229,12 +256,29 @@ if [ "$PUBLISH" -eq 1 ]; then
   # complete Regression suite on main; missing, pending, and red evidence block.
   verify_ci_conclusion "$SOURCE_COMMIT"
 
+  echo "▸ release evidence"
+  BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  MACOS_BUILD="macOS $(sw_vers -productVersion) ($(sw_vers -buildVersion)) $(uname -m)"
+  bun scripts/make-release-evidence.mjs \
+    --version "$VER" \
+    --source-commit "$SOURCE_COMMIT" \
+    --built-at "$BUILT_AT" \
+    --macos "$MACOS_BUILD" \
+    --ci-run "$CI_RUN_URL" \
+    --ci-result "$CI_RUN_RESULT" \
+    --artifact "$DMG" \
+    --artifact "$DIST/rotli.app.tar.gz" \
+    --artifact "$DIST/rotli.app.tar.gz.sig" \
+    --artifact "$DIST/latest.json" \
+    > "$DIST/release-evidence.json"
+
   git tag "v$VER" "$SOURCE_COMMIT"
   git push origin "v$VER"
 
   echo "▸ publish → $RELEASES_REPO (tag v$VER)"
   gh release create "v$VER" \
     "$DMG" "$DIST/rotli.app.tar.gz" "$DIST/rotli.app.tar.gz.sig" "$DIST/latest.json" \
+    "$DIST/release-evidence.json" \
     --repo "$RELEASES_REPO" \
     --title "rotli $VER" \
     --notes "$NOTES"

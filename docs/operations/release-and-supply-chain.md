@@ -42,11 +42,14 @@ The current script:
 - regenerates and signs the updater archive from the stapled app;
 - creates, signs, notarizes, and staples the DMG;
 - creates `latest.json`; and
+- records the exact source, CI run, repository-pinned toolchains, and artifact
+  SHA-256 digests in `release-evidence.json`; and
 - publishes only when `--publish` is passed.
 
 Known hardening gaps before a 1.0 or paid production release:
 
-- add checksums, SBOM, artifact/source provenance, and a release evidence bundle;
+- add an SBOM, signed artifact/source provenance, retained notary submission
+  records, and an off-GitHub evidence archive;
 - define beta/stable channels and a signed rollback procedure;
 - record and review the Apple notary log, not only the success status; and
 - move signing/updater key custody from single-maintainer knowledge to a
@@ -57,11 +60,12 @@ supply-chain assurance.
 
 ## Release evidence bundle
 
-Each published version should retain a machine-readable manifest containing at
-least:
+`release.sh --publish` generates and uploads this machine-readable core
+manifest from the reviewed repository pins:
 
 ```json
 {
+  "schemaVersion": 1,
   "product": "rotli",
   "version": "0.x.y",
   "sourceCommit": "full git sha",
@@ -74,7 +78,7 @@ least:
   },
   "checks": {
     "ciRun": "immutable URL or identifier",
-    "result": "success"
+    "result": "success or explicitly overridden conclusion"
   },
   "artifacts": [
     {
@@ -82,16 +86,16 @@ least:
       "sha256": "digest",
       "signature": "signature filename"
     }
-  ],
-  "sbom": "SBOM filename",
-  "notarySubmissions": ["submission id"]
+  ]
 }
 ```
 
 The manifest contains no credential, local path, Keychain name beyond public
-configuration, or user data. Evidence is stored with the release and in a
-maintainer-controlled archive so a delivery-repository outage does not erase
-the provenance record.
+configuration, or user data. The current script stores it with the GitHub
+release. A maintainer-controlled archive must be added so a delivery-repository
+outage cannot erase the provenance record. That archive, an SBOM, signed
+provenance, and retained notary identifiers remain promotion requirements
+rather than fields that imply evidence the current script does not yet collect.
 
 ## Dependency policy
 
@@ -164,7 +168,8 @@ Before calling the delivery process production-ready:
 
 - protect the release branch with required reviews and checks;
 - eliminate dirty-tree publication and silent tag failures;
-- generate and retain the evidence bundle automatically;
+- extend the generated evidence with an SBOM, signed provenance, retained
+  notary records, and a maintainer-controlled archive;
 - complete a signing-key loss/rotation tabletop;
 - complete one updater rollback/superseding-release exercise; and
 - demonstrate install, update, and offline Gatekeeper behavior on a clean Mac.

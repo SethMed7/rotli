@@ -32,6 +32,9 @@ updater signing credentials.
 - Use exact hosted image labels (`ubuntu-24.04` and `macos-15`), not `*-latest`.
 - Pin every third-party action to a full reviewed commit SHA and retain its
   release tag in a comment.
+- Install Bun from the root `.bun-version`; keep both manifests' `packageManager`
+  fields identical to it. Let Rustup consume `rust-toolchain.toml` rather than
+  selecting a moving stable channel in workflow YAML.
 - Install JavaScript dependencies from committed lockfiles with `bun ci`.
 - Keep the workflow token read-only. Audit results belong in the job log and do
   not need permission to create a separate check run.
