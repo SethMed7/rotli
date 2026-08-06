@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The website is ready for search and link previews.** Its production build
+  now publishes canonical and Open Graph metadata, a sitemap, robots guidance,
+  and a useful not-found page.
+
+### Changed
+
+- **The website download button cannot get ahead of a release.** It now opens
+  the latest signed release that actually exists instead of constructing a DMG
+  URL from a version that might not have been published yet.
+
 ## [0.77.0] - 2026-08-05
 
 

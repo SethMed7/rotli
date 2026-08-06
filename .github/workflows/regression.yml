@@ -40,6 +40,8 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
       - run: bun ci
         working-directory: site
+      - run: bun run check
+        working-directory: site
       - run: bun run build
         working-directory: site
 

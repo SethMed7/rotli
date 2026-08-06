@@ -1,20 +1,13 @@
 ---
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import Base from '../layouts/Base.astro';
 import quokka from '../assets/quokka.svg?raw';
 import waving from '../assets/waving.svg?raw';
 import staysLocal from '../assets/stays_local.svg?raw';
 
-// The download always tracks the NEWEST build: the version is read at build time
-// from the app's own package.json (the single source of truth release.sh ships),
-// so the button links straight to that release's DMG — never a hand-typed, stale
-// version. Rebuilding the site after a release picks up the new version for free.
-const VERSION = JSON.parse(
-  readFileSync(fileURLToPath(new URL('../../../package.json', import.meta.url)), 'utf8'),
-).version;
-const DOWNLOAD_URL = `https://github.com/SethMed7/rotli-releases/releases/download/v${VERSION}/rotli_${VERSION}_aarch64.dmg`;
+// The release page is the safe indirection: version bumps can land before their
+// signed DMG is published, while /releases/latest always names a real release.
 const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
+const DOWNLOAD_URL = RELEASES_URL;
 const GITHUB_URL = 'https://github.com/SethMed7/rotli';
 // the memex-format story — the format lives on as rotli's vault format
 // (the old standalone SethMed7/memex repo is retired), so the story link
@@ -88,7 +81,7 @@ const promises = [
         <a class="btn btn-secondary" href={GITHUB_URL} rel="noopener">View on GitHub</a>
       </div>
       <p class="cta-meta">
-        macOS · Apple Silicon · <a href={RELEASES_URL} rel="noopener">v{VERSION}</a>
+        macOS · Apple Silicon · <a href={RELEASES_URL} rel="noopener">latest signed release</a>
       </p>
     </section>
 
@@ -128,7 +121,7 @@ const promises = [
         </ul>
         <p class="privacy-note">
           You work how you want in <b>Main</b>; your data organizes itself into your
-          <b>Brain</b> for the AI — location and metadata only, never the words inside your notes.
+          {' '}<b>Brain</b> for the AI — location and metadata only, never the words inside your notes.
         </p>
         <a class="memex-link" href={MEMEX_URL} rel="noopener">
           Built on the memex vault format — one plain folder, yours to keep →
@@ -153,7 +146,7 @@ const promises = [
     const root = document.documentElement;
     const modeBtn = document.getElementById('mode-toggle');
     const famBtn = document.getElementById('family-toggle');
-    const store = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+    const store = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch (e) {} };
     const syncMode = () => modeBtn && modeBtn.setAttribute('data-mode', root.dataset.mode || 'light');
     syncMode();
     modeBtn &&

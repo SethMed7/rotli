@@ -22,19 +22,20 @@ bun run dev      # local dev server
 
 ```sh
 cd site
+bun run check    # Astro + TypeScript diagnostics
 bun run build    # static output → site/dist/
 bun run preview  # serve the built dist/ locally
 ```
 
-## Notes for later
+## Production details
 
-- **Download button** and repo links live in `src/pages/index.astro`.
-  Search for `TODO(seth)` — set the real release URL (the notarized DMG on
-  rotli-releases / the GitHub `releases/latest` asset) and confirm the public
-  repo URL.
+- The canonical production origin is `https://rotli.app` in
+  `astro.config.mjs`; the sitemap and canonical metadata derive from it.
+- The download button deliberately opens the newest published release page.
+  Do not construct a DMG URL from the app package version: a version bump can
+  merge before its signed asset is published.
 - Brand tokens in `src/layouts/Base.astro` mirror
   `src/brand/tokens/colors.json`.
 - Fonts (General Sans body, Baloo 2 wordmark) are copied into
   `public/fonts/` from `src/brand/fonts/`.
-- Hero screenshot is `public/rotli-warm-light.png`, copied from
-  `docs/media/`.
+- Hero screenshots are the four `public/rotli-app-*.png` files.

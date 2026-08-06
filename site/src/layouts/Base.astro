@@ -5,10 +5,24 @@
 // pure attribute selectors — no flash, no media-query juggling.
 // Palettes mirror the app: warm = colors.json (Warm Light/Dark); soft = themes.css
 // (Paper / Charcoal).
+interface Props {
+  title?: string;
+  description?: string;
+  canonicalPath?: string;
+  image?: string;
+  noindex?: boolean;
+}
+
 const {
   title = 'rotli — a local-first notes app for your Mac menu bar',
   description = 'A local-first notes app that lives in your Mac’s menu bar — summon it, write, dismiss it.',
-} = Astro.props;
+  canonicalPath = Astro.url.pathname,
+  image = '/rotli-app-paper.png',
+  noindex = false,
+} = Astro.props as Props;
+const siteUrl = Astro.site ?? Astro.url;
+const canonicalUrl = new URL(canonicalPath, siteUrl).href;
+const socialImageUrl = new URL(image, siteUrl).href;
 ---
 <html lang="en">
   <head>
@@ -17,6 +31,19 @@ const {
     <meta name="color-scheme" content="light dark" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow'} />
+    <link rel="canonical" href={canonicalUrl} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="rotli" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={socialImageUrl} />
+    <meta property="og:image:alt" content="rotli in its Paper environment" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImageUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <!-- resolve theme before first paint (no flash) -->
     <script is:inline>
@@ -79,6 +106,10 @@ const {
       }
       a { color: inherit; }
       img { max-width: 100%; display: block; }
+      :where(a, button):focus-visible {
+        outline: 2px solid var(--accent-text);
+        outline-offset: 3px;
+      }
 
       .logo-mark, .char { display: inline-block; line-height: 0; color: var(--text); }
       .logo-mark svg, .char svg { display: block; width: 100%; height: auto; }
