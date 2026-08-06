@@ -31,6 +31,7 @@ import { useViewsStore } from "../../state/views";
 import { ChevronRight, FolderGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
 import { chatMark } from "./chatMark";
+import { ModelLogo } from "./modelLogo";
 import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
 
 /** Where a dragged chat would land: a folder row (assignment — positional
@@ -344,13 +345,20 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           // nothing but chats, "this is a chat" is the one thing you already
           // know (Seth, 2026-08-04). A chat with no model picked yet gets a
           // blank badge — it holds the column, and claims nothing.
-          const id = chatModelMap[runKeyOf(c.slug)] ?? chatModelId;
+          const ownModel = chatModelMap[runKeyOf(c.slug)];
+          const id = ownModel ?? chatModelId;
           if (!id) return <span className="sb-chatmark none" title="No model picked yet" />;
           const name = modelLabel(id, models.data ?? [], hybridPresets);
           const mark = chatMark(modelProvider(id, models.data ?? [], hybridPresets), name);
           return (
-            <span className={`sb-chatmark ${mark.key}`} title={mark.title} aria-hidden="true">
-              {mark.initial}
+            <span
+              className={`sb-chatmark ${mark.key}${mark.logo ? " has-logo" : ""}`}
+              title={mark.title}
+              role={ownModel === undefined ? "img" : undefined}
+              aria-label={ownModel === undefined ? mark.title : undefined}
+              aria-hidden={ownModel !== undefined ? "true" : undefined}
+            >
+              {mark.logo ? <ModelLogo logo={mark.logo} /> : mark.initial}
             </span>
           );
         })()}

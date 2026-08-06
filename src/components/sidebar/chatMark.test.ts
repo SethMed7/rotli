@@ -12,8 +12,8 @@ describe("markKeyOf", () => {
   });
 
   test("both Google transports share one vendor — agy and the API lane", () => {
-    expect(markKeyOf("agy")).toBe("google");
-    expect(markKeyOf("gemini")).toBe("google");
+    expect(markKeyOf("agy")).toBe("gemini");
+    expect(markKeyOf("gemini")).toBe("gemini");
   });
 
   test("a hybrid preset is its own mark", () => {
@@ -24,6 +24,11 @@ describe("markKeyOf", () => {
     expect(markKeyOf("mlx")).toBe("local");
     expect(markKeyOf(undefined)).toBe("local");
     expect(markKeyOf("some-model-rotli-never-heard-of")).toBe("local");
+  });
+
+  test("local families use their real model marks without changing locality", () => {
+    expect(markKeyOf("mlx", "Gemma 3 12B")).toBe("gemma");
+    expect(markKeyOf("mlx", "mlx-community/Qwen3-30B-A3B-4bit")).toBe("qwen");
   });
 });
 
@@ -37,9 +42,14 @@ describe("chatMark", () => {
     expect(chatMark("mlx", "Qwen3 30B").title).toBe("Qwen3 30B — this Mac");
   });
 
-  test("every mark is exactly one character — the badge is 14px", () => {
-    for (const p of ["claude", "codex", "agy", "gemini", "preset", "mlx", undefined]) {
-      expect(chatMark(p, "x").initial).toHaveLength(1);
+  test("known families carry logos; only honest fallbacks carry initials", () => {
+    for (const p of ["claude", "codex", "agy", "gemini"]) {
+      expect(chatMark(p, "x").logo).toBeDefined();
+      expect(chatMark(p, "x").initial).toBeUndefined();
     }
+    expect(chatMark("mlx", "Gemma 3").logo).toBe("gemma");
+    expect(chatMark("mlx", "Qwen3").logo).toBe("qwen");
+    expect(chatMark("mlx", "Unknown local model").initial).toBe("L");
+    expect(chatMark("preset", "Hybrid").initial).toBe("H");
   });
 });

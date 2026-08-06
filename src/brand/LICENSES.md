@@ -24,3 +24,9 @@ All faces are self-hostable. **No rented/metered fonts** (per the brand doctrine
 
 - The **quokka-r** (`logo/r-mark.svg`) is a smooth trace of Seth's approved 2026-06-10 brand board (gate round 3 approved 2026-06-11), with a judged flowing-bottom refinement; the wordmark is outlined Baloo 2 @600 with the traced r grafted as the leading glyph. Both are original-work transcriptions for rotli, built in `engine/RUNS/rotli/2026-06-10-board-intake/`.
 - The 10-icon sprite (`icons/rotli-icons.sprite.svg`) is constructed original work on the 24-grid.
+
+## External provider marks
+
+Model-family marks used only to identify chat models live in `providers/` and
+remain the property of their respective owners. Their exact provenance and the
+LobeHub MIT notice are recorded in [`providers/README.md`](providers/README.md).

@@ -730,18 +730,14 @@
 .sb-chatrun ~ .sb-chatpin {
   margin-left: 0;
 }
-/* the vendor mark that replaced the chat glyph (Seth, 2026-08-04: "all are
-   chats so having it doesn't make sense anymore"). Same 14px footprint the
-   glyph held, so every row's title still starts on one line. A LETTER, not a
-   logo — rotli doesn't reproduce anyone's trademark, and a real mark would be
-   mush at this size. */
+/* the model-family mark that replaced the redundant chat glyph. Authentic
+   compact artwork now identifies Claude, OpenAI, Gemini, Gemma, and Qwen; the
+   14px footprint stays fixed so every title begins on the same line. */
 .sb-chatmark {
   flex: 0 0 auto;
   box-sizing: border-box;
   width: 14px;
   height: 14px;
-  /* transparent by default so the bordered variants below keep the SAME
-     footprint — every row's title must start on one line */
   border: 1px solid transparent;
   border-radius: var(--r-inner);
   display: inline-grid;
@@ -750,40 +746,52 @@
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0;
-  color: var(--vendor-ink);
+  color: var(--text-muted);
   -webkit-user-select: none;
   user-select: none;
 }
-/* one vendor per hue, so the list groups by eye before you read a word */
-.sb-chatmark.anthropic {
-  background: var(--vendor-anthropic);
+.sb-chatmark.has-logo {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
 }
-.sb-chatmark.openai {
-  background: var(--vendor-openai);
+.model-logo {
+  display: block;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
 }
-.sb-chatmark.google {
-  background: var(--vendor-google);
+/* OpenAI ships black and white artwork. Use the official black Blossom as a
+   mask so its exact silhouette follows semantic ink instead of disappearing
+   in Warm Dark, Charcoal, or a selected row. */
+.model-logo--openai {
+  background: currentColor;
+  -webkit-mask: url("../brand/providers/openai-blossom.svg") center / contain no-repeat;
+  mask: url("../brand/providers/openai-blossom.svg") center / contain no-repeat;
 }
-.sb-chatmark.preset {
-  background: var(--vendor-preset);
+.sb-chatmark.preset,
+.sb-chatmark.local {
+  background: var(--surface-2);
+  border-color: var(--border);
 }
 /* on-device is deliberately the quiet one — it's the default, not an event */
 .sb-chatmark.local {
-  background: var(--surface-2);
   color: var(--text-muted);
-  border-color: var(--border);
 }
 /* no model picked yet: hold the column, claim nothing */
 .sb-chatmark.none {
   border-color: var(--border);
 }
-/* the selected row fills with the accent — a tinted badge on top of it would
-   fight, so the mark goes to the row's own ink (the rule .sb-chatrun and
-   .sb-chatmodel already follow) */
-.sb-chatrow.sel .sb-chatmark {
+/* Fallback letters and the monochrome OpenAI mark follow selected-row ink.
+   Full-color model marks retain their identifying brand artwork. */
+.sb-chatrow.sel .sb-chatmark:not(.has-logo) {
   background: var(--on-accent);
   color: var(--accent);
   border-color: transparent;
+}
+.sb-chatrow.sel .sb-chatmark.openai {
+  color: var(--on-accent);
 }
 
 /* the per-chat model chip (Seth, 2026-08-03) — a quiet right-aligned label,

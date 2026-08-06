@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Chat rows now show the model's real mark.** OpenAI, Claude, Gemini, Gemma,
+  and Qwen use their recognizable artwork instead of invented letter badges;
+  unknown local models and hybrid presets retain honest text fallbacks.
 - **The website download button cannot get ahead of a release.** It now opens
   the latest signed release that actually exists instead of constructing a DMG
   URL from a version that might not have been published yet.

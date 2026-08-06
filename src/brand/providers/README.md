@@ -1,0 +1,18 @@
+# Provider model marks
+
+These marks identify the model family answering a chat. They are not Rotli marks,
+and their presence does not imply sponsorship or endorsement.
+
+- `claude-spark-clay.svg`: Anthropic's official Claude Spark — Clay SVG from the
+  maintainer-provided Anthropic media resources.
+- `openai-blossom.svg`: OpenAI's official Blossom — Black SVG from the
+  maintainer-provided OpenAI logo kit. The app uses its silhouette as a CSS mask
+  so it remains legible across Rotli's four environments and selected rows.
+- `gemma.svg`: Google DeepMind's official Gemma repository icon at commit
+  `7b785991bd78626c73b317eb43fdbb6c292f7b9c`.
+- `gemini.svg` and `qwen.svg`: LobeHub Lobe Icons compact color vectors at
+  commit `f07e9be35aef452ce735f95ea8204a14ecc513f7`, used under the included MIT
+  license.
+
+Claude, OpenAI, Gemini, Gemma, and Qwen names and marks belong to their
+respective owners. Use these files only to identify the selected model family.

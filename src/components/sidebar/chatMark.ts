@@ -6,30 +6,34 @@
 // A glyph that says "this is a chat", inside a list of nothing but chats, is a
 // column of wasted pixels. The slot is worth more as the answer to the question
 // you actually have while scanning: WHO is answering. So it now carries the
-// chat's model — its vendor, as a tinted monogram.
+// chat's model — its vendor/model-family mark.
 //
-// A LETTER, NOT A LOGO: rotli doesn't reproduce anyone's trademark. A vendor
-// initial in the vendor's colour groups the list at a glance without pretending
-// to be someone's brand asset, and it stays legible at 14px where a real logo
-// would turn to mush.
+// Authentic compact marks are clearer than invented initials. Connected lanes
+// map from provider; local MLX models map from their family name so Gemma and
+// Qwen remain distinguishable without misrepresenting an unknown local model.
 //
 // Pure: no React, no store.
 
 /** The vendor lanes a chat can run on, plus the on-device one. */
-export type ChatMarkKey = "anthropic" | "openai" | "google" | "local" | "preset";
+export type ChatLogoKey = "anthropic" | "openai" | "gemini" | "gemma" | "qwen";
+export type ChatMarkKey = ChatLogoKey | "local" | "preset";
 
 export interface ChatMark {
   key: ChatMarkKey;
-  /** The single character drawn in the badge. */
-  initial: string;
+  /** Authentic model-family artwork; absent only for honest fallbacks. */
+  logo?: ChatLogoKey;
+  /** The fallback character for presets and unknown local models. */
+  initial?: string;
   /** Hover text — the full sentence the badge is shorthand for. */
   title: string;
 }
 
-const MARKS: Record<ChatMarkKey, { initial: string; vendor: string }> = {
-  anthropic: { initial: "A", vendor: "Anthropic" },
-  openai: { initial: "O", vendor: "OpenAI" },
-  google: { initial: "G", vendor: "Google" },
+const MARKS: Record<ChatMarkKey, { initial?: string; logo?: ChatLogoKey; vendor: string }> = {
+  anthropic: { logo: "anthropic", vendor: "Anthropic" },
+  openai: { logo: "openai", vendor: "OpenAI" },
+  gemini: { logo: "gemini", vendor: "Google" },
+  gemma: { logo: "gemma", vendor: "this Mac" },
+  qwen: { logo: "qwen", vendor: "this Mac" },
   local: { initial: "L", vendor: "this Mac" },
   preset: { initial: "H", vendor: "a hybrid preset" },
 };
@@ -41,7 +45,7 @@ const MARKS: Record<ChatMarkKey, { initial: string; vendor: string }> = {
  * Anything unrecognized reads as local: a model rotli can't place is one the
  * user installed, and calling it on-device is the answer that can't leak.
  */
-export function markKeyOf(provider: string | undefined): ChatMarkKey {
+export function markKeyOf(provider: string | undefined, modelName = ""): ChatMarkKey {
   switch (provider) {
     case "claude":
       return "anthropic";
@@ -49,16 +53,25 @@ export function markKeyOf(provider: string | undefined): ChatMarkKey {
       return "openai";
     case "agy":
     case "gemini":
-      return "google";
+      return "gemini";
     case "preset":
       return "preset";
-    default:
+    default: {
+      const family = modelName.toLowerCase();
+      if (family.includes("gemma")) return "gemma";
+      if (family.includes("qwen")) return "qwen";
       return "local";
+    }
   }
 }
 
 export function chatMark(provider: string | undefined, modelName: string): ChatMark {
-  const key = markKeyOf(provider);
-  const { initial, vendor } = MARKS[key];
-  return { key, initial, title: `${modelName} — ${vendor}` };
+  const key = markKeyOf(provider, modelName);
+  const { initial, logo, vendor } = MARKS[key];
+  return {
+    key,
+    title: `${modelName} — ${vendor}`,
+    ...(initial ? { initial } : {}),
+    ...(logo ? { logo } : {}),
+  };
 }

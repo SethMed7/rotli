@@ -31,16 +31,6 @@
   --swatch-paper: #ffffff;
   --swatch-charcoal: #161616;
 
-  /* vendor marks on chat rows (Settings-independent) — one hue per model
-     vendor so the chat list groups by eye. Every hue is measured ≥5:1 against
-     --vendor-ink, because the badge carries a 9px letter. Mono themes strip
-     them below, the same way they neutralize icon ink. */
-  --vendor-anthropic: #a35c34;
-  --vendor-openai: #2f7a63;
-  --vendor-google: #3f66b0;
-  --vendor-preset: #6f4f96;
-  --vendor-ink: #ffffff;
-
   /* app-icon picker tiles — fixed palettes, theme-independent (Settings → App icon) */
   --appicon-default-tile: #f8f2e9;
   --appicon-default-ink: #3a3028;
@@ -95,13 +85,6 @@
 /* Mono themes use neutral icon ink; imagery remains warm by design. */
 :root[data-theme="paper"],
 :root[data-theme="charcoal"] {
-  /* vendor hues would break the mono contract — the badges keep their shape
-     and their letter, and lose their colour */
-  --vendor-anthropic: var(--surface-2);
-  --vendor-openai: var(--surface-2);
-  --vendor-google: var(--surface-2);
-  --vendor-preset: var(--surface-2);
-  --vendor-ink: var(--text-muted);
   --icon-clay: currentColor;
   --icon-olive: currentColor;
   /* warm-token leaks re-pointed: done-check ink + Aa segment accent */
