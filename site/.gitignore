@@ -7,6 +7,9 @@ node_modules/
 # astro
 .astro/
 
+# wrangler
+.wrangler/
+
 # env & logs
 .env
 .env.production
