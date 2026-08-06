@@ -3,6 +3,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import App from "./app";
+import { attachIdleMotion } from "./lib/idleMotion";
 import { queryClient } from "./services/query";
 import { attachPersistence, hydratePersistedState, runDeferredMaintenance } from "./state/persist";
 
@@ -31,6 +32,7 @@ async function bootstrap(rootEl: HTMLElement): Promise<void> {
     </React.StrictMode>,
   );
   attachPersistence(); // the one debounced writer (main window + Tauri only)
+  attachIdleMotion(); // a tucked-away window stops animating (every window has one)
   // Orphan-map GC runs every launch but NOT before paint — kick it once the
   // browser is idle after the first render (perf audit 2026-08). It self-guards
   // to the main surface + hydrated Main, so a stray early call is a safe no-op.

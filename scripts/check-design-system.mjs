@@ -131,6 +131,13 @@ if (!/:focus-visible\s*\{[^}]*outline:\s*2px\s+solid\s+var\(--accent\)/s.test(ba
 if (!/@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(base)) {
   violations.push("base.css: missing reduced-motion fallback");
 }
+// The idle pause is load-bearing, not decorative: WKWebView does not promise to
+// suspend a hidden webview and WebKitGTK is worse, so a deleted rule would let
+// every infinite animation composite while the window is tucked away.
+// lib/idleMotion.ts stamps the attribute; this asserts the rule that consumes it.
+if (!/:root\[data-idle="hidden"\][^{]*\{[^}]*animation-play-state:\s*paused/s.test(base)) {
+  violations.push("base.css: missing the idle animation pause (:root[data-idle=\"hidden\"])");
+}
 if (/@media\s*\(prefers-color-scheme:/.test(`${colors}\n${themes}`)) {
   violations.push("theme tokens must not follow the OS implicitly; state/theme.ts owns system mode");
 }

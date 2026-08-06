@@ -348,3 +348,109 @@ punch-list — and a green build proves the "usable everywhere" MVP (Phase 0) is
 Then decide, with that punch-list in hand, whether to chase Phase 1 (Linux local
 AI via Ollama — the extensible adapter Seth wants) immediately or ship the Phase
 0 remote-AI Linux build first and let real Linux users pull it.
+
+---
+
+# Addendum — re-verified 2026-08-06 at 0.77.0
+
+Status: **AUDIT**. The body above is a snapshot at `97a0b6c` (0.69.0). This
+addendum re-counts every seam at `6e95b25` (0.77.0), and adds the one risk the
+body does not weigh: **the Linux webview engine itself**. Nothing above is
+retracted — the Rust-side analysis held up. The scope grew ~60% and the
+dominant risk moved.
+
+## Re-counted seams (HEAD, not 0.69.0)
+
+| Measure | 0.69.0 (body) | 0.77.0 (now) | Δ |
+|---|---|---|---|
+| `target_os = "macos"` occurrences | 22 gates / 7 files | **37 / 8 files** | +68% |
+| `#[cfg(not(target_os = "macos"))]` fallbacks | not counted | **14 / 6 files** | — |
+| `Command::new` subprocess seams | ~7 named | **22 calls / 11 distinct binaries** | — |
+| `#[tauri::command]` handlers | not counted | **147 / 12 files** | — |
+
+Per file, `target_os = "macos"`: `lib.rs` 12 · `corpus.rs` 8 · `organizer.rs` 6 ·
+`document_conversion.rs` 3 · `workspace.rs` 3 · `memex.rs` 2 · `web.rs` 2 ·
+`provider.rs` 1.
+
+Subprocess seams by binary: `open` ×7 · `launchctl` ×4 · `pmset` ×2 · `id` ×2 ·
+`/usr/bin/sandbox-exec` ×2 · `ioreg` · `/usr/sbin/sysctl` · `/usr/bin/textutil` ·
+`/usr/bin/security` · `/bin/kill` · `/bin/df`.
+
+**Three seams the body never listed** — all added since 0.69.0 and all needing a
+cross-platform answer: `id` (uid checks), `/bin/kill` (process-group teardown —
+Windows needs job objects), `/bin/df` (free-space probes → the `sysinfo` crate
+already proposed for seam #3 covers this).
+
+**Confirmed unchanged and still true:** the frontend is portable. Exactly **3**
+files under `src/` import `@tauri-apps` (`app.tsx`, `lib/quitFlush.ts`,
+`lib/tauri.ts`), and `src/lib/tauri.ts` — 1,856 lines, 221 exports — is the
+single IPC seam. `objc2*` remains target-gated in `Cargo.toml`. The updater is
+`tauri-plugin-updater` (cross-platform) against a GitHub-releases feed, and
+`src-tauri/icons/` already carries `icon.ico` plus Windows Square logos.
+
+## The risk the body does not weigh: WebKitGTK is not WKWebView
+
+The body's headline finding #1 — "the frontend is free" — is true about *code*
+and false about *rendering*. It assumes one webview behaves like another. On
+Linux, Tauri renders in **WebKit2GTK**, which carries documented, longstanding
+defects:
+
+- Severe slowdown with large DOMs; drag-select lags or freezes
+  ([tauri#3988](https://github.com/tauri-apps/tauri/issues/3988))
+- WebKit2GTK 2.40 made apps feel frozen — content not repainting after clicks
+  ([tauri#7021](https://github.com/tauri-apps/tauri/issues/7021))
+- A playing CSS animation blurs the rest of the app; `contenteditable` spans
+  misbehave ([discussion#9088](https://github.com/tauri-apps/tauri/discussions/9088))
+- WebGL/canvas silently falling back to a software rasterizer with no catchable
+  error; Tauri ships a whole
+  [Linux Graphics Issues](https://v2.tauri.app/develop/debug/linux-graphics/) page
+- An open request to [bundle a Chromium renderer](https://github.com/tauri-apps/tauri/issues/14963)
+
+rotli's three heaviest surfaces are a **CodeMirror 6 `contenteditable` editor**,
+**Excalidraw canvas boards**, and **Univer sheets** — the exact intersection of
+what WebKit2GTK handles worst. Windows is unaffected: WebView2 is evergreen
+Chromium.
+
+There is no scheduled rescue. Tauri has no committed v3 roadmap; CEF-for-Linux
+and Servo are "on the radar," and `tauri-runtime-verso` has been experimental
+since March 2025.
+
+## What this changes about the plan
+
+The body's phasing is still right. One gate is added, and it moves **first**:
+
+**Phase 0 gains a go/no-go.** Before any seam work, build a Linux AppImage and
+put the **real editor, a board, and a sheet** in front of WebKit2GTK in a VM.
+Type, drag-select, draw, scroll a sheet. This is roughly a day and it is the
+only test that can invalidate the plan — every other risk here is bounded
+mechanical work.
+
+- **Pass** → proceed exactly as the body describes.
+- **Fail** → the answer is *not* an Electron migration (see the decision record
+  in `docs/design/shell-runtime-decision.md`). The options are: ship Linux
+  degraded and honest; wait for Verso/CEF; or, because `src/lib/tauri.ts` is the
+  only frontend seam, a Linux-only alternative shell driving the same bundle
+  against the same Rust core. That last one costs two shells and two release
+  pipelines — it is a fallback, not a plan.
+
+**The Linux `cargo build` probe should be `workflow_dispatch`-only.** Its purpose
+is to *fail* and enumerate seams; wiring it to `push` would put a permanently red
+lane on every commit and break the repo's green rule.
+
+## Packaging gap found during this audit
+
+`src-tauri/tauri.conf.json` sets `bundle.targets` to `["app"]` — macOS only, and
+not even `dmg` (release.sh builds the DMG itself). Linux (`appimage`, `deb`) and
+Windows (`nsis`/`msi`) targets do not exist yet, so no non-Mac artifact can be
+produced today even if the crate compiled. Adding them is trivial; noting it so
+"Phase 0 ships an AppImage" is not mistaken for a one-line config change plus
+signing that is already in place. Windows Authenticode remains the one
+procurement item.
+
+## Blocking context (2026-08-06)
+
+Hosted CI is **billing-blocked**: the last six `Regression suite` runs all
+concluded `failure` with **0 steps executed** in every job. Until that clears,
+neither the Linux `cargo build` probe nor any other CI-based portability
+evidence can run. This is the practical first blocker on the whole
+cross-platform track, ahead of any code change.

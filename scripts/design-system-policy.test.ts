@@ -31,6 +31,16 @@ describe("flat CSS policy", () => {
     ]);
   });
 
+  test("rejects resuming animation against the idle pause", () => {
+    expect(
+      flatCssViolations(".spinner { animation-play-state: running; }", "src/styles/example.css"),
+    ).toEqual(["src/styles/example.css: animation-play-state:running defeats the idle pause in base.css"]);
+  });
+  test("allows pausing animation", () => {
+    expect(flatCssViolations(".spinner { animation-play-state: paused; }", "src/styles/example.css")).toEqual(
+      [],
+    );
+  });
   test("allows flat semantic hierarchy and a class named filter", () => {
     const css =
       ".filter:focus-within { border-color: var(--border-strong); outline: 2px solid var(--accent); }";

@@ -103,3 +103,16 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* A window that is put away must not keep compositing. Chromium suspends an
+ * occluded renderer; WKWebView makes no such promise and WebKitGTK is worse, so
+ * rotli parks its own animation instead of trusting the engine — every public
+ * Tauri "200% CPU while idle" report is an animation nobody could see.
+ * lib/idleMotion.ts stamps data-idle from the Page Visibility API; this one rule
+ * covers every animation, including ones not written yet. Enforced by
+ * check:design-system. */
+:root[data-idle="hidden"] *,
+:root[data-idle="hidden"] *::before,
+:root[data-idle="hidden"] *::after {
+  animation-play-state: paused !important;
+}

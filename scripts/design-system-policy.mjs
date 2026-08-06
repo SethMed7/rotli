@@ -15,6 +15,12 @@ export function flatCssViolations(source, file) {
   if (/(?:repeating-)?radial-gradient\s*\(/i.test(css)) {
     violations.push(`${file}: radial gradients are forbidden; use a solid semantic surface or scrim`);
   }
+  // A hidden window must stay parked. `running` is the CSS default, so writing
+  // it can only mean overriding base.css's idle pause — which would let an
+  // animation composite while nobody can see it (the Tauri idle-CPU bug).
+  if (/animation-play-state\s*:\s*running/i.test(css)) {
+    violations.push(`${file}: animation-play-state:running defeats the idle pause in base.css`);
+  }
   if (file !== "src/styles/base.css" && file !== "src/styles/themes.css" && /var\(--rotli-/i.test(css)) {
     violations.push(`${file}: product CSS must consume semantic roles, not fixed --rotli-* palette tokens`);
   }

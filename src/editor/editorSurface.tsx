@@ -52,12 +52,27 @@ function createdLabel(ts: number): string {
 }
 
 /** "just now" must not read "just now" an hour later — a quiet half-minute
- * tick keeps the relative time honest without re-rendering the editor. */
+ * tick keeps the relative time honest without re-rendering the editor.
+ *
+ * The tick skips hidden windows: rotli lives in the menu bar, so this would
+ * otherwise re-render every open editor pane twice a minute for hours nobody is
+ * looking at. Coming back re-ticks immediately, so the label is fresh on sight
+ * instead of up to 30s stale — the guard is also the better behavior. */
 function UpdatedAt({ ts }: { ts: number }) {
   const [, setTick] = useState(0);
   useEffect(() => {
-    const timer = setInterval(() => setTick((n) => n + 1), 30_000);
-    return () => clearInterval(timer);
+    const bump = () => setTick((n) => n + 1);
+    const timer = setInterval(() => {
+      if (!document.hidden) bump();
+    }, 30_000);
+    const onVisible = () => {
+      if (!document.hidden) bump();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
   return <>{relativeLabel(ts)}</>;
 }

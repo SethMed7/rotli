@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A window you have put away stops animating.** rotli lives in the menu bar,
+  so its window spends most of its life out of sight; every animation now parks
+  itself while the window is hidden and resumes when you come back. The relative
+  "updated" time in the editor stops ticking too, and refreshes the moment the
+  window returns — fresher on sight than before.
 - **The website is ready for search and link previews.** Its production build
   now publishes canonical and Open Graph metadata, a sitemap, robots guidance,
   and a useful not-found page.
