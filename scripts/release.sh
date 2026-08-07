@@ -176,6 +176,34 @@ CI=true bun run tauri build --bundles app \
   --config '{"bundle":{"createUpdaterArtifacts":true}}'
 
 [ -d "$APP" ] || { echo "✗ no .app at $APP"; exit 1; }
+
+# ── 1a. the bundle must not absorb local development junk ────────────────────
+# tauri.conf.json copies `../breve-runtime/` wholesale into Resources. That
+# folder is also where Breve resolves its production deps at runtime
+# (routines.rs `bun install --production`), so a machine that has ever run a
+# Breve routine grows a gitignored `defaults/node_modules` — and the next
+# release build sweeps it into the .app.
+#
+# This is not hypothetical: 0.78.0's first attempt shipped 462 MB of it, a
+# 28 MB app became 491 MB, and Apple rejected notarization because
+# onnxruntime-node's prebuilt .dylib/.node are unsigned. Ten minutes of Apple
+# round-trip to learn something `find` answers instantly. Worse, without this
+# the contents of a release depend on whether the releasing machine happens to
+# have run the app — so check the BUILT BUNDLE, not the source tree: the output
+# is the only place that catches every future variant of "junk got copied in."
+STRAY_MODULES="$(find "$APP" -type d -name node_modules -prune 2>/dev/null || true)"
+if [ -n "$STRAY_MODULES" ]; then
+  echo "✗ the built .app contains node_modules — refusing to notarize."
+  echo "$STRAY_MODULES" | sed 's/^/    /'
+  echo "  These are bundled resources, not dependencies of the app. Prebuilt"
+  echo "  native binaries inside them are unsigned and Apple will reject the"
+  echo "  submission. Remove them and rebuild, e.g.:"
+  echo "    rm -rf breve-runtime/defaults/node_modules"
+  echo "  (safe: Breve's live runtime keeps its own copy under the memex's"
+  echo "  .rotli/breve/, and breve-runtime/defaults/ is a tracked template.)"
+  exit 1
+fi
+
 # Tauri signs the .app with the hardened runtime (signingIdentity + entitlements).
 # We don't pre-check the flag — notarytool below is the real gate: Apple REJECTS a
 # non-hardened app, so an Accepted result IS the hardened-runtime proof.

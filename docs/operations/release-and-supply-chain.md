@@ -26,6 +26,13 @@ recoverable:
    ignored.
 7. A rollback or superseding release can be issued without weakening signature
    verification or overwriting historical evidence.
+8. **The bundle contains only what the repository declares.** A release must not
+   vary with the state of the machine that built it. `tauri.conf.json` copies
+   `breve-runtime/` wholesale into `Resources`, and Breve resolves its own
+   production dependencies inside that folder at runtime, so a machine that has
+   run a routine grows a gitignored `node_modules` that a naive build would
+   ship. `scripts/predmg-clean.sh` removes such trees before the build and
+   `scripts/release.sh` fails closed on the built `.app` if any survive.
 
 Releasing, installing, or changing a delivery channel remains an explicitly
 authorized operation. Passing local checks does not authorize publication.
@@ -37,6 +44,8 @@ The current script:
 - runs the JavaScript/TypeScript proof chain;
 - requires a successful hosted `Regression suite` conclusion for the exact
   source commit before publication;
+- clears stale DMG volumes and any `node_modules` under `breve-runtime/`, then
+  refuses to notarize a built `.app` that still contains one;
 - builds a Developer ID-signed app with hardened runtime;
 - notarizes and staples the app;
 - regenerates and signs the updater archive from the stapled app;

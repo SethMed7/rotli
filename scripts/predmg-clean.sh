@@ -26,4 +26,21 @@ hdiutil info 2>/dev/null \
 # 2) remove the leftover read-write scratch image, if any
 rm -f "$ROOT"/src-tauri/target/release/bundle/macos/rw.*.dmg 2>/dev/null || true
 
+# 3) drop dependency trees under breve-runtime/. tauri.conf.json copies that
+#    folder wholesale into the .app's Resources, and Breve resolves its own
+#    production deps there at runtime (routines.rs `bun install --production`),
+#    so a machine that has run a routine grows a gitignored node_modules the
+#    next build would bundle. 0.78.0's first attempt shipped 462 MB of it: a
+#    28 MB app became 491 MB and Apple rejected the notarization because
+#    onnxruntime-node's prebuilt binaries are unsigned. Regenerable by design
+#    and NOT the live runtime — Breve keeps that under the memex's
+#    .rotli/breve/ — so removing it is a no-op for anything real. Announced,
+#    never silent, because it can be hundreds of megabytes.
+find "$ROOT/breve-runtime" -type d -name node_modules -prune -print 2>/dev/null \
+  | while read -r stray; do
+      [ -n "$stray" ] || continue
+      echo "  predmg-clean: removing bundled-resource node_modules → ${stray#"$ROOT"/}"
+      rm -rf "$stray"
+    done || true   # nothing matched ⇒ tolerate under pipefail
+
 exit 0
