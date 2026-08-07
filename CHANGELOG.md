@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dropped photos land where you point.** Markdown now captures the exact drop
   position before importing a photo, so import time, scrolling, or a moved
   caret cannot redirect the image link elsewhere in the note.
+- **Photos stay inside Markdown lists.** Dropping a photo onto an empty bullet,
+  numbered item, or task now fills that list item instead of leaving a blank
+  marker and inserting the image outside the list.
 
 ## [0.78.0] - 2026-08-06
 

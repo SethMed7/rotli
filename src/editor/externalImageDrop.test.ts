@@ -12,7 +12,10 @@ describe("importImagesAtDrop", () => {
     const dispatched: Array<{ from: number; insert: string; anchor: number }> = [];
     const view = {
       posAtCoords: () => pointerPosition,
-      state: { selection: { main: { head: 1 } } },
+      state: {
+        selection: { main: { head: 1 } },
+        doc: { lineAt: () => ({ from: 0, to: 4, text: "body" }) },
+      },
       dispatch: ({
         changes,
         selection,
@@ -36,4 +39,40 @@ describe("importImagesAtDrop", () => {
       },
     ]);
   });
+
+  for (const { label, source } of [
+    { label: "bulleted", source: "- " },
+    { label: "numbered", source: "1. " },
+    { label: "task", source: "- [ ] " },
+  ]) {
+    test(`keeps a photo inside an empty ${label} list item`, async () => {
+      const at = source.length;
+      const dispatched: Array<{ from: number; insert: string; anchor: number }> = [];
+      const view = {
+        posAtCoords: () => at,
+        state: {
+          selection: { main: { head: at } },
+          doc: {
+            lineAt: () => ({ from: 0, to: source.length, text: source }),
+          },
+        },
+        dispatch: ({
+          changes,
+          selection,
+        }: {
+          changes: { from: number; insert: string };
+          selection: { anchor: number };
+        }) => dispatched.push({ ...changes, anchor: selection.anchor }),
+        focus: () => {},
+      };
+
+      await importImagesAtDrop(view, ["/tmp/photo.png"], { x: 10, y: 10 }, async () =>
+        Promise.resolve("storage/photo.png"),
+      );
+
+      expect(dispatched[0]?.from).toBe(at);
+      expect(dispatched[0]?.insert).toBe("![](storage:photo.png)\n");
+      expect(source + (dispatched[0]?.insert ?? "")).toBe(`${source}![](storage:photo.png)\n`);
+    });
+  }
 });
