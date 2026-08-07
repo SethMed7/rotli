@@ -6,8 +6,8 @@ Canonical repository instructions for AI-assisted work. Human contributors use
 ## Start
 
 1. Read `README.md`, this file, and the relevant contract from `docs/README.md`.
-2. If project CARL tools are available, call `carl_recall` with the task topic
-   before broad scans; otherwise read the matching `.carl/carl.json` domain.
+2. Call `carl_recall` with the task topic before broad scans; without it, read
+   the matching `.carl/carl.json` domain.
 3. Inspect implementation, focused tests, and `git status --short`. Preserve all
    unrelated work.
 
@@ -87,15 +87,13 @@ work, and any commit/publish/install/restart.
 
 ## Documentation ownership
 
-- README.md / CONTRIBUTING.md / PRODUCT.md / ROADMAP.md: public docs
-- `AGENTS.md`: always-loaded AI rules
-- `ARCHITECTURE.md` / `DESIGN.md` / `SYNTAX.md`: project-level contracts
-- `.carl/carl.json`: compact topic recall and decisions
-- `docs/README.md`: current contract map
-- `docs/architecture/`: code-facing contracts and dated audits
-- `breve-runtime/README.md`: managed runtime boundary
-- `src/brand/README.md`: brand implementation
-- `docs/archive/`: historical context only
+- `AGENTS.md`: always-loaded rules, canonical for EVERY agent. Entry points:
+  `CLAUDE.md` (Claude), `.codex/config.toml` (Codex)
+- `.carl/carl.json`: topic recall + decisions. A hook injects it for Claude;
+  Codex must call `carl_recall` itself, read-only (`check:docs` asserts both)
+- `docs/README.md`: contract map · `docs/architecture/`: contracts and audits
+- `ARCHITECTURE.md` / `DESIGN.md` / `SYNTAX.md`: project contracts
+- README / CONTRIBUTING / PRODUCT / ROADMAP: public · `docs/archive/`: history
+- `breve-runtime/README.md`, `src/brand/README.md`: runtime and brand
 
-Tool adapters should point here, not copy policy. Carl should route an agent to
-the smallest relevant contract rather than becoming another large manual.
+CARL routes to the smallest relevant contract; adapters point here, not copy it.
