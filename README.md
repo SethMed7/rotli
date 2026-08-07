@@ -44,6 +44,11 @@ your vault/                 ← one folder, openable in any editor
 
 You just capture. The **Librarian** — a small **on-device** helper — files each note into the **Library**'s areas like *People*, *Projects*, and *Research*. You never have to think about where a note goes, yet it's always exactly where you'd look for it. Prefer no AI at all? Choose a **raw vault** and the Librarian never runs — just your files, organized by you.
 
+Already have an Obsidian, ZenNotes, or ordinary Markdown folder? First run can
+inspect it without writing, then either open it in place or import a copy. Its
+nested folders become the initial Main reference tree; the files remain one
+tree on disk, never duplicated into a Rotli database.
+
 ## Main and the Library — one file, two ways in
 
 This is the idea rotli is built around, so it's worth thirty seconds:

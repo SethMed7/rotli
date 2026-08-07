@@ -116,6 +116,25 @@ destructive states, plus narrow-window behavior. Long content, missing content,
 keyboard-only navigation, and focus recovery are normal cases rather than
 polish work.
 
+## First-run setup
+
+- App setup and vault activation are separate. Skipping app setup applies the
+  documented calm defaults, but never chooses or creates a notes folder; the
+  next surface still asks the user to create or open a vault.
+- The companion character appears on every setup and activation state. Motion
+  is short, one-shot, tied to a state change, and absent under reduced motion;
+  scanning may use a bounded loading indicator while work is active.
+- Progress reads as position plus step name. Choice numbers sit beside the
+  labels they invoke, radio choices use arrow-key selection, and the current
+  `⌘Enter` binding is rendered inside the primary button it activates.
+- Opening an existing Markdown folder always has a read-only inventory/review
+  step before confirmation. Open-in-place adds only hidden Rotli sidecars;
+  import-copy requires an empty destination and leaves the source untouched.
+- An adopted Obsidian, ZenNotes, or generic Markdown tree becomes the one Main
+  reference tree with its nested folders intact. It does not create a parallel
+  content store or named views, and scanning does not rewrite note bodies or
+  inject visible Rotli folders.
+
 ## Diagram interaction
 
 - A rendered Mermaid fence is an entry point to one focused workspace with

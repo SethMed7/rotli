@@ -10,6 +10,7 @@ import {
   parseHybridPresets,
   parseSettings,
   pruneMap,
+  unknownAppSettingsKeys,
   unknownSettingsKeys,
   validTab,
 } from "./persist";
@@ -267,6 +268,18 @@ describe("unknownSettingsKeys — the round-trip remainder (#35)", () => {
     expect(parseSettings(raw).theme).toBe("dark");
     expect(parseSettings(raw).themeFamily).toBe("mono");
     expect(unknownSettingsKeys(raw)).toEqual({ futureKnob: 1 });
+  });
+});
+
+describe("unknownAppSettingsKeys — machine settings stay additive", () => {
+  test("keeps future app-shell keys without duplicating known keys", () => {
+    expect(unknownAppSettingsKeys('{"theme":"dark","futureShellMode":{"quiet":true}}')).toEqual({
+      futureShellMode: { quiet: true },
+    });
+  });
+
+  test("corrupt input has no passthrough payload", () => {
+    expect(unknownAppSettingsKeys("not json")).toEqual({});
   });
 });
 

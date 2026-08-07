@@ -12,6 +12,10 @@ Detailed capability contracts and dated audits are routed from
   additional subset projections; neither owns or copies content.
 - `.rotli/` contains rebuildable indexes, projections, journals, and explicit
   settings. It must not become a second content database.
+- App-shell preferences that must exist before a vault (onboarding completion,
+  environment, window behavior, and bindings) live in the machine-local
+  `app-settings.json`. Vault content, reference trees, editor state, and AI
+  policy never cross into that sidecar.
 - Markdown is the primary knowledge surface. Conventional secondary formats are
   kept behind adapters and must remain editable or offer an explicit local
   conversion path.
@@ -45,6 +49,7 @@ by directory folklore.
 | `src-tauri/src/` | Trusted Rust host: filesystem, security, IPC, process, updater, and scheduler edges |
 | `src-tauri/src/workspace.rs` | Headless application service plus CLI/MCP adapters over the same corpus policy; no provider calls |
 | `.rotli/main.json` / `.rotli/views.json` | Portable reference trees; named-view writes synchronize Markdown `view_tag` while boards/binaries remain frontmatter-free |
+| App `app-settings.json` | Narrow machine-local onboarding and shell preferences; exists independently of any vault |
 | `breve-runtime/` | Versioned runtime that Rotli configures, installs, and supervises |
 | `src/brand/` | Semantic visual tokens, typography, icons, and embedded brand assets |
 | `scripts/` | Deterministic architecture, security, syntax, documentation, build, and release checks |

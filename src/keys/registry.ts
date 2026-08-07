@@ -28,6 +28,10 @@ export interface KeyAction {
    * through activeEditor(), so they belong to the main AND quick windows). Like
    * global, a shared chord conflicts across surfaces. */
   shared?: boolean;
+  /** Runtime availability for transient surfaces such as first-run setup. */
+  enabled?: () => boolean;
+  /** Registered for dispatch but omitted from Settings/⌘K/shortcut maps. */
+  transient?: boolean;
   run: () => void;
 }
 
@@ -44,7 +48,7 @@ export function getAction(id: string): KeyAction | undefined {
 }
 
 export function allActions(): KeyAction[] {
-  return [...actions.values()];
+  return [...actions.values()].filter((action) => !action.transient);
 }
 
 export function dispatch(actionId: string): void {
@@ -149,6 +153,7 @@ export function attachDispatcher(surface: Surface): () => void {
     for (const action of actions.values()) {
       if (action.global) continue; // OS-side, handled in Rust
       if (!action.shared && action.surface !== surface) continue;
+      if (action.enabled && !action.enabled()) continue;
       const chord = currentChord(action.id);
       if (chord && normalizeChord(chord) === pressed) {
         event.preventDefault();

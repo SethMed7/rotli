@@ -11,6 +11,7 @@
 // set_summon_shortcut, and click-away hiding is a setting (set_hide_on_blur)
 // so heavy use can keep the window resident.
 
+mod app_settings;
 mod board;
 mod breve;
 mod chat;
@@ -721,6 +722,221 @@ struct CorpusConfigView {
     active_brain_id: Option<String>,
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VaultInspection {
+    path: String,
+    label: String,
+    kind: String,
+    source: String,
+    markdown_files: usize,
+    other_files: usize,
+    folders: usize,
+    warnings: Vec<String>,
+}
+
+fn inspect_vault_path(path: &std::path::Path) -> Result<VaultInspection, String> {
+    if !path.is_dir() {
+        return Err("Choose an existing folder.".into());
+    }
+    let root = std::fs::canonicalize(path).map_err(|e| format!("open {}: {e}", path.display()))?;
+    let empty = std::fs::read_dir(&root)
+        .map_err(|e| format!("read {}: {e}", root.display()))?
+        .filter_map(Result::ok)
+        .all(|entry| entry.file_name().to_str() == Some(".DS_Store"));
+    let mut markdown_files = 0usize;
+    let mut other_files = 0usize;
+    let mut folders = 0usize;
+    let mut symlinks = 0usize;
+    let mut stack = vec![root.clone()];
+    while let Some(dir) = stack.pop() {
+        let entries = std::fs::read_dir(&dir).map_err(|e| format!("read {}: {e}", dir.display()))?;
+        for entry in entries.filter_map(Result::ok) {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name == ".rotli" || name.starts_with('.') {
+                continue;
+            }
+            let Ok(kind) = entry.file_type() else { continue };
+            if kind.is_symlink() {
+                symlinks += 1;
+            } else if kind.is_dir() {
+                folders += 1;
+                stack.push(entry.path());
+            } else if kind.is_file() {
+                if entry.path().extension().and_then(|value| value.to_str()) == Some("md") {
+                    markdown_files += 1;
+                } else {
+                    other_files += 1;
+                }
+            }
+        }
+    }
+    let source = if root.join(".obsidian").is_dir() {
+        "Obsidian vault"
+    } else if root.join(".zennotes").is_dir() || root.join(".zen").is_dir() {
+        "ZenNotes vault"
+    } else if corpus::is_memex_root(&root) {
+        "Rotli memex"
+    } else {
+        "Markdown folder"
+    };
+    let kind = if corpus::is_memex_root(&root) {
+        "memex"
+    } else if empty {
+        "empty"
+    } else {
+        "markdown"
+    };
+    let mut warnings = Vec::new();
+    if empty {
+        warnings.push("This folder is empty. Go back and choose Create a new vault instead.".into());
+    } else if markdown_files == 0 {
+        warnings.push("No Markdown files were found; other supported files will still appear.".into());
+    }
+    if symlinks > 0 {
+        warnings.push(format!(
+            "{symlinks} symbolic link{} will not be followed.",
+            if symlinks == 1 { "" } else { "s" }
+        ));
+    }
+    Ok(VaultInspection {
+        path: root.to_string_lossy().into_owned(),
+        label: root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("Notes")
+            .to_string(),
+        kind: kind.into(),
+        source: source.into(),
+        markdown_files,
+        other_files,
+        folders,
+        warnings,
+    })
+}
+
+#[tauri::command]
+async fn corpus_inspect_folder(path: String) -> Result<VaultInspection, String> {
+    tauri::async_runtime::spawn_blocking(move || inspect_vault_path(std::path::Path::new(&path)))
+        .await
+        .map_err(|e| format!("vault inspection worker failed ({e})"))?
+}
+
+fn copy_vault_tree(source: &std::path::Path, destination: &std::path::Path) -> Result<(), String> {
+    let source = std::fs::canonicalize(source).map_err(|e| format!("open source: {e}"))?;
+    let destination = std::fs::canonicalize(destination).map_err(|e| format!("open destination: {e}"))?;
+    if source == destination || destination.starts_with(&source) || source.starts_with(&destination) {
+        return Err("Choose a separate destination outside the source vault.".into());
+    }
+    let has_entries = std::fs::read_dir(&destination)
+        .map_err(|e| e.to_string())?
+        .filter_map(Result::ok)
+        .any(|entry| entry.file_name().to_str() != Some(".DS_Store"));
+    if has_entries {
+        return Err("Import a copy into an empty folder.".into());
+    }
+    let mut stack = vec![(source.clone(), destination.clone())];
+    while let Some((from, to)) = stack.pop() {
+        std::fs::create_dir_all(&to).map_err(|e| format!("create {}: {e}", to.display()))?;
+        for entry in std::fs::read_dir(&from).map_err(|e| format!("read {}: {e}", from.display()))? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let name = entry.file_name();
+            if name.to_str() == Some(".rotli") {
+                continue;
+            }
+            let kind = entry.file_type().map_err(|e| e.to_string())?;
+            if kind.is_symlink() {
+                continue;
+            }
+            let target = to.join(&name);
+            if kind.is_dir() {
+                stack.push((entry.path(), target));
+            } else if kind.is_file() {
+                std::fs::copy(entry.path(), &target)
+                    .map_err(|e| format!("copy {}: {e}", entry.path().display()))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod vault_activation_tests {
+    use super::{copy_vault_tree, inspect_vault_path};
+
+    #[test]
+    fn inspection_is_read_only_and_copy_preserves_the_foreign_tree() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let source = temp.path().join("obsidian");
+        let destination = temp.path().join("copy");
+        std::fs::create_dir_all(source.join("Projects/Nested")).unwrap();
+        std::fs::create_dir_all(source.join(".obsidian")).unwrap();
+        std::fs::create_dir_all(source.join(".rotli")).unwrap();
+        std::fs::create_dir_all(&destination).unwrap();
+        std::fs::write(source.join("Projects/Nested/plan.md"), "# Plan\n").unwrap();
+        std::fs::write(source.join(".obsidian/app.json"), "{}").unwrap();
+        std::fs::write(source.join(".rotli/main.json"), "old rotli state").unwrap();
+
+        let report = inspect_vault_path(&source).unwrap();
+        assert_eq!(report.source, "Obsidian vault");
+        assert_eq!(report.markdown_files, 1);
+        assert_eq!(report.folders, 2);
+        assert_eq!(std::fs::read_to_string(source.join("Projects/Nested/plan.md")).unwrap(), "# Plan\n");
+
+        copy_vault_tree(&source, &destination).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(destination.join("Projects/Nested/plan.md")).unwrap(),
+            "# Plan\n"
+        );
+        assert!(destination.join(".obsidian/app.json").is_file());
+        assert!(!destination.join(".rotli").exists(), "source-specific Rotli state must not copy");
+    }
+
+    #[test]
+    fn copy_refuses_a_nonempty_destination_before_writing() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let source = temp.path().join("source");
+        let destination = temp.path().join("destination");
+        std::fs::create_dir_all(&source).unwrap();
+        std::fs::create_dir_all(&destination).unwrap();
+        std::fs::write(source.join("note.md"), "# Note\n").unwrap();
+        std::fs::write(destination.join("keep.md"), "# Keep\n").unwrap();
+
+        assert!(copy_vault_tree(&source, &destination).is_err());
+        assert_eq!(std::fs::read_to_string(destination.join("keep.md")).unwrap(), "# Keep\n");
+        assert!(!destination.join("note.md").exists());
+    }
+}
+
+#[tauri::command]
+async fn corpus_import_vault_copy(
+    app: AppHandle,
+    source: String,
+    destination: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _lane = vault_lane();
+        if cfg!(debug_assertions) {
+            return Err("Importing a primary vault is disabled in development.".into());
+        }
+        let source = std::path::PathBuf::from(source);
+        let destination = std::path::PathBuf::from(destination);
+        let inspection = inspect_vault_path(&source)?;
+        copy_vault_tree(&source, &destination)?;
+        corpus::set_corpus_path(&app, destination, inspection.kind != "memex")?;
+        app.restart();
+    })
+    .await
+    .map_err(|e| format!("vault import worker failed ({e})"))?
+}
+
+/// Read-only first-run gate. Unlike `corpus_list_config`, this never migrates,
+/// scaffolds, or creates a default notes folder.
+#[tauri::command]
+fn corpus_status(app: AppHandle) -> bool {
+    corpus::is_configured(&app)
+}
+
 /// The whole Location config. Migrates the four legacy files in on first read.
 #[tauri::command]
 fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
@@ -789,27 +1005,32 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
             picked.into_path().map_err(|e| e.to_string())?
         }
     };
-    let current = corpus::resolve_corpus(&app);
-    if abs == current {
+    let current = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
+    if current.as_ref() == Some(&abs) {
         return Ok(false);
     }
     match memex::detect_folder(&abs).kind.as_str() {
         "memex" => {
-            corpus::carry_settings(&current, &abs)?;
-            corpus::set_corpus_path(&app, abs)?;
+            if let Some(current) = &current {
+                corpus::carry_settings(current, &abs)?;
+            }
+            corpus::set_corpus_path(&app, abs, false)?;
         }
         "fresh" => {
-            if !corpus::is_memex_root(&current) {
-                corpus::relocate(&current, &abs)?;
+            if let Some(current) = &current {
+                if !corpus::is_memex_root(current) {
+                    corpus::relocate(current, &abs)?;
+                }
+                // relocate carries .rotli/ along; this is a no-op in that case
+                corpus::carry_settings(current, &abs)?;
             }
-            // relocate carried .rotli/ along; this covers the memex-root
-            // branch above it (no relocate) — a no-op when settings exist
-            corpus::carry_settings(&current, &abs)?;
-            corpus::set_corpus_path(&app, abs)?;
+            corpus::set_corpus_path(&app, abs, false)?;
         }
         _ => {
-            corpus::carry_settings(&current, &abs)?;
-            corpus::set_corpus_path(&app, abs)?;
+            if let Some(current) = &current {
+                corpus::carry_settings(current, &abs)?;
+            }
+            corpus::set_corpus_path(&app, abs, true)?;
         }
     }
     app.restart();
@@ -821,13 +1042,13 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
 /// ASYNC command (vault-lane pass, 2026-07-31): scaffold + settings carry +
 /// config rewrite ran on the main thread right behind the picker — worker now.
 #[tauri::command]
-async fn corpus_init_memex(app: AppHandle, path: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || corpus_init_memex_blocking(app, path))
+async fn corpus_init_memex(app: AppHandle, path: String, brain_enabled: bool) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || corpus_init_memex_blocking(app, path, brain_enabled))
         .await
         .map_err(|e| format!("vault worker failed ({e})"))?
 }
 
-fn corpus_init_memex_blocking(app: AppHandle, path: String) -> Result<(), String> {
+fn corpus_init_memex_blocking(app: AppHandle, path: String, brain_enabled: bool) -> Result<(), String> {
     let _lane = vault_lane();
     if cfg!(debug_assertions) {
         return Err("Creating or replacing the primary memex is disabled in development.".into());
@@ -836,9 +1057,29 @@ fn corpus_init_memex_blocking(app: AppHandle, path: String) -> Result<(), String
     memex::scaffold_memex(&root)?;
     // a scaffolded memex has no .rotli — carry the onboarding flow's choices
     // (Librarian-vs-raw included) so the new vault honors what was just picked
-    corpus::carry_settings(&corpus::resolve_corpus(&app), &root)?;
-    corpus::set_corpus_path(&app, root)?;
+    if corpus::is_configured(&app) {
+        corpus::carry_settings(&corpus::resolve_corpus(&app), &root)?;
+    }
+    write_vault_brain_choice(&root, brain_enabled)?;
+    corpus::set_corpus_path(&app, root, false)?;
     app.restart();
+}
+
+fn write_vault_brain_choice(root: &std::path::Path, enabled: bool) -> Result<(), String> {
+    let dot = root.join(".rotli");
+    std::fs::create_dir_all(&dot).map_err(|e| format!("create {}: {e}", dot.display()))?;
+    let path = dot.join("settings.json");
+    let mut value = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+        .filter(serde_json::Value::is_object)
+        .unwrap_or_else(|| serde_json::json!({ "v": 1 }));
+    value
+        .as_object_mut()
+        .expect("object filtered above")
+        .insert("brainEnabled".into(), serde_json::Value::Bool(enabled));
+    let json = serde_json::to_string_pretty(&value).map_err(|e| e.to_string())? + "\n";
+    fsutil::atomic_write(&path, &json, ".rotli-vault-settings-")
 }
 
 /// Create a PRACTICE vault (vault platform, 2026-07-26): scaffold a fresh
@@ -861,7 +1102,7 @@ fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<(), String> {
         return Err("Creating or replacing the primary memex is disabled in development.".into());
     }
     use tauri::Manager;
-    let current = corpus::resolve_corpus(&app);
+    let current = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
     let home = app.path().home_dir().map_err(|e| e.to_string())?;
     let mut root = home.join("rotli Practice Vault");
     let mut n = 1;
@@ -870,18 +1111,20 @@ fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<(), String> {
         root = home.join(format!("rotli Practice Vault {n}"));
     }
     memex::scaffold_memex(&root)?;
-    corpus::carry_settings(&current, &root)?;
+    if let Some(current) = &current {
+        corpus::carry_settings(current, &root)?;
+    }
     // best-effort: the practice vault must open even if the courtesy
     // registration of the outgoing vault is refused (plain folders have no
     // memex identity to register — they stay reachable via Location settings)
-    if corpus::is_memex_root(&current) {
+    if let Some(current) = current.filter(|path| corpus::is_memex_root(path)) {
         if let Ok(meta) = memex::prepare_brain_connect(&current) {
             let _ = corpus::upsert_brain(
                 &app,
                 corpus::ConnectedBrain {
                     id: String::new(),
                     label: meta.label,
-                    abs_path: current.clone(),
+                    abs_path: current,
                     memex_id: Some(meta.memex_id),
                     mode: meta.mode,
                     perms: meta.perms,
@@ -890,7 +1133,7 @@ fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<(), String> {
             );
         }
     }
-    corpus::set_corpus_path(&app, root)?;
+    corpus::set_corpus_path(&app, root, false)?;
     app.restart();
 }
 
@@ -1193,6 +1436,9 @@ pub fn run() {
             corpus_add_folder,
             corpus_forget_folder,
             corpus_list_config,
+            corpus_status,
+            corpus_inspect_folder,
+            corpus_import_vault_copy,
             corpus_choose_folder,
             corpus_init_memex,
             corpus_create_practice_vault,
@@ -1207,6 +1453,8 @@ pub fn run() {
             set_app_icon,
             set_demo_mode,
             demo_mode,
+            app_settings::app_settings_read,
+            app_settings::app_settings_write,
             corpus::corpus_list,
             corpus::corpus_search,
             corpus::corpus_read,
@@ -1353,15 +1601,21 @@ pub fn run() {
             // #3 (audit 2026-07): a connected brain's USER-SET perms must reach the
             // Rust write gates, not only the TS canWrite — carry them by root id.
             let brain_perms: std::collections::HashMap<String, memex::MemexPerms> =
-                corpus::ensure_corpus_config(app.handle())
-                    .brains
-                    .into_iter()
-                    .map(|b| (b.id, b.perms))
-                    .collect();
+                if corpus::is_configured(app.handle()) {
+                    corpus::ensure_corpus_config(app.handle())
+                        .brains
+                        .into_iter()
+                        .map(|b| (b.id, b.perms))
+                        .collect()
+                } else {
+                    std::collections::HashMap::new()
+                };
             let roots = corpus::startup_roots(app.handle());
             for root in roots {
                 let opened = if cfg!(debug_assertions) {
                     corpus::CorpusStore::open_read_only(root.abs_path.clone())
+                } else if root.adopted {
+                    corpus::CorpusStore::open_adopted(root.abs_path.clone())
                 } else {
                     corpus::CorpusStore::open(root.abs_path.clone())
                 };
@@ -1430,6 +1684,14 @@ pub fn run() {
                                 "rotli: could not warm the secure-note ledger for root {} ({e}) — egress backstop degraded to read_for_ai only",
                                 root.id
                             );
+                        }
+                        if root.adopted {
+                            if let Err(e) = store.seed_main_from_disk_if_missing() {
+                                eprintln!(
+                                    "rotli: could not mirror adopted vault {} into Main ({e})",
+                                    root.id
+                                );
+                            }
                         }
                         registry.insert(root.id, store);
                     }

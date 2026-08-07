@@ -70,7 +70,8 @@ export const connectBrain = (path?: string): Promise<boolean> => corpusConnectBr
 
 /** Onboarding "create a new brain": scaffold a fresh memex at `path` and make it
  * the corpus (the corpus IS a memex). Relaunches on success. */
-export const initMemexAsCorpus = (path: string): Promise<void> => corpusInitMemex(path);
+export const initMemexAsCorpus = (path: string, brainEnabled = true): Promise<void> =>
+  corpusInitMemex(path, brainEnabled);
 
 /** Scaffold + switch to a scratch PRACTICE vault (2026-07-26); the outgoing
  * vault stays registered and untouched. Relaunches on success. */

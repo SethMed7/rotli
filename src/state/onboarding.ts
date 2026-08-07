@@ -30,10 +30,10 @@ export async function resetAndReonboard(): Promise<void> {
 
   // theme + the General flags + the gate → defaults, in one store write
   useUiStore.setState({
-    theme: "light",
-    themeFamily: "warm",
-    matchLightFamily: "warm",
-    matchDarkFamily: "warm",
+    theme: "system",
+    themeFamily: "mono",
+    matchLightFamily: "mono",
+    matchDarkFamily: "mono",
     syntaxPalette: "rotli",
     stayOpen: false,
     showInDock: false,

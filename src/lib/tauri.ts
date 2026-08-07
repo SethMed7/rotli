@@ -89,6 +89,18 @@ export async function setAppIcon(variant: string): Promise<void> {
   await invoke("set_app_icon", { variant });
 }
 
+/** Machine-level shell/onboarding preferences. These exist before a vault and
+ * intentionally contain no notes, views, or vault-scoped AI policy. */
+export async function appSettingsRead(): Promise<string> {
+  if (!isTauri()) return "{}";
+  return invoke<string>("app_settings_read");
+}
+
+export async function appSettingsWrite(contents: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("app_settings_write", { contents });
+}
+
 /** Demo mode — swap to an isolated demo corpus (or back) + relaunch. Never
  * touches the real corpus config, so real notes are perfectly safe. */
 export async function setDemoMode(on: boolean): Promise<void> {
@@ -1223,6 +1235,49 @@ export interface CorpusConfigView {
   activeBrainId: string | null;
 }
 
+/** True only after the user has selected or created a primary vault. This is a
+ * read-only probe and never creates the historical default folder. */
+export function corpusStatus(): Promise<boolean> {
+  if (!isTauri()) return Promise.resolve(true);
+  return invoke<boolean>("corpus_status");
+}
+
+export interface VaultInspection {
+  path: string;
+  label: string;
+  kind: "memex" | "markdown" | "empty";
+  source: string;
+  markdownFiles: number;
+  otherFiles: number;
+  folders: number;
+  warnings: string[];
+}
+
+/** Read-only preflight for an existing vault. No `.rotli` files are written
+ * until the review screen is confirmed. */
+export function corpusInspectFolder(path: string): Promise<VaultInspection> {
+  if (!isTauri()) {
+    return Promise.resolve({
+      path,
+      label: path.split("/").pop() ?? "Notes",
+      kind: "markdown",
+      source: "Markdown folder",
+      markdownFiles: 24,
+      otherFiles: 3,
+      folders: 7,
+      warnings: [],
+    });
+  }
+  return invoke<VaultInspection>("corpus_inspect_folder", { path });
+}
+
+/** Copy a reviewed third-party Markdown tree into an empty destination, then
+ * activate the copy. The source is never modified. */
+export async function corpusImportVaultCopy(source: string, destination: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_import_vault_copy", { source, destination });
+}
+
 /** The whole Location config; migrates the four legacy files in on first read.
  * Browser preview gets a sane empty config so the UI still renders. */
 export function corpusListConfig(): Promise<CorpusConfigView> {
@@ -1253,9 +1308,9 @@ export async function corpusChooseFolder(path?: string): Promise<boolean> {
 
 /** Onboarding "create a new vault": scaffold a fresh memex at `path` and make it
  * your corpus (the corpus IS a memex). Relaunches on success. */
-export async function corpusInitMemex(path: string): Promise<void> {
+export async function corpusInitMemex(path: string, brainEnabled = true): Promise<void> {
   if (!isTauri()) return;
-  await invoke("corpus_init_memex", { path });
+  await invoke("corpus_init_memex", { path, brainEnabled });
 }
 
 /** Scaffold + switch to a scratch PRACTICE vault at an app-chosen home

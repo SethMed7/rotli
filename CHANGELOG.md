@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **First run now feels like part of the app.** The character accompanies every
+  setup screen with short state-based motion, numbered choices keep their number
+  beside the label, arrow keys select cards, and the live `⌘Enter` shortcut sits
+  inside the Continue button it activates.
+- **Bring an existing Markdown vault.** rotli inventories Obsidian, ZenNotes,
+  and ordinary Markdown folders without writing, then offers opening in place or
+  importing into an empty destination. Nested folders seed one Main reference
+  tree; note content is neither copied into a database nor rewritten.
+
+### Changed
+
+- **Skipping setup no longer chooses a notes location.** It applies the calm
+  Paper/Charcoal system defaults and continues to an explicit Create or Open
+  Vault screen. Fresh installs no longer silently create `~/Documents/rotli`.
+
 ### Fixed
 
 - **New items stay in the Main folder you chose.** Clicking or keyboard-opening

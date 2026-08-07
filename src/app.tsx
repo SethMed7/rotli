@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { EditorView } from "@codemirror/view";
+
 import "./styles/base.css";
 import "./styles/app.css";
 import "./styles/notes.css";
@@ -10,22 +11,25 @@ import "./styles/onboarding.css";
 import "./styles/board.css";
 import "./styles/memex.css";
 import "./styles/breve.css";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { useEffect, useState } from "react";
 // Excalidraw's vendor stylesheet (~144 KB raw / 23 KB gz) + canvas.css are no
 // longer eager here — they load with the lazy board engine (boards/engine/
 // excalidraw.tsx), so a session that never opens a board never pays for them at
 // startup (perf audit 2026-08).
 import { Suspense, lazy } from "react";
+
 import { CaptureCard } from "./components/captureCard";
+import { chatDropAt } from "./components/chatDrop";
+import { ContextMenu } from "./components/contextMenu";
+import { HotkeyBadges } from "./components/hotkeyBadges";
 import { NotesSurface } from "./components/notesSurface";
 import { Palette } from "./components/palette";
 import { PreviewModal } from "./components/previewModal";
-import { ContextMenu } from "./components/contextMenu";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
 import { BoardNameDialog } from "./components/boardNameDialog";
 import { Titlebar } from "./components/titlebar";
-import { chatDropAt } from "./components/chatDrop";
-import { HotkeyBadges } from "./components/hotkeyBadges";
 import { WhichKey } from "./components/whichKey";
 import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
@@ -51,32 +55,24 @@ import {
   setHideOnBlur,
   workspaceTakeOpenRequest,
 } from "./lib/tauri";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { EditorView } from "@codemirror/view";
 import { importImagesAtDrop } from "./editor/externalImageDrop";
 import { activeInstance, isWritable } from "./memex/config";
-import {
-  chooseFolder,
-  createPracticeVault,
-  initMemexAsCorpus,
-  loadConfig as memexLoadConfig,
-  writeNote,
-} from "./memex/service";
+import { loadConfig as memexLoadConfig, writeNote } from "./memex/service";
 import { summonChat } from "./services/chatSummon";
-import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
-import { useOrganizerLive } from "./state/organizerLive";
-import { flushSettingsNow } from "./state/persist";
-import { hydrateMain } from "./state/main";
-import { hydrateViews } from "./state/views";
-import { useMemexStore } from "./state/memex";
 import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateJournal, invalidateNotes } from "./services/hooks";
-import { queryClient } from "./services/query";
+import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
 import { notesService } from "./services/notes";
+import { queryClient } from "./services/query";
+import { hydrateMain } from "./state/main";
+import { useOrganizerLive } from "./state/organizerLive";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
+import { flushSettingsNow } from "./state/persist";
 import { applyQuickState } from "./state/quick";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./state/theme";
 import { useUiStore } from "./state/ui";
+import { useVaultStore } from "./state/vault";
+import { hydrateViews } from "./state/views";
 
 // Settings and Onboarding are full-surface fronts most sessions never (or
 // once) open — split them off the entry chunk like paneTree's CanvasSurface
@@ -85,6 +81,9 @@ const SettingsSurface = lazy(() =>
   import("./components/settingsSurface").then((m) => ({ default: m.SettingsSurface })),
 );
 const Onboarding = lazy(() => import("./components/onboarding").then((m) => ({ default: m.Onboarding })));
+const VaultActivation = lazy(() =>
+  import("./components/vaultActivation").then((m) => ({ default: m.VaultActivation })),
+);
 
 registerDefaultActions();
 
@@ -141,12 +140,14 @@ function MainShell() {
   const setOnboarded = useUiStore((s) => s.setOnboarded);
   const onboardingVersion = useUiStore((s) => s.onboardingVersion);
   const setOnboardingVersion = useUiStore((s) => s.setOnboardingVersion);
+  const vaultStatus = useVaultStore((s) => s.status);
   // first run (the real app only). The version gate ALSO re-onboards on every 0.x
   // update — bulletproof regardless of the `onboarded` flag's state on disk.
   const showOnboarding =
     isTauri() &&
     !import.meta.env.DEV &&
     (!onboarded || cmpVersion(onboardingVersion, REQUIRED_ONBOARDING_VERSION) < 0);
+  const showVaultActivation = isTauri() && vaultStatus === "unconfigured" && !showOnboarding;
 
   // hold ⌘ ~0.5s on the main surface → the non-modal shortcut map. Gated off
   // while the palette or settings own the keyboard, so it never doubles up; the
@@ -158,7 +159,7 @@ function MainShell() {
   useHeldModifier({
     modifier: "Meta",
     delayMs: 500,
-    enabled: hotkeyPeek !== "off" && !paletteOpen && !settingsOpen && !showOnboarding,
+    enabled: hotkeyPeek !== "off" && !paletteOpen && !settingsOpen && !showOnboarding && !showVaultActivation,
     onHold: () => setWhichKey(true),
     onRelease: () => setWhichKey(false),
   });
@@ -427,8 +428,8 @@ function MainShell() {
   // the flow would disappear the moment focus slips. The real behavior is
   // (re)applied on finish from the user's chosen Stay-open value.
   useEffect(() => {
-    if (showOnboarding) void setHideOnBlur(false);
-  }, [showOnboarding]);
+    if (showOnboarding || showVaultActivation) void setHideOnBlur(false);
+  }, [showOnboarding, showVaultActivation]);
 
   if (showOnboarding) {
     return (
@@ -443,34 +444,21 @@ function MainShell() {
               const ui = useUiStore.getState();
               void setHideOnBlur(!ui.stayOpen);
               void setDockVisible(ui.showInDock);
-              // commit the deferred brain choice from the "Your brain" step: "use"
-              // adopts an existing memex AS the corpus, "init" scaffolds a new one.
-              // Both RELAUNCH, so flush `onboarded` to disk FIRST or first-run loops
-              // back into onboarding (the 500 ms debounced writer wouldn't fire in time).
-              const choice = useMemexStore.getState().pendingChoice;
-              useMemexStore.getState().setPendingChoice(null);
-              // "keep" (the pre-seeded re-onboard default, #12) deliberately
-              // commits NOTHING — the corpus stays exactly where it is.
-              if (choice?.kind === "practice") {
-                // the practice vault (2026-07-26): settings flush first so the
-                // Librarian-vs-raw pick rides along (carry_settings), then Rust
-                // scaffolds the scratch vault, registers the outgoing vault as a
-                // connected library, and relaunches — no existing file touched
-                void flushSettingsNow()
-                  .then(() => createPracticeVault())
-                  .catch(() => {});
-              } else if (choice?.path && (choice.kind === "use" || choice.kind === "init")) {
-                const path = choice.path;
-                const kind = choice.kind;
-                void flushSettingsNow()
-                  .then(async () => {
-                    if (kind === "init") await initMemexAsCorpus(path);
-                    else await chooseFolder(path);
-                  })
-                  .catch(() => {});
-              }
+              // The onboarding gate is machine-level and must land even while
+              // no vault exists. Vault activation is the explicit next screen.
+              void flushSettingsNow().catch(() => {});
             }}
           />
+        </Suspense>
+      </div>
+    );
+  }
+
+  if (showVaultActivation) {
+    return (
+      <div className="app-window">
+        <Suspense fallback={null}>
+          <VaultActivation />
         </Suspense>
       </div>
     );

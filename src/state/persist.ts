@@ -1,8 +1,12 @@
-// Phase 2c — every preference survives relaunch. Two dot-files in the corpus
-// root, both owned by the frontend, both rebuildable from nothing:
+// Every preference survives relaunch. Vault-specific state stays in two
+// frontend-owned dot-files inside the corpus:
 //
 //   .rotli/settings.json   — app settings, hotkeys and per-note preferences.
 //   .rotli/viewstate.json  — panes, tabs, selection and recent items.
+//
+// App-shell/onboarding preferences also have a machine-level app-settings.json;
+// that narrow sidecar is available before a vault exists and contains no notes,
+// views, editor state, or vault AI policy.
 //
 // Hydration runs BEFORE the first render (main.tsx awaits it) so the first
 // paint is already in the right theme — no flash, no spinner, nothing to
@@ -22,6 +26,9 @@ import { allActions } from "../keys/registry";
 import { createDebouncedTask } from "../lib/debouncedTask";
 import { onQuitFlush } from "../lib/quitFlush";
 import {
+  appSettingsRead,
+  appSettingsWrite,
+  corpusStatus,
   corpusSettingsRead,
   corpusSettingsWrite,
   isTauri,
@@ -73,6 +80,7 @@ import {
   useUiStore,
 } from "./ui";
 import { ACCENT_COLORS, type AccentColor } from "./ui";
+import { useVaultStore } from "./vault";
 import { hydrateViews, useViewsStore } from "./views";
 
 const SAVE_DEBOUNCE_MS = 500;
@@ -296,6 +304,36 @@ interface PersistedSettings {
  * toggle (#35, audit 2026-07). Captured at hydration, spread under every
  * snapshot (known keys always win). */
 let settingsPassthrough: Record<string, unknown> = {};
+let appSettingsPassthrough: Record<string, unknown> = {};
+let appSettingsNeedsWrite = false;
+
+const APP_SETTINGS_KEYS = new Set([
+  "v",
+  "theme",
+  "themeFamily",
+  "matchLightFamily",
+  "matchDarkFamily",
+  "syntaxPalette",
+  "accentColor",
+  "stayOpen",
+  "showInDock",
+  "userName",
+  "hotkeyPeek",
+  "appIcon",
+  "onboarded",
+  "onboardingVersion",
+  "bindings",
+]);
+
+export function unknownAppSettingsKeys(raw: string): Record<string, unknown> {
+  try {
+    return Object.fromEntries(
+      Object.entries(record(JSON.parse(raw))).filter(([key]) => !APP_SETTINGS_KEYS.has(key)),
+    );
+  } catch {
+    return {};
+  }
+}
 
 /** Exported for tests (the safe-default locks); production callers stay inside
  * this module. */
@@ -584,6 +622,47 @@ function applySettings(s: PersistedSettings): void {
   useBindingsStore.setState({ overrides: s.bindings });
   useNoteStyleStore.setState({ styles: s.noteStyles });
   useTableWidthsStore.setState({ widths: s.tableWidths, heights: s.tableHeights });
+}
+
+/** Installation preferences that remain meaningful before (and across) vaults.
+ * Vault-scoped editor, content, and AI policy never enter this sidecar. */
+function applyAppSettings(s: PersistedSettings): void {
+  useUiStore.setState({
+    theme: s.theme,
+    themeFamily: s.themeFamily,
+    matchLightFamily: s.matchLightFamily,
+    matchDarkFamily: s.matchDarkFamily,
+    syntaxPalette: s.syntaxPalette,
+    accentColor: s.accentColor,
+    stayOpen: s.stayOpen,
+    showInDock: s.showInDock,
+    userName: s.userName,
+    hotkeyPeek: s.hotkeyPeek,
+    appIcon: s.appIcon,
+    onboarded: s.onboarded,
+    onboardingVersion: s.onboardingVersion,
+  });
+  useBindingsStore.setState({ overrides: s.bindings });
+}
+
+function withAppSettings(vault: PersistedSettings, app: PersistedSettings): PersistedSettings {
+  return {
+    ...vault,
+    theme: app.theme,
+    themeFamily: app.themeFamily,
+    matchLightFamily: app.matchLightFamily,
+    matchDarkFamily: app.matchDarkFamily,
+    syntaxPalette: app.syntaxPalette,
+    accentColor: app.accentColor,
+    stayOpen: app.stayOpen,
+    showInDock: app.showInDock,
+    userName: app.userName,
+    hotkeyPeek: app.hotkeyPeek,
+    appIcon: app.appIcon,
+    onboarded: app.onboarded,
+    onboardingVersion: app.onboardingVersion,
+    bindings: app.bindings,
+  };
 }
 
 /** Settings that live OUTSIDE the webview: window behavior, Dock policy, and
@@ -879,35 +958,105 @@ function prePaint(): void {
  * blocks on bad data — a deleted or corrupted dot-file just means defaults. */
 export async function hydratePersistedState(): Promise<void> {
   if (!isTauri()) return; // the browser keeps the in-memory demo, untouched
+  let configured = true;
   try {
-    const raw = await corpusSettingsRead("settings");
-    const settings = parseSettings(raw);
-    // keys this build doesn't know survive every rewrite (#35) — main window
-    // only would suffice (it's the one writer), but capturing here is harmless
-    settingsPassthrough = unknownSettingsKeys(raw);
-    applySettings(settings);
-    if (isMainSurface()) {
-      // Main + Views are independent reads — hydrate them together (perf
-      // audit 2026-07-30, #13). Viewstate is NOT independent: it validates
-      // activeView/selection against BOTH hydrated manifests, so it waits.
-      await Promise.all([hydrateMain(), hydrateViews()]);
-      await hydrateViewstate();
-      // gcPersistedMaps (orphan UI-map GC) needs the hydrated Main manifest
-      // (#78) but NOT the first paint — it walks listChats over every instance
-      // + a folder listing. Deferred off the pre-paint critical path
-      // (runDeferredMaintenance, kicked after first render); arming it here
-      // records that Main hydrated so the deferred pass is safe to run (perf
-      // audit 2026-08).
-      mainMapsReady = true;
-      applyShellSideEffects(settings);
-    }
+    configured = await corpusStatus();
   } catch {
-    // defaults are already in the stores — render proceeds
+    // A status failure must not strand an existing installation at activation.
+    configured = true;
+  }
+  useVaultStore.getState().setStatus(configured ? "configured" : "unconfigured");
+
+  let shellSettings = parseSettings("{}");
+  let appSettings = shellSettings;
+  let appSettingsPresent = false;
+  try {
+    const appRaw = await appSettingsRead();
+    appSettingsPresent = Object.keys(record(JSON.parse(appRaw))).length > 0;
+    appSettingsPassthrough = unknownAppSettingsKeys(appRaw);
+    appSettingsNeedsWrite = !appSettingsPresent;
+    appSettings = parseSettings(appRaw);
+    shellSettings = appSettings;
+    if (appSettingsPresent) applyAppSettings(appSettings);
+  } catch {
+    // in-memory app defaults remain
+  }
+
+  if (configured) {
+    try {
+      const raw = await corpusSettingsRead("settings");
+      const settings = parseSettings(raw);
+      shellSettings = settings;
+      // keys this build doesn't know survive every rewrite (#35) — main window
+      // only would suffice (it's the one writer), but capturing here is harmless
+      settingsPassthrough = unknownSettingsKeys(raw);
+      applySettings(settings);
+      if (appSettingsPresent) {
+        applyAppSettings(appSettings);
+        shellSettings = withAppSettings(settings, appSettings);
+      } else {
+        shellSettings = settings;
+      }
+      if (isMainSurface()) {
+        // Main + Views are independent reads. Viewstate validates against both.
+        await Promise.all([hydrateMain(), hydrateViews()]);
+        await hydrateViewstate();
+        mainMapsReady = true;
+      }
+    } catch {
+      // a missing/corrupt vault sidecar means defaults + app preferences
+    }
+  } else if (!appSettingsPresent) {
+    // The first-ever paint uses the calm pair and follows macOS. Existing
+    // installations are untouched because either their app sidecar or their
+    // configured vault supplies the prior choice.
+    useUiStore.setState({
+      theme: "system",
+      themeFamily: "mono",
+      matchLightFamily: "mono",
+      matchDarkFamily: "mono",
+      syntaxPalette: "rotli",
+      accentColor: "default",
+      stayOpen: false,
+      showInDock: false,
+    });
+    shellSettings = {
+      ...shellSettings,
+      theme: "system",
+      themeFamily: "mono",
+      matchLightFamily: "mono",
+      matchDarkFamily: "mono",
+    };
+  }
+  if (isMainSurface()) {
+    applyShellSideEffects(shellSettings);
   }
   prePaint();
 }
 
 // ─── save (one debounced writer, main window only) ───────────────────────────
+
+function appSettingsSnapshot(): string {
+  const ui = useUiStore.getState();
+  return JSON.stringify({
+    ...appSettingsPassthrough,
+    v: 1,
+    theme: ui.theme,
+    themeFamily: ui.themeFamily,
+    matchLightFamily: ui.matchLightFamily,
+    matchDarkFamily: ui.matchDarkFamily,
+    syntaxPalette: ui.syntaxPalette,
+    accentColor: ui.accentColor,
+    stayOpen: ui.stayOpen,
+    showInDock: ui.showInDock,
+    userName: ui.userName,
+    hotkeyPeek: ui.hotkeyPeek,
+    appIcon: ui.appIcon,
+    onboarded: ui.onboarded,
+    onboardingVersion: ui.onboardingVersion,
+    bindings: useBindingsStore.getState().overrides,
+  });
+}
 
 function settingsSnapshot(): string {
   const ui = useUiStore.getState();
@@ -988,7 +1137,11 @@ function viewstateSnapshot(): string {
  * before a deliberate relaunch so flags like `onboarded` survive the restart. */
 export async function flushSettingsNow(): Promise<void> {
   if (!isTauri()) return;
-  await corpusSettingsWrite("settings", settingsSnapshot());
+  const writes: Array<Promise<void>> = [appSettingsWrite(appSettingsSnapshot())];
+  if (useVaultStore.getState().status === "configured") {
+    writes.push(corpusSettingsWrite("settings", settingsSnapshot()));
+  }
+  await Promise.all(writes);
 }
 
 /** One drain of the debounced writer. The high-water marks advance ONLY when
@@ -1035,43 +1188,60 @@ export function createPersistDrain(
 export function attachPersistence(): () => void {
   if (!isTauri() || !isMainSurface()) return () => {};
 
-  // NOTE the deliberate ordering: `drain` closes over `saver`, which is
-  // assigned on the next line. Safe — onFailure only ever fires after an async
-  // write settles, long past this block — but don't hoist `drain` elsewhere.
-  const drain = createPersistDrain(
-    corpusSettingsWrite,
-    { settings: settingsSnapshot, viewstate: viewstateSnapshot },
-    // seed from the just-hydrated state so hydration itself never writes back
-    { settings: settingsSnapshot(), viewstate: viewstateSnapshot() },
-    // a failed write re-arms the debounce so the payload retries even with no
-    // further store change (hide/quit flushes retry it too)
-    () => saver.schedule(),
-  );
-  const saver = createDebouncedTask(SAVE_DEBOUNCE_MS, drain);
+  const configured = useVaultStore.getState().status === "configured";
+
+  let lastAppSettings = appSettingsNeedsWrite ? "" : appSettingsSnapshot();
+  const appDrain = async (): Promise<void> => {
+    const next = appSettingsSnapshot();
+    if (next === lastAppSettings) return;
+    await appSettingsWrite(next);
+    lastAppSettings = next;
+  };
+  const appSaver = createDebouncedTask(SAVE_DEBOUNCE_MS, appDrain);
+  if (appSettingsNeedsWrite) appSaver.schedule();
+
+  // The corpus writer simply stays dormant until activation relaunches into a
+  // configured vault. No command in a skipped first run can create `.rotli/`.
+  const corpusDrain = configured
+    ? createPersistDrain(
+        corpusSettingsWrite,
+        { settings: settingsSnapshot, viewstate: viewstateSnapshot },
+        { settings: settingsSnapshot(), viewstate: viewstateSnapshot() },
+        () => corpusSaver.schedule(),
+      )
+    : async () => {};
+  const corpusSaver = createDebouncedTask(SAVE_DEBOUNCE_MS, corpusDrain);
+
+  const schedule = (): void => {
+    appSaver.schedule();
+    if (configured) corpusSaver.schedule();
+  };
+  const flush = (): Promise<void> =>
+    Promise.all([appSaver.flush(), ...(configured ? [corpusSaver.flush()] : [])]).then(() => {});
 
   const unsubs = [
-    useUiStore.subscribe(saver.schedule),
-    useBindingsStore.subscribe(saver.schedule),
-    useNoteStyleStore.subscribe(saver.schedule),
-    useTableWidthsStore.subscribe(saver.schedule),
-    usePanesStore.subscribe(saver.schedule),
-    useMruStore.subscribe(saver.schedule),
+    useUiStore.subscribe(schedule),
+    useBindingsStore.subscribe(schedule),
+    useNoteStyleStore.subscribe(schedule),
+    useTableWidthsStore.subscribe(schedule),
+    usePanesStore.subscribe(schedule),
+    useMruStore.subscribe(schedule),
   ];
   const onVisibility = (): void => {
-    if (document.hidden) void saver.flush();
+    if (document.hidden) void flush();
   };
   const onPageHide = (): void => {
-    void saver.flush();
+    void flush();
   };
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("pagehide", onPageHide);
   // ⌘Q / tray-Quit with the window still up fires neither of the above —
   // the quit handshake (#4) holds the exit until the write actually lands,
   // so it must receive the flush PROMISE, not a fire-and-forget call.
-  onQuitFlush(() => saver.flush());
+  onQuitFlush(flush);
 
   return () => {
-    void saver.flush();
+    void flush();
     for (const unsub of unsubs) unsub();
     document.removeEventListener("visibilitychange", onVisibility);
     window.removeEventListener("pagehide", onPageHide);

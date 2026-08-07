@@ -68,6 +68,29 @@ impl Default for ReferenceManifest {
     }
 }
 
+/// Project the physical folder graph into a reference tree. `parent=None` is
+/// the vault root; every nested folder remains nested and every surfaced item
+/// appears exactly once under its physical/user-facing folder.
+fn reference_tree_from_list(list: &CorpusList, parent: Option<&str>) -> Vec<ReferenceNode> {
+    let folder_id = parent.unwrap_or("");
+    let mut tree: Vec<ReferenceNode> = list
+        .folders
+        .iter()
+        .filter(|folder| folder.parent_id.as_deref() == parent)
+        .map(|folder| ReferenceNode::Folder {
+            folder: folder.name.clone(),
+            children: reference_tree_from_list(list, Some(&folder.id)),
+        })
+        .collect();
+    tree.extend(
+        list.notes
+            .iter()
+            .filter(|note| note.folder_id == folder_id)
+            .map(|note| ReferenceNode::Note { note: note.id.clone() }),
+    );
+    tree
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct NamedView {
     pub name: String,
@@ -160,6 +183,10 @@ pub struct CorpusRoot {
     pub id: String,
     pub label: String,
     pub abs_path: PathBuf,
+    /// An existing Markdown tree adopted in place. It receives only `.rotli/`
+    /// sidecars—never Rotli's reserved folder scaffold or welcome note.
+    #[serde(default)]
+    pub adopted: bool,
 }
 
 /// The on-disk root registry (`corpus-roots.json` in the app config dir, beside
@@ -193,6 +220,7 @@ pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
                 "Production notes · read-only".to_string()
             },
             abs_path: cfg.corpus.abs_path,
+            adopted: cfg.corpus.adopted,
         }];
     }
     // demo mode: a single isolated demo memex — the real brains/folders are
@@ -203,14 +231,19 @@ pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
                 id: DEFAULT_ROOT_ID.to_string(),
                 label: "Notes".to_string(),
                 abs_path: demo,
+                adopted: false,
             }];
         }
+    }
+    if !is_configured(app) {
+        return Vec::new();
     }
     let cfg = ensure_corpus_config(app);
     let mut out: Vec<CorpusRoot> = vec![CorpusRoot {
         id: DEFAULT_ROOT_ID.to_string(),
         label: "Notes".to_string(),
         abs_path: resolve_corpus(app),
+        adopted: cfg.corpus.adopted,
     }];
     for b in &cfg.brains {
         if is_memex_root(&b.abs_path) {
@@ -218,6 +251,7 @@ pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
                 id: b.id.clone(),
                 label: b.label.clone(),
                 abs_path: b.abs_path.clone(),
+                adopted: false,
             });
         }
     }
@@ -239,6 +273,8 @@ pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
 #[serde(rename_all = "camelCase")]
 pub struct CorpusRef {
     pub abs_path: PathBuf,
+    #[serde(default)]
+    pub adopted: bool,
     // future: `storage_path: Option<PathBuf>` (default `<corpus>/storage`) — the
     // redirectable binary store. Not built yet (rotli writes no binaries).
 }
@@ -308,6 +344,38 @@ pub fn read_corpus_config(app: &tauri::AppHandle) -> Option<CorpusConfig> {
     corpus_config_file(app).and_then(|f| read_config_path_or_backup(&f))
 }
 
+fn configured_at(config_file: &Path, config_dir: &Path, default_root: &Path) -> bool {
+    config_file.exists()
+        || [
+            "corpus-root.txt",
+            "corpus-memex-root.txt",
+            "corpus-roots.json",
+            "memex-instances.json",
+        ]
+        .iter()
+        .any(|name| config_dir.join(name).exists())
+        || default_root.exists()
+}
+
+/// Whether this installation has deliberately selected a primary notes folder.
+/// Existing installs count as configured through either the unified config,
+/// one of its legacy pointers, or the historical default folder. This probe is
+/// read-only: a fresh launch must not create `~/Documents/rotli` or write a
+/// `corpus.json` before the user chooses a vault.
+pub fn is_configured(app: &tauri::AppHandle) -> bool {
+    if cfg!(debug_assertions) || demo_active(app) {
+        return true;
+    }
+    use tauri::Manager;
+    let Ok(dir) = app.path().app_config_dir() else {
+        return false;
+    };
+    let Some(config_file) = corpus_config_file(app) else {
+        return false;
+    };
+    configured_at(&config_file, &dir, &default_corpus_root(app))
+}
+
 /// The development shell mirrors the production corpus as its single visible
 /// source. It does not copy, register, or write the live tree. If a production
 /// config predating the unified model is all that exists, promote the active
@@ -331,7 +399,7 @@ fn dev_primary_from_config(cfg: CorpusConfig) -> Option<CorpusConfig> {
     };
     Some(CorpusConfig {
         version: cfg.version,
-        corpus: CorpusRef { abs_path: source },
+        corpus: CorpusRef { abs_path: source, adopted: false },
         brains: Vec::new(),
         folders: Vec::new(),
         active_brain_id: None,
@@ -693,7 +761,7 @@ fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
 
     CorpusConfig {
         version: 1,
-        corpus: CorpusRef { abs_path: corpus_path },
+        corpus: CorpusRef { abs_path: corpus_path, adopted: false },
         brains,
         folders,
         active_brain_id,
@@ -720,8 +788,18 @@ pub fn carry_settings(current: &Path, new_root: &Path) -> Result<(), String> {
 }
 
 /// Repoint the active corpus at `path`. The caller relaunches so it opens.
-pub fn set_corpus_path(app: &tauri::AppHandle, path: PathBuf) -> Result<(), String> {
-    let mut cfg = ensure_corpus_config(app);
+pub fn set_corpus_path(app: &tauri::AppHandle, path: PathBuf, adopted: bool) -> Result<(), String> {
+    let mut cfg = if is_configured(app) {
+        ensure_corpus_config(app)
+    } else {
+        CorpusConfig {
+            version: 1,
+            corpus: CorpusRef { abs_path: path.clone(), adopted },
+            brains: Vec::new(),
+            folders: Vec::new(),
+            active_brain_id: None,
+        }
+    };
     let target = canon(&path);
     // a folder can't be BOTH the corpus and a brain/added-folder — drop any dup so
     // the same dir never opens as two roots (doubled notes / two watchers).
@@ -736,7 +814,7 @@ pub fn set_corpus_path(app: &tauri::AppHandle, path: PathBuf) -> Result<(), Stri
     if dropped_active {
         cfg.active_brain_id = cfg.brains.first().map(|b| b.id.clone());
     }
-    cfg.corpus = CorpusRef { abs_path: path };
+    cfg.corpus = CorpusRef { abs_path: path, adopted };
     write_corpus_config(app, &cfg)
 }
 
@@ -832,7 +910,7 @@ pub fn add_folder(app: &tauri::AppHandle, path: PathBuf) -> Result<bool, String>
         .unwrap_or("folder")
         .to_string();
     let id = unique_folder_id(&cfg, &label);
-    cfg.folders.push(CorpusRoot { id, label, abs_path: path });
+    cfg.folders.push(CorpusRoot { id, label, abs_path: path, adopted: false });
     write_corpus_config(app, &cfg)?;
     Ok(true)
 }
@@ -2466,6 +2544,31 @@ impl CorpusStore {
         Self::open_with_mode(root, true)
     }
 
+    /// Adopt an existing Markdown tree in place. Rotli creates only its hidden,
+    /// rebuildable sidecar; the user's visible hierarchy stays byte-for-byte as
+    /// it was (no reserved folders and no welcome note).
+    pub fn open_adopted(root: PathBuf) -> Result<Self, String> {
+        let root = fs::canonicalize(&root)
+            .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
+        let dot = crate::containment::resolve_beneath(&root, Path::new(DOT_DIR))?;
+        fs::create_dir_all(dot)
+            .map_err(|e| format!("create {}: {e}", root.join(DOT_DIR).display()))?;
+        let mut store = Self {
+            root,
+            index: HashMap::new(),
+            suppress: SuppressSet::default(),
+            os_trash: true,
+            layout: Layout::LegacyRotli,
+            band_read_only: false,
+            perms_read_only: false,
+            list_cache: None,
+            search_index: None,
+        };
+        store.load_index();
+        store.init_search_index();
+        Ok(store)
+    }
+
     fn open_with_mode(root: PathBuf, read_only: bool) -> Result<Self, String> {
         // Probe BEFORE create_dir_all so an absent dir reads as "not a memex"
         // (→ legacy first-run), never as a memex over an empty folder.
@@ -3707,6 +3810,23 @@ impl CorpusStore {
     /// is still the primary gate; the ledger is the defense-in-depth layer.
     pub fn warm_secure_ledger(&mut self) -> Result<(), String> {
         self.ensure_walked()
+    }
+
+    /// First activation of an adopted Markdown folder mirrors its disk tree into
+    /// Main as references. Content is never copied and note files are never
+    /// rewritten; `.rotli/index.json` supplies the stable local identities.
+    pub fn seed_main_from_disk_if_missing(&mut self) -> Result<(), String> {
+        let path = self.guard_rel(&format!("{DOT_DIR}/main.json"))?;
+        if path.exists() {
+            return Ok(());
+        }
+        let list = self.list()?;
+        let manifest = ReferenceManifest {
+            version: 1,
+            tree: reference_tree_from_list(&list, None),
+        };
+        let json = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())? + "\n";
+        atomic_write(&path, &json)
     }
 
     /// Walk the disk ONLY when the change generation moved (perf audit
@@ -7223,7 +7343,7 @@ mod tests {
         seed_memex(&brain);
         let cfg = CorpusConfig {
             version: 1,
-            corpus: CorpusRef { abs_path: notes },
+            corpus: CorpusRef { abs_path: notes, adopted: false },
             brains: vec![ConnectedBrain {
                 id: "vault".into(),
                 label: "Vault".into(),
@@ -10207,6 +10327,7 @@ mod tests {
             id: DEFAULT_ROOT_ID.to_string(),
             label: "Notes".to_string(),
             abs_path: PathBuf::from("/tmp/rotli2"),
+            adopted: false,
         });
         assert_eq!(reg.roots.len(), 1);
         assert_eq!(reg.get(DEFAULT_ROOT_ID).unwrap().abs_path, PathBuf::from("/tmp/rotli2"));
@@ -10369,6 +10490,58 @@ mod tests {
         for name in ["Inbox", "Vault", "Storage", "Board"] {
             assert!(!vroot.join(name).exists(), "vault memex must not be scaffolded: {name}");
         }
+    }
+
+    #[test]
+    fn adopted_markdown_tree_keeps_visible_files_and_seeds_nested_main_references() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("obsidian-vault");
+        fs::create_dir_all(root.join("Projects/Rotli")).unwrap();
+        fs::write(root.join("loose.md"), "# Loose\n").unwrap();
+        fs::write(root.join("Projects/brief.md"), "# Brief\n").unwrap();
+        fs::write(root.join("Projects/Rotli/plan.md"), "# Plan\n").unwrap();
+
+        let mut store = CorpusStore::open_adopted(root.clone()).unwrap();
+        for reserved in ["Inbox", "Secure notes", "Vault", "Storage", "Board", "Archive", "Trash"] {
+            assert!(!root.join(reserved).exists(), "adoption injected visible folder {reserved}");
+        }
+
+        store.seed_main_from_disk_if_missing().unwrap();
+        let raw = fs::read_to_string(root.join(DOT_DIR).join("main.json")).unwrap();
+        let manifest: ReferenceManifest = serde_json::from_str(&raw).unwrap();
+        assert_eq!(manifest.version, 1);
+        assert_eq!(manifest.tree.len(), 2, "root folder + loose note should appear once");
+        let projects = manifest
+            .tree
+            .iter()
+            .find_map(|node| match node {
+                ReferenceNode::Folder { folder, children } if folder == "Projects" => Some(children),
+                _ => None,
+            })
+            .expect("Projects folder mirrored into Main");
+        assert_eq!(projects.len(), 2, "nested folder + direct note retained");
+        assert!(projects.iter().any(|node| matches!(
+            node,
+            ReferenceNode::Folder { folder, children }
+                if folder == "Rotli" && children.len() == 1
+        )));
+    }
+
+    #[test]
+    fn fresh_install_stays_unconfigured_until_a_real_or_legacy_root_exists() {
+        let dir = TempDir::new().unwrap();
+        let config = dir.path().join("config/corpus.json");
+        let config_dir = config.parent().unwrap();
+        let default_root = dir.path().join("Documents/rotli");
+        fs::create_dir_all(config_dir).unwrap();
+        assert!(!configured_at(&config, config_dir, &default_root));
+
+        fs::write(config_dir.join("corpus-root.txt"), "/old/notes").unwrap();
+        assert!(configured_at(&config, config_dir, &default_root));
+        fs::remove_file(config_dir.join("corpus-root.txt")).unwrap();
+
+        fs::create_dir_all(&default_root).unwrap();
+        assert!(configured_at(&config, config_dir, &default_root));
     }
 
     // ─── the walk cache (perf audit 2026-07-30, #1/#5) ───────────────────────

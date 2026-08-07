@@ -14,6 +14,7 @@ to defaults instead of triggering a content rewrite.
 |---|---|---|---|
 | `memex.json` and Markdown/frontmatter | Memex contract band `3.4` through `3.8` | User-portable durable truth | Out-of-band roots open read-only; unknown frontmatter survives |
 | App `corpus.json` | `version: 1` | Machine-local root registry | Migrate copy-first; never infer or rewrite missing user roots silently |
+| App `app-settings.json` | `v: 1` | Machine-local onboarding/shell preferences | Available without a vault; parse defensively; never place vault content, view state, or AI policy here |
 | `.rotli/main.json` | `version: 1` | Portable Main arrangement | References only; preserve unknown items; never copy content into Main |
 | `.rotli/views.json` | `version: 1` | Portable named subset arrangements | Unsupported newer versions stay read-only; names are identifiers; writes synchronize singular Markdown `view_tag` membership |
 | `.rotli/settings.json` | `v: 1` | Explicit user settings | Parse defensively, preserve unknown keys, default invalid values safely |
@@ -109,6 +110,15 @@ from the recorded backup; they never guess.
   frontmatter untouched.
 - Binary migrations are copy-only unless the user explicitly chooses a
   destructive replacement after verifying the new file.
+- `CorpusRef.adopted` is an additive `corpus.json` flag. Missing means the
+  historical Rotli layout; true means an existing Markdown tree receives only
+  hidden sidecars and a reference-only Main mirror. Downgrading to a build that
+  ignores the flag may scaffold its historical visible destination folders,
+  but does not delete or rewrite imported notes.
+- A build predating machine-level `app-settings.json` ignores that file. If it
+  is launched before any vault is configured, its historical first-run behavior
+  may create the old default notes folder; returning to a current build restores
+  the explicit activation gate.
 - Downgrade testing covers the most recent prior release whenever a persistent
   schema or external protocol changes.
 

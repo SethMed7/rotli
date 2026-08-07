@@ -1,389 +1,482 @@
-/* rotli — first-run onboarding (Seth, 2026-06-19). A calm centered wizard over
-   the app ground. Reuses .famrow/.famcard (theme cards) and .hkchord (the chord
-   recorder) from app.css/command.css; everything else is kit tokens only. */
+/* First-run setup + vault activation. Flat, token-only, keyboard-first. */
 
 .onb {
   position: relative;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ground);
-  overflow: hidden;
+  overflow: auto;
   padding: 56px 28px 28px;
+  background: var(--ground);
 }
 
-/* a draggable strip across the top so the frameless window still moves; sits
-   behind the card and clear of the native traffic lights (top-left) */
 .onb-drag {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  position: fixed;
+  inset: 0 0 auto;
   height: 44px;
 }
 
-.onb-card {
-  width: 100%;
-  max-width: 560px;
+.setup-shell {
+  width: min(920px, 100%);
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 18px;
 }
 
-.onb-step {
+.setup-progress,
+.setup-local-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 20px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.setup-stage {
+  display: grid;
+  grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
+  gap: 32px;
+  min-height: 420px;
+  animation: setup-step-in var(--motion-enter) var(--motion-ease) both;
+}
+
+.setup-companion {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 28px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.setup-companion .quokka {
+  animation: setup-character-arrive 220ms var(--motion-ease) both;
+}
+
+.setup-companion p {
+  max-width: 176px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.setup-content {
+  align-self: center;
+  width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  min-height: 320px;
-}
-.onb-welcome {
-  align-items: center;
-  text-align: center;
-  justify-content: center;
-}
-.onb-mark {
-  margin-bottom: 4px;
-}
-/* the step's quokka accent (Librarian rename, 2026-07-26) — a friendly,
-   currentColor line-art character above the title; decorative, never loud */
-.onb-quokka {
-  display: block;
-  margin: 0 auto 10px;
-  color: var(--text-muted);
 }
 
-.onb-title {
+.setup-eyebrow {
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.setup-content h1 {
+  max-width: 560px;
+  color: var(--text);
   font-family: var(--font-display);
+  font-size: clamp(25px, 4vw, 34px);
   font-weight: 700;
-  font-size: 25px;
-  letter-spacing: -0.01em;
-  color: var(--text);
-}
-.onb-sub {
-  font-family: var(--font-body);
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--text-muted);
-  max-width: 460px;
-}
-.onb-welcome .onb-sub {
-  margin: 0 auto;
-}
-.onb-sub b {
-  color: var(--text);
-  font-weight: 600;
-}
-.onb-name {
-  align-self: flex-start;
-  width: min(320px, 100%);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
-  padding: 9px 12px;
-  color: var(--text);
-  font: inherit;
-  font-size: 14px;
-}
-.onb-name:focus-visible {
-  outline: none;
-  border-color: var(--accent);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
 }
 
-/* — hotkey rows — */
-.onb-hks {
+.setup-lede {
+  max-width: 590px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.62;
+}
+
+.setup-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.setup-option {
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 4px;
-}
-.onb-hk {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 7px;
+  padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--r-card);
   background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-exit) var(--motion-ease),
+    background var(--motion-exit) var(--motion-ease),
+    transform var(--motion-exit) var(--motion-ease);
 }
-.onb-hk-text {
+
+.setup-option:hover {
+  background: var(--hov);
+}
+
+.setup-option:active {
+  transform: scale(0.99);
+}
+
+.setup-option.selected {
+  border-color: var(--accent);
+  background: var(--tint);
+}
+
+.setup-option:focus-visible,
+.setup-button:focus-visible,
+.setup-skip:focus-visible,
+.setup-shortcut-row .hkchord:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.setup-option-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.setup-option-heading kbd,
+.setup-button kbd,
+.setup-arrow-note kbd,
+.setup-primary kbd {
+  min-width: 19px;
+  min-height: 19px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 1;
+}
+
+.setup-option-description {
+  color: var(--text-muted);
+  font-size: 11.75px;
+  line-height: 1.48;
+}
+
+.setup-option-detail {
+  order: -1;
+  align-self: flex-end;
+  height: 0;
+}
+
+.setup-theme-dot {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+}
+
+.setup-theme-dot.warm-light { background: var(--swatch-warm-light); }
+.setup-theme-dot.warm-dark { background: var(--swatch-warm-dark); }
+.setup-theme-dot.mono-light { background: var(--swatch-paper); }
+.setup-theme-dot.mono-dark { background: var(--swatch-charcoal); }
+.setup-theme-dot.mono-system { background: var(--accent); }
+
+.setup-accent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.setup-arrow-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.setup-arrow-note kbd + kbd { margin-right: 3px; }
+
+.setup-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.setup-shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface);
+}
+
+.setup-shortcut-copy {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.onb-hk-label {
-  font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-}
-.onb-hk-hint {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.45;
-}
-.onb-hk-note {
-  flex: 0 0 auto;
-  font-size: 11.5px;
-  color: var(--accent-text, var(--accent));
-}
 
-/* — two-up choice cards (Dock + Behavior) — */
-.onb-choices {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 4px;
-}
-/* the keyboard is NOT hidden (Seth, 2026-07-31): every pickable card wears its
-   number — press it and the card selects. Pure CSS counters, so the badges
-   always match the keyboard handler's DOM order. */
-.onb-choices,
-.famrow {
-  counter-reset: onbcard;
-}
-.onb-choice,
-.famcard {
-  position: relative;
-}
-.onb-choice::after,
-.famcard::after {
-  counter-increment: onbcard;
-  content: counter(onbcard);
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: grid;
-  place-items: center;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-inner);
-  color: var(--text-muted);
-  font-size: 10.5px;
-  font-variant-numeric: tabular-nums;
-  pointer-events: none;
-}
-.onb-choice {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  text-align: left;
-  padding: 16px;
-  border: 1.5px solid var(--border);
-  border-radius: var(--r-card);
-  background: var(--surface);
-  cursor: pointer;
-  transition:
-    border-color var(--motion-exit) var(--motion-ease),
-    background var(--motion-exit) var(--motion-ease);
-}
-.onb-choice:hover {
-  background: var(--hov);
-}
-.onb-choice.sel {
-  border-color: var(--accent);
-  background: var(--tint);
-}
-.onb-choice-title {
-  font-family: var(--font-body);
-  font-size: 14px;
+.setup-shortcut-copy strong {
+  color: var(--text);
+  font-size: 12.5px;
   font-weight: 650;
-  color: var(--text);
-}
-.onb-choice-desc {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text-muted);
 }
 
-/* the standing key hint — context-aware, quiet, above the footer */
-.onb-keyhint {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  margin-top: 18px;
+.setup-shortcut-copy span,
+.setup-shortcut-copy em {
+  color: var(--text-muted);
   font-size: 11px;
-  color: var(--text-muted);
-}
-.onb-keyhint kbd {
-  display: inline-grid;
-  place-items: center;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-inner);
-  font-family: inherit;
-  font-size: 10.5px;
-  color: var(--text-muted);
+  font-style: normal;
+  line-height: 1.35;
 }
 
-/* — footer: progress dots + actions — */
-.onb-foot {
+.setup-shortcut-copy em { color: var(--danger); }
+
+.setup-footer {
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 6px;
-}
-.onb-lead {
-  display: flex;
-  align-items: center;
   gap: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
-.onb-dots {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.onb-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--r-pill);
-  background: var(--border);
-  transition: all var(--motion-exit) var(--motion-ease);
-}
-.onb-dot.on {
-  width: 20px;
-  background: var(--accent);
-}
-.onb-actions {
+
+.setup-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.onb-skip {
-  border: none;
-  background: none;
-  font-family: var(--font-body);
-  font-size: 12.5px;
-  color: var(--text-muted);
+
+.setup-button,
+.setup-skip {
+  border: 0;
+  font: inherit;
   cursor: pointer;
-  padding: 8px 6px;
-}
-.onb-skip:hover {
-  color: var(--text);
-}
-.onb-btn {
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 600;
-  border: 1px solid transparent;
-  border-radius: var(--r-pill);
-  padding: 9px 20px;
-  background: var(--accent);
-  color: var(--on-accent);
-  cursor: pointer;
-}
-.onb-btn:hover {
-  background-image: linear-gradient(var(--hov), var(--hov));
-}
-.onb-btn.ghost {
-  background: none;
-  border-color: var(--border);
-  color: var(--text);
-}
-.onb-btn.ghost:hover {
-  background: var(--hov);
-  background-image: none;
 }
 
-/* footer buttons share ONE baseline: every control is the same height, centered,
-   no stray margins, so Back/Continue/Skip line up exactly. */
-.onb-actions {
-  align-items: center;
-}
-.onb-actions .onb-btn,
-.onb-actions .onb-skip {
-  box-sizing: border-box;
+.setup-button {
+  min-height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 38px;
-  line-height: 1;
-  margin: 0;
+  gap: 10px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  font-size: 12.5px;
+  font-weight: 650;
 }
 
-/* the primary button holds ONE fixed width across every step so its label can
-   swap (Get started → Continue → Start using rotli) without the button — and the
-   Back button beside it — ever shifting position (Seth, 2026-07-07). */
-.onb-primary {
-  min-width: 160px;
-}
-/* Back keeps its slot on the welcome step (no button, but the space is reserved)
-   so the primary button doesn't slide right when Back appears on step two. */
-.onb-hidden {
-  visibility: hidden;
-  pointer-events: none;
+.setup-button.primary {
+  min-width: 154px;
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
-/* first-run model step (Seth, 2026-07-08 model UX pass, phase 3) */
-.onb-sub.small {
-  font-size: 12px;
-  margin-top: 10px;
+.setup-button.primary kbd {
+  border-color: var(--on-accent);
+  background: transparent;
+  color: inherit;
+  opacity: 0.8;
 }
-.onb-model-ready,
-.onb-model-pick,
-.onb-model-progress {
-  margin-top: 18px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-card);
-  background: var(--surface-2);
-}
-.onb-model-ready {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
+
+.setup-button.secondary {
+  border-color: var(--border);
+  background: var(--surface);
   color: var(--text);
 }
-.onb-model-pick {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+
+.setup-button.primary:hover:not(:disabled) { border-color: var(--border-strong); }
+.setup-button.secondary:hover:not(:disabled) { background: var(--hov); }
+
+.setup-button:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
-.onb-model-pickinfo {
+
+.setup-skip {
+  padding: 8px 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.setup-skip:hover { color: var(--text); }
+
+.setup-path {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-block: 1px solid var(--border);
+}
+
+.vault-stats span {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.onb-model-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-.onb-model-meta {
-  font-size: 12px;
+  padding: 10px 4px;
   color: var(--text-muted);
+  font-size: 10.5px;
 }
-.onb-model-proghead {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12.5px;
+
+.vault-stats strong {
   color: var(--text);
+  font-size: 17px;
+  font-weight: 650;
 }
-.onb-model-track {
-  height: 6px;
-  margin-top: 8px;
-  border-radius: var(--r-pill);
-  background: var(--tint);
+
+.vault-preservation {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.vault-preservation strong {
+  grid-column: 1 / -1;
+  color: var(--text);
+  font-size: 11.5px;
+}
+
+.vault-preservation span::before {
+  content: "✓";
+  margin-right: 6px;
+  color: var(--success);
+}
+
+.setup-warning,
+.setup-error {
+  padding: 8px 10px;
+  border-left: 2px solid var(--accent-text);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.setup-error { color: var(--danger); }
+
+.setup-scanning {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.setup-scan-line {
+  width: 100%;
+  height: 2px;
   overflow: hidden;
+  background: var(--border);
 }
-.onb-model-fill {
+
+.setup-scan-line::after {
+  content: "";
+  display: block;
+  width: 28%;
   height: 100%;
-  background: var(--accent-text);
-  border-radius: var(--r-pill);
-  transition: width var(--motion-exit) var(--motion-ease);
+  background: var(--accent);
+  animation: setup-scan 900ms var(--motion-ease) infinite alternate;
 }
-.onb-model-err {
-  color: var(--accent-text);
+
+@keyframes setup-step-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes setup-character-arrive {
+  from { opacity: 0; transform: translateY(7px) rotate(-2deg); }
+  to { opacity: 1; transform: translateY(0) rotate(0); }
+}
+
+@keyframes setup-scan {
+  from { transform: translateX(-20%); }
+  to { transform: translateX(280%); }
+}
+
+@media (max-width: 720px) {
+  .onb {
+    align-items: flex-start;
+    padding: 50px 18px 20px;
+  }
+
+  .setup-stage {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    min-height: 0;
+  }
+
+  .setup-companion {
+    min-height: 132px;
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 14px 18px;
+    text-align: left;
+  }
+
+  .setup-companion .quokka { max-width: 92px; max-height: 92px; }
+  .setup-companion p { max-width: 240px; }
+  .setup-options { grid-template-columns: 1fr; }
+  .setup-footer { align-items: flex-end; }
+  .setup-local-note { display: none; }
+}
+
+@media (max-width: 460px) {
+  .setup-companion { display: none; }
+  .setup-footer { flex-direction: column-reverse; align-items: stretch; }
+  .setup-actions { width: 100%; }
+  .setup-button { flex: 1; }
+  .setup-skip { align-self: center; }
+  .vault-stats { grid-template-columns: 1fr 1fr 1fr; }
+  .vault-preservation { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setup-stage,
+  .setup-companion .quokka,
+  .setup-scan-line::after {
+    animation: none;
+  }
 }

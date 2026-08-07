@@ -11,6 +11,7 @@ import {
 import { type BlockToggle, type HeadingLevel, type InlineMark, activeEditor } from "../editor/commands";
 import { captureHandle } from "../lib/captureHandle";
 import { quickHandle } from "../lib/quickHandle";
+import { setupHandle } from "../lib/setupHandle";
 import {
   corpusFrontmatter,
   corpusSetPinned,
@@ -98,6 +99,15 @@ function zoomReset(): void {
 }
 
 export function registerDefaultActions(): void {
+  registerAction({
+    id: "setup.continue",
+    title: "Continue setup",
+    defaultChord: "Meta+Enter",
+    enabled: () => setupHandle() !== null,
+    transient: true,
+    run: () => setupHandle()?.continue(),
+  });
+
   registerAction({
     id: "app.hide",
     title: "Hide rotli",
