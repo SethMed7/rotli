@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The website download button cannot get ahead of a release.** It now opens
   the latest signed release that actually exists instead of constructing a DMG
   URL from a version that might not have been published yet.
+- **Upgraded the interface engine to React 19.** No behavior changes — this
+  keeps rotli on a supported release line so future editor and board work is not
+  blocked. The React Compiler stays off.
 
 ## [0.77.0] - 2026-08-05
 
