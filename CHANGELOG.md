@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **New items stay in the Main folder you chose.** Clicking or keyboard-opening
   a Main folder now makes it the creation target, so choosing an Excalidraw
   board (or another item type) no longer drops the new item at Main's root.
+- **Boards created in a named-view folder stay in that view.** The new-item
+  chooser now retains the active view and its selected folder while preserving
+  the board's global Main reference.
 
 ## [0.78.0] - 2026-08-06
 
