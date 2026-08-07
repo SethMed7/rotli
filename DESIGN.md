@@ -149,6 +149,9 @@ polish work.
   position before asynchronous imports begin so later layout or selection
   changes cannot redirect the insertion. A drop onto an empty bullet, numbered
   item, or task fills that item instead of inserting an unlisted image below it.
+- A selection that completely contains an image keeps the image rendered and
+  visibly selected, including Select All. A caret or partial selection within
+  its source remains the explicit escape hatch for editing the Markdown link.
 - Beautified tables stay visually tabular during ordinary editing. Clicking or
   keyboard-entering a cell opens one inline cell editor; surrounding cells keep
   rendering, the current column widths and row height remain stable, long cell

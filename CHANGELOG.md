@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Slash commands work inside Markdown lists.** Type `/` after a bullet,
   number, or task marker to open the usual command menu. The marker stays put,
   and multiline inserts remain indented inside that item.
+- **Selecting a whole note keeps its photos visible.** Select All and other
+  selections that fully cover an image now leave the rendered photo selected
+  instead of replacing it with raw Markdown text.
 
 ## [0.78.0] - 2026-08-06
 

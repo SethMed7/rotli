@@ -31,6 +31,7 @@ import { locateLostImage } from "../services/imageRepair";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { scanFences } from "./fences";
+import { selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
 import { CHECK_EM, listStyle, MARKER_EM } from "./listGeometry";
 import { parseBlock } from "./render";
@@ -153,11 +154,11 @@ function listItemImage(
 ): boolean {
   const m = IMG_LINE.exec(content);
   if (!m || lineEnd <= contentBase) return false;
-  // an exact full-span selection is the click-selected image — stays rendered;
-  // any other caret in the line reveals the source (the reveal-on-caret law)
-  const selExact = sel.from === contentBase && sel.to === lineEnd;
-  if (lineTouched && !selExact) return false;
-  const d = Decoration.replace({ widget: new ImgWidget(m[1] ?? "", m[2] ?? "", selExact) });
+  // an exact OR containing selection keeps the image visible and selected;
+  // a caret/partial selection still reveals source for direct Markdown edits
+  const selected = selectionCoversImage(sel, contentBase, lineEnd);
+  if (lineTouched && !selected) return false;
+  const d = Decoration.replace({ widget: new ImgWidget(m[1] ?? "", m[2] ?? "", selected) });
   decos.push(d.range(contentBase, lineEnd));
   atomics.push(d.range(contentBase, lineEnd));
   return true;
@@ -726,10 +727,10 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
       // click-selected image (stays rendered, outlined)
       const imgM = IMG_LINE.exec(text);
       if (imgM && line.to > ls) {
-        const selExact = sel.from === ls && sel.to === line.to;
-        if (!lineTouched || selExact) {
+        const selected = selectionCoversImage(sel, ls, line.to);
+        if (!lineTouched || selected) {
           const d = Decoration.replace({
-            widget: new ImgWidget(imgM[1] ?? "", imgM[2] ?? "", selExact),
+            widget: new ImgWidget(imgM[1] ?? "", imgM[2] ?? "", selected),
           });
           decos.push(d.range(ls, line.to));
           atomics.push(d.range(ls, line.to));

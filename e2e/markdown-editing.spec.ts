@@ -219,3 +219,17 @@ test("slash commands work inside a numbered list item", async ({ page }) => {
     .click();
   await expect(editor).toContainText("1. ## ");
 });
+
+test("select all keeps images rendered and selected", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText(
+    "# Selection\n\nBefore\n\n![](storage:selection.png)\n\n- ![](storage:list-selection.png)\n\nAfter",
+  );
+
+  await expect(page.locator(".rotli-img")).toHaveCount(2);
+  await page.keyboard.press("ControlOrMeta+A");
+  await expect(page.locator(".rotli-img.sel")).toHaveCount(2);
+});
