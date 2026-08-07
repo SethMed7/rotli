@@ -378,6 +378,7 @@ export function EditorSurface({
           </button>
           <button
             type="button"
+            data-hotkey="editor.toggleMetadata"
             className={fileMetadata === "show" ? "aachip on" : "aachip"}
             aria-pressed={fileMetadata === "show"}
             aria-label={fileMetadata === "show" ? "Hide metadata" : "Show metadata"}

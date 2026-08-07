@@ -23,6 +23,7 @@ import {
   closeTabsRightWithDraftCleanup,
 } from "../documents/draftComposition";
 import { newItemInTab } from "../keys/actions";
+import { tabHotkeyAction } from "../keys/tabHotkeys";
 import { fileName } from "../lib/fileKind";
 import { startTabDrag } from "../lib/tabDrag";
 import { newItemDefinition } from "../newItems/model";
@@ -228,6 +229,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                   role="tab"
                   data-tab-id={tab.id}
                   data-tab-index={i}
+                  data-hotkey={tabHotkeyAction(i, pane.tabs.length)}
                   aria-selected={tab.id === pane.activeTabId}
                   className={`${tab.id === pane.activeTabId ? "tab active" : "tab"}${
                     tab.preview ? " preview" : ""

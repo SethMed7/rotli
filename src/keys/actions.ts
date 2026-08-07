@@ -222,6 +222,16 @@ export function registerDefaultActions(): void {
     },
   });
   registerAction({
+    id: "editor.toggleMetadata",
+    title: "Toggle file metadata",
+    defaultChord: "Meta+Shift+M",
+    run: () => {
+      if (!notesWorkspaceActive() || !focusedNoteIdNow()) return;
+      const ui = useUiStore.getState();
+      ui.setFileMetadata(ui.fileMetadata === "show" ? "hide" : "show");
+    },
+  });
+  registerAction({
     id: "app.settings",
     title: "Settings",
     defaultChord: "Meta+Comma",

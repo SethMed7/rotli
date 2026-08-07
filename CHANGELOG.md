@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Excalidraw boards are named before they exist.** Creating a board from the
   chooser, menu, or hotkey now asks for a name first and writes the final,
   collision-safe filename directly instead of creating an untitled placeholder.
+- **Held-Command hints now cover tabs and metadata.** Tabs show their real
+  `⌘1`–`⌘9` targets in the shortcut overlay, and `⌘⇧M` toggles the focused
+  note's file metadata through the shared, rebindable action registry.
 
 ## [0.78.0] - 2026-08-06
 
