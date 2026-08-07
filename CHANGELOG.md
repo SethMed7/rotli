@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Selecting a whole note keeps its photos visible.** Select All and other
   selections that fully cover an image now leave the rendered photo selected
   instead of replacing it with raw Markdown text.
+- **Arrow keys select photos instead of exposing image syntax.** Moving into a
+  rendered standalone or list photo now outlines it as an object, matching a
+  click, while an existing caret in image source remains editable.
 
 ## [0.78.0] - 2026-08-06
 

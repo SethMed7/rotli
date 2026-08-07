@@ -31,7 +31,7 @@ import { locateLostImage } from "../services/imageRepair";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { scanFences } from "./fences";
-import { selectionCoversImage } from "./imageSelection";
+import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
 import { CHECK_EM, listStyle, MARKER_EM } from "./listGeometry";
 import { parseBlock } from "./render";
@@ -137,11 +137,9 @@ const INLINE: InlineRule[] = [
 ];
 
 // a line that is JUST an image — ![alt](url) or ![caption|width](url)
-const IMG_LINE = /^\s*!\[([^\]]*)\]\(([^)]+)\)\s*$/;
-
 /** A list item whose CONTENT is exactly an image renders it inline after the
  * bullet/number/checkbox (Seth, 2026-07-09 — an image inside a bullet used to
- * stay raw markdown forever: IMG_LINE only matched image-ONLY lines). Returns
+ * stay raw markdown forever: only standalone images matched before). Returns
  * true when it decorated, so the caller skips the normal inline scan. */
 function listItemImage(
   content: string,
@@ -152,13 +150,13 @@ function listItemImage(
   decos: Range<Decoration>[],
   atomics: Range<Decoration>[],
 ): boolean {
-  const m = IMG_LINE.exec(content);
-  if (!m || lineEnd <= contentBase) return false;
+  const image = imageSourceSpan(content, contentBase);
+  if (!image || lineEnd <= contentBase) return false;
   // an exact OR containing selection keeps the image visible and selected;
   // a caret/partial selection still reveals source for direct Markdown edits
   const selected = selectionCoversImage(sel, contentBase, lineEnd);
   if (lineTouched && !selected) return false;
-  const d = Decoration.replace({ widget: new ImgWidget(m[1] ?? "", m[2] ?? "", selected) });
+  const d = Decoration.replace({ widget: new ImgWidget(image.alt, image.src, selected) });
   decos.push(d.range(contentBase, lineEnd));
   atomics.push(d.range(contentBase, lineEnd));
   return true;
@@ -299,10 +297,10 @@ class CheckboxWidget extends WidgetType {
 // An inline image: replaces a `![alt](src)` line with the rendered <img>. `storage:`
 // srcs resolve through the asset protocol. The alt may carry an Obsidian-style
 // width ("caption|420"); a corner grip resizes and rewrites that width into the
-// markdown (the .md stays the source of truth). CLICK SELECTS the image as an
-// object (outline; Backspace deletes it) — it never reveals the source; arrow
-// keys into the line remain the raw-markdown escape hatch. Dragging the body
-// moves the line, with a live drop-indicator marking where it will land.
+// markdown (the .md stays the source of truth). CLICK OR ARROW ENTRY selects
+// the image as an object (outline; Backspace deletes it) — it never reveals the
+// source. Dragging the body moves the line, with a live drop-indicator marking
+// where it will land.
 class ImgWidget extends WidgetType {
   constructor(
     readonly alt: string,
@@ -724,13 +722,13 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
 
       // a line that is JUST an image renders inline; a caret in the line reveals
       // the source — EXCEPT an exact full-span selection, which is the
-      // click-selected image (stays rendered, outlined)
-      const imgM = IMG_LINE.exec(text);
-      if (imgM && line.to > ls) {
+      // click- or arrow-selected image (stays rendered, outlined)
+      const image = imageSourceSpan(text, ls);
+      if (image && image.from === ls && line.to > ls) {
         const selected = selectionCoversImage(sel, ls, line.to);
         if (!lineTouched || selected) {
           const d = Decoration.replace({
-            widget: new ImgWidget(imgM[1] ?? "", imgM[2] ?? "", selected),
+            widget: new ImgWidget(image.alt, image.src, selected),
           });
           decos.push(d.range(ls, line.to));
           atomics.push(d.range(ls, line.to));

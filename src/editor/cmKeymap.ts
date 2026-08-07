@@ -18,6 +18,7 @@ import { EditorSelection, type EditorState, type Line, type TransactionSpec } fr
 import type { Command, EditorView, KeyBinding } from "@codemirror/view";
 
 import { lineInFence, scanFences } from "./fences";
+import { imageSourceSpan } from "./imageSelection";
 import {
   type CellRef,
   type TableBlock,
@@ -303,6 +304,32 @@ function tableArrow(dir: -1 | 1): Command {
   };
 }
 
+/** Entering an image widget with an arrow selects it as an object. A caret
+ * already inside raw image source still uses CodeMirror's normal motion, so
+ * direct Markdown editing remains available without a separate mode. */
+function imageArrow(direction: "up" | "down" | "left" | "right"): Command {
+  return (view) => {
+    const current = view.state.selection.main;
+    if (!current.empty) return false;
+    const next =
+      direction === "up" || direction === "down"
+        ? view.moveVertically(current, direction === "down")
+        : view.moveByChar(current, direction === "right");
+    if (next.head === current.head) return false;
+    const currentLine = view.state.doc.lineAt(current.head);
+    const nextLine = view.state.doc.lineAt(next.head);
+    if (nextLine.number === currentLine.number) return false;
+    const image = imageSourceSpan(nextLine.text, nextLine.from);
+    if (!image) return false;
+    view.dispatch({
+      selection: EditorSelection.range(image.from, image.to),
+      scrollIntoView: true,
+      userEvent: "select",
+    });
+    return true;
+  };
+}
+
 const tableEnter: Command = (view) => {
   const ctx = tableCtxAt(view);
   if (!ctx) return false;
@@ -333,6 +360,10 @@ export const rotliKeymap: KeyBinding[] = [
   { key: "Tab", run: tableTab, shift: tableShiftTab },
   { key: "ArrowUp", run: tableArrow(-1) },
   { key: "ArrowDown", run: tableArrow(1) },
+  { key: "ArrowUp", run: imageArrow("up") },
+  { key: "ArrowDown", run: imageArrow("down") },
+  { key: "ArrowLeft", run: imageArrow("left") },
+  { key: "ArrowRight", run: imageArrow("right") },
   { key: "Enter", run: enterContinueList },
   { key: "Tab", run: tabIndent, shift: tabOutdent },
   { key: "Space", run: taskOnSpace },

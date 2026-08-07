@@ -233,3 +233,15 @@ test("select all keeps images rendered and selected", async ({ page }) => {
   await page.keyboard.press("ControlOrMeta+A");
   await expect(page.locator(".rotli-img.sel")).toHaveCount(2);
 });
+
+test("arrowing into an image selects the rendered image", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("![](storage:arrow-selection.png)\nAfter");
+
+  await expect(page.locator(".rotli-img")).toHaveCount(1);
+  await page.keyboard.press("ArrowUp");
+  await expect(page.locator(".rotli-img.sel")).toHaveCount(1);
+});
