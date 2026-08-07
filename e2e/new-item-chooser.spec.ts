@@ -74,3 +74,24 @@ test("a Mermaid diagram item is born with the starter fence", async ({ page }) =
   // the note opens with the rendered starter diagram in place
   await expect(page.locator(".rotli-render-mermaid-trigger")).toBeVisible();
 });
+
+test("an item chosen after selecting a Main folder is filed in that folder", async ({ page }) => {
+  await gotoApp(page);
+
+  await page.getByRole("button", { name: "New folder in Main" }).click();
+  await page.getByRole("textbox", { name: "New folder in Main" }).fill("Sketches");
+  await page.getByRole("textbox", { name: "New folder in Main" }).press("Enter");
+
+  const folder = page.locator('.main-tree [data-main-folder="1"]', { hasText: "Sketches" });
+  await folder.click();
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("choose type");
+  await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
+  // Browser mode cannot invoke the native board creator. Markdown takes the
+  // same createManagedItem → presenter.fileInMain path after creation, so it
+  // proves the folder/chooser wiring without pretending a filesystem write ran.
+  await page.locator(".ni-surface").getByRole("button", { name: "New Markdown note" }).click();
+
+  const folderContents = folder.locator("..");
+  await expect(folderContents.locator(".main-row", { hasText: "Untitled" })).toHaveCount(1);
+});

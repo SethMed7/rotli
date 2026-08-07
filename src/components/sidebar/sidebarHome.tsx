@@ -699,7 +699,10 @@ export function SidebarHome({ zoom }: { zoom: number }) {
                 onClick={() => {
                   // toggle against the OPEN default (?? true) — toggleDestExpanded
                   // assumes closed, so the first click on a fresh folder no-oped
-                  if (!didMainDragRef.current) setDestExpanded(f.id, !open);
+                  if (!didMainDragRef.current) {
+                    setSelectedFolderId(f.id);
+                    setDestExpanded(f.id, !open);
+                  }
                 }}
                 onContextMenu={(e) => {
                   e.preventDefault();
@@ -839,6 +842,7 @@ export function SidebarHome({ zoom }: { zoom: number }) {
       // a Main folder defaults OPEN (?? true) — toggle against that default,
       // not toggleDestExpanded's closed default (first press must collapse)
       if (row.id.startsWith(MAIN_ROOT)) {
+        setSelectedFolderId(row.id);
         setDestExpanded(row.id, !(expandedDests[row.id] ?? true));
         return;
       }

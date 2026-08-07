@@ -52,6 +52,10 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
 - Creation from a named view also adds the item to that view and its current
   virtual folder. Creation from Main adds no `view_tag`. Removing a named-view
   assignment never deletes content or its Main reference.
+- Clicking or keyboard-opening a Main folder makes that virtual folder the
+  creation parent for every item kind. Opening the new-item chooser must retain
+  that parent while the user chooses Markdown, document, sheet, board, or
+  Mermaid.
 - The Brain organizer waits for the configured quiet window after the note's
   latest edit (five minutes by default) before classifying or refiling it. New
   edits reset that window; filing changes location/metadata, never note prose.

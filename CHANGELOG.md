@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **New items stay in the Main folder you chose.** Clicking or keyboard-opening
+  a Main folder now makes it the creation target, so choosing an Excalidraw
+  board (or another item type) no longer drops the new item at Main's root.
+
 ## [0.78.0] - 2026-08-06
 
 ### Added
