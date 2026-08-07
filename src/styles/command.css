@@ -1784,6 +1784,12 @@
   outline: none;
   border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
 }
+.rename-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.4;
+}
 .rename-actions {
   display: flex;
   justify-content: flex-end;

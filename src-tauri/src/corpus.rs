@@ -5039,9 +5039,23 @@ impl CorpusStore {
         })
     }
 
-    /// Create a new board in `folder_id`. `body` defaults to an empty scene.
-    /// Filename is a free `untitled.excalidraw` (collision-safe). id == relpath.
-    pub fn create_board(&mut self, folder_id: &str, body: Option<&str>) -> Result<NoteMeta, String> {
+    /// Create a board at its final, user-supplied name in one atomic write.
+    pub fn create_named_board(
+        &mut self,
+        folder_id: &str,
+        name: &str,
+        body: Option<&str>,
+    ) -> Result<NoteMeta, String> {
+        let stem = board_name_stem(name)?;
+        self.create_board_with_stem(folder_id, &stem, body)
+    }
+
+    fn create_board_with_stem(
+        &mut self,
+        folder_id: &str,
+        stem: &str,
+        body: Option<&str>,
+    ) -> Result<NoteMeta, String> {
         // In a memex, boards live in the storage/excalidraw board lane (writable —
         // see surfaced()). If the caller's folder isn't itself a writable surface,
         // land the board there so ⌘⇧N always saves and every board shares one home
@@ -5061,7 +5075,7 @@ impl CorpusStore {
             fs::create_dir_all(self.abs(folder_id))
                 .map_err(|e| format!("create folder {folder_id}: {e}"))?;
         }
-        let rel = self.free_name(folder_id, "untitled.excalidraw", None);
+        let rel = self.free_name(folder_id, &format!("{stem}.excalidraw"), None);
         let abs = self.abs(&rel);
         self.suppress.mark(&abs);
         atomic_write(&abs, body)?;
@@ -5096,17 +5110,7 @@ impl CorpusStore {
             return Err(format!("board not found: {id}"));
         }
         let folder = id.rsplit_once('/').map(|(f, _)| f.to_string()).unwrap_or_default();
-        let stem: String = new_name
-            .trim()
-            .trim_end_matches(".excalidraw")
-            .trim()
-            .chars()
-            .map(|c| if c == '/' || c == '\\' { '-' } else { c })
-            .collect();
-        let stem = stem.trim().to_string();
-        if stem.is_empty() {
-            return Err("a board needs a name".into());
-        }
+        let stem = board_name_stem(new_name)?;
         let new_rel = self.free_name(&folder, &format!("{stem}.excalidraw"), None);
         if new_rel == id {
             // same name — nothing to do, return current meta
@@ -5632,6 +5636,21 @@ fn walk(
 }
 
 /// A board's display title = its filename without the `.excalidraw` extension.
+fn board_name_stem(name: &str) -> Result<String, String> {
+    let stem: String = name
+        .trim()
+        .trim_end_matches(".excalidraw")
+        .trim()
+        .chars()
+        .map(|c| if c == '/' || c == '\\' { '-' } else { c })
+        .collect();
+    let stem = stem.trim().to_string();
+    if stem.is_empty() {
+        return Err("a board needs a name".into());
+    }
+    Ok(stem)
+}
+
 fn board_title(rel: &str) -> String {
     Path::new(rel)
         .file_stem()
@@ -6968,17 +6987,18 @@ pub fn corpus_write_board(
     state.route(&root, |s| s.write_board(&rel, &body)).map(|m| prefix_meta(&root, m))
 }
 
-/// Create a board in `folderId` (Tauri maps the JS `folderId` arg to
-/// `folder_id`). `body` is optional — `None` seeds an empty Excalidraw scene.
+/// Create a board in `folderId` at its final `name` (Tauri maps JS camelCase).
+/// `body` is optional — `None` seeds an empty Excalidraw scene.
 #[tauri::command]
 pub fn corpus_create_board(
     state: tauri::State<'_, CorpusState>,
     folder_id: String,
+    name: String,
     body: Option<String>,
 ) -> Result<NoteMeta, String> {
     let (root, rel) = split_root_id(&folder_id);
     state
-        .route(&root, |s| s.create_board(&rel, body.as_deref()))
+        .route(&root, |s| s.create_named_board(&rel, &name, body.as_deref()))
         .map(|m| prefix_meta(&root, m))
 }
 
@@ -8233,7 +8253,7 @@ mod tests {
 
         // create defaults to an empty scene, lands in the requested folder,
         // id == its relative path, kind == Board.
-        let meta = store.create_board("Inbox/excalidraw", None).unwrap();
+        let meta = store.create_named_board("Inbox/excalidraw", "untitled", None).unwrap();
         assert_eq!(meta.kind, NoteKind::Board);
         assert_eq!(meta.id, "Inbox/excalidraw/untitled.excalidraw");
         assert_eq!(meta.folder_id, "Inbox/excalidraw");
@@ -8264,8 +8284,22 @@ mod tests {
         assert!(doc.body.contains("\"id\":\"a\""), "round-tripped element survives");
 
         // a second board in the same folder gets a collision-safe name
-        let meta2 = store.create_board("Inbox/excalidraw", None).unwrap();
+        let meta2 = store.create_named_board("Inbox/excalidraw", "untitled", None).unwrap();
         assert_eq!(meta2.id, "Inbox/excalidraw/untitled-2.excalidraw");
+    }
+
+    #[test]
+    fn named_board_is_created_without_an_untitled_placeholder() {
+        let (_dir, mut store) = bare();
+
+        let meta = store.create_named_board("Inbox/excalidraw", "Project/Map", None).unwrap();
+        assert_eq!(meta.id, "Inbox/excalidraw/Project-Map.excalidraw");
+        assert_eq!(meta.title, "Project-Map");
+        assert!(!store.root().join("Inbox/excalidraw/untitled.excalidraw").exists());
+
+        let second = store.create_named_board("Inbox/excalidraw", "Project/Map", None).unwrap();
+        assert_eq!(second.id, "Inbox/excalidraw/Project-Map-2.excalidraw");
+        assert!(store.create_named_board("Inbox/excalidraw", "   ", None).is_err());
     }
 
     #[test]
@@ -8289,7 +8323,7 @@ mod tests {
     #[test]
     fn rename_board_moves_the_file_and_returns_new_id() {
         let (_dir, mut store) = bare();
-        let created = store.create_board("Inbox/excalidraw", None).unwrap();
+        let created = store.create_named_board("Inbox/excalidraw", "untitled", None).unwrap();
         assert_eq!(created.id, "Inbox/excalidraw/untitled.excalidraw");
 
         // rename within the folder: id becomes the new relpath, kind stays Board
@@ -9994,7 +10028,7 @@ mod tests {
         let mut store = CorpusStore::open(root.clone()).unwrap();
         store.os_trash = false;
 
-        let board = store.create_board("storage/excalidraw", None).unwrap();
+        let board = store.create_named_board("storage/excalidraw", "untitled", None).unwrap();
         let scene = fs::read_to_string(root.join(&board.id)).unwrap();
         assert!(board.id.ends_with(".excalidraw"));
 
@@ -10030,7 +10064,7 @@ mod tests {
         // it lands the board in the storage/excalidraw board lane so a board always
         // saves (Seth, 2026-07-07). write_board takes an explicit path with no such
         // redirect, so a hidden root is still refused outright.
-        let staged = store.create_board("self", None).unwrap();
+        let staged = store.create_named_board("self", "untitled", None).unwrap();
         assert_eq!(staged.kind, NoteKind::Board);
         assert_eq!(staged.folder_id, "storage/excalidraw");
         // …and a board in that lane is EDITABLE (the jorge case: saves succeed).
@@ -10038,7 +10072,7 @@ mod tests {
         assert!(store.writable("storage/other.png").is_err(), "rest of storage stays read-only");
         assert!(store.write_board("self/x.excalidraw", "{}").is_err());
         // …and a board created directly on chats/ (rotli's owned surface) stays there
-        let meta = store.create_board("chats", None).unwrap();
+        let meta = store.create_named_board("chats", "untitled", None).unwrap();
         assert_eq!(meta.kind, NoteKind::Board);
         assert_eq!(meta.folder_id, "chats");
         assert!(store.read_board(&meta.id).unwrap().body.contains("excalidraw"));

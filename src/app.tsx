@@ -22,6 +22,7 @@ import { PreviewModal } from "./components/previewModal";
 import { ContextMenu } from "./components/contextMenu";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
+import { BoardNameDialog } from "./components/boardNameDialog";
 import { Titlebar } from "./components/titlebar";
 import { chatDropAt } from "./components/chatDrop";
 import { HotkeyBadges } from "./components/hotkeyBadges";
@@ -508,6 +509,7 @@ function MainShell() {
       {whichKey &&
         (hotkeyPeek === "badges" ? <HotkeyBadges /> : <WhichKey onClose={() => setWhichKey(false)} />)}
       <ContextMenu />
+      <BoardNameDialog />
       <RenameDialog />
     </div>
   );

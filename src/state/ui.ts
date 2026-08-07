@@ -355,11 +355,15 @@ interface UiState {
   setSystemRoot: (id: string | null) => void;
   setContentView: (view: ContentView) => void;
 
-  /** The board id currently being renamed inline in the sidebar (its row shows a
-   * text input), or null. Set on right-click "Rename" and on new-board create so
-   * the user names it immediately (Seth, 2026-06-26). */
+  /** The existing board id currently being renamed inline in the sidebar (its
+   * row shows a text input), or null. New boards use the name-first request
+   * below, before any file exists. */
   renamingBoardId: string | null;
   setRenamingBoardId: (id: string | null) => void;
+  /** An ordinary user-invoked board creation waiting for its required name.
+   * The request carries presentation intent only; no file exists yet. */
+  boardCreationRequest: { newTab: boolean } | null;
+  setBoardCreationRequest: (request: { newTab: boolean } | null) => void;
   renamingChatSlug: string | null;
   setRenamingChatSlug: (slug: string | null) => void;
 
@@ -704,6 +708,8 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   renamingBoardId: null,
   setRenamingBoardId: (id) => set({ renamingBoardId: id }),
+  boardCreationRequest: null,
+  setBoardCreationRequest: (request) => set({ boardCreationRequest: request }),
   renamingChatSlug: null,
   setRenamingChatSlug: (slug) => set({ renamingChatSlug: slug }),
   rowActionError: null,

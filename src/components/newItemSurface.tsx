@@ -11,7 +11,7 @@
 import { useEffect, useRef } from "react";
 
 import { dispatch } from "../keys/registry";
-import { createManagedItem } from "../newItems/composition";
+import { createManagedItem, requestManagedBoardCreation } from "../newItems/composition";
 import { NEW_ITEM_DEFINITIONS, type NewItemKind } from "../newItems/model";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
@@ -44,6 +44,10 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
 
   const pickKind = (kind: NewItemKind) => {
     close();
+    if (kind === "board") {
+      requestManagedBoardCreation({ newTab: true });
+      return;
+    }
     void createManagedItem(kind, { newTab: true }).catch((err: unknown) =>
       useUiStore
         .getState()

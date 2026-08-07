@@ -86,6 +86,10 @@ agent IDs live in `customData.rotliAgentId`. Unknown user-created elements and
 top-level scene fields are preserved. Raw scene replacement is available only
 through the CLI and is schema-checked before the atomic save.
 
+Board creation requires a nonblank name and writes the collision-safe final
+filename directly. GUI, CLI, and MCP creation do not create and then rename an
+`untitled.excalidraw` placeholder.
+
 Board reads and writes share the corpus's bounded validator: 8 MB source,
 10,000 elements, 1,000 embedded files, 100,000 characters per string,
 10,000,000 absolute coordinate magnitude, depth 64, 200,000 JSON nodes, and 500

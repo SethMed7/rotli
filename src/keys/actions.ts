@@ -20,7 +20,7 @@ import {
   toggleMainWindow,
   toggleQuickWindow,
 } from "../lib/tauri";
-import { createManagedItem } from "../newItems/composition";
+import { createManagedItem, requestManagedBoardCreation } from "../newItems/composition";
 import type { NewItemKind } from "../newItems/model";
 import { openChatForNote } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
@@ -49,6 +49,10 @@ function focusedNoteIdNow(): string | null {
 }
 
 function runCreate(kind: NewItemKind, newTab: boolean): void {
+  if (kind === "board") {
+    requestManagedBoardCreation({ newTab });
+    return;
+  }
   void createManagedItem(kind, { newTab }).catch((error) =>
     useUiStore
       .getState()

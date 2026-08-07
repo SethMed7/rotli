@@ -86,8 +86,7 @@ const creator: NewItemCreator = {
       const base64 = await createBlankWorkbookBase64();
       return { id: await corpusCreateManagedFile(`untitled-${Date.now()}.xlsx`, base64), kind };
     }
-    const board = await corpusCreateBoard(resolvedPhysicalFolder());
-    return { id: board.id, kind };
+    throw new Error("a board needs a name before it can be created");
   },
 };
 
@@ -138,16 +137,26 @@ const presenter: NewItemPresenter = {
     if (item.kind === "markdown" || item.kind === "mermaid") panes.openNote(item.id, options);
     else if (item.kind === "board") {
       panes.openCanvas(item.id, options);
-      useUiStore.getState().setRenamingBoardId(item.id);
     } else panes.openFile(item.id, options);
   },
 };
 
 export async function createManagedItem(
   kind: NewItemKind,
-  options: { newTab?: boolean; open?: boolean } = {},
+  options: { newTab?: boolean; open?: boolean; boardName?: string } = {},
 ): Promise<CreatedItem> {
-  const item = await createNewItem({ creator, presenter }, kind, options);
+  const boardName = options.boardName?.trim() ?? "";
+  if (kind === "board" && !boardName) throw new Error("a board needs a name");
+  const itemCreator: NewItemCreator =
+    kind === "board"
+      ? {
+          async create() {
+            const board = await corpusCreateBoard(resolvedPhysicalFolder(), boardName);
+            return { id: board.id, kind: "board" };
+          },
+        }
+      : creator;
+  const item = await createNewItem({ creator: itemCreator, presenter }, kind, options);
   // Pristine-draft tracking lives HERE, where `open` is known: only an item the
   // user actually opened can be abandoned-blank. `open:false` creations (slash
   // embed targets) must never be tracked — a later open+close-unedited would
@@ -160,6 +169,12 @@ export async function createManagedItem(
   return item;
 }
 
+/** Open the shared name-first lane used by chooser cards, menus, and hotkeys.
+ * The file creator remains unavailable until the dialog supplies a name. */
+export function requestManagedBoardCreation(options: { newTab?: boolean } = {}): void {
+  useUiStore.getState().setBoardCreationRequest({ newTab: options.newTab ?? false });
+}
+
 /** Create a populated board atomically while preserving the same Main/view
  * filing and presentation policy used by every other creation entry point.
  * `besideNoteId` (Seth, 2026-07-29: a converted diagram lands "in the same
@@ -167,11 +182,12 @@ export async function createManagedItem(
  * named view — instead of reading the ambient selection. */
 export function createManagedBoardWithBody(
   body: string,
+  name: string,
   options: { newTab?: boolean; open?: boolean; besideNoteId?: string } = {},
 ): Promise<CreatedItem> {
   const populatedBoardCreator: NewItemCreator = {
     async create() {
-      const board = await corpusCreateBoard(resolvedPhysicalFolder(), body);
+      const board = await corpusCreateBoard(resolvedPhysicalFolder(), name, body);
       return { id: board.id, kind: "board" };
     },
   };

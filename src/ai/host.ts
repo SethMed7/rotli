@@ -18,7 +18,6 @@ import {
   corpusNotesAi,
   corpusReadAi,
   corpusReadableIds,
-  corpusRenameBoard,
   corpusSearchAi,
   corpusWriteAi,
   generateImage as tauriGenerateImage,
@@ -412,9 +411,11 @@ export function makeTauriHost(
       try {
         // mermaid is the wire format on purpose (local models write it far more
         // reliably than raw Excalidraw JSON); the conversion runs entirely local
-        const boardId = await createEditableBoardFromMermaid(mermaid, { open: false });
-        const named = title ? await corpusRenameBoard(boardId, title).catch(() => null) : null;
-        usePanesStore.getState().openCanvas(named?.id ?? boardId, { newTab: true });
+        const boardId = await createEditableBoardFromMermaid(mermaid, {
+          open: false,
+          name: title || "Diagram",
+        });
+        usePanesStore.getState().openCanvas(boardId, { newTab: true });
         await Promise.all([invalidateNotes(), invalidateMemex()]);
         return `created the board${title ? ` "${title}"` : ""} from your diagram and opened it on screen — a fully editable visual copy. Tell the user it's there and that they can rearrange it freely.`;
       } catch (e) {

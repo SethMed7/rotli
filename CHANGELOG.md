@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Boards created in a named-view folder stay in that view.** The new-item
   chooser now retains the active view and its selected folder while preserving
   the board's global Main reference.
+- **Excalidraw boards are named before they exist.** Creating a board from the
+  chooser, menu, or hotkey now asks for a name first and writes the final,
+  collision-safe filename directly instead of creating an untitled placeholder.
 
 ## [0.78.0] - 2026-08-06
 

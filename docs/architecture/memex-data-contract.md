@@ -45,6 +45,9 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   `storage/rotli/` in a memex or `Storage/` in the legacy layout.
 - **Boards** are raw `.excalidraw` files. The corpus adapter chooses the writable
   Excalidraw lane for a memex and a selected writable folder for legacy storage.
+  Ordinary user creation collects a nonblank name before writing anything, then
+  creates the collision-safe final filename atomically; cancelling the prompt
+  leaves no `untitled.excalidraw` placeholder behind.
 - Creating any item adds its one stable id/path to Main immediately, before the
   item is opened. A Brain-intake note therefore appears in Main while the same
   file still lives in staging. Refiling the physical item does not duplicate or

@@ -95,3 +95,17 @@ test("an item chosen after selecting a Main folder is filed in that folder", asy
   const folderContents = folder.locator("..");
   await expect(folderContents.locator(".main-row", { hasText: "Untitled" })).toHaveCount(1);
 });
+
+test("an Excalidraw board asks for its name before creation", async ({ page }) => {
+  await gotoApp(page);
+
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("choose type");
+  await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
+  await page.locator(".ni-surface").getByRole("button", { name: "New Board" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Name Excalidraw board" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("textbox", { name: "Board name" })).toBeFocused();
+  await expect(dialog.getByRole("button", { name: "Create board" })).toBeDisabled();
+});

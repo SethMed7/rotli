@@ -5,7 +5,6 @@
 import { corpusReadBoard, corpusRevealFile, corpusWriteBoard, isTauri } from "../lib/tauri";
 import { createManagedBoardWithBody } from "../newItems/composition";
 import { usePanesStore } from "../state/panes";
-import { useUiStore } from "../state/ui";
 import { convertMermaidToBoardScene } from "./engine/mermaid";
 import {
   EMPTY_BOARD_META,
@@ -58,7 +57,7 @@ export async function replaceCorruptBoardWithEmptyScene(boardId: string): Promis
  * false` skips the new tab (the replace-with-embed flow shows it inline). */
 export async function createEditableBoardFromMermaid(
   definition: string,
-  opts: { besideNoteId?: string; open?: boolean } = {},
+  opts: { besideNoteId?: string; open?: boolean; name?: string } = {},
 ): Promise<string> {
   if (!isTauri()) throw new Error("Editable board conversion requires the Rotli desktop app.");
   const source = definition.trim();
@@ -71,13 +70,12 @@ export async function createEditableBoardFromMermaid(
     files: scene.files,
     meta: EMPTY_BOARD_META,
   });
-  const board = await createManagedBoardWithBody(body, {
+  const board = await createManagedBoardWithBody(body, opts.name?.trim() || "Diagram", {
     open: false,
     ...(opts.besideNoteId ? { besideNoteId: opts.besideNoteId } : {}),
   });
   if (opts.open !== false) {
     usePanesStore.getState().openCanvas(board.id, { newTab: true });
-    useUiStore.getState().setRenamingBoardId(board.id);
   }
   return board.id;
 }

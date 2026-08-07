@@ -856,12 +856,7 @@ impl Workspace {
             "Board"
         };
         let scene = empty_board(description, tags);
-        let created = self.store.create_board(folder, Some(&scene))?;
-        let meta = if name.trim().is_empty() {
-            created
-        } else {
-            self.store.rename_board(&created.id, name)?
-        };
+        let meta = self.store.create_named_board(folder, name, Some(&scene))?;
         if self.root.is_default {
             self.main_add(&meta.id, main_parent)?;
         }

@@ -330,12 +330,15 @@ export function corpusWriteBoard(id: string, body: string): Promise<CorpusNoteMe
   return corpusInvoke("corpus_write_board", { id, body });
 }
 
-/** Create a new board in folderId (filename auto-picked, collision-safe).
+/** Create a new board in folderId with its initial name (collision-safe).
  * Omit body for an empty Excalidraw scene. The returned meta.id IS the new
- * board's corpus-relative path. */
-export function corpusCreateBoard(folderId: string, body?: string): Promise<CorpusNoteMeta> {
+ * board's corpus-relative path; no untitled placeholder is written first. */
+export function corpusCreateBoard(folderId: string, name: string, body?: string): Promise<CorpusNoteMeta> {
   // exactOptionalPropertyTypes: only pass body when present.
-  return corpusInvoke("corpus_create_board", body === undefined ? { folderId } : { folderId, body });
+  return corpusInvoke(
+    "corpus_create_board",
+    body === undefined ? { folderId, name } : { folderId, name, body },
+  );
 }
 
 /** Rename a board (.excalidraw) within its folder. `name` is a free stem (no
