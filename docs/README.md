@@ -36,6 +36,7 @@ fix both in the same change.
 | Assets, actors, trust boundaries, and residual risk | [`security/threat-model.md`](security/threat-model.md) |
 | What each class of model may see and edit (secure vs locked, reference lanes) | [`design/ai-visibility-matrix.md`](design/ai-visibility-matrix.md) |
 | Sidebar information architecture (Home/Chat fronts, System zone, front keys) | [`design/sidebar-home-chat.md`](design/sidebar-home-chat.md) |
+| Local-model output quality, speed, and heat — the measured plan | [`design/local-model-quality-and-performance.md`](design/local-model-quality-and-performance.md) |
 | Why rotli stays on Tauri, and how idle cost is kept honest | [`design/shell-runtime-decision.md`](design/shell-runtime-decision.md) |
 | Durable schemas, compatibility, migrations, and downgrade behavior | [`architecture/compatibility-and-migrations.md`](architecture/compatibility-and-migrations.md) |
 | Release integrity, provenance, SBOM, keys, and rollback | [`operations/release-and-supply-chain.md`](operations/release-and-supply-chain.md) |
