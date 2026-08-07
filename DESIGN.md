@@ -144,6 +144,10 @@ polish work.
 
 ## Markdown editing
 
+- Dropping local images into Markdown imports them into the memex and inserts
+  their image links at the pointer's drop position. Capture that document
+  position before asynchronous imports begin so later layout or selection
+  changes cannot redirect the insertion.
 - Beautified tables stay visually tabular during ordinary editing. Clicking or
   keyboard-entering a cell opens one inline cell editor; surrounding cells keep
   rendering, the current column widths and row height remain stable, long cell

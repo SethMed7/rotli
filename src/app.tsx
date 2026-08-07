@@ -53,6 +53,7 @@ import {
 } from "./lib/tauri";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { EditorView } from "@codemirror/view";
+import { importImagesAtDrop } from "./editor/externalImageDrop";
 import { activeInstance, isWritable } from "./memex/config";
 import {
   chooseFolder,
@@ -346,20 +347,7 @@ function MainShell() {
         await Promise.all(toStorage.map((p) => corpusImportFile("default", p)));
       }
       if (view && images.length) {
-        // import together, insert in drop order (audit 2026-07-30, batch half)
-        const wires = await Promise.all(images.map((p) => corpusImportFile("default", p)));
-        let insert = "";
-        for (const wire of wires) {
-          if (wire) insert += `\n![](storage:${wire.replace(/^storage\//i, "")})\n`;
-        }
-        if (insert) {
-          const at = view.posAtCoords({ x, y }) ?? view.state.selection.main.head;
-          view.dispatch({
-            changes: { from: at, insert },
-            selection: { anchor: at + insert.length },
-          });
-          view.focus();
-        }
+        await importImagesAtDrop(view, images, { x, y }, (path) => corpusImportFile("default", path));
       }
       await invalidateNotes();
     };

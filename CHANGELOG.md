@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Held-Command hints now cover tabs and metadata.** Tabs show their real
   `⌘1`–`⌘9` targets in the shortcut overlay, and `⌘⇧M` toggles the focused
   note's file metadata through the shared, rebindable action registry.
+- **Dropped photos land where you point.** Markdown now captures the exact drop
+  position before importing a photo, so import time, scrolling, or a moved
+  caret cannot redirect the image link elsewhere in the note.
 
 ## [0.78.0] - 2026-08-06
 
