@@ -4,5 +4,8 @@ args = [".carl/mcpServer.mjs"]
 cwd = "."
 enabled = true
 required = false
+# Read-only by contract: carl_stage_proposal is deliberately absent, and
+# scripts/check-documentation.mjs asserts it stays absent. Codex reports a stale
+# rule in its PR; a human or Claude files the proposal.
 enabled_tools = ["carl_recall", "carl_list_domains", "carl_get_domain", "carl_search_decisions"]
 default_tools_approval_mode = "auto"

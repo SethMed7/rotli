@@ -25,8 +25,17 @@ while IFS= read -r f; do
       fi
       ;;
   esac
-  # conflict markers must never land (a resolved-merge leftover shipped once)
-  if git show ":$f" 2>/dev/null | grep -qE '^(<{7}|={7}|>{7})( |$)'; then
+  # conflict markers must never land (a resolved-merge leftover shipped once).
+  #
+  # NOT `grep -q`. Under `set -o pipefail` that was a silent false negative on
+  # every file over ~64KB: -q exits the instant it matches, `git show` then dies
+  # of SIGPIPE with 141, and pipefail makes the whole pipeline non-zero — so a
+  # FOUND marker read as "clean". Measured 2026-08-07 under bash: 32/64KB caught,
+  # 128KB and up missed. It skipped exactly the files most likely to carry a bad
+  # merge — corpus.rs (476KB), organizer.rs (204KB), workspace.rs (139KB),
+  # lib/tauri.ts (73KB). Redirecting instead of -q makes grep read to EOF, so
+  # `git show` is never signalled. Regression: scripts/check-hook.test.ts.
+  if git show ":$f" 2>/dev/null | grep -E '^(<{7}|={7}|>{7})( |$)' >/dev/null; then
     echo "✗ pre-commit: conflict markers in the staged content of $f."
     exit 1
   fi

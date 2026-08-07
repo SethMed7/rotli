@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-08-06T23:51:34.176Z",
+  "last_modified": "2026-08-07T00:00:00.000Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -43,7 +43,13 @@
         "downgrade",
         "protocol version",
         "ADR",
-        "decision record"
+        "decision record",
+        "tauri",
+        "electron",
+        "webview",
+        "shell runtime",
+        "release",
+        "bundle"
       ],
       "exclude": [],
       "rules": [
@@ -116,6 +122,13 @@
           "added": "2026-07-30",
           "last_reviewed": "2026-07-31",
           "source": "CONTRIBUTING.md"
+        },
+        {
+          "id": 10,
+          "text": "The shell runtime is Tauri; Electron is rejected (decision 2026-08-06, docs/design/shell-runtime-decision.md). rotli must stay a good citizen while idle: a hidden window never composites. lib/idleMotion.ts stamps data-idle from the Page Visibility API and one :root[data-idle=\"hidden\"] rule in base.css pauses every animation; check:design-system enforces both the rule's presence and that no stylesheet sets animation-play-state:running. New always-on animations and unguarded intervals are the regression this prevents — WKWebView, unlike Chromium, does not throttle an occluded webview.",
+          "added": "2026-08-07",
+          "last_reviewed": "2026-08-07",
+          "source": "docs/design/shell-runtime-decision.md"
         }
       ],
       "decisions": [
@@ -153,17 +166,17 @@
       "rules": [
         {
           "id": 0,
-          "text": "A notes folder is one memex. Rotli may create chats, captures, and staged wiki notes through declared write lanes; it does not rewrite identity, personality, history, MAP.md, or curated wiki content through the interactive lane. TypeScript and Rust enforce the boundary independently.",
-          "added": "2026-06-22",
-          "last_reviewed": "2026-07-11",
+          "text": "Interactive lane writes chats/ and ALL of wiki/ (2026-08-03 — a filed note stays editable); never identity/personality/history/MAP.md/control files. Filer lane still owns AI metadata keys exclusively. TS and Rust enforce independently.",
+          "added": "2026-08-07",
+          "last_reviewed": "2026-08-07",
           "source": "docs/architecture/memex-data-contract.md"
         },
         {
           "id": 1,
-          "text": "Secure notes fail closed and live in the protected wiki/_secure lane inside the Brain. Remote/frontier models never receive their titles, snippets, bodies, or search results. Recognized on-device models require explicit local_ai_allowed permission; the organizer always skips secure and locked notes.",
-          "added": "2026-07-11",
-          "last_reviewed": "2026-07-11",
-          "source": "docs/architecture/memex-data-contract.md"
+          "text": "Secure and locked are independent. SECURE = visibility vs remote: frontier models never receive secure titles, snippets, bodies, or hits, under any setting; on-device models read them BY DEFAULT, withdrawable per note (local_ai_allowed tri-state) or per vault (secureLocalAi). LOCKED = editing: no AI of any class edits a locked note; every class still reads it. The organizer still skips both. Brain memory lanes (identity/, personality/, history/, MAP.md, inbox.md) are Surface::Reference — AI-retrievable, never in the Notes tree, never writable; vault plumbing stays Hidden.",
+          "added": "2026-08-07",
+          "last_reviewed": "2026-08-07",
+          "source": "docs/design/ai-visibility-matrix.md"
         },
         {
           "id": 2,
@@ -171,6 +184,13 @@
           "added": "2026-07-11",
           "last_reviewed": "2026-07-11",
           "source": "docs/architecture/memex-data-contract.md"
+        },
+        {
+          "id": 3,
+          "text": "Rust APPLIES the filter, not just the verdict: AI retrieval goes through corpus_search_ai / corpus_notes_ai, and every seam putting caller text on a network calls secret::blocked_for_remote (markers + the walk-fed secure-prose ledger), declared in egress-allowlist.json gatedEgressSites.",
+          "added": "2026-08-07",
+          "last_reviewed": "2026-08-07",
+          "source": "docs/design/ai-visibility-matrix.md"
         }
       ],
       "decisions": [
@@ -422,7 +442,13 @@
         "charcoal",
         "warm light",
         "warm dark",
-        "accessibility"
+        "accessibility",
+        "animation",
+        "motion",
+        "idle",
+        "reduced motion",
+        "spinner",
+        "transition"
       ],
       "exclude": [],
       "rules": [
@@ -439,6 +465,13 @@
           "added": "2026-07-11",
           "last_reviewed": "2026-07-21",
           "source": "DESIGN.md"
+        },
+        {
+          "id": 2,
+          "text": "A window that is put away must not composite: base.css pauses every animation under :root[data-idle=\"hidden\"], stamped by lib/idleMotion.ts from the Page Visibility API. check:design-system asserts the rule exists and that no stylesheet sets animation-play-state:running, but nothing stops a NEW always-on `animation: … infinite` — prefer state-conditional animation, and guard any interval with document.hidden. WKWebView, unlike Chromium, does not throttle an occluded webview.",
+          "added": "2026-08-07",
+          "last_reviewed": "2026-08-07",
+          "source": "docs/design/shell-runtime-decision.md"
         }
       ],
       "decisions": [
@@ -488,6 +521,13 @@
           "added": "2026-07-11",
           "last_reviewed": "2026-07-11",
           "source": "docs/architecture/memex-data-contract.md"
+        },
+        {
+          "id": 2,
+          "text": "Model CLASS decides data access, and class is derived from the endpoint plus the provider registry — never an asserted flag. An on-device model (loopback + mlx/llamacpp/ollama) may see secure notes; a frontier model never may, localhost proxy or not. Class buys VISIBILITY only: no class edits a locked note, and every AI write rides corpus_write_ai (read gate, then locked refusal). Headless workspace agents count as remote for content policy even when their process is local.",
+          "added": "2026-08-07",
+          "last_reviewed": "2026-08-07",
+          "source": "docs/design/ai-visibility-matrix.md"
         }
       ],
       "decisions": []
@@ -506,7 +546,13 @@
         "privacy",
         "telemetry",
         "support bundle",
-        "risk acceptance"
+        "risk acceptance",
+        "network call",
+        "egress",
+        "allowlist",
+        "exfiltration",
+        "secret",
+        "keychain"
       ],
       "exclude": [],
       "rules": [
@@ -636,16 +682,23 @@
         },
         {
           "id": 1,
-          "text": "The sidebar: one-row header (vault name ellipsizes first, New-board lives inside the New… menu), section chevrons on the row's RIGHT edge, a compact pinned System zone, and a utility footer — Files · Librarian · Settings (the Librarian entry is the journal formerly labeled Activity; internal ids keep 'activity'). Row menus offer Duplicate (via createRoutedNote, 'title copy'); the old Move to… manual filing is retired — the browser and the Librarian own placement.",
-          "added": "2026-07-29",
-          "last_reviewed": "2026-07-29",
-          "source": "src/components/sidebar.tsx"
+          "text": "The sidebar: one-row header, then a two-segment FRONT switcher — Home (All notes · Captures · Tasks · Main tree) and Chat (New chat · All chats · folders · every chat, uncapped). The active front owns the whole scrolling body. Breve is a MODE replacing the switcher. Home holds the collapsible SYSTEM zone (sec:system, default open); the Files · Librarian · Settings footer shows under every front. Persisted: sidebarView + expandedDests['sec:system']. Chords ⌃1 Home / ⌃2 Chat / ⌃⇧2 New chat / ⌃` toggles front; reveals switch fronts first. Parts live in src/components/sidebar/.",
+          "added": "2026-08-07",
+          "last_reviewed": "2026-08-07",
+          "source": "src/components/sidebar/"
         },
         {
           "id": 2,
-          "text": "Every tab is closeable including the last: the lone pane goes EMPTY (activeTabOf returns null) and rests on the quokka empty state with new-note/search/reopen actions; ⌘⇧T restores. The ⌘K palette follows real pointer movement only (onMouseMove, never onMouseEnter — scroll-under-cursor hover events snap the selection back).",
+          "text": "Every tab is closeable including the last: the lone pane goes EMPTY (activeTabOf returns null) and rests on the quokka empty state with new-note/search/reopen actions; ⌘⌥T restores (⌘⇧T is New board). The ⌘K palette follows real pointer movement only (onMouseMove, never onMouseEnter — scroll-under-cursor hover events snap the selection back).",
           "added": "2026-07-29",
-          "last_reviewed": "2026-07-29",
+          "last_reviewed": "2026-08-07",
+          "source": "src/state/panes.ts"
+        },
+        {
+          "id": 3,
+          "text": "A pane is a BOX: .pane-body clips, so no surface paints into the pane next door — a surface that cannot fit compresses its chrome then scrolls inside its own box, and popovers needing the window are portaled + fixed. Pane sizing has ONE law, clampSplitSizes(sizes, minFrac) over MIN_PANE_WIDTH 320 / chrome-derived MIN_PANE_HEIGHT 220, applied at split time, during a divider drag, and live via a ResizeObserver per split. Dividers carry aria-label, never title.",
+          "added": "2026-08-07",
+          "last_reviewed": "2026-08-07",
           "source": "src/state/panes.ts"
         }
       ],
@@ -660,7 +713,9 @@
       "rationale": "2026-08-01 fit sweep: at the old 160px floor a stacked chat's composer overhung its pane ~75px onto the pane below's strip and title. Locked by e2e/pane-resize-fit.spec.ts + clampSplitSizes unit tests.",
       "source": "src/state/panes.ts",
       "proposed_at": "2026-08-01T14:17:02.559Z",
-      "status": "pending"
+      "status": "adopted",
+      "adopted_at": "2026-08-07T00:00:00.000Z",
+      "adopted_as": "ROTLI_SHELL rule 3"
     },
     {
       "id": "stg-002",
@@ -669,7 +724,9 @@
       "rationale": "Rule 1 is stale: it required explicit local_ai_allowed for on-device reads and conflated locked with secure. Seth's 2026-08-01 directive flipped the local default and split the two axes; reference lanes replaced the blanket Hidden gating. Implemented and tested on both layers.",
       "source": "docs/design/ai-visibility-matrix.md",
       "proposed_at": "2026-08-01T15:18:36.448Z",
-      "status": "pending"
+      "status": "adopted",
+      "adopted_at": "2026-08-07T00:00:00.000Z",
+      "adopted_as": "ROTLI_MEMEX rule 1"
     },
     {
       "id": "stg-003",
@@ -678,7 +735,9 @@
       "rationale": "ROTLI_MODELS said nothing about what a model class may READ or WRITE, so agents inferred it from the stale ROTLI_MEMEX rule 1. Seth's 2026-08-01 matrix makes class the deciding axis for visibility and makes edit authority class-independent.",
       "source": "docs/design/ai-visibility-matrix.md",
       "proposed_at": "2026-08-01T15:18:45.370Z",
-      "status": "pending"
+      "status": "adopted",
+      "adopted_at": "2026-08-07T00:00:00.000Z",
+      "adopted_as": "ROTLI_MODELS rule 2"
     },
     {
       "id": "stg-004",
@@ -687,7 +746,9 @@
       "rationale": "Rule 1 still describes the retired Chat/Notes accordions and an uncollapsible System zone. The 2026-08-01 IA replaced both, split sidebar.tsx, and moved chat.new off ⌃2.",
       "source": "docs/design/sidebar-home-chat.md",
       "proposed_at": "2026-08-01T19:59:00.439Z",
-      "status": "pending"
+      "status": "adopted",
+      "adopted_at": "2026-08-07T00:00:00.000Z",
+      "adopted_as": "ROTLI_SHELL rule 1 (replaced)"
     },
     {
       "id": "stg-005",
@@ -696,7 +757,9 @@
       "rationale": "Rule 1 is stale: \"on-device models require explicit local_ai_allowed\" was inverted on 2026-08-01 (default allow), and it omits what the egress audit made load-bearing — TypeScript was applying the search/map/laundering/taint filters, so Rust supplied verdicts it did not enforce. Nine gaps, all closed in Rust.",
       "source": "docs/architecture/egress-threat-model.md",
       "proposed_at": "2026-08-01T20:45:28.688Z",
-      "status": "pending"
+      "status": "adopted",
+      "adopted_at": "2026-08-07T00:00:00.000Z",
+      "adopted_as": "ROTLI_MEMEX rule 3 (enforcement half; policy half merged into rule 1)"
     },
     {
       "id": "stg-006",
@@ -705,7 +768,9 @@
       "rationale": "Rule 0's \"does not rewrite curated wiki via interactive lane\" is stale: curated wiki flipped NoteRO→NoteRW (corpus.rs surfaced + canWrite) so Librarian-filed notes stop failing saves forever.",
       "source": "AI proposal",
       "proposed_at": "2026-08-03T22:03:24.181Z",
-      "status": "pending"
+      "status": "adopted",
+      "adopted_at": "2026-08-07T00:00:00.000Z",
+      "adopted_as": "ROTLI_MEMEX rule 0 (replaced)"
     },
     {
       "id": "stg-007",
@@ -714,7 +779,9 @@
       "rationale": "Tauri-vs-Electron was evaluated on measurement (rotli idle 0.008% of a core vs Electron peer 1.12%). The documented Tauri \"200% idle CPU\" failures are app-shaped — an animation nobody can see — and nothing in the repo prevented rotli from growing one. Recording the decision plus its mechanical guard stops both the migration question and the regression from recurring.",
       "source": "PR #85 perf/idle-citizenship; docs/design/shell-runtime-decision.md",
       "proposed_at": "2026-08-06T23:51:34.175Z",
-      "status": "pending"
+      "status": "adopted",
+      "adopted_at": "2026-08-07T00:00:00.000Z",
+      "adopted_as": "ROTLI_CORE rule 10"
     }
   ]
 }

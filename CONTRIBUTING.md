@@ -221,6 +221,20 @@ hook line. Precedents: `check:security`'s tool local-vs-egress classification
 hook's formatting/conflict guards. A review that only fixes the instance
 teaches nothing; the guard is the lesson.
 
+Two failures that looked like successes, both worth knowing because neither
+announced itself:
+
+- **A lapsed review bot reads as a passing review.** Greptile and Cursor Bugbot
+  post an ordinary comment when credits or entitlement run out, and
+  `gh pr view --json reviews` shows it exactly like any other review. Read the
+  body before trusting a green PR. When no automated reviewer is running, say so
+  in the PR rather than letting the absence pass silently.
+- **A pipeline reports its last stage, not its failure.** `release.sh --publish |
+  tail` returned 0 for a release Apple had rejected, because `tail` succeeded.
+  `set -e` inside the script had correctly aborted before publishing; the exit
+  code just never reached the caller. Redirect long-running scripts to a log and
+  check `$?`. The same trap applies to `git commit | tail && git push`.
+
 ## Required validation
 
 Use these focused gates while iterating:
