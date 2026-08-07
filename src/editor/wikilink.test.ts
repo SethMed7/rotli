@@ -105,6 +105,8 @@ describe("filterSlashItems", () => {
 
   test("a slash query must own the line and trail the caret", () => {
     expect(slashQueryAtCaret("/code block", 11)).toBe("code block");
+    expect(slashQueryAtCaret("1. /", 4)).toBe("");
+    expect(slashQueryAtCaret("  - /code", 9)).toBe("code");
     expect(slashQueryAtCaret("/code block", 5)).toBeNull();
     expect(slashQueryAtCaret("prefix /code", 12)).toBeNull();
     expect(slashQueryAtCaret("//code", 6)).toBeNull();

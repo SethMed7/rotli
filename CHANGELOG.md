@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Photos stay inside Markdown lists.** Dropping a photo onto an empty bullet,
   numbered item, or task now fills that list item instead of leaving a blank
   marker and inserting the image outside the list.
+- **Slash commands work inside Markdown lists.** Type `/` after a bullet,
+  number, or task marker to open the usual command menu. The marker stays put,
+  and multiline inserts remain indented inside that item.
 
 ## [0.78.0] - 2026-08-06
 

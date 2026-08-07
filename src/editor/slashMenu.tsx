@@ -16,6 +16,7 @@ import type { ReactNode } from "react";
 import { DOCUMENT_SEARCH_KEYWORDS } from "../documents/kinds";
 import type { BlockToggle } from "./commands";
 import { bulletGlyph, checklistGlyph, codeGlyph, numberedGlyph, quoteGlyph } from "./formatGlyphs";
+import { parseBlock } from "./render";
 
 // "H1/2/3" read as text glyphs (matches the format bar's H affordance voice)
 function Heading({ level }: { level: 1 | 2 | 3 }) {
@@ -345,10 +346,42 @@ export function filterSlashItems(query: string): SlashItem[] {
   );
 }
 
-/** A slash command owns the line only while the caret trails a slash-only query. */
+export interface SlashLineTarget {
+  /** Character offset where the slash query starts; list markers stay before it. */
+  from: number;
+  /** Indentation applied to subsequent scaffold lines so they remain in the item. */
+  continuation: string;
+}
+
+/** The editable slash-command lane for a paragraph or Markdown list item. */
+export function slashLineTarget(line: string): SlashLineTarget {
+  const block = parseBlock(line);
+  if (block.kind !== "bullet" && block.kind !== "numbered" && block.kind !== "task") {
+    return { from: 0, continuation: "" };
+  }
+  const prefix = line.slice(0, block.prefixLen).replace(/\t/g, "  ");
+  return { from: block.prefixLen, continuation: " ".repeat(prefix.length) };
+}
+
+/** Keep every non-empty continuation line inside the current list item. */
+export function adaptSlashInsertion(
+  insert: string,
+  caret: number,
+  continuation: string,
+): { insert: string; caret: number } {
+  if (!continuation) return { insert, caret };
+  const adapt = (text: string) => text.replace(/\n(?=.)/g, `\n${continuation}`);
+  return {
+    insert: adapt(insert),
+    caret: adapt(insert.slice(0, caret)).length,
+  };
+}
+
+/** A slash command owns paragraph or list-item content while the caret trails it. */
 export function slashQueryAtCaret(line: string, caret: number): string | null {
   if (caret !== line.length) return null;
-  return /^\/([^/]*)$/.exec(line)?.[1] ?? null;
+  const target = slashLineTarget(line);
+  return /^\/([^/]*)$/.exec(line.slice(target.from))?.[1] ?? null;
 }
 
 export function SlashMenu({

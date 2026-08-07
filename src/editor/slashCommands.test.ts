@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { NoteSummary } from "../types";
 import { imageGenMarkdown, readyImageEngines } from "./imageGenPopover";
 import { pickerFence, slashInsertion } from "./slashActions";
-import { filterSlashItems, SLASH_ITEMS } from "./slashMenu";
+import { adaptSlashInsertion, filterSlashItems, slashLineTarget, SLASH_ITEMS } from "./slashMenu";
 import { filterPickerNotes, slashPickerCanCreate } from "./slashPicker";
 
 const file = (id: string): NoteSummary => ({
@@ -66,6 +66,15 @@ describe("slash command catalog", () => {
       caret: 32,
     });
     expect(slashInsertion(byLabel("Table"))?.insert.split("\n")).toHaveLength(4);
+  });
+
+  test("list-item commands retain their marker and indent multiline scaffolds", () => {
+    const target = slashLineTarget("12. /math");
+    expect(target).toEqual({ from: 4, continuation: "    " });
+    expect(adaptSlashInsertion("```math\n\n```", 8, target.continuation)).toEqual({
+      insert: "```math\n\n    ```",
+      caret: 8,
+    });
   });
 
   test("targeted embeds use explicit typed fences", () => {

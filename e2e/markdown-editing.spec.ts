@@ -200,3 +200,22 @@ test("bullet outdent works on app-made AND tab-indented (foreign) lists", async 
   await page.keyboard.press("Shift+Tab");
   await expect(page.locator(".rotli-check")).toHaveCount(2);
 });
+
+test("slash commands work inside a numbered list item", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("1. /heading 2");
+
+  const menu = page.getByRole("menu", { name: "Insert block" });
+  await expect(menu).toBeVisible();
+  await menu.getByRole("menuitem", { name: /Heading 2/ }).click();
+
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("1. ## ");
+});

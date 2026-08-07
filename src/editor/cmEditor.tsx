@@ -47,7 +47,9 @@ import {
   type SlashItem,
   type SlashPickerMode,
   SlashMenu,
+  adaptSlashInsertion,
   filterSlashItems,
+  slashLineTarget,
   slashPlacement,
   slashQueryAtCaret,
 } from "./slashMenu";
@@ -74,6 +76,7 @@ interface PickerState {
   top: number;
   up: boolean;
   insertAt: number;
+  continuation: string;
 }
 
 /** The /image-gen popover's anchor (engine + prompt → PNG in storage/images). */
@@ -82,6 +85,7 @@ interface ImageGenState {
   top: number;
   up: boolean;
   insertAt: number;
+  continuation: string;
 }
 
 /** The floating format bar (bottom-center, ~42px tall, sitting 16px up) covers
@@ -367,6 +371,7 @@ function CmEditorImpl({
         insert = pickerFence(mode, note.id);
         caret = insert.length;
       }
+      ({ insert, caret } = adaptSlashInsertion(insert, caret, picker.continuation));
       view.dispatch({
         changes: { from: at, to: at, insert },
         selection: EditorSelection.cursor(at + caret),
@@ -378,9 +383,16 @@ function CmEditorImpl({
   );
 
   const openPicker = useCallback(
-    (mode: SlashPickerMode, insertAt: number, left: number, top: number, up: boolean) => {
+    (
+      mode: SlashPickerMode,
+      insertAt: number,
+      continuation: string,
+      left: number,
+      top: number,
+      up: boolean,
+    ) => {
       setSlash((s) => ({ ...s, open: false }));
-      setPicker({ mode, index: 0, left, top, up, insertAt });
+      setPicker({ mode, index: 0, left, top, up, insertAt, continuation });
     },
     [],
   );
@@ -390,8 +402,10 @@ function CmEditorImpl({
       const view = viewRef.current;
       if (!view) return;
       const line = view.state.doc.lineAt(view.state.selection.main.head);
+      const target = slashLineTarget(line.text);
+      const contentFrom = line.from + target.from;
       if (item.op.kind === "picker" || item.op.kind === "imageGen") {
-        const coords = view.coordsAtPos(line.from);
+        const coords = view.coordsAtPos(contentFrom);
         const host = hostRef.current?.getBoundingClientRect();
         const up = coords != null && slashPlacement(coords.top, window.innerHeight - coords.bottom) === "up";
         const left = (coords?.left ?? 0) - (host?.left ?? 0);
@@ -399,22 +413,23 @@ function CmEditorImpl({
           ? (coords?.top ?? 0) - (host?.top ?? 0) - 4
           : (coords?.bottom ?? 0) - (host?.top ?? 0) + 4;
         view.dispatch({
-          changes: { from: line.from, to: line.to, insert: "" },
-          selection: EditorSelection.cursor(line.from),
+          changes: { from: contentFrom, to: line.to, insert: "" },
+          selection: EditorSelection.cursor(contentFrom),
         });
         if (item.op.kind === "imageGen") {
           setSlash((s) => ({ ...s, open: false }));
-          setImageGen({ insertAt: line.from, left, top, up });
+          setImageGen({ insertAt: contentFrom, continuation: target.continuation, left, top, up });
           return;
         }
-        openPicker(item.op.mode, line.from, left, top, up);
+        openPicker(item.op.mode, contentFrom, target.continuation, left, top, up);
         return;
       }
       const insertion = slashInsertion(item.op);
       if (!insertion) return;
+      const adapted = adaptSlashInsertion(insertion.insert, insertion.caret, target.continuation);
       view.dispatch({
-        changes: { from: line.from, to: line.to, insert: insertion.insert },
-        selection: EditorSelection.cursor(line.from + insertion.caret),
+        changes: { from: contentFrom, to: line.to, insert: adapted.insert },
+        selection: EditorSelection.cursor(contentFrom + adapted.caret),
       });
       setSlash((s) => ({ ...s, open: false }));
       view.focus();
@@ -702,9 +717,10 @@ function CmEditorImpl({
               setImageGen(null);
               if (!view) return;
               const clamped = Math.min(at, view.state.doc.length);
+              const adapted = adaptSlashInsertion(markdown, markdown.length, imageGen.continuation);
               view.dispatch({
-                changes: { from: clamped, to: clamped, insert: markdown },
-                selection: EditorSelection.cursor(clamped + markdown.length),
+                changes: { from: clamped, to: clamped, insert: adapted.insert },
+                selection: EditorSelection.cursor(clamped + adapted.caret),
               });
               view.focus();
             }}

@@ -79,7 +79,9 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
 - Markdown is the primary knowledge surface. It exclusively owns slash commands,
   typed embed fences, wikilinks, note frontmatter, and note-native workflows.
   DOCX documents, sheets, and Excalidraw boards are secondary bonus work
-  surfaces with conventional file behavior, not parallel note systems.
+  surfaces with conventional file behavior, not parallel note systems. Slash
+  commands activate in paragraph or list-item content; list markers remain in
+  place and multiline scaffolds indent their continuation lines inside the item.
 - A Markdown `mermaid` fence owns its diagram source. The rendered block opens a
   View/Visual/Code workspace; `/Mermaid` inserts a valid starter flowchart. View
   provides pan, zoom, and fit. Visual losslessly edits supported flowcharts as
