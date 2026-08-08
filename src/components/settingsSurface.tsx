@@ -70,7 +70,13 @@ import {
   setHideOnBlur,
   systemProfile,
 } from "../lib/tauri";
-import { CORPUS_INSTANCE_ID, type MemexInstance, type Perms } from "../memex/config";
+import {
+  CORPUS_INSTANCE_ID,
+  type MemexInstance,
+  type Perms,
+  activeInstance,
+  isWritable,
+} from "../memex/config";
 import {
   useChooseFolder,
   useConnectBrain,
@@ -87,7 +93,7 @@ import { useFolders } from "../services/hooks";
 import { queryClient } from "../services/query";
 import { resetAndReonboard } from "../state/onboarding";
 import { usePanesStore } from "../state/panes";
-import { setQuickFolderSynced } from "../state/quick";
+import { setQuickFolderSynced, setQuickVaultSynced } from "../state/quick";
 import { ACCENT_COLORS, type AppIcon, type OrganizerTrust, SOLID_THEMES, useUiStore } from "../state/ui";
 import { VOICES } from "../voice/speech";
 import { Character, type CharacterName, QuokkaMark } from "./character";
@@ -520,14 +526,20 @@ function GeneralPane() {
     void demoMode().then(setDemo);
   }, []);
   const quickFolder = useUiStore((s) => s.quickFolder);
-  // The external Vault is read-mostly — quick notes never land there — and the
-  // LOCAL memex's curated wiki/** + chats/ refuse note creation at the write
-  // gate: offering one here would leave ⌥Q silently dead forever (#6, audit
-  // 2026-07). Keep all of them out of the destination picker entirely.
+  const quickVaultId = useUiStore((s) => s.quickVaultId);
+  const captureVaultId = useUiStore((s) => s.captureVaultId);
+  const setCaptureVaultId = useUiStore((s) => s.setCaptureVaultId);
+  const memexConfig = useMemexConfig();
+  const currentVault = memexConfig.data ? activeInstance(memexConfig.data) : null;
+  const writableVaults = (memexConfig.data?.instances ?? []).filter(isWritable);
+  // Physical folders remain available only for current/local routing. Named
+  // memex destinations always use their guarded intake lane.
   const folderOpts = (useFolders().data ?? []).filter(
     (f) => !isHidden(f.id) && !isVault(f.id) && !isWikiPath(f.id) && !isChatsPath(f.id),
   );
   const hasCurrent = folderOpts.some((f) => f.id === quickFolder);
+  const hasQuickVault = !quickVaultId || writableVaults.some((vault) => vault.id === quickVaultId);
+  const hasCaptureVault = !captureVaultId || writableVaults.some((vault) => vault.id === captureVaultId);
   return (
     <>
       <PaneHead title="General" char="base" />
@@ -611,16 +623,60 @@ function GeneralPane() {
         left off and closes when you click away.
       </p>
       <label className="setselect-row">
-        <span>New quick notes go to</span>
+        <span>Destination vault</span>
         <select
           className="setselect"
-          value={quickFolder}
-          onChange={(e) => setQuickFolderSynced(e.target.value)}
+          aria-label="Quick Note destination vault"
+          value={quickVaultId ?? ""}
+          onChange={(e) => setQuickVaultSynced(e.target.value || null)}
         >
-          {!hasCurrent && <option value={quickFolder}>{quickFolder}</option>}
-          {folderOpts.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
+          <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
+          {!hasQuickVault && <option value={quickVaultId ?? ""}>Unavailable vault — {quickVaultId}</option>}
+          {writableVaults.map((vault) => (
+            <option key={vault.id} value={vault.id}>
+              Always {vault.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {!quickVaultId && (
+        <label className="setselect-row">
+          <span>Folder</span>
+          <select
+            className="setselect"
+            value={quickFolder}
+            onChange={(e) => setQuickFolderSynced(e.target.value)}
+          >
+            {!hasCurrent && <option value={quickFolder}>{quickFolder}</option>}
+            {folderOpts.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <p className="setnote">A named vault must have write access in Location before it appears here.</p>
+
+      <h4 className="sethead">Quick capture</h4>
+      <p className="lead">
+        One-breath captures can follow the current writable vault or stay pinned to a separate capture vault.
+      </p>
+      <label className="setselect-row">
+        <span>Destination vault</span>
+        <select
+          className="setselect"
+          aria-label="Quick capture destination vault"
+          value={captureVaultId ?? ""}
+          onChange={(e) => setCaptureVaultId(e.target.value || null)}
+        >
+          <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
+          {!hasCaptureVault && (
+            <option value={captureVaultId ?? ""}>Unavailable vault — {captureVaultId}</option>
+          )}
+          {writableVaults.map((vault) => (
+            <option key={vault.id} value={vault.id}>
+              Always {vault.label}
             </option>
           ))}
         </select>

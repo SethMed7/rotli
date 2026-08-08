@@ -1618,6 +1618,8 @@ export interface QuickStatePayload {
   activeId: string | null;
   /** Folder new quick notes are created in. */
   folder: string;
+  /** Exact writable memex for new notes; null preserves current routing. */
+  vaultId: string | null;
 }
 
 /** Keep the quick-access set in step across the main + quick webviews — the

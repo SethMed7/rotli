@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Quick Note and Quick capture can target separate vaults.** General settings
+  now offers an independent destination for each global capture entry point,
+  while preserving Quick Note's current local-folder option. Explicit vault
+  choices require write access and never silently fall back to another vault.
 - **The Librarian now explains its filing system where you use it.** Its
   re-openable guide maps intake, Library folders, reference-only views,
   Archive, Trash, assets, and chats; it also explains the one-file rationale

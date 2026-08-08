@@ -221,6 +221,12 @@ interface UiState {
   /** Folder new quick notes (the "+") are created in. */
   quickFolder: string;
   setQuickFolder: (folder: string) => void;
+  /** Exact writable memex for new Quick Notes; null preserves current routing. */
+  quickVaultId: string | null;
+  setQuickVaultId: (id: string | null) => void;
+  /** Exact writable memex for Quick capture; null preserves current routing. */
+  captureVaultId: string | null;
+  setCaptureVaultId: (id: string | null) => void;
 
   /** The ONE sidebar — collapse state (remembered per window, persisted in the
    * shell) and width (px; drag the grip on its right edge). The two-rail era is
@@ -578,6 +584,10 @@ export const useUiStore = create<UiState>((set, get) => ({
   // "Inbox" on disk (fs mode); the seeded Inbox id in the browser
   quickFolder: inboxFolderId,
   setQuickFolder: (folder) => set({ quickFolder: folder }),
+  quickVaultId: null,
+  setQuickVaultId: (id) => set({ quickVaultId: id }),
+  captureVaultId: null,
+  setCaptureVaultId: (id) => set({ captureVaultId: id }),
 
   sidebarCollapsed: false,
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),

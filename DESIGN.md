@@ -79,6 +79,10 @@ exception.
   reference-only Main/named views and links directly to Librarian and Security
   controls; understanding the automation must not depend on remembering a
   first-run modal or interpreting a bare help glyph.
+- Quick Note and Quick capture expose separate destination-vault controls in
+  General settings. “Current destination” preserves the default; pinning a
+  named writable vault is explicit, and unavailable choices remain visible
+  until corrected rather than silently appearing to succeed elsewhere.
 - The System zone (Library · Assets · Archive · Trash, plus added external
   folders) stays pinned below the body and belongs to Home; its header is a
   disclosure so the whole zone can be folded away. The sidebar ends in a pinned

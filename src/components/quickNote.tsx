@@ -13,6 +13,7 @@ import { EditorSurface } from "../editor/editorSurface";
 import { useTransientPopover } from "../lib/popover";
 import { setQuickHandle } from "../lib/quickHandle";
 import { corpusFrontmatter, corpusSetSecure, onQuickShow, startWindowDrag } from "../lib/tauri";
+import { createVaultCapture } from "../services/captureRouting";
 import { createRoutedNote } from "../services/createNote";
 import { isChatsPath, isVault, isWikiPath } from "../services/destinations";
 import { invalidateNotes, useSearchableNotes } from "../services/hooks";
@@ -245,20 +246,25 @@ export function QuickNote() {
   }, [universe.ready, notes, ids, activeId]);
 
   const newNote = () => {
-    // Quick notes default to the LOCAL Inbox. The external Vault is read-mostly —
-    // rotli never creates a note inside it (never into a memex's chats/) — and the
-    // local memex's curated wiki/** + chats/ REFUSE creation at the write gate, so
-    // a stored quickFolder pointing at any of those (a stale Settings pick)
-    // redirects to the local Inbox instead of leaving ⌥Q dead (#6, audit 2026-07).
+    // Without an exact vault choice, preserve the legacy local-folder/current
+    // memex route. An exact writable vault bypasses that folder and uses its
+    // guarded intake; a stale choice surfaces an error instead of misfiling.
     const stored = useUiStore.getState().quickFolder;
+    const targetId = useUiStore.getState().quickVaultId;
     const folder = isVault(stored) || isWikiPath(stored) || isChatsPath(stored) ? inboxFolderId : stored;
     creatingRef.current = true;
-    void createRoutedNote({
-      selectedFolderId: folder,
-      isSmart: folder === inboxFolderId,
-      localFallback: inboxFolderId,
-      secure: true,
-    })
+    const create = targetId
+      ? createVaultCapture(targetId, "").then((noteId) => {
+          if (!noteId) throw new Error("The chosen Quick Note vault is unavailable.");
+          return noteId;
+        })
+      : createRoutedNote({
+          selectedFolderId: folder,
+          isSmart: folder === inboxFolderId,
+          localFallback: inboxFolderId,
+          secure: true,
+        });
+    void create
       .then(async (noteId) => {
         await invalidateNotes();
         setErr(null);

@@ -14,7 +14,7 @@ export const QUICK_MAX = 5;
 
 function snapshot(): QuickStatePayload {
   const s = useUiStore.getState();
-  return { ids: s.quickNoteIds, activeId: s.quickActiveId, folder: s.quickFolder };
+  return { ids: s.quickNoteIds, activeId: s.quickActiveId, folder: s.quickFolder, vaultId: s.quickVaultId };
 }
 
 /** Apply locally + tell the other webview (no echo — the receiver uses
@@ -25,11 +25,13 @@ function commit(patch: Partial<QuickStatePayload>): void {
     ids: patch.ids ?? cur.ids,
     activeId: patch.activeId !== undefined ? patch.activeId : cur.activeId,
     folder: patch.folder ?? cur.folder,
+    vaultId: patch.vaultId !== undefined ? patch.vaultId : cur.vaultId,
   };
   useUiStore.setState({
     quickNoteIds: next.ids,
     quickActiveId: next.activeId,
     quickFolder: next.folder,
+    quickVaultId: next.vaultId,
   });
   emitQuickSet(next);
 }
@@ -76,6 +78,10 @@ export function setQuickFolderSynced(folder: string): void {
   commit({ folder });
 }
 
+export function setQuickVaultSynced(vaultId: string | null): void {
+  commit({ vaultId });
+}
+
 /** Drop ids whose notes no longer exist (deleted since last run) and repair the
  * active pointer — called once the corpus list resolves in the quick window. */
 export function pruneQuick(alive: Set<string>): void {
@@ -94,5 +100,6 @@ export function applyQuickState(state: QuickStatePayload): void {
     quickNoteIds: state.ids,
     quickActiveId: state.activeId,
     quickFolder: state.folder,
+    quickVaultId: state.vaultId ?? null,
   });
 }

@@ -148,6 +148,16 @@ describe("parseSettings — creation and Brain model", () => {
     expect(parseSettings('{"organizerModel":"gemini35"}').organizerModel).toBe("gemini35");
     expect(parseSettings('{"organizerModel":"future"}').organizerModel).toBe("local");
   });
+
+  test("quick-note and quick-capture vault choices are independent and optional", () => {
+    expect(parseSettings("{}").quickVaultId).toBeNull();
+    expect(parseSettings("{}").captureVaultId).toBeNull();
+    const settings = parseSettings('{"quickVaultId":"quick","captureVaultId":"work"}');
+    expect(settings.quickVaultId).toBe("quick");
+    expect(settings.captureVaultId).toBe("work");
+    expect(parseSettings('{"quickVaultId":7,"captureVaultId":false}').quickVaultId).toBeNull();
+    expect(parseSettings('{"quickVaultId":7,"captureVaultId":false}').captureVaultId).toBeNull();
+  });
 });
 
 describe("parseSettings — fileMetadata (Show file metadata)", () => {

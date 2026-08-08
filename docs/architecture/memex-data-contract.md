@@ -28,6 +28,14 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   routes a new note through **Brain intake**: the portable staging lane currently
   stored at `wiki/_inbox/`. An explicit writable local folder remains the
   physical home.
+- **Global capture destinations are explicit and independent.** Quick Note and
+  Quick capture each default to the current writable memex, while Settings may
+  pin either entry point to a different registered memex with `chats+inbox`
+  access. The chosen root id lives in `.rotli/settings.json`; Quick Note syncs
+  its choice between the main and floating webviews. An explicit root that is
+  removed or becomes read-only fails closed instead of silently receiving the
+  thought elsewhere. Quick Note's existing local-folder choice remains
+  available only while it follows current routing.
 - A Rotli-authored note's first H1 is its title. The filename is a derived,
   human-readable projection: lowercase title words joined with hyphens and a
   `.md` extension (`# Strategy master` → `strategy-master.md`). Stable identity

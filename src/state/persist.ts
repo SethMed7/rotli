@@ -273,6 +273,8 @@ interface PersistedSettings {
   captureOrder: string[];
   quickActiveId: string | null;
   quickFolder: string;
+  quickVaultId: string | null;
+  captureVaultId: string | null;
   /** The ONE sidebar's collapse state + width, and which dests are expanded —
    * the two-rail keys (foldersCollapsed/listCollapsed/lastOpenRails/
    * foldersWidth/listWidth) are retired (Seth, 2026-06-13). */
@@ -409,6 +411,9 @@ export function parseSettings(raw: string): PersistedSettings {
       : (quickNoteIds[0] ?? null);
   const quickFolder =
     typeof data.quickFolder === "string" && data.quickFolder ? data.quickFolder : inboxFolderId;
+  const quickVaultId = typeof data.quickVaultId === "string" && data.quickVaultId ? data.quickVaultId : null;
+  const captureVaultId =
+    typeof data.captureVaultId === "string" && data.captureVaultId ? data.captureVaultId : null;
   return {
     v: 1,
     theme: asEnum(data.theme, THEME_SETTINGS, "light"),
@@ -523,6 +528,8 @@ export function parseSettings(raw: string): PersistedSettings {
     captureOrder,
     quickActiveId,
     quickFolder,
+    quickVaultId,
+    captureVaultId,
     // missing keys default — old configs predate the single sidebar, never crash
     sidebarCollapsed: asBool(data.sidebarCollapsed, false),
     sidebarWidth: clampSidebarWidth(typeof data.sidebarWidth === "number" ? data.sidebarWidth : 240),
@@ -611,6 +618,8 @@ function applySettings(s: PersistedSettings): void {
     captureOrder: s.captureOrder,
     quickActiveId: s.quickActiveId,
     quickFolder: s.quickFolder,
+    quickVaultId: s.quickVaultId,
+    captureVaultId: s.captureVaultId,
     sidebarCollapsed: s.sidebarCollapsed,
     sidebarWidth: s.sidebarWidth,
     sidebarZoom: s.sidebarZoom,
@@ -1104,6 +1113,8 @@ function settingsSnapshot(): string {
     captureOrder: ui.captureOrder,
     quickActiveId: ui.quickActiveId,
     quickFolder: ui.quickFolder,
+    quickVaultId: ui.quickVaultId,
+    captureVaultId: ui.captureVaultId,
     sidebarCollapsed: ui.sidebarCollapsed,
     sidebarWidth: ui.sidebarWidth,
     sidebarZoom: ui.sidebarZoom,

@@ -56,8 +56,7 @@ import {
   workspaceTakeOpenRequest,
 } from "./lib/tauri";
 import { importImagesAtDrop } from "./editor/externalImageDrop";
-import { activeInstance, isWritable } from "./memex/config";
-import { loadConfig as memexLoadConfig, writeNote } from "./memex/service";
+import { createVaultCapture } from "./services/captureRouting";
 import { summonChat } from "./services/chatSummon";
 import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateJournal, invalidateNotes } from "./services/hooks";
@@ -175,12 +174,11 @@ function MainShell() {
   // in your list), then acks so the card may clear. Plain Enter never surfaces
   // the app (open=false); ⌘Enter (open=true) opens the Board so you can see it.
   //
-  // With a writable memex, ⌥C lands as a STAGED NOTE in wiki/_inbox/ instead (no
+  // With a writable destination memex, ⌥C lands as a STAGED NOTE in wiki/_inbox/ instead (no
   // Board card; inbox.md is not a rotli write surface — #96, audit 2026-07). The
-  // brain path resolves the active instance imperatively each time (it's not in a
-  // store yet here), and falls back to the Board on ANY failure — a capture must
-  // never be lost. The card clears ONLY when we ack, so we ack ONLY on a confirmed
-  // save — on total failure the draft stays put for the next summon.
+  // An explicit vault choice is exact: if it becomes unavailable, the draft is
+  // left un-acked rather than silently written elsewhere. The default route may
+  // still fall back to the Board so existing local setups keep working.
   useEffect(
     () =>
       onCaptureSave(({ id, body, open }) => {
@@ -191,15 +189,12 @@ function MainShell() {
         };
         void (async () => {
           let saved = false;
+          const targetId = useUiStore.getState().captureVaultId;
           try {
-            // Quick capture has ONE default home (not a user setting): a staged
-            // note in the brain's wiki/_inbox when writable, else the Board.
-            const cfg = await memexLoadConfig();
-            const inst = activeInstance(cfg);
-            if (inst && isWritable(inst)) {
+            const noteId = await createVaultCapture(targetId, body);
+            if (noteId) {
               // a quick capture is a STAGED NOTE in wiki/_inbox → it shows in the
               // one Captures surface (Seth, 2026-06-30). ⌘Enter surfaces Captures.
-              await writeNote({ instance: inst, body, secure: true });
               await invalidateNotes();
               if (open) useUiStore.getState().setContentView("board");
             } else {
@@ -207,8 +202,9 @@ function MainShell() {
             }
             saved = true;
           } catch {
-            // any failure (inbox write refused, memex gone) → never drop the
-            // capture; try the Board as a fallback
+            // The default route keeps its legacy local fallback. An explicit
+            // target never misfiles: leave the draft un-acked for the next summon.
+            if (targetId) return;
             try {
               await toBoard();
               saved = true;
