@@ -399,14 +399,6 @@
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-.fsec-save {
-  margin-left: auto;
-  font-size: 9.5px;
-  font-weight: 500;
-  letter-spacing: normal;
-  text-transform: none;
-  color: var(--text-muted);
-}
 .fsec-add {
   display: inline-flex;
   align-items: center;
@@ -421,9 +413,6 @@
   /* always visible, whisper-quiet (Seth, 2026-07-25 Zen rule + 2026-07-26
      calm pass); full strength on hover/focus */
   opacity: 0.38;
-}
-.fsec-save + .fsec-add {
-  margin-left: 0;
 }
 .fsec-add + .fsec-add {
   margin-left: 0;

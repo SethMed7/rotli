@@ -113,7 +113,9 @@ exception.
 - Main's view switcher stays in the existing section header: exact view name,
   standard menu disclosure, inline create/rename, and an explicit delete row
   that states content remains in Main. A named view must not become a second
-  sidebar, tab bar, colored workspace, glow, or card stack.
+  sidebar, tab bar, colored workspace, glow, or card stack. Automatic Main and
+  named-view tree writes stay visually silent when they succeed; write failures
+  remain visible inline so durability problems never masquerade as success.
 
 ## Required states
 

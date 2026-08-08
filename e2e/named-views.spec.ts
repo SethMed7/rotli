@@ -6,6 +6,17 @@ import { expect, test } from "@playwright/test";
 
 import { gotoApp } from "./support";
 
+test("successful background tree saves stay visually silent", async ({ page }) => {
+  await gotoApp(page);
+
+  await page.getByRole("button", { name: "New folder in Main" }).click();
+  await page.getByRole("textbox", { name: "New folder in Main" }).fill("Quiet save");
+  await page.getByRole("textbox", { name: "New folder in Main" }).press("Enter");
+
+  await expect(page.locator('.main-tree [data-main-folder="1"]', { hasText: "Quiet save" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: /^(Saving…|Saved)$/ })).toHaveCount(0);
+});
+
 test("named views keep Main global and make Command-T context-sensitive", async ({ page }) => {
   await gotoApp(page);
 

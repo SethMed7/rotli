@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Background tree saves now feel immediate.** The Main/named-view header no
+  longer flashes `Saving…` or `Saved` after ordinary organization; failures
+  still surface inline instead of disappearing.
 - **Held-Command hints now read cleanly on the active control.** Home, Chat,
   and New chat show complete Command-inclusive chords that can be pressed
   directly while the overlay is open; active hints no longer disappear into

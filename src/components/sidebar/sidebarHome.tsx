@@ -201,19 +201,14 @@ export function SidebarHome({ zoom }: { zoom: number }) {
   // never moves Main. Mouse + drag navigable.
   const mainManifest = useMainStore((s) => s.manifest);
   const setMainTree = useMainStore((s) => s.setTree);
-  const mainSaveState = useMainStore((s) => s.saveState);
   const mainError = useMainStore((s) => s.error);
   const viewsManifest = useViewsStore((s) => s.manifest);
   const setViewsManifest = useViewsStore((s) => s.setManifest);
   const viewsWritable = useViewsStore((s) => s.writable);
-  const viewsSaveState = useViewsStore((s) => s.saveState);
   const viewsError = useViewsStore((s) => s.error);
   const activeView = useUiStore((s) => s.activeView);
   const setActiveView = useUiStore((s) => s.setActiveView);
   const activeTree = useActiveTree();
-  // the header's Saving…/Saved chip follows whichever tree is being edited —
-  // main.json now reports its writes too (audit 2026-07-30, correctness #3)
-  const treeSaveState = activeView ? viewsSaveState : mainSaveState;
   const setActiveTree = (tree: typeof activeTree, ids?: Set<string>) => {
     if (activeView) {
       setViewsManifest(setNamedViewTree(viewsManifest, activeView, tree, ids));
@@ -1088,11 +1083,6 @@ export function SidebarHome({ zoom }: { zoom: number }) {
                 <ChevronRight size={9} />
               </span>
             </button>
-            {(treeSaveState === "saving" || treeSaveState === "saved") && (
-              <span className="fsec-save" role="status">
-                {treeSaveState === "saving" ? "Saving…" : "Saved"}
-              </span>
-            )}
             <button
               type="button"
               className="fsec-add"
