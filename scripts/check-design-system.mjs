@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import sharp from "sharp";
 import {
   BREVE_PDF_PRESETS,
   contrastRatio,
@@ -153,9 +154,47 @@ for (const [name, palette] of Object.entries(BREVE_PDF_PRESETS)) {
   if (error) violations.push(`Breve PDF preset ${name}: ${error}`);
 }
 
+// Sidebar model marks share one 14px slot, so their visible artwork must share
+// an optical footprint too. A nominally 14px SVG with a padded viewBox or
+// hairline geometry still reads as a tiny icon beside its peers. Rasterize at
+// the shipped size and guard both the visible bounds and alpha mass.
+for (const name of ["claude-spark-clay", "gemini", "gemma", "qwen", "openai-blossom"]) {
+  const { data } = await sharp(join(root, `src/brand/providers/${name}.svg`))
+    .resize(14, 14, { fit: "contain" })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let minX = 14;
+  let minY = 14;
+  let maxX = -1;
+  let maxY = -1;
+  let alphaMass = 0;
+  for (let y = 0; y < 14; y += 1) {
+    for (let x = 0; x < 14; x += 1) {
+      const alpha = data[(y * 14 + x) * 4 + 3];
+      alphaMass += alpha;
+      if (alpha <= 32) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  const width = maxX - minX + 1;
+  const height = maxY - minY + 1;
+  const opaquePixels = Math.round(alphaMass / 255);
+  if (width < 12 || height < 12 || opaquePixels < 32) {
+    violations.push(
+      `provider mark ${name}: optical footprint ${width}x${height}, ${opaquePixels} alpha-pixels; expected at least 12x12 and 32`,
+    );
+  }
+}
+
 if (violations.length) {
   console.error(`design-system regression failed:\n${violations.map((line) => `  - ${line}`).join("\n")}`);
   process.exit(1);
 }
 
-console.log(`check:design-system ok — ${expectedDataThemes.length} app themes + ${Object.keys(BREVE_PDF_PRESETS).length} PDF palettes`);
+console.log(
+  `check:design-system ok — ${expectedDataThemes.length} app themes + ${Object.keys(BREVE_PDF_PRESETS).length} PDF palettes + 5 provider marks`,
+);

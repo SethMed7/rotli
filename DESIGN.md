@@ -71,6 +71,9 @@ exception.
   an ordered list of fronts, so a Home dashboard block or the parked email Inbox
   joins without another information-architecture change. Breve is a mode, not a
   front — it replaces the switcher rather than nesting one.
+- Provider/model marks in Chat use one 14px slot and an optically consistent
+  visible footprint; source SVG padding and fine linework must not make one
+  family read as a smaller icon than its peers.
 - The System zone (Library · Assets · Archive · Trash, plus added external
   folders) stays pinned below the body and belongs to Home; its header is a
   disclosure so the whole zone can be folded away. The sidebar ends in a pinned

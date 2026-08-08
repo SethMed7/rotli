@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Chat model icons now scan at one size.** Gemma and OpenAI marks are
+  optically normalized to the same compact sidebar footprint as Claude,
+  Gemini, and Qwen, with a design-system guard covering future additions.
 - **Background tree saves now feel immediate.** The Main/named-view header no
   longer flashes `Saving…` or `Saved` after ordinary organization; failures
   still surface inline instead of disappearing.
