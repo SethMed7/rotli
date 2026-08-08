@@ -905,13 +905,14 @@
 .act-pad {
   padding: 0 22px 8px;
 }
-/* the ? help button — quiet ring, opens the explainer */
+/* the labeled help button keeps the explainer discoverable after first use */
 .act-help {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 20px;
+  width: auto;
   height: 20px;
+  padding: 0 7px;
   border: 1px solid var(--border);
   border-radius: var(--r-pill);
   background: none;
@@ -1153,6 +1154,11 @@
   font-size: 17px;
   font-weight: 700;
 }
+.lib-intro h4 {
+  margin: 14px 0 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
 .lib-intro p,
 .lib-intro li {
   font-size: 13px;
@@ -1177,7 +1183,14 @@
   font-weight: 600;
 }
 .lib-intro-ok {
-  margin-top: 4px;
+  margin-left: auto;
+}
+.lib-intro-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 14px;
 }
 .act-desc {
   flex: 1 1 auto;

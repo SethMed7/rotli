@@ -6,7 +6,7 @@
 //
 // 2026-07-31 rework (Seth): no per-row mascot, proposals grouped per note,
 // history folded into days (recent first, the long tail behind View all), a
-// first-visit explainer modal (re-openable via the ? button), a LIVE run band
+// first-visit explainer modal (re-openable via the labeled help button), a LIVE run band
 // (the daemon narrates each note it looks at; Stop hands control back), and
 // journal hygiene (prune resolved history; pending is sacred).
 
@@ -106,8 +106,14 @@ function fieldWord(a: BrainAction): string {
 }
 
 /** The first-visit explainer — everything the Librarian may and may NOT do,
- * in one card. Re-openable any time from the header's ? button. */
-function LibrarianIntro({ onClose }: { onClose: () => void }) {
+ * in one card. Re-openable any time from the header's help button. */
+function LibrarianIntro({
+  onClose,
+  onOpenSettings,
+}: {
+  onClose: () => void;
+  onOpenSettings: (pane: "brain" | "security") => void;
+}) {
   const cardRef = useRef<HTMLDivElement>(null);
   useTransientPopover([cardRef], true, onClose);
   return (
@@ -142,6 +148,31 @@ function LibrarianIntro({ onClose }: { onClose: () => void }) {
             <strong>Everything is journaled and undoable</strong> — this page is the whole record.
           </li>
         </ul>
+        <h4>Where your files go</h4>
+        <ul className="lib-intro-rules">
+          <li>
+            <strong>New captures wait in intake</strong> until the quiet window passes and the Librarian can
+            place them in a Library area.
+          </li>
+          <li>
+            <strong>Library areas are ordinary folders</strong> under <code>wiki/</code>. The Markdown files
+            remain readable and editable without Rotli.
+          </li>
+          <li>
+            <strong>Main and named views are references</strong> stored in <code>.rotli/</code>, never extra
+            copies of your notes. Reorganizing a view does not move the file.
+          </li>
+          <li>
+            <strong>Archive, Trash, assets, and chats stay separate</strong> so lifecycle state and app data
+            do not get mixed into your note folders.
+          </li>
+        </ul>
+        <h4>Why this structure</h4>
+        <p>
+          One durable file has one physical home. Views can change freely around it, and the journal can
+          reverse the Librarian&rsquo;s moves without reconciling duplicate content. That keeps the vault
+          portable, inspectable, and useful when Rotli is closed.
+        </p>
         <p className="lib-intro-trust">
           <strong>How much may it do?</strong> That&rsquo;s the ladder in Settings → Librarian:
           <br />
@@ -150,9 +181,17 @@ function LibrarianIntro({ onClose }: { onClose: () => void }) {
           plus keeps each area&rsquo;s overview page fresh, all on its own; metadata suggestions never pile
           up. Only one thing always waits for you at every rung: filing a note it isn&rsquo;t sure about.
         </p>
-        <button type="button" className="ghostbtn primary lib-intro-ok" onClick={onClose}>
-          Got it
-        </button>
+        <div className="lib-intro-links" aria-label="Learn more">
+          <button type="button" className="ghostbtn" onClick={() => onOpenSettings("brain")}>
+            Librarian settings
+          </button>
+          <button type="button" className="ghostbtn" onClick={() => onOpenSettings("security")}>
+            Security &amp; privacy
+          </button>
+          <button type="button" className="ghostbtn primary lib-intro-ok" onClick={onClose}>
+            Got it
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -238,6 +277,12 @@ export function ActivitySurface() {
   const closeIntro = () => {
     setIntroOpen(false);
     if (!introSeen) setIntroSeen(true);
+  };
+  const openIntroSettings = (pane: "brain" | "security") => {
+    closeIntro();
+    const ui = useUiStore.getState();
+    ui.setSettingsPaneRequest(pane);
+    ui.setSettingsOpen(true);
   };
 
   // the daemon's narration (titles only) — the "watch it work" feed
@@ -414,7 +459,7 @@ export function ActivitySurface() {
 
   return (
     <div className="board activity">
-      {introOpen && <LibrarianIntro onClose={closeIntro} />}
+      {introOpen && <LibrarianIntro onClose={closeIntro} onOpenSettings={openIntroSettings} />}
       <header className="board-head">
         <h2 className="board-title">Librarian</h2>
         {pending.length > 0 && (
@@ -425,11 +470,11 @@ export function ActivitySurface() {
         <button
           type="button"
           className="act-help"
-          aria-label="What is the Librarian?"
-          title="What is the Librarian?"
+          aria-label="How the Librarian works"
+          title="How the Librarian works"
           onClick={() => setIntroOpen(true)}
         >
-          ?
+          How it works
         </button>
         {/* the daemon is event-driven and sleeps when idle — this is the
             explicit nudge (one pass now, then back to sleep). Hidden when the

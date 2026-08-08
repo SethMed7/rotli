@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The Librarian now explains its filing system where you use it.** Its
+  re-openable guide maps intake, Library folders, reference-only views,
+  Archive, Trash, assets, and chats; it also explains the one-file rationale
+  and links directly to Librarian and Security settings.
 - **Long notes now have a quick way home.** A compact arrow appears at the
   bottom-right after scrolling and returns the Markdown pane to the top.
 
