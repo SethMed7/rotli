@@ -245,3 +245,17 @@ test("arrowing into an image selects the rendered image", async ({ page }) => {
   await page.keyboard.press("ArrowUp");
   await expect(page.locator(".rotli-img.sel")).toHaveCount(1);
 });
+
+test("double-clicking a rendered image keeps it selected instead of exposing source", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("![](storage:double-click-selection.png)\nAfter");
+
+  const image = page.locator(".rotli-img");
+  await expect(image).toHaveCount(1);
+  await image.dblclick();
+  await expect(page.locator(".rotli-img.sel")).toHaveCount(1);
+  await expect(editor).not.toContainText("![](storage:double-click-selection.png)");
+});

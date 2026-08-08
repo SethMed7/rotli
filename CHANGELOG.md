@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Double-clicking a photo keeps it rendered.** The second click now preserves
+  the selected image instead of exposing its Markdown source.
+
 ## [0.79.0] - 2026-08-07
 
 ### Added

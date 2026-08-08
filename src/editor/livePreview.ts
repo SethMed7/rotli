@@ -518,6 +518,15 @@ class ImgWidget extends WidgetType {
       window.addEventListener("mouseup", onUp);
       window.addEventListener("keydown", onKey, true);
     });
+    wrap.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!wrap.isConnected) return;
+      const imageFrom = view.posAtDOM(wrap);
+      const imageTo = view.state.doc.lineAt(imageFrom).to;
+      view.dispatch({ selection: { anchor: imageFrom, head: imageTo } });
+      view.focus();
+    });
     const grip = document.createElement("span");
     grip.className = "rotli-img-resize";
     grip.setAttribute("aria-hidden", "true");
@@ -551,9 +560,9 @@ class ImgWidget extends WidgetType {
     return wrap;
   }
   ignoreEvent(event: Event) {
-    // we own the press/drag/release cycle — CM must not race a caret in on
-    // mousedown (that was the "click turns the image into text" bug)
-    return event.type === "mousedown";
+    // We own the press/drag/release cycle and its synthesized double-click —
+    // CM must not race a caret or word selection into the hidden source.
+    return event.type === "mousedown" || event.type === "dblclick";
   }
 }
 
