@@ -411,6 +411,10 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   while nesting its original storage path (`trash/storage/rotli/file.docx`), so
   restore remains possible without `.rotli/` state. File lifecycle actions never
   invoke macOS Trash; the Rust boundary validates both moves and restores.
+- Excalidraw boards enter Archive/Trash through the board-safe note lifecycle
+  move, which preserves their opaque JSON bytes; restore uses the recorded sink
+  path. Frontend capability checks must not classify a board as a conventional
+  file or gate it on storage-file writability.
 - `bun run check:architecture` guards inward dependencies and keeps slash
   commands out of non-Markdown surfaces.
 - `bun run check:structure` enforces camelCase source filenames and denies

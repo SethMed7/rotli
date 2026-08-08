@@ -84,7 +84,9 @@ exception.
   an explicit exception to header-adjacent navigation): every segment
   navigates and the current selection is the leaf. Right-clicking empty space
   offers New folder (where creation is allowed) and Sort by Name / Kind /
-  Date modified / Date created; re-picking the active key flips direction.
+  Date modified / Date created; re-picking the active key flips direction. A
+  selected item or gathered selection can be dragged onto the System Trash row;
+  it uses the same guarded lifecycle operation as `⌘Delete`.
 - Every tab is closeable, including the last one: the lone pane rests on the
   quokka empty state with quiet ways back in (new note · search · reopen tab).
   An empty pane is a designed state, not an error.

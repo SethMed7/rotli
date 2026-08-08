@@ -1,5 +1,6 @@
 // Drag a note (or board) INTO the Main tree from outside the sidebar — the
-// All-notes list rows and (via tabDrag) editor tabs. Pointer-based, because HTML5
+// All-notes list rows and (via tabDrag) editor tabs. System-browser items may
+// also land on the sidebar's Trash row. Pointer-based, because HTML5
 // drag is dead in the macOS WKWebView shell (Seth, 2026-07-07). It mirrors the
 // sidebar's own "add" drag: a floating ghost rides the cursor, the hovered Main
 // row highlights (`.main-dropover`), and on drop the note is added to Main at that
@@ -46,10 +47,16 @@ export function commitMainAdd(noteId: string, drop: { id: string; pos: DropPos }
   if (parent && parent !== MAIN_ROOT) inheritFolderView(noteId, parent);
 }
 
-/** Begin a possible Main-add drag from a row's pointerdown. `id` is the note or
- * board id to add. A plain click falls through; real travel starts the drag. */
-export function startMainAddDrag(event: ReactPointerEvent, id: string, label: string): void {
-  let drop: { id: string; pos: DropPos } | null = null;
+/** Begin a possible cross-surface drag from a row's pointerdown. `id` is the
+ * note or board id to add to Main; callers may additionally expose Trash. A
+ * plain click falls through; real travel starts the drag. */
+export function startMainAddDrag(
+  event: ReactPointerEvent,
+  id: string,
+  label: string,
+  opts?: { allowMain?: boolean; onTrash?: () => void },
+): void {
+  let drop: { kind: "main"; id: string; pos: DropPos } | { kind: "trash" } | null = null;
   let hovered: HTMLElement | null = null;
 
   const clearHover = () => {
@@ -60,21 +67,31 @@ export function startMainAddDrag(event: ReactPointerEvent, id: string, label: st
   createPointerDragSession(event, {
     ghost: (x, y) => createDragGhost(label, x, y),
     onMove: (x, y) => {
-      const at = mainDropAt(x, y);
-      if (!at) {
-        drop = null;
+      const trash = opts?.onTrash
+        ? ((document.elementFromPoint(x, y) as HTMLElement | null)?.closest(
+            '[data-system-trash-drop="1"]',
+          ) as HTMLElement | null)
+        : null;
+      const at = opts?.allowMain === false ? null : mainDropAt(x, y);
+      const nextHovered = trash ?? at?.el ?? null;
+      if (hovered !== nextHovered) {
         clearHover();
+        hovered = nextHovered;
+        hovered?.classList.add("main-dropover");
+      }
+      if (trash) {
+        drop = { kind: "trash" };
         return;
       }
-      if (hovered !== at.el) {
-        clearHover();
-        hovered = at.el;
-        at.el.classList.add("main-dropover");
+      if (!at) {
+        drop = null;
+        return;
       }
-      drop = { id: at.id, pos: at.pos };
+      drop = { kind: "main", id: at.id, pos: at.pos };
     },
     onDrop: () => {
-      if (drop) commitMainAdd(id, drop);
+      if (drop?.kind === "trash") opts?.onTrash?.();
+      else if (drop?.kind === "main") commitMainAdd(id, drop);
     },
     onEnd: clearHover,
     // swallow the trailing click so the row doesn't also open on drop

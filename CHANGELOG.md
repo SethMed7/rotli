@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Boards can be archived or trashed again.** Their menus no longer mislabel
+  them as read-only files, and items in the System browser can be dragged onto
+  the Trash row using the same guarded lifecycle as `⌘Delete`.
 - **Double-clicking a photo keeps it rendered.** The second click now preserves
   the selected image instead of exposing its Markdown source.
 

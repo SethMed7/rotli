@@ -41,7 +41,7 @@ import {
   rerootDiskPath,
   sortFolderListing,
 } from "../services/systemBrowser";
-import { emptyTrash } from "../services/systemTrash";
+import { emptyTrash, trashSystemSelection } from "../services/systemTrash";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
@@ -470,10 +470,16 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       }
     },
     onContextMenu: (e: MouseEvent) => openMenu(e, n),
-    onPointerDown:
-      n.kind === "file"
-        ? undefined
-        : (e: ReactPointerEvent) => startMainAddDrag(e, n.id, n.title || "Empty note"),
+    onPointerDown: (e: ReactPointerEvent) => {
+      const draggedItems = selectedIds.has(n.id) ? selection : [n];
+      startMainAddDrag(e, n.id, n.title || "Empty note", {
+        allowMain: n.kind !== "file",
+        onTrash: () => {
+          setSelection(draggedItems);
+          void trashSystemSelection();
+        },
+      });
+    },
   });
 
   // rubber-band selection on EMPTY space (items own their gestures/drags):

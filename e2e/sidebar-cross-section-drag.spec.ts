@@ -36,6 +36,21 @@ test("dragging a note from the Assets browser into Main adds a reference without
   await expect(page.locator(".system-browser .fdr-tile", { hasText: "Groceries" })).toBeVisible();
 });
 
+test("dragging an item from the System browser onto Trash moves it there", async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator(".frow", { hasText: "Assets" }).first().click();
+  const source = page.locator(".system-browser .fdr-tile", { hasText: "Groceries" }).first();
+  await expect(source).toBeVisible();
+
+  const trash = page.locator(".sb-system .frow", { hasText: "Trash" }).first();
+  await pointerDrag(page, source, await centerOf(trash));
+
+  await expect(source).toHaveCount(0);
+  await trash.click();
+  await expect(page.locator(".system-browser .fdr-tile", { hasText: "Groceries" })).toBeVisible();
+});
+
 test("the System browser is a real Finder: grid, columned list, folder entry, breadcrumb", async ({
   page,
 }) => {

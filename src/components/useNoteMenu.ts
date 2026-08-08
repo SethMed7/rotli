@@ -28,6 +28,7 @@ import { createRoutedNote } from "../services/createNote";
 import { DEST, isSink } from "../services/destinations";
 import { invalidateNotes, useArchiveNote, useRestoreNote, useTrashNote } from "../services/hooks";
 import { useMainGcIds } from "../services/hooks";
+import { activeItemSinkLane } from "../services/itemLifecycle";
 import { isEmptyNote } from "../services/mainDismiss";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { markNoteDraftChanged } from "../services/noteDrafts";
@@ -116,7 +117,9 @@ export function useNoteMenu() {
         // breadcrumb for the note lane to read — the sink-relative restore is
         // its only correct way home. Trashing one is now possible (the note
         // lane used to refuse it outright), so its return trip must work too.
-        const isFile = note.kind === "file" || note.kind === "board";
+        const isFile = note.kind === "file";
+        const isBoard = note.kind === "board";
+        const restoresByPath = isFile || isBoard;
         // an archived/trashed note: open + Restore only — the lifecycle actions
         // don't apply until it's back (mirrors the retired RowMenu's split).
         // Gate on isSink (Archive/Trash), NOT isHidden: a STAGED capture lives
@@ -124,7 +127,7 @@ export function useNoteMenu() {
         // must get the full menu, not a dead "Restore" that no-ops (Seth,
         // 2026-07-06: "Restore does nothing but I can see it in All notes").
         if (isSink(note.folderId)) {
-          const restoreItem: MenuSpec = isFile
+          const restoreItem: MenuSpec = restoresByPath
             ? {
                 kind: "action" as const,
                 label: "Restore to original folder",
@@ -183,8 +186,8 @@ export function useNoteMenu() {
           return;
         }
 
-        const isBoard = note.kind === "board";
         const isNote = !isFile && !isBoard;
+        const sinkLane = activeItemSinkLane(note.kind);
         const inMain = mainHasNote(manifest.tree, note.id);
         const currentView = assignedView(viewsManifest, note.id);
         const starred = quickIds.includes(note.id);
@@ -193,7 +196,7 @@ export function useNoteMenu() {
         // menu shows the right toggle label + check (Seth #23, 2026-07-03: these
         // moved out of the metadata popover into this menu).
         const fm = isNote ? await corpusFrontmatter(note.id).catch(() => null) : null;
-        const fileStat = isFile ? await corpusFileStat(note.id).catch(() => null) : null;
+        const fileStat = sinkLane === "file" ? await corpusFileStat(note.id).catch(() => null) : null;
         const secureAtHome =
           isNote && (isSecureBrainFolder(noteDiskFolder(note)) || isSecureNotesFolder(noteDiskFolder(note)));
 
@@ -467,7 +470,7 @@ export function useNoteMenu() {
             });
           }
         }
-        if (!isFile) {
+        if (sinkLane === "note") {
           items.push({ kind: "sep" as const });
           items.push({
             kind: "action" as const,
@@ -479,7 +482,7 @@ export function useNoteMenu() {
           });
         }
         items.push({ kind: "sep" as const });
-        if (!isFile) {
+        if (sinkLane === "note") {
           items.push({
             kind: "action" as const,
             label: "Archive",
@@ -490,7 +493,7 @@ export function useNoteMenu() {
             },
           });
         }
-        if (isFile) {
+        if (sinkLane === "file") {
           const movable = fileStat?.lifecycleMutable === true;
           const moveFile = (sink: "Archive" | "Trash") => {
             if (!movable) return;

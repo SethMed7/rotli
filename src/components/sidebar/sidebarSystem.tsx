@@ -176,6 +176,7 @@ export function SidebarSystem({
                 title={
                   trashFull ? `${destNotes.length} items — open Trash to review and empty it` : undefined
                 }
+                data-system-trash-drop={id === DEST.trash ? "1" : undefined}
                 onClick={() => openSystemRoot(id)}
                 {...rowProps({ id, kind: "folder" })}
               >
