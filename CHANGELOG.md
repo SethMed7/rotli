@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The onboarding character now lives on the page, not inside a card.** Each
+  setup state brings it in with one brief gesture that respects reduced motion.
+
 ### Fixed
 
 - **Double-clicking a photo keeps it rendered.** The second click now preserves

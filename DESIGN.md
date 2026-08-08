@@ -121,9 +121,10 @@ polish work.
 - App setup and vault activation are separate. Skipping app setup applies the
   documented calm defaults, but never chooses or creates a notes folder; the
   next surface still asks the user to create or open a vault.
-- The companion character appears on every setup and activation state. Motion
-  is short, one-shot, tied to a state change, and absent under reduced motion;
-  scanning may use a bounded loading indicator while work is active.
+- The companion character appears directly on the ground, without a card, on
+  every setup and activation state. Motion is short, one-shot, tied to a state
+  change, and absent under reduced motion; scanning may use a bounded loading
+  indicator while work is active.
 - Progress reads as position plus step name. Choice numbers sit beside the
   labels they invoke, radio choices use arrow-key selection, and the current
   `⌘Enter` binding is rendered inside the primary button it activates.

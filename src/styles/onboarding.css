@@ -53,16 +53,14 @@
   align-items: center;
   justify-content: center;
   gap: 18px;
-  padding: 28px 20px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-card);
-  background: var(--surface-2);
+  padding: 28px 0;
   color: var(--text-muted);
   text-align: center;
 }
 
 .setup-companion .quokka {
-  animation: setup-character-arrive 220ms var(--motion-ease) both;
+  transform-origin: 50% 85%;
+  animation: setup-character-arrive 240ms var(--motion-ease) both;
 }
 
 .setup-companion p {
@@ -427,7 +425,8 @@
 }
 
 @keyframes setup-character-arrive {
-  from { opacity: 0; transform: translateY(7px) rotate(-2deg); }
+  from { opacity: 0; transform: translateY(6px) scale(0.97) rotate(-1deg); }
+  72% { opacity: 1; transform: translateY(-1px) scale(1) rotate(0.35deg); }
   to { opacity: 1; transform: translateY(0) rotate(0); }
 }
 
@@ -452,7 +451,7 @@
     min-height: 132px;
     flex-direction: row;
     justify-content: flex-start;
-    padding: 14px 18px;
+    padding: 8px 0;
     text-align: left;
   }
 
