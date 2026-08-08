@@ -28,6 +28,8 @@ export interface BadgeSpot {
   chord: string;
   left: number;
   top: number;
+  /** True when the anchored control is the current pressed/selected choice. */
+  active: boolean;
 }
 
 /** Is this rect worth badging — on screen, and big enough to anchor to? A
@@ -47,7 +49,11 @@ export function rectIsBadgeable(
  * are testable without a DOM. Badges anchor to the control's TOP-LEFT, nudged
  * inward so they read as sitting ON the control rather than beside it. */
 export function collectSpots(
-  elements: readonly { id: string; rect: { left: number; top: number; width: number; height: number } }[],
+  elements: readonly {
+    id: string;
+    rect: { left: number; top: number; width: number; height: number };
+    active?: boolean;
+  }[],
   viewport: { width: number; height: number },
   chordOf: (id: string) => string | null,
 ): BadgeSpot[] {
@@ -66,6 +72,7 @@ export function collectSpots(
       chord: formatChord(chord),
       left: Math.max(2, el.rect.left + 2),
       top: Math.max(2, el.rect.top + 2),
+      active: el.active ?? false,
     });
   }
   return out;
@@ -83,7 +90,14 @@ export function HotkeyBadges() {
       const id = node.getAttribute(HOTKEY_ATTR);
       if (!id) return [];
       const r = node.getBoundingClientRect();
-      return [{ id, rect: { left: r.left, top: r.top, width: r.width, height: r.height } }];
+      return [
+        {
+          id,
+          rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+          active:
+            node.getAttribute("aria-pressed") === "true" || node.getAttribute("aria-selected") === "true",
+        },
+      ];
     });
     setSpots(collectSpots(elements, { width: window.innerWidth, height: window.innerHeight }, currentChord));
   }, []);
@@ -92,7 +106,11 @@ export function HotkeyBadges() {
   return (
     <div className="hkbadges" role="presentation" aria-hidden="true">
       {spots.map((spot) => (
-        <kbd className="hkbadge" key={spot.id} style={{ left: spot.left, top: spot.top }}>
+        <kbd
+          className={spot.active ? "hkbadge on-active" : "hkbadge"}
+          key={spot.id}
+          style={{ left: spot.left, top: spot.top }}
+        >
           {spot.chord}
         </kbd>
       ))}

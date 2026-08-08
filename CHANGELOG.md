@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Held-Command hints now read cleanly on the active control.** Home, Chat,
+  and New chat show complete Command-inclusive chords that can be pressed
+  directly while the overlay is open; active hints no longer disappear into
+  an accent-on-accent block.
 - **The onboarding character now lives on the page, not inside a card.** Each
   setup state brings it in with one brief gesture that respects reduced motion.
 - **Showing file metadata now reveals it immediately.** Turning metadata on

@@ -9,8 +9,22 @@ test("holding Command labels tabs with their numbered shortcuts", async ({ page 
 
   await page.keyboard.down("Meta");
   try {
-    await expect(page.locator(".hkbadge", { hasText: "⌘1" })).toHaveCount(1);
-    await expect(page.locator(".hkbadge", { hasText: "⌘2" })).toHaveCount(1);
+    await expect(page.locator(".hkbadge").filter({ hasText: /^⌘1$/ })).toHaveCount(1);
+    await expect(page.locator(".hkbadge").filter({ hasText: /^⌘2$/ })).toHaveCount(1);
+  } finally {
+    await page.keyboard.up("Meta");
+  }
+});
+
+test("held-Command badges show complete front chords and distinguish the active control", async ({
+  page,
+}) => {
+  await gotoApp(page);
+
+  await page.keyboard.down("Meta");
+  try {
+    await expect(page.locator(".hkbadge.on-active", { hasText: "⌃⌘1" })).toHaveCount(1);
+    await expect(page.locator(".hkbadge:not(.on-active)", { hasText: "⌃⌘2" })).toHaveCount(1);
   } finally {
     await page.keyboard.up("Meta");
   }

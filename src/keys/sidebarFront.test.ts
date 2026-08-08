@@ -48,4 +48,10 @@ describe("sidebar front actions", () => {
     expect(chords.every((c) => typeof c === "string" && c.length > 0)).toBe(true);
     expect(new Set(chords).size).toBe(3);
   });
+
+  test("front chords include the held Command key advertised by the live overlay", () => {
+    expect(currentChord("modules.notes")).toBe("Meta+Ctrl+1");
+    expect(currentChord("modules.chat")).toBe("Meta+Ctrl+2");
+    expect(currentChord("chat.new")).toBe("Meta+Ctrl+Shift+2");
+  });
 });

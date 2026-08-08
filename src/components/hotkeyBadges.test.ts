@@ -36,7 +36,7 @@ describe("collectSpots", () => {
 
   test("badges land on their control, formatted in Mac symbols", () => {
     const spots = collectSpots([{ id: "modules.notes", rect: rect(100, 200) }], VIEWPORT, chordOf);
-    expect(spots).toEqual([{ id: "modules.notes", chord: "⌃1", left: 102, top: 202 }]);
+    expect(spots).toEqual([{ id: "modules.notes", chord: "⌃1", left: 102, top: 202, active: false }]);
   });
 
   test("an UNBOUND action is skipped — a badge must never teach a key that does nothing", () => {
@@ -72,5 +72,20 @@ describe("collectSpots", () => {
       chordOf,
     );
     expect(spots.map((s) => s.id)).toEqual(["modules.notes"]);
+  });
+
+  test("a selected control carries an active badge with the complete chord", () => {
+    const spots = collectSpots(
+      [{ id: "modules.notes", rect: rect(100, 200), active: true }],
+      VIEWPORT,
+      () => "Meta+Ctrl+1",
+    );
+    expect(spots[0]).toEqual({
+      id: "modules.notes",
+      chord: "⌃⌘1",
+      left: 102,
+      top: 202,
+      active: true,
+    });
   });
 });

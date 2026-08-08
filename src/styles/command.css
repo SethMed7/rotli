@@ -1845,3 +1845,10 @@
      same-accent control without introducing a color literal (check:hex) */
   border: 1px solid var(--border-strong);
 }
+.hkbadge.on-active {
+  /* A selected control already owns the accent. Repeating the same fill made
+     the hint dissolve into the control, so active hints use the calm surface
+     voice while preserving the exact same size and placement. */
+  background: var(--surface);
+  color: var(--text);
+}

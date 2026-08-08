@@ -611,13 +611,14 @@ export function registerDefaultActions(): void {
     },
   });
 
-  // — the FRONTS (Seth's IA, 2026-08-01): ⌃1 Home, ⌃2 Chat. The sidebar's
-  //   switcher and these chords are the same gesture, so a keyboard user never
-  //   has to reach for the pill (docs/design/sidebar-home-chat.md). —
+  // — the FRONTS (Seth's IA, 2026-08-01): ⌃⌘1 Home, ⌃⌘2 Chat. The sidebar's
+  //   switcher and these chords are the same gesture, and including ⌘ means the
+  //   chord shown by the held-Command overlay can be pressed directly without
+  //   releasing the reveal key first (review 2026-08-08). —
   registerAction({
     id: "modules.notes",
     title: "Go to Home",
-    defaultChord: "Ctrl+1",
+    defaultChord: "Meta+Ctrl+1",
     run: () => {
       const ui = useUiStore.getState();
       ui.setSettingsOpen(false);
@@ -629,7 +630,7 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "modules.chat",
     title: "Go to Chat",
-    defaultChord: "Ctrl+2",
+    defaultChord: "Meta+Ctrl+2",
     run: () => {
       const ui = useUiStore.getState();
       ui.setSettingsOpen(false);
@@ -657,13 +658,13 @@ export function registerDefaultActions(): void {
     },
   });
 
-  // Chat is a FRONT now, not a section. ⌃⇧2 opens a fresh chat pane (it moved
-  // off ⌃2 so the two fronts could own ⌃1/⌃2 — bindings persist by action id,
-  // so an existing override is untouched). Both reach ⌘K and are rebindable.
+  // Chat is a FRONT now, not a section. ⌃⌘⇧2 opens a fresh chat pane (it moved
+  // off ⌃⌘2 so the two fronts could own ⌃⌘1/⌃⌘2 — bindings persist by action
+  // id, so an existing override is untouched). Both reach ⌘K and are rebindable.
   registerAction({
     id: "chat.new",
     title: "New chat",
-    defaultChord: "Ctrl+Shift+2",
+    defaultChord: "Meta+Ctrl+Shift+2",
     run: () => {
       const ui = useUiStore.getState();
       ui.setSettingsOpen(false);

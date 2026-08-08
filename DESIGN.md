@@ -41,6 +41,10 @@ exception.
 
 - Every user action remains keyboard reachable and participates in the shared
   action/keybinding system.
+- Held-Command badges show the complete live chord. Controls that are meant to
+  be invoked directly from that reveal state include Command in their default
+  chord, and a badge on the active control uses the calm surface voice instead
+  of repeating accent-on-accent.
 - The sidebar's active-item grammar follows the focused pane across Markdown,
   boards, PDFs, DOCX, sheets, and other surfaced files. Opening a conventional
   file expands its containing folder and highlights the same durable item id;
