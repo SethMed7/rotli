@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Saved chats stay visible in the Chat sidebar.** Selecting an empty or
+  legacy named view no longer turns a non-empty chat list into a blank menu;
+  views with assigned chats still narrow normally.
 - **Boards can be archived or trashed again.** Their menus no longer mislabel
   them as read-only files, and items in the System browser can be dragged onto
   the Trash row using the same guarded lifecycle as `⌘Delete`.

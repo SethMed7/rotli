@@ -32,6 +32,7 @@ import { ChevronRight, FolderGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../
 import { InlineRenameInput } from "../inlineRenameInput";
 import { chatMark } from "./chatMark";
 import { ModelLogo } from "./modelLogo";
+import { visibleSidebarChats } from "./sidebarChatProjection";
 import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
 
 /** Where a dragged chat would land: a folder row (assignment — positional
@@ -69,13 +70,19 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   const chatModelMap = useUiStore((s) => s.chatModel);
   const chatModelId = useUiStore((s) => s.chatModelId);
 
-  // chats participate in named views (2026-08-03): an active view narrows the
-  // chat front to its own chats, exactly like Home narrows the notes tree
+  // Chats participate in named views (2026-08-03), but an empty/legacy view
+  // must not turn a non-empty Chat front into a blank list. Once that view has
+  // at least one live chat membership it narrows normally.
   const activeView = useUiStore((s) => s.activeView);
   const viewsManifest = useViewsStore((s) => s.manifest);
   const viewsWritable = useViewsStore((s) => s.writable && s.hydrated);
   const setViewsManifest = useViewsStore((s) => s.setManifest);
-  const visibleSlugs = activeView ? new Set(viewChats(viewsManifest, activeView)) : null;
+  const visibleChats = visibleSidebarChats(
+    chatList,
+    activeView ? viewChats(viewsManifest, activeView) : null,
+  );
+  const visibleSlugs =
+    visibleChats.length === chatList.length ? null : new Set(visibleChats.map((c) => c.slug));
   const inView = (c: MemexChatSummary) => visibleSlugs === null || visibleSlugs.has(c.slug);
 
   // the top lanes — views onto the list, not folders (rows also stay in their
