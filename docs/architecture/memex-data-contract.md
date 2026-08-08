@@ -24,10 +24,12 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   letters, numbers, spaces, periods, underscores, or hyphens; `Main` is
   reserved. Boards and binary files remain frontmatter-free, so their view
   membership exists only as an explicit reference in `.rotli/views.json`.
-- **Markdown notes** are plain `.md` files. A smart, Main, or Brain selection
-  routes a new note through **Brain intake**: the portable staging lane currently
-  stored at `wiki/_inbox/`. An explicit writable local folder remains the
-  physical home.
+- **Markdown notes** are plain `.md` files. With the Librarian enabled, a smart,
+  Main, or Brain selection routes a new note through **Brain intake**, the
+  portable staging lane at `wiki/_inbox/`. With the Librarian disabled, a new
+  ordinary note lands directly under `wiki/`; no organizer exists to move it
+  later. Secure notes keep their protected `wiki/_secure/` home in both modes.
+  An explicit writable local folder remains the physical home.
 - **Global capture destinations are explicit and independent.** Quick Note and
   Quick capture each default to the current writable memex, while Settings may
   pin either entry point to a different registered memex with `chats+inbox`

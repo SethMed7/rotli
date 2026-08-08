@@ -1449,7 +1449,8 @@ export function onOrganizerProgress(cb: (p: OrganizerProgress) => void): () => v
 // ——— the memex seam (Stage 1) — typed wrappers over the Rust memex commands
 //     (src-tauri/src/memex.rs). rotli connects to / initiates a memex instance
 //     (the shared identity/personality/wiki/history/chats/inbox.md spine; for Seth, ~/memex-vault)
-//     and OWNS chats/ + the wiki/_inbox/ staging, nothing else (inbox.md is not a
+//     and OWNS chats/ + note creation in wiki/_inbox (Librarian on) or directly
+//     under wiki/ (Librarian off), nothing else (inbox.md is not a
 //     rotli surface — #96, audit 2026-07). Mirror-not-import: the byte-shape
 //     of what we write lives in src/memex/contract.ts; these only move bytes. ———
 
@@ -1541,8 +1542,9 @@ export function memexArchiveChat(root: string, slug: string): Promise<void> {
 export function memexRevealChat(root: string, slug: string): Promise<void> {
   return memexInvoke("memex_reveal_chat", { root, slug });
 }
-/** Write a v3.5 note into wiki/_inbox/, or wiki/_secure/ when its composed
- * frontmatter carries secure:true. Returns the absolute path. */
+/** Write a note through the memex's creation policy: wiki/_inbox with the
+ * Librarian on, wiki/ with it off, or wiki/_secure when frontmatter carries
+ * secure:true. Returns the absolute path. */
 export function memexWriteNote(root: string, stem: string, contents: string): Promise<string> {
   return memexInvoke("memex_write_note", { root, stem, contents });
 }

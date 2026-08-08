@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Raw vaults no longer strand every new note in Librarian intake.** When the
+  Librarian is off, new ordinary notes land directly in the vault's `wiki/`
+  note lane. Existing files are not moved; secure notes keep their protected
+  home and the rest of the vault structure is unchanged.
 - **Chat model icons now scan at one size.** Gemma and OpenAI marks are
   optically normalized to the same compact sidebar footprint as Claude,
   Gemini, and Qwen, with a design-system guard covering future additions.

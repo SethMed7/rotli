@@ -205,7 +205,7 @@ export async function pinChat(instance: MemexInstance, slug: string, pinned: boo
   if (next !== existing) await memexWriteChat(instance.root, slug, next);
 }
 
-// ── notes (rotli's owned wiki/_inbox staging — the v3.5 write model) ───────────
+// ── notes (Librarian intake or the raw vault's wiki root) ──────────────────────
 
 export interface WriteNoteInput {
   instance: MemexInstance;
@@ -219,10 +219,10 @@ export interface WriteNoteInput {
   secure?: boolean;
 }
 
-/** Write a brand-new note into the active memex's `wiki/_inbox/` staging per the v3.5
- *  contract. AI metadata (area/summary/tags/links) is left blank — a later phase's
- *  local LLM classifies + files it to `wiki/<area>/`. The `id` is set once and never
- *  changes. Returns the new note's id, staging stem, and absolute path. */
+/** Write a brand-new note through the active memex's creation policy: `wiki/_inbox/`
+ *  with the Librarian enabled, or the `wiki/` root when it is off. AI metadata
+ *  (area/summary/tags/links) is left blank. The `id` is set once and never changes.
+ *  Returns the new note's id, filename stem, and absolute path. */
 export async function writeNote(input: WriteNoteInput): Promise<{ id: string; stem: string; path: string }> {
   const { instance } = input;
   const id = ulid();

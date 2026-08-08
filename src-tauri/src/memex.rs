@@ -9,9 +9,11 @@
 //! the bytes down atomically + under an advisory lock (Breve's daemon writes the
 //! same tree concurrently).
 //!
-//! OWNERSHIP: rotli writes ONLY `chats/` and the `wiki/_inbox/` note staging (v3.5).
+//! OWNERSHIP: rotli writes ONLY `chats/`, the `wiki/_inbox/` note staging (v3.5),
+//! and new ordinary notes directly under `wiki/` when the Librarian is disabled.
 //! `inbox.md` is NOT a rotli write surface (#96, audit 2026-07 — nothing ever appended
-//! it; captures stage in `wiki/_inbox/`; Breve owns its own inbox.md appends; rotli only
+//! it; captures follow the same Librarian-aware note-creation policy; Breve owns
+//! its own inbox.md appends; rotli only
 //! scaffolds the file when initiating a NEW memex). `identity/`, `personality/`,
 //! `history/`, `MAP.md`, the CURATED rest
 //! of `wiki/`, and every control file are NEVER written — `assert_writable` refuses, regardless of what
@@ -917,13 +919,15 @@ fn move_chat_to_bucket(
     with_file_lock(&src, || fs::rename(&src, &dst).map_err(|e| e.to_string()))
 }
 
-/// Write a brand-new note (full v3.5 bytes composed by TS) into the `wiki/_inbox/`
-/// staging area as `<slug>.md`. `safe_slug` validates the requested base; a
+/// Write a brand-new note (full v3.5 bytes composed by TS) into the Librarian's
+/// `wiki/_inbox/` staging area, or directly into `wiki/` for a raw vault, as
+/// `<slug>.md`. `safe_slug` validates the requested base; a
 /// sibling collision becomes `<slug> (2).md`, `<slug> (3).md`, … under one
 /// directory-level creation lock. Stable identity remains the frontmatter ULID.
 /// Atomic + under the lock, exactly like a chat write. The ROOT must be
-/// registered (#20). A later phase's local LLM classifies + `git mv`s the note
-/// out to `wiki/<area>/`; rotli only ever writes the staging copy.
+/// registered (#20). With the Librarian enabled, its local model later
+/// classifies + moves the staged note to `wiki/<area>/`; raw vaults keep the
+/// root-level note exactly where Rotli created it.
 #[tauri::command]
 pub fn memex_write_note(
     app: tauri::AppHandle,
@@ -946,8 +950,15 @@ fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, Stri
         .is_some_and(|(frontmatter, _)| {
             frontmatter.lines().any(|line| line.trim() == "secure: true")
         });
-    let lane = if secure { "_secure" } else { "_inbox" };
-    let dir = root.join("wiki").join(lane);
+    let librarian_enabled = secure || librarian_enabled_at(root)?;
+    let lane = if secure {
+        Some("_secure")
+    } else if librarian_enabled {
+        Some("_inbox")
+    } else {
+        None
+    };
+    let dir = lane.map_or_else(|| root.join("wiki"), |lane| root.join("wiki").join(lane));
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     with_file_lock(&dir.join(".rotli-note-create"), || {
         let mut file_name = format!("{safe}.md");
@@ -956,8 +967,11 @@ fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, Stri
             file_name = format!("{safe} ({number}).md");
             number += 1;
         }
-        let rel = format!("wiki/{lane}/{file_name}");
-        assert_writable(&rel)?;
+        let rel = lane.map_or_else(
+            || format!("wiki/{file_name}"),
+            |lane| format!("wiki/{lane}/{file_name}"),
+        );
+        assert_note_creation_writable(&rel, lane.is_none())?;
         let path = dir.join(&file_name);
         if secure {
             let ignore = root.join(".gitignore");
@@ -975,6 +989,32 @@ fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, Stri
         atomic_write(&path, contents)?;
         Ok(path.to_string_lossy().to_string())
     })
+}
+
+fn assert_note_creation_writable(rel: &str, raw_root: bool) -> Result<(), String> {
+    if !raw_root {
+        return assert_writable(rel);
+    }
+    let file = rel.strip_prefix("wiki/").unwrap_or_default();
+    if !file.is_empty() && !file.contains('/') && file.ends_with(".md") {
+        Ok(())
+    } else {
+        Err(format!("raw-vault note creation escaped the wiki root: {rel}"))
+    }
+}
+
+/// Read the per-vault automation switch at creation time. Missing or malformed
+/// settings preserve the established ON default; a genuine I/O error refuses
+/// the write because guessing could put a note in the wrong physical lane.
+fn librarian_enabled_at(root: &Path) -> Result<bool, String> {
+    match fs::read_to_string(root.join(".rotli/settings.json")) {
+        Ok(settings) => Ok(serde_json::from_str::<Value>(&settings)
+            .ok()
+            .and_then(|value| value.get("brainEnabled").and_then(Value::as_bool))
+            .unwrap_or(true)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(true),
+        Err(error) => Err(format!("read Librarian setting before note creation: {error}")),
+    }
 }
 
 #[derive(Serialize)]
@@ -1305,6 +1345,43 @@ mod tests {
         assert!(write_note_at(root, "../escape", "x").is_err());
         assert!(write_note_at(root, "a/b", "x").is_err());
         assert!(write_note_at(root, "Caps", "x").is_err());
+    }
+
+    #[test]
+    fn raw_vault_note_creation_uses_the_wiki_root_not_librarian_intake() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join(".rotli")).unwrap();
+        std::fs::write(root.join(".rotli/settings.json"), "{\"brainEnabled\":false}\n").unwrap();
+        let body = "---\nid: 01JRAW\n---\n# Plain note\n";
+
+        let path = write_note_at(root, "plain-note", body).unwrap();
+        let duplicate = write_note_at(root, "plain-note", body).unwrap();
+
+        assert!(path.ends_with("wiki/plain-note.md"));
+        assert!(duplicate.ends_with("wiki/plain-note (2).md"));
+        assert!(!root.join("wiki/_inbox/plain-note.md").exists());
+        assert_eq!(std::fs::read_to_string(path).unwrap(), body);
+
+        let secure = "---\nid: 01SECURE\nsecure: true\n---\n# Private\n";
+        let secure_path = write_note_at(root, "private", secure).unwrap();
+        assert!(secure_path.ends_with("wiki/_secure/private.md"));
+    }
+
+    #[test]
+    fn unreadable_librarian_setting_refuses_only_the_ambiguous_creation_lane() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join(".rotli/settings.json")).unwrap();
+
+        let ordinary = "---\nid: 01JRAW\n---\n# Plain note\n";
+        assert!(write_note_at(root, "plain-note", ordinary).is_err());
+        assert!(!root.join("wiki/plain-note.md").exists());
+        assert!(!root.join("wiki/_inbox/plain-note.md").exists());
+
+        let secure = "---\nid: 01SECURE\nsecure: true\n---\n# Private\n";
+        let secure_path = write_note_at(root, "private", secure).unwrap();
+        assert!(secure_path.ends_with("wiki/_secure/private.md"));
     }
 
     #[test]
