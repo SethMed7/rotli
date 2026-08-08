@@ -839,6 +839,41 @@
 .sb-chatrow:hover {
   background: var(--hov);
 }
+.sb-chatview {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 5px;
+  padding: 4px 10px 7px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.sb-chatview-label {
+  flex: 0 0 auto;
+}
+.sb-chatview-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 600;
+}
+.sb-chatview-all {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sb-chatview-all:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 /* the OPEN chat rides the ONE active-item state — the same solid accent pill
    the open note wears (consistency audit 2026-07-30; the old 10% wash cited a
    "selected folder wash" the tree retired in the one-active-state redesign) */

@@ -16,8 +16,10 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   Chats have no frontmatter `view_tag` — the list is their whole membership —
   and Rust round-trips the field verbatim. An active view with live chat members
   narrows the Chat front to them; an empty, legacy, or stale membership falls
-  back to every saved chat instead of blanking a non-empty sidebar. A chat
-  created while a view is active joins it.
+  back to every saved chat instead of blanking a non-empty sidebar. Chat always
+  names an inherited active view in its own front and offers a one-click return
+  to Main/all chats, so a Notes-side view change never becomes an invisible
+  filter. A chat created while a view is active joins it.
 - A Markdown note may belong to one named view. Rotli synchronizes the exact
   view name into managed `view_tag` metadata on assignment, rename, deletion,
   UI, CLI, and MCP writes. View names are unique case-insensitively and use

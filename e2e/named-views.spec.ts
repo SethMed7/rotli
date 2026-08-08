@@ -58,6 +58,36 @@ test("named views keep Main global and make Command-T context-sensitive", async 
   await expect(menu.getByRole("menuitem", { name: "Copy File Path" })).toBeDisabled();
 });
 
+test("Chat names the inherited Notes view and can leave it for all chats", async ({ page }) => {
+  await gotoApp(page);
+
+  // Keep All chats as the content surface while Home changes the shared named
+  // view; the old UI then highlighted "All chats" beside a filtered list.
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await page.getByRole("button", { name: "All chats", exact: true }).click();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+
+  const viewSwitcher = page.getByRole("button", { name: /Current view: Main/ });
+  await viewSwitcher.scrollIntoViewIfNeeded();
+  await viewSwitcher.click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
+  await page.getByRole("textbox", { name: "New view" }).fill("Client work");
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  const context = page.getByRole("group", { name: "Chat view context" });
+  await expect(context).toContainText("Client work");
+  const allChats = page.getByRole("button", { name: "All chats", exact: true });
+  await expect(allChats).not.toHaveClass(/\bsel\b/);
+
+  await context.getByRole("button", { name: "Show all chats" }).click();
+  await expect(context).toHaveCount(0);
+  await expect(allChats).toHaveClass(/\bsel\b/);
+
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Current view: Main/ })).toBeVisible();
+});
+
 test("the new-item chooser keeps a named view folder as its creation context", async ({ page }) => {
   await gotoApp(page);
 

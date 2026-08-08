@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Chat now explains when a Notes view is filtering it.** The Chat sidebar
+  names the inherited view and offers one click back to Main and all chats;
+  clicking its existing All chats row now clears the view too.
 - **Raw vaults no longer strand every new note in Librarian intake.** When the
   Librarian is off, new ordinary notes land directly in the vault's `wiki/`
   note lane. Existing files are not moved; secure notes keep their protected

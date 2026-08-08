@@ -74,6 +74,9 @@ exception.
 - Provider/model marks in Chat use one 14px slot and an optically consistent
   visible footprint; source SVG padding and fine linework must not make one
   family read as a smaller icon than its peers.
+- When Chat inherits a named view selected on Home, it names that view in a
+  quiet inline context row and offers a direct return to all chats. Cross-front
+  filtering must never depend on remembering hidden state from another front.
 - The Librarian journal keeps a labeled, re-openable explanation of its file
   structure and rationale. It distinguishes physical Library folders from
   reference-only Main/named views and links directly to Librarian and Security

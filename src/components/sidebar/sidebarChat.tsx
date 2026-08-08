@@ -74,6 +74,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   // must not turn a non-empty Chat front into a blank list. Once that view has
   // at least one live chat membership it narrows normally.
   const activeView = useUiStore((s) => s.activeView);
+  const setActiveView = useUiStore((s) => s.setActiveView);
   const viewsManifest = useViewsStore((s) => s.manifest);
   const viewsWritable = useViewsStore((s) => s.writable && s.hydrated);
   const setViewsManifest = useViewsStore((s) => s.setManifest);
@@ -84,6 +85,10 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   const visibleSlugs =
     visibleChats.length === chatList.length ? null : new Set(visibleChats.map((c) => c.slug));
   const inView = (c: MemexChatSummary) => visibleSlugs === null || visibleSlugs.has(c.slug);
+  const showAllChats = () => {
+    setActiveView(null);
+    setContentView("allChats");
+  };
 
   // the top lanes — views onto the list, not folders (rows also stay in their
   // real folder below). WORKING first (Seth, 2026-08-04: "a loading icon that
@@ -401,13 +406,24 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           type="button"
           /* highlight "All chats" only when its content view is active — so it
              never lights up alongside an open chat row (Seth, 2026-07-01) */
-          className={`sb-chatrow all${contentView === "allChats" ? " sel" : ""}`}
+          className={`sb-chatrow all${contentView === "allChats" && !activeView ? " sel" : ""}`}
           data-hotkey="chat.all"
-          onClick={() => setContentView("allChats")}
+          onClick={showAllChats}
         >
           <SearchGlyph size={14} />
           <span className="fname">All chats</span>
         </button>
+        {activeView && (
+          <div className="sb-chatview" role="group" aria-label="Chat view context">
+            <span className="sb-chatview-label">View</span>
+            <span className="sb-chatview-name" title={activeView}>
+              {activeView}
+            </span>
+            <button type="button" className="sb-chatview-all" onClick={showAllChats}>
+              Show all chats
+            </button>
+          </div>
+        )}
         {!activeMemex ? (
           <button type="button" className="sb-chat-empty" onClick={() => dispatch("app.settings")}>
             Connect a memex in Settings → Location
