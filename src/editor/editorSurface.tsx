@@ -217,6 +217,8 @@ export function EditorSurface({
   // from disk, rendered as an editable banner above the body. Fetched only while
   // the setting is on; null keeps the banner out of the CM view entirely.
   const fileMetadata = useUiStore((s) => s.fileMetadata);
+  const previousFileMetadata = useRef(fileMetadata);
+  const [scrollToTopSignal, setScrollToTopSignal] = useState(0);
   const [fmRaw, setFmRaw] = useState<string | null>(null);
   // commit counter + refusal message: a refused (or no-op) commit re-reads the
   // SAME block string, and both React's setState and the widget's eq() bail on
@@ -225,6 +227,12 @@ export function EditorSurface({
   // the error renders inside it (a console.warn is not feedback).
   const [fmGen, setFmGen] = useState(0);
   const [fmErr, setFmErr] = useState<string | null>(null);
+  useEffect(() => {
+    if (fileMetadata === "show" && previousFileMetadata.current !== "show" && focusedPane) {
+      setScrollToTopSignal((signal) => signal + 1);
+    }
+    previousFileMetadata.current = fileMetadata;
+  }, [fileMetadata, focusedPane]);
   useEffect(() => {
     setFmErr(null); // a refusal never follows the note to another tab
     if (fileMetadata !== "show") {
@@ -409,6 +417,7 @@ export function EditorSurface({
         fmPath={diskPath}
         fmGen={fmGen}
         fmErr={fmErr}
+        scrollToTopSignal={scrollToTopSignal}
         onFmCommit={commitFm}
         onFmRead={onFmRead}
       />

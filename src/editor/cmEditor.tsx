@@ -16,6 +16,7 @@ import { Compartment, EditorSelection, EditorState, Prec } from "@codemirror/sta
 import { EditorView, keymap, placeholder } from "@codemirror/view";
 import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ArrowUpGlyph } from "../components/glyphs";
 import { clamp } from "../lib/clamp";
 import { DEST } from "../services/destinations";
 import { useNotes, useSearchableNotes } from "../services/hooks";
@@ -94,6 +95,11 @@ interface ImageGenState {
  * line pushes the text UP instead of sliding behind the bar (Seth, 2026-06-24).
  * Matches the content's 90px bottom padding reserve. */
 const FORMAT_BAR_SCROLL_MARGIN = 88;
+const SCROLL_TO_TOP_THRESHOLD = 160;
+
+function scrollBehavior(): ScrollBehavior {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+}
 
 // memo: the parent editor shell re-renders on caret ctx + header measurement
 // state; with stable props this CM host must not re-render per caret move
@@ -113,6 +119,7 @@ function CmEditorImpl({
   fmPath = null,
   fmGen = 0,
   fmErr = null,
+  scrollToTopSignal = 0,
   onFmCommit,
   onFmRead,
 }: {
@@ -135,6 +142,8 @@ function CmEditorImpl({
   fmGen?: number;
   /** Why the last commit was refused (rendered inside the banner), or null. */
   fmErr?: string | null;
+  /** Monotonic command from the editor chrome (metadata-on is one source). */
+  scrollToTopSignal?: number;
   /** Commit the user-typed block (blur / ⌘S) — the owner writes + re-reads. */
   onFmCommit?: (text: string) => void;
   /** Fresh disk truth on demand (the banner re-pulls it when editing starts). */
@@ -142,6 +151,7 @@ function CmEditorImpl({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const [canScrollToTop, setCanScrollToTop] = useState(false);
   const applyingExternal = useRef(false);
   const focusModeRef = useRef(focusMode);
   const onContextRef = useRef(onContext);
@@ -568,6 +578,11 @@ function CmEditorImpl({
     // Reuse the existing scroller styling and shared paper-canvas theming, which
     // all targets .ed-scroll (themes.css) — the CM scroller becomes the canvas
     view.scrollDOM.classList.add("ed-scroll");
+    const reportScrollPosition = () => {
+      setCanScrollToTop(view.scrollDOM.scrollTop > SCROLL_TO_TOP_THRESHOLD);
+    };
+    view.scrollDOM.addEventListener("scroll", reportScrollPosition, { passive: true });
+    reportScrollPosition();
 
     // model → CM: another pane editing this same note pushes its text in here
     const unsub = onDocumentChange(noteId, () => {
@@ -597,6 +612,7 @@ function CmEditorImpl({
     }
 
     return () => {
+      view.scrollDOM.removeEventListener("scroll", reportScrollPosition);
       unsub();
       unregisterEditor(paneId, handle);
       view.destroy();
@@ -604,6 +620,14 @@ function CmEditorImpl({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteId, paneId]);
+
+  useEffect(() => {
+    if (scrollToTopSignal === 0) return;
+    // Metadata is a reveal command, not leisurely navigation: land on the only
+    // place it can be seen before async frontmatter reconfiguration can retain
+    // a mid-document anchor.
+    viewRef.current?.scrollDOM.scrollTo({ top: 0, behavior: "auto" });
+  }, [scrollToTopSignal]);
 
   // live spell-check toggle (default on; a Settings switch)
   useEffect(() => {
@@ -691,6 +715,17 @@ function CmEditorImpl({
         ref={hostRef}
         style={{ "--cm-measure": `${measureWidth}px` } as CSSProperties}
       />
+      {canScrollToTop && (
+        <button
+          type="button"
+          className="editor-scroll-top"
+          aria-label="Scroll to top"
+          title="Scroll to top"
+          onClick={() => viewRef.current?.scrollDOM.scrollTo({ top: 0, behavior: scrollBehavior() })}
+        >
+          <ArrowUpGlyph size={16} />
+        </button>
+      )}
       {picker && (
         <div
           className={picker.up ? "rotli-slash-anchor up" : "rotli-slash-anchor"}

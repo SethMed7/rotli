@@ -41,6 +41,16 @@ export function ChevronRight({ size = 10, className }: GlyphProps) {
   );
 }
 
+/** Scroll-to-top — a calm vertical arrow, distinct from disclosure chevrons. */
+export function ArrowUpGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="m6 10 6-6 6 6" />
+      <path d="M12 4v16" />
+    </Glyph>
+  );
+}
+
 /** Copy — two offset rounded rects (the universal clipboard-copy mark). Chat
  * message hover action (2026-07-30). */
 export function CopyGlyph(props: GlyphProps) {

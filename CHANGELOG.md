@@ -10,10 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Long notes now have a quick way home.** A compact arrow appears at the
+  bottom-right after scrolling and returns the Markdown pane to the top.
+
 ### Changed
 
 - **The onboarding character now lives on the page, not inside a card.** Each
   setup state brings it in with one brief gesture that respects reduced motion.
+- **Showing file metadata now reveals it immediately.** Turning metadata on
+  returns the focused Markdown pane to the banner at the top of the note.
 
 ### Fixed
 

@@ -679,6 +679,26 @@
   color: var(--text-muted);
 }
 
+.editor-scroll-top {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 4;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+.editor-scroll-top:hover {
+  background-image: linear-gradient(var(--hov), var(--hov));
+}
+
 /* Raw Markdown is an intentional source editor, not an unstyled fallback.
    Structure uses two semantic roles: the active Rotli accent for punctuation
    and a calm AA blue for headings/emphasis. The tokens live in the brand layer,

@@ -166,6 +166,11 @@ polish work.
 
 ## Markdown editing
 
+- A Markdown pane reveals one compact scroll-to-top control after meaningful
+  downward scrolling. It floats at the pane's bottom-right, remains a labeled
+  keyboard-focusable button, and uses reduced-motion-safe spatial feedback.
+  Turning file metadata on returns that pane to the top immediately because
+  the metadata banner exists only above the note body.
 - Dropping local images into Markdown imports them into the memex and inserts
   their image links at the pointer's drop position. Capture that document
   position before asynchronous imports begin so later layout or selection
