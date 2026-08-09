@@ -32,6 +32,14 @@ function relativeWireId(id: string): string {
   return rel.replace(/^storage\//i, "");
 }
 
+function decodeStoragePath(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
 function itemOf(id: string, source: ChatWorkSource): ChatWorkItem {
   return {
     id,
@@ -45,7 +53,7 @@ function itemOf(id: string, source: ChatWorkSource): ChatWorkItem {
  * The root id stays machine-local; the chat stores only its memex-relative
  * `storage:` path. */
 export function attachmentReference(index: number, wireId: string): string {
-  return `[Image #${index}](storage:${relativeWireId(wireId)})`;
+  return `[Image #${index}](storage:${encodeURI(relativeWireId(wireId))})`;
 }
 
 /** User bubbles keep the familiar image handle while the ordinary Markdown
@@ -69,7 +77,7 @@ export function projectChatWorkItems(input: ChatWorkProjectionInput): ChatWorkIt
     for (const match of message.text.matchAll(STORAGE_LINK)) {
       const label = match[1] ?? "";
       const src = match[2] ?? "";
-      const rel = `storage/${src.slice("storage:".length)}`;
+      const rel = `storage/${decodeStoragePath(src.slice("storage:".length))}`;
       add(itemOf(`${input.rootPrefix}${rel}`, /^Image #\d+$/i.test(label) ? "attachment" : "generated"));
     }
   }

@@ -4,9 +4,9 @@ import { attachmentReference, projectChatWorkItems, visibleChatText } from "./ch
 
 describe("chat Work references", () => {
   test("stores attached images as portable storage links without showing paths in the bubble", () => {
-    const reference = attachmentReference(1, "vault:storage/images/architecture-sketch.png");
+    const reference = attachmentReference(1, "vault:storage/images/Architecture sketch.png");
 
-    expect(reference).toBe("[Image #1](storage:images/architecture-sketch.png)");
+    expect(reference).toBe("[Image #1](storage:images/Architecture%20sketch.png)");
     expect(visibleChatText(`${reference}\nWhat does this show?`)).toBe("[Image #1]\nWhat does this show?");
   });
 
@@ -15,23 +15,23 @@ describe("chat Work references", () => {
       rootPrefix: "vault:",
       messages: [
         {
-          text: "[Image #1](storage:images/architecture-sketch.png)\nReview this.",
+          text: "[Image #1](storage:images/Architecture%20sketch.png)\nReview this.",
         },
         {
           text: "[Artifact: Rotli brief](storage:rotli/rotli-brief.docx)",
         },
       ],
       discoveredIds: [
-        "vault:storage/images/architecture-sketch.png",
+        "vault:storage/images/Architecture sketch.png",
         "vault:storage/chats/rotli-tech-stack/generated-diagram.png",
       ],
     });
 
     expect(items).toEqual([
       {
-        id: "vault:storage/images/architecture-sketch.png",
+        id: "vault:storage/images/Architecture sketch.png",
         kind: "image",
-        name: "architecture-sketch.png",
+        name: "Architecture sketch.png",
         source: "attachment",
       },
       {
