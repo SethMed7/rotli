@@ -40,6 +40,10 @@ function decodeStoragePath(path: string): string {
   }
 }
 
+function encodeStoragePath(path: string): string {
+  return path.split("/").map(encodeURIComponent).join("/");
+}
+
 function itemOf(id: string, source: ChatWorkSource): ChatWorkItem {
   return {
     id,
@@ -53,7 +57,7 @@ function itemOf(id: string, source: ChatWorkSource): ChatWorkItem {
  * The root id stays machine-local; the chat stores only its memex-relative
  * `storage:` path. */
 export function attachmentReference(index: number, wireId: string): string {
-  return `[Image #${index}](storage:${encodeURI(relativeWireId(wireId))})`;
+  return `[Image #${index}](storage:${encodeStoragePath(relativeWireId(wireId))})`;
 }
 
 /** User bubbles keep the familiar image handle while the ordinary Markdown
