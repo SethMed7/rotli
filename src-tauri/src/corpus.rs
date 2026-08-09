@@ -2528,6 +2528,10 @@ fn with_view_tag(text: &str, tag: Option<&str>) -> String {
     compose_document(&frontmatter, body)
 }
 
+pub(crate) const CHAT_IMAGE_ASSET_EXTS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "avif", "bmp", "tiff", "tif",
+];
+
 impl CorpusStore {
     /// Open (or first-run-initialize) a corpus at `root`. The dispatcher: probe
     /// `root/memex.json` once — a valid `mx_` id routes to the memex path (browse
@@ -2915,6 +2919,36 @@ impl CorpusStore {
         }
         let folder = match self.layout {
             Layout::Memex => "storage/rotli",
+            Layout::LegacyRotli => "Storage",
+        };
+        let rel = self.free_name(folder, name, None);
+        self.guard_rel(&rel)?;
+        fs::create_dir_all(self.abs(folder)).map_err(|e| format!("create {folder}: {e}"))?;
+        let abs = self.abs(&rel);
+        self.suppress.mark(&abs);
+        atomic_write_bytes(&abs, bytes)?;
+        Ok(rel)
+    }
+
+    /// Persist bytes chosen in Chat as a conventional image asset. The chat
+    /// records the returned memex-relative path in ordinary Markdown; this
+    /// lane owns only the copied image bytes and never a proprietary artifact
+    /// record. Names are collision-safe and read-only roots fail closed.
+    pub fn create_image_asset(&mut self, name: &str, bytes: &[u8]) -> Result<String, String> {
+        self.mutation_allowed()?;
+        validate_component(name)?;
+        if bytes.is_empty() {
+            return Err("image payload is empty".into());
+        }
+        let ext = Path::new(name)
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(str::to_ascii_lowercase);
+        if !ext.as_deref().is_some_and(|value| CHAT_IMAGE_ASSET_EXTS.contains(&value)) {
+            return Err(format!("chat images must use one of: {}", CHAT_IMAGE_ASSET_EXTS.join(", ")));
+        }
+        let folder = match self.layout {
+            Layout::Memex => "storage/images",
             Layout::LegacyRotli => "Storage",
         };
         let rel = self.free_name(folder, name, None);
@@ -6317,6 +6351,32 @@ pub fn corpus_import_file(
     Ok(compose_root_id(&root_id, &rel))
 }
 
+/// Persist an image selected through the webview's file input into the same
+/// user-owned asset lane used by the rest of the corpus. The IPC payload is
+/// bounded before writing; the store independently validates name, type, root
+/// mutability, and destination.
+#[tauri::command]
+pub fn corpus_create_image_asset(
+    state: tauri::State<'_, CorpusState>,
+    root_id: String,
+    name: String,
+    base64: String,
+) -> Result<String, String> {
+    use base64::Engine;
+    const MAX_IMAGE_BYTES: usize = 25_000_000;
+    if base64.len() > (MAX_IMAGE_BYTES * 4 / 3) + 8 {
+        return Err("image is larger than 25 MB".into());
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64.as_bytes())
+        .map_err(|e| format!("bad image payload: {e}"))?;
+    if bytes.len() > MAX_IMAGE_BYTES {
+        return Err("image is larger than 25 MB".into());
+    }
+    let rel = state.route(&root_id, |store| store.create_image_asset(&name, &bytes))?;
+    Ok(compose_root_id(&root_id, &rel))
+}
+
 /// Size + user-lane writability of a surfaced file. The sheet editor probes this
 /// before offering edit mode: a read-only root (a memex/linked-library) or a file
 /// over the read cap stays a viewer.
@@ -7587,6 +7647,26 @@ mod tests {
         assert!(!store.managed_file_creation_available());
         assert!(store.create_managed_file("blocked.docx", b"nope").is_err());
         assert!(!root.join("storage/rotli/blocked.docx").exists());
+    }
+
+    #[test]
+    fn picked_chat_images_become_collision_safe_user_owned_assets() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+
+        let first = store.create_image_asset("architecture.png", b"png-one").unwrap();
+        let second = store.create_image_asset("architecture.png", b"png-two").unwrap();
+        assert_eq!(first, "storage/images/architecture.png");
+        assert_eq!(second, "storage/images/architecture-2.png");
+        assert_eq!(fs::read(root.join(&first)).unwrap(), b"png-one");
+        assert!(store.create_image_asset("notes.txt", b"nope").is_err());
+
+        store.set_perms_read_only(true);
+        assert!(store.create_image_asset("blocked.png", b"nope").is_err());
+        assert!(!root.join("storage/images/blocked.png").exists());
     }
 
     #[test]

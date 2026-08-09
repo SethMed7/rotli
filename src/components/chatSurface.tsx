@@ -47,6 +47,12 @@ import {
 } from "../chatMemory/model";
 import { renderMermaidElement } from "../editor/mermaidRender";
 import { renderInline } from "../editor/render";
+import {
+  CHAT_IMAGE_ASSET_EXTS,
+  attachmentReference,
+  projectChatWorkItems,
+  visibleChatText,
+} from "../lib/chatWork";
 import { fileName } from "../lib/fileKind";
 import { type AnchoredPlacement, anchoredPopover, useTransientPopover } from "../lib/popover";
 import {
@@ -55,6 +61,7 @@ import {
   chatModels,
   cliCancel,
   cliDetect,
+  corpusCreateImageAsset,
   corpusFrontmatter,
   corpusImportFile,
   fileAssetUrl,
@@ -62,7 +69,6 @@ import {
   localQueueCancel,
   localQueuePrioritize,
   onLocalQueue,
-  resolveImageSrc,
 } from "../lib/tauri";
 import { CORPUS_INSTANCE_ID, activeInstance } from "../memex/config";
 import { hasSecureContext } from "../memex/contract";
@@ -80,13 +86,14 @@ import { invalidateNotes, useNoteIndex } from "../services/hooks";
 import { assignChatToView } from "../services/viewTree";
 import { useChatRuns } from "../state/chatRuns";
 import { type Measure } from "../state/noteStyle";
-import { usePanesStore } from "../state/panes";
+import { leaves, usePanesStore } from "../state/panes";
 import { chatKey, chatModelFor, useUiStore } from "../state/ui";
 import { useViewsStore } from "../state/views";
 import { takeSentences } from "../voice/sentences";
 import { speaker } from "../voice/speech";
 import { Character, QuokkaMark } from "./character";
 import { CHAT_PANE_ATTR, registerChatDrop } from "./chatDrop";
+import { ChatWorkRail } from "./chatWorkRail";
 import {
   CheckGlyph,
   CloudGlyph,
@@ -100,6 +107,12 @@ import {
 interface Msg {
   speaker: string;
   text: string;
+}
+
+interface ChatImageAttachment {
+  id: string;
+  name: string;
+  src: string;
 }
 
 /** Parse a chat .md's `## Messages` block back into bubbles — rotli writes the
@@ -240,68 +253,6 @@ const MEASURE_LABELS: { id: Measure; label: string }[] = [
   { id: "comfort", label: "Comfort" },
   { id: "wide", label: "Wide" },
 ];
-
-function AssetsGlyph() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="2" y="2.8" width="12" height="10.4" rx="1.5" />
-      <circle cx="5.6" cy="6.4" r="1.1" />
-      <path d="M2.5 12 6.7 8.2l2.6 2.4 2.3-2 1.9 1.7" />
-    </svg>
-  );
-}
-
-/** One generated asset in the drawer — thumbnail via the asset protocol. */
-function AssetThumb({ id, onOpen }: { id: string; onOpen: () => void }) {
-  const url = useQuery({ queryKey: ["asset-url", id], queryFn: () => fileAssetUrl(id) });
-  const name = fileName(id);
-  return (
-    <button type="button" className="chat-asset" title={name} onClick={onOpen}>
-      {url.data ? <img src={url.data} alt={name} /> : <span className="chat-asset-wait">…</span>}
-    </button>
-  );
-}
-
-/** The chat's generated assets — everything under storage/chats/<slug>/. */
-function AssetsDrawer({
-  ids,
-  anchorRef,
-  onOpen,
-  onClose,
-}: {
-  ids: string[];
-  anchorRef: RefObject<HTMLElement | null>;
-  onOpen: (id: string) => void;
-  onClose: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  useTransientPopover([ref, anchorRef], true, onClose);
-  return (
-    <div className="chat-assets-pop" ref={ref} role="dialog" aria-label="Chat assets">
-      {ids.length === 0 ? (
-        <p className="chat-assets-empty">
-          Nothing yet — ask the chat to generate an image and it lands here.
-        </p>
-      ) : (
-        <div className="chat-assets-grid">
-          {ids.map((id) => (
-            <AssetThumb key={id} id={id} onOpen={() => onOpen(id)} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /** The header width picker — the notes Aa measure, as a chat popover. */
 function MeasureMenu({
@@ -810,8 +761,8 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const isFocusedPane = usePanesStore((s) => s.focusedPaneId === paneId);
   const bindChat = usePanesStore((s) => s.bindChat);
   const openNote = usePanesStore((s) => s.openNote);
-  const openFile = usePanesStore((s) => s.openFile);
   const openToSide = usePanesStore((s) => s.openToSide);
+  const paneRoot = usePanesStore((s) => s.root);
   const noteIndex = useNoteIndex();
   const setAttached = useSetChatAttachedTo();
 
@@ -918,8 +869,9 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   }, []);
   // which message's hover Copy just fired — flips its glyph to a ✓ for a beat
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<ChatImageAttachment[]>([]);
   const [visionHint, setVisionHint] = useState(false);
+  const [attachmentErr, setAttachmentErr] = useState<string | null>(null);
   // a failed chats/<slug>.md write — the thread still shows for this session,
   // but SAY it won't survive a reload (#11, audit 2026-07); cleared on the
   // next successful save.
@@ -928,7 +880,8 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const [noteBusy, setNoteBusy] = useState(false);
   const [noteErr, setNoteErr] = useState<string | null>(null);
   const [measureOpen, setMeasureOpen] = useState(false);
-  const [assetsOpen, setAssetsOpen] = useState(false);
+  const [openedWorkId, setOpenedWorkId] = useState<string | null>(null);
+  const [workRailExpanded, setWorkRailExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const msgRef = useRef<HTMLTextAreaElement>(null);
@@ -940,7 +893,6 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   // or a secure read during a live turn) — drives the one-way taint
   const secureReadRef = useRef(false);
   const measureBtnRef = useRef<HTMLButtonElement>(null);
-  const assetsBtnRef = useRef<HTMLButtonElement>(null);
   // the live turn's cancel key (connected CLIs — Rust kills the child)
   const requestRef = useRef<string | null>(null);
   // run sequence: Stop orphans the in-flight run — its late events and reply
@@ -948,7 +900,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   // orphaning is the honest cancel: the UI is free, the result is discarded)
   const runSeq = useRef(0);
   // what Stop gives back to the composer — the sent prompt returns intact
-  const lastSentRef = useRef<{ text: string; images: string[] } | null>(null);
+  const lastSentRef = useRef<{ text: string; images: ChatImageAttachment[] } | null>(null);
   // this turn's place in the local-compute queue, or null when it's actually
   // generating. Local models share one Mac: a send that doesn't fit measured
   // headroom WAITS rather than piling on (docs/design/local-compute-guardrails.md).
@@ -1129,7 +1081,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     // themselves never land in chats/<slug>.md.
     const userText =
       imgs.length > 0
-        ? `${imgs.map((_, i) => `[Image #${i + 1}]`).join(" ")}${typed ? `\n${typed}` : ""}`
+        ? `${imgs.map((image, i) => attachmentReference(i + 1, image.id)).join(" ")}${typed ? `\n${typed}` : ""}`
         : typed;
     lastSentRef.current = { text: typed, images: imgs };
     setMessage("");
@@ -1236,7 +1188,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       web: attachedSecure ? false : globeOn,
       model,
       ...(attachedNoteId ? { noteId: attachedNoteId } : {}),
-      ...(imgs.length > 0 ? { images: imgs } : {}),
+      ...(imgs.length > 0 ? { images: imgs.map((image) => image.src) } : {}),
       ...(image ? { imageTool: true } : {}),
       // the board tool is local conversion — offered whenever the desktop
       // bridge exists (the host re-checks the secure taint at call time)
@@ -1478,10 +1430,35 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   };
 
   const onPickFiles = async (files: FileList | null) => {
-    if (!files) return;
-    const picks = [...files].filter((f) => f.type.startsWith("image/"));
-    const datas = await Promise.all(picks.map(readAsDataURL));
-    if (datas.length > 0) setImages((prev) => [...prev, ...datas]);
+    if (!files || !active) return;
+    const picks = [...files].filter(
+      (file) =>
+        file.type.startsWith("image/") ||
+        CHAT_IMAGE_ASSET_EXTS.includes(file.name.split(".").pop()?.toLowerCase() ?? ""),
+    );
+    const rootId = active.id === CORPUS_INSTANCE_ID ? "default" : active.id;
+    const attached: ChatImageAttachment[] = [];
+    const errors: string[] = [];
+    for (const file of picks) {
+      try {
+        const src = await readAsDataURL(file);
+        const comma = src.indexOf(",");
+        if (comma < 0) throw new Error("couldn’t read the image payload");
+        const id = await corpusCreateImageAsset(rootId, file.name, src.slice(comma + 1));
+        attached.push({ id, name: file.name, src });
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : String(error));
+      }
+    }
+    if (attached.length > 0) {
+      setImages((previous) => [...previous, ...attached]);
+      await invalidateNotes();
+    }
+    setAttachmentErr(
+      errors.length > 0
+        ? `Couldn’t attach ${errors.length} image${errors.length === 1 ? "" : "s"}. ${errors[0]}`
+        : null,
+    );
   };
 
   // — dropped images (Seth, 2026-08-04) — the window handler hands us OS PATHS.
@@ -1489,24 +1466,33 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   // anywhere else uses), then read it back through the asset protocol: the
   // composer speaks data URLs, and the image becomes a durable vault asset
   // instead of a byte blob that exists only until you hit send.
-  const attachPaths = useCallback((paths: readonly string[]) => {
-    void (async () => {
-      const datas: string[] = [];
-      for (const path of paths) {
-        try {
-          const rel = await corpusImportFile("default", path);
-          if (!rel) continue;
-          const url = await resolveImageSrc(rel);
-          if (!url) continue;
-          const blob = await fetch(url).then((r) => r.blob());
-          datas.push(await readAsDataURL(new File([blob], "dropped", { type: blob.type })));
-        } catch {
-          /* one unreadable drop must not lose the others */
+  const attachPaths = useCallback(
+    (paths: readonly string[]) => {
+      if (!active) return;
+      void (async () => {
+        const attached: ChatImageAttachment[] = [];
+        const rootId = active.id === CORPUS_INSTANCE_ID ? "default" : active.id;
+        for (const path of paths) {
+          try {
+            const rel = await corpusImportFile(rootId, path);
+            if (!rel) continue;
+            const url = await fileAssetUrl(rel);
+            if (!url) continue;
+            const blob = await fetch(url).then((r) => r.blob());
+            attached.push({
+              id: rel,
+              name: fileName(rel),
+              src: await readAsDataURL(new File([blob], fileName(rel), { type: blob.type })),
+            });
+          } catch {
+            /* one unreadable drop must not lose the others */
+          }
         }
-      }
-      if (datas.length > 0) setImages((prev) => [...prev, ...datas]);
-    })();
-  }, []);
+        if (attached.length > 0) setImages((previous) => [...previous, ...attached]);
+      })();
+    },
+    [active],
+  );
 
   useEffect(() => registerChatDrop(paneId, attachPaths), [paneId, attachPaths]);
 
@@ -1517,6 +1503,30 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       ? `${active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`}storage/chats/${chatSlug}/`
       : null;
   const assetIds = assetPrefix ? [...noteIndex.keys()].filter((id) => id.startsWith(assetPrefix)).sort() : [];
+  const workItems = projectChatWorkItems({
+    rootPrefix: active && active.id !== CORPUS_INSTANCE_ID ? `${active.id}:` : "",
+    messages,
+    attachmentIds: images.map((image) => image.id),
+    discoveredIds: assetIds,
+  });
+  const openedWorkAlive = openedWorkId
+    ? leaves(paneRoot).some(
+        (leaf) =>
+          leaf.id !== paneId &&
+          leaf.tabs.some((tab) => tab.surfaceKind === "file" && tab.fileId === openedWorkId),
+      )
+    : false;
+  useEffect(() => {
+    if (!openedWorkId || openedWorkAlive) return;
+    setOpenedWorkId(null);
+    setWorkRailExpanded(false);
+  }, [openedWorkId, openedWorkAlive]);
+
+  const openWorkItem = (id: string) => {
+    setOpenedWorkId(id);
+    setWorkRailExpanded(false);
+    openToSide("file", id);
+  };
 
   /** Open the attached note per the Settings choice: a new tab here, or a
    * right split beside the chat. The split path carves the pane WITH the note
@@ -1569,7 +1579,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
 
   return (
     <div
-      className="chat-surface"
+      className={isTauri() && active ? "chat-surface has-work-rail" : "chat-surface"}
       {...{ [CHAT_PANE_ATTR]: paneId }}
       style={{ "--chat-measure": `${CHAT_MEASURE_PX[measure]}px` } as CSSProperties}
     >
@@ -1578,30 +1588,6 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
         {active && <span className="chat-inst">· {active.label}</span>}
         {active && (
           <div className="chat-head-tools">
-            {assetIds.length > 0 && (
-              <>
-                <button
-                  ref={assetsBtnRef}
-                  type="button"
-                  className="chat-tool"
-                  title={`Assets generated in this chat (${assetIds.length})`}
-                  onClick={() => setAssetsOpen((v) => !v)}
-                >
-                  <AssetsGlyph />
-                </button>
-                {assetsOpen && (
-                  <AssetsDrawer
-                    ids={assetIds}
-                    anchorRef={assetsBtnRef}
-                    onOpen={(id) => {
-                      setAssetsOpen(false);
-                      openFile(id, { newTab: true });
-                    }}
-                    onClose={() => setAssetsOpen(false)}
-                  />
-                )}
-              </>
-            )}
             <button
               ref={measureBtnRef}
               type="button"
@@ -1673,7 +1659,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                 messages.map((m, idx) => (
                   <ChatMessage
                     key={idx}
-                    text={m.text}
+                    text={m.speaker === "you" ? visibleChatText(m.text) : m.text}
                     you={m.speaker === "you"}
                     index={idx}
                     copied={copiedIdx === idx}
@@ -1767,12 +1753,12 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                 )}
                 {images.length > 0 && (
                   <div className="chat-attachments">
-                    {images.map((src, i) => (
-                      <span key={i} className="chat-attachment">
+                    {images.map((image, i) => (
+                      <span key={image.id} className="chat-attachment">
                         {/* the handle you can talk about — the same number the
                             sent message carries as [Image #N] (2026-08-04) */}
                         <span className="chat-attachment-n" aria-hidden="true">{`#${i + 1}`}</span>
-                        <img src={src} alt={`Attached image ${i + 1}`} />
+                        <img src={image.src} alt={`Attached image ${i + 1}: ${image.name}`} />
                         <button
                           type="button"
                           className="chat-attachment-x"
@@ -1784,6 +1770,11 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                       </span>
                     ))}
                   </div>
+                )}
+                {attachmentErr && (
+                  <p className="file-err chat-attachment-err" role="alert">
+                    ⚠ {attachmentErr}
+                  </p>
                 )}
                 {visionHint && (
                   <div className="chat-vision-hint">
@@ -1909,6 +1900,15 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
             </div>
           )}
         </main>
+      )}
+      {isTauri() && active && (
+        <ChatWorkRail
+          items={workItems}
+          openedId={openedWorkId}
+          collapsed={openedWorkAlive && !workRailExpanded}
+          onOpen={(item) => openWorkItem(item.id)}
+          onExpand={() => setWorkRailExpanded(true)}
+        />
       )}
     </div>
   );

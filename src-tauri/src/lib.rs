@@ -1474,6 +1474,7 @@ pub fn run() {
             corpus::corpus_open_with_apps,
             corpus::corpus_open_file_with,
             corpus::corpus_import_file,
+            corpus::corpus_create_image_asset,
             corpus::corpus_abs,
             corpus::corpus_frontmatter,
             corpus::corpus_raw_frontmatter,

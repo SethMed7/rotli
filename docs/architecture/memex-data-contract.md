@@ -157,6 +157,16 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   the pinned path or an error. The command offers only image engines whose lane
   is enabled AND whose CLI probes installed + authenticated — capability- and
   login-based, like every other model surface.
+- **Chat Work is a file projection, not an artifact database (2026-08-09).**
+  The normal Chat layout derives its Work rail from standard `storage:`
+  Markdown links in that chat's messages plus the files already pinned under
+  `storage/chats/<slug>/`. An image selected in the composer is copied into the
+  user-owned `storage/images/` lane (collision-safe, bounded, and refused for a
+  read-only root) before it can be sent; the transcript stores a portable
+  Markdown link labeled `Image #N` whose target uses the `storage:` shorthand,
+  while the bubble may show only the friendly handle. Selecting a Work item
+  delegates to the ordinary pane/file surface and opens it to the right; the
+  rail never becomes a parallel viewer or file store.
 - File-format dependencies stay behind adapters and composition roots so a DOCX
   codec, document editor, workbook codec, or canvas engine can be swapped
   without changing creation commands or UI entry points.

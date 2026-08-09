@@ -16,6 +16,25 @@
   overflow: hidden;
 }
 
+.chat-surface.has-work-rail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.chat-surface.has-work-rail > .chat-head {
+  grid-column: 1;
+  grid-row: 1;
+}
+.chat-surface.has-work-rail > .chat-main,
+.chat-surface.has-work-rail > .chat-empty {
+  grid-column: 1;
+  grid-row: 2;
+}
+.chat-surface.has-work-rail > .chat-work-rail {
+  grid-column: 2;
+  grid-row: 1 / -1;
+}
+
 .chat-head {
   display: flex;
   align-items: center;
@@ -78,60 +97,6 @@
   color: var(--accent-text);
   font-weight: 600;
 }
-/* the chat's generated-assets drawer */
-.chat-assets-pop {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 30;
-  width: 264px;
-  /* never taller than the pane it opens in — the surface is a size container,
-     so the drawer scrolls instead of being cut off by the pane's edge in a
-     short split (Seth, 2026-08-01 fit sweep) */
-  max-height: min(320px, calc(100cqh - 64px));
-  overflow-y: auto;
-  padding: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-card);
-}
-.chat-assets-empty {
-  margin: 4px 2px;
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-.chat-assets-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.chat-asset {
-  display: block;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--r-inner);
-  background: var(--surface-2);
-  overflow: hidden;
-  cursor: pointer;
-  aspect-ratio: 1;
-}
-.chat-asset img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.chat-asset:hover {
-  border-color: var(--text-muted);
-}
-.chat-asset-wait {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  color: var(--text-muted);
-}
 .chat-head h2 {
   font-family: var(--font-display);
   font-size: 16px;
@@ -148,6 +113,197 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* Chat Work — a contextual file rail, not a second content system. Its rows
+   are ordinary memex files and opening one delegates to the pane store. */
+.chat-work-rail {
+  width: 296px;
+  flex: 0 0 296px;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  transition:
+    width var(--motion-exit) var(--motion-ease),
+    flex-basis var(--motion-exit) var(--motion-ease);
+}
+.chat-work-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.chat-work-head {
+  height: 45px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.chat-work-head h3 {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+}
+.chat-work-head span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.chat-work-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 10px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.chat-work-tabs button {
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11.5px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.chat-work-tabs button:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.chat-work-tabs button.is-active {
+  background: var(--tint);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.chat-work-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+}
+.chat-work-empty {
+  padding: 16px 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.chat-work-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.chat-work-row:hover {
+  background: var(--hov);
+}
+.chat-work-row.is-open {
+  background: var(--tint);
+  color: var(--accent-text);
+}
+.chat-work-thumb {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  background: var(--surface-2);
+}
+.chat-work-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.chat-work-file-glyph {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+}
+.chat-work-file-glyph svg {
+  width: 100%;
+  height: 100%;
+}
+.chat-work-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-work-name,
+.chat-work-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-work-name {
+  font-size: 12.5px;
+}
+.chat-work-meta {
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+.chat-work-launcher {
+  display: none;
+  width: 100%;
+  padding-top: 7px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.chat-work-launcher button {
+  width: 34px;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 16px auto;
+  place-items: center;
+  gap: 2px;
+  padding: 0 3px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+}
+.chat-work-launcher button:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.chat-work-launcher svg {
+  width: 15px;
+  height: 15px;
+}
+.chat-work-rail.is-collapsed {
+  width: 44px;
+  flex-basis: 44px;
+}
+.chat-work-rail.is-collapsed .chat-work-panel {
+  display: none;
+}
+.chat-work-rail.is-collapsed .chat-work-launcher {
+  display: flex;
 }
 /* the model selecter — what we have in the memex ai (~/.memex/ai). Pinned to the
    right of the chat header so it reads as "this conversation runs on <model>". */
@@ -606,6 +762,23 @@
   font-size: 12px;
   cursor: pointer;
   text-decoration: underline;
+}
+.chat-attachment-err {
+  margin: 0;
+  font-size: 11.5px;
+}
+
+@container chat (max-width: 980px) {
+  .chat-work-rail {
+    width: 44px;
+    flex-basis: 44px;
+  }
+  .chat-work-rail .chat-work-panel {
+    display: none;
+  }
+  .chat-work-rail .chat-work-launcher {
+    display: flex;
+  }
 }
 
 /* — the short-pane fit (Seth, 2026-08-01) —

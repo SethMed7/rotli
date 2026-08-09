@@ -701,6 +701,13 @@ export async function corpusImportFile(rootId: string, path: string): Promise<st
   return invoke<string>("corpus_import_file", { rootId, path });
 }
 
+/** Persist an image selected in Chat as a collision-safe user-owned asset.
+ * The transcript keeps only its portable `storage:` reference. */
+export async function corpusCreateImageAsset(rootId: string, name: string, base64: string): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_create_image_asset", { rootId, name, base64 });
+}
+
 /** Absolute path for a corpus-relative path (e.g. a `storage:` asset). */
 export async function corpusAbs(rootId: string, rel: string): Promise<string> {
   if (!isTauri()) return "";

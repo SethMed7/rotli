@@ -5,6 +5,22 @@
       "sourceOfTruth": "src/sheets/kinds.ts SHEET_EDIT_MAX_BYTES ↔ src-tauri/src/corpus.rs SHEET_EDIT_MAX_BYTES",
       "value": 8000000
     },
+    "chatImageAssetExts": {
+      "sourceOfTruth": "src/lib/chatWork.ts CHAT_IMAGE_ASSET_EXTS ↔ src-tauri/src/corpus.rs CHAT_IMAGE_ASSET_EXTS",
+      "value": [
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "webp",
+        "heic",
+        "heif",
+        "avif",
+        "bmp",
+        "tiff",
+        "tif"
+      ]
+    },
     "boardLimits": {
       "sourceOfTruth": "src/boards/validation.ts BOARD_LIMITS ↔ src-tauri/src/board.rs BOARD_MAX_*",
       "value": {

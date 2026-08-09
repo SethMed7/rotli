@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Chat now keeps its working files beside the conversation.** A contextual
+  Work rail lists attached images and generated chat assets; selecting one
+  opens the user-owned file in a new pane to the right, while the rail collapses
+  to a quiet launcher. Picked images are copied into the memex and remain
+  recoverable through portable `storage:` references in the chat Markdown.
+
 ## [0.80.0] - 2026-08-08
 
 ### Added

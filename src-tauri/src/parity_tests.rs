@@ -29,6 +29,11 @@ fn sheet_edit_max_bytes_matches_fixture() {
 }
 
 #[test]
+fn chat_image_asset_exts_match_fixture() {
+    assert_eq!(string_list(&entry("chatImageAssetExts")), crate::corpus::CHAT_IMAGE_ASSET_EXTS);
+}
+
+#[test]
 fn board_limits_match_fixture() {
     let limits = entry("boardLimits");
     assert_eq!(

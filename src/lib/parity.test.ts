@@ -18,6 +18,7 @@ import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { DOCUMENT_CONVERTIBLE_EXTS } from "../documents/kinds";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
+import { CHAT_IMAGE_ASSET_EXTS } from "./chatWork";
 import {
   type FrontmatterView,
   type MemexPerms,
@@ -30,6 +31,10 @@ const entries = fixture.entries;
 describe("parity.json ↔ TS constants", () => {
   test("sheetEditMaxBytes", () => {
     expect(SHEET_EDIT_MAX_BYTES).toBe(entries.sheetEditMaxBytes.value);
+  });
+
+  test("chatImageAssetExts", () => {
+    expect(CHAT_IMAGE_ASSET_EXTS).toEqual(entries.chatImageAssetExts.value);
   });
 
   test("boardLimits", () => {
