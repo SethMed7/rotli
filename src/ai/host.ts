@@ -5,7 +5,8 @@
 
 import { createEditableBoardFromMermaid } from "../boards/composition";
 import { memoryKeywords, mergeKeywordHits, rankChatMemories } from "../chatMemory/retrieval";
-import { extOf } from "../lib/fileKind";
+import { DOCX_EDITABLE } from "../documents/kinds";
+import { extOf, fileName } from "../lib/fileKind";
 import {
   type ChatModelInfo,
   chatMessages,
@@ -14,6 +15,8 @@ import {
   corpusFileBytes,
   corpusFileText,
   corpusFrontmatter,
+  corpusCreateManagedFile,
+  corpusExportNotePdf,
   corpusList,
   corpusNotesAi,
   corpusReadAi,
@@ -29,11 +32,13 @@ import { hasSecureContext } from "../memex/contract";
 import { buildModelMap } from "../memex/modelMap";
 import { listChats, loadConfig, readChat as readMemexChat } from "../memex/service";
 import { invalidateMemex } from "../memex/useMemex";
+import { createPopulatedManagedItem, registerPopulatedManagedItem } from "../newItems/composition";
 import { createRoutedNote } from "../services/createNote";
 import { invalidateNotes } from "../services/hooks";
 import { SHEET_BIN, SHEET_TEXT } from "../sheets/kinds";
 import { workbookToCsv } from "../sheets/view";
 import { usePanesStore } from "../state/panes";
+import { artifactFileName, editableDocumentText, markdownToDocumentDraft } from "./artifacts";
 import { contextWindowFor } from "./budget";
 import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "./searchProvider";
@@ -106,11 +111,22 @@ export interface HostImageCtx {
   engine: "codex" | "agy";
 }
 
+export interface CreatedChatArtifact {
+  id: string;
+  label: string;
+  surfaceKind: "note" | "canvas" | "file";
+}
+
 export function makeTauriHost(
   model: ChatModelInfo,
   opts?: {
     requestId?: string;
     image?: HostImageCtx;
+    /** Registered root that owns conventional files created by this chat. */
+    artifactRootId?: string;
+    /** Presentation collects durable file links and appends them to the final
+     * assistant turn, so Work does not depend on the model remembering them. */
+    onArtifact?: (artifact: CreatedChatArtifact) => void;
     /** Fired when this run reads a SECURE note (a local model with per-note
      * permission may) — the chat surface taints the chat so its history can
      * never later ride to a remote model (audit 2026-07-29 #7). */
@@ -240,6 +256,7 @@ export function makeTauriHost(
         ...(secure ? { secure: true } : {}),
       });
       await Promise.all([invalidateNotes(), invalidateMemex()]);
+      opts?.onArtifact?.({ id, label: title || "Untitled note", surfaceKind: "note" });
       return `created ${secure ? "SECURE " : ""}note ${id}${title ? ` ("${title}")` : ""} in the intake${
         secure ? " (marked secure because this chat carries secure-note content)" : ""
       } — tell the user it's there, and offer open_note to show it.`;
@@ -367,18 +384,27 @@ export function makeTauriHost(
         .replace(/^["']|["']$/g, "");
       const files = notes.filter((n) => n.kind === "file");
       const file =
+        files.find((n) => n.id.toLowerCase() === q) ??
         files.find((n) => n.title.toLowerCase() === q) ??
         files.find((n) => n.title.toLowerCase().includes(q));
       if (!file) return `no file matching "${query}". Use the exact filename (e.g. report.csv).`;
       const ext = extOf(file.title);
-      const text = SHEET_BIN.has(ext)
-        ? await workbookToCsv({ base64: await corpusFileBytes(file.id) })
-        : SHEET_TEXT.has(ext)
-          ? await workbookToCsv({
-              csv: await corpusFileText(file.id),
-              delimiter: ext === "tsv" ? "\t" : ",",
-            })
-          : await corpusFileText(file.id);
+      let text: string;
+      if (SHEET_BIN.has(ext)) {
+        text = await workbookToCsv({ base64: await corpusFileBytes(file.id) });
+      } else if (SHEET_TEXT.has(ext)) {
+        text = await workbookToCsv({
+          csv: await corpusFileText(file.id),
+          delimiter: ext === "tsv" ? "\t" : ",",
+        });
+      } else if (DOCX_EDITABLE.has(ext)) {
+        const { editManagedDocument } = await import("../documents/composition");
+        const editable = await editManagedDocument(file.id);
+        text = editable.kind === "ready" ? editableDocumentText(editable.document) : "";
+        if (!text) return "This document is too large or has no editable text Rotli can give the model.";
+      } else {
+        text = await corpusFileText(file.id);
+      }
       // Storage files carry no frontmatter, so they skip corpus_read_ai's
       // secure gate — apply the same policy prior chats get (audit 2026-07):
       // a remote model never receives secret-shaped file contents.
@@ -398,13 +424,62 @@ export function makeTauriHost(
       // (imageTool gate) — this branch is the belt-and-suspenders message
       if (!opts?.image) return "error: image generation isn't set up for this chat.";
       const { root, slug, engine } = opts.image;
-      return tauriGenerateImage({
+      const id = await tauriGenerateImage({
         requestId: opts?.requestId ?? crypto.randomUUID(),
         root,
         slug,
         prompt,
         engine,
       });
+      opts?.onArtifact?.({ id, label: fileName(id), surfaceKind: "file" });
+      return id;
+    },
+    async createArtifact(kind, title, content) {
+      if (opts?.isSecureContext?.() === true) {
+        return "blocked: this chat carries secure-note content, so it cannot create an unprotected document, sheet, or PDF. Create a secure Markdown note instead.";
+      }
+      const rootId = opts?.artifactRootId;
+      if (!rootId) return "error: file creation isn't set up for this chat.";
+      try {
+        if (kind === "document") {
+          const name = artifactFileName(title, "docx");
+          const item = await createPopulatedManagedItem("document", async () => {
+            const { createManagedDocumentFromDraft } = await import("../documents/composition");
+            return createManagedDocumentFromDraft(name, markdownToDocumentDraft(title, content), rootId);
+          });
+          opts.onArtifact?.({ id: item.id, label: fileName(item.id), surfaceKind: "file" });
+          return `created editable document ${item.id}. Tell the user it is in Chat Work and opens in Rotli's document editor.`;
+        }
+        if (kind === "sheet") {
+          const name = artifactFileName(title, "xlsx");
+          const item = await createPopulatedManagedItem("sheet", async () => {
+            const { createWorkbookFromCsvBase64 } = await import("../sheets/create");
+            const base64 = await createWorkbookFromCsvBase64(content, title.slice(0, 31) || "Sheet1");
+            return corpusCreateManagedFile(name, base64, rootId);
+          });
+          opts.onArtifact?.({ id: item.id, label: fileName(item.id), surfaceKind: "file" });
+          return `created editable sheet ${item.id}. Tell the user it is in Chat Work and opens in Rotli's sheet editor.`;
+        }
+
+        // A PDF is always derived from an editable Markdown source. Source is
+        // created and registered first; if the macOS exporter fails, the user's
+        // authored content still survives and the error says exactly what did.
+        const heading = /^#\s/.test(content) ? "" : `# ${title}\n\n`;
+        const sourceId = await createRoutedNote({
+          selectedFolderId: "",
+          isSmart: true,
+          localFallback: "Inbox",
+          body: `${heading}${content}\n`.replace(/\n+$/, "\n"),
+        });
+        await registerPopulatedManagedItem({ id: sourceId, kind: "markdown" });
+        opts.onArtifact?.({ id: sourceId, label: `${title} — editable source`, surfaceKind: "note" });
+        const pdfId = await corpusExportNotePdf(sourceId, artifactFileName(title, "pdf"), title);
+        await registerPopulatedManagedItem({ id: pdfId, kind: "document" });
+        opts.onArtifact?.({ id: pdfId, label: fileName(pdfId), surfaceKind: "file" });
+        return `created PDF copy ${pdfId} and kept editable Markdown source ${sourceId}. Tell the user both are in Chat Work.`;
+      } catch (error) {
+        return `error: the work file could not be created — ${error instanceof Error ? error.message : String(error)}`;
+      }
     },
     async drawBoard(title, mermaid) {
       // the create_note taint law's BOARD twin: boards are never secure-gated
@@ -419,6 +494,7 @@ export function makeTauriHost(
           open: false,
           name: title || "Diagram",
         });
+        opts?.onArtifact?.({ id: boardId, label: fileName(boardId), surfaceKind: "canvas" });
         usePanesStore.getState().openCanvas(boardId, { newTab: true });
         await Promise.all([invalidateNotes(), invalidateMemex()]);
         return `created the board${title ? ` "${title}"` : ""} from your diagram and opened it on screen — a fully editable visual copy. Tell the user it's there and that they can rearrange it freely.`;

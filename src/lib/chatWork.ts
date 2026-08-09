@@ -12,6 +12,7 @@ export interface ChatWorkItem {
   kind: ChatWorkKind;
   name: string;
   source: ChatWorkSource;
+  surfaceKind: "note" | "canvas" | "file";
 }
 
 interface ChatWorkProjectionInput {
@@ -25,6 +26,7 @@ interface ChatWorkProjectionInput {
 }
 
 const STORAGE_LINK = /\[([^\]]+)]\((storage:[^)\s]+)\)/g;
+const ROTLI_LINK = /\[([^\]]+)]\(rotli:\/\/open\?id=([^&\s)]+)&kind=(note|board|file)\)/g;
 
 function relativeWireId(id: string): string {
   const colon = id.indexOf(":");
@@ -44,12 +46,19 @@ function encodeStoragePath(path: string): string {
   return path.split("/").map(encodeURIComponent).join("/");
 }
 
-function itemOf(id: string, source: ChatWorkSource): ChatWorkItem {
+function itemOf(
+  id: string,
+  source: ChatWorkSource,
+  surface?: ChatWorkItem["surfaceKind"],
+  label?: string,
+): ChatWorkItem {
+  const ext = extOf(id);
   return {
     id,
-    kind: IMAGE_EXTS.has(extOf(id)) ? "image" : "artifact",
-    name: fileName(id),
+    kind: IMAGE_EXTS.has(ext) ? "image" : "artifact",
+    name: label?.trim() || fileName(id),
     source,
+    surfaceKind: surface ?? (ext === "md" ? "note" : ext === "excalidraw" ? "canvas" : "file"),
   };
 }
 
@@ -60,10 +69,31 @@ export function attachmentReference(index: number, wireId: string): string {
   return `[Image #${index}](storage:${encodeStoragePath(relativeWireId(wireId))})`;
 }
 
+/** Durable links appended by presentation after a creation tool succeeds. Files
+ * use the portable storage shorthand; note/board identities use Rotli's
+ * existing validated deep-link contract. */
+export function artifactReference(
+  label: string,
+  wireId: string,
+  surfaceKind: ChatWorkItem["surfaceKind"],
+): string {
+  const safeLabel =
+    label
+      .replaceAll("[", " ")
+      .replaceAll("]", " ")
+      .replace(/[\n\r]/g, " ")
+      .trim() || fileName(wireId);
+  if (surfaceKind === "file" && /(^|:)storage\//i.test(wireId)) {
+    return `[${safeLabel}](storage:${encodeStoragePath(relativeWireId(wireId))})`;
+  }
+  const kind = surfaceKind === "canvas" ? "board" : surfaceKind;
+  return `[${safeLabel}](rotli://open?id=${encodeURIComponent(wireId)}&kind=${kind})`;
+}
+
 /** User bubbles keep the familiar image handle while the ordinary Markdown
  * file retains the durable storage target. */
 export function visibleChatText(text: string): string {
-  return text.replace(STORAGE_LINK, "[$1]");
+  return text.replace(STORAGE_LINK, "[$1]").replace(ROTLI_LINK, "[$1]");
 }
 
 /** Build the rail from portable links in the transcript plus files in the
@@ -83,6 +113,11 @@ export function projectChatWorkItems(input: ChatWorkProjectionInput): ChatWorkIt
       const src = match[2] ?? "";
       const rel = `storage/${decodeStoragePath(src.slice("storage:".length))}`;
       add(itemOf(`${input.rootPrefix}${rel}`, /^Image #\d+$/i.test(label) ? "attachment" : "generated"));
+    }
+    for (const match of message.text.matchAll(ROTLI_LINK)) {
+      const id = decodeStoragePath(match[2] ?? "");
+      const kind = match[3] === "board" ? "canvas" : match[3] === "note" ? "note" : "file";
+      if (id) add(itemOf(id, "generated", kind, match[1]));
     }
   }
   for (const id of input.attachmentIds ?? []) add(itemOf(id, "attachment"));

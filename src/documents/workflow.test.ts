@@ -7,7 +7,13 @@ import type {
   DocumentFileWriter,
   DocumentRepository,
 } from "./ports";
-import { createDocument, documentFileName, editDocument } from "./workflow";
+import {
+  createDocument,
+  type CreateDocumentDependencies,
+  createNamedDocument,
+  documentFileName,
+  editDocument,
+} from "./workflow";
 
 describe("document application workflows", () => {
   test("creation composes an encoder and repository without knowing either implementation", async () => {
@@ -31,6 +37,26 @@ describe("document application workflows", () => {
 
   test("invalid adapter extensions fail before storage is called", async () => {
     expect(() => documentFileName("../", 42)).toThrow();
+  });
+
+  test("a populated document keeps its explicit safe basename", async () => {
+    const writes: string[] = [];
+    const dependencies: CreateDocumentDependencies = {
+      encoder: { extension: "docx", encode: async () => "encoded" },
+      repository: {
+        create: async (name) => {
+          writes.push(name);
+          return `storage/rotli/${name}`;
+        },
+      },
+    };
+    await expect(createNamedDocument(dependencies, "launch-plan.docx", { title: "Launch" })).resolves.toBe(
+      "storage/rotli/launch-plan.docx",
+    );
+    expect(writes).toEqual(["launch-plan.docx"]);
+    await expect(
+      createNamedDocument(dependencies, "../launch-plan.docx", { title: "Launch" }),
+    ).rejects.toThrow();
   });
 
   test("editing refuses oversized files before reading or decoding bytes", async () => {

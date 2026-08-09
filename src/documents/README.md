@@ -58,6 +58,14 @@ be OCRed or unlocked first. No account, network service, font download, or
 in-place conversion is involved. `.dot`, `.pages`, and other legacy formats
 remain unsupported when no faithful local conversion route is available.
 
+Chat PDF generation is the reverse, copy-only lane: Rotli first creates a
+normal editable Markdown source, then the fixed macOS `/usr/sbin/cupsfilter`
+adapter exports a separate PDF into managed storage. The source remains the
+editable truth; the PDF remains a viewer copy with the existing Convert to DOCX
+escape hatch. The Rust boundary rejects secure, secret-shaped, or locked source,
+read-only roots, invalid names, oversized output, and bytes without a PDF
+signature. Neither file is replaced in place.
+
 ### PDF parser dependency review
 
 `pdf-extract` 0.12.0 is a direct MIT-licensed Rust dependency used only inside

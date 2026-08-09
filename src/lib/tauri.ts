@@ -805,9 +805,19 @@ export async function corpusWriteFileBytes(id: string, base64: string, bak = fal
 }
 
 /** Create a Rotli-owned .xlsx/.docx in its managed storage lane. */
-export async function corpusCreateManagedFile(name: string, base64: string): Promise<string> {
+export async function corpusCreateManagedFile(
+  name: string,
+  base64: string,
+  rootId?: string,
+): Promise<string> {
   if (!isTauri()) return "";
-  return invoke<string>("corpus_create_managed_file", { name, base64 });
+  return invoke<string>("corpus_create_managed_file", { name, base64, rootId });
+}
+
+/** Export an editable Markdown note to a separate PDF copy in the same root. */
+export async function corpusExportNotePdf(id: string, name: string, title: string): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_export_note_pdf", { id, name, title });
 }
 
 /** Convert a legacy document or embedded-text PDF into a new managed DOCX

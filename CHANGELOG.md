@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   opens the user-owned file in a new pane to the right, while the rail collapses
   to a quiet launcher. Picked images are copied into the memex and remain
   recoverable through portable `storage:` references in the chat Markdown.
+- **Chat can create files the user owns and keeps editing.** Models can create
+  Markdown notes, DOCX documents, XLSX sheets, Excalidraw boards, and images
+  through Rotli's existing editors and lifecycle. PDF requests produce a local
+  exported copy plus a separate editable Markdown source. Created items are
+  linked into Chat Work deterministically and can be opened to the right or
+  brought back into the composer with **Use in chat**.
 
 ## [0.80.0] - 2026-08-08
 

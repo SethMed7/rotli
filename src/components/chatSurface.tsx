@@ -27,7 +27,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { modelIsOnDevice } from "../ai/guard";
-import { makeTauriHost } from "../ai/host";
+import { type CreatedChatArtifact, makeTauriHost } from "../ai/host";
 import { presetFor, runHybrid } from "../ai/hybrid";
 import { runAgent } from "../ai/loop";
 import {
@@ -49,6 +49,7 @@ import { renderMermaidElement } from "../editor/mermaidRender";
 import { renderInline } from "../editor/render";
 import {
   CHAT_IMAGE_ASSET_EXTS,
+  artifactReference,
   attachmentReference,
   projectChatWorkItems,
   visibleChatText,
@@ -1193,6 +1194,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       // the board tool is local conversion — offered whenever the desktop
       // bridge exists (the host re-checks the secure taint at call time)
       ...(isTauri() ? { boardTool: true } : {}),
+      ...(isTauri() ? { artifactTool: true } : {}),
       ...(userName ? { userName } : {}),
     };
 
@@ -1209,7 +1211,19 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     // same run already sees the secure context (PR #4 P1)
     const isSecureContext = () => secureReadRef.current || attachedSecure;
     const webSearchProvider = useUiStore.getState().webSearchProvider;
-    const baseOpts = { requestId, onSecureNoteRead, isSecureContext, webSearchProvider };
+    const createdArtifacts: CreatedChatArtifact[] = [];
+    const onArtifact = (artifact: CreatedChatArtifact) => {
+      if (!createdArtifacts.some((current) => current.id === artifact.id)) createdArtifacts.push(artifact);
+    };
+    const artifactRootId = active.id === CORPUS_INSTANCE_ID ? "default" : active.id;
+    const baseOpts = {
+      requestId,
+      onSecureNoteRead,
+      isSecureContext,
+      webSearchProvider,
+      onArtifact,
+      artifactRootId,
+    };
     const hostOpts = image ? { ...baseOpts, image } : baseOpts;
     const events = preset
       ? runHybrid(preset, modelList, runInput, (m, o) => makeTauriHost(m, { ...hostOpts, ...o }), requestId)
@@ -1240,6 +1254,12 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
 
     const failed = reply.startsWith("⚠");
     if (!reply) reply = "(the model returned nothing)";
+    if (createdArtifacts.length > 0) {
+      const links = createdArtifacts.map((artifact) =>
+        artifactReference(artifact.label, artifact.id, artifact.surfaceKind),
+      );
+      reply = `${reply}\n\nCreated: ${links.join(" · ")}`;
+    }
     setMessages((p) => [...p, { speaker: "rotli", text: reply }]);
     // the answer is IN — settle the sidebar signal now (not after the slower
     // persistence + note-memory pass): watched clears, unwatched flips unread.
@@ -1513,7 +1533,13 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     ? leaves(paneRoot).some(
         (leaf) =>
           leaf.id !== paneId &&
-          leaf.tabs.some((tab) => tab.surfaceKind === "file" && tab.fileId === openedWorkId),
+          leaf.tabs.some((tab) =>
+            tab.surfaceKind === "note"
+              ? tab.noteId === openedWorkId
+              : tab.surfaceKind === "canvas"
+                ? tab.boardId === openedWorkId
+                : tab.surfaceKind === "file" && tab.fileId === openedWorkId,
+          ),
       )
     : false;
   useEffect(() => {
@@ -1522,10 +1548,32 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     setWorkRailExpanded(false);
   }, [openedWorkId, openedWorkAlive]);
 
-  const openWorkItem = (id: string) => {
-    setOpenedWorkId(id);
+  const openWorkItem = (item: (typeof workItems)[number]) => {
+    setOpenedWorkId(item.id);
     setWorkRailExpanded(false);
-    openToSide("file", id);
+    openToSide(item.surfaceKind, item.id);
+  };
+
+  const addWorkItemToChat = async (item: (typeof workItems)[number]) => {
+    if (item.kind === "image") {
+      try {
+        const url = await fileAssetUrl(item.id);
+        const blob = await fetch(url).then((response) => response.blob());
+        const src = await readAsDataURL(new File([blob], item.name, { type: blob.type }));
+        setImages((current) =>
+          current.some((image) => image.id === item.id)
+            ? current
+            : [...current, { id: item.id, name: item.name, src }],
+        );
+        setAttachmentErr(null);
+      } catch (error) {
+        setAttachmentErr(error instanceof Error ? error.message : String(error));
+      }
+    } else {
+      const reference = artifactReference(item.name, item.id, item.surfaceKind);
+      setMessage((current) => (current.trim() ? `${current.trimEnd()}\n${reference}` : `Use ${reference}: `));
+    }
+    requestAnimationFrame(() => msgRef.current?.focus());
   };
 
   /** Open the attached note per the Settings choice: a new tab here, or a
@@ -1906,7 +1954,8 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
           items={workItems}
           openedId={openedWorkId}
           collapsed={openedWorkAlive && !workRailExpanded}
-          onOpen={(item) => openWorkItem(item.id)}
+          onOpen={openWorkItem}
+          onUse={(item) => void addWorkItemToChat(item)}
           onExpand={() => setWorkRailExpanded(true)}
         />
       )}

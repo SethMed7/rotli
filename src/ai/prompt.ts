@@ -20,6 +20,8 @@ export interface PromptCtx {
   imageTool?: boolean;
   /** Offer the draw_board tool (desktop app; local mermaid→board conversion). */
   boardTool?: boolean;
+  /** Offer editable conventional work-product creation. */
+  artifactTool?: boolean;
   /** The user's name (Settings → General / onboarding) — omit when unset. */
   userName?: string;
 }
@@ -143,6 +145,9 @@ export const gemmaAdapter: Adapter = {
     const boardTool = ctx.boardTool
       ? `\n- {"thought":"…","tool":"draw_board","args":{"title":"…","mermaid":"flowchart TD\\n  A[Start] --> B[Done]"}} → turn a Mermaid flowchart into an editable visual board saved with the user's boards and shown on screen. Use it when the user asks for a board, canvas, or visual diagram they can edit. Keep to a simple flowchart: named nodes, arrows, short labels, one direction (TD or LR).`
       : "";
+    const artifactTool = ctx.artifactTool
+      ? `\n- {"thought":"…","tool":"create_artifact","args":{"kind":"document|sheet|pdf","title":"…","content":"…"}} → create a user-owned work file. Use Markdown-like content for document/PDF; use valid CSV (including a header row) for a sheet. PDF always creates an editable Markdown source beside the exported copy.`
+      : "";
 
     return `You are rotli, a warm, concise assistant running entirely on the user's Mac.${namedLine(ctx.userName)}
 
@@ -163,7 +168,7 @@ TOOLS — to use one, reply with a SINGLE JSON object:
 - {"thought":"…","tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} → REWRITE an existing note. read_note it first, then send the FULL new body — it replaces everything (never send a fragment)
 - {"thought":"…","tool":"open_note","args":{"id":"…"}}        → open a note on the user's screen, in a tab
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} → read a file by name (text, or a spreadsheet as CSV)
-${webTools}${imageTool}${boardTool}
+${webTools}${imageTool}${boardTool}${artifactTool}
 When you can answer, reply: {"thought":"a concise evidence/decision checkpoint","final":"your answer to the user"}
 
 HOW YOU WORK (one JSON object per step):
@@ -186,6 +191,7 @@ RULES:
 - Output ONE JSON object and nothing else. No text outside the JSON. No code fences.
 - ${webRule}
 - When the user asks you to change, clean up, rewrite, or add to a note — ACTUALLY EDIT IT: read_note it, then update_note with the complete improved body. Don't just show the new text in chat.
+- A storage: or rotli://open reference in the user's message is an explicit work-file attachment. Use its id with read_note for kind=note, or its exact filename/path with read_file for a file, before answering about it.
 - For "all/every/who are" questions, an index or overview note holds the full roster in its body — read it; search results and the index below show only a few top matches. A search hit marked "role":"area-index" IS that area's generated roster (its body lists everything filed there) — read that one first. A folder's own README only EXPLAINS the folder and often names nobody.
 - On a follow-up, your earlier answer is a summary, NOT a source: to give names, items, or details, read the note that holds them. If a note you already read did not contain what's asked, read a DIFFERENT note (the area's index/list note) instead of the same one again.
 - A note may open with metadata between --- lines (id, tags, links, summary): that is FILING metadata, not content. The "links:" line — and every [[name]] anywhere in a note — is a POINTER to another note, and those pointers mix people, projects, and reference material indiscriminately. NEVER build a list or an answer out of them: if the BODY of the note you read doesn't hold the answer, read another note instead. Answering from a links line is how a project ends up in a list of people.
@@ -256,6 +262,9 @@ export const frontierAdapter: Adapter = {
     const boardTool = ctx.boardTool
       ? `\n- {"thought":"…","tool":"draw_board","args":{"title":"…","mermaid":"flowchart TD\\n  A --> B"}} — turn a Mermaid flowchart into an editable visual board (use when the user asks for a board/canvas/editable diagram; keep it a simple flowchart)`
       : "";
+    const artifactTool = ctx.artifactTool
+      ? `\n- {"thought":"…","tool":"create_artifact","args":{"kind":"document|sheet|pdf","title":"…","content":"…"}} — create an editable work file; sheet content is CSV, PDF also keeps an editable Markdown source`
+      : "";
 
     return `You are rotli's reasoning engine. The user's memex — their personal notes folder, indexed below — is your knowledge base; search it before answering from memory.${namedLine(ctx.userName)}
 
@@ -268,10 +277,10 @@ Tools:
 - {"thought":"…","tool":"create_note","args":{"title":"…","body":"…markdown…"}} — create a NEW note in the user's memex (lands in their intake)
 - {"thought":"…","tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} — rewrite an existing note (read it first; the body replaces everything, never a fragment)
 - {"thought":"…","tool":"open_note","args":{"id":"…"}} — open a note on the user's screen, in a tab
-- {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}${boardTool}
+- {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}${boardTool}${artifactTool}
 To answer the user: {"thought":"…","final":"your answer"} — the final text leads with the facts found (never with where they live or with note titles), in Markdown ("- " lists for 3+ items, **bold** key names; a | table | for comparisons and a \`\`\`mermaid flowchart for processes both render in chat and in notes — use them when they clarify).
 
-Rules: You have NO native tools and no shell in this environment — the JSON protocol above is your ONLY way to act; never attempt or request built-in tools (some CLI harnesses would silently deny and abort the turn). ${webRule} ${freshnessRule} A request to change/clean up/add to a note means EDIT it — read_note then update_note with the complete new body, never just prose in chat. For past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences (one distinctive word beats a phrase; a phrase only matches if the note contains it verbatim). The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); the "links:" line and every [[name]] are POINTERS that mix people, projects, and reference — never build a list or an answer out of them, and when a note's body lacks the answer read another note rather than falling back on its metadata. A hit marked "role":"area-index" is that area's generated roster — read it first for any all/every/list question; a folder README only explains the folder. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
+Rules: You have NO native tools and no shell in this environment — the JSON protocol above is your ONLY way to act; never attempt or request built-in tools (some CLI harnesses would silently deny and abort the turn). ${webRule} ${freshnessRule} A request to change/clean up/add to a note means EDIT it — read_note then update_note with the complete new body, never just prose in chat. A storage: or rotli://open reference in the user's message is an explicit work-file attachment: use its id with read_note for kind=note, or its exact filename/path with read_file for a file, before answering about it. For past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences (one distinctive word beats a phrase; a phrase only matches if the note contains it verbatim). The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); the "links:" line and every [[name]] are POINTERS that mix people, projects, and reference — never build a list or an answer out of them, and when a note's body lacks the answer read another note rather than falling back on its metadata. A hit marked "role":"area-index" is that area's generated roster — read it first for any all/every/list question; a folder README only explains the folder. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
 
 KNOWLEDGE BASE INDEX (abbreviated — each area's "count" is the true total):
 ${renderKnowledgeMap(ctx.knowledge)}

@@ -41,6 +41,7 @@ const WEB_RESEARCH_TOOLS: ToolName[] = ["research_web"];
 // which subset a model sees.
 const WEB_TOOLS: ToolName[] = ["web_search", "web_fetch", "research_web"];
 const IMAGE_TOOLS: ToolName[] = ["generate_image"];
+const ARTIFACT_TOOLS: ToolName[] = ["create_artifact"];
 // local mermaid→Excalidraw conversion — a creation tool, never egress
 const BOARD_TOOLS: ToolName[] = ["draw_board"];
 // every tool whose ARGS leave the device — the secret guard covers them all
@@ -90,6 +91,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     ...NOTE_TOOLS,
     ...(input.web ? enabledWebTools : []),
     ...(input.imageTool ? IMAGE_TOOLS : []),
+    ...(input.artifactTool ? ARTIFACT_TOOLS : []),
     ...(input.boardTool ? BOARD_TOOLS : []),
   ]);
 
@@ -137,6 +139,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       scratch: pruneScratch(scratch, budget.maxScratchChars),
       maxSteps,
       ...(input.imageTool ? { imageTool: true } : {}),
+      ...(input.artifactTool ? { artifactTool: true } : {}),
       ...(input.boardTool ? { boardTool: true } : {}),
       ...(input.userName ? { userName: input.userName } : {}),
     });

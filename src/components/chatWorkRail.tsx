@@ -47,12 +47,14 @@ export function ChatWorkRail({
   openedId,
   collapsed,
   onOpen,
+  onUse,
   onExpand,
 }: {
   items: readonly ChatWorkItem[];
   openedId: string | null;
   collapsed: boolean;
   onOpen: (item: ChatWorkItem) => void;
+  onUse: (item: ChatWorkItem) => void;
   onExpand: () => void;
 }) {
   const [filter, setFilter] = useState<WorkFilter>("all");
@@ -90,24 +92,40 @@ export function ChatWorkRail({
             </div>
           ) : (
             visible.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={item.id === openedId ? "chat-work-row is-open" : "chat-work-row"}
-                aria-label={`Open ${item.name} to the right`}
-                onClick={() => onOpen(item)}
-              >
-                <span className="chat-work-thumb">
-                  <WorkThumb item={item} />
-                </span>
-                <span className="chat-work-copy">
-                  <span className="chat-work-name">{item.name}</span>
-                  <span className="chat-work-meta">
-                    {item.kind === "image" ? "Image" : extOf(item.name).toUpperCase() || "File"}
-                    {item.source === "attachment" ? " · Attached" : " · Created here"}
+              <div key={item.id} className="chat-work-entry">
+                <button
+                  type="button"
+                  className={item.id === openedId ? "chat-work-row is-open" : "chat-work-row"}
+                  aria-label={`Open ${item.name} to the right`}
+                  onClick={() => onOpen(item)}
+                >
+                  <span className="chat-work-thumb">
+                    <WorkThumb item={item} />
                   </span>
-                </span>
-              </button>
+                  <span className="chat-work-copy">
+                    <span className="chat-work-name">{item.name}</span>
+                    <span className="chat-work-meta">
+                      {item.kind === "image"
+                        ? "Image"
+                        : item.surfaceKind === "note"
+                          ? "Markdown"
+                          : item.surfaceKind === "canvas"
+                            ? "Board"
+                            : extOf(item.name).toUpperCase() || "File"}
+                      {item.source === "attachment" ? " · Attached" : " · Created here"}
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="chat-work-use"
+                  aria-label={`Use ${item.name} in chat`}
+                  title="Use in chat"
+                  onClick={() => onUse(item)}
+                >
+                  Use
+                </button>
+              </div>
             ))
           )}
         </div>

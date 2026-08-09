@@ -303,3 +303,23 @@ describe("edit workflow rule", () => {
     expect(f).toContain("read_note then update_note");
   });
 });
+
+describe("editable artifact generation", () => {
+  test("both adapters expose the tool only when the desktop host enables it", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      expect(adapter.renderPrompt({ ...base })).not.toContain('"tool":"create_artifact"');
+      const enabled = adapter.renderPrompt({ ...base, artifactTool: true });
+      expect(enabled).toContain('"tool":"create_artifact"');
+      expect(enabled).toContain("document|sheet|pdf");
+      expect(enabled).toMatch(/editable Markdown source/i);
+    }
+  });
+
+  test("both adapters treat a Work reference as an attachment that must be read", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      const prompt = adapter.renderPrompt({ ...base, artifactTool: true });
+      expect(prompt).toContain("rotli://open");
+      expect(prompt).toMatch(/explicit work-file attachment/i);
+    }
+  });
+});

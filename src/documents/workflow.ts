@@ -28,6 +28,27 @@ export async function createDocument(
   return dependencies.repository.create(documentFileName(dependencies.encoder.extension, now), base64);
 }
 
+/** Named/populated documents use the same encoder + repository boundary as a
+ * blank document. The caller owns the display-name projection; this boundary
+ * accepts only one basename with the encoder's exact extension. */
+export async function createNamedDocument(
+  dependencies: CreateDocumentDependencies,
+  name: string,
+  draft: DocumentDraft,
+): Promise<string> {
+  const extension = dependencies.encoder.extension.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (
+    !extension ||
+    name.includes("/") ||
+    name.includes("\\") ||
+    !name.toLowerCase().endsWith(`.${extension}`)
+  ) {
+    throw new Error(`document name must be one .${extension} basename`);
+  }
+  const base64 = await dependencies.encoder.encode(draft);
+  return dependencies.repository.create(name, base64);
+}
+
 export interface EditDocumentDependencies<Source> {
   reader: DocumentFileReader;
   writer: DocumentFileWriter;

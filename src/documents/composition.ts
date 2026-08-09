@@ -16,9 +16,9 @@ import { useMainStore } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { convertLegacyDocument } from "./conversion";
 import { DOCUMENT_EDIT_MAX_BYTES } from "./kinds";
-import { blankDocumentDraft } from "./model";
+import { blankDocumentDraft, type DocumentDraft } from "./model";
 import type { DocumentFileReader, DocumentFileWriter, DocumentRepository } from "./ports";
-import { createDocument, editDocument } from "./workflow";
+import { createDocument, createNamedDocument, editDocument } from "./workflow";
 
 const repository: DocumentRepository = {
   create: corpusCreateManagedFile,
@@ -36,6 +36,18 @@ const writer: DocumentFileWriter = {
 export async function createManagedDocument(now = Date.now()): Promise<string> {
   const { docxEncoder } = await import("./create");
   return createDocument({ encoder: docxEncoder, repository }, blankDocumentDraft(), now);
+}
+
+export async function createManagedDocumentFromDraft(
+  name: string,
+  draft: DocumentDraft,
+  rootId?: string,
+): Promise<string> {
+  const { docxEncoder } = await import("./create");
+  const routedRepository: DocumentRepository = rootId
+    ? { create: (fileName, base64) => corpusCreateManagedFile(fileName, base64, rootId) }
+    : repository;
+  return createNamedDocument({ encoder: docxEncoder, repository: routedRepository }, name, draft);
 }
 
 export async function editManagedDocument(fileId: string) {

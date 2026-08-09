@@ -169,6 +169,31 @@ export async function createManagedItem(
   return item;
 }
 
+/** Generated documents and sheets still ride the one item-creation presenter:
+ * refresh, Main/view filing, and ordinary file surfaces stay identical to a
+ * chooser-created item. The supplied creator owns only the populated bytes. */
+export function createPopulatedManagedItem(
+  kind: "document" | "sheet",
+  createFile: () => Promise<string>,
+): Promise<CreatedItem> {
+  return createNewItem(
+    {
+      creator: { create: async () => ({ id: await createFile(), kind }) },
+      presenter,
+    },
+    kind,
+    { open: false },
+  );
+}
+
+/** Register bytes created by a specialized adapter (for example a PDF export
+ * and its Markdown source) with the same refresh/Main/view policy. */
+export async function registerPopulatedManagedItem(item: CreatedItem): Promise<CreatedItem> {
+  await presenter.refresh();
+  presenter.fileInMain(item);
+  return item;
+}
+
 /** Open the shared name-first lane used by chooser cards, menus, and hotkeys.
  * The file creator remains unavailable until the dialog supplies a name. */
 export function requestManagedBoardCreation(options: { newTab?: boolean } = {}): void {

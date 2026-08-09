@@ -4,6 +4,7 @@
 // scan beats any index.
 
 import type { CorpusNoteMeta } from "../lib/tauri";
+import { isChatArtifactKind } from "./artifacts";
 export { buildIndex } from "../memex/modelMap";
 import type { Budget } from "./budget";
 import type { Host, NoteHit, ScratchStep, ToolName, WebEvidenceSource } from "./types";
@@ -230,6 +231,8 @@ export function statusFor(tool: ToolName, args?: Record<string, unknown>): strin
     }
     case "generate_image":
       return "generating an image…";
+    case "create_artifact":
+      return "creating the file…";
     case "draw_board":
       return "drawing the board…";
   }
@@ -482,6 +485,19 @@ export async function runTool(
       if (prompt === "") return 'error: generate_image needs a "prompt" describing the image.';
       const rel = await host.generateImage(prompt);
       return `saved: ${rel} — it's in this chat's assets. Tell the user it's ready (mention the filename).`;
+    }
+    case "create_artifact": {
+      const kind = argText(args.kind).trim().toLowerCase();
+      const title = argText(args.title).trim();
+      const content = argText(args.content ?? args.body ?? args.csv).trim();
+      if (!isChatArtifactKind(kind)) {
+        return 'error: create_artifact needs a supported kind: "document", "sheet", or "pdf".';
+      }
+      if (title === "" || content === "") {
+        return 'error: create_artifact needs a non-empty "title" and "content".';
+      }
+      if (!host.createArtifact) return "error: this host cannot create work files.";
+      return host.createArtifact(kind, title, content);
     }
     case "draw_board": {
       const source = argText(args.mermaid ?? args.code ?? args.definition).trim();

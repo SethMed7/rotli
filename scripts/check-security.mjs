@@ -166,6 +166,10 @@ function stripComments(src) {
     "search_memory",
     "read_memory",
     "read_file",
+    // create_artifact composes only local note/document/sheet/PDF adapters.
+    // host.ts refuses a secure-context chat; the Rust PDF boundary separately
+    // rejects protected source and read-only output roots (2026-08-09).
+    "create_artifact",
     // draw_board converts Mermaid → an Excalidraw board file entirely on
     // device (boards/composition mermaid-to-excalidraw) — a creation tool,
     // no egress; the host gates it behind the secure-context taint (2026-08-03)

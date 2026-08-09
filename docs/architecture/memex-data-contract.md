@@ -167,6 +167,19 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   while the bubble may show only the friendly handle. Selecting a Work item
   delegates to the ordinary pane/file surface and opens it to the right; the
   rail never becomes a parallel viewer or file store.
+- **Generated Chat work uses existing creation boundaries (2026-08-09).**
+  Markdown rides the guarded note-creation lane; DOCX and XLSX use the managed
+  binary lane and their existing local editors; boards use the raw Excalidraw
+  lane; generated images retain their pinned chat-assets destination. A PDF
+  request first creates an ordinary editable Markdown source, then exports a
+  separate collision-safe PDF copy locally through the fixed macOS print
+  adapter. Rust independently refuses protected/secret-shaped or locked source,
+  read-only roots, invalid names, and non-PDF output. Presentation appends
+  ordinary storage links or validated Rotli deep links to the assistant turn,
+  so Work can project every result after reload without a manifest. **Use in
+  chat** attaches images as vision inputs and references other work by its
+  durable file/note identity; document reads traverse the same DOCX model the
+  editor owns.
 - File-format dependencies stay behind adapters and composition roots so a DOCX
   codec, document editor, workbook codec, or canvas engine can be swapped
   without changing creation commands or UI entry points.

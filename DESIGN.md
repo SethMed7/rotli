@@ -74,6 +74,14 @@ exception.
 - Provider/model marks in Chat use one 14px slot and an optically consistent
   visible footprint; source SVG padding and fine linework must not make one
   family read as a smaller icon than its peers.
+- Chat's contextual Work rail stays a quiet file list beside the normal
+  conversation, using the current environment and accent without introducing a
+  new workspace theme. Opening an item uses the existing pane system to the
+  right and collapses the rail to a slim launcher; narrow chat panes use that
+  launcher from the start. Each row exposes keyboard-reachable **Open** and
+  **Use in chat** actions. Notes, boards, documents, sheets, PDFs, and images
+  continue to render in their owning Rotli surfaces—Work never previews or
+  edits them itself.
 - When Chat inherits a named view selected on Home, it names that view in a
   quiet inline context row and offers a direct return to all chats. Cross-front
   filtering must never depend on remembering hidden state from another front.

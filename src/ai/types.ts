@@ -6,6 +6,7 @@
 // the public web. It is host-agnostic: the ONLY rotli/Tauri coupling is the `Host`,
 // so the whole module lifts into the shared ~/.memex/ai client layer later.
 
+import type { ChatArtifactKind } from "./artifacts";
 import type { ModelMeta } from "./budget";
 import type { WebSearchProvider } from "./searchProvider";
 
@@ -21,6 +22,7 @@ export type ToolName =
   | "research_web"
   | "web_search"
   | "web_fetch"
+  | "create_artifact"
   | "generate_image"
   | "draw_board";
 
@@ -109,6 +111,9 @@ export interface Host {
   /** Generate an image into this chat's assets via a connected engine. Returns
    * the saved corpus-relative path (the observation the model reports). */
   generateImage(prompt: string): Promise<string>;
+  /** Create a conventional editable work product through Rotli's existing
+   * document/sheet/PDF-source workflows. */
+  createArtifact?(kind: ChatArtifactKind, title: string, content: string): Promise<string>;
   /** Turn Mermaid flowchart source into an editable Excalidraw board in the
    * user's boards and show it (generative UI, 2026-08-03). Mermaid is the wire
    * format on purpose: every model — especially local ones — writes it far
@@ -169,6 +174,8 @@ export interface RunInput {
   imageTool?: boolean;
   /** Offer the draw_board tool (the desktop app; conversion is fully local). */
   boardTool?: boolean;
+  /** Offer conventional document, sheet, and PDF-copy creation. */
+  artifactTool?: boolean;
   /** The user's name for prompt personalization — omit when unset. */
   userName?: string;
   /** Stream the final answer token-by-token when the host supports it (default

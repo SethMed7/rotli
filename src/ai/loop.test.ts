@@ -748,6 +748,30 @@ describe("runAgent", () => {
     expect(calls.generateImage).toEqual([]);
   });
 
+  test("create_artifact dispatches only when the desktop artifact lane is on", async () => {
+    const created: string[] = [];
+    const { host } = fakeHost(
+      [
+        '{"tool":"create_artifact","args":{"kind":"sheet","title":"Runway","content":"Month,Cash\\nJan,100"}}',
+        '{"final":"the sheet is ready"}',
+      ],
+      {
+        createArtifact: async (kind, title, content) => {
+          created.push(kind, title, content);
+          return "created runway.xlsx";
+        },
+      },
+    );
+    const { final } = await run(host, {
+      history: [],
+      userText: "make a runway sheet",
+      web: false,
+      artifactTool: true,
+    });
+    expect(final).toBe("the sheet is ready");
+    expect(created).toEqual(["sheet", "Runway", "Month,Cash\nJan,100"]);
+  });
+
   test("the egress guard blocks a secret-shaped image prompt", async () => {
     const { host, calls } = fakeHost([
       '{"tool":"generate_image","args":{"prompt":"render sk-ant-api03-EXAMPLE0EXAMPLE0EXAM"}}',
@@ -1044,5 +1068,47 @@ describe("draw_board tool", () => {
     const { host } = fakeHost([]);
     const result = await runTool(host, "draw_board", { mermaid: "flowchart TD\n  A --> B" }, budget);
     expect(result).toBe("error: this host cannot draw boards.");
+  });
+});
+
+describe("create_artifact tool", () => {
+  const budget = budgetFor({ id: "gemma-3-12b-it-qat-4bit" });
+
+  test("passes one supported editable format through to the host", async () => {
+    const { host } = fakeHost([]);
+    const seen: string[] = [];
+    const result = await runTool(
+      {
+        ...host,
+        createArtifact: async (kind, title, content) => {
+          seen.push(kind, title, content);
+          return "created quarterly-plan.docx";
+        },
+      },
+      "create_artifact",
+      { kind: "document", title: "Quarterly plan", content: "## Goals\nShip it." },
+      budget,
+    );
+    expect(result).toBe("created quarterly-plan.docx");
+    expect(seen).toEqual(["document", "Quarterly plan", "## Goals\nShip it."]);
+  });
+
+  test("rejects unsupported formats and empty content before touching the host", async () => {
+    const { host } = fakeHost([]);
+    let calls = 0;
+    const withArtifact = {
+      ...host,
+      createArtifact: async () => {
+        calls += 1;
+        return "never";
+      },
+    };
+    expect(
+      await runTool(withArtifact, "create_artifact", { kind: "html", title: "No", content: "x" }, budget),
+    ).toContain("supported kind");
+    expect(
+      await runTool(withArtifact, "create_artifact", { kind: "sheet", title: "No rows" }, budget),
+    ).toContain("needs");
+    expect(calls).toBe(0);
   });
 });

@@ -2930,6 +2930,58 @@ impl CorpusStore {
         Ok(rel)
     }
 
+    /// A generated PDF is an exported copy, never its editable source. Keep it
+    /// in the managed lane but behind a dedicated boundary so the generic
+    /// DOCX/XLSX byte command cannot start accepting passive formats.
+    pub fn create_exported_pdf(&mut self, name: &str, bytes: &[u8]) -> Result<String, String> {
+        self.mutation_allowed()?;
+        validate_component(name)?;
+        if Path::new(name)
+            .extension()
+            .and_then(|value| value.to_str())
+            .is_none_or(|value| !value.eq_ignore_ascii_case("pdf"))
+        {
+            return Err("exported copies must use a .pdf filename".into());
+        }
+        if !bytes.starts_with(b"%PDF-") {
+            return Err("exported copy is not a valid PDF".into());
+        }
+        let folder = match self.layout {
+            Layout::Memex => "storage/rotli",
+            Layout::LegacyRotli => "Storage",
+        };
+        let rel = self.free_name(folder, name, None);
+        self.guard_rel(&rel)?;
+        fs::create_dir_all(self.abs(folder)).map_err(|e| format!("create {folder}: {e}"))?;
+        let abs = self.abs(&rel);
+        self.suppress.mark(&abs);
+        atomic_write_bytes(&abs, bytes)?;
+        Ok(rel)
+    }
+
+    fn editable_pdf_source(&mut self, id_or_rel: &str) -> Result<String, String> {
+        let rel = self.resolve_note_rel(id_or_rel)?;
+        let abs = self.guard_rel(&rel)?;
+        let metadata = fs::metadata(&abs).map_err(|e| format!("stat {rel}: {e}"))?;
+        if metadata.len() > GENERATED_PDF_SOURCE_MAX_BYTES {
+            return Err(format!(
+                "PDF source exceeds the {} MB local export limit.",
+                GENERATED_PDF_SOURCE_MAX_BYTES / 1_000_000
+            ));
+        }
+        let text = fs::read_to_string(abs).map_err(|e| format!("read {rel}: {e}"))?;
+        let (frontmatter, raw) = parse_document(&text);
+        let frontmatter = frontmatter.unwrap_or_default();
+        let body = editor_body(raw);
+        if walked_secure(&frontmatter, body) {
+            return Err("Protected or secret-shaped notes cannot be exported to an unprotected PDF copy.".into());
+        }
+        if frontmatter.foreign.iter().any(|line| locked_field(line) == Some(true)) {
+            return Err("Locked notes cannot be used as generated PDF sources.".into());
+        }
+        Ok(body.to_string())
+    }
+
     /// Persist bytes chosen in Chat as a conventional image asset. The chat
     /// records the returned memex-relative path in ordinary Markdown; this
     /// lane owns only the copied image bytes and never a proprietary artifact
@@ -6452,24 +6504,56 @@ pub fn corpus_create_managed_file(
     state: tauri::State<'_, CorpusState>,
     name: String,
     base64: String,
+    root_id: Option<String>,
 ) -> Result<String, String> {
     use base64::Engine;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(base64.as_bytes())
         .map_err(|e| format!("bad file payload: {e}"))?;
-    let default_id = state
-        .0
-        .lock()
-        .map_err(|_| "corpus lock poisoned".to_string())?
-        .default_id
-        .clone();
-    let rel = state.route(&default_id, |store| store.create_managed_file(&name, &bytes))?;
-    Ok(compose_root_id(&default_id, &rel))
+    let root_id = match root_id {
+        Some(id) => id,
+        None => state.default_root_id()?,
+    };
+    let rel = state.route(&root_id, |store| store.create_managed_file(&name, &bytes))?;
+    Ok(compose_root_id(&root_id, &rel))
+}
+
+/// Export one ordinary editable Markdown note to a separate managed PDF copy.
+/// The source and destination stay in the same registered root; Rust refuses
+/// secure, secret-shaped, locked, read-only, and malformed inputs independently
+/// of the frontend host policy.
+#[tauri::command]
+pub async fn corpus_export_note_pdf(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    name: String,
+    title: String,
+) -> Result<String, String> {
+    let (root, source_id) = split_root_id(&id);
+    let body = state.route(&root, |store| {
+        store.mutation_allowed()?;
+        store.editable_pdf_source(&source_id)
+    })?;
+
+    #[cfg(not(target_os = "macos"))]
+    return Err("Local PDF export is currently available only on macOS.".into());
+
+    #[cfg(target_os = "macos")]
+    {
+        let bytes = tauri::async_runtime::spawn_blocking(move || {
+            crate::document_conversion::export_markdown_pdf_bytes(&title, &body)
+        })
+        .await
+        .map_err(|e| format!("PDF export worker failed ({e})"))??;
+        let rel = state.route(&root, |store| store.create_exported_pdf(&name, &bytes))?;
+        Ok(compose_root_id(&root, &rel))
+    }
 }
 
 /// Byte-identical to DOCUMENT_CONVERTIBLE_EXTS in src/documents/kinds.ts (parity.json).
 pub(crate) const DOCUMENT_CONVERTIBLE_EXTS: &[&str] = &["doc", "rtf", "odt", "pdf"];
 const LOCAL_DOCUMENT_CONVERSION_MAX_BYTES: u64 = 32_000_000;
+const GENERATED_PDF_SOURCE_MAX_BYTES: u64 = 16_000_000;
 
 fn converted_document_name(rel: &str) -> Result<String, String> {
     let path = Path::new(rel);
@@ -7667,6 +7751,40 @@ mod tests {
         store.set_perms_read_only(true);
         assert!(store.create_image_asset("blocked.png", b"nope").is_err());
         assert!(!root.join("storage/images/blocked.png").exists());
+    }
+
+    #[test]
+    fn pdf_exports_require_an_editable_unprotected_source_and_valid_copy() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+
+        let note = store.create("wiki/_inbox", "# Launch\n\nShip calmly.\n").unwrap();
+        assert_eq!(store.editable_pdf_source(&note.id).unwrap(), "# Launch\n\nShip calmly.\n");
+        let pdf = store.create_exported_pdf("launch.pdf", b"%PDF-1.4\ncopy").unwrap();
+        assert_eq!(pdf, "storage/rotli/launch.pdf");
+        assert!(store.create_exported_pdf("bad.pdf", b"not pdf").is_err());
+
+        let secure = store
+            .create("wiki/_secure", "# Private\n\nsecret\n")
+            .unwrap();
+        store.set_secure(&secure.id, true).unwrap();
+        assert!(store.editable_pdf_source(&secure.id).is_err());
+
+        let oversized = store.create("wiki/_inbox", "# Too large\n").unwrap();
+        let oversized_rel = store.resolve_note_rel(&oversized.id).unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(root.join(oversized_rel))
+            .unwrap()
+            .set_len(GENERATED_PDF_SOURCE_MAX_BYTES + 1)
+            .unwrap();
+        assert!(store.editable_pdf_source(&oversized.id).is_err());
+
+        store.set_perms_read_only(true);
+        assert!(store.create_exported_pdf("blocked.pdf", b"%PDF-1.4\ncopy").is_err());
     }
 
     #[test]

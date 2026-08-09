@@ -193,13 +193,16 @@
   font-size: 12px;
   line-height: 1.5;
 }
+.chat-work-entry {
+  position: relative;
+}
 .chat-work-row {
   width: 100%;
   display: flex;
   align-items: center;
   gap: 9px;
   min-width: 0;
-  padding: 7px 8px;
+  padding: 7px 44px 7px 8px;
   border: 0;
   border-radius: var(--r-control);
   background: none;
@@ -207,6 +210,30 @@
   text-align: left;
   font: inherit;
   cursor: pointer;
+}
+.chat-work-use {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  translate: 0 -50%;
+  min-height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+  opacity: 0;
+}
+.chat-work-entry:hover .chat-work-use,
+.chat-work-entry:focus-within .chat-work-use {
+  opacity: 1;
+}
+.chat-work-use:hover {
+  background: var(--hov);
+  color: var(--text);
 }
 .chat-work-row:hover {
   background: var(--hov);

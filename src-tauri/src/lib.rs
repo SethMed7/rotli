@@ -1468,6 +1468,7 @@ pub fn run() {
             corpus::corpus_write_file_bytes,
             corpus::corpus_new_file_bytes,
             corpus::corpus_create_managed_file,
+            corpus::corpus_export_note_pdf,
             corpus::corpus_convert_document,
             corpus::corpus_managed_file_creation_available,
             corpus::corpus_reveal_file,
