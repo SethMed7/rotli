@@ -44,7 +44,7 @@ describe("chatModelFor — own pick, else the new-chat seed", () => {
 
 describe("the per-chat model map — isolation", () => {
   beforeEach(() => {
-    useUiStore.setState({ chatModel: {}, chatModelId: null });
+    useUiStore.setState({ chatModel: {}, chatProvider: {}, chatModelId: null });
   });
 
   test("setting chat A's model leaves chat B alone", () => {
@@ -103,6 +103,30 @@ describe("the per-chat model map — isolation", () => {
   });
 });
 
+describe("the per-chat primary provider — immutable after the chat is saved", () => {
+  beforeEach(() => {
+    useUiStore.setState({ chatProvider: {} });
+  });
+
+  test("the first provider wins; same-provider model changes cannot rewrite it", () => {
+    const { setChatProvider } = useUiStore.getState();
+    setChatProvider("corpus:chat-a", "claude");
+    const pinned = useUiStore.getState().chatProvider;
+    setChatProvider("corpus:chat-a", "claude");
+    expect(useUiStore.getState().chatProvider).toBe(pinned);
+    setChatProvider("corpus:chat-a", "gpt");
+    expect(useUiStore.getState().chatProvider).toEqual({ "corpus:chat-a": "claude" });
+  });
+
+  test("an unsaved provider key can be spent after it is carried to the saved chat", () => {
+    const { setChatProvider, clearChatProvider } = useUiStore.getState();
+    setChatProvider("unsaved:pane-1", "gemini");
+    setChatProvider("corpus:saved", useUiStore.getState().chatProvider["unsaved:pane-1"]!);
+    clearChatProvider("unsaved:pane-1");
+    expect(useUiStore.getState().chatProvider).toEqual({ "corpus:saved": "gemini" });
+  });
+});
+
 describe("parseSettings — chatModel (durable, additive, session-key free)", () => {
   test("missing key defaults to an empty map (every chat follows the seed)", () => {
     expect(parseSettings("{}").chatModel).toEqual({});
@@ -123,6 +147,15 @@ describe("parseSettings — chatModel (durable, additive, session-key free)", ()
     const s = parseSettings('{"chatModelId":"claude-sonnet-5"}');
     expect(s.chatModel).toEqual({});
     expect(chatModelFor(s.chatModel, "any-chat", s.chatModelId)).toBe("claude-sonnet-5");
+  });
+});
+
+describe("parseSettings — chatProvider", () => {
+  test("accepts provider families, drops invalid values, and never restores session keys", () => {
+    const settings = parseSettings(
+      '{"chatProvider":{"corpus:a":"claude","corpus:b":"local:mlx","corpus:c":"preset","unsaved:p1":"gpt"}}',
+    );
+    expect(settings.chatProvider).toEqual({ "corpus:a": "claude", "corpus:b": "local:mlx" });
   });
 });
 
@@ -155,20 +188,22 @@ describe("rescopeChatMapKeys — legacy keys re-home to their one owning vault",
   });
 });
 
-describe("retargetChatMapKeys — a rename keeps the model/globe/measure", () => {
+describe("retargetChatMapKeys — a rename keeps the model/provider/globe/measure", () => {
   beforeEach(() => {
-    useUiStore.setState({ chatModel: {}, chatWeb: {}, chatMeasure: {} });
+    useUiStore.setState({ chatModel: {}, chatProvider: {}, chatWeb: {}, chatMeasure: {} });
   });
 
-  test("all three maps follow the new key; other chats untouched", () => {
+  test("all four maps follow the new key; other chats untouched", () => {
     useUiStore.setState({
       chatModel: { "corpus:old": "gpt-5.2", "corpus:other": "gemma-3-12b" },
+      chatProvider: { "corpus:old": "gpt" },
       chatWeb: { "corpus:old": true },
       chatMeasure: { "corpus:old": "wide" },
     });
     retargetChatMapKeys("corpus:old", "corpus:new");
     const s = useUiStore.getState();
     expect(s.chatModel).toEqual({ "corpus:new": "gpt-5.2", "corpus:other": "gemma-3-12b" });
+    expect(s.chatProvider).toEqual({ "corpus:new": "gpt" });
     expect(s.chatWeb).toEqual({ "corpus:new": true });
     expect(s.chatMeasure).toEqual({ "corpus:new": "wide" });
   });

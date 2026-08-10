@@ -17,6 +17,7 @@
 // In a plain browser (vite dev) every entry point here is a no-op — the
 // in-memory demo corpus stays exactly as it was (the seam's whole point).
 
+import { isPrimaryProvider, type PrimaryProvider } from "../ai/chatProvider";
 import { type HybridPreset, PROVIDER_IDS, type ProviderId } from "../ai/models";
 import { parseWebSearchProvider, type WebSearchProvider } from "../ai/searchProvider";
 import { useBindingsStore } from "../keys/bindings";
@@ -213,6 +214,9 @@ interface PersistedSettings {
    * chatModelId, which newer builds keep writing — so a downgrade lands on the
    * last model picked, exactly the pre-per-chat behavior. */
   chatModel: Record<string, string>;
+  /** Immutable provider family for each saved chat. Additive: older settings
+   * infer it from the saved model when the chat next opens. */
+  chatProvider: Record<string, PrimaryProvider>;
   /** Per-chat web-search toggle (the composer globe), keyed by chat slug. The
    * session-scoped unsaved-chat keys ("unsaved:<paneId>", and the legacy "" key)
    * never persist — a stored one flipped the silent-egress default for every
@@ -443,6 +447,13 @@ export function parseSettings(raw: string): PersistedSettings {
       }
       return persistableChatMap(out);
     })(),
+    chatProvider: (() => {
+      const out: Record<string, PrimaryProvider> = {};
+      for (const [k, v] of Object.entries(record(data.chatProvider))) {
+        if (typeof v === "string" && isPrimaryProvider(v)) out[k] = v;
+      }
+      return persistableChatMap(out);
+    })(),
     chatWeb: (() => {
       const out: Record<string, boolean> = {};
       const src = data.chatWeb;
@@ -596,6 +607,7 @@ function applySettings(s: PersistedSettings): void {
     userName: s.userName,
     chatModelId: s.chatModelId,
     chatModel: s.chatModel,
+    chatProvider: s.chatProvider,
     chatWeb: s.chatWeb,
     chatMeasure: s.chatMeasure,
     chatNoteOpen: s.chatNoteOpen,
@@ -918,6 +930,8 @@ async function gcPersistedMaps(): Promise<void> {
       if (keptMeasure !== ui.chatMeasure) useUiStore.setState({ chatMeasure: keptMeasure });
       const keptModel = pruneMap(rescopeChatMapKeys(ui.chatModel, owners), liveKey);
       if (keptModel !== ui.chatModel) useUiStore.setState({ chatModel: keptModel });
+      const keptProvider = pruneMap(rescopeChatMapKeys(ui.chatProvider, owners), liveKey);
+      if (keptProvider !== ui.chatProvider) useUiStore.setState({ chatProvider: keptProvider });
     }
   } catch {
     // an unreadable chats/ anywhere — keep everything
@@ -1092,6 +1106,7 @@ function settingsSnapshot(): string {
     userName: ui.userName,
     chatModelId: ui.chatModelId,
     chatModel: persistableChatMap(ui.chatModel),
+    chatProvider: persistableChatMap(ui.chatProvider),
     chatWeb: persistableChatMap(ui.chatWeb),
     chatMeasure: persistableChatMap(ui.chatMeasure),
     chatNoteOpen: ui.chatNoteOpen,

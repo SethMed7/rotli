@@ -38,8 +38,8 @@ export function useChatRename() {
       try {
         const finalSlug = await renameChat(active, oldSlug, newSlug);
         retargetChat(oldSlug, finalSlug);
-        // the chat keeps its model pick, globe, and measure — a rename used to
-        // orphan all three under the old key (audit 2026-08-03)
+        // the chat keeps its model/provider pick, globe, and measure — a rename
+        // used to orphan these maps under the old key (audit 2026-08-03)
         retargetChatMapKeys(chatKey(active.id, oldSlug, ""), chatKey(active.id, finalSlug, ""));
         // …and its named-view membership (chats in views, 2026-08-03)
         const views = useViewsStore.getState();

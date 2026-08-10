@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exported copy plus a separate editable Markdown source. Created items are
   linked into Chat Work deterministically and can be opened to the right or
   brought back into the composer with **Use in chat**.
+- **A chat keeps one primary provider without closing off a second opinion.**
+  After a chat is saved, its model picker stays within that provider (for
+  example, Claude Opus to Sonnet). An explicit `@Claude`, `@GPT`, or `@Gemini`
+  mention can consult another configured provider for one attributed turn
+  without changing the chat's primary provider.
 
 ## [0.80.0] - 2026-08-08
 

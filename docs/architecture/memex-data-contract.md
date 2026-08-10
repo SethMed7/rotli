@@ -180,6 +180,20 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   chat** attaches images as vision inputs and references other work by its
   durable file/note identity; document reads traverse the same DOCX model the
   editor owns.
+- **A saved chat owns one primary provider family (2026-08-09).** A fresh chat
+  may begin with any available direct model; its first successful save pins the
+  user-facing provider family in the vault-scoped `chatProvider` settings map.
+  Later model changes are filtered and guarded to that family (Claude models,
+  GPT models, Gemini models across its configured transports, or one local
+  runtime). Hybrid routing presets are not primary Chat models because they do
+  not have one provider. Older chats infer the additive provider field from
+  their saved model when next opened. An explicit `@Claude`, `@GPT`, or
+  `@Gemini` tag may route only that turn to the first available model in a
+  configured second provider; the assistant text records the provider and
+  exact model attribution, and neither the primary provider nor primary model
+  setting changes. The consulted turn rides the ordinary host, retrieval,
+  egress, cancellation, artifact, and persistence boundaries; a secure chat
+  therefore cannot use a remote consultation to bypass its model gate.
 - File-format dependencies stay behind adapters and composition roots so a DOCX
   codec, document editor, workbook codec, or canvas engine can be swapped
   without changing creation commands or UI entry points.

@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 
+import type { PrimaryProvider } from "../ai/chatProvider";
 import type { HybridPreset, ProviderId } from "../ai/models";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "../ai/searchProvider";
 import { DEFAULT_NEW_ITEM_KIND, type NewItemKind } from "../newItems/model";
@@ -75,7 +76,7 @@ export function chatKey(instanceId: string | null, slug: string | null, paneId: 
 }
 
 /** Move a renamed chat's entries in every per-chat map to its new key — a
- * rename used to orphan the model pick, globe, and measure under the old slug
+ * rename used to orphan the model/provider pick, globe, and measure under the old slug
  * until the GC deleted them (audit 2026-08-03). */
 export function retargetChatMapKeys(oldKey: string, newKey: string): void {
   if (oldKey === newKey) return;
@@ -88,10 +89,12 @@ export function retargetChatMapKeys(oldKey: string, newKey: string): void {
     return next;
   };
   const chatModel = move(s.chatModel);
+  const chatProvider = move(s.chatProvider);
   const chatWeb = move(s.chatWeb);
   const chatMeasure = move(s.chatMeasure);
   useUiStore.setState({
     ...(chatModel ? { chatModel } : {}),
+    ...(chatProvider ? { chatProvider } : {}),
     ...(chatWeb ? { chatWeb } : {}),
     ...(chatMeasure ? { chatMeasure } : {}),
   });
@@ -412,6 +415,12 @@ interface UiState {
   chatModel: Record<string, string>;
   setChatModel: (key: string, id: string) => void;
   clearChatModel: (key: string) => void;
+  /** The provider family a SAVED chat starts with. First write wins: models may
+   * change inside this family, but a different provider requires a new chat.
+   * Keyed and persisted exactly like chatModel. */
+  chatProvider: Record<string, PrimaryProvider>;
+  setChatProvider: (key: string, provider: PrimaryProvider) => void;
+  clearChatProvider: (key: string) => void;
   /** Per-chat web-search toggle (the composer globe), keyed by chat slug. Off by
    * default; only an enabled chat may use the web_search/web_fetch tools. Persisted —
    * except the session-scoped "unsaved:<paneId>" keys: a not-yet-saved chat's choice
@@ -746,6 +755,15 @@ export const useUiStore = create<UiState>((set, get) => ({
       if (!(key in s.chatModel)) return s;
       const { [key]: _gone, ...rest } = s.chatModel;
       return { chatModel: rest };
+    }),
+  chatProvider: {},
+  setChatProvider: (key, provider) =>
+    set((s) => (key in s.chatProvider ? s : { chatProvider: { ...s.chatProvider, [key]: provider } })),
+  clearChatProvider: (key) =>
+    set((s) => {
+      if (!(key in s.chatProvider)) return s;
+      const { [key]: _gone, ...rest } = s.chatProvider;
+      return { chatProvider: rest };
     }),
   chatWeb: {},
   setChatWeb: (slug, on) => set((s) => ({ chatWeb: { ...s.chatWeb, [slug]: on } })),

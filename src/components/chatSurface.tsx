@@ -9,7 +9,8 @@
 // This component is driven by props { paneId, chatSlug } — chatSlug null = a fresh
 // unsent chat; the first send creates the file and BINDS the tab to its slug.
 //
-// Still Increment 1: one-shot (no streaming), no @-context yet.
+// Provider consultation is explicit: a saved chat keeps one primary provider,
+// while @Claude / @GPT / @Gemini routes only that tagged turn and attributes it.
 
 import { useQueries, useQuery } from "@tanstack/react-query";
 import {
@@ -26,9 +27,19 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import {
+  attributedConsultReply,
+  type ConsultProvider,
+  modelsForPrimaryProvider,
+  parseConsultMention,
+  type PrimaryProvider,
+  providerFamilyFor,
+  providerFamilyFromProvider,
+  providerFamilyLabel,
+  selectConsultModel,
+} from "../ai/chatProvider";
 import { modelIsOnDevice } from "../ai/guard";
 import { type CreatedChatArtifact, makeTauriHost } from "../ai/host";
-import { presetFor, runHybrid } from "../ai/hybrid";
 import { runAgent } from "../ai/loop";
 import {
   PROVIDER_IDS,
@@ -37,6 +48,7 @@ import {
   type ProviderId,
   flattenModels,
   mergedModels,
+  modelProvider,
 } from "../ai/models";
 import type { ChatTurn, RunInput } from "../ai/types";
 import { syncManagedChatMemory } from "../chatMemory/composition";
@@ -341,11 +353,15 @@ function ModelPicker({
   groups,
   picked,
   fallbackFrom,
+  primaryProvider,
+  consultProviders,
   onPick,
 }: {
   groups: ModelGroups;
   picked: ChatModelInfo | null;
   fallbackFrom?: string | null;
+  primaryProvider: PrimaryProvider | null;
+  consultProviders: readonly ConsultProvider[];
   onPick: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -534,6 +550,14 @@ function ModelPicker({
               visibility: box ? undefined : "hidden",
             }}
           >
+            {primaryProvider && (
+              <div className="chat-modelpop-notice">
+                This chat stays with <b>{providerFamilyLabel(primaryProvider)}</b>. Switch models here
+                {consultProviders.length > 0
+                  ? `; type ${consultProviders.map((provider) => `@${providerFamilyLabel(provider)}`).join(" or ")} to consult another provider for one turn.`
+                  : "."}
+              </div>
+            )}
             {fallbackFrom && (
               <div className="chat-modelpop-notice">
                 Saved model <b>{shortModelLabel(fallbackFrom)}</b> is unavailable. Using the fallback shown in
@@ -751,6 +775,9 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
   const chatModelMap = useUiStore((s) => s.chatModel);
   const setChatModel = useUiStore((s) => s.setChatModel);
   const clearChatModel = useUiStore((s) => s.clearChatModel);
+  const chatProviderMap = useUiStore((s) => s.chatProvider);
+  const setChatProvider = useUiStore((s) => s.setChatProvider);
+  const clearChatProvider = useUiStore((s) => s.clearChatProvider);
   const chatWeb = useUiStore((s) => s.chatWeb);
   const setChatWeb = useUiStore((s) => s.setChatWeb);
   const clearChatWeb = useUiStore((s) => s.clearChatWeb);
@@ -815,20 +842,35 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     (id, index) => !aiProviders[id] || providerChecks[index]?.isFetched,
   );
   const catalogSettled = models.isFetched && providerChecksSettled;
-  const allGroups = mergedModels(models.data ?? [], aiProviders, hybridPresets, blockedModels, providerReady);
+  const catalogGroups = mergedModels(models.data ?? [], aiProviders, [], blockedModels, providerReady);
   // A secure-note chat never offers a connected or routing model — and neither
   // does a loose chat whose history was fed by a secure-note read (the
   // secureContext taint, audit 2026-07-29 #7). The exact frontmatter is
   // rechecked on send as the authoritative backstop.
   const [secureContext, setSecureContext] = useState(false);
   const secureChat = secureAttachmentHint || secureContext;
-  const groups: ModelGroups = secureChat ? { ...allGroups, connected: [], presets: [] } : allGroups;
-  const modelList = flattenModels(groups);
+  const availableGroups: ModelGroups = secureChat
+    ? { ...catalogGroups, connected: [], presets: [] }
+    : catalogGroups;
+  const availableModels = flattenModels(availableGroups);
   // THIS chat's model — its own pick, or the new-chat seed until it has one.
   // Independent per chat (Seth, 2026-08-01): two chat panes side by side each
   // send to their own model, and picking in one never moves the other.
   const chatKeyId = chatKey(active?.id ?? null, chatSlug, paneId);
   const chatModelId = chatModelFor(chatModelMap, chatKeyId, chatModelSeed);
+  const inferredProvider = chatModelId
+    ? providerFamilyFromProvider(modelProvider(chatModelId, models.data ?? [], hybridPresets) ?? "")
+    : null;
+  const primaryProvider = chatProviderMap[chatKeyId] ?? (chatSlug ? inferredProvider : null);
+  const providerModels = primaryProvider
+    ? modelsForPrimaryProvider(availableModels, primaryProvider)
+    : availableModels;
+  const groups: ModelGroups = {
+    local: availableGroups.local.filter((model) => providerModels.includes(model)),
+    connected: availableGroups.connected.filter((model) => providerModels.includes(model)),
+    presets: [],
+  };
+  const modelList = flattenModels(groups);
   const savedPick = modelList.find((m) => m.id === chatModelId);
   const fallbackPick = modelList.find((m) => m.isDefault) ?? modelList[0] ?? null;
   // A persisted remote choice must not silently become the local default while
@@ -848,11 +890,28 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     setChatModel(chatKeyId, resolvedModelId);
   }, [catalogSettled, resolvedModelId, chatOwnsModel, chatKeyId, setChatModel]);
 
+  // Additive migration for chats saved before provider locking: infer the
+  // family from their durable model id. A legacy routing preset has no single
+  // provider, so it settles on the visible fallback instead.
+  useEffect(() => {
+    if (!chatSlug || !catalogSettled || chatProviderMap[chatKeyId]) return;
+    const provider = inferredProvider ?? (picked ? providerFamilyFor(picked) : null);
+    if (provider) setChatProvider(chatKeyId, provider);
+  }, [catalogSettled, chatKeyId, chatProviderMap, chatSlug, inferredProvider, picked, setChatProvider]);
+
   /** Pick a model FOR THIS CHAT, and seed the next new chat with it. */
   const pickModel = (id: string) => {
+    const candidate = availableModels.find((model) => model.id === id);
+    const provider = candidate ? providerFamilyFor(candidate) : null;
+    if (!candidate || !provider || (primaryProvider && provider !== primaryProvider)) return;
     setChatModel(chatKeyId, id);
     setChatModelSeed(id);
   };
+
+  const consultProviders = (["claude", "gpt", "gemini"] as const).filter(
+    (provider) =>
+      provider !== primaryProvider && availableModels.some((model) => providerFamilyFor(model) === provider),
+  );
 
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -1040,9 +1099,41 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     if (!picked) {
       setMessages((p) => [
         ...p,
-        { speaker: "rotli", text: "⚠ No on-device model is set up — add one in your memex AI store." },
+        {
+          speaker: "rotli",
+          text: primaryProvider
+            ? `⚠ This chat stays with ${providerFamilyLabel(primaryProvider)}, but no ${providerFamilyLabel(primaryProvider)} model is available. Re-enable that provider in Settings, or start a new chat for another provider.`
+            : "⚠ No chat model is set up — add an on-device model or connect a provider in Settings.",
+        },
       ]);
       return;
+    }
+    const typed = message.trim();
+    const consultation = parseConsultMention(typed);
+    if (consultation.kind === "error") {
+      setMessages((previous) => [...previous, { speaker: "rotli", text: `⚠ ${consultation.message}` }]);
+      return;
+    }
+    const turnPrimary = primaryProvider ?? providerFamilyFor(picked);
+    let turnModel = picked;
+    if (consultation.kind === "consult") {
+      if (!turnPrimary) {
+        setMessages((previous) => [
+          ...previous,
+          { speaker: "rotli", text: "⚠ Pick this chat’s primary provider before consulting another one." },
+        ]);
+        return;
+      }
+      const consultant = selectConsultModel(availableModels, consultation.provider, turnPrimary);
+      if (!consultant) {
+        const message =
+          consultation.provider === turnPrimary
+            ? `This chat already uses ${providerFamilyLabel(turnPrimary)}. Choose another ${providerFamilyLabel(turnPrimary)} model from the picker instead.`
+            : `${providerFamilyLabel(consultation.provider)} is not configured and available for consultation.`;
+        setMessages((previous) => [...previous, { speaker: "rotli", text: `⚠ ${message}` }]);
+        return;
+      }
+      turnModel = consultant;
     }
     let attachmentIsSecure = secureAttachmentHint;
     if (attachedNoteId) {
@@ -1063,7 +1154,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     }
     // the whole secure lineage: attached-secure, or the chat's own taint
     const attachedSecure = attachmentIsSecure || secureReadRef.current;
-    if (attachedSecure && !modelIsOnDevice(picked)) {
+    if (attachedSecure && !modelIsOnDevice(turnModel)) {
       setMessages((previous) => [
         ...previous,
         {
@@ -1073,7 +1164,6 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       ]);
       return;
     }
-    const typed = message.trim();
     const imgs = images;
     // An attachment becomes PART OF THE MESSAGE (Seth, 2026-08-04: "like a
     // #image one like claude does so we can reference it and talk about it").
@@ -1084,6 +1174,11 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       imgs.length > 0
         ? `${imgs.map((image, i) => attachmentReference(i + 1, image.id)).join(" ")}${typed ? `\n${typed}` : ""}`
         : typed;
+    const modelTyped = consultation.kind === "consult" ? consultation.prompt : typed;
+    const modelUserText =
+      imgs.length > 0
+        ? `${imgs.map((image, i) => attachmentReference(i + 1, image.id)).join(" ")}${modelTyped ? `\n${modelTyped}` : ""}`
+        : modelTyped;
     lastSentRef.current = { text: typed, images: imgs };
     setMessage("");
     setImages([]);
@@ -1163,6 +1258,12 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
         const pinnedModel = chatModelMap[webKey] ?? picked.id;
         setChatModel(savedKey, pinnedModel); // and the model this chat runs on
         clearChatModel(webKey);
+        const provider = providerFamilyFor(picked);
+        // A newly created file is a new chat identity even if a stale sidecar
+        // key survived an earlier deleted chat with the same slug.
+        clearChatProvider(savedKey);
+        if (provider) setChatProvider(savedKey, provider);
+        clearChatProvider(webKey);
         setTitle("");
       }
       sentPersisted = true;
@@ -1175,7 +1276,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
 
     const requestId = crypto.randomUUID();
     requestRef.current = requestId;
-    const model = { id: picked.id, api: picked.api };
+    const model = { id: turnModel.id, api: turnModel.api };
     // the image tool needs a pinned assets dir — a SAVED chat only (which a
     // just-sent fresh chat now is) — and its engine's lane enabled
     const image =
@@ -1185,7 +1286,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     const userName = useUiStore.getState().userName.trim();
     const runInput: RunInput = {
       history,
-      userText,
+      userText: modelUserText,
       web: attachedSecure ? false : globeOn,
       model,
       ...(attachedNoteId ? { noteId: attachedNoteId } : {}),
@@ -1198,9 +1299,6 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       ...(userName ? { userName } : {}),
     };
 
-    // a preset pick routes through the hybrid layer; everything else is the
-    // normal loop. Both yield the same event stream.
-    const preset = presetFor(picked.id, hybridPresets);
     // a secure-note read mid-run taints the chat immediately (UI + this
     // turn's persistence) and one-way — the marker lands on the chat file below
     const onSecureNoteRead = () => {
@@ -1225,9 +1323,7 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
       artifactRootId,
     };
     const hostOpts = image ? { ...baseOpts, image } : baseOpts;
-    const events = preset
-      ? runHybrid(preset, modelList, runInput, (m, o) => makeTauriHost(m, { ...hostOpts, ...o }), requestId)
-      : runAgent(makeTauriHost(picked, hostOpts), runInput);
+    const events = runAgent(makeTauriHost(turnModel, hostOpts), runInput);
 
     let reply = "";
     try {
@@ -1254,6 +1350,11 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
 
     const failed = reply.startsWith("⚠");
     if (!reply) reply = "(the model returned nothing)";
+    if (consultation.kind === "consult") {
+      reply = failed
+        ? `⚠ ${providerFamilyLabel(consultation.provider)} consultation failed — ${reply.replace(/^⚠\s*/, "")}`
+        : attributedConsultReply(turnModel, reply);
+    }
     if (createdArtifacts.length > 0) {
       const links = createdArtifacts.map((artifact) =>
         artifactReference(artifact.label, artifact.id, artifact.surfaceKind),
@@ -1351,6 +1452,10 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
         const pinnedModel = chatModelMap[webKey] ?? picked.id;
         setChatModel(savedKey, pinnedModel); // and the model this chat runs on
         clearChatModel(webKey);
+        const provider = providerFamilyFor(picked);
+        clearChatProvider(savedKey);
+        if (provider) setChatProvider(savedKey, provider);
+        clearChatProvider(webKey);
         setTitle("");
       }
       setSaveErr(null);
@@ -1888,11 +1993,22 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
                         groups={groups}
                         picked={picked ?? null}
                         fallbackFrom={fallbackFrom}
+                        primaryProvider={primaryProvider}
+                        consultProviders={consultProviders}
                         onPick={(id) => {
                           pickModel(id);
                           setVisionHint(false);
                         }}
                       />
+                    ) : primaryProvider ? (
+                      <button
+                        type="button"
+                        className="chat-model-trigger"
+                        title={`This chat stays with ${providerFamilyLabel(primaryProvider)}`}
+                        onClick={() => setSettingsOpen(true)}
+                      >
+                        {providerFamilyLabel(primaryProvider)} unavailable · Settings
+                      </button>
                     ) : null}
                     <button
                       type="button"
