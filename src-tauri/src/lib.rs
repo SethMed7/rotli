@@ -1261,20 +1261,47 @@ fn set_dock_visible(app: AppHandle, visible: bool) {
     let _ = (app, visible);
 }
 
+fn app_icon_bytes(variant: &str, development: bool) -> Option<&'static [u8]> {
+    if development {
+        return Some(include_bytes!("../icons/variants/clay.png"));
+    }
+    match variant {
+        "warm" => Some(include_bytes!("../icons/variants/warm.png")),
+        "paper" => Some(include_bytes!("../icons/variants/paper.png")),
+        "charcoal" => Some(include_bytes!("../icons/variants/charcoal.png")),
+        "clay" => Some(include_bytes!("../icons/variants/clay.png")),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod app_icon_tests {
+    use super::app_icon_bytes;
+
+    #[test]
+    fn development_always_uses_the_accent_backed_icon() {
+        let accent = app_icon_bytes("clay", false).unwrap();
+        assert_eq!(app_icon_bytes("default", true), Some(accent));
+        assert_eq!(app_icon_bytes("paper", true), Some(accent));
+    }
+
+    #[test]
+    fn production_keeps_the_user_icon_policy() {
+        assert!(app_icon_bytes("default", false).is_none());
+        assert!(app_icon_bytes("paper", false).is_some());
+    }
+}
+
 /// Swap the macOS Dock/app icon at runtime (Settings → Appearance → App icon).
-/// The variant PNGs are compiled in; "default" (or any unknown value) resets to
-/// the bundle icon. AppKit's setApplicationIconImage must run on the main thread.
+/// Development always keeps the accent-backed icon so it cannot be confused
+/// with production. Release builds retain the user's selected variant, while
+/// "default" (or an unknown value) resets to the bundle icon. AppKit's
+/// setApplicationIconImage must run on the main thread.
 #[tauri::command]
 fn set_app_icon(app: AppHandle, variant: String) {
     #[cfg(target_os = "macos")]
     {
-        let bytes: Option<Vec<u8>> = match variant.as_str() {
-            "warm" => Some(include_bytes!("../icons/variants/warm.png").to_vec()),
-            "paper" => Some(include_bytes!("../icons/variants/paper.png").to_vec()),
-            "charcoal" => Some(include_bytes!("../icons/variants/charcoal.png").to_vec()),
-            "clay" => Some(include_bytes!("../icons/variants/clay.png").to_vec()),
-            _ => None, // "default" → the bundle icon (nil clears the override)
-        };
+        let bytes = app_icon_bytes(&variant, cfg!(debug_assertions)).map(Vec::from);
         let _ = app.run_on_main_thread(move || {
             use objc2::{AllocAnyThread, MainThreadMarker};
             use objc2_app_kit::{NSApplication, NSImage};

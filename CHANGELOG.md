@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Development builds are unmistakable and consolidated.** The native development
+  command launches as **rotli (dev)** and always uses the accent-backed app icon,
+  while production keeps its existing name and user-selectable icon.
 - **Chat now keeps its working files beside the conversation.** A contextual
   Work rail lists attached images and generated chat assets; selecting one
   opens the user-owned file in a new pane to the right, while the rail collapses
