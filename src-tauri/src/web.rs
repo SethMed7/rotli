@@ -1,6 +1,6 @@
-//! Web tools for the agentic client — the on-device model's window to the public
-//! internet. The webview CSP only allows `ipc:`, so search + fetch run here in Rust
-//! (like chat.rs's model bridge). Provider = DuckDuckGo, no API key (Seth, 2026-06-29).
+//! Public-page fetch and safe OS link opening for the agentic client. Search
+//! provider adapters live in `web_search.rs`; every network path remains in
+//! Rust because the webview CSP allows only IPC.
 //!
 //! SECURITY — the secret-egress backstop. Before any outbound request we run
 //! `crate::secret::looks_secure` on the query / URL; a match aborts the call so a
@@ -23,55 +23,6 @@ use tauri::Url;
 const UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-/// One web search result the model sees.
-#[derive(serde::Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct WebResult {
-    pub title: String,
-    pub url: String,
-    pub snippet: String,
-}
-
-/// Web search via DuckDuckGo (no key). Returns up to `limit` results (default 5).
-/// The egress guard blocks a query that looks like it carries a secret.
-///
-/// ASYNC command (perf audit 2026-07-30, #3): a sync command runs on the MAIN
-/// thread, and this one holds up to two sequential 10s blocking fetches — the
-/// window froze for the duration, per agent tool call. The blocking work moves
-/// to a worker; every guard stays exactly where it was, inside the body.
-#[tauri::command]
-pub async fn web_search(query: String, limit: Option<usize>) -> Result<Vec<WebResult>, String> {
-    tauri::async_runtime::spawn_blocking(move || web_search_blocking(&query, limit))
-        .await
-        .map_err(|e| format!("web search worker failed ({e})"))?
-}
-
-fn web_search_blocking(query: &str, limit: Option<usize>) -> Result<Vec<WebResult>, String> {
-    let q = query.trim();
-    if q.is_empty() {
-        return Ok(vec![]);
-    }
-    if q.chars().count() > WEB_QUERY_MAX_CHARS {
-        return Err("blocked: that search query is far too long to be a search query.".into());
-    }
-    if crate::secret::blocked_for_remote(q) {
-        return Err(
-            "blocked: that query carries private content — not sending it to the web."
-                .into(),
-        );
-    }
-    let limit = limit.unwrap_or(5).clamp(1, 10);
-
-    // primary: the lite endpoint — stable flat markup, direct (un-wrapped) URLs.
-    let mut results = ddg_lite(q).map(|h| parse_lite(&h)).unwrap_or_default();
-    if results.is_empty() {
-        // fallback: the html endpoint — URLs arrive wrapped in a /l/?uddg= redirect.
-        results = ddg_html(q).map(|h| parse_html(&h)).unwrap_or_default();
-    }
-    results.truncate(limit);
-    Ok(results)
-}
-
 // ── hardened fetch path (SSRF) ────────────────────────────────────────────────
 //
 // Policy mirrors breve-runtime/scripts/safe-fetch.ts (MIRROR-NOT-IMPORT across
@@ -90,12 +41,6 @@ const WEB_FETCH_MAX_REDIRECTS: u32 = 3;
 /// stuff read-note prose into query params — so an over-long URL is refused
 /// outright (audit 2026-07). 2048 matches the classic interoperable limit.
 const WEB_FETCH_MAX_URL_CHARS: usize = 2048;
-/// The same reasoning for the SEARCH lane, which had no cap at all: a query is
-/// a channel with a fixed destination but no size limit, so an injected loop
-/// could ship an unbounded volume of note prose to the search engine in one
-/// call (audit 2026-08-01). A real query is words, not a document.
-const WEB_QUERY_MAX_CHARS: usize = 512;
-
 /// Private / loopback / link-local / ULA / CGNAT / unspecified — never connect.
 fn ip_is_private(ip: IpAddr) -> bool {
     match ip {
@@ -265,108 +210,6 @@ fn web_fetch_blocking(url: &str, max_chars: Option<usize>) -> Result<String, Str
     Ok(truncate_chars(&text, cap))
 }
 
-// ── DuckDuckGo fetchers (network) ─────────────────────────────────────────────
-
-fn ddg_lite(q: &str) -> Result<String, String> {
-    ureq::get("https://lite.duckduckgo.com/lite/")
-        .query("q", q)
-        .set("User-Agent", UA)
-        .set("Accept-Language", "en-US,en;q=0.9")
-        .timeout(Duration::from_secs(10))
-        .call()
-        .map_err(|e| format!("ddg lite ({e})"))?
-        .into_string()
-        .map_err(|e| e.to_string())
-}
-
-fn ddg_html(q: &str) -> Result<String, String> {
-    ureq::get("https://html.duckduckgo.com/html/")
-        .query("q", q)
-        .set("User-Agent", UA)
-        .set("Accept-Language", "en-US,en;q=0.9")
-        .timeout(Duration::from_secs(10))
-        .call()
-        .map_err(|e| format!("ddg html ({e})"))?
-        .into_string()
-        .map_err(|e| e.to_string())
-}
-
-// ── parsers (pure — unit-tested without network) ──────────────────────────────
-
-/// lite.duckduckgo.com markup: each result is an `<a class="result-link" href="…">`
-/// followed by a `<td class="result-snippet">`. URLs are direct (no redirect).
-fn parse_lite(html: &str) -> Vec<WebResult> {
-    let link_re = Regex::new(r#"(?is)<a\b([^>]*?)href=["']([^"']+)["']([^>]*?)>(.*?)</a>"#).unwrap();
-    let snip_re = Regex::new(r#"(?is)<td[^>]*class=["']result-snippet["'][^>]*>(.*?)</td>"#).unwrap();
-    let snippets: Vec<String> = snip_re.captures_iter(html).map(|c| clean_text(&c[1])).collect();
-    let mut out = Vec::new();
-    for c in link_re.captures_iter(html) {
-        let attrs = format!("{} {}", &c[1], &c[3]);
-        if !attrs.contains("result-link") {
-            continue;
-        }
-        let url = c[2].trim().to_string();
-        if !url.starts_with("http") {
-            continue;
-        }
-        let title = clean_text(&c[4]);
-        if title.is_empty() {
-            continue;
-        }
-        let i = out.len();
-        out.push(WebResult {
-            title,
-            url,
-            snippet: snippets.get(i).cloned().unwrap_or_default(),
-        });
-    }
-    out
-}
-
-/// html.duckduckgo.com markup: `<a class="result__a" href="//duckduckgo.com/l/?uddg=ENC&…">`
-/// (the real URL is percent-encoded in `uddg`), snippet in `class="result__snippet"`.
-fn parse_html(html: &str) -> Vec<WebResult> {
-    let link_re = Regex::new(r#"(?is)<a\b([^>]*?class=["']result__a["'][^>]*?)>(.*?)</a>"#).unwrap();
-    let href_re = Regex::new(r#"href=["']([^"']+)["']"#).unwrap();
-    let snip_re = Regex::new(r#"(?is)class=["']result__snippet["'][^>]*>(.*?)</a>"#).unwrap();
-    let snippets: Vec<String> = snip_re.captures_iter(html).map(|c| clean_text(&c[1])).collect();
-    let mut out = Vec::new();
-    for c in link_re.captures_iter(html) {
-        let href = href_re
-            .captures(&c[1])
-            .map(|m| m[1].to_string())
-            .unwrap_or_default();
-        let url = unwrap_ddg_redirect(&href);
-        if url.is_empty() {
-            continue;
-        }
-        let title = clean_text(&c[2]);
-        if title.is_empty() {
-            continue;
-        }
-        let i = out.len();
-        out.push(WebResult {
-            title,
-            url,
-            snippet: snippets.get(i).cloned().unwrap_or_default(),
-        });
-    }
-    out
-}
-
-/// Recover the real URL from DDG's `/l/?uddg=…` redirect wrapper (or fix a
-/// protocol-relative `//host/…`).
-fn unwrap_ddg_redirect(href: &str) -> String {
-    if let Some(idx) = href.find("uddg=") {
-        let enc = href[idx + 5..].split('&').next().unwrap_or("");
-        return percent_decode(enc);
-    }
-    if href.starts_with("//") {
-        return format!("https:{href}");
-    }
-    href.to_string()
-}
-
 // ── HTML → text ───────────────────────────────────────────────────────────────
 
 fn html_to_text(html: &str) -> String {
@@ -393,11 +236,6 @@ fn strip_tags(s: &str) -> String {
     RE.get_or_init(|| Regex::new(r"(?s)<[^>]+>").unwrap())
         .replace_all(s, "")
         .to_string()
-}
-
-fn clean_text(s: &str) -> String {
-    let decoded = decode_entities(&strip_tags(s));
-    decoded.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn collapse_ws(s: &str) -> String {
@@ -443,44 +281,6 @@ fn decode_entities(s: &str) -> String {
         .to_string();
     // &amp; last so "&amp;lt;" doesn't become "<"
     s.replace("&amp;", "&")
-}
-
-fn percent_decode(s: &str) -> String {
-    let bytes = s.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'%' if i + 2 < bytes.len() => match (hex_val(bytes[i + 1]), hex_val(bytes[i + 2])) {
-                (Some(h), Some(l)) => {
-                    out.push(h * 16 + l);
-                    i += 3;
-                }
-                _ => {
-                    out.push(bytes[i]);
-                    i += 1;
-                }
-            },
-            b'+' => {
-                out.push(b' ');
-                i += 1;
-            }
-            b => {
-                out.push(b);
-                i += 1;
-            }
-        }
-    }
-    String::from_utf8_lossy(&out).to_string()
-}
-
-fn hex_val(b: u8) -> Option<u8> {
-    match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        b'A'..=b'F' => Some(b - b'A' + 10),
-        _ => None,
-    }
 }
 
 fn truncate_chars(s: &str, max: usize) -> String {
@@ -548,48 +348,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn lite_parses_a_result() {
-        let html = r#"<table>
-          <tr><td><a rel="nofollow" href="https://www.rust-lang.org/" class="result-link">Rust Programming Language</a></td></tr>
-          <tr><td class="result-snippet">A language empowering everyone to build reliable software.</td></tr>
-        </table>"#;
-        let r = parse_lite(html);
-        assert_eq!(r.len(), 1);
-        assert_eq!(r[0].url, "https://www.rust-lang.org/");
-        assert_eq!(r[0].title, "Rust Programming Language");
-        assert!(r[0].snippet.contains("empowering"));
-    }
-
-    #[test]
-    fn html_unwraps_the_uddg_redirect() {
-        let html = r##"<a class="result__a" rel="nofollow" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fpage&amp;rut=abc">Example Page</a>
-          <a class="result__snippet" href="#">A short description here.</a>"##;
-        let r = parse_html(html);
-        assert_eq!(r.len(), 1);
-        assert_eq!(r[0].url, "https://example.com/page");
-        assert_eq!(r[0].title, "Example Page");
-        assert!(r[0].snippet.contains("description"));
-    }
-
-    #[test]
     fn html_to_text_strips_and_decodes() {
         let t = html_to_text("<p>Hello&nbsp;<b>world</b> &amp; friends</p><script>evil()</script>");
         assert!(t.contains("Hello world & friends"), "got: {t:?}");
         assert!(!t.contains("evil"));
-    }
-
-    #[test]
-    fn egress_guard_blocks_a_secret_query() {
-        // the blocking inner IS the command body (the async wrapper only moves
-        // it to a worker) — the guard is exercised where it lives
-        let r = web_search_blocking("here is my key sk-ant-api03-EXAMPLE0EXAMPLE0EXAM please search", None);
-        assert!(r.is_err());
-    }
-
-    #[test]
-    fn percent_decode_basics() {
-        assert_eq!(percent_decode("a%20b+c"), "a b c");
-        assert_eq!(percent_decode("https%3A%2F%2Fx.com"), "https://x.com");
     }
 
     // ── SSRF hardening — shared fixtures (scripts/fixtures/egress-fixtures.json) ──
@@ -717,16 +479,6 @@ mod tests {
         .is_err());
         // the scheme rule is unchanged and still comes first
         assert!(open_url("file:///etc/passwd".into()).is_err());
-    }
-
-    /// The search lane had a destination but no size limit, so an injected loop
-    /// could ship a document's worth of note prose to the engine in one call.
-    #[test]
-    fn over_long_search_queries_are_refused() {
-        let long = "lorem ".repeat(200);
-        assert!(long.chars().count() > WEB_QUERY_MAX_CHARS);
-        let err = web_search_blocking(&long, Some(5)).unwrap_err();
-        assert!(err.contains("too long"), "{err}");
     }
 
     #[test]

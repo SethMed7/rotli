@@ -194,6 +194,13 @@ describe("parseSettings — the AI Models keys (Seth, 2026-07-02)", () => {
     expect(s.imageEngine).toBe("codex");
     expect(s.chatNoteOpen).toBe("tab");
     expect(s.chatMeasure).toEqual({});
+    expect(s.webSearchProvider).toBe("duckduckgo");
+  });
+
+  test("keeps the selected web-search provider and rejects unknown destinations", () => {
+    expect(parseSettings('{"webSearchProvider":"brave"}').webSearchProvider).toBe("brave");
+    expect(parseSettings('{"webSearchProvider":"google"}').webSearchProvider).toBe("duckduckgo");
+    expect(parseSettings('{"webSearchProvider":42}').webSearchProvider).toBe("duckduckgo");
   });
 
   test("round-trips enabled lanes; unknown lanes and non-booleans are ignored", () => {

@@ -5,6 +5,7 @@ import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+import type { WebSearchProvider } from "../ai/searchProvider";
 import { DEFAULT_BREVE_PDF_THEME } from "../brand/brevePdfThemes";
 import type { SearchHit } from "../types";
 
@@ -602,6 +603,7 @@ export function generateImage(args: {
 /** Keychain account for the Gemini API key — one of keychain.rs's ALLOWED
  * names (parity.json keychainAllowedAccounts). */
 export const SECRET_GEMINI_API_KEY = "gemini-api-key";
+export const SECRET_BRAVE_SEARCH_API_KEY = "brave-search-api-key";
 
 /** Keychain-backed secrets (Rust allowlists the names; a stored value never
  * crosses IPC back — only exists/absent does). */
@@ -617,14 +619,16 @@ export function secretDelete(name: string): Promise<void> {
 
 /** One web search result the model sees. */
 export interface WebResult {
+  provider: WebSearchProvider;
   title: string;
   url: string;
   snippet: string;
 }
 
-/** Web search via DuckDuckGo (no key). Rejects a query that trips the secret guard. */
-export function webSearch(query: string, limit?: number): Promise<WebResult[]> {
-  return aiInvoke("web_search", { query, limit });
+/** Search through the explicitly selected provider. Rust revalidates the
+ * provider, guards the query, and reads any credential from Keychain. */
+export function webSearch(provider: WebSearchProvider, query: string, limit?: number): Promise<WebResult[]> {
+  return aiInvoke("web_search", { provider, query, limit });
 }
 
 /** Fetch a page and return readable text (HTML stripped, capped by `maxChars`). */

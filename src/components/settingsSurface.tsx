@@ -1,12 +1,12 @@
 // Settings — the r1 frame F window grammar: left nav (Hotkeys · Appearance ·
-// Storage · Plugins) + one surface. Esc closes back to notes (the registry's
+// Storage · Connections) + one surface. Esc closes back to notes (the registry's
 // app.hide chain). Storage shows the corpus story with the future default path
 // ~/Documents/rotli; "Later" cards are quiet and non-interactive. Hotkeys is
 // the rebind list: click a chord, press the next combo (a quiet inline note if
 // the chord is taken).
 
 import { useQuery } from "@tanstack/react-query";
-import { type KeyboardEvent, useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { makeTauriHost } from "../ai/host";
 import { suggestPresets } from "../ai/hybrid";
@@ -26,6 +26,7 @@ import {
   nameFromRepo,
   scanVerdict,
 } from "../ai/models";
+import { WEB_SEARCH_PROVIDERS, webSearchProviderInfo } from "../ai/searchProvider";
 import { verifyLane } from "../ai/verify";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
@@ -59,7 +60,9 @@ import {
   organizerRunOnce,
   organizerSetBrain,
   organizerSetTrust,
+  openUrl,
   revealCorpus,
+  SECRET_BRAVE_SEARCH_API_KEY,
   SECRET_GEMINI_API_KEY,
   secretDelete,
   secretExists,
@@ -101,10 +104,10 @@ import {
   CheckGlyph,
   CloudGlyph,
   DatabaseGlyph,
+  ExternalLinkGlyph,
   KeyboardGlyph,
   LaptopGlyph,
   NotesStackGlyph,
-  PlusGlyph,
   ShieldGlyph,
   SunGlyph,
 } from "./glyphs";
@@ -117,7 +120,7 @@ type SettingsPane =
   | "security"
   | "models"
   | "location"
-  | "plugins";
+  | "connections";
 
 const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = [
   { id: "general", label: "General", glyph: LaptopGlyph },
@@ -135,7 +138,7 @@ const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = 
   // notes folder *is* (or can become) a brain — one concept, not two overlapping
   // ones. See LocationPane below.
   { id: "location", label: "Location", glyph: DatabaseGlyph },
-  { id: "plugins", label: "Plugins", glyph: PlusGlyph },
+  { id: "connections", label: "Connections", glyph: ExternalLinkGlyph },
 ];
 
 /** A settings pane heading with its quokka character accent (Seth, 2026-06-26) —
@@ -1902,6 +1905,201 @@ function GeminiKeyRow({ onSaved }: { onSaved?: () => void }) {
   );
 }
 
+const BRAVE_KEY_HELP_URL = "https://api-dashboard.search.brave.com/documentation/guides/authentication";
+
+/** Brave's saved value is write-only from the webview: the row probes only
+ * present/absent, and an update starts from a blank uncontrolled password
+ * field so an existing credential never enters React state. */
+function BraveKeyRow() {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [hasInput, setHasInput] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; err: boolean } | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const saved = useQuery({
+    queryKey: ["secret", SECRET_BRAVE_SEARCH_API_KEY],
+    queryFn: () => secretExists(SECRET_BRAVE_SEARCH_API_KEY),
+    enabled: isTauri(),
+  });
+  const refresh = () =>
+    void queryClient.invalidateQueries({ queryKey: ["secret", SECRET_BRAVE_SEARCH_API_KEY] });
+  const save = () => {
+    const value = inputRef.current?.value.trim() ?? "";
+    if (!value || busy) return;
+    setNote(null);
+    setBusy(true);
+    secretStore(SECRET_BRAVE_SEARCH_API_KEY, value)
+      .then(() => {
+        if (inputRef.current) inputRef.current.value = "";
+        setHasInput(false);
+        setConfirmRemove(false);
+        setNote({ text: "Key saved to the macOS Keychain.", err: false });
+        refresh();
+      })
+      .catch((error) => setNote({ text: error instanceof Error ? error.message : String(error), err: true }))
+      .finally(() => setBusy(false));
+  };
+
+  const status = !isTauri()
+    ? "Available in the Mac app"
+    : busy
+      ? "Updating Keychain…"
+      : saved.isPending
+        ? "Checking Keychain…"
+        : saved.isError
+          ? "Couldn’t check Keychain"
+          : saved.data
+            ? "Key saved"
+            : "Key missing";
+
+  return (
+    <div className="websearch-key">
+      <div className="websearch-keyhead">
+        <span className="websearch-keylabel">Brave API key</span>
+        <span className={saved.isError ? "ailane-chip err" : saved.data ? "ailane-chip ok" : "ailane-chip"}>
+          {status}
+        </span>
+      </div>
+      <div className="aikey">
+        <input
+          ref={inputRef}
+          type="password"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          className="aikey-input"
+          aria-label="Brave Search API key"
+          placeholder={saved.data ? "Paste a new key to replace the saved key" : "Brave Search API key…"}
+          disabled={!isTauri() || saved.isPending || busy}
+          onInput={(event) => setHasInput(event.currentTarget.value.trim().length > 0)}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.key === "Enter" && hasInput) save();
+          }}
+        />
+        <button
+          type="button"
+          className="ghostbtn primary"
+          disabled={!isTauri() || !hasInput || busy}
+          onClick={save}
+        >
+          {busy ? "Saving…" : saved.data ? "Update key" : "Save key"}
+        </button>
+      </div>
+      <div className="websearch-actions">
+        <button type="button" className="ailane-helptoggle" onClick={() => void openUrl(BRAVE_KEY_HELP_URL)}>
+          How to get a Brave Search API key ↗
+        </button>
+        {saved.data && !confirmRemove && (
+          <button
+            type="button"
+            className="ghostbtn quiet"
+            disabled={busy}
+            onClick={() => setConfirmRemove(true)}
+          >
+            Remove saved key…
+          </button>
+        )}
+        {saved.data && confirmRemove && (
+          <>
+            <span className="websearch-remove-label">Remove the saved key?</span>
+            <button
+              type="button"
+              className="ghostbtn danger"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                secretDelete(SECRET_BRAVE_SEARCH_API_KEY)
+                  .then(() => {
+                    setConfirmRemove(false);
+                    setNote({ text: "Key removed from the Keychain.", err: false });
+                    refresh();
+                  })
+                  .catch((error) =>
+                    setNote({ text: error instanceof Error ? error.message : String(error), err: true }),
+                  )
+                  .finally(() => setBusy(false));
+              }}
+            >
+              Remove key
+            </button>
+            <button
+              type="button"
+              className="ghostbtn"
+              disabled={busy}
+              onClick={() => setConfirmRemove(false)}
+            >
+              Cancel
+            </button>
+          </>
+        )}
+      </div>
+      <p className="setnote websearch-keynote">
+        Rotli never displays a saved key. Brave&rsquo;s current plans and account limits are set by Brave;
+        check its dashboard for the terms that apply to you.
+      </p>
+      {note && (
+        <p
+          className={note.err ? "setnote err websearch-keynote" : "setnote websearch-keynote"}
+          aria-live="polite"
+        >
+          {note.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function WebResearchSection() {
+  const provider = useUiStore((state) => state.webSearchProvider);
+  const setProvider = useUiStore((state) => state.setWebSearchProvider);
+  const selected = webSearchProviderInfo(provider);
+
+  return (
+    <section className="aisection">
+      <h4 className="set-subhead">Web research</h4>
+      <p className="setnote">
+        The globe still controls internet access for each chat. This setting chooses where every globe-enabled
+        search in this vault goes; switching providers changes that network destination.
+      </p>
+      <fieldset className="websearch-options">
+        <legend className="websearch-legend">Search provider</legend>
+        {WEB_SEARCH_PROVIDERS.map((option) => (
+          <label
+            className={option.id === provider ? "websearch-option selected" : "websearch-option"}
+            key={option.id}
+          >
+            <input
+              type="radio"
+              name="web-search-provider"
+              value={option.id}
+              checked={option.id === provider}
+              onChange={() => setProvider(option.id)}
+            />
+            <span className="websearch-optioncopy">
+              <span className="websearch-optionname">{option.label}</span>
+              <span className="websearch-optiondetail">{option.detail}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      {selected.needsKey && <BraveKeyRow />}
+      <p className="setnote websearch-privacy">
+        Search queries go directly from this Mac to <b>{selected.label}</b>. Rotli also reads selected public
+        result pages directly so the model can answer from evidence. The provider and sites receive ordinary
+        network request information; their own privacy and retention terms apply. Rotli never ships a shared
+        search key and never changes providers after a failure.
+      </p>
+      {!selected.needsKey && (
+        <p className="setnote websearch-availability">
+          DuckDuckGo needs no account or setup, but its unofficial HTML result pages can change or become
+          temporarily unavailable. Rotli reports that failure instead of pretending there were no results.
+        </p>
+      )}
+    </section>
+  );
+}
+
 /** One preset's editor — plain controlled fields over a draft copy. */
 function PresetEditor({
   draft,
@@ -2376,7 +2574,7 @@ function SecurityPane() {
   );
 }
 
-function PluginsPane() {
+function ConnectionsPane() {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     void navigator.clipboard?.writeText(CLAUDE_DOCS_COMMAND).then(() => {
@@ -2386,24 +2584,35 @@ function PluginsPane() {
   };
   return (
     <>
-      <PaneHead title="Plugins" char="chat" />
-      <p className="lead">Plugins extend rotli over the same corpus.</p>
+      <PaneHead title="Connections" char="chat" />
+      <p className="lead">
+        Choose the outside services rotli can contact. Connections stay explicit, use your own accounts when
+        required, and never change destinations after a failure.
+      </p>
+
+      <WebResearchSection />
 
       {/* Use rotli for your docs — a prompt you paste into Claude Code so a
           project's docs live in rotli, not the repo (Seth, 2026-07-07). */}
-      <div className="claudecmd">
-        <div className="claudecmd-head">
-          <h4>Use rotli for your docs</h4>
-          <button type="button" className="claudecmd-copy" onClick={copy}>
-            {copied ? "Copied" : "Copy"}
-          </button>
-        </div>
-        <p className="plugdesc">
-          Paste this into Claude Code in any project and your planning + docs land in rotli instead of the
-          repo — everything but the README.
+      <section className="aisection">
+        <h4 className="set-subhead">Extensions</h4>
+        <p className="setnote">
+          Extend rotli&rsquo;s corpus workflows without giving another service ownership of your notes.
         </p>
-        <pre className="claudecmd-block">{CLAUDE_DOCS_COMMAND}</pre>
-      </div>
+        <div className="claudecmd">
+          <div className="claudecmd-head">
+            <h4>Use rotli for your docs</h4>
+            <button type="button" className="claudecmd-copy" onClick={copy} aria-live="polite">
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <p className="plugdesc">
+            Paste this into Claude Code in any project and your planning + docs land in rotli instead of the
+            repo — everything but the README.
+          </p>
+          <pre className="claudecmd-block">{CLAUDE_DOCS_COMMAND}</pre>
+        </div>
+      </section>
     </>
   );
 }
@@ -2456,7 +2665,7 @@ export function SettingsSurface() {
           {pane === "security" && <SecurityPane />}
           {pane === "models" && <ModelsPane />}
           {pane === "location" && <LocationPane />}
-          {pane === "plugins" && <PluginsPane />}
+          {pane === "connections" && <ConnectionsPane />}
         </div>
       </div>
     </div>

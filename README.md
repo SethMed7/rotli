@@ -80,7 +80,7 @@ handwriting-first notebook experience. See [ROADMAP.md](ROADMAP.md).
 - **Panes & tabs** — split with `⌘D` / `⌘⇧D`, tabs with `⌘T`; one tab means zero tab chrome. Everything drag-resizable, everything remembered.
 - **`⌘K`** — every note and action in one palette, recents first.
 - **Quick capture (`⌥C`)** — from anywhere on your Mac: one breath, type, `⏎` — the thought lands in Captures and the AI files it later.
-- **Chat that knows your notes** — on-device by default; connect the subscription CLIs you already use; attach images; flip the globe for a web lookup.
+- **Chat that knows your notes** — on-device by default; connect the subscription CLIs you already use; attach images; flip the globe for a web lookup. DuckDuckGo works without setup, or choose Brave Search API with your own Keychain-stored key in **Settings → Connections → Web research**.
 - **Autosave** — a quiet olive dot. No spinners, ever.
 - **Every hotkey rebindable** — one searchable registry in Settings.
 

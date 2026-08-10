@@ -20,6 +20,13 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   names an inherited active view in its own front and offers a one-click return
   to Main/all chats, so a Notes-side view change never becomes an invisible
   filter. A chat created while a view is active joins it.
+- **Web-search destination is an explicit vault setting.**
+  `.rotli/settings.json` stores only `webSearchProvider` (`duckduckgo` by
+  default, or `brave`); it never stores an API key. The per-chat globe remains
+  the consent bit for whether that chat may use the network and is not a
+  provider selector. Brave credentials live under Rotli's allowlisted macOS
+  Keychain account, while search execution and provider failure policy remain
+  application/adapter concerns outside the memex.
 - A Markdown note may belong to one named view. Rotli synchronizes the exact
   view name into managed `view_tag` metadata on assignment, rename, deletion,
   UI, CLI, and MCP writes. View names are unique case-insensitively and use

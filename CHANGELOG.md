@@ -64,6 +64,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Choose where globe-enabled web research goes.** DuckDuckGo remains the free,
+  no-account default; Brave Search API is now an optional bring-your-own-key
+  provider whose credential stays in the macOS Keychain. The new Connections
+  settings section names the direct network destination and never reveals a
+  saved key.
+- **Local answers now read evidence before making current claims.** A bounded
+  research tool searches once, reads the top public pages, supplies numbered
+  sources, and validates citations. Missing, conflicting, malicious, or
+  unavailable evidence now steers the model toward uncertainty instead of a
+  confident answer from memory.
 - **First run now feels like part of the app.** The character accompanies every
   setup screen with short state-based motion, numbered choices keep their number
   beside the label, arrow keys select cards, and the live `⌘Enter` shortcut sits
@@ -75,6 +85,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Local web research now follows an evidence-first reasoning order.** Gemma
+  carries a bounded private checkpoint from source inventory through exact fact
+  extraction, reconciliation, citation mapping, and answer-or-abstain. Citation
+  cleanup and date/time/timezone pairing checks catch unsupported combinations
+  without adding an unconditional model call. Explicit source routing keeps
+  unanchored public specifications, trials, transactions, benchmarks, and
+  missions out of personal-note search. If a weak local model still chooses a
+  note search for an unmistakably public question, Rotli corrects it locally
+  without executing the note search or automatically sending a web request.
+- **Web-search failures are no longer disguised as empty results.** DuckDuckGo
+  now distinguishes no results, connection/timeout/HTTP failures, challenges,
+  and changed markup; Brave distinguishes missing or rejected keys, quota/rate
+  limits, network failures, and malformed responses. Rotli never silently
+  retries through a different provider.
 - **Skipping setup no longer chooses a notes location.** It applies the calm
   Paper/Charcoal system defaults and continues to an explicit Create or Open
   Vault screen. Fresh installs no longer silently create `~/Documents/rotli`.

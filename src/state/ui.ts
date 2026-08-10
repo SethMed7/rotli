@@ -3,6 +3,7 @@
 import { create } from "zustand";
 
 import type { HybridPreset, ProviderId } from "../ai/models";
+import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "../ai/searchProvider";
 import { DEFAULT_NEW_ITEM_KIND, type NewItemKind } from "../newItems/model";
 import { inboxFolderId } from "../services/notes";
 import type { NoteSummary } from "../types";
@@ -451,6 +452,10 @@ interface UiState {
   /** Connected subscription models (Settings → AI Models): which lanes are
    * enabled. A lane must ALSO detect as installed+authed to serve. Persisted. */
   aiProviders: Record<ProviderId, boolean>;
+  /** The vault's one web-search destination. The chat globe remains the
+   * per-chat consent switch and never changes this provider. */
+  webSearchProvider: WebSearchProvider;
+  setWebSearchProvider: (provider: WebSearchProvider) => void;
   setAiProvider: (id: ProviderId, on: boolean) => void;
   /** Hybrid model presets (organizer → routes → fallback). Persisted. */
   hybridPresets: HybridPreset[];
@@ -770,6 +775,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setTaskCycle: (v) => set({ taskCycle: v }),
   aiProviders: { claude: false, codex: false, agy: false, gemini: false },
   setAiProvider: (id, on) => set((s) => ({ aiProviders: { ...s.aiProviders, [id]: on } })),
+  webSearchProvider: DEFAULT_WEB_SEARCH_PROVIDER,
+  setWebSearchProvider: (provider) => set({ webSearchProvider: provider }),
   hybridPresets: [],
   setHybridPresets: (list) => set({ hybridPresets: list }),
   blockedModels: [],

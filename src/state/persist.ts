@@ -18,6 +18,7 @@
 // in-memory demo corpus stays exactly as it was (the seam's whole point).
 
 import { type HybridPreset, PROVIDER_IDS, type ProviderId } from "../ai/models";
+import { parseWebSearchProvider, type WebSearchProvider } from "../ai/searchProvider";
 import { useBindingsStore } from "../keys/bindings";
 import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
@@ -232,6 +233,8 @@ interface PersistedSettings {
   /** Connected subscription lanes (Settings → AI Models); all off by default —
    * a chat never leaves the Mac without the user flipping a lane on. */
   aiProviders: Record<ProviderId, boolean>;
+  /** Search destination for every globe-enabled chat in this vault. */
+  webSearchProvider: WebSearchProvider;
   /** Hybrid model presets (organizer → routes → fallback). */
   hybridPresets: HybridPreset[];
   /** Connected models turned off inside an enabled lane (picker-hidden). */
@@ -483,6 +486,7 @@ export function parseSettings(raw: string): PersistedSettings {
       }
       return out;
     })(),
+    webSearchProvider: parseWebSearchProvider(data.webSearchProvider),
     hybridPresets: parseHybridPresets(data.hybridPresets),
     blockedModels: Array.isArray(data.blockedModels)
       ? data.blockedModels.filter((x): x is string => typeof x === "string")
@@ -600,6 +604,7 @@ function applySettings(s: PersistedSettings): void {
     readAloudVoice: s.readAloudVoice,
     taskCycle: s.taskCycle,
     aiProviders: s.aiProviders,
+    webSearchProvider: s.webSearchProvider,
     hybridPresets: s.hybridPresets,
     blockedModels: s.blockedModels,
     imageEngine: s.imageEngine,
@@ -1095,6 +1100,7 @@ function settingsSnapshot(): string {
     readAloudVoice: ui.readAloudVoice,
     taskCycle: ui.taskCycle,
     aiProviders: ui.aiProviders,
+    webSearchProvider: ui.webSearchProvider,
     hybridPresets: ui.hybridPresets,
     blockedModels: ui.blockedModels,
     imageEngine: ui.imageEngine,

@@ -12,12 +12,16 @@ describe("statusFor — enriched, safe live labels", () => {
   test("bare tool (no args) keeps the generic label", () => {
     expect(statusFor("search_notes")).toBe("searching your notes…");
     expect(statusFor("web_search")).toBe("searching the web…");
+    expect(statusFor("research_web")).toBe("researching the web…");
     expect(statusFor("read_note")).toBe("reading a note…");
   });
 
   test("a query is woven into the search label", () => {
     expect(statusFor("search_notes", { query: "camino" })).toBe("searching your notes for “camino”…");
     expect(statusFor("web_search", { query: "frontier ai" })).toBe("searching the web for “frontier ai”…");
+    expect(statusFor("research_web", { query: "frontier ai" })).toBe(
+      "researching the web for “frontier ai”…",
+    );
     expect(statusFor("search_memory", { query: "decisions" })).toBe("searching your memory for “decisions”…");
   });
 

@@ -18,7 +18,12 @@ import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { DOCUMENT_CONVERTIBLE_EXTS } from "../documents/kinds";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
-import { type FrontmatterView, type MemexPerms, SECRET_GEMINI_API_KEY } from "./tauri";
+import {
+  type FrontmatterView,
+  type MemexPerms,
+  SECRET_BRAVE_SEARCH_API_KEY,
+  SECRET_GEMINI_API_KEY,
+} from "./tauri";
 
 const entries = fixture.entries;
 
@@ -64,7 +69,11 @@ describe("parity.json ↔ TS constants", () => {
   });
 
   test("keychainAllowedAccounts", () => {
-    expect(entries.keychainAllowedAccounts.value).toEqual([SECRET_GEMINI_API_KEY, ROTLI_RESEND_ACCOUNT]);
+    expect(entries.keychainAllowedAccounts.value).toEqual([
+      SECRET_GEMINI_API_KEY,
+      SECRET_BRAVE_SEARCH_API_KEY,
+      ROTLI_RESEND_ACCOUNT,
+    ]);
   });
 
   test("cliBinCandidates", () => {

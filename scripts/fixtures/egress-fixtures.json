@@ -3,6 +3,18 @@
   "byteCap": 2000000,
   "maxRedirectHops": 3,
   "maxUrlChars": 2048,
+  "searchProviders": [
+    {
+      "provider": "duckduckgo",
+      "default": true,
+      "endpoints": ["https://lite.duckduckgo.com/lite/", "https://html.duckduckgo.com/html/"]
+    },
+    {
+      "provider": "brave",
+      "default": false,
+      "endpoints": ["https://api.search.brave.com/res/v1/web/search"]
+    }
+  ],
   "ips": [
     { "ip": "10.0.0.1", "private": true, "why": "10/8" },
     { "ip": "10.255.255.254", "private": true, "why": "10/8 upper edge" },

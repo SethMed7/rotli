@@ -4,6 +4,16 @@
 
 import type { Parsed, ToolName } from "./types";
 
+const THOUGHT_MAX_CHARS = 800;
+
+/** Keep reasoning as a concise private checkpoint, not an unbounded transcript.
+ * The field remains optional so older/frontier models that omit it still work. */
+function parsedThought(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const thought = value.trim().slice(0, THOUGHT_MAX_CHARS);
+  return thought || undefined;
+}
+
 /** Pull the first balanced JSON object out of a model reply — tolerating a leading
  * ```json fence and prose around it. Returns null if there's no object. */
 export function extractJsonObject(s: string): string | null {
@@ -48,15 +58,16 @@ export function parseAction(raw: string, allowed: ReadonlySet<ToolName>): Parsed
     return { kind: "invalid", reason: "not a JSON object" };
   }
   const obj = data as Record<string, unknown>;
+  const thought = parsedThought(obj.thought);
   if (typeof obj.final === "string") {
-    return { kind: "final", text: obj.final };
+    return { kind: "final", text: obj.final, ...(thought ? { thought } : {}) };
   }
   if (typeof obj.tool === "string") {
     const tool = obj.tool as ToolName;
     if (!allowed.has(tool)) return { kind: "invalid", reason: `unknown tool "${obj.tool}"` };
     const args =
       obj.args !== null && typeof obj.args === "object" ? (obj.args as Record<string, unknown>) : {};
-    return { kind: "call", tool, args };
+    return { kind: "call", tool, args, ...(thought ? { thought } : {}) };
   }
   return { kind: "invalid", reason: 'reply had neither a known "tool" nor a "final"' };
 }

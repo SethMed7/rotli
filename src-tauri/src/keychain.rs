@@ -18,8 +18,13 @@ pub(crate) const SERVICE: &str = "rotli";
 /// The only secret names the webview may address — every literal site in the
 /// crate imports these (parity.json keychainAllowedAccounts).
 pub(crate) const GEMINI_API_KEY_ACCOUNT: &str = "gemini-api-key";
+pub(crate) const BRAVE_SEARCH_API_KEY_ACCOUNT: &str = "brave-search-api-key";
 pub(crate) const BREVE_RESEND_ACCOUNT: &str = "breve-resend-api-key";
-pub(crate) const ALLOWED: &[&str] = &[GEMINI_API_KEY_ACCOUNT, BREVE_RESEND_ACCOUNT];
+pub(crate) const ALLOWED: &[&str] = &[
+    GEMINI_API_KEY_ACCOUNT,
+    BRAVE_SEARCH_API_KEY_ACCOUNT,
+    BREVE_RESEND_ACCOUNT,
+];
 
 /// errSecItemNotFound — deleting a secret that isn't there is not an error.
 const NOT_FOUND: i32 = -25300;
@@ -37,8 +42,8 @@ fn allow(name: &str) -> Result<(), String> {
     }
 }
 
-/// Crate-internal read — the transport that needs the key (chat.rs) calls this;
-/// the webview never sees the value.
+/// Crate-internal read — the transport that needs a key calls this; the
+/// webview never sees the value.
 pub(crate) fn get_secret(name: &str) -> Option<String> {
     if cfg!(debug_assertions) {
         return dev_secrets().lock().ok().and_then(|values| values.get(name).cloned());
@@ -115,9 +120,21 @@ mod tests {
 
     #[test]
     fn unknown_names_are_refused() {
-        assert!(allow("gemini-api-key").is_ok());
-        assert!(allow("breve-resend-api-key").is_ok());
+        assert!(allow(GEMINI_API_KEY_ACCOUNT).is_ok());
+        assert!(allow(BRAVE_SEARCH_API_KEY_ACCOUNT).is_ok());
+        assert!(allow(BREVE_RESEND_ACCOUNT).is_ok());
         assert!(allow("com.apple.anything").is_err());
         assert!(allow("").is_err());
+    }
+
+    #[test]
+    fn brave_webview_lane_can_probe_but_never_read_the_saved_value() {
+        // Debug tests use DEV_SECRETS, never the developer's live Keychain.
+        store_secret(BRAVE_SEARCH_API_KEY_ACCOUNT, "fixture-brave-key").unwrap();
+        assert!(secret_exists(BRAVE_SEARCH_API_KEY_ACCOUNT.to_string()).unwrap());
+        delete_secret(BRAVE_SEARCH_API_KEY_ACCOUNT).unwrap();
+        assert!(!secret_exists(BRAVE_SEARCH_API_KEY_ACCOUNT.to_string()).unwrap());
+        // There is intentionally no Tauri `secret_get` command. Only the
+        // crate-internal search adapter may call get_secret.
     }
 }

@@ -32,6 +32,7 @@ mod routines;
 mod search_index;
 mod secret;
 mod web;
+mod web_search;
 mod workspace;
 
 use std::sync::{Condvar, Mutex};
@@ -1549,7 +1550,7 @@ pub fn run() {
             organizer::organizer_learn_field,
             organizer::organizer_secure_hints,
             organizer::organizer_dismiss_secure,
-            web::web_search,
+            web_search::web_search,
             web::web_fetch,
             web::open_url,
             corpus::corpus_create_folder,

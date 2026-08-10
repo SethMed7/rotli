@@ -101,7 +101,7 @@ way a compromised loop would.
 
 | # | Path | Verdict | Enforced by |
 |---|---|---|---|
-| 7 | `web_search` — query to DuckDuckGo | **GAP → FIXED** | gate upgraded to `blocked_for_remote`; and the query had **no length cap** at all, so an injected loop could ship a document's worth of prose in one call — now capped at 512 chars |
+| 7 | `web_search` — query to the explicitly selected DuckDuckGo or Brave adapter | **GAP → FIXED** | gate upgraded to `blocked_for_remote`; the query is capped at 512 chars; destinations are literal and redirect-free. Provider choice is per vault, the globe remains per-chat consent, Brave authentication is Keychain-only in Rust, and failures never fall through to a different provider |
 | 8 | `web_fetch` — URL to any public host | **GAP → FIXED** | gate upgraded. SSRF containment (scheme, private-IP, same-host redirects, byte + 2048-char URL caps) was already solid and is untouched |
 | 9 | `open_url` — URL to the OS browser | **GAP → FIXED** | had **no content gate whatsoever**. `url_openable` bounds the SCHEME, which stops an arbitrary app launch, but nothing bounded the payload. The webview can `invoke` it directly, so the agent loop's own `EGRESS_TOOLS` list never applied to it. It now asks the same question every other outbound lane asks |
 

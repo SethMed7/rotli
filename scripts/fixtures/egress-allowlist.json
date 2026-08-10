@@ -13,14 +13,17 @@
     ],
     "httpClient": "ureq",
     "ureqFiles": {
-      "web.rs": "web_search (DuckDuckGo lite/html — query only, secret-scanned) + web_fetch (arbitrary public web via the vetted_resolve SSRF-blocked agent, same-host redirects, byte+URL caps)",
+      "web_search.rs": "provider-dispatched search to literal DuckDuckGo lite/html or api.search.brave.com; query is secret/private-prose scanned and capped, redirects/body size/time are bounded, Brave auth comes from Keychain",
+      "web.rs": "web_fetch (arbitrary public web via the vetted_resolve SSRF-blocked agent, same-host redirects, byte+URL caps)",
       "chat.rs": "the on-device / Gemini model bridge — endpoint_permitted clamps the destination to registered loopback model servers or the pinned Gemini base; egress_allowed refuses secret-shaped transcripts to non-local endpoints",
       "breve.rs": "breve_test_email — Resend send to the literal https://api.resend.com/emails host, Keychain Bearer, configured recipients only"
     },
     "gatedEgressSites": {
       "_comment": "Every Rust function that puts CALLER-SUPPLIED text on a network — a model transport, a CLI provider, or a web lane — must ask crate::secret::blocked_for_remote (the marker scan + the secure-prose ledger). Adding an outbound lane without the gate is the class the 2026-08-01 audit found three times: open_url had no content gate at all, the organizer's remote lane had none, and web_search had no size bound. check-security.mjs asserts each function below still calls the gate.",
+      "src-tauri/src/web_search.rs": [
+        "web_search_blocking"
+      ],
       "src-tauri/src/web.rs": [
-        "web_search_blocking",
         "web_fetch_blocking",
         "open_url"
       ],
@@ -60,9 +63,10 @@
     }
   },
   "keychain": {
-    "_comment": "The two allowlisted account names may appear ONLY at their named-constant declaration sites + the parity fixture + tests. Any other literal occurrence (a hand-typed 'gemini-api-key' at a call site) fails the check — callers must import the constant.",
+    "_comment": "The allowlisted account names may appear ONLY at their named-constant declaration sites + the parity fixture + tests. Any other literal occurrence fails the check — callers must import the constant.",
     "accounts": [
       "gemini-api-key",
+      "brave-search-api-key",
       "breve-resend-api-key"
     ],
     "constantSites": [
@@ -94,6 +98,7 @@
     "_comment": "Heuristic (documented limits in docs/development/security.md): flags a println!/eprintln!/console.log in an egress-adjacent file whose argument names a body/secret/prompt/transcript variable. It catches the obvious regression (logging a note body next to a network call); it CANNOT prove the absence of a leak — a renamed variable or an interpolated helper slips it. It is a tripwire, not a proof.",
     "egressAdjacentFiles": [
       "src-tauri/src/web.rs",
+      "src-tauri/src/web_search.rs",
       "src-tauri/src/chat.rs",
       "src-tauri/src/provider.rs",
       "src-tauri/src/breve.rs",

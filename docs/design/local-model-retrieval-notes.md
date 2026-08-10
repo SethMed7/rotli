@@ -11,6 +11,85 @@ All numbers in this memo describe an anonymized production-shaped vault
 contents in examples are invented stand-ins with the same *shape* as the real
 failures.
 
+## 2026-08-07 implementation note — bounded web research
+
+The local adapter now sees one `research_web` capability rather than being
+asked to plan low-level search and fetch itself. One model-selected call runs
+the chosen provider, deterministically reads at most the first three results,
+and returns bounded page evidence with provider, title, URL, excerpt, and exact
+`S1`/`S2` source identifiers. A final grounded answer must cite supplied ids;
+missing or invented ids get a conditional correction step. Search/provider
+failure or absent readable evidence instructs abstention instead of recall.
+Frontier adapters retain `web_search` and `web_fetch` primitives.
+
+This does not add an unconditional model generation: a successful local web
+turn remains one tool-selection generation plus one final generation. The
+fixture eval now scores grounded facts, citation-to-source validity,
+conflicting/absent evidence, and malicious webpage instructions, in addition
+to whether a web tool was called. All search and page observations are frozen;
+the eval never needs external network access.
+
+## 2026-08-08 implementation note — ordered reasoning and semantic grounding
+
+Gemma 3 is reasoning-capable, but the installed Gemma 3 chat template does not
+offer a native thinking-mode switch. Rotli therefore makes the useful research
+order explicit in the existing agent turn instead of adding a server flag or a
+model call: inventory the supplied sources, extract exact facts, reconcile
+conflicts and date/time/timezone pairings, build a claim-to-source ledger, then
+answer only supported claims. If useful evidence is absent, the final step must
+abstain.
+
+The loop now carries each parsed `thought` forward as a short private reasoning
+checkpoint. It is capped, included in the scratch budget, defused before it
+re-enters the prompt, and never emitted as an `AgentEvent` or persisted as chat
+content. Each checkpoint also records the remaining-step count at the time it
+was made so the scratch remains append-only and prompt-cache safe.
+
+Citation validation now normalizes grouped source ids to the supported
+`[S1][S2]` form and applies one deliberately narrow semantic check without
+another generation: a cited date/time/timezone tuple must occur together in a
+cited source. This catches the observed DART failure where individually present
+tokens were recombined into the wrong calendar date. It is not a general
+entailment checker; unsupported non-temporal synthesis remains a model-quality
+risk. The frozen eval includes the midnight/timezone case and allows a third
+model call only when the deterministic validator found a defect.
+
+The follow-up ten-question Gemma audit covers direct attribution, temporal
+pairings, units and qualifiers, two-source synthesis, negation, transaction
+attribution, arithmetic comparison, absent evidence, conflicting evidence, and
+malicious page instructions. Its first run mechanically scored 5/10: four real
+failures all routed bare public entities into plausible memex folders, while a
+fifth answer correctly said a date was disputed/withdrawn but fell outside the
+scorer's uncertainty vocabulary. Source routing is now explicit: personal
+anchors select the memex, while unanchored product specifications, trials,
+regulatory status, public transactions, benchmarks, missions, and reports select
+`research_web`. The corrected audit produced ten accurate, source-valid outputs
+(six direct two-generation answers and four conditional three-generation
+citation repairs; mean 2.4 generations). No case adds an unconditional model
+call.
+
+An alternate-phrasing sweep now runs the same ten claim contracts against the
+same frozen evidence without duplicating scorers. Its first mechanical result
+was 6/10: one answer was accurate but exceeded the old call ceiling, while
+Atlas, Solace, and Northstar exposed two real robustness failures—public facts
+misrouted to note search, and malformed JSON caused by unescaped quotation marks
+inside `thought`. Prompt guidance alone had already failed these variants, so a
+pure application policy now classifies only unmistakable provenance cues. A
+personal anchor or attached note always selects the memex; explicit public
+specification, trial, regulatory, transaction, benchmark, and launch language
+can locally reject a mistaken note-search choice and tell Gemma to choose
+`research_web`. Ambiguous names remain model-routed, and the policy never
+dispatches a provider itself.
+
+The corrected full paraphrase sweep produced ten accurate outputs. Nine scored
+immediately; the tenth correctly used “Eastern Time” and “Pacific Time” but
+exposed an abbreviation-only temporal scorer. Evidence validation now
+canonicalizes full Eastern/Pacific zone names while still rejecting the wrong
+zone family. The targeted proof then passed that variant in two generations.
+Accuracy and efficiency are reported separately: a grounded recovery is not
+declared factually wrong solely because it needed an additional conditional
+step.
+
 ## 1. What a real vault looks like (and why it breaks fixture assumptions)
 
 The fixture vault in `eval-local-chat.ts` has 8 notes, one area each, and one

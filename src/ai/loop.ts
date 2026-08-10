@@ -12,9 +12,16 @@ import { budgetFor } from "./budget";
 import { containsPrivateDataOverlap, looksSecret } from "./guard";
 import { extractJsonObject, parseAction } from "./parse";
 import { adapterFor, trimHistory } from "./prompt";
+import { localSourceRoute } from "./sourceRouting";
 import { type FinalExtractor, makeFinalExtractor } from "./stream";
 import { pruneScratch, runTool, statusFor } from "./tools";
 import type { AgentEvent, CompleteReq, Host, RunInput, ScratchStep, ToolName } from "./types";
+import {
+  normalizeWebCitations,
+  renumberResearchEvidence,
+  researchEvidenceRecords,
+  webGroundingIssue,
+} from "./webEvidence";
 
 const NOTE_TOOLS: ToolName[] = [
   "search_memory",
@@ -26,7 +33,13 @@ const NOTE_TOOLS: ToolName[] = [
   "open_note",
   "read_file",
 ];
-const WEB_TOOLS: ToolName[] = ["web_search", "web_fetch"];
+const NOTE_SEARCH_TOOLS: ToolName[] = ["search_memory", "search_notes"];
+const WEB_PRIMITIVE_TOOLS: ToolName[] = ["web_search", "web_fetch"];
+const WEB_RESEARCH_TOOLS: ToolName[] = ["research_web"];
+// Kept literal because check:security statically proves every off-device
+// ToolName is classified here; the strategy-specific arrays above control
+// which subset a model sees.
+const WEB_TOOLS: ToolName[] = ["web_search", "web_fetch", "research_web"];
 const IMAGE_TOOLS: ToolName[] = ["generate_image"];
 // local mermaid→Excalidraw conversion — a creation tool, never egress
 const BOARD_TOOLS: ToolName[] = ["draw_board"];
@@ -68,9 +81,14 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
   // models). The hybrid layer opts out (input.stream === false) so an inner
   // leg's tokens don't surface as the turn's answer.
   const useStream = input.stream !== false;
+  const enabledWebTools = adapter.webStrategy === "research" ? WEB_RESEARCH_TOOLS : WEB_PRIMITIVE_TOOLS;
+  const sourceRoute =
+    input.web && adapter.webStrategy === "research"
+      ? localSourceRoute(input.userText, input.noteId !== undefined)
+      : "ambiguous";
   const allowed: ReadonlySet<ToolName> = new Set<ToolName>([
     ...NOTE_TOOLS,
-    ...(input.web ? WEB_TOOLS : []),
+    ...(input.web ? enabledWebTools : []),
     ...(input.imageTool ? IMAGE_TOOLS : []),
     ...(input.boardTool ? BOARD_TOOLS : []),
   ]);
@@ -104,6 +122,9 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     });
   }
   let consecutiveBad = 0;
+  let researchAttempted = false;
+  let nextWebSourceNumber = 1;
+  const webEvidence = new Map<string, string>();
 
   for (let step = 1; step <= maxSteps; step++) {
     yield { type: "status", text: step === 1 ? "thinking…" : `thinking… (step ${step})` };
@@ -132,7 +153,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       const gen = generate(
         host,
         { messages: [message], formatJson: adapter.wantsFormatJson },
-        useStream,
+        useStream && !researchAttempted,
         false,
       );
       const out = yield* gen;
@@ -155,7 +176,20 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     const parsed = parseAction(raw, allowed);
 
     if (parsed.kind === "final") {
-      yield { type: "final", text: parsed.text };
+      const finalText = normalizeWebCitations(parsed.text);
+      const groundingIssue = webGroundingIssue(finalText, webEvidence);
+      if (groundingIssue) {
+        consecutiveBad += 1;
+        scratch.push({
+          action: "final answer citation check",
+          ...(parsed.thought ? { thought: parsed.thought } : {}),
+          result: `error: ${groundingIssue} Revise the final answer using only the supplied evidence. Do not call research_web again; the evidence is already available.`,
+          remainingSteps: Math.max(0, maxSteps - step),
+        });
+        if (consecutiveBad >= 2) break;
+        continue;
+      }
+      yield { type: "final", text: finalText };
       return;
     }
 
@@ -164,10 +198,15 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       // an INVALID reply (e.g. naming a tool that's off for this chat) gets its
       // PRECISE reason back so the model fixes the right thing; only a truly
       // UNPARSEABLE reply gets the JSON-shape nudge (Seth, 2026-06-30 — audit).
-      const result =
+      const baseResult =
         parsed.kind === "invalid"
           ? `error: ${parsed.reason}. Reply with ONE JSON object: {"tool":…,"args":…} or {"final":"…"}.`
           : 'error: your reply was not one valid JSON object. Reply with exactly one: {"tool":…,"args":…} or {"final":"…"}.';
+      const routeHint =
+        sourceRoute === "external" && !researchAttempted
+          ? ' This is a public/external fact question: call research_web next, not a note tool. Keep JSON strings valid; omit quotation marks inside "thought" rather than leaving them unescaped.'
+          : "";
+      const result = `${baseResult}${routeHint}`;
       scratch.push({ action: raw.slice(0, 160), result });
       if (consecutiveBad >= 2) break; // confused model → stop burning steps, force a final
       continue;
@@ -184,6 +223,22 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
         result: "(already requested above — use that result, or give your final answer)",
       });
       if (consecutiveBad >= 2) break; // looping → force a final
+      continue;
+    }
+
+    // A weak local model can ignore prompt-level provenance routing and treat
+    // a bare public entity as one of the user's projects. Do not execute that
+    // mistaken note search: return a local correction and let the model choose
+    // research_web itself. This never auto-egresses; personal and ambiguous
+    // questions remain fully model-routed.
+    if (sourceRoute === "external" && !researchAttempted && NOTE_SEARCH_TOOLS.includes(parsed.tool)) {
+      scratch.push({
+        action: sig,
+        ...(parsed.thought ? { thought: parsed.thought } : {}),
+        result:
+          "routing correction: this asks for public/external facts, so note search was not run. Call research_web next and answer only from its evidence.",
+        remainingSteps: Math.max(0, maxSteps - step),
+      });
       continue;
     }
 
@@ -223,12 +278,30 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     } catch (e) {
       result = `error: ${errMsg(e, "tool failed")}`;
     }
-    scratch.push({ action: sig, result });
+    if (parsed.tool === "research_web") {
+      researchAttempted = true;
+      const numbered = renumberResearchEvidence(result, nextWebSourceNumber);
+      result = numbered.observation;
+      nextWebSourceNumber = numbered.nextNumber;
+      for (const source of researchEvidenceRecords(result)) webEvidence.set(source.sourceId, source.text);
+    }
+    scratch.push({
+      action: sig,
+      ...(parsed.thought ? { thought: parsed.thought } : {}),
+      result,
+      remainingSteps: Math.max(0, maxSteps - step),
+    });
   }
 
   // step budget spent (or two strikes) → force a final answer from what we have.
   yield { type: "status", text: "wrapping up…" };
-  const forced = yield* forceFinal(host, input, pruneScratch(scratch, budget.maxScratchChars), useStream);
+  const forced = yield* forceFinal(
+    host,
+    input,
+    pruneScratch(scratch, budget.maxScratchChars),
+    useStream && !researchAttempted,
+    webEvidence,
+  );
   yield { type: "final", text: forced };
 }
 
@@ -240,6 +313,7 @@ async function* forceFinal(
   input: RunInput,
   scratch: ScratchStep[],
   useStream: boolean,
+  webEvidence: ReadonlyMap<string, string>,
 ): AsyncGenerator<AgentEvent, string, void> {
   const prompt = adapterFor(input.model).renderForceFinal({
     history: input.history,
@@ -250,22 +324,30 @@ async function* forceFinal(
   try {
     const out = yield* generate(host, { messages: [{ role: "user", content: prompt }] }, useStream, true);
     if (out.extractor && out.extractor.mode === "final") {
-      return out.extractor.finalText.trim() || "I couldn't find enough to answer that confidently.";
+      return groundForcedFinal(out.extractor.finalText, webEvidence);
     }
     const raw = out.raw;
     const obj = extractJsonObject(raw);
     if (obj !== null) {
       try {
         const d = JSON.parse(obj) as { final?: unknown };
-        if (typeof d.final === "string") return d.final;
+        if (typeof d.final === "string") return groundForcedFinal(d.final, webEvidence);
       } catch {
         // fall through to raw prose
       }
     }
-    return raw.trim() || "I couldn't find enough to answer that confidently.";
+    return groundForcedFinal(raw, webEvidence);
   } catch (e) {
     return `⚠ ${errMsg(e, "couldn't reach the model")}`;
   }
+}
+
+function groundForcedFinal(answer: string, webEvidence: ReadonlyMap<string, string>): string {
+  const text = normalizeWebCitations(answer.trim());
+  if (!text) return "I couldn't find enough to answer that confidently.";
+  return webGroundingIssue(text, webEvidence)
+    ? "I couldn't verify a fully grounded answer from the available web evidence."
+    : text;
 }
 
 /** The set of locally-retrieved PRIVATE text the overlap guard protects: the

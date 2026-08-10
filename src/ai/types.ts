@@ -7,6 +7,7 @@
 // so the whole module lifts into the shared ~/.memex/ai client layer later.
 
 import type { ModelMeta } from "./budget";
+import type { WebSearchProvider } from "./searchProvider";
 
 export type ToolName =
   | "search_notes"
@@ -17,6 +18,7 @@ export type ToolName =
   | "search_memory"
   | "read_memory"
   | "read_file"
+  | "research_web"
   | "web_search"
   | "web_fetch"
   | "generate_image"
@@ -44,9 +46,19 @@ export interface MemoryHit {
 
 /** A web result surfaced by web_search. */
 export interface WebHit {
+  provider: WebSearchProvider;
   title: string;
   url: string;
   snippet: string;
+}
+
+export interface WebEvidenceSource {
+  sourceId: string;
+  provider: WebSearchProvider;
+  title: string;
+  url: string;
+  searchExcerpt: string;
+  evidence: string;
 }
 
 /** A prior conversation turn (the user-visible thread, not the scratchpad). */
@@ -110,8 +122,8 @@ export interface Host {
 
 /** The classified result of a model step. */
 export type Parsed =
-  | { kind: "call"; tool: ToolName; args: Record<string, unknown> }
-  | { kind: "final"; text: string }
+  | { kind: "call"; tool: ToolName; args: Record<string, unknown>; thought?: string }
+  | { kind: "final"; text: string; thought?: string }
   | { kind: "invalid"; reason: string }
   | { kind: "unparseable"; raw: string };
 
@@ -119,7 +131,12 @@ export type Parsed =
 export interface ScratchStep {
   /** A stable signature of the action (drives the duplicate guard) or the raw reply. */
   action: string;
+  /** Bounded, model-authored reasoning checkpoint. It is private working
+   * memory: defused before re-entry and never emitted as an AgentEvent. */
+  thought?: string;
   result: string;
+  /** Snapshot written when the step completes; never recomputed later. */
+  remainingSteps?: number;
 }
 
 /** What the loop yields as it runs. A `delta` carries the next slice of the

@@ -52,9 +52,10 @@
       "value": "rotli"
     },
     "keychainAllowedAccounts": {
-      "sourceOfTruth": "src-tauri/src/keychain.rs ALLOWED ↔ src/lib/tauri.ts SECRET_GEMINI_API_KEY + breve-runtime/scripts/keychain-names.ts ROTLI_RESEND_ACCOUNT",
+      "sourceOfTruth": "src-tauri/src/keychain.rs ALLOWED ↔ src/lib/tauri.ts SECRET_GEMINI_API_KEY + SECRET_BRAVE_SEARCH_API_KEY + breve-runtime/scripts/keychain-names.ts ROTLI_RESEND_ACCOUNT",
       "value": [
         "gemini-api-key",
+        "brave-search-api-key",
         "breve-resend-api-key"
       ]
     },

@@ -813,6 +813,16 @@ endless plausible tinkering.
 rather than answer better. Watch for falling mean steps accompanied by falling verdicts — that is
 the wrong kind of cheaper.
 
+**2026-08-08 web-research slice.** The carry-forward mechanics above are now
+implemented: thoughts are parsed, capped, scratch-budgeted, defused on re-entry,
+and paired with an append-only remaining-step snapshot. Gemma's web prompt also
+names a five-stage evidence workflow (inventory, exact extraction,
+reconciliation, claim ledger, grounded answer/abstention). A deterministic
+date/time/timezone-pairing check conditionally requests correction; the normal
+path still uses two generations. This validates the observed web-grounding
+failure class, not the broader vault-retrieval verdict threshold in this PR's
+kill criterion; that wider claim still requires the full sweep.
+
 ---
 
 ## Privacy and security invariants

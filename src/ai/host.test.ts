@@ -19,6 +19,7 @@ import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import * as realTauri from "../lib/tauri";
 import type { ChatModelInfo, CorpusNoteMeta, FrontmatterView } from "../lib/tauri";
 import type { SearchHit } from "../types";
+import type { WebSearchProvider } from "./searchProvider";
 import type { Host } from "./types";
 
 const LOCAL: ChatModelInfo = {
@@ -56,6 +57,7 @@ let rows: Row[] = [];
 /** Set by the test when the batched permission probe should blow up. */
 let probeThrows = false;
 const writes: { id: string; body: string; modelId: string }[] = [];
+const webRequests: Array<{ provider: WebSearchProvider; query: string; limit: number }> = [];
 
 const meta = (row: Row): CorpusNoteMeta => ({
   id: row.id,
@@ -153,6 +155,10 @@ void mock.module("../lib/tauri", () => ({
     row.body = body;
     return meta(row);
   },
+  webSearch: async (provider: WebSearchProvider, query: string, limit: number) => {
+    webRequests.push({ provider, query, limit });
+    return [{ provider, title: "Result", url: "https://example.com", snippet: "evidence" }];
+  },
 }));
 
 afterAll(() => {
@@ -171,6 +177,7 @@ function updateVia(host: Host, id: string, body: string): Promise<string> {
 beforeEach(() => {
   probeThrows = false;
   writes.length = 0;
+  webRequests.length = 0;
   rows = [
     { id: "n-open", title: "Kelpie plan", body: "an ordinary kelpie note", folderId: "Inbox" },
     {
@@ -196,6 +203,17 @@ beforeEach(() => {
       reference: true,
     },
   ];
+});
+
+describe("web search provider composition", () => {
+  test("uses DuckDuckGo by default and forwards an explicit Brave selection", async () => {
+    await makeTauriHost(LOCAL).webSearch("default destination", 4);
+    await makeTauriHost(LOCAL, { webSearchProvider: "brave" }).webSearch("chosen destination", 2);
+    expect(webRequests).toEqual([
+      { provider: "duckduckgo", query: "default destination", limit: 4 },
+      { provider: "brave", query: "chosen destination", limit: 2 },
+    ]);
+  });
 });
 
 describe("SECURE is a visibility control against remote", () => {

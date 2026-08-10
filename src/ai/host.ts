@@ -36,6 +36,7 @@ import { workbookToCsv } from "../sheets/view";
 import { usePanesStore } from "../state/panes";
 import { contextWindowFor } from "./budget";
 import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
+import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "./searchProvider";
 import { channelStream } from "./stream";
 import {
   folderHits,
@@ -118,6 +119,9 @@ export function makeTauriHost(
      * model creates in that state is stamped `secure: true`, so a same-run
      * create_note can't launder secure prose into an open note (PR #4 P1). */
     isSecureContext?: () => boolean;
+    /** One vault-level destination. The per-chat globe decides whether this
+     * capability is offered at all; it never selects the provider. */
+    webSearchProvider?: WebSearchProvider;
   },
 ): Host {
   const host: Host = {
@@ -384,7 +388,7 @@ export function makeTauriHost(
       return text;
     },
     webSearch(query, limit) {
-      return tauriWebSearch(query, limit);
+      return tauriWebSearch(opts?.webSearchProvider ?? DEFAULT_WEB_SEARCH_PROVIDER, query, limit);
     },
     webFetch(url, maxChars) {
       return tauriWebFetch(url, maxChars);

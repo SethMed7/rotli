@@ -1256,7 +1256,8 @@ export function ChatSurface({ paneId, chatSlug }: { paneId: string; chatSlug: st
     // live view of the taint, so a create_note AFTER a secure read in the
     // same run already sees the secure context (PR #4 P1)
     const isSecureContext = () => secureReadRef.current || attachedSecure;
-    const baseOpts = { requestId, onSecureNoteRead, isSecureContext };
+    const webSearchProvider = useUiStore.getState().webSearchProvider;
+    const baseOpts = { requestId, onSecureNoteRead, isSecureContext, webSearchProvider };
     const hostOpts = image ? { ...baseOpts, image } : baseOpts;
     const events = preset
       ? runHybrid(preset, modelList, runInput, (m, o) => makeTauriHost(m, { ...hostOpts, ...o }), requestId)

@@ -59,7 +59,7 @@ from every diagnostics path. Full record: egress threat model O7, design in
 | Path | Destination | Data | Guard |
 |---|---|---|---|
 | `web_fetch` | arbitrary public web | model-chosen URL text | secret scan + `vetted_resolve` IP-pinned SSRF block + same-host redirects + 2 MB / 2048-char caps (fixtures) |
-| `web_search` | duckduckgo.com only | query | `protected_for_remote` secret scan |
+| `web_search` | selected literal provider: `lite.duckduckgo.com` / `html.duckduckgo.com`, or `api.search.brave.com` | query | per-chat globe consent + per-vault provider selection + `blocked_for_remote` secret/private-prose scan + 512-char cap + redirect/body/time caps; Brave credential is read from Keychain in Rust at request time |
 | `chat_messages` | registered loopback model server **or** the pinned Gemini base | conversation transcript + images | `endpoint_permitted` destination clamp + `egress_allowed` secret-shaped refusal to non-local endpoints; local llama.cpp Bearer never rides to a remote base |
 | `generate_image` | OpenAI/Google via codex/agy CLI | model-authored prompt | `protected_for_remote`; prompt framed as DATA to the nested agent |
 | CLI lanes (claude/codex/agy) | Anthropic/OpenAI/Google | transcript | binary+model allowlist (parity-pinned), tool-less/sandboxed argv, secret scan |
@@ -76,6 +76,16 @@ from every diagnostics path. Full record: egress threat model O7, design in
 The full inventory — every ureq / fetch / network-CLI call site with its
 destination class and guard — is tracked in
 [`../../scripts/fixtures/egress-allowlist.json`](../../scripts/fixtures/egress-allowlist.json).
+Search endpoints are also parity-pinned in
+[`../../scripts/fixtures/egress-fixtures.json`](../../scripts/fixtures/egress-fixtures.json).
+The globe is internet consent for one chat; it does not choose a destination.
+The selected provider is a vault setting, and a provider failure is returned as
+that provider's failure. Rotli never retries through another provider because
+that would silently change the egress destination. DuckDuckGo is the free,
+unconfigured default and uses unofficial HTML pages whose availability may
+vary. Brave is optional BYOK: Rotli sends the request directly from the Mac,
+reads the key from the macOS Keychain only inside Rust, and never ships a shared
+key or returns a saved value through IPC.
 
 The workspace MCP server itself performs no network request, but a connected
 Claude or Codex process may be remote. It therefore treats every agent as remote:
@@ -87,6 +97,21 @@ do not disclose a count of withheld secure notes. `rotli agent doctor` forces a
 read-only store, while `rotli agent self-test` uses only a temporary memex.
 Every returned note/board value is labeled untrusted data: it cannot authorize a
 tool call or count as mutation confirmation.
+
+Local-model reasoning checkpoints are ephemeral loop scratch, not durable
+memory: Rotli caps and budgets them, defuses them before prompt re-entry, and
+does not emit them as UI events or save them in chat notes. Fetched webpage
+results remain explicitly fenced as untrusted data. Carrying a checkpoint does
+not widen egress permissions; every later web argument still passes the same
+secret/private-prose guards immediately before dispatch.
+
+Local source routing also never initiates egress. For an unmistakably public
+fact question it may refuse to execute a weak model's mistaken note-search call
+and return a local correction asking the model to choose `research_web`.
+Personal anchors and attached notes win; ambiguous bare names remain
+model-routed instead of being sent outward. The globe, selected destination,
+secret scan, and private-prose overlap guard still apply after the model makes
+that explicit web-tool call.
 
 Markdown SVG fences are also untrusted content. The editor parses them as XML
 and rebuilds a fresh, allowlisted SVG subtree; source nodes are never adopted
@@ -106,7 +131,7 @@ runs in the `lint` chain (`bun run check:security` to run it alone). It enforces
   `src-tauri/Cargo.toml`. It also pins that the agent loop's `EGRESS_TOOLS` set
   covers every non-local `ToolName`, so a future off-device tool can't ride past
   the secret guard.
-- **(b) Keychain literals.** The two allowlisted account names may appear only at
+- **(b) Keychain literals.** The three allowlisted account names may appear only at
   their named-constant declaration sites — a hand-typed literal at a call site
   fails; callers import the constant.
 - **(c) Platform snapshot.** `tauri.conf.json`'s `csp`, `devCsp`,
@@ -122,7 +147,8 @@ Adjacent, pre-existing guards this layer builds on (run by `bun run check`):
 `check:secret-parity` (guard.ts ↔ secret.rs detector parity), `check:parity`
 (endpoint-locality + shared constants), `check:breve-contract`,
 `check:structure`, and the fixture-driven egress tests on both stacks
-(`src-tauri/src/web.rs` `#[cfg(test)]` + `breve-runtime/tests/test-safe-fetch-fixtures.ts`
+(`src-tauri/src/web.rs` / `src-tauri/src/web_search.rs` `#[cfg(test)]` +
+`breve-runtime/tests/test-safe-fetch-fixtures.ts`
 against [`../../scripts/fixtures/egress-fixtures.json`](../../scripts/fixtures/egress-fixtures.json)).
 
 ## Adding a network call (procedure)

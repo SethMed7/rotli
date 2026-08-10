@@ -6,7 +6,7 @@
 import type { CorpusNoteMeta } from "../lib/tauri";
 export { buildIndex } from "../memex/modelMap";
 import type { Budget } from "./budget";
-import type { Host, NoteHit, ScratchStep, ToolName } from "./types";
+import type { Host, NoteHit, ScratchStep, ToolName, WebEvidenceSource } from "./types";
 
 export function truncate(s: string, max: number): string {
   return s.length <= max ? s : `${s.slice(0, max)}…`;
@@ -173,11 +173,17 @@ export function isAreaIndex(title: string, folder: string): boolean {
  * Oldest results are trimmed first — the most recent (most relevant) stay intact. */
 export function pruneScratch(scratch: ScratchStep[], maxChars: number): ScratchStep[] {
   let total = 0;
-  for (const e of scratch) total += e.result.length;
+  for (const e of scratch) total += e.action.length + (e.thought?.length ?? 0) + e.result.length;
   if (total <= maxChars) return scratch;
-  const out = scratch.map((e) => ({ action: e.action, result: e.result }));
+  const out = scratch.map((e) => ({ ...e }));
   for (let i = 0; i < out.length && total > maxChars; i++) {
     const cur = out[i]!;
+    if (cur.thought && cur.thought.length > 80) {
+      const over = total - maxChars;
+      const keep = Math.max(60, cur.thought.length - over);
+      total -= cur.thought.length - keep;
+      cur.thought = `${cur.thought.slice(0, keep)}…(trimmed)`;
+    }
     if (cur.result.length > 60) {
       const over = total - maxChars;
       const keep = Math.max(40, cur.result.length - over);
@@ -216,6 +222,8 @@ export function statusFor(tool: ToolName, args?: Record<string, unknown>): strin
     }
     case "web_search":
       return q ? `searching the web for “${q}”…` : "searching the web…";
+    case "research_web":
+      return q ? `researching the web for “${q}”…` : "researching the web…";
     case "web_fetch": {
       const host = args ? webHost(argText(args.url)) : "";
       return host ? `reading ${host}…` : "reading a web page…";
@@ -410,12 +418,59 @@ export async function runTool(
       if (q === "") return 'error: web_search needs a "query".';
       const hits = await host.webSearch(q, budget.maxHits);
       if (hits.length === 0) return "no web results.";
-      const trimmed = hits.map((h) => ({
+      const trimmed = hits.map((h, index) => ({
+        sourceId: `S${index + 1}`,
+        provider: h.provider,
         title: h.title,
         url: h.url,
         snippet: truncate(h.snippet, budget.snippetChars),
       }));
       return JSON.stringify(trimmed);
+    }
+    case "research_web": {
+      const q = argText(args.query).trim();
+      if (q === "") return 'error: research_web needs a "query".';
+      const hits = await host.webSearch(q, budget.maxHits);
+      if (hits.length === 0) {
+        return JSON.stringify({
+          kind: "web_research",
+          evidenceAvailable: false,
+          sources: [],
+          guidance:
+            "No search results were found. Say the answer could not be verified; do not guess from memory.",
+        });
+      }
+      const selected = hits.slice(0, Math.min(3, hits.length));
+      const pageChars = Math.max(600, Math.floor(budget.webFetchChars / selected.length));
+      const sources = await Promise.all(
+        selected.map(async (hit, index): Promise<WebEvidenceSource | null> => {
+          try {
+            const page = truncateBody(await host.webFetch(hit.url, pageChars), pageChars).trim();
+            if (!page) return null;
+            return {
+              sourceId: `S${index + 1}`,
+              provider: hit.provider,
+              title: hit.title,
+              url: hit.url,
+              searchExcerpt: truncate(hit.snippet, budget.snippetChars),
+              evidence: page,
+            };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const evidence = sources.filter((source): source is WebEvidenceSource => source !== null);
+      return JSON.stringify({
+        kind: "web_research",
+        provider: hits[0]?.provider,
+        evidenceAvailable: evidence.length > 0,
+        sources: evidence,
+        guidance:
+          evidence.length > 0
+            ? "Answer only from this evidence. Cite factual claims with the matching sourceId values. If sources conflict, say so instead of choosing one confidently."
+            : "Search returned links, but Rotli could not read usable page evidence. Say the answer could not be verified; do not guess from memory.",
+      });
     }
     case "web_fetch": {
       const url = argText(args.url).trim();
