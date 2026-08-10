@@ -97,10 +97,6 @@ interface ImageGenState {
 const FORMAT_BAR_SCROLL_MARGIN = 88;
 const SCROLL_TO_TOP_THRESHOLD = 160;
 
-function scrollBehavior(): ScrollBehavior {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-}
-
 // memo: the parent editor shell re-renders on caret ctx + header measurement
 // state; with stable props this CM host must not re-render per caret move
 // (perf audit 2026-07-30, finding 8).
@@ -721,7 +717,9 @@ function CmEditorImpl({
           className="editor-scroll-top"
           aria-label="Scroll to top"
           title="Scroll to top"
-          onClick={() => viewRef.current?.scrollDOM.scrollTo({ top: 0, behavior: scrollBehavior() })}
+          // A command must land exactly: smooth scrolling can lose to
+          // CodeMirror's active cursor anchor while the document settles.
+          onClick={() => viewRef.current?.scrollDOM.scrollTo({ top: 0, behavior: "auto" })}
         >
           <ArrowUpGlyph size={16} />
         </button>
