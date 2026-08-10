@@ -1608,6 +1608,19 @@ pub fn run() {
             memex::memex_pick_folder
         ])
         .setup(|app| {
+            // `tauri dev` runs the bare Cargo binary instead of a bundled .app.
+            // Apply the merged config name to AppKit's process metadata; the
+            // tray below uses the same name, while release still receives the
+            // ordinary production config.
+            #[cfg(all(target_os = "macos", debug_assertions))]
+            {
+                use objc2_foundation::{NSProcessInfo, NSString};
+                if let Some(product_name) = app.config().product_name.as_deref() {
+                    let name = NSString::from_str(product_name);
+                    NSProcessInfo::processInfo().setProcessName(&name);
+                }
+            }
+
             // The visitor law: never in the dock, never in Cmd-Tab.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -1812,12 +1825,14 @@ pub fn run() {
 
             // Menu-bar tray: the kit r-mark as a TEMPLATE icon (macOS tints it).
             // 44px = 22px logical @2x; tray-icon scales NSImage to the bar height.
-            let open = MenuItemBuilder::with_id("open", "Open rotli").build(app)?;
-            let quit = MenuItemBuilder::with_id("quit", "Quit rotli").build(app)?;
+            let product_name = app.config().product_name.as_deref().unwrap_or("rotli");
+            let open = MenuItemBuilder::with_id("open", format!("Open {product_name}")).build(app)?;
+            let quit = MenuItemBuilder::with_id("quit", format!("Quit {product_name}")).build(app)?;
             let menu = MenuBuilder::new(app).items(&[&open, &quit]).build()?;
             TrayIconBuilder::with_id("rotli")
                 .icon(Image::from_bytes(include_bytes!("../icons/tray@2x.png"))?)
                 .icon_as_template(true)
+                .tooltip(product_name)
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {

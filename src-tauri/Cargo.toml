@@ -49,7 +49,7 @@ tantivy = "0.26.1"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSResponder"] }
-objc2-foundation = { version = "0.3", features = ["NSData"] }
+objc2-foundation = { version = "0.3", features = ["NSData", "NSString"] }
 
 # Size diet (2026-07-31): the release binary embeds the whole frontend dist, and
 # without a profile the code portion shipped 16 codegen units, no LTO, and 51k
