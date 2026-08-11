@@ -29,7 +29,7 @@ stays complete — every `package.json` script must appear in this document):
 | Command | Purpose |
 |---|---|
 | `bun run dev` / `bun run preview` | Vite dev server against the seeded demo corpus / preview of the built bundle |
-| `bun run dev:app` | The native desktop development app, branded `rotli (dev)` with the accent-backed icon (`bun run tauri` remains the raw Tauri CLI passthrough) |
+| `bun run dev:app` | The native desktop development app, branded `rotli (dev)` with the accent-backed icon; explicitly mounts the production vault writable for real-app testing, while raw `bun run tauri dev` retains the read-only safety default |
 | `bun run format` / `bun run format:check` | oxfmt write / verify over `src`, `e2e`, `scripts`, `playwright.config.ts` — the same trees the pre-commit hook enforces, with import sorting on (`breve-runtime` keeps hand-aligned tables and stays outside). `format:check` rides the `lint` chain |
 | `bun run typecheck` | The TypeScript compiler over `src` (`tsc --noEmit` — `typescript@7`, the Go port) — the type-correctness source of truth, first step of `lint` (e2e and breve-runtime have their own lanes: `check:e2e-types`, `check:breve-runtime`) |
 | `bun run typecheck:tsc6` | All three scopes re-checked on `typescript6` (`npm:typescript@~6.0.3`, the last JavaScript TypeScript) — the independent second implementation, not merely a slower one; must stay green alongside the `tsc` lanes. Called by explicit path because `typescript@7` owns `node_modules/.bin/tsc` |

@@ -212,12 +212,14 @@ impl RootRegistry {
 pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
     if cfg!(debug_assertions) {
         let cfg = ensure_corpus_config(app);
+        let read_only = crate::development_read_only();
         return vec![CorpusRoot {
             id: DEFAULT_ROOT_ID.to_string(),
-            label: if is_memex_root(&cfg.corpus.abs_path) {
-                "Production memex · read-only".to_string()
-            } else {
-                "Production notes · read-only".to_string()
+            label: match (is_memex_root(&cfg.corpus.abs_path), read_only) {
+                (true, true) => "Production memex · read-only".to_string(),
+                (false, true) => "Production notes · read-only".to_string(),
+                (true, false) => "Live memex · development".to_string(),
+                (false, false) => "Live notes · development".to_string(),
             },
             abs_path: cfg.corpus.abs_path,
             adopted: cfg.corpus.adopted,
@@ -3815,7 +3817,7 @@ impl CorpusStore {
         }
         if self.perms_read_only {
             return Err(
-                if cfg!(debug_assertions) {
+                if crate::development_read_only() {
                     "the production memex is mounted read-only in development".into()
                 } else {
                     "this brain is connected read-only — allow writes in Settings → Location first".into()

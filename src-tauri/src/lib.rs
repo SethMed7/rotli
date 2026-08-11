@@ -53,6 +53,35 @@ const DEFAULT_CAPTURE: &str = "Alt+C";
 const DEFAULT_QUICK: &str = "Alt+Q";
 const DEFAULT_CHAT_SUMMON: &str = "Alt+A";
 const DEFAULT_SEARCH_SUMMON: &str = "Alt+F"; // "find" — summon the window with ⌘K open
+const DEV_LIVE_VAULT_ENV: &str = "ROTLI_DEV_LIVE_VAULT";
+
+fn development_read_only_for(debug: bool, live_vault: bool) -> bool {
+    debug && !live_vault
+}
+
+pub(crate) fn development_read_only() -> bool {
+    development_read_only_for(
+        cfg!(debug_assertions),
+        std::env::var(DEV_LIVE_VAULT_ENV).as_deref() == Ok("1"),
+    )
+}
+
+#[cfg(test)]
+mod development_mode_tests {
+    use super::development_read_only_for;
+
+    #[test]
+    fn debug_is_read_only_unless_the_live_vault_is_explicitly_enabled() {
+        assert!(development_read_only_for(true, false));
+        assert!(!development_read_only_for(true, true));
+    }
+
+    #[test]
+    fn release_is_never_changed_by_the_development_flag() {
+        assert!(!development_read_only_for(false, false));
+        assert!(!development_read_only_for(false, true));
+    }
+}
 
 /// Clicking the tray icon steals focus from the window, so blur fires (and
 /// hides it) *before* the tray click arrives. Within this grace window the
@@ -629,7 +658,7 @@ async fn corpus_add_folder(app: AppHandle, path: Option<String>) -> Result<bool,
 
 fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
+    if development_read_only() {
         return Err("Location changes are disabled while the production memex is mounted read-only in development.".into());
     }
     use tauri_plugin_dialog::DialogExt;
@@ -661,7 +690,7 @@ fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bo
 #[tauri::command]
 fn corpus_forget_folder(app: AppHandle, id: String) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
+    if development_read_only() {
         return Err("Location changes are disabled while the production memex is mounted read-only in development.".into());
     }
     if id == corpus::DEFAULT_ROOT_ID {
@@ -917,7 +946,7 @@ async fn corpus_import_vault_copy(
 ) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let _lane = vault_lane();
-        if cfg!(debug_assertions) {
+        if development_read_only() {
             return Err("Importing a primary vault is disabled in development.".into());
         }
         let source = std::path::PathBuf::from(source);
@@ -946,7 +975,7 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
         Some((id, p)) => (true, Some(id), Some(p)),
         None => (false, None, None),
     };
-    if cfg!(debug_assertions) {
+    if development_read_only() {
         perms = Some(memex::MemexPerms::ReadOnly);
     }
     let corpus_brain_enabled = root_brain_enabled(&cfg.corpus.abs_path);
@@ -988,7 +1017,7 @@ async fn corpus_choose_folder(app: AppHandle, path: Option<String>) -> Result<bo
 
 fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
+    if development_read_only() {
         return Err("The production memex is the fixed read-only source in development.".into());
     }
     use tauri_plugin_dialog::DialogExt;
@@ -1051,7 +1080,7 @@ async fn corpus_init_memex(app: AppHandle, path: String, brain_enabled: bool) ->
 
 fn corpus_init_memex_blocking(app: AppHandle, path: String, brain_enabled: bool) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
+    if development_read_only() {
         return Err("Creating or replacing the primary memex is disabled in development.".into());
     }
     let root = std::path::PathBuf::from(&path);
@@ -1099,7 +1128,7 @@ async fn corpus_create_practice_vault(app: AppHandle) -> Result<(), String> {
 
 fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
+    if development_read_only() {
         return Err("Creating or replacing the primary memex is disabled in development.".into());
     }
     use tauri::Manager;
@@ -1152,7 +1181,7 @@ async fn corpus_connect_brain(app: AppHandle, path: Option<String>) -> Result<bo
 
 fn corpus_connect_brain_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
+    if development_read_only() {
         return Err("The production memex is already mounted as the single read-only source in development.".into());
     }
     use tauri_plugin_dialog::DialogExt;
@@ -1191,7 +1220,7 @@ fn corpus_connect_brain_blocking(app: AppHandle, path: Option<String>) -> Result
 #[tauri::command]
 fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
+    if development_read_only() {
         return Err("The production memex binding cannot be changed in development.".into());
     }
     // forget_root is a superset of the old forget_brain (it also drops a folder by
@@ -1205,7 +1234,7 @@ fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
 #[tauri::command]
 fn corpus_set_active_brain(app: AppHandle, id: String) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
+    if development_read_only() {
         return Err("The production memex is the fixed read-only source in development.".into());
     }
     corpus::set_active_brain(&app, &id)
@@ -1220,7 +1249,7 @@ fn corpus_set_active_brain(app: AppHandle, id: String) -> Result<(), String> {
 #[tauri::command]
 fn corpus_set_brain_perms(app: AppHandle, id: String, perms: memex::MemexPerms) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
+    if development_read_only() {
         return Err("Production memex permissions cannot be changed in development.".into());
     }
     corpus::set_brain_perms(&app, &id, perms)?;
@@ -1655,7 +1684,7 @@ pub fn run() {
                 };
             let roots = corpus::startup_roots(app.handle());
             for root in roots {
-                let opened = if cfg!(debug_assertions) {
+                let opened = if development_read_only() {
                     corpus::CorpusStore::open_read_only(root.abs_path.clone())
                 } else if root.adopted {
                     corpus::CorpusStore::open_adopted(root.abs_path.clone())
@@ -1664,7 +1693,7 @@ pub fn run() {
                 };
                 match opened {
                     Ok(mut store) => {
-                        if cfg!(debug_assertions)
+                        if development_read_only()
                             || brain_perms.get(&root.id).is_some_and(|p| p.read_only())
                         {
                             store.set_perms_read_only(true);

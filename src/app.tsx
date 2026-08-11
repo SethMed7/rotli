@@ -64,6 +64,7 @@ import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
 import { notesService } from "./services/notes";
 import { queryClient } from "./services/query";
 import { hydrateMain } from "./state/main";
+import { onboardingRequired } from "./state/onboarding";
 import { useOrganizerLive } from "./state/organizerLive";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
 import { flushSettingsNow } from "./state/persist";
@@ -113,17 +114,6 @@ function surfaceFromUrl(): Surface {
 declare const __APP_VERSION__: string;
 const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0";
 
-/** Compare dotted versions numerically: <0 if a<b, 0 if equal, >0 if a>b. */
-function cmpVersion(a: string, b: string): number {
-  const pa = a.split(".").map((n) => Number.parseInt(n, 10) || 0);
-  const pb = b.split(".").map((n) => Number.parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (d !== 0) return d;
-  }
-  return 0;
-}
-
 // The onboardingVersion gate. While 0.x (beta), re-onboard on EVERY version change
 // (the flow keeps evolving). Post-1.0, freeze the bar at 1.0.0 so updates never
 // re-onboard — only a fresh install (no prior onboardingVersion) does.
@@ -142,10 +132,12 @@ function MainShell() {
   const vaultStatus = useVaultStore((s) => s.status);
   // first run (the real app only). The version gate ALSO re-onboards on every 0.x
   // update — bulletproof regardless of the `onboarded` flag's state on disk.
-  const showOnboarding =
-    isTauri() &&
-    !import.meta.env.DEV &&
-    (!onboarded || cmpVersion(onboardingVersion, REQUIRED_ONBOARDING_VERSION) < 0);
+  const showOnboarding = onboardingRequired(
+    isTauri(),
+    onboarded,
+    onboardingVersion,
+    REQUIRED_ONBOARDING_VERSION,
+  );
   const showVaultActivation = isTauri() && vaultStatus === "unconfigured" && !showOnboarding;
 
   // hold ⌘ ~0.5s on the main surface → the non-modal shortcut map. Gated off

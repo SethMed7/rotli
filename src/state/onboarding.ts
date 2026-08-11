@@ -12,6 +12,25 @@ import { allActions } from "../keys/registry";
 import { setDockVisible, setGlobalShortcut, setHideOnBlur } from "../lib/tauri";
 import { useUiStore } from "./ui";
 
+function compareVersions(a: string, b: string): number {
+  const left = a.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const right = b.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  for (let index = 0; index < Math.max(left.length, right.length); index++) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+export function onboardingRequired(
+  native: boolean,
+  onboarded: boolean,
+  onboardingVersion: string,
+  requiredVersion: string,
+): boolean {
+  return native && (!onboarded || compareVersions(onboardingVersion, requiredVersion) < 0);
+}
+
 export async function resetAndReonboard(): Promise<void> {
   // hotkeys → defaults: drop every override, then re-register each GLOBAL action
   // to its default accelerator OS-side (the dispatcher reads defaults for the

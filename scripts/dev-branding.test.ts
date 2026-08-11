@@ -17,7 +17,9 @@ test("the native dev command uses an unmistakable identity without changing prod
     bundle?: { icon?: string[] };
   };
 
-  expect(pkg.scripts?.["dev:app"]).toBe("tauri dev --config src-tauri/tauri.dev.conf.json");
+  expect(pkg.scripts?.["dev:app"]).toBe(
+    "env ROTLI_DEV_LIVE_VAULT=1 tauri dev --config src-tauri/tauri.dev.conf.json",
+  );
   expect(development.productName).toBe("rotli (dev)");
   expect(development.bundle?.icon).toContain("icons-dev/icon.icns");
   expect(production.productName).toBe("rotli");

@@ -23,7 +23,7 @@ bun install --frozen-lockfile
 
 ```sh
 bun run dev        # browser-only frontend with demo/in-memory behavior
-bun run dev:app    # native Rotli (dev); manage this process yourself
+bun run dev:app    # native rotli (dev); WARNING: reads and writes the production vault
 ```
 
 Browser mode cannot validate the native titlebar, menu-bar lifecycle,

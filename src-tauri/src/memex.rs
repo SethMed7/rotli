@@ -401,7 +401,7 @@ pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<Path
 pub fn memex_detect(app: tauri::AppHandle) -> Result<Vec<DetectedMemex>, String> {
     // A debug shell is an isolated review workspace. Never enumerate or offer
     // the user's production brains from `tauri dev`.
-    if cfg!(debug_assertions) {
+    if crate::development_read_only() {
         return Ok(Vec::new());
     }
     let mut roots: Vec<PathBuf> = Vec::new();
@@ -761,7 +761,7 @@ pub fn memex_write_chat(
     slug: String,
     contents: String,
 ) -> Result<String, String> {
-    if cfg!(debug_assertions) {
+    if crate::development_read_only() {
         return Err("the production memex is mounted read-only in development".into());
     }
     let root = registered_root(&app, &root)?;
@@ -802,7 +802,7 @@ pub fn memex_write_chat_folders(
     root: String,
     contents: String,
 ) -> Result<(), String> {
-    if cfg!(debug_assertions) {
+    if crate::development_read_only() {
         return Err("the production memex is mounted read-only in development".into());
     }
     let root = registered_root(&app, &root)?;
@@ -827,7 +827,7 @@ pub fn memex_rename_chat(
     old_slug: String,
     new_slug: String,
 ) -> Result<String, String> {
-    if cfg!(debug_assertions) {
+    if crate::development_read_only() {
         return Err("the production memex is mounted read-only in development".into());
     }
     let root = registered_root(&app, &root)?;
@@ -856,7 +856,7 @@ pub fn memex_rename_chat(
 /// rotli's writable `chats/` surface. Registered root (#20). (Seth #4, 2026-07-08.)
 #[tauri::command]
 pub fn memex_delete_chat(app: tauri::AppHandle, root: String, slug: String) -> Result<(), String> {
-    if cfg!(debug_assertions) {
+    if crate::development_read_only() {
         return Err("the production memex is mounted read-only in development".into());
     }
     move_chat_to_bucket(&app, &root, &slug, "trash")
@@ -865,7 +865,7 @@ pub fn memex_delete_chat(app: tauri::AppHandle, root: String, slug: String) -> R
 /// Archive a chat: the same move, into `chats/archive/` — out of the way, still kept.
 #[tauri::command]
 pub fn memex_archive_chat(app: tauri::AppHandle, root: String, slug: String) -> Result<(), String> {
-    if cfg!(debug_assertions) {
+    if crate::development_read_only() {
         return Err("the production memex is mounted read-only in development".into());
     }
     move_chat_to_bucket(&app, &root, &slug, "archive")
@@ -935,7 +935,7 @@ pub fn memex_write_note(
     stem: String,
     contents: String,
 ) -> Result<String, String> {
-    if cfg!(debug_assertions) {
+    if crate::development_read_only() {
         return Err("the production memex is mounted read-only in development".into());
     }
     let root = registered_root(&app, &root)?;
@@ -1041,7 +1041,7 @@ pub async fn memex_validate(app: tauri::AppHandle, root: String) -> Result<Valid
 }
 
 fn memex_validate_blocking(app: &tauri::AppHandle, root: &str) -> Result<ValidateReport, String> {
-    if cfg!(debug_assertions) {
+    if crate::development_read_only() {
         return Ok(ValidateReport {
             ok: true,
             skipped: true,

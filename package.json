@@ -13,7 +13,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:app": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "dev:app": "env ROTLI_DEV_LIVE_VAULT=1 tauri dev --config src-tauri/tauri.dev.conf.json",
     "build": "bun scripts/sync-excalidraw-fonts.mjs && bun run check:breve-runtime && tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",

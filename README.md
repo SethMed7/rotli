@@ -132,7 +132,7 @@ You work how you want in **Main**; the Librarian organizes the **Library** under
 
 ```sh
 bun install
-bun run dev:app     # rotli (dev): distinct icon · menu bar · ⌥Space · ⌥C
+bun run dev:app     # native rotli (dev); uses the production vault with real writes
 bun run dev         # frontend only, in a plain browser (in-memory demo memex)
 bun run check       # TypeScript, tests, runtime, architecture, design, and docs
 cargo test --manifest-path src-tauri/Cargo.toml
