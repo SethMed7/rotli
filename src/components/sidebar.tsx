@@ -28,7 +28,7 @@ import { ChevronRight, CoffeeGlyph, NewFileGlyph, NewFolderGlyph, VaultGlyph } f
 import { SidebarChat } from "./sidebar/sidebarChat";
 import { SidebarFooter } from "./sidebar/sidebarFooter";
 import { SidebarHome } from "./sidebar/sidebarHome";
-import { SidebarSwitcher } from "./sidebar/sidebarSwitcher";
+import { SidebarSwitcher, sidebarFrontBody, sidebarFrontSelection } from "./sidebar/sidebarSwitcher";
 import { useActiveTree } from "./sidebar/useActiveTree";
 import { useChatFolders } from "./sidebar/useChatFolders";
 
@@ -58,6 +58,8 @@ export function Sidebar() {
   const setSidebarView = useUiStore((s) => s.setSidebarView);
   const sidebarZoom = useUiStore((s) => s.sidebarZoom);
   const contentView = useUiStore((s) => s.contentView);
+  const dashboardSection = useUiStore((s) => s.dashboardSection);
+  const setDashboardSection = useUiStore((s) => s.setDashboardSection);
   const collapseAllDests = useUiStore((s) => s.collapseAllDests);
   const requestSystemFolder = useUiStore((s) => s.requestSystemFolder);
   const requestSidebarFolder = useUiStore((s) => s.requestSidebarFolder);
@@ -93,8 +95,9 @@ export function Sidebar() {
       // Location lives inside Settings — the pane picker is one click away
       openSettings: () => dispatch("app.settings"),
     });
-    const rect = e.currentTarget.getBoundingClientRect();
-    openContextMenu(rect.left, rect.bottom + 4, items, { returnFocus: () => e.currentTarget.focus() });
+    const trigger = e.currentTarget;
+    const rect = trigger.getBoundingClientRect();
+    openContextMenu(rect.left, rect.bottom + 4, items, { returnFocus: () => trigger.focus() });
   };
 
   // — the front follows the focused tab (2026-08-01). Every navigation reveal —
@@ -114,6 +117,11 @@ export function Sidebar() {
     // `focusedTab` is a fresh object each render — the string key is the dep
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedTabKey, setSidebarView]);
+  const visibleSidebarView = sidebarFrontBody(sidebarView, contentView, dashboardSection);
+  const pickSidebarView = (view: typeof sidebarView) => {
+    setSidebarView(view);
+    if (contentView === "dashboard") setDashboardSection(view === "chat" ? "models" : "rotli");
+  };
 
   return (
     <aside
@@ -183,7 +191,7 @@ export function Sidebar() {
           aria-label={
             sidebarMode === "breve"
               ? "New folder is unavailable in Breve"
-              : sidebarView === "chat"
+              : visibleSidebarView === "chat"
                 ? "New chat folder"
                 : "New folder"
           }
@@ -201,7 +209,7 @@ export function Sidebar() {
           <span className="tip" aria-hidden="true">
             {sidebarMode === "breve"
               ? "Unavailable in Breve"
-              : sidebarView === "chat"
+              : visibleSidebarView === "chat"
                 ? "New chat folder"
                 : "New folder"}
           </span>
@@ -237,7 +245,11 @@ export function Sidebar() {
           header, above everything the front renders. Breve is a MODE with its
           own navigation, so it replaces the switcher rather than nesting one. */}
       {sidebarMode !== "breve" && (
-        <SidebarSwitcher value={sidebarView} onPick={setSidebarView} chatCount={chats.chatList.length} />
+        <SidebarSwitcher
+          value={sidebarFrontSelection(sidebarView, contentView)}
+          onPick={pickSidebarView}
+          chatCount={chats.chatList.length}
+        />
       )}
 
       {/* a failed row-menu action (file-to-brain, board rename) says so HERE —
@@ -258,10 +270,10 @@ export function Sidebar() {
 
       {sidebarMode === "breve" ? (
         <BreveSidebar zoom={sidebarZoom} />
-      ) : sidebarView === "chat" ? (
+      ) : visibleSidebarView === "chat" ? (
         <SidebarChat chats={chats} zoom={sidebarZoom} />
       ) : (
-        <SidebarHome zoom={sidebarZoom} />
+        <SidebarHome zoom={sidebarZoom} chats={chats} />
       )}
 
       {/* the utility footer is APP-level, not front-level: it stays under Home

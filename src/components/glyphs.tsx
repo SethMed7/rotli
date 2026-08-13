@@ -4,7 +4,7 @@
 
 import type { ReactNode } from "react";
 
-import { DOCUMENT_EXTS } from "../documents/kinds";
+import { DOCUMENT_EXTS, WORD_EXTS } from "../documents/kinds";
 import { IMAGE_EXTS, extOf } from "../lib/fileKind";
 
 interface GlyphProps {
@@ -144,6 +144,30 @@ export function DocumentGlyph(props: GlyphProps) {
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
       <path d="M14 2v6h6M8 12h8M8 16h8" />
     </Glyph>
+  );
+}
+
+/** Microsoft Word file mark. Unlike ordinary chrome glyphs, format identity is
+ * useful information here, so the familiar Word blue remains fixed across all
+ * four Rotli environments. */
+export function WordGlyph({ size = 15, className }: GlyphProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+      <rect x="7" y="3" width="14" height="18" rx="2" fill="var(--format-word)" opacity="0.82" />
+      <path
+        d="M13 8h5M13 12h5M13 16h5"
+        fill="none"
+        stroke="var(--on-format-word)"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        opacity="0.72"
+      />
+      <rect x="2" y="6" width="12" height="12" rx="1.5" fill="var(--format-word)" />
+      <path
+        d="m4.35 8.8 1.42 6.4h1.7l1.02-3.94 1.03 3.94h1.7l1.43-6.4h-1.53l-.82 4.36L9.25 8.8H7.74L6.7 13.16 5.87 8.8Z"
+        fill="var(--on-format-word)"
+      />
+    </svg>
   );
 }
 
@@ -288,6 +312,7 @@ export function glyphForNote(
     const ext = extOf(note.title ?? "");
     if (ext === "svg") return <SvgFormatGlyph {...props} />;
     if (ext === "pdf") return <PdfGlyph {...props} />;
+    if (WORD_EXTS.has(ext)) return <WordGlyph {...props} />;
     if (DOCUMENT_EXTS.has(ext)) return <DocumentGlyph {...props} />;
     if (IMAGE_EXTS.has(ext)) return <ImageGlyph {...props} />;
   }
@@ -516,7 +541,7 @@ export function FocusGlyph(props: GlyphProps) {
   );
 }
 
-/** Settings → Hotkeys nav row (r1 frame F). */
+/** Settings → Keybindings nav row (r1 frame F). */
 export function KeyboardGlyph(props: GlyphProps) {
   return (
     <Glyph {...props}>

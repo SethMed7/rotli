@@ -69,12 +69,29 @@ export interface RoutedCreate {
   body?: string;
   /** Quick/private entry points can force secure while keeping their normal home. */
   secure?: boolean;
+  /** Pin model/tool-created work to the chat's registered root instead of
+   * consulting ambient UI selection again after an asynchronous run. */
+  rootId?: string;
+}
+
+/** Resolve an explicit root capability without falling back to ambient UI
+ * state. Kept pure so cross-root isolation remains regression-testable. */
+export function instanceForRoot(config: Awaited<ReturnType<typeof loadConfig>>, rootId: string) {
+  const id = rootId === "default" ? CORPUS_INSTANCE_ID : rootId;
+  return config.instances.find((instance) => instance.id === id) ?? null;
 }
 
 /** Create a new note per `routeDecision`, returning its WIRE id (for opening). */
 export async function createRoutedNote(opts: RoutedCreate): Promise<string> {
   const { selectedFolderId, isSmart, localFallback, body = "" } = opts;
-  const active = activeInstance(await loadConfig());
+  const config = await loadConfig();
+  const active = opts.rootId ? instanceForRoot(config, opts.rootId) : activeInstance(config);
+  if (opts.rootId && !active) {
+    throw new Error(`The target vault “${opts.rootId}” is no longer registered.`);
+  }
+  if (opts.rootId && !isWritable(active)) {
+    throw new Error(`The target vault “${opts.rootId}” is not writable.`);
+  }
   const secure = creationIsSecure(
     selectedFolderId,
     opts.secure === undefined ? undefined : { secure: opts.secure },

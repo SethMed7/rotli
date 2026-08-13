@@ -8,7 +8,7 @@ describe("syncChatMemory", () => {
     const calls: string[] = [];
     const repository: ChatMemoryRepository = {
       findByStem: async () => null,
-      create: async (body) => (calls.push("create"), { id: "n", stem: "chat-abc123", body }),
+      create: async (body) => (calls.push("create"), { id: "n", stem: "chat-abc123", body, revision: "r1" }),
       update: async () => void calls.push("update"),
       attach: async () => void calls.push("attach"),
     };
@@ -26,7 +26,7 @@ describe("syncChatMemory", () => {
     const calls: string[] = [];
     const repository: ChatMemoryRepository = {
       findByStem: async () => null, // the attached note is out of this listing's reach
-      create: async (body) => (calls.push("create"), { id: "n", stem: "memory-note", body }),
+      create: async (body) => (calls.push("create"), { id: "n", stem: "memory-note", body, revision: "r1" }),
       update: async () => void calls.push("update"),
       attach: async () => void calls.push("attach"),
     };
@@ -45,7 +45,7 @@ describe("syncChatMemory", () => {
     let body = "# Chat\n";
     let updates = 0;
     const repository: ChatMemoryRepository = {
-      findByStem: async () => ({ id: "n", stem: "chat-abc123", body }),
+      findByStem: async () => ({ id: "n", stem: "chat-abc123", body, revision: "r1" }),
       create: async () => {
         throw new Error("should not create");
       },
@@ -69,7 +69,7 @@ describe("syncChatMemory", () => {
   test("a model composes the notes; its output is sanitized into the section", async () => {
     const repository: ChatMemoryRepository = {
       findByStem: async () => null,
-      create: async (body) => ({ id: "n", stem: "s", body }),
+      create: async (body) => ({ id: "n", stem: "s", body, revision: "r1" }),
       update: async () => {},
       attach: async () => {},
     };
@@ -90,7 +90,7 @@ describe("syncChatMemory", () => {
   test("a failed or empty model call keeps existing notes instead of wiping them", async () => {
     let body = `# Chat\n\nNotes from [[chat]].\n\n${CHAT_NOTES_HEADING}\n\n- the kept point\n`;
     const repository: ChatMemoryRepository = {
-      findByStem: async () => ({ id: "n", stem: "s", body }),
+      findByStem: async () => ({ id: "n", stem: "s", body, revision: "r1" }),
       create: async () => {
         throw new Error("should not create");
       },

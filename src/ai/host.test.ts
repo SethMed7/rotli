@@ -40,6 +40,12 @@ const FRONTIER: ChatModelInfo = {
   endpoint: "https://api.anthropic.com",
   api: "cli",
 };
+const CODEX: ChatModelInfo = {
+  ...FRONTIER,
+  id: "gpt-5.6-sol",
+  label: "GPT-5.6 Sol",
+  provider: "codex",
+};
 
 /** The fake vault. `secure` notes are the ones a frontier model may never see;
  * `locked` ones are the ones no model may edit. */
@@ -57,7 +63,12 @@ let rows: Row[] = [];
 /** Set by the test when the batched permission probe should blow up. */
 let probeThrows = false;
 const writes: { id: string; body: string; modelId: string }[] = [];
-const webRequests: Array<{ provider: WebSearchProvider; query: string; limit: number }> = [];
+const webRequests: Array<{
+  provider: WebSearchProvider;
+  query: string;
+  limit: number;
+}> = [];
+const cliRequests: Array<Parameters<typeof realTauri.cliComplete>[0]> = [];
 
 const meta = (row: Row): CorpusNoteMeta => ({
   id: row.id,
@@ -127,6 +138,17 @@ void mock.module("../lib/tauri", () => ({
     }
     return `---\nid: ${row.id}\n---\n\n${row.body}`;
   },
+  corpusReadAiVersioned: async (id: string, model: ChatModelInfo) => {
+    const row = rows.find((r) => r.id === id);
+    if (!row) throw new Error(`unknown note: ${id}`);
+    if (!readable(row, model)) {
+      throw new Error("This note is secure and can never be sent to a remote model.");
+    }
+    return {
+      body: `---\nid: ${row.id}\n---\n\n${row.body}`,
+      revision: `test:${row.id}:${row.body}`,
+    };
+  },
   corpusFrontmatter: async (id: string): Promise<FrontmatterView | null> => {
     const row = rows.find((r) => r.id === id);
     if (!row) return null;
@@ -155,9 +177,20 @@ void mock.module("../lib/tauri", () => ({
     row.body = body;
     return meta(row);
   },
+  cliComplete: async (request: Parameters<typeof realTauri.cliComplete>[0]) => {
+    cliRequests.push(request);
+    return "frontier reply";
+  },
   webSearch: async (provider: WebSearchProvider, query: string, limit: number) => {
     webRequests.push({ provider, query, limit });
-    return [{ provider, title: "Result", url: "https://example.com", snippet: "evidence" }];
+    return [
+      {
+        provider,
+        title: "Result",
+        url: "https://example.com",
+        snippet: "evidence",
+      },
+    ];
   },
 }));
 
@@ -178,8 +211,14 @@ beforeEach(() => {
   probeThrows = false;
   writes.length = 0;
   webRequests.length = 0;
+  cliRequests.length = 0;
   rows = [
-    { id: "n-open", title: "Kelpie plan", body: "an ordinary kelpie note", folderId: "Inbox" },
+    {
+      id: "n-open",
+      title: "Kelpie plan",
+      body: "an ordinary kelpie note",
+      folderId: "Inbox",
+    },
     {
       id: "n-secure",
       title: "Kelpie passphrase",
@@ -187,7 +226,13 @@ beforeEach(() => {
       folderId: "Secure notes",
       secure: true,
     },
-    { id: "n-locked", title: "Kelpie charter", body: "a kelpie charter", folderId: "Inbox", locked: true },
+    {
+      id: "n-locked",
+      title: "Kelpie charter",
+      body: "a kelpie charter",
+      folderId: "Inbox",
+      locked: true,
+    },
     {
       id: "identity/00-identity.md",
       title: "Identity",
@@ -213,6 +258,23 @@ describe("web search provider composition", () => {
       { provider: "duckduckgo", query: "default destination", limit: 4 },
       { provider: "brave", query: "chosen destination", limit: 2 },
     ]);
+  });
+});
+
+describe("frontier process controls", () => {
+  test("forwards the per-chat effort and tier to the Rust-validated CLI command", async () => {
+    await makeTauriHost(CODEX, {
+      reasoningEffort: "high",
+      serviceTier: "fast",
+    }).complete({
+      messages: [{ role: "user", content: "Explain the boundary" }],
+    });
+    expect(cliRequests).toHaveLength(1);
+    expect(cliRequests[0]).toMatchObject({
+      provider: "codex",
+      reasoningEffort: "high",
+      serviceTier: "fast",
+    });
   });
 });
 
@@ -318,6 +380,14 @@ describe("LOCKED is an edit control that binds every class", () => {
 });
 
 describe("secure content flows only into secure containers", () => {
+  test("a tainted chat may not create an unprotected Word document", async () => {
+    const host = makeTauriHost(LOCAL, { isSecureContext: () => true });
+    if (!host.createDocument) throw new Error("the Tauri host must expose create_document");
+    const out = await host.createDocument("Private plan", "protected prose");
+    expect(out).toMatch(/blocked/);
+    expect(out).toMatch(/not protected/i);
+  });
+
   test("a tainted chat may not edit an OPEN note", async () => {
     const host = makeTauriHost(LOCAL, { isSecureContext: () => true });
     const out = await updateVia(host, "n-open", "# Kelpie plan\n\nthe passphrase is hunter2");
@@ -334,10 +404,24 @@ describe("secure content flows only into secure containers", () => {
 
   test("reading a secure note taints the chat", async () => {
     let tainted = false;
-    const host = makeTauriHost(LOCAL, { onSecureNoteRead: () => (tainted = true) });
+    const host = makeTauriHost(LOCAL, {
+      onSecureNoteRead: () => (tainted = true),
+    });
     await host.readNote("n-open");
     expect(tainted).toBe(false);
     await host.readNote("n-secure");
     expect(tainted).toBe(true);
+  });
+
+  test("once a secure read taints a run, even a paraphrased web query is refused", async () => {
+    let tainted = false;
+    const host = makeTauriHost(LOCAL, {
+      onSecureNoteRead: () => (tainted = true),
+      isSecureContext: () => tainted,
+    });
+    await host.readNote("n-secure");
+
+    await expect(host.webSearch("moonriver launch", 3)).rejects.toThrow("secure-note content");
+    expect(webRequests).toEqual([]);
   });
 });

@@ -33,6 +33,7 @@ export async function updateNoteAsAi(
   id: string,
   body: string,
   model?: Pick<ChatModelInfo, "id" | "endpoint">,
+  expectedRevision?: string,
 ): Promise<void> {
   const frontmatter = await corpusFrontmatter(id).catch(() => null);
   if (!frontmatter) {
@@ -42,7 +43,8 @@ export async function updateNoteAsAi(
     throw new Error("This note is locked — no AI may edit it, so the chat left it alone.");
   }
   // no model ⇒ treat the write as REMOTE, the fail-closed direction
-  await corpusWriteAi(id, body, model ?? { id: "", endpoint: "" });
+  if (!expectedRevision) throw new Error("This note has no save revision. Read it again before editing.");
+  await corpusWriteAi(id, body, model ?? { id: "", endpoint: "" }, expectedRevision);
 }
 
 export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Promise<ChatMemoryNote> {
@@ -67,19 +69,22 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       );
       if (!id) return null;
       const note = await notesService.getNote(id);
-      return note ? { id, stem, body: note.body } : null;
+      return note ? { id, stem, body: note.body, revision: note.revision } : null;
     },
     async create(body: string): Promise<ChatMemoryNote> {
       const created = await writeNote({ instance: input.instance, body });
-      return { id: `${prefix}${created.id}`, stem: created.stem, body };
+      const id = `${prefix}${created.id}`;
+      const note = await notesService.getNote(id);
+      if (!note) throw new Error("The new conversation note could not be read back after creation.");
+      return { id, stem: created.stem, body, revision: note.revision };
     },
     // browser mode has no corpus, so the twin keeps the in-memory service
-    update: async (id: string, body: string) => {
+    update: async (id: string, body: string, expectedRevision: string) => {
       if (!isTauri()) {
-        await notesService.updateNote(id, body);
+        await notesService.updateNote(id, body, expectedRevision);
         return;
       }
-      await updateNoteAsAi(id, body, input.model);
+      await updateNoteAsAi(id, body, input.model, expectedRevision);
     },
     attach: (stem: string) => setChatAttachedTo(input.instance, input.chatSlug, stem),
   };

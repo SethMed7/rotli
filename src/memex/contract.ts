@@ -76,6 +76,21 @@ export interface ChatMeta {
   participants?: string[];
 }
 
+/** Durable navigation references created by a chat. They point at ordinary
+ * vault files; the chat owns only the association, never the artifact bytes. */
+export interface ChatArtifact {
+  kind: "note" | "file" | "canvas";
+  id: string;
+  /** Optional presentation only. Identity and authority remain `kind` + `id`. */
+  label?: string;
+}
+
+export interface ChatArtifactTurn {
+  /** Zero-based assistant-turn ordinal. */
+  assistant: number;
+  artifacts: ChatArtifact[];
+}
+
 // ── dates (mirror conversations.ts `today`) ──────────────────────────────────
 // conversations.ts stamps YYYY-MM-DD in the home tz. The composition helpers take
 // an explicit `date` so they stay pure/testable; the service passes today().
@@ -263,6 +278,121 @@ export function setChatSecureContext(contents: string): string {
 export function hasSecureContext(contents: string): boolean {
   const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
   return !!fm && fm[1] !== undefined && /^secureContext:\s*true\s*$/m.test(fm[1]);
+}
+
+const CHAT_ARTIFACTS_KEY = "rotliArtifacts";
+const CHAT_ARTIFACT_TURNS_KEY = "rotliArtifactTurns";
+
+function validChatArtifact(value: unknown): value is ChatArtifact {
+  if (!value || typeof value !== "object") return false;
+  const artifact = value as { kind?: unknown; id?: unknown; label?: unknown };
+  return (
+    (artifact.kind === "note" || artifact.kind === "file" || artifact.kind === "canvas") &&
+    typeof artifact.id === "string" &&
+    artifact.id.length > 0 &&
+    artifact.id.length <= 1024 &&
+    !/[\r\n\0]/.test(artifact.id) &&
+    (artifact.label === undefined ||
+      (typeof artifact.label === "string" &&
+        artifact.label.length > 0 &&
+        artifact.label.length <= 256 &&
+        !/[\r\n\0]/.test(artifact.label)))
+  );
+}
+
+/** Parse Rotli's additive artifact metadata from the first frontmatter block.
+ * Unknown/malformed values fail to an empty list; body text never participates. */
+export function parseChatArtifacts(contents: string): ChatArtifact[] {
+  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
+  if (!fm || fm[1] === undefined) return [];
+  const raw = new RegExp(`^${CHAT_ARTIFACTS_KEY}:\\s*(.*)$`, "m").exec(fm[1])?.[1];
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const unique = new Map<string, ChatArtifact>();
+    for (const artifact of parsed.slice(-100)) {
+      if (!validChatArtifact(artifact)) continue;
+      unique.set(`${artifact.kind}\0${artifact.id}`, artifact);
+    }
+    return [...unique.values()];
+  } catch {
+    return [];
+  }
+}
+
+/** Idempotently attach one artifact reference without touching chat messages. */
+export function addChatArtifact(contents: string, artifact: ChatArtifact): string {
+  if (!validChatArtifact(artifact)) return contents;
+  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
+  if (!fm || fm[1] === undefined) return contents;
+  const artifacts = parseChatArtifacts(contents);
+  if (artifacts.some((item) => item.kind === artifact.kind && item.id === artifact.id)) return contents;
+  const line = `${CHAT_ARTIFACTS_KEY}: ${JSON.stringify([...artifacts.slice(-99), artifact])}`;
+  const block = fm[1];
+  const next = new RegExp(`^${CHAT_ARTIFACTS_KEY}:.*$`, "m").test(block)
+    ? block.replace(new RegExp(`^${CHAT_ARTIFACTS_KEY}:.*$`, "m"), line)
+    : `${block}\n${line}`;
+  return `${contents.slice(0, fm.index)}---\n${next}\n---${contents.slice(fm.index + fm[0].length)}`;
+}
+
+function validChatArtifactTurn(value: unknown): value is ChatArtifactTurn {
+  if (!value || typeof value !== "object") return false;
+  const turn = value as { assistant?: unknown; artifacts?: unknown };
+  return (
+    Number.isSafeInteger(turn.assistant) &&
+    Number(turn.assistant) >= 0 &&
+    Number(turn.assistant) <= 10_000 &&
+    Array.isArray(turn.artifacts)
+  );
+}
+
+/** Read durable per-response artifact ownership from frontmatter only. */
+export function parseChatArtifactTurns(contents: string): ChatArtifactTurn[] {
+  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
+  if (!fm || fm[1] === undefined) return [];
+  const raw = new RegExp(`^${CHAT_ARTIFACT_TURNS_KEY}:\\s*(.*)$`, "m").exec(fm[1])?.[1];
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const turns = new Map<number, ChatArtifactTurn>();
+    for (const value of parsed.slice(-100)) {
+      if (!validChatArtifactTurn(value)) continue;
+      const unique = new Map<string, ChatArtifact>();
+      for (const artifact of value.artifacts.slice(-24)) {
+        if (validChatArtifact(artifact)) unique.set(`${artifact.kind}\0${artifact.id}`, artifact);
+      }
+      if (unique.size > 0) {
+        turns.set(value.assistant, { assistant: value.assistant, artifacts: [...unique.values()] });
+      }
+    }
+    return [...turns.values()].sort((a, b) => a.assistant - b.assistant);
+  } catch {
+    return [];
+  }
+}
+
+/** Set one assistant turn's artifact list without changing transcript bytes. */
+export function addChatArtifactTurn(
+  contents: string,
+  assistant: number,
+  artifacts: readonly ChatArtifact[],
+): string {
+  if (!Number.isSafeInteger(assistant) || assistant < 0 || assistant > 10_000) return contents;
+  const valid = artifacts.filter(validChatArtifact).slice(-24);
+  if (valid.length === 0) return contents;
+  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
+  if (!fm || fm[1] === undefined) return contents;
+  const turns = parseChatArtifactTurns(contents).filter((turn) => turn.assistant !== assistant);
+  turns.push({ assistant, artifacts: valid });
+  turns.sort((a, b) => a.assistant - b.assistant);
+  const line = `${CHAT_ARTIFACT_TURNS_KEY}: ${JSON.stringify(turns.slice(-100))}`;
+  const block = fm[1];
+  const next = new RegExp(`^${CHAT_ARTIFACT_TURNS_KEY}:.*$`, "m").test(block)
+    ? block.replace(new RegExp(`^${CHAT_ARTIFACT_TURNS_KEY}:.*$`, "m"), line)
+    : `${block}\n${line}`;
+  return `${contents.slice(0, fm.index)}---\n${next}\n---${contents.slice(fm.index + fm[0].length)}`;
 }
 
 /** Keep the attached note's `## Chat` backlink in sync (byte-identical to

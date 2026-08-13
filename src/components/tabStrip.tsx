@@ -2,11 +2,13 @@
 // "single-tab pane shows zero tab chrome" Apple-Notes default is retired, so a
 // lone tab is still visible and closeable. 34px on ground, 1px bottom border;
 // tabs 96–208px, always-labeled + type glyph; active = surface fill merging
-// into the editor; close × on active/hover only; labeled + button. Focus is
+// into the editor; close × on active/hover only, with its space always reserved
+// so the strip never reflows. Overflow follows Settings → General: Scroll keeps
+// the 96px title floor and pans, while Fit shrinks every tab into the pane.
+// Focus is
 // marked at the PANE level (the 1px accent ring on `.pane.focused`, multi-pane
 // only — the 2026-07-30 removal of the tab's clay top edge moved the cue there);
-// unfocused panes also dim their strips. Overflow compresses to the 96px floor,
-// then horizontally scrolls behind linen fade masks — no dropdown.
+// unfocused panes also dim their strips.
 //
 // Tabs drag with POINTER events (Seth, 2026-06-15: HTML5 drag is dead in the
 // macOS WKWebView shell): drag within a strip to reorder, onto another strip to
@@ -67,6 +69,7 @@ function tabLabel(tab: Tab, titles: TitleLookup): string {
 
 export function TabStrip({ pane }: { pane: LeafNode }) {
   const newTabDefault = useUiStore((s) => s.newTabDefault);
+  const tabLayout = useUiStore((s) => s.tabLayout);
   const activateTab = usePanesStore((s) => s.activateTab);
   const draggingTab = usePanesStore((s) => s.draggingTab);
   // Main lives here too — a tab is a note (or board) you're looking at, so
@@ -211,7 +214,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   };
 
   return (
-    <div className="tabstrip" role="tablist">
+    <div className="tabstrip" data-tab-layout={tabLayout} role="tablist">
       <div className="tabscroll-wrap" data-fade-left={fade.left} data-fade-right={fade.right}>
         <div
           className="tabscroll"
@@ -223,7 +226,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
           {pane.tabs.map((tab, i) => {
             const dragging = draggingTab?.paneId === pane.id && draggingTab.tabId === tab.id;
             return (
-              <div key={tab.id} className="tabslot">
+              <div key={tab.id} className={tab.id === pane.activeTabId ? "tabslot active" : "tabslot"}>
                 {dropAt === i && <span className="tab-ins" aria-hidden="true" />}
                 <div
                   role="tab"

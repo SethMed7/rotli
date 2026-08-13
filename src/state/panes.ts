@@ -19,7 +19,7 @@ import { create } from "zustand";
 import { clamp } from "../lib/clamp";
 import { initialNoteId, ulid } from "../services/notes";
 import type { LeafNode, PaneNode, SplitDir, Tab } from "../types";
-import { touchMru } from "./mru";
+import { touchItemActivity, touchMru } from "./mru";
 import {
   type NavKind,
   dropNavEntry,
@@ -483,7 +483,7 @@ interface PanesState {
    * silently dropped newTab). */
   openSummary: (note: { id: string; kind?: string }, opts?: { newTab?: boolean }) => void;
   /** Bind a freshly-created chat (in `paneId`'s active chat tab) to its new slug. */
-  bindChat: (paneId: string, chatSlug: string) => void;
+  bindChat: (paneId: string, tabId: string, chatSlug: string) => void;
   /** Focus + activate the surface's open tab in ANY pane (Back/Forward replay
    * must reuse work, never spawn a duplicate in whichever pane holds focus).
    * Returns false when the surface is nowhere open. */
@@ -629,7 +629,9 @@ export const usePanesStore = create<PanesState>((set, get) => {
     },
 
     openCanvas: (boardId, opts) => {
-      // boards aren't notes — no touchMru. Like openNote, surface the panes.
+      // Boards do not join note MRU, but viewing still refreshes the optional
+      // Main-retention clock without rewriting the .excalidraw file.
+      touchItemActivity(boardId);
       recordNav(navEntry("canvas", boardId)); // #6: boards join the trail
       useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
@@ -700,7 +702,9 @@ export const usePanesStore = create<PanesState>((set, get) => {
     },
 
     openFile: (fileId, opts) => {
-      // files aren't notes — no touchMru. Like openCanvas, surface the panes.
+      // Conventional files do not join note MRU, but viewing still refreshes
+      // the optional Main-retention clock without touching their bytes.
+      touchItemActivity(fileId);
       recordNav(navEntry("file", fileId)); // #6: surfaced files join the trail
       useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
@@ -777,14 +781,15 @@ export const usePanesStore = create<PanesState>((set, get) => {
       else get().openNote(note.id, opts);
     },
 
-    bindChat: (paneId, chatSlug) => {
+    bindChat: (paneId, tabId, chatSlug) => {
       recordNav(navEntry("chat", chatSlug)); // the fresh chat just gained its identity
       set((s) => ({
         root: updateLeaf(s.root, paneId, (l) => ({
           ...l,
-          tabs: l.tabs.map((t) =>
-            t.id === l.activeTabId && t.surfaceKind === "chat" ? { ...t, chatSlug } : t,
-          ),
+          // The create call is asynchronous. The user may activate another tab
+          // before it returns, so bind the tab that initiated the send rather
+          // than whichever tab happens to be active at completion time.
+          tabs: l.tabs.map((t) => (t.id === tabId && t.surfaceKind === "chat" ? { ...t, chatSlug } : t)),
         })),
       }));
     },
@@ -911,6 +916,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
         touchMru(id);
         recordNav(id);
       } else {
+        if (kind === "canvas" || kind === "file") touchItemActivity(id);
         recordNav(navEntry(kind, id));
       }
     },
@@ -920,6 +926,8 @@ export const usePanesStore = create<PanesState>((set, get) => {
       if (target) {
         const noteId = tabNoteId(target);
         if (noteId) touchMru(noteId);
+        else if (target.surfaceKind === "canvas") touchItemActivity(target.boardId);
+        else if (target.surfaceKind === "file") touchItemActivity(target.fileId);
       }
       set({
         root: updateLeaf(get().root, paneId, (l) =>

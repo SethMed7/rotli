@@ -7,7 +7,9 @@ Detailed capability contracts and dated audits are routed from
 
 ## Durable truth
 
-- One notes folder is one memex. User-owned files are durable truth.
+- One user-chosen folder is one vault. User-owned files are durable truth;
+  Rotli's portable structure and metadata layer describes that vault without
+  becoming a second content store.
 - Main is the global reference projection over those files. Named views are
   additional subset projections; neither owns or copies content.
 - `.rotli/` contains rebuildable indexes, projections, journals, and explicit
@@ -63,10 +65,10 @@ by directory folklore.
 - Secure notes are an AI-egress and organizer-access boundary, not an encrypted
   vault. At-rest encryption remains the responsibility of macOS/FileVault.
 - Provider calls and agent orchestration belong to Rotli adapters, never the
-  portable memex.
+  portable vault contract.
 - Browser mode cannot prove native filesystem, Keychain, titlebar, updater,
   scheduler, or process behavior.
-- Tests never target a live memex, Keychain, daemon, scheduler, or production
+- Tests never target a live vault, Keychain, daemon, scheduler, or production
   delivery account.
 - CLI and MCP reads use the remote-AI secure-content gate; external-agent
   writes additionally require a fresh revision, refuse locked notes, and use

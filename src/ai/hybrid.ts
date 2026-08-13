@@ -106,7 +106,7 @@ export async function* runHybrid(
   const runOn = async function* (
     model: ChatModelInfo,
     userText: string,
-  ): AsyncGenerator<AgentEvent, string, void> {
+  ): AsyncGenerator<AgentEvent, { final: string; questioned: boolean }, void> {
     let final = "";
     try {
       const host = makeHost(model, requestId ? { requestId } : undefined);
@@ -121,21 +121,28 @@ export async function* runHybrid(
       });
       for await (const ev of events) {
         if (ev.type === "final") final = ev.text;
-        else yield ev;
+        else {
+          yield ev;
+          if (ev.type === "question") return { final: "", questioned: true };
+        }
       }
     } catch (e) {
       final = `⚠ ${e instanceof Error ? e.message : String(e)}`;
     }
-    return final;
+    return { final, questioned: false };
   };
 
-  let final = yield* runOn(chosen.model, refined ?? input.userText);
+  let outcome = yield* runOn(chosen.model, refined ?? input.userText);
+  if (outcome.questioned) return;
+  let final = outcome.final;
 
   // 3) a failed executor gets ONE fallback; a second failure surfaces as-is
   const fallback = preset.fallback ? byId.get(preset.fallback) : undefined;
   if (final.startsWith("⚠") && fallback && fallback.id !== chosen.model.id) {
     yield { type: "status", text: `falling back to ${fallback.label}…` };
-    final = yield* runOn(fallback, input.userText);
+    outcome = yield* runOn(fallback, input.userText);
+    if (outcome.questioned) return;
+    final = outcome.final;
   }
 
   yield { type: "final", text: final || "(the model returned nothing)" };

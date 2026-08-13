@@ -84,6 +84,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   // G — board metadata (Seth, 2026-06-26): description + tags ride top-level in
   // the .excalidraw (see boards/session.ts BoardMeta).
   const apiRef = useRef<ExcaliApi | null>(null);
+  const sourceSceneRef = useRef<Record<string, unknown> | null>(null);
   const metaRef = useRef<BoardMeta>(EMPTY_BOARD_META);
   const [meta, setMeta] = useState<BoardMeta>(EMPTY_BOARD_META);
   const [metaOpen, setMetaOpen] = useState(false);
@@ -95,7 +96,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
     setState({ status: "loading", initialData: null });
     setRepairConfirm(false);
     loadBoard(boardId)
-      .then(({ scene, meta: loaded }) => {
+      .then(({ scene, meta: loaded, revision }) => {
         if (cancelled) return;
         metaRef.current = loaded;
         setMeta(loaded);
@@ -107,13 +108,16 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
             appState?: Record<string, unknown>;
             files?: Record<string, unknown>;
           };
+          sourceSceneRef.current = scene as Record<string, unknown>;
           saver.prime(
             serializeBoardScene({
+              sourceScene: sourceSceneRef.current,
               elements: s.elements ?? [],
               appState: s.appState ?? {},
               files: s.files ?? {},
               meta: loaded,
             }),
+            revision,
           );
         } catch {
           /* a foreign scene that can't re-serialize just skips the baseline */
@@ -158,7 +162,11 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   const buildBody = useCallback(() => {
     const s = sceneRef.current;
     if (!s) throw new Error("no scene captured");
-    return serializeBoardScene({ ...s, meta: metaRef.current });
+    return serializeBoardScene({
+      ...s,
+      ...(sourceSceneRef.current ? { sourceScene: sourceSceneRef.current } : {}),
+      meta: metaRef.current,
+    });
   }, []);
   const onChange = useCallback(
     (elements: BoardChangeElements, appState: BoardChangeAppState, files: BoardChangeFiles) => {
@@ -184,6 +192,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
       if (!api || !isTauri()) return;
       try {
         const body = serializeBoardScene({
+          ...(sourceSceneRef.current ? { sourceScene: sourceSceneRef.current } : {}),
           elements: api.getSceneElements(),
           appState: api.getAppState(),
           files: api.getFiles(),

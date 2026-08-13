@@ -22,6 +22,12 @@ const MODIFIER_CODES: Record<HeldModifier, [string, string]> = {
 
 export type HeldModifier = "Meta" | "Alt" | "Control" | "Shift";
 
+/** Normal workspace hints are immediate; attention-owning modal UI keeps the
+ * deliberate hold so Command does not flash help during an interaction. */
+export function hotkeyPeekDelay(hasModal: boolean): number {
+  return hasModal ? 500 : 0;
+}
+
 interface HeldModifierOptions {
   /** Which lone modifier, held idle, arms the timer. */
   modifier: HeldModifier;
@@ -86,11 +92,16 @@ export function useHeldModifier(opts: HeldModifierOptions): void {
         if (cancelledUntilKeyup) return; // wait for keyup to re-arm
         if (otherModifierDown(ref.current.modifier, event)) return;
         if (timer === null && !held) {
-          timer = window.setTimeout(() => {
-            timer = null;
+          if (ref.current.delayMs <= 0) {
             held = true;
             ref.current.onHold();
-          }, ref.current.delayMs);
+          } else {
+            timer = window.setTimeout(() => {
+              timer = null;
+              held = true;
+              ref.current.onHold();
+            }, ref.current.delayMs);
+          }
         }
         return;
       }

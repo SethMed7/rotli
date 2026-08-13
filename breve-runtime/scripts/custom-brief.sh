@@ -17,7 +17,7 @@ STEM="${ROTLI_ROUTINE_STEM:?custom-brief needs ROTLI_ROUTINE_STEM}"
 
 # Sandbox + model selection: identical to the slot wrappers.
 SB="$HOME/.cache/breve/breve-write-sandbox.sb"
-SANDBOX=""; if [ "$BREVE_SANDBOX" != "0" ] && [ -f "$SB" ]; then SANDBOX="/usr/bin/sandbox-exec -f $SB"; fi
+SANDBOX=""
 BREVE_MODEL="${BREVE_MODEL:-$(bun "$BREVE/scripts/brief-model.ts" 2>/dev/null || echo sonnet)}"
 LOG_DIR="$BREVE/logs"
 mkdir -p "$LOG_DIR"
@@ -47,8 +47,11 @@ brief_exists() { [ -f "$BREVE/briefs/${STEM}.md" ]; }
 
 {
   echo "=== Breve custom brief '$RID' run: $(date) ==="
-  bun "$BREVE/scripts/sandbox.ts" --print >/dev/null 2>&1 || true
-  [ "$BREVE_SANDBOX" != "0" ] && [ -f "$SB" ] && SANDBOX="/usr/bin/sandbox-exec -f $SB"
+  if ! bun "$BREVE/scripts/sandbox.ts" --require >/dev/null 2>&1; then
+    echo "secure model sandbox unavailable — refusing to generate a remote brief"
+    exit 1
+  fi
+  SANDBOX="/usr/bin/sandbox-exec -f $SB"
   export GH_TOKEN="$(bun "$BREVE/scripts/secret.ts" get breve-gh-readonly 2>/dev/null || true)"
   run_model "$BREVE_MODEL"
   echo "=== claude ($BREVE_MODEL) exit $? at $(date) ==="

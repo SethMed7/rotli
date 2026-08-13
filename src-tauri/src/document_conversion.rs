@@ -40,7 +40,10 @@ fn markdown_to_print_text(title: &str, markdown: &str) -> String {
             }
         }
         if line.trim().is_empty() {
-            if lines.last().is_some_and(|previous: &String| !previous.is_empty()) {
+            if lines
+                .last()
+                .is_some_and(|previous: &String| !previous.is_empty())
+            {
                 lines.push(String::new());
             }
         } else {
@@ -66,7 +69,8 @@ pub(crate) fn export_markdown_pdf_bytes(title: &str, markdown: &str) -> Result<V
     if printable.trim().is_empty() {
         return Err("The editable source is empty, so there is nothing to export.".into());
     }
-    let temp = tempfile::tempdir().map_err(|error| format!("create PDF export workspace: {error}"))?;
+    let temp =
+        tempfile::tempdir().map_err(|error| format!("create PDF export workspace: {error}"))?;
     let input = temp.path().join("editable-source.txt");
     fs::write(&input, printable).map_err(|error| format!("prepare PDF source: {error}"))?;
     let output = std::process::Command::new("/usr/sbin/cupsfilter")

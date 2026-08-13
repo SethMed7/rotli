@@ -3,9 +3,10 @@
 import { describe, expect, test } from "bun:test";
 
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 
 import { hexFromArgb } from "./colors";
-import { b64FromBytes, b64FromText, bytesFromB64, fillFromCsvRows } from "./xlsx";
+import { b64FromBytes, b64FromText, bytesFromB64, fillFromCsvRows, loadXlsx } from "./xlsx";
 
 const HASH = "#";
 
@@ -43,5 +44,16 @@ describe("fillFromCsvRows", () => {
     const ws = must(wb.worksheets[0], "worksheet");
     expect(ws.getRow(2).getCell(1).value).toBe("007");
     expect(ws.getRow(2).getCell(2).value).toBe("3");
+  });
+});
+
+describe("round-trip safety", () => {
+  test("refuses a workbook feature ExcelJS would silently discard", async () => {
+    const wb = new ExcelJS.Workbook();
+    wb.addWorksheet("Data").getCell("A1").value = 1;
+    const zip = await JSZip.loadAsync(await wb.xlsx.writeBuffer());
+    zip.file("xl/charts/chart1.xml", '<c:chartSpace xmlns:c="chart" />');
+    const bytes = await zip.generateAsync({ type: "uint8array" });
+    await expect(loadXlsx(bytes.buffer as ArrayBuffer)).rejects.toThrow("chart");
   });
 });

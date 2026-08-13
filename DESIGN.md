@@ -74,14 +74,23 @@ exception.
 - Provider/model marks in Chat use one 14px slot and an optically consistent
   visible footprint; source SVG padding and fine linework must not make one
   family read as a smaller icon than its peers.
-- Chat's contextual Work rail stays a quiet file list beside the normal
-  conversation, using the current environment and accent without introducing a
-  new workspace theme. Opening an item uses the existing pane system to the
-  right and collapses the rail to a slim launcher; narrow chat panes use that
-  launcher from the start. Each row exposes keyboard-reachable **Open** and
-  **Use in chat** actions. Notes, boards, documents, sheets, PDFs, and images
-  continue to render in their owning Rotli surfaces—Work never previews or
-  edits them itself.
+- Activity dashboards never blend unlike sources. Home's Rotli-activity card
+  and dashboard lens report vault notes/chats; Chat's model-usage card and lens
+  report aggregate provider session counters. Model tokens are not labeled as
+  Rotli usage. Dollar values may use a dated, provider-published standard API
+  price snapshot for comparison, but are never labeled as subscription charges
+  or invoices; unknown model IDs remain unpriced. Browser mode never pretends
+  to inspect native histories.
+- Full Rotli-activity and model-usage dashboards share one 24-hour / 7-day /
+  30-day / 90-day range grammar. Dashboard lens and range selection reuse the
+  existing Home/Chat solid-accent segmented state; they do not introduce a
+  separate underline treatment.
+- A first native telemetry read uses a quiet, motion-safe skeleton. Refreshes
+  and range changes keep the last complete dashboard readable, label it as
+  updating, and never blank the surface while a newer aggregate is prepared.
+- Assistant Markdown task lists render as quiet, read-only progress plans with
+  pending/current/completed states and a compact completion count. They remain
+  transcript projections, not controls for an external provider process.
 - When Chat inherits a named view selected on Home, it names that view in a
   quiet inline context row and offers a direct return to all chats. Cross-front
   filtering must never depend on remembering hidden state from another front.
@@ -117,6 +126,9 @@ exception.
 - Every tab is closeable, including the last one: the lone pane rests on the
   quokka empty state with quiet ways back in (new note · search · reopen tab).
   An empty pane is a designed state, not an error.
+- Tab hover is paint-only: close controls reserve their space, and switching
+  hover/active state never moves neighboring tabs. Crowded tab bars follow the
+  persisted Scroll or Fit preference.
 - Quick Look is a PEEK, never the workspace: Space (or the row menu's Preview)
   opens a modal preview; formats without a faithful cheap render show an
   honest metadata card, and the Open button is always the escalation to the
@@ -146,6 +158,42 @@ Every changed surface accounts for loading, empty, error, saved, disabled, and
 destructive states, plus narrow-window behavior. Long content, missing content,
 keyboard-only navigation, and focus recovery are normal cases rather than
 polish work.
+
+## Chat artifacts
+
+- Creating an image, board, document, or other artifact leaves the conversation
+  in place and returns a normal assistant response. Creation must not force a
+  split, focus change, or automatic file open.
+- Conventional documents created by a chat remain visible inside the final
+  assistant turn as one full-width file button per row. Their format mark and
+  label must identify the real file type; selecting one uses the artifact
+  policy chosen in Settings:
+  reuse one right-side pane (default), create a pane, or open a new tab.
+- In a wide chat pane, artifacts use a quiet full-height side rail in otherwise
+  unused horizontal space. While it is open, the rail owns the single visible
+  artifact close control. The rail shows image thumbnails and conventional
+  format marks; selecting a row opens that artifact through the ordinary pane
+  system.
+- When the chat pane cannot retain a readable conversation beside the rail,
+  the rail collapses behind an icon-only, accessibly labeled header control as
+  a keyboard-safe popover. Existing artifacts remain reachable at every
+  supported pane width.
+
+## Chat welcome and navigation
+
+- A fresh, unsent chat is one centered working composition: time-aware greeting,
+  still companion illustration, optional title, composer, and three useful
+  prompt starters. A machine-level Calm/Lively preference changes the companion
+  pose and adds a quiet Morning, Noon, Afternoon, or Evening scene contained
+  behind the companion rather than tinting the workspace; sun position, terrain,
+  and dusk treatment convey the period without motion. The Rotli character keeps
+  neutral brand ink and neither setting creates idle animation.
+- Saved-chat headers use the available pane width while transcript and composer
+  measures remain independently readable.
+- Long-chat prompt markers are uniform in size. Hover or keyboard focus opens
+  their compact, unnumbered prompt list; only semantic accent color identifies
+  the active marker. The list opens beside and top-aligned with the marker,
+  shifting vertically only enough to remain inside its owning chat pane.
 
 ## First-run setup
 

@@ -27,6 +27,24 @@ describe("userName", () => {
   });
 });
 
+describe("automatic housekeeping settings", () => {
+  test("both policies default off and preserve valid day counts", () => {
+    const defaults = parseSettings("{}");
+    expect(defaults.mainAutoRemoveDays).toBeNull();
+    expect(defaults.chatAutoArchiveDays).toBeNull();
+
+    const enabled = parseSettings('{"mainAutoRemoveDays":45,"chatAutoArchiveDays":90}');
+    expect(enabled.mainAutoRemoveDays).toBe(45);
+    expect(enabled.chatAutoArchiveDays).toBe(90);
+  });
+
+  test("invalid values fail closed instead of enabling cleanup", () => {
+    const parsed = parseSettings('{"mainAutoRemoveDays":0,"chatAutoArchiveDays":"30"}');
+    expect(parsed.mainAutoRemoveDays).toBeNull();
+    expect(parsed.chatAutoArchiveDays).toBeNull();
+  });
+});
+
 describe("raw Markdown syntax palette", () => {
   test("defaults to Rotli, preserves Mono, and rejects unknown palettes", () => {
     expect(parseSettings("{}").syntaxPalette).toBe("rotli");
@@ -59,7 +77,9 @@ describe("sidebarView (the Home/Chat front, 2026-08-01)", () => {
   });
 
   test("a stored System fold survives the parse untouched", () => {
-    const raw = JSON.stringify({ expandedDests: { "sec:system": false, "sec:notes": false } });
+    const raw = JSON.stringify({
+      expandedDests: { "sec:system": false, "sec:notes": false },
+    });
     const dests = parseSettings(raw).expandedDests;
     expect(dests["sec:system"]).toBe(false);
     // the retired section key is preserved, not seeded over — a downgrade
@@ -144,6 +164,12 @@ describe("parseSettings — creation and Brain model", () => {
     expect(parseSettings('{"newTabDefault":"database"}').newTabDefault).toBe("markdown");
   });
 
+  test("tab layout defaults to scroll and only accepts the two visible modes", () => {
+    expect(parseSettings("{}").tabLayout).toBe("scroll");
+    expect(parseSettings('{"tabLayout":"fit"}').tabLayout).toBe("fit");
+    expect(parseSettings('{"tabLayout":"compress"}').tabLayout).toBe("scroll");
+  });
+
   test("Gemini 3.5 is an explicit organizer choice; unknown values fail closed to local", () => {
     expect(parseSettings('{"organizerModel":"gemini35"}').organizerModel).toBe("gemini35");
     expect(parseSettings('{"organizerModel":"future"}').organizerModel).toBe("local");
@@ -178,18 +204,38 @@ describe("parseSettings — fileMetadata (Show file metadata)", () => {
 describe("parseSettings — chatWeb (#7: no session keys in the durable map)", () => {
   test("keeps real per-slug toggles, drops the legacy '' and unsaved: keys", () => {
     const raw = '{"chatWeb":{"":true,"unsaved:pane-1":true,"my-chat":true,"other":false}}';
-    expect(parseSettings(raw).chatWeb).toEqual({ "my-chat": true, other: false });
+    expect(parseSettings(raw).chatWeb).toEqual({
+      "my-chat": true,
+      other: false,
+    });
   });
 
   test("drops non-boolean entries entirely", () => {
-    expect(parseSettings('{"chatWeb":{"a":"yes","b":true}}').chatWeb).toEqual({ b: true });
+    expect(parseSettings('{"chatWeb":{"a":"yes","b":true}}').chatWeb).toEqual({
+      b: true,
+    });
+  });
+});
+
+describe("parseSettings — frontier controls", () => {
+  test("keeps allowlisted values and drops attacker-shaped/session values", () => {
+    const parsed = parseSettings(
+      '{"chatReasoning":{"corpus:a":"xhigh","corpus:b":"ultra","unsaved:p":"high"},"chatServiceTier":{"corpus:a":"fast","corpus:b":"priority"}}',
+    );
+    expect(parsed.chatReasoning).toEqual({ "corpus:a": "xhigh" });
+    expect(parsed.chatServiceTier).toEqual({ "corpus:a": "fast" });
   });
 });
 
 describe("parseSettings — the AI Models keys (Seth, 2026-07-02)", () => {
   test("defaults: every lane OFF, no presets, codex engine, note opens as tab", () => {
     const s = parseSettings("{}");
-    expect(s.aiProviders).toEqual({ claude: false, codex: false, agy: false, gemini: false });
+    expect(s.aiProviders).toEqual({
+      claude: false,
+      codex: false,
+      agy: false,
+      gemini: false,
+    });
     expect(s.hybridPresets).toEqual([]);
     expect(s.imageEngine).toBe("codex");
     expect(s.chatNoteOpen).toBe("tab");
@@ -205,7 +251,12 @@ describe("parseSettings — the AI Models keys (Seth, 2026-07-02)", () => {
 
   test("round-trips enabled lanes; unknown lanes and non-booleans are ignored", () => {
     const s = parseSettings('{"aiProviders":{"claude":true,"gemini":true,"evil":true,"codex":"yes"}}');
-    expect(s.aiProviders).toEqual({ claude: true, codex: false, agy: false, gemini: true });
+    expect(s.aiProviders).toEqual({
+      claude: true,
+      codex: false,
+      agy: false,
+      gemini: true,
+    });
     expect("evil" in s.aiProviders).toBe(false);
   });
 
@@ -219,6 +270,20 @@ describe("parseSettings — the AI Models keys (Seth, 2026-07-02)", () => {
     expect(parseSettings('{"imageEngine":"agy"}').imageEngine).toBe("agy");
     expect(parseSettings('{"chatNoteOpen":"window"}').chatNoteOpen).toBe("tab");
     expect(parseSettings('{"chatNoteOpen":"split"}').chatNoteOpen).toBe("split");
+  });
+
+  test("chat presentation preferences round-trip and reject unknown values", () => {
+    const defaults = parseSettings("{}");
+    expect(defaults.chatWelcomeStyle).toBe("lively");
+    expect(defaults.chatArtifactOpen).toBe("sidecar");
+
+    const selected = parseSettings('{"chatWelcomeStyle":"calm","chatArtifactOpen":"tab"}');
+    expect(selected.chatWelcomeStyle).toBe("calm");
+    expect(selected.chatArtifactOpen).toBe("tab");
+
+    const invalid = parseSettings('{"chatWelcomeStyle":"animated","chatArtifactOpen":"window"}');
+    expect(invalid.chatWelcomeStyle).toBe("lively");
+    expect(invalid.chatArtifactOpen).toBe("sidecar");
   });
 
   test("hotkeyPeek round-trips; anything unknown reads as badges, never off", () => {
@@ -259,7 +324,12 @@ describe("parseHybridPresets — shape-validated, invalid entries dropped", () =
       fallback: 7,
     };
     expect(parseHybridPresets([messy])).toEqual([
-      { id: "p1", name: "My hybrid", organizer: "gemma-3", routes: [{ when: "ok", model: "sonnet" }] },
+      {
+        id: "p1",
+        name: "My hybrid",
+        organizer: "gemma-3",
+        routes: [{ when: "ok", model: "sonnet" }],
+      },
     ]);
   });
 
@@ -272,7 +342,10 @@ describe("parseHybridPresets — shape-validated, invalid entries dropped", () =
 describe("unknownSettingsKeys — the round-trip remainder (#35)", () => {
   test("returns keys this build has no field for, and only those", () => {
     const raw = '{"theme":"dark","organizerThreshold":0.9,"futureKnob":{"x":1}}';
-    expect(unknownSettingsKeys(raw)).toEqual({ organizerThreshold: 0.9, futureKnob: { x: 1 } });
+    expect(unknownSettingsKeys(raw)).toEqual({
+      organizerThreshold: 0.9,
+      futureKnob: { x: 1 },
+    });
   });
 
   test("is empty for a fully-known or corrupt file", () => {
@@ -309,10 +382,18 @@ describe("validTab — every surfaceKind survives a relaunch (#34)", () => {
 
   test("round-trips all five tab kinds", () => {
     roundTrips({ id: "t1", surfaceKind: "note", noteId: "note-1" });
-    roundTrips({ id: "t2", surfaceKind: "canvas", boardId: "Inbox/b.excalidraw" });
+    roundTrips({
+      id: "t2",
+      surfaceKind: "canvas",
+      boardId: "Inbox/b.excalidraw",
+    });
     roundTrips({ id: "t3", surfaceKind: "chat", chatSlug: "my-chat" });
     roundTrips({ id: "t4", surfaceKind: "chat", chatSlug: null });
-    roundTrips({ id: "t5", surfaceKind: "file", fileId: "storage/report.xlsx" });
+    roundTrips({
+      id: "t5",
+      surfaceKind: "file",
+      fileId: "storage/report.xlsx",
+    });
     roundTrips({ id: "t6", surfaceKind: "activity" });
   });
 

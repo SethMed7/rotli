@@ -33,9 +33,8 @@ import { Titlebar } from "./components/titlebar";
 import { WhichKey } from "./components/whichKey";
 import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
-import { useHeldModifier } from "./keys/useHeldModifier";
+import { hotkeyPeekDelay, useHeldModifier } from "./keys/useHeldModifier";
 import {
-  checkForUpdate,
   corpusImportFile,
   emitCaptureAck,
   emitThemeSet,
@@ -56,6 +55,7 @@ import {
   workspaceTakeOpenRequest,
 } from "./lib/tauri";
 import { importImagesAtDrop } from "./editor/externalImageDrop";
+import { onQuitFlushFailure } from "./lib/quitFlush";
 import { createVaultCapture } from "./services/captureRouting";
 import { summonChat } from "./services/chatSummon";
 import { DEST } from "./services/destinations";
@@ -67,7 +67,10 @@ import { hydrateMain } from "./state/main";
 import { onboardingRequired } from "./state/onboarding";
 import { useOrganizerLive } from "./state/organizerLive";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
-import { flushSettingsNow } from "./state/persist";
+import { invalidateMemex } from "./memex/useMemex";
+import { invalidateChatFolders } from "./services/chatFolders";
+import { refreshAfterExternalCorpusChange } from "./services/externalCorpusChange";
+import { flushSettingsNow, runAutoRetentionMaintenance } from "./state/persist";
 import { applyQuickState } from "./state/quick";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./state/theme";
 import { useUiStore } from "./state/ui";
@@ -123,6 +126,7 @@ const REQUIRED_ONBOARDING_VERSION =
 function MainShell() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
+  const transientCount = useUiStore((s) => s.transients.length);
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const focusMode = useUiStore((s) => s.focusMode);
   const onboarded = useUiStore((s) => s.onboarded);
@@ -130,6 +134,8 @@ function MainShell() {
   const onboardingVersion = useUiStore((s) => s.onboardingVersion);
   const setOnboardingVersion = useUiStore((s) => s.setOnboardingVersion);
   const vaultStatus = useVaultStore((s) => s.status);
+  const mainAutoRemoveDays = useUiStore((s) => s.mainAutoRemoveDays);
+  const chatAutoArchiveDays = useUiStore((s) => s.chatAutoArchiveDays);
   // first run (the real app only). The version gate ALSO re-onboards on every 0.x
   // update — bulletproof regardless of the `onboarded` flag's state on disk.
   const showOnboarding = onboardingRequired(
@@ -140,17 +146,17 @@ function MainShell() {
   );
   const showVaultActivation = isTauri() && vaultStatus === "unconfigured" && !showOnboarding;
 
-  // hold ⌘ ~0.5s on the main surface → the non-modal shortcut map. Gated off
-  // while the palette or settings own the keyboard, so it never doubles up; the
-  // hook releases the moment a real chord fires (Seth, 2026-06-13).
+  // A lone ⌘ reveals shortcut help immediately in the normal workspace. When
+  // a modal/popover owns attention, keep the deliberate hold threshold so a
+  // model picker or menu does not flash the HUD during ordinary commands.
   const [whichKey, setWhichKey] = useState(false);
   // WHAT the hold reveals is the user's call (Seth, 2026-08-04): badges pinned
   // to the controls themselves (default), the original grouped panel, or off.
   const hotkeyPeek = useUiStore((s) => s.hotkeyPeek);
   useHeldModifier({
     modifier: "Meta",
-    delayMs: 500,
-    enabled: hotkeyPeek !== "off" && !paletteOpen && !settingsOpen && !showOnboarding && !showVaultActivation,
+    delayMs: hotkeyPeekDelay(transientCount > 0 || paletteOpen),
+    enabled: hotkeyPeek !== "off" && !settingsOpen && !showOnboarding && !showVaultActivation,
     onHold: () => setWhichKey(true),
     onRelease: () => setWhichKey(false),
   });
@@ -160,6 +166,24 @@ function MainShell() {
     if (focusMode) document.documentElement.dataset.focus = "true";
     else delete document.documentElement.dataset.focus;
   }, [focusMode]);
+
+  // One composition-owned housekeeping trigger. It runs after opt-in/settings
+  // changes and whenever the app becomes visible again. No background timer:
+  // a tucked-away local-first app should remain completely idle.
+  useEffect(() => {
+    if (mainAutoRemoveDays === null && chatAutoArchiveDays === null) return;
+    const run = () => {
+      void runAutoRetentionMaintenance().then(() => {
+        void Promise.all([invalidateNotes(), invalidateMemex()]);
+      });
+    };
+    run();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") run();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [chatAutoArchiveDays, mainAutoRemoveDays]);
 
   // the capture card lives in another webview; this window owns the corpus — it
   // drops the capture onto the BOARD as a card (a real .md in Board/, NOT a note
@@ -217,14 +241,17 @@ function MainShell() {
   useEffect(
     () =>
       onCorpusChanged(() => {
-        void invalidateFolders();
-        void invalidateNotes();
-        void hydrateMain();
-        void hydrateViews();
-        // the same watcher callback that emits this ALSO feeds the daemon's
-        // queue, so the organizer status ("N waiting") moves here — event, not
-        // a 60s poll (perf audit 2026-07-30, finding 23)
-        void invalidateJournal();
+        void refreshAfterExternalCorpusChange({
+          folders: invalidateFolders,
+          notes: invalidateNotes,
+          chats: invalidateMemex,
+          chatFolders: invalidateChatFolders,
+          main: hydrateMain,
+          views: hydrateViews,
+          // the same watcher callback that emits this ALSO feeds the daemon's
+          // queue, so organizer status moves here — event, not a 60s poll.
+          journal: invalidateJournal,
+        });
       }),
     [],
   );
@@ -378,40 +405,6 @@ function MainShell() {
     });
   }, []);
 
-  // Updates (Part 2): one quiet on-mount check, main surface only, never
-  // blocking. CARL rule 2 — NO auto-download, NO modal, NO nag: a SILENT check of
-  // the signed feed that, if a newer build is offered, just sets a transient ui
-  // flag → the quiet dot on the titlebar Settings button (the titlebar reads it).
-  // We check on launch, again whenever the app is summoned (it may have been
-  // hidden for days), and on a slow 3-hour timer — throttled so a flurry of
-  // show/hide can't hammer it. Any failure (offline, feed down) is swallowed.
-  useEffect(() => {
-    if (!isTauri()) return;
-    let last = 0;
-    const runCheck = () => {
-      const now = Date.now();
-      if (now - last < 600_000) return; // at most once / 10 min
-      last = now;
-      void checkForUpdate()
-        .then((status) => {
-          if (!status.available) return;
-          useUiStore.getState().setUpdateAvailable(true);
-          useUiStore.getState().setUpdateVersion(status.version ?? null);
-        })
-        .catch(() => {});
-    };
-    runCheck();
-    const onVisible = () => {
-      if (!document.hidden) runCheck();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    const timer = setInterval(runCheck, 3 * 60 * 60 * 1000);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-      clearInterval(timer);
-    };
-  }, []);
-
   // While onboarding, the window must NOT vanish on blur (it normally hides) —
   // the flow would disappear the moment focus slips. The real behavior is
   // (re)applied on finish from the user's chosen Stay-open value.
@@ -537,6 +530,15 @@ export default function App() {
   // the quick-access set is kept in step across webviews (the same pattern) —
   // the quick window emits its edits, the main window records + persists them
   useEffect(() => onQuickSet(applyQuickState), []);
+
+  useEffect(() => {
+    if (surface !== "main") return;
+    return onQuitFlushFailure((message) => {
+      useUiStore
+        .getState()
+        .setRowActionError(`Rotli stayed open because some changes could not be saved — ${message}`);
+    });
+  }, [surface]);
 
   // apply the persisted Dock/app icon on startup (macOS; no-op elsewhere) —
   // main only: the quick/capture webviews would each repeat the same

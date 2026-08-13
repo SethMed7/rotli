@@ -39,7 +39,7 @@ async function noteChatContext(note: NoteSummary): Promise<NoteChatContext> {
   }
   const instance = activeInstance(await loadConfig());
   if (!instance || instance.perms !== "chats+inbox") {
-    throw new Error("Connect a writable brain before starting a note chat.");
+    throw new Error("Choose a writable vault before starting a note chat.");
   }
 
   const notePath = await corpusNotePath(note.id);
@@ -50,7 +50,7 @@ async function noteChatContext(note: NoteSummary): Promise<NoteChatContext> {
     isSecureNotesFolder(folder) ||
     /(?:^|\/)wiki\/_secure(?:\/|$)/.test(notePath.replace(/^[^:]+:/, ""));
   const stem = secure ? secureNoteStem(note.id) : noteStemFromPath(notePath);
-  if (!stem) throw new Error("Rotli couldn’t resolve this note in the brain.");
+  if (!stem) throw new Error("Rotli couldn’t resolve this note in the vault.");
 
   const chats = await listChats(instance);
   return { instance, stem, secure, chats, attached: findAttachedChats(chats, stem) };

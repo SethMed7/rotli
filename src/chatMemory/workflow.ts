@@ -10,12 +10,13 @@ export interface ChatMemoryNote {
   id: string;
   stem: string;
   body: string;
+  revision: string;
 }
 
 export interface ChatMemoryRepository {
   findByStem(stem: string): Promise<ChatMemoryNote | null>;
   create(body: string): Promise<ChatMemoryNote>;
-  update(id: string, body: string): Promise<void>;
+  update(id: string, body: string, expectedRevision: string): Promise<void>;
   attach(stem: string): Promise<void>;
 }
 
@@ -69,7 +70,7 @@ export async function syncChatMemory(
   }
   const next = mergeChatMemory(note.body, input.title, input.chatSlug, content);
   if (next !== note.body) {
-    await repository.update(note.id, next);
+    await repository.update(note.id, next, note.revision);
     note = { ...note, body: next };
   }
   return note;

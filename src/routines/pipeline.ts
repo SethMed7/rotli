@@ -140,7 +140,7 @@ function briefSpine(routine: BreveRoutine): PipelineStage[] {
       id: "sandbox",
       kind: "sandbox",
       label: "Sandbox",
-      detail: "sandbox-exec — everything outside Breve and your memex is read-only",
+      detail: "sandbox-exec — everything outside Breve and your vault is read-only",
       enabled: true,
     },
     {

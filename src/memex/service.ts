@@ -19,7 +19,7 @@ import {
   memexDetect,
   memexListChats,
   memexPickFolder,
-  memexRead,
+  memexReadChat,
   memexReadContract,
   memexValidate,
   memexArchiveChat,
@@ -33,10 +33,13 @@ import { titleOf } from "../services/derive";
 import { type MemexConfig, type MemexInstance, type Perms, fromCorpusConfig } from "./config";
 import {
   type ChatMsg,
+  type ChatArtifact,
   type NoteMeta,
   ROTLI_SOURCE,
   SPINE,
   appendMessages,
+  addChatArtifact,
+  addChatArtifactTurn,
   canWrite,
   chatSlug,
   composeNewChat,
@@ -104,6 +107,9 @@ export interface WriteChatInput {
   messages: ChatMsg[];
   /** Append to this existing chat instead of creating a new one. */
   existingSlug?: string;
+  /** One-way information-flow taint. It is applied to the same bytes as this
+   * turn, never as a follow-up write. Rust independently preserves it. */
+  secureContext?: boolean;
 }
 
 export async function writeChat(input: WriteChatInput): Promise<{ slug: string; path: string }> {
@@ -111,13 +117,20 @@ export async function writeChat(input: WriteChatInput): Promise<{ slug: string; 
   const slug = input.existingSlug ?? input.slug ?? chatSlug({ title: input.title, source: ROTLI_SOURCE });
   const rel = `chats/${slug}.md`;
   if (!canWrite(rel, instance.perms)) {
-    throw new Error("This memex is read-only for rotli — connect it with write access first.");
+    throw new Error("This vault is read-only for rotli — connect it with write access first.");
   }
   const date = today();
+  // Each call represents one real send/receive boundary. Stamp missing turns
+  // here, at the persistence seam, so every caller gets durable original-time
+  // semantics without relying on presentation code to remember it.
+  const sentAt = new Date().toISOString();
+  const messages = input.messages.map((message) => ({ ...message, at: message.at ?? sentAt }));
   let contents: string;
+  let expectedRevision: string | null = null;
   if (input.existingSlug) {
-    const existing = await memexRead(instance.root, rel);
-    contents = appendMessages(existing, input.messages, date);
+    const existing = await memexReadChat(instance.root, slug);
+    expectedRevision = existing.revision;
+    contents = appendMessages(existing.contents, messages, date);
   } else {
     contents = composeNewChat(
       {
@@ -126,11 +139,12 @@ export async function writeChat(input: WriteChatInput): Promise<{ slug: string; 
         slug,
         ...(input.attachedTo ? { attachedTo: input.attachedTo } : {}),
       },
-      input.messages,
+      messages,
       date,
     ).contents;
   }
-  const path = await memexWriteChat(instance.root, slug, contents);
+  if (input.secureContext) contents = setChatSecureContext(contents);
+  const path = await memexWriteChat(instance.root, slug, contents, expectedRevision);
   return { slug, path };
 }
 
@@ -139,36 +153,75 @@ export async function writeChat(input: WriteChatInput): Promise<{ slug: string; 
 export async function setChatAttachedTo(instance: MemexInstance, slug: string, stem: string): Promise<void> {
   const rel = `chats/${slug}.md`;
   if (!canWrite(rel, instance.perms)) {
-    throw new Error("This memex is read-only for rotli — connect it with write access first.");
+    throw new Error("This vault is read-only for rotli — connect it with write access first.");
   }
-  const existing = await memexRead(instance.root, rel);
-  const next = setAttachedTo(existing, stem);
-  if (next !== existing) await memexWriteChat(instance.root, slug, next);
-}
-
-/** Stamp the one-way secure-context marker on an EXISTING chat — written the
- * moment a turn's tool trace read a secure note (audit 2026-07-29 #7). */
-export async function markChatSecureContext(instance: MemexInstance, slug: string): Promise<void> {
-  const rel = `chats/${slug}.md`;
-  if (!canWrite(rel, instance.perms)) {
-    throw new Error("This memex is read-only for rotli — connect it with write access first.");
+  const existing = await memexReadChat(instance.root, slug);
+  const next = setAttachedTo(existing.contents, stem);
+  if (next !== existing.contents) {
+    await memexWriteChat(instance.root, slug, next, existing.revision);
   }
-  const existing = await memexRead(instance.root, rel);
-  const next = setChatSecureContext(existing);
-  if (next !== existing) await memexWriteChat(instance.root, slug, next);
 }
 
 export const listChats = (instance: MemexInstance): Promise<MemexChatSummary[]> =>
   memexListChats(instance.root);
 
 export const readChat = (instance: MemexInstance, slug: string): Promise<string> =>
-  memexRead(instance.root, `chats/${slug}.md`);
+  memexReadChat(instance.root, slug).then((chat) => chat.contents);
+
+/** Attach a durable artifact navigation reference to an existing chat. This is
+ * an additive/idempotent merge, so a revision race can be safely re-read and
+ * retried without replacing a newer transcript. */
+export async function registerChatArtifact(
+  instance: MemexInstance,
+  slug: string,
+  artifact: ChatArtifact,
+): Promise<void> {
+  if (!canWrite(`chats/${slug}.md`, instance.perms)) {
+    throw new Error("This vault is read-only for rotli — connect it with write access first.");
+  }
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const existing = await memexReadChat(instance.root, slug);
+    const next = addChatArtifact(existing.contents, artifact);
+    if (next === existing.contents) return;
+    try {
+      await memexWriteChat(instance.root, slug, next, existing.revision);
+      return;
+    } catch (error) {
+      if (attempt === 0 && /revision conflict/i.test(String(error))) continue;
+      throw error;
+    }
+  }
+}
+
+/** Bind artifacts to the assistant response that created them. */
+export async function registerChatArtifactTurn(
+  instance: MemexInstance,
+  slug: string,
+  assistant: number,
+  artifacts: readonly ChatArtifact[],
+): Promise<void> {
+  if (!canWrite(`chats/${slug}.md`, instance.perms)) {
+    throw new Error("This vault is read-only for rotli — connect it with write access first.");
+  }
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const existing = await memexReadChat(instance.root, slug);
+    const next = addChatArtifactTurn(existing.contents, assistant, artifacts);
+    if (next === existing.contents) return;
+    try {
+      await memexWriteChat(instance.root, slug, next, existing.revision);
+      return;
+    } catch (error) {
+      if (attempt === 0 && /revision conflict/i.test(String(error))) continue;
+      throw error;
+    }
+  }
+}
 
 /** Rename a chat (chats/<old>.md → chats/<new>.md). Returns the new slug. Refused
  * unless the chats surface is writable for this instance. */
 export async function renameChat(instance: MemexInstance, oldSlug: string, newSlug: string): Promise<string> {
   if (!canWrite(`chats/${newSlug}.md`, instance.perms)) {
-    throw new Error("this brain is read-only — can't rename a chat here");
+    throw new Error("this vault is read-only — can't rename a chat here");
   }
   return memexRenameChat(instance.root, oldSlug, newSlug);
 }
@@ -176,7 +229,7 @@ export async function renameChat(instance: MemexInstance, oldSlug: string, newSl
 /** Soft-delete a chat (→ hidden chats/trash/, recoverable in Finder). */
 export async function deleteChat(instance: MemexInstance, slug: string): Promise<void> {
   if (!canWrite(`chats/${slug}.md`, instance.perms)) {
-    throw new Error("this brain is read-only — can't delete a chat here");
+    throw new Error("this vault is read-only — can't delete a chat here");
   }
   await memexDeleteChat(instance.root, slug);
 }
@@ -184,7 +237,7 @@ export async function deleteChat(instance: MemexInstance, slug: string): Promise
 /** Archive a chat (→ hidden chats/archive/). */
 export async function archiveChat(instance: MemexInstance, slug: string): Promise<void> {
   if (!canWrite(`chats/${slug}.md`, instance.perms)) {
-    throw new Error("this brain is read-only — can't archive a chat here");
+    throw new Error("this vault is read-only — can't archive a chat here");
   }
   await memexArchiveChat(instance.root, slug);
 }
@@ -198,11 +251,13 @@ export async function revealChat(instance: MemexInstance, slug: string): Promise
 export async function pinChat(instance: MemexInstance, slug: string, pinned: boolean): Promise<void> {
   const rel = `chats/${slug}.md`;
   if (!canWrite(rel, instance.perms)) {
-    throw new Error("this brain is read-only — can't pin a chat here");
+    throw new Error("this vault is read-only — can't pin a chat here");
   }
-  const existing = await memexRead(instance.root, rel);
-  const next = setChatPinned(existing, pinned);
-  if (next !== existing) await memexWriteChat(instance.root, slug, next);
+  const existing = await memexReadChat(instance.root, slug);
+  const next = setChatPinned(existing.contents, pinned);
+  if (next !== existing.contents) {
+    await memexWriteChat(instance.root, slug, next, existing.revision);
+  }
 }
 
 // ── notes (Librarian intake or the raw vault's wiki root) ──────────────────────
@@ -231,7 +286,7 @@ export async function writeNote(input: WriteNoteInput): Promise<{ id: string; st
   const rel = `${input.secure ? SPINE.wikiSecure : SPINE.wikiInbox}/${stem}.md`;
   // TS gate first (the Rust assert_writable is the second layer).
   if (!canWrite(rel, instance.perms)) {
-    throw new Error("This memex is read-only for rotli — connect it with write access first.");
+    throw new Error("This vault is read-only for rotli — connect it with write access first.");
   }
   // reach default = the owning user (the brain's primary). Single-tenant / unreadable
   // ⇒ owner-only ([]); never invent a user. (Phase 3 adds the active-user picker.)

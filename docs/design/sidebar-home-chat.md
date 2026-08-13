@@ -35,16 +35,18 @@ Now the sidebar has **one top switcher and one body**:
 └──────────────────────────────┘
 ```
 
-- **Home** is today's Notes world: All notes · Captures · Tasks · the Main /
-  named-view tree, then the System zone and the footer. "Home, which is notes
-  essentially and eventually a dashboard."
-- **Chat** is the chat world: New chat · All chats · an **Unread** lane (when
-  any reply landed unwatched) · chat folders · every chat, then the footer.
+- **Home** is today's Notes world: a compact, factual Rotli-activity overview · All notes
+  · Captures · Tasks · the Main / named-view tree, then the System zone and the
+  footer. The overview counts new/updated files from corpus timestamps and
+  saved chat activity. It contains no provider/token telemetry. Rotli does not estimate word authorship: a
+  human-vs-AI split requires an edit-provenance contract the corpus does not yet
+  record.
+- **Chat** is the chat world: New chat · All chats · one session **Activity**
+  lane · recency-sorted chat folders · every chat, then the footer.
   Since 2026-08-03 the front carries live signals and organization:
-  - **Run signals** — a chat that is answering breathes a small accent dot on
-    its row; a reply that settles while you're elsewhere flips it to a solid
-    **unread** dot, and those chats also collect in the Unread lane at the top
-    (a view onto the list, not a folder). Opening the chat spends the flag.
+  - **Run signals** — a chat is labeled Working while answering, New when a
+    reply lands elsewhere, and Done once acknowledged. The Activity lane stays
+    at the top for the session, clearly separated from virtual folders.
     State lives in `src/state/chatRuns.ts`, session-only — the transcript on
     disk is the durable truth. Navigating away no longer cancels a queued
     turn; it completes, persists, and flips its row.
@@ -53,14 +55,19 @@ Now the sidebar has **one top switcher and one body**:
     top"). The old per-folder manual drag order is retired (the manifest field
     still parses for older builds); dragging a chat onto a folder still files
     it there.
-  - **Pinned folders** — a chat folder's context menu can pin it above the
-    others (`pinned` on the `chat-folders.json` entry).
-  - **Model chip** — a row shows its chat's own model pick (quiet, right-
-    aligned) when the chat isn't currently running/unread.
+  - **Pinned and recent folders** — an explicit pin wins; otherwise the folder
+    containing the newest chat floats first (`pinned` stays on the
+    `chat-folders.json` entry, while recency remains derived from chat files).
+  - **Provider mark + recency** — the left mark identifies the model provider;
+    the right edge shows compact last activity (`now`, `4h`, `8d`) rather than
+    repeating the model name.
   - **Views** — chats join named views (`chats: [slug]` on the view in
     `views.json`, singular membership like notes): the row menu's "Move to
     view", an active view narrows the front to its chats, and a chat born
-    while a view is active belongs to it.
+  while a view is active belongs to it.
+  - **Model-usage overview** — the compact top card reads aggregate token,
+    session, and top-model facts from provider-owned local histories and opens
+    the Model usage dashboard lens. It never shares a card with vault activity.
 - Neither view is collapsible. Each owns the whole body and scrolls on its own
   (`.sb-rows`) — the "infinite scroll" in Seth's words.
 - **System** (Library · Assets · Archive · Trash, plus any added external
@@ -71,25 +78,62 @@ Now the sidebar has **one top switcher and one body**:
 
 ## Why Home owns System, and Chat does not
 
-Library, Assets, Archive and Trash are stores of *notes and files*. A chat is
+Library, Assets, Archive and Trash are stores of _notes and files_. A chat is
 not filed into any of them (chats live in `chats/` and are grouped by the
 virtual chat-folder sidecar). Putting the System zone in Chat would show four
 rows that answer no question the Chat view can ask. The footer, by contrast,
 is about the app and the vault, so it stays everywhere.
 
-## Reserving the dashboard
+## Home dashboard
 
-Seth's Home is "notes essentially and **eventually a dashboard**". The switcher
-is deliberately built so that arrival needs no second IA change:
+Seth's Home is "notes essentially and a dashboard". The switcher required no
+second IA change:
 
 - The switcher is a list of **fronts**, not a boolean. `SidebarView` is a string
   union (`"home" | "chat"`), the pill renders `SIDEBAR_FRONTS.map(...)`, and the
   persisted key stores the string. A third front is one array entry.
-- Inside Home, the body is an ordered stack of **blocks** (smart rows → Main
-  tree → System). A dashboard block joins that stack above the smart rows — a
-  summary card, agenda, or Breve digest — without moving anything else.
+- Inside Home, the body remains an ordered stack of **blocks** (week overview →
+  smart rows → Main tree → System). The overview is derived and read-only.
 - Because Home is one scroll with no accordions, a dashboard block does not have
   to fight a section header for the top of the column.
+- Selection follows the visible destination. While the full dashboard is open,
+  its compact overview card carries the active treatment; the Home/Chat front
+  switcher and any note or chat hidden underneath it remain unselected. The
+  current front still renders the sidebar body, so this is a presentation rule,
+  not a third persisted front or a change to navigation history. Switching the
+  full dashboard lens keeps the corresponding Home or Chat overview card in
+  view, and picking Home/Chat while there changes the lens rather than creating
+  a second simultaneous selection.
+
+### Rotli activity and model usage are different sources
+
+The full dashboard has two explicit, mutually selected lenses:
+
+- **Rotli activity** is derived from the active vault's note and saved-chat
+  files: totals, creation/update activity, and recents for a selected 24-hour,
+  7-, 30-, or 90-day range. Home opens this lens.
+- **Model usage** is derived by a read-only Rust adapter from Claude Code and
+  Codex local JSONL session histories for one allowlisted range (24 hours, 7,
+  30, or 90 days). Chat opens this lens. Rust owns the fixed directories,
+  streams bounded records, deduplicates provider events, caches aggregates for
+  one minute, reuses unchanged parsed histories, and reads only the appended
+  tail of a growing history after its first complete parse. Concurrent range
+  reads serialize behind that cache instead of duplicating multi-gigabyte work.
+  The first read gets a motion-safe skeleton; later range changes keep the last
+  complete aggregate visible while the replacement is prepared. IPC returns
+  only provider/model/token/session/time-bucket counts.
+  Transcript text, prompts, responses, project paths, transcript file names,
+  working directories, and session identifiers never cross IPC.
+
+Model usage is local telemetry, not subscription accounting. Rotli may apply a
+dated, provider-published standard API price snapshot to exact model IDs so the
+dashboard can show an API-equivalent dollar comparison beside token counts.
+Unknown or ambiguous model IDs remain visibly unpriced. Rotli does not infer
+the user's plan, remaining quota, invoice, or subscription charge from token
+counters, and it does not fetch a live pricing table. The estimate assumes
+standard context and the default cache-write rate because local aggregates do
+not retain every billable routing detail. The browser twin shows an honest
+desktop-only empty state because it must not inspect the host.
 
 ## Persistence
 
@@ -97,10 +141,30 @@ Both new pieces of state ride the existing `.rotli/settings.json` writer in
 `src/state/persist.ts`, additively — an older build ignores both keys and lands
 on its own defaults.
 
-| Key | Type | Default | Meaning |
-|---|---|---|---|
-| `sidebarView` | `"home" \| "chat"` | `"home"` | Which front reopens on launch |
-| `expandedDests["sec:system"]` | `boolean` | `true` (open) | The System zone's fold |
+| Key                           | Type               | Default       | Meaning                       |
+| ----------------------------- | ------------------ | ------------- | ----------------------------- |
+| `sidebarView`                 | `"home" \| "chat"` | `"home"`      | Which front reopens on launch |
+| `expandedDests["sec:system"]` | `boolean`          | `true` (open) | The System zone's fold        |
+| `mainAutoRemoveDays`           | `number \| null`  | `null` (off)  | Unlink inactive refs from Main |
+| `chatAutoArchiveDays`          | `number \| null`  | `null` (off)  | Archive inactive saved chats   |
+
+### Automatic housekeeping
+
+Settings → General offers two independent, opt-in inactivity policies. Both
+default off. An item is inactive only when neither its durable modification
+time nor its app-owned last-viewed time falls inside the selected number of
+days. The last-viewed clocks live in `.rotli/viewstate.json`; opening something
+must never rewrite the user file merely to record UI activity.
+
+- **Remove inactive items from Main** removes only the reference from
+  `.rotli/main.json`. It never moves, archives, trashes, edits, or deletes the
+  underlying note, board, or conventional file.
+- **Archive inactive chats** uses the existing recoverable chat Archive path.
+  It does not delete the transcript.
+- Pinned or currently open items are always excluded. Missing/unreadable
+  timestamps and failed listings fail closed: no item is selected.
+- The composition root applies enabled policies after launch/settings changes
+  and when the main window becomes visible. There is no background interval.
 
 Retired keys: `expandedDests["sec:chat"]` and `["sec:notes"]` no longer render
 anything. They are not deleted from anyone's config — `gcPersistedMaps` keeps
@@ -114,11 +178,11 @@ in the unknown-key passthrough (`#35`), so a downgrade keeps the user's cap.
 
 Every command stays remappable through `src/keys/` — these are default chords.
 
-| Chord | Action id | Behavior |
-|---|---|---|
-| `⌃1` | `modules.notes` | Go to **Home** (was "Go to Notes") |
-| `⌃2` | `modules.chat` | Go to **Chat** — the new front switch |
-| `⌃⇧2` | `chat.new` | New chat (was `⌃2`), and switches to Chat |
+| Chord | Action id       | Behavior                                  |
+| ----- | --------------- | ----------------------------------------- |
+| `⌃1`  | `modules.notes` | Go to **Home** (was "Go to Notes")        |
+| `⌃2`  | `modules.chat`  | Go to **Chat** — the new front switch     |
+| `⌃⇧2` | `chat.new`      | New chat (was `⌃2`), and switches to Chat |
 
 `chat.new` keeps its identity and its place in the palette; only its default
 chord moved down one modifier so `⌃1`/`⌃2` can read as "front 1 / front 2".
@@ -162,7 +226,7 @@ front first, or the reveal silently does nothing.
 - **Navigation reveal** — opening a note, board, or file from ⌘K, a deep link,
   Quick Look, or another surface: the sidebar watches the focused tab's
   `surfaceKind`. A chat tab pulls the front to Chat; a note/board/file tab pulls
-  it to Home. It fires on *change* only (a mount-guard ref), so the persisted
+  it to Home. It fires on _change_ only (a mount-guard ref), so the persisted
   front on launch is never overridden, and switching fronts by hand while a tab
   stays focused is never undone.
 
@@ -172,25 +236,25 @@ front first, or the reveal silently does nothing.
 candidate in `docs/architecture/code-audit.md`. This change splits it along the
 new IA — each piece owns one front or one zone.
 
-| File | Owns |
-|---|---|
-| `src/components/sidebar.tsx` | The shell: `<aside>`, the vault header row + create/collapse icons, the error lane, the switcher, front routing, the front auto-switch effect |
-| `src/components/sidebar/sidebarSwitcher.tsx` | The two-segment pill (presentational) |
-| `src/components/sidebar/sidebarHome.tsx` | The Home body: smart rows, view switcher + editors, the Main tree with its pointer-drag and multi-select, the roving list, the reveal effects |
-| `src/components/sidebar/sidebarChat.tsx` | The Chat body: New chat, All chats, chat folders, chat rows, chat drag + rename |
-| `src/components/sidebar/sidebarSystem.tsx` | The System zone: its disclosure header, Library + destination rows, added external folders |
-| `src/components/sidebar/sidebarFooter.tsx` | Files · Librarian · Settings, and the Librarian's badges + working dot |
-| `src/components/sidebar/useChatFolders.ts` | The chat-folder query + read-modify-write helper, shared by the Chat body and the shell's collapse-all |
-| `src/services/systemNav.ts` | `openSystemRoot(id)` — the one way to open the System browser at a root |
+| File                                         | Owns                                                                                                                                          |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/components/sidebar.tsx`                 | The shell: `<aside>`, the vault header row + create/collapse icons, the error lane, the switcher, front routing, the front auto-switch effect |
+| `src/components/sidebar/sidebarSwitcher.tsx` | The two-segment pill (presentational)                                                                                                         |
+| `src/components/sidebar/sidebarHome.tsx`     | The Home body: smart rows, view switcher + editors, the Main tree with its pointer-drag and multi-select, the roving list, the reveal effects |
+| `src/components/sidebar/sidebarChat.tsx`     | The Chat body: New chat, All chats, chat folders, chat rows, chat drag + rename                                                               |
+| `src/components/sidebar/sidebarSystem.tsx`   | The System zone: its disclosure header, Library + destination rows, added external folders                                                    |
+| `src/components/sidebar/sidebarFooter.tsx`   | Files · Librarian · Settings, and the Librarian's badges + working dot                                                                        |
+| `src/components/sidebar/useChatFolders.ts`   | The chat-folder query + read-modify-write helper, shared by the Chat body and the shell's collapse-all                                        |
+| `src/services/systemNav.ts`                  | `openSystemRoot(id)` — the one way to open the System browser at a root                                                                       |
 
 ## What this does not do
 
-- **No virtualization.** Home renders the *curated* Main tree, not every note,
+- **No virtualization.** Home renders the _curated_ Main tree, not every note,
   so its row count is unchanged by this work; Chat renders one row per chat.
   Neither is a 900-row list today. If either becomes one, windowing that list is
   the next step — measured first, not assumed.
 - **No new front.** Inbox (email) is still parked in `ROADMAP.md`. When it
   returns it is a third `SIDEBAR_FRONTS` entry, not a third accordion.
-- **No change to Breve.** Breve is still a sidebar *mode* (a lens over the same
+- **No change to Breve.** Breve is still a sidebar _mode_ (a lens over the same
   vault), which replaces the whole body including the switcher — a front
   switcher inside a mode that has its own navigation would be two switchers.

@@ -23,6 +23,8 @@
   --document-ink: #000000;
   --document-muted-ink: #595959;
   --document-border: #c6c6c6;
+  --format-word: #185abd; /* Microsoft Word file identity; fixed across app themes */
+  --on-format-word: #ffffff;
   --surface-2: #f1e7d8;
   --tint: #f2d6c2; /* Peach — selected/highlight backgrounds */
   --text: #3a3028; /* Cocoa */

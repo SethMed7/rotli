@@ -4,7 +4,7 @@
 //!
 //! MIRROR-NOT-IMPORT (the boundary law, see breve-runtime/docs/memex-boundary.md): rotli
 //! NEVER imports memex-vault's bun/node engine. It does file I/O here and only ever
-//! SHELLS OUT to the brain's own `scripts/validate.ts`. The byte-shape of the files
+//! never executes code stored in a memex. The byte-shape of the files
 //! it writes is mirrored in `src/memex/contract.ts` (TS) — this module just lays
 //! the bytes down atomically + under an advisory lock (Breve's daemon writes the
 //! same tree concurrently).
@@ -22,10 +22,11 @@
 //! commands at an arbitrary path). The active-instance registry lives OUTSIDE any corpus,
 //! in the app config dir, so a connected brain is never littered with rotli wiring.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -33,6 +34,50 @@ use tauri::Manager;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 use uuid::Uuid;
+
+use crate::fsutil::with_file_lock;
+
+const FOLDER_AUTHORIZATION_TTL: Duration = Duration::from_secs(5 * 60);
+
+/// Exact folders selected by a native picker. A webview-provided absolute path
+/// is never authority by itself; onboarding may reuse one selected path across
+/// inspect/review/activate steps for a short, bounded interval.
+#[derive(Default)]
+pub struct FolderAuthorizations(Mutex<HashMap<PathBuf, Instant>>);
+
+impl FolderAuthorizations {
+    fn authorize(&self, path: &Path) -> Result<PathBuf, String> {
+        let canonical = fs::canonicalize(path)
+            .map_err(|e| format!("open selected folder {}: {e}", path.display()))?;
+        if !canonical.is_dir() {
+            return Err("the selected path is not a folder".into());
+        }
+        let mut grants = self
+            .0
+            .lock()
+            .map_err(|_| "folder authorization lock poisoned".to_string())?;
+        let now = Instant::now();
+        grants.retain(|_, issued| now.duration_since(*issued) <= FOLDER_AUTHORIZATION_TTL);
+        grants.insert(canonical.clone(), now);
+        Ok(canonical)
+    }
+
+    pub(crate) fn require(&self, path: &Path) -> Result<PathBuf, String> {
+        let canonical = fs::canonicalize(path)
+            .map_err(|e| format!("open selected folder {}: {e}", path.display()))?;
+        let mut grants = self
+            .0
+            .lock()
+            .map_err(|_| "folder authorization lock poisoned".to_string())?;
+        let now = Instant::now();
+        grants.retain(|_, issued| now.duration_since(*issued) <= FOLDER_AUTHORIZATION_TTL);
+        if grants.contains_key(&canonical) {
+            Ok(canonical)
+        } else {
+            Err("this operation requires a folder selected in Rotli's native picker".into())
+        }
+    }
+}
 
 /// The memex contract version rotli is built against — MUST match
 /// `src/memex/contract.ts` `CONTRACT_VERSION` exactly (the lockstep test below
@@ -62,55 +107,6 @@ fn now_iso() -> String {
 /// Temp file in the SAME dir + rename — a concurrent reader never sees a torn file.
 fn atomic_write(path: &Path, contents: &str) -> Result<(), String> {
     crate::fsutil::atomic_write(path, contents, ".rotli-memex-")
-}
-
-/// How long a lockfile must sit untouched before it counts as STALE and is
-/// reclaimed — WELL ABOVE the ~10s max wait (#42, audit 2026-07: when the two
-/// were equal, a live >10s holder had its lockfile deleted out from under it).
-const LOCK_STALE: Duration = Duration::from_millis(30_000);
-
-/// A short advisory lock around a read-modify-write (mirrors conversations.ts
-/// `withFileLock`: O_EXCL lockfile, ~10s ceiling, stale-lock reclaim). Breve's
-/// daemon writes the same tree rotli does (e.g. both merge `memex.json`) — this
-/// serializes them. FAIL-CLOSED (#42): if the lock can't be acquired within the
-/// ceiling the write is REFUSED — never run the read-modify-write unserialized.
-fn with_file_lock<T>(target: &Path, f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
-    with_file_lock_attempts(target, 200, f) // 200 × 50ms ≈ the ~10s ceiling
-}
-
-fn with_file_lock_attempts<T>(
-    target: &Path,
-    attempts: u32,
-    f: impl FnOnce() -> Result<T, String>,
-) -> Result<T, String> {
-    let lock = PathBuf::from(format!("{}.lock", target.to_string_lossy()));
-    let mut held = false;
-    for _ in 0..attempts {
-        match fs::OpenOptions::new().write(true).create_new(true).open(&lock) {
-            Ok(_) => {
-                held = true;
-                break;
-            }
-            Err(_) => {
-                if let Ok(modified) = fs::metadata(&lock).and_then(|m| m.modified()) {
-                    if modified.elapsed().map(|d| d > LOCK_STALE).unwrap_or(false) {
-                        let _ = fs::remove_file(&lock);
-                        continue;
-                    }
-                }
-                std::thread::sleep(Duration::from_millis(50));
-            }
-        }
-    }
-    if !held {
-        return Err(format!(
-            "another writer is holding {} — try again in a moment",
-            lock.display()
-        ));
-    }
-    let result = f();
-    let _ = fs::remove_file(&lock);
-    result
 }
 
 // ─── the write guard (rotli owns chats/ + wiki/_inbox/, nothing else) ──────────
@@ -143,7 +139,7 @@ fn assert_writable(rel: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "rotli only writes chats, wiki/_inbox staging, and wiki/_secure here — the rest of memex-vault's memory is read-only (refused: {rel})"
+            "rotli only writes chats, Library intake, and secure notes here — the rest of this vault's reference layer is read-only (refused: {rel})"
         ))
     }
 }
@@ -184,9 +180,12 @@ pub struct DetectedMemex {
 /// dotfile) — so a folder with only macOS cruft still counts as empty/"fresh".
 fn dir_has_no_real_entries(root: &Path) -> bool {
     match fs::read_dir(root) {
-        Ok(rd) => !rd
-            .filter_map(|e| e.ok())
-            .any(|e| e.file_name().to_str().map(|n| !n.starts_with('.')).unwrap_or(true)),
+        Ok(rd) => !rd.filter_map(|e| e.ok()).any(|e| {
+            e.file_name()
+                .to_str()
+                .map(|n| !n.starts_with('.'))
+                .unwrap_or(true)
+        }),
         Err(_) => true,
     }
 }
@@ -333,7 +332,8 @@ fn stamp_rotli(memex_path: &Path) -> Result<(), String> {
             v["apps"] = serde_json::json!({});
         }
         if v["apps"].get("rotli").is_none() {
-            v["apps"]["rotli"] = serde_json::json!({ "role": "chat-system", "connectedAt": now_iso() });
+            v["apps"]["rotli"] =
+                serde_json::json!({ "role": "chat-system", "connectedAt": now_iso() });
             let json = serde_json::to_string_pretty(&v).map_err(|e| e.to_string())? + "\n";
             atomic_write(memex_path, &json)?;
         }
@@ -341,8 +341,10 @@ fn stamp_rotli(memex_path: &Path) -> Result<(), String> {
     })
 }
 
-// ─── bun resolution (for the validate.ts shell-out) ────────────────────────────
+// ─── bun resolution (trusted application-owned runtimes only) ────────────────
 
+/// Locate Bun for Rotli-owned Breve and routine entrypoints. Caller-controlled
+/// memex scripts must never be passed to this executable.
 pub(crate) fn find_bun() -> PathBuf {
     if let Ok(home) = std::env::var("HOME") {
         let p = PathBuf::from(format!("{home}/.bun/bin/bun"));
@@ -350,13 +352,13 @@ pub(crate) fn find_bun() -> PathBuf {
             return p;
         }
     }
-    for c in ["/opt/homebrew/bin/bun", "/usr/local/bin/bun"] {
-        let p = PathBuf::from(c);
+    for candidate in ["/opt/homebrew/bin/bun", "/usr/local/bin/bun"] {
+        let p = PathBuf::from(candidate);
         if p.exists() {
             return p;
         }
     }
-    PathBuf::from("bun") // last resort: rely on PATH
+    PathBuf::from("bun")
 }
 
 // ─── the registered-roots guard (#20, audit 2026-07) ───────────────────────────
@@ -386,10 +388,38 @@ pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<Path
     roots.extend(cfg.folders.into_iter().map(|f| f.abs_path));
     let want = PathBuf::from(root);
     if root_among(&roots, &want) {
-        fs::canonicalize(&want).map_err(|e| format!("bad memex root {root}: {e}"))
+        fs::canonicalize(&want).map_err(|e| format!("bad vault root {root}: {e}"))
     } else {
-        Err(format!("not a registered memex root: {root}"))
+        Err(format!("not a registered vault root: {root}"))
     }
+}
+
+/// Resolve a memex mutation target and independently enforce its configured
+/// capability. Being registered makes a root readable/routable; it does not
+/// grant the older memex adapter write access. This closes the alternate IPC
+/// lane around `CorpusStore::perms_read_only` for connected brains.
+fn registered_write_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, String> {
+    let want = registered_root(app, root)?;
+    let cfg = crate::corpus::ensure_corpus_config(app);
+    if memex_write_allowed(&cfg, &want) {
+        Ok(want)
+    } else {
+        Err("this vault is read-only for Rotli".into())
+    }
+}
+
+fn memex_write_allowed(cfg: &crate::corpus::CorpusConfig, want: &Path) -> bool {
+    let Ok(want) = fs::canonicalize(want) else {
+        return false;
+    };
+    if fs::canonicalize(&cfg.corpus.abs_path).is_ok_and(|path| path == want) {
+        return brain_view(&want).is_some_and(|(_, perms)| !perms.read_only());
+    }
+    cfg.brains.iter().any(|brain| {
+        !brain.perms.read_only()
+            && fs::canonicalize(&brain.abs_path).is_ok_and(|path| path == want)
+            && brain_view(&want).is_some()
+    })
 }
 
 // ─── commands ──────────────────────────────────────────────────────────────────
@@ -401,7 +431,7 @@ pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<Path
 pub fn memex_detect(app: tauri::AppHandle) -> Result<Vec<DetectedMemex>, String> {
     // A debug shell is an isolated review workspace. Never enumerate or offer
     // the user's production brains from `tauri dev`.
-    if crate::development_read_only() {
+    if cfg!(debug_assertions) {
         return Ok(Vec::new());
     }
     let mut roots: Vec<PathBuf> = Vec::new();
@@ -469,6 +499,36 @@ pub fn memex_read_contract(app: tauri::AppHandle, root: String) -> Result<Contra
 pub fn memex_read(app: tauri::AppHandle, root: String, rel: String) -> Result<String, String> {
     let root = registered_root(&app, &root)?;
     read_at(&root, &rel)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionedChat {
+    pub contents: String,
+    pub revision: String,
+}
+
+/// Read one chat with the revision that must accompany its next full-file
+/// replacement. Unlike the generic spine read, a missing chat is an error.
+#[tauri::command]
+pub fn memex_read_chat(
+    app: tauri::AppHandle,
+    root: String,
+    slug: String,
+) -> Result<VersionedChat, String> {
+    let root = registered_root(&app, &root)?;
+    read_chat_at(&root, &slug)
+}
+
+fn read_chat_at(root: &Path, slug: &str) -> Result<VersionedChat, String> {
+    let safe = safe_slug(slug)?;
+    let rel = format!("chats/{safe}.md");
+    let path = crate::containment::resolve_beneath(root, Path::new(&rel))?;
+    let bytes = fs::read(&path).map_err(|error| format!("read {rel}: {error}"))?;
+    let revision = crate::fsutil::revision(&bytes);
+    let contents =
+        String::from_utf8(bytes).map_err(|_| format!("chat is not valid UTF-8: {rel}"))?;
+    Ok(VersionedChat { contents, revision })
 }
 
 fn read_at(root: &Path, rel: &str) -> Result<String, String> {
@@ -657,12 +717,19 @@ pub struct BrainConnect {
 pub fn prepare_brain_connect(path: &Path) -> Result<BrainConnect, String> {
     let card = detect_one(path);
     if card.kind != "memex" {
-        return Err("That folder isn't a memex (no valid memex.json with an mx_ id).".into());
+        return Err("That folder isn't a compatible Rotli vault (its portable format marker is missing or invalid).".into());
     }
-    let memex_id = card.memex_id.clone().ok_or("memex.json has no id")?;
+    let memex_id = card
+        .memex_id
+        .clone()
+        .ok_or("the vault format marker has no id")?;
     let in_range = contract_ok(card.contract.as_deref());
     let mode = card.users_json.as_deref().map(parse_mode_raw);
-    let perms = if in_range { MemexPerms::ChatsInbox } else { MemexPerms::ReadOnly };
+    let perms = if in_range {
+        MemexPerms::ChatsInbox
+    } else {
+        MemexPerms::ReadOnly
+    };
     // additive stamp only when we're allowed to write (in-range contract)
     if in_range {
         stamp_rotli(&path.join("memex.json"))?;
@@ -697,7 +764,7 @@ pub fn brain_view(path: &Path) -> Option<(String, MemexPerms)> {
 /// onboarding's "create a new brain" path; refuses a non-empty folder.
 pub fn scaffold_memex(root: &Path) -> Result<String, String> {
     if root.exists() && !dir_has_no_real_entries(root) {
-        return Err("Pick an empty folder — rotli starts a fresh brain there.".into());
+        return Err("Pick an empty folder — rotli starts a fresh vault there.".into());
     }
     fs::create_dir_all(root).map_err(|e| e.to_string())?;
     for d in [
@@ -714,8 +781,14 @@ pub fn scaffold_memex(root: &Path) -> Result<String, String> {
     ] {
         fs::create_dir_all(root.join(d)).map_err(|e| e.to_string())?;
     }
-    atomic_write(&root.join("inbox.md"), &format!("# Inbox\n\n{INBOX_MARK}\n"))?;
-    atomic_write(&root.join("MAP.md"), "# MAP\n\nThe index of this memex.\n")?;
+    atomic_write(
+        &root.join("inbox.md"),
+        &format!("# Inbox\n\n{INBOX_MARK}\n"),
+    )?;
+    atomic_write(
+        &root.join("MAP.md"),
+        "# MAP\n\nThe index of this Rotli vault.\n",
+    )?;
     // the memex is a TEXT tree; binaries live in the gitignored storage/ (referenced
     // by storage: links), and .rotli/ is rotli's rebuildable sidecar.
     atomic_write(&root.join(".gitignore"), "storage/\n.rotli/\n")?;
@@ -739,10 +812,15 @@ pub fn scaffold_memex(root: &Path) -> Result<String, String> {
 /// snapshot only (the authoritative parse is TS `parseAccessMode`).
 fn parse_mode_raw(users_json: &str) -> String {
     match serde_json::from_str::<Value>(users_json) {
-        Ok(v) if v.get("users").map(|u| u.is_array()).unwrap_or(false)
-            && v.get("primary").map(|p| p.is_string()).unwrap_or(false) =>
+        Ok(v)
+            if v.get("users").map(|u| u.is_array()).unwrap_or(false)
+                && v.get("primary").map(|p| p.is_string()).unwrap_or(false) =>
         {
-            match v.get("mode").and_then(|m| m.as_str()).map(|s| s.trim().to_lowercase()) {
+            match v
+                .get("mode")
+                .and_then(|m| m.as_str())
+                .map(|s| s.trim().to_lowercase())
+            {
                 Some(m) if m == "local" || m == "open" => m,
                 _ => "secure".into(),
             }
@@ -760,60 +838,169 @@ pub fn memex_write_chat(
     root: String,
     slug: String,
     contents: String,
+    expected_revision: Option<String>,
 ) -> Result<String, String> {
-    if crate::development_read_only() {
-        return Err("the production memex is mounted read-only in development".into());
-    }
-    let root = registered_root(&app, &root)?;
-    write_chat_at(&root, &slug, &contents)
+    let root = registered_write_root(&app, &root)?;
+    write_chat_at(&root, &slug, &contents, expected_revision.as_deref())
 }
 
-fn write_chat_at(root: &Path, slug: &str, contents: &str) -> Result<String, String> {
+fn write_chat_at(
+    root: &Path,
+    slug: &str,
+    contents: &str,
+    expected_revision: Option<&str>,
+) -> Result<String, String> {
     let safe = safe_slug(slug)?;
     let rel = format!("chats/{safe}.md");
     assert_writable(&rel)?;
     let chats = root.join("chats");
     fs::create_dir_all(&chats).map_err(|e| e.to_string())?;
     let path = chats.join(format!("{safe}.md"));
-    with_file_lock(&path, || atomic_write(&path, contents))?;
+    with_file_lock(&path, || {
+        let existing = match fs::read(&path) {
+            Ok(existing) => Some(existing),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(format!("read existing chat: {error}")),
+        };
+        match (expected_revision, existing.as_deref()) {
+            (None, Some(_)) => {
+                return Err(format!(
+                    "chat already exists: {safe}; choose another title instead of replacing it"
+                ))
+            }
+            (Some(expected), Some(bytes)) => crate::fsutil::compare_revision(expected, bytes)?,
+            (Some(_), None) => return Err(format!("chat no longer exists: {safe}")),
+            (None, None) => {}
+        }
+        let existing_tainted = match existing {
+            Some(bytes) => {
+                let text = String::from_utf8(bytes)
+                    .map_err(|_| format!("existing chat is not valid UTF-8: {safe}"))?;
+                chat_secure_context(&text)
+            }
+            None => false,
+        };
+        let next = if existing_tainted {
+            ensure_chat_secure_context(contents)
+        } else {
+            contents.to_string()
+        };
+        atomic_write(&path, &next)
+    })?;
     Ok(path.to_string_lossy().to_string())
+}
+
+fn chat_frontmatter_bounds(contents: &str) -> Option<(usize, usize, &'static str)> {
+    let (start, eol) = if contents.starts_with("---\r\n") {
+        (5, "\r\n")
+    } else if contents.starts_with("---\n") {
+        (4, "\n")
+    } else {
+        return None;
+    };
+    let closing = contents[start..].find(&format!("{eol}---"))? + start;
+    Some((start, closing, eol))
+}
+
+fn chat_secure_context(contents: &str) -> bool {
+    let Some((start, end, _)) = chat_frontmatter_bounds(contents) else {
+        return false;
+    };
+    contents[start..end].lines().any(|line| {
+        line.split_once(':')
+            .is_some_and(|(key, value)| key.trim() == "secureContext" && value.trim() == "true")
+    })
+}
+
+fn ensure_chat_secure_context(contents: &str) -> String {
+    if chat_secure_context(contents) {
+        return contents.to_string();
+    }
+    let Some((start, end, eol)) = chat_frontmatter_bounds(contents) else {
+        return format!("---\nsecureContext: true\n---\n\n{contents}");
+    };
+    let block = &contents[start..end];
+    let mut lines: Vec<&str> = block.lines().collect();
+    let mut replaced = false;
+    for line in &mut lines {
+        if line
+            .split_once(':')
+            .is_some_and(|(key, _)| key.trim() == "secureContext")
+        {
+            *line = "secureContext: true";
+            replaced = true;
+        }
+    }
+    let mut block = lines.join(eol);
+    if !replaced {
+        if !block.is_empty() {
+            block.push_str(eol);
+        }
+        block.push_str("secureContext: true");
+    }
+    format!("{}{}{}", &contents[..start], block, &contents[end..])
 }
 
 /// The chat-folder manifest — a REBUILDABLE `.rotli` sidecar grouping the flat
 /// `chats/` surface into user folders (chats never move on disk; delete the
 /// file and the list is simply flat again). Fixed relative path, so there is
 /// no traversal surface. Absent reads as "" — TS owns the shape.
-#[tauri::command]
-pub fn memex_chat_folders(app: tauri::AppHandle, root: String) -> Result<String, String> {
-    let root = registered_root(&app, &root)?;
-    match fs::read_to_string(root.join(".rotli/chat-folders.json")) {
-        Ok(contents) => Ok(contents),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
-        Err(e) => Err(format!("read chat folders: {e}")),
-    }
+fn read_chat_folders_at(root: &Path) -> Result<crate::fsutil::VersionedText, String> {
+    let contents = match fs::read_to_string(root.join(".rotli/chat-folders.json")) {
+        Ok(contents) => contents,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(format!("read chat folders: {e}")),
+    };
+    Ok(crate::fsutil::versioned_text(contents))
 }
 
-/// Write the chat-folder manifest. Same debug read-only guard as every memex
-/// write; contents must be valid JSON and index-sized (it's a projection, not
-/// a store).
+#[tauri::command]
+pub fn memex_chat_folders(
+    app: tauri::AppHandle,
+    root: String,
+) -> Result<crate::fsutil::VersionedText, String> {
+    let root = registered_root(&app, &root)?;
+    read_chat_folders_at(&root)
+}
+
+/// Write the chat-folder manifest. Contents must be valid JSON and index-sized
+/// (it's a projection, not a store).
+fn write_chat_folders_at(
+    root: &Path,
+    contents: &str,
+    expected_revision: &str,
+) -> Result<String, String> {
+    if contents.len() > 262_144 {
+        return Err(
+            "the chat-folders manifest is unexpectedly large — refusing to write it.".into(),
+        );
+    }
+    serde_json::from_str::<serde_json::Value>(contents)
+        .map_err(|e| format!("chat folders must be valid JSON: {e}"))?;
+    let dir = root.join(".rotli");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join("chat-folders.json");
+    with_file_lock(&path, || {
+        let current = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(error) => return Err(format!("read chat folders: {error}")),
+        };
+        crate::fsutil::compare_revision(expected_revision, &current)?;
+        atomic_write(&path, contents)?;
+        Ok(crate::fsutil::revision(contents.as_bytes()))
+    })
+}
+
 #[tauri::command]
 pub fn memex_write_chat_folders(
     app: tauri::AppHandle,
     root: String,
     contents: String,
-) -> Result<(), String> {
-    if crate::development_read_only() {
-        return Err("the production memex is mounted read-only in development".into());
-    }
-    let root = registered_root(&app, &root)?;
-    if contents.len() > 262_144 {
-        return Err("the chat-folders manifest is unexpectedly large — refusing to write it.".into());
-    }
-    serde_json::from_str::<serde_json::Value>(&contents)
-        .map_err(|e| format!("chat folders must be valid JSON: {e}"))?;
-    let dir = root.join(".rotli");
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    atomic_write(&dir.join("chat-folders.json"), &contents)
+    expected_revision: String,
+) -> Result<String, String> {
+    let root = registered_write_root(&app, &root)?;
+    write_chat_folders_at(&root, &contents, &expected_revision)
 }
 
 /// Rename a chat: `chats/<old>.md` → `chats/<new>.md`. Both slugs are re-validated
@@ -827,10 +1014,7 @@ pub fn memex_rename_chat(
     old_slug: String,
     new_slug: String,
 ) -> Result<String, String> {
-    if crate::development_read_only() {
-        return Err("the production memex is mounted read-only in development".into());
-    }
-    let root = registered_root(&app, &root)?;
+    let root = registered_write_root(&app, &root)?;
     let old_safe = safe_slug(&old_slug)?;
     let new_safe = safe_slug(&new_slug)?;
     assert_writable(&format!("chats/{old_safe}.md"))?;
@@ -856,18 +1040,12 @@ pub fn memex_rename_chat(
 /// rotli's writable `chats/` surface. Registered root (#20). (Seth #4, 2026-07-08.)
 #[tauri::command]
 pub fn memex_delete_chat(app: tauri::AppHandle, root: String, slug: String) -> Result<(), String> {
-    if crate::development_read_only() {
-        return Err("the production memex is mounted read-only in development".into());
-    }
     move_chat_to_bucket(&app, &root, &slug, "trash")
 }
 
 /// Archive a chat: the same move, into `chats/archive/` — out of the way, still kept.
 #[tauri::command]
 pub fn memex_archive_chat(app: tauri::AppHandle, root: String, slug: String) -> Result<(), String> {
-    if crate::development_read_only() {
-        return Err("the production memex is mounted read-only in development".into());
-    }
     move_chat_to_bucket(&app, &root, &slug, "archive")
 }
 
@@ -905,7 +1083,7 @@ fn move_chat_to_bucket(
     slug: &str,
     bucket: &str,
 ) -> Result<(), String> {
-    let root = registered_root(app, root)?;
+    let root = registered_write_root(app, root)?;
     let safe = safe_slug(slug)?;
     assert_writable(&format!("chats/{safe}.md"))?;
     assert_writable(&format!("chats/{bucket}/{safe}.md"))?;
@@ -935,20 +1113,32 @@ pub fn memex_write_note(
     stem: String,
     contents: String,
 ) -> Result<String, String> {
-    if crate::development_read_only() {
-        return Err("the production memex is mounted read-only in development".into());
-    }
-    let root = registered_root(&app, &root)?;
-    write_note_at(&root, &stem, &contents)
+    let root = registered_write_root(&app, &root)?;
+    let suppress = app
+        .state::<crate::corpus::CorpusState>()
+        .suppress_set_for_root(&root)?;
+    write_note_at_with_suppress(&root, &stem, &contents, Some(&suppress))
 }
 
+#[cfg(test)]
 fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, String> {
+    write_note_at_with_suppress(root, stem, contents, None)
+}
+
+fn write_note_at_with_suppress(
+    root: &Path,
+    stem: &str,
+    contents: &str,
+    suppress: Option<&crate::corpus::SuppressSet>,
+) -> Result<String, String> {
     let safe = safe_slug(stem)?;
     let secure = contents
         .strip_prefix("---\n")
         .and_then(|rest| rest.split_once("\n---"))
         .is_some_and(|(frontmatter, _)| {
-            frontmatter.lines().any(|line| line.trim() == "secure: true")
+            frontmatter
+                .lines()
+                .any(|line| line.trim() == "secure: true")
         });
     let librarian_enabled = secure || librarian_enabled_at(root)?;
     let lane = if secure {
@@ -986,6 +1176,13 @@ fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, Stri
                 atomic_write(&ignore, &next)?;
             }
         }
+        // Invalidate the registered CorpusStore's warm walk cache before the
+        // bytes land. The same mark suppresses the watcher echo, exactly as a
+        // native CorpusStore write does. A failed write merely causes a safe
+        // rescan on the next read.
+        if let Some(suppress) = suppress {
+            suppress.mark(&path);
+        }
         atomic_write(&path, contents)?;
         Ok(path.to_string_lossy().to_string())
     })
@@ -999,7 +1196,9 @@ fn assert_note_creation_writable(rel: &str, raw_root: bool) -> Result<(), String
     if !file.is_empty() && !file.contains('/') && file.ends_with(".md") {
         Ok(())
     } else {
-        Err(format!("raw-vault note creation escaped the wiki root: {rel}"))
+        Err(format!(
+            "raw-vault note creation escaped the wiki root: {rel}"
+        ))
     }
 }
 
@@ -1013,7 +1212,9 @@ fn librarian_enabled_at(root: &Path) -> Result<bool, String> {
             .and_then(|value| value.get("brainEnabled").and_then(Value::as_bool))
             .unwrap_or(true)),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(true),
-        Err(error) => Err(format!("read Librarian setting before note creation: {error}")),
+        Err(error) => Err(format!(
+            "read Librarian setting before note creation: {error}"
+        )),
     }
 }
 
@@ -1027,12 +1228,11 @@ pub struct ValidateReport {
     pub warnings: u32,
 }
 
-/// Shell out to the brain's own `scripts/validate.ts` (mirror-not-import: we exec
-/// it by path, never load it). Degrades to "skipped" if bun / the script is absent.
-/// The ROOT must be registered (#20) — this execs a script FROM the target tree.
-/// ASYNC command (perf audit 2026-07-30, #14): the `bun validate.ts` subprocess
-/// is unbounded and froze the window for its full run. It executes on a worker
-/// now; the registered-root gate (#20) stays exactly where it was.
+/// Validation must treat the memex as DATA. Older builds executed
+/// `scripts/validate.ts` from the selected root with Rotli's inherited
+/// environment; a crafted imported vault could therefore run arbitrary code.
+/// Until the validator is ported behind a narrow Rust data API, report the
+/// check as skipped instead of violating the content/code boundary.
 #[tauri::command]
 pub async fn memex_validate(app: tauri::AppHandle, root: String) -> Result<ValidateReport, String> {
     tauri::async_runtime::spawn_blocking(move || memex_validate_blocking(&app, &root))
@@ -1041,56 +1241,33 @@ pub async fn memex_validate(app: tauri::AppHandle, root: String) -> Result<Valid
 }
 
 fn memex_validate_blocking(app: &tauri::AppHandle, root: &str) -> Result<ValidateReport, String> {
-    if crate::development_read_only() {
+    if cfg!(debug_assertions) {
         return Ok(ValidateReport {
             ok: true,
             skipped: true,
-            stdout: "production memex validation is disabled in development".into(),
+            stdout: "production vault validation is disabled in development".into(),
             errors: 0,
             warnings: 0,
         });
     }
     let root = registered_root(app, root)?;
-    let script = root.join("scripts").join("validate.ts");
-    if !script.exists() {
-        return Ok(ValidateReport {
-            ok: true,
-            skipped: true,
-            stdout: "no scripts/validate.ts here — validation skipped".into(),
-            errors: 0,
-            warnings: 0,
-        });
-    }
-    let out = std::process::Command::new(find_bun())
-        .arg(&script)
-        .current_dir(&root)
-        .output();
-    let out = match out {
-        Ok(o) => o,
-        Err(_) => {
-            return Ok(ValidateReport {
-                ok: true,
-                skipped: true,
-                stdout: "bun not found — validation skipped".into(),
-                errors: 0,
-                warnings: 0,
-            })
+    Ok(safe_validation_report(&root))
+}
+
+fn safe_validation_report(root: &Path) -> ValidateReport {
+    let has_script = root.join("scripts/validate.ts").is_file();
+    ValidateReport {
+        ok: true,
+        skipped: true,
+        stdout: if has_script {
+            "Library script not run — Rotli treats files in a vault as untrusted data. Use the vault's own trusted tooling to validate it."
+        } else {
+            "No built-in safe validator is available for this library yet."
         }
-    };
-    let combined = format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let errors = combined.matches('✗').count() as u32;
-    let warnings = combined.matches('⚠').count() as u32;
-    Ok(ValidateReport {
-        ok: out.status.success(),
-        skipped: false,
-        stdout: combined,
-        errors,
-        warnings,
-    })
+        .into(),
+        errors: 0,
+        warnings: 0,
+    }
 }
 
 /// Native folder picker that returns a path WITHOUT moving anything (for
@@ -1106,15 +1283,14 @@ pub async fn memex_pick_folder(app: tauri::AppHandle) -> Result<Option<String>, 
         let picked = app
             .dialog()
             .file()
-            .set_title("Choose a memex folder")
+            .set_title("Choose a Rotli vault")
             .blocking_pick_folder();
         match picked {
-            Some(fp) => Ok(Some(
-                fp.into_path()
-                    .map_err(|e| e.to_string())?
-                    .to_string_lossy()
-                    .to_string(),
-            )),
+            Some(fp) => {
+                let path = fp.into_path().map_err(|e| e.to_string())?;
+                let canonical = app.state::<FolderAuthorizations>().authorize(&path)?;
+                Ok(Some(canonical.to_string_lossy().to_string()))
+            }
             None => Ok(None),
         }
     })
@@ -1138,9 +1314,9 @@ mod tests {
         for root in [&a, &b] {
             fs::create_dir_all(root.join("chats")).unwrap();
         }
-        write_chat_at(&a, "daily", "---\ntitle: A's daily\n---\nbody a\n").unwrap();
-        write_chat_at(&b, "daily", "---\ntitle: B's daily\n---\nbody b\n").unwrap();
-        write_chat_at(&a, "only-in-a", "---\ntitle: Only A\n---\n").unwrap();
+        write_chat_at(&a, "daily", "---\ntitle: A's daily\n---\nbody a\n", None).unwrap();
+        write_chat_at(&b, "daily", "---\ntitle: B's daily\n---\nbody b\n", None).unwrap();
+        write_chat_at(&a, "only-in-a", "---\ntitle: Only A\n---\n", None).unwrap();
 
         let list_a = list_chats_at(&a).unwrap();
         let list_b = list_chats_at(&b).unwrap();
@@ -1150,15 +1326,22 @@ mod tests {
         assert_eq!(list_b[0].title, "B's daily");
         assert!(!list_b.iter().any(|c| c.slug == "only-in-a"));
         // same slug, distinct files — a write in A never touched B
-        assert!(fs::read_to_string(a.join("chats/daily.md")).unwrap().contains("body a"));
-        assert!(fs::read_to_string(b.join("chats/daily.md")).unwrap().contains("body b"));
+        assert!(fs::read_to_string(a.join("chats/daily.md"))
+            .unwrap()
+            .contains("body a"));
+        assert!(fs::read_to_string(b.join("chats/daily.md"))
+            .unwrap()
+            .contains("body b"));
         // and a slug cannot traverse out of its root
-        assert!(write_chat_at(&a, "../escape", "x").is_err());
+        assert!(write_chat_at(&a, "../escape", "x", None).is_err());
     }
 
     #[test]
     fn memex_perms_round_trip_their_wire_strings() {
-        for (perms, wire) in [(MemexPerms::ChatsInbox, "chats+inbox"), (MemexPerms::ReadOnly, "read-only")] {
+        for (perms, wire) in [
+            (MemexPerms::ChatsInbox, "chats+inbox"),
+            (MemexPerms::ReadOnly, "read-only"),
+        ] {
             let json = serde_json::to_string(&perms).unwrap();
             assert_eq!(json, format!("\"{wire}\""));
             assert_eq!(serde_json::from_str::<MemexPerms>(&json).unwrap(), perms);
@@ -1169,6 +1352,58 @@ mod tests {
         assert_eq!(MemexPerms::parse("admin"), None);
         assert!(MemexPerms::ReadOnly.read_only());
         assert!(!MemexPerms::ChatsInbox.read_only());
+    }
+
+    #[test]
+    fn every_memex_write_requires_the_roots_rust_configured_capability() {
+        use crate::corpus::{ConnectedBrain, CorpusConfig, CorpusRef, CorpusRoot};
+
+        let tmp = tempfile::tempdir().unwrap();
+        let primary = tmp.path().join("primary");
+        let read_only = tmp.path().join("read-only");
+        let writable = tmp.path().join("writable");
+        let added_folder = tmp.path().join("added-folder");
+        for path in [&primary, &read_only, &writable] {
+            scaffold_memex(path).unwrap();
+        }
+        fs::create_dir_all(&added_folder).unwrap();
+        let config = CorpusConfig {
+            version: 1,
+            corpus: CorpusRef {
+                abs_path: primary.clone(),
+                adopted: false,
+            },
+            brains: vec![
+                ConnectedBrain {
+                    id: "read-only".into(),
+                    label: "Read only".into(),
+                    abs_path: read_only.clone(),
+                    memex_id: None,
+                    mode: None,
+                    perms: MemexPerms::ReadOnly,
+                },
+                ConnectedBrain {
+                    id: "writable".into(),
+                    label: "Writable".into(),
+                    abs_path: writable.clone(),
+                    memex_id: None,
+                    mode: None,
+                    perms: MemexPerms::ChatsInbox,
+                },
+            ],
+            folders: vec![CorpusRoot {
+                id: "folder".into(),
+                label: "Folder".into(),
+                abs_path: added_folder.clone(),
+                adopted: true,
+            }],
+            active_brain_id: None,
+        };
+
+        assert!(memex_write_allowed(&config, &primary));
+        assert!(!memex_write_allowed(&config, &read_only));
+        assert!(memex_write_allowed(&config, &writable));
+        assert!(!memex_write_allowed(&config, &added_folder));
     }
 
     #[test]
@@ -1268,17 +1503,23 @@ mod tests {
         let lock = dir.path().join("inbox.md.lock");
         std::fs::write(&lock, "").unwrap(); // a live holder (fresh mtime)
         let mut ran = false;
-        let r = with_file_lock_attempts(&target, 3, || {
+        let r = crate::fsutil::with_file_lock_attempts(&target, 3, || {
             ran = true;
             Ok(())
         });
-        assert!(r.is_err(), "non-acquisition must be an Err, not a fallthrough");
+        assert!(
+            r.is_err(),
+            "non-acquisition must be an Err, not a fallthrough"
+        );
         assert!(!ran, "the closure must NOT run without the lock");
-        assert!(lock.exists(), "a live holder's lockfile is never dispossessed");
+        assert!(
+            lock.exists(),
+            "a live holder's lockfile is never dispossessed"
+        );
 
         // once the holder releases, the same write goes through and cleans up
         std::fs::remove_file(&lock).unwrap();
-        let r = with_file_lock_attempts(&target, 3, || Ok(42));
+        let r = crate::fsutil::with_file_lock_attempts(&target, 3, || Ok(42));
         assert_eq!(r.unwrap(), 42);
         assert!(!lock.exists(), "the lock is released after the write");
     }
@@ -1290,7 +1531,10 @@ mod tests {
         let b = tempfile::tempdir().unwrap();
         let roots = vec![a.path().to_path_buf()];
         assert!(root_among(&roots, a.path()));
-        assert!(!root_among(&roots, b.path()), "an unregistered dir is refused");
+        assert!(
+            !root_among(&roots, b.path()),
+            "an unregistered dir is refused"
+        );
         assert!(
             !root_among(&roots, &a.path().join("missing")),
             "a nonexistent path fails closed"
@@ -1339,7 +1583,8 @@ mod tests {
         let path = write_note_at(root, stem, body).unwrap();
         assert!(path.ends_with("wiki/_inbox/pricing-decision.md"));
         assert_eq!(std::fs::read_to_string(&path).unwrap(), body);
-        let duplicate = write_note_at(root, stem, "---\nid: 02JTEST\n---\n# Pricing decision\n").unwrap();
+        let duplicate =
+            write_note_at(root, stem, "---\nid: 02JTEST\n---\n# Pricing decision\n").unwrap();
         assert!(duplicate.ends_with("wiki/_inbox/pricing-decision (2).md"));
         // a stem with a path separator / traversal / caps is rejected by safe_slug
         assert!(write_note_at(root, "../escape", "x").is_err());
@@ -1348,11 +1593,34 @@ mod tests {
     }
 
     #[test]
+    fn write_note_invalidates_a_warm_corpus_cache_before_immediate_readback() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("vault");
+        scaffold_memex(&root).unwrap();
+        let mut store = crate::corpus::CorpusStore::open(root.clone()).unwrap();
+        store.list().unwrap(); // reproduce the stale-cache precondition
+        let suppress = store.suppress_set();
+        let id = "01J00000000000000000000000";
+        let body = format!("---\nid: {id}\n---\n# Conversation note\n");
+
+        write_note_at_with_suppress(&root, "conversation-note", &body, Some(&suppress)).unwrap();
+
+        let note = store
+            .read(id)
+            .expect("the creating command must make the note immediately readable");
+        assert!(note.body.contains("Conversation note"));
+    }
+
+    #[test]
     fn raw_vault_note_creation_uses_the_wiki_root_not_librarian_intake() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         std::fs::create_dir_all(root.join(".rotli")).unwrap();
-        std::fs::write(root.join(".rotli/settings.json"), "{\"brainEnabled\":false}\n").unwrap();
+        std::fs::write(
+            root.join(".rotli/settings.json"),
+            "{\"brainEnabled\":false}\n",
+        )
+        .unwrap();
         let body = "---\nid: 01JRAW\n---\n# Plain note\n";
 
         let path = write_note_at(root, "plain-note", body).unwrap();
@@ -1393,16 +1661,123 @@ mod tests {
         assert!(Path::new(&path).is_file());
         assert!(path.ends_with("wiki/_secure/private-01secure.md"));
         let ignored = fs::read_to_string(root.join(".gitignore")).unwrap();
-        assert!(ignored.lines().any(|line| line.trim() == "wiki/_secure/private-01secure.md"));
+        assert!(ignored
+            .lines()
+            .any(|line| line.trim() == "wiki/_secure/private-01secure.md"));
     }
 
     #[test]
     fn safe_slug_rejects_path_tricks() {
-        assert_eq!(safe_slug("rotli-architecture").unwrap(), "rotli-architecture");
+        assert_eq!(
+            safe_slug("rotli-architecture").unwrap(),
+            "rotli-architecture"
+        );
         assert!(safe_slug("../etc/passwd").is_err());
         assert!(safe_slug("a/b").is_err());
         assert!(safe_slug("Caps").is_err());
         assert!(safe_slug("").is_err());
+    }
+
+    #[test]
+    fn secure_chat_taint_is_one_way_at_the_rust_write_boundary() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = fs::canonicalize(dir.path()).unwrap();
+        write_chat_at(
+            &root,
+            "tainted",
+            "---\ntitle: Tainted\nsecureContext: true\n---\n\nsecret-derived turn\n",
+            None,
+        )
+        .unwrap();
+
+        let revision = read_chat_at(&root, "tainted").unwrap().revision;
+
+        write_chat_at(
+            &root,
+            "tainted",
+            "---\ntitle: Tainted\n---\n\ncaller omitted the marker\n",
+            Some(&revision),
+        )
+        .unwrap();
+
+        let saved = fs::read_to_string(root.join("chats/tainted.md")).unwrap();
+        assert!(saved.contains("secureContext: true"));
+
+        let crlf = "---\r\ntitle: Private\r\nsecureContext: true\r\n---\r\n\r\nsecret\r\n";
+        assert!(chat_secure_context(crlf));
+        let rewritten = ensure_chat_secure_context(
+            "---\r\ntitle: Private\r\nsecureContext: false\r\n---\r\n\r\nsecret\r\n",
+        );
+        assert!(rewritten.contains("secureContext: true\r\n---"));
+    }
+
+    #[test]
+    fn chat_create_and_update_never_overwrite_an_existing_or_newer_transcript() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = fs::canonicalize(dir.path()).unwrap();
+        let original = "---\ntitle: Daily\n---\n\nfirst turn\n";
+        write_chat_at(&root, "daily", original, None).unwrap();
+        let opened = read_chat_at(&root, "daily").unwrap();
+
+        assert!(write_chat_at(&root, "daily", "replacement", None).is_err());
+        write_chat_at(
+            &root,
+            "daily",
+            "---\ntitle: Daily\n---\n\nexternal turn\n",
+            Some(&opened.revision),
+        )
+        .unwrap();
+        assert!(write_chat_at(&root, "daily", "stale local turn", Some(&opened.revision)).is_err());
+
+        let saved = read_chat_at(&root, "daily").unwrap();
+        assert!(saved.contents.contains("external turn"));
+        assert!(!saved.contents.contains("stale local turn"));
+    }
+
+    #[test]
+    fn stale_chat_folder_projection_never_replaces_a_newer_grouping() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = fs::canonicalize(dir.path()).unwrap();
+        let opened = read_chat_folders_at(&root).unwrap();
+        let first =
+            r#"{"version":1,"folders":[{"id":"work","name":"Work"}],"assignments":{},"order":{}}"#;
+        write_chat_folders_at(&root, first, &opened.revision).unwrap();
+        let stale =
+            r#"{"version":1,"folders":[{"id":"old","name":"Old"}],"assignments":{},"order":{}}"#;
+        let error = write_chat_folders_at(&root, stale, &opened.revision).unwrap_err();
+        assert!(error.contains("revision conflict"), "{error}");
+        assert_eq!(read_chat_folders_at(&root).unwrap().contents, first);
+    }
+
+    #[test]
+    fn folder_authority_is_exact_and_comes_from_native_selection() {
+        let dir = tempfile::tempdir().unwrap();
+        let selected = dir.path().join("selected");
+        let sibling = dir.path().join("sibling");
+        fs::create_dir_all(&selected).unwrap();
+        fs::create_dir_all(&sibling).unwrap();
+        let grants = FolderAuthorizations::default();
+
+        assert!(grants.require(&selected).is_err());
+        let canonical = grants.authorize(&selected).unwrap();
+        assert_eq!(grants.require(&selected).unwrap(), canonical);
+        assert!(grants.require(&sibling).is_err());
+    }
+
+    #[test]
+    fn library_validation_never_executes_a_script_from_the_memex() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("scripts")).unwrap();
+        fs::write(
+            dir.path().join("scripts/validate.ts"),
+            "await Bun.write('../executed', 'pwned')",
+        )
+        .unwrap();
+
+        let report = safe_validation_report(dir.path());
+        assert!(report.skipped);
+        assert!(!dir.path().join("executed").exists());
+        assert!(report.stdout.contains("untrusted data"));
     }
 
     #[test]

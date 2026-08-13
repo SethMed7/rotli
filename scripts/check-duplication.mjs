@@ -44,12 +44,16 @@
 // listed files) for decisions that must survive edits, e.g. the organizer.rs-
 // vs-Breve retry divergence (synthesis: "do not fix", permanent).
 
-import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdtempSync, rmSync } from "node:fs";
-import { join, relative } from "node:path";
-import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import ts from "typescript";
+import { join, relative } from "node:path";
+
+// TypeScript 7's default package export is the CLI/version shim and no longer
+// exposes the stable compiler API this miner needs. The repository pins the
+// compatibility compiler explicitly for AST-based tooling.
+import ts from "typescript6";
 
 const root = process.cwd();
 const args = process.argv.slice(2);
@@ -80,31 +84,158 @@ const SCAN_ROOTS = [
 // Control keywords survive normalization (both languages, one set — shingles
 // only ever compare within-language, so overlap is harmless).
 const KEYWORDS = new Set([
-  "if", "else", "for", "while", "do", "return", "break", "continue", "switch", "case", "default",
-  "try", "catch", "finally", "throw", "new", "typeof", "instanceof", "in", "of", "void", "delete",
-  "function", "class", "extends", "super", "this", "const", "let", "var", "async", "await", "yield",
-  "import", "export", "from", "as", "interface", "type", "enum", "namespace", "readonly", "static",
-  "public", "private", "protected", "abstract", "true", "false", "null", "undefined", "never", "unknown",
-  "any", "string", "number", "boolean", "object", "symbol", "bigint", "keyof", "infer", "satisfies", "is",
-  "fn", "pub", "mut", "impl", "struct", "trait", "mod", "use", "crate", "self", "Self", "match", "loop",
-  "ref", "move", "dyn", "where", "unsafe", "extern", "Some", "None", "Ok", "Err", "Box", "Vec", "String",
-  "Option", "Result", "u8", "u16", "u32", "u64", "usize", "i8", "i16", "i32", "i64", "isize", "f32", "f64",
-  "str", "bool", "char",
+  "if",
+  "else",
+  "for",
+  "while",
+  "do",
+  "return",
+  "break",
+  "continue",
+  "switch",
+  "case",
+  "default",
+  "try",
+  "catch",
+  "finally",
+  "throw",
+  "new",
+  "typeof",
+  "instanceof",
+  "in",
+  "of",
+  "void",
+  "delete",
+  "function",
+  "class",
+  "extends",
+  "super",
+  "this",
+  "const",
+  "let",
+  "var",
+  "async",
+  "await",
+  "yield",
+  "import",
+  "export",
+  "from",
+  "as",
+  "interface",
+  "type",
+  "enum",
+  "namespace",
+  "readonly",
+  "static",
+  "public",
+  "private",
+  "protected",
+  "abstract",
+  "true",
+  "false",
+  "null",
+  "undefined",
+  "never",
+  "unknown",
+  "any",
+  "string",
+  "number",
+  "boolean",
+  "object",
+  "symbol",
+  "bigint",
+  "keyof",
+  "infer",
+  "satisfies",
+  "is",
+  "fn",
+  "pub",
+  "mut",
+  "impl",
+  "struct",
+  "trait",
+  "mod",
+  "use",
+  "crate",
+  "self",
+  "Self",
+  "match",
+  "loop",
+  "ref",
+  "move",
+  "dyn",
+  "where",
+  "unsafe",
+  "extern",
+  "Some",
+  "None",
+  "Ok",
+  "Err",
+  "Box",
+  "Vec",
+  "String",
+  "Option",
+  "Result",
+  "u8",
+  "u16",
+  "u32",
+  "u64",
+  "usize",
+  "i8",
+  "i16",
+  "i32",
+  "i64",
+  "isize",
+  "f32",
+  "f64",
+  "str",
+  "bool",
+  "char",
 ]);
 
 // Bare global API calls that carry signal (property accesses are kept by the
 // after-dot rule; these appear without a receiver).
 const KNOWN_GLOBALS = new Set([
-  "setTimeout", "clearTimeout", "setInterval", "clearInterval", "requestAnimationFrame",
-  "cancelAnimationFrame", "fetch", "structuredClone", "queueMicrotask", "console", "window",
-  "document", "navigator", "JSON", "Math", "Promise", "Object", "Array", "Date", "Map", "Set",
-  "addEventListener", "removeEventListener",
+  "setTimeout",
+  "clearTimeout",
+  "setInterval",
+  "clearInterval",
+  "requestAnimationFrame",
+  "cancelAnimationFrame",
+  "fetch",
+  "structuredClone",
+  "queueMicrotask",
+  "console",
+  "window",
+  "document",
+  "navigator",
+  "JSON",
+  "Math",
+  "Promise",
+  "Object",
+  "Array",
+  "Date",
+  "Map",
+  "Set",
+  "addEventListener",
+  "removeEventListener",
 ]);
 
 const LIFECYCLE_EVENTS = new Set([
-  "addEventListener", "removeEventListener", "pointerdown", "pointermove", "pointerup",
-  "pointercancel", "spawn", "kill", "open", "close", "setInterval", "clearInterval",
-  "setTimeout", "clearTimeout",
+  "addEventListener",
+  "removeEventListener",
+  "pointerdown",
+  "pointermove",
+  "pointerup",
+  "pointercancel",
+  "spawn",
+  "kill",
+  "open",
+  "close",
+  "setInterval",
+  "clearInterval",
+  "setTimeout",
+  "clearTimeout",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -117,15 +248,25 @@ function tokenize(src, lang) {
   const n = src.length;
   while (i < n) {
     const c = src[i];
-    if (c === " " || c === "\t" || c === "\n" || c === "\r") { i++; continue; }
-    if (c === "/" && src[i + 1] === "/") { while (i < n && src[i] !== "\n") i++; continue; }
+    if (c === " " || c === "\t" || c === "\n" || c === "\r") {
+      i++;
+      continue;
+    }
+    if (c === "/" && src[i + 1] === "/") {
+      while (i < n && src[i] !== "\n") i++;
+      continue;
+    }
     if (c === "/" && src[i + 1] === "*") {
       let depth = 1;
       i += 2;
       while (i < n && depth > 0) {
-        if (lang === "rust" && src[i] === "/" && src[i + 1] === "*") { depth++; i += 2; }
-        else if (src[i] === "*" && src[i + 1] === "/") { depth--; i += 2; }
-        else i++;
+        if (lang === "rust" && src[i] === "/" && src[i + 1] === "*") {
+          depth++;
+          i += 2;
+        } else if (src[i] === "*" && src[i + 1] === "/") {
+          depth--;
+          i += 2;
+        } else i++;
       }
       continue;
     }
@@ -143,15 +284,26 @@ function tokenize(src, lang) {
     if (c === '"' || c === "'" || (c === "`" && lang !== "rust")) {
       if (c === "'" && lang === "rust") {
         const m = /^'(?:\\.|[^'\\])'/.exec(src.slice(i, i + 8));
-        if (m) { toks.push({ kind: "str", value: m[0].slice(1, -1) }); i += m[0].length; continue; }
-        toks.push({ kind: "punct", text: "'" }); i++; continue; // lifetime tick
+        if (m) {
+          toks.push({ kind: "str", value: m[0].slice(1, -1) });
+          i += m[0].length;
+          continue;
+        }
+        toks.push({ kind: "punct", text: "'" });
+        i++;
+        continue; // lifetime tick
       }
       const quote = c;
       let j = i + 1;
       let val = "";
       while (j < n && src[j] !== quote) {
-        if (src[j] === "\\") { val += src[j] + (src[j + 1] ?? ""); j += 2; }
-        else { val += src[j]; j++; }
+        if (src[j] === "\\") {
+          val += src[j] + (src[j + 1] ?? "");
+          j += 2;
+        } else {
+          val += src[j];
+          j++;
+        }
       }
       toks.push({ kind: "str", value: val });
       i = j + 1;
@@ -161,8 +313,14 @@ function tokenize(src, lang) {
       let j = i + 1;
       while (j < n) {
         const d = src[j];
-        if (/[0-9a-fA-F_xXoObBeE]/.test(d)) { j++; continue; }
-        if (d === "." && /[0-9]/.test(src[j + 1] ?? "")) { j += 2; continue; }
+        if (/[0-9a-fA-F_xXoObBeE]/.test(d)) {
+          j++;
+          continue;
+        }
+        if (d === "." && /[0-9]/.test(src[j + 1] ?? "")) {
+          j += 2;
+          continue;
+        }
         break;
       }
       while (j < n && /[a-zA-Z0-9_]/.test(src[j])) j++; // numeric suffixes (usize, f64, n)
@@ -252,8 +410,12 @@ function extractTsUnits(rel, text) {
   const units = [];
   const visit = (node) => {
     if (
-      (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node) ||
-        ts.isMethodDeclaration(node) || ts.isConstructorDeclaration(node) || ts.isGetAccessor(node) ||
+      (ts.isFunctionDeclaration(node) ||
+        ts.isFunctionExpression(node) ||
+        ts.isArrowFunction(node) ||
+        ts.isMethodDeclaration(node) ||
+        ts.isConstructorDeclaration(node) ||
+        ts.isGetAccessor(node) ||
         ts.isSetAccessor(node)) &&
       node.body
     ) {
@@ -270,7 +432,8 @@ function extractTsUnits(rel, text) {
 
 function extractRustUnits(rel, text) {
   const units = [];
-  const re = /^[ \t]*(?:pub(?:\([^)]*\))?[ \t]+)?(?:const[ \t]+|async[ \t]+|unsafe[ \t]+|extern[ \t]+"[^"]*"[ \t]+)*fn[ \t]+([A-Za-z_][A-Za-z0-9_]*)/gm;
+  const re =
+    /^[ \t]*(?:pub(?:\([^)]*\))?[ \t]+)?(?:const[ \t]+|async[ \t]+|unsafe[ \t]+|extern[ \t]+"[^"]*"[ \t]+)*fn[ \t]+([A-Za-z_][A-Za-z0-9_]*)/gm;
   let m;
   while ((m = re.exec(text))) {
     const braceStart = findBodyBrace(text, m.index + m[0].length);
@@ -303,25 +466,40 @@ function balanceBraces(text, open) {
   const n = text.length;
   while (i < n) {
     const c = text[i];
-    if (c === "/" && text[i + 1] === "/") { while (i < n && text[i] !== "\n") i++; continue; }
+    if (c === "/" && text[i + 1] === "/") {
+      while (i < n && text[i] !== "\n") i++;
+      continue;
+    }
     if (c === "/" && text[i + 1] === "*") {
       let d = 1;
       i += 2;
       while (i < n && d > 0) {
-        if (text[i] === "/" && text[i + 1] === "*") { d++; i += 2; }
-        else if (text[i] === "*" && text[i + 1] === "/") { d--; i += 2; }
-        else i++;
+        if (text[i] === "/" && text[i + 1] === "*") {
+          d++;
+          i += 2;
+        } else if (text[i] === "*" && text[i + 1] === "/") {
+          d--;
+          i += 2;
+        } else i++;
       }
       continue;
     }
-    if (c === '"') { i++; while (i < n && text[i] !== '"') i += text[i] === "\\" ? 2 : 1; i++; continue; }
+    if (c === '"') {
+      i++;
+      while (i < n && text[i] !== '"') i += text[i] === "\\" ? 2 : 1;
+      i++;
+      continue;
+    }
     if (c === "'") {
       const m = /^'(?:\\.|[^'\\])'/.exec(text.slice(i, i + 8));
       i += m ? m[0].length : 1;
       continue;
     }
     if (c === "{") depth++;
-    else if (c === "}") { depth--; if (depth === 0) return i + 1; }
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
     i++;
   }
   return -1;
@@ -342,9 +520,13 @@ function fnv(s) {
 function winnow(tokens) {
   if (tokens.length < SHINGLE_K) return new Set();
   const hashes = [];
-  for (let i = 0; i + SHINGLE_K <= tokens.length; i++) hashes.push(fnv(tokens.slice(i, i + SHINGLE_K).join("\x1f")));
+  for (let i = 0; i + SHINGLE_K <= tokens.length; i++)
+    hashes.push(fnv(tokens.slice(i, i + SHINGLE_K).join("\x1f")));
   const picked = new Set();
-  if (hashes.length <= WINNOW_W) { for (const h of hashes) picked.add(h); return picked; }
+  if (hashes.length <= WINNOW_W) {
+    for (const h of hashes) picked.add(h);
+    return picked;
+  }
   for (let i = 0; i + WINNOW_W <= hashes.length; i++) {
     let min = Infinity;
     for (let j = i; j < i + WINNOW_W; j++) if (hashes[j] < min) min = hashes[j];
@@ -360,9 +542,19 @@ function jaccard(a, b) {
 }
 
 class UnionFind {
-  constructor(n) { this.p = Array.from({ length: n }, (_, i) => i); }
-  find(x) { while (this.p[x] !== x) { this.p[x] = this.p[this.p[x]]; x = this.p[x]; } return x; }
-  union(a, b) { this.p[this.find(a)] = this.find(b); }
+  constructor(n) {
+    this.p = Array.from({ length: n }, (_, i) => i);
+  }
+  find(x) {
+    while (this.p[x] !== x) {
+      this.p[x] = this.p[this.p[x]];
+      x = this.p[x];
+    }
+    return x;
+  }
+  union(a, b) {
+    this.p[this.find(a)] = this.find(b);
+  }
 }
 
 function sha256(s) {
@@ -419,7 +611,9 @@ function mine() {
   // Signal 1: winnowed shingle similarity, within-language only.
   {
     const index = new Map();
-    units.forEach((u, i) => { for (const h of u.prints) (index.get(h) ?? index.set(h, []).get(h)).push(i); });
+    units.forEach((u, i) => {
+      for (const h of u.prints) (index.get(h) ?? index.set(h, []).get(h)).push(i);
+    });
     const pairCounts = new Map();
     for (const members of index.values()) {
       if (members.length < 2 || members.length > 64) continue; // >64 = boilerplate fingerprint
@@ -438,7 +632,10 @@ function mine() {
       const a = Math.floor(key / 1e6);
       const b = key % 1e6;
       const j = jaccard(units[a].prints, units[b].prints);
-      if (j >= JACCARD_MIN) { uf.union(a, b); pairJaccard.set(key, j); }
+      if (j >= JACCARD_MIN) {
+        uf.union(a, b);
+        pairJaccard.set(key, j);
+      }
     }
     const groups = new Map();
     for (const key of pairJaccard.keys()) {
@@ -463,7 +660,9 @@ function mine() {
       [...u.literals].filter((l) => (literalCensus.get(l) ?? 0) <= RARE_LITERAL_MAX_OCCURRENCES),
     );
     const index = new Map();
-    rareByUnit.forEach((lits, i) => { for (const l of lits) (index.get(l) ?? index.set(l, []).get(l)).push(i); });
+    rareByUnit.forEach((lits, i) => {
+      for (const l of lits) (index.get(l) ?? index.set(l, []).get(l)).push(i);
+    });
     const pairShared = new Map();
     for (const members of index.values()) {
       for (let a = 0; a < members.length; a++) {
@@ -489,7 +688,14 @@ function mine() {
     for (const [setKey, members] of byLitSet) {
       const sites = [...members].map((i) => units[i]);
       const lits = setKey.split("\x1f");
-      clusters.push(buildCluster("literal", sites, 12 * lits.length, lits.map((l) => l.slice(2))));
+      clusters.push(
+        buildCluster(
+          "literal",
+          sites,
+          12 * lits.length,
+          lits.map((l) => l.slice(2)),
+        ),
+      );
     }
   }
 
@@ -526,8 +732,13 @@ function mine() {
 function contains(outer, inner) {
   if (outer.signal !== inner.signal || outer.sites.length < inner.sites.length) return false;
   return inner.sites.every((s) =>
-    outer.sites.some((o) => o.file === s.file && o.startLine <= s.startLine && o.endLine >= s.endLine &&
-      (o.startLine !== s.startLine || o.endLine !== s.endLine)),
+    outer.sites.some(
+      (o) =>
+        o.file === s.file &&
+        o.startLine <= s.startLine &&
+        o.endLine >= s.endLine &&
+        (o.startLine !== s.startLine || o.endLine !== s.endLine),
+    ),
   );
 }
 
@@ -535,13 +746,29 @@ function buildCluster(signal, sites, baseScore, sharedLiterals) {
   // Keep only outermost sites: a unit clustering with its own enclosing
   // function is self-similarity through nesting, not duplication.
   sites = sites.filter(
-    (u) => !sites.some((o) => o !== u && o.file === u.file && o.startLine <= u.startLine && o.endLine >= u.endLine &&
-      (o.startLine !== u.startLine || o.endLine !== u.endLine || sites.indexOf(o) < sites.indexOf(u))),
+    (u) =>
+      !sites.some(
+        (o) =>
+          o !== u &&
+          o.file === u.file &&
+          o.startLine <= u.startLine &&
+          o.endLine >= u.endLine &&
+          (o.startLine !== u.startLine || o.endLine !== u.endLine || sites.indexOf(o) < sites.indexOf(u)),
+      ),
   );
   if (sites.length < 2) return null;
   const anyTest = sites.some((u) => u.isTest);
-  const ordered = [...sites].sort((a, b) => (a.file === b.file ? a.startLine - b.startLine : a.file < b.file ? -1 : 1));
-  const fingerprint = sha256(signal + "\n" + ordered.map((u) => u.norm.join("\x1f")).sort().join("\n\x00"));
+  const ordered = [...sites].sort((a, b) =>
+    a.file === b.file ? a.startLine - b.startLine : a.file < b.file ? -1 : 1,
+  );
+  const fingerprint = sha256(
+    signal +
+      "\n" +
+      ordered
+        .map((u) => u.norm.join("\x1f"))
+        .sort()
+        .join("\n\x00"),
+  );
   return {
     id: `${signal}-${fingerprint.slice(0, 10)}`,
     score: Math.round(baseScore * (anyTest ? 0.5 : 1)),
@@ -572,8 +799,12 @@ function loadAllowlist() {
 function allowlisted(cluster, entries) {
   for (const e of entries) {
     if (e.fingerprint && e.fingerprint === cluster.fingerprint) return e;
-    if (e.files && (!e.signal || e.signal === cluster.signal) &&
-      cluster.sites.every((s) => e.files.includes(s.file))) return e;
+    if (
+      e.files &&
+      (!e.signal || e.signal === cluster.signal) &&
+      cluster.sites.every((s) => e.files.includes(s.file))
+    )
+      return e;
   }
   return null;
 }
@@ -606,7 +837,11 @@ function runJudge(clusters, limit) {
   const judged = [];
   for (const cluster of clusters.slice(0, limit ?? clusters.length)) {
     const key = sha256(cluster.normalizedSnippets.join("\n\x00") + "\n" + version + "\n" + JUDGE_MODEL);
-    if (cache[key]) { hits++; judged.push({ cluster: cluster.id, cached: true, ...cache[key].judgment }); continue; }
+    if (cache[key]) {
+      hits++;
+      judged.push({ cluster: cluster.id, cached: true, ...cache[key].judgment });
+      continue;
+    }
     const payload = {
       signal: cluster.signal,
       sharedLiterals: cluster.sharedLiterals,
@@ -646,14 +881,28 @@ function runJudge(clusters, limit) {
   }
   const sorted = Object.fromEntries(Object.entries(cache).sort(([a], [b]) => (a < b ? -1 : 1)));
   writeFileSync(cachePath, JSON.stringify(sorted, null, 2) + "\n");
-  console.log(`judge: ${calls} model calls, ${hits} cache hits, ${failures} failures -> scripts/dup-judgments.json`);
+  console.log(
+    `judge: ${calls} model calls, ${hits} cache hits, ${failures} failures -> scripts/dup-judgments.json`,
+  );
   for (const j of judged) {
     console.log(`  ${j.cluster} ${j.cached ? "(cached)" : ""}: ${j.classification} -> ${j.action}`);
   }
 }
 
-const CLASSIFICATIONS = new Set(["duplicated_policy", "shared_mechanism", "independent_security_enforcement", "coincidental", "uncertain"]);
-const ACTIONS = new Set(["shared_helper", "shared_fixture", "generated_contract", "parity_test", "leave_documented"]);
+const CLASSIFICATIONS = new Set([
+  "duplicated_policy",
+  "shared_mechanism",
+  "independent_security_enforcement",
+  "coincidental",
+  "uncertain",
+]);
+const ACTIONS = new Set([
+  "shared_helper",
+  "shared_fixture",
+  "generated_contract",
+  "parity_test",
+  "leave_documented",
+]);
 
 function parseJudgment(stdout) {
   const start = stdout.indexOf("{");
@@ -709,7 +958,9 @@ console.log(
     ` (${suppressed.length} allowlisted)${flag("--diff") ? " [diff mode]" : ""} -> ${outPath}`,
 );
 for (const c of capped.slice(0, 10)) {
-  console.log(`  [${String(c.score).padStart(4)}] ${c.id} ${c.sites.map((s) => `${s.file}:${s.lines}`).join(" | ")}`);
+  console.log(
+    `  [${String(c.score).padStart(4)}] ${c.id} ${c.sites.map((s) => `${s.file}:${s.lines}`).join(" | ")}`,
+  );
 }
 
 if (flag("--judge")) runJudge(capped, opt("--judge-limit") ? Number(opt("--judge-limit")) : undefined);

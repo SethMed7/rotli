@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import type { EditableDocument } from "../documents/model";
 import { artifactFileName, editableDocumentText, markdownToDocumentDraft } from "./artifacts";
 
 describe("chat artifact policy", () => {
@@ -33,6 +34,28 @@ describe("chat artifact policy", () => {
         ],
       }),
     ).toBe("Launch calmly\n\nOwner\tStatus");
+  });
+
+  test("projects embedded image context without treating it as a table", () => {
+    const document: EditableDocument = {
+      id: "storage/example.docx",
+      title: "Example",
+      content: [
+        {
+          kind: "image",
+          image: {
+            id: "diagram",
+            name: "architecture.png",
+            mimeType: "image/png",
+            base64: "AA==",
+            widthPx: 640,
+            heightPx: 360,
+            alt: "Architecture overview",
+          },
+        },
+      ],
+    };
+    expect(editableDocumentText(document)).toBe("Architecture overview");
   });
 
   test("maps ordinary Markdown into the editable DOCX subset", () => {

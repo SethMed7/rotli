@@ -30,7 +30,7 @@ export function chatFolderKey(id: string): string {
 }
 
 export interface SidebarChatData {
-  /** The vault whose chats/ these are — null until a memex is configured. */
+  /** The vault whose chats/ these are — null until a vault is configured. */
   activeMemex: MemexInstance | null;
   /** Pinned first, then most-recent (Seth, 2026-07-30). */
   chatList: MemexChatSummary[];
@@ -60,7 +60,7 @@ export function useChatFolders(): SidebarChatData {
     enabled: !!activeMemex && isTauri(),
     queryFn: () => loadChatFolders(activeMemex!),
   });
-  const manifest = foldersQuery.data ?? EMPTY_CHAT_FOLDERS;
+  const manifest = foldersQuery.data?.manifest ?? EMPTY_CHAT_FOLDERS;
   const grouped = useMemo(() => groupChats(chatList, manifest), [chatList, manifest]);
   const folderKeys = useMemo(
     () => manifest.folders.map((folder) => chatFolderKey(folder.id)),
@@ -71,7 +71,7 @@ export function useChatFolders(): SidebarChatData {
     if (!activeMemex) return;
     setRowActionError(null);
     void loadChatFolders(activeMemex)
-      .then((fresh) => saveChatFolders(activeMemex, mutate(fresh)))
+      .then((fresh) => saveChatFolders(activeMemex, mutate(fresh.manifest), fresh.revision))
       .then(() => invalidateChatFolders())
       .then(() => after?.())
       .catch((err) =>

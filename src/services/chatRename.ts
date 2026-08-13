@@ -49,10 +49,10 @@ export function useChatRename() {
         }
         // the chat keeps its folder — the assignment key follows the slug
         try {
-          const manifest = await loadChatFolders(active);
-          const migrated = migrateChatFolderSlug(manifest, oldSlug, finalSlug);
-          if (migrated !== manifest) {
-            await saveChatFolders(active, migrated);
+          const opened = await loadChatFolders(active);
+          const migrated = migrateChatFolderSlug(opened.manifest, oldSlug, finalSlug);
+          if (migrated !== opened.manifest) {
+            await saveChatFolders(active, migrated, opened.revision);
             await invalidateChatFolders();
           }
         } catch {

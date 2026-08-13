@@ -55,6 +55,12 @@ already there — it was simply unenforced. That is what
 `:root[data-idle="hidden"]` in `src/styles/base.css`, `src/lib/idleMotion.ts`,
 and the `check:design-system` contract now fix.
 
+Persistent sidebar state is stricter: it stays static. A chat entering Working
+or Unread updates its labeled lane and dot immediately, then schedules no
+animation while the state remains unchanged. This follows the measured lesson
+from [Herdr's sidebar work](https://herdr.dev/blog/ten-agents-three-clients-95-percent-less-cpu/):
+motion should mean something changed, not merely that a process is still alive.
+
 ### An honest negative result
 
 A WKWebView harness (native `NSWindow` + `WKWebView`, 240 elements each running

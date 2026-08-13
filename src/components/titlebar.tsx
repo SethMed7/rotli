@@ -6,7 +6,7 @@
 // Rail-toggle law (Seth, 2026-06-13): the two titlebar rail icons (Folders ⌘0,
 // Notes list ⌥⌘L) are GONE. One unified, memory-based sidebar toggle now lives
 // INLINE left of the note-list filter (and on the warm-edge restore strip when
-// both rails are collapsed). The ⌘0 / ⌥⌘L chords stay rebindable in Hotkeys —
+// both rails are collapsed). The ⌘0 / ⌥⌘L chords stay rebindable in Keybindings —
 // they just no longer have a home in the bar.
 
 import type { MouseEvent } from "react";

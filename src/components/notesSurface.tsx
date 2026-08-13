@@ -14,6 +14,7 @@ import { useNotes } from "../services/hooks";
 import { useUiStore } from "../state/ui";
 import { AllChatsSurface } from "./allChatsSurface";
 import { BoardSurface } from "./boardSurface";
+import { DashboardSurface } from "./dashboardSurface";
 import { EmptyState } from "./emptyState";
 import { ClockGlyph } from "./glyphs";
 import { NoteListSurface } from "./noteListSurface";
@@ -118,6 +119,8 @@ export function NotesSurface() {
         </Suspense>
       ) : contentView === "board" ? (
         <BoardSurface />
+      ) : contentView === "dashboard" ? (
+        <DashboardSurface />
       ) : contentView === "allNotes" ? (
         <NoteListSurface title="All notes" searchable searchPlaceholder="Search all notes…" />
       ) : contentView === "allChats" ? (

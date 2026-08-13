@@ -8,6 +8,7 @@
 // answer — a tool step's JSON scaffolding never reaches the user. Persistence is the
 // caller's job — only the final answer is written to the chat file.
 
+import { artifactClarification } from "./artifactIntent";
 import { budgetFor } from "./budget";
 import { containsPrivateDataOverlap, looksSecret } from "./guard";
 import { extractJsonObject, parseAction } from "./parse";
@@ -33,6 +34,8 @@ const NOTE_TOOLS: ToolName[] = [
   "open_note",
   "read_file",
 ];
+const DOCUMENT_TOOLS: ToolName[] = ["create_document"];
+const ARTIFACT_TOOLS: ToolName[] = ["create_artifact"];
 const NOTE_SEARCH_TOOLS: ToolName[] = ["search_memory", "search_notes"];
 const WEB_PRIMITIVE_TOOLS: ToolName[] = ["web_search", "web_fetch"];
 const WEB_RESEARCH_TOOLS: ToolName[] = ["research_web"];
@@ -41,7 +44,6 @@ const WEB_RESEARCH_TOOLS: ToolName[] = ["research_web"];
 // which subset a model sees.
 const WEB_TOOLS: ToolName[] = ["web_search", "web_fetch", "research_web"];
 const IMAGE_TOOLS: ToolName[] = ["generate_image"];
-const ARTIFACT_TOOLS: ToolName[] = ["create_artifact"];
 // local mermaid→Excalidraw conversion — a creation tool, never egress
 const BOARD_TOOLS: ToolName[] = ["draw_board"];
 // every tool whose ARGS leave the device — the secret guard covers them all
@@ -75,6 +77,17 @@ async function* generate(
 }
 
 export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<AgentEvent, void, void> {
+  const clarification = artifactClarification(input.userText, {
+    documentTool: input.documentTool === true && host.createDocument !== undefined,
+  });
+  if (clarification) {
+    if (clarification.kind === "question") {
+      yield { type: "question", prompt: clarification.prompt, options: clarification.options };
+    } else {
+      yield { type: "final", text: clarification.text };
+    }
+    return;
+  }
   const budget = budgetFor(input.model); // the client's rules, sized to THIS model
   const adapter = adapterFor(input.model); // gemma (local default) or frontier
   const maxSteps = input.maxSteps ?? budget.maxSteps;
@@ -89,9 +102,10 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       : "ambiguous";
   const allowed: ReadonlySet<ToolName> = new Set<ToolName>([
     ...NOTE_TOOLS,
+    ...(input.documentTool ? DOCUMENT_TOOLS : []),
+    ...(input.artifactTool ? ARTIFACT_TOOLS : []),
     ...(input.web ? enabledWebTools : []),
     ...(input.imageTool ? IMAGE_TOOLS : []),
-    ...(input.artifactTool ? ARTIFACT_TOOLS : []),
     ...(input.boardTool ? BOARD_TOOLS : []),
   ]);
 
@@ -139,6 +153,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       scratch: pruneScratch(scratch, budget.maxScratchChars),
       maxSteps,
       ...(input.imageTool ? { imageTool: true } : {}),
+      ...(input.documentTool ? { documentTool: true } : {}),
       ...(input.artifactTool ? { artifactTool: true } : {}),
       ...(input.boardTool ? { boardTool: true } : {}),
       ...(input.userName ? { userName: input.userName } : {}),
@@ -178,6 +193,11 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
 
     const parsed = parseAction(raw, allowed);
 
+    if (parsed.kind === "question") {
+      yield { type: "question", prompt: parsed.prompt, options: parsed.options };
+      return;
+    }
+
     if (parsed.kind === "final") {
       const finalText = normalizeWebCitations(parsed.text);
       const groundingIssue = webGroundingIssue(finalText, webEvidence);
@@ -203,8 +223,8 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       // UNPARSEABLE reply gets the JSON-shape nudge (Seth, 2026-06-30 — audit).
       const baseResult =
         parsed.kind === "invalid"
-          ? `error: ${parsed.reason}. Reply with ONE JSON object: {"tool":…,"args":…} or {"final":"…"}.`
-          : 'error: your reply was not one valid JSON object. Reply with exactly one: {"tool":…,"args":…} or {"final":"…"}.';
+          ? `error: ${parsed.reason}. Reply with ONE JSON object: {"tool":…,"args":…}, {"question":"…","options":["…","…"]}, or {"final":"…"}.`
+          : 'error: your reply was not one valid JSON object. Reply with exactly one: {"tool":…,"args":…}, {"question":"…","options":["…","…"]}, or {"final":"…"}.';
       const routeHint =
         sourceRoute === "external" && !researchAttempted
           ? ' This is a public/external fact question: call research_web next, not a note tool. Keep JSON strings valid; omit quotation marks inside "thought" rather than leaving them unescaped.'
@@ -265,7 +285,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       scratch.push({
         action: sig,
         result:
-          "blocked: that off-device action repeats private text retrieved from the memex. Rephrase without private prose or perform the network action yourself.",
+          "blocked: that off-device action repeats private text retrieved from your vault. Rephrase without private prose or perform the network action yourself.",
       });
       if (consecutiveBad >= 2) break;
       continue;

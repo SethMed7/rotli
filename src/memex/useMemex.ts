@@ -82,6 +82,7 @@ export function useWriteChat() {
       attachedTo?: string;
       messages: ChatMsg[];
       existingSlug?: string;
+      secureContext?: boolean;
     }) => svc.writeChat(input),
     onSuccess: (_res, vars) => queryClient.invalidateQueries({ queryKey: memexKeys.chats(vars.instance.id) }),
   });

@@ -4,7 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { splitMessageBlocks } from "./chatMessageBlocks";
+import { splitMessageBlocks, structureMessageLines } from "./chatMessageBlocks";
 
 describe("splitMessageBlocks", () => {
   test("plain prose is one lines block; fences split around it", () => {
@@ -63,5 +63,69 @@ describe("splitMessageBlocks", () => {
   test("pipes inside a fence never start a table", () => {
     const blocks = splitMessageBlocks("```\n| a | b |\n| - | - |\n```");
     expect(blocks).toEqual([{ kind: "code", lang: "", code: "| a | b |\n| - | - |" }]);
+  });
+});
+
+describe("structureMessageLines", () => {
+  test("keeps headings, paragraphs, quotes, and list depth semantic", () => {
+    expect(
+      structureMessageLines([
+        "## What changed",
+        "A short explanation.",
+        "",
+        "- First",
+        "  - Nested",
+        "1. One",
+        "   2. Two",
+        "> A caution",
+      ]),
+    ).toEqual([
+      { kind: "heading", level: 2, text: "What changed" },
+      { kind: "paragraph", text: "A short explanation." },
+      { kind: "space" },
+      {
+        kind: "list",
+        ordered: false,
+        items: [
+          { depth: 0, text: "First" },
+          { depth: 1, text: "Nested" },
+        ],
+      },
+      {
+        kind: "list",
+        ordered: true,
+        items: [
+          { depth: 0, text: "One" },
+          { depth: 1, text: "Two" },
+        ],
+      },
+      { kind: "quote", text: "A caution" },
+    ]);
+  });
+
+  test("recognizes provider progress plans without changing transcript text", () => {
+    expect(
+      structureMessageLines([
+        "- [x] Read the contract",
+        "- [~] Implement the native boundary",
+        "- [ ] Run validation",
+        "☑ Preserve the vault",
+        "◉ Verify the current step",
+        "☐ Publish only when asked",
+      ]),
+    ).toEqual([
+      {
+        kind: "list",
+        ordered: false,
+        items: [
+          { depth: 0, text: "Read the contract", taskState: "done" },
+          { depth: 0, text: "Implement the native boundary", taskState: "active" },
+          { depth: 0, text: "Run validation", taskState: "pending" },
+          { depth: 0, text: "Preserve the vault", taskState: "done" },
+          { depth: 0, text: "Verify the current step", taskState: "active" },
+          { depth: 0, text: "Publish only when asked", taskState: "pending" },
+        ],
+      },
+    ]);
   });
 });

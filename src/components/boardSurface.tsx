@@ -15,27 +15,32 @@ import { createPointerDragSession } from "../lib/pointerDrag";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
 import { mainNoteIds } from "../services/mainTree";
-import { archiveNoteWithImages } from "../services/noteLifecycle";
+import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLifecycle";
 import { notesService } from "../services/notes";
 import { useMainStore } from "../state/main";
 import { useFocusedNoteId, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { pendingRevealKey } from "./captureReveal";
 import { Character } from "./character";
-import { ArchiveGlyph, CheckGlyph, glyphForNote } from "./glyphs";
+import { ArchiveGlyph, CheckGlyph, TrashGlyph, glyphForNote } from "./glyphs";
 import { useNoteMenu } from "./useNoteMenu";
 
 /** Per-item accounting for a batched archive: say exactly how many failed (and
  * why, first reason) through the app's row-action banner — the loop used to be
  * serial with silent rejection. */
-function reportArchiveFailures(results: PromiseSettledResult<unknown>[], total: number, noun: string): void {
+function reportLifecycleFailures(
+  results: PromiseSettledResult<unknown>[],
+  total: number,
+  noun: string,
+  verb: string,
+): void {
   const failed = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
   if (failed.length === 0) return;
   const reason = failed[0]!.reason;
   useUiStore
     .getState()
     .setRowActionError(
-      `${failed.length} of ${total} ${noun}s couldn’t be archived — ${
+      `${failed.length} of ${total} ${noun}s couldn’t be ${verb} — ${
         reason instanceof Error ? reason.message : String(reason)
       }`,
     );
@@ -99,6 +104,7 @@ export function BoardSurface() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<{ id: string; after: boolean } | null>(null);
   const didDragRef = useRef(false);
+  const trashTargetRef = useRef(false);
 
   // captures in the user's manual order; new ids (not yet ordered) keep their
   // newest-first spot from listNotes.
@@ -130,6 +136,18 @@ export function BoardSurface() {
         setDragId(id);
       },
       onMove: (x, y) => {
+        const trash = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest(
+          '[data-system-trash-drop="1"]',
+        ) as HTMLElement | null;
+        document
+          .querySelector('[data-system-trash-drop="1"]')
+          ?.classList.toggle("capture-trash-target", !!trash);
+        trashTargetRef.current = !!trash;
+        if (trash) {
+          drop = null;
+          setDropAt(null);
+          return;
+        }
         const hit = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest(
           "[data-cap-id]",
         ) as HTMLElement | null;
@@ -144,6 +162,11 @@ export function BoardSurface() {
         setDropAt(drop);
       },
       onDrop: () => {
+        if (trashTargetRef.current) {
+          const ids = selected.has(id) ? [...selected] : [id];
+          void trashCaptureIds(ids);
+          return;
+        }
         const d = drop;
         if (!d) return;
         const ids = ordered.map((c) => c.id).filter((x) => x !== id);
@@ -155,6 +178,8 @@ export function BoardSurface() {
         }
       },
       onEnd: () => {
+        document.querySelector('[data-system-trash-drop="1"]')?.classList.remove("capture-trash-target");
+        trashTargetRef.current = false;
         setDragId(null);
         setDropAt(null);
       },
@@ -193,7 +218,7 @@ export function BoardSurface() {
       // consume the originals together — independent archives, so one failure
       // must not strand the rest (audit 2026-07-30, #16 batch half)
       const results = await Promise.allSettled(ordered.map((c) => archiveNoteWithImages(c.id)));
-      reportArchiveFailures(results, ordered.length, "merged capture");
+      reportLifecycleFailures(results, ordered.length, "merged capture", "archived");
       await invalidateNotes();
       setSelected(new Set());
       openNote(note.id); // returns the content area to the panes
@@ -208,7 +233,22 @@ export function BoardSurface() {
     setBusy(true);
     try {
       const results = await Promise.allSettled(chosen.map((c) => archiveNoteWithImages(c.id)));
-      reportArchiveFailures(results, chosen.length, "capture");
+      reportLifecycleFailures(results, chosen.length, "capture", "archived");
+      await invalidateNotes();
+      setSelected(new Set());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Move captures to Rotli's recoverable Trash. Shared by the toolbar and the
+   * sidebar drop target so drag-and-drop cannot acquire a separate delete path. */
+  const trashCaptureIds = async (ids: readonly string[]) => {
+    if (ids.length === 0 || busy) return;
+    setBusy(true);
+    try {
+      const results = await Promise.allSettled(ids.map((id) => trashNoteWithImages(id)));
+      reportLifecycleFailures(results, ids.length, "capture", "moved to Trash");
       await invalidateNotes();
       setSelected(new Set());
     } finally {
@@ -304,6 +344,15 @@ export function BoardSurface() {
           <button type="button" className="board-btn" disabled={busy} onClick={() => void archiveSelected()}>
             <ArchiveGlyph size={14} />
             Archive
+          </button>
+          <button
+            type="button"
+            className="board-btn"
+            disabled={busy}
+            onClick={() => void trashCaptureIds(chosen.map((capture) => capture.id))}
+          >
+            <TrashGlyph size={14} />
+            Trash
           </button>
           <button type="button" className="board-btn primary" disabled={busy} onClick={() => void merge()}>
             {busy ? "Merging…" : chosen.length > 1 ? `Merge ${chosen.length} into a note` : "Make a note"}

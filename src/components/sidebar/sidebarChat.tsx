@@ -11,7 +11,7 @@ import { modelLabel, modelProvider } from "../../ai/models";
 import { dispatch } from "../../keys/registry";
 import { createDragGhost } from "../../lib/dragGhost";
 import { createPointerDragSession } from "../../lib/pointerDrag";
-import { type MemexChatSummary, chatModels, isTauri } from "../../lib/tauri";
+import { type MemexChatSummary, chatModels, isTauri, modelUsage } from "../../lib/tauri";
 import { archiveChat, deleteChat, pinChat, revealChat } from "../../memex/service";
 import { invalidateMemex } from "../../memex/useMemex";
 import {
@@ -30,9 +30,10 @@ import { chatKey, useUiStore } from "../../state/ui";
 import { useViewsStore } from "../../state/views";
 import { ChevronRight, FolderGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
+import { compactUsageNumber, modelUsageSnapshot } from "../modelUsageSummary";
 import { chatMark } from "./chatMark";
 import { ModelLogo } from "./modelLogo";
-import { visibleSidebarChats } from "./sidebarChatProjection";
+import { relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
 import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
 
 /** Where a dragged chat would land: a folder row (assignment — positional
@@ -43,6 +44,8 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   const { activeMemex, chatList, manifest, grouped, update } = chats;
   const contentView = useUiStore((s) => s.contentView);
   const setContentView = useUiStore((s) => s.setContentView);
+  const dashboardSection = useUiStore((s) => s.dashboardSection);
+  const setDashboardSection = useUiStore((s) => s.setDashboardSection);
   const expandedDests = useUiStore((s) => s.expandedDests);
   const setDestExpanded = useUiStore((s) => s.setDestExpanded);
   const setRowActionError = useUiStore((s) => s.setRowActionError);
@@ -53,8 +56,9 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   const chatRename = useChatRename();
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
 
-  // run signals (2026-08-03): pulsing while a chat answers, a dot once a reply
-  // landed unwatched. Keys are vault-scoped, same as every per-chat map.
+  // Run signals (2026-08-03): a quiet static dot while a chat answers, a
+  // full-strength dot once a reply lands unwatched. Keys are vault-scoped,
+  // same as every per-chat map; the state change renders once and stays still.
   const runs = useChatRuns((s) => s.runs);
   const clearUnread = useChatRuns((s) => s.clearUnread);
   const runKeyOf = (slug: string) => chatKey(activeMemex?.id ?? null, slug, "");
@@ -66,6 +70,14 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
     staleTime: Infinity,
   });
+  const localUsage = useQuery({
+    queryKey: ["modelUsage", "7d"],
+    queryFn: () => modelUsage("7d"),
+    staleTime: 60_000,
+  });
+  const usageSnapshot = modelUsageSnapshot(localUsage.data);
+  const usageFavorite = usageSnapshot.favorite;
+  const usageFavoriteMark = usageFavorite ? chatMark(usageFavorite.provider, usageFavorite.model) : null;
   const hybridPresets = useUiStore((s) => s.hybridPresets);
   const chatModelMap = useUiStore((s) => s.chatModel);
   const chatModelId = useUiStore((s) => s.chatModelId);
@@ -90,13 +102,10 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     setContentView("allChats");
   };
 
-  // the top lanes — views onto the list, not folders (rows also stay in their
-  // real folder below). WORKING first (Seth, 2026-08-04: "a loading icon that
-  // shows the chat is working, and it should be at the top"): a chat that is
-  // answering right now floats above everything, including folders, so you
-  // never hunt for it. Then UNREAD — replies that landed while you were away.
-  const workingChats = chatList.filter((c) => inView(c) && runs[runKeyOf(c.slug)] === "running");
-  const unreadChats = chatList.filter((c) => inView(c) && runs[runKeyOf(c.slug)] === "unread");
+  // One clearly separated activity lane holds every run seen this session.
+  // Completed work stays discoverable instead of disappearing the instant it
+  // settles; the canonical row still remains inside its recency-sorted folder.
+  const activityChats = chatList.filter((c) => inView(c) && runs[runKeyOf(c.slug)] !== undefined);
 
   // the header's New-folder button, while Chat is the active front, mints a
   // CHAT folder and opens its rename inline — the nonce is the seam between
@@ -164,10 +173,9 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   };
 
   // one chat row, shared by folder groups and the loose list below them.
-  // `hoisted` marks the COPY a lane (Working/Unread) lifts to the top: the same
-  // chat still sits in its real place below, and only that one carries the
-  // selected highlight — two lit rows for one open chat read as a bug (Seth,
-  // 2026-08-04: "don't like double active"; same law as the All-chats rule).
+  // `hoisted` marks the COPY the Activity lane lifts to the top: the same chat
+  // still sits in its real folder below, and only that canonical row carries
+  // the selected highlight — two lit rows for one open chat read as a bug.
   const renderChatRow = (c: MemexChatSummary, folderId: string | null, hoisted = false) =>
     chatRename.renamingChatSlug === c.slug ? (
       <InlineRenameInput
@@ -376,18 +384,20 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         })()}
         <span className="fname">{c.title || c.slug}</span>
         {(() => {
-          // run signal first (it's the newest fact), then the model chip
+          // A live session status is the newest fact. Otherwise the right edge
+          // carries compact file activity; the provider mark already identifies
+          // the model family without repeating a long model name.
           const run = runs[runKeyOf(c.slug)];
-          const ownModel = chatModelMap[runKeyOf(c.slug)];
           return (
             <>
-              {run === "running" && (
-                <span className="sb-chatrun running" role="status" aria-label="Answering…" />
+              {hoisted && run === "running" && (
+                <span className="sb-chatstatus running" role="status">
+                  Working
+                </span>
               )}
-              {run === "unread" && <span className="sb-chatrun unread" aria-label="New reply" />}
-              {ownModel && !run && (
-                <span className="sb-chatmodel">{modelLabel(ownModel, models.data ?? [], hybridPresets)}</span>
-              )}
+              {hoisted && run === "unread" && <span className="sb-chatstatus unread">New</span>}
+              {hoisted && run === "done" && <span className="sb-chatstatus done">Done</span>}
+              {!hoisted && <span className="sb-chattime">{relativeChatAge(Date.now(), c.modifiedMs)}</span>}
             </>
           );
         })()}
@@ -398,6 +408,35 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   return (
     <div className="sb-rows" aria-label="Chat" style={{ zoom }}>
       <div className="sb-chat">
+        <button
+          type="button"
+          className={`sb-home-dashboard sb-model-dashboard${contentView === "dashboard" && dashboardSection === "models" ? " sel" : ""}`}
+          aria-label="Open model usage dashboard"
+          aria-current={contentView === "dashboard" && dashboardSection === "models" ? "page" : undefined}
+          onClick={() => {
+            setDashboardSection("models");
+            setContentView("dashboard");
+          }}
+        >
+          <div className="sb-home-dashboard-head">
+            <span>7 days</span>
+            <span>Model usage&nbsp; ↗</span>
+          </div>
+          <div className="sb-home-dashboard-row">
+            <strong>Usage</strong>
+            <span>
+              {localUsage.isLoading ? "Reading…" : `${compactUsageNumber(usageSnapshot.tokens)} tokens`}
+            </span>
+          </div>
+          <div className="sb-home-dashboard-row chat">
+            <strong>Top</strong>
+            <span className="sb-model-favorite" title={usageFavorite?.model ?? "No local usage yet"}>
+              {usageFavoriteMark?.logo ? <ModelLogo logo={usageFavoriteMark.logo} /> : null}
+              <span>{usageFavorite?.model ?? (localUsage.isError ? "Unavailable" : "No usage yet")}</span>
+            </span>
+            <span>{usageSnapshot.sessions.toLocaleString()} sessions</span>
+          </div>
+        </button>
         <button type="button" className="sb-chatnew" data-hotkey="chat.new" onClick={() => openChat(null)}>
           <PlusGlyph size={14} />
           <span>New chat</span>
@@ -426,35 +465,20 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         )}
         {!activeMemex ? (
           <button type="button" className="sb-chat-empty" onClick={() => dispatch("app.settings")}>
-            Connect a memex in Settings → Location
+            Choose a vault in Settings → Location
           </button>
         ) : chatList.length === 0 ? (
           <p className="sb-empty">No chats yet.</p>
         ) : (
           <>
-            {/* the Working lane (2026-08-04) — only while something is actually
-                running, so the sidebar stays quiet the rest of the time */}
-            {workingChats.length > 0 && (
-              <div className="sb-chatfolder sb-chatworking">
+            {activityChats.length > 0 && (
+              <div className="sb-chatfolder sb-chatactivity">
                 <div className="sb-chatrow sb-chatfolder-row unreadhead" aria-hidden="true">
-                  <span className="sb-chatrun running" />
-                  <span className="fname">Working</span>
-                  <span className="sb-chatfolder-n">{workingChats.length}</span>
+                  <span className="sb-activity-mark" />
+                  <span className="fname">Activity</span>
+                  <span className="sb-chatfolder-n">{activityChats.length}</span>
                 </div>
-                {workingChats.map((c) => renderChatRow(c, null, true))}
-              </div>
-            )}
-            {/* the Unread lane (2026-08-03): every reply that landed while you
-                were elsewhere, newest first — a view onto the list, not a
-                folder; rows also stay in their real folder below */}
-            {unreadChats.length > 0 && (
-              <div className="sb-chatfolder sb-chatunread">
-                <div className="sb-chatrow sb-chatfolder-row unreadhead" aria-hidden="true">
-                  <span className="sb-chatrun unread" />
-                  <span className="fname">Unread</span>
-                  <span className="sb-chatfolder-n">{unreadChats.length}</span>
-                </div>
-                {unreadChats.map((c) => renderChatRow(c, null, true))}
+                {activityChats.map((c) => renderChatRow(c, null, true))}
               </div>
             )}
             {grouped.folders.map(({ folder, chats: allFolderChats }) => {

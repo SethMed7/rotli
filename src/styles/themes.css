@@ -18,10 +18,36 @@
    base; every dark theme flips it. */
 :root {
   color-scheme: light;
+  --chat-welcome-morning: #f4dfd5;
+  --chat-welcome-morning-detail: #c97e62;
+  --chat-welcome-morning-ground: #dcc9b8;
+  --chat-welcome-noon: #e4edf0;
+  --chat-welcome-noon-detail: #d6a957;
+  --chat-welcome-noon-ground: #ccd9c4;
+  --chat-welcome-afternoon: #f0d7c4;
+  --chat-welcome-afternoon-detail: #c77652;
+  --chat-welcome-afternoon-ground: #d4b79e;
+  --chat-welcome-evening: #d8d4df;
+  --chat-welcome-evening-detail: #f0e2c8;
+  --chat-welcome-evening-ground: #bbb6c4;
 }
 :root[data-theme="dark"],
 :root[data-theme="charcoal"] {
   color-scheme: dark;
+}
+:root[data-theme="dark"] {
+  --chat-welcome-morning: #392923;
+  --chat-welcome-morning-detail: #d89978;
+  --chat-welcome-morning-ground: #46372d;
+  --chat-welcome-noon: #293234;
+  --chat-welcome-noon-detail: #d8b96f;
+  --chat-welcome-noon-ground: #374237;
+  --chat-welcome-afternoon: #3b2921;
+  --chat-welcome-afternoon-detail: #d9825f;
+  --chat-welcome-afternoon-ground: #4a362a;
+  --chat-welcome-evening: #282631;
+  --chat-welcome-evening-detail: #d8cec2;
+  --chat-welcome-evening-ground: #35313b;
 }
 
 /* picker swatches — available in every theme, for Settings → Appearance */
@@ -60,6 +86,18 @@
   --hov: rgba(22, 22, 22, 0.07);
   --act: rgba(22, 22, 22, 0.11);
   --scrim: rgba(22, 22, 22, 0.42);
+  --chat-welcome-morning: #f1e5df;
+  --chat-welcome-morning-detail: #b17661;
+  --chat-welcome-morning-ground: #ddd0c4;
+  --chat-welcome-noon: #e7ecee;
+  --chat-welcome-noon-detail: #b88e49;
+  --chat-welcome-noon-ground: #d1d9cd;
+  --chat-welcome-afternoon: #eee0d3;
+  --chat-welcome-afternoon-detail: #ad7056;
+  --chat-welcome-afternoon-ground: #d8c5b2;
+  --chat-welcome-evening: #e1dfe4;
+  --chat-welcome-evening-detail: #f7f2e9;
+  --chat-welcome-evening-ground: #cbc8cf;
 }
 
 /* — MONO · charcoal (dark) — breve theme values, verbatim where possible — */
@@ -80,6 +118,18 @@
   --hov: rgba(233, 231, 226, 0.08);
   --act: rgba(233, 231, 226, 0.13);
   --scrim: rgba(0, 0, 0, 0.5);
+  --chat-welcome-morning: #28211e;
+  --chat-welcome-morning-detail: #bd8068;
+  --chat-welcome-morning-ground: #37302a;
+  --chat-welcome-noon: #222829;
+  --chat-welcome-noon-detail: #c1a35f;
+  --chat-welcome-noon-ground: #303730;
+  --chat-welcome-afternoon: #2d211c;
+  --chat-welcome-afternoon-detail: #c47758;
+  --chat-welcome-afternoon-ground: #3b2d24;
+  --chat-welcome-evening: #211f29;
+  --chat-welcome-evening-detail: #d2c8bd;
+  --chat-welcome-evening-ground: #302d35;
 }
 
 /* Mono themes use neutral icon ink; imagery remains warm by design. */

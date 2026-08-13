@@ -92,6 +92,9 @@ export function editableDocumentText(document: EditableDocument): string {
       if (content.kind === "paragraph") {
         return content.paragraph.runs.map((run) => run.text).join("");
       }
+      if (content.kind === "image") {
+        return content.image.alt?.trim() || content.image.name;
+      }
       return content.table.rows
         .map((row) =>
           row.cells

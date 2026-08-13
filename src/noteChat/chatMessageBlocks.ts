@@ -10,6 +10,93 @@ export type MessageBlock =
   | { kind: "mermaid"; code: string }
   | { kind: "table"; header: string[]; rows: string[][] };
 
+export type StructuredMessageLine =
+  | { kind: "heading"; level: number; text: string }
+  | { kind: "paragraph"; text: string }
+  | { kind: "quote"; text: string }
+  | { kind: "space" }
+  | {
+      kind: "list";
+      ordered: boolean;
+      items: Array<{
+        depth: number;
+        text: string;
+        taskState?: "pending" | "active" | "done";
+      }>;
+    };
+
+function structuredListItem(line: string) {
+  const markdown = /^(\s*)(?:([-+*])|(?:\d+[.)]))\s+(.+)$/.exec(line);
+  const symbolic = /^(\s*)(☐|☑|☒|◉)\s+(.+)$/.exec(line);
+  const match = markdown ?? symbolic;
+  if (!match) return null;
+  const ordered = markdown ? match[2] === undefined : false;
+  let text = match[3] ?? "";
+  let taskState: "pending" | "active" | "done" | undefined;
+  const task = /^\[([ xX~-])\]\s+(.+)$/.exec(text);
+  if (task) {
+    taskState = task[1] === " " ? "pending" : task[1]?.toLowerCase() === "x" ? "done" : "active";
+    text = task[2] ?? "";
+  } else if (symbolic) {
+    taskState = symbolic[2] === "☐" ? "pending" : symbolic[2] === "◉" ? "active" : "done";
+  }
+  const spaces = (match[1] ?? "").replace(/\t/g, "  ").length;
+  return { ordered, depth: Math.min(6, Math.floor(spaces / 2)), text, taskState };
+}
+
+/**
+ * Give ordinary Markdown lines their reading structure in chat. This is a
+ * display projection only: the transcript remains the exact Markdown source.
+ */
+export function structureMessageLines(lines: readonly string[]): StructuredMessageLine[] {
+  const out: StructuredMessageLine[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i] ?? "";
+    if (!line.trim()) {
+      out.push({ kind: "space" });
+      i += 1;
+      continue;
+    }
+    const heading = /^(#{1,6})\s+(.+)$/.exec(line.trimStart());
+    if (heading) {
+      out.push({ kind: "heading", level: heading[1]?.length ?? 1, text: heading[2] ?? "" });
+      i += 1;
+      continue;
+    }
+    const quote = /^\s*>\s?(.*)$/.exec(line);
+    if (quote) {
+      out.push({ kind: "quote", text: quote[1] ?? "" });
+      i += 1;
+      continue;
+    }
+    const list = structuredListItem(line);
+    if (list) {
+      const ordered = list.ordered;
+      const items: Array<{
+        depth: number;
+        text: string;
+        taskState?: "pending" | "active" | "done";
+      }> = [];
+      while (i < lines.length) {
+        const next = structuredListItem(lines[i] ?? "");
+        if (!next || next.ordered !== ordered) break;
+        items.push({
+          depth: next.depth,
+          text: next.text,
+          ...(next.taskState ? { taskState: next.taskState } : {}),
+        });
+        i += 1;
+      }
+      out.push({ kind: "list", ordered, items });
+      continue;
+    }
+    out.push({ kind: "paragraph", text: line });
+    i += 1;
+  }
+  return out;
+}
+
 /** A `| a | b |` row into trimmed cells (outer pipes shed, inner kept). */
 function tableCells(line: string): string[] {
   let s = line.trim();

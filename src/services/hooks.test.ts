@@ -26,7 +26,7 @@ function summary(id: string, over: Partial<NoteSummary> = {}): NoteSummary {
 }
 
 function note(id: string, over: Partial<Note> = {}): Note {
-  return { ...summary(id), body: `# Title ${id}\n\nSnippet ${id}`, ...over };
+  return { ...summary(id), body: `# Title ${id}\n\nSnippet ${id}`, revision: `test:${id}`, ...over };
 }
 
 afterEach(() => {

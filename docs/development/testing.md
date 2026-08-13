@@ -39,6 +39,14 @@ stays complete — every `package.json` script must appear in this document):
 | `bun run build:mac` | Local signed `.app` bundle (predmg clean + `tauri build`) |
 | `bun run release` | `scripts/release.sh` — gate, sign, notarize, staple, publish; only under an explicitly authorized release |
 
+`bun run tauri dev` mirrors the production-selected vault and uses the same
+revision, filesystem-lock, containment, and secure/locked write gates as the
+installed app. Portable Main and named views therefore remain identical between
+the two applications, as do vault settings such as model choices and Librarian
+consent. Development-only window state stays in the app cache;
+connected-location changes and live delivery tests remain disabled. Treat
+manual dev interaction as interaction with the live vault.
+
 Use the smallest focused command while iterating, then run the three required
 handoff commands from `AGENTS.md`. Never point an automated test at a live memex,
 Keychain, scheduler, daemon, or production delivery account.

@@ -24,15 +24,6 @@ export function providerFamilyFromProvider(provider: string): PrimaryProvider | 
   return `provider:${provider}`;
 }
 
-export function isPrimaryProvider(value: string): value is PrimaryProvider {
-  return (
-    value === "claude" ||
-    value === "gpt" ||
-    value === "gemini" ||
-    /^(local|provider):[a-z0-9._-]+$/i.test(value)
-  );
-}
-
 export function providerFamilyFor(model: Pick<ChatModelInfo, "provider">): PrimaryProvider | null {
   return providerFamilyFromProvider(model.provider);
 }

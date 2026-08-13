@@ -11,7 +11,7 @@ export interface DebouncedTask {
   /** (Re)arm the trailing timer. */
   schedule: () => void;
   /** Cancel the timer and run immediately; resolves when the run settles.
-   * Errors are swallowed — a failed flush must never hang a quit or unload. */
+   * Errors propagate so the native quit handshake can keep unsaved state open. */
   flush: () => Promise<void>;
   /** Drop the pending timer without running. */
   cancel: () => void;
@@ -24,18 +24,16 @@ export function createDebouncedTask(ms: number, run: () => Promise<void> | void)
     timer = null;
   };
   const fire = async (): Promise<void> => {
-    try {
-      await run();
-    } catch {
-      // swallowed by design — see flush() doc
-    }
+    await run();
   };
   return {
     schedule(): void {
       clear();
       timer = setTimeout(() => {
         timer = null;
-        void fire();
+        // Background debounce failures are surfaced by each owning subsystem;
+        // only an explicit flush needs the rejection for the quit handshake.
+        void fire().catch(() => {});
       }, ms);
     },
     flush(): Promise<void> {

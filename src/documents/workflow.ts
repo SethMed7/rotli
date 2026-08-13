@@ -18,6 +18,19 @@ export function documentFileName(extension: string, now = Date.now()): string {
   return `untitled-${now}.${safe}`;
 }
 
+export function namedDocumentFileName(title: string, extension: string, now = Date.now()): string {
+  const safeExtension = extension.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!safeExtension) throw new Error("document encoder did not provide a valid extension");
+  const stem = title
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60)
+    .replace(/-$/g, "");
+  return `${stem || "document"}-${now}.${safeExtension}`;
+}
+
 /** Create-document use case. Framework and file-format details arrive through ports. */
 export async function createDocument(
   dependencies: CreateDocumentDependencies,
@@ -28,25 +41,19 @@ export async function createDocument(
   return dependencies.repository.create(documentFileName(dependencies.encoder.extension, now), base64);
 }
 
-/** Named/populated documents use the same encoder + repository boundary as a
- * blank document. The caller owns the display-name projection; this boundary
- * accepts only one basename with the encoder's exact extension. */
+/** Create a populated, meaningfully named document without giving a caller a
+ * filesystem path. The repository remains responsible for the managed lane. */
 export async function createNamedDocument(
   dependencies: CreateDocumentDependencies,
-  name: string,
+  title: string,
   draft: DocumentDraft,
+  now = Date.now(),
 ): Promise<string> {
-  const extension = dependencies.encoder.extension.toLowerCase().replace(/[^a-z0-9]/g, "");
-  if (
-    !extension ||
-    name.includes("/") ||
-    name.includes("\\") ||
-    !name.toLowerCase().endsWith(`.${extension}`)
-  ) {
-    throw new Error(`document name must be one .${extension} basename`);
-  }
   const base64 = await dependencies.encoder.encode(draft);
-  return dependencies.repository.create(name, base64);
+  return dependencies.repository.create(
+    namedDocumentFileName(title, dependencies.encoder.extension, now),
+    base64,
+  );
 }
 
 export interface EditDocumentDependencies<Source> {
@@ -62,7 +69,7 @@ export type DocumentEditingOutcome =
       kind: "ready";
       document: EditableDocument;
       warnings: string[];
-      save(next: EditableDocument): Promise<void>;
+      save(next: EditableDocument): Promise<string>;
     };
 
 /** Open one local editing session around the ORIGINAL package. Save mutates the
@@ -73,15 +80,18 @@ export async function editDocument<Source>(
 ): Promise<DocumentEditingOutcome> {
   const stat = await dependencies.reader.stat(fileId);
   if (stat && stat.len > dependencies.maxBytes) return { kind: "too-large" };
+  if (!stat) throw new Error("The document is unavailable.");
   const base64 = await dependencies.reader.readBase64(fileId, dependencies.maxBytes + 1);
   const decoded = await dependencies.codec.decode(base64, fileId);
+  let revision = stat.revision;
   return {
     kind: "ready",
     document: decoded.document,
     warnings: decoded.warnings,
     save: async (next) => {
       const encoded = await dependencies.codec.encode(decoded.source, next);
-      await dependencies.writer.writeBase64(fileId, encoded, true);
+      revision = await dependencies.writer.writeBase64(fileId, encoded, true, revision);
+      return revision;
     },
   };
 }

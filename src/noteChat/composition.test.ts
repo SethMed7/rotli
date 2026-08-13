@@ -128,7 +128,12 @@ describe("listChatsForNote", () => {
     await syncChatMemory(
       {
         findByStem: async () => null,
-        create: async (body) => ({ id: "memory", stem: "chat-about-fish-audio-vs-elevenlabs", body }),
+        create: async (body) => ({
+          id: "memory",
+          stem: "chat-about-fish-audio-vs-elevenlabs",
+          body,
+          revision: "r1",
+        }),
         update: async () => {},
         attach: async (stem) => {
           const chat = chats.find((c) => c.slug === slug);

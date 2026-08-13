@@ -9,12 +9,12 @@
 // audit 2026-07-30, #6: ~450 KB of inlined markup was 29% of the entry chunk).
 // They stay ?raw inline SVG — tinting survives; only the LOADING moved. The
 // wrapper span reserves its box, so the one async tick never shifts layout.
-// The bold logo mark stays eager: it's ~6 KB and sits in the titlebar at
+// The detailed logo mark stays eager: it's ~6 KB and sits in the titlebar at
 // first paint.
 
 import { useEffect, useState } from "react";
 
-import logoMark from "../assets/characters/_logo-bold.svg?raw";
+import logoMark from "../assets/characters/_logo.svg?raw";
 import type { CharacterName } from "./characterArt";
 
 export type { CharacterName } from "./characterArt";

@@ -1,4 +1,5 @@
 import { trackNewDocumentDraft } from "../documents/draftComposition";
+import type { DocumentImage } from "../documents/model";
 import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
 /** Composition root for item creation. Product rules stay in model/workflow. */
 import { invalidateMemex } from "../memex/useMemex";
@@ -169,9 +170,28 @@ export async function createManagedItem(
   return item;
 }
 
-/** Generated documents and sheets still ride the one item-creation presenter:
- * refresh, Main/view filing, and ordinary file surfaces stay identical to a
- * chooser-created item. The supplied creator owns only the populated bytes. */
+/** Create a populated editable Word artifact while retaining the same refresh,
+ * Main/view filing, and presentation policy as a toolbar-created document.
+ * Populated artifacts are never tracked as discardable blank drafts. */
+export function createManagedDocumentWithContent(
+  title: string,
+  body: string,
+  options: { newTab?: boolean; open?: boolean; images?: DocumentImage[]; rootId?: string } = {},
+): Promise<CreatedItem> {
+  const populatedDocumentCreator: NewItemCreator = {
+    async create() {
+      const { createManagedDocumentFromMarkdown } = await import("../documents/composition");
+      return {
+        id: await createManagedDocumentFromMarkdown(title, body, Date.now(), options.images, options.rootId),
+        kind: "document",
+      };
+    },
+  };
+  return createNewItem({ creator: populatedDocumentCreator, presenter }, "document", options);
+}
+
+/** Generated sheets retain the same refresh and Main/view filing policy as a
+ * chooser-created item while letting their adapter supply populated bytes. */
 export function createPopulatedManagedItem(
   kind: "document" | "sheet",
   createFile: () => Promise<string>,
@@ -187,7 +207,7 @@ export function createPopulatedManagedItem(
 }
 
 /** Register bytes created by a specialized adapter (for example a PDF export
- * and its Markdown source) with the same refresh/Main/view policy. */
+ * and its editable Markdown source) with the shared refresh/Main/view policy. */
 export async function registerPopulatedManagedItem(item: CreatedItem): Promise<CreatedItem> {
   await presenter.refresh();
   presenter.fileInMain(item);
@@ -208,11 +228,20 @@ export function requestManagedBoardCreation(options: { newTab?: boolean } = {}):
 export function createManagedBoardWithBody(
   body: string,
   name: string,
-  options: { newTab?: boolean; open?: boolean; besideNoteId?: string } = {},
+  options: { newTab?: boolean; open?: boolean; besideNoteId?: string; rootId?: string } = {},
 ): Promise<CreatedItem> {
   const populatedBoardCreator: NewItemCreator = {
     async create() {
-      const board = await corpusCreateBoard(resolvedPhysicalFolder(), name, body);
+      // Chat/tool calls carry an explicit root capability. Do not re-read the
+      // ambient sidebar selection after a long model run: it may now point at
+      // another vault. `Storage` is a conventional lane and the Rust memex
+      // adapter redirects it to storage/excalidraw.
+      const folder = options.rootId
+        ? options.rootId === "default"
+          ? DEST.storage
+          : `${options.rootId}:storage/excalidraw`
+        : resolvedPhysicalFolder();
+      const board = await corpusCreateBoard(folder, name, body);
       return { id: board.id, kind: "board" };
     },
   };

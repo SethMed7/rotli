@@ -1298,6 +1298,15 @@
   font-size: var(--fs-label);
   color: var(--text-muted);
 }
+.retention-days-row {
+  margin: -2px 14px 2px;
+  max-width: calc(640px - 28px);
+  justify-content: flex-end;
+}
+.retention-days-input {
+  flex: 0 0 76px;
+  text-align: end;
+}
 .setselect {
   font: inherit;
   font-size: 13px;
@@ -1581,44 +1590,86 @@
   padding-top: 20px;
   border-top: 1px solid var(--border);
 }
-.claudecmd-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.claudecmd-head h4 {
+.claudecmd-intro h4 {
   margin: 0;
   font-size: 13px;
   font-weight: 650;
   color: var(--text);
 }
-.claudecmd-copy {
-  flex: 0 0 auto;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 8px;
+.claudecmd-intro .plugdesc {
+  max-width: 780px;
+  margin: 6px 0 0;
+  line-height: 1.55;
+}
+.claudecmd-shell {
+  margin-top: 14px;
+  overflow: hidden;
   border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
-.claudecmd-copy:hover {
-  border-color: var(--text);
-}
-.claudecmd-block {
-  margin: 12px 0 0;
-  padding: 14px 16px;
   border-radius: 10px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+}
+.claudecmd-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 38px;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+.claudecmd-copy {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  width: 88px;
+  min-height: 28px;
+  justify-content: center;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.claudecmd-copy:hover,
+.claudecmd-copy:focus-visible {
+  border-color: var(--border);
+  background: var(--tint);
+  color: var(--text);
+}
+.claudecmd-copy.copied {
+  color: var(--accent-text);
+}
+.claudecmd-copy.failed {
+  color: var(--danger);
+}
+.claudecmd-block {
+  margin: 0;
+  padding: 16px;
+  background: transparent;
+  border: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   line-height: 1.55;
   color: var(--text);
   white-space: pre-wrap;
   overflow-x: auto;
+}
+.claudecmd-status {
+  display: block;
+  min-height: 15px;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.claudecmd-status.failed {
+  color: var(--danger);
 }
 .hksearch {
   width: 100%;

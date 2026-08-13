@@ -86,7 +86,9 @@ fn reference_tree_from_list(list: &CorpusList, parent: Option<&str>) -> Vec<Refe
         list.notes
             .iter()
             .filter(|note| note.folder_id == folder_id)
-            .map(|note| ReferenceNode::Note { note: note.id.clone() }),
+            .map(|note| ReferenceNode::Note {
+                note: note.id.clone(),
+            }),
     );
     tree
 }
@@ -139,7 +141,12 @@ pub fn relocate(old_root: &Path, new_root: &Path) -> Result<(), String> {
         let has_real = fs::read_dir(new_root)
             .map_err(|e| e.to_string())?
             .filter_map(|e| e.ok())
-            .any(|e| e.file_name().to_str().map(|n| !n.starts_with('.')).unwrap_or(true));
+            .any(|e| {
+                e.file_name()
+                    .to_str()
+                    .map(|n| !n.starts_with('.'))
+                    .unwrap_or(true)
+            });
         if has_real {
             return Err("Pick an empty folder — rotli won't merge into existing files.".into());
         }
@@ -212,14 +219,12 @@ impl RootRegistry {
 pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
     if cfg!(debug_assertions) {
         let cfg = ensure_corpus_config(app);
-        let read_only = crate::development_read_only();
         return vec![CorpusRoot {
             id: DEFAULT_ROOT_ID.to_string(),
-            label: match (is_memex_root(&cfg.corpus.abs_path), read_only) {
-                (true, true) => "Production memex · read-only".to_string(),
-                (false, true) => "Production notes · read-only".to_string(),
-                (true, false) => "Live memex · development".to_string(),
-                (false, false) => "Live notes · development".to_string(),
+            label: if is_memex_root(&cfg.corpus.abs_path) {
+                "Production vault".to_string()
+            } else {
+                "Production notes".to_string()
             },
             abs_path: cfg.corpus.abs_path,
             adopted: cfg.corpus.adopted,
@@ -319,19 +324,27 @@ pub struct CorpusConfig {
 
 fn corpus_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
     use tauri::Manager;
-    app.path()
-        .app_config_dir()
-        .ok()
-        .map(|d| d.join(if cfg!(debug_assertions) { "corpus.dev.json" } else { "corpus.json" }))
+    app.path().app_config_dir().ok().map(|d| {
+        d.join(if cfg!(debug_assertions) {
+            "corpus.dev.json"
+        } else {
+            "corpus.json"
+        })
+    })
 }
 
 fn production_corpus_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
     use tauri::Manager;
-    app.path().app_config_dir().ok().map(|d| d.join("corpus.json"))
+    app.path()
+        .app_config_dir()
+        .ok()
+        .map(|d| d.join("corpus.json"))
 }
 
 fn read_config_path(path: &Path) -> Option<CorpusConfig> {
-    fs::read_to_string(path).ok().and_then(|t| serde_json::from_str(&t).ok())
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
 }
 
 /// Read a config without mutating it. A valid `.bak` is an emergency fallback:
@@ -379,7 +392,8 @@ pub fn is_configured(app: &tauri::AppHandle) -> bool {
 }
 
 /// The development shell mirrors the production corpus as its single visible
-/// source. It does not copy, register, or write the live tree. If a production
+/// source and uses the same guarded read/write semantics as the installed app.
+/// If a production
 /// config predating the unified model is all that exists, promote the active
 /// memex from the isolated dev config snapshot instead of showing a second notes
 /// root beside it.
@@ -401,7 +415,10 @@ fn dev_primary_from_config(cfg: CorpusConfig) -> Option<CorpusConfig> {
     };
     Some(CorpusConfig {
         version: cfg.version,
-        corpus: CorpusRef { abs_path: source, adopted: false },
+        corpus: CorpusRef {
+            abs_path: source,
+            adopted: false,
+        },
         brains: Vec::new(),
         folders: Vec::new(),
         active_brain_id: None,
@@ -435,25 +452,46 @@ pub fn write_corpus_config(app: &tauri::AppHandle, cfg: &CorpusConfig) -> Result
 
 /// Bump when the seed content changes so an already-seeded demo memex re-seeds on
 /// next activation (Seth, 2026-07-07 — v2 is the public, rotli-about-rotli seed).
-const DEMO_SEED_VERSION: &str = "2";
+const DEMO_SEED_VERSION: &str = "3";
 
 /// The bundled seed content, written into memex-demo on first activation. It is a
 /// PUBLIC demo — general, about rotli itself, nothing personal (it ships in
 /// screenshots and demos). `.rotli/main.json` seeds a hand-arranged Main so the
 /// demo shows the same note reachable two ways: in Main (your view) and in the
-/// Brain (where it lives).
+/// Library (where it lives).
 const DEMO_SEED: &[(&str, &str)] = &[
     ("memex.json", include_str!("../demo-seed/memex.json")),
     ("MAP.md", include_str!("../demo-seed/MAP.md")),
     ("inbox.md", include_str!("../demo-seed/inbox.md")),
     (".rotli/main.json", include_str!("../demo-seed/main.json")),
-    ("wiki/guides/welcome-to-rotli.md", include_str!("../demo-seed/wiki/guides/welcome-to-rotli.md")),
-    ("wiki/guides/main-and-the-brain.md", include_str!("../demo-seed/wiki/guides/main-and-the-brain.md")),
-    ("wiki/ideas/note-taking-that-lasts.md", include_str!("../demo-seed/wiki/ideas/note-taking-that-lasts.md")),
-    ("wiki/reading/local-first-software.md", include_str!("../demo-seed/wiki/reading/local-first-software.md")),
-    ("wiki/_inbox/try-quick-capture.md", include_str!("../demo-seed/wiki/_inbox/try-quick-capture.md")),
-    ("wiki/_inbox/weekend-project.md", include_str!("../demo-seed/wiki/_inbox/weekend-project.md")),
-    ("chats/getting-started.md", include_str!("../demo-seed/chats/getting-started.md")),
+    (
+        "wiki/guides/welcome-to-rotli.md",
+        include_str!("../demo-seed/wiki/guides/welcome-to-rotli.md"),
+    ),
+    (
+        "wiki/guides/main-and-the-library.md",
+        include_str!("../demo-seed/wiki/guides/main-and-the-library.md"),
+    ),
+    (
+        "wiki/ideas/note-taking-that-lasts.md",
+        include_str!("../demo-seed/wiki/ideas/note-taking-that-lasts.md"),
+    ),
+    (
+        "wiki/reading/local-first-software.md",
+        include_str!("../demo-seed/wiki/reading/local-first-software.md"),
+    ),
+    (
+        "wiki/_inbox/try-quick-capture.md",
+        include_str!("../demo-seed/wiki/_inbox/try-quick-capture.md"),
+    ),
+    (
+        "wiki/_inbox/weekend-project.md",
+        include_str!("../demo-seed/wiki/_inbox/weekend-project.md"),
+    ),
+    (
+        "chats/getting-started.md",
+        include_str!("../demo-seed/chats/getting-started.md"),
+    ),
 ];
 
 /// Scaffold the seeded demo memex at `root` (idempotent — overwrites the seed).
@@ -480,10 +518,13 @@ pub fn is_demo_memex(root: &Path) -> bool {
 
 fn demo_flag_file(app: &tauri::AppHandle) -> Option<PathBuf> {
     use tauri::Manager;
-    app.path()
-        .app_config_dir()
-        .ok()
-        .map(|d| d.join(if cfg!(debug_assertions) { "demo.dev.on" } else { "demo.on" }))
+    app.path().app_config_dir().ok().map(|d| {
+        d.join(if cfg!(debug_assertions) {
+            "demo.dev.on"
+        } else {
+            "demo.on"
+        })
+    })
 }
 
 /// The demo memex folder — `memex-demo`, a sibling of the user's real corpus.
@@ -644,7 +685,13 @@ fn canon(p: &Path) -> PathBuf {
 fn unique_id(label: &str, fallback: &str, taken: impl Fn(&str) -> bool) -> String {
     let mut base: String = label
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
         .collect();
     while base.contains("--") {
         base = base.replace("--", "-");
@@ -763,7 +810,10 @@ fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
 
     CorpusConfig {
         version: 1,
-        corpus: CorpusRef { abs_path: corpus_path, adopted: false },
+        corpus: CorpusRef {
+            abs_path: corpus_path,
+            adopted: false,
+        },
         brains,
         folders,
         active_brain_id,
@@ -786,7 +836,9 @@ pub fn carry_settings(current: &Path, new_root: &Path) -> Result<(), String> {
         return Ok(());
     }
     fs::create_dir_all(&dst_dir).map_err(|e| format!("create {}: {e}", dst_dir.display()))?;
-    fs::copy(&src, &dst).map_err(|e| format!("carry settings: {e}")).map(|_| ())
+    fs::copy(&src, &dst)
+        .map_err(|e| format!("carry settings: {e}"))
+        .map(|_| ())
 }
 
 /// Repoint the active corpus at `path`. The caller relaunches so it opens.
@@ -796,7 +848,10 @@ pub fn set_corpus_path(app: &tauri::AppHandle, path: PathBuf, adopted: bool) -> 
     } else {
         CorpusConfig {
             version: 1,
-            corpus: CorpusRef { abs_path: path.clone(), adopted },
+            corpus: CorpusRef {
+                abs_path: path.clone(),
+                adopted,
+            },
             brains: Vec::new(),
             folders: Vec::new(),
             active_brain_id: None,
@@ -816,7 +871,10 @@ pub fn set_corpus_path(app: &tauri::AppHandle, path: PathBuf, adopted: bool) -> 
     if dropped_active {
         cfg.active_brain_id = cfg.brains.first().map(|b| b.id.clone());
     }
-    cfg.corpus = CorpusRef { abs_path: path, adopted };
+    cfg.corpus = CorpusRef {
+        abs_path: path,
+        adopted,
+    };
     write_corpus_config(app, &cfg)
 }
 
@@ -833,8 +891,7 @@ pub fn upsert_brain(
     let target = canon(&brain.abs_path);
     if canon(&cfg.corpus.abs_path) == target {
         return Err(
-            "That folder is already your notes folder (your brain) — it can't also be a connected brain."
-                .into(),
+            "That folder is already your vault — it can't also be a linked library.".into(),
         );
     }
     let existing = cfg.brains.iter().find(|b| canon(&b.abs_path) == target);
@@ -842,7 +899,7 @@ pub fn upsert_brain(
         if let Some(prev) = e.memex_id.as_deref() {
             if prev != new_id {
                 return Err(
-                    "This folder is a different memex than the one rotli connected to — refusing."
+                    "This folder is a different vault than the one rotli connected to — refusing."
                         .into(),
                 );
             }
@@ -855,7 +912,10 @@ pub fn upsert_brain(
             brain.id.clone()
         }
     });
-    let entry = ConnectedBrain { id: id.clone(), ..brain };
+    let entry = ConnectedBrain {
+        id: id.clone(),
+        ..brain
+    };
     cfg.brains.retain(|b| canon(&b.abs_path) != target);
     cfg.brains.push(entry);
     if make_active || cfg.active_brain_id.is_none() {
@@ -867,13 +927,17 @@ pub fn upsert_brain(
 pub fn set_active_brain(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
     let mut cfg = ensure_corpus_config(app);
     if !cfg.brains.iter().any(|b| b.id == id) {
-        return Err("no such brain".into());
+        return Err("no such vault".into());
     }
     cfg.active_brain_id = Some(id.to_string());
     write_corpus_config(app, &cfg)
 }
 
-pub fn set_brain_perms(app: &tauri::AppHandle, id: &str, perms: crate::memex::MemexPerms) -> Result<(), String> {
+pub fn set_brain_perms(
+    app: &tauri::AppHandle,
+    id: &str,
+    perms: crate::memex::MemexPerms,
+) -> Result<(), String> {
     // no string validation here anymore — serde on MemexPerms already rejected
     // anything but the two wire values at the IPC boundary
     let mut cfg = ensure_corpus_config(app);
@@ -881,7 +945,7 @@ pub fn set_brain_perms(app: &tauri::AppHandle, id: &str, perms: crate::memex::Me
         .brains
         .iter_mut()
         .find(|b| b.id == id)
-        .ok_or("no such brain")?;
+        .ok_or("no such vault")?;
     b.perms = perms;
     write_corpus_config(app, &cfg)
 }
@@ -912,7 +976,12 @@ pub fn add_folder(app: &tauri::AppHandle, path: PathBuf) -> Result<bool, String>
         .unwrap_or("folder")
         .to_string();
     let id = unique_folder_id(&cfg, &label);
-    cfg.folders.push(CorpusRoot { id, label, abs_path: path, adopted: false });
+    cfg.folders.push(CorpusRoot {
+        id,
+        label,
+        abs_path: path,
+        adopted: false,
+    });
     write_corpus_config(app, &cfg)?;
     Ok(true)
 }
@@ -1001,7 +1070,12 @@ fn stamp_to_ms(stamp: &str) -> Option<i64> {
 /// note stays date-shaped like everything memex-vault writes.
 fn today_stamp() -> String {
     let now = OffsetDateTime::now_utc().date();
-    format!("{:04}-{:02}-{:02}", now.year(), u8::from(now.month()), now.day())
+    format!(
+        "{:04}-{:02}-{:02}",
+        now.year(),
+        u8::from(now.month()),
+        now.day()
+    )
 }
 
 /// (created_ms, updated_ms) from file metadata — the fallback for notes that
@@ -1093,19 +1167,14 @@ fn parse_fields(head: &str) -> Frontmatter {
 /// independent source of truth.
 fn searchable_metadata(fm: &Frontmatter) -> String {
     const KEYS: [&str; 8] = [
-        "aliases",
-        "area",
-        "summary",
-        "tags",
-        "links",
-        "shelf",
-        "reach",
-        "view_tag",
+        "aliases", "area", "summary", "tags", "links", "shelf", "reach", "view_tag",
     ];
     fm.foreign
         .iter()
         .filter(|line| {
-            let Some((key, _)) = line.split_once(':') else { return false };
+            let Some((key, _)) = line.split_once(':') else {
+                return false;
+            };
             key == key.trim() && KEYS.contains(&key)
         })
         .cloned()
@@ -1118,7 +1187,10 @@ fn searchable_metadata(fm: &Frontmatter) -> String {
 /// body detector for a note whose metadata panel was never opened.
 fn walked_secure(fm: &Frontmatter, body: &str) -> bool {
     fm.foreign.iter().any(|l| secure_field(l) == Some(true))
-        || fm.foreign.iter().any(|l| secure_context_field(l) == Some(true))
+        || fm
+            .foreign
+            .iter()
+            .any(|l| secure_context_field(l) == Some(true))
         || looks_secure(body)
 }
 
@@ -1128,8 +1200,14 @@ pub fn compose_document(fm: &Frontmatter, raw_body: &str) -> String {
     let mut out = String::with_capacity(raw_body.len() + 128);
     out.push_str("---\n");
     out.push_str(&format!("id: {}\n", fm.id.as_deref().unwrap_or("")));
-    out.push_str(&format!("created: {}\n", fm.created.as_deref().unwrap_or("")));
-    out.push_str(&format!("updated: {}\n", fm.updated.as_deref().unwrap_or("")));
+    out.push_str(&format!(
+        "created: {}\n",
+        fm.created.as_deref().unwrap_or("")
+    ));
+    out.push_str(&format!(
+        "updated: {}\n",
+        fm.updated.as_deref().unwrap_or("")
+    ));
     out.push_str(&format!("pinned: {}\n", fm.pinned.unwrap_or(false)));
     // origin emitted ONLY when Some(_) — right after pinned, before foreign —
     // so notes that never entered a hidden root stay byte-identical.
@@ -1297,6 +1375,10 @@ pub struct TaskItem {
 #[serde(rename_all = "camelCase")]
 pub struct FileStat {
     pub len: u64,
+    /// Opaque revision of the complete file bytes. Length and mtime are not
+    /// concurrency tokens: same-size writes and coarse timestamp filesystems
+    /// would otherwise let an office save replace an external edit.
+    pub revision: String,
     pub writable: bool,
     /// Whether an explicit user action may move this storage asset into the
     /// memex Archive or Trash. Separate from `writable`: unsupported formats
@@ -1415,7 +1497,11 @@ pub fn merge_raw_frontmatter(original: &str, submitted: &str) -> Result<String, 
 
     // an emptied block: with nothing reserved to restore the fences go too
     if lines.is_empty() {
-        return Ok(if orig_block.is_empty() { original.to_string() } else { body.to_string() });
+        return Ok(if orig_block.is_empty() {
+            original.to_string()
+        } else {
+            body.to_string()
+        });
     }
     let mut out = String::with_capacity(body.len() + submitted.len() + 16);
     out.push_str("---\n");
@@ -1481,7 +1567,11 @@ fn project_folder(layout: Layout, disk_folder: &str, fm: &Frontmatter) -> String
                 // the default capture shelf "Inbox" is the ONE Captures surface — route
                 // it to the reserved "Board" root the sidebar reads as "Captures" (Seth,
                 // 2026-06-30); a real user shelf (Myela/Payments) still projects to it.
-                return if primary == "Inbox" { "Board".to_string() } else { primary };
+                return if primary == "Inbox" {
+                    "Board".to_string()
+                } else {
+                    primary
+                };
             }
         }
     }
@@ -1529,7 +1619,11 @@ fn ensure_backing_folders(folders: &mut Vec<FolderMeta>, notes: &[NoteMeta]) {
                 Some((p, nm)) => (Some(p.to_string()), nm.to_string()),
                 None => (None, path.clone()),
             };
-            folders.push(FolderMeta { id: path.clone(), name, parent_id: parent.clone() });
+            folders.push(FolderMeta {
+                id: path.clone(),
+                name,
+                parent_id: parent.clone(),
+            });
             known.insert(path.clone());
             path = parent.unwrap_or_default();
         }
@@ -1583,8 +1677,10 @@ fn strip_markdown(line: &str) -> String {
     // raw markdown (render-only: the .md file is untouched). Images first, then
     // links, in lockstep with derive.ts stripMarkdown.
     let reduced = reduce_md_links(&reduce_md_links(s, true), false);
-    let cleaned: String =
-        reduced.chars().filter(|c| !matches!(c, '*' | '_' | '`')).collect();
+    let cleaned: String = reduced
+        .chars()
+        .filter(|c| !matches!(c, '*' | '_' | '`'))
+        .collect();
     cleaned.trim().to_string()
 }
 
@@ -1694,7 +1790,9 @@ const SNIPPET_CTX: usize = 60;
 /// 1:1, so a char offset in the folded text equals the offset in the original.
 /// TS twin: `fold` in src/services/search.ts.
 fn fold_chars(s: &str) -> Vec<char> {
-    s.chars().map(|c| c.to_lowercase().next().unwrap_or(c)).collect()
+    s.chars()
+        .map(|c| c.to_lowercase().next().unwrap_or(c))
+        .collect()
 }
 
 /// Char offset of the first occurrence of `needle` in `hay` (both pre-folded).
@@ -1747,12 +1845,21 @@ pub fn search_match(
             }
             continue;
         }
-        snippet.push(if matches!(c, '\n' | '\r' | '\t') { ' ' } else { c });
+        snippet.push(if matches!(c, '\n' | '\r' | '\t') {
+            ' '
+        } else {
+            c
+        });
     }
     if end < chars.len() {
         snippet.push('…');
     }
-    Some(SearchMatch { rank: 1, snippet, match_start, match_len: q.len() })
+    Some(SearchMatch {
+        rank: 1,
+        snippet,
+        match_start,
+        match_len: q.len(),
+    })
 }
 
 /// Trash and its subtree only — the ONE root search never surfaces (Archive
@@ -1779,7 +1886,8 @@ fn is_archive_folder(folder: &str) -> bool {
 /// is not finished, so it still belongs on the Tasks surface. Mirrors the
 /// editor's grammar in src/editor/taskState.ts.
 fn strip_open_box(rest: &str) -> Option<&str> {
-    rest.strip_prefix("[ ]").or_else(|| rest.strip_prefix("[/]"))
+    rest.strip_prefix("[ ]")
+        .or_else(|| rest.strip_prefix("[/]"))
 }
 
 /// An open `- [ ]` / `* [ ]` / `1. [ ]` checkbox line's own text — or the `[/]`
@@ -1807,7 +1915,10 @@ fn open_task_text(trimmed: &str) -> Option<&str> {
 fn check_off(line: &str) -> Option<String> {
     let trimmed = line.trim_start();
     let lead = line.len() - trimmed.len();
-    let after_marker = if let Some(rest) = trimmed.strip_prefix("- ").or_else(|| trimmed.strip_prefix("* ")) {
+    let after_marker = if let Some(rest) = trimmed
+        .strip_prefix("- ")
+        .or_else(|| trimmed.strip_prefix("* "))
+    {
         trimmed.len() - rest.len()
     } else {
         let rest = strip_ordered_prefix(trimmed)?.strip_prefix(' ')?;
@@ -1868,7 +1979,9 @@ fn task_continuation(raw: &str) -> Option<&str> {
 fn joined_task_text(lines: &[&str], start: usize) -> Option<String> {
     let mut text = open_task_text(lines.get(start)?.trim_start())?.to_string();
     for raw in lines.iter().skip(start + 1) {
-        let Some(cont) = task_continuation(raw) else { break };
+        let Some(cont) = task_continuation(raw) else {
+            break;
+        };
         text.push(' ');
         text.push_str(cont);
     }
@@ -1883,7 +1996,13 @@ fn leading_snippet(body: &str) -> String {
     const MAX: usize = 140;
     let flat: String = body
         .chars()
-        .map(|c| if matches!(c, '\n' | '\r' | '\t') { ' ' } else { c })
+        .map(|c| {
+            if matches!(c, '\n' | '\r' | '\t') {
+                ' '
+            } else {
+                c
+            }
+        })
         .collect();
     let flat = flat.trim();
     let mut out: String = flat.chars().take(MAX).collect();
@@ -2129,6 +2248,10 @@ pub struct NoteDoc {
     pub disk_folder_id: String,
     /// Frontmatter stripped — what the editor edits.
     pub body: String,
+    /// Opaque revision of the complete on-disk file, including frontmatter.
+    /// Every whole-body write must present this value so a stale editor cannot
+    /// replace a newer external, CLI, MCP, AI, or second-window edit.
+    pub revision: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub pinned: bool,
@@ -2146,8 +2269,27 @@ pub struct CorpusBoardDoc {
     pub folder_id: String,
     /// The raw `.excalidraw` JSON string — the file verbatim.
     pub body: String,
+    /// Opaque revision of the raw scene bytes.
+    pub revision: String,
     pub created_at: i64,
     pub updated_at: i64,
+}
+
+/// A write returns both list metadata and the revision of the bytes that
+/// actually landed. Flattening keeps the existing TypeScript metadata shape.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CorpusWriteResult {
+    #[serde(flatten)]
+    pub meta: NoteMeta,
+    pub revision: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CorpusAiRead {
+    pub body: String,
+    pub revision: String,
 }
 
 /// A minimal, valid empty Excalidraw scene. New boards start here; it opens
@@ -2203,7 +2345,8 @@ impl SuppressSet {
     /// Invalidate walk caches without suppressing anything — the watcher calls
     /// this once per fired external burst.
     pub fn bump(&self) {
-        self.generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.generation
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
 
     pub fn generation(&self) -> u64 {
@@ -2377,8 +2520,46 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
 fn is_reference_lane(rel: &str) -> bool {
     const DIRS: [&str; 3] = ["identity", "personality", "history"];
     const FILES: [&str; 2] = ["MAP.md", "inbox.md"];
-    DIRS.iter().any(|d| rel == *d || rel.starts_with(&format!("{d}/")))
+    DIRS.iter()
+        .any(|d| rel == *d || rel.starts_with(&format!("{d}/")))
         || FILES.contains(&rel)
+}
+
+pub(crate) const CHAT_IMAGE_ASSET_EXTS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "avif", "bmp", "tiff", "tif",
+];
+
+fn image_payload_matches_extension(ext: &str, bytes: &[u8]) -> bool {
+    match ext {
+        "png" => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+        "jpg" | "jpeg" => bytes.starts_with(b"\xff\xd8\xff"),
+        "gif" => bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a"),
+        "webp" => bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP"),
+        "bmp" => bytes.starts_with(b"BM"),
+        "tif" | "tiff" => bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*"),
+        "heic" | "heif" | "avif" => {
+            if bytes.get(4..8) != Some(b"ftyp") {
+                return false;
+            }
+            bytes.get(8..bytes.len().min(64)).is_some_and(|brands| {
+                brands.chunks_exact(4).any(|brand| match ext {
+                    "avif" => brand == b"avif" || brand == b"avis",
+                    _ => matches!(
+                        brand,
+                        b"heic"
+                            | b"heix"
+                            | b"hevc"
+                            | b"hevx"
+                            | b"heim"
+                            | b"heis"
+                            | b"mif1"
+                            | b"msf1"
+                    ),
+                })
+            })
+        }
+        _ => false,
+    }
 }
 
 pub struct CorpusStore {
@@ -2469,7 +2650,10 @@ fn collect_view_membership(
     for node in nodes {
         match node {
             ReferenceNode::Folder { folder, children } => {
-                if folder.trim().is_empty() || folder != folder.trim() || folder.contains(['/', ':']) {
+                if folder.trim().is_empty()
+                    || folder != folder.trim()
+                    || folder.contains(['/', ':'])
+                {
                     return Err(format!("invalid folder name in view {view}: {folder}"));
                 }
                 collect_view_membership(children, view, membership)?;
@@ -2530,10 +2714,6 @@ fn with_view_tag(text: &str, tag: Option<&str>) -> String {
     compose_document(&frontmatter, body)
 }
 
-pub(crate) const CHAT_IMAGE_ASSET_EXTS: &[&str] = &[
-    "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "avif", "bmp", "tiff", "tif",
-];
-
 impl CorpusStore {
     /// Open (or first-run-initialize) a corpus at `root`. The dispatcher: probe
     /// `root/memex.json` once — a valid `mx_` id routes to the memex path (browse
@@ -2543,8 +2723,8 @@ impl CorpusStore {
         Self::open_with_mode(root, false)
     }
 
-    /// Open an existing corpus as a view only. This is the development mount for
-    /// the production memex: no sidecar creation, seeding, index persistence, or
+    /// Open an existing corpus as a view only. Used by explicitly read-only
+    /// headless connections: no sidecar creation, seeding, index persistence, or
     /// user/organizer write lane is allowed.
     pub fn open_read_only(root: PathBuf) -> Result<Self, String> {
         Self::open_with_mode(root, true)
@@ -2554,8 +2734,8 @@ impl CorpusStore {
     /// rebuildable sidecar; the user's visible hierarchy stays byte-for-byte as
     /// it was (no reserved folders and no welcome note).
     pub fn open_adopted(root: PathBuf) -> Result<Self, String> {
-        let root = fs::canonicalize(&root)
-            .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
+        let root =
+            fs::canonicalize(&root).map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
         let dot = crate::containment::resolve_beneath(&root, Path::new(DOT_DIR))?;
         fs::create_dir_all(dot)
             .map_err(|e| format!("create {}: {e}", root.join(DOT_DIR).display()))?;
@@ -2589,15 +2769,20 @@ impl CorpusStore {
     /// path writable. Layout::LegacyRotli.
     fn open_legacy(root: PathBuf, read_only: bool) -> Result<Self, String> {
         let fresh = !root.exists()
-            || fs::read_dir(&root).map(|mut d| d.next().is_none()).unwrap_or(false);
+            || fs::read_dir(&root)
+                .map(|mut d| d.next().is_none())
+                .unwrap_or(false);
         if read_only && !root.is_dir() {
-            return Err(format!("read-only corpus does not exist: {}", root.display()));
+            return Err(format!(
+                "read-only corpus does not exist: {}",
+                root.display()
+            ));
         }
         if !read_only {
             fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
         }
-        let root = fs::canonicalize(&root)
-            .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
+        let root =
+            fs::canonicalize(&root).map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
         if !read_only {
             let dot = crate::containment::resolve_beneath(&root, Path::new(DOT_DIR))?;
             fs::create_dir_all(dot)
@@ -2635,8 +2820,8 @@ impl CorpusStore {
     /// scaffold its Inbox/Vault/Storage/… inside someone's memex-vault. Layout::Memex
     /// then keeps every write off self/history/wiki/MAP/inbox + control files.
     fn open_memex(root: PathBuf, read_only: bool) -> Result<Self, String> {
-        let root = fs::canonicalize(&root)
-            .map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
+        let root =
+            fs::canonicalize(&root).map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
         if !read_only {
             let dot = crate::containment::resolve_beneath(&root, Path::new(DOT_DIR))?;
             fs::create_dir_all(dot)
@@ -2746,6 +2931,7 @@ impl CorpusStore {
         };
         Ok(FileStat {
             len: meta.len(),
+            revision: crate::fsutil::file_revision(&abs)?,
             // an existing storage/ office file is editable in place
             // even though the contract's writable() refuses the storage lane at large
             writable: self.writable(rel).is_ok() || self.storage_office_editable(rel),
@@ -2785,7 +2971,9 @@ impl CorpusStore {
             return Err(format!("not a file lifecycle destination: {sink}"));
         }
         if !self.storage_file_lifecycle_mutable(rel) {
-            return Err(format!("this file is read-only or outside Rotli storage: {rel}"));
+            return Err(format!(
+                "this file is read-only or outside Rotli storage: {rel}"
+            ));
         }
         let abs = self.abs(rel);
         let name = Path::new(rel)
@@ -2875,7 +3063,9 @@ impl CorpusStore {
         if bak {
             let bak_abs = abs.with_file_name(format!(
                 "{}.bak",
-                abs.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+                abs.file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default()
             ));
             if !bak_abs.exists() {
                 fs::copy(&abs, &bak_abs).map_err(|e| format!("backup {rel}: {e}"))?;
@@ -2885,10 +3075,33 @@ impl CorpusStore {
         atomic_write_bytes(&abs, bytes)
     }
 
+    pub fn write_file_bytes_if_revision(
+        &mut self,
+        rel: &str,
+        bytes: &[u8],
+        bak: bool,
+        expected_revision: &str,
+    ) -> Result<String, String> {
+        validate_rel(rel)?;
+        let abs = self.guard_rel(rel)?;
+        if !abs.is_file() {
+            return Err(format!("not a file: {rel}"));
+        }
+        let current = fs::read(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        crate::fsutil::compare_revision(expected_revision, &current)?;
+        self.write_file_bytes(rel, bytes, bak)?;
+        Ok(crate::fsutil::revision(bytes))
+    }
+
     /// Create a NEW file from raw bytes in `folder` — the csv → xlsx convert
     /// writes the sibling workbook here. Collision-safe via free_name (never
     /// clobbers); same writable() gate. Returns the new file's rel path.
-    pub fn new_file_bytes(&mut self, folder: &str, name: &str, bytes: &[u8]) -> Result<String, String> {
+    pub fn new_file_bytes(
+        &mut self,
+        folder: &str,
+        name: &str,
+        bytes: &[u8],
+    ) -> Result<String, String> {
         if !folder.is_empty() {
             validate_rel(folder)?;
         }
@@ -2897,7 +3110,8 @@ impl CorpusStore {
         self.guard_rel(&rel)?;
         self.writable(&rel)?;
         if !folder.is_empty() {
-            fs::create_dir_all(self.abs(folder)).map_err(|e| format!("create folder {folder}: {e}"))?;
+            fs::create_dir_all(self.abs(folder))
+                .map_err(|e| format!("create folder {folder}: {e}"))?;
         }
         let abs = self.abs(&rel);
         self.suppress.mark(&abs);
@@ -2916,8 +3130,14 @@ impl CorpusStore {
             .extension()
             .and_then(|value| value.to_str())
             .map(str::to_ascii_lowercase);
-        if !ext.as_deref().is_some_and(|value| GENERATED_FILE_EXTS.contains(&value)) {
-            return Err(format!("managed files must use one of: {}", GENERATED_FILE_EXTS.join(", ")));
+        if !ext
+            .as_deref()
+            .is_some_and(|value| GENERATED_FILE_EXTS.contains(&value))
+        {
+            return Err(format!(
+                "managed files must use one of: {}",
+                GENERATED_FILE_EXTS.join(", ")
+            ));
         }
         let folder = match self.layout {
             Layout::Memex => "storage/rotli",
@@ -2976,18 +3196,23 @@ impl CorpusStore {
         let frontmatter = frontmatter.unwrap_or_default();
         let body = editor_body(raw);
         if walked_secure(&frontmatter, body) {
-            return Err("Protected or secret-shaped notes cannot be exported to an unprotected PDF copy.".into());
+            return Err(
+                "Protected or secret-shaped notes cannot be exported to an unprotected PDF copy."
+                    .into(),
+            );
         }
-        if frontmatter.foreign.iter().any(|line| locked_field(line) == Some(true)) {
+        if frontmatter
+            .foreign
+            .iter()
+            .any(|line| locked_field(line) == Some(true))
+        {
             return Err("Locked notes cannot be used as generated PDF sources.".into());
         }
         Ok(body.to_string())
     }
 
-    /// Persist bytes chosen in Chat as a conventional image asset. The chat
-    /// records the returned memex-relative path in ordinary Markdown; this
-    /// lane owns only the copied image bytes and never a proprietary artifact
-    /// record. Names are collision-safe and read-only roots fail closed.
+    /// Persist bytes selected through Chat as a conventional image asset. The
+    /// transcript keeps a portable reference; this lane owns only copied bytes.
     pub fn create_image_asset(&mut self, name: &str, bytes: &[u8]) -> Result<String, String> {
         self.mutation_allowed()?;
         validate_component(name)?;
@@ -2998,8 +3223,18 @@ impl CorpusStore {
             .extension()
             .and_then(|value| value.to_str())
             .map(str::to_ascii_lowercase);
-        if !ext.as_deref().is_some_and(|value| CHAT_IMAGE_ASSET_EXTS.contains(&value)) {
-            return Err(format!("chat images must use one of: {}", CHAT_IMAGE_ASSET_EXTS.join(", ")));
+        if !ext
+            .as_deref()
+            .is_some_and(|value| CHAT_IMAGE_ASSET_EXTS.contains(&value))
+        {
+            return Err(format!(
+                "chat images must use one of: {}",
+                CHAT_IMAGE_ASSET_EXTS.join(", ")
+            ));
+        }
+        let ext = ext.expect("validated image extension");
+        if !image_payload_matches_extension(&ext, bytes) {
+            return Err(format!("image payload does not match its .{ext} filename"));
         }
         let folder = match self.layout {
             Layout::Memex => "storage/images",
@@ -3058,7 +3293,9 @@ impl CorpusStore {
             .iter()
             // hide RESERVED keys (locked/secure/owner/…) from the user's editor —
             // they're managed by rotli, not hand-edited (v3.7).
-            .filter(|l| !l.trim().is_empty() && field_key(l).is_none_or(|k| !RESERVED_KEYS.contains(&k)))
+            .filter(|l| {
+                !l.trim().is_empty() && field_key(l).is_none_or(|k| !RESERVED_KEYS.contains(&k))
+            })
             .cloned()
             .collect();
         Ok(FrontmatterView {
@@ -3083,14 +3320,16 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
-        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let (fm, body) = parse_document(&text);
-        let mut fm = fm.unwrap_or_default();
-        fm.foreign.retain(|l| locked_field(l).is_none());
-        if locked {
-            fm.foreign.push("locked: true".to_string());
-        }
-        atomic_write(&path, &compose_document(&fm, body))
+        crate::fsutil::with_file_lock(&path, || {
+            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let (fm, body) = parse_document(&text);
+            let mut fm = fm.unwrap_or_default();
+            fm.foreign.retain(|l| locked_field(l).is_none());
+            if locked {
+                fm.foreign.push("locked: true".to_string());
+            }
+            atomic_write(&path, &compose_document(&fm, body))
+        })
     }
 
     /// Toggle the per-note PIN — the typed `pinned` frontmatter fact that floats
@@ -3105,11 +3344,13 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
-        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let (fm, body) = parse_document(&text);
-        let mut fm = fm.unwrap_or_default();
-        fm.pinned = Some(pinned);
-        atomic_write(&path, &compose_document(&fm, body))
+        crate::fsutil::with_file_lock(&path, || {
+            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let (fm, body) = parse_document(&text);
+            let mut fm = fm.unwrap_or_default();
+            fm.pinned = Some(pinned);
+            atomic_write(&path, &compose_document(&fm, body))
+        })
     }
 
     /// Set (or, with an empty value, remove) a foreign frontmatter field — the
@@ -3129,30 +3370,47 @@ impl CorpusStore {
             return Err(format!("`{key}` is managed by rotli, not editable here"));
         }
         if AI_KEYS.contains(&key) {
-            return Err(format!("`{key}` belongs to the AI filer — not editable here"));
+            return Err(format!(
+                "`{key}` belongs to the AI filer — not editable here"
+            ));
         }
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.writable(rel)?;
         let path = self.abs(rel);
-        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let (fm, body) = parse_document(&text);
-        let mut fm = fm.unwrap_or_default();
-        fm.foreign.retain(|l| field_key(l) != Some(key));
-        let value = value.trim();
-        if !value.is_empty() {
-            fm.foreign.push(format!("{key}: {value}"));
-        }
-        self.suppress.mark(&path);
-        atomic_write(&path, &compose_document(&fm, body))
+        crate::fsutil::with_file_lock(&path, || {
+            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let (fm, body) = parse_document(&text);
+            let mut fm = fm.unwrap_or_default();
+            fm.foreign.retain(|l| field_key(l) != Some(key));
+            let value = value.trim();
+            if !value.is_empty() {
+                fm.foreign.push(format!("{key}: {value}"));
+            }
+            self.suppress.mark(&path);
+            atomic_write(&path, &compose_document(&fm, body))
+        })
     }
 
     /// The note's frontmatter as RAW TEXT (fences included), byte-exact from
     /// disk; "" when the note has none. The "Show file metadata" view renders
     /// this above the body — the metadata IS the top of the file, not a form.
+    #[cfg(test)]
     fn raw_frontmatter(&mut self, id_or_rel: &str) -> Result<String, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
         let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
         Ok(raw_frontmatter_block(&text).to_string())
+    }
+
+    fn raw_frontmatter_versioned(
+        &mut self,
+        id_or_rel: &str,
+    ) -> Result<crate::fsutil::VersionedText, String> {
+        let rel = self.resolve_note_rel(id_or_rel)?;
+        let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
+        Ok(crate::fsutil::VersionedText {
+            contents: raw_frontmatter_block(&text).to_string(),
+            revision: crate::fsutil::revision(text.as_bytes()),
+        })
     }
 
     /// Write back a user-edited raw frontmatter block. merge_raw_frontmatter
@@ -3162,39 +3420,54 @@ impl CorpusStore {
     /// user-writability as every editor save (wiki/** included since 2026-08-03).
     /// Because `secure:` can be typed here, the gitignore stays in step the same
     /// way set_secure keeps it (secure ⇒ gitignored, cleared ⇒ un-ignored).
+    #[cfg(test)]
     fn write_frontmatter_raw(&mut self, id_or_rel: &str, block: &str) -> Result<(), String> {
+        let revision = self.raw_frontmatter_versioned(id_or_rel)?.revision;
+        self.write_frontmatter_raw_if_revision(id_or_rel, block, &revision)
+            .map(|_| ())
+    }
+
+    fn write_frontmatter_raw_if_revision(
+        &mut self,
+        id_or_rel: &str,
+        block: &str,
+        expected_revision: &str,
+    ) -> Result<String, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
         self.writable(&rel)?;
         let path = self.abs(&rel);
-        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let out = merge_raw_frontmatter(&text, block)?;
-        if out == text {
-            return Ok(()); // byte-identical — no write, no watcher echo
-        }
-        let was_secure = |t: &str| {
-            parse_document(t)
-                .0
-                .unwrap_or_default()
-                .foreign
-                .iter()
-                .any(|l| secure_field(l) == Some(true))
-        };
-        let (before, after) = (was_secure(&text), was_secure(&out));
-        let (_, out_body) = parse_document(&out);
-        if before && !after && looks_secure(out_body) {
-            return Err(
-                "Remove the detected secret from the note before removing secure protection"
-                    .into(),
-            );
-        }
-        self.suppress.mark(&path);
-        atomic_write(&path, &out)?;
-        if after && !before {
-            self.gitignore_add(&rel)?;
-        } else if before && !after {
-            self.gitignore_remove(&rel)?;
-        }
-        Ok(())
+        crate::fsutil::with_file_lock(&path, || {
+            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
+            let out = merge_raw_frontmatter(&text, block)?;
+            if out == text {
+                return Ok(crate::fsutil::revision(text.as_bytes())); // no write, no watcher echo
+            }
+            let was_secure = |t: &str| {
+                parse_document(t)
+                    .0
+                    .unwrap_or_default()
+                    .foreign
+                    .iter()
+                    .any(|l| secure_field(l) == Some(true))
+            };
+            let (before, after) = (was_secure(&text), was_secure(&out));
+            let (_, out_body) = parse_document(&out);
+            if before && !after && looks_secure(out_body) {
+                return Err(
+                    "Remove the detected secret from the note before removing secure protection"
+                        .into(),
+                );
+            }
+            self.suppress.mark(&path);
+            atomic_write(&path, &out)?;
+            if after && !before {
+                self.gitignore_add(&rel)?;
+            } else if before && !after {
+                self.gitignore_remove(&rel)?;
+            }
+            Ok(crate::fsutil::revision(out.as_bytes()))
+        })
     }
 
     /// Append a path to the corpus `.gitignore` (idempotent) — a secure note must
@@ -3204,19 +3477,21 @@ impl CorpusStore {
     fn gitignore_add(&self, rel: &str) -> Result<(), String> {
         self.mutation_allowed()?;
         let path = self.guard_rel(".gitignore")?;
-        // an unreadable .gitignore must not be rewritten from empty — that
-        // would drop every OTHER secure note's ignore line
-        let existing = read_existing_text(&path)?;
-        if existing.lines().any(|l| l.trim() == rel) {
-            return Ok(());
-        }
-        let mut out = existing;
-        if !out.is_empty() && !out.ends_with('\n') {
+        crate::fsutil::with_file_lock(&path, || {
+            // an unreadable .gitignore must not be rewritten from empty — that
+            // would drop every OTHER secure note's ignore line
+            let existing = read_existing_text(&path)?;
+            if existing.lines().any(|l| l.trim() == rel) {
+                return Ok(());
+            }
+            let mut out = existing;
+            if !out.is_empty() && !out.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push_str(rel);
             out.push('\n');
-        }
-        out.push_str(rel);
-        out.push('\n');
-        atomic_write(&path, &out)
+            atomic_write(&path, &out)
+        })
     }
 
     /// Remove a path from the corpus `.gitignore` — called when a note's secure flag
@@ -3225,18 +3500,20 @@ impl CorpusStore {
     fn gitignore_remove(&self, rel: &str) -> Result<(), String> {
         self.mutation_allowed()?;
         let path = self.guard_rel(".gitignore")?;
-        let Ok(existing) = fs::read_to_string(&path) else {
-            return Ok(());
-        };
-        if !existing.lines().any(|l| l.trim() == rel) {
-            return Ok(());
-        }
-        let kept: Vec<&str> = existing.lines().filter(|l| l.trim() != rel).collect();
-        let mut out = kept.join("\n");
-        if !out.is_empty() {
-            out.push('\n');
-        }
-        atomic_write(&path, &out)
+        crate::fsutil::with_file_lock(&path, || {
+            let Ok(existing) = fs::read_to_string(&path) else {
+                return Ok(());
+            };
+            if !existing.lines().any(|l| l.trim() == rel) {
+                return Ok(());
+            }
+            let kept: Vec<&str> = existing.lines().filter(|l| l.trim() != rel).collect();
+            let mut out = kept.join("\n");
+            if !out.is_empty() {
+                out.push('\n');
+            }
+            atomic_write(&path, &out)
+        })
     }
 
     /// Make the hand-arranged Main and named-view manifests git-committable while
@@ -3251,33 +3528,35 @@ impl CorpusStore {
         if !path.exists() && !self.root.join(".git").exists() {
             return Ok(());
         }
-        let existing = read_existing_text(&path)?;
-        let mut lines: Vec<String> = existing.lines().map(str::to_string).collect();
-        let mut changed = false;
-        for l in lines.iter_mut() {
-            if l.trim() == ".rotli/" || l.trim() == ".rotli" {
-                *l = ".rotli/*".to_string();
+        crate::fsutil::with_file_lock(&path, || {
+            let existing = read_existing_text(&path)?;
+            let mut lines: Vec<String> = existing.lines().map(str::to_string).collect();
+            let mut changed = false;
+            for l in lines.iter_mut() {
+                if l.trim() == ".rotli/" || l.trim() == ".rotli" {
+                    *l = ".rotli/*".to_string();
+                    changed = true;
+                }
+            }
+            if !lines.iter().any(|l| l.trim() == ".rotli/*") {
+                lines.push(".rotli/*".to_string());
                 changed = true;
             }
-        }
-        if !lines.iter().any(|l| l.trim() == ".rotli/*") {
-            lines.push(".rotli/*".to_string());
-            changed = true;
-        }
-        if !lines.iter().any(|l| l.trim() == "!.rotli/main.json") {
-            lines.push("!.rotli/main.json".to_string());
-            changed = true;
-        }
-        if !lines.iter().any(|l| l.trim() == "!.rotli/views.json") {
-            lines.push("!.rotli/views.json".to_string());
-            changed = true;
-        }
-        if changed {
-            let mut out = lines.join("\n");
-            out.push('\n');
-            atomic_write(&path, &out)?;
-        }
-        Ok(())
+            if !lines.iter().any(|l| l.trim() == "!.rotli/main.json") {
+                lines.push("!.rotli/main.json".to_string());
+                changed = true;
+            }
+            if !lines.iter().any(|l| l.trim() == "!.rotli/views.json") {
+                lines.push("!.rotli/views.json".to_string());
+                changed = true;
+            }
+            if changed {
+                let mut out = lines.join("\n");
+                out.push('\n');
+                atomic_write(&path, &out)?;
+            }
+            Ok(())
+        })
     }
 
     /// Toggle the per-note SECURE policy. Secure notes have a REAL protected home:
@@ -3294,13 +3573,17 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let rel = self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(&rel);
+        crate::fsutil::with_file_lock(&path, || self.set_secure_resolved(&rel, secure))
+    }
+
+    fn set_secure_resolved(&mut self, rel: &str, secure: bool) -> Result<(), String> {
+        let path = self.abs(rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
         let mut fm = fm.unwrap_or_default();
         if !secure && looks_secure(body) {
             return Err(
-                "Remove the detected secret from the note before removing secure protection"
-                    .into(),
+                "Remove the detected secret from the note before removing secure protection".into(),
             );
         }
         let note_id = fm
@@ -3308,27 +3591,32 @@ impl CorpusStore {
             .clone()
             .filter(|id| !id.is_empty())
             .ok_or_else(|| "secure notes require a stable frontmatter id".to_string())?;
-        let current_folder = folder_of(&rel);
+        let current_folder = folder_of(rel);
         let secure_home = match self.layout {
             Layout::Memex => "wiki/_secure",
             Layout::LegacyRotli => "Secure notes",
         };
-        let in_secure_home = current_folder == secure_home
-            || current_folder.starts_with(&format!("{secure_home}/"));
+        let in_secure_home =
+            current_folder == secure_home || current_folder.starts_with(&format!("{secure_home}/"));
 
         if secure {
-            if !in_secure_home && !fm.foreign.iter().any(|line| secure_origin_field(line).is_some()) {
+            if !in_secure_home
+                && !fm
+                    .foreign
+                    .iter()
+                    .any(|line| secure_origin_field(line).is_some())
+            {
                 fm.foreign.push(format!("secure_origin: {current_folder}"));
             }
             fm.foreign.retain(|line| secure_field(line).is_none());
             fm.foreign.push("secure: true".to_string());
             // Protect the CURRENT path before any write or move. relocate adds
             // the target ignore before moving and removes this old line after.
-            self.gitignore_add(&rel)?;
+            self.gitignore_add(rel)?;
             self.suppress.mark(&path);
             atomic_write(&path, &compose_document(&fm, body))?;
             if !in_secure_home {
-                self.relocate(&note_id, &rel, secure_home)?;
+                self.relocate(&note_id, rel, secure_home)?;
             }
             return Ok(());
         }
@@ -3340,18 +3628,16 @@ impl CorpusStore {
             .foreign
             .iter()
             .find_map(|line| secure_origin_field(line))
-            .filter(|home| {
-                home != secure_home && !home.starts_with(&format!("{secure_home}/"))
-            })
+            .filter(|home| home != secure_home && !home.starts_with(&format!("{secure_home}/")))
             .unwrap_or_else(|| match self.layout {
                 Layout::Memex => "wiki/_inbox".to_string(),
                 Layout::LegacyRotli => "Inbox".to_string(),
             });
         let final_rel = if in_secure_home {
-            self.relocate(&note_id, &rel, &restore_home)?;
+            self.relocate(&note_id, rel, &restore_home)?;
             self.resolve_note_rel(&note_id)?
         } else {
-            rel
+            rel.to_string()
         };
         let final_path = self.abs(&final_rel);
         let final_text = fs::read_to_string(&final_path).map_err(|e| e.to_string())?;
@@ -3400,13 +3686,17 @@ impl CorpusStore {
         names.sort();
         for name in names {
             let rel = format!("{intake}/{name}");
-            let Ok(text) = fs::read_to_string(self.abs(&rel)) else { continue };
+            let Ok(text) = fs::read_to_string(self.abs(&rel)) else {
+                continue;
+            };
             let (fm, raw) = parse_document(&text);
             let Some(fm) = fm else { continue };
             if !fm.foreign.iter().any(|l| secure_field(l) == Some(true)) {
                 continue;
             }
-            let Some(id) = fm.id.clone().filter(|id| !id.is_empty()) else { continue };
+            let Some(id) = fm.id.clone().filter(|id| !id.is_empty()) else {
+                continue;
+            };
             out.push(SecureRepairCandidate {
                 id,
                 rel: rel.clone(),
@@ -3477,8 +3767,9 @@ impl CorpusStore {
             "model": "",
             "status": "applied",
         });
-        self.journal_append(&row.to_string())
-            .map_err(|e| format!("The note moved to the protected lane, but journaling failed: {e}"))
+        self.journal_append(&row.to_string()).map_err(|e| {
+            format!("The note moved to the protected lane, but journaling failed: {e}")
+        })
     }
 
     /// Pin this note's on-device AI visibility, overriding the vault default.
@@ -3492,23 +3783,25 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
-        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let (fm, body) = parse_document(&text);
-        let mut fm = fm.unwrap_or_default();
-        let explicitly_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
-        let secure = explicitly_secure || looks_secure(body);
-        if !secure {
-            return Err("Local AI access is only meaningful for a secure note".into());
-        }
-        fm.foreign.retain(|l| local_ai_allowed_field(l).is_none());
-        // pin the classification either way: a detector-secure note that now
-        // carries an explicit access decision must carry the flag it decides on
-        if !explicitly_secure {
-            fm.foreign.push("secure: true".to_string());
-            self.gitignore_add(rel)?;
-        }
-        fm.foreign.push(format!("local_ai_allowed: {allowed}"));
-        atomic_write(&path, &compose_document(&fm, body))
+        crate::fsutil::with_file_lock(&path, || {
+            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let (fm, body) = parse_document(&text);
+            let mut fm = fm.unwrap_or_default();
+            let explicitly_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
+            let secure = explicitly_secure || looks_secure(body);
+            if !secure {
+                return Err("Local AI access is only meaningful for a secure note".into());
+            }
+            fm.foreign.retain(|l| local_ai_allowed_field(l).is_none());
+            // pin the classification either way: a detector-secure note that now
+            // carries an explicit access decision must carry the flag it decides on
+            if !explicitly_secure {
+                fm.foreign.push("secure: true".to_string());
+                self.gitignore_add(rel)?;
+            }
+            fm.foreign.push(format!("local_ai_allowed: {allowed}"));
+            atomic_write(&path, &compose_document(&fm, body))
+        })
     }
 
     /// Read a note FOR an AI model — the ONE read gate every AI lane passes
@@ -3544,7 +3837,10 @@ impl CorpusStore {
         let (fm, body) = parse_document(&text);
         let fm = fm.unwrap_or_default();
         let secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
-            || fm.foreign.iter().any(|l| secure_context_field(l) == Some(true))
+            || fm
+                .foreign
+                .iter()
+                .any(|l| secure_context_field(l) == Some(true))
             || looks_secure(body);
         if secure {
             // remote FIRST and unconditionally — the refusal must never depend
@@ -3604,6 +3900,7 @@ impl CorpusStore {
     /// the AI's write surface is exactly the human's minus locked notes, never
     /// wider. The USER's own `write` is untouched: locking protects a note from
     /// models, not from its author.
+    #[cfg(test)]
     pub(crate) fn write_for_ai(
         &mut self,
         id_or_rel: &str,
@@ -3614,7 +3911,11 @@ impl CorpusStore {
         let text = self.read_for_ai(&rel, model_is_local)?;
         let (fm, target_body) = parse_document(&text);
         let fm = fm.unwrap_or_default();
-        if fm.foreign.iter().any(|line| locked_field(line) == Some(true)) {
+        if fm
+            .foreign
+            .iter()
+            .any(|line| locked_field(line) == Some(true))
+        {
             return Err(
                 "This note is locked — no AI may edit it. Unlock it from the note's menu first."
                     .into(),
@@ -3628,8 +3929,8 @@ impl CorpusStore {
         // a frontier model reads five minutes later. Rust cannot see chats; it
         // CAN see that the incoming body is protected content, so it refuses to
         // let protected prose land anywhere it would stop being protected.
-        let target_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
-            || looks_secure(target_body);
+        let target_secure =
+            fm.foreign.iter().any(|l| secure_field(l) == Some(true)) || looks_secure(target_body);
         if !target_secure && crate::secret::blocked_for_remote(body) {
             return Err(
                 "This text came out of a secure note, so it can only be written into a note that is itself secure. Use create_note instead — the new note will be marked secure."
@@ -3640,10 +3941,55 @@ impl CorpusStore {
         self.write_resolved(id_or_rel, body, rel)
     }
 
+    pub(crate) fn write_for_ai_if_revision(
+        &mut self,
+        id_or_rel: &str,
+        body: &str,
+        model_is_local: bool,
+        expected_revision: &str,
+    ) -> Result<CorpusWriteResult, String> {
+        let rel = self.resolve_note_rel(id_or_rel)?;
+        self.writable(&rel)?;
+        let path = self.abs(&rel);
+        crate::fsutil::with_file_lock(&path, || {
+            let text = self.read_for_ai(&rel, model_is_local)?;
+            let (fm, target_body) = parse_document(&text);
+            let fm = fm.unwrap_or_default();
+            if fm
+                .foreign
+                .iter()
+                .any(|line| locked_field(line) == Some(true))
+            {
+                return Err(
+                    "This note is locked — no AI may edit it. Unlock it from the note's menu first."
+                        .into(),
+                );
+            }
+            let target_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+                || looks_secure(target_body);
+            if !target_secure && crate::secret::blocked_for_remote(body) {
+                return Err(
+                    "This text came out of a secure note, so it can only be written into a note that is itself secure. Use create_note instead — the new note will be marked secure."
+                        .into(),
+                );
+            }
+            crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
+            let meta = self.write_resolved(id_or_rel, body, rel.clone())?;
+            let landed_rel = self.path_of(id_or_rel)?;
+            let landed = fs::read(self.guard_rel(&landed_rel)?)
+                .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
+            Ok(CorpusWriteResult {
+                meta,
+                revision: crate::fsutil::revision(&landed),
+            })
+        })
+    }
+
     /// The headless workspace adapters are remote-agent surfaces. They share the
     /// same fail-closed secure-content gate as Chat and add the organizer's lock
     /// rule before any body write. Keeping this check beside `writable()` means
     /// the CLI and MCP cannot accidentally invent a broader write policy.
+    #[cfg(test)]
     pub(crate) fn write_for_remote_agent(
         &mut self,
         id: &str,
@@ -3652,7 +3998,11 @@ impl CorpusStore {
         let rel = self.resolve_note_rel(id)?;
         let text = self.read_for_ai(&rel, false)?;
         let fm = parse_document(&text).0.unwrap_or_default();
-        if fm.foreign.iter().any(|line| locked_field(line) == Some(true)) {
+        if fm
+            .foreign
+            .iter()
+            .any(|line| locked_field(line) == Some(true))
+        {
             return Err("note is locked — an external agent may not edit it".into());
         }
         if self.layout == Layout::Memex && (rel == "wiki" || rel.starts_with("wiki/")) {
@@ -3661,6 +4011,41 @@ impl CorpusStore {
             self.writable(&rel)?;
         }
         self.write_resolved(id, body, rel)
+    }
+
+    pub(crate) fn write_for_remote_agent_if_revision(
+        &mut self,
+        id: &str,
+        body: &str,
+        expected_revision: &str,
+    ) -> Result<CorpusWriteResult, String> {
+        let rel = self.resolve_note_rel(id)?;
+        if self.layout == Layout::Memex && (rel == "wiki" || rel.starts_with("wiki/")) {
+            self.filer_writable(&rel)?;
+        } else {
+            self.writable(&rel)?;
+        }
+        let path = self.abs(&rel);
+        crate::fsutil::with_file_lock(&path, || {
+            let text = self.read_for_ai(&rel, false)?;
+            let fm = parse_document(&text).0.unwrap_or_default();
+            if fm
+                .foreign
+                .iter()
+                .any(|line| locked_field(line) == Some(true))
+            {
+                return Err("note is locked — an external agent may not edit it".into());
+            }
+            crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
+            let meta = self.write_resolved(id, body, rel.clone())?;
+            let landed_rel = self.path_of(id)?;
+            let landed = fs::read(self.guard_rel(&landed_rel)?)
+                .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
+            Ok(CorpusWriteResult {
+                meta,
+                revision: crate::fsutil::revision(&landed),
+            })
+        })
     }
 
     /// May a remote agent rewrite this note's FRONTMATTER (a view tag)? The
@@ -3672,7 +4057,7 @@ impl CorpusStore {
         match surfaced(self.layout, rel) {
             Surface::NoteRW | Surface::NoteRO => Ok(()),
             Surface::Reference => {
-                Err("that note is part of the brain's memory and no agent may write it".into())
+                Err("that note is part of the vault's protected reference layer and no agent may write it".into())
             }
             Surface::Hidden => Err(format!("not available to AI: {rel}")),
         }
@@ -3689,7 +4074,10 @@ impl CorpusStore {
             return true;
         }
         let rel = self.resolve_note_rel(&rel).unwrap_or(rel);
-        !matches!(surfaced(self.layout, &rel), Surface::Hidden | Surface::Reference)
+        !matches!(
+            surfaced(self.layout, &rel),
+            Surface::Hidden | Surface::Reference
+        )
     }
 
     pub(crate) fn move_for_remote_agent(
@@ -3700,7 +4088,11 @@ impl CorpusStore {
         let rel = self.resolve_note_rel(id)?;
         let text = self.read_for_ai(&rel, false)?;
         let fm = parse_document(&text).0.unwrap_or_default();
-        if fm.foreign.iter().any(|line| locked_field(line) == Some(true)) {
+        if fm
+            .foreign
+            .iter()
+            .any(|line| locked_field(line) == Some(true))
+        {
             return Err("note is locked — an external agent may not move it".into());
         }
         if self.layout == Layout::Memex
@@ -3720,8 +4112,7 @@ impl CorpusStore {
     ) -> Result<NoteMeta, String> {
         if looks_secure(body) {
             return Err(
-                "the new note looks sensitive — a remote agent may not create or retain it"
-                    .into(),
+                "the new note looks sensitive — a remote agent may not create or retain it".into(),
             );
         }
         self.create(folder_id, body)
@@ -3730,8 +4121,7 @@ impl CorpusStore {
     /// First run: the corpus is born with Inbox and ONE warm welcome note.
     /// No demo notes on disk — the in-memory demo corpus stays browser-only.
     fn first_run(&mut self) -> Result<(), String> {
-        fs::create_dir_all(self.root.join("Inbox"))
-            .map_err(|e| format!("create Inbox: {e}"))?;
+        fs::create_dir_all(self.root.join("Inbox")).map_err(|e| format!("create Inbox: {e}"))?;
         self.create("Inbox", WELCOME_BODY)?;
         Ok(())
     }
@@ -3781,7 +4171,10 @@ impl CorpusStore {
         if self.mutation_allowed().is_err() {
             return;
         }
-        let file = IndexFile { version: 1, notes: self.index.clone() };
+        let file = IndexFile {
+            version: 1,
+            notes: self.index.clone(),
+        };
         if let Ok(json) = serde_json::to_string_pretty(&file) {
             if let Ok(path) = self.guard_rel(&format!("{DOT_DIR}/index.json")) {
                 let _ = atomic_write(&path, &json);
@@ -3812,16 +4205,14 @@ impl CorpusStore {
         // both refuse every user write.
         if self.band_read_only {
             return Err(
-                "this brain's contract is outside the band rotli supports — it opens read-only".into(),
+                "this vault's format is outside the range rotli supports — it opens read-only"
+                    .into(),
             );
         }
         if self.perms_read_only {
             return Err(
-                if crate::development_read_only() {
-                    "the production memex is mounted read-only in development".into()
-                } else {
-                    "this brain is connected read-only — allow writes in Settings → Location first".into()
-                },
+                "this vault is connected read-only — allow writes in Settings → Location first"
+                    .into(),
             );
         }
         Ok(())
@@ -3836,7 +4227,7 @@ impl CorpusStore {
         match surfaced(self.layout, rel) {
             Surface::NoteRW => Ok(()),
             _ => Err(format!(
-                "this location is read-only to rotli in a memex — it writes wiki notes, chats, and boards (refused: {})",
+                "this location is read-only to rotli in this vault — it writes Library notes, chats, and boards (refused: {})",
                 if rel.is_empty() { "<root>" } else { rel }
             )),
         }
@@ -3877,7 +4268,12 @@ impl CorpusStore {
     /// files stable across runs), then a freshly minted ulid.
     pub fn list(&mut self) -> Result<CorpusList, String> {
         self.ensure_walked()?;
-        Ok(self.list_cache.as_ref().expect("ensure_walked fills the cache").list.clone())
+        Ok(self
+            .list_cache
+            .as_ref()
+            .expect("ensure_walked fills the cache")
+            .list
+            .clone())
     }
 
     /// Warm the secure-prose ledger for this root at STARTUP, before any egress
@@ -3926,15 +4322,22 @@ impl CorpusStore {
         // read the generation BEFORE walking: a write landing mid-walk makes
         // the stored generation stale and the next call re-walks — the safe side
         let generation = self.suppress.generation();
-        if self.list_cache.as_ref().is_some_and(|c| c.generation == generation) {
+        if self
+            .list_cache
+            .as_ref()
+            .is_some_and(|c| c.generation == generation)
+        {
             return Ok(());
         }
         let mut folders: Vec<FolderMeta> = Vec::new();
         let mut notes: Vec<NoteMeta> = Vec::new();
         let mut reference: Vec<NoteMeta> = Vec::new();
         let mut texts: HashMap<String, CachedNoteText> = HashMap::new();
-        let reverse: HashMap<String, String> =
-            self.index.iter().map(|(id, p)| (p.clone(), id.clone())).collect();
+        let reverse: HashMap<String, String> = self
+            .index
+            .iter()
+            .map(|(id, p)| (p.clone(), id.clone()))
+            .collect();
         let mut new_index: HashMap<String, String> = HashMap::new();
 
         walk(
@@ -3979,8 +4382,12 @@ impl CorpusStore {
         for text in texts.values().filter(|t| t.secure) {
             crate::secret::remember_secure_text(&text.body);
         }
-        self.list_cache =
-            Some(ListCache { generation, list: CorpusList { folders, notes }, reference, texts });
+        self.list_cache = Some(ListCache {
+            generation,
+            list: CorpusList { folders, notes },
+            reference,
+            texts,
+        });
         Ok(())
     }
 
@@ -3990,7 +4397,12 @@ impl CorpusStore {
     /// `resolve_note_rel`'s passthrough reads them without an index entry.
     pub fn reference_notes(&mut self) -> Result<Vec<NoteMeta>, String> {
         self.ensure_walked()?;
-        Ok(self.list_cache.as_ref().expect("ensure_walked fills the cache").reference.clone())
+        Ok(self
+            .list_cache
+            .as_ref()
+            .expect("ensure_walked fills the cache")
+            .reference
+            .clone())
     }
 
     /// Case-insensitive FULL-TEXT search over this root's notes: one `list()`
@@ -4077,7 +4489,10 @@ impl CorpusStore {
     /// never Trash, never a Memex root's chats/ — identical scope to the substring
     /// lane, plus the Reference lane (gated at query time by `include_reference`).
     fn collect_index_docs(&self) -> Vec<crate::search_index::IndexDoc> {
-        let cache = self.list_cache.as_ref().expect("ensure_walked fills the cache");
+        let cache = self
+            .list_cache
+            .as_ref()
+            .expect("ensure_walked fills the cache");
         let layout = self.layout;
         let mut docs = Vec::new();
         for meta in cache.list.notes.iter().chain(cache.reference.iter()) {
@@ -4116,7 +4531,10 @@ impl CorpusStore {
         limit: usize,
         include_reference: bool,
     ) -> Vec<SearchHit> {
-        let cache = self.list_cache.as_ref().expect("ensure_walked fills the cache");
+        let cache = self
+            .list_cache
+            .as_ref()
+            .expect("ensure_walked fills the cache");
         let layout = self.layout;
         let mut lut: HashMap<&str, (&NoteMeta, bool)> = HashMap::new();
         for m in cache.list.notes.iter() {
@@ -4145,14 +4563,17 @@ impl CorpusStore {
                     search_match(query, &meta.title, &t.body, &meta.snippet)
                         .or_else(|| search_match(query, &meta.title, &t.metadata, &meta.snippet))
                 })
-                .or_else(|| search_match(query, &meta.title, &meta.aliases.join("\n"), &meta.snippet))
+                .or_else(|| {
+                    search_match(query, &meta.title, &meta.aliases.join("\n"), &meta.snippet)
+                })
                 .unwrap_or_else(|| SearchMatch {
                     // a purely tokenized/fuzzy hit — nothing contiguous to frame.
                     // Rank it a body hit with a leading snippet and no highlight
                     // span, so it renders honestly and sorts after exact hits.
                     rank: 1,
                     snippet: leading_snippet(
-                        text.map(|t| t.body.as_str()).unwrap_or(meta.snippet.as_str()),
+                        text.map(|t| t.body.as_str())
+                            .unwrap_or(meta.snippet.as_str()),
                     ),
                     match_start: 0,
                     match_len: 0,
@@ -4187,8 +4608,15 @@ impl CorpusStore {
         // search was a DOUBLE full read — list() then re-read+parse per body)
         self.ensure_walked()?;
         let layout = self.layout;
-        let cache = self.list_cache.as_ref().expect("ensure_walked fills the cache");
-        let reference: &[NoteMeta] = if include_reference { &cache.reference } else { &[] };
+        let cache = self
+            .list_cache
+            .as_ref()
+            .expect("ensure_walked fills the cache");
+        let reference: &[NoteMeta] = if include_reference {
+            &cache.reference
+        } else {
+            &[]
+        };
         for meta in cache.list.notes.iter().chain(reference) {
             if meta.kind != NoteKind::Note
                 || is_trash_folder(&meta.folder_id)
@@ -4202,12 +4630,7 @@ impl CorpusStore {
             if let Some(m) = search_match(query, &meta.title, &text.body, &meta.snippet)
                 .or_else(|| search_match(query, &meta.title, &text.metadata, &meta.snippet))
                 .or_else(|| {
-                    search_match(
-                        query,
-                        &meta.title,
-                        &meta.aliases.join("\n"),
-                        &meta.snippet,
-                    )
+                    search_match(query, &meta.title, &meta.aliases.join("\n"), &meta.snippet)
                 })
             {
                 hits.push(SearchHit {
@@ -4238,7 +4661,10 @@ impl CorpusStore {
         // rides the same cached walk as list()/search() — no second read pass
         self.ensure_walked()?;
         let layout = self.layout;
-        let cache = self.list_cache.as_ref().expect("ensure_walked fills the cache");
+        let cache = self
+            .list_cache
+            .as_ref()
+            .expect("ensure_walked fills the cache");
         let mut out = Vec::new();
         for meta in &cache.list.notes {
             if meta.kind != NoteKind::Note
@@ -4248,7 +4674,9 @@ impl CorpusStore {
             {
                 continue;
             }
-            let Some(text) = cache.texts.get(&meta.id) else { continue };
+            let Some(text) = cache.texts.get(&meta.id) else {
+                continue;
+            };
             let lines: Vec<&str> = text.body.lines().collect();
             let mut fenced = false;
             for (line, raw_line) in lines.iter().enumerate() {
@@ -4279,7 +4707,12 @@ impl CorpusStore {
     /// all ride along). Re-validates the exact line first: a note edited since
     /// the list was built refuses instead of flipping the wrong line. `line`
     /// indexes the EDITOR BODY's lines — the same domain `tasks()` reports.
-    pub(crate) fn toggle_task(&mut self, id_or_rel: &str, line: usize, expect: &str) -> Result<(), String> {
+    pub(crate) fn toggle_task(
+        &mut self,
+        id_or_rel: &str,
+        line: usize,
+        expect: &str,
+    ) -> Result<(), String> {
         self.mutation_allowed()?;
         let rel = self.resolve_note_rel(id_or_rel)?;
         let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
@@ -4288,9 +4721,12 @@ impl CorpusStore {
             Some(_) => editor_body(raw),
             None => raw,
         };
-        let stale = || "This task changed since the list was made — it refreshes on its own.".to_string();
+        let stale =
+            || "This task changed since the list was made — it refreshes on its own.".to_string();
         let lines: Vec<&str> = body.lines().collect();
-        let Some(current) = lines.get(line) else { return Err(stale()) };
+        let Some(current) = lines.get(line) else {
+            return Err(stale());
+        };
         // validate against the JOINED text — the same shape tasks() reported
         if joined_task_text(&lines, line).as_deref() != Some(expect) {
             return Err(stale());
@@ -4385,12 +4821,25 @@ impl CorpusStore {
         let folder = project_folder(self.layout, &disk_folder, &fm);
         Ok(NoteDoc {
             id: id.to_string(),
-            origin: if is_hidden_root(&disk_folder) { fm.origin.clone() } else { None },
+            origin: if is_hidden_root(&disk_folder) {
+                fm.origin.clone()
+            } else {
+                None
+            },
             folder_id: folder,
             disk_folder_id: disk_folder,
             body: body.to_string(),
-            created_at: fm.created.as_deref().and_then(stamp_to_ms).unwrap_or(file_created),
-            updated_at: fm.updated.as_deref().and_then(stamp_to_ms).unwrap_or(file_updated),
+            revision: crate::fsutil::revision(text.as_bytes()),
+            created_at: fm
+                .created
+                .as_deref()
+                .and_then(stamp_to_ms)
+                .unwrap_or(file_created),
+            updated_at: fm
+                .updated
+                .as_deref()
+                .and_then(stamp_to_ms)
+                .unwrap_or(file_updated),
             pinned: fm.pinned.unwrap_or(false),
         })
     }
@@ -4406,12 +4855,33 @@ impl CorpusStore {
         self.write_resolved(id, body, rel)
     }
 
-    fn write_resolved(
+    /// Human/interactive whole-body save with optimistic concurrency. The
+    /// comparison happens inside the store's mutation critical section, after
+    /// path routing and immediately before the write path re-reads metadata.
+    pub fn write_if_revision(
         &mut self,
         id: &str,
         body: &str,
-        rel: String,
-    ) -> Result<NoteMeta, String> {
+        expected_revision: &str,
+    ) -> Result<CorpusWriteResult, String> {
+        let rel = self.path_of(id)?;
+        self.writable(&rel)?;
+        let abs = self.guard_rel(&rel)?;
+        crate::fsutil::with_file_lock(&abs, || {
+            let current = fs::read(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+            crate::fsutil::compare_revision(expected_revision, &current)?;
+            let meta = self.write_resolved(id, body, rel.clone())?;
+            let landed_rel = self.path_of(id)?;
+            let landed = fs::read(self.guard_rel(&landed_rel)?)
+                .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
+            Ok(CorpusWriteResult {
+                meta,
+                revision: crate::fsutil::revision(&landed),
+            })
+        })
+    }
+
+    fn write_resolved(&mut self, id: &str, body: &str, rel: String) -> Result<NoteMeta, String> {
         let abs = self.abs(&rel);
 
         // an unreadable existing file must abort the save — regenerating
@@ -4437,7 +4907,11 @@ impl CorpusStore {
             .unwrap_or_else(|| ms_to_stamp(file_created));
         // a memex note stays date-shaped (v3.5: updated: YYYY-MM-DD); local notes
         // keep rotli's RFC3339 stamp.
-        let updated = if self.layout == Layout::Memex { today_stamp() } else { now_stamp() };
+        let updated = if self.layout == Layout::Memex {
+            today_stamp()
+        } else {
+            now_stamp()
+        };
 
         let fm = Frontmatter {
             id: Some(id.to_string()),
@@ -4480,14 +4954,16 @@ impl CorpusStore {
         if target_abs != abs && is_secure {
             self.gitignore_add(&target_rel)?;
         }
+        self.suppress.mark(&abs);
         self.suppress.mark(&target_abs);
-        atomic_write(&target_abs, &text)?;
+        // Rewrite in place first, then use the filesystem's rename operation.
+        // The former copy-to-target + ignored remove_file failure could leave
+        // two independent files with the same durable note id; a later index
+        // rebuild could then select the stale duplicate nondeterministically.
+        atomic_write(&abs, &text)?;
         if target_abs != abs {
-            self.suppress.mark(&abs);
-            let _ = fs::remove_file(&abs);
-            // best-effort AFTER the move: a failed removal leaves a harmless
-            // stale line, never an unprotected note — and must not report a
-            // completed rename as a failure.
+            fs::rename(&abs, &target_abs)
+                .map_err(|e| format!("rename {rel} to {target_rel}: {e}"))?;
             if is_secure {
                 let _ = self.gitignore_remove(&rel);
             }
@@ -4505,7 +4981,11 @@ impl CorpusStore {
             created_at: stamp_to_ms(&created).unwrap_or_else(now_ms),
             updated_at: stamp_to_ms(&updated).unwrap_or_else(now_ms),
             pinned: fm.pinned.unwrap_or(false),
-            origin: if is_hidden_root(&disk_folder) { fm.origin } else { None },
+            origin: if is_hidden_root(&disk_folder) {
+                fm.origin
+            } else {
+                None
+            },
             kind: NoteKind::Note,
         })
     }
@@ -4551,9 +5031,11 @@ impl CorpusStore {
             } else {
                 target_folder.clone()
             };
-            return self.relocate_opaque(&rel, &dest);
+            let path = self.abs(&rel);
+            return crate::fsutil::with_file_lock(&path, || self.relocate_opaque(&rel, &dest));
         }
-        self.relocate(id, &rel, &target_folder)
+        let path = self.abs(&rel);
+        crate::fsutil::with_file_lock(&path, || self.relocate(id, &rel, &target_folder))
     }
 
     /// Move a NON-markdown item (a board, a surfaced file) between folders
@@ -4593,7 +5075,11 @@ impl CorpusStore {
         let folder = folder_of(&target_rel);
         Ok(NoteMeta {
             id: target_rel.clone(),
-            title: if is_board { board_title(&target_rel) } else { name },
+            title: if is_board {
+                board_title(&target_rel)
+            } else {
+                name
+            },
             snippet: String::new(),
             aliases: Vec::new(),
             // boards/files carry no frontmatter, so the shelf projection has
@@ -4604,7 +5090,11 @@ impl CorpusStore {
             updated_at,
             pinned: false,
             origin: None,
-            kind: if is_board { NoteKind::Board } else { NoteKind::File },
+            kind: if is_board {
+                NoteKind::Board
+            } else {
+                NoteKind::File
+            },
         })
     }
 
@@ -4633,7 +5123,10 @@ impl CorpusStore {
         // durable file policy as secure creation; moving it back out preserves
         // that policy until the user deliberately removes protection.
         if (target_folder == "Secure notes" || target_folder.starts_with("Secure notes/"))
-            && !old_fm.foreign.iter().any(|line| secure_field(line) == Some(true))
+            && !old_fm
+                .foreign
+                .iter()
+                .any(|line| secure_field(line) == Some(true))
         {
             old_fm.foreign.push("secure: true".to_string());
         }
@@ -4701,12 +5194,13 @@ impl CorpusStore {
         // both paths are OUR writes — neither should echo back as external
         self.suppress.mark(&abs);
         self.suppress.mark(&target_abs);
-        atomic_write(&target_abs, &out)?;
+        // Rewrite the single source inode first, then move it. Never implement
+        // an identity-preserving move as copy + best-effort delete: a failed
+        // delete creates duplicate durable ids and unstable reachability.
+        atomic_write(&abs, &out)?;
         if target_abs != abs {
-            let _ = fs::remove_file(&abs);
-            // best-effort AFTER the move: a failed removal leaves a harmless
-            // stale line, never an unprotected note — and must not report a
-            // completed move as a failure.
+            fs::rename(&abs, &target_abs)
+                .map_err(|e| format!("move {rel} to {target_rel}: {e}"))?;
             if is_secure {
                 let _ = self.gitignore_remove(rel);
             }
@@ -4766,21 +5260,25 @@ impl CorpusStore {
     fn filer_writable(&self, rel: &str) -> Result<(), String> {
         self.guard_rel(rel)?;
         if self.layout != Layout::Memex {
-            return Err("the filer only runs on a memex".into());
+            return Err("the Librarian only runs in a Rotli vault".into());
         }
         // #3 (audit 2026-07): the FILER lane honors the same read-only verdicts as
         // the user lane — an out-of-band contract or read-only perms close BOTH.
         if self.band_read_only {
             return Err(
-                "this brain's contract is outside the band rotli supports — the filer may not write it".into(),
+                "this vault's format is outside the range rotli supports — the Librarian may not write it".into(),
             );
         }
         if self.perms_read_only {
-            return Err("this brain is connected read-only — the filer may not write it".into());
+            return Err(
+                "this vault is connected read-only — the Librarian may not write it".into(),
+            );
         }
         let rel = rel.trim_start_matches('/');
         if !(rel == "wiki" || rel.starts_with("wiki/")) {
-            return Err(format!("the filer may only write the brain (refused: {rel})"));
+            return Err(format!(
+                "the Librarian may only write the vault's Library (refused: {rel})"
+            ));
         }
         let abs = self.abs(rel);
         if abs.is_file() {
@@ -4805,7 +5303,12 @@ impl CorpusStore {
     /// keys, so the territories stay disjoint. Gated by `filer_writable`. Takes a
     /// wire id OR a rel path (resolve_note_rel). pub(crate): the organizer daemon
     /// writes through this same gate — no second write primitive.
-    pub(crate) fn set_ai_field(&mut self, id_or_rel: &str, key: &str, value: &str) -> Result<(), String> {
+    pub(crate) fn set_ai_field(
+        &mut self,
+        id_or_rel: &str,
+        key: &str,
+        value: &str,
+    ) -> Result<(), String> {
         self.brain_gate()?;
         let key = key.trim();
         if !AI_KEYS.contains(&key) {
@@ -4814,16 +5317,18 @@ impl CorpusStore {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
         let path = self.abs(rel);
-        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let (fm, body) = parse_document(&text);
-        let mut fm = fm.unwrap_or_default();
-        fm.foreign.retain(|l| field_key(l) != Some(key));
-        let value = value.trim();
-        if !value.is_empty() {
-            fm.foreign.push(format!("{key}: {value}"));
-        }
-        self.suppress.mark(&path);
-        atomic_write(&path, &compose_document(&fm, body))
+        crate::fsutil::with_file_lock(&path, || {
+            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let (fm, body) = parse_document(&text);
+            let mut fm = fm.unwrap_or_default();
+            fm.foreign.retain(|l| field_key(l) != Some(key));
+            let value = value.trim();
+            if !value.is_empty() {
+                fm.foreign.push(format!("{key}: {value}"));
+            }
+            self.suppress.mark(&path);
+            atomic_write(&path, &compose_document(&fm, body))
+        })
     }
 
     /// Overwrite a per-area generated overview `wiki/<area>/_index.md` — the ONLY
@@ -4840,18 +5345,23 @@ impl CorpusStore {
         }
         let dir = self.abs(&format!("wiki/{area}"));
         let rel = format!("wiki/{area}/_index.md");
-        self.filer_writable(&rel)?;
         let path = self.abs(&rel);
-        if body.is_empty() {
-            self.suppress.mark(&path);
-            if path.exists() {
-                fs::remove_file(&path).map_err(|e| format!("remove {rel}: {e}"))?;
+        crate::fsutil::with_file_lock(&path, || {
+            // Re-check after acquiring the same lock used by every other Rotli
+            // note writer. A user or another process may have locked/secured
+            // the generated note while this operation was waiting.
+            self.filer_writable(&rel)?;
+            if body.is_empty() {
+                self.suppress.mark(&path);
+                if path.exists() {
+                    fs::remove_file(&path).map_err(|e| format!("remove {rel}: {e}"))?;
+                }
+                return Ok(());
             }
-            return Ok(());
-        }
-        fs::create_dir_all(&dir).map_err(|e| format!("create wiki/{area}: {e}"))?;
-        self.suppress.mark(&path);
-        atomic_write(&path, body)
+            fs::create_dir_all(&dir).map_err(|e| format!("create wiki/{area}: {e}"))?;
+            self.suppress.mark(&path);
+            atomic_write(&path, body)
+        })
     }
 
     /// FILE a note (by wire id or rel path) into the brain per its `area` frontmatter
@@ -4892,9 +5402,16 @@ impl CorpusStore {
         if folder_of(rel) == target_folder {
             return Err(format!("already in {target_folder}"));
         }
-        let text = fs::read_to_string(self.abs(rel)).map_err(|e| format!("read {rel}: {e}"))?;
-        let id = parse_document(&text).0.unwrap_or_default().id.ok_or("note has no id")?;
-        self.relocate(&id, rel, target_folder)
+        let path = self.abs(rel);
+        crate::fsutil::with_file_lock(&path, || {
+            let text = fs::read_to_string(&path).map_err(|e| format!("read {rel}: {e}"))?;
+            let id = parse_document(&text)
+                .0
+                .unwrap_or_default()
+                .id
+                .ok_or("note has no id")?;
+            self.relocate(&id, rel, target_folder)
+        })
     }
 
     /// Append one line to the brain change JOURNAL (`.rotli/brain-journal.jsonl`) —
@@ -4905,14 +5422,16 @@ impl CorpusStore {
         let dir = self.guard_rel(DOT_DIR)?;
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let path = self.guard_rel(&format!("{DOT_DIR}/brain-journal.jsonl"))?;
-        // a failed read must not silently REPLACE the whole journal with one line
-        let mut out = read_existing_text(&path)?;
-        if !out.is_empty() && !out.ends_with('\n') {
+        crate::fsutil::with_file_lock(&path, || {
+            // a failed read must not silently REPLACE the whole journal with one line
+            let mut out = read_existing_text(&path)?;
+            if !out.is_empty() && !out.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push_str(line.trim());
             out.push('\n');
-        }
-        out.push_str(line.trim());
-        out.push('\n');
-        atomic_write(&path, &out)
+            atomic_write(&path, &out)
+        })
     }
 
     /// Read the whole brain journal (`""` when none yet).
@@ -4932,42 +5451,54 @@ impl CorpusStore {
     pub fn journal_prune(&self, keep_days: u32) -> Result<usize, String> {
         self.mutation_allowed()?;
         let path = self.guard_rel(&format!("{DOT_DIR}/brain-journal.jsonl"))?;
-        let text = fs::read_to_string(&path).unwrap_or_default();
-        if text.is_empty() {
-            return Ok(0);
-        }
-        let cutoff_ms = OffsetDateTime::now_utc().unix_timestamp() * 1000
-            - i64::from(keep_days) * 86_400_000;
-        // fold: latest status + ts per id (last line wins, same as the frontend)
-        let mut latest: HashMap<String, (String, i64)> = HashMap::new();
-        for line in text.lines() {
-            let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else { continue };
-            let Some(id) = v.get("id").and_then(|x| x.as_str()) else { continue };
-            let status = v.get("status").and_then(|x| x.as_str()).unwrap_or("").to_string();
-            let ts = v.get("ts").and_then(serde_json::Value::as_i64).unwrap_or(0);
-            latest.insert(id.to_string(), (status, ts));
-        }
-        let keep = |line: &str| -> bool {
-            let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else {
-                return true; // never eat a line we can't read
-            };
-            let Some(id) = v.get("id").and_then(|x| x.as_str()) else { return true };
-            match latest.get(id) {
-                Some((status, ts)) => status == "proposed" || *ts >= cutoff_ms,
-                None => true,
+        crate::fsutil::with_file_lock(&path, || {
+            let text = fs::read_to_string(&path).unwrap_or_default();
+            if text.is_empty() {
+                return Ok(0);
             }
-        };
-        let kept: Vec<&str> = text.lines().filter(|l| keep(l)).collect();
-        let removed = text.lines().count() - kept.len();
-        if removed == 0 {
-            return Ok(0);
-        }
-        let mut out = kept.join("\n");
-        if !out.is_empty() {
-            out.push('\n');
-        }
-        atomic_write(&path, &out)?;
-        Ok(removed)
+            let cutoff_ms = OffsetDateTime::now_utc().unix_timestamp() * 1000
+                - i64::from(keep_days) * 86_400_000;
+            // fold: latest status + ts per id (last line wins, same as the frontend)
+            let mut latest: HashMap<String, (String, i64)> = HashMap::new();
+            for line in text.lines() {
+                let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else {
+                    continue;
+                };
+                let Some(id) = v.get("id").and_then(|x| x.as_str()) else {
+                    continue;
+                };
+                let status = v
+                    .get("status")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let ts = v.get("ts").and_then(serde_json::Value::as_i64).unwrap_or(0);
+                latest.insert(id.to_string(), (status, ts));
+            }
+            let keep = |line: &str| -> bool {
+                let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else {
+                    return true; // never eat a line we can't read
+                };
+                let Some(id) = v.get("id").and_then(|x| x.as_str()) else {
+                    return true;
+                };
+                match latest.get(id) {
+                    Some((status, ts)) => status == "proposed" || *ts >= cutoff_ms,
+                    None => true,
+                }
+            };
+            let kept: Vec<&str> = text.lines().filter(|l| keep(l)).collect();
+            let removed = text.lines().count() - kept.len();
+            if removed == 0 {
+                return Ok(0);
+            }
+            let mut out = kept.join("\n");
+            if !out.is_empty() {
+                out.push('\n');
+            }
+            atomic_write(&path, &out)?;
+            Ok(removed)
+        })
     }
 
     /// Shared Main-manifest seam for the GUI and headless workspace adapters.
@@ -4977,8 +5508,53 @@ impl CorpusStore {
         self.dot_read("main")
     }
 
+    pub(crate) fn main_read_versioned(&self) -> Result<crate::fsutil::VersionedText, String> {
+        Ok(crate::fsutil::versioned_text(self.main_read()?))
+    }
+
     pub(crate) fn main_write(&self, contents: &str) -> Result<(), String> {
-        self.suppress.mark(&self.root.join(DOT_DIR).join("main.json"));
+        let path = self.root.join(DOT_DIR).join("main.json");
+        crate::fsutil::with_file_lock(&path, || self.main_write_unlocked(contents))
+    }
+
+    pub(crate) fn main_write_if_revision(
+        &self,
+        contents: &str,
+        expected_revision: &str,
+    ) -> Result<String, String> {
+        let path = self.root.join(DOT_DIR).join("main.json");
+        crate::fsutil::with_file_lock(&path, || {
+            let current = self.main_read()?;
+            crate::fsutil::compare_revision(expected_revision, current.as_bytes())?;
+            self.main_write_unlocked(contents)?;
+            Ok(crate::fsutil::revision(contents.as_bytes()))
+        })
+    }
+
+    pub(crate) fn main_update<T>(
+        &self,
+        update: impl FnOnce(&str) -> Result<(String, T), String>,
+    ) -> Result<T, String> {
+        let path = self.root.join(DOT_DIR).join("main.json");
+        crate::fsutil::with_file_lock(&path, || {
+            let current = self.main_read()?;
+            let (contents, result) = update(&current)?;
+            self.main_write_unlocked(&contents)?;
+            Ok(result)
+        })
+    }
+
+    fn main_write_unlocked(&self, contents: &str) -> Result<(), String> {
+        let manifest: ReferenceManifest = serde_json::from_str(contents)
+            .map_err(|error| format!("invalid Main manifest: {error}"))?;
+        if manifest.version != 1 {
+            return Err(format!(
+                "Main format v{} is not writable by this Rotli build",
+                manifest.version
+            ));
+        }
+        self.suppress
+            .mark(&self.root.join(DOT_DIR).join("main.json"));
         self.dot_write("main", contents)?;
         self.ensure_main_committable()
     }
@@ -4987,16 +5563,48 @@ impl CorpusStore {
         self.dot_read("views")
     }
 
+    pub(crate) fn views_read_versioned(&self) -> Result<crate::fsutil::VersionedText, String> {
+        Ok(crate::fsutil::versioned_text(self.views_read()?))
+    }
+
     /// Validate and persist a named-view manifest while synchronizing singular
     /// Markdown membership into `view_tag`. The prepared writes are rolled back
     /// if any later write fails, so a CLI/UI operation cannot leave half-tagged
     /// notes. Boards and binary files are intentionally skipped.
-    pub(crate) fn views_write(&mut self, contents: &str) -> Result<(), String> {
+    pub(crate) fn views_write_if_revision(
+        &mut self,
+        contents: &str,
+        expected_revision: &str,
+    ) -> Result<String, String> {
+        let path = self.root.join(DOT_DIR).join("views.json");
+        crate::fsutil::with_file_lock(&path, || {
+            let current = self.views_read()?;
+            crate::fsutil::compare_revision(expected_revision, current.as_bytes())?;
+            self.views_write_unlocked(contents)?;
+            Ok(crate::fsutil::revision(contents.as_bytes()))
+        })
+    }
+
+    pub(crate) fn views_update<T>(
+        &mut self,
+        update: impl FnOnce(&str) -> Result<(String, T), String>,
+    ) -> Result<T, String> {
+        let path = self.root.join(DOT_DIR).join("views.json");
+        crate::fsutil::with_file_lock(&path, || {
+            let current = self.views_read()?;
+            let (contents, result) = update(&current)?;
+            self.views_write_unlocked(&contents)?;
+            Ok(result)
+        })
+    }
+
+    fn views_write_unlocked(&mut self, contents: &str) -> Result<(), String> {
         self.mutation_allowed()?;
         let next: ViewsManifest = serde_json::from_str(contents)
             .map_err(|error| format!("invalid views manifest: {error}"))?;
         let next_membership = validated_view_membership(&next)?;
-        let current = serde_json::from_str::<ViewsManifest>(&self.views_read()?).unwrap_or_default();
+        let current =
+            serde_json::from_str::<ViewsManifest>(&self.views_read()?).unwrap_or_default();
         let current_membership = validated_view_membership(&current).unwrap_or_default();
 
         // Rust independently enforces the product law that named views are
@@ -5009,7 +5617,10 @@ impl CorpusStore {
                 .map_err(|error| format!("invalid Main manifest: {error}"))?
         };
         if main.version != 1 {
-            return Err(format!("Main format v{} is not writable by this Rotli build", main.version));
+            return Err(format!(
+                "Main format v{} is not writable by this Rotli build",
+                main.version
+            ));
         }
         let mut main_changed = false;
         for item_id in next_membership.keys() {
@@ -5021,7 +5632,8 @@ impl CorpusStore {
             }
         }
         if main_changed {
-            let raw = serde_json::to_string_pretty(&main).map_err(|error| error.to_string())? + "\n";
+            let raw =
+                serde_json::to_string_pretty(&main).map_err(|error| error.to_string())? + "\n";
             self.main_write(&raw)?;
         }
 
@@ -5031,7 +5643,7 @@ impl CorpusStore {
             .filter(|id| current_membership.get(*id) != next_membership.get(*id))
             .cloned()
             .collect();
-        let mut prepared: Vec<(PathBuf, String, String)> = Vec::new();
+        let mut prepared: Vec<(PathBuf, Option<String>)> = Vec::new();
         for id in changed_ids {
             let Ok(rel) = self.resolve_note_rel(&id) else {
                 continue; // an orphan reference is retained until normal view GC
@@ -5040,51 +5652,74 @@ impl CorpusStore {
                 continue; // boards and binaries never receive Markdown metadata
             }
             let path = self.abs(&rel);
-            let original = fs::read_to_string(&path).map_err(|error| format!("read {rel}: {error}"))?;
-            let updated = with_view_tag(&original, next_membership.get(&id).map(String::as_str));
-            if updated != original {
-                prepared.push((path, original, updated));
-            }
+            prepared.push((path, next_membership.get(&id).cloned()));
         }
 
         let manifest_path = self.root.join(DOT_DIR).join("views.json");
         let previous_manifest = fs::read_to_string(&manifest_path).ok();
-        let mut written: Vec<(PathBuf, String)> = Vec::new();
-        for (path, original, updated) in &prepared {
-            self.suppress.mark(path);
-            if let Err(error) = atomic_write(path, updated) {
-                for (written_path, prior) in written.iter().rev() {
-                    self.suppress.mark(written_path);
-                    let _ = atomic_write(written_path, prior);
+        let mut written: Vec<(PathBuf, String, String)> = Vec::new();
+        for (path, tag) in &prepared {
+            let result = crate::fsutil::with_file_lock(path, || {
+                // Read only after acquiring the note lock. Building `updated`
+                // from an earlier snapshot could replace a user, CLI, MCP, or
+                // Librarian edit that landed while the view transaction waited.
+                let original = fs::read_to_string(path)
+                    .map_err(|error| format!("read {}: {error}", path.display()))?;
+                let updated = with_view_tag(&original, tag.as_deref());
+                if updated == original {
+                    return Ok(None);
                 }
-                return Err(error);
+                self.suppress.mark(path);
+                atomic_write(path, &updated)?;
+                Ok(Some((original, updated)))
+            });
+            match result {
+                Ok(Some((original, updated))) => {
+                    written.push((path.clone(), original, updated));
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    self.rollback_view_note_writes(&written);
+                    return Err(error);
+                }
             }
-            written.push((path.clone(), original.clone()));
         }
         self.suppress.mark(&manifest_path);
         if let Err(error) = self.dot_write("views", contents) {
-            for (path, prior) in written.iter().rev() {
-                self.suppress.mark(path);
-                let _ = atomic_write(path, prior);
-            }
+            self.rollback_view_note_writes(&written);
             return Err(error);
         }
         if let Err(error) = self.ensure_main_committable() {
-            for (path, prior) in written.iter().rev() {
-                self.suppress.mark(path);
-                let _ = atomic_write(path, prior);
-            }
+            self.rollback_view_note_writes(&written);
             match previous_manifest {
                 Some(raw) => {
+                    self.suppress.mark(&manifest_path);
                     let _ = atomic_write(&manifest_path, &raw);
                 }
                 None => {
+                    self.suppress.mark(&manifest_path);
                     let _ = fs::remove_file(&manifest_path);
                 }
             }
             return Err(error);
         }
         Ok(())
+    }
+
+    /// Best-effort rollback for a failed multi-file view update. Never replace
+    /// bytes written after this transaction: another writer's newer content is
+    /// more important than restoring perfect projection consistency.
+    fn rollback_view_note_writes(&self, written: &[(PathBuf, String, String)]) {
+        for (path, prior, applied) in written.iter().rev() {
+            let _ = crate::fsutil::with_file_lock(path, || {
+                let current = fs::read_to_string(path).map_err(|error| error.to_string())?;
+                if current == *applied {
+                    self.suppress.mark(path);
+                    atomic_write(path, prior)?;
+                }
+                Ok(())
+            });
+        }
     }
 
     pub fn create(&mut self, folder_id: &str, body: &str) -> Result<NoteMeta, String> {
@@ -5097,9 +5732,8 @@ impl CorpusStore {
         body: &str,
         secure: bool,
     ) -> Result<NoteMeta, String> {
-        let secure = secure
-            || folder_id == "Secure notes"
-            || folder_id.starts_with("Secure notes/");
+        let secure =
+            secure || folder_id == "Secure notes" || folder_id.starts_with("Secure notes/");
         let disk_folder = if secure {
             match self.layout {
                 Layout::Memex => "wiki/_secure",
@@ -5206,6 +5840,7 @@ impl CorpusStore {
         Ok(CorpusBoardDoc {
             id: id.to_string(),
             folder_id: folder_of(id),
+            revision: crate::fsutil::revision(body.as_bytes()),
             body,
             created_at,
             updated_at,
@@ -5244,6 +5879,27 @@ impl CorpusStore {
             pinned: false,
             origin: None,
             kind: NoteKind::Board,
+        })
+    }
+
+    pub fn write_board_if_revision(
+        &mut self,
+        id: &str,
+        body: &str,
+        expected_revision: &str,
+    ) -> Result<CorpusWriteResult, String> {
+        validate_rel(id)?;
+        if !id.ends_with(".excalidraw") {
+            return Err(format!("not a board: {id}"));
+        }
+        self.writable(id)?;
+        let abs = self.guard_rel(id)?;
+        let current = fs::read(&abs).map_err(|e| format!("read {id}: {e}"))?;
+        crate::fsutil::compare_revision(expected_revision, &current)?;
+        let meta = self.write_board(id, body)?;
+        Ok(CorpusWriteResult {
+            meta,
+            revision: crate::fsutil::revision(body.as_bytes()),
         })
     }
 
@@ -5317,7 +5973,10 @@ impl CorpusStore {
         if !old_abs.exists() {
             return Err(format!("board not found: {id}"));
         }
-        let folder = id.rsplit_once('/').map(|(f, _)| f.to_string()).unwrap_or_default();
+        let folder = id
+            .rsplit_once('/')
+            .map(|(f, _)| f.to_string())
+            .unwrap_or_default();
         let stem = board_name_stem(new_name)?;
         let new_rel = self.free_name(&folder, &format!("{stem}.excalidraw"), None);
         if new_rel == id {
@@ -5390,7 +6049,11 @@ impl CorpusStore {
         // (kind != note never enters the ULID index), and Empty Trash must
         // delete those too (2026-07-31 — "Emptied 0 of 35").
         let rel = self.resolve_note_rel(id)?;
-        let stale_ulid = self.index.iter().find(|(_, r)| **r == rel).map(|(k, _)| k.clone());
+        let stale_ulid = self
+            .index
+            .iter()
+            .find(|(_, r)| **r == rel)
+            .map(|(k, _)| k.clone());
         self.writable(&rel)?;
         let abs = self.abs(&rel);
         let name = Path::new(&rel)
@@ -5438,7 +6101,12 @@ impl CorpusStore {
     }
 
     /// Shared recoverable file removal for note purge and storage assets.
-    fn trash_existing_path(&mut self, abs: &Path, fallback_name: &str, label: &str) -> Result<(), String> {
+    fn trash_existing_path(
+        &mut self,
+        abs: &Path,
+        fallback_name: &str,
+        label: &str,
+    ) -> Result<(), String> {
         self.suppress.mark(abs);
         if self.os_trash && trash::delete(abs).is_ok() {
             return Ok(());
@@ -5458,7 +6126,11 @@ impl CorpusStore {
         fs::rename(abs, &dest).map_err(|e| format!("trash {label}: {e}"))
     }
 
-    pub fn create_folder(&mut self, name: &str, parent_id: Option<&str>) -> Result<FolderMeta, String> {
+    pub fn create_folder(
+        &mut self,
+        name: &str,
+        parent_id: Option<&str>,
+    ) -> Result<FolderMeta, String> {
         validate_component(name)?;
         let parent = parent_id.filter(|p| !p.is_empty());
         if let Some(p) = parent {
@@ -5494,7 +6166,11 @@ impl CorpusStore {
             }
             _ => root_str,
         };
-        Ok(CorpusOverview { root, folders, files })
+        Ok(CorpusOverview {
+            root,
+            folders,
+            files,
+        })
     }
 
     /// Opaque JSON dot-files. `background.json` remains a readable legacy slot
@@ -5582,7 +6258,9 @@ fn user_dot_writable(which: &str) -> Result<(), String> {
         "background" => Err("the legacy background slot is read-only".into()),
         "main" => Err("write .rotli/main.json through corpus_main_write".into()),
         "views" => Err("write .rotli/views.json through corpus_views_write".into()),
-        "organizer" => Err("`organizer` is the daemon's own state — not writable from the app".into()),
+        "organizer" => {
+            Err("`organizer` is the daemon's own state — not writable from the app".into())
+        }
         other => Err(format!("unknown settings file: {other}")),
     }
 }
@@ -5651,7 +6329,11 @@ fn walk(
     reference: &mut Vec<NoteMeta>,
     texts: &mut HashMap<String, CachedNoteText>,
 ) -> Result<(), String> {
-    let dir = if prefix.is_empty() { root.to_path_buf() } else { root.join(prefix) };
+    let dir = if prefix.is_empty() {
+        root.to_path_buf()
+    } else {
+        root.join(prefix)
+    };
     let mut entries: Vec<_> = fs::read_dir(&dir)
         .map_err(|e| format!("read dir {}: {e}", dir.display()))?
         .filter_map(|e| e.ok())
@@ -5663,7 +6345,11 @@ fn walk(
         if name.starts_with('.') {
             continue;
         }
-        let rel = if prefix.is_empty() { name.clone() } else { format!("{prefix}/{name}") };
+        let rel = if prefix.is_empty() {
+            name.clone()
+        } else {
+            format!("{prefix}/{name}")
+        };
         let kind = match entry.file_type() {
             Ok(k) => k,
             Err(_) => continue,
@@ -5683,10 +6369,14 @@ fn walk(
         // them — `writable()` still refuses every non-NoteRW surface.
         if surface == Surface::Reference {
             if kind.is_dir() {
-                walk(layout, root, &rel, reverse, new_index, folders, notes, reference, texts)?;
+                walk(
+                    layout, root, &rel, reverse, new_index, folders, notes, reference, texts,
+                )?;
             } else if kind.is_file() && name.ends_with(".md") {
                 let abs = entry.path();
-                let Ok(text) = fs::read_to_string(&abs) else { continue };
+                let Ok(text) = fs::read_to_string(&abs) else {
+                    continue;
+                };
                 let (fm, raw) = parse_document(&text);
                 let had_fm = fm.is_some();
                 let body = match &fm {
@@ -5698,7 +6388,11 @@ fn walk(
                     rel.clone(),
                     CachedNoteText {
                         body: body.to_string(),
-                        metadata: if had_fm { searchable_metadata(&fm) } else { String::new() },
+                        metadata: if had_fm {
+                            searchable_metadata(&fm)
+                        } else {
+                            String::new()
+                        },
                         secure: walked_secure(&fm, body),
                     },
                 );
@@ -5710,8 +6404,16 @@ fn walk(
                     aliases: Vec::new(),
                     folder_id: prefix.to_string(),
                     disk_folder_id: prefix.to_string(),
-                    created_at: fm.created.as_deref().and_then(stamp_to_ms).unwrap_or(file_created),
-                    updated_at: fm.updated.as_deref().and_then(stamp_to_ms).unwrap_or(file_updated),
+                    created_at: fm
+                        .created
+                        .as_deref()
+                        .and_then(stamp_to_ms)
+                        .unwrap_or(file_created),
+                    updated_at: fm
+                        .updated
+                        .as_deref()
+                        .and_then(stamp_to_ms)
+                        .unwrap_or(file_updated),
                     pinned: false,
                     origin: None,
                     kind: NoteKind::Note,
@@ -5725,8 +6427,7 @@ fn walk(
             // browsable folder; still recurse to collect those notes.
             // wiki/_inbox staging + storage/ aren't browsable folder ROWS: their
             // files are re-homed (notes by shelf; storage binaries to Storage).
-            let staging =
-                layout == Layout::Memex && (rel == "wiki/_inbox" || rel == "storage");
+            let staging = layout == Layout::Memex && (rel == "wiki/_inbox" || rel == "storage");
             if !staging {
                 let folder_id = project_lifecycle_folder(layout, &rel);
                 let parent_id = if prefix.is_empty() {
@@ -5744,10 +6445,14 @@ fn walk(
                     parent_id,
                 });
             }
-            walk(layout, root, &rel, reverse, new_index, folders, notes, reference, texts)?;
+            walk(
+                layout, root, &rel, reverse, new_index, folders, notes, reference, texts,
+            )?;
         } else if kind.is_file() && name.ends_with(".md") {
             let abs = entry.path();
-            let Ok(text) = fs::read_to_string(&abs) else { continue };
+            let Ok(text) = fs::read_to_string(&abs) else {
+                continue;
+            };
             let (fm, raw) = parse_document(&text);
             let body = match &fm {
                 Some(_) => editor_body(raw),
@@ -5766,7 +6471,12 @@ fn walk(
                 .as_ref()
                 .filter(|id| !id.is_empty() && !new_index.contains_key(id.as_str()))
                 .cloned()
-                .or_else(|| reverse.get(&rel).filter(|id| !new_index.contains_key(*id)).cloned())
+                .or_else(|| {
+                    reverse
+                        .get(&rel)
+                        .filter(|id| !new_index.contains_key(*id))
+                        .cloned()
+                })
                 .unwrap_or_else(|| Ulid::new().to_string());
             new_index.insert(id.clone(), rel.clone());
             // cache the parsed text beside the meta — search()/tasks() read it
@@ -5775,7 +6485,11 @@ fn walk(
                 id.clone(),
                 CachedNoteText {
                     body: body.to_string(),
-                    metadata: if had_fm { searchable_metadata(&fm) } else { String::new() },
+                    metadata: if had_fm {
+                        searchable_metadata(&fm)
+                    } else {
+                        String::new()
+                    },
                     secure: walked_secure(&fm, body),
                 },
             );
@@ -5784,7 +6498,11 @@ fn walk(
             let (file_created, file_updated) = file_stamps(&abs);
             // only notes physically under a hidden root (Archive/Trash) carry
             // an origin out to the wire; everything else is None.
-            let origin = if is_hidden_root(prefix) { fm.origin.clone() } else { None };
+            let origin = if is_hidden_root(prefix) {
+                fm.origin.clone()
+            } else {
+                None
+            };
             notes.push(NoteMeta {
                 id,
                 title,
@@ -5792,8 +6510,16 @@ fn walk(
                 aliases,
                 folder_id,
                 disk_folder_id: prefix.to_string(),
-                created_at: fm.created.as_deref().and_then(stamp_to_ms).unwrap_or(file_created),
-                updated_at: fm.updated.as_deref().and_then(stamp_to_ms).unwrap_or(file_updated),
+                created_at: fm
+                    .created
+                    .as_deref()
+                    .and_then(stamp_to_ms)
+                    .unwrap_or(file_created),
+                updated_at: fm
+                    .updated
+                    .as_deref()
+                    .and_then(stamp_to_ms)
+                    .unwrap_or(file_updated),
                 pinned: fm.pinned.unwrap_or(false),
                 origin,
                 kind: NoteKind::Note,
@@ -5950,10 +6676,18 @@ fn relevant_paths(
     // directory; treating it as content bypasses the exact-file suppress set
     // and makes every app-authored write echo as "external". Metadata-only
     // changes contain no note bytes and never require a corpus refresh.
-    if matches!(event.kind, notify::EventKind::Modify(notify::event::ModifyKind::Metadata(_))) {
+    if matches!(
+        event.kind,
+        notify::EventKind::Modify(notify::event::ModifyKind::Metadata(_))
+    ) {
         return Vec::new();
     }
-    event.paths.iter().filter(|p| path_relevant(root, suppress, p)).cloned().collect()
+    event
+        .paths
+        .iter()
+        .filter(|p| path_relevant(root, suppress, p))
+        .cloned()
+        .collect()
 }
 
 /// The unit-testable core of the watcher's filter.
@@ -5966,10 +6700,13 @@ pub fn path_relevant(root: &Path, suppress: &SuppressSet, path: &Path) -> bool {
     let Ok(rel) = normalized_path.strip_prefix(&normalized_root) else {
         return false;
     };
-    // Main and named views are the two portable hand-arranged sidecars. CLI/MCP
-    // writes happen in another process, so the resident app must observe them;
-    // every other dot-file remains private runtime state and stays ignored.
-    if rel == Path::new(".rotli/main.json") || rel == Path::new(".rotli/views.json") {
+    // Main, named views, and chat folders are portable hand-arranged sidecars.
+    // Another Rotli process may write them, so every resident window must
+    // observe them; every other dot-file remains private runtime state.
+    if rel == Path::new(".rotli/main.json")
+        || rel == Path::new(".rotli/views.json")
+        || rel == Path::new(".rotli/chat-folders.json")
+    {
         return true;
     }
     for comp in rel.components() {
@@ -6002,11 +6739,21 @@ pub struct CorpusRegistry {
 
 impl CorpusRegistry {
     pub fn new(default_id: String) -> Self {
-        Self { stores: HashMap::new(), default_id }
+        Self {
+            stores: HashMap::new(),
+            default_id,
+        }
     }
 
-    pub fn insert(&mut self, id: String, store: CorpusStore) {
+    pub fn insert(&mut self, id: String, store: CorpusStore) -> Result<(), String> {
+        if id.is_empty() || id.contains(':') {
+            return Err(format!("invalid corpus root id: {id:?}"));
+        }
+        if self.stores.contains_key(&id) {
+            return Err(format!("duplicate corpus root id: {id}"));
+        }
         self.stores.insert(id, store);
+        Ok(())
     }
 }
 
@@ -6014,6 +6761,54 @@ impl CorpusRegistry {
 /// (disk error at startup) — commands then return a clean error instead of
 /// panicking on missing state.
 pub struct CorpusState(pub Mutex<CorpusRegistry>);
+
+const IMPORT_AUTHORIZATION_TTL: Duration = Duration::from_secs(30);
+
+/// Exact paths supplied by a native OS drop event. The webview is untrusted:
+/// knowing an arbitrary absolute path is not authority to copy it into the
+/// corpus and read it back. Each native grant is short-lived and single-use.
+#[derive(Default)]
+pub struct ImportAuthorizations(Mutex<HashMap<PathBuf, (Instant, usize)>>);
+
+impl ImportAuthorizations {
+    pub(crate) fn authorize_native_drop(&self, paths: &[PathBuf]) {
+        let Ok(mut grants) = self.0.lock() else {
+            return;
+        };
+        let now = Instant::now();
+        grants.retain(|_, (issued, _)| now.duration_since(*issued) <= IMPORT_AUTHORIZATION_TTL);
+        for path in paths {
+            let Ok(canonical) = fs::canonicalize(path) else {
+                continue;
+            };
+            if !canonical.is_file() {
+                continue;
+            }
+            let entry = grants.entry(canonical).or_insert((now, 0));
+            entry.0 = now;
+            entry.1 = entry.1.saturating_add(1);
+        }
+    }
+
+    fn consume(&self, path: &Path) -> Result<PathBuf, String> {
+        let canonical =
+            fs::canonicalize(path).map_err(|e| format!("the dropped file is unavailable: {e}"))?;
+        let mut grants = self
+            .0
+            .lock()
+            .map_err(|_| "import authorization lock poisoned".to_string())?;
+        let now = Instant::now();
+        grants.retain(|_, (issued, _)| now.duration_since(*issued) <= IMPORT_AUTHORIZATION_TTL);
+        let Some((_issued, remaining)) = grants.get_mut(&canonical) else {
+            return Err("file import requires a fresh native drag-and-drop authorization".into());
+        };
+        *remaining = remaining.saturating_sub(1);
+        if *remaining == 0 {
+            grants.remove(&canonical);
+        }
+        Ok(canonical)
+    }
+}
 
 impl CorpusState {
     /// The registry's default root id — the memex the journal/organizer
@@ -6031,7 +6826,10 @@ impl CorpusState {
     /// services (Breve migration). The path is owned by the registry; callers
     /// never accept a path from the webview.
     pub(crate) fn default_root_path(&self) -> Result<PathBuf, String> {
-        let reg = self.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+        let reg = self
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?;
         let store = reg
             .stores
             .get(&reg.default_id)
@@ -6039,12 +6837,36 @@ impl CorpusState {
         Ok(store.root().to_path_buf())
     }
 
+    /// Share one registered store's cache generation/suppression set with a
+    /// narrow legacy memex write. Those writes use the same filesystem root but
+    /// historically bypassed `CorpusStore`, leaving its warm list cache stale
+    /// until the watcher echoed the change. Matching by canonical root keeps the
+    /// bridge capability-scoped; caller-controlled paths cannot mint a store.
+    pub(crate) fn suppress_set_for_root(&self, root: &Path) -> Result<SuppressSet, String> {
+        let canonical = fs::canonicalize(root)
+            .map_err(|e| format!("canonicalize corpus root {}: {e}", root.display()))?;
+        let reg = self
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?;
+        reg.stores
+            .values()
+            .find(|store| {
+                fs::canonicalize(store.root()).is_ok_and(|candidate| candidate == canonical)
+            })
+            .map(CorpusStore::suppress_set)
+            .ok_or_else(|| format!("corpus root unavailable: {}", canonical.display()))
+    }
+
     /// The Breve importer writes curated notes under `wiki/reference/**`, so it
     /// rides the same memex-only, contract-band, user-permissions gate as the AI
     /// filer. App-private `.rotli/routines` writes use `default_root_path` and
     /// remain available even when the connected brain itself is read-only.
     pub(crate) fn default_breve_memex_write_root(&self) -> Result<PathBuf, String> {
-        let mut reg = self.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+        let mut reg = self
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?;
         let default_id = reg.default_id.clone();
         let store = reg
             .stores
@@ -6065,7 +6887,10 @@ impl CorpusState {
         root_id: &str,
         f: impl FnOnce(&mut CorpusStore) -> Result<T, String>,
     ) -> Result<T, String> {
-        let mut reg = self.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+        let mut reg = self
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?;
         let store = reg
             .stores
             .get_mut(root_id)
@@ -6085,6 +6910,14 @@ fn prefix_meta(root_id: &str, mut m: NoteMeta) -> NoteMeta {
         m.id = compose_root_id(root_id, &m.id);
     }
     m
+}
+
+fn prefix_write_result(root_id: &str, mut result: CorpusWriteResult) -> CorpusWriteResult {
+    result.meta = prefix_meta(root_id, result.meta);
+    if result.meta.kind == NoteKind::Note {
+        result.meta.id = compose_root_id(root_id, &result.meta.id);
+    }
+    result
 }
 
 /// ASYNC + spawn_blocking (perf audit 2026-08): on a cache miss `corpus_list`
@@ -6108,7 +6941,10 @@ fn corpus_list_inner(state: &CorpusState) -> Result<CorpusList, String> {
     // Aggregate across every registered root, prefixing each emitted folder_id /
     // board id via compose_root_id (default bare). Note ulids stay bare for the
     // default root; a non-default root prefixes its ulids too so reads route back.
-    let mut reg = state.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+    let mut reg = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?;
     let mut ids: Vec<String> = reg.stores.keys().cloned().collect();
     // stable order: default first, then the rest sorted, so the wire is deterministic
     ids.sort();
@@ -6208,7 +7044,10 @@ fn corpus_search_inner(
     // default FALSE: ⌘K and every other user caller keep today's scope. Only the
     // AI host opts into the reference lane (docs/design/ai-visibility-matrix.md).
     let include_reference = include_reference.unwrap_or(false);
-    let mut reg = state.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+    let mut reg = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?;
     let mut ids: Vec<String> = reg.stores.keys().cloned().collect();
     ids.sort();
     if let Some(pos) = ids.iter().position(|i| *i == reg.default_id) {
@@ -6264,7 +7103,10 @@ pub async fn corpus_search_ai(
         let mut permitted = Vec::with_capacity(hits.len());
         for hit in hits {
             let (root, rel) = split_root_id(&hit.id);
-            if state.route(&root, |s| s.read_for_ai(&rel, model_is_local)).is_ok() {
+            if state
+                .route(&root, |s| s.read_for_ai(&rel, model_is_local))
+                .is_ok()
+            {
                 permitted.push(hit);
             }
         }
@@ -6293,7 +7135,10 @@ pub async fn corpus_notes_ai(
         let mut permitted = Vec::new();
         for meta in listed.notes.into_iter().chain(reference) {
             let (root, rel) = split_root_id(&meta.id);
-            if state.route(&root, |s| s.read_for_ai(&rel, model_is_local)).is_ok() {
+            if state
+                .route(&root, |s| s.read_for_ai(&rel, model_is_local))
+                .is_ok()
+            {
                 permitted.push(meta);
             }
         }
@@ -6394,13 +7239,16 @@ pub fn corpus_file_bytes(
 #[tauri::command]
 pub fn corpus_import_file(
     state: tauri::State<'_, CorpusState>,
+    authorizations: tauri::State<'_, ImportAuthorizations>,
     root_id: String,
     path: String,
 ) -> Result<String, String> {
-    let src = PathBuf::from(&path);
-    if !src.is_file() {
-        return Err(format!("not a file: {path}"));
-    }
+    // The native drag event grants this exact source path once. Destination
+    // authority is independent: `route` accepts only a registered root and
+    // `import_file` enforces that root's mutation policy. Keeping the old
+    // default-only check here silently routed Chat drops away from the active
+    // connected vault even though every subsequent operation was root-aware.
+    let src = authorizations.consume(Path::new(&path))?;
     let rel = state.route(&root_id, |s| s.import_file(&src))?;
     Ok(compose_root_id(&root_id, &rel))
 }
@@ -6435,7 +7283,10 @@ pub fn corpus_create_image_asset(
 /// before offering edit mode: a read-only root (a memex/linked-library) or a file
 /// over the read cap stays a viewer.
 #[tauri::command]
-pub fn corpus_file_stat(state: tauri::State<'_, CorpusState>, id: String) -> Result<FileStat, String> {
+pub fn corpus_file_stat(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+) -> Result<FileStat, String> {
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| s.file_stat(&rel))
 }
@@ -6472,13 +7323,16 @@ pub fn corpus_write_file_bytes(
     id: String,
     base64: String,
     bak: Option<bool>,
-) -> Result<(), String> {
+    expected_revision: String,
+) -> Result<String, String> {
     use base64::Engine;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(base64.as_bytes())
         .map_err(|e| format!("bad file payload: {e}"))?;
     let (root, rel) = split_root_id(&id);
-    state.route(&root, |s| s.write_file_bytes(&rel, &bytes, bak.unwrap_or(false)))
+    state.route(&root, |s| {
+        s.write_file_bytes_if_revision(&rel, &bytes, bak.unwrap_or(false), &expected_revision)
+    })
 }
 
 /// Create a NEW file from base64 bytes in `folder_id` (collision-safe) — the
@@ -6642,7 +7496,9 @@ pub fn corpus_managed_file_creation_available(
         .map_err(|_| "corpus lock poisoned".to_string())?
         .default_id
         .clone();
-    state.route(&default_id, |store| Ok(store.managed_file_creation_available()))
+    state.route(&default_id, |store| {
+        Ok(store.managed_file_creation_available())
+    })
 }
 
 /// Reveal a surfaced file in Finder (`open -R`) — the file surface's dropdown.
@@ -6793,9 +7649,9 @@ pub fn corpus_set_field(
 pub fn corpus_raw_frontmatter(
     state: tauri::State<'_, CorpusState>,
     id: String,
-) -> Result<String, String> {
+) -> Result<crate::fsutil::VersionedText, String> {
     let (root, rel) = split_root_id(&id);
-    state.route(&root, |s| s.raw_frontmatter(&rel))
+    state.route(&root, |s| s.raw_frontmatter_versioned(&rel))
 }
 
 /// Write back a user-edited raw frontmatter block. Rust restores the reserved
@@ -6805,9 +7661,12 @@ pub fn corpus_write_frontmatter_raw(
     state: tauri::State<'_, CorpusState>,
     id: String,
     block: String,
-) -> Result<(), String> {
+    expected_revision: String,
+) -> Result<String, String> {
     let (root, rel) = split_root_id(&id);
-    state.route(&root, |s| s.write_frontmatter_raw(&rel, &block))
+    state.route(&root, |s| {
+        s.write_frontmatter_raw_if_revision(&rel, &block, &expected_revision)
+    })
 }
 
 /// FILER (contract v3.7): set an AI-owned metadata field (area/summary/tags/links/
@@ -6826,7 +7685,10 @@ pub fn corpus_set_ai_field(
 
 /// FILER (v3.7): file a note into the brain per its `area` field (fs-atomic move).
 #[tauri::command]
-pub fn corpus_file_note(state: tauri::State<'_, CorpusState>, id: String) -> Result<String, String> {
+pub fn corpus_file_note(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+) -> Result<String, String> {
     // returns the note's NEW rel path so the frontend can journal the move.
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| {
@@ -6839,7 +7701,10 @@ pub fn corpus_file_note(state: tauri::State<'_, CorpusState>, id: String) -> Res
 /// manual-filing surfaces use (a `.md` note travels as its frontmatter ULID, but
 /// staged-detection and the journal need the path). A rel path passes through.
 #[tauri::command]
-pub fn corpus_note_path(state: tauri::State<'_, CorpusState>, id: String) -> Result<String, String> {
+pub fn corpus_note_path(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+) -> Result<String, String> {
     let (root, rel) = split_root_id(&id);
     let bare = state.route(&root, |s| s.resolve_note_rel(&rel))?;
     Ok(compose_root_id(&root, &bare))
@@ -6989,10 +7854,16 @@ pub fn corpus_read_ai(
     id: String,
     model_id: String,
     endpoint: String,
-) -> Result<String, String> {
+) -> Result<CorpusAiRead, String> {
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     let (root, rel) = split_root_id(&id);
-    state.route(&root, |s| s.read_for_ai(&rel, model_is_local))
+    state.route(&root, |s| {
+        let body = s.read_for_ai(&rel, model_is_local)?;
+        Ok(CorpusAiRead {
+            revision: crate::fsutil::revision(body.as_bytes()),
+            body,
+        })
+    })
 }
 
 /// Batch form of the AI read-permission probe (perf audit 2026-07-30, #4):
@@ -7016,7 +7887,10 @@ pub async fn corpus_readable_ids(
         let mut readable = Vec::new();
         for id in ids {
             let (root, rel) = split_root_id(&id);
-            if state.route(&root, |s| s.read_for_ai(&rel, model_is_local)).is_ok() {
+            if state
+                .route(&root, |s| s.read_for_ai(&rel, model_is_local))
+                .is_ok()
+            {
                 readable.push(id);
             }
         }
@@ -7037,7 +7911,10 @@ pub async fn corpus_readable_ids(
 /// an AI-only retrieval surface with no model argument is exactly the shape
 /// this audit was closing (docs/architecture/egress-threat-model.md).
 fn corpus_reference_notes_inner(state: &CorpusState) -> Result<Vec<NoteMeta>, String> {
-    let mut reg = state.0.lock().map_err(|_| "corpus lock poisoned".to_string())?;
+    let mut reg = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?;
     let mut ids: Vec<String> = reg.stores.keys().cloned().collect();
     ids.sort();
     if let Some(pos) = ids.iter().position(|i| *i == reg.default_id) {
@@ -7071,16 +7948,15 @@ pub fn corpus_write_ai(
     body: String,
     model_id: String,
     endpoint: String,
-) -> Result<NoteMeta, String> {
+    expected_revision: String,
+) -> Result<CorpusWriteResult, String> {
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     let (root, rel) = split_root_id(&id);
-    state.route(&root, |s| s.write_for_ai(&rel, &body, model_is_local)).map(|mut m| {
-        m = prefix_meta(&root, m);
-        if m.kind == NoteKind::Note {
-            m.id = compose_root_id(&root, &m.id);
-        }
-        m
-    })
+    state
+        .route(&root, |s| {
+            s.write_for_ai_if_revision(&rel, &body, model_is_local, &expected_revision)
+        })
+        .map(|result| prefix_write_result(&root, result))
 }
 
 #[tauri::command]
@@ -7088,15 +7964,14 @@ pub fn corpus_write(
     state: tauri::State<'_, CorpusState>,
     id: String,
     body: String,
-) -> Result<NoteMeta, String> {
+    expected_revision: String,
+) -> Result<CorpusWriteResult, String> {
     let (root, rel) = split_root_id(&id);
-    state.route(&root, |s| s.write(&rel, &body)).map(|mut m| {
-        m = prefix_meta(&root, m);
-        if m.kind == NoteKind::Note {
-            m.id = compose_root_id(&root, &m.id);
-        }
-        m
-    })
+    state
+        .route(&root, |s| {
+            s.write_if_revision(&rel, &body, &expected_revision)
+        })
+        .map(|result| prefix_write_result(&root, result))
 }
 
 #[tauri::command]
@@ -7108,12 +7983,14 @@ pub fn corpus_create(
 ) -> Result<NoteMeta, String> {
     let (root, rel) = split_root_id(&folder_id);
     state
-        .route(&root, |s| s.create_with_policy(&rel, &body, secure.unwrap_or(false)))
+        .route(&root, |s| {
+            s.create_with_policy(&rel, &body, secure.unwrap_or(false))
+        })
         .map(|mut m| {
-        m = prefix_meta(&root, m);
-        m.id = compose_root_id(&root, &m.id);
-        m
-    })
+            m = prefix_meta(&root, m);
+            m.id = compose_root_id(&root, &m.id);
+            m
+        })
 }
 
 #[tauri::command]
@@ -7125,7 +8002,10 @@ pub fn corpus_delete(state: tauri::State<'_, CorpusState>, id: String) -> Result
 /// The ephemeral-note lane: hard-discard a note ONLY if its body is blank
 /// (Rust re-verifies; see `Store::discard_blank`). Bypasses the in-app Trash.
 #[tauri::command]
-pub fn corpus_discard_blank(state: tauri::State<'_, CorpusState>, id: String) -> Result<(), String> {
+pub fn corpus_discard_blank(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+) -> Result<(), String> {
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| s.discard_blank(&rel))
 }
@@ -7145,13 +8025,15 @@ pub fn corpus_move(
     if id_root != tgt_root {
         return Err("moving a note across roots isn't supported yet".into());
     }
-    state.route(&id_root, |s| s.move_note(&rel, &tgt_rel)).map(|mut m| {
-        m = prefix_meta(&id_root, m);
-        if m.kind == NoteKind::Note {
-            m.id = compose_root_id(&id_root, &m.id);
-        }
-        m
-    })
+    state
+        .route(&id_root, |s| s.move_note(&rel, &tgt_rel))
+        .map(|mut m| {
+            m = prefix_meta(&id_root, m);
+            if m.kind == NoteKind::Note {
+                m.id = compose_root_id(&id_root, &m.id);
+            }
+            m
+        })
 }
 
 /// Rename a board (`.excalidraw`) within its folder. Boards are path-id'd and
@@ -7164,7 +8046,9 @@ pub fn corpus_rename_board(
     name: String,
 ) -> Result<NoteMeta, String> {
     let (root, rel) = split_root_id(&id);
-    state.route(&root, |s| s.rename_board(&rel, &name)).map(|m| prefix_meta(&root, m))
+    state
+        .route(&root, |s| s.rename_board(&rel, &name))
+        .map(|m| prefix_meta(&root, m))
 }
 
 /// The `corpus_purge` command was unregistered in the 2026-07 audit (#68)
@@ -7248,9 +8132,14 @@ pub fn corpus_write_board(
     state: tauri::State<'_, CorpusState>,
     id: String,
     body: String,
-) -> Result<NoteMeta, String> {
+    expected_revision: String,
+) -> Result<CorpusWriteResult, String> {
     let (root, rel) = split_root_id(&id);
-    state.route(&root, |s| s.write_board(&rel, &body)).map(|m| prefix_meta(&root, m))
+    state
+        .route(&root, |s| {
+            s.write_board_if_revision(&rel, &body, &expected_revision)
+        })
+        .map(|result| prefix_write_result(&root, result))
 }
 
 /// Create a board in `folderId` at its final `name` (Tauri maps JS camelCase).
@@ -7264,7 +8153,9 @@ pub fn corpus_create_board(
 ) -> Result<NoteMeta, String> {
     let (root, rel) = split_root_id(&folder_id);
     state
-        .route(&root, |s| s.create_named_board(&rel, &name, body.as_deref()))
+        .route(&root, |s| {
+            s.create_named_board(&rel, &name, body.as_deref())
+        })
         .map(|m| prefix_meta(&root, m))
 }
 
@@ -7298,16 +8189,24 @@ fn demo_machine_dot_path(app: &tauri::AppHandle, file: &str) -> Option<PathBuf> 
     Some(real.join(DOT_DIR).join(name))
 }
 
-/// Per-machine UI state for a debug shell. The production memex is mounted as a
-/// view only, so settings, view state, wallpaper, and Main layout live in the app
-/// cache instead of creating or changing `<memex>/.rotli/*`.
+/// Per-machine window state for a debug shell. View state and wallpaper stay in
+/// the app cache so development window experiments do not replace the installed
+/// app's layout. Vault settings and portable organization (`main` and `views`)
+/// deliberately bypass this lane and route to the live vault.
 fn dev_machine_dot_path(app: &tauri::AppHandle, file: &str) -> Option<PathBuf> {
-    if !cfg!(debug_assertions) {
+    if !cfg!(debug_assertions) || !dev_machine_state_file(file) {
         return None;
     }
     use tauri::Manager;
     let name = dot_file(file).ok()?;
-    app.path().app_cache_dir().ok().map(|d| d.join("tauri-dev-state").join(name))
+    app.path()
+        .app_cache_dir()
+        .ok()
+        .map(|d| d.join("tauri-dev-state").join(name))
+}
+
+fn dev_machine_state_file(file: &str) -> bool {
+    matches!(file, "viewstate" | "wallpaper")
 }
 
 #[tauri::command]
@@ -7374,55 +8273,74 @@ pub fn corpus_settings_write(
     state.route(&default_id, |s| s.dot_write(&file, &contents))
 }
 
-/// Write `.rotli/main.json` (the user's durable Main arrangement) AND ensure the
-/// corpus `.gitignore` commits it — separate from settings/viewstate, which stay
-/// per-machine (Seth, 2026-07-01). Read it back with `corpus_settings_read("main")`.
+/// Read the user's durable Main arrangement with the exact content revision
+/// required by its next full-manifest replacement.
 #[tauri::command]
-pub fn corpus_main_write(
-    app: tauri::AppHandle,
+pub fn corpus_main_read(
     state: tauri::State<'_, CorpusState>,
-    contents: String,
-) -> Result<(), String> {
-    if let Some(path) = dev_machine_dot_path(&app, "main") {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        return atomic_write(&path, &contents);
-    }
+) -> Result<crate::fsutil::VersionedText, String> {
     let default_id = state
         .0
         .lock()
         .map_err(|_| "corpus lock poisoned".to_string())?
         .default_id
         .clone();
-    state.route(&default_id, |s| {
-        s.dot_write("main", &contents)?;
-        s.ensure_main_committable()
+    state.route(&default_id, |store| store.main_read_versioned())
+}
+
+/// Write `.rotli/main.json` (the user's durable Main arrangement) AND ensure the
+/// corpus `.gitignore` commits it — separate from settings/viewstate, which stay
+/// per-machine (Seth, 2026-07-01). A stale full-manifest replacement is refused.
+#[tauri::command]
+pub fn corpus_main_write(
+    state: tauri::State<'_, CorpusState>,
+    contents: String,
+    expected_revision: String,
+) -> Result<String, String> {
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |store| {
+        store.main_write_if_revision(&contents, &expected_revision)
     })
 }
 
-/// Write `.rotli/views.json` through the schema + Markdown metadata sync gate.
-/// Debug mounts remain read-only against the live corpus, so their view layout
-/// stays in the same app-cache lane as debug Main.
+/// Read named views with the exact content revision required by their next
+/// replacement. Main remains a separate global reference projection.
 #[tauri::command]
-pub fn corpus_views_write(
-    app: tauri::AppHandle,
+pub fn corpus_views_read(
     state: tauri::State<'_, CorpusState>,
-    contents: String,
-) -> Result<(), String> {
-    if let Some(path) = dev_machine_dot_path(&app, "views") {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        return atomic_write(&path, &contents);
-    }
+) -> Result<crate::fsutil::VersionedText, String> {
     let default_id = state
         .0
         .lock()
         .map_err(|_| "corpus lock poisoned".to_string())?
         .default_id
         .clone();
-    state.route(&default_id, |store| store.views_write(&contents))
+    state.route(&default_id, |store| store.views_read_versioned())
+}
+
+/// Write `.rotli/views.json` through the schema + Markdown metadata sync gate.
+/// Main and named views are portable vault organization, so development and
+/// installed builds deliberately share these files.
+#[tauri::command]
+pub fn corpus_views_write(
+    state: tauri::State<'_, CorpusState>,
+    contents: String,
+    expected_revision: String,
+) -> Result<String, String> {
+    let default_id = state
+        .0
+        .lock()
+        .map_err(|_| "corpus lock poisoned".to_string())?
+        .default_id
+        .clone();
+    state.route(&default_id, |store| {
+        store.views_write_if_revision(&contents, &expected_revision)
+    })
 }
 
 // ─── tests ───────────────────────────────────────────────────────────────────
@@ -7441,8 +8359,24 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
+    fn development_isolates_window_state_but_not_vault_state() {
+        for file in ["viewstate", "wallpaper"] {
+            assert!(dev_machine_state_file(file), "{file}");
+        }
+        for file in ["settings", "main", "views", "organizer", "chat-folders"] {
+            assert!(!dev_machine_state_file(file), "{file}");
+        }
+    }
+
+    #[test]
     fn open_with_allowlist_covers_office_apps_without_accepting_arbitrary_commands() {
-        for app in ["Microsoft Excel", "Numbers", "Microsoft Word", "Pages", "LibreOffice"] {
+        for app in [
+            "Microsoft Excel",
+            "Numbers",
+            "Microsoft Word",
+            "Pages",
+            "LibreOffice",
+        ] {
             assert!(OPEN_WITH_APPS.contains(&app));
         }
         assert!(!OPEN_WITH_APPS.contains(&"Terminal"));
@@ -7451,10 +8385,22 @@ mod tests {
 
     #[test]
     fn document_conversion_names_only_the_explicit_local_family() {
-        assert_eq!(converted_document_name("storage/Quarterly report.doc").unwrap(), "Quarterly report.docx");
-        assert_eq!(converted_document_name("storage/notes.rtf").unwrap(), "notes.docx");
-        assert_eq!(converted_document_name("storage/draft.odt").unwrap(), "draft.docx");
-        assert_eq!(converted_document_name("storage/reference.pdf").unwrap(), "reference.docx");
+        assert_eq!(
+            converted_document_name("storage/Quarterly report.doc").unwrap(),
+            "Quarterly report.docx"
+        );
+        assert_eq!(
+            converted_document_name("storage/notes.rtf").unwrap(),
+            "notes.docx"
+        );
+        assert_eq!(
+            converted_document_name("storage/draft.odt").unwrap(),
+            "draft.docx"
+        );
+        assert_eq!(
+            converted_document_name("storage/reference.pdf").unwrap(),
+            "reference.docx"
+        );
         assert!(converted_document_name("storage/design.pages").is_err());
         assert!(converted_document_name("storage/macro.docm").is_err());
     }
@@ -7476,8 +8422,14 @@ mod tests {
 
         let cfg = read_config_path_or_backup(&selected).unwrap();
         assert_eq!(cfg.corpus.abs_path, root);
-        assert!(!selected.exists(), "a read-only fallback must not restore or rewrite production config");
-        assert!(backup.exists(), "the recovery snapshot must remain untouched");
+        assert!(
+            !selected.exists(),
+            "a read-only fallback must not restore or rewrite production config"
+        );
+        assert!(
+            backup.exists(),
+            "the recovery snapshot must remain untouched"
+        );
     }
 
     #[test]
@@ -7489,7 +8441,10 @@ mod tests {
         seed_memex(&brain);
         let cfg = CorpusConfig {
             version: 1,
-            corpus: CorpusRef { abs_path: notes, adopted: false },
+            corpus: CorpusRef {
+                abs_path: notes,
+                adopted: false,
+            },
             brains: vec![ConnectedBrain {
                 id: "vault".into(),
                 label: "Vault".into(),
@@ -7548,15 +8503,34 @@ mod tests {
 
         let cfg = migrate_config_at(&cfg_dir, &corpus);
 
-        assert_eq!(canon(&cfg.corpus.abs_path), canon(&corpus), "corpus stays the plain notes folder");
-        assert_eq!(cfg.brains.len(), 1, "double registration deduped to one brain");
+        assert_eq!(
+            canon(&cfg.corpus.abs_path),
+            canon(&corpus),
+            "corpus stays the plain notes folder"
+        );
+        assert_eq!(
+            cfg.brains.len(),
+            1,
+            "double registration deduped to one brain"
+        );
         let b = &cfg.brains[0];
-        assert_eq!(b.id, "vault", "keeps the vault id so the sidebar prefix stays valid");
+        assert_eq!(
+            b.id, "vault",
+            "keeps the vault id so the sidebar prefix stays valid"
+        );
         assert_eq!(canon(&b.abs_path), canon(&brain));
-        assert_eq!(b.perms, crate::memex::MemexPerms::ChatsInbox, "carries write perms from the instance, not read-only");
+        assert_eq!(
+            b.perms,
+            crate::memex::MemexPerms::ChatsInbox,
+            "carries write perms from the instance, not read-only"
+        );
         assert_eq!(b.memex_id.as_deref(), Some(mxid));
         assert_eq!(b.mode.as_deref(), Some("secure"));
-        assert_eq!(cfg.active_brain_id.as_deref(), Some("vault"), "active mapped via memexId");
+        assert_eq!(
+            cfg.active_brain_id.as_deref(),
+            Some("vault"),
+            "active mapped via memexId"
+        );
     }
 
     /// A brand-new user (empty config dir) gets the default corpus and no brains —
@@ -7584,9 +8558,13 @@ mod tests {
         assert!(looks_secure("github_pat_11EXAMPLE0EXAMPLE0EXAM"));
         assert!(looks_secure("AIzaSyExample0Example0Example0Example0E"));
         assert!(looks_secure("card 3782 822463 10005")); // amex grouping
-        // plain notes are NOT secure (no false positives on phone/time)
-        assert!(!looks_secure("A normal note — groceries, weather, call 555-1234 at 3pm."));
-        assert!(!looks_secure("Meeting notes: ship v2, review the gateway flow."));
+                                                         // plain notes are NOT secure (no false positives on phone/time)
+        assert!(!looks_secure(
+            "A normal note — groceries, weather, call 555-1234 at 3pm."
+        ));
+        assert!(!looks_secure(
+            "Meeting notes: ship v2, review the gateway flow."
+        ));
     }
 
     #[test]
@@ -7618,22 +8596,83 @@ mod tests {
     }
 
     #[test]
+    fn absolute_import_paths_require_a_single_use_native_drop_grant() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("private.txt");
+        fs::write(&source, "private").unwrap();
+        let grants = ImportAuthorizations::default();
+
+        assert!(grants.consume(&source).is_err());
+        grants.authorize_native_drop(std::slice::from_ref(&source));
+        assert_eq!(
+            grants.consume(&source).unwrap(),
+            fs::canonicalize(&source).unwrap()
+        );
+        assert!(
+            grants.consume(&source).is_err(),
+            "a webview cannot replay a native grant"
+        );
+    }
+
+    #[test]
     fn write_file_bytes_overwrites_with_one_time_bak() {
         let (_dir, mut store) = bare();
         fs::create_dir_all(store.root().join("Storage")).unwrap();
         fs::write(store.root().join("Storage/book.xlsx"), b"original-bytes").unwrap();
 
         // a missing file is an error — the save lane never creates
-        assert!(store.write_file_bytes("Storage/nope.xlsx", b"x", false).is_err());
+        assert!(store
+            .write_file_bytes("Storage/nope.xlsx", b"x", false)
+            .is_err());
 
-        store.write_file_bytes("Storage/book.xlsx", b"first-save", true).unwrap();
-        assert_eq!(fs::read(store.root().join("Storage/book.xlsx")).unwrap(), b"first-save");
+        store
+            .write_file_bytes("Storage/book.xlsx", b"first-save", true)
+            .unwrap();
+        assert_eq!(
+            fs::read(store.root().join("Storage/book.xlsx")).unwrap(),
+            b"first-save"
+        );
         // .bak holds the PRE-rotli original…
-        assert_eq!(fs::read(store.root().join("Storage/book.xlsx.bak")).unwrap(), b"original-bytes");
+        assert_eq!(
+            fs::read(store.root().join("Storage/book.xlsx.bak")).unwrap(),
+            b"original-bytes"
+        );
         // …and a second save never touches it (one-time backup)
-        store.write_file_bytes("Storage/book.xlsx", b"second-save", true).unwrap();
-        assert_eq!(fs::read(store.root().join("Storage/book.xlsx.bak")).unwrap(), b"original-bytes");
-        assert_eq!(fs::read(store.root().join("Storage/book.xlsx")).unwrap(), b"second-save");
+        store
+            .write_file_bytes("Storage/book.xlsx", b"second-save", true)
+            .unwrap();
+        assert_eq!(
+            fs::read(store.root().join("Storage/book.xlsx.bak")).unwrap(),
+            b"original-bytes"
+        );
+        assert_eq!(
+            fs::read(store.root().join("Storage/book.xlsx")).unwrap(),
+            b"second-save"
+        );
+    }
+
+    #[test]
+    fn stale_office_save_must_not_overwrite_a_same_size_external_edit() {
+        let (_dir, mut store) = bare();
+        fs::write(store.root().join("Storage/book.xlsx"), b"opened").unwrap();
+        let opened = fs::read(store.root().join("Storage/book.xlsx")).unwrap();
+        fs::write(store.root().join("Storage/book.xlsx"), b"newer!").unwrap();
+
+        let result = store.write_file_bytes_if_revision(
+            "Storage/book.xlsx",
+            b"stale!",
+            false,
+            &crate::fsutil::revision(&opened),
+        );
+        assert!(
+            result.is_err(),
+            "a stale office save must report a conflict"
+        );
+        assert_eq!(
+            fs::read(store.root().join("Storage/book.xlsx")).unwrap(),
+            b"newer!"
+        );
+        assert_eq!(opened, b"opened");
     }
 
     #[test]
@@ -7649,9 +8688,14 @@ mod tests {
 
         let stat = store.file_stat("storage/graph.png").unwrap();
         assert!(!stat.writable);
-        assert!(store.write_file_bytes("storage/graph.png", b"edited", true).is_err());
+        assert!(store
+            .write_file_bytes("storage/graph.png", b"edited", true)
+            .is_err());
         assert_eq!(fs::read(root.join("storage/graph.png")).unwrap(), b"pixels");
-        assert!(!root.join("storage/graph.png.bak").exists(), "a refused save must not leave a .bak");
+        assert!(
+            !root.join("storage/graph.png.bak").exists(),
+            "a refused save must not leave a .bak"
+        );
         // new files refuse too (the csv→xlsx convert can't create in the vault)
         assert!(store.new_file_bytes("storage", "new.xlsx", b"x").is_err());
     }
@@ -7664,14 +8708,23 @@ mod tests {
         let root = dir.path().join("brain");
         seed_memex(&root);
         fs::create_dir_all(root.join("storage/samples")).unwrap();
-        fs::write(root.join("storage/samples/company-overview.xlsx"), b"vault-bytes").unwrap();
+        fs::write(
+            root.join("storage/samples/company-overview.xlsx"),
+            b"vault-bytes",
+        )
+        .unwrap();
         fs::write(root.join("storage/notes.csv"), b"a,b\n").unwrap();
         let mut store = CorpusStore::open(root.clone()).unwrap();
         store.os_trash = false;
 
         // the probe now offers edit mode, the in-place save lands, the pre-rotli
         // bytes survive as a one-time .bak
-        assert!(store.file_stat("storage/samples/company-overview.xlsx").unwrap().writable);
+        assert!(
+            store
+                .file_stat("storage/samples/company-overview.xlsx")
+                .unwrap()
+                .writable
+        );
         assert!(store.file_stat("storage/notes.csv").unwrap().writable);
         assert!(store
             .write_file_bytes("storage/samples/company-overview.xlsx", b"edited", true)
@@ -7687,22 +8740,30 @@ mod tests {
 
         // still refused: a MISSING sheet (overwrite-only, never a create) and any
         // NEW file in storage (the csv→xlsx convert can't target the vault)
-        assert!(store.write_file_bytes("storage/nope.xlsx", b"x", false).is_err());
+        assert!(store
+            .write_file_bytes("storage/nope.xlsx", b"x", false)
+            .is_err());
         assert!(store.new_file_bytes("storage", "fresh.xlsx", b"x").is_err());
 
         // a read-only-connected brain closes even the storage-sheet lane — the
         // exception must yield to perms, exactly like writable() does
         store.set_perms_read_only(true);
         assert!(!store.file_stat("storage/notes.csv").unwrap().writable);
-        assert!(store.write_file_bytes("storage/notes.csv", b"x,y\n", false).is_err());
+        assert!(store
+            .write_file_bytes("storage/notes.csv", b"x,y\n", false)
+            .is_err());
     }
 
     #[test]
     fn new_file_bytes_is_collision_safe() {
         let (_dir, mut store) = bare();
-        let a = store.new_file_bytes("Storage", "sheet.xlsx", b"one").unwrap();
+        let a = store
+            .new_file_bytes("Storage", "sheet.xlsx", b"one")
+            .unwrap();
         assert_eq!(a, "Storage/sheet.xlsx");
-        let b = store.new_file_bytes("Storage", "sheet.xlsx", b"two").unwrap();
+        let b = store
+            .new_file_bytes("Storage", "sheet.xlsx", b"two")
+            .unwrap();
         assert_eq!(b, "Storage/sheet-2.xlsx");
         assert_eq!(fs::read(store.root().join(&a)).unwrap(), b"one");
         assert_eq!(fs::read(store.root().join(&b)).unwrap(), b"two");
@@ -7724,8 +8785,14 @@ mod tests {
         assert_eq!(sheet, "storage/rotli/untitled.xlsx");
         assert_eq!(fs::read(root.join(&doc)).unwrap(), b"docx");
         let listed = store.list().unwrap();
-        assert!(listed.notes.iter().any(|note| note.id == doc && note.kind == NoteKind::File));
-        assert!(listed.notes.iter().any(|note| note.id == sheet && note.kind == NoteKind::File));
+        assert!(listed
+            .notes
+            .iter()
+            .any(|note| note.id == doc && note.kind == NoteKind::File));
+        assert!(listed
+            .notes
+            .iter()
+            .any(|note| note.id == sheet && note.kind == NoteKind::File));
         assert!(store.create_managed_file("script.sh", b"nope").is_err());
         assert!(store.managed_file_creation_available());
 
@@ -7733,60 +8800,6 @@ mod tests {
         assert!(!store.managed_file_creation_available());
         assert!(store.create_managed_file("blocked.docx", b"nope").is_err());
         assert!(!root.join("storage/rotli/blocked.docx").exists());
-    }
-
-    #[test]
-    fn picked_chat_images_become_collision_safe_user_owned_assets() {
-        let dir = TempDir::new().unwrap();
-        let root = dir.path().join("brain");
-        seed_memex(&root);
-        let mut store = CorpusStore::open(root.clone()).unwrap();
-        store.os_trash = false;
-
-        let first = store.create_image_asset("architecture.png", b"png-one").unwrap();
-        let second = store.create_image_asset("architecture.png", b"png-two").unwrap();
-        assert_eq!(first, "storage/images/architecture.png");
-        assert_eq!(second, "storage/images/architecture-2.png");
-        assert_eq!(fs::read(root.join(&first)).unwrap(), b"png-one");
-        assert!(store.create_image_asset("notes.txt", b"nope").is_err());
-
-        store.set_perms_read_only(true);
-        assert!(store.create_image_asset("blocked.png", b"nope").is_err());
-        assert!(!root.join("storage/images/blocked.png").exists());
-    }
-
-    #[test]
-    fn pdf_exports_require_an_editable_unprotected_source_and_valid_copy() {
-        let dir = TempDir::new().unwrap();
-        let root = dir.path().join("brain");
-        seed_memex(&root);
-        let mut store = CorpusStore::open(root.clone()).unwrap();
-        store.os_trash = false;
-
-        let note = store.create("wiki/_inbox", "# Launch\n\nShip calmly.\n").unwrap();
-        assert_eq!(store.editable_pdf_source(&note.id).unwrap(), "# Launch\n\nShip calmly.\n");
-        let pdf = store.create_exported_pdf("launch.pdf", b"%PDF-1.4\ncopy").unwrap();
-        assert_eq!(pdf, "storage/rotli/launch.pdf");
-        assert!(store.create_exported_pdf("bad.pdf", b"not pdf").is_err());
-
-        let secure = store
-            .create("wiki/_secure", "# Private\n\nsecret\n")
-            .unwrap();
-        store.set_secure(&secure.id, true).unwrap();
-        assert!(store.editable_pdf_source(&secure.id).is_err());
-
-        let oversized = store.create("wiki/_inbox", "# Too large\n").unwrap();
-        let oversized_rel = store.resolve_note_rel(&oversized.id).unwrap();
-        fs::OpenOptions::new()
-            .write(true)
-            .open(root.join(oversized_rel))
-            .unwrap()
-            .set_len(GENERATED_PDF_SOURCE_MAX_BYTES + 1)
-            .unwrap();
-        assert!(store.editable_pdf_source(&oversized.id).is_err());
-
-        store.set_perms_read_only(true);
-        assert!(store.create_exported_pdf("blocked.pdf", b"%PDF-1.4\ncopy").is_err());
     }
 
     #[test]
@@ -7799,8 +8812,14 @@ mod tests {
 
         let doc = store.create_managed_file("draft.docx", b"docx").unwrap();
         let stat = store.file_stat(&doc).unwrap();
-        assert!(stat.writable, "DOCX files open in Rotli's local document editor");
-        assert!(stat.lifecycle_mutable, "managed files still need a lifecycle action");
+        assert!(
+            stat.writable,
+            "DOCX files open in Rotli's local document editor"
+        );
+        assert!(
+            stat.lifecycle_mutable,
+            "managed files still need a lifecycle action"
+        );
         let trashed = store.move_file_to_sink(&doc, "Trash").unwrap();
         assert!(!root.join(&doc).exists());
         assert_eq!(trashed, "trash/storage/rotli/draft.docx");
@@ -7827,7 +8846,9 @@ mod tests {
         // Rotli storage, so the sink move still refuses it.
         fs::create_dir_all(root.join("wiki/projects")).unwrap();
         fs::write(root.join("wiki/projects/reference.pdf"), b"keep").unwrap();
-        assert!(store.move_file_to_sink("wiki/projects/reference.pdf", "Trash").is_err());
+        assert!(store
+            .move_file_to_sink("wiki/projects/reference.pdf", "Trash")
+            .is_err());
         assert!(root.join("wiki/projects/reference.pdf").is_file());
         assert!(store.move_file_to_sink(&doc, "Somewhere").is_err());
     }
@@ -7849,6 +8870,24 @@ mod tests {
         let mut store = CorpusStore::open(root).unwrap();
         store.os_trash = false;
         (dir, store)
+    }
+
+    #[test]
+    fn chat_image_asset_rejects_mislabeled_bytes_before_writing() {
+        let (_dir, mut store) = bare();
+        assert!(store
+            .create_image_asset("not-an-image.png", b"ordinary text")
+            .is_err());
+        assert!(!store.root().join("Storage/not-an-image.png").exists());
+
+        let id = store
+            .create_image_asset("pixel.png", b"\x89PNG\r\n\x1a\nminimal-test-payload")
+            .unwrap();
+        assert_eq!(id, "Storage/pixel.png");
+        assert_eq!(
+            fs::read(store.root().join(id)).unwrap(),
+            b"\x89PNG\r\n\x1a\nminimal-test-payload"
+        );
     }
 
     // ── frontmatter codec ──
@@ -7899,7 +8938,10 @@ mod tests {
         let fm = fm.unwrap();
         assert_eq!(fm.origin, None);
         let out = compose_document(&fm, body);
-        assert!(!out.contains("origin:"), "absent origin must not be emitted:\n{out}");
+        assert!(
+            !out.contains("origin:"),
+            "absent origin must not be emitted:\n{out}"
+        );
         assert_eq!(out, absent);
     }
 
@@ -7911,7 +8953,12 @@ mod tests {
         let fm = fm.unwrap();
         assert_eq!(
             fm.foreign,
-            vec!["tags: [alpha, beta]", "meta:", "  source: web", "# a comment"]
+            vec![
+                "tags: [alpha, beta]",
+                "meta:",
+                "  source: web",
+                "# a comment"
+            ]
         );
         assert_eq!(compose_document(&fm, body), text);
     }
@@ -7943,14 +8990,27 @@ mod tests {
         )
         .unwrap();
         store.list().unwrap();
-        store.set_pinned("01TESTID000000000000ABCDEF", true).unwrap();
+        store
+            .set_pinned("01TESTID000000000000ABCDEF", true)
+            .unwrap();
         let meta = store
             .write("01TESTID000000000000ABCDEF", "# Kept\n\nEdited.\n")
             .unwrap();
         assert!(meta.pinned, "body save must preserve the on-disk pin");
-        let on_disk = fs::read_to_string(store.root().join(store.index.get("01TESTID000000000000ABCDEF").unwrap())).unwrap();
-        assert!(on_disk.contains("aliases: [old-name]"), "foreign key destroyed:\n{on_disk}");
-        assert!(on_disk.contains("created: 2026-06-01T00:00:00Z"), "created not preserved");
+        let on_disk = fs::read_to_string(
+            store
+                .root()
+                .join(store.index.get("01TESTID000000000000ABCDEF").unwrap()),
+        )
+        .unwrap();
+        assert!(
+            on_disk.contains("aliases: [old-name]"),
+            "foreign key destroyed:\n{on_disk}"
+        );
+        assert!(
+            on_disk.contains("created: 2026-06-01T00:00:00Z"),
+            "created not preserved"
+        );
         assert!(on_disk.contains("pinned: true"));
         assert!(on_disk.ends_with("# Kept\n\nEdited.\n"));
     }
@@ -7983,9 +9043,20 @@ mod tests {
         let (fm, body) = parse_document(&out);
         let fm = fm.unwrap();
         assert_eq!(body, "\nBody.\n", "body must be byte-exact from disk");
-        assert_eq!(fm.id.as_deref(), Some("01RAW0000000000000000000B"), "id restored");
-        assert_eq!(fm.created.as_deref(), Some("2026-06-12T10:00:00Z"), "created restored");
-        assert!(out.contains("owner: breve"), "dropped owner restored:\n{out}");
+        assert_eq!(
+            fm.id.as_deref(),
+            Some("01RAW0000000000000000000B"),
+            "id restored"
+        );
+        assert_eq!(
+            fm.created.as_deref(),
+            Some("2026-06-12T10:00:00Z"),
+            "created restored"
+        );
+        assert!(
+            out.contains("owner: breve"),
+            "dropped owner restored:\n{out}"
+        );
         assert!(out.contains("view_tag: OpenSource") && !out.contains("view_tag: Myela"));
         assert_eq!(fm.pinned, Some(true), "pinned lands as typed");
         assert!(out.contains("locked: true") && out.contains("secure: true"));
@@ -7995,8 +9066,15 @@ mod tests {
 
         // a user can't MINT provenance: an invented owner on a note without one goes
         let plain = "---\nid: C\ncreated: 2026-06-12T10:00:00Z\nupdated: 2026-06-12T10:00:00Z\npinned: false\n---\n\nP.\n";
-        let out = merge_raw_frontmatter(plain, "---\nid: C\ncreated: 2026-06-12T10:00:00Z\nowner: me\n---\n").unwrap();
-        assert!(!out.contains("owner:"), "invented owner must be dropped:\n{out}");
+        let out = merge_raw_frontmatter(
+            plain,
+            "---\nid: C\ncreated: 2026-06-12T10:00:00Z\nowner: me\n---\n",
+        )
+        .unwrap();
+        assert!(
+            !out.contains("owner:"),
+            "invented owner must be dropped:\n{out}"
+        );
 
         // a stray fence line inside the block would truncate it on the next parse
         assert!(merge_raw_frontmatter(plain, "---\nid: C\n---\nsneaky: body\n---\n").is_err());
@@ -8015,15 +9093,30 @@ mod tests {
         let block = store.raw_frontmatter(id).unwrap();
         store.write_frontmatter_raw(id, &block).unwrap();
         let rel = store.index.get(id).unwrap().clone();
-        assert_eq!(fs::read_to_string(store.root().join(&rel)).unwrap(), original);
+        assert_eq!(
+            fs::read_to_string(store.root().join(&rel)).unwrap(),
+            original
+        );
         store
-            .write_frontmatter_raw(id, "---\nid: FORGED\ncreated: yesterday\ntags: [kept]\n---\n")
+            .write_frontmatter_raw(
+                id,
+                "---\nid: FORGED\ncreated: yesterday\ntags: [kept]\n---\n",
+            )
             .unwrap();
         let on_disk = fs::read_to_string(store.root().join(&rel)).unwrap();
-        assert!(on_disk.contains("id: 01RAWSTORE000000000000000A"), "id restored:\n{on_disk}");
-        assert!(on_disk.contains("created: 2026-06-01T00:00:00Z"), "created restored");
+        assert!(
+            on_disk.contains("id: 01RAWSTORE000000000000000A"),
+            "id restored:\n{on_disk}"
+        );
+        assert!(
+            on_disk.contains("created: 2026-06-01T00:00:00Z"),
+            "created restored"
+        );
         assert!(on_disk.contains("tags: [kept]"), "typed key lands");
-        assert!(on_disk.ends_with("\n# Raw\n\nBody.\n"), "body byte-exact:\n{on_disk}");
+        assert!(
+            on_disk.ends_with("\n# Raw\n\nBody.\n"),
+            "body byte-exact:\n{on_disk}"
+        );
 
         // Memex: wiki + chats both accept (the USER gate — same as every save;
         // wiki writable since 2026-08-03), Reference/Hidden lanes still refuse
@@ -8032,11 +9125,38 @@ mod tests {
         seed_memex(&brain);
         let mut mx = CorpusStore::open(brain).unwrap();
         mx.os_trash = false;
-        mx.write_frontmatter_raw("wiki/note.md", "---\ntags: [x]\n---\n").unwrap();
-        assert_eq!(mx.raw_frontmatter("wiki/note.md").unwrap(), "---\ntags: [x]\n---\n");
-        mx.write_frontmatter_raw("chats/welcome.md", "---\ntags: [x]\n---\n").unwrap();
-        assert_eq!(mx.raw_frontmatter("chats/welcome.md").unwrap(), "---\ntags: [x]\n---\n");
-        assert!(mx.write_frontmatter_raw("MAP.md", "---\ntags: [x]\n---\n").is_err());
+        mx.write_frontmatter_raw("wiki/note.md", "---\ntags: [x]\n---\n")
+            .unwrap();
+        assert_eq!(
+            mx.raw_frontmatter("wiki/note.md").unwrap(),
+            "---\ntags: [x]\n---\n"
+        );
+        mx.write_frontmatter_raw("chats/welcome.md", "---\ntags: [x]\n---\n")
+            .unwrap();
+        assert_eq!(
+            mx.raw_frontmatter("chats/welcome.md").unwrap(),
+            "---\ntags: [x]\n---\n"
+        );
+        assert!(mx
+            .write_frontmatter_raw("MAP.md", "---\ntags: [x]\n---\n")
+            .is_err());
+    }
+
+    #[test]
+    fn stale_raw_metadata_never_erases_newer_vault_or_librarian_fields() {
+        let (_dir, mut store) = fresh();
+        let note = store.create("Inbox", "# Metadata race\n").unwrap();
+        let opened = store.raw_frontmatter_versioned(&note.id).unwrap();
+
+        store.set_field(&note.id, "project", "Rotli").unwrap();
+        let error = store
+            .write_frontmatter_raw_if_revision(&note.id, &opened.contents, &opened.revision)
+            .unwrap_err();
+        assert!(error.contains("revision conflict"), "{error}");
+        assert!(store
+            .raw_frontmatter(&note.id)
+            .unwrap()
+            .contains("project: Rotli"));
     }
 
     #[test]
@@ -8051,7 +9171,10 @@ mod tests {
         // adding a key keeps the nested map intact
         let typed = "---\nid: 01NEST000000000000000000A\ncreated: 2026-06-12T10:00:00Z\nsource:\n  created: 2020-01-01\n  id: web-123\n  url: https://x\ntags: [x]\n---\n";
         let out = merge_raw_frontmatter(text, typed).unwrap();
-        assert!(out.contains("\n  created: 2020-01-01\n"), "nested created kept:\n{out}");
+        assert!(
+            out.contains("\n  created: 2020-01-01\n"),
+            "nested created kept:\n{out}"
+        );
         assert!(out.contains("\n  id: web-123\n"), "nested id kept:\n{out}");
         assert!(out.contains("tags: [x]"));
         // dropping the TOP-LEVEL provenance restores it up top — the nested
@@ -8080,12 +9203,20 @@ mod tests {
             .write_frontmatter_raw(id, "---\nid: x\ncreated: y\nsecure: true\n---\n")
             .unwrap();
         let ignored = fs::read_to_string(root.join(".gitignore")).unwrap();
-        assert!(ignored.lines().any(|l| l.trim() == rel), "secure via raw lane must gitignore: {ignored:?}");
+        assert!(
+            ignored.lines().any(|l| l.trim() == rel),
+            "secure via raw lane must gitignore: {ignored:?}"
+        );
         // clearing it un-ignores (the set_secure symmetry)
         store.write_frontmatter_raw(id, "---\n---\n").unwrap();
         let ignored = fs::read_to_string(root.join(".gitignore")).unwrap();
-        assert!(!ignored.lines().any(|l| l.trim() == rel), "cleared secure must un-ignore: {ignored:?}");
-        assert!(!fs::read_to_string(root.join(&rel)).unwrap().contains("secure:"));
+        assert!(
+            !ignored.lines().any(|l| l.trim() == rel),
+            "cleared secure must un-ignore: {ignored:?}"
+        );
+        assert!(!fs::read_to_string(root.join(&rel))
+            .unwrap()
+            .contains("secure:"));
     }
 
     #[test]
@@ -8095,10 +9226,17 @@ mod tests {
         // resolves to a real file outside the root must fail, not write
         let (dir, mut store) = bare();
         fs::write(dir.path().join("outside.md"), "---\n---\nX\n").unwrap();
-        assert!(store.abs("../outside.md").is_file(), "test setup: the escape target exists");
+        assert!(
+            store.abs("../outside.md").is_file(),
+            "test setup: the escape target exists"
+        );
         assert!(store.resolve_note_rel("../outside.md").is_err());
-        assert!(store.write_frontmatter_raw("../outside.md", "---\npwn: true\n---\n").is_err());
-        assert!(!fs::read_to_string(dir.path().join("outside.md")).unwrap().contains("pwn"));
+        assert!(store
+            .write_frontmatter_raw("../outside.md", "---\npwn: true\n---\n")
+            .is_err());
+        assert!(!fs::read_to_string(dir.path().join("outside.md"))
+            .unwrap()
+            .contains("pwn"));
     }
 
     #[test]
@@ -8130,12 +9268,25 @@ mod tests {
             "---\nid: 01HASID0000000000000ABCDEF\ncreated: 2026-06-10T08:00:00Z\nupdated: 2026-06-10T08:00:00Z\npinned: false\n---\n\n# Has id\n",
         )
         .unwrap();
-        fs::write(root.join("Work/no frontmatter.md"), "# Dropped in\n\nFrom outside.\n").unwrap();
+        fs::write(
+            root.join("Work/no frontmatter.md"),
+            "# Dropped in\n\nFrom outside.\n",
+        )
+        .unwrap();
 
         let list = store.list().unwrap();
         assert_eq!(list.notes.len(), 2);
-        assert!(list.notes.iter().any(|n| n.id == "01HASID0000000000000ABCDEF"));
-        let minted = list.notes.iter().find(|n| n.title == "Dropped in").unwrap().id.clone();
+        assert!(list
+            .notes
+            .iter()
+            .any(|n| n.id == "01HASID0000000000000ABCDEF"));
+        let minted = list
+            .notes
+            .iter()
+            .find(|n| n.title == "Dropped in")
+            .unwrap()
+            .id
+            .clone();
 
         // minted id is path-stable across runs (persisted in index.json)
         let mut store2 = CorpusStore::open(root.clone()).unwrap();
@@ -8149,7 +9300,10 @@ mod tests {
         store3.os_trash = false;
         let list3 = store3.list().unwrap();
         assert_eq!(list3.notes.len(), 2);
-        assert!(list3.notes.iter().any(|n| n.id == "01HASID0000000000000ABCDEF"));
+        assert!(list3
+            .notes
+            .iter()
+            .any(|n| n.id == "01HASID0000000000000ABCDEF"));
         let doc = store3.read("01HASID0000000000000ABCDEF").unwrap();
         assert_eq!(doc.body, "# Has id\n");
         assert_eq!(doc.folder_id, "Work");
@@ -8164,7 +9318,11 @@ mod tests {
         let list = store.list().unwrap();
         let ids: Vec<&str> = list.folders.iter().map(|f| f.id.as_str()).collect();
         assert!(ids.contains(&"Imported") && ids.contains(&"Imported/Deep"));
-        let deep = list.folders.iter().find(|f| f.id == "Imported/Deep").unwrap();
+        let deep = list
+            .folders
+            .iter()
+            .find(|f| f.id == "Imported/Deep")
+            .unwrap();
         assert_eq!(deep.parent_id.as_deref(), Some("Imported"));
         assert!(list.notes.iter().any(|n| n.folder_id == "Imported/Deep"));
     }
@@ -8219,8 +9377,14 @@ mod tests {
             .aliases
             .iter()
             .any(|alias| alias == "the-3-stage-infrastructure-plan"));
-        assert_eq!(store.search("myela-stage-plan", 10, false).unwrap().len(), 1);
-        assert!(store.root().join(rel).is_file(), "listing must remain read-only");
+        assert_eq!(
+            store.search("myela-stage-plan", 10, false).unwrap().len(),
+            1
+        );
+        assert!(
+            store.root().join(rel).is_file(),
+            "listing must remain read-only"
+        );
     }
 
     #[test]
@@ -8248,9 +9412,9 @@ mod tests {
         assert!(repaired.is_file());
         assert!(!store.root().join(rel).exists());
         let text = fs::read_to_string(repaired).unwrap();
-        assert!(text.contains(
-            "aliases: [\"kept\",\"myela-stage-plan-abc123\",\"myela-stage-plan\"]"
-        ));
+        assert!(
+            text.contains("aliases: [\"kept\",\"myela-stage-plan-abc123\",\"myela-stage-plan\"]")
+        );
         assert!(!text.contains("\"The 3-stage infrastructure plan\""));
     }
 
@@ -8260,7 +9424,10 @@ mod tests {
         assert_eq!(title_of("![photo](storage:abc.png)\nrest"), "photo");
         assert_eq!(title_of("![](storage:abc.png)\nrest"), "Image");
         assert_eq!(title_of("[the doc](https://x.y/z)"), "the doc");
-        assert_eq!(snippet_of("# T\nsee ![chart](a.png) and [spec](b)"), "see chart and spec");
+        assert_eq!(
+            snippet_of("# T\nsee ![chart](a.png) and [spec](b)"),
+            "see chart and spec"
+        );
         // malformed spans pass through untouched
         assert_eq!(title_of("[not a link] (gap)"), "[not a link] (gap)");
         assert_eq!(title_of("![dangling](no close"), "![dangling](no close");
@@ -8271,8 +9438,13 @@ mod tests {
     #[test]
     fn search_match_ranks_title_over_body_with_offsets() {
         // title hit: rank 0, offsets index the TITLE, stored snippet rides through
-        let m = search_match("groc", "Groceries", "# Groceries\n\nOlive oil.\n", "Olive oil.")
-            .unwrap();
+        let m = search_match(
+            "groc",
+            "Groceries",
+            "# Groceries\n\nOlive oil.\n",
+            "Olive oil.",
+        )
+        .unwrap();
         assert_eq!((m.rank, m.match_start, m.match_len), (0, 0, 4));
         assert_eq!(m.snippet, "Olive oil.");
 
@@ -8286,7 +9458,9 @@ mod tests {
         .unwrap();
         assert_eq!(m.rank, 1);
         let chars: Vec<char> = m.snippet.chars().collect();
-        let hit: String = chars[m.match_start..m.match_start + m.match_len].iter().collect();
+        let hit: String = chars[m.match_start..m.match_start + m.match_len]
+            .iter()
+            .collect();
         assert_eq!(hit, "sourdough");
 
         // case-insensitive both directions; no match / blank query → None
@@ -8303,14 +9477,18 @@ mod tests {
         let m = search_match("needle", "T", &long, "").unwrap();
         assert!(m.snippet.starts_with('…') && m.snippet.ends_with('…'));
         let chars: Vec<char> = m.snippet.chars().collect();
-        let hit: String = chars[m.match_start..m.match_start + m.match_len].iter().collect();
+        let hit: String = chars[m.match_start..m.match_start + m.match_len]
+            .iter()
+            .collect();
         assert_eq!(hit, "NEEDLE");
         assert_eq!(chars.len(), 1 + 60 + 6 + 60 + 1);
 
         // emphasis stripped OUTSIDE the match, newlines flattened — offsets stay true
         let m = search_match("needle", "T", "**bold**\nneedle `x`", "").unwrap();
         let chars: Vec<char> = m.snippet.chars().collect();
-        let hit: String = chars[m.match_start..m.match_start + m.match_len].iter().collect();
+        let hit: String = chars[m.match_start..m.match_start + m.match_len]
+            .iter()
+            .collect();
         assert_eq!(hit, "needle");
         assert!(!m.snippet.contains('*') && !m.snippet.contains('`'));
         assert!(!m.snippet.contains('\n'));
@@ -8319,18 +9497,31 @@ mod tests {
     #[test]
     fn store_search_covers_bodies_ranks_titles_first_and_skips_trash() {
         let (_dir, mut store) = bare();
-        let a = store.create("Inbox", "# Wire limit\n\nCall the bank about the cap.\n").unwrap();
-        let b = store
-            .create("Notes", "# Meeting prep\n\nRaise the wire limit question with finance.\n")
+        let a = store
+            .create("Inbox", "# Wire limit\n\nCall the bank about the cap.\n")
             .unwrap();
-        let c = store.create("Inbox", "# Old wire limit note\n\ndead\n").unwrap();
+        let b = store
+            .create(
+                "Notes",
+                "# Meeting prep\n\nRaise the wire limit question with finance.\n",
+            )
+            .unwrap();
+        let c = store
+            .create("Inbox", "# Old wire limit note\n\ndead\n")
+            .unwrap();
         store.move_note(&c.id, "Trash").unwrap();
 
         let hits = store.search("wire limit", 50, false).unwrap();
         let ids: Vec<&str> = hits.iter().map(|h| h.id.as_str()).collect();
         assert!(ids.contains(&a.id.as_str()), "title hit found");
-        assert!(ids.contains(&b.id.as_str()), "BODY hit found — full-text works");
-        assert!(!ids.contains(&c.id.as_str()), "Trash never surfaces in search");
+        assert!(
+            ids.contains(&b.id.as_str()),
+            "BODY hit found — full-text works"
+        );
+        assert!(
+            !ids.contains(&c.id.as_str()),
+            "Trash never surfaces in search"
+        );
         // title hit outranks the body hit
         assert_eq!(hits[0].id, a.id);
         assert_eq!(hits[0].rank, 0);
@@ -8348,17 +9539,31 @@ mod tests {
         // a move to Trash drops the note from search — all through store.search,
         // never touching the substring fallback.
         let (_dir, mut store) = bare();
-        let n = store.create("Inbox", "# Notes\n\nthe kelpie surfaced at dawn\n").unwrap();
-        assert_eq!(store.search("kelpie", 50, false).unwrap().len(), 1, "indexed on first search");
+        let n = store
+            .create("Inbox", "# Notes\n\nthe kelpie surfaced at dawn\n")
+            .unwrap();
+        assert_eq!(
+            store.search("kelpie", 50, false).unwrap().len(),
+            1,
+            "indexed on first search"
+        );
 
-        store.write(&n.id, "# Notes\n\nthe selkie surfaced at dawn\n").unwrap();
-        assert!(store.search("kelpie", 50, false).unwrap().is_empty(), "edited-away term gone");
+        store
+            .write(&n.id, "# Notes\n\nthe selkie surfaced at dawn\n")
+            .unwrap();
+        assert!(
+            store.search("kelpie", 50, false).unwrap().is_empty(),
+            "edited-away term gone"
+        );
         let hits = store.search("selkie", 50, false).unwrap();
         assert_eq!(hits.len(), 1, "the new term is found");
         assert_eq!(hits[0].id, n.id);
 
         store.move_note(&n.id, "Trash").unwrap();
-        assert!(store.search("selkie", 50, false).unwrap().is_empty(), "trashed note leaves search");
+        assert!(
+            store.search("selkie", 50, false).unwrap().is_empty(),
+            "trashed note leaves search"
+        );
     }
 
     #[test]
@@ -8368,15 +9573,45 @@ mod tests {
         // This diffs the two lanes over the mid-word cases prefix matching used to
         // drop, plus multi-word and whole-word queries, and asserts index ⊇ substring.
         let (_dir, mut store) = bare();
-        store.create("Inbox", "# Router\n\nsteps to reconfigure the router later\n").unwrap();
-        store.create("Notes", "# Session\n\nhow to reauthenticate the session\n").unwrap();
-        store.create("Inbox", "# Carbon\n\nreduce the carbon footprint this year\n").unwrap();
-        store.create("Notes", "# Garden\n\nunrelated notes about gardens\n").unwrap();
-        for q in ["config", "auth", "print", "reconfigure", "footprint", "the router", "session"] {
-            let idx: std::collections::HashSet<String> =
-                store.search(q, 200, true).unwrap().into_iter().map(|h| h.id).collect();
-            let sub: std::collections::HashSet<String> =
-                store.search_substring(q, 200, true).unwrap().into_iter().map(|h| h.id).collect();
+        store
+            .create(
+                "Inbox",
+                "# Router\n\nsteps to reconfigure the router later\n",
+            )
+            .unwrap();
+        store
+            .create("Notes", "# Session\n\nhow to reauthenticate the session\n")
+            .unwrap();
+        store
+            .create(
+                "Inbox",
+                "# Carbon\n\nreduce the carbon footprint this year\n",
+            )
+            .unwrap();
+        store
+            .create("Notes", "# Garden\n\nunrelated notes about gardens\n")
+            .unwrap();
+        for q in [
+            "config",
+            "auth",
+            "print",
+            "reconfigure",
+            "footprint",
+            "the router",
+            "session",
+        ] {
+            let idx: std::collections::HashSet<String> = store
+                .search(q, 200, true)
+                .unwrap()
+                .into_iter()
+                .map(|h| h.id)
+                .collect();
+            let sub: std::collections::HashSet<String> = store
+                .search_substring(q, 200, true)
+                .unwrap()
+                .into_iter()
+                .map(|h| h.id)
+                .collect();
             assert!(
                 sub.is_subset(&idx),
                 "index lost recall for {q:?}: substring={sub:?} index={idx:?}"
@@ -8404,10 +9639,18 @@ mod tests {
             match_len: 1,
             updated_at,
         };
-        let mut hits = vec![hit("old-body", 1, 10), hit("new-body", 1, 20), hit("title", 0, 1)];
+        let mut hits = vec![
+            hit("old-body", 1, 10),
+            hit("new-body", 1, 20),
+            hit("title", 0, 1),
+        ];
         sort_hits(&mut hits);
         let ids: Vec<&str> = hits.iter().map(|h| h.id.as_str()).collect();
-        assert_eq!(ids, ["title", "new-body", "old-body"], "rank asc → recency desc");
+        assert_eq!(
+            ids,
+            ["title", "new-body", "old-body"],
+            "rank asc → recency desc"
+        );
         // the id tie-break: identical rank + recency sorts ascending by id
         let mut ties = vec![hit("b", 1, 5), hit("a", 1, 5)];
         sort_hits(&mut ties);
@@ -8421,9 +9664,15 @@ mod tests {
         // just a folder, and its notes MUST stay findable (only a memex root's
         // chats/ transcripts are excluded).
         let (_dir, mut store) = bare();
-        let n = store.create("chats", "# Chat ideas\n\nthe kelpie fragment\n").unwrap();
+        let n = store
+            .create("chats", "# Chat ideas\n\nthe kelpie fragment\n")
+            .unwrap();
         let hits = store.search("kelpie", 50, false).unwrap();
-        assert_eq!(hits.len(), 1, "plain-root chats/ note is searchable: {hits:?}");
+        assert_eq!(
+            hits.len(),
+            1,
+            "plain-root chats/ note is searchable: {hits:?}"
+        );
         assert_eq!(hits[0].id, n.id);
     }
 
@@ -8438,7 +9687,11 @@ mod tests {
             "---\nshelf: Inbox\n---\n\n# Staged capture\n\nthe kelpie fragment\n",
         )
         .unwrap();
-        fs::write(root.join("chats/k.md"), "# Chat\n\nthe kelpie fragment too\n").unwrap();
+        fs::write(
+            root.join("chats/k.md"),
+            "# Chat\n\nthe kelpie fragment too\n",
+        )
+        .unwrap();
         let mut store = CorpusStore::open(root).unwrap();
         store.os_trash = false;
 
@@ -8477,7 +9730,10 @@ mod tests {
 
         store.write(&meta.id, "# Second title\n\nBody.\n").unwrap();
         let after = store.index.get(&meta.id).unwrap().clone();
-        assert!(after.ends_with("second-title.md"), "file not renamed: {after}");
+        assert!(
+            after.ends_with("second-title.md"),
+            "file not renamed: {after}"
+        );
         assert!(!store.root().join(&before).exists(), "old file left behind");
         assert!(store.root().join(&after).is_file());
         let on_disk = fs::read_to_string(store.root().join(&after)).unwrap();
@@ -8486,6 +9742,33 @@ mod tests {
         // id↔path index stays authoritative: read by the same id still works
         let doc = store.read(&meta.id).unwrap();
         assert_eq!(doc.body, "# Second title\n\nBody.\n");
+    }
+
+    #[test]
+    fn stale_editor_write_must_not_overwrite_an_external_edit() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = CorpusStore::open(dir.path().to_path_buf()).unwrap();
+        let note = store.create("Inbox", "# Original\n\nfirst").unwrap();
+        let opened = store.read(&note.id).unwrap();
+        let rel = store.path_of(&note.id).unwrap();
+
+        fs::write(
+            store.root().join(&rel),
+            "---\nid: 01EXTERNAL\n---\n\n# External\n\nnewer",
+        )
+        .unwrap();
+
+        let result = store.write_if_revision(
+            &note.id,
+            &format!("{}\n\nlocal", opened.body),
+            &opened.revision,
+        );
+        assert!(
+            result.is_err(),
+            "a stale editor save must report a conflict"
+        );
+        let current = fs::read_to_string(store.root().join(&rel)).unwrap();
+        assert!(current.contains("# External\n\nnewer"));
     }
 
     #[test]
@@ -8521,7 +9804,9 @@ mod tests {
     #[test]
     fn create_read_write_delete_cycle() {
         let (_dir, mut store) = bare();
-        let meta = store.create("Inbox", "# Groceries\n\nOlive oil, sourdough.\n").unwrap();
+        let meta = store
+            .create("Inbox", "# Groceries\n\nOlive oil, sourdough.\n")
+            .unwrap();
         assert_eq!(meta.title, "Groceries");
         assert_eq!(meta.snippet, "Olive oil, sourdough.");
         assert!(!meta.pinned);
@@ -8534,7 +9819,9 @@ mod tests {
         // pin through the real pin path, then confirm a body save PRESERVES it
         // (write() carries pinned through from disk — the race-fix contract).
         store.set_pinned(&meta.id, true).unwrap();
-        let updated = store.write(&meta.id, "# Groceries\n\nOlive oil, the good butter.\n").unwrap();
+        let updated = store
+            .write(&meta.id, "# Groceries\n\nOlive oil, the good butter.\n")
+            .unwrap();
         assert!(updated.pinned, "body save must preserve the on-disk pin");
         assert!(updated.updated_at >= meta.updated_at);
         let doc = store.read(&meta.id).unwrap();
@@ -8551,17 +9838,34 @@ mod tests {
         // still a real file, still readable by the same id, carrying its origin.
         store.delete(&meta.id).unwrap();
         let doc = store.read(&meta.id).unwrap();
-        assert!(doc.folder_id.starts_with("Trash"), "soft-deleted note must live under Trash, got {}", doc.folder_id);
-        assert_eq!(doc.origin.as_deref(), Some("Inbox"), "origin must remember where it came from");
-        assert!(doc.body.contains("the good butter"), "body survives the move");
+        assert!(
+            doc.folder_id.starts_with("Trash"),
+            "soft-deleted note must live under Trash, got {}",
+            doc.folder_id
+        );
+        assert_eq!(
+            doc.origin.as_deref(),
+            Some("Inbox"),
+            "origin must remember where it came from"
+        );
+        assert!(
+            doc.body.contains("the good butter"),
+            "body survives the move"
+        );
         // still surfaced by the raw walk — but under Trash, so the TS "normal"
         // view (isHidden) filters it out. The corpus never loses it.
         let list = store.list().unwrap();
         let still = list.notes.iter().find(|n| n.id == meta.id).unwrap();
-        assert!(still.folder_id.starts_with("Trash"), "still in the corpus, just under Trash");
+        assert!(
+            still.folder_id.starts_with("Trash"),
+            "still in the corpus, just under Trash"
+        );
         // the file truly lives on disk under Trash/ (never the OS trash / .rotli)
         let rel = store.index.get(&meta.id).unwrap();
-        assert!(rel.starts_with("Trash/"), "physical path under Trash: {rel}");
+        assert!(
+            rel.starts_with("Trash/"),
+            "physical path under Trash: {rel}"
+        );
         assert!(store.root().join(rel).is_file());
     }
 
@@ -8573,7 +9877,9 @@ mod tests {
 
         // create defaults to an empty scene, lands in the requested folder,
         // id == its relative path, kind == Board.
-        let meta = store.create_named_board("Inbox/excalidraw", "untitled", None).unwrap();
+        let meta = store
+            .create_named_board("Inbox/excalidraw", "untitled", None)
+            .unwrap();
         assert_eq!(meta.kind, NoteKind::Board);
         assert_eq!(meta.id, "Inbox/excalidraw/untitled.excalidraw");
         assert_eq!(meta.folder_id, "Inbox/excalidraw");
@@ -8586,25 +9892,40 @@ mod tests {
         assert_eq!(board.kind, NoteKind::Board);
         assert_eq!(board.folder_id, "Inbox/excalidraw");
         // boards are NOT in the .rotli ulid index (path IS the id)
-        assert!(!store.index.contains_key(&meta.id), "boards must bypass the ulid index");
+        assert!(
+            !store.index.contains_key(&meta.id),
+            "boards must bypass the ulid index"
+        );
 
         // read returns the raw JSON body (the empty-scene default)
         let doc = store.read_board(&meta.id).unwrap();
         assert_eq!(doc.id, meta.id);
         assert_eq!(doc.folder_id, "Inbox/excalidraw");
-        assert!(doc.body.contains("\"type\":\"excalidraw\""), "default scene JSON: {}", doc.body);
+        assert!(
+            doc.body.contains("\"type\":\"excalidraw\""),
+            "default scene JSON: {}",
+            doc.body
+        );
 
         // write round-trips the raw scene verbatim (no frontmatter added)
         let scene = "{\"type\":\"excalidraw\",\"version\":2,\"source\":\"rotli\",\"elements\":[{\"id\":\"a\"}],\"appState\":{},\"files\":{}}";
         let w = store.write_board(&meta.id, scene).unwrap();
         assert_eq!(w.kind, NoteKind::Board);
         let on_disk = fs::read_to_string(store.root().join(&meta.id)).unwrap();
-        assert_eq!(on_disk, scene, "board JSON must persist byte-exact, no frontmatter");
+        assert_eq!(
+            on_disk, scene,
+            "board JSON must persist byte-exact, no frontmatter"
+        );
         let doc = store.read_board(&meta.id).unwrap();
-        assert!(doc.body.contains("\"id\":\"a\""), "round-tripped element survives");
+        assert!(
+            doc.body.contains("\"id\":\"a\""),
+            "round-tripped element survives"
+        );
 
         // a second board in the same folder gets a collision-safe name
-        let meta2 = store.create_named_board("Inbox/excalidraw", "untitled", None).unwrap();
+        let meta2 = store
+            .create_named_board("Inbox/excalidraw", "untitled", None)
+            .unwrap();
         assert_eq!(meta2.id, "Inbox/excalidraw/untitled-2.excalidraw");
     }
 
@@ -8612,14 +9933,23 @@ mod tests {
     fn named_board_is_created_without_an_untitled_placeholder() {
         let (_dir, mut store) = bare();
 
-        let meta = store.create_named_board("Inbox/excalidraw", "Project/Map", None).unwrap();
+        let meta = store
+            .create_named_board("Inbox/excalidraw", "Project/Map", None)
+            .unwrap();
         assert_eq!(meta.id, "Inbox/excalidraw/Project-Map.excalidraw");
         assert_eq!(meta.title, "Project-Map");
-        assert!(!store.root().join("Inbox/excalidraw/untitled.excalidraw").exists());
+        assert!(!store
+            .root()
+            .join("Inbox/excalidraw/untitled.excalidraw")
+            .exists());
 
-        let second = store.create_named_board("Inbox/excalidraw", "Project/Map", None).unwrap();
+        let second = store
+            .create_named_board("Inbox/excalidraw", "Project/Map", None)
+            .unwrap();
         assert_eq!(second.id, "Inbox/excalidraw/Project-Map-2.excalidraw");
-        assert!(store.create_named_board("Inbox/excalidraw", "   ", None).is_err());
+        assert!(store
+            .create_named_board("Inbox/excalidraw", "   ", None)
+            .is_err());
     }
 
     #[test]
@@ -8633,7 +9963,11 @@ mod tests {
         )
         .unwrap();
         let list = store.list().unwrap();
-        let board = list.notes.iter().find(|n| n.id == "Notes/sketch.excalidraw").unwrap();
+        let board = list
+            .notes
+            .iter()
+            .find(|n| n.id == "Notes/sketch.excalidraw")
+            .unwrap();
         assert_eq!(board.kind, NoteKind::Board);
         assert_eq!(board.title, "sketch");
         assert_eq!(board.folder_id, "Notes");
@@ -8643,7 +9977,9 @@ mod tests {
     #[test]
     fn rename_board_moves_the_file_and_returns_new_id() {
         let (_dir, mut store) = bare();
-        let created = store.create_named_board("Inbox/excalidraw", "untitled", None).unwrap();
+        let created = store
+            .create_named_board("Inbox/excalidraw", "untitled", None)
+            .unwrap();
         assert_eq!(created.id, "Inbox/excalidraw/untitled.excalidraw");
 
         // rename within the folder: id becomes the new relpath, kind stays Board
@@ -8652,12 +9988,18 @@ mod tests {
         assert_eq!(renamed.kind, NoteKind::Board);
         assert_eq!(renamed.folder_id, "Inbox/excalidraw");
         assert!(!store.root().join(&created.id).exists(), "old file is gone");
-        assert!(store.root().join(&renamed.id).exists(), "new file is present");
+        assert!(
+            store.root().join(&renamed.id).exists(),
+            "new file is present"
+        );
 
         // path separators in a name are flattened to '-'; empty names refused
         let flat = store.rename_board(&renamed.id, "a/b").unwrap();
         assert_eq!(flat.id, "Inbox/excalidraw/a-b.excalidraw");
-        assert!(store.rename_board(&flat.id, "   ").is_err(), "empty name refused");
+        assert!(
+            store.rename_board(&flat.id, "   ").is_err(),
+            "empty name refused"
+        );
         // a non-board id is refused
         assert!(store.rename_board("Inbox/note", "x").is_err());
     }
@@ -8665,9 +10007,18 @@ mod tests {
     #[test]
     fn read_board_rejects_non_board_and_escape() {
         let (_dir, mut store) = bare();
-        assert!(store.read_board("Inbox/note.md").is_err(), "must reject non-.excalidraw");
-        assert!(store.read_board("../escape.excalidraw").is_err(), "must reject path escape");
-        assert!(store.read_board("Nope/missing.excalidraw").is_err(), "missing file errors");
+        assert!(
+            store.read_board("Inbox/note.md").is_err(),
+            "must reject non-.excalidraw"
+        );
+        assert!(
+            store.read_board("../escape.excalidraw").is_err(),
+            "must reject path escape"
+        );
+        assert!(
+            store.read_board("Nope/missing.excalidraw").is_err(),
+            "missing file errors"
+        );
     }
 
     // ── the never-delete lifecycle: move · archive · restore ──
@@ -8675,7 +10026,9 @@ mod tests {
     #[test]
     fn move_into_archive_stamps_origin_then_restore_clears_it() {
         let (_dir, mut store) = bare();
-        let meta = store.create("Brain", "# A thought\n\nKeep this.\n").unwrap();
+        let meta = store
+            .create("Brain", "# A thought\n\nKeep this.\n")
+            .unwrap();
         let id = meta.id.clone();
         // fresh out of Brain there is no origin
         assert_eq!(store.read(&id).unwrap().origin, None);
@@ -8693,7 +10046,10 @@ mod tests {
         let rel = store.index.get(&id).unwrap();
         assert!(rel.starts_with("Archive/"));
         let on_disk = fs::read_to_string(store.root().join(rel)).unwrap();
-        assert!(on_disk.contains("origin: Brain"), "origin not persisted:\n{on_disk}");
+        assert!(
+            on_disk.contains("origin: Brain"),
+            "origin not persisted:\n{on_disk}"
+        );
 
         // move back to its origin → origin cleared, lands in Brain
         let restored = store.move_note(&id, "Brain").unwrap();
@@ -8705,7 +10061,10 @@ mod tests {
         let rel = store.index.get(&id).unwrap();
         assert!(rel.starts_with("Brain/"));
         let on_disk = fs::read_to_string(store.root().join(rel)).unwrap();
-        assert!(!on_disk.contains("origin:"), "origin should be gone after restore:\n{on_disk}");
+        assert!(
+            !on_disk.contains("origin:"),
+            "origin should be gone after restore:\n{on_disk}"
+        );
     }
 
     #[test]
@@ -8714,9 +10073,15 @@ mod tests {
         let meta = store.create("Inbox", "# Throwaway\n").unwrap();
         // soft-delete first (into Trash), then purge it for real
         store.delete(&meta.id).unwrap();
-        assert!(store.read(&meta.id).is_ok(), "still in the corpus after soft delete");
+        assert!(
+            store.read(&meta.id).is_ok(),
+            "still in the corpus after soft delete"
+        );
         store.purge(&meta.id).unwrap();
-        assert!(store.read(&meta.id).is_err(), "purge removes it from the corpus");
+        assert!(
+            store.read(&meta.id).is_err(),
+            "purge removes it from the corpus"
+        );
         assert!(store.list().unwrap().notes.iter().all(|n| n.id != meta.id));
         // never a TRUE hard delete in tests: it landed in .rotli/trash/
         let trashed: Vec<_> = fs::read_dir(store.root().join(DOT_DIR).join("trash"))
@@ -8742,7 +10107,10 @@ mod tests {
         assert_eq!(trashed, "trash/storage/rotli/stale.xlsx");
 
         store.purge(&trashed).unwrap();
-        assert!(!root.join(&trashed).exists(), "purge removes the file from trash/");
+        assert!(
+            !root.join(&trashed).exists(),
+            "purge removes the file from trash/"
+        );
         assert!(store.list().unwrap().notes.iter().all(|n| n.id != trashed));
     }
 
@@ -8751,23 +10119,35 @@ mod tests {
         let (_dir, store) = bare();
         let now = (OffsetDateTime::now_utc().unix_timestamp()) * 1000;
         let old = now - 90 * 86_400_000; // ~90 days ago
-        // pending-old: latest status "proposed" → survives ANY prune.
-        // resolved-old: proposed→applied long ago → dropped (both lines).
-        // resolved-new: applied yesterday → survives a 30-day prune.
+                                         // pending-old: latest status "proposed" → survives ANY prune.
+                                         // resolved-old: proposed→applied long ago → dropped (both lines).
+                                         // resolved-new: applied yesterday → survives a 30-day prune.
         for line in [
             format!(r#"{{"id":"pend","ts":{old},"status":"proposed"}}"#),
             format!(r#"{{"id":"oldr","ts":{old},"status":"proposed"}}"#),
             format!(r#"{{"id":"oldr","ts":{old},"status":"applied"}}"#),
-            format!(r#"{{"id":"newr","ts":{},"status":"applied"}}"#, now - 86_400_000),
+            format!(
+                r#"{{"id":"newr","ts":{},"status":"applied"}}"#,
+                now - 86_400_000
+            ),
         ] {
             store.journal_append(&line).unwrap();
         }
         let removed = store.journal_prune(30).unwrap();
         assert_eq!(removed, 2, "both lines of the old resolved id go");
         let kept = store.journal_read().unwrap();
-        assert!(kept.contains(r#""id":"pend""#), "pending is sacred:\n{kept}");
-        assert!(kept.contains(r#""id":"newr""#), "recent resolved stays:\n{kept}");
-        assert!(!kept.contains(r#""id":"oldr""#), "old resolved is gone:\n{kept}");
+        assert!(
+            kept.contains(r#""id":"pend""#),
+            "pending is sacred:\n{kept}"
+        );
+        assert!(
+            kept.contains(r#""id":"newr""#),
+            "recent resolved stays:\n{kept}"
+        );
+        assert!(
+            !kept.contains(r#""id":"oldr""#),
+            "old resolved is gone:\n{kept}"
+        );
         // keep_days = 0 clears ALL resolved history, pending still survives
         store.journal_prune(0).unwrap();
         let kept = store.journal_read().unwrap();
@@ -8784,13 +10164,26 @@ mod tests {
         // a blank note discards for real — no Trash-folder detour
         let blank = store.create("Inbox", "").unwrap();
         store.discard_blank(&blank.id).unwrap();
-        assert!(store.read(&blank.id).is_err(), "blank note must leave the corpus");
         assert!(
-            store.list().unwrap().notes.iter().all(|n| n.folder_id != "Trash"),
+            store.read(&blank.id).is_err(),
+            "blank note must leave the corpus"
+        );
+        assert!(
+            store
+                .list()
+                .unwrap()
+                .notes
+                .iter()
+                .all(|n| n.folder_id != "Trash"),
             "discard must never route through the in-app Trash folder"
         );
         // recoverable: it landed in .rotli/trash (the test-path fallback)
-        assert!(fs::read_dir(store.root().join(DOT_DIR).join("trash")).unwrap().count() >= 1);
+        assert!(
+            fs::read_dir(store.root().join(DOT_DIR).join("trash"))
+                .unwrap()
+                .count()
+                >= 1
+        );
 
         // whitespace-only still counts as blank
         let spaces = store.create("Inbox", "  \n\n  ").unwrap();
@@ -8799,8 +10192,14 @@ mod tests {
 
         // ANY content refuses — the exposed command cannot destroy prose
         let kept = store.create("Inbox", "# Real note\n").unwrap();
-        assert!(store.discard_blank(&kept.id).is_err(), "non-blank must refuse");
-        assert!(store.read(&kept.id).is_ok(), "refusal leaves the note untouched");
+        assert!(
+            store.discard_blank(&kept.id).is_err(),
+            "non-blank must refuse"
+        );
+        assert!(
+            store.read(&kept.id).is_ok(),
+            "refusal leaves the note untouched"
+        );
     }
 
     #[test]
@@ -8814,13 +10213,19 @@ mod tests {
         fs::write(&abs, [0xC3, 0x28, b'r', b'e', b'a', b'l']).unwrap();
 
         let err = store.discard_blank(&note.id).unwrap_err();
-        assert!(err.contains("refusing to discard"), "unreadable must refuse: {err}");
+        assert!(
+            err.contains("refusing to discard"),
+            "unreadable must refuse: {err}"
+        );
         assert!(abs.is_file(), "the file must survive the refusal");
 
         // the same unreadable file must abort a body save instead of
         // regenerating its frontmatter from nothing
         assert!(store.write(&note.id, "new body").is_err());
-        assert_eq!(fs::read(&abs).unwrap(), [0xC3, 0x28, b'r', b'e', b'a', b'l']);
+        assert_eq!(
+            fs::read(&abs).unwrap(),
+            [0xC3, 0x28, b'r', b'e', b'a', b'l']
+        );
     }
 
     #[test]
@@ -8829,7 +10234,11 @@ mod tests {
         assert!(store.root().join("Inbox").is_dir());
         assert!(store.root().join(DOT_DIR).is_dir());
         let list = store.list().unwrap();
-        assert_eq!(list.notes.len(), 1, "exactly ONE welcome note, no demo corpus");
+        assert_eq!(
+            list.notes.len(),
+            1,
+            "exactly ONE welcome note, no demo corpus"
+        );
         let welcome = &list.notes[0];
         assert_eq!(welcome.folder_id, "Inbox");
         assert_eq!(welcome.title, "Welcome to rotli");
@@ -8861,7 +10270,11 @@ mod tests {
         again.os_trash = false;
         let doc = again.read(&meta.id).unwrap();
         assert!(doc.pinned, "pin lost across quit/relaunch");
-        assert_eq!(again.list().unwrap().notes[0].id, meta.id, "pinned must sort first");
+        assert_eq!(
+            again.list().unwrap().notes[0].id,
+            meta.id,
+            "pinned must sort first"
+        );
     }
 
     #[test]
@@ -8923,18 +10336,46 @@ mod tests {
         let root = PathBuf::from("/corpus");
         let s = SuppressSet::default();
         assert!(path_relevant(&root, &s, Path::new("/corpus/Work/note.md")));
-        assert!(path_relevant(&root, &s, Path::new("/corpus/Inbox/excalidraw/ideas.excalidraw"))); // a board
+        assert!(path_relevant(
+            &root,
+            &s,
+            Path::new("/corpus/Inbox/excalidraw/ideas.excalidraw")
+        )); // a board
         assert!(path_relevant(&root, &s, Path::new("/corpus/Dropped"))); // a folder
-        assert!(path_relevant(&root, &s, Path::new("/corpus/.rotli/main.json")));
-        assert!(path_relevant(&root, &s, Path::new("/corpus/.rotli/views.json")));
-        assert!(!path_relevant(&root, &s, Path::new("/corpus/.rotli/index.json")));
-        assert!(!path_relevant(&root, &s, Path::new("/corpus/.rotli-write-abc")));
+        assert!(path_relevant(
+            &root,
+            &s,
+            Path::new("/corpus/.rotli/main.json")
+        ));
+        assert!(path_relevant(
+            &root,
+            &s,
+            Path::new("/corpus/.rotli/views.json")
+        ));
+        assert!(path_relevant(
+            &root,
+            &s,
+            Path::new("/corpus/.rotli/chat-folders.json")
+        ));
+        assert!(!path_relevant(
+            &root,
+            &s,
+            Path::new("/corpus/.rotli/index.json")
+        ));
+        assert!(!path_relevant(
+            &root,
+            &s,
+            Path::new("/corpus/.rotli-write-abc")
+        ));
         assert!(!path_relevant(&root, &s, Path::new("/corpus/.DS_Store")));
         assert!(!path_relevant(&root, &s, Path::new("/corpus/photo.png")));
         assert!(!path_relevant(&root, &s, Path::new("/elsewhere/x.md")));
         let ours = PathBuf::from("/corpus/Work/ours.md");
         s.mark(&ours);
-        assert!(!path_relevant(&root, &s, &ours), "our own write must not echo");
+        assert!(
+            !path_relevant(&root, &s, &ours),
+            "our own write must not echo"
+        );
     }
 
     // ── Increment 3: the corpus can BE a memex instance ──
@@ -9021,11 +10462,20 @@ mod tests {
 
         let mut store = CorpusStore::open_read_only(root.clone()).unwrap();
         assert_eq!(store.layout, Layout::Memex);
-        assert!(!root.join(DOT_DIR).exists(), "opening a live memex must not create .rotli");
+        assert!(
+            !root.join(DOT_DIR).exists(),
+            "opening a live memex must not create .rotli"
+        );
 
         let list = store.list().unwrap();
-        assert!(!list.notes.is_empty(), "the production memex remains readable");
-        assert!(!root.join(DOT_DIR).exists(), "index reconciliation must remain in memory");
+        assert!(
+            !list.notes.is_empty(),
+            "the production memex remains readable"
+        );
+        assert!(
+            !root.join(DOT_DIR).exists(),
+            "index reconciliation must remain in memory"
+        );
         assert!(store.write("wiki/_inbox/draft.md", "changed").is_err());
         assert!(store.set_locked("wiki/_inbox/draft.md", true).is_err());
         assert!(store.set_pinned("wiki/_inbox/draft.md", true).is_err());
@@ -9063,10 +10513,14 @@ mod tests {
         assert!(store.filer_writable("").is_err());
 
         // stage a note in _inbox, then the FILER gives it an area/summary.
-        let note = store.create("wiki/_inbox", "# Alazan 84\n\nland deal notes").unwrap();
+        let note = store
+            .create("wiki/_inbox", "# Alazan 84\n\nland deal notes")
+            .unwrap();
         let rel = store.path_of(&note.id).unwrap();
         assert!(store.set_ai_field(&rel, "area", "Projects").is_ok());
-        assert!(store.set_ai_field(&rel, "summary", "the Alazan 84 land deal").is_ok());
+        assert!(store
+            .set_ai_field(&rel, "summary", "the Alazan 84 land deal")
+            .is_ok());
         // the allowlist refuses a USER key, a RESERVED key, and junk.
         assert!(store.set_ai_field(&rel, "shelf", "Inbox").is_err());
         assert!(store.set_ai_field(&rel, "locked", "true").is_err());
@@ -9085,7 +10539,10 @@ mod tests {
         assert_eq!(filed.folder_id, "wiki/Projects");
         let new_rel = store.path_of(&note.id).unwrap();
         assert!(new_rel.starts_with("wiki/Projects/"));
-        assert_eq!(store.read_frontmatter(&new_rel).unwrap().updated, before.updated);
+        assert_eq!(
+            store.read_frontmatter(&new_rel).unwrap().updated,
+            before.updated
+        );
 
         // UNDO direction (Phase 3): filer_move the filed note BACK to _inbox staging.
         let back = store.filer_move(&new_rel, "wiki/_inbox").unwrap();
@@ -9145,13 +10602,18 @@ mod tests {
         store.set_secure(&note.id, false).unwrap();
 
         // write_index — the one file the filer overwrites wholesale.
-        assert!(store.write_index("Projects", "# Projects\n\n- Alazan 84\n").is_ok());
+        assert!(store
+            .write_index("Projects", "# Projects\n\n- Alazan 84\n")
+            .is_ok());
         assert!(store.abs("wiki/Projects/_index.md").is_file());
         // an EMPTY body removes the file: undoing the FIRST applied index
         // rewrite (journal before == "") restores "no file", not a 0-byte husk
         assert!(store.write_index("Projects", "").is_ok());
         assert!(!store.abs("wiki/Projects/_index.md").exists());
-        assert!(store.write_index("Projects", "").is_ok(), "removing a missing index is a no-op");
+        assert!(
+            store.write_index("Projects", "").is_ok(),
+            "removing a missing index is a no-op"
+        );
     }
 
     /// #1 (audit 2026-07, CRITICAL): a SECURE note's `.gitignore` line is its
@@ -9171,29 +10633,47 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
         store.os_trash = false;
-        let note = store.create("Inbox", "# Api key\n\nsk-ant-abcdefghijklmnop123").unwrap();
+        let note = store
+            .create("Inbox", "# Api key\n\nsk-ant-abcdefghijklmnop123")
+            .unwrap();
         store.set_secure(&note.id, true).unwrap();
         let old_rel = store.path_of(&note.id).unwrap();
         assert!(ignored_lines(&store.root).contains(&old_rel));
 
         // retitle → the file renames; the gitignore line must follow
-        store.write(&note.id, "# Rotated key\n\nsk-ant-abcdefghijklmnop123").unwrap();
+        store
+            .write(&note.id, "# Rotated key\n\nsk-ant-abcdefghijklmnop123")
+            .unwrap();
         let renamed_rel = store.path_of(&note.id).unwrap();
         assert_ne!(renamed_rel, old_rel, "the title change renames the file");
         let lines = ignored_lines(&store.root);
-        assert!(lines.contains(&renamed_rel), "new path must be ignored: {lines:?}");
-        assert!(!lines.contains(&old_rel), "old line must be gone: {lines:?}");
+        assert!(
+            lines.contains(&renamed_rel),
+            "new path must be ignored: {lines:?}"
+        );
+        assert!(
+            !lines.contains(&old_rel),
+            "old line must be gone: {lines:?}"
+        );
 
         // user move (Archive) → same discipline
         store.move_note(&note.id, "Archive").unwrap();
         let archived_rel = store.path_of(&note.id).unwrap();
         assert!(archived_rel.starts_with("Archive/"));
         let lines = ignored_lines(&store.root);
-        assert!(lines.contains(&archived_rel), "moved path must be ignored: {lines:?}");
-        assert!(!lines.contains(&renamed_rel), "pre-move line must be gone: {lines:?}");
+        assert!(
+            lines.contains(&archived_rel),
+            "moved path must be ignored: {lines:?}"
+        );
+        assert!(
+            !lines.contains(&renamed_rel),
+            "pre-move line must be gone: {lines:?}"
+        );
 
         // a NON-secure note's moves never touch the gitignore
-        let plain = store.create("Inbox", "# Plain note\n\nnothing secret").unwrap();
+        let plain = store
+            .create("Inbox", "# Plain note\n\nnothing secret")
+            .unwrap();
         store.move_note(&plain.id, "Archive").unwrap();
         let plain_rel = store.path_of(&plain.id).unwrap();
         assert!(!ignored_lines(&store.root).contains(&plain_rel));
@@ -9206,7 +10686,9 @@ mod tests {
         seed_memex(&brain);
         let mut mx = CorpusStore::open(brain).unwrap();
         mx.os_trash = false;
-        let staged = mx.create("wiki/_inbox", "# Private draft\n\nOwner-only notes").unwrap();
+        let staged = mx
+            .create("wiki/_inbox", "# Private draft\n\nOwner-only notes")
+            .unwrap();
         mx.set_secure(&staged.id, true).unwrap();
         let secure_rel = mx.path_of(&staged.id).unwrap();
         assert!(secure_rel.starts_with("wiki/_secure/"));
@@ -9230,7 +10712,9 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
         store.os_trash = false;
-        let note = store.create("Inbox", "# Api key\n\nsk-ant-abcdefghijklmnop123").unwrap();
+        let note = store
+            .create("Inbox", "# Api key\n\nsk-ant-abcdefghijklmnop123")
+            .unwrap();
         store.set_secure(&note.id, true).unwrap();
         let old_rel = store.path_of(&note.id).unwrap();
 
@@ -9247,7 +10731,9 @@ mod tests {
         assert!(store.read(&note.id).is_ok());
 
         // the title-rename branch of write() holds the same line
-        assert!(store.write(&note.id, "# Rotated key\n\nsk-ant-abcdefghijklmnop123").is_err());
+        assert!(store
+            .write(&note.id, "# Rotated key\n\nsk-ant-abcdefghijklmnop123")
+            .is_err());
         assert_eq!(store.path_of(&note.id).unwrap(), old_rel);
         assert!(store.root.join(&old_rel).is_file());
 
@@ -9277,7 +10763,11 @@ mod tests {
         .unwrap();
         // NOT candidates: a plain intake note, a flagged note WITHOUT a stable
         // id, and a note already living in the protected lane
-        fs::write(root.join("wiki/_inbox/plain.md"), "# Plain\n\nnothing secret\n").unwrap();
+        fs::write(
+            root.join("wiki/_inbox/plain.md"),
+            "# Plain\n\nnothing secret\n",
+        )
+        .unwrap();
         fs::write(
             root.join("wiki/_inbox/idless.md"),
             "---\nsecure: true\n---\n\n# Idless\n\nold hand-made state\n",
@@ -9285,15 +10775,27 @@ mod tests {
         .unwrap();
         let mut store = CorpusStore::open(root.clone()).unwrap();
         store.os_trash = false;
-        let homed = store.create("wiki/_inbox", "# Homed secret\n\nprivate").unwrap();
+        let homed = store
+            .create("wiki/_inbox", "# Homed secret\n\nprivate")
+            .unwrap();
         store.set_secure(&homed.id, true).unwrap();
-        assert!(store.path_of(&homed.id).unwrap().starts_with("wiki/_secure/"));
+        assert!(store
+            .path_of(&homed.id)
+            .unwrap()
+            .starts_with("wiki/_secure/"));
 
         let candidates = store.secure_repair_scan().unwrap();
-        assert_eq!(candidates.len(), 1, "only the flagged, id-bearing intake note: {candidates:?}");
+        assert_eq!(
+            candidates.len(),
+            1,
+            "only the flagged, id-bearing intake note: {candidates:?}"
+        );
         assert_eq!(candidates[0].id, "01JLEGACYSECUREULID000000");
         assert_eq!(candidates[0].folder, "wiki/_inbox");
-        assert_eq!(candidates[0].title, "Gateway ENV", "the preview shows the user the real title");
+        assert_eq!(
+            candidates[0].title, "Gateway ENV",
+            "the preview shows the user the real title"
+        );
 
         let report = store.secure_repair_apply().unwrap();
         assert_eq!(report.repaired, 1);
@@ -9303,12 +10805,20 @@ mod tests {
         let new_rel = store.path_of("01JLEGACYSECUREULID000000").unwrap();
         assert!(new_rel.starts_with("wiki/_secure/"), "{new_rel}");
         let moved = fs::read_to_string(store.abs(&new_rel)).unwrap();
-        assert!(moved.contains(legacy_body.trim_end()), "prose must survive unchanged:\n{moved}");
+        assert!(
+            moved.contains(legacy_body.trim_end()),
+            "prose must survive unchanged:\n{moved}"
+        );
         assert!(moved.contains("secure: true"));
         // the new path is ignored; the old intake path line is gone
         let ignored = fs::read_to_string(root.join(".gitignore")).unwrap();
         assert!(ignored.lines().any(|l| l.trim() == new_rel), "{ignored}");
-        assert!(!ignored.lines().any(|l| l.trim() == "wiki/_inbox/gateway-env.md"), "{ignored}");
+        assert!(
+            !ignored
+                .lines()
+                .any(|l| l.trim() == "wiki/_inbox/gateway-env.md"),
+            "{ignored}"
+        );
         // untouched bystanders
         assert!(root.join("wiki/_inbox/plain.md").is_file());
         assert!(root.join("wiki/_inbox/idless.md").is_file());
@@ -9324,12 +10834,18 @@ mod tests {
         let row = &rows[0];
         assert_eq!(row["status"], "applied");
         assert_eq!(row["noteUlid"], "01JLEGACYSECUREULID000000");
-        assert_eq!(row["noteId"], "01JLEGACYSECUREULID000000", "the rel embeds the slug — journal by ULID");
+        assert_eq!(
+            row["noteId"], "01JLEGACYSECUREULID000000",
+            "the rel embeds the slug — journal by ULID"
+        );
         assert_eq!(row["noteTitle"], "");
         assert_eq!(row["before"], "wiki/_inbox");
         assert_eq!(row["after"], "wiki/_secure");
         for leak in ["Gateway", "gateway-env", "TOKEN", "abc-legacy-value"] {
-            assert!(!journal.contains(leak), "journal must stay content-free ({leak}):\n{journal}");
+            assert!(
+                !journal.contains(leak),
+                "journal must stay content-free ({leak}):\n{journal}"
+            );
         }
 
         // idempotent: nothing left to repair, no second journal row
@@ -9355,20 +10871,34 @@ mod tests {
         .unwrap();
         let mut store = CorpusStore::open(root.clone()).unwrap();
         store.os_trash = false;
-        assert!(store.secure_repair_scan().unwrap().is_empty(), "the explicit flag is required");
+        assert!(
+            store.secure_repair_scan().unwrap().is_empty(),
+            "the explicit flag is required"
+        );
         // the per-note step holds the same line even when called directly
         let err = store.secure_repair_note("wiki/_inbox/hot.md").unwrap_err();
         assert!(err.contains("explicitly marked secure"), "{err}");
-        assert!(root.join("wiki/_inbox/hot.md").is_file(), "refusal moves nothing");
         assert!(
-            !fs::read_to_string(root.join("wiki/_inbox/hot.md")).unwrap().contains("secure: true"),
+            root.join("wiki/_inbox/hot.md").is_file(),
+            "refusal moves nothing"
+        );
+        assert!(
+            !fs::read_to_string(root.join("wiki/_inbox/hot.md"))
+                .unwrap()
+                .contains("secure: true"),
             "repair must never ADD the flag"
         );
         drop(store);
 
         let mut ro = CorpusStore::open_read_only(root).unwrap();
-        assert!(ro.secure_repair_scan().is_ok(), "the preview scan stays read-only");
-        assert!(ro.secure_repair_apply().is_err(), "read-only refuses the mutation");
+        assert!(
+            ro.secure_repair_scan().is_ok(),
+            "the preview scan stays read-only"
+        );
+        assert!(
+            ro.secure_repair_apply().is_err(),
+            "read-only refuses the mutation"
+        );
     }
 
     /// A symlink dropped into intake is never repair material — the scan skips
@@ -9381,7 +10911,11 @@ mod tests {
         seed_memex(&root);
         fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
         let outside = tmp.path().join("outside.md");
-        fs::write(&outside, "---\nid: 01JOUTSIDEULID00000000000\nsecure: true\n---\n\n# Outside\n").unwrap();
+        fs::write(
+            &outside,
+            "---\nid: 01JOUTSIDEULID00000000000\nsecure: true\n---\n\n# Outside\n",
+        )
+        .unwrap();
         std::os::unix::fs::symlink(&outside, root.join("wiki/_inbox/linked.md")).unwrap();
         let mut store = CorpusStore::open(root).unwrap();
         assert!(store.secure_repair_scan().unwrap().is_empty());
@@ -9414,7 +10948,10 @@ mod tests {
         assert_eq!(report.failed.len(), 1, "{:?}", report.failed);
         assert!(root.join(rel).is_file(), "nothing moved");
         assert!(!root.join("wiki/_secure").join("stuck.md").exists());
-        assert!(store.journal_read().unwrap().is_empty(), "a refused repair journals nothing");
+        assert!(
+            store.journal_read().unwrap().is_empty(),
+            "a refused repair journals nothing"
+        );
     }
 
     /// A RAW vault (vault-vs-brain, 2026-07-26) refuses the ENTIRE filer lane —
@@ -9434,12 +10971,25 @@ mod tests {
         store.set_ai_field(&note.id, "summary", "one line").unwrap();
         store.set_ai_field(&note.id, "area", "Projects").unwrap();
 
-        store.dot_write("settings", "{\"brainEnabled\":false}").unwrap();
-        let err = store.set_ai_field(&note.id, "summary", "two lines").unwrap_err();
+        store
+            .dot_write("settings", "{\"brainEnabled\":false}")
+            .unwrap();
+        let err = store
+            .set_ai_field(&note.id, "summary", "two lines")
+            .unwrap_err();
         assert!(err.contains("Librarian is off"), "{err}");
-        assert!(store.file_note(&note.id).unwrap_err().contains("Librarian is off"));
-        assert!(store.write_index("Projects", "# P\n").unwrap_err().contains("Librarian is off"));
-        assert!(store.filer_move(&note.id, "wiki/Projects").unwrap_err().contains("Librarian is off"));
+        assert!(store
+            .file_note(&note.id)
+            .unwrap_err()
+            .contains("Librarian is off"));
+        assert!(store
+            .write_index("Projects", "# P\n")
+            .unwrap_err()
+            .contains("Librarian is off"));
+        assert!(store
+            .filer_move(&note.id, "wiki/Projects")
+            .unwrap_err()
+            .contains("Librarian is off"));
 
         // the AGENT edit surface is a VAULT feature, not a Brain feature
         // (pressure-test 2026-07-26: the broad filer_writable gate broke it) —
@@ -9453,12 +11003,19 @@ mod tests {
         store.set_locked(&note.id, true).unwrap();
         store.set_locked(&note.id, false).unwrap();
         store.set_secure(&note.id, true).unwrap();
-        assert!(store.path_of(&note.id).unwrap().starts_with("wiki/_secure/"));
+        assert!(store
+            .path_of(&note.id)
+            .unwrap()
+            .starts_with("wiki/_secure/"));
         store.set_secure(&note.id, false).unwrap();
 
         // flipping back on restores the lane
-        store.dot_write("settings", "{\"brainEnabled\":true}").unwrap();
-        store.set_ai_field(&note.id, "summary", "three lines").unwrap();
+        store
+            .dot_write("settings", "{\"brainEnabled\":true}")
+            .unwrap();
+        store
+            .set_ai_field(&note.id, "summary", "three lines")
+            .unwrap();
     }
 
     /// The consent boundary fails CLOSED (pressure-test 2026-07-26): a genuine
@@ -9470,10 +11027,16 @@ mod tests {
         let root = tmp.path().join("brain");
         seed_memex(&root);
         let store = CorpusStore::open(root.clone()).unwrap();
-        assert!(store.brain_enabled(), "no settings file at all ⇒ ON (today's behavior)");
+        assert!(
+            store.brain_enabled(),
+            "no settings file at all ⇒ ON (today's behavior)"
+        );
         // a DIRECTORY at the settings path makes the read a genuine IO error
         fs::create_dir_all(root.join(".rotli/settings.json")).unwrap();
-        assert!(!store.brain_enabled(), "an unreadable consent boundary fails closed");
+        assert!(
+            !store.brain_enabled(),
+            "an unreadable consent boundary fails closed"
+        );
     }
 
     /// Onboarding's choices survive the corpus switch (pressure-test
@@ -9489,7 +11052,11 @@ mod tests {
         fs::create_dir_all(&fresh).unwrap();
         fs::create_dir_all(veteran.join(".rotli")).unwrap();
         fs::write(old.join(".rotli/settings.json"), "{\"brainEnabled\":false}").unwrap();
-        fs::write(veteran.join(".rotli/settings.json"), "{\"brainEnabled\":true}").unwrap();
+        fs::write(
+            veteran.join(".rotli/settings.json"),
+            "{\"brainEnabled\":true}",
+        )
+        .unwrap();
 
         carry_settings(&old, &fresh).unwrap();
         assert_eq!(
@@ -9524,7 +11091,9 @@ mod tests {
             )
             .unwrap();
         // a task in a sink is not a nag
-        let sunk = store.create("Inbox", "# Sunk\n\n- [ ] never nags\n").unwrap();
+        let sunk = store
+            .create("Inbox", "# Sunk\n\n- [ ] never nags\n")
+            .unwrap();
         store.move_note(&sunk.id, "Archive").unwrap();
 
         let tasks = store.tasks().unwrap();
@@ -9533,7 +11102,11 @@ mod tests {
         // ordered tasks project too (2026-08-03), checked/plain ordered lines don't
         assert_eq!(
             texts,
-            vec!["call the bank about the wire", "second style", "rotate the key"],
+            vec![
+                "call the bank about the wire",
+                "second style",
+                "rotate the key"
+            ],
             "{tasks:?}"
         );
         assert!(tasks.iter().all(|t| t.note_id == note.id));
@@ -9541,22 +11114,43 @@ mod tests {
 
         // checking off rewrites exactly the checkbox line, through the write
         // path — validated against the joined text tasks() reported
-        store.toggle_task(&note.id, tasks[0].line, "call the bank about the wire").unwrap();
+        store
+            .toggle_task(&note.id, tasks[0].line, "call the bank about the wire")
+            .unwrap();
         let body = store.read(&note.id).unwrap().body;
         assert!(body.contains("- [x] call the bank"), "{body}");
-        assert!(body.contains("* [ ] second style"), "other tasks untouched: {body}");
-        assert!(body.contains("- [ ] not a task — code"), "fenced text untouched: {body}");
-        assert_eq!(store.tasks().unwrap().len(), 2, "a checked task leaves the list");
+        assert!(
+            body.contains("* [ ] second style"),
+            "other tasks untouched: {body}"
+        );
+        assert!(
+            body.contains("- [ ] not a task — code"),
+            "fenced text untouched: {body}"
+        );
+        assert_eq!(
+            store.tasks().unwrap().len(),
+            2,
+            "a checked task leaves the list"
+        );
 
         // an ordered task toggles the same way — replacen hits the box, not the number
-        let ordered = store.tasks().unwrap().into_iter().find(|t| t.text == "rotate the key").unwrap();
-        store.toggle_task(&note.id, ordered.line, "rotate the key").unwrap();
+        let ordered = store
+            .tasks()
+            .unwrap()
+            .into_iter()
+            .find(|t| t.text == "rotate the key")
+            .unwrap();
+        store
+            .toggle_task(&note.id, ordered.line, "rotate the key")
+            .unwrap();
         let body = store.read(&note.id).unwrap().body;
         assert!(body.contains("1. [x] rotate the key"), "{body}");
         assert_eq!(store.tasks().unwrap().len(), 1);
 
         // stale refusal: the note changed since the list was built
-        let err = store.toggle_task(&note.id, tasks[0].line, "call the bank").unwrap_err();
+        let err = store
+            .toggle_task(&note.id, tasks[0].line, "call the bank")
+            .unwrap_err();
         assert!(err.contains("changed since"), "{err}");
         // and a wrong line index refuses the same way
         assert!(store.toggle_task(&note.id, 999, "second style").is_err());
@@ -9567,7 +11161,9 @@ mod tests {
         let mut ro = CorpusStore::open_read_only(root).unwrap();
         assert!(ro.tasks().is_ok());
         let remaining = ro.tasks().unwrap();
-        assert!(ro.toggle_task(&note.id, remaining[0].line, "second style").is_err());
+        assert!(ro
+            .toggle_task(&note.id, remaining[0].line, "second style")
+            .is_err());
     }
 
     /// `[/]` — in progress (2026-08-04, from ZenNotes). Started is not
@@ -9587,12 +11183,21 @@ mod tests {
 
         let tasks = store.tasks().unwrap();
         let texts: Vec<&str> = tasks.iter().map(|t| t.text.as_str()).collect();
-        assert_eq!(texts, vec!["drafting the memo", "second style", "ordered, underway"], "{tasks:?}");
+        assert_eq!(
+            texts,
+            vec!["drafting the memo", "second style", "ordered, underway"],
+            "{tasks:?}"
+        );
 
-        store.toggle_task(&note.id, tasks[0].line, "drafting the memo").unwrap();
+        store
+            .toggle_task(&note.id, tasks[0].line, "drafting the memo")
+            .unwrap();
         let body = store.read(&note.id).unwrap().body;
         assert!(body.contains("- [x] drafting the memo"), "{body}");
-        assert!(body.contains("* [/] second style"), "others untouched: {body}");
+        assert!(
+            body.contains("* [/] second style"),
+            "others untouched: {body}"
+        );
         assert_eq!(store.tasks().unwrap().len(), 2);
     }
 
@@ -9600,9 +11205,15 @@ mod tests {
     /// otherwise a task that TALKS about a checkbox gets the wrong one flipped.
     #[test]
     fn check_off_targets_the_box_and_never_the_words() {
-        assert_eq!(check_off("- [/] fix the [ ] case").unwrap(), "- [x] fix the [ ] case");
+        assert_eq!(
+            check_off("- [/] fix the [ ] case").unwrap(),
+            "- [x] fix the [ ] case"
+        );
         assert_eq!(check_off("  - [ ] nested").unwrap(), "  - [x] nested");
-        assert_eq!(check_off("12. [ ] step twelve").unwrap(), "12. [x] step twelve");
+        assert_eq!(
+            check_off("12. [ ] step twelve").unwrap(),
+            "12. [x] step twelve"
+        );
         assert_eq!(check_off("* [/] star").unwrap(), "* [x] star");
         // already done, or not a task at all
         assert!(check_off("- [x] done").is_none());
@@ -9627,7 +11238,12 @@ mod tests {
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].folder, "Inbox");
         let report = store.secure_repair_apply().unwrap();
-        assert_eq!((report.repaired, report.failed.len()), (1, 0), "{:?}", report.failed);
+        assert_eq!(
+            (report.repaired, report.failed.len()),
+            (1, 0),
+            "{:?}",
+            report.failed
+        );
         let new_rel = store.path_of("01JLEGACYLAYOUTULID000000").unwrap();
         assert!(new_rel.starts_with("Secure notes/"), "{new_rel}");
     }
@@ -9642,14 +11258,31 @@ mod tests {
         let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
         store.os_trash = false;
         // detectable secret, NO secure: flag (the panel was never opened)
-        let hot = store.create("Inbox", "# Stripe\n\ncard 4242424242424242").unwrap();
-        assert!(store.read_for_ai(&hot.id, false).is_err(), "unflagged secret must refuse remote");
-        assert!(store.read_for_ai(&hot.id, true).is_ok(), "on-device reads a secure note by default");
+        let hot = store
+            .create("Inbox", "# Stripe\n\ncard 4242424242424242")
+            .unwrap();
+        assert!(
+            store.read_for_ai(&hot.id, false).is_err(),
+            "unflagged secret must refuse remote"
+        );
+        assert!(
+            store.read_for_ai(&hot.id, true).is_ok(),
+            "on-device reads a secure note by default"
+        );
         store.set_local_ai_access(&hot.id, false).unwrap();
-        assert!(store.read_for_ai(&hot.id, true).is_err(), "an explicit per-note DENY closes it locally");
+        assert!(
+            store.read_for_ai(&hot.id, true).is_err(),
+            "an explicit per-note DENY closes it locally"
+        );
         store.set_local_ai_access(&hot.id, true).unwrap();
-        assert!(store.read_for_ai(&hot.id, true).is_ok(), "explicitly allowed local access passes");
-        assert!(store.read_for_ai(&hot.id, false).is_err(), "remote stays blocked in every knob state");
+        assert!(
+            store.read_for_ai(&hot.id, true).is_ok(),
+            "explicitly allowed local access passes"
+        );
+        assert!(
+            store.read_for_ai(&hot.id, false).is_err(),
+            "remote stays blocked in every knob state"
+        );
         // a clean note passes remote
         let clean = store.create("Inbox", "# Groceries\n\neggs, milk").unwrap();
         assert!(store.read_for_ai(&clean.id, false).is_ok());
@@ -9701,14 +11334,23 @@ mod tests {
         let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
         store.os_trash = false;
         let secret = store
-            .create_with_policy("Secure notes", "# Vault code\n\nthe kelpie passphrase", true)
+            .create_with_policy(
+                "Secure notes",
+                "# Vault code\n\nthe kelpie passphrase",
+                true,
+            )
             .unwrap();
-        let open = store.create("Inbox", "# Kelpie\n\nan ordinary kelpie note").unwrap();
+        let open = store
+            .create("Inbox", "# Kelpie\n\nan ordinary kelpie note")
+            .unwrap();
 
         // READ, named directly — the only answer a remote model ever gets
         let refusal = store.read_for_ai(&secret.id, false).unwrap_err();
         assert!(refusal.contains("secure"), "{refusal}");
-        assert!(!refusal.contains("passphrase"), "a refusal must never quote the body");
+        assert!(
+            !refusal.contains("passphrase"),
+            "a refusal must never quote the body"
+        );
         // the same id IS readable on-device — proving the refusal is about the
         // model class, not a missing file
         assert!(store.read_for_ai(&secret.id, true).is_ok());
@@ -9717,7 +11359,10 @@ mod tests {
         // the per-hit read gate is what removes it for a remote model. That is
         // exactly what `corpus_readable_ids` does with `read_for_ai`.
         let hits = store.search("kelpie", 50, true).unwrap();
-        assert!(hits.iter().any(|h| h.id == secret.id), "test setup: both notes match");
+        assert!(
+            hits.iter().any(|h| h.id == secret.id),
+            "test setup: both notes match"
+        );
         let remote_visible: Vec<String> = hits
             .iter()
             .filter(|h| store.read_for_ai(&h.id, false).is_ok())
@@ -9739,12 +11384,16 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
         store.os_trash = false;
-        let note = store.create_with_policy("Secure notes", "# Private\n\nbody", true).unwrap();
+        let note = store
+            .create_with_policy("Secure notes", "# Private\n\nbody", true)
+            .unwrap();
 
         // default: no settings file at all ⇒ on-device may read
         assert!(store.read_for_ai(&note.id, true).is_ok());
         // vault knob OFF ⇒ closed locally, still closed remotely
-        store.dot_write("settings", "{\"secureLocalAi\":false}").unwrap();
+        store
+            .dot_write("settings", "{\"secureLocalAi\":false}")
+            .unwrap();
         assert!(store.read_for_ai(&note.id, true).is_err());
         assert!(store.read_for_ai(&note.id, false).is_err());
         // an explicit per-note ALLOW overrides the vault's no
@@ -9752,17 +11401,24 @@ mod tests {
         assert!(store.read_for_ai(&note.id, true).is_ok());
         assert!(store.read_for_ai(&note.id, false).is_err());
         // and an explicit per-note DENY overrides the vault's yes
-        store.dot_write("settings", "{\"secureLocalAi\":true}").unwrap();
+        store
+            .dot_write("settings", "{\"secureLocalAi\":true}")
+            .unwrap();
         store.set_local_ai_access(&note.id, false).unwrap();
         assert!(store.read_for_ai(&note.id, true).is_err());
         assert!(store.read_for_ai(&note.id, false).is_err());
         // the decision is written EXPLICITLY, both ways, so it is legible on disk
         let rel = store.path_of(&note.id).unwrap();
         let text = fs::read_to_string(store.abs(&rel)).unwrap();
-        assert!(text.lines().any(|l| l.trim() == "local_ai_allowed: false"), "{text}");
+        assert!(
+            text.lines().any(|l| l.trim() == "local_ai_allowed: false"),
+            "{text}"
+        );
         // a NON-secure note has nothing to say here, and the vault knob never
         // narrows an ordinary note (every class reads those by definition)
-        store.dot_write("settings", "{\"secureLocalAi\":false}").unwrap();
+        store
+            .dot_write("settings", "{\"secureLocalAi\":false}")
+            .unwrap();
         let open = store.create("Inbox", "# Open\n\nbody").unwrap();
         assert!(store.set_local_ai_access(&open.id, false).is_err());
         assert!(store.read_frontmatter(&open.id).unwrap().local_ai_allowed);
@@ -9786,16 +11442,22 @@ mod tests {
         assert!(store.read_for_ai(&note.id, false).is_ok());
         // EDIT: neither class
         for local in [true, false] {
-            let err = store.write_for_ai(&note.id, "# Plan\n\nrewritten", local).unwrap_err();
+            let err = store
+                .write_for_ai(&note.id, "# Plan\n\nrewritten", local)
+                .unwrap_err();
             assert!(err.contains("locked"), "{err}");
         }
         let rel = store.path_of(&note.id).unwrap();
-        assert!(fs::read_to_string(store.abs(&rel)).unwrap().contains("original body"));
+        assert!(fs::read_to_string(store.abs(&rel))
+            .unwrap()
+            .contains("original body"));
         // the human's own save still works
         assert!(store.write(&note.id, "# Plan\n\nmy own edit").is_ok());
         // unlocked, an AI write lands
         store.set_locked(&note.id, false).unwrap();
-        assert!(store.write_for_ai(&note.id, "# Plan\n\nAI edit", true).is_ok());
+        assert!(store
+            .write_for_ai(&note.id, "# Plan\n\nAI edit", true)
+            .is_ok());
     }
 
     /// AUDIT 2026-08-01, GAP 2 — the compromised-loop shape. The agent loop can
@@ -9825,8 +11487,14 @@ mod tests {
         // the exact bytes a compromised loop would obtain from the UNGATED
         // editor read: no frontmatter, so no marker for the old detector
         let stripped = store.read(&note.id).unwrap().body;
-        assert!(!stripped.contains("secure:"), "the editor lane strips frontmatter: {stripped}");
-        assert!(!crate::secret::looks_secure(&stripped), "and the prose is not secret-SHAPED");
+        assert!(
+            !stripped.contains("secure:"),
+            "the editor lane strips frontmatter: {stripped}"
+        );
+        assert!(
+            !crate::secret::looks_secure(&stripped),
+            "and the prose is not secret-SHAPED"
+        );
         assert!(
             !crate::secret::protected_for_remote(&stripped),
             "which is exactly why the marker backstop alone was not enough"
@@ -9842,7 +11510,9 @@ mod tests {
         ));
 
         // an ORDINARY note in the same vault is untouched by any of this
-        let open = store.create("Inbox", "# Errands\n\nCollect the boots from the cobbler.").unwrap();
+        let open = store
+            .create("Inbox", "# Errands\n\nCollect the boots from the cobbler.")
+            .unwrap();
         store.list().unwrap();
         let open_body = store.read(&open.id).unwrap().body;
         assert!(!crate::secret::blocked_for_remote(&open_body));
@@ -9858,7 +11528,9 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
         store.os_trash = false;
-        let chat = store.create("Inbox", "# Chat\n\nordinary looking words").unwrap();
+        let chat = store
+            .create("Inbox", "# Chat\n\nordinary looking words")
+            .unwrap();
         let rel = store.path_of(&chat.id).unwrap();
         let text = fs::read_to_string(store.abs(&rel)).unwrap();
         let (fm, body) = parse_document(&text);
@@ -9866,8 +11538,14 @@ mod tests {
         fm.foreign.push("secureContext: true".to_string());
         atomic_write(&store.abs(&rel), &compose_document(&fm, body)).unwrap();
 
-        assert!(store.read_for_ai(&chat.id, false).is_err(), "remote must be refused");
-        assert!(store.read_for_ai(&chat.id, true).is_ok(), "on-device still reads it");
+        assert!(
+            store.read_for_ai(&chat.id, false).is_err(),
+            "remote must be refused"
+        );
+        assert!(
+            store.read_for_ai(&chat.id, true).is_ok(),
+            "on-device still reads it"
+        );
     }
 
     /// AUDIT 2026-08-01, GAP 9 — the laundering rule, in Rust. The TS host has
@@ -9886,7 +11564,9 @@ mod tests {
                 true,
             )
             .unwrap();
-        let open = store.create("Inbox", "# Open\n\nnothing sensitive here").unwrap();
+        let open = store
+            .create("Inbox", "# Open\n\nnothing sensitive here")
+            .unwrap();
         store.list().unwrap(); // the walk teaches the ledger
 
         let laundered = "# Open\n\nThe wardship stipend renews each Candlemas quarter.";
@@ -9895,7 +11575,9 @@ mod tests {
         assert!(err.contains("secure"), "{err}");
         let rel = store.path_of(&open.id).unwrap();
         assert!(
-            fs::read_to_string(store.abs(&rel)).unwrap().contains("nothing sensitive"),
+            fs::read_to_string(store.abs(&rel))
+                .unwrap()
+                .contains("nothing sensitive"),
             "the open note must be untouched"
         );
 
@@ -9903,7 +11585,9 @@ mod tests {
         // a blanket refusal
         assert!(store.write_for_ai(&secret.id, laundered, true).is_ok());
         // and an ordinary edit to the open note still lands
-        assert!(store.write_for_ai(&open.id, "# Open\n\nbuy more oats", true).is_ok());
+        assert!(store
+            .write_for_ai(&open.id, "# Open\n\nbuy more oats", true)
+            .is_ok());
     }
 
     /// AUDIT 2026-08-01, GAP 7 — a view tag REWRITES frontmatter, so it is an AI
@@ -9915,18 +11599,28 @@ mod tests {
         let root = tmp.path().join("memex");
         fs::create_dir_all(root.join("wiki")).unwrap();
         fs::create_dir_all(root.join("identity")).unwrap();
-        fs::write(root.join("memex.json"), "{\"id\":\"mx_test\",\"contract\":\"3.7\"}").unwrap();
+        fs::write(
+            root.join("memex.json"),
+            "{\"id\":\"mx_test\",\"contract\":\"3.7\"}",
+        )
+        .unwrap();
         fs::write(root.join("wiki/open.md"), "# Open\n").unwrap();
         fs::write(root.join("identity/00-identity.md"), "# Me\n").unwrap();
         fs::write(root.join("STRUCTURE.md"), "# Layout\n").unwrap();
         let store = CorpusStore::open(root).unwrap();
-        assert_eq!(store.layout, Layout::Memex, "test setup: this must open as a memex");
+        assert_eq!(
+            store.layout,
+            Layout::Memex,
+            "test setup: this must open as a memex"
+        );
 
         // curated wiki notes DO take a view tag (view inheritance is a feature)
         assert!(store.agent_frontmatter_writable("wiki/open.md").is_ok());
-        // the brain's memory lanes are written by no lane, ever
-        let err = store.agent_frontmatter_writable("identity/00-identity.md").unwrap_err();
-        assert!(err.contains("memory"), "{err}");
+        // the protected reference lanes are written by no agent lane, ever
+        let err = store
+            .agent_frontmatter_writable("identity/00-identity.md")
+            .unwrap_err();
+        assert!(err.contains("protected reference layer"), "{err}");
         // and vault plumbing is not even acknowledged
         assert!(store.agent_frontmatter_writable("STRUCTURE.md").is_err());
     }
@@ -9993,9 +11687,15 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
         store.os_trash = false;
-        let note = store.create_with_policy("Secure notes", "# Private\n\nbody", true).unwrap();
-        assert!(store.write_for_ai(&note.id, "# Private\n\nremote edit", false).is_err());
-        assert!(store.write_for_ai(&note.id, "# Private\n\nlocal edit", true).is_ok());
+        let note = store
+            .create_with_policy("Secure notes", "# Private\n\nbody", true)
+            .unwrap();
+        assert!(store
+            .write_for_ai(&note.id, "# Private\n\nremote edit", false)
+            .is_err());
+        assert!(store
+            .write_for_ai(&note.id, "# Private\n\nlocal edit", true)
+            .is_ok());
     }
 
     /// #22 (audit 2026-07): set_field is the USER lane — it must refuse the AI
@@ -10010,13 +11710,18 @@ mod tests {
         let mut store = CorpusStore::open(brain).unwrap();
         store.os_trash = false;
 
-        let staged = store.create("wiki/_inbox", "# A staged note\n\nbody").unwrap();
+        let staged = store
+            .create("wiki/_inbox", "# A staged note\n\nbody")
+            .unwrap();
         let rel = store.path_of(&staged.id).unwrap();
         // a user key on a user-writable note: fine
         assert!(store.set_field(&rel, "shelf", "[Inbox]").is_ok());
         // every AI key is refused in the user lane — even where writable() passes
         for key in AI_KEYS {
-            assert!(store.set_field(&rel, key, "x").is_err(), "AI key `{key}` must refuse");
+            assert!(
+                store.set_field(&rel, key, "x").is_err(),
+                "AI key `{key}` must refuse"
+            );
         }
         // reserved keys stay refused (existing behavior)
         assert!(store.set_field(&rel, "locked", "true").is_err());
@@ -10034,12 +11739,21 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let ahead = tmp.path().join("ahead");
         seed_memex(&ahead);
-        fs::write(ahead.join("memex.json"), "{\"id\":\"mx_future\",\"contract\":\"9.9\",\"apps\":{}}")
-            .unwrap();
+        fs::write(
+            ahead.join("memex.json"),
+            "{\"id\":\"mx_future\",\"contract\":\"9.9\",\"apps\":{}}",
+        )
+        .unwrap();
         let mut store = CorpusStore::open(ahead).unwrap();
         store.os_trash = false;
-        assert!(store.writable("chats/x.md").is_err(), "user lane closed out of band");
-        assert!(store.filer_writable("wiki/_inbox").is_err(), "filer lane closed out of band");
+        assert!(
+            store.writable("chats/x.md").is_err(),
+            "user lane closed out of band"
+        );
+        assert!(
+            store.filer_writable("wiki/_inbox").is_err(),
+            "filer lane closed out of band"
+        );
         assert!(store.create("chats", "# chat").is_err());
 
         // in-band brain: open, then user-set read-only perms close both lanes live
@@ -10050,10 +11764,19 @@ mod tests {
         assert!(store.writable("chats/x.md").is_ok());
         assert!(store.filer_writable("wiki/_inbox").is_ok());
         store.set_perms_read_only(true);
-        assert!(store.writable("chats/x.md").is_err(), "read-only perms close the user lane");
-        assert!(store.filer_writable("wiki/_inbox").is_err(), "…and the filer lane");
+        assert!(
+            store.writable("chats/x.md").is_err(),
+            "read-only perms close the user lane"
+        );
+        assert!(
+            store.filer_writable("wiki/_inbox").is_err(),
+            "…and the filer lane"
+        );
         store.set_perms_read_only(false);
-        assert!(store.writable("chats/x.md").is_ok(), "perms can re-open an in-band brain");
+        assert!(
+            store.writable("chats/x.md").is_ok(),
+            "perms can re-open an in-band brain"
+        );
     }
 
     /// #44 (audit 2026-07): the webview's settings-write whitelist is NARROWER
@@ -10063,15 +11786,76 @@ mod tests {
     fn settings_write_whitelist_protects_daemon_and_main_files() {
         assert!(user_dot_writable("settings").is_ok());
         assert!(user_dot_writable("viewstate").is_ok());
-        assert!(user_dot_writable("background").is_err(), "legacy wallpaper is read-only");
-        assert!(user_dot_writable("organizer").is_err(), "daemon-owned state");
-        assert!(user_dot_writable("main").is_err(), "main goes through corpus_main_write");
-        assert!(user_dot_writable("views").is_err(), "views go through corpus_views_write");
+        assert!(
+            user_dot_writable("background").is_err(),
+            "legacy wallpaper is read-only"
+        );
+        assert!(
+            user_dot_writable("organizer").is_err(),
+            "daemon-owned state"
+        );
+        assert!(
+            user_dot_writable("main").is_err(),
+            "main goes through corpus_main_write"
+        );
+        assert!(
+            user_dot_writable("views").is_err(),
+            "views go through corpus_views_write"
+        );
         assert!(user_dot_writable("junk").is_err());
         // the READ table still serves all five
         for f in ["settings", "viewstate", "background", "main", "organizer"] {
             assert!(dot_file(f).is_ok());
         }
+    }
+
+    #[test]
+    fn stale_main_and_view_manifests_never_replace_newer_vault_structure() {
+        let (_dir, mut store) = fresh();
+
+        let opened_main = store.main_read_versioned().unwrap();
+        let first_main = r#"{"version":1,"tree":[{"note":"first"}]}"#;
+        store
+            .main_write_if_revision(first_main, &opened_main.revision)
+            .unwrap();
+        let stale_main = r#"{"version":1,"tree":[{"note":"stale"}]}"#;
+        let error = store
+            .main_write_if_revision(stale_main, &opened_main.revision)
+            .unwrap_err();
+        assert!(error.contains("revision conflict"), "{error}");
+        assert_eq!(store.main_read().unwrap(), first_main);
+
+        let opened_views = store.views_read_versioned().unwrap();
+        let first_views = r#"{"version":1,"views":[{"name":"Work","tree":[]}]}"#;
+        store
+            .views_write_if_revision(first_views, &opened_views.revision)
+            .unwrap();
+        let stale_views = r#"{"version":1,"views":[{"name":"Personal","tree":[]}]}"#;
+        let error = store
+            .views_write_if_revision(stale_views, &opened_views.revision)
+            .unwrap_err();
+        assert!(error.contains("revision conflict"), "{error}");
+        assert_eq!(store.views_read().unwrap(), first_views);
+    }
+
+    #[test]
+    fn failed_view_rollback_never_replaces_a_newer_note_edit() {
+        let (_dir, mut store) = fresh();
+        let note = store.create("Inbox", "# Original\n\nBody").unwrap();
+        let rel = store.path_of(&note.id).unwrap();
+        let path = store.abs(&rel);
+        let prior = fs::read_to_string(&path).unwrap();
+        let applied = with_view_tag(&prior, Some("Work"));
+        fs::write(&path, &applied).unwrap();
+
+        let newer = applied.replace("Body", "Newer edit");
+        fs::write(&path, &newer).unwrap();
+        store.rollback_view_note_writes(&[(path.clone(), prior.clone(), applied.clone())]);
+        assert_eq!(fs::read_to_string(&path).unwrap(), newer);
+
+        fs::write(&path, &applied).unwrap();
+        store.rollback_view_note_writes(&[(path.clone(), prior.clone(), applied)]);
+        assert_eq!(fs::read_to_string(&path).unwrap(), prior);
     }
 
     #[test]
@@ -10115,7 +11899,11 @@ mod tests {
             .map(|e| e.file_name().to_string_lossy().into_owned())
             .filter(|n| n.ends_with(".md"))
             .collect();
-        assert_eq!(files, vec!["pricing.md"], "expected one clean slug file, got {files:?}");
+        assert_eq!(
+            files,
+            vec!["pricing.md"],
+            "expected one clean slug file, got {files:?}"
+        );
         let on_disk = fs::read_to_string(inbox.join("pricing.md")).unwrap();
         let _ = rel; // the original path is gone after the title-tracking rename
         assert!(on_disk.contains("aliases: [\"pricing-aa11bb\"]"));
@@ -10125,10 +11913,19 @@ mod tests {
         assert!(on_disk.contains("reach: [seth]"), "reach lost:\n{on_disk}");
         assert!(on_disk.contains("summary:"), "summary lost:\n{on_disk}");
         // created preserved as the original DATE; updated bumped to a DATE (not RFC3339)
-        assert!(on_disk.contains("created: 2026-06-20"), "created changed:\n{on_disk}");
-        assert!(!on_disk.contains("updated: 2026-06-20"), "updated not bumped:\n{on_disk}");
+        assert!(
+            on_disk.contains("created: 2026-06-20"),
+            "created changed:\n{on_disk}"
+        );
+        assert!(
+            !on_disk.contains("updated: 2026-06-20"),
+            "updated not bumped:\n{on_disk}"
+        );
         let updated_line = on_disk.lines().find(|l| l.starts_with("updated:")).unwrap();
-        assert!(!updated_line.contains('T'), "updated should be a date, not RFC3339: {updated_line}");
+        assert!(
+            !updated_line.contains('T'),
+            "updated should be a date, not RFC3339: {updated_line}"
+        );
         // the body changed
         assert!(on_disk.contains("edited body"));
         assert!(!on_disk.contains("original body"));
@@ -10136,9 +11933,15 @@ mod tests {
 
     #[test]
     fn shelf_of_parses_the_v35_field() {
-        let fm = |line: &str| Frontmatter { foreign: vec![line.to_string()], ..Default::default() };
+        let fm = |line: &str| Frontmatter {
+            foreign: vec![line.to_string()],
+            ..Default::default()
+        };
         assert_eq!(shelf_of(&fm("shelf: [Inbox]")), vec!["Inbox"]);
-        assert_eq!(shelf_of(&fm("shelf: [Myela/Payments, Work]")), vec!["Myela/Payments", "Work"]);
+        assert_eq!(
+            shelf_of(&fm("shelf: [Myela/Payments, Work]")),
+            vec!["Myela/Payments", "Work"]
+        );
         assert_eq!(shelf_of(&fm("shelf: Inbox")), vec!["Inbox"]); // bare (no brackets)
         assert_eq!(shelf_of(&fm("shelf: []")), Vec::<String>::new());
         assert_eq!(shelf_of(&Frontmatter::default()), Vec::<String>::new()); // absent
@@ -10149,7 +11952,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let root = dir.path().join("brain");
         seed_memex(&root); // also writes a shelf-less wiki/note.md
-        // a rotli staging note (v3.5): lives in wiki/_inbox, shelf = Inbox
+                           // a rotli staging note (v3.5): lives in wiki/_inbox, shelf = Inbox
         fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
         fs::write(
             root.join("wiki/_inbox/pricing-aa11bb.md"),
@@ -10178,7 +11981,11 @@ mod tests {
         let list = store.list().unwrap();
 
         let folder_of_note = |id: &str| {
-            list.notes.iter().find(|n| n.title == id).map(|n| n.folder_id.clone()).unwrap()
+            list.notes
+                .iter()
+                .find(|n| n.title == id)
+                .map(|n| n.folder_id.clone())
+                .unwrap()
         };
         // staging notes are PROJECTED onto their shelf, not wiki/_inbox. The default
         // "Inbox" shelf routes to the Captures surface ("Board"); a real shelf stays.
@@ -10188,7 +11995,11 @@ mod tests {
         // the shelf-less curated note falls back to its disk folder
         assert_eq!(folder_of_note("A wiki note"), "wiki");
 
-        let filed = list.notes.iter().find(|n| n.title == "Cross-project tasks").unwrap();
+        let filed = list
+            .notes
+            .iter()
+            .find(|n| n.title == "Cross-project tasks")
+            .unwrap();
         assert_eq!(filed.disk_folder_id, "wiki/projects");
         let staged = list.notes.iter().find(|n| n.title == "Pricing").unwrap();
         assert_eq!(staged.disk_folder_id, "wiki/_inbox");
@@ -10202,7 +12013,14 @@ mod tests {
         assert!(has("Board"));
         assert!(has("Myela"), "the nested shelf's ancestor must exist");
         assert!(has("Myela/Payments"));
-        let parent_of = |id: &str| list.folders.iter().find(|f| f.id == id).unwrap().parent_id.clone();
+        let parent_of = |id: &str| {
+            list.folders
+                .iter()
+                .find(|f| f.id == id)
+                .unwrap()
+                .parent_id
+                .clone()
+        };
         assert_eq!(parent_of("Myela/Payments"), Some("Myela".to_string()));
         assert_eq!(parent_of("Myela"), None);
         // the wiki/_inbox staging dir is NOT surfaced as a browsable folder
@@ -10226,7 +12044,10 @@ mod tests {
         assert_eq!(surfaced(m, "history/2026/x.md"), Surface::Reference);
         assert_eq!(surfaced(m, "identity"), Surface::Reference);
         assert_eq!(surfaced(m, "identity/00-identity.md"), Surface::Reference);
-        assert_eq!(surfaced(m, "personality/04-principles.md"), Surface::Reference);
+        assert_eq!(
+            surfaced(m, "personality/04-principles.md"),
+            Surface::Reference
+        );
         // a SIBLING whose name merely starts with a lane name is not the lane
         assert_eq!(surfaced(m, "identity-drafts/x.md"), Surface::Hidden);
         assert_eq!(surfaced(m, "MAP.md.bak"), Surface::Hidden);
@@ -10244,7 +12065,10 @@ mod tests {
         assert_eq!(surfaced(m, "wiki/engineering/filed.md"), Surface::NoteRW);
         assert_eq!(surfaced(m, "wiki"), Surface::NoteRW);
         // LegacyRotli surfaces everything read-write (today)
-        assert_eq!(surfaced(Layout::LegacyRotli, "STRUCTURE.md"), Surface::NoteRW);
+        assert_eq!(
+            surfaced(Layout::LegacyRotli, "STRUCTURE.md"),
+            Surface::NoteRW
+        );
         assert_eq!(surfaced(Layout::LegacyRotli, "self/x.md"), Surface::NoteRW);
     }
 
@@ -10258,13 +12082,27 @@ mod tests {
         seed_memex(&root);
         fs::create_dir_all(root.join("identity")).unwrap();
         fs::create_dir_all(root.join("personality")).unwrap();
-        fs::write(root.join("identity/00-identity.md"), "# Identity\n\nSeth is a quokkanaut.\n")
-            .unwrap();
-        fs::write(root.join("personality/04-principles.md"), "# Principles\n\nquokkanaut rules\n")
-            .unwrap();
-        fs::write(root.join("history/2026/day.md"), "# A day\n\nquokkanaut log\n").ok();
+        fs::write(
+            root.join("identity/00-identity.md"),
+            "# Identity\n\nSeth is a quokkanaut.\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("personality/04-principles.md"),
+            "# Principles\n\nquokkanaut rules\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("history/2026/day.md"),
+            "# A day\n\nquokkanaut log\n",
+        )
+        .ok();
         fs::create_dir_all(root.join("history/2026")).unwrap();
-        fs::write(root.join("history/2026/day.md"), "# A day\n\nquokkanaut log\n").unwrap();
+        fs::write(
+            root.join("history/2026/day.md"),
+            "# A day\n\nquokkanaut log\n",
+        )
+        .unwrap();
 
         let mut store = CorpusStore::open(root).unwrap();
         store.os_trash = false;
@@ -10274,17 +12112,33 @@ mod tests {
         assert!(!list.notes.iter().any(|n| n.id.starts_with("identity/")));
         assert!(!list.notes.iter().any(|n| n.title == "Identity"));
         for hidden in ["identity", "personality", "history", "history/2026"] {
-            assert!(!list.folders.iter().any(|f| f.id == hidden), "{hidden} became a folder row");
+            assert!(
+                !list.folders.iter().any(|f| f.id == hidden),
+                "{hidden} became a folder row"
+            );
         }
-        assert!(list.notes.iter().any(|n| n.title == "A wiki note"), "the wiki note still lists");
+        assert!(
+            list.notes.iter().any(|n| n.title == "A wiki note"),
+            "the wiki note still lists"
+        );
 
         // retrievable through the AI's own lane
         let reference = store.reference_notes().unwrap();
-        for rel in ["identity/00-identity.md", "personality/04-principles.md", "MAP.md", "inbox.md"]
-        {
-            assert!(reference.iter().any(|n| n.id == rel), "{rel} missing from the reference lane");
+        for rel in [
+            "identity/00-identity.md",
+            "personality/04-principles.md",
+            "MAP.md",
+            "inbox.md",
+        ] {
+            assert!(
+                reference.iter().any(|n| n.id == rel),
+                "{rel} missing from the reference lane"
+            );
         }
-        assert!(!reference.iter().any(|n| n.id == "STRUCTURE.md"), "control docs stay hidden");
+        assert!(
+            !reference.iter().any(|n| n.id == "STRUCTURE.md"),
+            "control docs stay hidden"
+        );
         assert!(!reference.iter().any(|n| n.id == "memex.json"));
 
         // search: OUT by default, IN when the AI asks — and READABLE by BOTH classes
@@ -10294,13 +12148,26 @@ mod tests {
         assert!(hits.iter().any(|h| h.id == "personality/04-principles.md"));
         assert!(hits.iter().any(|h| h.id == "history/2026/day.md"));
         for hit in &hits {
-            assert!(store.read_for_ai(&hit.id, true).is_ok(), "on-device must read {}", hit.id);
-            assert!(store.read_for_ai(&hit.id, false).is_ok(), "frontier must read {}", hit.id);
+            assert!(
+                store.read_for_ai(&hit.id, true).is_ok(),
+                "on-device must read {}",
+                hit.id
+            );
+            assert!(
+                store.read_for_ai(&hit.id, false).is_ok(),
+                "frontier must read {}",
+                hit.id
+            );
         }
-        assert!(store.read_for_ai("identity/00-identity.md", false).unwrap().contains("quokkanaut"));
+        assert!(store
+            .read_for_ai("identity/00-identity.md", false)
+            .unwrap()
+            .contains("quokkanaut"));
 
         // still unwritable by every lane, and control files stay unreadable
-        assert!(store.write_for_ai("identity/00-identity.md", "# Pwned\n", true).is_err());
+        assert!(store
+            .write_for_ai("identity/00-identity.md", "# Pwned\n", true)
+            .is_err());
         assert!(store.write("identity/00-identity.md", "# Pwned\n").is_err());
         assert!(store.read_for_ai("STRUCTURE.md", true).is_err());
         assert!(store.read_for_ai("memex.json", false).is_err());
@@ -10348,7 +12215,9 @@ mod tests {
         let mut store = CorpusStore::open(root.clone()).unwrap();
         store.os_trash = false;
 
-        let board = store.create_named_board("storage/excalidraw", "untitled", None).unwrap();
+        let board = store
+            .create_named_board("storage/excalidraw", "untitled", None)
+            .unwrap();
         let scene = fs::read_to_string(root.join(&board.id)).unwrap();
         assert!(board.id.ends_with(".excalidraw"));
 
@@ -10359,7 +12228,11 @@ mod tests {
         // bytes are IDENTICAL — no frontmatter composed into the JSON
         assert_eq!(fs::read_to_string(root.join(&trashed.id)).unwrap(), scene);
         // …and the filename survived (relocate would have slugified the JSON)
-        assert!(trashed.id.ends_with("untitled.excalidraw"), "{}", trashed.id);
+        assert!(
+            trashed.id.ends_with("untitled.excalidraw"),
+            "{}",
+            trashed.id
+        );
 
         // the round trip: it goes back where it came from
         let restored = store.restore_file(&trashed.id).unwrap();
@@ -10389,13 +12262,20 @@ mod tests {
         assert_eq!(staged.folder_id, "storage/excalidraw");
         // …and a board in that lane is EDITABLE (the jorge case: saves succeed).
         assert!(store.write_board(&staged.id, EMPTY_EXCALIDRAW).is_ok());
-        assert!(store.writable("storage/other.png").is_err(), "rest of storage stays read-only");
+        assert!(
+            store.writable("storage/other.png").is_err(),
+            "rest of storage stays read-only"
+        );
         assert!(store.write_board("self/x.excalidraw", "{}").is_err());
         // …and a board created directly on chats/ (rotli's owned surface) stays there
         let meta = store.create_named_board("chats", "untitled", None).unwrap();
         assert_eq!(meta.kind, NoteKind::Board);
         assert_eq!(meta.folder_id, "chats");
-        assert!(store.read_board(&meta.id).unwrap().body.contains("excalidraw"));
+        assert!(store
+            .read_board(&meta.id)
+            .unwrap()
+            .body
+            .contains("excalidraw"));
 
         // read is gated too: a board that physically sits under a hidden root
         // (self/) must NOT be readable, even though its path is well-formed.
@@ -10431,17 +12311,40 @@ mod tests {
         // The tree shows content lanes plus title-cased lifecycle destinations,
         // never self/history/control material.
         let folder_ids: Vec<&str> = list.folders.iter().map(|f| f.id.as_str()).collect();
-        assert!(folder_ids.contains(&"wiki"), "wiki/ should surface as a folder");
-        assert!(folder_ids.contains(&"chats"), "chats/ should surface as a folder");
-        assert!(!folder_ids.iter().any(|f| f.starts_with("self")), "self/ must stay hidden");
-        assert!(!folder_ids.iter().any(|f| f.starts_with("history")), "history/ must stay hidden");
-        assert!(folder_ids.contains(&"Archive"), "archive/ should project to Archive");
-        assert!(folder_ids.contains(&"Trash"), "trash/ should project to Trash");
-        assert!(!folder_ids.iter().any(|f| f.starts_with("archive")), "lowercase disk id leaked");
+        assert!(
+            folder_ids.contains(&"wiki"),
+            "wiki/ should surface as a folder"
+        );
+        assert!(
+            folder_ids.contains(&"chats"),
+            "chats/ should surface as a folder"
+        );
+        assert!(
+            !folder_ids.iter().any(|f| f.starts_with("self")),
+            "self/ must stay hidden"
+        );
+        assert!(
+            !folder_ids.iter().any(|f| f.starts_with("history")),
+            "history/ must stay hidden"
+        );
+        assert!(
+            folder_ids.contains(&"Archive"),
+            "archive/ should project to Archive"
+        );
+        assert!(
+            folder_ids.contains(&"Trash"),
+            "trash/ should project to Trash"
+        );
+        assert!(
+            !folder_ids.iter().any(|f| f.starts_with("archive")),
+            "lowercase disk id leaked"
+        );
         // STRUCTURE.md / inbox.md / MAP.md (root .md docs) never appear as notes
         let folders_of: Vec<&str> = list.notes.iter().map(|n| n.folder_id.as_str()).collect();
         assert!(
-            list.notes.iter().all(|n| n.title != "Structure" && n.title != "MAP" && n.title != "Inbox"),
+            list.notes
+                .iter()
+                .all(|n| n.title != "Structure" && n.title != "MAP" && n.title != "Inbox"),
             "a root memex-vault doc surfaced as an editable note"
         );
         // every surfaced note lives under wiki/ or chats/, nothing else
@@ -10479,14 +12382,23 @@ mod tests {
     fn split_and_compose_round_trip_the_id_scheme() {
         // bare ids → the default root, unchanged (the byte-identical gate)
         assert_eq!(split_root_id("Inbox"), ("default".into(), "Inbox".into()));
-        assert_eq!(split_root_id("Inbox/Work"), ("default".into(), "Inbox/Work".into()));
+        assert_eq!(
+            split_root_id("Inbox/Work"),
+            ("default".into(), "Inbox/Work".into())
+        );
         assert_eq!(
             split_root_id("01JXF00000000000000000000A"),
             ("default".into(), "01JXF00000000000000000000A".into())
         );
         // a non-default root prefixes "<rootid>:" and splits on the FIRST colon
-        assert_eq!(split_root_id("vault:wiki/foo"), ("vault".into(), "wiki/foo".into()));
-        assert_eq!(split_root_id("vault:chats/x.md"), ("vault".into(), "chats/x.md".into()));
+        assert_eq!(
+            split_root_id("vault:wiki/foo"),
+            ("vault".into(), "wiki/foo".into())
+        );
+        assert_eq!(
+            split_root_id("vault:chats/x.md"),
+            ("vault".into(), "chats/x.md".into())
+        );
         assert_eq!(split_root_id("vault:"), ("vault".into(), "".into()));
 
         // compose: default → BARE (no prefix, ever); non-default → prefixed
@@ -10495,9 +12407,18 @@ mod tests {
         assert_eq!(compose_root_id("vault", "wiki/foo"), "vault:wiki/foo");
 
         // round-trips for the default root are IDENTITY on the wire
-        for id in ["Inbox", "Inbox/Work", "Storage", "01JXF00000000000000000000A"] {
+        for id in [
+            "Inbox",
+            "Inbox/Work",
+            "Storage",
+            "01JXF00000000000000000000A",
+        ] {
             let (r, rel) = split_root_id(id);
-            assert_eq!(compose_root_id(&r, &rel), id, "default round-trip must be byte-identical");
+            assert_eq!(
+                compose_root_id(&r, &rel),
+                id,
+                "default round-trip must be byte-identical"
+            );
         }
     }
 
@@ -10506,8 +12427,14 @@ mod tests {
         // the router char must never be allowed inside a folder name, or a
         // folder literally named "a:b" could collide with "<rootid>:path".
         let (_dir, mut store) = bare();
-        assert!(store.create_folder("a:b", None).is_err(), "colon name must be rejected");
-        assert!(store.create("a:b", "# nope\n").is_err(), "colon folder must be rejected");
+        assert!(
+            store.create_folder("a:b", None).is_err(),
+            "colon name must be rejected"
+        );
+        assert!(
+            store.create("a:b", "# nope\n").is_err(),
+            "colon folder must be rejected"
+        );
         assert!(validate_component("plain").is_ok());
         assert!(validate_component("has:colon").is_err());
         // the file read/open lanes (corpus_file_text/_bytes/open_file) now run
@@ -10530,7 +12457,10 @@ mod tests {
             adopted: false,
         });
         assert_eq!(reg.roots.len(), 1);
-        assert_eq!(reg.get(DEFAULT_ROOT_ID).unwrap().abs_path, PathBuf::from("/tmp/rotli2"));
+        assert_eq!(
+            reg.get(DEFAULT_ROOT_ID).unwrap().abs_path,
+            PathBuf::from("/tmp/rotli2")
+        );
         // JSON round-trips
         let json = serde_json::to_string(&reg).unwrap();
         let back: RootRegistry = serde_json::from_str(&json).unwrap();
@@ -10572,12 +12502,25 @@ mod tests {
         let mut store = CorpusStore::open(root.clone()).unwrap();
         store.os_trash = false;
         // the Brain folder + its note still exist on disk after open
-        assert!(store.root().join("Brain").is_dir(), "existing Brain folder must survive");
-        assert!(store.root().join("Brain/kept.md").is_file(), "the note must survive");
+        assert!(
+            store.root().join("Brain").is_dir(),
+            "existing Brain folder must survive"
+        );
+        assert!(
+            store.root().join("Brain/kept.md").is_file(),
+            "the note must survive"
+        );
         // and it surfaces as a plain folder in the listing (no data loss)
         let list = store.list().unwrap();
-        assert!(list.folders.iter().any(|f| f.id == "Brain"), "Brain surfaces as a plain folder");
-        let note = list.notes.iter().find(|n| n.id == "01BRAINKEEP000000000000AAA").unwrap();
+        assert!(
+            list.folders.iter().any(|f| f.id == "Brain"),
+            "Brain surfaces as a plain folder"
+        );
+        let note = list
+            .notes
+            .iter()
+            .find(|n| n.id == "01BRAINKEEP000000000000AAA")
+            .unwrap();
         assert_eq!(note.folder_id, "Brain");
     }
 
@@ -10619,15 +12562,31 @@ mod tests {
         let (_dir, mut store) = fresh();
         store.create("Inbox/Work", "# A routed note\n").unwrap();
         let mut reg = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
-        reg.insert(DEFAULT_ROOT_ID.to_string(), store);
+        reg.insert(DEFAULT_ROOT_ID.to_string(), store).unwrap();
         let list = aggregate(&mut reg);
         for f in &list.folders {
-            assert!(!f.id.contains(':'), "default folder id must be bare: {}", f.id);
-            assert!(f.parent_id.as_deref().map(|p| !p.contains(':')).unwrap_or(true));
+            assert!(
+                !f.id.contains(':'),
+                "default folder id must be bare: {}",
+                f.id
+            );
+            assert!(f
+                .parent_id
+                .as_deref()
+                .map(|p| !p.contains(':'))
+                .unwrap_or(true));
         }
         for n in &list.notes {
-            assert!(!n.id.contains(':'), "default note id must be bare: {}", n.id);
-            assert!(!n.folder_id.contains(':'), "default folder_id must be bare: {}", n.folder_id);
+            assert!(
+                !n.id.contains(':'),
+                "default note id must be bare: {}",
+                n.id
+            );
+            assert!(
+                !n.folder_id.contains(':'),
+                "default folder_id must be bare: {}",
+                n.folder_id
+            );
             assert!(
                 !n.disk_folder_id.contains(':'),
                 "default disk_folder_id must be bare: {}",
@@ -10635,6 +12594,19 @@ mod tests {
             );
         }
         assert!(list.folders.iter().any(|f| f.id == "Inbox/Work"));
+    }
+
+    #[test]
+    fn duplicate_or_malformed_root_ids_never_replace_an_existing_route() {
+        let (_first_dir, first) = fresh();
+        let (_second_dir, second) = fresh();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry.insert("vault".into(), first).unwrap();
+        assert!(registry.insert("vault".into(), second).is_err());
+        let (_third_dir, third) = fresh();
+        assert!(registry.insert("bad:id".into(), third).is_err());
+        assert!(registry.stores.contains_key("vault"));
+        assert_eq!(registry.stores.len(), 1);
     }
 
     #[test]
@@ -10651,30 +12623,50 @@ mod tests {
         assert_eq!(vault_store.layout, Layout::Memex);
 
         let mut reg = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
-        reg.insert(DEFAULT_ROOT_ID.to_string(), default_store);
-        reg.insert("vault".to_string(), vault_store);
+        reg.insert(DEFAULT_ROOT_ID.to_string(), default_store)
+            .unwrap();
+        reg.insert("vault".to_string(), vault_store).unwrap();
         let list = aggregate(&mut reg);
 
         // default ids stay bare; vault ids are prefixed
-        let default_folders: Vec<&str> =
-            list.folders.iter().filter(|f| !f.id.contains(':')).map(|f| f.id.as_str()).collect();
-        assert!(default_folders.contains(&"Inbox"), "default Inbox stays bare");
+        let default_folders: Vec<&str> = list
+            .folders
+            .iter()
+            .filter(|f| !f.id.contains(':'))
+            .map(|f| f.id.as_str())
+            .collect();
+        assert!(
+            default_folders.contains(&"Inbox"),
+            "default Inbox stays bare"
+        );
         let vault_folders: Vec<&str> = list
             .folders
             .iter()
             .filter(|f| f.id.starts_with("vault:"))
             .map(|f| f.id.as_str())
             .collect();
-        assert!(vault_folders.contains(&"vault:wiki"), "wiki/ surfaces, prefixed");
-        assert!(vault_folders.contains(&"vault:chats"), "chats/ surfaces, prefixed");
+        assert!(
+            vault_folders.contains(&"vault:wiki"),
+            "wiki/ surfaces, prefixed"
+        );
+        assert!(
+            vault_folders.contains(&"vault:chats"),
+            "chats/ surfaces, prefixed"
+        );
         // the brain's memory never surfaces, even prefixed
         assert!(
-            !list.folders.iter().any(|f| f.id.starts_with("vault:self")
-                || f.id.starts_with("vault:history")),
+            !list
+                .folders
+                .iter()
+                .any(|f| f.id.starts_with("vault:self") || f.id.starts_with("vault:history")),
             "self/ + history/ must never surface from the vault"
         );
         // every vault note lives under wiki/ or chats/ and its folder_id is prefixed
-        for n in list.notes.iter().filter(|n| n.folder_id.starts_with("vault:")) {
+        for n in list
+            .notes
+            .iter()
+            .filter(|n| n.folder_id.starts_with("vault:"))
+        {
             assert!(
                 n.disk_folder_id.starts_with("vault:"),
                 "vault disk folder must be prefixed: {}",
@@ -10688,7 +12680,10 @@ mod tests {
         }
         // the memex root was never scaffolded with local reserved rows
         for name in ["Inbox", "Vault", "Storage", "Board"] {
-            assert!(!vroot.join(name).exists(), "vault memex must not be scaffolded: {name}");
+            assert!(
+                !vroot.join(name).exists(),
+                "vault memex must not be scaffolded: {name}"
+            );
         }
     }
 
@@ -10702,20 +12697,37 @@ mod tests {
         fs::write(root.join("Projects/Rotli/plan.md"), "# Plan\n").unwrap();
 
         let mut store = CorpusStore::open_adopted(root.clone()).unwrap();
-        for reserved in ["Inbox", "Secure notes", "Vault", "Storage", "Board", "Archive", "Trash"] {
-            assert!(!root.join(reserved).exists(), "adoption injected visible folder {reserved}");
+        for reserved in [
+            "Inbox",
+            "Secure notes",
+            "Vault",
+            "Storage",
+            "Board",
+            "Archive",
+            "Trash",
+        ] {
+            assert!(
+                !root.join(reserved).exists(),
+                "adoption injected visible folder {reserved}"
+            );
         }
 
         store.seed_main_from_disk_if_missing().unwrap();
         let raw = fs::read_to_string(root.join(DOT_DIR).join("main.json")).unwrap();
         let manifest: ReferenceManifest = serde_json::from_str(&raw).unwrap();
         assert_eq!(manifest.version, 1);
-        assert_eq!(manifest.tree.len(), 2, "root folder + loose note should appear once");
+        assert_eq!(
+            manifest.tree.len(),
+            2,
+            "root folder + loose note should appear once"
+        );
         let projects = manifest
             .tree
             .iter()
             .find_map(|node| match node {
-                ReferenceNode::Folder { folder, children } if folder == "Projects" => Some(children),
+                ReferenceNode::Folder { folder, children } if folder == "Projects" => {
+                    Some(children)
+                }
                 _ => None,
             })
             .expect("Projects folder mirrored into Main");
@@ -10755,11 +12767,19 @@ mod tests {
         // a DIRECT disk write (no store, no watcher running): an unchanged
         // generation means list() must serve the cache, not re-walk
         fs::write(store.root().join("sneaky.md"), "# Sneaky\n").unwrap();
-        assert_eq!(store.list().unwrap().notes.len(), n, "cache re-walked without a bump");
+        assert_eq!(
+            store.list().unwrap().notes.len(),
+            n,
+            "cache re-walked without a bump"
+        );
 
         // the watcher's lane: an external burst bumps the generation
         store.suppress_set().bump();
-        assert_eq!(store.list().unwrap().notes.len(), n + 1, "bump did not refresh the walk");
+        assert_eq!(
+            store.list().unwrap().notes.len(),
+            n + 1,
+            "bump did not refresh the walk"
+        );
     }
 
     #[test]
@@ -10777,7 +12797,9 @@ mod tests {
     #[test]
     fn search_and_tasks_ride_the_cached_parse() {
         let (_dir, mut store) = bare();
-        store.create("", "# Groceries\n\noat milk\n\n- [ ] buy the good butter\n").unwrap();
+        store
+            .create("", "# Groceries\n\noat milk\n\n- [ ] buy the good butter\n")
+            .unwrap();
         // both projections answer from the SAME cached walk — and stay correct
         let hits = store.search("oat milk", 10, false).unwrap();
         assert_eq!(hits.len(), 1, "cached body missed a search hit");
@@ -10787,9 +12809,15 @@ mod tests {
         // an edit refreshes what they see
         let id = hits[0].id.clone();
         store.write(&id, "# Groceries\n\nalmond milk\n").unwrap();
-        assert!(store.search("oat milk", 10, false).unwrap().is_empty(), "stale cached body served");
+        assert!(
+            store.search("oat milk", 10, false).unwrap().is_empty(),
+            "stale cached body served"
+        );
         assert_eq!(store.search("almond milk", 10, false).unwrap().len(), 1);
-        assert!(store.tasks().unwrap().is_empty(), "checked-off task survived in the cache");
+        assert!(
+            store.tasks().unwrap().is_empty(),
+            "checked-off task survived in the cache"
+        );
     }
 
     #[test]
@@ -10827,10 +12855,14 @@ mod tests {
         let suppress = store.suppress_set();
         let fired = Arc::new(AtomicUsize::new(0));
         let counter = fired.clone();
-        spawn_watcher(root.clone(), suppress.clone(), move |paths: &[PathBuf]| {
-            assert!(!paths.is_empty(), "a fire must carry the burst's paths");
-            counter.fetch_add(1, Ordering::SeqCst);
-        })
+        spawn_watcher(
+            root.clone(),
+            suppress.clone(),
+            move |paths: &[PathBuf]| {
+                assert!(!paths.is_empty(), "a fire must carry the burst's paths");
+                counter.fetch_add(1, Ordering::SeqCst);
+            },
+        )
         .unwrap();
         std::thread::sleep(Duration::from_millis(400)); // watcher warm-up
 
@@ -10842,7 +12874,10 @@ mod tests {
         std::thread::sleep(Duration::from_millis(1500));
         let after_burst = fired.load(Ordering::SeqCst);
         assert!(after_burst >= 1, "external change never reported");
-        assert!(after_burst <= 2, "debounce failed: {after_burst} fires for one burst");
+        assert!(
+            after_burst <= 2,
+            "debounce failed: {after_burst} fires for one burst"
+        );
 
         // our own write (suppressed path) → no new notification
         let ours = root.join("ours.md");

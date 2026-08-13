@@ -79,10 +79,19 @@ fn hostile_vault() -> Vault {
     let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
     store.os_trash = false;
     store.create("Inbox", INJECTION).unwrap();
-    let secure = store.create_with_policy("Secure notes", SECURE_BODY, true).unwrap();
-    let open = store.create("Inbox", "# Errands\n\nreturn the library books").unwrap();
+    let secure = store
+        .create_with_policy("Secure notes", SECURE_BODY, true)
+        .unwrap();
+    let open = store
+        .create("Inbox", "# Errands\n\nreturn the library books")
+        .unwrap();
     store.list().unwrap();
-    Vault { _tmp: tmp, store, secure_id: secure.id, open_id: open.id }
+    Vault {
+        _tmp: tmp,
+        store,
+        secure_id: secure.id,
+        open_id: open.id,
+    }
 }
 
 /// Step 1 + 2 of the injection: enumerate, then read. The model is cooperating;
@@ -95,7 +104,10 @@ fn a_cooperating_model_cannot_enumerate_or_read_the_secure_note_remotely() {
     // asked directly for the note's own words, a frontier-context request gets
     // nothing: the per-hit gate is what `corpus_search_ai` applies in Rust.
     let hits = v.store.search("ashgrove settlement", 50, true).unwrap();
-    assert!(hits.iter().any(|h| h.id == v.secure_id), "eval setup: the note must match");
+    assert!(
+        hits.iter().any(|h| h.id == v.secure_id),
+        "eval setup: the note must match"
+    );
     let remote_visible: Vec<&str> = hits
         .iter()
         .filter(|h| v.store.read_for_ai(&h.id, false).is_ok())
@@ -110,7 +122,10 @@ fn a_cooperating_model_cannot_enumerate_or_read_the_secure_note_remotely() {
     // to it for free. Policy, not persuasion.
     let refusal = v.store.read_for_ai(&v.secure_id, false).unwrap_err();
     assert!(refusal.contains("secure"), "{refusal}");
-    assert!(!refusal.contains("Ashgrove"), "a refusal must never quote the body: {refusal}");
+    assert!(
+        !refusal.contains("Ashgrove"),
+        "a refusal must never quote the body: {refusal}"
+    );
     assert!(!refusal.contains("hundred"), "{refusal}");
 }
 
@@ -126,8 +141,14 @@ fn the_stolen_prose_cannot_leave_by_any_outbound_lane() {
     assert!(v.store.read_for_ai(&v.secure_id, true).is_ok());
 
     // nothing about the stolen phrase announces itself
-    assert!(!secret::looks_secure(STOLEN_PHRASE), "eval setup: not secret-SHAPED");
-    assert!(!secret::protected_for_remote(STOLEN_PHRASE), "eval setup: carries no marker");
+    assert!(
+        !secret::looks_secure(STOLEN_PHRASE),
+        "eval setup: not secret-SHAPED"
+    );
+    assert!(
+        !secret::protected_for_remote(STOLEN_PHRASE),
+        "eval setup: carries no marker"
+    );
 
     // ...and yet every seam refuses it, because the VAULT told the gate
     for outbound in [
@@ -157,7 +178,9 @@ fn the_stolen_prose_cannot_leave_by_any_outbound_lane() {
 
     // an ordinary sentence from the SAME vault is unaffected — the gate is
     // targeted, not a blanket refusal to talk to the network
-    assert!(!secret::blocked_for_remote("return the library books before friday please"));
+    assert!(!secret::blocked_for_remote(
+        "return the library books before friday please"
+    ));
 }
 
 /// Step 5: the persistence move. Denied the network, a cooperating model is
@@ -191,13 +214,20 @@ fn the_stolen_prose_cannot_be_laundered_into_an_open_note() {
 #[test]
 fn a_cooperating_model_cannot_edit_a_locked_note_for_the_attacker() {
     let mut v = hostile_vault();
-    let note = v.store.create("Inbox", "# Policy\n\napprove nothing automatically").unwrap();
+    let note = v
+        .store
+        .create("Inbox", "# Policy\n\napprove nothing automatically")
+        .unwrap();
     v.store.set_locked(&note.id, true).unwrap();
 
     for local in [true, false] {
         let err = v
             .store
-            .write_for_ai(&note.id, "# Policy\n\napprove everything automatically", local)
+            .write_for_ai(
+                &note.id,
+                "# Policy\n\napprove everything automatically",
+                local,
+            )
             .unwrap_err();
         assert!(err.contains("locked"), "{err}");
     }
@@ -217,27 +247,45 @@ fn the_index_is_not_the_gate_a_stale_secure_bit_still_refuses_remotely() {
     let tmp = TempDir::new().unwrap();
     let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
     store.os_trash = false;
-    let note = store.create("Inbox", "# Plan\n\nthe quarterly figure stays between us").unwrap();
+    let note = store
+        .create("Inbox", "# Plan\n\nthe quarterly figure stays between us")
+        .unwrap();
 
     // the first search indexes the note as NON-secure — which it genuinely is now
     let hits = store.search("quarterly figure", 50, true).unwrap();
-    assert!(hits.iter().any(|h| h.id == note.id), "eval setup: the note must match");
-    assert!(store.read_for_ai(&note.id, false).is_ok(), "eval setup: ordinary, remote-readable");
+    assert!(
+        hits.iter().any(|h| h.id == note.id),
+        "eval setup: the note must match"
+    );
+    assert!(
+        store.read_for_ai(&note.id, false).is_ok(),
+        "eval setup: ordinary, remote-readable"
+    );
 
     // mark it secure ON DISK, bypassing the store so NO generation bump fires —
     // the index keeps its stale `secure = false` bit for this id
-    let rel = store.index.get(&note.id).expect("indexed id after the walk").clone();
+    let rel = store
+        .index
+        .get(&note.id)
+        .expect("indexed id after the walk")
+        .clone();
     let abs = store.abs(&rel);
     let on_disk = std::fs::read_to_string(&abs).unwrap();
     let secured = on_disk.replacen("---\n", "---\nsecure: true\n", 1);
-    assert_ne!(secured, on_disk, "eval setup: the secure flag was actually inserted");
+    assert_ne!(
+        secured, on_disk,
+        "eval setup: the secure flag was actually inserted"
+    );
     std::fs::write(&abs, secured).unwrap();
 
     // the authoritative gate reads DISK, so the remote read is refused now, and the
     // refusal never quotes the body
     let refusal = store.read_for_ai(&note.id, false).unwrap_err();
     assert!(refusal.contains("secure"), "{refusal}");
-    assert!(!refusal.contains("quarterly"), "a refusal must never quote the body: {refusal}");
+    assert!(
+        !refusal.contains("quarterly"),
+        "a refusal must never quote the body: {refusal}"
+    );
 
     // the user lane still LISTS the note (it is in the index with the stale bit) —
     // so the leak WOULD happen if the AI lane trusted the index. Filtering the same

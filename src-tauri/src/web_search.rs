@@ -845,5 +845,4 @@ mod tests {
             TransportFailure::Timeout
         );
     }
-
 }

@@ -90,8 +90,7 @@
     "default": [
       "core:default",
       "core:window:allow-start-dragging",
-      "updater:default",
-      "process:allow-restart"
+      "updater:default"
     ]
   },
   "sensitiveLogging": {

@@ -1,7 +1,12 @@
-# Memex data and creation contract
+# Vault data, Rotli layer, and creation contract
 
-Rotli has no application database. The memex folder is the source of truth;
-indexes and `.rotli/` files are rebuildable projections or explicit settings.
+The user-facing durable workspace is a **vault**: one ordinary folder the user
+chooses and owns. Rotli has no application database. Files in the vault are the
+source of truth; indexes and `.rotli/` files are rebuildable projections or
+explicit settings. Older portable files and internal modules retain literal
+`memex` names (`memex.json`, `src/memex/`, and Rust command names) for format and
+API compatibility. Those names describe Rotli's internal contract layer, not a
+second user-visible product or storage location.
 
 ## One physical home, many views
 
@@ -26,7 +31,7 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   the consent bit for whether that chat may use the network and is not a
   provider selector. Brave credentials live under Rotli's allowlisted macOS
   Keychain account, while search execution and provider failure policy remain
-  application/adapter concerns outside the memex.
+  application/adapter concerns outside the vault contract.
 - A Markdown note may belong to one named view. Rotli synchronizes the exact
   view name into managed `view_tag` metadata on assignment, rename, deletion,
   UI, CLI, and MCP writes. View names are unique case-insensitively and use
@@ -34,14 +39,14 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   reserved. Boards and binary files remain frontmatter-free, so their view
   membership exists only as an explicit reference in `.rotli/views.json`.
 - **Markdown notes** are plain `.md` files. With the Librarian enabled, a smart,
-  Main, or Brain selection routes a new note through **Brain intake**, the
+  Main, or Library selection routes a new note through **Library intake**, the
   portable staging lane at `wiki/_inbox/`. With the Librarian disabled, a new
   ordinary note lands directly under `wiki/`; no organizer exists to move it
   later. Secure notes keep their protected `wiki/_secure/` home in both modes.
   An explicit writable local folder remains the physical home.
 - **Global capture destinations are explicit and independent.** Quick Note and
-  Quick capture each default to the current writable memex, while Settings may
-  pin either entry point to a different registered memex with `chats+inbox`
+  Quick capture each default to the current writable vault, while Settings may
+  pin either entry point to a different registered vault with `chats+inbox`
   access. The chosen root id lives in `.rotli/settings.json`; Quick Note syncs
   its choice between the main and floating webviews. An explicit root that is
   removed or becomes read-only fails closed instead of silently receiving the
@@ -61,16 +66,16 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
 - Filename normalization is adoption-on-write, not a scan-time migration. New
   notes use the readable form immediately; editing or explicitly renaming an
   older `<slug>-<id6>.md` note moves it to the readable form. Merely opening or
-  listing a memex never rewrites user files.
+  listing a vault never rewrites user files.
 - **Documents and sheets** created by Rotli live in the managed binary lane:
-  `storage/rotli/` in a memex or `Storage/` in the legacy layout.
+  `storage/rotli/` in a Rotli vault or `Storage/` in the legacy layout.
 - **Boards** are raw `.excalidraw` files. The corpus adapter chooses the writable
-  Excalidraw lane for a memex and a selected writable folder for legacy storage.
+  Excalidraw lane for a Rotli vault and a selected writable folder for legacy storage.
   Ordinary user creation collects a nonblank name before writing anything, then
   creates the collision-safe final filename atomically; cancelling the prompt
   leaves no `untitled.excalidraw` placeholder behind.
 - Creating any item adds its one stable id/path to Main immediately, before the
-  item is opened. A Brain-intake note therefore appears in Main while the same
+  item is opened. A Library-intake note therefore appears in Main while the same
   file still lives in staging. Refiling the physical item does not duplicate or
   invalidate the Main arrangement.
 - Creation from a named view also adds the item to that view and its current
@@ -80,13 +85,42 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   folder the creation parent for every item kind. Opening the new-item chooser
   must retain that parent while the user chooses Markdown, document, sheet,
   board, or Mermaid. Named-view creation also retains the global Main reference.
-- The Brain organizer waits for the configured quiet window after the note's
+- The Librarian waits for the configured quiet window after the note's
   latest edit (five minutes by default) before classifying or refiling it. New
   edits reset that window; filing changes location/metadata, never note prose.
 - A newly created DOCX remains a session-pristine draft until its first content
   mutation. Explicitly closing its final tab while it is still pristine moves
   the managed file to Rotli's recoverable Trash and removes its Main reference.
   Rotli never infers that a pre-existing blank document is disposable.
+
+## Durability and concurrent edits
+
+- Markdown, board, DOCX, sheet, CSV, and generic managed-file reads return a
+  content revision derived from the exact bytes read. Every replacement write
+  must present that revision; a mismatch is a conflict and must leave the newer
+  disk bytes untouched. The editor keeps its dirty buffer and surfaces the
+  conflict rather than silently retrying against a fresh revision.
+- Saved chat updates use the same rule. Creation refuses an existing slug, and
+  `secureContext` is a one-way transition inside the same locked write window,
+  so concurrent windows cannot erase taint or overwrite a newer transcript.
+- A successful direct chat-note write invalidates the owning `CorpusStore`
+  generation before returning. Its initiating webview can therefore read the
+  new note immediately instead of waiting for a watcher echo. Watcher delivery
+  refreshes notes, chats, chat folders, Main, named views, and journal
+  projections independently, so one failed refresh cannot suppress the rest.
+- A physical path is a locator, not note identity. User and Librarian moves
+  rewrite one source file and then rename it while preserving the frontmatter
+  id; they never implement identity-preserving moves as copy plus best-effort
+  delete. Open buffers keep their dirty bytes when an external rename/delete
+  makes the old locator temporarily unresolvable.
+- Ordinary saves use same-directory temporary files, file sync, atomic replace,
+  and a best-effort parent-directory sync. Disk, permission, serialization, and
+  revision failures are errors, never reported as saved.
+- Quit and in-app restart are coordinated with all three webviews. Every
+  registered editor, board, document, sheet, settings, and projection flush must
+  acknowledge the attempt; failure or timeout cancels exit/restart and restores
+  the main window with an error. Forced process/OS termination can still lose
+  unsaved in-memory debounce work; no durable draft journal exists yet.
 
 ## Editing capabilities
 
@@ -124,6 +158,17 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   page fitted to the pane and does not expose Markdown block handles or canvas
   margin-corner guides. Portaled controls retain the document insertion range,
   and only content mutations—not viewport changes—activate Save.
+- Chat artifact requests preserve the requested conventional format. Explicit
+  Word/DOCX requests create a real editable `.docx` through the same managed
+  document workflow, Main/view filing, and Rust corpus boundary as toolbar
+  creation; they must never be silently substituted with a Markdown note.
+  Bare “doc/document” requests are clarified as Word versus Markdown before
+  any file is created. Raster images generated earlier in the same agent run
+  are embedded as conventional DOCX media and rendered through the local
+  document adapter; an unreadable or unsupported image fails the document
+  creation visibly rather than becoming an invisible placement claim. Secure-
+  tainted chat content cannot be written to DOCX because conventional files do
+  not carry the secure-note policy.
 - Legacy `.doc`, `.rtf`, and `.odt` conversion is local and copy-only: the fixed
   macOS system converter produces a new managed DOCX, the original is never
   overwritten, and the result is not added to Markdown slash results until it
@@ -157,43 +202,43 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
   the pinned path or an error. The command offers only image engines whose lane
   is enabled AND whose CLI probes installed + authenticated — capability- and
   login-based, like every other model surface.
-- **Chat Work is a file projection, not an artifact database (2026-08-09).**
-  The normal Chat layout derives its Work rail from standard `storage:`
-  Markdown links in that chat's messages plus the files already pinned under
-  `storage/chats/<slug>/`. An image selected in the composer is copied into the
-  user-owned `storage/images/` lane (collision-safe, bounded, and refused for a
-  read-only root) before it can be sent; the transcript stores a portable
-  Markdown link labeled `Image #N` whose target uses the `storage:` shorthand,
-  while the bubble may show only the friendly handle. Selecting a Work item
-  delegates to the ordinary pane/file surface and opens it to the right; the
-  rail never becomes a parallel viewer or file store.
-- **Generated Chat work uses existing creation boundaries (2026-08-09).**
-  Markdown rides the guarded note-creation lane; DOCX and XLSX use the managed
-  binary lane and their existing local editors; boards use the raw Excalidraw
-  lane; generated images retain their pinned chat-assets destination. A PDF
-  request first creates an ordinary editable Markdown source, then exports a
-  separate collision-safe PDF copy locally through the fixed macOS print
-  adapter. Rust independently refuses protected/secret-shaped or locked source,
-  read-only roots, invalid names, and non-PDF output. Presentation appends
-  ordinary storage links or validated Rotli deep links to the assistant turn,
-  so Work can project every result after reload without a manifest. **Use in
-  chat** attaches images as vision inputs and references other work by its
-  durable file/note identity; document reads traverse the same DOCX model the
-  editor owns.
-- **A saved chat owns one primary provider family (2026-08-09).** A fresh chat
-  may begin with any available direct model; its first successful save pins the
-  user-facing provider family in the vault-scoped `chatProvider` settings map.
-  Later model changes are filtered and guarded to that family (Claude models,
-  GPT models, Gemini models across its configured transports, or one local
-  runtime). Hybrid routing presets are not primary Chat models because they do
-  not have one provider. Older chats infer the additive provider field from
-  their saved model when next opened. An explicit `@Claude`, `@GPT`, or
-  `@Gemini` tag may route only that turn to the first available model in a
-  configured second provider; the assistant text records the provider and
-  exact model attribution, and neither the primary provider nor primary model
-  setting changes. The consulted turn rides the ordinary host, retrieval,
-  egress, cancellation, artifact, and persistence boundaries; a secure chat
-  therefore cannot use a remote consultation to bypass its model gate.
+- Chat-created images, boards, and Word documents stay closed after creation
+  and are registered in the originating chat's portable `rotliArtifacts`
+  frontmatter. A wide chat can reveal that list as a quiet artifact rail; when
+  its pane becomes narrow, the same list remains available from the header
+  control. Conventional documents additionally remain visible as file buttons
+  attached to the final assistant turn. Selecting an artifact—not creation
+  itself—uses the explicit UI preference: reuse one right-side pane (default),
+  create a pane, or open a new tab. This preference is projection state and
+  never changes the artifact's durable identity. A generated image
+  observation supplies the exact `storage:` Markdown source. If the same run
+  creates a note with only that image's basename, the host
+  repairs it to the pinned storage source rather than leaving a broken root-
+  relative link.
+- Images selected or dropped into Chat are copied into the initiating registered
+  root's managed image lane before the turn is sent. The transcript stores only
+  a portable `storage:` reference; Rust bounds the payload, validates its image
+  signature and extension, enforces root mutability, and writes atomically.
+  Unsupported drops fail before Rotli imports them.
+- A requested PDF is an exported copy of a separate editable Markdown source,
+  both attached to the originating assistant turn. Rust keeps both in the same
+  registered root and refuses secure, secret-shaped, locked, read-only, or
+  oversized sources before invoking the local macOS renderer.
+- Unsent chat title, text, and image attachments are session state owned by the
+  stable tab id. Switching tabs or temporarily unmounting a chat surface never
+  clears that draft; sending it does. The first successful save binds the
+  initiating tab rather than whichever tab happens to be active when an async
+  write completes.
+- User turns are the navigation landmarks for a long transcript. The chat may
+  derive a compact left-edge prompt navigator from rendered messages; it is a
+  view only and does not create another chat index or durable identity.
+- Every model adapter shares one bounded clarification response shape: one
+  concise question with two or three mutually exclusive options. The loop
+  accepts it only when a missing material choice changes the result or file
+  action, renders it through the same application event for local, connected,
+  and hybrid models, and never treats the options as tools or authority. The
+  pending choice is scoped to its chat tab for the current session; the visible
+  question remains ordinary durable chat text.
 - File-format dependencies stay behind adapters and composition roots so a DOCX
   codec, document editor, workbook codec, or canvas engine can be swapped
   without changing creation commands or UI entry points.
@@ -202,7 +247,7 @@ indexes and `.rotli/` files are rebuildable projections or explicit settings.
 
 The Rust corpus boundary independently validates every write.
 
-- Frontmatter is the memex's portable record, not an imitation database hidden
+- Frontmatter is the vault's portable record, not an imitation database hidden
   beside it. Known fields have stable names, types, ownership, and canonical
   group order; unknown user fields survive byte-for-byte. New Rotli notes use:
 
@@ -245,18 +290,18 @@ The Rust corpus boundary independently validates every write.
   provider-owned field. It is TRI-STATE since 2026-08-01: absent means "follow
   the vault's `secureLocalAi` default", `true` pins on-device access on, `false`
   pins it off. It is written only on a secure note.
-- The Brain filer owns only its declared enrichment fields: `area`, `summary`,
+- The Librarian owns only its declared enrichment fields: `area`, `summary`,
   `tags`, and `links`.
 - Unknown frontmatter is preserved byte-for-byte. Reserved provenance cannot be
   forged through the raw metadata editor.
 - Boards and binary files never receive Markdown frontmatter.
 - The metadata surface derives and displays the canonical absolute file path
   from the corpus router. Paths are never copied into editable frontmatter,
-  where a title rename or Brain filing move could make them stale.
+  where a title rename or Librarian filing move could make them stale.
 
 ## Queryable filesystem records
 
-The memex must remain searchable like a database while staying ordinary files:
+The vault must remain searchable like a database while staying ordinary files:
 
 - The canonical record is `frontmatter + H1 + body + filesystem location`.
   Rebuildable indexes may parse and accelerate those records but never become
@@ -266,13 +311,13 @@ The memex must remain searchable like a database while staying ordinary files:
 - Full-text retrieval searches title, body, and the declared searchable metadata
   vocabulary (`aliases`, `area`, `summary`, `tags`, `links`, `shelf`, `reach`,
   and `view_tag`). Secure-content gates still apply independently.
-- Structured filtering uses the memex v3.8 grammar owned by the foundation's
+- Structured filtering uses the portable v3.8 grammar owned by the foundation's
   `QUERY.md`: quoted/bare text plus predicates such as `area:projects`,
   `tag:payments`, or `updated:>=2026-07-01`, joined with implicit `AND`. Rotli
   implements it through `rotli notes query` and read-only MCP `rotli_query`.
   Parsed clauses accompany bounded results; queries never mutate files or treat
   `.rotli/` indexes as durable data.
-- Schema evolution is additive and versioned through the memex contract.
+- Schema evolution is additive and versioned through the vault's internal contract.
   Unknown fields round-trip, malformed security fields fail closed, and any
   bulk filename/metadata normalization requires the migration protocol and an
   explicit user-approved apply step.
@@ -294,7 +339,7 @@ Retrieval policy is capability-based. Context size selects bounded search,
 history, note-read, and table-of-contents budgets; provider names do not grant
 capability by themselves.
 
-Model Mapping 0 builds a fresh, bounded memex table of contents for each model
+Model Mapping 0 builds a fresh, bounded vault table of contents for each model
 request:
 
 - compact models receive a small area map and drill in through search;
@@ -309,12 +354,12 @@ the whole object in an explicit untrusted-data boundary; note-controlled values
 never become headings, roles, tool declarations, or delimiters.
 
 Pinned notes and recently touched notes rank first. These are transparent user
-signals stored in normal memex metadata/filesystem state—not hidden learning in
+signals stored in normal vault metadata/filesystem state—not hidden learning in
 a database. Future priority signals must remain inspectable and rebuildable.
 
 ## Master memory retrieval (RAG)
 
-The Brain exposes one retrieval protocol over two durable sources: organized
+Rotli's vault layer exposes one retrieval protocol over two durable sources: organized
 notes and prior chat transcripts.
 
 1. **Ingest:** every successfully persisted chat owns one linked background
@@ -330,7 +375,7 @@ notes and prior chat transcripts.
    and ranks raw chat matches by title/body relevance. Results carry provenance
    (`note` or `chat`) and a stable id.
 4. **Ground:** `read_memory` opens only the selected note or original chat. The
-   model does not receive the whole memex or all transcripts by default.
+   model does not receive the whole vault or all transcripts by default.
 5. **Generate:** tool observations, current conversation history, and the model-
    specific budget form the answer context. The existing step, history, scratch,
    note, and snippet caps prevent context overflow.
@@ -357,7 +402,7 @@ but it must remain rebuildable, optional, and behind the retrieval port.
 
 ## Security and validation
 
-- `Secure notes` is a protected filesystem lane inside the Brain
+- `Secure notes` is a protected filesystem lane inside the Library
   (`wiki/_secure/`), not a database or opaque vault. The underscore excludes it
   from normal organizer areas while the sidebar exposes it deliberately.
   Protection is also stored on each Markdown file as `secure: true`.
@@ -392,14 +437,14 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   moves. The organizer skips secure notes regardless of interactive local
   access, and skips locked notes entirely.
 - Remote organizer choices apply only to non-secure, unlocked notes.
-- **Lanes (2026-08-01).** In a memex, `wiki/` and `chats/` are the Notes tree.
+- **Lanes (2026-08-01).** In a Rotli vault, `wiki/` and `chats/` are the Notes tree.
   Both are writable through the interactive lane — all of `wiki/` since
   2026-08-03: the Librarian files staged notes into curated areas, and a filed
   note must stay editable rather than silently turning read-only the moment it
   leaves `wiki/_inbox/` (before that, only `_inbox` staging and `_secure`
   wrote). `wiki/_secure/` stays model-gated on read and is never an organizer
   area; the filer lane still owns the AI metadata keys exclusively.
-  The brain's memory lanes — `identity/`, `personality/`, `history/`, `MAP.md`,
+  The vault's reference lanes — `identity/`, `personality/`, `history/`, `MAP.md`,
   `inbox.md` — are `Surface::Reference`: never in the Notes tree, never writable
   by any lane, and **retrievable by both classes of model** through the AI's
   search / knowledge-map / read tools. Reference note ids are relative paths.
@@ -409,19 +454,19 @@ but it must remain rebuildable, optional, and behind the retrieval port.
 - **Product vocabulary (2026-07-26):** the organizer layer is branded the
   **Librarian** and its organized area (the `wiki/` tree) the **Library**; a
   connected vault is a **Linked library**. These are display names only —
-  contract terms, folder ids (`Brain`, `wiki/`), and the `brainEnabled`
-  setting keep their internal names. Since 2026-07-28 the journal surface
+  legacy contract terms, folder ids (`Brain`, `wiki/`), and the `brainEnabled`
+  setting keep their internal names for compatibility. Since 2026-07-28 the journal surface
   (formerly the sidebar's "Activity" row) is reached as **Librarian** in the
   sidebar's utility footer; "Activity" survives only in internal identifiers.
 - **A vault may be raw** (vault-vs-brain, 2026-07-26): the per-vault
-  `brainEnabled` setting (missing ⇒ on) turns the Brain layer off entirely.
+  `brainEnabled` setting (missing ⇒ on) turns the Librarian layer off entirely.
   Raw means the organizer never acts and the filer write lane refuses —
   enforced independently in the daemon's cycle gate and the corpus boundary.
   Flipping the switch never moves or rewrites a file; re-enabling resumes at
   Suggest. Security controls (secure notes, the detector, repairs) are vault
   properties and hold identically in both modes. Spec:
   [`2026-07-26-vault-vs-brain.md`](../decisions/2026-07-26-vault-vs-brain.md).
-- A note explicitly flagged `secure: true` whose file still sits in Brain
+- A note explicitly flagged `secure: true` whose file still sits in Library
   intake is legacy or externally moved state; the organizer must never read it
   in place. The Librarian journal (the sidebar footer's **Librarian** entry)
   offers the explicit, previewable **legacy
@@ -465,7 +510,7 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   shared by GUI, CLI, and MCP writes. Blank repair is an explicit confirmed
   replacement, never a parse fallback.
 - Storage assets use a recoverable lifecycle: “Remove from Main” only removes a
-  reference. Archive/Trash actions move the physical file under the memex sink
+  reference. Archive/Trash actions move the physical file under the vault sink
   while nesting its original storage path (`trash/storage/rotli/file.docx`), so
   restore remains possible without `.rotli/` state. File lifecycle actions never
   invoke macOS Trash; the Rust boundary validates both moves and restores.
@@ -478,6 +523,6 @@ but it must remain rebuildable, optional, and behind the retrieval port.
 - `bun run check:structure` enforces camelCase source filenames and denies
   database dependencies.
 
-The memex owns this portable policy vocabulary and its file representation. It
+The vault contract owns this portable policy vocabulary and its file representation. It
 does not execute AI calls: provider clients, retrieval execution, and agent
 loops stay in Rotli behind the host/corpus access boundary.

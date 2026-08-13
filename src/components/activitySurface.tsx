@@ -145,7 +145,8 @@ function LibrarianIntro({
             reads a note to organize it, and only the model you chose in Settings.
           </li>
           <li>
-            <strong>Everything is journaled and undoable</strong> — this page is the whole record.
+            <strong>Recorded actions stay reviewable</strong> — undo rechecks the current note and refuses if
+            it changed.
           </li>
         </ul>
         <h4>Where your files go</h4>

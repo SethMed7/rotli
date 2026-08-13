@@ -1,7 +1,7 @@
-// Settings — the r1 frame F window grammar: left nav (Hotkeys · Appearance ·
+// Settings — the r1 frame F window grammar: left nav (Keybindings · Appearance ·
 // Storage · Connections) + one surface. Esc closes back to notes (the registry's
 // app.hide chain). Storage shows the corpus story with the future default path
-// ~/Documents/rotli; "Later" cards are quiet and non-interactive. Hotkeys is
+// ~/Documents/rotli; "Later" cards are quiet and non-interactive. Keybindings is
 // the rebind list: click a chord, press the next combo (a quiet inline note if
 // the chord is taken).
 
@@ -94,15 +94,24 @@ import { NEW_ITEM_DEFINITIONS } from "../newItems/model";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
 import { useFolders } from "../services/hooks";
 import { queryClient } from "../services/query";
+import { DEFAULT_RETENTION_DAYS, MAX_RETENTION_DAYS, parseRetentionDays } from "../services/retentionPolicy";
 import { resetAndReonboard } from "../state/onboarding";
 import { usePanesStore } from "../state/panes";
 import { setQuickFolderSynced, setQuickVaultSynced } from "../state/quick";
-import { ACCENT_COLORS, type AppIcon, type OrganizerTrust, SOLID_THEMES, useUiStore } from "../state/ui";
+import {
+  ACCENT_COLORS,
+  type AppIcon,
+  type OrganizerTrust,
+  SOLID_THEMES,
+  type TimeFormat,
+  useUiStore,
+} from "../state/ui";
 import { VOICES } from "../voice/speech";
 import { Character, type CharacterName, QuokkaMark } from "./character";
 import {
   CheckGlyph,
   CloudGlyph,
+  CopyGlyph,
   DatabaseGlyph,
   ExternalLinkGlyph,
   KeyboardGlyph,
@@ -124,7 +133,7 @@ type SettingsPane =
 
 const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = [
   { id: "general", label: "General", glyph: LaptopGlyph },
-  { id: "hotkeys", label: "Hotkeys", glyph: KeyboardGlyph },
+  { id: "hotkeys", label: "Keybindings", glyph: KeyboardGlyph },
   { id: "appearance", label: "Appearance", glyph: SunGlyph },
   // the organizer daemon's trust ladder (design §4.3) — minimal Phase-4 pane;
   // capability checkboxes / Pause / Reset Brain are Phase 5 (§4.8)
@@ -356,7 +365,7 @@ function HotkeysPane() {
 
   return (
     <>
-      <PaneHead title="Hotkeys" char="notes" />
+      <PaneHead title="Keybindings" char="notes" />
       <p className="lead">Every shortcut in rotli is yours to rebind. Click a chord, press the new keys.</p>
       <section className="hksection">
         <div className="hkhead">Hold ⌘</div>
@@ -377,7 +386,7 @@ function HotkeysPane() {
       <input
         type="search"
         className="hksearch"
-        placeholder="Search hotkeys…"
+        placeholder="Search keybindings…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={(e) => e.stopPropagation()}
@@ -403,10 +412,9 @@ function HotkeysPane() {
 
 // ——— General: visitor vs resident, dock visibility (Seth, 2026-06-12) ———
 
-// ——— Updates: the current version + a manual check, plus the one-click
-// "Install & relaunch" when the signed feed offers a newer build. The on-mount
-// App.tsx check primes updateAvailable/updateVersion; this lets you also check
-// on demand and pull the update down (CARL rule 2: nothing auto-downloads). ———
+// ——— Updates: the current version + an explicit manual check, plus the
+// one-click "Install & relaunch" when the signed feed offers a newer build.
+// Launching or merely showing Rotli never contacts the feed. ———
 
 type CheckState =
   | { kind: "idle" }
@@ -422,7 +430,7 @@ function UpdatesSection() {
   const setUpdateAvailable = useUiStore((s) => s.setUpdateAvailable);
   const setUpdateVersion = useUiStore((s) => s.setUpdateVersion);
   const [version, setVersion] = useState("0.1.0");
-  // seed from the on-mount check so re-opening Settings keeps the badge
+  // Preserve the result of an explicit check while Settings is reopened.
   const [state, setState] = useState<CheckState>(
     updateAvailable ? { kind: "available", version: updateVersion } : { kind: "idle" },
   );
@@ -518,8 +526,16 @@ function GeneralPane() {
   const setFileMetadata = useUiStore((s) => s.setFileMetadata);
   const newTabDefault = useUiStore((s) => s.newTabDefault);
   const setNewTabDefault = useUiStore((s) => s.setNewTabDefault);
+  const tabLayout = useUiStore((s) => s.tabLayout);
+  const setTabLayout = useUiStore((s) => s.setTabLayout);
   const userName = useUiStore((s) => s.userName);
   const setUserName = useUiStore((s) => s.setUserName);
+  const timeFormat = useUiStore((s) => s.timeFormat);
+  const setTimeFormat = useUiStore((s) => s.setTimeFormat);
+  const mainAutoRemoveDays = useUiStore((s) => s.mainAutoRemoveDays);
+  const setMainAutoRemoveDays = useUiStore((s) => s.setMainAutoRemoveDays);
+  const chatAutoArchiveDays = useUiStore((s) => s.chatAutoArchiveDays);
+  const setChatAutoArchiveDays = useUiStore((s) => s.setChatAutoArchiveDays);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const taskCycle = useUiStore((st) => st.taskCycle);
   const setTaskCycle = useUiStore((st) => st.setTaskCycle);
@@ -575,7 +591,7 @@ function GeneralPane() {
       <p className="setnote">
         Either way the menu-bar icon stays, {chordLabel(bindingOverrides, "app.toggleWindow")} opens the app,
         and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture — all rebindable in
-        Hotkeys.
+        Keybindings.
       </p>
 
       <h4 className="sethead">Your name</h4>
@@ -594,6 +610,85 @@ function GeneralPane() {
           onKeyDown={(e) => e.stopPropagation()}
         />
       </label>
+
+      <h4 className="sethead">Time</h4>
+      <p className="lead">Choose the clock shown beside the original send time on chat messages.</p>
+      <Seg
+        value={timeFormat}
+        options={[
+          ["12", "12-hour"],
+          ["24", "24-hour"],
+        ]}
+        onPick={(value) => setTimeFormat(value as TimeFormat)}
+      />
+
+      <h4 className="sethead">Automatic housekeeping</h4>
+      <p className="lead">
+        Keep active work close without deleting it. Viewing an item resets its inactivity clock.
+      </p>
+      <div className="swgroup">
+        <Toggle
+          on={mainAutoRemoveDays !== null}
+          title="Remove inactive items from Main"
+          desc="Unlinks the Main reference only. The file stays exactly where it is in your vault."
+          onChange={() => {
+            setMainAutoRemoveDays(mainAutoRemoveDays === null ? DEFAULT_RETENTION_DAYS : null);
+          }}
+        />
+        {mainAutoRemoveDays !== null && (
+          <label className="setselect-row retention-days-row">
+            <span>Not touched for</span>
+            <input
+              className="aikey-input retention-days-input"
+              type="number"
+              min={1}
+              max={MAX_RETENTION_DAYS}
+              value={mainAutoRemoveDays}
+              aria-label="Days before removing an inactive item from Main"
+              onChange={(event) => {
+                const days = parseRetentionDays(event.currentTarget.valueAsNumber);
+                if (days !== null) {
+                  setMainAutoRemoveDays(days);
+                }
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+            />
+            <span>days</span>
+          </label>
+        )}
+        <Toggle
+          on={chatAutoArchiveDays !== null}
+          title="Archive inactive chats"
+          desc="Moves untouched chats into the existing recoverable Chat Archive. Pinned chats stay put."
+          onChange={() => {
+            setChatAutoArchiveDays(chatAutoArchiveDays === null ? DEFAULT_RETENTION_DAYS : null);
+          }}
+        />
+        {chatAutoArchiveDays !== null && (
+          <label className="setselect-row retention-days-row">
+            <span>Not touched for</span>
+            <input
+              className="aikey-input retention-days-input"
+              type="number"
+              min={1}
+              max={MAX_RETENTION_DAYS}
+              value={chatAutoArchiveDays}
+              aria-label="Days before archiving an inactive chat"
+              onChange={(event) => {
+                const days = parseRetentionDays(event.currentTarget.valueAsNumber);
+                if (days !== null) {
+                  setChatAutoArchiveDays(days);
+                }
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+            />
+            <span>days</span>
+          </label>
+        )}
+      </div>
+      <p className="setnote">
+        Both are off by default. Open and pinned items are never moved by automatic housekeeping.
+      </p>
 
       <h4 className="sethead">New tabs</h4>
       <p className="lead">
@@ -618,6 +713,20 @@ function GeneralPane() {
         Markdown notes support slash commands and embeds. Documents stay conventional documents; sheets and
         boards use their own focused editors.
       </p>
+
+      <h4 className="sethead">Tab bar</h4>
+      <p className="lead">
+        Scroll keeps titles readable in a horizontally scrollable strip. Fit shrinks every tab to keep the
+        full set visible in the pane.
+      </p>
+      <Seg
+        value={tabLayout}
+        options={[
+          ["scroll", "Scroll"],
+          ["fit", "Fit to window"],
+        ]}
+        onPick={setTabLayout}
+      />
 
       <h4 className="sethead">Quick note</h4>
       <p className="lead">
@@ -742,8 +851,8 @@ function GeneralPane() {
 
       <h4 className="sethead">Start fresh</h4>
       <p className="lead">
-        Reset your hotkeys, window behavior, and theme back to the defaults and run first-time setup again.
-        Your notes are never touched.
+        Reset your keybindings, window behavior, and theme back to the defaults and run first-time setup
+        again. Your notes are never touched.
       </p>
       <button
         type="button"
@@ -830,6 +939,8 @@ function AppearancePane() {
   const setMatchDarkFamily = useUiStore((s) => s.setMatchDarkFamily);
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const setSyntaxPalette = useUiStore((s) => s.setSyntaxPalette);
+  const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
+  const setChatWelcomeStyle = useUiStore((s) => s.setChatWelcomeStyle);
   const appIcon = useUiStore((s) => s.appIcon);
   const setAppIconState = useUiStore((s) => s.setAppIcon);
   const followingSystem = theme === "system";
@@ -897,6 +1008,20 @@ function AppearancePane() {
         follows you across themes.
       </p>
       <AccentRow />
+
+      <h4 className="sethead">New chat</h4>
+      <p className="lead">
+        Calm keeps the welcome monochrome. Lively places the companion in a quiet time-of-day scene without
+        tinting the workspace. Neither mode animates while idle.
+      </p>
+      <Seg
+        value={chatWelcomeStyle}
+        options={[
+          ["calm", "Calm"],
+          ["lively", "Lively"],
+        ]}
+        onPick={setChatWelcomeStyle}
+      />
 
       <h4 className="sethead">Markdown source</h4>
       <p className="lead">Choose the syntax colors used in Raw Markdown. This never changes the file.</p>
@@ -1083,13 +1208,13 @@ function LocationPane() {
     <>
       <PaneHead title="Location" char="local" />
       <p className="lead">
-        Your notes are plain Markdown files in <b>one folder</b> on this Mac — and that folder can be your{" "}
-        <b>brain</b> (a memex): notes, chats, and knowledge together, kept tidy by AI but always yours to
-        arrange. rotli never holds your notes hostage.
+        Your <b>vault</b> is one folder of plain Markdown and conventional files on this Mac. Rotli adds its
+        organization and retrieval layer without taking ownership; you choose whether the on-device Librarian
+        keeps it tidy. rotli never holds your notes hostage.
       </p>
 
       {/* —— the one folder —— */}
-      <h4 className="sethead">{isDev ? "Production memex" : "Your notes folder"}</h4>
+      <h4 className="sethead">{isDev ? "Production vault" : "Your vault"}</h4>
       {!isDev && (
         <div className="store-grid">
           <div className="store sel">
@@ -1114,12 +1239,12 @@ function LocationPane() {
       )}
       <div className="locrow">
         <div className="loctext">
-          <span className="loclabel">{isDev ? "Source" : "Notes folder"}</span>
+          <span className="loclabel">{isDev ? "Source" : "Vault folder"}</span>
           <code className="locpath">{rootPath}</code>
           {isDev ? (
             <span className="memex-badge ro">read-only in dev</span>
           ) : (
-            corpusIsBrain && <span className="memex-badge write">memex</span>
+            corpusIsBrain && <span className="memex-badge write">vault</span>
           )}
           {active && !active.brainEnabled && <span className="memex-badge">raw</span>}
         </div>
@@ -1141,7 +1266,7 @@ function LocationPane() {
       </div>
       {isDev && (
         <p className="setnote">
-          This is the same memex used by production Rotli. Development reads it directly, but cannot change
+          This is the same vault used by production Rotli. Development reads it directly, but cannot change
           notes, chats, inbox, boards, metadata, permissions, or its <code>.rotli/</code> sidecar.
           Development-only appearance and window state stay in the app cache.
         </p>
@@ -1167,9 +1292,9 @@ function LocationPane() {
 
       {!isDev && (
         <p className="setnote">
-          <b>Choose folder…</b> takes a memex (rotli uses it as your notes folder), an empty folder (your
-          notes move there), or any folder (used as-is). The hidden <code>.rotli/</code> is just an index —
-          deleting it loses nothing but a rebuild.
+          <b>Choose folder…</b> takes a Rotli vault (used in place), an empty folder (your notes move there),
+          or any folder (used as-is). The hidden <code>.rotli/</code> is just an index — deleting it loses
+          nothing but a rebuild.
         </p>
       )}
 
@@ -1178,11 +1303,10 @@ function LocationPane() {
         <>
           <h4 className="sethead">Linked libraries</h4>
           <p className="lead">
-            A <b>linked library</b> is a <em>second</em> memex you reference alongside your notes — a shared
-            or team brain, a reference vault. <b>Most people never need one</b> (your notes folder is already
-            your memex). rotli reads the whole library and, per its perms, writes only <b>chats</b>,{" "}
-            <b>inbox</b>, and new notes; it never touches its history or identity, and its curated wiki is
-            read-only.
+            A <b>linked library</b> is a <em>second vault</em> you reference alongside your own — for example,
+            a shared, team, or reference vault. <b>Most people never need one.</b> rotli reads the whole
+            library and, per its permissions, writes only <b>chats</b>, <b>inbox</b>, and new notes; it never
+            touches its history or identity, and its curated wiki is read-only.
           </p>
           {candidates.length > 0 && (
             <>
@@ -1193,7 +1317,7 @@ function LocationPane() {
                     <div className="mc-title">{d.label}</div>
                     <div className="mc-path">{d.root}</div>
                     <div className="mc-meta">
-                      contract {d.contract ?? "?"} · {d.memexId?.slice(0, 12) ?? "no id"}
+                      format {d.contract ?? "?"} · {d.memexId?.slice(0, 12) ?? "no id"}
                     </div>
                   </div>
                   <button
@@ -1210,8 +1334,8 @@ function LocationPane() {
           )}
           {linkedLibraries.length === 0 ? (
             <p className="setnote">
-              No linked libraries. Link one only if you want a second, shared memex — otherwise your notes
-              folder is all you need.
+              No linked libraries. Link one only if you want a second, shared vault — otherwise your vault is
+              all you need.
             </p>
           ) : (
             linkedLibraries.map((inst) => (
@@ -1276,7 +1400,7 @@ const TRUST_CAPTIONS: Record<OrganizerTrust, string> = {
   suggest: "Nothing happens by itself. Every change waits in the Librarian for your approval.",
   tidy: "Files new captures and fills in metadata by itself. Each area's overview page still waits for your OK — that's the one thing Organize adds.",
   organize:
-    "Everything Tidy does, plus it keeps each area's overview page fresh on its own (the default) — all journaled, all undoable. Metadata suggestions never pile up: leftovers apply themselves.",
+    "Everything Tidy does, plus it keeps each area's overview page fresh on its own (the default). Actions appear in Librarian Activity; guarded undo refuses if a note has changed since. Metadata suggestions never pile up: leftovers apply themselves.",
 };
 
 function BrainPane() {
@@ -1321,7 +1445,7 @@ function BrainPane() {
         optional caretaker on top: a quiet helper that files your notes into the Library&rsquo;s areas and
         fills in their metadata (area, tags, a one-line summary). It only ever changes{" "}
         <b>where a note lives</b> and its <b>metadata</b> — the words inside your notes are never touched, and
-        everything it does is logged in Librarian Activity, undoable.
+        its completed actions appear in Librarian Activity, with guarded undo when the note still matches.
       </p>
       <Toggle
         on={brainOn}
@@ -1559,7 +1683,7 @@ function LocalModelsSection({ installed, onChanged }: { installed: ChatModelInfo
       <p className="setnote">
         Models that run entirely on your Mac. Pick any of them per chat — a model loads when asked and unloads
         after a few idle minutes, so nothing runs around the clock. The
-        <b> default</b> is what your other memex apps (like Breve) use.
+        <b> default</b> is what your other vault-aware tools (like Breve) use.
       </p>
 
       <div className="aiscan-row">
@@ -2213,11 +2337,13 @@ function ModelsPane() {
   const imageEngine = useUiStore((s) => s.imageEngine);
   const setImageEngine = useUiStore((s) => s.setImageEngine);
   const chatNoteOpen = useUiStore((s) => s.chatNoteOpen);
+  const chatArtifactOpen = useUiStore((s) => s.chatArtifactOpen);
   const readAloud = useUiStore((s) => s.readAloud);
   const setReadAloud = useUiStore((s) => s.setReadAloud);
   const readAloudVoice = useUiStore((s) => s.readAloudVoice);
   const setReadAloudVoice = useUiStore((s) => s.setReadAloudVoice);
   const setChatNoteOpen = useUiStore((s) => s.setChatNoteOpen);
+  const setChatArtifactOpen = useUiStore((s) => s.setChatArtifactOpen);
 
   const blockedModels = useUiStore((s) => s.blockedModels);
   const local = useQuery({
@@ -2460,6 +2586,23 @@ function ModelsPane() {
       </section>
 
       <section className="aisection">
+        <h4 className="set-subhead">Opening chat artifacts</h4>
+        <p className="setnote">
+          Reuse keeps one working pane beside the chat. Choose a new pane or a tab when you want each file
+          separated.
+        </p>
+        <Seg
+          value={chatArtifactOpen}
+          options={[
+            ["sidecar", "Reuse right pane"],
+            ["split", "New pane"],
+            ["tab", "New tab"],
+          ]}
+          onPick={setChatArtifactOpen}
+        />
+      </section>
+
+      <section className="aisection">
         <h4 className="set-subhead">Voice</h4>
         <p className="setnote">
           Read replies aloud with a speaker button on each answer. The voice runs on this Mac and is prepared
@@ -2488,19 +2631,19 @@ function ModelsPane() {
   );
 }
 
-/** The prompt you paste into Claude Code so a project's docs live in rotli (your
- * memex) instead of the repo — planning + documentation you organize in rotli,
+/** The prompt you paste into Claude Code so a project's docs live in your Rotli
+ * vault instead of the repo — planning + documentation you organize in rotli,
  * the README the only thing that stays in the repo. Copy-first; you refine the
  * wording to taste (Seth, 2026-07-07). */
-const CLAUDE_DOCS_COMMAND = `When you create or update documentation for this project, keep it in my rotli
-memex — NOT this repo. The README is the ONLY doc that stays in the repo.
+const CLAUDE_DOCS_COMMAND = `When you create or update documentation for this project, keep it in my Rotli
+vault — NOT this repo. The README is the ONLY doc that stays in the repo.
 
 • Before writing a new doc, ask me: "rotli or repo?" (the README always → repo).
 • When a doc goes to rotli, write the Markdown file into my rotli notes folder
   under wiki/_inbox/<slug>.md with frontmatter:
       ---
       owner: rotli
-      shelf: [<Project>]     # this project's name, e.g. Rotli or Memex
+      shelf: [<Project>]     # this project's name, e.g. Rotli
       ---
   rotli files it, and I keep it under my <Project> folder in Main.
 • Do not create or leave project docs in this repo's docs/ folder.`;
@@ -2524,7 +2667,7 @@ function SecurityPane() {
       </p>
       <span className="mplabel">What secure means</span>
       <p className="setnote">
-        Secure notes live in <b>Secure notes</b> — a real folder in your memex (<code>wiki/_secure/</code>),
+        Secure notes live in <b>Secure notes</b> — a real folder in your vault (<code>wiki/_secure/</code>),
         not a hidden vault — and every one is kept out of git automatically.
       </p>
       <p className="setnote">
@@ -2575,12 +2718,26 @@ function SecurityPane() {
 }
 
 function ConnectionsPane() {
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    void navigator.clipboard?.writeText(CLAUDE_DOCS_COMMAND).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    });
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const copyReset = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copyReset.current !== null) window.clearTimeout(copyReset.current);
+    },
+    [],
+  );
+
+  const copy = async () => {
+    if (copyReset.current !== null) window.clearTimeout(copyReset.current);
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard access is unavailable");
+      await navigator.clipboard.writeText(CLAUDE_DOCS_COMMAND);
+      setCopyState("copied");
+      copyReset.current = window.setTimeout(() => setCopyState("idle"), 1800);
+    } catch {
+      setCopyState("failed");
+    }
   };
   return (
     <>
@@ -2600,17 +2757,35 @@ function ConnectionsPane() {
           Extend rotli&rsquo;s corpus workflows without giving another service ownership of your notes.
         </p>
         <div className="claudecmd">
-          <div className="claudecmd-head">
+          <div className="claudecmd-intro">
             <h4>Use rotli for your docs</h4>
-            <button type="button" className="claudecmd-copy" onClick={copy} aria-live="polite">
-              {copied ? "Copied" : "Copy"}
-            </button>
+            <p className="plugdesc">
+              Paste this into Claude Code in any project and your planning + docs land in rotli instead of the
+              repo — everything but the README.
+            </p>
           </div>
-          <p className="plugdesc">
-            Paste this into Claude Code in any project and your planning + docs land in rotli instead of the
-            repo — everything but the README.
-          </p>
-          <pre className="claudecmd-block">{CLAUDE_DOCS_COMMAND}</pre>
+          <div className="claudecmd-shell">
+            <div className="claudecmd-toolbar">
+              <span>Claude Code instruction</span>
+              <button
+                type="button"
+                className={`claudecmd-copy ${copyState}`}
+                onClick={() => void copy()}
+                aria-label={
+                  copyState === "copied" ? "Copied Claude Code instruction" : "Copy Claude Code instruction"
+                }
+              >
+                {copyState === "copied" ? <CheckGlyph size={13} /> : <CopyGlyph size={13} />}
+                <span>
+                  {copyState === "copied" ? "Copied" : copyState === "failed" ? "Try again" : "Copy"}
+                </span>
+              </button>
+            </div>
+            <pre className="claudecmd-block">{CLAUDE_DOCS_COMMAND}</pre>
+          </div>
+          <span className={`claudecmd-status ${copyState === "failed" ? "failed" : ""}`} aria-live="polite">
+            {copyState === "failed" ? "Rotli couldn’t access the clipboard. Try copying again." : ""}
+          </span>
         </div>
       </section>
     </>

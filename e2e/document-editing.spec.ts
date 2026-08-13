@@ -48,8 +48,15 @@ test("DOCX list paragraphs use Univer's registered presets", async ({ page }) =>
 test("a PDF keeps its viewer header and offers an editable DOCX copy", async ({ page }) => {
   await gotoApp(page);
   await page.evaluate(async () => {
-    const panesPath = "/src/state/panes.ts";
-    const { usePanesStore } = await import(panesPath);
+    // A reused Vite server can have hot-reloaded this module under a timestamped
+    // URL. Import that exact instance so the test drives the store mounted by
+    // React instead of creating a second, disconnected Zustand store.
+    const panesPath = performance
+      .getEntriesByType("resource")
+      .map((entry) => entry.name)
+      .find((name) => new URL(name).pathname === "/src/state/panes.ts");
+    if (!panesPath) throw new Error("the mounted panes module could not be located");
+    const { usePanesStore } = await import(/* @vite-ignore */ panesPath);
     usePanesStore.getState().openFile("storage/reference.pdf", { newTab: true });
   });
 

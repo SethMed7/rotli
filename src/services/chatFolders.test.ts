@@ -41,6 +41,29 @@ describe("chat folders (virtual grouping over flat chats/)", () => {
     expect(grouped.loose.map((c) => c.slug)).toEqual(["a", "c"]);
   });
 
+  test("an unpinned folder with the newest chat floats above older folders", () => {
+    let { manifest, id: work } = createChatFolder(EMPTY_CHAT_FOLDERS, "Work");
+    const personal = createChatFolder(manifest, "Personal");
+    manifest = personal.manifest;
+    manifest = assignChatToFolder(manifest, "old", work);
+    manifest = assignChatToFolder(manifest, "new", personal.id);
+    const chats = [
+      { slug: "new", modifiedMs: 900 },
+      { slug: "old", modifiedMs: 100 },
+    ];
+    expect(groupChats(chats, manifest).folders.map((f) => f.folder.name)).toEqual(["Personal", "Work"]);
+  });
+
+  test("a folder with activity floats above an empty folder", () => {
+    let { manifest, id: empty } = createChatFolder(EMPTY_CHAT_FOLDERS, "Empty");
+    const active = createChatFolder(manifest, "Active");
+    manifest = assignChatToFolder(active.manifest, "recent", active.id);
+    expect(
+      groupChats([{ slug: "recent", modifiedMs: 900 }], manifest).folders.map((f) => f.folder.name),
+    ).toEqual(["Active", "Empty"]);
+    expect(empty).not.toBe(active.id);
+  });
+
   test("deleting a folder frees its chats; renaming keeps assignments", () => {
     let { manifest, id } = createChatFolder(EMPTY_CHAT_FOLDERS, "Work");
     manifest = assignChatToFolder(manifest, "b", id);

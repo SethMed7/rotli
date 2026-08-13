@@ -14,6 +14,7 @@ export type ToolName =
   | "search_notes"
   | "read_note"
   | "create_note"
+  | "create_document"
   | "update_note"
   | "open_note"
   | "search_memory"
@@ -69,6 +70,13 @@ export interface ChatTurn {
   text: string;
 }
 
+/** A bounded choice the model cannot safely infer. The application renders
+ * this consistently for every local, connected, and hybrid provider. */
+export interface AgentQuestion {
+  prompt: string;
+  options: string[];
+}
+
 export interface CompleteReq {
   messages: { role: "system" | "user" | "assistant"; content: string; images?: string[] }[];
   /** Ask the model server to coerce a single JSON object (MLX generate shape). */
@@ -92,6 +100,10 @@ export interface Host {
   /** CREATE a note — the same intake lane as the workspace CLI (staging/Inbox;
    * the organizer files it later). Returns the observation the model reports. */
   createNote(title: string, body: string): Promise<string>;
+  /** Create a conventional editable Word document through the desktop's
+   * managed-document workflow. Optional so browser/headless hosts do not
+   * pretend to provide native file creation. */
+  createDocument?(title: string, body: string): Promise<string>;
   /** REWRITE an existing note's editor body (frontmatter preserved). Gated
    * like a read — the model may only edit what it could read — and a
    * secure-context chat may only edit notes that are themselves secure.
@@ -128,6 +140,7 @@ export interface Host {
 /** The classified result of a model step. */
 export type Parsed =
   | { kind: "call"; tool: ToolName; args: Record<string, unknown>; thought?: string }
+  | ({ kind: "question"; thought?: string } & AgentQuestion)
   | { kind: "final"; text: string; thought?: string }
   | { kind: "invalid"; reason: string }
   | { kind: "unparseable"; raw: string };
@@ -151,6 +164,7 @@ export type AgentEvent =
   | { type: "status"; text: string }
   | { type: "tool"; tool: ToolName; args: Record<string, unknown> }
   | { type: "delta"; text: string }
+  | ({ type: "question" } & AgentQuestion)
   | { type: "final"; text: string };
 
 export interface RunInput {
@@ -172,6 +186,8 @@ export interface RunInput {
   /** Offer the generate_image tool (a connected engine is set up + the chat is
    * saved, so its assets dir is well-defined). Independent of the web globe. */
   imageTool?: boolean;
+  /** Offer native editable Word-document creation (desktop app only). */
+  documentTool?: boolean;
   /** Offer the draw_board tool (the desktop app; conversion is fully local). */
   boardTool?: boolean;
   /** Offer conventional document, sheet, and PDF-copy creation. */

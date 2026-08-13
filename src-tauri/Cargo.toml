@@ -25,7 +25,6 @@ tauri-plugin-deep-link = "2"                                     # rotli:// link
 tauri-plugin-dialog = "2"                                        # native folder picker (move the corpus)
 percent-encoding = "2"                                           # deep-link id encoding (already transitive)
 tauri-plugin-updater = "2"                                       # in-app updates (signed feed → download + relaunch)
-tauri-plugin-process = "2"                                       # relaunch() after an update installs
 ureq = { version = "2", features = ["json"] }                   # Chat front: POST the on-device model from Rust (the webview CSP blocks localhost)
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

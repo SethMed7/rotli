@@ -38,10 +38,11 @@ inward toward stable business rules:
    the composition root—never every consumer.
 9. Source module filenames use camelCase. Exported React components remain
    PascalCase; filename casing does not leak into the product vocabulary.
-10. The memex is the data store. Do not add a database for state that belongs in
-    content, clean metadata, or a rebuildable `.rotli/` projection.
-11. The memex contains portable knowledge, metadata, prompts, protocols, and
-    capability maps. It does not own provider clients, model calls, ranking
+10. The vault's ordinary files are the data store. Do not add a database for
+    state that belongs in content, clean metadata, or a rebuildable `.rotli/`
+    projection.
+11. The vault contract contains portable knowledge, metadata, prompts,
+    protocols, and capability maps. It does not own provider clients, model calls, ranking
     execution, or agent orchestration; those remain in Rotli's AI/application
     layer behind host ports.
 

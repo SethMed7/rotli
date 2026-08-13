@@ -32,6 +32,8 @@ export const EMPTY_BOARD_META: BoardMeta = { description: "", tags: "" };
 export interface LoadedBoard {
   scene: unknown;
   meta: BoardMeta;
+  /** Present for a corpus-backed load; omitted by the pure parser. */
+  revision?: string;
 }
 
 /** Parse and fully validate a raw .excalidraw body. Corrupt or oversized input
@@ -64,18 +66,41 @@ function durableAppState(appState: Record<string, unknown>): Record<string, unkn
  * selection, tool) is stripped so saves stay diff-friendly; rotliMeta always
  * rides top-level so no save path can drop the board's AI description/tags. */
 export function serializeBoardScene(parts: {
+  /** Original parsed scene. Unknown top-level fields and newer schema markers
+   * are user data; known Rotli/Excalidraw fields below deliberately override
+   * only the portions this editor owns. */
+  sourceScene?: Record<string, unknown>;
   elements: readonly unknown[];
   appState: Record<string, unknown>;
   files: Record<string, unknown>;
   meta: BoardMeta;
 }): string {
+  const source = parts.sourceScene ?? {};
+  const originalElements = new Map<string, Record<string, unknown>>();
+  if (Array.isArray(source.elements)) {
+    for (const element of source.elements) {
+      if (element && typeof element === "object" && typeof (element as { id?: unknown }).id === "string") {
+        originalElements.set((element as { id: string }).id, element as Record<string, unknown>);
+      }
+    }
+  }
+  const elements = parts.elements.map((element) => {
+    if (!element || typeof element !== "object" || typeof (element as { id?: unknown }).id !== "string") {
+      return element;
+    }
+    const id = (element as { id: string }).id;
+    return { ...(originalElements.get(id) ?? {}), ...(element as Record<string, unknown>) };
+  });
+  const originalFiles =
+    source.files && typeof source.files === "object" ? (source.files as Record<string, unknown>) : {};
   const body = JSON.stringify({
-    type: "excalidraw" as const,
-    version: 2,
-    source: "rotli",
-    elements: parts.elements,
+    ...source,
+    type: source.type ?? ("excalidraw" as const),
+    version: source.version ?? 2,
+    source: source.source ?? "rotli",
+    elements,
     appState: durableAppState(parts.appState),
-    files: parts.files,
+    files: { ...originalFiles, ...parts.files },
     rotliMeta: parts.meta,
   });
   parseAndValidateBoard(body);
@@ -85,7 +110,7 @@ export function serializeBoardScene(parts: {
 export interface BoardSaver {
   /** The just-loaded canonical body — a later save identical to it is skipped
    * (opening/panning a board must never touch the file). */
-  prime(body: string): void;
+  prime(body: string, revision?: string): void;
   /** Stash the freshest BUILDER and (re)arm the trailing debounce. The builder
    * runs at most once per drain — Excalidraw fires onChange per pointer move,
    * and serializing megabytes per event was the big-board perf cliff. */
@@ -114,7 +139,10 @@ export function createBoardSaver(
         lastSaved = body;
         onResult?.(null);
       },
-      (e: unknown) => onResult?.(e instanceof Error ? e.message : String(e)),
+      (e: unknown) => {
+        onResult?.(e instanceof Error ? e.message : String(e));
+        throw e;
+      },
     );
   const task = createDebouncedTask(BOARD_SAVE_DEBOUNCE_MS, () => {
     const build = pendingBuild;
@@ -125,7 +153,7 @@ export function createBoardSaver(
       body = build();
     } catch (e) {
       onResult?.(e instanceof Error ? e.message : String(e));
-      return;
+      throw e;
     }
     if (body === lastSaved) return; // viewport churn, selection, a no-op — skip
     return put(body);
@@ -139,7 +167,7 @@ export function createBoardSaver(
       task.schedule();
     },
     saveNow(body) {
-      void put(body);
+      void put(body).catch(() => {});
     },
     flush() {
       return task.flush();

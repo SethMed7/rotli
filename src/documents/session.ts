@@ -11,6 +11,7 @@ export interface ParkedDocumentSession {
   session: ReadyDocumentSession;
   document: EditableDocument;
   diskLen: number;
+  diskRevision: string;
   dirtyGen: number;
 }
 
@@ -19,13 +20,14 @@ interface LiveDocumentSession {
   session: ReadyDocumentSession;
   snapshot: () => EditableDocument;
   diskLen: number;
+  diskRevision: string;
   dirtyGen: () => number;
   onFlushed: (gen: number) => void;
 }
 
 const parked = new Map<string, ParkedDocumentSession>();
 const live = new Map<string, LiveDocumentSession>();
-let flushing = false;
+let activeFlush: Promise<void> | null = null;
 
 export function getParkedDocument(fileId: string): ParkedDocumentSession | undefined {
   return parked.get(fileId);
@@ -47,10 +49,10 @@ export function unregisterLiveDocument(fileId: string): void {
   live.delete(fileId);
 }
 
-export async function flushDirtyDocuments(): Promise<void> {
-  if (flushing) return;
-  flushing = true;
-  try {
+export function flushDirtyDocuments(): Promise<void> {
+  if (activeFlush) return activeFlush;
+  activeFlush = (async () => {
+    const failures: string[] = [];
     for (const entry of [...live.values()]) {
       const gen = entry.dirtyGen();
       if (!gen) continue;
@@ -59,31 +61,40 @@ export async function flushDirtyDocuments(): Promise<void> {
           session: entry.session,
           document: entry.snapshot(),
           diskLen: entry.diskLen,
+          diskRevision: entry.diskRevision,
           dirtyGen: gen,
         });
-      } catch {
-        /* snapshot failed — leave the live session for the next flush */
+      } catch (error) {
+        failures.push(
+          `${entry.fileId}: snapshot failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
     for (const [fileId, entry] of [...parked]) {
       try {
-        await entry.session.save(entry.document);
+        const revision = await entry.session.save(entry.document);
+        entry.diskRevision = revision;
         if (parked.get(fileId) === entry) parked.delete(fileId);
         const current = live.get(fileId);
-        if (current && current.dirtyGen() === entry.dirtyGen) current.onFlushed(entry.dirtyGen);
-      } catch {
-        /* stays parked; explicit Save will show the error */
+        if (current && current.dirtyGen() === entry.dirtyGen) {
+          current.diskRevision = revision;
+          current.onFlushed(entry.dirtyGen);
+        }
+      } catch (error) {
+        failures.push(`${fileId}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
-  } finally {
-    flushing = false;
-  }
+    if (failures.length > 0) throw new Error(failures.join("; "));
+  })().finally(() => {
+    activeFlush = null;
+  });
+  return activeFlush;
 }
 
 if (typeof document !== "undefined") {
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") void flushDirtyDocuments();
+    if (document.visibilityState === "hidden") void flushDirtyDocuments().catch(() => {});
   });
-  window.addEventListener("pagehide", () => void flushDirtyDocuments());
+  window.addEventListener("pagehide", () => void flushDirtyDocuments().catch(() => {}));
 }
 onQuitFlush(() => flushDirtyDocuments());

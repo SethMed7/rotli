@@ -59,7 +59,7 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
     {
       digit: "1",
       label: "Chat",
-      description: "A conversation with your models over the memex.",
+      description: "A conversation with your models using your vault as context.",
       glyph: <ChatGlyph size={22} />,
       run: () => {
         close();

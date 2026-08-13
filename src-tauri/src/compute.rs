@@ -107,8 +107,20 @@ pub(crate) fn parse_knobs(settings: &str) -> Knobs {
             .and_then(serde_json::Value::as_bool)
             .unwrap_or(d.enabled),
         min_free_pct: num(&v, "localMinFreePercent", 0.0, 95.0, d.min_free_pct),
-        warn_multiplier: num(&v, "localWarnReserveMultiplier", 1.0, 10.0, d.warn_multiplier),
-        overhead_mb: num(&v, "localRequestOverheadMB", 0.0, 262_144.0, d.overhead_mb as f64) as u64,
+        warn_multiplier: num(
+            &v,
+            "localWarnReserveMultiplier",
+            1.0,
+            10.0,
+            d.warn_multiplier,
+        ),
+        overhead_mb: num(
+            &v,
+            "localRequestOverheadMB",
+            0.0,
+            262_144.0,
+            d.overhead_mb as f64,
+        ) as u64,
         fallback_footprint_mb: num(
             &v,
             "localModelFootprintMB",
@@ -117,8 +129,20 @@ pub(crate) fn parse_knobs(settings: &str) -> Knobs {
             d.fallback_footprint_mb as f64,
         ) as u64,
         queue_max: num(&v, "localQueueMax", 1.0, 256.0, d.queue_max as f64) as usize,
-        wait: Duration::from_secs_f64(num(&v, "localQueueWaitSecs", 1.0, 86_400.0, DEFAULT_WAIT_SECS)),
-        poll: Duration::from_millis(num(&v, "localQueuePollMs", 50.0, 60_000.0, DEFAULT_POLL_MS as f64) as u64),
+        wait: Duration::from_secs_f64(num(
+            &v,
+            "localQueueWaitSecs",
+            1.0,
+            86_400.0,
+            DEFAULT_WAIT_SECS,
+        )),
+        poll: Duration::from_millis(num(
+            &v,
+            "localQueuePollMs",
+            50.0,
+            60_000.0,
+            DEFAULT_POLL_MS as f64,
+        ) as u64),
     }
 }
 
@@ -163,7 +187,9 @@ pub(crate) struct Memory {
 /// guarantee is one anyway — so the degrade costs latency and nothing else.
 pub(crate) fn read_memory() -> Option<Memory> {
     let total_bytes: f64 = crate::localmodel::sysctl("hw.memsize")?.parse().ok()?;
-    let available_pct: f64 = crate::localmodel::sysctl("kern.memorystatus_level")?.parse().ok()?;
+    let available_pct: f64 = crate::localmodel::sysctl("kern.memorystatus_level")?
+        .parse()
+        .ok()?;
     if !total_bytes.is_finite() || total_bytes <= 0.0 || !available_pct.is_finite() {
         return None;
     }
@@ -412,7 +438,10 @@ impl Shared {
     }
 
     pub(crate) fn prioritize(&self, id: &str) -> Result<(), String> {
-        let mut g = self.inner.lock().map_err(|_| "compute queue lock poisoned".to_string())?;
+        let mut g = self
+            .inner
+            .lock()
+            .map_err(|_| "compute queue lock poisoned".to_string())?;
         if !g.prioritize(id) {
             return Err("that message isn't waiting for compute anymore.".into());
         }
@@ -428,7 +457,10 @@ impl Shared {
         // WAITING entry, but a streaming generation is already running — it
         // polls the abort set and stops (Stop, mid-stream).
         self.request_abort(id);
-        let mut g = self.inner.lock().map_err(|_| "compute queue lock poisoned".to_string())?;
+        let mut g = self
+            .inner
+            .lock()
+            .map_err(|_| "compute queue lock poisoned".to_string())?;
         g.cancel(id); // unknown / already-running id = no-op, never an error
         let snap = g.snapshot();
         self.emit(&snap);
@@ -446,7 +478,10 @@ impl Shared {
 
     /// Has this request been asked to abort? Polled between streamed tokens.
     pub(crate) fn is_aborted(&self, id: &str) -> bool {
-        self.aborts.lock().map(|set| set.contains(id)).unwrap_or(false)
+        self.aborts
+            .lock()
+            .map(|set| set.contains(id))
+            .unwrap_or(false)
     }
 
     /// Clear a request's abort flag — the streamer calls this when it finishes
@@ -469,7 +504,10 @@ impl Shared {
         read_mem: &dyn Fn() -> Option<Memory>,
     ) -> Result<Ticket, String> {
         {
-            let mut g = self.inner.lock().map_err(|_| "compute queue lock poisoned".to_string())?;
+            let mut g = self
+                .inner
+                .lock()
+                .map_err(|_| "compute queue lock poisoned".to_string())?;
             if g.waiting.iter().any(|w| w.id == id) || g.running.iter().any(|r| r.id == id) {
                 return Err("that local request is already in flight.".into());
             }
@@ -492,7 +530,10 @@ impl Shared {
 
         let deadline = Instant::now() + knobs.wait;
         let mut mem = read_mem();
-        let mut g = self.inner.lock().map_err(|_| "compute queue lock poisoned".to_string())?;
+        let mut g = self
+            .inner
+            .lock()
+            .map_err(|_| "compute queue lock poisoned".to_string())?;
         loop {
             let Some(pos) = g.waiting.iter().position(|w| w.id == id) else {
                 // dropped out from under us (a hard cancel) — treat as cancelled
@@ -515,10 +556,16 @@ impl Shared {
             match decision {
                 Decision::Admit => {
                     g.waiting.remove(pos);
-                    g.running.push(Running { id: id.to_string(), model: model.to_string() });
+                    g.running.push(Running {
+                        id: id.to_string(),
+                        model: model.to_string(),
+                    });
                     let snap = g.snapshot();
                     self.emit(&snap);
-                    return Ok(Ticket { shared: Arc::clone(self), id: id.to_string() });
+                    return Ok(Ticket {
+                        shared: Arc::clone(self),
+                        id: id.to_string(),
+                    });
                 }
                 Decision::Wait(reason) => {
                     if g.waiting[pos].reason != reason {
@@ -546,7 +593,10 @@ impl Shared {
                 .map_err(|_| "compute queue lock poisoned".to_string())?;
             drop(next);
             mem = read_mem();
-            g = self.inner.lock().map_err(|_| "compute queue lock poisoned".to_string())?;
+            g = self
+                .inner
+                .lock()
+                .map_err(|_| "compute queue lock poisoned".to_string())?;
         }
     }
 }
@@ -565,7 +615,8 @@ pub(crate) fn with_slot<T>(
     if !knobs.enabled {
         return run();
     }
-    let footprint = crate::localmodel::model_footprint_mb(model).unwrap_or(knobs.fallback_footprint_mb);
+    let footprint =
+        crate::localmodel::model_footprint_mb(model).unwrap_or(knobs.fallback_footprint_mb);
     let _ticket = state.0.acquire(id, model, footprint, knobs, &read_memory)?;
     run()
 }
@@ -606,10 +657,17 @@ mod tests {
     use super::*;
 
     fn mem(total_gb: f64, pct: f64, pressure: Pressure) -> Memory {
-        Memory { total_mb: total_gb * 1024.0, available_pct: pct, pressure }
+        Memory {
+            total_mb: total_gb * 1024.0,
+            available_pct: pct,
+            pressure,
+        }
     }
     fn running(model: &str) -> Running {
-        Running { id: format!("r-{model}"), model: model.to_string() }
+        Running {
+            id: format!("r-{model}"),
+            model: model.to_string(),
+        }
     }
 
     // ── the admission rule ───────────────────────────────────────────────────
@@ -618,7 +676,13 @@ mod tests {
     fn an_idle_mac_with_room_admits() {
         let k = Knobs::default();
         // 64 GB at 52% available, an 8 GB model: cost ≈ 13.4 pts, leaves ≈ 38.6
-        let d = decide("gemma", 8192, &[], Some(mem(64.0, 52.0, Pressure::Normal)), &k);
+        let d = decide(
+            "gemma",
+            8192,
+            &[],
+            Some(mem(64.0, 52.0, Pressure::Normal)),
+            &k,
+        );
         assert_eq!(d, Decision::Admit);
     }
 
@@ -626,7 +690,13 @@ mod tests {
     fn a_small_mac_queues_the_same_model_instead_of_thrashing() {
         let k = Knobs::default();
         // 16 GB at 45%: an 8 GB model costs ≈ 55 pts — nowhere near 20% reserve
-        let d = decide("gemma", 8192, &[], Some(mem(16.0, 45.0, Pressure::Normal)), &k);
+        let d = decide(
+            "gemma",
+            8192,
+            &[],
+            Some(mem(16.0, 45.0, Pressure::Normal)),
+            &k,
+        );
         assert_eq!(d, Decision::Wait(REASON_HEADROOM));
     }
 
@@ -635,9 +705,15 @@ mod tests {
         let k = Knobs::default();
         let m = mem(16.0, 30.0, Pressure::Normal);
         // cold: 8 GB + 768 MB on 16 GB = ~55 pts ⇒ no
-        assert_eq!(decide("gemma", 8192, &[], Some(m), &k), Decision::Wait(REASON_HEADROOM));
+        assert_eq!(
+            decide("gemma", 8192, &[], Some(m), &k),
+            Decision::Wait(REASON_HEADROOM)
+        );
         // warm: the weights are already loaded, so only 768 MB ⇒ ~4.7 pts ⇒ yes
-        assert_eq!(decide("gemma", 8192, &[running("gemma")], Some(m), &k), Decision::Admit);
+        assert_eq!(
+            decide("gemma", 8192, &[running("gemma")], Some(m), &k),
+            Decision::Admit
+        );
     }
 
     #[test]
@@ -653,14 +729,24 @@ mod tests {
     #[test]
     fn exactly_at_the_reserve_line_admits_and_one_mb_more_does_not() {
         let k = Knobs::default(); // reserve 20%, overhead 768 MB
-        // 100 GB total ⇒ 1 pt = 1024 MB. Pick availability so the sums are exact.
+                                  // 100 GB total ⇒ 1 pt = 1024 MB. Pick availability so the sums are exact.
         let total_mb = 102_400.0;
         let footprint = 10_240 - DEFAULT_OVERHEAD_MB; // marginal = exactly 10 GB = 10 pts
-        let at = Memory { total_mb, available_pct: 30.0, pressure: Pressure::Normal };
+        let at = Memory {
+            total_mb,
+            available_pct: 30.0,
+            pressure: Pressure::Normal,
+        };
         assert_eq!(decide("m", footprint, &[], Some(at), &k), Decision::Admit);
 
-        let below = Memory { available_pct: 30.0 - 0.001, ..at };
-        assert_eq!(decide("m", footprint, &[], Some(below), &k), Decision::Wait(REASON_HEADROOM));
+        let below = Memory {
+            available_pct: 30.0 - 0.001,
+            ..at
+        };
+        assert_eq!(
+            decide("m", footprint, &[], Some(below), &k),
+            Decision::Wait(REASON_HEADROOM)
+        );
     }
 
     #[test]
@@ -668,7 +754,10 @@ mod tests {
         let k = Knobs::default();
         // 35% available, ~5 pt cost: clears 20% but not the doubled 40%
         let m = |p| mem(100.0, 35.0, p);
-        assert_eq!(decide("m", 4096, &[], Some(m(Pressure::Normal)), &k), Decision::Admit);
+        assert_eq!(
+            decide("m", 4096, &[], Some(m(Pressure::Normal)), &k),
+            Decision::Admit
+        );
         assert_eq!(
             decide("m", 4096, &[], Some(m(Pressure::Warn)), &k),
             Decision::Wait(REASON_HEADROOM)
@@ -692,9 +781,15 @@ mod tests {
 
     #[test]
     fn the_master_switch_admits_everything() {
-        let k = Knobs { enabled: false, ..Knobs::default() };
+        let k = Knobs {
+            enabled: false,
+            ..Knobs::default()
+        };
         let starved = mem(8.0, 1.0, Pressure::Critical);
-        assert_eq!(decide("m", 64_000, &[running("other")], Some(starved), &k), Decision::Admit);
+        assert_eq!(
+            decide("m", 64_000, &[running("other")], Some(starved), &k),
+            Decision::Admit
+        );
     }
 
     // ── knobs ────────────────────────────────────────────────────────────────
@@ -751,7 +846,10 @@ mod tests {
         let inner = seed(&["a", "b", "c"]);
         assert_eq!(order(&inner), ["a", "b", "c"]);
         let snap = inner.snapshot();
-        assert_eq!(snap.waiting.iter().map(|e| e.position).collect::<Vec<_>>(), [0, 1, 2]);
+        assert_eq!(
+            snap.waiting.iter().map(|e| e.position).collect::<Vec<_>>(),
+            [0, 1, 2]
+        );
         assert_eq!(snap.waiting[0].reason, REASON_QUEUED);
         assert!(snap.running.is_empty());
     }
@@ -777,8 +875,22 @@ mod tests {
         let mut inner = seed(&["a", "b"]);
         inner.running.push(running("m"));
         assert!(inner.cancel("b"));
-        assert!(inner.waiting.iter().find(|w| w.id == "b").unwrap().cancelled);
-        assert!(!inner.waiting.iter().find(|w| w.id == "a").unwrap().cancelled);
+        assert!(
+            inner
+                .waiting
+                .iter()
+                .find(|w| w.id == "b")
+                .unwrap()
+                .cancelled
+        );
+        assert!(
+            !inner
+                .waiting
+                .iter()
+                .find(|w| w.id == "a")
+                .unwrap()
+                .cancelled
+        );
         // a running id (and an unknown one) is a no-op, never an error
         assert!(!inner.cancel("r-m"));
         assert!(!inner.cancel("nope"));
@@ -788,7 +900,11 @@ mod tests {
     // ── acquire / release / cancel end to end ────────────────────────────────
 
     fn fast_knobs() -> Knobs {
-        Knobs { poll: Duration::from_millis(5), wait: Duration::from_secs(5), ..Knobs::default() }
+        Knobs {
+            poll: Duration::from_millis(5),
+            wait: Duration::from_secs(5),
+            ..Knobs::default()
+        }
     }
     fn roomy() -> Option<Memory> {
         Some(mem(512.0, 90.0, Pressure::Normal))
@@ -803,7 +919,10 @@ mod tests {
             }
             std::thread::sleep(Duration::from_millis(5));
         }
-        panic!("queue never reached the expected state: {:?}", shared.snapshot());
+        panic!(
+            "queue never reached the expected state: {:?}",
+            shared.snapshot()
+        );
     }
 
     #[test]
@@ -820,7 +939,10 @@ mod tests {
     #[test]
     fn a_queue_full_arrival_is_refused_honestly_instead_of_waiting_forever() {
         let shared = Arc::new(Shared::default());
-        let k = Knobs { queue_max: 1, ..fast_knobs() };
+        let k = Knobs {
+            queue_max: 1,
+            ..fast_knobs()
+        };
         // park one waiter (a different model is generating ⇒ it can never admit)
         let held = shared.acquire("run", "gemma", 1, &k, &roomy).unwrap();
         let bg = {
@@ -891,7 +1013,9 @@ mod tests {
         assert_eq!(snap.waiting[1].reason, REASON_AHEAD); // and it knows why
 
         shared.prioritize("second").unwrap();
-        let snap = until(&shared, |s| s.waiting.first().is_some_and(|w| w.request_id == "second"));
+        let snap = until(&shared, |s| {
+            s.waiting.first().is_some_and(|w| w.request_id == "second")
+        });
         assert_eq!(snap.waiting[1].request_id, "first");
 
         drop(held);
@@ -913,10 +1037,16 @@ mod tests {
     #[test]
     fn a_waiter_that_never_fits_gives_up_honestly() {
         let shared = Arc::new(Shared::default());
-        let k = Knobs { wait: Duration::from_millis(40), ..fast_knobs() };
+        let k = Knobs {
+            wait: Duration::from_millis(40),
+            ..fast_knobs()
+        };
         let held = shared.acquire("run", "gemma", 1, &k, &roomy).unwrap();
         let err = shared.acquire("wait", "qwen", 1, &k, &roomy).unwrap_err();
-        assert!(err.contains("waited for compute longer than expected"), "{err}");
+        assert!(
+            err.contains("waited for compute longer than expected"),
+            "{err}"
+        );
         assert!(shared.snapshot().waiting.is_empty()); // and it left no ghost
         drop(held);
     }

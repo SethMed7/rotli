@@ -15,8 +15,9 @@ import { MAIN_ROOT, addNoteToMainAt } from "../services/mainTree";
 import { useMainStore } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { convertLegacyDocument } from "./conversion";
+import { documentDraftFromMarkdown } from "./fromMarkdown";
 import { DOCUMENT_EDIT_MAX_BYTES } from "./kinds";
-import { blankDocumentDraft, type DocumentDraft } from "./model";
+import { blankDocumentDraft, type DocumentDraft, type DocumentImage } from "./model";
 import type { DocumentFileReader, DocumentFileWriter, DocumentRepository } from "./ports";
 import { createDocument, createNamedDocument, editDocument } from "./workflow";
 
@@ -39,15 +40,31 @@ export async function createManagedDocument(now = Date.now()): Promise<string> {
 }
 
 export async function createManagedDocumentFromDraft(
-  name: string,
+  title: string,
   draft: DocumentDraft,
+  now = Date.now(),
   rootId?: string,
 ): Promise<string> {
   const { docxEncoder } = await import("./create");
   const routedRepository: DocumentRepository = rootId
-    ? { create: (fileName, base64) => corpusCreateManagedFile(fileName, base64, rootId) }
+    ? { create: (name, base64) => corpusCreateManagedFile(name, base64, rootId) }
     : repository;
-  return createNamedDocument({ encoder: docxEncoder, repository: routedRepository }, name, draft);
+  return createNamedDocument({ encoder: docxEncoder, repository: routedRepository }, title, draft, now);
+}
+
+export function createManagedDocumentFromMarkdown(
+  title: string,
+  body: string,
+  now = Date.now(),
+  images: DocumentImage[] = [],
+  rootId?: string,
+): Promise<string> {
+  return createManagedDocumentFromDraft(
+    title,
+    { ...documentDraftFromMarkdown(title, body), ...(images.length ? { images } : {}) },
+    now,
+    rootId,
+  );
 }
 
 export async function editManagedDocument(fileId: string) {

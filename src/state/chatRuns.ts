@@ -1,26 +1,27 @@
 // Live chat-run signals for the sidebar (Seth, 2026-08-03: "some sort of
 // loading on the left sidebar for when the chat is loading and completed —
 // that way I know to click on it"). One tiny in-memory store: a chat is
-// `running` while its turn is in flight and `unread` when the reply settled
-// while the user was looking elsewhere. Keys are the vault-scoped chatKey
-// (`<instanceId>:<slug>`, or `unsaved:<paneId>` before the first save binds).
+// `running` while its turn is in flight, `unread` when the reply settled while
+// the user was looking elsewhere, and `done` after it has been acknowledged.
+// Keys are the vault-scoped chatKey
+// (`<instanceId>:<slug>`, or `unsaved:<tabId>` before the first save binds).
 // Deliberately NOT persisted: the transcript on disk is the durable truth —
 // these are session signals, and a relaunch starts quiet.
 
 import { create } from "zustand";
 
-export type ChatRunState = "running" | "unread";
+export type ChatRunState = "running" | "unread" | "done";
 
 interface ChatRunsState {
   runs: Record<string, ChatRunState>;
-  /** A turn took off — the sidebar row starts its pulse. */
+  /** A turn took off — the sidebar row shows its static working mark. */
   markRunning: (key: string) => void;
   /** The turn settled. `seen` = the surface was still mounted (the user watched
-   * the answer arrive) — clears; otherwise the row flips to `unread`. */
+   * the answer arrive) — done; otherwise the row flips to `unread`. */
   settleRun: (key: string, seen: boolean) => void;
-  /** The first save binds an unsaved pane key to its real slug key. */
+  /** The first save binds an unsaved tab key to its real slug key. */
   retargetRun: (oldKey: string, newKey: string) => void;
-  /** Opening the chat spends its unread flag (a running one keeps pulsing). */
+  /** Opening the chat acknowledges unread as done (a live run stays marked). */
   clearUnread: (key: string) => void;
 }
 
@@ -34,7 +35,7 @@ export const useChatRuns = create<ChatRunsState>((set, get) => ({
     const runs = { ...get().runs };
     if (seen) {
       if (!(key in runs)) return;
-      delete runs[key];
+      runs[key] = "done";
     } else {
       runs[key] = "unread";
     }
@@ -51,7 +52,7 @@ export const useChatRuns = create<ChatRunsState>((set, get) => ({
   clearUnread: (key) => {
     if (get().runs[key] !== "unread") return;
     const runs = { ...get().runs };
-    delete runs[key];
+    runs[key] = "done";
     set({ runs });
   },
 }));

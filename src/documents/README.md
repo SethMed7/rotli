@@ -11,7 +11,7 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
 - `kinds.ts` is the only frontend format-policy registry: extensions, local
   editing support, creation format, search keywords, byte cap, and native apps.
 - `theme.ts` is the only generated-DOCX visual contract: Word font names,
-  sizes, colors, page size, and margins.
+  sizes, colors, page size, margins, and embedded-image frame limits.
 - `create.ts` is a pure OOXML encoder. It knows no UI, corpus, or Tauri state.
 - `codec/docx.ts` maps supported OOXML paragraphs, text styles, and tables to
   the clean document model. It patches `word/document.xml`, preserves unrelated
@@ -22,6 +22,10 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
   Its narrow policy helper owns mutation classification and the insertion-range
   bridge needed when a portaled table dialog takes focus.
 - `composition.ts` is the only module that joins concrete adapters to Tauri.
+- Chat-authored Word documents reuse that composition and the ordinary managed
+  item filing workflow. Model-authored Markdown-like headings, paragraphs,
+  lists, and one table are converted only at the creation boundary; the durable
+  result is conventional DOCX, not a parallel Markdown document system.
 - `documentEditor.tsx` owns editor lifecycle, scoped ⌘S, dirty parking, and save
   status. `embedDocument.tsx` and `fileSurface.tsx` are hosts; neither parses or
   generates document bytes.
@@ -32,8 +36,8 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
 ## Editing boundary
 
 DOCX support is create + local structured editing. The portable subset currently
-covers paragraphs, heading/title styles, alignment, lists, fonts, sizes, color,
-common inline emphasis, and native Word tables with editable cell content and
+supports paragraphs, heading/title styles, alignment, lists, fonts, sizes, color,
+common inline emphasis, embedded raster images, and native Word tables with editable cell content and
 row/column structure through Univer. Unsupported Word objects remain preserved
 in their OOXML locations but are not editable; a one-time `.bak` protects the
 original before the first Rotli save. Markdown-only features such as slash
@@ -44,6 +48,16 @@ environment: white paper, black Arial text when the file does not specify a
 style, one complete page fitted at initial open, and no canvas margin-corner
 guides. Opening a modal must not discard the document insertion range. Only
 content mutations make a session dirty; viewport zoom and scroll never do.
+
+Raster images generated earlier in the same chat run are embedded as ordinary
+DOCX media and rendered as inline drawings in the local editor. Resizing and
+newly inserting supported PNG, JPEG, GIF, or BMP drawings round-trip through
+OOXML relationships; unsupported drawing structures remain byte-preserved when
+untouched. Creation fails visibly instead of producing a document that claims a
+missing or unreadable image was embedded. Generated visuals use the same
+500×500 maximum frame as the local editor, include Univer's complete inline
+drawing metadata, and sit after the introductory heading/prose rather than
+between the title and the document's opening thought.
 
 Legacy `.doc`, `.rtf`, and `.odt` files use an explicit macOS-local conversion
 workflow. `/usr/bin/textutil` writes a temporary DOCX, Rotli validates the

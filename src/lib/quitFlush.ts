@@ -10,7 +10,8 @@
 // milliseconds instead of riding out the Rust-side timeout.
 //
 // Register work with `onQuitFlush` — SheetEditor parks its dirty-sheet flush here.
-// Flushers run in parallel and a throwing flusher never blocks the ack.
+// Flushers run in parallel. Any failure is reported to Rust, which aborts the
+// normal quit and keeps the user's unsaved buffers alive.
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -33,23 +34,45 @@ export function onQuitFlush(fn: Flusher): () => void {
   };
 }
 
-/** Run every registered flusher; resolves when ALL settle (a rejection is a
- * skipped flush, never a hung quit). Exported for tests. */
+/** Run every registered flusher and preserve all failures after every flusher
+ * had a chance to save. Exported for tests. */
 export async function runQuitFlushers(): Promise<void> {
-  await Promise.allSettled([...flushers].map(async (f) => f()));
+  const results = await Promise.allSettled([...flushers].map(async (f) => f()));
+  const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failures.length > 0) {
+    const first = failures[0]?.reason;
+    throw new Error(
+      `${failures.length} save operation${failures.length === 1 ? "" : "s"} failed: ${first instanceof Error ? first.message : String(first)}`,
+    );
+  }
+}
+
+type QuitFlushPayload = { attemptId: number };
+const failureSubscribers = new Set<(message: string) => void>();
+
+export function onQuitFlushFailure(fn: (message: string) => void): () => void {
+  failureSubscribers.add(fn);
+  return () => failureSubscribers.delete(fn);
 }
 
 // The listener exists only in the Tauri shell (bun tests / browser preview
 // have no IPC — and nothing to flush that survives them anyway).
 if (typeof window !== "undefined" && isTauri()) {
-  void listen("rotli:flush-before-quit", () => {
+  void listen<QuitFlushPayload>("rotli:flush-before-quit", (event) => {
     void (async () => {
       try {
         await runQuitFlushers();
-      } finally {
-        // the ack releases the exit; a failed invoke just rides out Rust's timeout
-        await invoke("quit_flush_done").catch(() => {});
+        await invoke("quit_flush_done", { attemptId: event.payload.attemptId, ok: true }).catch(() => {});
+      } catch (error) {
+        await invoke("quit_flush_done", {
+          attemptId: event.payload.attemptId,
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        }).catch(() => {});
       }
     })();
+  });
+  void listen<string>("rotli:quit-flush-failed", (event) => {
+    for (const subscriber of failureSubscribers) subscriber(event.payload);
   });
 }

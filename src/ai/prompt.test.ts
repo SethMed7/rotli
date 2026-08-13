@@ -23,6 +23,28 @@ describe("userName in the prompt", () => {
     }
   });
 
+  test("teaches every model lane the visible long-running progress grammar", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      const prompt = adapter.renderPrompt({
+        web: false,
+        knowledge: "",
+        history: [],
+        userText: "Do the long task",
+        scratch: [],
+        maxSteps: 4,
+      });
+      expect(prompt).toContain("- [ ] pending");
+      expect(prompt).toContain("- [~] current");
+      expect(prompt).toContain("- [x] complete");
+      const final = adapter.renderForceFinal({
+        history: [],
+        userText: "Do the long task",
+        scratch: [],
+      });
+      expect(final).toContain("- [~] current");
+    }
+  });
+
   test("names the user in both force-final prompts", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
       const named = adapter.renderForceFinal({
@@ -293,6 +315,30 @@ describe("update_note in the prompts", () => {
   });
 });
 
+describe("artifact format fidelity", () => {
+  test("both adapters expose native DOCX creation and forbid substituting a Markdown note", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      const prompt = adapter.renderPrompt({ ...base, documentTool: true });
+      expect(prompt).toContain('"tool":"create_document"');
+      expect(prompt).toContain("Word document");
+      expect(prompt).toMatch(/never substitute|do not substitute/i);
+      expect(prompt).toMatch(/ask.*Word.*Markdown|Word.*Markdown.*ask/i);
+      expect(prompt).toMatch(/stay closed.*Artifacts.*click/i);
+      expect(prompt).toMatch(/never claim they opened automatically/i);
+    }
+  });
+
+  test("both adapters expose one bounded clarification protocol", () => {
+    for (const adapter of [gemmaAdapter, frontierAdapter]) {
+      const prompt = adapter.renderPrompt({ ...base, documentTool: true });
+      expect(prompt).toContain('"question":"…"');
+      expect(prompt).toMatch(/2–3|2-3/);
+      expect(prompt).toMatch(/materially change/i);
+      expect(prompt).toMatch(/do not ask|don.t ask/i);
+    }
+  });
+});
+
 // The edit-workflow rule (live-eval failure 2026-07-30: without it, "clean up
 // my note" produced prose in chat instead of an update_note write).
 describe("edit workflow rule", () => {
@@ -308,10 +354,12 @@ describe("editable artifact generation", () => {
   test("both adapters expose the tool only when the desktop host enables it", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
       expect(adapter.renderPrompt({ ...base })).not.toContain('"tool":"create_artifact"');
-      const enabled = adapter.renderPrompt({ ...base, artifactTool: true });
+      const enabled = adapter.renderPrompt({ ...base, artifactTool: true, documentTool: true });
       expect(enabled).toContain('"tool":"create_artifact"');
-      expect(enabled).toContain("document|sheet|pdf");
+      expect(enabled).toContain("sheet|pdf");
       expect(enabled).toMatch(/editable Markdown source/i);
+      expect(enabled).toContain('"tool":"create_document"');
+      expect(enabled).toMatch(/Use create_document|use create_document/i);
     }
   });
 

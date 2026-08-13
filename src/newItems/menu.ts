@@ -19,8 +19,9 @@ export function openNewItemMenu(
   event: Pick<ReactMouseEvent<HTMLElement>, "currentTarget" | "stopPropagation">,
 ): void {
   event.stopPropagation();
-  const rect = event.currentTarget.getBoundingClientRect();
+  const trigger = event.currentTarget;
+  const rect = trigger.getBoundingClientRect();
   useContextMenu.getState().open(rect.left, rect.bottom + 4, newItemMenuItems(), {
-    returnFocus: () => event.currentTarget.focus(),
+    returnFocus: () => trigger.focus(),
   });
 }

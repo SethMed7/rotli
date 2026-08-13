@@ -293,7 +293,9 @@ impl OrganizerHandle {
         {
             let mut q = self.0.queue.lock().unwrap();
             for p in paths {
-                let Ok(rel) = p.strip_prefix(root) else { continue };
+                let Ok(rel) = p.strip_prefix(root) else {
+                    continue;
+                };
                 let rel = rel.to_string_lossy().replace('\\', "/");
                 if !candidate_rel(&rel) {
                     continue;
@@ -408,7 +410,11 @@ struct OrganizerFile {
 
 impl Default for OrganizerFile {
     fn default() -> Self {
-        OrganizerFile { version: 1, notes: BTreeMap::new(), areas: BTreeMap::new() }
+        OrganizerFile {
+            version: 1,
+            notes: BTreeMap::new(),
+            areas: BTreeMap::new(),
+        }
     }
 }
 
@@ -540,7 +546,9 @@ fn classify_covered(s: &NoteSnapshot, st: &OrganizerFile) -> bool {
 /// Enrich already handled this exact body — proposal, apply, or "every target
 /// field is user-owned" all record the same marker (a body edit re-evaluates).
 fn enrich_covered(s: &NoteSnapshot, st: &OrganizerFile) -> bool {
-    st.notes.get(&state_key(s)).is_some_and(|n| n.proposed.enrich == s.body_hash)
+    st.notes
+        .get(&state_key(s))
+        .is_some_and(|n| n.proposed.enrich == s.body_hash)
 }
 
 // ─── pure core: classify ─────────────────────────────────────────────────────
@@ -549,7 +557,9 @@ fn enrich_covered(s: &NoteSnapshot, st: &OrganizerFile) -> bool {
 /// never underscore/dot names), each with the first content line of its
 /// `_index.md` as a one-line description ("" when none). Lock-free reads.
 fn area_vocab(root: &Path) -> Vec<(String, String)> {
-    let Ok(entries) = std::fs::read_dir(root.join("wiki")) else { return Vec::new() };
+    let Ok(entries) = std::fs::read_dir(root.join("wiki")) else {
+        return Vec::new();
+    };
     let mut names: Vec<String> = entries
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
@@ -598,11 +608,19 @@ fn classify_prompt(s: &NoteSnapshot, vocab: &[(String, String)]) -> String {
     p.push_str(
         "\nAnswer with ONLY a JSON object, no prose:\n{\"area\": \"<one area name above, or none>\", \"confidence\": <number 0 to 1>}\n",
     );
-    if let Some(tags) = s.fields.get("tags").filter(|t| !t.is_empty() && t.as_str() != "[]") {
+    if let Some(tags) = s
+        .fields
+        .get("tags")
+        .filter(|t| !t.is_empty() && t.as_str() != "[]")
+    {
         p.push_str(&format!("\nExisting tags: {tags}\n"));
     }
     let body: String = s.body.chars().take(BODY_BUDGET).collect();
-    p.push_str(&format!("\nNote title: {}\n\nNote body:\n{}\n", s.title, body.trim()));
+    p.push_str(&format!(
+        "\nNote title: {}\n\nNote body:\n{}\n",
+        s.title,
+        body.trim()
+    ));
     p
 }
 
@@ -619,10 +637,24 @@ fn parse_classify(raw: &str, vocab: &[(String, String)]) -> Option<ClassifyOut> 
     let end = raw.rfind('}')?;
     let v: serde_json::Value = serde_json::from_str(&raw[start..=end]).ok()?;
     let area_raw = v.get("area")?.as_str()?.trim();
-    let canonical = vocab.iter().find(|(n, _)| n.eq_ignore_ascii_case(area_raw))?.0.clone();
-    let confidence = v.get("confidence").and_then(serde_json::Value::as_f64).unwrap_or(0.0);
-    let confidence = if confidence.is_finite() { confidence.clamp(0.0, 1.0) } else { 0.0 };
-    Some(ClassifyOut { area: canonical, confidence })
+    let canonical = vocab
+        .iter()
+        .find(|(n, _)| n.eq_ignore_ascii_case(area_raw))?
+        .0
+        .clone();
+    let confidence = v
+        .get("confidence")
+        .and_then(serde_json::Value::as_f64)
+        .unwrap_or(0.0);
+    let confidence = if confidence.is_finite() {
+        confidence.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    Some(ClassifyOut {
+        area: canonical,
+        confidence,
+    })
 }
 
 // ─── pure core: enrich (Job B) ───────────────────────────────────────────────
@@ -642,9 +674,7 @@ fn list_peers(root: &Path) -> Vec<(String, String)> {
     let mut peers: Vec<(String, String)> = rels
         .into_iter()
         .filter(|rel| candidate_rel(rel))
-        .filter(|rel| {
-            snapshot_note(root, rel).is_ok_and(|s| !s.secure && !s.locked)
-        })
+        .filter(|rel| snapshot_note(root, rel).is_ok_and(|s| !s.secure && !s.locked))
         .map(|rel| {
             let stem = rel
                 .rsplit('/')
@@ -669,7 +699,10 @@ fn rank_note_candidates(
     others: &[(String, String)],
     n: usize,
 ) -> Vec<String> {
-    let text: String = format!("{title} {body}").chars().take(BODY_BUDGET).collect();
+    let text: String = format!("{title} {body}")
+        .chars()
+        .take(BODY_BUDGET)
+        .collect();
     let tokens: std::collections::BTreeSet<String> = text
         .to_lowercase()
         .split(|c: char| !c.is_ascii_alphanumeric())
@@ -721,7 +754,11 @@ fn enrich_prompt(s: &NoteSnapshot, candidates: &[String]) -> String {
         "\nAnswer with ONLY a JSON object, no prose:\n{\"summary\": \"<one line>\", \"tags\": [\"<tag>\", ...], \"links\": [\"<candidate>\", ...]}\n",
     );
     let body: String = s.body.chars().take(BODY_BUDGET).collect();
-    p.push_str(&format!("\nNote title: {}\n\nNote body:\n{}\n", s.title, body.trim()));
+    p.push_str(&format!(
+        "\nNote title: {}\n\nNote body:\n{}\n",
+        s.title,
+        body.trim()
+    ));
     p
 }
 
@@ -775,14 +812,21 @@ fn parse_enrich(raw: &str, candidates: &[String]) -> Option<EnrichOut> {
                 .filter_map(|x| x.as_str())
                 .filter_map(|s| {
                     let s = s.trim().trim_matches(|c| c == '[' || c == ']');
-                    candidates.iter().find(|c| c.eq_ignore_ascii_case(s)).cloned()
+                    candidates
+                        .iter()
+                        .find(|c| c.eq_ignore_ascii_case(s))
+                        .cloned()
                 })
                 .collect()
         })
         .unwrap_or_default();
     links.sort();
     links.dedup();
-    Some(EnrichOut { summary, tags, links })
+    Some(EnrichOut {
+        summary,
+        tags,
+        links,
+    })
 }
 
 impl EnrichOut {
@@ -865,7 +909,10 @@ fn members_hash(rows: &[IndexRow]) -> String {
 
 /// A table cell must stay on one line and can't contain a bare `|`.
 fn cell(s: &str) -> String {
-    s.split_whitespace().collect::<Vec<_>>().join(" ").replace('|', "\\|")
+    s.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .replace('|', "\\|")
 }
 
 /// Render an area overview — fully deterministic (same members → same bytes →
@@ -953,7 +1000,9 @@ fn supersede(s: &corpus::CorpusStore, old_id: &str) -> Result<bool, String> {
         return Ok(false);
     }
     let journal = s.journal_read()?;
-    let Some(mut row) = journal_latest(&journal, old_id) else { return Ok(false) };
+    let Some(mut row) = journal_latest(&journal, old_id) else {
+        return Ok(false);
+    };
     if row.get("status").and_then(|v| v.as_str()) != Some("proposed") {
         return Ok(false);
     }
@@ -1106,10 +1155,17 @@ struct Knobs {
 }
 
 fn parse_knobs(settings_json: &str) -> Knobs {
-    let v: serde_json::Value = serde_json::from_str(settings_json).unwrap_or(serde_json::Value::Null);
+    let v: serde_json::Value =
+        serde_json::from_str(settings_json).unwrap_or(serde_json::Value::Null);
     Knobs {
-        brain_enabled: v.get("brainEnabled").and_then(serde_json::Value::as_bool).unwrap_or(true),
-        trust: v.get("organizerTrust").and_then(|t| t.as_str()).map(Trust::parse),
+        brain_enabled: v
+            .get("brainEnabled")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(true),
+        trust: v
+            .get("organizerTrust")
+            .and_then(|t| t.as_str())
+            .map(Trust::parse),
         threshold: v
             .get("organizerThreshold")
             .and_then(serde_json::Value::as_f64)
@@ -1154,7 +1210,9 @@ fn read_knobs(corpus_state: &CorpusState, root_id: &str, inner: &OrganizerInner)
         let mut seen = inner.settings_brain.lock().unwrap();
         if *seen != Some(knobs.brain_enabled) {
             *seen = Some(knobs.brain_enabled);
-            inner.brain_off.store(!knobs.brain_enabled, Ordering::SeqCst);
+            inner
+                .brain_off
+                .store(!knobs.brain_enabled, Ordering::SeqCst);
         }
     }
     knobs
@@ -1190,11 +1248,17 @@ enum Outcome {
 /// What one enrich candidate resolved to inside the write `route()`.
 enum EnrichOutcome {
     Requeue,
-    Rows { proposed: usize, applied: usize, superseded: bool },
+    Rows {
+        proposed: usize,
+        applied: usize,
+        superseded: bool,
+    },
 }
 
 fn now_rfc3339() -> String {
-    OffsetDateTime::now_utc().format(&Rfc3339).unwrap_or_default()
+    OffsetDateTime::now_utc()
+        .format(&Rfc3339)
+        .unwrap_or_default()
 }
 
 fn now_ms() -> i64 {
@@ -1282,10 +1346,9 @@ pub(crate) fn run_cycle(
                 // while its content is unchanged; flagged notes never consult
                 // the dismissal (they are already protected).
                 let dismissed = !snap.secure_flagged
-                    && state
-                        .notes
-                        .get(&state_key(&snap))
-                        .is_some_and(|n| !n.secure_dismissed.is_empty() && n.secure_dismissed == snap.text_hash);
+                    && state.notes.get(&state_key(&snap)).is_some_and(|n| {
+                        !n.secure_dismissed.is_empty() && n.secure_dismissed == snap.text_hash
+                    });
                 if dismissed {
                     inner.status.lock().unwrap().secure_pending.remove(&rel);
                 } else {
@@ -1318,9 +1381,8 @@ pub(crate) fn run_cycle(
         let mut snap = snap;
         // the live feed's "what it's looking at right now" line — titles only,
         // never body content (the same boundary every surface keeps)
-        inner.emit_progress(
-            serde_json::json!({ "phase": "note", "title": snap.title, "rel": rel }),
-        );
+        inner
+            .emit_progress(serde_json::json!({ "phase": "note", "title": snap.title, "rel": rel }));
 
         // ── Job A — Classify (`wiki/_inbox` staging only) ─────────────────────
         if rel.starts_with("wiki/_inbox/") && !classify_covered(&snap, &state) {
@@ -1395,7 +1457,11 @@ pub(crate) fn run_cycle(
                                 return Ok(Outcome::Requeue); // edited under us — re-evaluate (§4.8)
                             }
                             let mut row = JournalRow {
-                                action: if verb == Verb::FileStaged { "file" } else { "field" },
+                                action: if verb == Verb::FileStaged {
+                                    "file"
+                                } else {
+                                    "field"
+                                },
                                 note_id: rel.clone(),
                                 note_title: snap.title.clone(),
                                 note_ulid: snap.id.clone(),
@@ -1587,10 +1653,17 @@ pub(crate) fn run_cycle(
             continue;
         }
         let peers = peers.get_or_insert_with(|| list_peers(root));
-        let self_stem =
-            rel.rsplit('/').next().unwrap_or(&rel).trim_end_matches(".md").to_string();
-        let others: Vec<(String, String)> =
-            peers.iter().filter(|(_, stem)| *stem != self_stem).cloned().collect();
+        let self_stem = rel
+            .rsplit('/')
+            .next()
+            .unwrap_or(&rel)
+            .trim_end_matches(".md")
+            .to_string();
+        let others: Vec<(String, String)> = peers
+            .iter()
+            .filter(|(_, stem)| *stem != self_stem)
+            .cloned()
+            .collect();
         let candidates = rank_note_candidates(&snap.title, &snap.body, &others, LINK_CANDIDATES);
         let prompt = enrich_prompt(&snap, &candidates);
         // the model call — again NO lock held
@@ -1613,8 +1686,7 @@ pub(crate) fn run_cycle(
 
         // the write window — one short route(); re-check the note first
         let outcome = corpus_state.route(root_id, |s| {
-            let fresh =
-                std::fs::read_to_string(root.join(&rel)).map_err(|e| e.to_string())?;
+            let fresh = std::fs::read_to_string(root.join(&rel)).map_err(|e| e.to_string())?;
             let (fresh_fm, fresh_body) = corpus::parse_document(&fresh);
             if fnv1a64(fresh_body.as_bytes()) != snap.body_hash {
                 return Ok(EnrichOutcome::Requeue); // edited under us — re-evaluate (§4.8)
@@ -1629,7 +1701,8 @@ pub(crate) fn run_cycle(
                 .foreign
                 .iter()
                 .filter_map(|l| {
-                    l.split_once(':').map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
+                    l.split_once(':')
+                        .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
                 })
                 .collect();
             // §4.8 supersede — this pass only runs for a CHANGED body, so any
@@ -1702,14 +1775,22 @@ pub(crate) fn run_cycle(
             ns.proposed.enrich_rows = new_rows;
             ns.processed_at = stamp.clone();
             s.dot_write("organizer", &state_pretty(&state))?;
-            Ok(EnrichOutcome::Rows { proposed, applied, superseded })
+            Ok(EnrichOutcome::Rows {
+                proposed,
+                applied,
+                superseded,
+            })
         });
         match outcome {
             Ok(EnrichOutcome::Requeue) => {
                 inner.queue.lock().unwrap().insert(rel, Instant::now());
                 report.requeued += 1;
             }
-            Ok(EnrichOutcome::Rows { proposed, applied, superseded }) => {
+            Ok(EnrichOutcome::Rows {
+                proposed,
+                applied,
+                superseded,
+            }) => {
                 report.proposals += proposed;
                 report.applied += applied;
                 if proposed + applied > 0 || superseded {
@@ -1911,7 +1992,9 @@ fn audit_gaps(root: &Path, state: &OrganizerFile) -> Vec<String> {
 /// `enrich_covered` let the next cycle model them again.
 fn reopen_coverage(root: &Path, state: &mut OrganizerFile, gaps: &[String]) {
     for rel in gaps {
-        let Ok(snap) = snapshot_note(root, rel) else { continue };
+        let Ok(snap) = snapshot_note(root, rel) else {
+            continue;
+        };
         if let Some(ns) = state.notes.get_mut(&state_key(&snap)) {
             ns.hash.clear();
             ns.proposed.enrich.clear();
@@ -1920,7 +2003,9 @@ fn reopen_coverage(root: &Path, state: &mut OrganizerFile, gaps: &[String]) {
 }
 
 fn collect_md(root: &Path, prefix: &str, out: &mut Vec<String>) {
-    let Ok(entries) = std::fs::read_dir(root.join(prefix)) else { return };
+    let Ok(entries) = std::fs::read_dir(root.join(prefix)) else {
+        return;
+    };
     for entry in entries.filter_map(|e| e.ok()) {
         let name = entry.file_name().to_string_lossy().into_owned();
         if name.starts_with('.') {
@@ -1949,7 +2034,12 @@ struct GateProbes {
 
 impl GateProbes {
     fn new() -> Self {
-        GateProbes { at: None, on_ac: true, thermal_ok: true, user_idle: true }
+        GateProbes {
+            at: None,
+            on_ac: true,
+            thermal_ok: true,
+            user_idle: true,
+        }
     }
 
     /// `max_age` is the caller's staleness budget: ~60s between cycles, a much
@@ -1969,7 +2059,10 @@ impl GateProbes {
 
 #[cfg(target_os = "macos")]
 fn probe_on_ac() -> bool {
-    match std::process::Command::new("pmset").args(["-g", "batt"]).output() {
+    match std::process::Command::new("pmset")
+        .args(["-g", "batt"])
+        .output()
+    {
         Ok(o) => String::from_utf8_lossy(&o.stdout).contains("AC Power"),
         Err(_) => true,
     }
@@ -1984,13 +2077,20 @@ fn probe_on_ac() -> bool {
 /// hot) — a 12B generation is a real thermal event on a laptop (doc §2 gate 2).
 #[cfg(target_os = "macos")]
 fn probe_thermal_ok() -> bool {
-    let Ok(o) = std::process::Command::new("pmset").args(["-g", "therm"]).output() else {
+    let Ok(o) = std::process::Command::new("pmset")
+        .args(["-g", "therm"])
+        .output()
+    else {
         return true;
     };
     let text = String::from_utf8_lossy(&o.stdout);
     for line in text.lines() {
         if let Some(rest) = line.trim().strip_prefix("CPU_Speed_Limit") {
-            if let Some(v) = rest.split('=').nth(1).and_then(|v| v.trim().parse::<u32>().ok()) {
+            if let Some(v) = rest
+                .split('=')
+                .nth(1)
+                .and_then(|v| v.trim().parse::<u32>().ok())
+            {
                 return v >= 80;
             }
         }
@@ -2006,7 +2106,10 @@ fn probe_thermal_ok() -> bool {
 /// No keyboard/mouse for 60s ⇒ idle (HIDIdleTime is in nanoseconds).
 #[cfg(target_os = "macos")]
 fn probe_user_idle() -> bool {
-    let Ok(o) = std::process::Command::new("ioreg").args(["-c", "IOHIDSystem"]).output() else {
+    let Ok(o) = std::process::Command::new("ioreg")
+        .args(["-c", "IOHIDSystem"])
+        .output()
+    else {
         return true;
     };
     let text = String::from_utf8_lossy(&o.stdout);
@@ -2041,7 +2144,12 @@ fn app_backgrounded(app: &tauri::AppHandle) -> bool {
 /// warm (no keep-alive/warm-up calls exist; the server's own idle-unload
 /// rules). `root_id`/`root` name the store whose layout is Memex — the
 /// daemon's only territory; no memex ⇒ this is never called.
-pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: String, root: PathBuf) {
+pub fn spawn_organizer(
+    app: tauri::AppHandle,
+    handle: OrganizerHandle,
+    root_id: String,
+    root: PathBuf,
+) {
     handle.0.running.store(true, Ordering::SeqCst);
     // install the live-progress sink — run_cycle narrates through it and the
     // Activity surface listens ("rotli:organizer-progress"); titles only
@@ -2096,7 +2204,13 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                     .lock()
                     .unwrap()
                     .map(|t| t.saturating_duration_since(Instant::now())),
-                inner.queue.lock().unwrap().values().map(|t| t.elapsed()).min(),
+                inner
+                    .queue
+                    .lock()
+                    .unwrap()
+                    .values()
+                    .map(|t| t.elapsed())
+                    .min(),
                 cycle_owed,
                 quiet,
                 next_model_try.map(|t| t.saturating_duration_since(Instant::now())),
@@ -2175,8 +2289,9 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                     let gaps = audit_gaps(&root, &state);
                     if !gaps.is_empty() {
                         reopen_coverage(&root, &mut state, &gaps);
-                        let _ = corpus_state
-                            .route(&root_id, |s| s.dot_write("organizer", &state_pretty(&state)));
+                        let _ = corpus_state.route(&root_id, |s| {
+                            s.dot_write("organizer", &state_pretty(&state))
+                        });
                         targets.extend(gaps);
                     }
                 }
@@ -2240,8 +2355,12 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                 parse_knobs(&s).model
             };
             let transport = |prompt: &str| match org_model {
-                OrgModel::Claude => crate::provider::organizer_claude_complete(prompt, CLAUDE_TIMEOUT),
-                OrgModel::Gemini35 => crate::provider::organizer_gemini_complete(prompt, GEMINI_TIMEOUT),
+                OrgModel::Claude => {
+                    crate::provider::organizer_claude_complete(prompt, CLAUDE_TIMEOUT)
+                }
+                OrgModel::Gemini35 => {
+                    crate::provider::organizer_gemini_complete(prompt, GEMINI_TIMEOUT)
+                }
                 OrgModel::Local => {
                     let msgs = [WireMsg {
                         role: "user".to_string(),
@@ -2276,9 +2395,9 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                         "stopped": report.stopped,
                     }));
                     cycle_owed = false; // the owed post-sweep cycle ran
-                    // gate-blocked candidates were left queued with their OLD
-                    // enqueue stamps (quiet already elapsed) — without the flag
-                    // the planner would spin Run/park-nothing back-to-back
+                                        // gate-blocked candidates were left queued with their OLD
+                                        // enqueue stamps (quiet already elapsed) — without the flag
+                                        // the planner would spin Run/park-nothing back-to-back
                     if report.requeued > 0 {
                         gate_closed_at = Some(Instant::now());
                     }
@@ -2359,7 +2478,7 @@ pub fn organizer_status(state: tauri::State<OrganizerState>) -> OrganizerStatus 
 pub fn organizer_stop(state: tauri::State<OrganizerState>) -> Result<(), String> {
     let inner = &state.0 .0;
     if !inner.running.load(Ordering::SeqCst) {
-        return Err("the organizer isn't running — your notes folder isn't a memex".into());
+        return Err("the Librarian isn't running for this vault".into());
     }
     inner.stop_now.store(true, Ordering::SeqCst);
     // an unstarted queued nudge dies with the stop — the user said hands off
@@ -2372,7 +2491,7 @@ pub fn organizer_stop(state: tauri::State<OrganizerState>) -> Result<(), String>
 pub fn organizer_run_once(state: tauri::State<OrganizerState>) -> Result<(), String> {
     let inner = &state.0 .0;
     if !inner.running.load(Ordering::SeqCst) {
-        return Err("the organizer isn't running — your notes folder isn't a memex".into());
+        return Err("the Librarian isn't running for this vault".into());
     }
     inner.run_now.store(true, Ordering::SeqCst);
     // notify UNDER the queue mutex (same reason as nudge_sweep: the parked
@@ -2388,7 +2507,10 @@ pub fn organizer_run_once(state: tauri::State<OrganizerState>) -> Result<(), Str
 /// is felt now instead of racing the debounced settings write. settings.json
 /// remains the durable backstop the daemon re-adopts each cycle.
 #[tauri::command]
-pub fn organizer_set_brain(state: tauri::State<OrganizerState>, enabled: bool) -> Result<(), String> {
+pub fn organizer_set_brain(
+    state: tauri::State<OrganizerState>,
+    enabled: bool,
+) -> Result<(), String> {
     let inner = &state.0 .0;
     inner.brain_off.store(!enabled, Ordering::SeqCst);
     if enabled {
@@ -2403,7 +2525,10 @@ pub fn organizer_set_brain(state: tauri::State<OrganizerState>, enabled: bool) -
 /// Immediate in-memory trust flip; the frontend persists the same value into
 /// settings.json, which the daemon re-reads each cycle as the backstop.
 #[tauri::command]
-pub fn organizer_set_trust(state: tauri::State<OrganizerState>, level: String) -> Result<(), String> {
+pub fn organizer_set_trust(
+    state: tauri::State<OrganizerState>,
+    level: String,
+) -> Result<(), String> {
     let t = Trust::parse_strict(&level).ok_or_else(|| format!("unknown trust level: {level}"))?;
     state.0.set_trust(t);
     state.0 .0.cv.notify_all();
@@ -2472,8 +2597,15 @@ pub(crate) fn secure_hints(
     corpus_state: &CorpusState,
     handle: &OrganizerHandle,
 ) -> Result<Vec<SecureHint>, String> {
-    let pending: Vec<String> =
-        handle.0.status.lock().unwrap().secure_pending.iter().cloned().collect();
+    let pending: Vec<String> = handle
+        .0
+        .status
+        .lock()
+        .unwrap()
+        .secure_pending
+        .iter()
+        .cloned()
+        .collect();
     if pending.is_empty() {
         return Ok(Vec::new());
     }
@@ -2487,7 +2619,9 @@ pub(crate) fn secure_hints(
             if !candidate_rel(rel) {
                 continue;
             }
-            let Ok(snap) = snapshot_note(&root, rel) else { continue };
+            let Ok(snap) = snapshot_note(&root, rel) else {
+                continue;
+            };
             if !snap.secure {
                 continue; // cleaned since the last cycle — not review material
             }
@@ -2523,7 +2657,10 @@ pub(crate) fn dismiss_secure(
             return Err("This note is marked secure — unmark it from its own menu instead.".into());
         }
         let mut st = parse_state(&s.dot_read("organizer")?);
-        st.notes.entry(state_key(&snap)).or_default().secure_dismissed = snap.text_hash.clone();
+        st.notes
+            .entry(state_key(&snap))
+            .or_default()
+            .secure_dismissed = snap.text_hash.clone();
         s.dot_write("organizer", &state_pretty(&st))
     })?;
     handle.0.status.lock().unwrap().secure_pending.remove(rel);
@@ -2565,14 +2702,23 @@ mod tests {
         fs::create_dir_all(root.join("wiki/Projects")).unwrap();
         fs::create_dir_all(root.join("wiki/Research")).unwrap();
         fs::create_dir_all(root.join("chats")).unwrap();
-        fs::write(root.join("memex.json"), "{\"id\":\"mx_test123\",\"contract\":\"3.4\"}").unwrap();
+        fs::write(
+            root.join("memex.json"),
+            "{\"id\":\"mx_test123\",\"contract\":\"3.4\"}",
+        )
+        .unwrap();
         fs::write(root.join("wiki/README.md"), "# This is your Brain\n").unwrap();
         let store = corpus::CorpusStore::open(root).unwrap();
         assert!(store.is_memex());
         let root = store.root().to_path_buf(); // canonicalized (/var → /private/var)
         let mut reg = corpus::CorpusRegistry::new("default".to_string());
-        reg.insert("default".to_string(), store);
-        (dir, root, CorpusState(Mutex::new(reg)), OrganizerHandle::new())
+        reg.insert("default".to_string(), store).unwrap();
+        (
+            dir,
+            root,
+            CorpusState(Mutex::new(reg)),
+            OrganizerHandle::new(),
+        )
     }
 
     /// Create a real staged capture through the corpus (so it has a ULID) and
@@ -2587,7 +2733,9 @@ mod tests {
     }
 
     fn write_settings(state: &CorpusState, json: &str) {
-        state.route("default", |s| s.dot_write("settings", json)).unwrap();
+        state
+            .route("default", |s| s.dot_write("settings", json))
+            .unwrap();
     }
 
     /// Add a control frontmatter line (locked/secure) the way the UI would —
@@ -2614,8 +2762,7 @@ mod tests {
     /// invariant's measuring stick.
     fn tree_hash(root: &Path) -> String {
         fn walk(root: &Path, dir: &Path, out: &mut Vec<(String, String)>) {
-            let mut entries: Vec<_> =
-                fs::read_dir(dir).unwrap().filter_map(|e| e.ok()).collect();
+            let mut entries: Vec<_> = fs::read_dir(dir).unwrap().filter_map(|e| e.ok()).collect();
             entries.sort_by_key(|e| e.file_name());
             for e in entries {
                 let name = e.file_name().to_string_lossy().into_owned();
@@ -2655,9 +2802,18 @@ mod tests {
     fn candidate_filter_drops_index_readme_dots_nonwiki() {
         assert!(candidate_rel("wiki/_inbox/foo-a1b2c3.md"));
         assert!(candidate_rel("wiki/Projects/alazan-84-x1y2z3.md"));
-        assert!(!candidate_rel("wiki/README.md"), "the pinned trust artifact");
-        assert!(!candidate_rel("wiki/Projects/_index.md"), "the daemon's own output");
-        assert!(!candidate_rel("chats/today.md"), "not the daemon's territory");
+        assert!(
+            !candidate_rel("wiki/README.md"),
+            "the pinned trust artifact"
+        );
+        assert!(
+            !candidate_rel("wiki/Projects/_index.md"),
+            "the daemon's own output"
+        );
+        assert!(
+            !candidate_rel("chats/today.md"),
+            "not the daemon's territory"
+        );
         assert!(!candidate_rel("inbox.md"));
         assert!(!candidate_rel("wiki/Projects/photo.png"));
         assert!(!candidate_rel("wiki/.hidden/x.md"));
@@ -2673,7 +2829,10 @@ mod tests {
                 hash: "abc".into(),
                 area: "Projects".into(),
                 last_fields: BTreeMap::from([("summary".to_string(), "one line".to_string())]),
-                proposed: ProposedState { file: "abc".into(), ..Default::default() },
+                proposed: ProposedState {
+                    file: "abc".into(),
+                    ..Default::default()
+                },
                 processed_at: "2026-07-01T00:00:00Z".into(),
                 secure_dismissed: String::new(),
             },
@@ -2706,18 +2865,40 @@ mod tests {
         fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
         let fm = "---\nid: 01SKIP\ncreated: 2026-07-01\nupdated: 2026-07-01\npinned: false\n";
 
-        fs::write(root.join("wiki/_inbox/locked.md"), format!("{fm}locked: true\n---\n\n# L\n")).unwrap();
-        fs::write(root.join("wiki/_inbox/flagged.md"), format!("{fm}secure: true\n---\n\n# S\n")).unwrap();
+        fs::write(
+            root.join("wiki/_inbox/locked.md"),
+            format!("{fm}locked: true\n---\n\n# L\n"),
+        )
+        .unwrap();
+        fs::write(
+            root.join("wiki/_inbox/flagged.md"),
+            format!("{fm}secure: true\n---\n\n# S\n"),
+        )
+        .unwrap();
         // NO secure flag — the body itself trips the in-memory detector
-        fs::write(root.join("wiki/_inbox/ssn.md"), format!("{fm}---\n\n# T\n\nSSN: 078-05-1120\n")).unwrap();
-        fs::write(root.join("wiki/_inbox/plain.md"), format!("{fm}---\n\n# P\n\ngroceries\n")).unwrap();
+        fs::write(
+            root.join("wiki/_inbox/ssn.md"),
+            format!("{fm}---\n\n# T\n\nSSN: 078-05-1120\n"),
+        )
+        .unwrap();
+        fs::write(
+            root.join("wiki/_inbox/plain.md"),
+            format!("{fm}---\n\n# P\n\ngroceries\n"),
+        )
+        .unwrap();
 
         let st = OrganizerFile::default();
         let quiet = Duration::ZERO;
         let snap = |name: &str| snapshot_note(&root, &format!("wiki/_inbox/{name}")).unwrap();
 
-        assert_eq!(skip_reason(&snap("locked.md"), &st, quiet), Some(Skip::Locked));
-        assert_eq!(skip_reason(&snap("flagged.md"), &st, quiet), Some(Skip::Secure));
+        assert_eq!(
+            skip_reason(&snap("locked.md"), &st, quiet),
+            Some(Skip::Locked)
+        );
+        assert_eq!(
+            skip_reason(&snap("flagged.md"), &st, quiet),
+            Some(Skip::Secure)
+        );
         assert_eq!(
             skip_reason(&snap("ssn.md"), &st, quiet),
             Some(Skip::Secure),
@@ -2736,7 +2917,10 @@ mod tests {
             state_key(&s),
             NoteState {
                 hash: s.body_hash.clone(),
-                proposed: ProposedState { enrich: s.body_hash.clone(), ..Default::default() },
+                proposed: ProposedState {
+                    enrich: s.body_hash.clone(),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         );
@@ -2745,7 +2929,10 @@ mod tests {
         let mut st2b = OrganizerFile::default();
         st2b.notes.insert(
             state_key(&s),
-            NoteState { hash: s.body_hash.clone(), ..Default::default() },
+            NoteState {
+                hash: s.body_hash.clone(),
+                ..Default::default()
+            },
         );
         assert_eq!(skip_reason(&s, &st2b, quiet), None);
         // outstanding proposals for this hash also block re-proposing
@@ -2774,7 +2961,11 @@ mod tests {
         let out = parse_classify("{\"area\": \"projects\", \"confidence\": 1.7}", &vocab).unwrap();
         assert_eq!(out.area, "Projects", "case-insensitive → canonical");
         assert_eq!(out.confidence, 1.0, "clamped to [0,1]");
-        let out = parse_classify("prose {\"area\":\"Research\",\"confidence\":-2} more", &vocab).unwrap();
+        let out = parse_classify(
+            "prose {\"area\":\"Research\",\"confidence\":-2} more",
+            &vocab,
+        )
+        .unwrap();
         assert_eq!(out.area, "Research");
         assert_eq!(out.confidence, 0.0);
         // an invented area, "none", junk, or missing fields → None (never a guess)
@@ -2783,7 +2974,12 @@ mod tests {
         assert!(parse_classify("total junk", &vocab).is_none());
         assert!(parse_classify("{\"confidence\": 0.9}", &vocab).is_none());
         // a missing confidence is 0, not a rejection (the area is still valid)
-        assert_eq!(parse_classify("{\"area\": \"Projects\"}", &vocab).unwrap().confidence, 0.0);
+        assert_eq!(
+            parse_classify("{\"area\": \"Projects\"}", &vocab)
+                .unwrap()
+                .confidence,
+            0.0
+        );
     }
 
     #[test]
@@ -2791,13 +2987,21 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let root = dir.path().to_path_buf();
         fs::create_dir_all(root.join("wiki/Projects")).unwrap();
-        let write = |name: &str, text: &str| fs::write(root.join("wiki/Projects").join(name), text).unwrap();
+        let write = |name: &str, text: &str| {
+            fs::write(root.join("wiki/Projects").join(name), text).unwrap()
+        };
         write(
             "complete.md",
             "---\nsummary: done\ntags: a, b\nlinks: \"[[x]]\"\n---\n# Complete\nbody\n",
         );
-        write("gap.md", "---\ntags: a\n---\n# Gap\nbody without summary or links\n");
-        write("secret-gap.md", "---\nsecure: true\n---\n# Secret\nno fields either\n");
+        write(
+            "gap.md",
+            "---\ntags: a\n---\n# Gap\nbody without summary or links\n",
+        );
+        write(
+            "secret-gap.md",
+            "---\nsecure: true\n---\n# Secret\nno fields either\n",
+        );
 
         // mark every note COVERED (hash + enrich recorded) — the diff sweep
         // would find nothing; only the audit sees the missing metadata
@@ -2815,17 +3019,30 @@ mod tests {
             };
             state.notes.insert(state_key(&snap), ns);
         }
-        assert!(sweep(&root, &state).is_empty(), "the plain diff sweep sees nothing");
+        assert!(
+            sweep(&root, &state).is_empty(),
+            "the plain diff sweep sees nothing"
+        );
 
         let gaps = audit_gaps(&root, &state);
-        assert_eq!(gaps, vec!["wiki/Projects/gap.md".to_string()], "complete + secure excluded");
+        assert_eq!(
+            gaps,
+            vec!["wiki/Projects/gap.md".to_string()],
+            "complete + secure excluded"
+        );
 
         reopen_coverage(&root, &mut state, &gaps);
         let snap = snapshot_note(&root, "wiki/Projects/gap.md").unwrap();
         let ns = state.notes.get(&state_key(&snap)).unwrap();
-        assert!(ns.hash.is_empty() && ns.proposed.enrich.is_empty(), "coverage re-opened");
+        assert!(
+            ns.hash.is_empty() && ns.proposed.enrich.is_empty(),
+            "coverage re-opened"
+        );
         // and the next sweep now picks it up like any unprocessed note
-        assert_eq!(sweep(&root, &state), vec!["wiki/Projects/gap.md".to_string()]);
+        assert_eq!(
+            sweep(&root, &state),
+            vec!["wiki/Projects/gap.md".to_string()]
+        );
     }
 
     #[test]
@@ -2842,7 +3059,12 @@ mod tests {
             confidence: Some(0.91),
             status: "proposed",
         };
-        let line = journal_line(&row, "01JULIDULIDULIDULIDULIDULI", 1751370000000, "gemma-3-12b-it-qat-4bit");
+        let line = journal_line(
+            &row,
+            "01JULIDULIDULIDULIDULIDULI",
+            1751370000000,
+            "gemma-3-12b-it-qat-4bit",
+        );
         let v: serde_json::Value = serde_json::from_str(&line).unwrap();
         assert_eq!(v["id"], "01JULIDULIDULIDULIDULIDULI");
         assert_eq!(v["ts"], 1751370000000i64);
@@ -2878,7 +3100,10 @@ mod tests {
             serde_json::from_str(&journal_line(&frow, "01X", 1, "m")).unwrap();
         assert_eq!(v["field"], "suggested_area");
         assert!(v.get("area").is_none());
-        assert!(v.get("noteUlid").is_none(), "no ULID (external drop / index) ⇒ no key");
+        assert!(
+            v.get("noteUlid").is_none(),
+            "no ULID (external drop / index) ⇒ no key"
+        );
     }
 
     #[test]
@@ -2907,7 +3132,10 @@ mod tests {
         for (trust, verb, want) in table {
             assert_eq!(auto_applies(trust, verb, false), want, "{trust:?}/{verb:?}");
             // secure ⇒ NEVER, at every rung, for every verb (§4.2.4)
-            assert!(!auto_applies(trust, verb, true), "secure must veto {trust:?}/{verb:?}");
+            assert!(
+                !auto_applies(trust, verb, true),
+                "secure must veto {trust:?}/{verb:?}"
+            );
         }
     }
 
@@ -2922,11 +3150,24 @@ mod tests {
             run_now: false,
         };
         assert!(gates_pass(&base));
-        assert!(!gates_pass(&GateSnapshot { on_ac: false, ..base }));
-        assert!(!gates_pass(&GateSnapshot { thermal_ok: false, ..base }));
+        assert!(!gates_pass(&GateSnapshot {
+            on_ac: false,
+            ..base
+        }));
+        assert!(!gates_pass(&GateSnapshot {
+            thermal_ok: false,
+            ..base
+        }));
         // active user + foregrounded app → wait; either idle or backgrounded is enough
-        assert!(!gates_pass(&GateSnapshot { user_idle: false, ..base }));
-        assert!(gates_pass(&GateSnapshot { user_idle: false, app_backgrounded: true, ..base }));
+        assert!(!gates_pass(&GateSnapshot {
+            user_idle: false,
+            ..base
+        }));
+        assert!(gates_pass(&GateSnapshot {
+            user_idle: false,
+            app_backgrounded: true,
+            ..base
+        }));
         // run_now bypasses power/idle/thermal…
         assert!(gates_pass(&GateSnapshot {
             on_ac: false,
@@ -2936,8 +3177,15 @@ mod tests {
             ..base
         }));
         // …but NEVER an interactive chat
-        assert!(!gates_pass(&GateSnapshot { interactive_busy: true, run_now: true, ..base }));
-        assert!(!gates_pass(&GateSnapshot { interactive_busy: true, ..base }));
+        assert!(!gates_pass(&GateSnapshot {
+            interactive_busy: true,
+            run_now: true,
+            ..base
+        }));
+        assert!(!gates_pass(&GateSnapshot {
+            interactive_busy: true,
+            ..base
+        }));
     }
 
     #[test]
@@ -2946,17 +3194,47 @@ mod tests {
         // the energy law: an idle corpus schedules ZERO wakeups (no tick, no
         // timer, no settings read, no pmset shell-out) until an event arrives.
         assert_eq!(
-            plan_wait(false, false, None, None, None, false, DEFAULT_QUIET, None, None),
+            plan_wait(
+                false,
+                false,
+                None,
+                None,
+                None,
+                false,
+                DEFAULT_QUIET,
+                None,
+                None
+            ),
             Wait::Park
         );
         // closed gates alone (no pending work) must not schedule a retry tick
         assert_eq!(
-            plan_wait(false, false, None, None, None, false, DEFAULT_QUIET, None, Some(GATE_RECHECK)),
+            plan_wait(
+                false,
+                false,
+                None,
+                None,
+                None,
+                false,
+                DEFAULT_QUIET,
+                None,
+                Some(GATE_RECHECK)
+            ),
             Wait::Park
         );
         // a lingering backoff alone (queue drained meanwhile) parks too
         assert_eq!(
-            plan_wait(false, false, None, None, None, false, DEFAULT_QUIET, Some(BACKOFF_MAX), None),
+            plan_wait(
+                false,
+                false,
+                None,
+                None,
+                None,
+                false,
+                DEFAULT_QUIET,
+                Some(BACKOFF_MAX),
+                None
+            ),
             Wait::Park
         );
         // Off parks EVERYTHING — a full queue, an owed sweep, a stored nudge
@@ -2982,12 +3260,32 @@ mod tests {
         // newest enqueue 1s old → one timed wake when the burst settles; every
         // further edit re-news the age, so a typing spree = ONE run at the end
         assert_eq!(
-            plan_wait(false, false, None, None, Some(Duration::from_secs(1)), false, quiet, None, None),
+            plan_wait(
+                false,
+                false,
+                None,
+                None,
+                Some(Duration::from_secs(1)),
+                false,
+                quiet,
+                None,
+                None
+            ),
             Wait::For(Duration::from_secs(44))
         );
         // quiet elapsed → ripe
         assert_eq!(
-            plan_wait(false, false, None, None, Some(quiet), false, quiet, None, None),
+            plan_wait(
+                false,
+                false,
+                None,
+                None,
+                Some(quiet),
+                false,
+                quiet,
+                None,
+                None
+            ),
             Wait::Run
         );
         // Run-now bypasses quiet, settle, AND the model backoff (never chat —
@@ -3009,12 +3307,32 @@ mod tests {
         // …but a nudge blocked by a closed gate is QUEUED, not consumed (#29):
         // the leash remainder times the retry (no busy-spin against a chat)…
         assert_eq!(
-            plan_wait(false, true, None, None, None, false, quiet, None, Some(GATE_RECHECK)),
+            plan_wait(
+                false,
+                true,
+                None,
+                None,
+                None,
+                false,
+                quiet,
+                None,
+                Some(GATE_RECHECK)
+            ),
             Wait::For(GATE_RECHECK)
         );
         // …and once the leash decays the pending nudge actually runs
         assert_eq!(
-            plan_wait(false, true, None, None, None, false, quiet, None, Some(Duration::ZERO)),
+            plan_wait(
+                false,
+                true,
+                None,
+                None,
+                None,
+                false,
+                quiet,
+                None,
+                Some(Duration::ZERO)
+            ),
             Wait::Run
         );
     }
@@ -3025,7 +3343,17 @@ mod tests {
         // an owed sweep settles SWEEP_SETTLE from the nudge (approval sprees
         // fold to one disk walk), then runs
         assert_eq!(
-            plan_wait(false, false, Some(Duration::from_secs(1)), None, None, false, quiet, None, None),
+            plan_wait(
+                false,
+                false,
+                Some(Duration::from_secs(1)),
+                None,
+                None,
+                false,
+                quiet,
+                None,
+                None
+            ),
             Wait::For(SWEEP_SETTLE - Duration::from_secs(1))
         );
         // the startup hold stretches the owed sweep's wait to the remainder —
@@ -3075,46 +3403,105 @@ mod tests {
             Wait::Run
         );
         assert_eq!(
-            plan_wait(false, false, Some(SWEEP_SETTLE), None, None, false, quiet, None, None),
+            plan_wait(
+                false,
+                false,
+                Some(SWEEP_SETTLE),
+                None,
+                None,
+                false,
+                quiet,
+                None,
+                None
+            ),
             Wait::Run
         );
         // model offline: the backoff stretches a ripe queue's wait — no retry
         // storm against a dead server
         assert_eq!(
-            plan_wait(false, false, None, None, Some(quiet), false, quiet, Some(Duration::from_secs(30)), None),
+            plan_wait(
+                false,
+                false,
+                None,
+                None,
+                Some(quiet),
+                false,
+                quiet,
+                Some(Duration::from_secs(30)),
+                None
+            ),
             Wait::For(Duration::from_secs(30))
         );
         // gates closed with work pending → the bounded GATE_RECHECK leash
         // (the ONLY timed retry that exists, and only while work is staged)
         assert_eq!(
-            plan_wait(false, false, None, None, Some(quiet), false, quiet, None, Some(GATE_RECHECK)),
+            plan_wait(
+                false,
+                false,
+                None,
+                None,
+                Some(quiet),
+                false,
+                quiet,
+                None,
+                Some(GATE_RECHECK)
+            ),
             Wait::For(GATE_RECHECK)
         );
         // the leash is a REMAINDER: mid-leash re-plans wait only what's left…
         assert_eq!(
-            plan_wait(false, false, None, None, Some(quiet), false, quiet, None, Some(Duration::from_secs(30))),
+            plan_wait(
+                false,
+                false,
+                None,
+                None,
+                Some(quiet),
+                false,
+                quiet,
+                None,
+                Some(Duration::from_secs(30))
+            ),
             Wait::For(Duration::from_secs(30))
         );
         // …and an EXPIRED leash runs — the gates get re-probed instead of the
         // blocked attempt re-waiting the full leash forever (the starvation bug)
         assert_eq!(
-            plan_wait(false, false, None, None, Some(quiet), false, quiet, None, Some(Duration::ZERO)),
+            plan_wait(
+                false,
+                false,
+                None,
+                None,
+                Some(quiet),
+                false,
+                quiet,
+                None,
+                Some(Duration::ZERO)
+            ),
             Wait::Run
         );
         // an owed post-sweep cycle alone (empty queue) still runs — frontend
         // approvals are suppress-marked, the index diff must catch up
-        assert_eq!(plan_wait(false, false, None, None, None, true, quiet, None, None), Wait::Run);
+        assert_eq!(
+            plan_wait(false, false, None, None, None, true, quiet, None, None),
+            Wait::Run
+        );
     }
 
     #[test]
     fn nudges_owe_exactly_one_sweep() {
         let handle = OrganizerHandle::new();
-        assert!(handle.0.sweep_at.lock().unwrap().is_none(), "born owing nothing");
+        assert!(
+            handle.0.sweep_at.lock().unwrap().is_none(),
+            "born owing nothing"
+        );
         handle.nudge_sweep();
         assert!(handle.0.sweep_at.lock().unwrap().is_some());
         *handle.0.sweep_at.lock().unwrap() = None;
         handle.set_trust(Trust::Off);
-        assert!(handle.0.sweep_at.lock().unwrap().is_none(), "Off never wakes anything");
+        assert!(
+            handle.0.sweep_at.lock().unwrap().is_none(),
+            "Off never wakes anything"
+        );
         handle.set_trust(Trust::Suggest);
         assert!(
             handle.0.sweep_at.lock().unwrap().is_some(),
@@ -3127,27 +3514,56 @@ mod tests {
         assert_eq!(Trust::parse("tidy"), Trust::Tidy);
         // Organize is the default rung (2026-07-02) — location+metadata only,
         // journaled+undoable; an explicit settings choice always wins
-        assert_eq!(Trust::parse("garbage"), Trust::Organize, "unknown → the default rung");
+        assert_eq!(
+            Trust::parse("garbage"),
+            Trust::Organize,
+            "unknown → the default rung"
+        );
         assert_eq!(Trust::parse(""), Trust::Organize);
-        assert!(Trust::parse_strict("garbage").is_none(), "the command rejects junk");
+        assert!(
+            Trust::parse_strict("garbage").is_none(),
+            "the command rejects junk"
+        );
         // knob parsing: bad values fall back, never explode
         let k = parse_knobs("{\"organizerTrust\":\"organize\",\"organizerThreshold\":0.6,\"organizerQuietSecs\":10}");
         assert_eq!(k.trust, Some(Trust::Organize));
         assert_eq!(k.threshold, 0.6);
         assert_eq!(k.quiet, Duration::from_secs(10));
         let k = parse_knobs("{\"organizerThreshold\":7}");
-        assert_eq!(k.threshold, DEFAULT_THRESHOLD, "out-of-band threshold → default");
+        assert_eq!(
+            k.threshold, DEFAULT_THRESHOLD,
+            "out-of-band threshold → default"
+        );
         assert_eq!(k.trust, None);
         let k = parse_knobs("not json");
         assert_eq!(k.threshold, DEFAULT_THRESHOLD);
         assert_eq!(k.quiet, DEFAULT_QUIET);
-        assert_eq!(k.model, OrgModel::Local, "absent/garbage organizerModel → on-device");
+        assert_eq!(
+            k.model,
+            OrgModel::Local,
+            "absent/garbage organizerModel → on-device"
+        );
         // recognized remote lanes are explicit; everything else stays local
-        assert_eq!(parse_knobs("{\"organizerModel\":\"claude\"}").model, OrgModel::Claude);
-        assert_eq!(parse_knobs("{\"organizerModel\":\"Claude\"}").model, OrgModel::Claude);
-        assert_eq!(parse_knobs("{\"organizerModel\":\"gemini35\"}").model, OrgModel::Gemini35);
-        assert_eq!(parse_knobs("{\"organizerModel\":\"local\"}").model, OrgModel::Local);
-        assert_eq!(parse_knobs("{\"organizerModel\":\"gpt\"}").model, OrgModel::Local);
+        assert_eq!(
+            parse_knobs("{\"organizerModel\":\"claude\"}").model,
+            OrgModel::Claude
+        );
+        assert_eq!(
+            parse_knobs("{\"organizerModel\":\"Claude\"}").model,
+            OrgModel::Claude
+        );
+        assert_eq!(
+            parse_knobs("{\"organizerModel\":\"gemini35\"}").model,
+            OrgModel::Gemini35
+        );
+        assert_eq!(
+            parse_knobs("{\"organizerModel\":\"local\"}").model,
+            OrgModel::Local
+        );
+        assert_eq!(
+            parse_knobs("{\"organizerModel\":\"gpt\"}").model,
+            OrgModel::Local
+        );
     }
 
     // ── the cycle ──
@@ -3155,8 +3571,11 @@ mod tests {
     #[test]
     fn secure_and_locked_never_reach_the_transport() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit: these assertions encode propose-only (Suggest) semantics
-        // a locked capture, a flagged-secure capture, and a raw-secret capture
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        ); // explicit: these assertions encode propose-only (Suggest) semantics
+           // a locked capture, a flagged-secure capture, and a raw-secret capture
         let locked = stage_capture(&state, "# Locked one\n\nplain");
         add_flag(&root, &locked, "locked: true");
         let flagged = stage_capture(&state, "# Flagged one\n\nplain");
@@ -3173,11 +3592,18 @@ mod tests {
         };
         let report =
             run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 0, "secure/locked must NEVER be modeled");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            0,
+            "secure/locked must NEVER be modeled"
+        );
         assert_eq!(report.secure_skipped, 2);
         assert_eq!(report.locked_skipped, 1);
         assert_eq!(report.proposals, 0);
-        assert!(journal_rows(&state).is_empty(), "no proposal may carry secure content");
+        assert!(
+            journal_rows(&state).is_empty(),
+            "no proposal may carry secure content"
+        );
     }
 
     /// The transport tests share: classify prompts get an area pick, enrich
@@ -3196,7 +3622,14 @@ mod tests {
 
     /// A note already sitting in an area, written the way an external tool (or
     /// a past filing) would leave it — raw fs, own ULID, some frontmatter.
-    fn seed_placed(root: &Path, area: &str, name: &str, id: &str, extra_fm: &str, body: &str) -> String {
+    fn seed_placed(
+        root: &Path,
+        area: &str,
+        name: &str,
+        id: &str,
+        extra_fm: &str,
+        body: &str,
+    ) -> String {
         let rel = format!("wiki/{area}/{name}");
         fs::write(
             root.join(&rel),
@@ -3212,7 +3645,10 @@ mod tests {
         // captures + a placed note), and refresh-index (the placed member) —
         // and at Suggest not one byte outside `.rotli/` may change.
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // EXPLICIT: this test proves Suggest is write-free (Organize is the default now)
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        ); // EXPLICIT: this test proves Suggest is write-free (Organize is the default now)
         let high = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         let low = stage_capture(&state, "# Mystery\n\nunclear scribble");
         let placed = seed_placed(
@@ -3223,17 +3659,37 @@ mod tests {
             "summary: my own words\n",
             "# Old note\n\nland archive\n",
         );
-        handle.enqueue(&root, &[root.join(&high), root.join(&low), root.join(&placed)]);
+        handle.enqueue(
+            &root,
+            &[root.join(&high), root.join(&low), root.join(&placed)],
+        );
 
         let before = tree_hash(&root);
-        let report =
-            run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        let report = run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
 
-        assert_eq!(tree_hash(&root), before, "Suggest must be write-free outside .rotli/");
+        assert_eq!(
+            tree_hash(&root),
+            before,
+            "Suggest must be write-free outside .rotli/"
+        );
         assert_eq!(report.applied, 0);
         let rows = journal_rows(&state);
-        assert!(rows.iter().all(|r| r["status"] == "proposed"), "Suggest proposes ONLY");
-        let file_row = rows.iter().find(|r| r["action"] == "file").expect("a file proposal");
+        assert!(
+            rows.iter().all(|r| r["status"] == "proposed"),
+            "Suggest proposes ONLY"
+        );
+        let file_row = rows
+            .iter()
+            .find(|r| r["action"] == "file")
+            .expect("a file proposal");
         assert_eq!(file_row["after"], "wiki/Projects");
         assert_eq!(file_row["before"], "wiki/_inbox");
         assert_eq!(file_row["confidence"], 0.95);
@@ -3250,11 +3706,19 @@ mod tests {
         assert!(!rows
             .iter()
             .any(|r| r["field"] == "summary" && r["noteId"] == placed.as_str()));
-        assert!(rows.iter().any(|r| r["field"] == "tags" && r["noteId"] == placed.as_str()));
+        assert!(rows
+            .iter()
+            .any(|r| r["field"] == "tags" && r["noteId"] == placed.as_str()));
         // the index proposal carries the FULL proposed body for the diff (§4.5)
-        let idx = rows.iter().find(|r| r["action"] == "index").expect("an index proposal");
+        let idx = rows
+            .iter()
+            .find(|r| r["action"] == "index")
+            .expect("an index proposal");
         assert_eq!(idx["area"], "Projects");
-        assert!(idx["after"].as_str().unwrap().contains("| Old note | my own words |"));
+        assert!(idx["after"]
+            .as_str()
+            .unwrap()
+            .contains("| Old note | my own words |"));
         assert_eq!(idx["before"], "");
         // the daemon's own state landed in the sidecar
         let st = state.route("default", |s| s.dot_read("organizer")).unwrap();
@@ -3264,7 +3728,10 @@ mod tests {
     #[test]
     fn second_run_same_corpus_is_a_noop() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit: these assertions encode propose-only (Suggest) semantics
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        ); // explicit: these assertions encode propose-only (Suggest) semantics
         let rel = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         let calls = AtomicUsize::new(0);
         let transport = |p: &str| {
@@ -3275,7 +3742,11 @@ mod tests {
         handle.enqueue(&root, &[root.join(&rel)]);
         let first =
             run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 2, "one classify + one enrich call");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            2,
+            "one classify + one enrich call"
+        );
         let rows_after_first = journal_rows(&state).len();
         assert!(first.proposals > 0);
 
@@ -3285,12 +3756,19 @@ mod tests {
         let report =
             run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
         assert_eq!(calls.load(Ordering::SeqCst), 2, "unchanged note re-modeled");
-        assert_eq!(journal_rows(&state).len(), rows_after_first, "duplicate rows journaled");
+        assert_eq!(
+            journal_rows(&state).len(),
+            rows_after_first,
+            "duplicate rows journaled"
+        );
         assert_eq!(report.proposals, 0);
 
         // and the sweep agrees: nothing to enqueue for an unchanged corpus
         let st = parse_state(&state.route("default", |s| s.dot_read("organizer")).unwrap());
-        assert!(sweep(&root, &st).is_empty(), "sweep must be a diff, not a re-process");
+        assert!(
+            sweep(&root, &st).is_empty(),
+            "sweep must be a diff, not a re-process"
+        );
     }
 
     #[test]
@@ -3300,16 +3778,43 @@ mod tests {
         // PARKS — a plain condvar wait, no tick, no timer, no model call —
         // until a real event (watcher / Run-now / approval nudge) arrives.
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit: these assertions encode propose-only (Suggest) semantics
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        ); // explicit: these assertions encode propose-only (Suggest) semantics
         let rel = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         handle.enqueue(&root, &[root.join(&rel)]);
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
 
         let st = parse_state(&state.route("default", |s| s.dot_read("organizer")).unwrap());
-        assert!(sweep(&root, &st).is_empty(), "a converged corpus has no sweep candidates");
-        assert!(handle.0.queue.lock().unwrap().is_empty(), "nothing left staged");
+        assert!(
+            sweep(&root, &st).is_empty(),
+            "a converged corpus has no sweep candidates"
+        );
+        assert!(
+            handle.0.queue.lock().unwrap().is_empty(),
+            "nothing left staged"
+        );
         assert_eq!(
-            plan_wait(false, false, None, None, None, false, DEFAULT_QUIET, None, None),
+            plan_wait(
+                false,
+                false,
+                None,
+                None,
+                None,
+                false,
+                DEFAULT_QUIET,
+                None,
+                None
+            ),
             Wait::Park,
             "idle corpus ⇒ Park: zero scheduled wakeups"
         );
@@ -3318,24 +3823,40 @@ mod tests {
     #[test]
     fn tidy_files_staged_capture_and_journals_applied() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}",
+        );
         let rel = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         let before_updated = {
             let text = fs::read_to_string(root.join(&rel)).unwrap();
             corpus::parse_document(&text).0.unwrap_or_default().updated
         };
         handle.enqueue(&root, &[root.join(&rel)]);
-        let report =
-            run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        let report = run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
 
         // filing + the enrich annotations auto-apply at Tidy
         assert!(report.applied >= 1);
         assert!(!root.join(&rel).exists(), "the staged capture left _inbox");
         let rows = journal_rows(&state);
-        let file_row = rows.iter().find(|r| r["action"] == "file").expect("the filing row");
+        let file_row = rows
+            .iter()
+            .find(|r| r["action"] == "file")
+            .expect("the filing row");
         assert_eq!(file_row["status"], "applied");
         let new_rel = file_row["noteId"].as_str().unwrap();
-        assert!(new_rel.starts_with("wiki/Projects/"), "journal carries the new rel: {new_rel}");
+        assert!(
+            new_rel.starts_with("wiki/Projects/"),
+            "journal carries the new rel: {new_rel}"
+        );
         let filed = fs::read_to_string(root.join(new_rel)).unwrap();
         assert!(filed.contains("area: Projects"));
         assert!(filed.contains("filed_by: gemma-3-12b-it-qat-4bit"));
@@ -3347,7 +3868,10 @@ mod tests {
         let after_updated = corpus::parse_document(&filed).0.unwrap_or_default().updated;
         assert_eq!(after_updated, before_updated);
         // an index REWRITE stays a proposal at Tidy (§4.3 — review until Organize)
-        let idx = rows.iter().find(|r| r["action"] == "index").expect("an index row");
+        let idx = rows
+            .iter()
+            .find(|r| r["action"] == "index")
+            .expect("an index row");
         assert_eq!(idx["status"], "proposed");
         assert!(!root.join("wiki/Projects/_index.md").exists());
         // state converged: area recorded, no outstanding file proposal
@@ -3355,13 +3879,19 @@ mod tests {
         let ns = st.notes.values().next().unwrap();
         assert_eq!(ns.area, "Projects");
         assert!(ns.proposed.file.is_empty());
-        assert_eq!(ns.last_fields.get("summary").map(String::as_str), Some("one line"));
+        assert_eq!(
+            ns.last_fields.get("summary").map(String::as_str),
+            Some("one line")
+        );
     }
 
     #[test]
     fn tidy_sets_suggested_area_below_threshold() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}",
+        );
         let rel = stage_capture(&state, "# Mystery\n\nunclear scribble");
         handle.enqueue(&root, &[root.join(&rel)]);
         let transport = |_: &str| Ok("{\"area\":\"Research\",\"confidence\":0.4}".to_string());
@@ -3373,7 +3903,10 @@ mod tests {
         let staged = fs::read_to_string(root.join(&rel)).unwrap();
         assert!(staged.contains("suggested_area: Research"));
         assert!(staged.contains("area_confidence: 0.40"));
-        assert!(!staged.contains("\narea: "), "no area write below threshold:\n{staged}");
+        assert!(
+            !staged.contains("\narea: "),
+            "no area write below threshold:\n{staged}"
+        );
         // …and the journal row is the applied annotation
         let rows = journal_rows(&state);
         assert_eq!(rows[0]["action"], "field");
@@ -3392,12 +3925,18 @@ mod tests {
             Ok("{\"area\":\"Projects\",\"confidence\":0.95}".to_string())
         };
         // Off: drain nothing, model nothing, queue intact
-        write_settings(&state, "{\"organizerTrust\":\"off\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"off\",\"organizerQuietSecs\":0}",
+        );
         run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
         assert_eq!(calls.load(Ordering::SeqCst), 0);
         assert_eq!(handle.0.queue.lock().unwrap().len(), 1);
         // gates closed: candidate stays queued for the next wake
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        );
         let closed = || false;
         let report = run_cycle(&state, "default", &root, &handle.0, &closed, &transport).unwrap();
         assert_eq!(calls.load(Ordering::SeqCst), 0);
@@ -3408,14 +3947,21 @@ mod tests {
     #[test]
     fn model_offline_requeues_and_reports() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit: these assertions encode propose-only (Suggest) semantics
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        ); // explicit: these assertions encode propose-only (Suggest) semantics
         let rel = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         handle.enqueue(&root, &[root.join(&rel)]);
         let transport = |_: &str| Err("local model unreachable".to_string());
         let report =
             run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
         assert!(report.model_offline);
-        assert_eq!(handle.0.queue.lock().unwrap().len(), 1, "queue survives an outage");
+        assert_eq!(
+            handle.0.queue.lock().unwrap().len(),
+            1,
+            "queue survives an outage"
+        );
         assert!(journal_rows(&state).is_empty());
         // and a later successful run drains it (resume cleanly, §4.8)
         let transport = |_: &str| Ok("{\"area\":\"Projects\",\"confidence\":0.95}".to_string());
@@ -3433,7 +3979,11 @@ mod tests {
         let (_dir, _root, state, handle) = seed_brain();
         write_settings(&state, "{\"organizerTrust\":\"organize\"}");
         read_knobs(&state, "default", &handle.0);
-        assert_eq!(*handle.0.trust.lock().unwrap(), Trust::Organize, "startup seed adopted");
+        assert_eq!(
+            *handle.0.trust.lock().unwrap(),
+            Trust::Organize,
+            "startup seed adopted"
+        );
         handle.set_trust(Trust::Off);
         read_knobs(&state, "default", &handle.0);
         assert_eq!(
@@ -3454,7 +4004,10 @@ mod tests {
     #[test]
     fn trust_off_mid_cycle_parks_the_remaining_queue() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}",
+        );
         let a = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         let b = stage_capture(&state, "# Beta capture\n\nmore land notes");
         handle.enqueue(&root, &[root.join(&a), root.join(&b)]);
@@ -3469,10 +4022,18 @@ mod tests {
         };
         let report =
             run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 2, "only `a` (classify + enrich) was modeled");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            2,
+            "only `a` (classify + enrich) was modeled"
+        );
         assert!(root.join(&b).exists(), "`b` untouched");
         assert!(report.requeued >= 1);
-        assert_eq!(handle.0.queue.lock().unwrap().len(), 1, "`b` stays queued for later");
+        assert_eq!(
+            handle.0.queue.lock().unwrap().len(),
+            1,
+            "`b` stays queued for later"
+        );
         assert!(
             !root.join("wiki/Projects/_index.md").exists(),
             "the index job parks too after a mid-cycle Off"
@@ -3482,10 +4043,21 @@ mod tests {
     #[test]
     fn reproposal_supersedes_the_stale_pending_rows() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit Suggest (Organize is the default now)
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        ); // explicit Suggest (Organize is the default now)
         let rel = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         handle.enqueue(&root, &[root.join(&rel)]);
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
         let old_ids: Vec<String> = journal_rows(&state)
             .iter()
             .filter(|r| r["status"] == "proposed")
@@ -3502,7 +4074,15 @@ mod tests {
         )
         .unwrap();
         handle.enqueue(&root, &[root.join(&rel)]);
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
 
         // fold like the frontend: last line per id wins
         let mut latest: HashMap<String, String> = HashMap::new();
@@ -3513,7 +4093,10 @@ mod tests {
             );
         }
         for id in &old_ids {
-            assert_eq!(latest[id], "dismissed", "stale row {id} must retire, not linger");
+            assert_eq!(
+                latest[id], "dismissed",
+                "stale row {id} must retire, not linger"
+            );
         }
         // no contradictory pending filings: the old file proposal is gone and
         // the new decision (low-confidence suggested_area) is the pending one
@@ -3530,17 +4113,40 @@ mod tests {
     #[test]
     fn secure_hint_survives_small_cycles_and_clears_when_reviewed() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit: these assertions encode propose-only (Suggest) semantics
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        ); // explicit: these assertions encode propose-only (Suggest) semantics
         let secret = stage_capture(&state, "# Card\n\ncard 4242 4242 4242 4242\n");
         let plain = stage_capture(&state, "# Plain\n\ngroceries\n");
         handle.enqueue(&root, &[root.join(&secret), root.join(&plain)]);
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
         let pending = |h: &OrganizerHandle| h.0.status.lock().unwrap().secure_pending.len();
-        assert_eq!(pending(&handle), 1, "the secret capture is remembered for review");
+        assert_eq!(
+            pending(&handle),
+            1,
+            "the secret capture is remembered for review"
+        );
 
         // a small watcher cycle on an unrelated note must NOT zero the hint
         handle.enqueue(&root, &[root.join(&plain)]);
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
         assert_eq!(pending(&handle), 1, "the review hint must not flicker off");
 
         // the user reviews it: the secret comes out → the hint clears
@@ -3552,7 +4158,15 @@ mod tests {
         )
         .unwrap();
         handle.enqueue(&root, &[root.join(&secret)]);
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
         assert_eq!(pending(&handle), 0, "a reviewed capture leaves the hint");
     }
 
@@ -3601,13 +4215,32 @@ mod tests {
             dual_transport(p)
         };
         handle.enqueue(&root, &[root.join(&plain), root.join(&secret)]);
-        let report = run_cycle(&state, "default", &root, &handle.0, &no_gates(), &counting).unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 0, "a raw vault must NEVER be modeled");
+        let report =
+            run_cycle(&state, "default", &root, &handle.0, &no_gates(), &counting).unwrap();
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            0,
+            "a raw vault must NEVER be modeled"
+        );
         assert_eq!((report.proposals, report.applied), (0, 0));
-        assert!(handle.0.queue.lock().unwrap().is_empty(), "the queue drains without acting");
-        assert_eq!(handle.0.status.lock().unwrap().secure_pending.len(), 0, "no review nags");
-        assert!(journal_rows(&state).is_empty(), "a raw vault journals nothing");
-        assert_eq!(user_tree(&root), before, "raw cycles leave every user file byte-identical");
+        assert!(
+            handle.0.queue.lock().unwrap().is_empty(),
+            "the queue drains without acting"
+        );
+        assert_eq!(
+            handle.0.status.lock().unwrap().secure_pending.len(),
+            0,
+            "no review nags"
+        );
+        assert!(
+            journal_rows(&state).is_empty(),
+            "a raw vault journals nothing"
+        );
+        assert_eq!(
+            user_tree(&root),
+            before,
+            "raw cycles leave every user file byte-identical"
+        );
 
         // Brain back ON at Suggest — resumes proposing, still never rewrites files
         write_settings(
@@ -3616,20 +4249,37 @@ mod tests {
         );
         handle.0.settings_trust.lock().unwrap().take(); // fresh adoption of the file's rung
         handle.enqueue(&root, &[root.join(&plain), root.join(&secret)]);
-        let report = run_cycle(&state, "default", &root, &handle.0, &no_gates(), &counting).unwrap();
-        assert!(calls.load(Ordering::SeqCst) > 0, "re-enabling resumes the Brain");
+        let report =
+            run_cycle(&state, "default", &root, &handle.0, &no_gates(), &counting).unwrap();
+        assert!(
+            calls.load(Ordering::SeqCst) > 0,
+            "re-enabling resumes the Brain"
+        );
         assert!(report.proposals > 0, "Suggest proposes on re-entry");
         assert_eq!(report.applied, 0, "never auto-apply on re-entry");
-        assert_eq!(user_tree(&root), before, "Suggest proposals never touch user files");
+        assert_eq!(
+            user_tree(&root),
+            before,
+            "Suggest proposals never touch user files"
+        );
 
         // and OFF again: inert once more
         write_settings(&state, "{\"brainEnabled\":false,\"organizerQuietSecs\":0}");
         let at_reenter = calls.load(Ordering::SeqCst);
         handle.enqueue(&root, &[root.join(&plain)]);
-        let report = run_cycle(&state, "default", &root, &handle.0, &no_gates(), &counting).unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), at_reenter, "off means off, immediately");
+        let report =
+            run_cycle(&state, "default", &root, &handle.0, &no_gates(), &counting).unwrap();
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            at_reenter,
+            "off means off, immediately"
+        );
         assert_eq!((report.proposals, report.applied), (0, 0));
-        assert_eq!(user_tree(&root), before, "the full off→on→off round trip changed nothing");
+        assert_eq!(
+            user_tree(&root),
+            before,
+            "the full off→on→off round trip changed nothing"
+        );
     }
 
     /// The LIVE off signal (pressure-test 2026-07-26): flipping the Brain off
@@ -3638,7 +4288,10 @@ mod tests {
     #[test]
     fn brain_off_mid_cycle_stops_at_the_next_candidate() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        );
         let a = stage_capture(&state, "# Alazan 84\n\nland deal notes\n");
         let b = stage_capture(&state, "# Trip plan\n\nflights and hotels\n");
         handle.enqueue(&root, &[root.join(&a), root.join(&b)]);
@@ -3657,7 +4310,10 @@ mod tests {
             1,
             "the SECOND candidate must never be modeled after the off flip"
         );
-        assert!(handle.0.queue.lock().unwrap().is_empty(), "the rest drains without acting");
+        assert!(
+            handle.0.queue.lock().unwrap().is_empty(),
+            "the rest drains without acting"
+        );
     }
 
     /// The missing-field default IS the compatibility promise: an untouched
@@ -3678,10 +4334,21 @@ mod tests {
     #[test]
     fn not_sensitive_dismissal_persists_and_rearms_on_change() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        );
         let secret = stage_capture(&state, "# Card\n\ncard 4242 4242 4242 4242\n");
         handle.enqueue(&root, &[root.join(&secret)]);
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
         let pending = |h: &OrganizerHandle| h.0.status.lock().unwrap().secure_pending.len();
         assert_eq!(pending(&handle), 1);
 
@@ -3694,19 +4361,45 @@ mod tests {
         dismiss_secure(&state, &handle, &secret).unwrap();
         assert_eq!(pending(&handle), 0, "the answer clears the row immediately");
         assert!(
-            !fs::read_to_string(root.join(&secret)).unwrap().contains("secure"),
+            !fs::read_to_string(root.join(&secret))
+                .unwrap()
+                .contains("secure"),
             "Not sensitive must never write into the note"
         );
 
         handle.enqueue(&root, &[root.join(&secret)]);
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
-        assert_eq!(pending(&handle), 0, "the dismissal is durable across cycles");
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
+        assert_eq!(
+            pending(&handle),
+            0,
+            "the dismissal is durable across cycles"
+        );
 
         // a content change the detector sees re-arms the review
         let text = fs::read_to_string(root.join(&secret)).unwrap();
-        fs::write(root.join(&secret), format!("{text}\nsk-ant-abcdefghijklmnop123\n")).unwrap();
+        fs::write(
+            root.join(&secret),
+            format!("{text}\nsk-ant-abcdefghijklmnop123\n"),
+        )
+        .unwrap();
         handle.enqueue(&root, &[root.join(&secret)]);
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
         assert_eq!(pending(&handle), 1, "changed content re-arms the hint");
     }
 
@@ -3730,13 +4423,27 @@ mod tests {
     #[test]
     fn secure_hints_split_flagged_from_detector_only_and_prune_stale() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        );
         let detector = stage_capture(&state, "# Api key\n\nsk-ant-abcdefghijklmnop123\n");
         let flagged = stage_capture(&state, "# Private\n\nowner notes\n");
         add_flag(&root, &flagged, "secure: true");
         let gone = stage_capture(&state, "# Card\n\ncard 4242 4242 4242 4242\n");
-        handle.enqueue(&root, &[root.join(&detector), root.join(&flagged), root.join(&gone)]);
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        handle.enqueue(
+            &root,
+            &[root.join(&detector), root.join(&flagged), root.join(&gone)],
+        );
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
         assert_eq!(handle.0.status.lock().unwrap().secure_pending.len(), 3);
 
         fs::remove_file(root.join(&gone)).unwrap();
@@ -3752,7 +4459,10 @@ mod tests {
         // §4.8 "don't apply a stale decision": the fresh body-hash re-check
         // inside the write route() — the user typed while the model ran.
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}",
+        );
         let rel = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         handle.enqueue(&root, &[root.join(&rel)]);
         let calls = AtomicUsize::new(0);
@@ -3762,18 +4472,36 @@ mod tests {
             calls.fetch_add(1, Ordering::SeqCst);
             // the note changes WHILE the model call is in flight
             let text = fs::read_to_string(root2.join(&rel2)).unwrap();
-            fs::write(root2.join(&rel2), format!("{text}\nmore words typed meanwhile\n")).unwrap();
+            fs::write(
+                root2.join(&rel2),
+                format!("{text}\nmore words typed meanwhile\n"),
+            )
+            .unwrap();
             dual_transport(p)
         };
         let report =
             run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 1, "requeue skips Enrich for this pass");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "requeue skips Enrich for this pass"
+        );
         assert_eq!(report.proposals, 0);
         assert_eq!(report.applied, 0);
         assert!(report.requeued >= 1);
-        assert!(journal_rows(&state).is_empty(), "a stale decision must never journal");
-        assert!(root.join(&rel).exists(), "the note was NOT filed on the stale read");
-        assert_eq!(handle.0.queue.lock().unwrap().len(), 1, "queued for re-evaluation");
+        assert!(
+            journal_rows(&state).is_empty(),
+            "a stale decision must never journal"
+        );
+        assert!(
+            root.join(&rel).exists(),
+            "the note was NOT filed on the stale read"
+        );
+        assert_eq!(
+            handle.0.queue.lock().unwrap().len(),
+            1,
+            "queued for re-evaluation"
+        );
     }
 
     #[test]
@@ -3781,7 +4509,10 @@ mod tests {
         // TOCTOU: the user locks the note between the classify read and the
         // write — the Filer gate re-reads `locked` fresh and must refuse.
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}",
+        );
         let rel = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         handle.enqueue(&root, &[root.join(&rel)]);
         let root2 = root.clone();
@@ -3795,10 +4526,20 @@ mod tests {
         let report =
             run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
         assert_eq!(report.applied, 0);
-        assert_eq!(report.errors, 1, "the refused write is reported, not swallowed");
+        assert_eq!(
+            report.errors, 1,
+            "the refused write is reported, not swallowed"
+        );
         assert!(root.join(&rel).exists(), "a locked note must not move");
         assert!(journal_rows(&state).is_empty());
-        let err = handle.0.status.lock().unwrap().last_error.clone().expect("error surfaced");
+        let err = handle
+            .0
+            .status
+            .lock()
+            .unwrap()
+            .last_error
+            .clone()
+            .expect("error surfaced");
         assert!(err.contains("locked"), "{err}");
     }
 
@@ -3810,7 +4551,10 @@ mod tests {
         // "classify-covered" — that stranded it: no journal row, invisible in
         // Activity, unrescuable by the sweep until its body changed.
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}",
+        );
         let a = stage_capture(&state, "# Alazan 84\n\nland deal notes");
         let b = stage_capture(&state, "# Mystery\n\nunclear scribble");
         handle.enqueue(&root, &[root.join(&a), root.join(&b)]);
@@ -3838,7 +4582,9 @@ mod tests {
         );
         // and no journal row claims anything happened to A
         assert!(
-            journal_rows(&state).iter().all(|r| r["noteId"].as_str().unwrap() != a),
+            journal_rows(&state)
+                .iter()
+                .all(|r| r["noteId"].as_str().unwrap() != a),
             "no row may claim A was touched"
         );
     }
@@ -3850,7 +4596,10 @@ mod tests {
         // re-derive the field values from the fresh file and skip the
         // now-user-owned field instead of clobbering it.
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}",
+        );
         let rel = place_note(&state, "# Alazan 84\n\nland deal notes", "Projects");
         handle.enqueue(&root, &[root.join(&rel)]);
         let root2 = root.clone();
@@ -3867,9 +4616,18 @@ mod tests {
             text.contains("summary: my own words"),
             "the user's mid-flight summary survives:\n{text}"
         );
-        assert!(!text.contains("model line"), "the stale model summary must not land:\n{text}");
-        assert!(text.contains("tags: [land]"), "untouched fields still enrich:\n{text}");
-        assert_eq!(report.applied, 1, "tags applied; summary skipped, not errored");
+        assert!(
+            !text.contains("model line"),
+            "the stale model summary must not land:\n{text}"
+        );
+        assert!(
+            text.contains("tags: [land]"),
+            "untouched fields still enrich:\n{text}"
+        );
+        assert_eq!(
+            report.applied, 1,
+            "tags applied; summary skipped, not errored"
+        );
         assert!(
             journal_rows(&state).iter().all(|r| r["field"] != "summary"),
             "no row may claim the summary write"
@@ -3882,9 +4640,20 @@ mod tests {
         // files/fields have — a membership change retires the pending row, and
         // reaching the fixed point (approved / reverted) retires it too.
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit Suggest (Organize is the default now)
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        ); // explicit Suggest (Organize is the default now)
         place_note(&state, "# Alazan 84\n\nland deal notes", "Projects");
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
         let p1 = journal_rows(&state)
             .iter()
             .find(|r| r["action"] == "index" && r["status"] == "proposed")
@@ -3893,7 +4662,15 @@ mod tests {
 
         // membership changes while P1 is pending → the re-proposal retires it
         place_note(&state, "# Land survey\n\nsurvey notes", "Projects");
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
         let latest = |id: &str| {
             journal_rows(&state)
                 .iter()
@@ -3901,7 +4678,11 @@ mod tests {
                 .map(|r| r["status"].as_str().unwrap().to_string())
                 .unwrap()
         };
-        assert_eq!(latest(&p1), "dismissed", "the stale index proposal retires (#26)");
+        assert_eq!(
+            latest(&p1),
+            "dismissed",
+            "the stale index proposal retires (#26)"
+        );
         let p2 = journal_rows(&state)
             .iter()
             .rfind(|r| r["action"] == "index")
@@ -3918,10 +4699,25 @@ mod tests {
             .map(|r| r["after"].as_str().unwrap().to_string())
             .unwrap();
         fs::write(root.join("wiki/Projects/_index.md"), &after).unwrap();
-        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
-        assert_eq!(latest(&p2), "dismissed", "the settled proposal leaves pending (#26)");
+        run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
+        assert_eq!(
+            latest(&p2),
+            "dismissed",
+            "the settled proposal leaves pending (#26)"
+        );
         let st = parse_state(&state.route("default", |s| s.dot_read("organizer")).unwrap());
-        assert!(st.areas["Projects"].proposed_row.is_empty(), "the handle cleared");
+        assert!(
+            st.areas["Projects"].proposed_row.is_empty(),
+            "the handle cleared"
+        );
     }
 
     #[test]
@@ -3931,13 +4727,20 @@ mod tests {
         // daemon-owned to `field_eligible`, never as a freezing user edit.
         let (_dir, root, state, _handle) = seed_brain();
         let rel = stage_capture(&state, "# Alazan 84\n\nnotes");
-        state.route("default", |s| s.set_ai_field(&rel, "summary", "approved line")).unwrap();
+        state
+            .route("default", |s| {
+                s.set_ai_field(&rel, "summary", "approved line")
+            })
+            .unwrap();
         let snap = snapshot_note(&root, &rel).unwrap();
         let key = state_key(&snap);
         learn_field(&state, &key, "summary", "approved line").unwrap();
         let st = parse_state(&state.route("default", |s| s.dot_read("organizer")).unwrap());
         assert_eq!(
-            st.notes[&key].last_fields.get("summary").map(String::as_str),
+            st.notes[&key]
+                .last_fields
+                .get("summary")
+                .map(String::as_str),
             Some("approved line")
         );
         assert!(
@@ -3952,10 +4755,18 @@ mod tests {
         // FILENAME, whose slug is title-derived (for a quick capture the title
         // is often the secret itself).
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}"); // explicit: these assertions encode propose-only (Suggest) semantics
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        ); // explicit: these assertions encode propose-only (Suggest) semantics
         let note = place_note(&state, "# Alazan 84\n\nland deal notes", "Projects");
         let peer = place_note(&state, "# Alazan history\n\nolder land papers", "Research");
-        let peer_stem = peer.rsplit('/').next().unwrap().trim_end_matches(".md").to_string();
+        let peer_stem = peer
+            .rsplit('/')
+            .next()
+            .unwrap()
+            .trim_end_matches(".md")
+            .to_string();
         seed_placed(
             &root,
             "Research",
@@ -3976,15 +4787,23 @@ mod tests {
         let peers = list_peers(&root);
         assert!(peers.iter().any(|(_, s)| s == &peer_stem));
         assert!(
-            peers.iter().all(|(_, s)| !s.contains("sk-ant") && !s.contains("private")),
+            peers
+                .iter()
+                .all(|(_, s)| !s.contains("sk-ant") && !s.contains("private")),
             "secure/locked stems must be out of the candidate haystack: {peers:?}"
         );
         // …and no prompt carries the poisoned stems
         handle.enqueue(&root, &[root.join(&note)]);
         let stem = peer_stem.clone();
         let transport = move |p: &str| {
-            assert!(!p.contains("sk-ant"), "a secure slug reached the model:\n{p}");
-            assert!(!p.contains("alazan-private"), "a locked slug reached the model:\n{p}");
+            assert!(
+                !p.contains("sk-ant"),
+                "a secure slug reached the model:\n{p}"
+            );
+            assert!(
+                !p.contains("alazan-private"),
+                "a locked slug reached the model:\n{p}"
+            );
             assert!(p.contains(&stem), "the clean peer still rides");
             Ok("{\"summary\":\"one line\",\"tags\":[\"land\"],\"links\":[]}".to_string())
         };
@@ -4009,19 +4828,38 @@ mod tests {
     #[test]
     fn rank_candidates_orders_by_keyword_overlap() {
         let others = vec![
-            ("wiki/Research/quokka-facts-z9y8x7.md".to_string(), "quokka-facts-z9y8x7".to_string()),
+            (
+                "wiki/Research/quokka-facts-z9y8x7.md".to_string(),
+                "quokka-facts-z9y8x7".to_string(),
+            ),
             (
                 "wiki/Projects/alazan-history-a1b2c3.md".to_string(),
                 "alazan-history-a1b2c3".to_string(),
             ),
-            ("wiki/Projects/land-survey-m4n5o6.md".to_string(), "land-survey-m4n5o6".to_string()),
+            (
+                "wiki/Projects/land-survey-m4n5o6.md".to_string(),
+                "land-survey-m4n5o6".to_string(),
+            ),
         ];
         // stem hits (×3) outrank folder hits (×2); ties break on stem;
         // zero-overlap peers are dropped entirely
         let out = rank_note_candidates("Alazan 84", "alazan land deal research", &others, 5);
-        assert_eq!(out, ["alazan-history-a1b2c3", "land-survey-m4n5o6", "quokka-facts-z9y8x7"]);
-        assert_eq!(rank_note_candidates("Alazan 84", "alazan land", &others, 1).len(), 1);
-        assert!(rank_note_candidates("", "", &others, 5).is_empty(), "no tokens ⇒ no candidates");
+        assert_eq!(
+            out,
+            [
+                "alazan-history-a1b2c3",
+                "land-survey-m4n5o6",
+                "quokka-facts-z9y8x7"
+            ]
+        );
+        assert_eq!(
+            rank_note_candidates("Alazan 84", "alazan land", &others, 1).len(),
+            1
+        );
+        assert!(
+            rank_note_candidates("", "", &others, 5).is_empty(),
+            "no tokens ⇒ no candidates"
+        );
         assert!(
             rank_note_candidates("totally unrelated", "words", &others, 5).is_empty(),
             "score 0 is not a candidate"
@@ -4070,25 +4908,45 @@ mod tests {
                 ("links", "[[x-1]], [[y-2]]".to_string()),
             ]
         );
-        let empty = EnrichOut { summary: String::new(), tags: vec![], links: vec![] };
+        let empty = EnrichOut {
+            summary: String::new(),
+            tags: vec![],
+            links: vec![],
+        };
         assert!(empty.fields().is_empty());
     }
 
     #[test]
     fn enrich_never_clobbers_a_user_edited_field() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}",
+        );
         let rel = place_note(&state, "# Alazan 84\n\nland deal notes", "Projects");
         // the user hand-wrote a summary (external editor) — NOT the daemon's
         add_flag(&root, &rel, "summary: my own words");
         handle.enqueue(&root, &[root.join(&rel)]);
-        let report =
-            run_cycle(&state, "default", &root, &handle.0, &no_gates(), &dual_transport).unwrap();
+        let report = run_cycle(
+            &state,
+            "default",
+            &root,
+            &handle.0,
+            &no_gates(),
+            &dual_transport,
+        )
+        .unwrap();
 
         let text = fs::read_to_string(root.join(&rel)).unwrap();
-        assert!(text.contains("summary: my own words"), "user edit clobbered:\n{text}");
+        assert!(
+            text.contains("summary: my own words"),
+            "user edit clobbered:\n{text}"
+        );
         assert!(!text.contains("summary: one line"));
-        assert!(text.contains("tags: [deal, land]"), "empty field not filled:\n{text}");
+        assert!(
+            text.contains("tags: [deal, land]"),
+            "empty field not filled:\n{text}"
+        );
         // the user-owned field was never even PROPOSED
         assert!(journal_rows(&state).iter().all(|r| r["field"] != "summary"));
         assert!(report.applied >= 1);
@@ -4098,16 +4956,26 @@ mod tests {
     fn enrich_fills_empty_fields_at_tidy_and_proposes_at_suggest() {
         let (_dir, root, state, handle) = seed_brain();
         let peer = place_note(&state, "# Alazan history\n\nolder land papers", "Research");
-        let peer_stem =
-            peer.rsplit('/').next().unwrap().trim_end_matches(".md").to_string();
+        let peer_stem = peer
+            .rsplit('/')
+            .next()
+            .unwrap()
+            .trim_end_matches(".md")
+            .to_string();
         let note = place_note(&state, "# Alazan 84\n\nland deal notes", "Projects");
 
         // Suggest: three field proposals, not a byte on the note
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        );
         handle.enqueue(&root, &[root.join(&note)]);
         let stem = peer_stem.clone();
         let transport = move |p: &str| {
-            assert!(p.contains(&stem), "the ranked link candidate must ride the prompt");
+            assert!(
+                p.contains(&stem),
+                "the ranked link candidate must ride the prompt"
+            );
             Ok(format!(
                 "{{\"summary\":\"one line\",\"tags\":[\"land\"],\"links\":[\"{stem}\"]}}"
             ))
@@ -4129,7 +4997,10 @@ mod tests {
         assert!(!unchanged.contains("summary: one line"));
 
         // Tidy: the same pass on a fresh note APPLIES and records the baseline
-        write_settings(&state, "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}",
+        );
         handle.enqueue(&root, &[root.join(&peer)]);
         let transport = |_: &str| {
             Ok("{\"summary\":\"peer line\",\"tags\":[\"papers\"],\"links\":[]}".to_string())
@@ -4146,13 +5017,19 @@ mod tests {
             .values()
             .find(|n| n.last_fields.get("summary").map(String::as_str) == Some("peer line"))
             .expect("lastFields baseline recorded");
-        assert_eq!(ns.proposed.enrich, ns.hash, "enrich coverage recorded for this body");
+        assert_eq!(
+            ns.proposed.enrich, ns.hash,
+            "enrich coverage recorded for this body"
+        );
     }
 
     #[test]
     fn enrich_output_is_canonically_sorted_and_byte_stable() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}",
+        );
         let rel = place_note(&state, "# Alazan 84\n\nland deal notes", "Projects");
         let calls = AtomicUsize::new(0);
         // messy model output: unsorted, duplicated, mixed-case, multi-line
@@ -4164,12 +5041,22 @@ mod tests {
         handle.enqueue(&root, &[root.join(&rel)]);
         run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
         let first = fs::read_to_string(root.join(&rel)).unwrap();
-        assert!(first.contains("summary: A deal note"), "collapsed to one line:\n{first}");
-        assert!(first.contains("tags: [alpha, zeta]"), "canonical sort:\n{first}");
+        assert!(
+            first.contains("summary: A deal note"),
+            "collapsed to one line:\n{first}"
+        );
+        assert!(
+            first.contains("tags: [alpha, zeta]"),
+            "canonical sort:\n{first}"
+        );
         // an unchanged body is never re-modeled and never rewritten
         handle.enqueue(&root, &[root.join(&rel)]);
         run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), 1, "byte-stable output must be a no-op");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "byte-stable output must be a no-op"
+        );
         assert_eq!(fs::read_to_string(root.join(&rel)).unwrap(), first);
     }
 
@@ -4178,7 +5065,10 @@ mod tests {
     #[test]
     fn render_index_is_deterministic_fixed_point() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}",
+        );
         let a = place_note(&state, "# Beta\n\ntwo", "Projects");
         let b = place_note(&state, "# Alpha\n\none", "Projects");
         handle.enqueue(&root, &[root.join(&a), root.join(&b)]);
@@ -4199,13 +5089,19 @@ mod tests {
             run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
         assert_eq!(report.applied, 0);
         assert_eq!(journal_rows(&state).len(), rows_before);
-        assert_eq!(fs::read_to_string(root.join("wiki/Projects/_index.md")).unwrap(), idx);
+        assert_eq!(
+            fs::read_to_string(root.join("wiki/Projects/_index.md")).unwrap(),
+            idx
+        );
     }
 
     #[test]
     fn secure_and_locked_notes_are_omitted_from_index() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}",
+        );
         // a quick capture's TITLE is its first body line — for a secure note
         // that is often the secret itself, so even a title-only row would leak
         // it into the committed, non-gitignored _index.md. Omit entirely.
@@ -4242,9 +5138,15 @@ mod tests {
         assert_eq!(report.applied, 1);
         let idx = fs::read_to_string(root.join("wiki/Projects/_index.md")).unwrap();
         assert!(idx.contains("| Open | visible line |"));
-        assert!(!idx.contains("850-40"), "secure ⇒ OMITTED, title included (§4.2.5):\n{idx}");
+        assert!(
+            !idx.contains("850-40"),
+            "secure ⇒ OMITTED, title included (§4.2.5):\n{idx}"
+        );
         assert!(!idx.contains("SSN"));
-        assert!(!idx.contains("Vault"), "locked notes are off-limits wholesale (§3.1):\n{idx}");
+        assert!(
+            !idx.contains("Vault"),
+            "locked notes are off-limits wholesale (§3.1):\n{idx}"
+        );
         assert!(!idx.contains("full of secrets") && !idx.contains("private plans"));
         // the proposed body in the journal is the same redaction-free render
         let rows = journal_rows(&state);
@@ -4266,7 +5168,10 @@ mod tests {
         let transport =
             |_: &str| -> Result<String, String> { panic!("the index job never calls the model") };
 
-        write_settings(&state, "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"suggest\",\"organizerQuietSecs\":0}",
+        );
         let report =
             run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
         assert_eq!(report.proposals, 1);
@@ -4275,7 +5180,10 @@ mod tests {
         assert_eq!(rows[0]["action"], "index");
         assert_eq!(rows[0]["status"], "proposed");
         assert_eq!(rows[0]["area"], "Projects");
-        assert!(rows[0]["after"].as_str().unwrap().contains("| Open | visible line |"));
+        assert!(rows[0]["after"]
+            .as_str()
+            .unwrap()
+            .contains("| Open | visible line |"));
 
         // a second cycle must NOT spam the same proposal (the proposedHash guard)
         let report =
@@ -4284,13 +5192,19 @@ mod tests {
         assert_eq!(journal_rows(&state).len(), 1);
 
         // Tidy still reviews index rewrites (§4.3 — jarring actions wait)
-        write_settings(&state, "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"tidy\",\"organizerQuietSecs\":0}",
+        );
         run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
         assert!(!root.join("wiki/Projects/_index.md").exists());
         assert_eq!(journal_rows(&state).len(), 1);
 
         // Organize applies — and journals the apply
-        write_settings(&state, "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}",
+        );
         let report =
             run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
         assert_eq!(report.applied, 1);
@@ -4303,7 +5217,10 @@ mod tests {
     #[test]
     fn members_hash_change_detection() {
         let (_dir, root, state, handle) = seed_brain();
-        write_settings(&state, "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}");
+        write_settings(
+            &state,
+            "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}",
+        );
         seed_placed(
             &root,
             "Projects",

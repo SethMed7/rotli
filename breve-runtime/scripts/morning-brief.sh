@@ -10,7 +10,7 @@ SKILL="${ROTLI_BREVE_SKILL:-$BREVE/skills/breve/SKILL.md}"
 LANES=",${ROTLI_BREVE_LANES:-inApp,signal,email},"
 # Sandbox the brief's claude call exactly like the daemon tiers (write+read confinement).
 SB="$HOME/.cache/breve/breve-write-sandbox.sb"
-SANDBOX=""; if [ "$BREVE_SANDBOX" != "0" ] && [ -f "$SB" ]; then SANDBOX="/usr/bin/sandbox-exec -f $SB"; fi
+SANDBOX=""
 # If the profile is missing, sandbox.ts below generates it from the managed runtime paths.
 # Brief model is config-driven — your pick in settings.json "briefModel" (default sonnet,
 # the "deeper reasoning" tier, approved for briefs). NEVER inherit the system default (it was
@@ -19,17 +19,15 @@ BREVE_MODEL="${BREVE_MODEL:-$(bun "$BREVE/scripts/brief-model.ts" 2>/dev/null ||
 # Resolve the memex + storage roots from config (config.local.json owns the real paths; no hardcoding).
 KNOWLEDGE="$(bun "$BREVE/scripts/print-root.ts" knowledge 2>/dev/null || echo "$HOME/memex-vault")"
 STORE="$(bun "$BREVE/scripts/print-root.ts" storage 2>/dev/null || echo "$HOME/memex-storage")"
-# Cross-provider fallback chain. Each agent CLI has INDEPENDENT auth (Anthropic / Google / OpenAI), so a
-# Claude outage or 401 (the common failure) doesn't touch the others. argv[0] resolved to an absolute
-# path (sandbox-exec runs the program directly).
+# Cross-provider fallback chain. Anthropic and Google have independent auth, so a Claude outage or
+# 401 does not affect the sandboxed Gemini fallback. argv[0] is absolute for sandbox-exec.
 CLAUDE_BIN="$(command -v claude 2>/dev/null || echo claude)"
 AGY="$([ -x "$HOME/.local/bin/agy" ] && echo "$HOME/.local/bin/agy" || command -v agy 2>/dev/null || true)"
-CODEX="$(command -v codex 2>/dev/null || true)"
 LOG_DIR="$BREVE/logs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/$(date +%F).log"
 
-# Shared task body; only the lead-in differs per provider (Claude invokes the skill; gemini/codex read
+# Shared task body; only the lead-in differs per provider (Claude invokes the skill; Gemini reads
 # the same SKILL.md file directly — same steps, same MARKDOWN output, so any provider yields the brief).
 TASK="drain the inbox, generate today's brief as MARKDOWN only into $BREVE/briefs/ (Breve renders the readable newsletter HTML + PDF from the markdown — do NOT write the HTML or PDF yourself). If a brief for today already exists, refresh it instead of duplicating. Do NOT email or send anything — audio generation and the email send happen in the wrapper script after you finish. HARD RULE: everything except $BREVE and your memex is strictly read-only — never edit, commit, or push any other repo; flag needed changes in the brief instead. Do not take any other write actions."
 PROMPT="Read the Breve instructions at $SKILL and follow them end to end: $TASK"
@@ -48,53 +46,37 @@ fi
 
 TODAY=$(bun "$BREVE/scripts/today.ts")
 
-# Cross-provider self-heal: try Claude (configured model → a fallback model), then GEMINI (agy), then
-# CODEX — independent auth, so a Claude outage/401 (the common case, e.g. an expired login) still yields
-# a brief. We ALWAYS get the brief unless all three are down (rare). The OS write-sandbox ($SB) confines
-# every provider to Rotli's managed runtime + your memex. Downstream render/audio/email need no model auth.
+# Cross-provider self-heal: try Claude (configured model → a fallback model), then GEMINI (agy).
+# Both providers run under the same fail-closed profile. Codex's nested Seatbelt cannot express the
+# per-file secure-note read denies, so it is deliberately not a knowledge-bearing fallback.
 brief_made() { [ -f "$BREVE/briefs/$TODAY.md" ]; }
 
-# Run ONE provider. claude uses $PROMPT (skill invocation); gemini/codex use $PROMPT_AGENT (read SKILL.md).
-# claude + agy have no native OS sandbox, so we wrap them in $SANDBOX (sandbox-exec). codex ships its OWN
-# Seatbelt sandbox (`-s workspace-write` confines writes to the workdir + --add-dir, blocking your
-# other projects, etc.), and nesting it inside sandbox-exec fails ("can't initialize app-server") — so codex
-# runs UNWRAPPED and self-confines. Same write boundary, just enforced by codex instead of our profile.
+# Run ONE provider. Claude uses $PROMPT (skill invocation); Gemini uses $PROMPT_AGENT (read SKILL.md).
+# Both are wrapped in the generated macOS sandbox.
 gen() {
   case "$1" in
     claude) caffeinate -i $SANDBOX "$CLAUDE_BIN" -p --model "$2" --dangerously-skip-permissions "$PROMPT" ;;
     gemini) [ -n "$AGY" ]   && caffeinate -i $SANDBOX "$AGY" -p "$PROMPT_AGENT" --dangerously-skip-permissions --print-timeout 15m \
               --add-dir "$KNOWLEDGE" --add-dir "$BREVE" || { echo "(gemini/agy unavailable)"; return 1; } ;;
-    # codex runs with a CLEAN CODEX_HOME ($CODEX_HOME_CLEAN): real auth (symlinked) but mcp_servers
-    # stripped — the brief needs no MCP, and the configured servers (Supabase/Railway) only added
-    # oauth errors + latency. -c 'mcp_servers={}' didn't take (codex merges tables), hence the clean home.
-    codex)  [ -n "$CODEX" ] && caffeinate -i env CODEX_HOME="$CODEX_HOME_CLEAN" "$CODEX" exec --skip-git-repo-check -s workspace-write \
-              -C "$BREVE" --add-dir "$KNOWLEDGE" - <<<"$PROMPT_AGENT" || { echo "(codex unavailable)"; return 1; } ;;
   esac
 }
 
 {
   echo "=== Breve morning run: $(date) ==="
   # Ensure the sandbox profile exists before any model runs.
-  bun "$BREVE/scripts/sandbox.ts" --print >/dev/null 2>&1 || true
-  [ "$BREVE_SANDBOX" != "0" ] && [ -f "$SB" ] && SANDBOX="/usr/bin/sandbox-exec -f $SB"
+  if ! bun "$BREVE/scripts/sandbox.ts" --require >/dev/null 2>&1; then
+    echo "secure model sandbox unavailable — refusing to generate a remote brief"
+    exit 1
+  fi
+  SANDBOX="/usr/bin/sandbox-exec -f $SB"
   # Optional read-only gh token (empty = gh uses default auth).
   export GH_TOKEN="$(bun "$BREVE/scripts/secret.ts" get breve-gh-readonly 2>/dev/null || true)"
-
-  # Clean CODEX_HOME for the codex fallback: real auth (symlinked, never copied) + the user's
-  # config.toml MINUS any [mcp_servers*] table (all other config paths are absolute, so plugins /
-  # projects / hooks still resolve). Strips the Supabase/Railway MCP oauth noise from the run.
-  CODEX_HOME_CLEAN="$HOME/.codex"
-  if [ -n "$CODEX" ] && [ -f "$HOME/.codex/auth.json" ]; then
-    CODEX_HOME_CLEAN="$HOME/.cache/breve/codex-home"; mkdir -p "$CODEX_HOME_CLEAN"
-    ln -sf "$HOME/.codex/auth.json" "$CODEX_HOME_CLEAN/auth.json"
-    [ -f "$HOME/.codex/config.toml" ] && awk '/^\[mcp_servers/{skip=1;next} /^\[/&&!/^\[mcp_servers/{skip=0} !skip' "$HOME/.codex/config.toml" > "$CODEX_HOME_CLEAN/config.toml"
-  fi
 
   FALLBACK="haiku"; [ "$BREVE_MODEL" = "haiku" ] && FALLBACK="sonnet"
 
   if [ "$1" = "--test" ]; then
     # Plumbing check: exercise EACH provider's auth + file access (writes no brief), report each exit.
-    for prov in claude gemini codex; do
+    for prov in claude gemini; do
       echo "=== test $prov at $(date) ==="; gen "$prov" "$BREVE_MODEL"; echo "=== test $prov exit $? at $(date) ==="
     done
     echo "=== test done at $(date) ==="
@@ -108,7 +90,7 @@ gen() {
       [ -f "$BREVE/briefs/$TODAY.html" ] && mv -f "$BREVE/briefs/$TODAY.html" "$BREVE/briefs/$TODAY.html.prev"
       echo "=== regen: set aside existing brief (.prev) ==="
     fi
-    for step in "claude:$BREVE_MODEL" "claude:$FALLBACK" "gemini:-" "codex:-"; do
+    for step in "claude:$BREVE_MODEL" "claude:$FALLBACK" "gemini:-"; do
       prov="${step%%:*}"; mdl="${step#*:}"; [ "$mdl" = "-" ] && mdl=""
       echo "=== try $prov ${mdl:+($mdl) }at $(date) ==="
       gen "$prov" "$mdl"
@@ -127,7 +109,7 @@ gen() {
               "ℹ️ Today's brief was generated with $USED — your usual model ($BREVE_MODEL) was unavailable. It's on its way." || true
             ;;
           *)
-            # Fell OFF Claude entirely (gemini/codex) — almost always a Claude auth failure (401).
+            # Fell off Claude entirely (Gemini) — almost always a Claude auth failure (401).
             # Make this UNMISTAKABLE so a degraded brief never slips by unnoticed. Fully defensive:
             # try the Signal text path, then notify.ts, and never let an alert failure break the run.
             PROV="${USED%% *}"

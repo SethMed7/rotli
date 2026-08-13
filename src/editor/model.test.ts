@@ -25,7 +25,7 @@ import {
 const touched = new Set<string>();
 function buffer(id: string, body: string): void {
   touched.add(id);
-  ensureDocument(id, body);
+  ensureDocument(id, body, `test:${id}:1`);
 }
 
 /** Read the live buffer via the edit seam without mutating it. */
@@ -54,7 +54,7 @@ describe("ensureDocument", () => {
   test("does NOT clobber an existing live buffer (the live buffer is the truth)", () => {
     buffer("live", "alpha");
     editDocument("live", (lines) => [...lines, "beta"]);
-    ensureDocument("live", "STALE FROM QUERY"); // must be ignored
+    ensureDocument("live", "STALE FROM QUERY", "test:live:stale"); // must be ignored
     expect(read("live")).toEqual(["alpha", "beta"]);
   });
 });
@@ -62,21 +62,21 @@ describe("ensureDocument", () => {
 describe("reloadDocumentIfClean", () => {
   test("adopts disk truth when the buffer is clean", () => {
     touched.add("clean");
-    ensureDocument("clean", "old");
-    reloadDocumentIfClean("clean", "from disk");
+    ensureDocument("clean", "old", "test:clean:1");
+    reloadDocumentIfClean("clean", "from disk", "test:clean:2");
     expect(read("clean")).toEqual(["from disk"]);
   });
 
   test("does NOT clobber a dirty buffer", () => {
     buffer("dirty", "old");
     editDocument("dirty", () => ["local edit"]);
-    reloadDocumentIfClean("dirty", "from disk");
+    reloadDocumentIfClean("dirty", "from disk", "test:dirty:2");
     expect(read("dirty")).toEqual(["local edit"]);
   });
 
   test("seeds when the buffer does not exist yet", () => {
     touched.add("fresh");
-    reloadDocumentIfClean("fresh", "hello");
+    reloadDocumentIfClean("fresh", "hello", "test:fresh:1");
     expect(read("fresh")).toEqual(["hello"]);
   });
 });
@@ -122,6 +122,20 @@ describe("sync failure surfacing", () => {
     expect(documentSaveError("fail")).toBe("disk full");
   });
 
+  test("a save presents the revision that supplied the edited buffer", async () => {
+    let presented = "";
+    setWriteNoteBodyForTests((_id, _body, expectedRevision) => {
+      presented = expectedRevision;
+      return Promise.reject(new Error("revision conflict: external edit"));
+    });
+    buffer("conflict", "old");
+    editDocument("conflict", () => ["local"]);
+    await flushNote("conflict");
+    expect(presented).toBe("test:conflict:1");
+    expect(read("conflict")).toEqual(["local"]);
+    expect(documentSaveError("conflict")).toContain("revision conflict");
+  });
+
   test("a later successful write clears the surfaced error", async () => {
     let failures = 1;
     setWriteNoteBodyForTests(() =>
@@ -136,13 +150,13 @@ describe("sync failure surfacing", () => {
     expect(documentSaveError("recover")).toBeNull();
   });
 
-  test("unknown-note failures still evict the orphan buffer, with no error surfaced", async () => {
+  test("an external rename/delete never discards the only local draft", async () => {
     setWriteNoteBodyForTests(() => Promise.reject(new Error("unknown note: ghost2")));
     buffer("ghost2", "x");
     editDocument("ghost2", () => ["y"]);
     await flushNote("ghost2");
-    expect(read("ghost2")).toBeUndefined();
-    expect(documentSaveError("ghost2")).toBeNull();
+    expect(read("ghost2")).toEqual(["y"]);
+    expect(documentSaveError("ghost2")).toBe("unknown note: ghost2");
   });
 
   test("evicting a note clears its surfaced error", async () => {

@@ -123,7 +123,9 @@ function LeafView({ node }: { node: LeafNode }) {
             <CanvasSurface key={tab.id} paneId={node.id} boardId={tab.boardId} />
           </Suspense>
         )}
-        {tab?.surfaceKind === "chat" && <ChatSurface key={tab.id} paneId={node.id} chatSlug={tab.chatSlug} />}
+        {tab?.surfaceKind === "chat" && (
+          <ChatSurface key={tab.id} paneId={node.id} tabId={tab.id} chatSlug={tab.chatSlug} />
+        )}
         {tab?.surfaceKind === "file" && <FileSurface key={tab.id} paneId={node.id} fileId={tab.fileId} />}
         {tab?.surfaceKind === "activity" && <ActivitySurface key={tab.id} />}
         {tab?.surfaceKind === "newItem" && <NewItemSurface key={tab.id} paneId={node.id} tabId={tab.id} />}

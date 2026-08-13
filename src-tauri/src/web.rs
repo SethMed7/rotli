@@ -89,7 +89,9 @@ fn vet_fetch_url(raw: &str) -> Result<Url, String> {
     let host = url.host_str().ok_or("blocked: URL has no host.")?;
     let bare = host.trim_start_matches('[').trim_end_matches(']');
     if host_name_blocked(bare) {
-        return Err(format!("blocked host: {bare} — web_fetch reaches the public internet only."));
+        return Err(format!(
+            "blocked host: {bare} — web_fetch reaches the public internet only."
+        ));
     }
     if let Ok(ip) = bare.parse::<IpAddr>() {
         if ip_is_private(ip) {
@@ -102,7 +104,9 @@ fn vet_fetch_url(raw: &str) -> Result<Url, String> {
 /// Per-hop redirect vet: parseable target, full URL vet, and SAME host as the
 /// first request (a redirect may not steer the fetch to a new origin).
 fn vet_redirect(current: &Url, location: &str, first_host: &str) -> Result<Url, String> {
-    let next = current.join(location).map_err(|e| format!("bad redirect Location ({e})"))?;
+    let next = current
+        .join(location)
+        .map_err(|e| format!("bad redirect Location ({e})"))?;
     let next = vet_fetch_url(next.as_str())?;
     let host = next.host_str().unwrap_or_default().to_ascii_lowercase();
     if host != first_host {
@@ -119,7 +123,10 @@ fn vetted_resolve(netloc: &str) -> std::io::Result<Vec<SocketAddr>> {
     let host = netloc.rsplit_once(':').map_or(netloc, |(h, _)| h);
     let host = host.trim_start_matches('[').trim_end_matches(']');
     if host_name_blocked(host) {
-        return Err(Error::new(ErrorKind::PermissionDenied, format!("blocked host: {host}")));
+        return Err(Error::new(
+            ErrorKind::PermissionDenied,
+            format!("blocked host: {host}"),
+        ));
     }
     let addrs: Vec<SocketAddr> = netloc.to_socket_addrs()?.collect();
     if let Some(bad) = addrs.iter().find(|a| ip_is_private(a.ip())) {
@@ -129,7 +136,10 @@ fn vetted_resolve(netloc: &str) -> std::io::Result<Vec<SocketAddr>> {
         ));
     }
     if addrs.is_empty() {
-        return Err(Error::new(ErrorKind::NotFound, format!("no addresses for {host}")));
+        return Err(Error::new(
+            ErrorKind::NotFound,
+            format!("no addresses for {host}"),
+        ));
     }
     Ok(addrs)
 }
@@ -276,7 +286,9 @@ fn decode_entities(s: &str) -> String {
             } else {
                 raw.parse::<u32>().ok()
             };
-            cp.and_then(char::from_u32).map(|ch| ch.to_string()).unwrap_or_default()
+            cp.and_then(char::from_u32)
+                .map(|ch| ch.to_string())
+                .unwrap_or_default()
         })
         .to_string();
     // &amp; last so "&amp;lt;" doesn't become "<"
@@ -367,15 +379,24 @@ mod tests {
     fn fixture_caps_match_the_consts() {
         let f = egress_fixtures();
         assert_eq!(f["byteCap"].as_u64().unwrap(), WEB_FETCH_MAX_BYTES);
-        assert_eq!(f["maxRedirectHops"].as_u64().unwrap(), u64::from(WEB_FETCH_MAX_REDIRECTS));
-        assert_eq!(f["maxUrlChars"].as_u64().unwrap() as usize, WEB_FETCH_MAX_URL_CHARS);
+        assert_eq!(
+            f["maxRedirectHops"].as_u64().unwrap(),
+            u64::from(WEB_FETCH_MAX_REDIRECTS)
+        );
+        assert_eq!(
+            f["maxUrlChars"].as_u64().unwrap() as usize,
+            WEB_FETCH_MAX_URL_CHARS
+        );
     }
 
     /// The exfil-bandwidth cap (audit 2026-07): a URL stuffed past the cap is
     /// refused on the first vet — including on a redirect hop.
     #[test]
     fn over_long_urls_are_refused() {
-        let long = format!("https://example.com/?q={}", "a".repeat(WEB_FETCH_MAX_URL_CHARS));
+        let long = format!(
+            "https://example.com/?q={}",
+            "a".repeat(WEB_FETCH_MAX_URL_CHARS)
+        );
         assert!(vet_fetch_url(&long).is_err());
         let fine = format!("https://example.com/?q={}", "a".repeat(500));
         assert!(vet_fetch_url(&fine).is_ok());
@@ -386,7 +407,11 @@ mod tests {
         for e in egress_fixtures()["ips"].as_array().unwrap() {
             let raw = e["ip"].as_str().unwrap();
             let ip: IpAddr = raw.parse().expect(raw);
-            assert_eq!(ip_is_private(ip), e["private"].as_bool().unwrap(), "ip: {raw}");
+            assert_eq!(
+                ip_is_private(ip),
+                e["private"].as_bool().unwrap(),
+                "ip: {raw}"
+            );
         }
     }
 
@@ -394,7 +419,11 @@ mod tests {
     fn fixture_hosts_follow_the_name_policy() {
         for e in egress_fixtures()["hosts"].as_array().unwrap() {
             let host = e["host"].as_str().unwrap();
-            assert_eq!(host_name_blocked(host), e["blocked"].as_bool().unwrap(), "host: {host}");
+            assert_eq!(
+                host_name_blocked(host),
+                e["blocked"].as_bool().unwrap(),
+                "host: {host}"
+            );
         }
     }
 
@@ -414,7 +443,11 @@ mod tests {
             let first_host = from.host_str().unwrap().to_ascii_lowercase();
             let loc = e["location"].as_str().unwrap();
             let allow = e["verdict"].as_str().unwrap() == "allow";
-            assert_eq!(vet_redirect(&from, loc, &first_host).is_ok(), allow, "location: {loc}");
+            assert_eq!(
+                vet_redirect(&from, loc, &first_host).is_ok(),
+                allow,
+                "location: {loc}"
+            );
         }
     }
 
@@ -449,7 +482,8 @@ mod tests {
         assert!(vet_redirect(&from, "https://localhost/x", "a.example.com").is_err()); // private name
         assert!(vet_redirect(&from, "ftp://a.example.com/f", "a.example.com").is_err()); // scheme
         let ip_from = Url::parse("https://8.8.8.8/start").unwrap();
-        assert!(vet_redirect(&ip_from, "http://169.254.169.254/x", "8.8.8.8").is_err()); // private target
+        assert!(vet_redirect(&ip_from, "http://169.254.169.254/x", "8.8.8.8").is_err());
+        // private target
     }
 
     #[test]

@@ -5,6 +5,8 @@
 import type { Parsed, ToolName } from "./types";
 
 const THOUGHT_MAX_CHARS = 800;
+const QUESTION_MAX_CHARS = 240;
+const QUESTION_OPTION_MAX_CHARS = 80;
 
 /** Keep reasoning as a concise private checkpoint, not an unbounded transcript.
  * The field remains optional so older/frontier models that omit it still work. */
@@ -62,6 +64,24 @@ export function parseAction(raw: string, allowed: ReadonlySet<ToolName>): Parsed
   if (typeof obj.final === "string") {
     return { kind: "final", text: obj.final, ...(thought ? { thought } : {}) };
   }
+  if (typeof obj.question === "string") {
+    const prompt = obj.question.trim();
+    const rawOptions = obj.options;
+    if (!prompt || prompt.length > QUESTION_MAX_CHARS) {
+      return { kind: "invalid", reason: "question must be concise and non-empty" };
+    }
+    if (!Array.isArray(rawOptions) || rawOptions.length < 2 || rawOptions.length > 3) {
+      return { kind: "invalid", reason: "question needs 2 or 3 options" };
+    }
+    const options = rawOptions.map((option) => (typeof option === "string" ? option.trim() : ""));
+    if (
+      options.some((option) => !option || option.length > QUESTION_OPTION_MAX_CHARS) ||
+      new Set(options).size !== options.length
+    ) {
+      return { kind: "invalid", reason: "question options must be concise, distinct text" };
+    }
+    return { kind: "question", prompt, options, ...(thought ? { thought } : {}) };
+  }
   if (typeof obj.tool === "string") {
     const tool = obj.tool as ToolName;
     if (!allowed.has(tool)) return { kind: "invalid", reason: `unknown tool "${obj.tool}"` };
@@ -69,5 +89,8 @@ export function parseAction(raw: string, allowed: ReadonlySet<ToolName>): Parsed
       obj.args !== null && typeof obj.args === "object" ? (obj.args as Record<string, unknown>) : {};
     return { kind: "call", tool, args, ...(thought ? { thought } : {}) };
   }
-  return { kind: "invalid", reason: 'reply had neither a known "tool" nor a "final"' };
+  return {
+    kind: "invalid",
+    reason: 'reply had neither a known "tool", a "question", nor a "final"',
+  };
 }

@@ -35,6 +35,7 @@ import { findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
 import { cycleQuick, removeQuickNote } from "../state/quick";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
 import { registerAction } from "./registry";
+import { runSurfaceFind } from "./surfaceFind";
 
 const notesWorkspaceActive = (): boolean => useUiStore.getState().sidebarMode !== "breve";
 
@@ -570,6 +571,18 @@ export function registerDefaultActions(): void {
       },
     });
   }
+  registerAction({
+    id: "editor.find",
+    title: "Find in this file",
+    defaultChord: "Meta+F",
+    shared: true,
+    run: () => {
+      if (!notesWorkspaceActive()) return;
+      const editor = activeEditor();
+      if (editor?.find) editor.find();
+      else runSurfaceFind();
+    },
+  });
   for (const level of [1, 2, 3] as HeadingLevel[]) {
     registerAction({
       id: `editor.heading${level}`,

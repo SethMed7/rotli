@@ -32,13 +32,23 @@ requireMatch(
 );
 requireMatch(
   "src-tauri/src/routines.rs",
-  /source\.join\("defaults\/bun\.lock"\),\s*home\.join\("bun\.lock"\)/,
-  "Rotli must materialize Breve's committed lockfile beside its runtime manifest",
+  /source\.join\("defaults\/bun\.lock"\),\s*next\.join\("bun\.lock"\)/,
+  "Rotli must stage Breve's committed lockfile beside the candidate runtime manifest",
 );
 requireMatch(
   "src-tauri/src/routines.rs",
   /\.args\(\["install",\s*"--production",\s*"--frozen-lockfile",\s*"--silent"\]\)/,
   "Breve production dependencies must use a frozen install",
+);
+requireMatch(
+  "src-tauri/src/routines.rs",
+  /commit_runtime_swap\(&runtime,\s*&next,\s*&previous\)/,
+  "Breve code and dependencies must activate through the recoverable directory swap",
+);
+requireMatch(
+  "src-tauri/src/routines.rs",
+  /install_runtime_links\(home,\s*&runtime\)/,
+  "the mutable Breve home must point at the separately activated runtime bundle",
 );
 
 for (const path of [
@@ -88,5 +98,5 @@ if (failures.length) {
 }
 
 console.log(
-  "check:breve-contract ok — frozen dependencies, scheduler ownership, job locks, delivery claims, and alert idempotency are wired end to end",
+  "check:breve-contract ok — staged frozen dependencies, atomic runtime activation, scheduler ownership, job locks, delivery claims, and alert idempotency are wired end to end",
 );

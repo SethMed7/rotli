@@ -30,6 +30,7 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
   // carry the board's AI description/tags through embed edits — an embed save
   // must never drop rotliMeta the full canvas surface wrote
   const metaRef = useRef<BoardMeta>(EMPTY_BOARD_META);
+  const sourceSceneRef = useRef<Record<string, unknown> | null>(null);
 
   // the board's own tab open somewhere? that surface owns the pen
   const tabOpen = usePanesStore((s) => boardTabOpen(s.root, boardId));
@@ -48,7 +49,7 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
     let cancelled = false;
     setStatus("loading");
     loadBoard(boardId)
-      .then(({ scene, meta }) => {
+      .then(({ scene, meta, revision }) => {
         if (cancelled) return;
         metaRef.current = meta;
         // canonical baseline — opening the embed must never rewrite the file
@@ -58,13 +59,16 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
             appState?: Record<string, unknown>;
             files?: Record<string, unknown>;
           };
+          sourceSceneRef.current = scene as Record<string, unknown>;
           saver.prime(
             serializeBoardScene({
+              sourceScene: sourceSceneRef.current,
               elements: s.elements ?? [],
               appState: s.appState ?? {},
               files: s.files ?? {},
               meta,
             }),
+            revision,
           );
         } catch {
           /* a foreign scene that can't re-serialize just skips the baseline */
@@ -90,7 +94,11 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
   const buildBody = useCallback(() => {
     const s = sceneRef.current;
     if (!s) throw new Error("no scene captured");
-    return serializeBoardScene({ ...s, meta: metaRef.current });
+    return serializeBoardScene({
+      ...s,
+      ...(sourceSceneRef.current ? { sourceScene: sourceSceneRef.current } : {}),
+      meta: metaRef.current,
+    });
   }, []);
   const onChange = useCallback(
     (elements: readonly unknown[], appState: Record<string, unknown>, files: Record<string, unknown>) => {

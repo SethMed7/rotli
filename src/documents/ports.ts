@@ -12,12 +12,12 @@ export interface DocumentRepository {
 }
 
 export interface DocumentFileReader {
-  stat(id: string): Promise<{ len: number } | null>;
+  stat(id: string): Promise<{ len: number; revision: string } | null>;
   readBase64(id: string, maxBytes: number): Promise<string>;
 }
 
 export interface DocumentFileWriter {
-  writeBase64(id: string, base64: string, backup: boolean): Promise<void>;
+  writeBase64(id: string, base64: string, backup: boolean, expectedRevision: string): Promise<string>;
 }
 
 export interface DecodedDocument<Source> {

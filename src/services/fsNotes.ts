@@ -128,6 +128,7 @@ export class FsNotesService implements NotesService {
         updatedAt: doc.updatedAt,
         pinned: doc.pinned,
         body: doc.body,
+        revision: doc.revision,
       };
     } catch (err) {
       if (isNotFound(err)) return null;
@@ -137,15 +138,16 @@ export class FsNotesService implements NotesService {
 
   async createNote(folderId: string, body: string, policy?: NoteCreationPolicy): Promise<Note> {
     const meta = await corpusCreate(folderId, body, policy);
-    return { ...meta, body };
+    const doc = await corpusRead(meta.id);
+    return { ...meta, body, revision: doc.revision };
   }
 
-  async updateNote(id: string, body: string): Promise<Note> {
+  async updateNote(id: string, body: string, expectedRevision: string): Promise<Note> {
     try {
       // pinned is not part of the editor's write — Rust preserves the disk
       // truth itself, so no read-modify-write round-trip (or race) here
-      const meta = await corpusWrite(id, body);
-      return { ...meta, body };
+      const result = await corpusWrite(id, body, expectedRevision);
+      return { ...result, body };
     } catch (err) {
       // the editor model evicts dead buffers on this exact message shape
       if (isNotFound(err)) throw new Error(`unknown note: ${id}`);
@@ -163,7 +165,7 @@ export class FsNotesService implements NotesService {
 
   async moveNote(id: string, targetFolder: string): Promise<Note> {
     const meta = await corpusMove(id, targetFolder);
-    const { body } = await corpusRead(id);
+    const { body, revision } = await corpusRead(id);
     return {
       id: meta.id,
       title: titleOf(body),
@@ -175,6 +177,7 @@ export class FsNotesService implements NotesService {
       updatedAt: meta.updatedAt,
       pinned: meta.pinned,
       body,
+      revision,
     };
   }
 

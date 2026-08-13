@@ -11,6 +11,8 @@ export type BlockToggle = "quote" | "bullet" | "numbered" | "checklist";
 export type HeadingLevel = 1 | 2 | 3;
 
 export interface EditorHandle {
+  /** Open the active document's find bar. Optional on non-document editors. */
+  find?(): void;
   toggleMark(mark: InlineMark): void;
   setHeading(level: HeadingLevel): void;
   toggleBlock(kind: BlockToggle): void;
