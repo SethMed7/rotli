@@ -8,6 +8,93 @@ use std::path::Path;
 
 const PDF_EXTRACTED_TEXT_MAX_BYTES: usize = 16_000_000;
 
+fn markdown_to_print_text(title: &str, markdown: &str) -> String {
+    let link = regex::Regex::new(r"!?\[([^\]]*)\]\([^)]*\)").expect("static markdown link regex");
+    let mut lines = Vec::new();
+    let mut in_fence = false;
+    let mut first_content = true;
+    for raw in markdown.replace("\r\n", "\n").replace('\r', "\n").lines() {
+        let trimmed = raw.trim();
+        if trimmed.starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        let mut line = if in_fence {
+            raw.trim_end().to_string()
+        } else {
+            trimmed.trim_start_matches('#').trim_start().to_string()
+        };
+        if !in_fence {
+            if let Some(rest) = line.strip_prefix("- ").or_else(|| line.strip_prefix("* ")) {
+                line = format!("• {rest}");
+            }
+            line = link.replace_all(&line, "$1").into_owned();
+            for marker in ["**", "__", "~~", "`"] {
+                line = line.replace(marker, "");
+            }
+        }
+        if first_content && !line.trim().is_empty() {
+            first_content = false;
+            if line.trim().eq_ignore_ascii_case(title.trim()) {
+                continue;
+            }
+        }
+        if line.trim().is_empty() {
+            if lines
+                .last()
+                .is_some_and(|previous: &String| !previous.is_empty())
+            {
+                lines.push(String::new());
+            }
+        } else {
+            lines.push(line);
+        }
+    }
+    while lines.last().is_some_and(String::is_empty) {
+        lines.pop();
+    }
+    let mut out = title.trim().to_string();
+    if !out.is_empty() && !lines.is_empty() {
+        out.push_str("\n\n");
+    }
+    out.push_str(&lines.join("\n"));
+    out.push('\n');
+    out
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn export_markdown_pdf_bytes(title: &str, markdown: &str) -> Result<Vec<u8>, String> {
+    const PDF_EXPORT_MAX_BYTES: usize = 32_000_000;
+    let printable = markdown_to_print_text(title, markdown);
+    if printable.trim().is_empty() {
+        return Err("The editable source is empty, so there is nothing to export.".into());
+    }
+    let temp =
+        tempfile::tempdir().map_err(|error| format!("create PDF export workspace: {error}"))?;
+    let input = temp.path().join("editable-source.txt");
+    fs::write(&input, printable).map_err(|error| format!("prepare PDF source: {error}"))?;
+    let output = std::process::Command::new("/usr/sbin/cupsfilter")
+        .args(["-i", "text/plain", "-m", "application/pdf", "--"])
+        .arg(&input)
+        .output()
+        .map_err(|error| format!("start the macOS PDF exporter: {error}"))?;
+    if !output.status.success() {
+        let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if detail.is_empty() {
+            "The macOS PDF exporter could not create a copy.".into()
+        } else {
+            format!("The macOS PDF exporter failed: {detail}")
+        });
+    }
+    if !output.stdout.starts_with(b"%PDF-") {
+        return Err("The local exporter did not produce a valid PDF copy.".into());
+    }
+    if output.stdout.len() > PDF_EXPORT_MAX_BYTES {
+        return Err("The generated PDF is too large for the managed export lane.".into());
+    }
+    Ok(output.stdout)
+}
+
 fn pdf_pages_to_editable_text(pages: Vec<String>) -> Result<String, String> {
     if pages.iter().all(|page| page.trim().is_empty()) {
         return Err(
@@ -97,6 +184,23 @@ mod tests {
         assert!(pdf_pages_to_editable_text(vec![" \n".into(), "\t".into()])
             .unwrap_err()
             .contains("run OCR first"));
+    }
+
+    #[test]
+    fn markdown_pdf_export_keeps_readable_text_and_a_real_pdf_copy() {
+        assert_eq!(
+            markdown_to_print_text(
+                "Launch",
+                "# Launch\n\n## Goals\n\n- Ship **calmly**\n- Own [the source](https://example.com)"
+            ),
+            "Launch\n\nGoals\n\n• Ship calmly\n• Own the source\n",
+        );
+        #[cfg(target_os = "macos")]
+        {
+            let bytes = export_markdown_pdf_bytes("Launch", "## Goals\n\nShip calmly.").unwrap();
+            assert!(bytes.starts_with(b"%PDF-"));
+            assert!(bytes.len() > 1_000);
+        }
     }
 
     #[cfg(target_os = "macos")]

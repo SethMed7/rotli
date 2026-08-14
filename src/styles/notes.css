@@ -155,6 +155,112 @@
 }
 
 /* — destination / folder / smart rows (shared .frow grammar) — */
+.sb-home-dashboard {
+  display: block;
+  width: calc(100% - 12px);
+  margin: 2px 6px 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.sb-home-dashboard:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+.sb-home-dashboard.sel {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.sb-home-dashboard.sel .sb-home-dashboard-head,
+.sb-home-dashboard.sel .sb-home-dashboard-head > span:first-child,
+.sb-home-dashboard.sel .sb-home-dashboard-row,
+.sb-home-dashboard.sel .sb-home-dashboard-row strong {
+  color: var(--on-accent);
+}
+.sb-home-dashboard.sel .sb-home-dashboard-row + .sb-home-dashboard-row {
+  border-top-color: color-mix(in srgb, var(--on-accent) 24%, transparent);
+}
+.sb-home-dashboard-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--text-muted);
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.sb-home-dashboard-head > span:first-child {
+  color: var(--text);
+  font-weight: 700;
+}
+.sb-home-dashboard-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 25px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.sb-home-dashboard-row + .sb-home-dashboard-row {
+  border-top: 1px solid var(--border);
+}
+.sb-home-dashboard-row strong {
+  width: 40px;
+  color: var(--text);
+  font-size: 10.5px;
+}
+.sb-home-dashboard-row > span:not(.sb-home-favorite) {
+  white-space: nowrap;
+}
+.sb-home-dashboard-row > span:last-child {
+  margin-left: auto;
+}
+.sb-model-dashboard {
+  margin-top: 3px;
+  margin-bottom: 10px;
+}
+.sb-model-favorite {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+.sb-model-favorite .model-logo {
+  width: 12px;
+  height: 12px;
+}
+.sb-model-favorite > span {
+  max-width: 76px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-home-favorite {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-left: auto;
+}
+.sb-home-favorite .model-logo {
+  width: 13px;
+  height: 13px;
+}
+.sb-home-favorite > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .frow {
   display: flex;
   align-items: center;
@@ -312,6 +418,12 @@
 }
 .main-row {
   cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */
+}
+/* Main and named views are reference lists, not heading stacks. Keep their
+   note labels at body weight so a dense hand-arranged view stays calm; the
+   section label and true document headings carry hierarchy instead. */
+.main-tree .snrow .snt {
+  font-weight: 400;
 }
 /* #9 (Seth, 2026-07-03): the star + × sat with an awkward gap between them on a
    short-title row. Root cause — the shared `.snact { margin-left: auto }` absorbed
@@ -583,7 +695,11 @@
   margin: 4px 10px 2px;
   padding: 6px 8px;
   border-radius: var(--r-control);
-  background: color-mix(in srgb, var(--danger, var(--accent-text)) 9%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--danger, var(--accent-text)) 9%,
+    transparent
+  );
   font-size: 11.5px;
   line-height: 1.45;
   color: var(--danger, var(--accent-text));
@@ -649,6 +765,34 @@
 .sb-chatrow.in-folder {
   padding-left: 28px;
 }
+.sb-chatrow.in-folder::before {
+  content: "";
+  position: absolute;
+  left: 17px;
+  top: -1px;
+  bottom: -1px;
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+.main-branch-children {
+  position: relative;
+}
+.main-branch-children::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: var(--main-guide-left);
+  top: -1px;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+.main-branch-children > * {
+  position: relative;
+  z-index: 1;
+}
 /* drag-a-chat-into-a-folder feedback (Seth, 2026-07-30): the dragged row dims
    like a Main row; the hovered folder tints like an mdrop-into target */
 .sb-chatrow.dragging {
@@ -678,10 +822,10 @@
   color: var(--text-muted);
   flex: 0 0 auto;
 }
-/* run signals (Seth, 2026-08-03: "know to click on it") — an answering chat
-   breathes, a landed-unwatched reply holds a solid accent dot. One dot, 7px,
-   right-aligned; the breath is a soft opacity swell, no movement (motion
-   restraint — DESIGN-STANDARDS). */
+/* Run signals (Seth, 2026-08-03: "know to click on it") — an answering chat
+   holds a quiet static dot; a landed-unwatched reply uses the full-strength
+   dot. Entering either state updates immediately, while remaining in it
+   schedules no animation. The labeled Working/Unread lanes carry the meaning. */
 .sb-chatrun {
   margin-left: auto;
   flex: 0 0 auto;
@@ -691,7 +835,7 @@
   background: var(--accent);
 }
 .sb-chatrun.running {
-  animation: sb-chatrun-breathe 1.6s ease-in-out infinite;
+  opacity: 0.7;
 }
 /* THE bug Seth hit (2026-08-04): the chat you're watching is the `sel` row, and
    `sel` fills with --accent — so an --accent dot on it was invisible exactly
@@ -699,21 +843,6 @@
    the same rule .sb-chatpin and .sb-chatmodel already follow. */
 .sb-chatrow.sel .sb-chatrun {
   background: var(--on-accent);
-}
-@keyframes sb-chatrun-breathe {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sb-chatrun.running {
-    animation: none;
-    opacity: 0.7;
-  }
 }
 /* a dot pushes the pin off `margin-left:auto` duty */
 .sb-chatrun ~ .sb-chatpin {
@@ -751,13 +880,35 @@
   height: 14px;
   object-fit: contain;
 }
+/* Full-color provider art remains itself on the selected row. The row already
+   supplies the selection surface; a second backing tile made the logo look
+   boxed and visually heavier than every neighboring mark. */
 /* OpenAI ships black and white artwork. Use the official black Blossom as a
    mask so its exact silhouette follows semantic ink instead of disappearing
    in Warm Dark, Charcoal, or a selected row. */
-.model-logo--openai {
+.model-logo--openai,
+.model-logo--meta,
+.model-logo--microsoft,
+.model-logo--mistral {
   background: currentColor;
-  -webkit-mask: url("../brand/providers/openai-blossom.svg") center / contain no-repeat;
+}
+.model-logo--openai {
+  -webkit-mask: url("../brand/providers/openai-blossom.svg") center / contain
+    no-repeat;
   mask: url("../brand/providers/openai-blossom.svg") center / contain no-repeat;
+}
+.model-logo--meta {
+  -webkit-mask: url("../brand/providers/meta.svg") center / contain no-repeat;
+  mask: url("../brand/providers/meta.svg") center / contain no-repeat;
+}
+.model-logo--microsoft {
+  -webkit-mask: url("../brand/providers/microsoft.svg") center / contain
+    no-repeat;
+  mask: url("../brand/providers/microsoft.svg") center / contain no-repeat;
+}
+.model-logo--mistral {
+  -webkit-mask: url("../brand/providers/mistral.svg") center / contain no-repeat;
+  mask: url("../brand/providers/mistral.svg") center / contain no-repeat;
 }
 .sb-chatmark.preset,
 .sb-chatmark.local {
@@ -786,7 +937,9 @@
 /* the per-chat model chip (Seth, 2026-08-03) — a quiet right-aligned label,
    hidden while a run signal owns the row's right edge (the JSX renders one or
    the other), clipped before it can crowd the title */
-.sb-chatmodel {
+.sb-chatmodel,
+.sb-chattime,
+.sb-chatstatus {
   margin-left: auto;
   flex: 0 1 auto;
   max-width: 40%;
@@ -796,27 +949,55 @@
   font-size: 10.5px;
   color: var(--text-muted);
 }
-.sb-chatmodel ~ .sb-chatpin {
+.sb-chatmodel ~ .sb-chatpin,
+.sb-chattime ~ .sb-chatpin,
+.sb-chatstatus ~ .sb-chatpin {
   margin-left: 0;
 }
-.sb-chatrow.sel .sb-chatmodel {
+.sb-chatrow.sel .sb-chatmodel,
+.sb-chatrow.sel .sb-chattime,
+.sb-chatrow.sel .sb-chatstatus {
   color: var(--on-accent);
+}
+.sb-chatstatus {
+  font-weight: 600;
+}
+.sb-chatstatus.unread {
+  color: var(--accent-text);
+}
+.sb-chatstatus.done {
+  color: var(--text-muted);
 }
 /* the Unread lane header — reads like a folder row but is a label, not a
    control */
 .sb-chatunread .unreadhead,
-.sb-chatworking .unreadhead {
+.sb-chatworking .unreadhead,
+.sb-chatactivity .unreadhead {
   cursor: default;
   color: var(--text-muted);
   font-weight: 500;
 }
 .sb-chatunread .unreadhead .sb-chatrun,
-.sb-chatworking .unreadhead .sb-chatrun {
+.sb-chatworking .unreadhead .sb-chatrun,
+.sb-chatactivity .unreadhead .sb-activity-mark {
   margin-left: 0;
 }
 .sb-chatunread .unreadhead:hover,
-.sb-chatworking .unreadhead:hover {
+.sb-chatworking .unreadhead:hover,
+.sb-chatactivity .unreadhead:hover {
   background: none;
+}
+.sb-chatactivity {
+  margin: 4px 0 7px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border);
+}
+.sb-activity-mark {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
 }
 .sb-chatnew {
   color: var(--accent-text);
@@ -1256,6 +1437,20 @@
   min-width: 0;
   min-height: 0;
 }
+.pane-surface-slot {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.pane-surface-slot.idle {
+  display: none;
+}
+.pane-surface-slot > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
 .split {
   flex: 1;
   display: flex;
@@ -1450,7 +1645,7 @@
 }
 .tabscroll-wrap {
   position: relative;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
   height: 100%;
 }
@@ -1480,11 +1675,19 @@
 }
 .tabscroll-wrap::before {
   left: 0;
-  background: linear-gradient(90deg, var(--ground), color-mix(in srgb, var(--ground), transparent 100%));
+  background: linear-gradient(
+    90deg,
+    var(--ground),
+    color-mix(in srgb, var(--ground), transparent 100%)
+  );
 }
 .tabscroll-wrap::after {
   right: 0;
-  background: linear-gradient(270deg, var(--ground), color-mix(in srgb, var(--ground), transparent 100%));
+  background: linear-gradient(
+    270deg,
+    var(--ground),
+    color-mix(in srgb, var(--ground), transparent 100%)
+  );
 }
 .tabscroll-wrap[data-fade-left="true"]::before {
   opacity: 1;
@@ -1492,31 +1695,54 @@
 .tabscroll-wrap[data-fade-right="true"]::after {
   opacity: 1;
 }
-/* the drag wrapper: holds the tab + its insertion-line preview, carries the
-   flex compression so the inner tab keeps its 96–208px grammar (Seth,
-   2026-06-13) */
+/* the drag wrapper holds the tab + its insertion-line preview; the selected
+   Scroll/Fit policy below owns its flex sizing. */
 .tabslot {
   position: relative;
   display: flex;
   align-items: flex-end;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
 }
+/* Chrome-like inactive separators make a dense strip scannable without
+   giving every tab a heavy container. They are absolutely painted, so hover,
+   selection, and drag previews never change layout. */
+.tabslot + .tabslot::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: 9px;
+  bottom: 6px;
+  width: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+.tabslot.active::before,
+.tabslot.active + .tabslot::before,
+.tabslot:hover::before,
+.tabslot:hover + .tabslot::before {
+  opacity: 0;
+}
 .tab {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 7px;
-  height: 28px;
-  padding: 0 12px;
+  width: 100%;
+  height: 30px;
+  padding: 0 11px;
   min-width: 96px; /* the compression floor */
   max-width: 208px;
   flex: 0 1 auto;
+  border: 1px solid transparent;
+  border-bottom: 0;
   border-radius: var(--r-tab) var(--r-tab) 0 0;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
   position: relative;
   cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */
+  overflow: hidden;
   /* draggable — drag to reorder / move / split */
   z-index: 1;
 }
@@ -1608,15 +1834,26 @@
 }
 .tab:hover {
   background: var(--surface-2);
+  color: var(--text);
 }
 .tab.active {
   background: var(--surface); /* merges into the editor below */
   color: var(--text);
-  height: 30px;
-  margin-bottom: -1px;
-  border: 1px solid var(--border);
-  border-bottom: none;
+  border-color: var(--border);
   z-index: 2;
+}
+/* Cover the strip's bottom hairline beneath only the selected tab. The fixed
+   wrapper owns this paint so the tab can safely clip extreme Fit-mode content. */
+.tabslot.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: var(--surface);
+  z-index: 3;
+  pointer-events: none;
 }
 /* The 2px accent top edge that marked the focused pane's active tab is GONE
    (Seth, 2026-07-30: "I don't like the blue line on top of the active tab").
@@ -1626,15 +1863,19 @@
   width: 15px;
   height: 15px;
   border-radius: var(--r-inner);
-  display: none;
+  display: grid;
   place-items: center;
   color: var(--text-muted);
   cursor: pointer;
   flex: 0 0 auto;
+  opacity: 0;
+  pointer-events: none;
 }
 .tab.active .x,
-.tab:hover .x {
-  display: grid;
+.tab:hover .x,
+.tab:focus-within .x {
+  opacity: 1;
+  pointer-events: auto;
 }
 .tab .x:hover {
   background: var(--surface-2);
@@ -1662,6 +1903,26 @@
 .tabplus:hover .tip {
   opacity: 1;
   transition-delay: 300ms;
+}
+
+/* User-selectable crowding rules. Scroll is the readable default and keeps a
+   96px floor. Fit lets every tab share the available strip, down to its glyph
+   and a short label, without introducing horizontal movement. */
+.tabstrip[data-tab-layout="scroll"] .tabslot {
+  flex: 0 0 auto;
+}
+.tabstrip[data-tab-layout="fit"] .tabscroll {
+  overflow-x: hidden;
+}
+.tabstrip[data-tab-layout="fit"] .tabslot {
+  flex: 1 1 0;
+}
+.tabstrip[data-tab-layout="fit"] .tab {
+  min-width: 0;
+}
+.tabstrip[data-tab-layout="fit"] .tabscroll-wrap::before,
+.tabstrip[data-tab-layout="fit"] .tabscroll-wrap::after {
+  display: none;
 }
 
 /* — editor chassis (r2 padding; the body/marks/raw-line/format-bar styles
@@ -1888,29 +2149,45 @@
    it shows under Home and Chat alike, so it owns its own inset + hairline */
 .sb-foot {
   flex: 0 0 auto;
-  display: flex;
-  gap: 2px;
-  padding: 5px 8px 6px;
-  border-top: 1px solid var(--border);
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 9px 12px 10px;
+  border-top: 0;
+}
+.sb-foot::before {
+  content: "";
+  position: absolute;
+  inset: 0 16px auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--border) 18%,
+    var(--border) 82%,
+    transparent
+  );
+  opacity: 0.72;
 }
 .sb-footbtn {
-  flex: 1 1 0;
   min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 5px 4px;
+  gap: 7px;
+  min-height: 32px;
+  padding: 6px 5px;
   border: none;
   background: none;
   font: inherit;
   border-radius: var(--r-control);
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-muted);
   cursor: pointer;
 }
 .sb-footbtn:hover {
-  background: var(--hov);
+  background: color-mix(in srgb, var(--hov) 62%, transparent);
   color: var(--text);
 }
 .sb-footbtn svg {
@@ -1929,6 +2206,8 @@
 /* — the primary-color swatch row (Appearance + onboarding) — */
 .accentrow {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   margin: 8px 0 4px;
 }
@@ -1946,10 +2225,67 @@
 .accentdot.sel {
   border-color: var(--text);
 }
+.accentdot-default,
+.accentdot-custom {
+  width: auto;
+  min-width: 54px;
+  padding: 0 9px;
+  border-radius: var(--r-pill);
+}
+.accentdot-default {
+  background: var(--theme-accent-swatch);
+  color: var(--theme-on-accent);
+}
+.accentdot-custom {
+  min-width: 62px;
+  background: var(--accent-custom-swatch);
+  color: var(--accent-custom-on);
+}
 .accentdot-auto {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
-  color: var(--on-accent);
+  color: inherit;
+}
+.accentdot-custom-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: inherit;
+}
+.accent-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.accent-hue {
+  width: min(280px, 100%);
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr);
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+.accent-hue input {
+  width: 100%;
+  height: 8px;
+  margin: 0;
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--accent-hue-track);
+  cursor: pointer;
+}
+.accent-hue input::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  appearance: none;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent-custom-swatch);
+}
+.accent-hue input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 .onb-accent-lead {
   margin-top: 18px;

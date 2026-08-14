@@ -82,7 +82,16 @@ export function useWriteChat() {
       attachedTo?: string;
       messages: ChatMsg[];
       existingSlug?: string;
+      secureContext?: boolean;
     }) => svc.writeChat(input),
+    onSuccess: (_res, vars) => queryClient.invalidateQueries({ queryKey: memexKeys.chats(vars.instance.id) }),
+  });
+}
+
+export function useUpdateChatTitle() {
+  return useMutation({
+    mutationFn: ({ instance, slug, title }: { instance: MemexInstance; slug: string; title: string }) =>
+      svc.updateChatTitle(instance, slug, title),
     onSuccess: (_res, vars) => queryClient.invalidateQueries({ queryKey: memexKeys.chats(vars.instance.id) }),
   });
 }

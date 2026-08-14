@@ -220,6 +220,7 @@ export function EditorSurface({
   const previousFileMetadata = useRef(fileMetadata);
   const [scrollToTopSignal, setScrollToTopSignal] = useState(0);
   const [fmRaw, setFmRaw] = useState<string | null>(null);
+  const fmRevision = useRef("");
   // commit counter + refusal message: a refused (or no-op) commit re-reads the
   // SAME block string, and both React's setState and the widget's eq() bail on
   // identical values — the user's unsaved text would sit in the banner looking
@@ -235,14 +236,18 @@ export function EditorSurface({
   }, [fileMetadata, focusedPane]);
   useEffect(() => {
     setFmErr(null); // a refusal never follows the note to another tab
+    fmRevision.current = "";
     if (fileMetadata !== "show") {
       setFmRaw(null);
       return;
     }
     let alive = true;
     corpusRawFrontmatter(noteId)
-      .then((block) => {
-        if (alive) setFmRaw(block);
+      .then((opened) => {
+        if (alive) {
+          fmRevision.current = opened.revision;
+          setFmRaw(opened.contents);
+        }
       })
       .catch(() => {
         if (alive) setFmRaw(null); // unreadable (browser demo, race) → no banner
@@ -256,7 +261,7 @@ export function EditorSurface({
     (text: string) => {
       void (async () => {
         try {
-          await corpusWriteFrontmatterRaw(noteId, text);
+          fmRevision.current = await corpusWriteFrontmatterRaw(noteId, text, fmRevision.current);
           markNoteDraftChanged(noteId); // an explicit fm edit = intent to keep
           setFmErr(null);
         } catch (e) {
@@ -267,7 +272,9 @@ export function EditorSurface({
         // re-read either way: a commit shows what Rust actually wrote (reserved
         // keys restored), a refusal snaps the banner back to the file
         try {
-          setFmRaw(await corpusRawFrontmatter(noteId));
+          const opened = await corpusRawFrontmatter(noteId);
+          fmRevision.current = opened.revision;
+          setFmRaw(opened.contents);
         } catch {
           /* keep the current banner */
         }
@@ -282,7 +289,11 @@ export function EditorSurface({
   // (caret ctx, header measurements) — the keystroke path no longer re-renders
   // this surface at all (perf audit 2026-07-30, finding 8).
   const onCmContext = useCallback((line: string | null, selStart: number) => setCtx({ line, selStart }), []);
-  const onFmRead = useCallback(() => corpusRawFrontmatter(noteId), [noteId]);
+  const onFmRead = useCallback(async () => {
+    const opened = await corpusRawFrontmatter(noteId);
+    fmRevision.current = opened.revision;
+    return opened.contents;
+  }, [noteId]);
 
   // the buffer exists as soon as the note loads — edits always hit one buffer.
   // When disk changes UNDER us (agent / another editor) and this buffer is
@@ -290,8 +301,8 @@ export function EditorSurface({
   // the same file (Seth, 2026-07-09). Dirty local edits still win.
   useEffect(() => {
     if (!note) return;
-    ensureDocument(note.id, note.body);
-    reloadDocumentIfClean(note.id, note.body);
+    ensureDocument(note.id, note.body, note.revision);
+    reloadDocumentIfClean(note.id, note.body, note.revision);
   }, [note]);
 
   // leaving a note (tab switch, pane close, note switch) flushes its pending
@@ -412,6 +423,7 @@ export function EditorSurface({
         fontSize={fontSize}
         measureWidth={measureWidth}
         initialText={note.body}
+        initialRevision={note.revision}
         onContext={onCmContext}
         fmRaw={focusMode ? null : fmRaw}
         fmPath={diskPath}

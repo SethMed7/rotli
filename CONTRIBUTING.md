@@ -23,7 +23,7 @@ bun install --frozen-lockfile
 
 ```sh
 bun run dev        # browser-only frontend with demo/in-memory behavior
-bun run tauri dev  # native application; manage this process yourself
+bun run dev:app    # native rotli (dev); WARNING: reads and writes the production vault
 ```
 
 Browser mode cannot validate the native titlebar, menu-bar lifecycle,
@@ -102,9 +102,11 @@ exceed 100 columns. `cargo clippy --all-targets -- -D warnings` is the Rust
 gate; do not run `cargo fmt` or commit its output.
 
 Type correctness and linting are separate layers: `bun run typecheck`
-(`tsc --noEmit`, the compiler as source of truth — first step of `lint`, with
-`check:e2e-types` and `check:breve-runtime` as the sibling lanes for their
-trees) and the oxlint layer below.
+(`tsc --noEmit` over `src` plus the strict Vite/build-policy scope),
+`check:e2e-types`, and `check:breve-runtime`, followed by the oxlint layer
+below. The first two and the independent TypeScript 6 cross-check are in
+`lint`; the Breve TypeScript 7 pass is in `test:regression`, so `bun run check`
+holds all four scopes on both implementations.
 `tsc` is `typescript@7`, the Go port, which since 7.0.0 IS stock TypeScript
 rather than a preview alongside it. The `@typescript/native-preview` (`tsgo`)
 package was retired 2026-08-01 when `typescript@7.0.2` shipped the same engine
@@ -118,8 +120,8 @@ swap.
 (`~7.0.2`) AND `typescript6` (`npm:typescript@~6.0.3`), and the second one is
 not legacy debt — it is load-bearing in three places:
 
-- **The second opinion.** `bun run typecheck:tsc6` (plus `:e2e` and `:breve`)
-  runs the same three checks on the last JavaScript TypeScript. A cross-check
+- **The second opinion.** `bun run typecheck:tsc6` runs the same four scopes
+  (`src`, Vite/build policy, E2E, and Breve) on the last JavaScript TypeScript. A cross-check
   is only worth its runtime if it is an INDEPENDENT implementation; now that
   `tsc` is the Go port, 6.x is the only thing left that qualifies. All lanes
   must stay green. When the two disagree, fix the code unless the divergence is
@@ -153,7 +155,9 @@ hand-picked layer stays deliberately minimal (floating/misused promises,
 `no-explicit-any`, react-hooks, and a ban on bun:test's `it` alias: the suite
 spells every test `test(...)`), and as of 2026-08-01 it sits on top of oxlint's
 whole `correctness` category — measured before adoption, as this config
-demands. That measurement found 80 findings across 9 rules; 62 were fixed, 13
+demands. `scripts/` joined the same gate 2026-08-13 after its complete six-item
+debt was paid; the Vite build policy moved from untyped MJS into the strict
+node config at the same time. The original correctness measurement found 80 findings across 9 rules; 62 were fixed, 13
 are permitted by a rule option (`no-misused-spread` with `allow: ["string"]`,
 because `[...text]` code-point iteration is a documented contract here), and
 one rule is deferred: `await-thenable`, 18 findings, every one the

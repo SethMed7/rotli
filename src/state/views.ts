@@ -3,8 +3,8 @@
 
 import { create } from "zustand";
 
-import { corpusSettingsRead, corpusViewsWrite, isTauri } from "../lib/tauri";
-import { createTrackedWrite } from "../lib/trackedWrite";
+import { corpusViewsRead, corpusViewsWrite, isTauri } from "../lib/tauri";
+import { createRevisionedTrackedWrite } from "../lib/trackedWrite";
 import {
   EMPTY_VIEWS,
   type ViewsManifest,
@@ -20,12 +20,13 @@ interface ViewsState {
   hydrated: boolean;
   saveState: ViewsSaveState;
   error: string | null;
+  dirty: boolean;
   setManifest: (manifest: ViewsManifest) => void;
 }
 
 // the shared latest-wins guard (lib/trackedWrite) — this store's original
 // inline writeSequence, extracted so main.ts uses the identical policy
-const writeViews = createTrackedWrite(corpusViewsWrite);
+const viewsWriter = createRevisionedTrackedWrite(corpusViewsWrite);
 
 export const useViewsStore = create<ViewsState>((set, get) => ({
   manifest: EMPTY_VIEWS,
@@ -33,12 +34,13 @@ export const useViewsStore = create<ViewsState>((set, get) => ({
   hydrated: false,
   saveState: "idle",
   error: null,
+  dirty: false,
   setManifest: (manifest) => {
     if (!get().writable) return;
-    set({ manifest, saveState: isTauri() ? "saving" : "saved", error: null });
+    set({ manifest, saveState: isTauri() ? "saving" : "saved", error: null, dirty: isTauri() });
     if (!isTauri()) return;
-    writeViews(serializeViewsManifest(manifest), (ok, error) => {
-      if (ok) set({ saveState: "saved" });
+    viewsWriter.write(serializeViewsManifest(manifest), (ok, error) => {
+      if (ok) set({ saveState: "saved", dirty: false });
       else
         set({
           saveState: "error",
@@ -51,15 +53,18 @@ export const useViewsStore = create<ViewsState>((set, get) => ({
 /** Hydrate on launch and after an external CLI/MCP write. Unsupported future
  * formats stay read-only; malformed v1 data degrades to Main with an error. */
 export async function hydrateViews(): Promise<void> {
+  if (useViewsStore.getState().dirty) return;
   try {
-    const raw = await corpusSettingsRead("views");
-    const parsed = parseViewsManifest(raw || "{}");
+    const opened = await corpusViewsRead();
+    viewsWriter.setRevision(opened.revision);
+    const parsed = parseViewsManifest(opened.contents || "{}");
     useViewsStore.setState({
       manifest: parsed.manifest,
       writable: parsed.writable,
       hydrated: true,
       saveState: parsed.error ? "error" : "idle",
       error: parsed.error,
+      dirty: false,
     });
   } catch (error) {
     useViewsStore.setState({
@@ -68,6 +73,7 @@ export async function hydrateViews(): Promise<void> {
       hydrated: true,
       saveState: "error",
       error: `Couldn’t load views — ${error instanceof Error ? error.message : String(error)}`,
+      dirty: false,
     });
   }
 }

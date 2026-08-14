@@ -14,7 +14,7 @@ write, and let it slip away — your thoughts stay in plain markdown files you o
 in one folder on your Mac.
 
 You're reading this note in **Main** — your hand-arranged shelf. The very same
-note also lives in the **Brain**, filed under *guides*. One file, two ways in.
+note also lives in the **Library**, filed under *guides*. One file, two ways in.
 
 ## Try a few things
 

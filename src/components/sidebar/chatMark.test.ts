@@ -49,6 +49,9 @@ describe("chatMark", () => {
     }
     expect(chatMark("mlx", "Gemma 3").logo).toBe("gemma");
     expect(chatMark("mlx", "Qwen3").logo).toBe("qwen");
+    expect(chatMark("mlx", "Llama 3.2").logo).toBe("meta");
+    expect(chatMark("mlx", "Phi-3.5 mini").logo).toBe("microsoft");
+    expect(chatMark("mlx", "Ministral 8B").logo).toBe("mistral");
     expect(chatMark("mlx", "Unknown local model").initial).toBe("L");
     expect(chatMark("preset", "Hybrid").initial).toBe("H");
   });

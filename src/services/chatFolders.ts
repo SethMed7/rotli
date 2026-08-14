@@ -81,7 +81,10 @@ export function createChatFolder(
   const id = folderId();
   const trimmed = name.trim() || "New folder";
   return {
-    manifest: { ...manifest, folders: [...manifest.folders, { id, name: trimmed }] },
+    manifest: {
+      ...manifest,
+      folders: [...manifest.folders, { id, name: trimmed }],
+    },
     id,
   };
 }
@@ -165,7 +168,7 @@ export interface GroupedChats<T> {
 }
 
 /** Project the flat chat list through the manifest: PINNED folders first, then
- * the rest in manifest order, each with its chats in LIST order, then
+ * the rest by their newest chat activity, each with its chats in LIST order, then
  * everything unassigned.
  *
  * List order is the caller's pinned-then-recency sort, and it now rules inside
@@ -173,7 +176,7 @@ export interface GroupedChats<T> {
  * to the top of the folder / top of the left bar"). The old per-folder MANUAL
  * drag order is retired by that ask — the `order` field stays parsed for
  * manifest compatibility but no longer changes rendering. */
-export function groupChats<T extends { slug: string }>(
+export function groupChats<T extends { slug: string; modifiedMs?: number }>(
   chats: readonly T[],
   manifest: ChatFoldersManifest,
 ): GroupedChats<T> {
@@ -185,21 +188,52 @@ export function groupChats<T extends { slug: string }>(
     if (bucket) bucket.push(chat);
     else loose.push(chat);
   }
-  const ranked = [...manifest.folders].sort((a, b) => Number(b.pinned === true) - Number(a.pinned === true));
+  const manifestRank = new Map(manifest.folders.map((folder, index) => [folder.id, index]));
+  const newest = (folder: ChatFolder) =>
+    Math.max(
+      ...(byFolder.get(folder.id) ?? []).map((chat) => chat.modifiedMs ?? Number.NEGATIVE_INFINITY),
+      Number.NEGATIVE_INFINITY,
+    );
+  const ranked = [...manifest.folders].sort((a, b) => {
+    const pinRank = Number(b.pinned === true) - Number(a.pinned === true);
+    if (pinRank !== 0) return pinRank;
+    if (!a.pinned && !b.pinned) {
+      const aNewest = newest(a);
+      const bNewest = newest(b);
+      if (aNewest !== bNewest) return bNewest > aNewest ? 1 : -1;
+    }
+    return (manifestRank.get(a.id) ?? 0) - (manifestRank.get(b.id) ?? 0);
+  });
   return {
-    folders: ranked.map((folder) => ({ folder, chats: byFolder.get(folder.id) ?? [] })),
+    folders: ranked.map((folder) => ({
+      folder,
+      chats: byFolder.get(folder.id) ?? [],
+    })),
     loose,
   };
 }
 
 // ── I/O (memex bridge) ────────────────────────────────────────────────────────
 
-export async function loadChatFolders(instance: MemexInstance): Promise<ChatFoldersManifest> {
-  return parseChatFolders(await memexChatFolders(instance.root));
+export interface VersionedChatFolders {
+  manifest: ChatFoldersManifest;
+  revision: string;
 }
 
-export async function saveChatFolders(instance: MemexInstance, manifest: ChatFoldersManifest): Promise<void> {
-  await memexWriteChatFolders(instance.root, serializeChatFolders(manifest));
+export async function loadChatFolders(instance: MemexInstance): Promise<VersionedChatFolders> {
+  const opened = await memexChatFolders(instance.root);
+  return {
+    manifest: parseChatFolders(opened.contents),
+    revision: opened.revision,
+  };
+}
+
+export async function saveChatFolders(
+  instance: MemexInstance,
+  manifest: ChatFoldersManifest,
+  expectedRevision: string,
+): Promise<string> {
+  return memexWriteChatFolders(instance.root, serializeChatFolders(manifest), expectedRevision);
 }
 
 export const CHAT_FOLDERS_KEY = ["chat-folders"] as const;

@@ -16,7 +16,7 @@ import { Compartment, EditorSelection, EditorState, Prec } from "@codemirror/sta
 import { EditorView, keymap, placeholder } from "@codemirror/view";
 import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ArrowUpGlyph } from "../components/glyphs";
+import { ArrowUpGlyph, SearchGlyph } from "../components/glyphs";
 import { clamp } from "../lib/clamp";
 import { DEST } from "../services/destinations";
 import { useNotes, useSearchableNotes } from "../services/hooks";
@@ -36,6 +36,7 @@ import {
   toggleInlineMark,
   unregisterEditor,
 } from "./commands";
+import { findTextMatches, nextFindMatch } from "./find";
 import { fmBlock } from "./fmBlock";
 import { focusDim } from "./focusMode";
 import { headingFolding, toggleHeadingFold } from "./headingFold";
@@ -97,10 +98,6 @@ interface ImageGenState {
 const FORMAT_BAR_SCROLL_MARGIN = 88;
 const SCROLL_TO_TOP_THRESHOLD = 160;
 
-function scrollBehavior(): ScrollBehavior {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-}
-
 // memo: the parent editor shell re-renders on caret ctx + header measurement
 // state; with stable props this CM host must not re-render per caret move
 // (perf audit 2026-07-30, finding 8).
@@ -114,6 +111,7 @@ function CmEditorImpl({
   fontSize,
   measureWidth,
   initialText,
+  initialRevision,
   onContext,
   fmRaw = null,
   fmPath = null,
@@ -130,6 +128,7 @@ function CmEditorImpl({
   fontSize: number;
   measureWidth: number;
   initialText: string;
+  initialRevision: string;
   /** Report the caret's line + column up to the format bar (active states). */
   onContext: (line: string | null, selStart: number) => void;
   /** The note's RAW frontmatter block ("Show file metadata") — rendered as an
@@ -252,6 +251,50 @@ function CmEditorImpl({
   const [imageGen, setImageGen] = useState<ImageGenState | null>(null);
   const imageGenRef = useRef<ImageGenState | null>(null);
   imageGenRef.current = imageGen;
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const [findMatches, setFindMatches] = useState<{ from: number; to: number }[]>([]);
+  const [findIndex, setFindIndex] = useState(-1);
+  const findInputRef = useRef<HTMLInputElement>(null);
+  const findOpenRef = useRef(findOpen);
+  findOpenRef.current = findOpen;
+  const findQueryRef = useRef(findQuery);
+  findQueryRef.current = findQuery;
+
+  const selectFindMatch = useCallback(
+    (index: number, matches = findMatches) => {
+      const view = viewRef.current;
+      const match = matches[index];
+      if (!view || !match) return;
+      setFindIndex(index);
+      view.dispatch({
+        selection: EditorSelection.range(match.from, match.to),
+        scrollIntoView: true,
+      });
+    },
+    [findMatches],
+  );
+
+  const updateFind = useCallback(
+    (query: string, selectFirst = true) => {
+      const view = viewRef.current;
+      setFindQuery(query);
+      const matches = findTextMatches(view?.state.doc.toString() ?? "", query);
+      setFindMatches(matches);
+      const index = matches.length > 0 && selectFirst ? 0 : -1;
+      setFindIndex(index);
+      if (index >= 0) selectFindMatch(index, matches);
+    },
+    [selectFindMatch],
+  );
+
+  const moveFind = useCallback(
+    (direction: 1 | -1) => {
+      if (findMatches.length === 0) return;
+      selectFindMatch(nextFindMatch(findMatches, findIndex, direction));
+    },
+    [findIndex, findMatches, selectFindMatch],
+  );
   const { notes: searchableNotes } = useSearchableNotes();
   // ARCHIVED notes still exist — their wikilinks must keep resolving (and
   // opening); only Trash reads as deleted → the missing look (Seth, 2026-07-28:
@@ -289,6 +332,13 @@ function CmEditorImpl({
   // the format-command seam — operate on the live view's selection/line, reusing
   // the same pure transforms the old editor used (commands.ts)
   const handleRef = useRef<EditorHandle>({
+    find: () => {
+      setFindOpen(true);
+      requestAnimationFrame(() => {
+        findInputRef.current?.focus();
+        findInputRef.current?.select();
+      });
+    },
     toggleFold: () => {
       const view = viewRef.current;
       if (view) {
@@ -451,7 +501,7 @@ function CmEditorImpl({
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    ensureDocument(noteId, initialText);
+    ensureDocument(noteId, initialText, initialRevision);
     const startText = getDocumentText(noteId) ?? initialText;
 
     const reportContext = (view: EditorView) => {
@@ -564,6 +614,13 @@ function CmEditorImpl({
         EditorView.updateListener.of((u) => {
           if (u.docChanged && !applyingExternal.current) {
             setDocumentText(noteId, u.state.doc.toString());
+            if (findOpenRef.current) {
+              const matches = findTextMatches(u.state.doc.toString(), findQueryRef.current);
+              setFindMatches(matches);
+              setFindIndex((index) =>
+                matches.length === 0 ? -1 : Math.min(Math.max(index, 0), matches.length - 1),
+              );
+            }
           }
           if (u.docChanged || u.selectionSet || u.focusChanged) {
             reportContext(u.view);
@@ -715,13 +772,67 @@ function CmEditorImpl({
         ref={hostRef}
         style={{ "--cm-measure": `${measureWidth}px` } as CSSProperties}
       />
+      {findOpen && (
+        <div className="editor-find" role="search" aria-label="Find in this file">
+          <SearchGlyph size={14} />
+          <input
+            ref={findInputRef}
+            type="search"
+            value={findQuery}
+            placeholder="Find in this file"
+            aria-label="Find text"
+            onChange={(event) => updateFind(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                moveFind(event.shiftKey ? -1 : 1);
+              } else if (event.key === "Escape") {
+                event.preventDefault();
+                setFindOpen(false);
+                viewRef.current?.focus();
+              }
+            }}
+          />
+          <span className="editor-find-count">
+            {findMatches.length === 0 ? "0" : `${findIndex + 1}/${findMatches.length}`}
+          </span>
+          <button
+            type="button"
+            aria-label="Previous match"
+            disabled={!findMatches.length}
+            onClick={() => moveFind(-1)}
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            aria-label="Next match"
+            disabled={!findMatches.length}
+            onClick={() => moveFind(1)}
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            aria-label="Close find"
+            onClick={() => {
+              setFindOpen(false);
+              viewRef.current?.focus();
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
       {canScrollToTop && (
         <button
           type="button"
           className="editor-scroll-top"
           aria-label="Scroll to top"
           title="Scroll to top"
-          onClick={() => viewRef.current?.scrollDOM.scrollTo({ top: 0, behavior: scrollBehavior() })}
+          // A command must land exactly: smooth scrolling can lose to
+          // CodeMirror's active cursor anchor while the document settles.
+          onClick={() => viewRef.current?.scrollDOM.scrollTo({ top: 0, behavior: "auto" })}
         >
           <ArrowUpGlyph size={16} />
         </button>

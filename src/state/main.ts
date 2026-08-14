@@ -5,8 +5,8 @@
 
 import { create } from "zustand";
 
-import { corpusMainWrite, corpusSettingsRead, isTauri } from "../lib/tauri";
-import { createTrackedWrite } from "../lib/trackedWrite";
+import { corpusMainRead, corpusMainWrite, isTauri } from "../lib/tauri";
+import { createRevisionedTrackedWrite } from "../lib/trackedWrite";
 import {
   EMPTY_MAIN,
   type MainManifest,
@@ -24,6 +24,7 @@ interface MainState {
   manifest: MainManifest;
   saveState: MainSaveState;
   error: string | null;
+  dirty: boolean;
   /** Replace the Main tree and persist. Pass `liveIds` to prune dead note-refs
    * (ids whose note no longer exists) on save — empty folders are kept. */
   setTree: (tree: MainNode[], liveIds?: Set<string>) => void;
@@ -41,12 +42,13 @@ function isMainSurface(): boolean {
 // back-to-back setTree calls (drags, draft composition) race their writes —
 // only the LATEST call's outcome may report, or a stale completion masks a
 // lost arrangement (audit 2026-07-30, correctness #3; same guard as views.ts)
-const writeMain = createTrackedWrite(corpusMainWrite);
+const mainWriter = createRevisionedTrackedWrite(corpusMainWrite);
 
 export const useMainStore = create<MainState>((set) => ({
   manifest: EMPTY_MAIN,
   saveState: "idle",
   error: null,
+  dirty: false,
   setTree: (tree, liveIds) => {
     if (!isMainSurface()) {
       console.warn("main.json write refused off the main surface");
@@ -54,10 +56,10 @@ export const useMainStore = create<MainState>((set) => ({
     }
     const cleaned = liveIds ? gcManifest(tree, liveIds) : tree;
     const manifest: MainManifest = { version: 1, tree: cleaned };
-    set({ manifest, saveState: isTauri() ? "saving" : "saved", error: null });
+    set({ manifest, saveState: isTauri() ? "saving" : "saved", error: null, dirty: isTauri() });
     if (!isTauri()) return;
-    writeMain(serializeMainManifest(manifest), (ok, error) => {
-      if (ok) set({ saveState: "saved" });
+    mainWriter.write(serializeMainManifest(manifest), (ok, error) => {
+      if (ok) set({ saveState: "saved", dirty: false });
       else
         set({
           saveState: "error",
@@ -79,9 +81,16 @@ export function renameMainRef(oldId: string, newId: string): void {
 /** Load `.rotli/main.json` into the store — called from hydratePersistedState so the
  * Main view is right on the first paint. Missing/corrupt → empty Main, never a crash. */
 export async function hydrateMain(): Promise<void> {
+  if (useMainStore.getState().dirty) return;
   try {
-    const raw = await corpusSettingsRead("main");
-    useMainStore.setState({ manifest: parseMainManifest(raw || "{}") });
+    const opened = await corpusMainRead();
+    mainWriter.setRevision(opened.revision);
+    useMainStore.setState({
+      manifest: parseMainManifest(opened.contents || "{}"),
+      saveState: "idle",
+      error: null,
+      dirty: false,
+    });
   } catch (e) {
     console.warn("main.json hydrate failed", e);
   }

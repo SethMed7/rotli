@@ -11,13 +11,20 @@ export const GENERATED_DOCX_THEME = {
   headingColor: "000000",
   mutedColor: "000000",
   ruleColor: "C6C6C6",
-  bodySizeHalfPoints: 22,
-  subtitleSizeHalfPoints: 22,
-  titleSizeHalfPoints: 40,
-  heading1SizeHalfPoints: 32,
-  heading2SizeHalfPoints: 28,
-  heading3SizeHalfPoints: 24,
+  tableHeaderFill: "EEEEEE",
+  bodySizeHalfPoints: 24,
+  subtitleSizeHalfPoints: 24,
+  titleSizeHalfPoints: 48,
+  heading1SizeHalfPoints: 36,
+  heading2SizeHalfPoints: 30,
+  heading3SizeHalfPoints: 26,
+  lineSpacingTwips: 312,
   pageWidthTwips: 12_240,
   pageHeightTwips: 15_840,
   marginTwips: 1_440,
+  // Univer's own drawing insertion path constrains imported images to a
+  // 500×500 frame. Generated documents use the same boundary so their OOXML
+  // and editor snapshots agree on geometry.
+  imageMaxWidthPx: 500,
+  imageMaxHeightPx: 500,
 } as const;

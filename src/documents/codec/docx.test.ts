@@ -6,6 +6,9 @@ import { createDocxBase64 } from "../create";
 import { decodeDocx, encodeDocx } from "./docx";
 
 describe("DOCX editor codec", () => {
+  const RED_PIXEL_PNG =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nCEAAAAASUVORK5CYII=";
+
   test("round-trips edited paragraphs without rewriting opaque package parts", async () => {
     const base64 = await createDocxBase64({
       title: "Original title",
@@ -70,8 +73,8 @@ describe("DOCX editor codec", () => {
           rows: [
             {
               cells: [
-                { paragraphs: [{ runs: [{ text: "A" }] }] },
-                { paragraphs: [{ runs: [{ text: "B" }] }] },
+                { paragraphs: [{ runs: [{ text: "A", style: { bold: true } }] }] },
+                { paragraphs: [{ runs: [{ text: "B", style: { bold: true } }] }] },
               ],
             },
           ],
@@ -128,6 +131,33 @@ describe("DOCX editor codec", () => {
     expect(savedXml).toContain(object);
   });
 
+  test("refuses to rewrite a changed hyperlink paragraph instead of silently dropping its relationship", async () => {
+    const base64 = await createDocxBase64({
+      title: "Links",
+      blocks: [{ kind: "paragraph", text: "Linked text" }],
+    });
+    const zip = await JSZip.loadAsync(base64, { base64: true });
+    const xml = await zip.file("word/document.xml")?.async("string");
+    if (!xml) throw new Error("fixture has no document.xml");
+    zip.file(
+      "word/document.xml",
+      xml.replace(
+        '<w:r><w:t xml:space="preserve">Linked text</w:t></w:r>',
+        '<w:hyperlink r:id="rId99"><w:r><w:t xml:space="preserve">Linked text</w:t></w:r></w:hyperlink>',
+      ),
+    );
+    const linked = await zip.generateAsync({ type: "base64" });
+    const decoded = await decodeDocx(linked, "storage/rotli/links.docx");
+    const paragraph = decoded.document.content.find(
+      (content) =>
+        content.kind === "paragraph" && content.paragraph.runs.some((run) => run.text === "Linked text"),
+    );
+    if (!paragraph || paragraph.kind !== "paragraph") throw new Error("expected hyperlink paragraph");
+    paragraph.paragraph.runs = [{ text: "Changed link label" }];
+
+    await expect(encodeDocx(decoded.source, decoded.document)).rejects.toThrow(/unsupported Word inline/i);
+  });
+
   test("keeps an original table template when a new table is inserted before it", async () => {
     const base64 = await createDocxBase64({ title: "", table: [["Original"]] });
     const zip = await JSZip.loadAsync(base64, { base64: true });
@@ -151,5 +181,60 @@ describe("DOCX editor codec", () => {
     const savedXml = await saved.file("word/document.xml")?.async("string");
     expect(savedXml?.indexOf("New")).toBeLessThan(savedXml?.indexOf("Original") ?? -1);
     expect(savedXml).toContain(object);
+  });
+
+  test("round-trips resized and newly inserted images as conventional DOCX media", async () => {
+    const base64 = await createDocxBase64({
+      title: "Visual",
+      images: [
+        {
+          id: "source-image",
+          name: "Source",
+          mimeType: "image/png",
+          base64: RED_PIXEL_PNG,
+          widthPx: 120,
+          heightPx: 80,
+        },
+      ],
+    });
+    const decoded = await decodeDocx(base64, "storage/rotli/visual.docx");
+    const image = decoded.document.content.find((content) => content.kind === "image");
+    if (!image || image.kind !== "image") throw new Error("expected embedded image");
+    image.image.widthPx = 240;
+    image.image.heightPx = 160;
+    decoded.document.content.push({
+      kind: "image",
+      image: {
+        id: "new-image",
+        name: "New image",
+        mimeType: "image/png",
+        base64: RED_PIXEL_PNG,
+        widthPx: 320,
+        heightPx: 180,
+      },
+    });
+
+    const encoded = await encodeDocx(decoded.source, decoded.document);
+    const saved = await JSZip.loadAsync(encoded, { base64: true });
+    const savedXml = await saved.file("word/document.xml")?.async("string");
+    const relationships = await saved.file("word/_rels/document.xml.rels")?.async("string");
+    expect(savedXml).toContain('wp:extent cx="2286000" cy="1524000"');
+    expect(savedXml).toContain('name="New image"');
+    expect(relationships).toContain("relationships/image");
+    expect(saved.file(/word\/media\/rotli-inserted-image-\d+\.png/)).toHaveLength(1);
+
+    const reopened = await decodeDocx(encoded, "storage/rotli/visual.docx");
+    const images = reopened.document.content.filter((content) => content.kind === "image");
+    expect(images).toHaveLength(2);
+    expect(images.map((content) => (content.kind === "image" ? content.image.widthPx : 0))).toEqual([
+      240, 320,
+    ]);
+
+    const secondSave = await JSZip.loadAsync(await encodeDocx(decoded.source, decoded.document), {
+      base64: true,
+    });
+    const secondRelationships =
+      (await secondSave.file("word/_rels/document.xml.rels")?.async("string")) ?? "";
+    expect(secondRelationships.match(/rIdRotliImage/g)).toHaveLength(1);
   });
 });

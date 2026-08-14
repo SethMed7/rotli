@@ -10,8 +10,8 @@
 import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { EditorSurface } from "../editor/editorSurface";
+import { setQuickHandle } from "../keys/handles";
 import { useTransientPopover } from "../lib/popover";
-import { setQuickHandle } from "../lib/quickHandle";
 import { corpusFrontmatter, corpusSetSecure, onQuickShow, startWindowDrag } from "../lib/tauri";
 import { createVaultCapture } from "../services/captureRouting";
 import { createRoutedNote } from "../services/createNote";

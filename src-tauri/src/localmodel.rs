@@ -30,7 +30,9 @@ fn plist_buddy() -> &'static str {
 }
 
 fn home() -> Result<PathBuf, String> {
-    std::env::var("HOME").map(PathBuf::from).map_err(|_| "no HOME".to_string())
+    std::env::var("HOME")
+        .map(PathBuf::from)
+        .map_err(|_| "no HOME".to_string())
 }
 fn memex_ai() -> PathBuf {
     // best-effort base; every caller that needs it also resolves HOME first
@@ -65,7 +67,8 @@ fn valid_repo(repo: &str) -> Result<(), String> {
             !p.is_empty()
                 && p.len() <= 96
                 && *p != ".."
-                && p.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+                && p.chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
         });
     if ok {
         Ok(())
@@ -145,13 +148,22 @@ fn write_registry(reg: &serde_json::Value) -> Result<(), String> {
 fn registry_has_id(reg: &serde_json::Value, id: &str) -> bool {
     reg.get("models")
         .and_then(|m| m.as_array())
-        .map(|arr| arr.iter().any(|m| m.get("id").and_then(|v| v.as_str()) == Some(id)))
+        .map(|arr| {
+            arr.iter()
+                .any(|m| m.get("id").and_then(|v| v.as_str()) == Some(id))
+        })
         .unwrap_or(false)
 }
 
 /// Append a freshly-installed MLX chat model to the registry (idempotent — a
 /// re-install of the same id updates nothing new, never duplicates).
-fn append_model(id: &str, repo: &str, abs: &Path, approx_mb: u64, vision: bool) -> Result<(), String> {
+fn append_model(
+    id: &str,
+    repo: &str,
+    abs: &Path,
+    approx_mb: u64,
+    vision: bool,
+) -> Result<(), String> {
     let mut reg = read_registry()?;
     if registry_has_id(&reg, id) {
         return Ok(()); // already catalogued
@@ -178,8 +190,8 @@ fn append_model(id: &str, repo: &str, abs: &Path, approx_mb: u64, vision: bool) 
 
 /// Stamp the registry's `updated` field with today (a write just happened).
 fn bump_updated(reg: &mut serde_json::Value) {
-    if let Ok(now) = time::OffsetDateTime::now_utc()
-        .format(&time::format_description::well_known::Iso8601::DATE)
+    if let Ok(now) =
+        time::OffsetDateTime::now_utc().format(&time::format_description::well_known::Iso8601::DATE)
     {
         reg["updated"] = serde_json::Value::String(now);
     }
@@ -230,7 +242,10 @@ pub async fn local_model_install_progress(name: String) -> Result<InstallProgres
     valid_name(&name)?;
     tauri::async_runtime::spawn_blocking(move || {
         let dir = models_dir().join(&name);
-        Ok(InstallProgress { bytes: dir_bytes(&dir), done: looks_complete(&dir) })
+        Ok(InstallProgress {
+            bytes: dir_bytes(&dir),
+            done: looks_complete(&dir),
+        })
     })
     .await
     .map_err(|e| format!("progress worker failed ({e})"))?
@@ -274,7 +289,9 @@ pub async fn local_model_install(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-        let mut child = cmd.spawn().map_err(|e| format!("couldn't launch hf: {e}"))?;
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("couldn't launch hf: {e}"))?;
         let mut stderr_pipe = child.stderr.take();
         let mut stdout_pipe = child.stdout.take();
         children.lock().unwrap().insert(request_id.clone(), child);
@@ -301,18 +318,38 @@ pub async fn local_model_install(
         };
         if !ok {
             let _ = trash::delete(&dir_for_task); // clean the partial download
-            let tail: String = stderr.lines().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join(" · ");
+            let tail: String = stderr
+                .lines()
+                .rev()
+                .take(4)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join(" · ");
             return Err(format!(
                 "the download failed or was cancelled{}",
-                if tail.is_empty() { String::new() } else { format!(" — {tail}") }
+                if tail.is_empty() {
+                    String::new()
+                } else {
+                    format!(" — {tail}")
+                }
             ));
         }
         if !looks_complete(&dir_for_task) {
             let _ = trash::delete(&dir_for_task);
-            return Err("the download finished but the model files look incomplete — try again.".into());
+            return Err(
+                "the download finished but the model files look incomplete — try again.".into(),
+            );
         }
         let mb = approx_mb.unwrap_or_else(|| dir_bytes(&dir_for_task) / 1_000_000);
-        append_model(&name_for_task, &repo_for_task, &dir_for_task, mb, vision.unwrap_or(false))
+        append_model(
+            &name_for_task,
+            &repo_for_task,
+            &dir_for_task,
+            mb,
+            vision.unwrap_or(false),
+        )
     })
     .await
     .map_err(|e| format!("install task failed: {e}"))?
@@ -349,7 +386,10 @@ pub struct SystemProfile {
 /// knows sysctl isn't on a GUI app's PATH.
 pub(crate) fn sysctl(name: &str) -> Option<String> {
     // GUI apps don't get the login-shell PATH — sysctl lives in /usr/sbin
-    let out = Command::new("/usr/sbin/sysctl").args(["-n", name]).output().ok()?;
+    let out = Command::new("/usr/sbin/sysctl")
+        .args(["-n", name])
+        .output()
+        .ok()?;
     if !out.status.success() {
         return None;
     }
@@ -415,9 +455,16 @@ fn registry_entry(id: &str) -> Result<(String, PathBuf), String> {
     let entry = reg
         .get("models")
         .and_then(|m| m.as_array())
-        .and_then(|arr| arr.iter().find(|m| m.get("id").and_then(|v| v.as_str()) == Some(id)))
+        .and_then(|arr| {
+            arr.iter()
+                .find(|m| m.get("id").and_then(|v| v.as_str()) == Some(id))
+        })
         .ok_or_else(|| format!("{id} isn't installed."))?;
-    let provider = entry.get("provider").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let provider = entry
+        .get("provider")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
     let path = entry
         .get("path")
         .and_then(|v| v.as_str())
@@ -436,7 +483,9 @@ pub fn local_model_set_default(id: String) -> Result<(), String> {
     valid_name(&id)?;
     let (provider, path) = registry_entry(&id)?;
     if provider != "mlx" {
-        return Err("only MLX models run on the shared local server — this one has its own.".into());
+        return Err(
+            "only MLX models run on the shared local server — this one has its own.".into(),
+        );
     }
     // must be an installed model dir under the shared models/ (canonicalize both
     // so a `..` or symlink can't point the server outside the store)
@@ -447,7 +496,13 @@ pub fn local_model_set_default(id: String) -> Result<(), String> {
         return Err("the MLX server isn't installed on this Mac (no launchd plist).".into());
     }
     let set = Command::new(plist_buddy())
-        .args(["-c", &format!("Set :EnvironmentVariables:MEMEX_MLX_MODEL {}", target.display())])
+        .args([
+            "-c",
+            &format!(
+                "Set :EnvironmentVariables:MEMEX_MLX_MODEL {}",
+                target.display()
+            ),
+        ])
         .arg(&plist)
         .output()
         .map_err(|e| format!("PlistBuddy: {e}"))?;
@@ -473,7 +528,10 @@ fn contained_model_dir(models: &Path, path: &Path) -> Result<PathBuf, String> {
 }
 
 fn uid() -> Result<String, String> {
-    let out = Command::new("id").arg("-u").output().map_err(|e| e.to_string())?;
+    let out = Command::new("id")
+        .arg("-u")
+        .output()
+        .map_err(|e| e.to_string())?;
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
     } else {
@@ -504,7 +562,10 @@ fn reload_mlx(plist: &Path) -> Result<(), String> {
         if msg.contains("service already loaded") || msg.contains("5: Input/output error") {
             Ok(())
         } else {
-            Err(format!("activated, but the server didn't reload ({}) — it'll switch on the next restart.", msg.trim()))
+            Err(format!(
+                "activated, but the server didn't reload ({}) — it'll switch on the next restart.",
+                msg.trim()
+            ))
         }
     }
 }
@@ -532,7 +593,9 @@ pub fn local_model_uninstall(id: String) -> Result<(), String> {
 
     if let Some(default) = local_model_default() {
         if path == std::path::Path::new(&default) {
-            return Err("that's the default local model — make another one the default first.".into());
+            return Err(
+                "that's the default local model — make another one the default first.".into(),
+            );
         }
     }
     // the registry's path is user-writable data: only a dir proven to sit
@@ -540,7 +603,9 @@ pub fn local_model_uninstall(id: String) -> Result<(), String> {
     // entry could otherwise point this at the vault or ~/Documents)
     let trash_target = if path.exists() {
         Some(contained_model_dir(&models_dir(), &path).map_err(|_| {
-            format!("{id}'s registry path isn't inside the local models store — refusing to remove it.")
+            format!(
+                "{id}'s registry path isn't inside the local models store — refusing to remove it."
+            )
         })?)
     } else {
         None
@@ -621,7 +686,11 @@ mod tests {
         assert!(!registry_has_id(&reg, "qwen2.5-7b"));
         // splice one in (mirror append_model's core without touching disk)
         let entry = serde_json::json!({ "id": "qwen2.5-7b", "kind": "llm-chat" });
-        reg.get_mut("models").unwrap().as_array_mut().unwrap().push(entry);
+        reg.get_mut("models")
+            .unwrap()
+            .as_array_mut()
+            .unwrap()
+            .push(entry);
         assert!(registry_has_id(&reg, "qwen2.5-7b"));
         assert!(registry_has_id(&reg, "gemma-3-12b-it-qat-4bit")); // untouched
         assert_eq!(reg.get("_note").unwrap(), "keep me"); // untouched

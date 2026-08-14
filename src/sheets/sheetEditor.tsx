@@ -69,6 +69,7 @@ export default function SheetEditor({
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const diskLenRef = useRef(0);
+  const revisionRef = useRef("");
   const dirtyGen = useRef(0);
   const armedRef = useRef(false);
 
@@ -102,10 +103,11 @@ export default function SheetEditor({
 
     void (async () => {
       try {
+        const stat = await corpusFileStat(fileId);
+        if (!stat) throw new Error("this file is unavailable");
         let park = getParked(fileId);
         if (park) {
-          const stat = await corpusFileStat(fileId).catch(() => null);
-          const stale = !stat || stat.len !== park.diskLen;
+          const stale = stat.revision !== park.revision;
           if (stale || park.mode !== mode) {
             deleteParked(fileId);
             park = undefined;
@@ -121,9 +123,11 @@ export default function SheetEditor({
           model = park.model;
           idMapRef.current = park.idMap;
           diskLenRef.current = park.diskLen;
+          revisionRef.current = park.revision;
           dirtyGen.current = Math.max(1, dirtyGen.current);
           setDirty(true);
         } else if (mode === "csv") {
+          revisionRef.current = stat.revision;
           const csv = await corpusFileText(fileId, SHEET_EDIT_MAX_BYTES + 1);
           if (new TextEncoder().encode(csv).length > SHEET_EDIT_MAX_BYTES) {
             throw new Error("this file is too large to edit in rotli — opening read-only is fine");
@@ -134,6 +138,7 @@ export default function SheetEditor({
           model = workbookToModel(wb, fileId);
           idMapRef.current = buildSheetIdMap(wb, model);
         } else {
+          revisionRef.current = stat.revision;
           const b64 = await corpusFileBytes(fileId, SHEET_EDIT_MAX_BYTES + 1);
           const bytes = bytesFromB64(b64);
           if (bytes.length > SHEET_EDIT_MAX_BYTES) {
@@ -183,6 +188,7 @@ export default function SheetEditor({
             model: handle.save(),
             idMap: idMapRef.current,
             diskLen: diskLenRef.current,
+            revision: revisionRef.current,
             mode: modeRef.current,
           });
         }
@@ -202,23 +208,27 @@ export default function SheetEditor({
       unregisterLiveDirty(fileId);
       return;
     }
-    registerLiveDirty({
+    const entry: Parameters<typeof registerLiveDirty>[0] = {
       fileId,
       mode: modeRef.current,
       wb,
       saveModel: () => handle.save(),
       idMap: idMapRef.current,
       diskLen: diskLenRef.current,
+      revision: revisionRef.current,
       dirtyGen: () => dirtyGen.current,
       onFlushed: (gen) => {
         if (dirtyGen.current === gen) {
+          diskLenRef.current = entry.diskLen;
+          revisionRef.current = entry.revision;
           dirtyGen.current = 0;
           setDirty(false);
           deleteParked(fileId);
           unregisterLiveDirty(fileId);
         }
       },
-    });
+    };
+    registerLiveDirty(entry);
     return () => unregisterLiveDirty(fileId);
   }, [dirty, fileId, ready]);
 
@@ -232,8 +242,16 @@ export default function SheetEditor({
     setErr(null);
     try {
       const model = handle.save();
-      const len = await writeSheetModel(fileId, modeRef.current, wb, model, idMapRef.current);
-      diskLenRef.current = len;
+      const saved = await writeSheetModel(
+        fileId,
+        modeRef.current,
+        wb,
+        model,
+        idMapRef.current,
+        revisionRef.current,
+      );
+      diskLenRef.current = saved.len;
+      revisionRef.current = saved.revision;
       if (dirtyGen.current === gen) {
         dirtyGen.current = 0;
         setDirty(false);

@@ -28,7 +28,8 @@ fn validate(contents: &str) -> Result<(), String> {
     if contents.len() > MAX_SETTINGS_BYTES {
         return Err("app settings are too large".into());
     }
-    let value: Value = serde_json::from_str(contents).map_err(|e| format!("invalid app settings: {e}"))?;
+    let value: Value =
+        serde_json::from_str(contents).map_err(|e| format!("invalid app settings: {e}"))?;
     if !value.is_object() {
         return Err("app settings must be a JSON object".into());
     }

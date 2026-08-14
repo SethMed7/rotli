@@ -4,6 +4,7 @@ import type { NoteSummary } from "../types";
 import {
   type MainNode,
   addFolderToMain,
+  artifactMainFolderName,
   uniqueRootFolderName,
   addNoteToMain,
   addNoteToMainAt,
@@ -16,6 +17,7 @@ import {
   moveInTree,
   parseMainManifest,
   removeFromMain,
+  fileNoteInNamedRootFolder,
   renameFolderInMain,
   renameNoteRef,
   mainRowSort,
@@ -225,6 +227,25 @@ describe("tree mutations", () => {
       { note: "b" },
       { folder: "Today", children: [] },
     ]);
+  });
+});
+
+describe("fileNoteInNamedRootFolder", () => {
+  test("groups chat artifacts in Main without changing their durable ids", () => {
+    const tree: MainNode[] = [{ note: "storage/rotli/other.docx" }];
+    const once = fileNoteInNamedRootFolder(tree, "storage/rotli/report.docx", "Artifacts - Project chat");
+    const twice = fileNoteInNamedRootFolder(once, "wiki/diagram.excalidraw", "Artifacts - Project chat");
+    expect(twice).toEqual([
+      { note: "storage/rotli/other.docx" },
+      {
+        folder: "Artifacts - Project chat",
+        children: [{ note: "storage/rotli/report.docx" }, { note: "wiki/diagram.excalidraw" }],
+      },
+    ]);
+  });
+
+  test("normalizes chat titles so a visual folder cannot mint nested ids", () => {
+    expect(artifactMainFolderName("  Project / Q3: plan  ")).toBe("Artifacts - Project Q3 plan");
   });
 });
 

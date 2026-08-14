@@ -25,7 +25,6 @@ tauri-plugin-deep-link = "2"                                     # rotli:// link
 tauri-plugin-dialog = "2"                                        # native folder picker (move the corpus)
 percent-encoding = "2"                                           # deep-link id encoding (already transitive)
 tauri-plugin-updater = "2"                                       # in-app updates (signed feed → download + relaunch)
-tauri-plugin-process = "2"                                       # relaunch() after an update installs
 ureq = { version = "2", features = ["json"] }                   # Chat front: POST the on-device model from Rust (the webview CSP blocks localhost)
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -49,7 +48,7 @@ tantivy = "0.26.1"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSResponder"] }
-objc2-foundation = { version = "0.3", features = ["NSData"] }
+objc2-foundation = { version = "0.3", features = ["NSData", "NSString"] }
 
 # Size diet (2026-07-31): the release binary embeds the whole frontend dist, and
 # without a profile the code portion shipped 16 codegen units, no LTO, and 51k

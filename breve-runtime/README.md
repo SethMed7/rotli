@@ -2,8 +2,11 @@
 
 This directory is the versioned runtime that replaces the standalone `~/breve`
 project. Rotli copies executable code into the active corpus at
-`.rotli/breve/`, keeps mutable/private state there, and supervises
-`scripts/rotli-scheduler.ts`.
+`.rotli/breve-runtime/`, keeps mutable/private state at `.rotli/breve/`, and
+supervises `scripts/rotli-scheduler.ts` through stable compatibility aliases.
+The code/dependency bundle is staged and frozen-installed before an atomic
+directory swap; a failed or interrupted upgrade restores the previous complete
+bundle without replacing mutable state.
 
 The scheduler owns exactly the former launchd workload:
 
@@ -15,16 +18,36 @@ The scheduler owns exactly the former launchd workload:
   model routing, and confirmed maintenance actions
 
 Runtime configuration is canonical at `.rotli/routines/config.json`. The
-watchlist, creators, watchers, and briefs are aliases to their canonical memex
+watchlist, creators, watchers, and briefs are aliases to their canonical vault
 locations, so the UI, scheduler, and note index never maintain competing copies.
 Private installation files (`signal.json`, mail/recipient/access configuration),
 logs, transcripts, pending actions, and scheduler state live only under
 `.rotli/breve/` and remain gitignored with other `.rotli` state.
 
+Rotli's Breve dashboard is a read projection of those same vault-owned files:
+saved brief Markdown supplies the issue carousel, top stories, actions, and
+source links; routine configuration supplies the schedule; a sanitized bounded
+tail of `logs/rotli-scheduler.log` supplies Notifications. Raw commands,
+prompts, paths, and stderr never cross the native IPC boundary. Watchlist
+editing and web research remain separate effects. **Refresh last 30 days** is
+an explicit user action that runs the ordinary sandboxed custom-brief pipeline
+with `inApp` delivery only and writes its Markdown into the canonical briefs
+lane. Debug builds simulate the notification in memory and never start a model,
+scheduler, or production-vault write.
+
+Remote model processes fail closed behind the generated macOS Seatbelt policy.
+The policy is rebuilt at each spawn and denies derived state, Git history,
+secure/tainted Markdown reads, and all AI writes to locked files even though the
+broader vault is an allowed knowledge root. Claude and Antigravity are the only
+knowledge-bearing fallback providers; Codex is deliberately excluded because
+its native sandbox cannot express these literal per-file read denials. A
+disabled/unavailable sandbox stops model generation instead of widening access.
+
 Production dependencies are a separate deployment boundary. The committed
-`defaults/bun.lock` is copied beside the managed runtime's `package.json`, and
-Rotli runs a production-only frozen install. A missing Bun executable or any
-lockfile/install failure stops Breve startup with an explicit error; an old
+`defaults/bun.lock` is staged beside the managed runtime's `package.json`, and
+Rotli runs a production-only frozen install before activation. A missing Bun
+executable or any lockfile/install failure stops Breve startup with an explicit
+error while the prior runtime remains active and complete. An old
 `node_modules` directory is never accepted as proof that the pinned graph is
 current. Bundling Bun itself remains separate future hardening.
 

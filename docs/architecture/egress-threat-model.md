@@ -1,6 +1,6 @@
 # Egress threat model — can secure content reach a remote model?
 
-Status: ACCEPTED (2026-08-01) · Audit + hardening · Companion to
+Status: AUDITED, OPEN P0 (2026-08-10) · Audit + hardening · Companion to
 [`../design/ai-visibility-matrix.md`](../design/ai-visibility-matrix.md) (the
 policy) and [`../security/threat-model.md`](../security/threat-model.md) (the
 app-wide model). This document is the **path inventory**: every route by which
@@ -23,8 +23,16 @@ That frame is not paranoia, it is where the trust boundary actually is.
 regex secret detector is a heuristic. **Rust is the only authority**, so Rust is
 where every claim below is tested.
 
-The answer, before this change: **yes, by nine distinct routes.** After it:
-no route remains that does not require write access to the user's own disk.
+The answer, before the 2026-08-01 hardening: **yes, by nine distinct routes.**
+The follow-up audit closed additional headless, root-registration, Breve, and
+chat-taint paths, but found a more fundamental contradiction: the same webview
+can read secure plaintext for the human editor and invoke generic remote-egress
+commands. If that webview is actually hostile, it can paraphrase or encode the
+plaintext and defeat every content-overlap detector. The current architecture
+therefore does **not** prove non-disclosure under this document's hostile-webview
+assumption. Shipping the absolute promise requires capability/process isolation
+or trusted-side remote-context construction; the phrase ledger remains useful
+defense in depth, not a security proof.
 
 ## What "remote" means
 
@@ -39,7 +47,7 @@ Re-derived at every seam, never accepted from a caller:
 - Headless workspace agents (`rotli` CLI, `rotli-workspace` MCP) are remote for
   content policy even though the process is local.
 
-## The two content predicates
+## The three content predicates
 
 Everything in the tables below reduces to which question a seam asks.
 
@@ -113,7 +121,7 @@ way a compromised loop would.
 | 11 | `corpus_readable_ids` (batch probe) | SAFE | the exact same `read_for_ai` per id; bodies never returned |
 | 12 | `corpus_search` + TS filter | **GAP → FIXED** | Rust supplied the verdict, **TypeScript applied it**. A loop that skipped the probe got the titles and snippets of every matching secure note. New `corpus_search_ai` applies `read_for_ai` per hit **in Rust**, before anything crosses the boundary — one round trip instead of two, so it is also faster |
 | 13 | `corpus_list` / `corpus_reference_notes` → knowledge map | **GAP → FIXED** | same shape: secure TITLES reached the map through a TS-side filter. New `corpus_notes_ai` filters in Rust |
-| 14 | `corpus_read` / `corpus_file_text` / `corpus_file_bytes` | **MITIGATED** | these are the USER's editor lanes and cannot refuse the user their own notes. `corpus_read` returns the **frontmatter-stripped** body, which is precisely why the marker backstop was insufficient — see the ledger, above. The bytes are still obtainable; they can no longer EGRESS. **This holds from process start:** the ledger is fed by the corpus walk and `open` does not walk, so a fresh process once held none of a never-browsed root's secure prose until its first `list` — a real boot race (audit follow-up finding #2). Closed by walking every registered root once in the lib.rs setup loop (`warm_secure_ledger`), before any command can run |
+| 14 | `corpus_read` / `corpus_file_text` / `corpus_file_bytes` | **MITIGATED, NOT CLOSED** | these are the USER's editor lanes and cannot refuse the user their own notes. `corpus_read` returns the **frontmatter-stripped** body. The ledger is warm before commands run and blocks verbatim overlap at Rust egress seams, but a hostile webview that obtained the plaintext can transform it before invoking those seams. This is the unresolved trust-boundary contradiction described above |
 | 15 | Workspace `notes list` / `search` / `query` / `read` | SAFE | `read_for_ai(id, false)` per item, filter-before-truncate |
 | 16 | Workspace `list` — files and folders | **GAP → FIXED** | `NoteKind::File` metas and the whole folder tree bypassed every filter (`_ => true`), shipping the reserved `Secure notes/` folder name to a remote agent. Both now pass `agent_listable` |
 
@@ -143,58 +151,58 @@ These are real and they are not silently carried. Each needs either a product
 decision from Seth or a change whose blast radius does not belong in a security
 commit.
 
-### O1 — Breve's brief agent reads the whole vault (HIGHEST)
+### O1 — Breve filesystem exposure (MITIGATED; residual TOCTOU)
 
-`routines.rs` spawns the scheduler, which runs
-`claude -p --dangerously-skip-permissions` with `BREVE_KNOWLEDGE` pointed at the
-entire vault root. The macOS sandbox profile allow-reads the memex wholesale.
-Secure notes are ordinary `.md` files inside it.
+Every Claude/Antigravity model spawn now rebuilds a macOS Seatbelt profile from
+the current roots. The final policy denies `.rotli/`, `.git/`, the protected
+lane, secure/tainted Markdown reads, and all writes to locked files. The brief
+scripts pass `--require`: `BREVE_SANDBOX=0`, a missing `sandbox-exec`, or profile
+generation failure refuses model execution. The former Codex knowledge-bearing
+fallback was removed because its native sandbox could not express literal
+secure-file read denies.
 
-**So: any note the organizer would refuse to send, the morning-brief agent can
-simply open.** No gate in this document applies, because nothing is passed
-through a seam — the model is handed a filesystem.
+This is still not a perfect snapshot boundary. A same-user process can change a
+file's frontmatter after profile generation and before the model opens it. The
+canonical secure lane remains directory-denied, so the residual concerns a
+legacy or externally edited secure file outside that lane. A truly closed design
+would give the model an immutable, filtered projection rather than the live
+corpus.
 
-Not fixed here because the fix changes what Seth's daily brief can SEE, which is
-his call, not a hardening decision. The concrete option: the secure lane already
-appends every secure note's relative path to the vault `.gitignore`, so the
-sandbox profile can emit a matching `(deny file-read* (literal …))` per path and
-close this precisely. That belongs in its own change, with Seth's sign-off and a
-brief run to confirm nothing he wants is lost.
-
-### O2 — the model registry is an unprotected trust anchor
+### O2 — the model registry was an unprotected trust anchor (FIXED)
 
 `~/.memex/ai/registry.json` is the sole thing distinguishing "a real on-device
 model" from "a loopback proxy to a frontier provider". It is a plain user file.
-A caller can reach it by registering `~/.memex` as a corpus root
-(`corpus_add_folder` accepts any absolute path that `is_dir()`), which opens as
-`LegacyRotli` where everything is writable, and then writing
+Before this fix a caller could reach it by registering `~/.memex` as a corpus
+root, which opened as `LegacyRotli` where everything was writable, and then writing
 `providers.mlx.endpoint`. Exploiting it for exfil additionally requires an
 attacker-controlled loopback listener, so it is a chained break rather than a
 standalone one — but the same primitive grants arbitrary `$HOME` read/write,
 which is independently serious.
 
-Recommended (small, safe): refuse to register a corpus root that IS `$HOME` or
-that CONTAINS `~/.memex`. Deferred only because root registration is a UX path
-and this audit's remit was egress.
+Folder selection, inspection, import, initialization, and brain connection now
+reject `$HOME`, ancestors of `$HOME`, and overlap with known credential/config
+roots including `.memex`, `.codex`, `.claude`, `.ssh`, `.gnupg`, `.aws`,
+`.config`, `.breve-secrets`, Keychains, and Rotli application state. Exact
+native-picker grants are short-lived and consumed rather than accepting an
+arbitrary caller-supplied absolute path.
 
-### O3 — `read_main` / `read_views` leak ids to the headless agent
+### O3 — `read_main` / `read_views` leaked ids to the headless agent (FIXED)
 
-The Main and view manifests are dumped verbatim, and they reference notes by id
-from anywhere in the corpus. Differencing them against `rotli_list` yields the
-secure id set exactly. `rotli_status` additionally discloses absolute vault
-paths, which makes path-guessing practical. The matrix's T1 defense is stated as
-"the model never learns those ids"; the workspace lane does not honor it.
+The Main and view manifests were dumped verbatim, and they referenced notes by
+id from anywhere in the corpus. Differencing them against `rotli_list` yielded
+the secure id set exactly. `rotli_status` additionally disclosed absolute vault
+paths, making path-guessing practical. The matrix's T1 defense is stated as
+"the model never learns those ids"; the old workspace lane did not honor it.
 
-Filtering both manifests through `read_for_ai` is the fix and it is small — it
-is out of this commit only because manifest filtering interacts with how the
-sidebar reconciles orphaned entries, and getting that wrong loses user structure.
+Headless Main and named-view manifests are now recursively filtered through the
+same remote read policy before serialization. `rotli_status` no longer returns
+absolute roots, metrics use the filtered manifests, and mutation-return
+manifests are filtered too.
 
-### O4 — `queue_open` takes an unvalidated id
+### O4 — `queue_open` took an unvalidated id (FIXED)
 
-A remote agent can force the local app to open a named item on screen, with none
-of the shape validation `parse_deep_link` applies to the same payload.
-Disclosure to the user's own screen, not to a model — low, but it should share
-the deep-link validator.
+The workspace now resolves the item, requires it to be remote-visible, and
+requires a mutable configured workspace before queuing the request.
 
 ### O6 — the path-existence differential (low, pervasive, accepted)
 
@@ -203,16 +211,16 @@ gates on. So a **non-existent** id errors `note not found` while an **existing
 secure** one errors `This note is secure…`. Any lane that reads by id therefore
 lets a caller distinguish "no note here" from "a secure note here" by the error
 text — `corpus_read_ai`, the batch probe, `update_note`, `assign_view`, all of
-them. Combined with `rotli_status`'s absolute-path disclosure (O3) it makes
-path-guessing an existence oracle over secure notes.
+them. O3's fix removed the workspace's absolute-path/id assistance, but an exact
+id supplied by some other route remains a one-bit existence oracle.
 
 It is **not** a content leak: no title, snippet, body, or hash crosses — only the
 one bit "something private is at this exact path you guessed." It is accepted as
 low-severity and recorded rather than hidden, because closing it cleanly means
 making every legitimate `not found` lie as `secure` (or vice-versa) across the
 whole surface, which degrades honest errors everywhere to blunt one rarely-useful
-guess. If O3 is fixed (ids and paths stop leaking to the headless agent), the
-guessing input dries up and this loses most of its remaining value.
+guess. O3's fix dries up the most useful guessing input and leaves this residual
+substantially lower-value.
 
 ### O7 — the full-text index is a new at-rest asset (recorded, not a leak)
 
@@ -249,8 +257,14 @@ the walk with index-driven listing. `corpus_list`, `tasks`, and
 feeds the ledger) before it touches the index, so the egress ledger cannot go
 cold because search now uses an index.
 
-### O5 — residual limits, by design
+### O5 — residual limits and the unresolved webview boundary
 
+- **Hostile-webview non-disclosure is not proven.** A webview may legitimately
+  receive secure plaintext for display, then invoke generic egress with a
+  paraphrase, translation, encoding, or short chunks. No unkeyed content
+  detector can track the underlying information flow. This is the highest
+  remaining security risk and blocks the absolute privacy claim under the
+  stated trust model.
 - **The ledger stops only bulk verbatim copying.** ≤4-word chunking, paraphrase,
   translation, reordering, and any encoding defeat it — by design; it is a layer
   over `read_for_ai`, not a covert-channel defense. Stated in full above.

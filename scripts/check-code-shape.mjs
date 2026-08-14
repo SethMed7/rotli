@@ -4,7 +4,7 @@ import { dirname, extname, join, relative, resolve } from "node:path";
 const root = process.env.ROTLI_CHECK_ROOT ?? process.cwd();
 const violations = [];
 const sourceRoots = ["src", "breve-runtime/scripts"];
-const testRoots = ["src", "breve-runtime/tests", "scripts"];
+const testRoots = ["src", "e2e", "breve-runtime/tests", "scripts"];
 const sourceExtensions = [".ts", ".tsx", ".mjs"];
 
 function walkFiles(relRoot, predicate) {
@@ -37,6 +37,7 @@ const testFiles = testRoots.flatMap((dir) => walkFiles(
 const surfaceHomeExceptions = new Set([
   "src/editor/editorSurface.tsx",
   "src/components/breve/breveSurface.tsx",
+  "src/components/chat/chatSurface.tsx",
 ]);
 for (const file of productionFiles) {
   if (!file.startsWith("src/") || !/(?:Surface|Dialog)\.tsx$/.test(file)) continue;
@@ -118,7 +119,7 @@ function visit(file) {
     component.push(current);
   } while (current !== file);
   if (component.length > 1 || graph.get(file).includes(file)) {
-    violations.push(`module cycle: ${component.sort().join(" -> ")}`);
+    violations.push(`module cycle: ${component.sort((a, b) => a.localeCompare(b)).join(" -> ")}`);
   }
 }
 

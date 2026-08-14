@@ -51,7 +51,7 @@ export function AllChatsSurface() {
           <p className="be-title">{chats.length === 0 ? "No chats yet" : "No matches"}</p>
           <p className="be-sub">
             {chats.length === 0
-              ? "Start one with New chat — it saves as a plain chats/<slug>.md in your memex."
+              ? "Start one with New chat — it saves as a plain chats/<slug>.md in your vault."
               : "Try a different search."}
           </p>
         </div>

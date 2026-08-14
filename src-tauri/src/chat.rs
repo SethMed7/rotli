@@ -21,7 +21,8 @@ const DEFAULT_API: &str = "generate";
 /// key). Rides this same openai pipeline; the Bearer comes from the Keychain.
 /// NON-LOCAL on purpose — `egress_allowed` + `corpus_read_ai` treat it as the
 /// remote it is (secure notes never ride to it).
-pub(crate) const GEMINI_OPENAI_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
+pub(crate) const GEMINI_OPENAI_BASE: &str =
+    "https://generativelanguage.googleapis.com/v1beta/openai";
 
 /// The interactive paths wait up to two minutes; the background daemon uses a
 /// much shorter caller-set timeout so it never camps on the model server.
@@ -162,7 +163,12 @@ fn read_models() -> Option<Vec<ChatModel>> {
             .and_then(|v| v.get("api"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let api = if api_desc.contains("openai") { "openai" } else { "generate" }.to_string();
+        let api = if api_desc.contains("openai") {
+            "openai"
+        } else {
+            "generate"
+        }
+        .to_string();
         // the default = the first chat model on the provider flagged default:true
         let provider_default = p
             .and_then(|v| v.get("default"))
@@ -291,7 +297,16 @@ pub async fn chat_messages(
             if api == "openai" {
                 messages_openai(base, &model, &messages, temperature, max_tokens, &endpoint)
             } else {
-                messages_generate(base, &model, &messages, format_json.unwrap_or(false), temperature, max_tokens, &endpoint, CHAT_TIMEOUT)
+                messages_generate(
+                    base,
+                    &model,
+                    &messages,
+                    format_json.unwrap_or(false),
+                    temperature,
+                    max_tokens,
+                    &endpoint,
+                    CHAT_TIMEOUT,
+                )
             }
         };
         // COMPUTE GUARDRAILS (Seth, 2026-08-01 — docs/design/local-compute-guardrails.md):
@@ -448,7 +463,16 @@ pub fn complete_local(
     timeout: Duration,
 ) -> Result<String, String> {
     let base = DEFAULT_ENDPOINT.trim_end_matches('/');
-    messages_generate(base, DEFAULT_MODEL, messages, format_json, temperature, max_tokens, DEFAULT_ENDPOINT, timeout)
+    messages_generate(
+        base,
+        DEFAULT_MODEL,
+        messages,
+        format_json,
+        temperature,
+        max_tokens,
+        DEFAULT_ENDPOINT,
+        timeout,
+    )
 }
 
 /// MLX `/api/generate` — flatten the transcript to one prompt; optionally force a
@@ -686,7 +710,9 @@ fn openai_bearer(base: &str) -> Result<Option<String>, String> {
     if base.starts_with(GEMINI_OPENAI_BASE) {
         return crate::keychain::get_secret(crate::keychain::GEMINI_API_KEY_ACCOUNT)
             .map(Some)
-            .ok_or_else(|| "Gemini needs its API key — add it in Settings → AI Models.".to_string());
+            .ok_or_else(|| {
+                "Gemini needs its API key — add it in Settings → AI Models.".to_string()
+            });
     }
     if endpoint_is_local(base) {
         return Ok(read_api_key());
@@ -714,7 +740,10 @@ fn ensure_llamacpp_up(endpoint: &str) {
         _ => return,
     };
     let _ = std::process::Command::new("launchctl")
-        .args(["kickstart", &format!("gui/{uid}/com.sethmedina.memex-llamacpp")])
+        .args([
+            "kickstart",
+            &format!("gui/{uid}/com.sethmedina.memex-llamacpp"),
+        ])
         .output();
 }
 
@@ -755,7 +784,10 @@ mod tests {
     fn openai_url_branches_on_the_gemini_base() {
         // local llama.cpp mounts under /v1; Gemini's compat base already ends
         // in /openai and mounts directly at /chat/completions
-        assert_eq!(openai_url("http://localhost:11436"), "http://localhost:11436/v1/chat/completions");
+        assert_eq!(
+            openai_url("http://localhost:11436"),
+            "http://localhost:11436/v1/chat/completions"
+        );
         assert_eq!(
             openai_url(GEMINI_OPENAI_BASE),
             format!("{GEMINI_OPENAI_BASE}/chat/completions")
@@ -778,7 +810,11 @@ mod tests {
                 content: "what is this?".into(),
                 images: vec!["data:image/png;base64,AAAA".into(), "BBBB".into()],
             },
-            WireMsg { role: "assistant".into(), content: "hm".into(), images: vec![] },
+            WireMsg {
+                role: "assistant".into(),
+                content: "hm".into(),
+                images: vec![],
+            },
             WireMsg {
                 role: "user".into(),
                 content: "and this?".into(),
@@ -787,7 +823,11 @@ mod tests {
         ];
         assert_eq!(generate_images(&msgs), vec!["AAAA", "BBBB", "CCCC"]);
         // a text-only transcript adds NO images key to the body
-        let none = vec![WireMsg { role: "user".into(), content: "hi".into(), images: vec![] }];
+        let none = vec![WireMsg {
+            role: "user".into(),
+            content: "hi".into(),
+            images: vec![],
+        }];
         assert!(generate_images(&none).is_empty());
     }
 
@@ -801,7 +841,11 @@ mod tests {
             content: "summarize: card 4242-4242-4242-4242".into(),
             images: vec![],
         }];
-        let clean = vec![WireMsg { role: "user".into(), content: "hi there".into(), images: vec![] }];
+        let clean = vec![WireMsg {
+            role: "user".into(),
+            content: "hi there".into(),
+            images: vec![],
+        }];
         // local endpoint: secure content rides fine
         assert!(egress_allowed(DEFAULT_ENDPOINT, DEFAULT_MODEL, &secret).is_ok());
         // remote endpoint: the secret refuses, clean text passes
@@ -811,8 +855,16 @@ mod tests {
         assert!(egress_allowed(DEFAULT_ENDPOINT, "claude-proxy", &secret).is_err());
         // ANY turn carrying the secret trips it, not just the last
         let buried = vec![
-            WireMsg { role: "assistant".into(), content: "ssn: 123-45-6789".into(), images: vec![] },
-            WireMsg { role: "user".into(), content: "go on".into(), images: vec![] },
+            WireMsg {
+                role: "assistant".into(),
+                content: "ssn: 123-45-6789".into(),
+                images: vec![],
+            },
+            WireMsg {
+                role: "user".into(),
+                content: "go on".into(),
+                images: vec![],
+            },
         ];
         assert!(egress_allowed("https://api.example.com/v1", DEFAULT_MODEL, &buried).is_err());
         // unparseable endpoint ⇒ NOT local ⇒ fail closed on secrets
@@ -832,7 +884,10 @@ mod tests {
         assert!(endpoint_permitted("https://attacker.example/v1").is_err());
         assert!(endpoint_permitted("https://api.openai.com/v1").is_err());
         // lookalikes of the Gemini base don't pass the prefix test
-        assert!(endpoint_permitted("https://generativelanguage.googleapis.com.evil.tld/v1beta/openai").is_err());
+        assert!(endpoint_permitted(
+            "https://generativelanguage.googleapis.com.evil.tld/v1beta/openai"
+        )
+        .is_err());
         // unparseable ⇒ fail closed
         assert!(endpoint_permitted("").is_err());
     }
@@ -847,16 +902,32 @@ mod tests {
 
     #[test]
     fn flatten_messages_passes_a_lone_user_turn_verbatim() {
-        let msgs = vec![WireMsg { role: "user".into(), content: "hi".into(), images: vec![] }];
+        let msgs = vec![WireMsg {
+            role: "user".into(),
+            content: "hi".into(),
+            images: vec![],
+        }];
         assert_eq!(flatten_messages(&msgs), "hi");
     }
 
     #[test]
     fn flatten_messages_labels_multi_turn_and_cues_assistant() {
         let msgs = vec![
-            WireMsg { role: "system".into(), content: "be kind".into(), images: vec![] },
-            WireMsg { role: "user".into(), content: "hi".into(), images: vec![] },
-            WireMsg { role: "assistant".into(), content: "hello".into(), images: vec![] },
+            WireMsg {
+                role: "system".into(),
+                content: "be kind".into(),
+                images: vec![],
+            },
+            WireMsg {
+                role: "user".into(),
+                content: "hi".into(),
+                images: vec![],
+            },
+            WireMsg {
+                role: "assistant".into(),
+                content: "hello".into(),
+                images: vec![],
+            },
         ];
         let s = flatten_messages(&msgs);
         assert!(s.starts_with("System: be kind\n\n"));

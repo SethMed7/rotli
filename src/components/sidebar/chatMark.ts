@@ -15,7 +15,15 @@
 // Pure: no React, no store.
 
 /** The vendor lanes a chat can run on, plus the on-device one. */
-export type ChatLogoKey = "anthropic" | "openai" | "gemini" | "gemma" | "qwen";
+export type ChatLogoKey =
+  | "anthropic"
+  | "openai"
+  | "gemini"
+  | "gemma"
+  | "qwen"
+  | "meta"
+  | "microsoft"
+  | "mistral";
 export type ChatMarkKey = ChatLogoKey | "local" | "preset";
 
 export interface ChatMark {
@@ -34,6 +42,9 @@ const MARKS: Record<ChatMarkKey, { initial?: string; logo?: ChatLogoKey; vendor:
   gemini: { logo: "gemini", vendor: "Google" },
   gemma: { logo: "gemma", vendor: "this Mac" },
   qwen: { logo: "qwen", vendor: "this Mac" },
+  meta: { logo: "meta", vendor: "this Mac" },
+  microsoft: { logo: "microsoft", vendor: "this Mac" },
+  mistral: { logo: "mistral", vendor: "this Mac" },
   local: { initial: "L", vendor: "this Mac" },
   preset: { initial: "H", vendor: "a hybrid preset" },
 };
@@ -60,6 +71,9 @@ export function markKeyOf(provider: string | undefined, modelName = ""): ChatMar
       const family = modelName.toLowerCase();
       if (family.includes("gemma")) return "gemma";
       if (family.includes("qwen")) return "qwen";
+      if (family.includes("llama")) return "meta";
+      if (family.includes("phi")) return "microsoft";
+      if (family.includes("mistral") || family.includes("ministral")) return "mistral";
       return "local";
     }
   }

@@ -2,6 +2,7 @@
 
 import ExcelJS from "exceljs";
 import type { Workbook } from "exceljs";
+import JSZip from "jszip";
 
 // Surfaces never touch the vendor — the codec is the ONE exceljs seam.
 export type { Workbook } from "exceljs";
@@ -13,6 +14,34 @@ export function newWorkbook(): Workbook {
 
 /** Load an xlsx from raw bytes. */
 export async function loadXlsx(bytes: ArrayBuffer): Promise<Workbook> {
+  const zip = await JSZip.loadAsync(bytes);
+  const unsupported = Object.keys(zip.files).filter((name) => {
+    const path = name.toLowerCase();
+    return (
+      path.startsWith("xl/charts/") ||
+      path.startsWith("xl/pivottables/") ||
+      path.startsWith("xl/pivotcache/") ||
+      path.startsWith("xl/externallinks/") ||
+      path.startsWith("xl/querytables/") ||
+      path.startsWith("xl/slicers/") ||
+      path.startsWith("xl/ctrlprops/") ||
+      path.startsWith("xl/embeddings/") ||
+      path.startsWith("xl/activex/") ||
+      path.startsWith("xl/model/") ||
+      path.startsWith("xl/threadedcomments/") ||
+      path.startsWith("customxml/") ||
+      path.startsWith("customui/") ||
+      path.startsWith("_xmlsignatures/") ||
+      path === "xl/connections.xml" ||
+      path === "xl/vbaproject.bin"
+    );
+  });
+  if (unsupported.length > 0) {
+    const feature = unsupported[0] ?? "advanced workbook content";
+    throw new Error(
+      `This workbook contains ${feature}, which Rotli cannot preserve safely. Open it in Excel or convert a copy before editing.`,
+    );
+  }
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(bytes);
   return wb;

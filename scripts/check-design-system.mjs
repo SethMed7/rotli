@@ -16,6 +16,7 @@ const base = read("src/styles/base.css");
 const themeState = read("src/state/theme.ts");
 const uiState = read("src/state/ui.ts");
 const breveStyles = read("src/styles/breve.css");
+const notesStyles = read("src/styles/notes.css");
 const brandBoard = read("src/brand/board.html");
 const brandDefinition = JSON.parse(read("src/brand/brand.json"));
 const violations = [];
@@ -138,6 +139,12 @@ if (!/@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(base)) {
 // lib/idleMotion.ts stamps the attribute; this asserts the rule that consumes it.
 if (!/:root\[data-idle="hidden"\][^{]*\{[^}]*animation-play-state:\s*paused/s.test(base)) {
   violations.push("base.css: missing the idle animation pause (:root[data-idle=\"hidden\"])");
+}
+// A working chat already moves into the labeled Working lane. Its status mark
+// must remain static: continuous sidebar motion adds compositor work without
+// communicating another state change.
+if (/\.sb-chatrun\.running\s*\{[^}]*\banimation\s*:/s.test(notesStyles)) {
+  violations.push("notes.css: working-chat status marks must not animate continuously");
 }
 if (/@media\s*\(prefers-color-scheme:/.test(`${colors}\n${themes}`)) {
   violations.push("theme tokens must not follow the OS implicitly; state/theme.ts owns system mode");

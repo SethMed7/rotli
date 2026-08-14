@@ -9,4 +9,4 @@ reach: private
 # Try Quick capture
 
 Press your Quick capture shortcut from anywhere — even mid-sentence in another app
-— and a thought lands right here in the Inbox. File it later, or let the Brain do it.
+— and a thought lands right here in the Inbox. File it later, or let the Librarian do it.

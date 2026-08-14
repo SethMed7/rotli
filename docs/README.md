@@ -20,10 +20,11 @@ fix both in the same change.
 | Product interface and interaction design | [`../DESIGN.md`](../DESIGN.md) |
 | Syntax, naming, and formatting | [`../SYNTAX.md`](../SYNTAX.md) |
 | Clean architecture and dependency direction | [`architecture/clean-architecture.md`](architecture/clean-architecture.md) |
-| Memex storage, metadata, RAG, and secure notes | [`architecture/memex-data-contract.md`](architecture/memex-data-contract.md) |
+| Vault storage, Rotli's metadata layer, retrieval, and secure notes | [`architecture/memex-data-contract.md`](architecture/memex-data-contract.md) |
 | File editing and no-preview-only product law | [`architecture/memex-data-contract.md#editing-capabilities`](architecture/memex-data-contract.md#editing-capabilities) |
 | FileSurface capability matrix | [`architecture/file-surface-capability-audit-2026-07-11.md`](architecture/file-surface-capability-audit-2026-07-11.md) |
 | Current system-wide findings and priorities | [`architecture/system-audit-2026-07-29.md`](architecture/system-audit-2026-07-29.md) |
+| Production readiness, security, integrity, lifecycle, IPC, and scale audit | [`architecture/production-readiness-audit-2026-08-10.md`](architecture/production-readiness-audit-2026-08-10.md) |
 | Performance audit (async · imports · bundle) | [`architecture/perf-audit-2026-07-30.md`](architecture/perf-audit-2026-07-30.md) |
 | Egress threat model (can secure content reach a remote model?) | [`architecture/egress-threat-model.md`](architecture/egress-threat-model.md) |
 | Code organization audit | [`architecture/code-audit.md`](architecture/code-audit.md) |
@@ -50,7 +51,7 @@ fix both in the same change.
 
 - The repository owns code-facing architecture, security, operations,
   development, testing, brand, decision, and runtime contracts.
-- The memex may hold broader product knowledge, research, decision context, and
+- A development vault may hold broader product knowledge, research, decision context, and
   model-readable protocols. It does not replace current repository contracts.
 - `.carl/carl.json` is a compact, project-scoped recall layer shared through the
   local CARL MCP server. It summarizes stable facts and decisions and links back

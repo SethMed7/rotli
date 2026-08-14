@@ -95,7 +95,15 @@ fn build_schema() -> (Schema, Fields) {
     let all = sb.add_text_field("all", text);
     let hash = sb.add_u64_field("hash", STORED | FAST);
     let secure = sb.add_u64_field("secure", STORED | FAST);
-    (sb.build(), Fields { id, all, hash, secure })
+    (
+        sb.build(),
+        Fields {
+            id,
+            all,
+            hash,
+            secure,
+        },
+    )
 }
 
 /// Deterministic FNV-1a 64 over a doc's searchable content + its secure bit, so a
@@ -161,9 +169,13 @@ impl SearchIndex {
             .search(&tantivy::query::AllQuery, &DocSetCollector)
             .map_err(|e| format!("search index scan: {e}"))?;
         for addr in addrs {
-            let doc: TantivyDocument =
-                searcher.doc(addr).map_err(|e| format!("search index read: {e}"))?;
-            let id = doc.get_first(self.fields.id).and_then(|v| v.as_str()).map(str::to_string);
+            let doc: TantivyDocument = searcher
+                .doc(addr)
+                .map_err(|e| format!("search index read: {e}"))?;
+            let id = doc
+                .get_first(self.fields.id)
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
             let hash = doc.get_first(self.fields.hash).and_then(|v| v.as_u64());
             if let (Some(id), Some(hash)) = (id, hash) {
                 self.doc_hashes.insert(id, hash);
@@ -212,13 +224,19 @@ impl SearchIndex {
             }
             td.add_u64(self.fields.hash, hash);
             td.add_u64(self.fields.secure, u64::from(doc.secure));
-            writer.add_document(td).map_err(|e| format!("search add: {e}"))?;
+            writer
+                .add_document(td)
+                .map_err(|e| format!("search add: {e}"))?;
             self.doc_hashes.insert(doc.id.clone(), hash);
             changed = true;
         }
         // Deletions: ids we hold but the walk no longer sees.
-        let gone: Vec<String> =
-            self.doc_hashes.keys().filter(|id| !seen.contains(String::as_str(id))).cloned().collect();
+        let gone: Vec<String> = self
+            .doc_hashes
+            .keys()
+            .filter(|id| !seen.contains(String::as_str(id)))
+            .cloned()
+            .collect();
         for id in gone {
             writer.delete_term(Term::from_field_text(self.fields.id, &id));
             self.doc_hashes.remove(&id);
@@ -227,7 +245,9 @@ impl SearchIndex {
 
         if changed {
             writer.commit().map_err(|e| format!("search commit: {e}"))?;
-            self.reader.reload().map_err(|e| format!("search reload: {e}"))?;
+            self.reader
+                .reload()
+                .map_err(|e| format!("search reload: {e}"))?;
         }
         self.synced_generation = Some(generation);
         Ok(())
@@ -248,12 +268,14 @@ impl SearchIndex {
         };
         let searcher = self.reader.searcher();
         let collector = TopDocs::with_limit(over_fetch.max(1)).order_by_score();
-        let top =
-            searcher.search(&*q, &collector).map_err(|e| format!("search query: {e}"))?;
+        let top = searcher
+            .search(&*q, &collector)
+            .map_err(|e| format!("search query: {e}"))?;
         let mut ids = Vec::with_capacity(top.len());
         for (_score, addr) in top {
-            let doc: TantivyDocument =
-                searcher.doc(addr).map_err(|e| format!("search hit read: {e}"))?;
+            let doc: TantivyDocument = searcher
+                .doc(addr)
+                .map_err(|e| format!("search hit read: {e}"))?;
             if let Some(id) = doc.get_first(self.fields.id).and_then(|v| v.as_str()) {
                 ids.push(id.to_string());
             }
@@ -273,8 +295,7 @@ impl SearchIndex {
             let inner = raw.trim_matches('"').trim();
             let toks = tokenize(inner);
             if toks.len() >= 2 {
-                let terms: Vec<Term> =
-                    toks.iter().map(|t| Term::from_field_text(all, t)).collect();
+                let terms: Vec<Term> = toks.iter().map(|t| Term::from_field_text(all, t)).collect();
                 return Some(Box::new(PhraseQuery::new(terms)));
             }
             // one-word "phrase" degrades to the normal token path below
@@ -353,8 +374,8 @@ fn recreate(dir: &Path, schema: &Schema) -> Result<Index, String> {
         fs::remove_dir_all(dir).map_err(|e| format!("wipe search index: {e}"))?;
     }
     fs::create_dir_all(dir).map_err(|e| format!("create search index dir: {e}"))?;
-    let index =
-        Index::create_in_dir(dir, schema.clone()).map_err(|e| format!("create search index: {e}"))?;
+    let index = Index::create_in_dir(dir, schema.clone())
+        .map_err(|e| format!("create search index: {e}"))?;
     let stamp = serde_json::json!({ "schemaVersion": SCHEMA_VERSION }).to_string();
     fs::write(dir.join(META_FILE), stamp).map_err(|e| format!("write search stamp: {e}"))?;
     Ok(index)
@@ -385,7 +406,12 @@ mod tests {
             1,
             &[
                 doc("a", "Wire limit", "call the bank about the cap", false),
-                doc("b", "Meeting prep", "raise the wire limit question with finance", false),
+                doc(
+                    "b",
+                    "Meeting prep",
+                    "raise the wire limit question with finance",
+                    false,
+                ),
                 doc("c", "Groceries", "olive oil and sourdough bread", false),
             ],
         )
@@ -393,16 +419,31 @@ mod tests {
 
         // multi-token AND — both notes contain both tokens, the grocery note neither
         let ids = idx.query("wire limit", 20).unwrap();
-        assert!(ids.contains(&"a".to_string()) && ids.contains(&"b".to_string()), "{ids:?}");
-        assert!(!ids.contains(&"c".to_string()), "AND excludes the unrelated note: {ids:?}");
+        assert!(
+            ids.contains(&"a".to_string()) && ids.contains(&"b".to_string()),
+            "{ids:?}"
+        );
+        assert!(
+            !ids.contains(&"c".to_string()),
+            "AND excludes the unrelated note: {ids:?}"
+        );
 
         // prefix / as-you-type: "groc" finds "Groceries" without a full token
         assert!(idx.query("groc", 20).unwrap().contains(&"c".to_string()));
         // fuzzy: a distance-1 typo on the trailing token still surfaces the note
-        assert!(idx.query("sourdogh", 20).unwrap().contains(&"c".to_string()));
+        assert!(idx
+            .query("sourdogh", 20)
+            .unwrap()
+            .contains(&"c".to_string()));
         // phrase: adjacency required
-        assert!(idx.query("\"olive oil\"", 20).unwrap().contains(&"c".to_string()));
-        assert!(idx.query("\"oil olive\"", 20).unwrap().is_empty(), "wrong order, no phrase hit");
+        assert!(idx
+            .query("\"olive oil\"", 20)
+            .unwrap()
+            .contains(&"c".to_string()));
+        assert!(
+            idx.query("\"oil olive\"", 20).unwrap().is_empty(),
+            "wrong order, no phrase hit"
+        );
         // blank query is empty, never everything
         assert!(idx.query("   ", 20).unwrap().is_empty());
     }
@@ -424,9 +465,18 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(idx.query("config", 20).unwrap().contains(&"a".to_string()), "config → reconfigure");
-        assert!(idx.query("auth", 20).unwrap().contains(&"b".to_string()), "auth → reauthenticate");
-        assert!(idx.query("print", 20).unwrap().contains(&"c".to_string()), "print → footprint");
+        assert!(
+            idx.query("config", 20).unwrap().contains(&"a".to_string()),
+            "config → reconfigure"
+        );
+        assert!(
+            idx.query("auth", 20).unwrap().contains(&"b".to_string()),
+            "auth → reauthenticate"
+        );
+        assert!(
+            idx.query("print", 20).unwrap().contains(&"c".to_string()),
+            "print → footprint"
+        );
         // infix is targeted, not a blanket match — the unrelated note stays out
         assert!(!idx.query("config", 20).unwrap().contains(&"d".to_string()));
     }
@@ -437,22 +487,33 @@ mod tests {
     fn incremental_add_change_delete() {
         let tmp = TempDir::new().unwrap();
         let mut idx = SearchIndex::open_or_create(&tmp.path().join("s")).unwrap();
-        idx.sync(1, &[doc("a", "Alpha", "kelpie fragment", false)]).unwrap();
+        idx.sync(1, &[doc("a", "Alpha", "kelpie fragment", false)])
+            .unwrap();
         assert!(idx.query("kelpie", 10).unwrap().contains(&"a".to_string()));
 
         // edit "a" and add "b" at a new generation
         idx.sync(
             2,
-            &[doc("a", "Alpha", "selkie fragment", false), doc("b", "Beta", "brand new note", false)],
+            &[
+                doc("a", "Alpha", "selkie fragment", false),
+                doc("b", "Beta", "brand new note", false),
+            ],
         )
         .unwrap();
-        assert!(idx.query("kelpie", 10).unwrap().is_empty(), "old term gone after the edit");
+        assert!(
+            idx.query("kelpie", 10).unwrap().is_empty(),
+            "old term gone after the edit"
+        );
         assert!(idx.query("selkie", 10).unwrap().contains(&"a".to_string()));
         assert!(idx.query("brand", 10).unwrap().contains(&"b".to_string()));
 
         // drop "b" at another generation
-        idx.sync(3, &[doc("a", "Alpha", "selkie fragment", false)]).unwrap();
-        assert!(idx.query("brand", 10).unwrap().is_empty(), "deleted doc no longer indexed");
+        idx.sync(3, &[doc("a", "Alpha", "selkie fragment", false)])
+            .unwrap();
+        assert!(
+            idx.query("brand", 10).unwrap().is_empty(),
+            "deleted doc no longer indexed"
+        );
         assert!(idx.query("selkie", 10).unwrap().contains(&"a".to_string()));
     }
 
@@ -466,7 +527,10 @@ mod tests {
         assert_eq!(idx.synced_generation(), Some(5));
         // same generation, empty docs — MUST be ignored (would otherwise delete "a")
         idx.sync(5, &[]).unwrap();
-        assert!(idx.query("kelpie", 10).unwrap().contains(&"a".to_string()), "no-op held the doc");
+        assert!(
+            idx.query("kelpie", 10).unwrap().contains(&"a".to_string()),
+            "no-op held the doc"
+        );
     }
 
     /// Reopen resumes incrementally (hashes reloaded from the persisted index), and
@@ -477,7 +541,8 @@ mod tests {
         let dir = tmp.path().join("s");
         {
             let mut idx = SearchIndex::open_or_create(&dir).unwrap();
-            idx.sync(1, &[doc("a", "Alpha", "kelpie fragment", false)]).unwrap();
+            idx.sync(1, &[doc("a", "Alpha", "kelpie fragment", false)])
+                .unwrap();
         }
         // reopen: the persisted segment answers immediately, no re-sync needed
         let idx = SearchIndex::open_or_create(&dir).unwrap();
@@ -487,10 +552,14 @@ mod tests {
         // a stamp this binary does not recognize ⇒ wipe + rebuild, never a crash
         fs::write(dir.join(META_FILE), r#"{"schemaVersion":99999}"#).unwrap();
         let idx = SearchIndex::open_or_create(&dir).unwrap();
-        assert!(idx.query("kelpie", 10).unwrap().is_empty(), "mismatch wiped the stale index");
+        assert!(
+            idx.query("kelpie", 10).unwrap().is_empty(),
+            "mismatch wiped the stale index"
+        );
         // and it is immediately usable again (rebuildable)
         let mut idx = idx;
-        idx.sync(1, &[doc("z", "Zed", "new after rebuild", false)]).unwrap();
+        idx.sync(1, &[doc("z", "Zed", "new after rebuild", false)])
+            .unwrap();
         assert!(idx.query("rebuild", 10).unwrap().contains(&"z".to_string()));
     }
 
@@ -506,15 +575,20 @@ mod tests {
         }
         fs::remove_dir_all(&dir).unwrap();
         let idx = SearchIndex::open_or_create(&dir).expect("recreate, not error");
-        assert!(idx.query("kelpie", 10).unwrap().is_empty(), "gone with the wiped dir");
+        assert!(
+            idx.query("kelpie", 10).unwrap().is_empty(),
+            "gone with the wiped dir"
+        );
     }
 
     /// Rebuild-from-scratch parity: two indexes fed the same docs answer the same
     /// query with the same id set, whatever order the docs arrived in.
     #[test]
     fn rebuild_from_scratch_is_deterministic() {
-        let corpus =
-            [doc("a", "One", "the wire limit rose", false), doc("b", "Two", "wire and limit", false)];
+        let corpus = [
+            doc("a", "One", "the wire limit rose", false),
+            doc("b", "Two", "wire and limit", false),
+        ];
         let query = "wire limit";
 
         let t1 = TempDir::new().unwrap();
@@ -550,8 +624,20 @@ mod bench {
     fn latency_index_vs_substring_scan() {
         const N: usize = 5000;
         let words = [
-            "wire", "limit", "meeting", "finance", "kelpie", "settlement", "quarterly",
-            "invoice", "runtime", "preferences", "olive", "sourdough", "ashgrove", "budget",
+            "wire",
+            "limit",
+            "meeting",
+            "finance",
+            "kelpie",
+            "settlement",
+            "quarterly",
+            "invoice",
+            "runtime",
+            "preferences",
+            "olive",
+            "sourdough",
+            "ashgrove",
+            "budget",
         ];
         let docs: Vec<IndexDoc> = (0..N)
             .map(|i| {
@@ -577,7 +663,13 @@ mod bench {
         idx.sync(1, &docs).unwrap();
         let build = t.elapsed();
 
-        let queries = ["wire limit", "kelpie", "quarterly settlement", "runtime", "budget invoice"];
+        let queries = [
+            "wire limit",
+            "kelpie",
+            "quarterly settlement",
+            "runtime",
+            "budget invoice",
+        ];
         let rounds = 40;
 
         // INDEX path
@@ -606,11 +698,23 @@ mod bench {
         }
         let sub_total = t.elapsed();
 
-        let per = |d: std::time::Duration| d.as_secs_f64() * 1000.0 / (rounds * queries.len()) as f64;
+        let per =
+            |d: std::time::Duration| d.as_secs_f64() * 1000.0 / (rounds * queries.len()) as f64;
         println!("\n=== corpus_search latency @ {N} notes ===");
         println!("index build (full):   {:?}", build);
-        println!("index   per query:    {:.3} ms  ({} hits)", per(index_total), hits_idx);
-        println!("substr  per query:    {:.3} ms  ({} hits)", per(sub_total), hits_sub);
-        println!("speedup:              {:.1}x", per(sub_total) / per(index_total).max(1e-9));
+        println!(
+            "index   per query:    {:.3} ms  ({} hits)",
+            per(index_total),
+            hits_idx
+        );
+        println!(
+            "substr  per query:    {:.3} ms  ({} hits)",
+            per(sub_total),
+            hits_sub
+        );
+        println!(
+            "speedup:              {:.1}x",
+            per(sub_total) / per(index_total).max(1e-9)
+        );
     }
 }

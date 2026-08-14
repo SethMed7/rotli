@@ -38,14 +38,16 @@ import {
   setGlobalShortcut,
   setHideOnBlur,
 } from "../lib/tauri";
-import { listChats, loadConfig } from "../memex/service";
+import { activeInstance } from "../memex/config";
+import { archiveChat, listChats, loadConfig } from "../memex/service";
 import { DEFAULT_NEW_ITEM_KIND, NEW_ITEM_KINDS, type NewItemKind } from "../newItems/model";
-import { mainFolderIds } from "../services/mainTree";
+import { mainFolderIds, mainNoteIds, removeFromMain } from "../services/mainTree";
 import { inboxFolderId, notesService } from "../services/notes";
+import { isRetentionEligible, parseRetentionDays } from "../services/retentionPolicy";
 import type { PaneNode, Tab } from "../types";
 import { DEFAULT_VOICE, VOICES } from "../voice/speech";
 import { hydrateMain, useMainStore } from "./main";
-import { MRU_CAP, useMruStore } from "./mru";
+import { MRU_CAP, touchItemActivity, touchMru, useMruStore } from "./mru";
 import {
   DEFAULT_NOTE_STYLE,
   MAX_TEXT_SIZE,
@@ -61,6 +63,14 @@ import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
 import {
   ALL_NOTES,
   type BreveView,
+  CHAT_ARTIFACT_OPENS,
+  CHAT_NAMINGS,
+  CHAT_WELCOME_STYLES,
+  type ChatArtifactOpen,
+  type ChatNaming,
+  type ChatReasoningEffort,
+  type ChatServiceTier,
+  type ChatWelcomeStyle,
   clampSidebarWidth,
   clampSidebarZoom,
   HOTKEY_PEEKS,
@@ -74,13 +84,17 @@ import {
   RECENT,
   RESERVED_DESTS,
   SEC_SYSTEM,
+  TAB_LAYOUTS,
+  TIME_FORMATS,
+  type TimeFormat,
+  type TabLayout,
   type SidebarView,
   type ThemeFamily,
   type ThemeSetting,
   type SyntaxPalette,
   useUiStore,
 } from "./ui";
-import { ACCENT_COLORS, type AccentColor } from "./ui";
+import { ACCENT_COLORS, DEFAULT_ACCENT_HUE, type AccentColor } from "./ui";
 import { useVaultStore } from "./vault";
 import { hydrateViews, useViewsStore } from "./views";
 
@@ -187,10 +201,13 @@ interface PersistedSettings {
   matchDarkFamily: ThemeFamily;
   syntaxPalette: SyntaxPalette;
   accentColor: AccentColor;
+  accentHue: number;
   stayOpen: boolean;
   showInDock: boolean;
   /** What the generic New tab command creates. Markdown remains the safe default. */
   newTabDefault: NewItemKind;
+  /** Crowded pane tabs either scroll at a readable floor or shrink to fit. */
+  tabLayout: TabLayout;
   /** Editor spell-check (red squiggles); on by default. */
   spellcheck: boolean;
   /** Images follow their note into Archive/Trash (sole references only). */
@@ -205,6 +222,12 @@ interface PersistedSettings {
   blockHandles2: boolean;
   /** The user's name (onboarding / Settings → General); "" = unset. */
   userName: string;
+  /** App-global message clock display. */
+  timeFormat: TimeFormat;
+  /** Null means disabled. These remain vault-scoped because their effects are
+   * limited to the active vault's projection and chat lifecycle lane. */
+  mainAutoRemoveDays: number | null;
+  chatAutoArchiveDays: number | null;
   /** The model a NEW chat starts on — the last one picked anywhere (id from
    * ~/.memex/ai or a connected lane); null = the model store's default. */
   chatModelId: string | null;
@@ -213,8 +236,10 @@ interface PersistedSettings {
    * chatModelId, which newer builds keep writing — so a downgrade lands on the
    * last model picked, exactly the pre-per-chat behavior. */
   chatModel: Record<string, string>;
+  chatReasoning: Record<string, ChatReasoningEffort>;
+  chatServiceTier: Record<string, ChatServiceTier>;
   /** Per-chat web-search toggle (the composer globe), keyed by chat slug. The
-   * session-scoped unsaved-chat keys ("unsaved:<paneId>", and the legacy "" key)
+   * session-scoped unsaved-chat keys ("unsaved:<tabId>", and the legacy "" key)
    * never persist — a stored one flipped the silent-egress default for every
    * future fresh chat (#7, audit 2026-07). */
   chatWeb: Record<string, boolean>;
@@ -222,6 +247,12 @@ interface PersistedSettings {
   chatMeasure: Record<string, Measure>;
   /** Where a chat's attached note opens: a new tab (default) or a right split. */
   chatNoteOpen: "tab" | "split";
+  /** Fresh-chat personality: quiet, or time-aware with restrained color. */
+  chatWelcomeStyle: ChatWelcomeStyle;
+  /** Ask in the chat header, or derive the title from the first message. */
+  chatNaming: ChatNaming;
+  /** Where chat-created files and boards open. */
+  chatArtifactOpen: ChatArtifactOpen;
   /** What holding ⌘ reveals: inline badges (default), the grouped panel, or off. */
   hotkeyPeek: HotkeyPeek;
   /** Read replies aloud + the chosen voice (voice tier 0 — no mic, no entitlement). */
@@ -270,6 +301,8 @@ interface PersistedSettings {
   onboarded: boolean;
   /** The app version onboarding last completed at (the onboardingVersion gate). */
   onboardingVersion: string;
+  /** First-run checkpoint that survives a vault-selection relaunch. */
+  onboardingPhase: "preferences" | "vault" | "models";
   /** The Quick Note window's capped set, remembered note, and new-note folder
    * (Seth, 2026-06-15). */
   quickNoteIds: string[];
@@ -320,13 +353,19 @@ const APP_SETTINGS_KEYS = new Set([
   "matchDarkFamily",
   "syntaxPalette",
   "accentColor",
+  "accentHue",
   "stayOpen",
   "showInDock",
+  "tabLayout",
   "userName",
+  "timeFormat",
+  "chatWelcomeStyle",
+  "chatNaming",
   "hotkeyPeek",
   "appIcon",
   "onboarded",
   "onboardingVersion",
+  "onboardingPhase",
   "bindings",
 ]);
 
@@ -360,7 +399,10 @@ export function parseSettings(raw: string): PersistedSettings {
       typeof s.size === "number" && Number.isFinite(s.size)
         ? Math.min(MAX_TEXT_SIZE, Math.max(MIN_TEXT_SIZE, s.size))
         : DEFAULT_NOTE_STYLE.size;
-    noteStyles[id] = { size, measure: asEnum(s.measure, MEASURES, DEFAULT_NOTE_STYLE.measure) };
+    noteStyles[id] = {
+      size,
+      measure: asEnum(s.measure, MEASURES, DEFAULT_NOTE_STYLE.measure),
+    };
   }
   // table column widths + row heights — only arrays of finite positive numbers
   const tableWidths: Record<string, number[]> = {};
@@ -425,14 +467,25 @@ export function parseSettings(raw: string): PersistedSettings {
     matchDarkFamily: asEnum(data.matchDarkFamily, THEME_FAMILIES, "warm"),
     syntaxPalette: asEnum(data.syntaxPalette, SYNTAX_PALETTES, "rotli"),
     accentColor: asEnum(data.accentColor, ACCENT_COLORS, "default"),
+    accentHue:
+      typeof data.accentHue === "number" &&
+      Number.isFinite(data.accentHue) &&
+      data.accentHue >= 0 &&
+      data.accentHue <= 359
+        ? Math.round(data.accentHue)
+        : DEFAULT_ACCENT_HUE,
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
     newTabDefault: asEnum(data.newTabDefault, NEW_ITEM_KINDS, DEFAULT_NEW_ITEM_KIND),
+    tabLayout: asEnum(data.tabLayout, TAB_LAYOUTS, "scroll"),
     spellcheck: asBool(data.spellcheck, true),
     tidyImagesWithNote: asBool(data.tidyImagesWithNote, true),
     rawEditor: asBool(data.rawEditor, false),
     blockHandles2: asBool(data.blockHandles2, true),
     userName: typeof data.userName === "string" ? data.userName : "",
+    timeFormat: asEnum(data.timeFormat, TIME_FORMATS, "12"),
+    mainAutoRemoveDays: parseRetentionDays(data.mainAutoRemoveDays),
+    chatAutoArchiveDays: parseRetentionDays(data.chatAutoArchiveDays),
     chatModelId: typeof data.chatModelId === "string" ? data.chatModelId : null,
     chatModel: (() => {
       // ids are opaque strings (a model registry entry or a preset id) — shape
@@ -440,6 +493,22 @@ export function parseSettings(raw: string): PersistedSettings {
       const out: Record<string, string> = {};
       for (const [k, v] of Object.entries(record(data.chatModel))) {
         if (typeof v === "string" && v !== "") out[k] = v;
+      }
+      return persistableChatMap(out);
+    })(),
+    chatReasoning: (() => {
+      const out: Record<string, ChatReasoningEffort> = {};
+      for (const [k, v] of Object.entries(record(data.chatReasoning))) {
+        if (["minimal", "low", "medium", "high", "xhigh", "max"].includes(String(v))) {
+          out[k] = v as ChatReasoningEffort;
+        }
+      }
+      return persistableChatMap(out);
+    })(),
+    chatServiceTier: (() => {
+      const out: Record<string, ChatServiceTier> = {};
+      for (const [k, v] of Object.entries(record(data.chatServiceTier))) {
+        if (v === "standard" || v === "fast") out[k] = v;
       }
       return persistableChatMap(out);
     })(),
@@ -463,6 +532,9 @@ export function parseSettings(raw: string): PersistedSettings {
       return persistableChatMap(out);
     })(),
     chatNoteOpen: data.chatNoteOpen === "split" ? "split" : "tab",
+    chatWelcomeStyle: asEnum(data.chatWelcomeStyle, CHAT_WELCOME_STYLES, "lively"),
+    chatNaming: asEnum(data.chatNaming, CHAT_NAMINGS, "ask"),
+    chatArtifactOpen: asEnum(data.chatArtifactOpen, CHAT_ARTIFACT_OPENS, "sidecar"),
     // an unknown/absent value reads as the default rather than disabling the
     // peek — a typo in the file must never silently remove a discoverability aid
     hotkeyPeek: HOTKEY_PEEKS.includes(data.hotkeyPeek as HotkeyPeek)
@@ -528,6 +600,10 @@ export function parseSettings(raw: string): PersistedSettings {
     // onboarding on existing users (same migration shape as expandedDests above)
     onboarded: typeof data.onboarded === "boolean" ? data.onboarded : Object.keys(data).length > 0,
     onboardingVersion: typeof data.onboardingVersion === "string" ? data.onboardingVersion : "",
+    onboardingPhase:
+      data.onboardingPhase === "vault" || data.onboardingPhase === "models"
+        ? data.onboardingPhase
+        : "preferences",
     quickNoteIds,
     captureOrder,
     quickActiveId,
@@ -542,12 +618,17 @@ export function parseSettings(raw: string): PersistedSettings {
     // Home is the safe default front — a fresh (or unknown) value opens on notes
     sidebarView: data.sidebarView === "chat" ? "chat" : "home",
     breveView:
-      data.breveView === "watchlist" || data.breveView === "routines" || data.breveView === "settings"
+      data.breveView === "dashboard" ||
+      data.breveView === "briefs" ||
+      data.breveView === "notifications" ||
+      data.breveView === "watchlist" ||
+      data.breveView === "routines" ||
+      data.breveView === "settings"
         ? data.breveView
         : // the retired Models/Configure views merged into Settings (2026-07-30)
           data.breveView === "models" || data.breveView === "configure"
           ? "settings"
-          : "briefs",
+          : "dashboard",
     expandedDests,
     bindings,
     noteStyles,
@@ -586,19 +667,29 @@ function applySettings(s: PersistedSettings): void {
     matchDarkFamily: s.matchDarkFamily,
     syntaxPalette: s.syntaxPalette,
     accentColor: s.accentColor,
+    accentHue: s.accentHue,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
     newTabDefault: s.newTabDefault,
+    tabLayout: s.tabLayout,
     spellcheck: s.spellcheck,
     tidyImagesWithNote: s.tidyImagesWithNote,
     rawEditor: s.rawEditor,
     blockHandles: s.blockHandles2,
     userName: s.userName,
+    timeFormat: s.timeFormat,
+    mainAutoRemoveDays: s.mainAutoRemoveDays,
+    chatAutoArchiveDays: s.chatAutoArchiveDays,
     chatModelId: s.chatModelId,
     chatModel: s.chatModel,
+    chatReasoning: s.chatReasoning,
+    chatServiceTier: s.chatServiceTier,
     chatWeb: s.chatWeb,
     chatMeasure: s.chatMeasure,
     chatNoteOpen: s.chatNoteOpen,
+    chatWelcomeStyle: s.chatWelcomeStyle,
+    chatNaming: s.chatNaming,
+    chatArtifactOpen: s.chatArtifactOpen,
     hotkeyPeek: s.hotkeyPeek,
     readAloud: s.readAloud,
     readAloudVoice: s.readAloudVoice,
@@ -619,6 +710,7 @@ function applySettings(s: PersistedSettings): void {
     librarianIntroSeen: s.librarianIntroSeen,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
+    onboardingPhase: s.onboardingPhase,
     quickNoteIds: s.quickNoteIds,
     captureOrder: s.captureOrder,
     quickActiveId: s.quickActiveId,
@@ -635,7 +727,10 @@ function applySettings(s: PersistedSettings): void {
   });
   useBindingsStore.setState({ overrides: s.bindings });
   useNoteStyleStore.setState({ styles: s.noteStyles });
-  useTableWidthsStore.setState({ widths: s.tableWidths, heights: s.tableHeights });
+  useTableWidthsStore.setState({
+    widths: s.tableWidths,
+    heights: s.tableHeights,
+  });
 }
 
 /** Installation preferences that remain meaningful before (and across) vaults.
@@ -648,13 +743,19 @@ function applyAppSettings(s: PersistedSettings): void {
     matchDarkFamily: s.matchDarkFamily,
     syntaxPalette: s.syntaxPalette,
     accentColor: s.accentColor,
+    accentHue: s.accentHue,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
+    tabLayout: s.tabLayout,
     userName: s.userName,
+    timeFormat: s.timeFormat,
+    chatWelcomeStyle: s.chatWelcomeStyle,
+    chatNaming: s.chatNaming,
     hotkeyPeek: s.hotkeyPeek,
     appIcon: s.appIcon,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
+    onboardingPhase: s.onboardingPhase,
   });
   useBindingsStore.setState({ overrides: s.bindings });
 }
@@ -668,13 +769,19 @@ function withAppSettings(vault: PersistedSettings, app: PersistedSettings): Pers
     matchDarkFamily: app.matchDarkFamily,
     syntaxPalette: app.syntaxPalette,
     accentColor: app.accentColor,
+    accentHue: app.accentHue,
     stayOpen: app.stayOpen,
     showInDock: app.showInDock,
+    tabLayout: app.tabLayout,
     userName: app.userName,
+    timeFormat: app.timeFormat,
+    chatWelcomeStyle: app.chatWelcomeStyle,
+    chatNaming: app.chatNaming,
     hotkeyPeek: app.hotkeyPeek,
     appIcon: app.appIcon,
     onboarded: app.onboarded,
     onboardingVersion: app.onboardingVersion,
+    onboardingPhase: app.onboardingPhase,
     bindings: app.bindings,
   };
 }
@@ -710,6 +817,8 @@ interface PersistedViewstate {
   selectedFolderId: string;
   activeView: string | null;
   mru: string[];
+  itemTouchedAt: Record<string, number>;
+  chatTouchedAt: Record<string, number>;
 }
 
 /** Revalidate ONE persisted tab against the live Tab union — every surfaceKind
@@ -782,7 +891,13 @@ function validPane(v: unknown, alive: Set<string>): PaneNode | null {
     if (!only) return null;
     if (children.length === 1) return only;
     const total = sizes.reduce((a, b) => a + b, 0) || 1;
-    return { kind: "split", id: o.id, dir: o.dir, children, sizes: sizes.map((x) => x / total) };
+    return {
+      kind: "split",
+      id: o.id,
+      dir: o.dir,
+      children,
+      sizes: sizes.map((x) => x / total),
+    };
   }
   return null;
 }
@@ -853,6 +968,29 @@ async function hydrateViewstate(): Promise<void> {
       .slice(0, MRU_CAP);
     if (ids.length > 0) useMruStore.setState({ ids });
   }
+  const finiteTouches = (value: unknown, keep?: (key: string) => boolean): Record<string, number> =>
+    Object.fromEntries(
+      Object.entries(record(value))
+        .filter(
+          ([key, at]) => (!keep || keep(key)) && typeof at === "number" && Number.isFinite(at) && at > 0,
+        )
+        .sort((a, b) => Number(b[1]) - Number(a[1]))
+        .slice(0, 4096)
+        .map(([key, at]) => [key, at as number]),
+    ) as Record<string, number>;
+  useMruStore.setState({
+    itemTouchedAt: finiteTouches(data.itemTouchedAt, (id) => alive.has(id)),
+    chatTouchedAt: finiteTouches(data.chatTouchedAt),
+  });
+  // Every active tab is visible immediately after hydration, so it counts as
+  // viewed before the user clicks it. Chat surfaces add a vault-qualified touch
+  // when they mount and know their owning instance.
+  for (const leaf of leaves(usePanesStore.getState().root)) {
+    const active = leaf.tabs.find((tab) => tab.id === leaf.activeTabId);
+    if (active?.surfaceKind === "note") touchMru(active.noteId);
+    else if (active?.surfaceKind === "canvas") touchItemActivity(active.boardId);
+    else if (active?.surfaceKind === "file") touchItemActivity(active.fileId);
+  }
 }
 
 // ─── persisted-map GC (#78, audit 2026-07) ──────────────────────────────────
@@ -883,6 +1021,110 @@ let mainMapsReady = false;
 export async function runDeferredMaintenance(): Promise<void> {
   if (!mainMapsReady) return;
   await gcPersistedMaps();
+  await runAutoRetentionMaintenance();
+}
+
+/** Apply the two opt-in inactivity policies. Main is a reference projection,
+ * so cleanup only unlinks refs. Chats use the existing recoverable archive
+ * operation. A failed listing or invalid timestamp selects nothing. */
+let retentionMaintenanceInFlight: Promise<void> | null = null;
+
+export function runAutoRetentionMaintenance(now = Date.now()): Promise<void> {
+  if (retentionMaintenanceInFlight) return retentionMaintenanceInFlight;
+  const current = performAutoRetentionMaintenance(now);
+  retentionMaintenanceInFlight = current;
+  void current.then(
+    () => {
+      if (retentionMaintenanceInFlight === current) retentionMaintenanceInFlight = null;
+    },
+    () => {
+      if (retentionMaintenanceInFlight === current) retentionMaintenanceInFlight = null;
+    },
+  );
+  return current;
+}
+
+async function performAutoRetentionMaintenance(now: number): Promise<void> {
+  if (!mainMapsReady || !isTauri()) return;
+  const ui = useUiStore.getState();
+  if (ui.mainAutoRemoveDays === null && ui.chatAutoArchiveDays === null) return;
+
+  const openItems = new Set<string>();
+  const openChatSlugs = new Set<string>();
+  for (const leaf of leaves(usePanesStore.getState().root)) {
+    for (const tab of leaf.tabs) {
+      if (tab.surfaceKind === "note") openItems.add(tab.noteId);
+      else if (tab.surfaceKind === "canvas") openItems.add(tab.boardId);
+      else if (tab.surfaceKind === "file") openItems.add(tab.fileId);
+      else if (tab.surfaceKind === "chat" && tab.chatSlug) openChatSlugs.add(tab.chatSlug);
+    }
+  }
+
+  if (ui.mainAutoRemoveDays !== null) {
+    try {
+      const summaries = new Map((await notesService.listAll()).map((note) => [note.id, note]));
+      const main = useMainStore.getState();
+      let tree = main.manifest.tree;
+      for (const id of mainNoteIds(tree)) {
+        const note = summaries.get(id);
+        if (
+          note &&
+          isRetentionEligible(
+            {
+              updatedAt: note.updatedAt,
+              ...(useMruStore.getState().itemTouchedAt[id] !== undefined
+                ? { viewedAt: useMruStore.getState().itemTouchedAt[id] }
+                : {}),
+              pinned: note.pinned,
+              open: openItems.has(id),
+            },
+            ui.mainAutoRemoveDays,
+            now,
+          )
+        ) {
+          tree = removeFromMain(tree, id);
+        }
+      }
+      if (tree !== main.manifest.tree) main.setTree(tree);
+    } catch {
+      // A failed corpus listing means "unknown", never "safe to unlink".
+    }
+  }
+
+  if (ui.chatAutoArchiveDays !== null) {
+    try {
+      const instance = activeInstance(await loadConfig());
+      if (!instance) return;
+      const chats = await listChats(instance);
+      for (const chat of chats) {
+        if (
+          isRetentionEligible(
+            {
+              updatedAt: chat.modifiedMs,
+              ...(useMruStore.getState().chatTouchedAt[`${instance.id}:${chat.slug}`] !== undefined
+                ? {
+                    viewedAt: useMruStore.getState().chatTouchedAt[`${instance.id}:${chat.slug}`],
+                  }
+                : {}),
+              pinned: chat.pinned,
+              open: openChatSlugs.has(chat.slug),
+            },
+            ui.chatAutoArchiveDays,
+            now,
+          )
+        ) {
+          try {
+            await archiveChat(instance, chat.slug);
+          } catch {
+            // A per-chat refusal (including read-only policy) cannot turn into
+            // a broader operation. Continue with the independently eligible set.
+          }
+        }
+      }
+    } catch {
+      // Unreadable config or chat listing fails closed.
+    }
+  }
 }
 
 async function gcPersistedMaps(): Promise<void> {
@@ -918,6 +1160,10 @@ async function gcPersistedMaps(): Promise<void> {
       if (keptMeasure !== ui.chatMeasure) useUiStore.setState({ chatMeasure: keptMeasure });
       const keptModel = pruneMap(rescopeChatMapKeys(ui.chatModel, owners), liveKey);
       if (keptModel !== ui.chatModel) useUiStore.setState({ chatModel: keptModel });
+      const keptReasoning = pruneMap(rescopeChatMapKeys(ui.chatReasoning, owners), liveKey);
+      if (keptReasoning !== ui.chatReasoning) useUiStore.setState({ chatReasoning: keptReasoning });
+      const keptTier = pruneMap(rescopeChatMapKeys(ui.chatServiceTier, owners), liveKey);
+      if (keptTier !== ui.chatServiceTier) useUiStore.setState({ chatServiceTier: keptTier });
     }
   } catch {
     // an unreadable chats/ anywhere — keep everything
@@ -963,7 +1209,7 @@ function prePaint(): void {
     dark: s.matchDarkFamily,
   });
   applySyntaxPalette(s.syntaxPalette);
-  applyAccent(s.accentColor);
+  applyAccent(s.accentColor, s.accentHue);
 }
 
 // ─── hydrate (awaited by main.tsx before the first render) ───────────────────
@@ -1031,6 +1277,7 @@ export async function hydratePersistedState(): Promise<void> {
       matchDarkFamily: "mono",
       syntaxPalette: "rotli",
       accentColor: "default",
+      accentHue: DEFAULT_ACCENT_HUE,
       stayOpen: false,
       showInDock: false,
     });
@@ -1061,13 +1308,19 @@ function appSettingsSnapshot(): string {
     matchDarkFamily: ui.matchDarkFamily,
     syntaxPalette: ui.syntaxPalette,
     accentColor: ui.accentColor,
+    accentHue: ui.accentHue,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
+    tabLayout: ui.tabLayout,
     userName: ui.userName,
+    timeFormat: ui.timeFormat,
+    chatWelcomeStyle: ui.chatWelcomeStyle,
+    chatNaming: ui.chatNaming,
     hotkeyPeek: ui.hotkeyPeek,
     appIcon: ui.appIcon,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
+    onboardingPhase: ui.onboardingPhase,
     bindings: useBindingsStore.getState().overrides,
   });
 }
@@ -1082,19 +1335,29 @@ function settingsSnapshot(): string {
     matchDarkFamily: ui.matchDarkFamily,
     syntaxPalette: ui.syntaxPalette,
     accentColor: ui.accentColor,
+    accentHue: ui.accentHue,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
     newTabDefault: ui.newTabDefault,
+    tabLayout: ui.tabLayout,
     spellcheck: ui.spellcheck,
     tidyImagesWithNote: ui.tidyImagesWithNote,
     rawEditor: ui.rawEditor,
     blockHandles2: ui.blockHandles,
     userName: ui.userName,
+    timeFormat: ui.timeFormat,
+    mainAutoRemoveDays: ui.mainAutoRemoveDays,
+    chatAutoArchiveDays: ui.chatAutoArchiveDays,
     chatModelId: ui.chatModelId,
     chatModel: persistableChatMap(ui.chatModel),
+    chatReasoning: persistableChatMap(ui.chatReasoning),
+    chatServiceTier: persistableChatMap(ui.chatServiceTier),
     chatWeb: persistableChatMap(ui.chatWeb),
     chatMeasure: persistableChatMap(ui.chatMeasure),
     chatNoteOpen: ui.chatNoteOpen,
+    chatWelcomeStyle: ui.chatWelcomeStyle,
+    chatNaming: ui.chatNaming,
+    chatArtifactOpen: ui.chatArtifactOpen,
     hotkeyPeek: ui.hotkeyPeek,
     readAloud: ui.readAloud,
     readAloudVoice: ui.readAloudVoice,
@@ -1115,6 +1378,7 @@ function settingsSnapshot(): string {
     librarianIntroSeen: ui.librarianIntroSeen,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
+    onboardingPhase: ui.onboardingPhase,
     quickNoteIds: ui.quickNoteIds,
     captureOrder: ui.captureOrder,
     quickActiveId: ui.quickActiveId,
@@ -1146,6 +1410,8 @@ function viewstateSnapshot(): string {
     selectedFolderId: useUiStore.getState().selectedFolderId,
     activeView: useUiStore.getState().activeView,
     mru: useMruStore.getState().ids,
+    itemTouchedAt: useMruStore.getState().itemTouchedAt,
+    chatTouchedAt: useMruStore.getState().chatTouchedAt,
   };
   return JSON.stringify(snapshot);
 }
@@ -1245,10 +1511,10 @@ export function attachPersistence(): () => void {
     useMruStore.subscribe(schedule),
   ];
   const onVisibility = (): void => {
-    if (document.hidden) void flush();
+    if (document.hidden) void flush().catch(() => {});
   };
   const onPageHide = (): void => {
-    void flush();
+    void flush().catch(() => {});
   };
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("pagehide", onPageHide);
@@ -1258,7 +1524,7 @@ export function attachPersistence(): () => void {
   onQuitFlush(flush);
 
   return () => {
-    void flush();
+    void flush().catch(() => {});
     for (const unsub of unsubs) unsub();
     document.removeEventListener("visibilitychange", onVisibility);
     window.removeEventListener("pagehide", onPageHide);

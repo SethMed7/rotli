@@ -18,11 +18,12 @@ without weakening the file or privacy boundary.
 
 ## Product Purpose
 
-Rotli is a calm, local-first workspace over one user-owned memex. It makes
+Rotli is a calm, local-first workspace over one user-owned vault. It makes
 Markdown notes and conventional editable work surfaces immediately useful,
-keeps capture friction low, and lets on-device organization improve retrieval
-without turning projections, AI state, or application metadata into a second
-source of truth.
+keeps capture friction low, and lets people choose whether the on-device
+Librarian adds organization metadata that improves retrieval and chat context.
+Rotli's layer never turns projections, AI state, or application metadata into a
+second source of truth.
 
 ## Positioning
 

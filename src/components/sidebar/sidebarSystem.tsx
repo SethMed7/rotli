@@ -189,7 +189,7 @@ export function SidebarSystem({
             );
           })}
           {/* added external folders (Seth, 2026-06-27): folders you point rotli at
-              without moving them into the memex — browse + edit in place.
+              without moving them into your vault — browse + edit in place.
               Adding one moved to Location settings (2026-07-26). */}
           {addedRoots.length > 0 && <div className="fsec">Folders</div>}
           {addedRoots.map((r) => (

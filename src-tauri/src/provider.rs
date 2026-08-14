@@ -66,12 +66,20 @@ pub(crate) struct CliSpec {
 pub(crate) const CLIS: &[CliSpec] = &[
     CliSpec {
         id: "claude",
-        bins: &["~/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"],
+        bins: &[
+            "~/.local/bin/claude",
+            "/opt/homebrew/bin/claude",
+            "/usr/local/bin/claude",
+        ],
         models: &["sonnet", "opus", "haiku", "fable"],
     },
     CliSpec {
         id: "codex",
-        bins: &["/opt/homebrew/bin/codex", "~/.local/bin/codex", "/usr/local/bin/codex"],
+        bins: &[
+            "/opt/homebrew/bin/codex",
+            "~/.local/bin/codex",
+            "/usr/local/bin/codex",
+        ],
         models: &[
             "gpt-5.6-sol",
             "gpt-5.6-terra",
@@ -85,10 +93,7 @@ pub(crate) const CLIS: &[CliSpec] = &[
     CliSpec {
         id: "agy",
         bins: &["~/.local/bin/agy", "/opt/homebrew/bin/agy"],
-        models: &[
-            "Gemini 3.5 Flash (Medium)",
-            "Gemini 3.1 Pro (High)",
-        ],
+        models: &["Gemini 3.5 Flash (Medium)", "Gemini 3.1 Pro (High)"],
     },
 ];
 
@@ -137,9 +142,26 @@ fn build_args(
     timeout_secs: u64,
     imgs: Option<&ImageFiles>,
 ) -> Result<(Vec<String>, PromptVia), String> {
+    build_args_tuned(provider, model, prompt, timeout_secs, None, None, imgs)
+}
+
+/// The webview may request quality/cost controls, but the trusted native side
+/// owns the allowlists and translates them into provider-native argv. Unknown
+/// values fail closed before any process is started.
+fn build_args_tuned(
+    provider: &str,
+    model: &str,
+    prompt: &str,
+    timeout_secs: u64,
+    reasoning_effort: Option<&str>,
+    service_tier: Option<&str>,
+    imgs: Option<&ImageFiles>,
+) -> Result<(Vec<String>, PromptVia), String> {
     let s = spec(provider)?;
     if !s.models.contains(&model) {
-        return Err(format!("model \"{model}\" isn't in the {provider} allowlist"));
+        return Err(format!(
+            "model \"{model}\" isn't in the {provider} allowlist"
+        ));
     }
     let own = |xs: &[&str]| xs.iter().map(|x| x.to_string()).collect::<Vec<_>>();
     match provider {
@@ -149,9 +171,33 @@ fn build_args(
         // to the staged image dir — the narrowest allowlist that can open a PNG,
         // and it reverts to `--tools ""` the moment there is no attachment.
         "claude" => {
+            if let Some(tier) = service_tier {
+                return Err(format!("service tier \"{tier}\" isn't supported by claude"));
+            }
+            if let Some(effort) = reasoning_effort {
+                if !matches!(effort, "low" | "medium" | "high" | "xhigh" | "max") {
+                    return Err(format!(
+                        "reasoning effort \"{effort}\" isn't allowed for claude"
+                    ));
+                }
+            }
             let mut args = own(&["-p", "--tools"]);
-            args.push(if imgs.is_some() { "Read".into() } else { String::new() });
-            args.extend(own(&["--model", model, "--output-format", "json", "--no-session-persistence"]));
+            args.push(if imgs.is_some() {
+                "Read".into()
+            } else {
+                String::new()
+            });
+            args.extend(own(&[
+                "--model",
+                model,
+                "--output-format",
+                "json",
+                "--no-session-persistence",
+            ]));
+            if let Some(effort) = reasoning_effort {
+                args.push("--effort".into());
+                args.push(effort.into());
+            }
             if let Some(staged) = imgs {
                 args.push("--add-dir".into());
                 args.push(staged.dir.to_string_lossy().to_string());
@@ -163,27 +209,46 @@ fn build_args(
         // sandbox, shell tool off, JSONL out, no session litter (--ephemeral);
         // "-" = prompt from stdin. --cd pins it to a scratch dir OUTSIDE any repo.
         "codex" => {
+            if let Some(effort) = reasoning_effort {
+                if !matches!(effort, "minimal" | "low" | "medium" | "high" | "xhigh") {
+                    return Err(format!(
+                        "reasoning effort \"{effort}\" isn't allowed for codex"
+                    ));
+                }
+            }
+            if let Some(tier) = service_tier {
+                if !matches!(tier, "standard" | "fast") {
+                    return Err(format!("service tier \"{tier}\" isn't allowed for codex"));
+                }
+            }
             let scratch = codex_scratch_dir()?;
-            Ok((
-                vec![
-                    "exec".into(),
-                    "--json".into(),
-                    "--sandbox".into(),
-                    "read-only".into(),
-                    "--skip-git-repo-check".into(),
-                    "--ephemeral".into(),
-                    "--color".into(),
-                    "never".into(),
-                    "--cd".into(),
-                    scratch,
-                    "-c".into(),
-                    "features.shell_tool=false".into(),
-                    "--model".into(),
-                    model.into(),
-                ],
-                PromptVia::Stdin,
-            ))
-            .map(|(mut args, via): (Vec<String>, PromptVia)| {
+            let mut args = vec![
+                "exec".into(),
+                "--json".into(),
+                "--sandbox".into(),
+                "read-only".into(),
+                "--skip-git-repo-check".into(),
+                "--ephemeral".into(),
+                "--color".into(),
+                "never".into(),
+                "--cd".into(),
+                scratch,
+                "-c".into(),
+                "features.shell_tool=false".into(),
+                "--model".into(),
+                model.into(),
+            ];
+            if let Some(effort) = reasoning_effort {
+                args.push("-c".into());
+                args.push(format!("model_reasoning_effort=\"{effort}\""));
+            }
+            // `standard` means the account/configured default. Only Fast needs
+            // an override, keeping existing installations byte-for-byte stable.
+            if service_tier == Some("fast") {
+                args.push("-c".into());
+                args.push("service_tier=\"fast\"".into());
+            }
+            Ok((args, PromptVia::Stdin)).map(|(mut args, via): (Vec<String>, PromptVia)| {
                 // codex takes image FILES natively — no tool or permission
                 // concession needed at all. `-` (stdin) must stay last.
                 for path in imgs.map(|s| s.paths.as_slice()).unwrap_or(&[]) {
@@ -196,32 +261,40 @@ fn build_args(
         }
         // agy has no stdin lane — the prompt is the `-p` value. `--sandbox`
         // keeps it inert; `--print-timeout` mirrors our own deadline.
-        "agy" => Ok((
-            {
-                let mut args: Vec<String> =
-                    vec!["-p".into(), prompt.into(), "--model".into(), model.into()];
-                // agy auto-DENIES its own file read in headless mode, so seeing
-                // an attachment needs this flag. It is granted only for a turn
-                // that actually carries one, and cli_complete additionally wraps
-                // that turn in sandbox-exec pinned to the image dir — so "skip
-                // permissions" is contained by the OS, not merely trusted.
-                if imgs.is_some() {
-                    args.push("--dangerously-skip-permissions".into());
-                }
-                args.push("--sandbox".into());
-                args.push("--print-timeout".into());
-                args.push(format!("{}s", timeout_secs.max(30)));
-                args
-            },
-            PromptVia::Args,
-        )),
+        "agy" => {
+            if reasoning_effort.is_some() || service_tier.is_some() {
+                return Err(
+                    "Antigravity doesn't support Rotli reasoning or service-tier overrides".into(),
+                );
+            }
+            Ok((
+                {
+                    let mut args: Vec<String> =
+                        vec!["-p".into(), prompt.into(), "--model".into(), model.into()];
+                    // agy auto-DENIES its own file read in headless mode, so seeing
+                    // an attachment needs this flag. It is granted only for a turn
+                    // that actually carries one, and cli_complete additionally wraps
+                    // that turn in sandbox-exec pinned to the image dir — so "skip
+                    // permissions" is contained by the OS, not merely trusted.
+                    if imgs.is_some() {
+                        args.push("--dangerously-skip-permissions".into());
+                    }
+                    args.push("--sandbox".into());
+                    args.push("--print-timeout".into());
+                    args.push(format!("{}s", timeout_secs.max(30)));
+                    args
+                },
+                PromptVia::Args,
+            ))
+        }
         _ => Err(format!("unknown provider \"{provider}\"")),
     }
 }
 
 fn codex_scratch_dir() -> Result<String, String> {
     let dir = std::env::temp_dir().join("rotli-codex");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("couldn't create the codex scratch dir: {e}"))?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("couldn't create the codex scratch dir: {e}"))?;
     Ok(dir.to_string_lossy().to_string())
 }
 
@@ -233,10 +306,16 @@ fn codex_scratch_dir() -> Result<String, String> {
 /// can be steered out of the registered root.
 fn image_destination(root: &std::path::Path, slug: &str) -> Result<(PathBuf, String), String> {
     if slug.is_empty() {
-        return Ok((root.join("storage").join("images"), "storage/images".to_string()));
+        return Ok((
+            root.join("storage").join("images"),
+            "storage/images".to_string(),
+        ));
     }
     let slug = crate::memex::safe_slug(slug)?;
-    Ok((root.join("storage").join("chats").join(&slug), format!("storage/chats/{slug}")))
+    Ok((
+        root.join("storage").join("chats").join(&slug),
+        format!("storage/chats/{slug}"),
+    ))
 }
 
 /// agy has no `--cd`, so its chat spawns get an empty CWD the ordinary way —
@@ -244,7 +323,8 @@ fn image_destination(root: &std::path::Path, slug: &str) -> Result<(PathBuf, Str
 /// is nothing to see (the app's own cwd could be anywhere, including HOME).
 fn agy_scratch_dir() -> Result<String, String> {
     let dir = std::env::temp_dir().join("rotli-agy");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("couldn't create the agy scratch dir: {e}"))?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("couldn't create the agy scratch dir: {e}"))?;
     Ok(dir.to_string_lossy().to_string())
 }
 
@@ -269,18 +349,29 @@ fn write_image_files(images: &[String]) -> Result<Option<ImageFiles>, String> {
         return Ok(None);
     }
     use base64::Engine as _;
-    let dir = std::env::temp_dir().join(format!("rotli-img-{}", ulid::Ulid::new().to_string().to_lowercase()));
-    std::fs::create_dir_all(&dir).map_err(|e| format!("couldn't stage the attached images: {e}"))?;
+    let dir = std::env::temp_dir().join(format!(
+        "rotli-img-{}",
+        ulid::Ulid::new().to_string().to_lowercase()
+    ));
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("couldn't stage the attached images: {e}"))?;
     // own the dir from here on, so ANY early return below still cleans it up
-    let mut staged = ImageFiles { dir: dir.clone(), paths: Vec::new() };
+    let mut staged = ImageFiles {
+        dir: dir.clone(),
+        paths: Vec::new(),
+    };
     for (i, raw) in images.iter().enumerate() {
         // a data URL carries its own header — take what follows the comma
-        let payload = raw.split_once(',').map(|(_, rest)| rest).unwrap_or(raw.as_str());
+        let payload = raw
+            .split_once(',')
+            .map(|(_, rest)| rest)
+            .unwrap_or(raw.as_str());
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(payload.trim())
             .map_err(|_| "an attached image wasn't valid base64".to_string())?;
         let path = dir.join(format!("image-{}.png", i + 1));
-        std::fs::write(&path, &bytes).map_err(|e| format!("couldn't stage an attached image: {e}"))?;
+        std::fs::write(&path, &bytes)
+            .map_err(|e| format!("couldn't stage an attached image: {e}"))?;
         staged.paths.push(path.to_string_lossy().to_string());
     }
     Ok(Some(staged))
@@ -331,7 +422,11 @@ fn parse_claude_json(stdout: &str) -> Result<String, String> {
     let envelope = |v: &serde_json::Value| -> Option<Result<String, String>> {
         let result = v.get("result")?.as_str()?.trim().to_string();
         if v.get("is_error").and_then(|b| b.as_bool()) == Some(true) {
-            return Some(Err(if result.is_empty() { "claude returned an error".into() } else { result }));
+            return Some(Err(if result.is_empty() {
+                "claude returned an error".into()
+            } else {
+                result
+            }));
         }
         Some(Ok(result))
     };
@@ -380,7 +475,10 @@ fn parse_codex_jsonl(stdout: &str) -> Result<String, String> {
                 return Err(msg.to_string());
             }
             "error" => {
-                let msg = v.get("message").and_then(|s| s.as_str()).unwrap_or("codex error");
+                let msg = v
+                    .get("message")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("codex error");
                 return Err(msg.to_string());
             }
             _ => {}
@@ -397,8 +495,23 @@ fn parse_codex_jsonl(stdout: &str) -> Result<String, String> {
 fn parse_agy_text(stdout: &str, stderr: &str) -> Result<String, String> {
     let out = stdout.trim();
     if out.is_empty() {
-        let tail: String = stderr.lines().rev().take(3).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join(" · ");
-        Err(format!("agy returned nothing{}", if tail.is_empty() { String::new() } else { format!(" ({tail})") }))
+        let tail: String = stderr
+            .lines()
+            .rev()
+            .take(3)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join(" · ");
+        Err(format!(
+            "agy returned nothing{}",
+            if tail.is_empty() {
+                String::new()
+            } else {
+                format!(" ({tail})")
+            }
+        ))
     } else {
         Ok(out.to_string())
     }
@@ -416,10 +529,16 @@ fn run_registered(
     stdin_payload: Option<&str>,
     timeout: Duration,
 ) -> Result<(String, String, bool), String> {
-    cmd.stdin(if stdin_payload.is_some() { Stdio::piped() } else { Stdio::null() })
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd.spawn().map_err(|e| format!("couldn't launch the CLI: {e}"))?;
+    cmd.stdin(if stdin_payload.is_some() {
+        Stdio::piped()
+    } else {
+        Stdio::null()
+    })
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped());
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("couldn't launch the CLI: {e}"))?;
 
     if let Some(payload) = stdin_payload {
         if let Some(mut stdin) = child.stdin.take() {
@@ -492,9 +611,7 @@ pub const ORGANIZER_CLAUDE_MODEL: &str = "sonnet";
 /// kind of thing a backstop exists to catch (audit 2026-08-01, GAP 5).
 pub(crate) fn organizer_egress_allowed(prompt: &str) -> Result<(), String> {
     if crate::secret::blocked_for_remote(prompt) {
-        return Err(
-            "organizer prompt carries protected content — refusing the remote lane".into(),
-        );
+        return Err("organizer prompt carries protected content — refusing the remote lane".into());
     }
     Ok(())
 }
@@ -513,7 +630,13 @@ pub fn organizer_claude_complete(prompt: &str, timeout: Duration) -> Result<Stri
     organizer_egress_allowed(prompt)?;
     let bin = resolve_bin(spec("claude")?).ok_or("the claude CLI isn't installed")?;
     // the organizer lane never carries attachments — always the tightest posture
-    let (args, _via) = build_args("claude", ORGANIZER_CLAUDE_MODEL, prompt, timeout.as_secs(), None)?;
+    let (args, _via) = build_args(
+        "claude",
+        ORGANIZER_CLAUDE_MODEL,
+        prompt,
+        timeout.as_secs(),
+        None,
+    )?;
     let mut cmd = Command::new(&bin);
     cmd.args(&args);
     // a private, single-entry registry — the organizer has no shared children map
@@ -532,7 +655,11 @@ pub fn organizer_claude_complete(prompt: &str, timeout: Duration) -> Result<Stri
             .rev()
             .collect::<Vec<_>>()
             .join(" · ");
-        return Err(if tail.is_empty() { "claude produced no output".into() } else { tail });
+        return Err(if tail.is_empty() {
+            "claude produced no output".into()
+        } else {
+            tail
+        });
     }
     parsed
 }
@@ -550,7 +677,8 @@ pub fn organizer_gemini_complete(prompt: &str, timeout: Duration) -> Result<Stri
     let children: Arc<Mutex<HashMap<String, Running>>> = Arc::new(Mutex::new(HashMap::new()));
     let _gate = AGY_GATE.lock().unwrap();
     let payload = matches!(via, PromptVia::Stdin).then_some(prompt);
-    let (stdout, stderr, _ok) = run_registered(&children, "organizer-gemini", cmd, payload, timeout)?;
+    let (stdout, stderr, _ok) =
+        run_registered(&children, "organizer-gemini", cmd, payload, timeout)?;
     parse_agy_text(&stdout, &stderr)
 }
 
@@ -586,6 +714,9 @@ pub fn provider_chain(
 
 /// One tool-less completion step on a connected CLI. Blocking work rides
 /// `spawn_blocking` so `cli_cancel` can interleave on the IPC lane.
+// Keep the IPC parameters flat: Tauri derives the command contract from these
+// names, and wrapping them would be a breaking frontend/native API change.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn cli_complete(
     state: tauri::State<'_, ProviderState>,
@@ -594,6 +725,8 @@ pub async fn cli_complete(
     model: String,
     prompt: String,
     timeout_ms: Option<u64>,
+    reasoning_effort: Option<String>,
+    service_tier: Option<String>,
     // `images`: base64 payloads (raw or data: URL) the composer attached. Only
     // lanes with a NATIVE image flag carry them — see `image_args`.
     images: Option<Vec<String>>,
@@ -605,7 +738,8 @@ pub async fn cli_complete(
                 .into(),
         );
     }
-    let timeout = Duration::from_millis(timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS));
+    let timeout =
+        Duration::from_millis(timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS));
     let bin = resolve_bin(spec(&provider)?)
         .ok_or_else(|| format!("{provider} isn't installed (checked its usual homes)"))?;
     // staged for the whole turn; the temp dir is removed when this drops
@@ -618,7 +752,15 @@ pub async fn cli_complete(
         }
         _ => prompt,
     };
-    let (args, via) = build_args(&provider, &model, &prompt, timeout.as_secs(), staged.as_ref())?;
+    let (args, via) = build_args_tuned(
+        &provider,
+        &model,
+        &prompt,
+        timeout.as_secs(),
+        reasoning_effort.as_deref(),
+        service_tier.as_deref(),
+        staged.as_ref(),
+    )?;
     let has_images = staged.is_some();
 
     let children = Arc::clone(&state.children);
@@ -705,7 +847,10 @@ pub async fn cli_complete(
 
 /// Kill a live completion (the composer's stop). Unknown ids are a no-op.
 #[tauri::command]
-pub fn cli_cancel(state: tauri::State<'_, ProviderState>, request_id: String) -> Result<(), String> {
+pub fn cli_cancel(
+    state: tauri::State<'_, ProviderState>,
+    request_id: String,
+) -> Result<(), String> {
     if let Some(r) = state.children.lock().unwrap().get_mut(&request_id) {
         let _ = r.child.kill();
     }
@@ -783,13 +928,20 @@ mod image_sandbox_tests {
 
     #[test]
     fn profile_denies_home_and_allows_only_the_job_paths() {
-        let p = agy_sandbox_profile("/Users/x", "/Users/x/memex/storage/chats/s", "/Users/x/.local/bin");
+        let p = agy_sandbox_profile(
+            "/Users/x",
+            "/Users/x/memex/storage/chats/s",
+            "/Users/x/.local/bin",
+        );
         assert!(p.contains("(deny file-read* (subpath \"/Users/x\"))"));
         assert!(p.contains("(deny file-write* (subpath \"/Users/x\"))"));
         assert!(p.contains("(subpath \"/Users/x/memex/storage/chats/s\")"));
         assert!(p.contains("(subpath \"/Users/x/.gemini\")"));
         assert!(p.contains("(subpath \"/Users/x/.antigravity\")"));
-        assert!(p.contains("(subpath \"/Users/x/.local/bin\")"), "the CLI's own dir must stay readable");
+        assert!(
+            p.contains("(subpath \"/Users/x/.local/bin\")"),
+            "the CLI's own dir must stay readable"
+        );
         // the write-allow list must NOT include the Keychain (read-only there)
         let write_allow = p.split("(deny file-write*").nth(1).expect("write section");
         assert!(!write_allow.contains("Keychains"));
@@ -801,11 +953,16 @@ mod image_sandbox_tests {
         // broad Keychains read-allow, or a sandboxed engine holding a harvested
         // unlock password could read breve.keychain-db (audit 2026-07-29 #6).
         let p = agy_sandbox_profile("/Users/x", "/Users/x/m", "/Users/x/.local/bin");
-        let allow_at = p.find("(subpath \"/Users/x/Library/Keychains\")").expect("keychains allow");
+        let allow_at = p
+            .find("(subpath \"/Users/x/Library/Keychains\")")
+            .expect("keychains allow");
         let deny_at = p
             .find("(literal \"/Users/x/Library/Keychains/breve.keychain-db\")")
             .expect("breve keychain deny");
-        assert!(deny_at > allow_at, "the breve deny must follow the allow to win");
+        assert!(
+            deny_at > allow_at,
+            "the breve deny must follow the allow to win"
+        );
         assert!(p.contains("(literal \"/Users/x/Library/Keychains/breve.keychain\")"));
     }
 }
@@ -826,7 +983,10 @@ pub async fn generate_image(
     engine: String,
 ) -> Result<String, String> {
     if crate::secret::blocked_for_remote(&prompt) {
-        return Err("That prompt carries secret-shaped content — it won't be sent to an image engine.".into());
+        return Err(
+            "That prompt carries secret-shaped content — it won't be sent to an image engine."
+                .into(),
+        );
     }
     if engine != "codex" && engine != "agy" {
         return Err(format!("unknown image engine \"{engine}\""));
@@ -836,7 +996,8 @@ pub async fn generate_image(
     let bin = resolve_bin(spec(&engine)?)
         .ok_or_else(|| format!("{engine} isn't installed (checked its usual homes)"))?;
 
-    std::fs::create_dir_all(&dir).map_err(|e| format!("couldn't create the image assets dir: {e}"))?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("couldn't create the image assets dir: {e}"))?;
     let file = format!("img-{}.png", ulid::Ulid::new().to_string().to_lowercase());
     let abs = dir.join(&file);
     let abs_str = abs.to_string_lossy().to_string();
@@ -900,22 +1061,41 @@ pub async fn generate_image(
                 .filter(|p| !p.is_empty() && p != "/")
                 .unwrap_or_else(|| "/var/empty".into());
             let mut c = Command::new("/usr/bin/sandbox-exec");
-            c.arg("-p").arg(agy_sandbox_profile(&home, &dir_str, &bin_dir)).arg(&bin);
+            c.arg("-p")
+                .arg(agy_sandbox_profile(&home, &dir_str, &bin_dir))
+                .arg(&bin);
             c
         } else {
             Command::new(&bin)
         };
         cmd.args(&args);
-        let (_stdout, stderr, _ok) =
-            run_registered(&children, &request_id, cmd, payload.as_deref(), IMAGE_TIMEOUT)?;
+        let (_stdout, stderr, _ok) = run_registered(
+            &children,
+            &request_id,
+            cmd,
+            payload.as_deref(),
+            IMAGE_TIMEOUT,
+        )?;
         // the POSTCONDITION is the contract: the PNG exists and is non-empty
         let size = std::fs::metadata(&abs).map(|m| m.len()).unwrap_or(0);
         if size == 0 {
             let _ = std::fs::remove_file(&abs);
-            let tail: String = stderr.lines().rev().take(3).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join(" · ");
+            let tail: String = stderr
+                .lines()
+                .rev()
+                .take(3)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join(" · ");
             return Err(format!(
                 "the {engine} engine didn't produce the image{}",
-                if tail.is_empty() { String::new() } else { format!(" — {tail}") }
+                if tail.is_empty() {
+                    String::new()
+                } else {
+                    format!(" — {tail}")
+                }
             ));
         }
         Ok(format!("{rel_prefix}/{file}"))
@@ -949,7 +1129,8 @@ fn detect(provider: &str) -> Result<CliDetect, String> {
         "gemini" => Ok(CliDetect {
             installed: true,
             version: None,
-            authenticated: crate::keychain::get_secret(crate::keychain::GEMINI_API_KEY_ACCOUNT).is_some(),
+            authenticated: crate::keychain::get_secret(crate::keychain::GEMINI_API_KEY_ACCOUNT)
+                .is_some(),
         }),
         "claude" => {
             let bin = resolve_bin(spec("claude")?);
@@ -964,7 +1145,11 @@ fn detect(provider: &str) -> Result<CliDetect, String> {
                 .map(|s| s.success())
                 .unwrap_or(false);
             let file = home.join(".claude/.credentials.json").is_file();
-            Ok(CliDetect { installed: bin.is_some(), version, authenticated: keychain || file })
+            Ok(CliDetect {
+                installed: bin.is_some(),
+                version,
+                authenticated: keychain || file,
+            })
         }
         "codex" => {
             let bin = resolve_bin(spec("codex")?);
@@ -981,14 +1166,22 @@ fn detect(provider: &str) -> Result<CliDetect, String> {
                 })
                 .map(|s| s.success())
                 .unwrap_or(false);
-            Ok(CliDetect { installed: bin.is_some(), version, authenticated })
+            Ok(CliDetect {
+                installed: bin.is_some(),
+                version,
+                authenticated,
+            })
         }
         "agy" => {
             let bin = resolve_bin(spec("agy")?);
             let version = bin.as_ref().and_then(|b| version_of(b, &["--version"]));
             // agy stores its OAuth state under ~/.gemini/antigravity-cli
             let authenticated = home.join(".gemini/antigravity-cli").is_dir();
-            Ok(CliDetect { installed: bin.is_some(), version, authenticated })
+            Ok(CliDetect {
+                installed: bin.is_some(),
+                version,
+                authenticated,
+            })
         }
         other => Err(format!("unknown provider \"{other}\"")),
     }
@@ -999,7 +1192,11 @@ fn version_of(bin: &PathBuf, args: &[&str]) -> Option<String> {
     if !out.status.success() {
         return None;
     }
-    let line = String::from_utf8_lossy(&out.stdout).lines().next()?.trim().to_string();
+    let line = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .next()?
+        .trim()
+        .to_string();
     (!line.is_empty()).then_some(line)
 }
 
@@ -1022,7 +1219,16 @@ mod tests {
         let (args, via) = build_args("claude", "sonnet", "ignored", 60, None).unwrap();
         assert_eq!(
             args,
-            vec!["-p", "--tools", "", "--model", "sonnet", "--output-format", "json", "--no-session-persistence"]
+            vec![
+                "-p",
+                "--tools",
+                "",
+                "--model",
+                "sonnet",
+                "--output-format",
+                "json",
+                "--no-session-persistence"
+            ]
         );
         assert_eq!(via, PromptVia::Stdin);
     }
@@ -1044,8 +1250,53 @@ mod tests {
     }
 
     #[test]
+    fn frontier_tuning_is_provider_scoped_and_allowlisted() {
+        let (claude, _) =
+            build_args_tuned("claude", "sonnet", "ignored", 60, Some("max"), None, None).unwrap();
+        let effort = claude.iter().position(|arg| arg == "--effort").unwrap();
+        assert_eq!(claude[effort + 1], "max");
+
+        let (codex, _) = build_args_tuned(
+            "codex",
+            "gpt-5.6-sol",
+            "ignored",
+            60,
+            Some("xhigh"),
+            Some("fast"),
+            None,
+        )
+        .unwrap();
+        assert!(codex.contains(&"model_reasoning_effort=\"xhigh\"".to_string()));
+        assert!(codex.contains(&"service_tier=\"fast\"".to_string()));
+        assert_eq!(codex.last().unwrap(), "-");
+
+        assert!(
+            build_args_tuned("codex", "gpt-5.6-sol", "p", 60, Some("max"), None, None)
+                .unwrap_err()
+                .contains("reasoning effort")
+        );
+        assert!(
+            build_args_tuned("claude", "sonnet", "p", 60, None, Some("fast"), None)
+                .unwrap_err()
+                .contains("service tier")
+        );
+        assert!(build_args_tuned(
+            "agy",
+            "Gemini 3.5 Flash (Medium)",
+            "p",
+            60,
+            Some("high"),
+            None,
+            None,
+        )
+        .unwrap_err()
+        .contains("doesn't support"));
+    }
+
+    #[test]
     fn agy_args_embed_the_prompt_and_sandbox() {
-        let (args, via) = build_args("agy", "Gemini 3.5 Flash (Medium)", "hello there", 240, None).unwrap();
+        let (args, via) =
+            build_args("agy", "Gemini 3.5 Flash (Medium)", "hello there", 240, None).unwrap();
         assert_eq!(via, PromptVia::Args);
         assert_eq!(args[0], "-p");
         assert_eq!(args[1], "hello there");
@@ -1068,11 +1319,16 @@ mod tests {
     #[test]
     fn parse_codex_jsonl_takes_the_last_agent_message() {
         let sample = concat!(
-            r#"{"type":"thread.started","thread_id":"t1"}"#, "\n",
-            r#"{"type":"item.completed","item":{"type":"reasoning","text":"thinking"}}"#, "\n",
-            r#"{"type":"item.completed","item":{"type":"agent_message","text":"first"}}"#, "\n",
-            r#"{"type":"item.completed","item":{"type":"agent_message","text":"final answer"}}"#, "\n",
-            r#"{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}"#, "\n",
+            r#"{"type":"thread.started","thread_id":"t1"}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"type":"reasoning","text":"thinking"}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"first"}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"final answer"}}"#,
+            "\n",
+            r#"{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}"#,
+            "\n",
         );
         assert_eq!(parse_codex_jsonl(sample).unwrap(), "final answer");
         let failed = r#"{"type":"turn.failed","error":{"message":"quota exhausted"}}"#;
@@ -1120,9 +1376,15 @@ mod tests {
 
     #[test]
     fn home_expansion_only_touches_tilde_prefix() {
-        assert_eq!(expand_home("/opt/homebrew/bin/codex").unwrap(), PathBuf::from("/opt/homebrew/bin/codex"));
+        assert_eq!(
+            expand_home("/opt/homebrew/bin/codex").unwrap(),
+            PathBuf::from("/opt/homebrew/bin/codex")
+        );
         let home = std::env::var("HOME").unwrap();
-        assert_eq!(expand_home("~/.local/bin/claude").unwrap(), PathBuf::from(home).join(".local/bin/claude"));
+        assert_eq!(
+            expand_home("~/.local/bin/claude").unwrap(),
+            PathBuf::from(home).join(".local/bin/claude")
+        );
     }
 
     /// The image lanes: chats keep their per-chat assets dir; the editor's
@@ -1136,7 +1398,10 @@ mod tests {
         assert_eq!(rel, "storage/images");
 
         let (dir, rel) = image_destination(&root, "morning-brief").unwrap();
-        assert_eq!(dir, root.join("storage").join("chats").join("morning-brief"));
+        assert_eq!(
+            dir,
+            root.join("storage").join("chats").join("morning-brief")
+        );
         assert_eq!(rel, "storage/chats/morning-brief");
 
         // traversal never reaches the filesystem — safe_slug refuses first
@@ -1165,9 +1430,17 @@ mod tests {
 
         let (withimg, _) = build_args("claude", "sonnet", "p", 60, Some(&staged)).unwrap();
         let at = withimg.iter().position(|a| a == "--tools").unwrap();
-        assert_eq!(withimg[at + 1], "Read", "the narrowest allowlist that opens a PNG");
+        assert_eq!(
+            withimg[at + 1],
+            "Read",
+            "the narrowest allowlist that opens a PNG"
+        );
         let at = withimg.iter().position(|a| a == "--add-dir").unwrap();
-        assert_eq!(withimg[at + 1], dir.to_string_lossy(), "scoped to the staged dir only");
+        assert_eq!(
+            withimg[at + 1],
+            dir.to_string_lossy(),
+            "scoped to the staged dir only"
+        );
 
         // — codex: native image args, and "-" must stay LAST (it is stdin) —
         let (plain, _) = build_args("codex", "gpt-5.6-sol", "p", 60, None).unwrap();
@@ -1178,7 +1451,9 @@ mod tests {
         let at = withimg.iter().position(|a| a == "-i").unwrap();
         assert_eq!(withimg[at + 1], staged.paths[0]);
         // codex needs NO tool/permission concession at all
-        assert!(!withimg.iter().any(|a| a == "--dangerously-skip-permissions"));
+        assert!(!withimg
+            .iter()
+            .any(|a| a == "--dangerously-skip-permissions"));
 
         // — agy: permissions skipped ONLY with an image, sandbox always on —
         let (plain, _) = build_args("agy", "Gemini 3.5 Flash (Medium)", "p", 60, None).unwrap();
@@ -1189,8 +1464,13 @@ mod tests {
         assert!(plain.iter().any(|a| a == "--sandbox"));
         let (withimg, _) =
             build_args("agy", "Gemini 3.5 Flash (Medium)", "p", 60, Some(&staged)).unwrap();
-        assert!(withimg.iter().any(|a| a == "--dangerously-skip-permissions"));
-        assert!(withimg.iter().any(|a| a == "--sandbox"), "sandbox is never traded away");
+        assert!(withimg
+            .iter()
+            .any(|a| a == "--dangerously-skip-permissions"));
+        assert!(
+            withimg.iter().any(|a| a == "--sandbox"),
+            "sandbox is never traded away"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1204,7 +1484,10 @@ mod tests {
         assert!(text.contains("[Image #2] = /tmp/b.png"));
         assert!(text.contains("2 image(s)"));
         assert!(reads_images_from_path("claude") && reads_images_from_path("agy"));
-        assert!(!reads_images_from_path("codex"), "codex takes files as argv");
+        assert!(
+            !reads_images_from_path("codex"),
+            "codex takes files as argv"
+        );
     }
 
     /// The retry gate fires on agy's real headless-denial signature (Seth's

@@ -7,7 +7,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { breveWriteWatchlist, openUrl, type BreveSnapshot } from "../../lib/tauri";
+import { breveBackfillWatchlist, breveWriteWatchlist, openUrl, type BreveSnapshot } from "../../lib/tauri";
 import type { WatchItem } from "../../routines/watchlist";
 import { ChevronRight, ExternalLinkGlyph, PlusGlyph, SearchGlyph, XGlyph } from "../glyphs";
 import { PageHead, SaveNote, useBreveDraftGuard, type SaveState } from "./breveShared";
@@ -148,6 +148,8 @@ export function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
   const [base, setBase] = useState(() => watchlistDocument(initial.sections, initial.preferences));
   const [query, setQuery] = useState("");
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [refreshState, setRefreshState] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [refreshMessage, setRefreshMessage] = useState("");
   const [error, setError] = useState("");
   // groups arrive FOLDED (2026-07-30: 34 topics read as 10 calm rows, not a
   // wall) — search auto-expands matches, Add topic unfolds its group
@@ -232,7 +234,10 @@ export function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
     setSections((current) =>
       current.map((section) =>
         section.id === sectionId
-          ? { ...section, items: section.items.filter((item) => item.id !== itemId) }
+          ? {
+              ...section,
+              items: section.items.filter((item) => item.id !== itemId),
+            }
           : section,
       ),
     );
@@ -263,7 +268,10 @@ export function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
     setSections((current) =>
       current.map((section) =>
         section.id === sectionId
-          ? { ...section, items: [...section.items, { id: itemId, watch: "", lens: "", url: "" }] }
+          ? {
+              ...section,
+              items: [...section.items, { id: itemId, watch: "", lens: "", url: "" }],
+            }
           : section,
       ),
     );
@@ -290,6 +298,30 @@ export function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setSaveState("error");
+    }
+  };
+
+  const refreshLastThirtyDays = async () => {
+    if (hasIssues || refreshState === "running") return;
+    setRefreshState("running");
+    setRefreshMessage("");
+    setError("");
+    try {
+      if (dirty) {
+        setSaveState("saving");
+        const saved = await breveWriteWatchlist(markdown);
+        queryClient.setQueryData(BREVE_QUERY_KEY, saved);
+        setBase(markdown);
+        setSaveState("saved");
+      }
+      const result = await breveBackfillWatchlist();
+      queryClient.setQueryData(BREVE_QUERY_KEY, result.snapshot);
+      setRefreshState("done");
+      setRefreshMessage(result.message);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setRefreshState("error");
+      setRefreshMessage(message);
     }
   };
 
@@ -330,6 +362,19 @@ export function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
         </button>
         <button
           type="button"
+          className="ghostbtn"
+          disabled={hasIssues || refreshState === "running" || saveState === "saving"}
+          title={
+            hasIssues
+              ? "Fix the marked watchlist rows first"
+              : "Save any changes, then research this watchlist across the last 30 days"
+          }
+          onClick={() => void refreshLastThirtyDays()}
+        >
+          {refreshState === "running" ? "Refreshing 30 days…" : "Refresh last 30 days"}
+        </button>
+        <button
+          type="button"
           className="ghostbtn primary"
           disabled={!dirty || hasIssues || saveState === "saving"}
           onClick={() => void save()}
@@ -337,6 +382,15 @@ export function WatchlistView({ snapshot }: { snapshot: BreveSnapshot }) {
           {saveState === "saving" ? "Saving…" : "Save watchlist"}
         </button>
       </div>
+
+      {refreshMessage && (
+        <p
+          className={`breve-watch-refresh-note ${refreshState}`}
+          role={refreshState === "error" ? "alert" : "status"}
+        >
+          {refreshMessage}
+        </p>
+      )}
 
       <div className="breve-watch-groups">
         {visibleSections.map((section) => {

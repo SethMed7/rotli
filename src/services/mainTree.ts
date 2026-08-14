@@ -325,6 +325,36 @@ export function addFolderToMain(tree: MainNode[], name: string): MainNode[] {
   return [...tree, { folder: uniqueRootFolderName(tree, name), children: [] }];
 }
 
+/** File one durable item reference under a deterministic root folder. The
+ * physical file never moves; this only edits Main's portable projection. */
+export function fileNoteInNamedRootFolder(tree: MainNode[], noteId: string, name: string): MainNode[] {
+  const trimmed = name.trim();
+  if (!trimmed) return tree;
+  const without = removeFromMain(tree, noteId);
+  let found = false;
+  const next = without.map((node): MainNode => {
+    if (!("folder" in node) || node.folder !== trimmed) return node;
+    found = true;
+    return { folder: node.folder, children: [...node.children, { note: noteId }] };
+  });
+  return found ? next : [...next, { folder: trimmed, children: [{ note: noteId }] }];
+}
+
+export function artifactMainFolderName(chatTitle: string): string {
+  const safe = chatTitle
+    .normalize("NFKC")
+    .replace(/[\\/:]/g, " ")
+    .replaceAll(String.fromCharCode(0), " ")
+    .split("")
+    .map((character) => (character.charCodeAt(0) < 32 ? " " : character))
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 64)
+    .trim();
+  return `Artifacts - ${safe || "Untitled chat"}`;
+}
+
 /** Remove a note/folder from Main by its rendered id (a folder takes its subtree). */
 export function removeFromMain(tree: MainNode[], dragId: string): MainNode[] {
   return findAndRemove(tree, dragId, MAIN_ROOT).tree;

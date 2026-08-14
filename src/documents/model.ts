@@ -6,11 +6,28 @@ export interface DocumentBlock {
   level?: 1 | 2 | 3;
 }
 
+export interface DocumentImage {
+  /** Stable inside one document package; not a filesystem identity. */
+  id: string;
+  name: string;
+  mimeType: "image/png" | "image/jpeg" | "image/gif" | "image/bmp";
+  /** Raw base64 bytes without a data-URL prefix. */
+  base64: string;
+  widthPx: number;
+  heightPx: number;
+  alt?: string;
+}
+
 export interface DocumentDraft {
   title: string;
   subtitle?: string;
   blocks?: DocumentBlock[];
   table?: string[][];
+  /** Ordered native content for structured generated documents. Legacy block
+   * and table inputs remain supported for ordinary blank/template creation. */
+  content?: DocumentContent[];
+  /** Generated visuals are conventional embedded DOCX media. */
+  images?: DocumentImage[];
 }
 
 export type DocumentAlignment = "left" | "center" | "right" | "justify";
@@ -60,7 +77,8 @@ export interface DocumentTable {
 
 export type DocumentContent =
   | { kind: "paragraph"; paragraph: DocumentParagraph }
-  | { kind: "table"; table: DocumentTable };
+  | { kind: "table"; table: DocumentTable }
+  | { kind: "image"; image: DocumentImage };
 
 export interface EditableDocument {
   id: string;

@@ -38,10 +38,11 @@ inward toward stable business rules:
    the composition root—never every consumer.
 9. Source module filenames use camelCase. Exported React components remain
    PascalCase; filename casing does not leak into the product vocabulary.
-10. The memex is the data store. Do not add a database for state that belongs in
-    content, clean metadata, or a rebuildable `.rotli/` projection.
-11. The memex contains portable knowledge, metadata, prompts, protocols, and
-    capability maps. It does not own provider clients, model calls, ranking
+10. The vault's ordinary files are the data store. Do not add a database for
+    state that belongs in content, clean metadata, or a rebuildable `.rotli/`
+    projection.
+11. The vault contract contains portable knowledge, metadata, prompts,
+    protocols, and capability maps. It does not own provider clients, model calls, ranking
     execution, or agent orchestration; those remain in Rotli's AI/application
     layer behind host ports.
 
@@ -55,7 +56,9 @@ inward toward stable business rules:
 - Does the security boundary validate independently?
 - Did the change reduce concepts as well as lines of code?
 
-`bun run check:architecture` discovers clean feature roles and enforces their
+`bun run check:architecture` requires every top-level source area and
+presentation feature directory to have a named owner in
+`scripts/source-ownership.ts`, discovers clean feature roles, and enforces their
 inward imports, pure ports/policies, the Tauri adapter boundary, the
 Markdown-only slash boundary, and the vendor seams. Discovery is never a silent
 opt-in: a `src/` dir carrying role files without the full
@@ -72,7 +75,18 @@ and a stale exemption fails the check. The vendor seams: `exceljs`, `@excalidraw
 (`src/sheets/codec` + `src/sheets/engine`, `src/boards/engine` — plus
 `src/app.tsx`, allowed solely for Excalidraw's theme CSS import,
 `src/documents/engine` + `src/brand/univerTheme.ts`, `src/documents/codec` +
-`src/documents/create.ts`). `bun run check:code-shape` rejects production
+`src/documents/create.ts`). Chat and onboarding presentation are cohesive
+clusters under `src/components/chat/` and `src/components/onboarding/`; new
+feature-specific helpers may not accumulate at `src/components/` root. `src/lib`
+is inward by default, with its store/service/Tauri-aware shell and gesture
+adapters named individually in the ownership registry. `bun run check:code-shape` rejects production
 module cycles and imports of test code. Architecture changes should extend these
 guards instead of relying only on reviewer memory. See the
 [testing contract](../development/testing.md) for the complete evidence matrix.
+
+`src/services/` is the effectful application boundary, not a miscellaneous
+bucket. Every production service declares its owning capability in
+`SERVICE_FILE_OWNERS`; new files fail until they choose an owner. Physical
+subdirectories may be introduced capability by capability when a cohesive move
+reduces imports and survives focused tests—the registry is the migration map,
+not a substitute for those eventual clusters.

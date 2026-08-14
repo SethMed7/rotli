@@ -14,21 +14,53 @@ export type ThemeSetting = "light" | "dark" | "system";
 
 /** Theme family: Warm is the branded pair; Mono is Paper and Charcoal. */
 export type ThemeFamily = "warm" | "mono";
+export type OnboardingPhase = "preferences" | "vault" | "models";
 export type SyntaxPalette = "rotli" | "mono";
 
 /** The user's PRIMARY color (Seth, 2026-07-28): the active state, folder
  * color, selection wash — everything riding --accent. "default" keeps each
  * theme's own truth (warm clay / mono ink); a named accent overrides it in
  * both schemes. Chosen in onboarding, changeable in Settings → Appearance. */
-export const ACCENT_COLORS = ["default", "blue", "green", "violet", "rose", "amber"] as const;
+export const ACCENT_COLORS = ["default", "blue", "green", "violet", "rose", "amber", "custom"] as const;
 export type AccentColor = (typeof ACCENT_COLORS)[number];
+export const DEFAULT_ACCENT_HUE = 210;
 
 /** The four solid themes, in the order the titlebar sun cycles them. */
-export const SOLID_THEMES: { family: ThemeFamily; mode: "light" | "dark"; label: string }[] = [
+export const SOLID_THEMES: {
+  family: ThemeFamily;
+  mode: "light" | "dark";
+  label: string;
+}[] = [
   { family: "warm", mode: "light", label: "Warm Light" },
   { family: "warm", mode: "dark", label: "Warm Dark" },
   { family: "mono", mode: "light", label: "Paper" },
   { family: "mono", mode: "dark", label: "Charcoal" },
+];
+
+/** Settings/onboarding presentation. Each family is one theme with a light and
+ * dark environment; System chooses between the same pair automatically. The
+ * underlying four environments and titlebar cycle above stay unchanged. */
+export const THEME_FAMILY_PRESENTATIONS: readonly {
+  family: ThemeFamily;
+  label: string;
+  description: string;
+  lightLabel: string;
+  darkLabel: string;
+}[] = [
+  {
+    family: "mono",
+    label: "Paper & Charcoal",
+    description: "Paper in Light, Charcoal in Dark.",
+    lightLabel: "Paper",
+    darkLabel: "Charcoal",
+  },
+  {
+    family: "warm",
+    label: "Rotli",
+    description: "Clay and cream by day, cocoa at night.",
+    lightLabel: "Warm Light",
+    darkLabel: "Warm Dark",
+  },
 ];
 
 /** The organizer daemon's §4.3 trust ladder, monotonic in risk. Off = dormant ·
@@ -63,14 +95,49 @@ export type TaskCycle = "two" | "three";
 
 export const TASK_CYCLES: readonly TaskCycle[] = ["two", "three"];
 
+/** How much personality the fresh-chat welcome carries. Both modes stay still;
+ * `lively` adds a time-aware character and restrained semantic color, while
+ * `calm` keeps the same useful layout deliberately quiet. */
+export type ChatWelcomeStyle = "calm" | "lively";
+
+export const CHAT_WELCOME_STYLES: readonly ChatWelcomeStyle[] = ["calm", "lively"];
+
+/** How a fresh chat gets its display title. `ask` puts a quiet, skippable
+ * field in the persistent chat header; `automatic` derives it from the first
+ * message without adding another stop before the composer. */
+export type ChatNaming = "ask" | "automatic";
+
+export const CHAT_NAMINGS: readonly ChatNaming[] = ["ask", "automatic"];
+
+/** How the pane tab bar handles a crowded strip. `scroll` preserves a
+ * readable tab floor and pans horizontally; `fit` keeps every tab visible by
+ * shrinking them and ellipsizing their labels. */
+export type TabLayout = "scroll" | "fit";
+
+export const TAB_LAYOUTS: readonly TabLayout[] = ["scroll", "fit"];
+
+/** Clock used beside durable chat-message timestamps. */
+export type TimeFormat = "12" | "24";
+
+export const TIME_FORMATS: readonly TimeFormat[] = ["12", "24"];
+
+/** Where a chat-created artifact opens. `sidecar` is the working default: one
+ * pane immediately to the right of the chat is reused for every artifact. */
+export type ChatArtifactOpen = "sidecar" | "split" | "tab";
+
+export const CHAT_ARTIFACT_OPENS: readonly ChatArtifactOpen[] = ["sidecar", "split", "tab"];
+
+export type ChatReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+export type ChatServiceTier = "standard" | "fast";
+
 /** The per-chat key every chat-scoped map uses: `<instanceId>:<slug>` for a
- * saved chat, or a PANE-scoped session key while the chat is still unsaved
+ * saved chat, or a TAB-scoped session key while the chat is still unsaved
  * (never a shared "" key — that leaked one chat's choice into every future
  * fresh chat, #7). VAULT-scoped since 2026-08-03: a bare slug collided across
  * brains sharing one corpus settings.json, so two vaults' same-named chats
  * shared one model pick / globe / measure. */
-export function chatKey(instanceId: string | null, slug: string | null, paneId: string): string {
-  if (!slug) return `unsaved:${paneId}`;
+export function chatKey(instanceId: string | null, slug: string | null, tabId: string): string {
+  if (!slug) return `unsaved:${tabId}`;
   return instanceId ? `${instanceId}:${slug}` : slug;
 }
 
@@ -90,10 +157,14 @@ export function retargetChatMapKeys(oldKey: string, newKey: string): void {
   const chatModel = move(s.chatModel);
   const chatWeb = move(s.chatWeb);
   const chatMeasure = move(s.chatMeasure);
+  const chatReasoning = move(s.chatReasoning);
+  const chatServiceTier = move(s.chatServiceTier);
   useUiStore.setState({
     ...(chatModel ? { chatModel } : {}),
     ...(chatWeb ? { chatWeb } : {}),
     ...(chatMeasure ? { chatMeasure } : {}),
+    ...(chatReasoning ? { chatReasoning } : {}),
+    ...(chatServiceTier ? { chatServiceTier } : {}),
   });
 }
 
@@ -115,16 +186,30 @@ export const TASKS = "tasks";
  * left-menu sections (Chat · Notes) stay visible (Seth, 2026-06-24;
  * Chat folded in from a full-surface front 2026-06-26). */
 // (the old "chat" contentView is retired — chat is a PANE surface now)
-export type ContentView = "panes" | "board" | "allNotes" | "allChats" | "recent" | "tasks" | "system";
+export type ContentView =
+  | "panes"
+  | "dashboard"
+  | "board"
+  | "allNotes"
+  | "allChats"
+  | "recent"
+  | "tasks"
+  | "system";
+
+/** The dashboard deliberately has two non-overlapping lenses. Rotli activity
+ * comes from the vault; model usage comes from provider-owned local session
+ * histories. Keeping the active lens explicit prevents the two from reading
+ * like one kind of telemetry. */
+export type DashboardSection = "rotli" | "models";
 
 /** The sidebar's high-level lens. Breve is an operational view over the same
  * corpus, not a separate window or a tab, so switching lenses must leave the
  * current notes contentView and pane tree untouched. */
 export type SidebarMode = "notes" | "breve";
-/** Breve's four sections (2026-07-30 rework): reading first (Briefs), then the
- * schedule (Routines), the topic registry (Watchlist), and one Settings home
- * (the former Models + Configure views merged). */
-export type BreveView = "briefs" | "routines" | "watchlist" | "settings";
+/** Breve stays a vault-bound operational lens. Dashboard is the news-hub
+ * landing, Notifications is the sanitized routine activity projection, and
+ * the durable briefs/routines/watchlist/settings surfaces remain available. */
+export type BreveView = "dashboard" | "briefs" | "notifications" | "routines" | "watchlist" | "settings";
 
 /** The sidebar's FRONTS (Seth, 2026-08-01, from Claude Desktop's Home|Code
  * pill): a two-segment switcher under the vault header replaces the old stacked
@@ -184,6 +269,9 @@ interface UiState {
   /** The primary color — see ACCENT_COLORS. "default" = the theme's own. */
   accentColor: AccentColor;
   setAccentColor: (accent: AccentColor) => void;
+  /** Hue used by the contrast-managed Custom accent (0–359). */
+  accentHue: number;
+  setAccentHue: (hue: number) => void;
 
   /** General: visitor (click-away hides, default) vs resident (stays open). */
   stayOpen: boolean;
@@ -196,6 +284,9 @@ interface UiState {
    * menu actions always keep their own kind. */
   newTabDefault: NewItemKind;
   setNewTabDefault: (kind: NewItemKind) => void;
+  /** Whether crowded pane tabs scroll or shrink to stay in the window. */
+  tabLayout: TabLayout;
+  setTabLayout: (layout: TabLayout) => void;
 
   /** First-run gate: false until the user finishes (or skips) onboarding, or
    * after a manual "Reset & re-onboard". Persisted in settings.json; the
@@ -206,6 +297,10 @@ interface UiState {
    * gate re-onboards on every 0.x update, then freezes post-1.0. */
   onboardingVersion: string;
   setOnboardingVersion: (v: string) => void;
+  /** Durable first-run checkpoint. Vault selection may relaunch the native app,
+   * so the next launch must resume at model setup instead of starting over. */
+  onboardingPhase: OnboardingPhase;
+  setOnboardingPhase: (phase: OnboardingPhase) => void;
 
   /** The Quick Note window's capped set (Seth, 2026-06-15): up to QUICK_MAX
    * note ids, in switcher order. The mutations + cross-webview sync live in
@@ -356,6 +451,8 @@ interface UiState {
    * Board/All-notes are VIEWS in the pane area, not full-surface takeovers
    * (Seth, 2026-06-24). Esc returns to "panes". Not persisted (transient). */
   contentView: ContentView;
+  dashboardSection: DashboardSection;
+  setDashboardSection: (section: DashboardSection) => void;
   /** Which System root the browser surface shows (contentView "system") —
    * "Brain" (the Library) or a destination id. Transient, like contentView. */
   systemRoot: string | null;
@@ -396,6 +493,14 @@ interface UiState {
    * General. Personalizes AI chat (the prompt persona line). Persisted; "" = unset. */
   userName: string;
   setUserName: (name: string) => void;
+  timeFormat: TimeFormat;
+  setTimeFormat: (format: TimeFormat) => void;
+  /** Optional, vault-scoped housekeeping. Null is deliberately OFF. Main
+   * cleanup unlinks only the projection; chat cleanup uses recoverable Archive. */
+  mainAutoRemoveDays: number | null;
+  setMainAutoRemoveDays: (days: number | null) => void;
+  chatAutoArchiveDays: number | null;
+  setChatAutoArchiveDays: (days: number | null) => void;
 
   /** The model a BRAND-NEW chat starts on — the last model picked anywhere.
    * null = the model store's own default. A chat that has made (or inherited)
@@ -405,24 +510,30 @@ interface UiState {
   setChatModelId: (id: string | null) => void;
   /** Per-chat model pick (Seth, 2026-08-01: two chat panes must be able to run
    * different models at once), keyed exactly like chatWeb — the chat slug, or
-   * "unsaved:<paneId>" until the first send binds it. Missing key = the
+   * "unsaved:<tabId>" until the first send binds it. Missing key = the
    * `chatModelId` seed; the chat surface pins its own entry as soon as the
    * model catalog settles, so a pick in one pane can never move another pane's
    * chat. Persisted (unsaved keys excluded, like every per-chat map). */
   chatModel: Record<string, string>;
   setChatModel: (key: string, id: string) => void;
   clearChatModel: (key: string) => void;
+  /** Optional provider-native quality controls. Rust independently validates
+   * these values before constructing process argv. */
+  chatReasoning: Record<string, ChatReasoningEffort>;
+  setChatReasoning: (key: string, value: ChatReasoningEffort | null) => void;
+  chatServiceTier: Record<string, ChatServiceTier>;
+  setChatServiceTier: (key: string, value: ChatServiceTier | null) => void;
   /** Per-chat web-search toggle (the composer globe), keyed by chat slug. Off by
    * default; only an enabled chat may use the web_search/web_fetch tools. Persisted —
-   * except the session-scoped "unsaved:<paneId>" keys: a not-yet-saved chat's choice
-   * lives under its PANE (never a shared "" key that would leak web-ON into every
+   * except the session-scoped "unsaved:<tabId>" keys: a not-yet-saved chat's choice
+   * lives under its TAB (never a shared "" key that would leak web-ON into every
    * future fresh chat — #7, audit 2026-07) and is carried to the slug on bind. */
   chatWeb: Record<string, boolean>;
   setChatWeb: (slug: string, on: boolean) => void;
-  /** Drop one chatWeb key — the unsaved-pane key after bind carries it to the slug. */
+  /** Drop one chatWeb key — the unsaved-tab key after bind carries it to the slug. */
   clearChatWeb: (key: string) => void;
   /** Per-chat measure (Narrow/Comfort/Wide — the notes Aa vocabulary), keyed
-   * exactly like chatWeb (slug, or "unsaved:<paneId>" until the first send
+   * exactly like chatWeb (slug, or "unsaved:<tabId>" until the first send
    * binds it). Missing key = comfort. Persisted (unsaved keys excluded). */
   chatMeasure: Record<string, Measure>;
   setChatMeasure: (key: string, m: Measure) => void;
@@ -431,6 +542,16 @@ interface UiState {
    * this pane, or a right split beside the chat. Persisted. */
   chatNoteOpen: "tab" | "split";
   setChatNoteOpen: (v: "tab" | "split") => void;
+  /** The fresh-chat welcome's visual personality. Machine-level appearance. */
+  chatWelcomeStyle: ChatWelcomeStyle;
+  setChatWelcomeStyle: (v: ChatWelcomeStyle) => void;
+  /** Whether a fresh chat asks for a name in its header or names itself from
+   * the first message. Existing chat names always remain directly editable. */
+  chatNaming: ChatNaming;
+  setChatNaming: (v: ChatNaming) => void;
+  /** Where files and boards created by chat open. Persisted per vault. */
+  chatArtifactOpen: ChatArtifactOpen;
+  setChatArtifactOpen: (v: ChatArtifactOpen) => void;
   /** Read replies aloud — the voice tier that needs no microphone and no
    * entitlement (docs/design/voice.md). Off by default: the voice model is
    * fetched on FIRST USE, so nobody pays for a voice they never asked for. */
@@ -567,6 +688,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setSyntaxPalette: (palette) => set({ syntaxPalette: palette }),
   accentColor: "default",
   setAccentColor: (accent) => set({ accentColor: accent }),
+  accentHue: DEFAULT_ACCENT_HUE,
+  setAccentHue: (hue) => set({ accentHue: Math.max(0, Math.min(359, Math.round(hue))) }),
 
   stayOpen: false,
   setStayOpen: (on) => set({ stayOpen: on }),
@@ -574,11 +697,15 @@ export const useUiStore = create<UiState>((set, get) => ({
   setShowInDock: (on) => set({ showInDock: on }),
   newTabDefault: DEFAULT_NEW_ITEM_KIND,
   setNewTabDefault: (kind) => set({ newTabDefault: kind }),
+  tabLayout: "scroll",
+  setTabLayout: (layout) => set({ tabLayout: layout }),
 
   onboarded: false,
   setOnboarded: (done) => set({ onboarded: done }),
   onboardingVersion: "",
   setOnboardingVersion: (v) => set({ onboardingVersion: v }),
+  onboardingPhase: "preferences",
+  setOnboardingPhase: (phase) => set({ onboardingPhase: phase }),
 
   quickNoteIds: [],
   setQuickNoteIds: (ids) => set({ quickNoteIds: ids }),
@@ -612,11 +739,14 @@ export const useUiStore = create<UiState>((set, get) => ({
       !window.confirm("Discard your unsaved Breve changes and return to Notes?")
     )
       return;
-    set({ sidebarMode: mode, ...(mode === "breve" ? {} : { breveDirty: false }) });
+    set({
+      sidebarMode: mode,
+      ...(mode === "breve" ? {} : { breveDirty: false }),
+    });
   },
   sidebarView: "home",
   setSidebarView: (view) => set({ sidebarView: view }),
-  breveView: "briefs",
+  breveView: "dashboard",
   setBreveView: (view) => {
     const current = get();
     if (
@@ -639,7 +769,9 @@ export const useUiStore = create<UiState>((set, get) => ({
     "vault:": true,
   },
   toggleDestExpanded: (id) =>
-    set((s) => ({ expandedDests: { ...s.expandedDests, [id]: !s.expandedDests[id] } })),
+    set((s) => ({
+      expandedDests: { ...s.expandedDests, [id]: !s.expandedDests[id] },
+    })),
   setDestExpanded: (id, open) => set((s) => ({ expandedDests: { ...s.expandedDests, [id]: open } })),
   revealNonce: 0,
   revealMode: "auto",
@@ -716,6 +848,8 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   contentView: "panes",
   setContentView: (view) => set({ contentView: view }),
+  dashboardSection: "rotli",
+  setDashboardSection: (section) => set({ dashboardSection: section }),
   systemRoot: null,
   setSystemRoot: (id) => set({ systemRoot: id }),
   renameTarget: null,
@@ -735,6 +869,12 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   userName: "",
   setUserName: (name) => set({ userName: name }),
+  timeFormat: "12",
+  setTimeFormat: (format) => set({ timeFormat: format }),
+  mainAutoRemoveDays: null,
+  setMainAutoRemoveDays: (days) => set({ mainAutoRemoveDays: days }),
+  chatAutoArchiveDays: null,
+  setChatAutoArchiveDays: (days) => set({ chatAutoArchiveDays: days }),
 
   chatModelId: null,
   setChatModelId: (id) => set({ chatModelId: id }),
@@ -746,6 +886,22 @@ export const useUiStore = create<UiState>((set, get) => ({
       if (!(key in s.chatModel)) return s;
       const { [key]: _gone, ...rest } = s.chatModel;
       return { chatModel: rest };
+    }),
+  chatReasoning: {},
+  setChatReasoning: (key, value) =>
+    set((s) => {
+      const next = { ...s.chatReasoning };
+      if (value === null) delete next[key];
+      else next[key] = value;
+      return { chatReasoning: next };
+    }),
+  chatServiceTier: {},
+  setChatServiceTier: (key, value) =>
+    set((s) => {
+      const next = { ...s.chatServiceTier };
+      if (value === null) delete next[key];
+      else next[key] = value;
+      return { chatServiceTier: next };
     }),
   chatWeb: {},
   setChatWeb: (slug, on) => set((s) => ({ chatWeb: { ...s.chatWeb, [slug]: on } })),
@@ -765,6 +921,12 @@ export const useUiStore = create<UiState>((set, get) => ({
     }),
   chatNoteOpen: "tab",
   setChatNoteOpen: (v) => set({ chatNoteOpen: v }),
+  chatWelcomeStyle: "lively",
+  setChatWelcomeStyle: (v) => set({ chatWelcomeStyle: v }),
+  chatNaming: "ask",
+  setChatNaming: (v) => set({ chatNaming: v }),
+  chatArtifactOpen: "sidecar",
+  setChatArtifactOpen: (v) => set({ chatArtifactOpen: v }),
   hotkeyPeek: "badges",
   setHotkeyPeek: (v) => set({ hotkeyPeek: v }),
   readAloud: false,

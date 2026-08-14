@@ -4,9 +4,46 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { routeDecision } from "./createNote";
+import type { MemexConfig } from "../memex/config";
+import { instanceForRoot, routeDecision } from "./createNote";
 
 const FALLBACK = "Inbox";
+
+const ROOTS: MemexConfig = {
+  activeId: "other",
+  instances: [
+    {
+      id: "corpus",
+      label: "Primary",
+      root: "/primary",
+      role: "corpus",
+      memexId: "primary",
+      mode: null,
+      perms: "chats+inbox",
+      brainEnabled: true,
+    },
+    {
+      id: "other",
+      label: "Other",
+      root: "/other",
+      role: "brain",
+      memexId: "other",
+      mode: "open",
+      perms: "chats+inbox",
+      brainEnabled: true,
+    },
+  ],
+};
+
+describe("instanceForRoot", () => {
+  test("an explicit default root does not follow a later ambient selection", () => {
+    expect(instanceForRoot(ROOTS, "default")?.id).toBe("corpus");
+  });
+
+  test("unknown roots fail closed instead of selecting the active vault", () => {
+    expect(instanceForRoot(ROOTS, "missing")).toBeNull();
+  });
+});
 
 describe("routeDecision (memex-vs-local)", () => {
   test("no writable memex ⇒ always local", () => {

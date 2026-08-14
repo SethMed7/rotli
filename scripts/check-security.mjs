@@ -153,7 +153,7 @@ function stripComments(src) {
   const toolBlock = types.match(/export type ToolName\s*=([\s\S]*?);/);
   if (!toolBlock) failures.push("src/ai/types.ts: could not find the ToolName union to check EGRESS_TOOLS completeness.");
   const toolNames = toolBlock ? [...toolBlock[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]) : [];
-  // create_note/update_note write INTO the vault and open_note opens a tab —
+  // create_note/update_note/create_document write INTO the vault and open_note opens a tab —
   // all stay on-device (no bytes leave), so they classify local (PR #4,
   // 2026-07-29; update_note added 2026-07-30, gated by corpus_read_ai + the
   // secure-context refusal in host.ts).
@@ -161,11 +161,19 @@ function stripComments(src) {
     "search_notes",
     "read_note",
     "create_note",
+    // create_document encodes DOCX locally and writes only through the managed
+    // corpus repository; secure-tainted runs are refused because DOCX has no
+    // note protection metadata.
+    "create_document",
     "update_note",
     "open_note",
     "search_memory",
     "read_memory",
     "read_file",
+    // create_artifact composes only local note/document/sheet/PDF adapters.
+    // host.ts refuses a secure-context chat; the Rust PDF boundary separately
+    // rejects protected source and read-only output roots (2026-08-09).
+    "create_artifact",
     // draw_board converts Mermaid → an Excalidraw board file entirely on
     // device (boards/composition mermaid-to-excalidraw) — a creation tool,
     // no egress; the host gates it behind the secure-context taint (2026-08-03)
@@ -248,6 +256,25 @@ function stripComments(src) {
   }
 }
 
+// ── (e) update checks are user-initiated ─────────────────────────────────────
+//
+// Local-first also describes network behavior: the updater feed may be queried
+// from the explicit Settings control, never from app mount, visibility, or a
+// timer. This catches a recurrence without pretending that a grep proves the
+// wider absence of network activity (the egress inventory above owns that).
+{
+  const allowedCallers = new Set(["src/components/settingsSurface.tsx"]);
+  for (const rel of walkTree("src", /\.(ts|tsx)$/)) {
+    if (rel === "src/lib/tauri.ts") continue; // capability implementation
+    const code = stripComments(read(rel));
+    if (/\bcheckForUpdate\s*\(/.test(code) && !allowedCallers.has(rel)) {
+      failures.push(
+        `${rel}: checks the updater feed outside the explicit Settings action — Rotli must not phone home on launch, visibility, or a timer.`,
+      );
+    }
+  }
+}
+
 function walkTree(dir, re) {
   const out = [];
   const stack = [dir];
@@ -267,4 +294,6 @@ if (failures.length) {
   console.error(`check:security failed:\n${failures.map((l) => `  - ${l}`).join("\n")}`);
   process.exit(1);
 }
-console.log("check:security ok — egress sites declared, keychain literals constant-only, CSP/capability/updater snapshot intact, no sensitive logging");
+console.log(
+  "check:security ok — egress sites declared, keychain literals constant-only, CSP/capability/updater snapshot intact, updater checks user-initiated, no sensitive logging",
+);

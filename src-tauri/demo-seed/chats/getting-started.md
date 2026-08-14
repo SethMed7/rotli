@@ -11,5 +11,6 @@ attachedTo: [[welcome-to-rotli]]
 **Assistant:** Three things. It's local-first — your notes are plain markdown
 files in one folder you own, not a cloud database. It lives in the menu bar, so
 capture is a keystroke away and the window disappears when you're done. And the
-folder is a memex: notes, chats, and knowledge together, filed by an on-device AI
-but always yours to rearrange. Open the **Welcome** note for a few things to try.
+vault keeps notes, chats, files, and useful metadata together. You choose whether
+the on-device Librarian organizes it, and it is always yours to rearrange. Open
+the **Welcome** note for a few things to try.

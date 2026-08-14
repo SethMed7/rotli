@@ -9,6 +9,10 @@ export const DOCUMENT_CONVERTIBLE_EXTS = ["doc", "rtf", "odt", "pdf"] as const;
 export const DOCX_EDITABLE = new Set<string>(DOCX_EDITABLE_EXTS);
 export const DOCUMENT_CONVERTIBLE = new Set<string>(DOCUMENT_CONVERTIBLE_EXTS);
 export const DOCUMENT_EXTS = new Set<string>([...DOCX_EDITABLE_EXTS, ...DOCUMENT_NATIVE_ONLY_EXTS]);
+/** Formats whose durable file identity is specifically Microsoft Word rather
+ * than the broader conventional-document family. Presentation consumes this
+ * one policy for tabs, artifact rows, and chat file buttons. */
+export const WORD_EXTS = new Set<string>([...DOCX_EDITABLE_EXTS, "doc", "dot"]);
 
 export const DOCUMENT_CREATE_EXTENSION = "docx";
 export const DOCUMENT_OPEN_WITH_APPS = ["Microsoft Word", "Pages", "LibreOffice"] as const;

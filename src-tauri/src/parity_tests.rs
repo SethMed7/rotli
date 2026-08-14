@@ -25,7 +25,18 @@ fn string_list(value: &Value) -> Vec<String> {
 
 #[test]
 fn sheet_edit_max_bytes_matches_fixture() {
-    assert_eq!(entry("sheetEditMaxBytes").as_u64(), Some(crate::corpus::SHEET_EDIT_MAX_BYTES as u64));
+    assert_eq!(
+        entry("sheetEditMaxBytes").as_u64(),
+        Some(crate::corpus::SHEET_EDIT_MAX_BYTES as u64)
+    );
+}
+
+#[test]
+fn chat_image_asset_exts_match_fixture() {
+    assert_eq!(
+        string_list(&entry("chatImageAssetExts")),
+        crate::corpus::CHAT_IMAGE_ASSET_EXTS
+    );
 }
 
 #[test]
@@ -67,16 +78,28 @@ fn board_limits_match_fixture() {
 
 #[test]
 fn document_convertible_exts_match_fixture() {
-    assert_eq!(string_list(&entry("documentConvertibleExts")), crate::corpus::DOCUMENT_CONVERTIBLE_EXTS);
+    assert_eq!(
+        string_list(&entry("documentConvertibleExts")),
+        crate::corpus::DOCUMENT_CONVERTIBLE_EXTS
+    );
 }
 
 #[test]
 fn memex_perms_match_fixture() {
     // the enum's serde wire strings ARE the contract — a variant rename fails here
-    let wire: Vec<String> = [crate::memex::MemexPerms::ChatsInbox, crate::memex::MemexPerms::ReadOnly]
-        .iter()
-        .map(|p| serde_json::to_value(p).unwrap().as_str().unwrap().to_string())
-        .collect();
+    let wire: Vec<String> = [
+        crate::memex::MemexPerms::ChatsInbox,
+        crate::memex::MemexPerms::ReadOnly,
+    ]
+    .iter()
+    .map(|p| {
+        serde_json::to_value(p)
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string()
+    })
+    .collect();
     assert_eq!(string_list(&entry("memexPerms")), wire);
 }
 
@@ -104,30 +127,52 @@ fn frontmatter_view_matches_fixture() {
 
 #[test]
 fn keychain_service_matches_fixture() {
-    assert_eq!(entry("keychainService").as_str(), Some(crate::keychain::SERVICE));
+    assert_eq!(
+        entry("keychainService").as_str(),
+        Some(crate::keychain::SERVICE)
+    );
 }
 
 #[test]
 fn keychain_allowed_accounts_match_fixture() {
-    assert_eq!(string_list(&entry("keychainAllowedAccounts")), crate::keychain::ALLOWED);
+    assert_eq!(
+        string_list(&entry("keychainAllowedAccounts")),
+        crate::keychain::ALLOWED
+    );
 }
 
 #[test]
 fn cli_bin_candidates_match_fixture() {
     let fixture = entry("cliBinCandidates");
     let map = fixture.as_object().expect("cliBinCandidates is an object");
-    assert_eq!(map.len(), crate::provider::CLIS.len(), "fixture and CLIS list different providers");
+    assert_eq!(
+        map.len(),
+        crate::provider::CLIS.len(),
+        "fixture and CLIS list different providers"
+    );
     for spec in crate::provider::CLIS {
-        assert_eq!(string_list(&map[spec.id]), spec.bins, "candidate list drifted for {}", spec.id);
+        assert_eq!(
+            string_list(&map[spec.id]),
+            spec.bins,
+            "candidate list drifted for {}",
+            spec.id
+        );
     }
 }
 
 #[test]
 fn endpoint_locality_fixtures_agree() {
-    for case in entry("endpointLocality").as_array().expect("endpointLocality is an array") {
+    for case in entry("endpointLocality")
+        .as_array()
+        .expect("endpointLocality is an array")
+    {
         let url = case["url"].as_str().expect("url is a string");
         let expected = case["local"].as_bool().expect("local is a bool");
-        assert_eq!(crate::chat::endpoint_is_local(url), expected, "endpoint_is_local({url:?})");
+        assert_eq!(
+            crate::chat::endpoint_is_local(url),
+            expected,
+            "endpoint_is_local({url:?})"
+        );
     }
 }
 
@@ -138,7 +183,9 @@ fn endpoint_locality_fixtures_agree() {
 #[test]
 fn secure_overlap() {
     let value = entry("secureOverlap");
-    let source = value["source"].as_str().expect("fixture source is a string");
+    let source = value["source"]
+        .as_str()
+        .expect("fixture source is a string");
     crate::secret::remember_secure_text(source);
     for outbound in string_list(&value["matches"]) {
         assert!(

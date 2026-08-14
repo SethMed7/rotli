@@ -15,6 +15,7 @@ interface ParkedSheet {
   model: SheetModel;
   idMap: Map<string, number>;
   diskLen: number;
+  revision: string;
   mode: SheetFileMode;
 }
 
@@ -25,6 +26,7 @@ interface LiveDirty {
   saveModel: () => SheetModel;
   idMap: Map<string, number>;
   diskLen: number;
+  revision: string;
   dirtyGen: () => number;
   onFlushed: (gen: number) => void;
 }
@@ -39,26 +41,27 @@ export async function writeSheetModel(
   wb: Workbook,
   model: SheetModel,
   idMap: Map<string, number>,
-): Promise<number> {
+  expectedRevision: string,
+): Promise<{ len: number; revision: string }> {
   if (mode === "csv") {
     const text = csvTextFromRows(csvRowsFromSnapshot(model));
     const bytes = new TextEncoder().encode(text);
-    await corpusWriteFileBytes(fileId, b64FromText(text), true);
-    return bytes.length;
+    const revision = await corpusWriteFileBytes(fileId, b64FromText(text), true, expectedRevision);
+    return { len: bytes.length, revision };
   }
   applyModelToWorkbook(wb, model, idMap);
   const bytes = await saveXlsx(wb);
-  await corpusWriteFileBytes(fileId, b64FromBytes(bytes), true);
-  return bytes.length;
+  const revision = await corpusWriteFileBytes(fileId, b64FromBytes(bytes), true, expectedRevision);
+  return { len: bytes.length, revision };
 }
 
-let flushing = false;
+let activeFlush: Promise<void> | null = null;
 
 /** Write every parked + live-dirty session. Exported for tests. */
-export async function flushDirtySheets(): Promise<void> {
-  if (flushing) return;
-  flushing = true;
-  try {
+export function flushDirtySheets(): Promise<void> {
+  if (activeFlush) return activeFlush;
+  activeFlush = (async () => {
+    const failures: string[] = [];
     for (const [fileId, live] of [...liveDirty]) {
       if (live.dirtyGen() === 0) continue;
       try {
@@ -67,30 +70,43 @@ export async function flushDirtySheets(): Promise<void> {
           model: live.saveModel(),
           idMap: live.idMap,
           diskLen: live.diskLen,
+          revision: live.revision,
           mode: live.mode,
         });
-      } catch {
-        /* snapshot failed — retry next flush */
+      } catch (error) {
+        failures.push(
+          `${fileId}: snapshot failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
     for (const [fileId, session] of [...parked]) {
       try {
         const genBefore = liveDirty.get(fileId)?.dirtyGen() ?? 0;
-        const len = await writeSheetModel(fileId, session.mode, session.wb, session.model, session.idMap);
+        const saved = await writeSheetModel(
+          fileId,
+          session.mode,
+          session.wb,
+          session.model,
+          session.idMap,
+          session.revision,
+        );
         const still = parked.get(fileId);
         if (still === session) parked.delete(fileId);
         const live = liveDirty.get(fileId);
         if (live && live.dirtyGen() === genBefore) {
-          live.diskLen = len;
+          live.diskLen = saved.len;
+          live.revision = saved.revision;
           live.onFlushed(genBefore);
         }
-      } catch {
-        /* stays parked */
+      } catch (error) {
+        failures.push(`${fileId}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
-  } finally {
-    flushing = false;
-  }
+    if (failures.length > 0) throw new Error(failures.join("; "));
+  })().finally(() => {
+    activeFlush = null;
+  });
+  return activeFlush;
 }
 
 export interface ParkedSession {
@@ -98,6 +114,7 @@ export interface ParkedSession {
   model: SheetModel;
   idMap: Map<string, number>;
   diskLen: number;
+  revision: string;
   mode: SheetFileMode;
 }
 
@@ -123,10 +140,10 @@ export function unregisterLiveDirty(fileId: string): void {
 
 if (typeof document !== "undefined") {
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") void flushDirtySheets();
+    if (document.visibilityState === "hidden") void flushDirtySheets().catch(() => {});
   });
   window.addEventListener("pagehide", () => {
-    void flushDirtySheets();
+    void flushDirtySheets().catch(() => {});
   });
 }
 onQuitFlush(() => flushDirtySheets());

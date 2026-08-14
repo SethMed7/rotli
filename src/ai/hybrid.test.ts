@@ -115,6 +115,22 @@ describe("parseRouteChoice", () => {
 });
 
 describe("runHybrid", () => {
+  test("passes a routed model's clarification through without manufacturing an empty final", async () => {
+    const { makeHost } = makeHosts({
+      "gemma-3": ['{"route":1}'],
+      sonnet: ['{"question":"Which audience?","options":["Customers","Team"]}'],
+    });
+    const { events, final } = await collect(runHybrid(PRESET, MODELS, INPUT, makeHost));
+
+    expect(events).toContainEqual({
+      type: "question",
+      prompt: "Which audience?",
+      options: ["Customers", "Team"],
+    });
+    expect(events.some((event) => event.type === "final")).toBe(false);
+    expect(final).toBe("");
+  });
+
   test("organizer routes to route 2 and the refined prompt reaches the executor", async () => {
     const { makeHost, prompts } = makeHosts({
       "gemma-3": ['{"route":2,"refinedPrompt":"solve X precisely"}'],

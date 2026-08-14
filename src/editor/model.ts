@@ -20,16 +20,21 @@ const SYNC_DEBOUNCE_MS = 400;
 const RETRY_DELAY_MS = 5000;
 
 const docs = new Map<string, string[]>();
+const revisions = new Map<string, string>();
 const subs = new Map<string, Set<() => void>>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
 // The one write funnel syncNow uses — swappable so tests can simulate the disk
 // failing (the in-memory test service can't fail any other way).
-let writeNoteBody: (noteId: string, body: string) => Promise<Note | void> = (noteId, body) =>
-  notesService.updateNote(noteId, body);
+let writeNoteBody: (noteId: string, body: string, expectedRevision: string) => Promise<Note | void> = (
+  noteId,
+  body,
+  expectedRevision,
+) => notesService.updateNote(noteId, body, expectedRevision);
 
 export function setWriteNoteBodyForTests(fn: typeof writeNoteBody | null): void {
-  writeNoteBody = fn ?? ((noteId, body) => notesService.updateNote(noteId, body));
+  writeNoteBody =
+    fn ?? ((noteId, body, expectedRevision) => notesService.updateNote(noteId, body, expectedRevision));
 }
 
 // ——— checkbox signature: the Tasks projection walks the corpus (corpus_tasks),
@@ -69,7 +74,7 @@ export function useDocumentDirty(noteId: string): boolean {
 }
 
 // ——— save failures SURFACE (perf audit 2026-07-30, correctness #1): a write
-// that fails for any reason other than "the note is gone" keeps the buffer,
+// that fails for any reason keeps the buffer,
 // shows itself in the editor, and retries — silence here is data loss. ———
 
 const saveErrors = new Map<string, string>();
@@ -110,22 +115,24 @@ export function useDocumentSaveError(noteId: string): string | null {
 
 /** Seed the buffer from the service body. No-op if the note is already open
  * somewhere — the live buffer is the truth, never the (possibly stale) query. */
-export function ensureDocument(noteId: string, body: string): void {
+export function ensureDocument(noteId: string, body: string, revision: string): void {
   if (docs.has(noteId)) return;
   const lines = body.split("\n");
   docs.set(noteId, lines);
+  revisions.set(noteId, revision);
   taskSigs.set(noteId, taskSignature(lines));
 }
 
 /** Replace a CLEAN buffer with disk truth (external edit / agent write). No-op
  * when the note has unsaved local edits — those win until flush. Seeds when
  * the buffer doesn't exist yet. */
-export function reloadDocumentIfClean(noteId: string, body: string): void {
+export function reloadDocumentIfClean(noteId: string, body: string, revision: string): void {
   if (dirtyIds.has(noteId)) return;
   const next = body.split("\n");
   const cur = docs.get(noteId);
   if (cur && cur.length === next.length && cur.every((l, i) => l === next[i])) return;
   docs.set(noteId, next);
+  revisions.set(noteId, revision);
   taskSigs.set(noteId, taskSignature(next));
   const set = subs.get(noteId);
   if (set) for (const fn of set) fn();
@@ -139,6 +146,7 @@ export function evictDocument(noteId: string): void {
   if (pending !== undefined) clearTimeout(pending);
   timers.delete(noteId);
   docs.delete(noteId);
+  revisions.delete(noteId);
   taskSigs.delete(noteId);
   setDirty(noteId, false);
   setSaveError(noteId, null);
@@ -165,9 +173,15 @@ export function editDocument(noteId: string, edit: (lines: readonly string[]) =>
 function syncNow(noteId: string): Promise<void> {
   const lines = docs.get(noteId);
   if (!lines) return Promise.resolve();
-  return writeNoteBody(noteId, lines.join("\n"))
+  const expectedRevision = revisions.get(noteId);
+  if (!expectedRevision) {
+    setSaveError(noteId, "This note has no save revision. Reload it before editing.");
+    return Promise.resolve();
+  }
+  return writeNoteBody(noteId, lines.join("\n"), expectedRevision)
     .then((note) => {
       setSaveError(noteId, null);
+      if (note) revisions.set(noteId, note.revision);
       // saved — unless newer keystrokes already queued the next sync
       if (!timers.has(noteId)) setDirty(noteId, false);
       if (!note) return; // test stub — no cache to patch
@@ -181,16 +195,19 @@ function syncNow(noteId: string): Promise<void> {
       return applyNoteWrite(note, { tasksChanged });
     })
     .catch((err: unknown) => {
-      // the note is gone (deleted with a pending sync): drop the orphan buffer.
-      if (err instanceof Error && err.message.startsWith("unknown note")) {
-        evictDocument(noteId);
-        return;
-      }
-      // any other failure (read-only volume, permissions, disk full) keeps the
+      // Any failure (missing/renamed note, read-only volume, permissions, disk full) keeps the
       // buffer AND says so: the note stays dirty, the editor shows the error,
       // and a retry timer keeps the sync alive even with no further keystroke.
       // The retry rides the timers map, so quit-flush picks it up too.
       setSaveError(noteId, err instanceof Error ? err.message : String(err));
+      // A conflict is durable until the user resolves the two versions. Blind
+      // retries would only hammer the disk and can never become safe on their
+      // own; the live local buffer stays intact and visibly dirty.
+      if (
+        err instanceof Error &&
+        (err.message.startsWith("revision conflict") || err.message.startsWith("unknown note"))
+      )
+        return;
       scheduleRetry(noteId);
     });
 }
@@ -234,14 +251,23 @@ export function flushNote(noteId: string): Promise<void> {
  * 400ms window must never eat the last keystrokes once the disk-backed service
  * lands. Resolves when every write settles, so the quit handshake can hold the
  * exit until the IPC lands. */
-export function flushSyncs(): Promise<void> {
+export async function flushSyncs(): Promise<void> {
   const pending: Array<Promise<void>> = [];
   for (const [noteId, timer] of timers) {
     clearTimeout(timer);
     pending.push(syncNow(noteId));
   }
   timers.clear();
-  return Promise.allSettled(pending).then(() => undefined);
+  await Promise.allSettled(pending);
+  const unsaved = [...dirtyIds];
+  if (unsaved.length > 0) {
+    const detail = unsaved
+      .map((noteId) => saveErrors.get(noteId))
+      .filter((message): message is string => Boolean(message))[0];
+    throw new Error(
+      `${unsaved.length} note${unsaved.length === 1 ? "" : "s"} still has unsaved edits${detail ? `: ${detail}` : ""}`,
+    );
+  }
 }
 
 // Keystrokes are never lost: quit/reload (pagehide), the window hiding under
@@ -249,10 +275,10 @@ export function flushSyncs(): Promise<void> {
 // all flush the debounce window immediately. ⌘Q/tray-Quit can fire with the
 // window still focused (no hide, no blur), so the quit handshake awaits the
 // same flush before the process exits.
-window.addEventListener("pagehide", () => void flushSyncs());
-window.addEventListener("blur", () => void flushSyncs());
+window.addEventListener("pagehide", () => void flushSyncs().catch(() => {}));
+window.addEventListener("blur", () => void flushSyncs().catch(() => {}));
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) void flushSyncs();
+  if (document.hidden) void flushSyncs().catch(() => {});
 });
 onQuitFlush(flushSyncs);
 

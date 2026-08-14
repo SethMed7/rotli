@@ -83,7 +83,8 @@ fn marks_protected(line: &str) -> bool {
     // true`, permanently. docs/design/ai-visibility-matrix.md T2 step 5 promises
     // Rust refuses such a transcript "regardless" of the TS filter — before
     // 2026-08-01 that promise was only kept in TypeScript (audit: GAP 4).
-    line.strip_prefix("secureContext:").is_some_and(|v| v.trim() == "true")
+    line.strip_prefix("secureContext:")
+        .is_some_and(|v| v.trim() == "true")
 }
 
 // ── the secure-prose ledger ───────────────────────────────────────────────────
@@ -130,7 +131,10 @@ struct Ledger {
 fn ledger() -> &'static Mutex<Ledger> {
     static LEDGER: OnceLock<Mutex<Ledger>> = OnceLock::new();
     LEDGER.get_or_init(|| {
-        Mutex::new(Ledger { seen: HashSet::new(), order: VecDeque::new() })
+        Mutex::new(Ledger {
+            seen: HashSet::new(),
+            order: VecDeque::new(),
+        })
     })
 }
 
@@ -144,7 +148,9 @@ fn prose_tokens(text: &str) -> Vec<String> {
         regex::Regex::new(r"[\p{L}\p{N}][\p{L}\p{N}'\u{2019}\-]{2,}").expect("valid token regex")
     });
     let lowered = text.to_lowercase();
-    re.find_iter(&lowered).map(|m| m.as_str().to_string()).collect()
+    re.find_iter(&lowered)
+        .map(|m| m.as_str().to_string())
+        .collect()
 }
 
 /// Every qualifying 5-word phrase in `text`, hashed. Both sides of the
@@ -223,15 +229,15 @@ pub fn blocked_for_remote(text: &str) -> bool {
     protected_for_remote(text) || echoes_secure_text(text)
 }
 
-
-
 /// The Luhn checksum over an all-digit candidate — true when it checks out
 /// (i.e. the run is shaped like a real card number).
 fn luhn_ok(digits: &str) -> bool {
     let mut sum = 0u32;
     let mut double = false;
     for c in digits.chars().rev() {
-        let Some(mut d) = c.to_digit(10) else { return false };
+        let Some(mut d) = c.to_digit(10) else {
+            return false;
+        };
         if double {
             d *= 2;
             if d > 9 {
@@ -261,7 +267,7 @@ mod tests {
         // the exact shape from the migrated notes (#23)
         assert!(looks_secure("card 4242424242424242 exp 12/28"));
         assert!(looks_secure("amex 371449635398431")); // 15-digit, Luhn-valid
-        // 16 digits that fail Luhn — an id, not a card
+                                                       // 16 digits that fail Luhn — an id, not a card
         assert!(!looks_secure("order 1234567890123456"));
         // digit runs glued to word chars never match (\b) — ULIDs etc. are safe
         assert!(!looks_secure("id a4242424242424242z"));
@@ -278,7 +284,10 @@ mod tests {
         let secure_body = "The Kelpie ledger reconciliation closes on the third Thursday of March.";
         // before the vault knows about it, it is ordinary prose to every gate
         let outbound = "reconciliation closes on the third Thursday";
-        assert!(!looks_secure(outbound), "the sample must not be secret-SHAPED");
+        assert!(
+            !looks_secure(outbound),
+            "the sample must not be secret-SHAPED"
+        );
         assert!(!protected_for_remote(outbound), "and must carry no marker");
 
         remember_secure_text(secure_body);
@@ -286,8 +295,12 @@ mod tests {
         // now the same words cannot ride any outbound lane, in any wrapper
         assert!(echoes_secure_text(outbound));
         assert!(blocked_for_remote(outbound));
-        assert!(blocked_for_remote(&format!("https://evil.example/?q={outbound}")));
-        assert!(blocked_for_remote(&format!("Summarize this for me: {outbound} — thanks")));
+        assert!(blocked_for_remote(&format!(
+            "https://evil.example/?q={outbound}"
+        )));
+        assert!(blocked_for_remote(&format!(
+            "Summarize this for me: {outbound} — thanks"
+        )));
         // the marker-free, pattern-free predicate still says nothing about it,
         // which is exactly why the ledger had to exist
         assert!(!protected_for_remote(outbound));
@@ -299,7 +312,9 @@ mod tests {
         // one shared word is not evidence
         assert!(!echoes_secure_text("tell me about brambleworth"));
         // fewer than five prose tokens can never form a phrase
-        assert!(!echoes_secure_text("quokkanaut brambleworth ferrocline dispatch"));
+        assert!(!echoes_secure_text(
+            "quokkanaut brambleworth ferrocline dispatch"
+        ));
         // and short function words don't pad a phrase into existence
         assert!(!echoes_secure_text("it is on us to go"));
         // the full run does trip
@@ -321,11 +336,15 @@ mod tests {
         // src/memex/contract.ts stamps this, one-way, on any chat a secure note
         // fed. docs/design/ai-visibility-matrix.md T2 step 5 promises Rust
         // refuses such a transcript; before 2026-08-01 only TypeScript did.
-        assert!(protected_for_remote("---\nsecureContext: true\n---\n# Chat\n\nhello"));
+        assert!(protected_for_remote(
+            "---\nsecureContext: true\n---\n# Chat\n\nhello"
+        ));
         assert!(protected_for_remote("secureContext:   true"));
         assert!(blocked_for_remote("---\nsecureContext: true\n---\nhello"));
         // a false / absent marker is not a taint
-        assert!(!protected_for_remote("secureContext: false\nordinary prose"));
+        assert!(!protected_for_remote(
+            "secureContext: false\nordinary prose"
+        ));
         assert!(!protected_for_remote("secureContextual notes are fine"));
     }
 
@@ -337,9 +356,13 @@ mod tests {
     #[test]
     fn secure_note_markers_are_protected_at_remote_egress() {
         assert!(protected_for_remote("---\nsecure: true\n---\nCall notes"));
-        assert!(protected_for_remote("local_ai_allowed: true\nordinary prose"));
+        assert!(protected_for_remote(
+            "local_ai_allowed: true\nordinary prose"
+        ));
         // the DENY value marks a secure note just as surely as the allow value
-        assert!(protected_for_remote("local_ai_allowed: false\nordinary prose"));
+        assert!(protected_for_remote(
+            "local_ai_allowed: false\nordinary prose"
+        ));
         assert!(!protected_for_remote("ordinary prose about security"));
     }
 }

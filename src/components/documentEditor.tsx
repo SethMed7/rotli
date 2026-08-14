@@ -35,8 +35,10 @@ export default function DocumentEditor({
   const sessionRef = useRef<ReadyDocumentSession | null>(null);
   const handleRef = useRef<DocumentEngineHandle | null>(null);
   const diskLenRef = useRef(0);
+  const diskRevisionRef = useRef("");
   const dirtyGenRef = useRef(0);
   const armedRef = useRef(false);
+  const pendingEngineDisposeRef = useRef<Promise<void>>(Promise.resolve());
   const [ready, setReady] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -54,18 +56,24 @@ export default function DocumentEditor({
     if (!host) return;
     let disposed = false;
     let disposeEngine: (() => void) | null = null;
+    const previousEngineDisposal = pendingEngineDisposeRef.current;
     armedRef.current = false;
     setReady(false);
     setErr(null);
 
     void (async () => {
       try {
+        // Univer owns a nested React root. A structural remount waits for the
+        // prior root's deferred teardown so two engines never share this host.
+        await previousEngineDisposal;
+        if (disposed) return;
         const stat = await corpusFileStat(fileId);
         if (!stat?.writable) throw new Error("This document is in a read-only location.");
         diskLenRef.current = stat.len;
+        diskRevisionRef.current = stat.revision;
 
         let park = getParkedDocument(fileId);
-        if (park && park.diskLen !== stat.len) {
+        if (park && park.diskRevision !== stat.revision) {
           deleteParkedDocument(fileId);
           park = undefined;
         }
@@ -78,6 +86,7 @@ export default function DocumentEditor({
           dirtyGenRef.current = Math.max(1, park.dirtyGen);
           setDirty(true);
           setWarnings(session.warnings);
+          diskRevisionRef.current = park.diskRevision;
         } else {
           const outcome = await editManagedDocument(fileId);
           if (outcome.kind === "too-large") {
@@ -132,13 +141,31 @@ export default function DocumentEditor({
             session,
             document: handle.save(),
             diskLen: diskLenRef.current,
+            diskRevision: diskRevisionRef.current,
             dirtyGen: dirtyGenRef.current,
           });
         }
       } catch {
         /* an editor teardown must never block tab or theme changes */
       }
-      disposeEngine?.();
+      if (disposeEngine) {
+        const dispose = disposeEngine;
+        // React refuses a synchronous nested-root unmount while it is committing
+        // this component's cleanup. Move the vendor teardown past that commit;
+        // the next mount awaits it above before touching the same host.
+        pendingEngineDisposeRef.current = new Promise((resolve) => {
+          window.setTimeout(() => {
+            try {
+              dispose();
+            } catch {
+              // Teardown must release the tab even if Univer has already
+              // disposed one of its RxJS services during hot replacement.
+            } finally {
+              resolve();
+            }
+          }, 0);
+        });
+      }
       handleRef.current = null;
       sessionRef.current = null;
     };
@@ -151,21 +178,24 @@ export default function DocumentEditor({
       unregisterLiveDocument(fileId);
       return;
     }
-    registerLiveDocument({
+    const entry: Parameters<typeof registerLiveDocument>[0] = {
       fileId,
       session,
       snapshot: () => handle.save(),
       diskLen: diskLenRef.current,
+      diskRevision: diskRevisionRef.current,
       dirtyGen: () => dirtyGenRef.current,
       onFlushed: (generation) => {
         if (dirtyGenRef.current === generation) {
+          diskRevisionRef.current = entry.diskRevision;
           dirtyGenRef.current = 0;
           setDirty(false);
           deleteParkedDocument(fileId);
           unregisterLiveDocument(fileId);
         }
       },
-    });
+    };
+    registerLiveDocument(entry);
     return () => unregisterLiveDocument(fileId);
   }, [dirty, fileId, ready]);
 
@@ -177,7 +207,7 @@ export default function DocumentEditor({
     setSaving(true);
     setErr(null);
     try {
-      await session.save(handle.save());
+      diskRevisionRef.current = await session.save(handle.save());
       const stat = await corpusFileStat(fileId).catch(() => null);
       if (stat) diskLenRef.current = stat.len;
       if (dirtyGenRef.current === generation) {

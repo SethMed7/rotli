@@ -8,7 +8,7 @@
 // eventually a dashboard", and the parked email Inbox is a third front waiting
 // in ROADMAP.md. Both arrive as one entry in SIDEBAR_FRONTS.
 
-import type { SidebarView } from "../../state/ui";
+import type { ContentView, DashboardSection, SidebarView } from "../../state/ui";
 import { ChatGlyph, HomeGlyph } from "../glyphs";
 
 const SIDEBAR_FRONTS: {
@@ -36,12 +36,30 @@ const SIDEBAR_FRONTS: {
   },
 ];
 
+/** A full dashboard is its own selected destination. Keep rendering the last
+ * sidebar front underneath it, but do not claim that Home or Chat is the
+ * active surface while the overview card is selected. */
+export function sidebarFrontSelection(value: SidebarView, contentView: ContentView): SidebarView | null {
+  return contentView === "dashboard" ? null : value;
+}
+
+/** Each dashboard lens keeps its owning overview card in view. This does not
+ * persist a front change until the user explicitly picks Home or Chat. */
+export function sidebarFrontBody(
+  value: SidebarView,
+  contentView: ContentView,
+  dashboardSection: DashboardSection,
+): SidebarView {
+  if (contentView !== "dashboard") return value;
+  return dashboardSection === "models" ? "chat" : "home";
+}
+
 export function SidebarSwitcher({
   value,
   onPick,
   chatCount,
 }: {
-  value: SidebarView;
+  value: SidebarView | null;
   onPick: (view: SidebarView) => void;
   /** Chats in this vault — a quiet count on the Chat segment, so switching
    * fronts is never a blind jump. Hidden at 0. */

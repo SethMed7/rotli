@@ -68,7 +68,7 @@ describe("createNote / getNote / updateNote", () => {
   test("re-derives title/snippet and bumps updatedAt on update", async () => {
     const svc = freshService();
     const note = await svc.createNote(DEST.inbox, "# Before");
-    const updated = await svc.updateNote(note.id, "# After\n\nnew body");
+    const updated = await svc.updateNote(note.id, "# After\n\nnew body", note.revision);
     expect(updated.title).toBe("After");
     expect(updated.snippet).toBe("new body");
     expect(updated.createdAt).toBe(note.createdAt); // created never moves
@@ -78,7 +78,15 @@ describe("createNote / getNote / updateNote", () => {
 
   test("throws a recognizable 'unknown note' error on a missing update", async () => {
     const svc = freshService();
-    expect(svc.updateNote("ghost", "x")).rejects.toThrow("unknown note: ghost");
+    expect(svc.updateNote("ghost", "x", "memory:missing")).rejects.toThrow("unknown note: ghost");
+  });
+
+  test("refuses a stale whole-body update", async () => {
+    const svc = freshService();
+    const opened = await svc.createNote(DEST.inbox, "# Original");
+    const external = await svc.updateNote(opened.id, "# External", opened.revision);
+    await expect(svc.updateNote(opened.id, "# Stale", opened.revision)).rejects.toThrow("revision conflict");
+    expect(await svc.getNote(opened.id)).toEqual(external);
   });
 });
 

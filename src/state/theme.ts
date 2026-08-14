@@ -25,7 +25,9 @@ export function applySyntaxPalette(value: SyntaxPalette): void {
 
 /** The primary color rides a data attribute beside the theme — "default"
  * removes it so each theme's own accent truth applies. */
-export function applyAccent(value: AccentColor): void {
+export function applyAccent(value: AccentColor, hue = 210): void {
+  const safeHue = Number.isFinite(hue) && hue >= 0 && hue <= 359 ? Math.round(hue) : 210;
+  document.documentElement.style.setProperty("--accent-hue", String(safeHue));
   if (value === "default") delete document.documentElement.dataset.accent;
   else document.documentElement.dataset.accent = value;
 }

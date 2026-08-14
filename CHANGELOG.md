@@ -10,6 +10,269 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breve now opens as a vault-specific news dashboard.** The latest saved
+  briefs form a most-recent-first carousel on the left while Top stories stays
+  visible on the right, with watchlist sources, actions, upcoming routines, and
+  sanitized scheduler activity below. Watchlist has an explicit **Refresh last
+  30 days** action: it saves pending topic changes first, generates one
+  in-app brief in that vault in production, and reports its bounded lifecycle
+  through Breve Notifications. Development only previews that action in memory;
+  it does not run a model or write a production vault.
+
+- **Browser is available from New and ⌥T.** The New chooser exposes a Browser
+  action alongside Chat and durable file types, and the same action is
+  independently rebindable in Keybindings. It opens the user's default web
+  browser without creating a fake vault item.
+
+- **Global search now happens in the titlebar field itself.** Clicking search or
+  pressing ⌘K focuses the same top field and unfolds results directly beneath
+  it instead of opening a centered modal. A semantic fade quiets the rest of
+  the workspace while leaving the field, results, and underlying content crisp.
+  The field keeps one clean container: the Rotli mark and ⌘K hint no longer sit
+  inside extra chips. Search sections now follow their strongest result, so an
+  exact or prefix filename/title match rises above incidental note-body hits
+  instead of being buried by a fixed Notes-before-Files order.
+
+- **Development builds now keep a recognizable Dock icon.** The unbundled
+  `tauri dev` executable sets Rotli's quokka icon at runtime instead of falling
+  back to macOS's generic `exec` tile, with a fixed blue background that keeps
+  it visibly distinct from the production app. Its runtime-safe artwork uses
+  the same optical Dock footprint as the production icon rather than filling
+  the entire slot. Release icon choices are unchanged.
+
+- **Chat naming now lives in the chat header.** Fresh and saved chats share a
+  quiet `view / chat name` breadcrumb instead of putting a second title field
+  above the composer. The fixed header now remains the first row in fresh and
+  saved chats instead of being displaced beneath the welcome area. Ask-first
+  mode focuses that optional header name and Enter advances directly to the
+  message; First-message mode bypasses naming and derives a normalized title
+  automatically. Saved titles remain directly editable in the same header and
+  update their sidebar and tab labels without changing the durable Markdown
+  filename.
+
+- **Onboarding now owns the vault and model decisions end to end.** Completing
+  shortcuts always proceeds to an explicit vault choice—even in development—
+  with options to create a tagged Rotli vault, review an existing folder, use a
+  practice vault, or deliberately keep a configured vault. Development writes
+  only its isolated vault binding and no longer treats the production fallback
+  as selected. After vault activation, a relaunch-safe final step can install a
+  starter on-device model or connect authenticated Claude Code, Codex, and
+  Antigravity lanes; model setup remains optional and clearly labels connected
+  models as remote.
+  The model step now reuses and lists every registered on-device model, lets
+  users select the MLX default or confirm removal, and exposes the curated
+  install catalog model by model. Back buttons now display and invoke Rotli's
+  real remappable Back chord across preferences, vault substates, and models.
+  The shared setup frame now keeps its footer fixed across every step; long
+  model or vault content scrolls inside the middle stage instead of moving the
+  primary action. Progress now remains one continuous six-step count across
+  preferences, vault, and models. The model screen groups local models,
+  installs, and subscriptions into compact disclosures with explicit scroll
+  cues, while the slowly alternating edge companions remain present through
+  the complete onboarding flow. Those disclosures now use Rotli's shared
+  chevron and show the approved Gemma, Qwen, Llama, Phi, Mistral, Claude,
+  OpenAI, and Gemini-family marks beside the models they identify.
+
+- **Onboarding appearance separates theme from mode.** The same Charcoal,
+  Paper, Warm Light, and Warm Dark token sets are organized as two families—
+  Paper & Charcoal, and Rotli—with explicit Light, Dark, and System choices.
+  Selecting Light or Dark turns System off; System follows macOS within the
+  selected family. Primary color leads with the
+  environment's own accent, keeps the existing presets, and adds a persisted,
+  contrast-managed custom hue. Dock companion now leads the window choices,
+  and two partly hidden characters remain at the welcome edges while a slow,
+  low-opacity pair alternates positions; reduced motion keeps the scene static.
+
+- **Chat dates now share the message hover row.** The timestamp appears beside
+  Copy (and Read aloud when available) on message hover or keyboard focus,
+  keeping the transcript quiet without separating related metadata controls.
+
+- **Rotli activity and model usage are now separate, honest dashboards.** Home
+  opens vault note/chat activity; Chat opens local provider usage. Both lenses
+  offer 24-hour, 7-, 30-, and 90-day ranges, while model usage adds trends,
+  provider coverage, and a model breakdown. Rust scans fixed Claude Code/Codex history directories and
+  returns aggregates only—never prompts, replies, paths, filenames, or session
+  ids. Exact recognized models also show a dated standard-API dollar estimate;
+  unknown IDs stay unpriced, and the comparison is explicitly not subscription
+  billing. The browser twin does not imitate native telemetry. Loading now has
+  a restrained reading state, range changes retain the last complete dashboard,
+  and native scans reuse unchanged histories or parse only newly appended bytes.
+  While a dashboard is open, its sidebar overview card now owns the active
+  treatment instead of leaving a stale Home/Chat or note selection highlighted.
+- **The Claude Code docs extension is easier to copy confidently.** Its action
+  now lives on the instruction block it copies, uses the standard copy glyph,
+  and reports copied or clipboard-failure state without shifting the content.
+- **Long-running model plans read as progress instead of transcript noise.**
+  Standard Markdown task lists and provider-style checkbox symbols render as a
+  compact read-only checklist with pending, current, completed, and completion
+  count states. Local and frontier prompts use the same task-list grammar only
+  when a multi-step job benefits from visible progress.
+
+- **General can keep inactive work out of the way without deleting it.** Two
+  opt-in, default-off settings can unlink untouched items from Main or move
+  untouched chats into the recoverable Chat Archive after a chosen number of
+  days. Viewing resets the app-owned inactivity clock; pinned and open items
+  stay put, and Main cleanup never moves or edits the underlying file.
+- **Chat transcripts render more like structured documents.** Assistant
+  headings, nested bullet/numbered lists, quotes, code blocks, attached images,
+  and original send times now have dedicated presentation. General can show
+  message times on a 12- or 24-hour clock, and file-local Command-F opens an
+  in-editor find bar.
+- **Settings and sidebar utilities are quieter.** The former Hotkeys section is
+  now Keybindings, and the Files/Librarian/Settings footer uses an inset fade
+  and steadier spacing instead of a hard full-width divider.
+
+- **Chat model controls now match the native provider.** The model picker is
+  grouped by provider instead of opening one long list. Claude and Codex chats
+  expose per-chat reasoning effort; Codex also offers Standard/Fast service
+  routing. Rust independently allowlists every IPC value before constructing
+  subprocess arguments.
+- **Chat activity and Home summaries are easier to scan.** Completed runs stay
+  in a separated session Activity lane, chat folders float by newest activity,
+  rows show compact last-chat times, and nested trees gain quiet guide lines.
+  Home starts with factual new-note, updated-note, and selected-model counts for
+  the week; Rotli does not invent a human-vs-AI word split without provenance.
+- **Chat and editor controls received an optical alignment pass.** The prompt
+  marker bars center in their rail, the composer meets the transcript with a
+  semantic fade, the add control is unboxed, compact Rotli marks use the
+  detailed line art, fresh-chat content sits higher, and the editor return-to-
+  top control matches the floating format bar.
+
+- **Tab bars stay still under the pointer.** Hover and active styling now use
+  fixed geometry with reserved close-button space, so neighboring tabs no
+  longer jump. Settings → General can keep readable horizontally scrolling
+  tabs or shrink the full tab set to fit the pane.
+
+- **Fresh chats now feel composed instead of empty.** A compact Rotli companion
+  asks “What should we work on?” beside the prompt instead of sitting inside a
+  decorative time-of-day card. An optional onboarding name personalizes that
+  line, and Lively adds one restrained arrival hop rather than a continuous idle
+  loop. Useful vault-aware starters sit beneath a wider, centered composer.
+- **Chat artifacts now open where the user expects.** The default reuses one
+  right-side working pane for every artifact from a chat; Settings can instead
+  choose a new pane or new tab. Word/document buttons
+  now span the message width and remain attached to the assistant response that
+  presents them.
+- **Long chats are easier to navigate and clarify.** A quiet left-edge prompt
+  navigator stays open while the pointer crosses into its compact, top-aligned
+  prompt list and jumps to earlier user turns. Hovering or keyboard-focusing a
+  prompt previews its matching rail marker with a lower-opacity accent while
+  the current prompt keeps the stronger state. Every local/connected/hybrid model can surface the same
+  compact clarification bar; the composer groups attachments and web search
+  under one add menu, keeps the model beside Send, and reminds users to verify
+  important model responses.
+- **Chat artifacts now preserve the file format the user requested.** Word and
+  DOCX requests create real editable `.docx` files through the managed document
+  workflow; ambiguous “document” requests ask Word versus Markdown. Images
+  generated in the same run are embedded as ordinary editable DOCX media, and
+  generated headings, lists, tables, and spacing use native Word structure.
+  Images, boards, and documents stay closed until selected from the chat's
+  quiet full-height artifact rail or its compact narrow-pane header menu. Word
+  files now use a recognizable blue Word mark and remain directly clickable as
+  document buttons inside the originating chat.
+- **Working chats now stay visible without continuous sidebar motion.** The
+  Working lane and status dot update immediately when a run changes state, then
+  remain static instead of pulsing for the duration of the response.
+- **Native development now uses the live vault's real organization and write
+  contracts.** `bun run tauri dev` opens the production-selected vault through
+  the same revision, locking, containment, and secure/locked gates as the
+  installed app, including vault settings, model choices, portable Main, and
+  named views. Window-only debug state remains isolated, and location changes
+  plus live delivery tests stay disabled in development.
+- **Update checks are now explicit.** Rotli contacts the signed updater feed
+  only when the user chooses Check for updates in Settings; launch, window
+  visibility, and background timers remain offline.
+- **Breve remote briefs fail closed behind the current vault policy.** Each
+  model spawn rebuilds its macOS sandbox denials for secure, tainted, locked,
+  derived, and Git files. The knowledge-bearing Codex fallback was removed
+  because its sandbox could not express the same per-file read boundary.
+- **Vault is now the consistent product vocabulary.** Current contracts call
+  the user-owned folder a vault and describe Rotli's metadata/projection layer
+  separately; legacy `memex` filenames and APIs remain unchanged for
+  compatibility.
+
+### Fixed
+
+- **A new vault now opens as a real empty workspace.** Its welcome and mini
+  tutorial are transient UI, so Rotli does not create a throwaway tutorial note
+  or probe an empty note id. Naming the first note creates it through the normal
+  vault workflow. Chat, board, and rich-file tabs also keep a bounded three-item
+  warm cache, reducing WebKit rebuild stalls while preserving independent chat
+  drafts and multiple simultaneously open chats.
+- **Chat setup controls are more compact and stable.** The optional title's
+  Enter hint now lives inside the title field, and the model chooser groups
+  Local, Claude Code, Codex, and Antigravity behind a provider rail with search,
+  family marks, keyboard navigation, and a bounded scrolling result list.
+
+- **Onboarding card shortcuts work before the cards have focus.** Arrow and
+  visible number keys now move from the selected card on every choice step,
+  while editors and other controls retain their keys. Vault activation also
+  names the exact folder action, and app setup proceeds directly to that real
+  picker instead of stopping on a misleading passive “choose where notes live”
+  screen.
+
+- **Chat image attachments survive reload without trusting the webview.** File
+  picks and drops are copied atomically into the initiating registered vault,
+  transcripts keep portable `storage:` links, unsupported or mislabeled bytes
+  fail before import, and asynchronous artifact creation stays pinned to that
+  vault even if the user changes the active sidebar context mid-run.
+- **Switching tabs no longer erases an unsent chat draft.** Titles, message
+  text, and image attachments are owned by the initiating tab, and an async
+  first save can no longer bind its result to a different active tab.
+- **Native chat writes and external changes now refresh immediately.** A newly
+  created chat note is readable before the watcher round trip, and watcher
+  delivery also refreshes chat folders plus the other filesystem-backed
+  projections so installed and development windows converge on the same vault
+  state.
+- **Chat detail controls no longer collide visually.** Selected provider art
+  keeps its native silhouette without a second tile, and the final reply's copy
+  controls share a footer with the Rotli mark instead of overlapping it.
+- **Generated Word visuals no longer reserve an empty-looking lead page.** The
+  DOCX and local editor now agree on inline drawing metadata and frame size,
+  and the image follows the document introduction with preserved aspect ratio.
+- **Generated chat images no longer become broken Markdown links.** Tool
+  observations provide the exact `storage:` source, same-run note creation
+  repairs a shortened generated basename, and successful generation refreshes
+  the asset index immediately.
+- **Concurrent edits no longer overwrite newer note, board, document, sheet,
+  CSV, generic-file, or saved-chat bytes.** Reads carry exact content revisions;
+  stale writes fail as conflicts and keep the local editor buffer available.
+- **Quit and every in-app relaunch now wait for all windows to save.** A failed
+  or timed-out Markdown, board, document, sheet, settings, or projection flush
+  cancels exit/restart and surfaces the failure instead of claiming success.
+- **External renames and deletes no longer discard a dirty Markdown draft.** An
+  unresolvable old locator retains its in-memory buffer and reports the conflict.
+- **Native file/folder IPC no longer accepts arbitrary absolute paths from the
+  webview.** Imports and root changes consume short-lived exact native-picker or
+  drag grants and reject home, credential, Keychain, and application-state roots.
+- **Root and chat identity fail closed under collisions.** Duplicate or malformed
+  root ids cannot replace an existing route; saved-chat creates refuse an
+  existing slug, updates require a revision, and secure taint is one-way in the
+  same locked write window.
+- **Headless CLI/MCP results no longer disclose secure structure indirectly.**
+  Main/views and metrics are remote-policy-filtered, status omits absolute root
+  paths, and queued opens require an agent-visible item.
+- **Round trips preserve more conventional-file data.** Excalidraw retains
+  unknown scene and element fields; DOCX retains unsupported XML/package
+  content or refuses an unsafe advanced edit; XLSX refuses packages containing
+  known advanced OOXML features that the current editor would silently drop.
+- **Context menus restore focus without retaining a cleared React event.**
+  Closing sidebar, vault, and new-item menus no longer raises an asynchronous
+  `currentTarget` error when their trigger has been rerendered.
+- **Document-editor styling no longer leaks into Rotli dialogs.** Opening a Word
+  pane keeps chat artifact menus and other application popovers in the active
+  Rotli environment instead of forcing the editor's white-paper palette.
+- **Concurrent organization can no longer silently erase newer structure or
+  metadata.** Main, named views, chat folders, raw frontmatter, note metadata,
+  Librarian writes, CLI, and MCP now share exact revisions and cross-process
+  filesystem locks. Named-view rollback never replaces a newer note edit.
+- **Breve runtime upgrades are staged and recoverable.** Rotli frozen-installs
+  immutable code and dependencies beside the mutable managed home, activates
+  them with an atomic directory swap, and restores the prior complete runtime
+  after a failed install or interrupted swap.
+
 ## [0.80.0] - 2026-08-08
 
 ### Added
@@ -160,7 +423,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.77.0] - 2026-08-05
 
-
 ### Changed
 
 - **A chat row shows its model, not a chat icon.** Every row in Chat was wearing
@@ -171,12 +433,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **One highlight per open chat.** A chat that was working (or unread) appeared
-  twice — once in the lane at the top, once in its real place — and *both* copies
+  twice — once in the lane at the top, once in its real place — and _both_ copies
   lit up as selected. The lanes are notifications, not locations, so only the
   row in the chat's real home is highlighted now.
 
 ## [0.76.0] - 2026-08-04
-
 
 ### Added
 
@@ -203,7 +464,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A task can be in progress, not just done or not.** Write `- [/]` and rotli
   draws the box half-filled — started work stops looking identical to work you
   haven't touched. It still shows on the Tasks surface, because started isn't
-  finished. In Settings → General → Checkboxes you can make a *click* walk
+  finished. In Settings → General → Checkboxes you can make a _click_ walk
   through it too: once for in progress, again for done. Typing `[/]` yourself
   works either way.
 
@@ -235,7 +496,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   toggle that lays out the real pipeline it runs — the schedule and its
   head-start, the sandbox, the model and its self-heal fallback, the render,
   audio and preview steps, the hold until delivery time, and every delivery lane.
-  Lanes you've switched off still appear, greyed, so you can see what *isn't*
+  Lanes you've switched off still appear, greyed, so you can see what _isn't_
   running as easily as what is. It's read-only in this pass and derived from the
   real scripts rather than stored, so nothing about your routines changed.
 
@@ -511,7 +772,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Secure and locked finally mean two different things.**
   **Secure** hides a note from cloud models — completely, no setting, no
-  exception. Models running on your own Mac *can* now read secure notes by
+  exception. Models running on your own Mac _can_ now read secure notes by
   default, which is the point of running one: nothing it reads leaves the
   machine. Any single note can still opt out from its menu, and the whole vault
   can from Settings → Security.
@@ -537,7 +798,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the quokka down before clipping the words.
 
 - **Every chat keeps its own model.** Two chats side by side can now run two
-  different models at once: the chip under the composer shows *that* chat's
+  different models at once: the chip under the composer shows _that_ chat's
   model, sends from that chat use it, and it stays with the chat across
   relaunches. Picking a model no longer reaches into every other open chat. A
   brand-new chat still starts on the last model you picked, so nothing changes
@@ -545,8 +806,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **On-device chats wait their turn instead of bogging down your Mac.** Run as
   many local chats as you like — before each reply starts, rotli checks how much
   memory this Mac actually has free right now and how big that model is. If
-  there's room it just goes; if there isn't, the message says *"queued — not
-  enough compute headroom right now"* and waits, with a **Prioritize** button to
+  there's room it just goes; if there isn't, the message says _"queued — not
+  enough compute headroom right now"_ and waits, with a **Prioritize** button to
   run it next. Stopping or leaving a queued message takes it back out of the
   line. There's no fixed limit on how many chats you can have open — a roomy Mac
   runs several at once, a smaller one runs them one after another. Claude, Codex
@@ -563,7 +824,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **"List the people in my vault" answers with your people.** The on-device
   model used to open the `people/` README — a note that explains how the folder
   is organized and names nobody — and read its list of links out loud, so a
-  *project* could end up in a list of your family. Three things changed: notes
+  _project_ could end up in a list of your family. Three things changed: notes
   filed under a folder you name ("people", "projects") now turn up in the
   model's search instead of only notes that spell that word out; the area's
   generated index — the note that actually lists everyone — is marked as such
@@ -1004,8 +1265,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Code blocks read like an IDE.** Fenced code with a language tag (```ts,
-  ```json, ```python, ```rust, ```bash and twenty-some more, aliases
+- **Code blocks read like an IDE.** Fenced code with a language tag (`ts,
+`json, `python, `rust, ```bash and twenty-some more, aliases
   included) renders with real syntax colors — keywords, strings, comments,
   numbers, functions, and types each in their own voice, tuned per theme by
   riding the accent palette. Languages load lazily so notes stay fast, an

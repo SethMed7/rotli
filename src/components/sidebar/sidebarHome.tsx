@@ -86,9 +86,11 @@ import {
 } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
 import { useNoteMenu } from "../useNoteMenu";
+import { homeDashboardSnapshot } from "./homeDashboardModel";
 import { noteDisplayTitle } from "./noteDisplayTitle";
 import { SidebarSystem, type SystemDestRow } from "./sidebarSystem";
 import { useActiveTree } from "./useActiveTree";
+import type { SidebarChatData } from "./useChatFolders";
 import { type RovingRow, useRovingList } from "./useRovingList";
 
 /** Capture-board glyph — a 2×2 grid of cards (the quick-capture Board button).
@@ -134,7 +136,7 @@ const DEST_ROWS: SystemDestRow[] = [
   { id: DEST.trash, label: "Trash", Glyph: TrashGlyph },
 ];
 
-export function SidebarHome({ zoom }: { zoom: number }) {
+export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatData }) {
   const foldersData = useFolders().data;
   // the COUNTS speak the same universe the All-notes surface renders
   // (useSearchableNotes — staged + Brain + Vault + added roots): counting the
@@ -142,6 +144,24 @@ export function SidebarHome({ zoom }: { zoom: number }) {
   // an ⌥C capture landed (#60, audit 2026-07). Cache reads, not new fetches.
   const searchableNotes = useSearchableNotes().notes;
   const searchableCount = searchableNotes.length;
+  const chatModelMap = useUiStore((s) => s.chatModel);
+  const dashboardModels = useMemo(
+    () =>
+      Object.fromEntries(
+        chats.chatList.flatMap((chat) => {
+          const scoped = chats.activeMemex ? `${chats.activeMemex.id}:${chat.slug}` : chat.slug;
+          const id = chatModelMap[scoped] ?? chatModelMap[chat.slug];
+          return id ? [[chat.slug, id]] : [];
+        }),
+      ),
+    [chatModelMap, chats.activeMemex, chats.chatList],
+  );
+  const dashboard = useMemo(
+    () => homeDashboardSnapshot(searchableNotes, dashboardModels, chats.chatList, Date.now()),
+    [searchableNotes, dashboardModels, chats.chatList],
+  );
+  const dashboardSection = useUiStore((s) => s.dashboardSection);
+  const setDashboardSection = useUiStore((s) => s.setDashboardSection);
   // the reserved queries — all served from the one cached corpus_list, so
   // these hooks are cache reads, not fetches
   const secureNotes = useNotes(DEST.secure).data ?? [];
@@ -251,9 +271,10 @@ export function SidebarHome({ zoom }: { zoom: number }) {
   // The DERIVED destination highlight (Seth #1, 2026-07-08): a destination/folder
   // row only reads "selected" while the focused tab's content actually LIVES
   // under it — a stale ⌘N create-target (e.g. Storage) no longer glows while you
-  // work in a Main note.
+  // work in a Main note. Full surfaces own selection while they are visible,
+  // so the note underneath the dashboard must not keep a second active pill.
   const focusedTab = useFocusedTab();
-  const focusedItemId = sidebarItemId(focusedTab);
+  const focusedItemId = contentView === "panes" ? sidebarItemId(focusedTab) : null;
   // failed row-menu actions (file-to-brain, board rename) land here — the menu
   // that launched them is gone by the time they fail (#11, audit 2026-07)
   const setRowActionError = useUiStore((s) => s.setRowActionError);
@@ -451,8 +472,11 @@ export function SidebarHome({ zoom }: { zoom: number }) {
         },
       );
     }
-    const rect = e.currentTarget.getBoundingClientRect();
-    openContextMenu(rect.left, rect.bottom + 4, items, { returnFocus: () => e.currentTarget.focus() });
+    const trigger = e.currentTarget;
+    const rect = trigger.getBoundingClientRect();
+    openContextMenu(rect.left, rect.bottom + 4, items, {
+      returnFocus: () => trigger.focus(),
+    });
   };
 
   // — Main pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell, so the
@@ -682,7 +706,7 @@ export function SidebarHome({ zoom }: { zoom: number }) {
             );
           }
           return (
-            <div key={f.id}>
+            <div key={f.id} className="main-branch">
               <button
                 type="button"
                 data-main-id={f.id}
@@ -716,7 +740,18 @@ export function SidebarHome({ zoom }: { zoom: number }) {
                     "clicking the folder" silently deleted it from Main. Removal
                     lives in the right-click menu, like note rows (2026-07-09). */}
               </button>
-              {open && renderMainTree(f.id, depth + 1, rp)}
+              {open && (
+                <div
+                  className="main-branch-children"
+                  style={
+                    {
+                      "--main-guide-left": `${contentPad - 9}px`,
+                    } as React.CSSProperties
+                  }
+                >
+                  {renderMainTree(f.id, depth + 1, rp)}
+                </div>
+              )}
             </div>
           );
         })}
@@ -1023,6 +1058,31 @@ export function SidebarHome({ zoom }: { zoom: number }) {
         {/* This wrapper is the roving listbox: Tab enters at the one tabIndex=0
             row, j/k walk it; the keyboard highlight is :focus-visible. */}
         <div className="sb-notes-tree" role="listbox" aria-label="Notes tree">
+          <button
+            type="button"
+            className={`sb-home-dashboard${contentView === "dashboard" && dashboardSection === "rotli" ? " sel" : ""}`}
+            aria-label="Open Rotli activity dashboard"
+            aria-current={contentView === "dashboard" && dashboardSection === "rotli" ? "page" : undefined}
+            onClick={() => {
+              setDashboardSection("rotli");
+              setContentView("dashboard");
+            }}
+          >
+            <div className="sb-home-dashboard-head">
+              <span>This week</span>
+              <span>Rotli activity&nbsp; ↗</span>
+            </div>
+            <div className="sb-home-dashboard-row">
+              <strong>Notes</strong>
+              <span>{dashboard.notes.newInRange} new</span>
+              <span>{dashboard.notes.updatedInRange} updated</span>
+            </div>
+            <div className="sb-home-dashboard-row chat">
+              <strong>Chats</strong>
+              <span>{dashboard.chat.activeInRange} active</span>
+              <span>{dashboard.chat.total} saved</span>
+            </div>
+          </button>
           <button
             type="button"
             className={`frow${contentView === "allNotes" ? " sel" : ""}`}

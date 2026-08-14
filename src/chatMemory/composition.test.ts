@@ -56,7 +56,7 @@ beforeEach(() => {
 
 describe("chat-memory sync obeys the AI write matrix", () => {
   test("an unlocked note is rewritten through the AI lane, carrying the model identity", async () => {
-    await updateNoteAsAi("n-1", "# Conversation\n\nnew body", MODEL);
+    await updateNoteAsAi("n-1", "# Conversation\n\nnew body", MODEL, "r1");
     expect(writes).toEqual([
       { id: "n-1", body: "# Conversation\n\nnew body", modelId: MODEL.id, endpoint: MODEL.endpoint },
     ]);
@@ -75,7 +75,7 @@ describe("chat-memory sync obeys the AI write matrix", () => {
   });
 
   test("no model given ⇒ the write is treated as REMOTE (the fail-closed direction)", async () => {
-    await updateNoteAsAi("n-1", "body");
+    await updateNoteAsAi("n-1", "body", undefined, "r1");
     expect(writes[0]?.endpoint).toBe("");
   });
 });

@@ -11,11 +11,12 @@
 import { useEffect, useRef } from "react";
 
 import { dispatch } from "../keys/registry";
+import { openUrl } from "../lib/tauri";
 import { createManagedItem, requestManagedBoardCreation } from "../newItems/composition";
 import { NEW_ITEM_DEFINITIONS, type NewItemKind } from "../newItems/model";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
-import { BoardGlyph, ChatGlyph, DocumentGlyph, FileGlyph, NewFileGlyph } from "./glyphs";
+import { BoardGlyph, BrowserGlyph, ChatGlyph, DocumentGlyph, FileGlyph, NewFileGlyph } from "./glyphs";
 
 function kindGlyph(kind: NewItemKind) {
   if (kind === "board") return <BoardGlyph size={22} />;
@@ -59,15 +60,25 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
     {
       digit: "1",
       label: "Chat",
-      description: "A conversation with your models over the memex.",
+      description: "A conversation with your models using your vault as context.",
       glyph: <ChatGlyph size={22} />,
       run: () => {
         close();
         dispatch("chat.new");
       },
     },
+    {
+      digit: "2",
+      label: "Browser",
+      description: "Open a new page in your default web browser.",
+      glyph: <BrowserGlyph size={22} />,
+      run: () => {
+        close();
+        void openUrl("https://www.google.com/");
+      },
+    },
     ...NEW_ITEM_DEFINITIONS.map((def, index) => ({
-      digit: String(index + 2),
+      digit: String(index + 3),
       label: def.label,
       description: def.description,
       glyph: kindGlyph(def.kind),

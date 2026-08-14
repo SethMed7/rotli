@@ -18,9 +18,8 @@ changelog entries, generated output, and Carl sessions are historical only.
 
 - Rotli is local-first. User files are durable truth; `.rotli/` contains
   rebuildable projections and explicit settings.
-- One notes folder is one memex. Main is the global reference view; named views
-  are subset reference projections, never stores. Do not add a database for
-  memex content.
+- One folder is one vault. Main and named views are reference projections, never
+  stores. Rotli's portable metadata layer is not a content store or database.
 - Markdown is Rotli's primary knowledge surface and alone owns slash commands,
   wikilinks, embed fences, frontmatter, and note-native workflows. DOCX, sheets,
   Excalidraw boards, and assets are secondary bonus work surfaces that keep
@@ -29,15 +28,14 @@ changelog entries, generated output, and Carl sessions are historical only.
   preview-only file surfaces. Every other format presented as supported must be
   editable in Rotli; otherwise offer an explicit local conversion/import path
   and describe the format as unsupported until that workflow exists.
-- The memex owns portable knowledge structure, metadata, prompts, protocols, and
-  capability maps—not provider calls or agent orchestration.
+- The vault owns portable structure, metadata, prompts, protocols, and
+  capabilities—not provider calls or agent orchestration.
 - Secure notes fail closed: remote models never see them; on-device models do
   unless a knob says no. Locked = no AI edits it, every class reads it. TS and
   Rust enforce both independently.
 - Breve is a Rotli capability. Rotli owns its UI, runtime, configuration,
   lifecycle, and scheduler integration.
-- Environments: Warm Light, Warm Dark, Paper, and Charcoal. Paper/Charcoal are
-  the calm defaults; the warm pair is intentional.
+- Environments are Warm Light, Warm Dark, Paper, and Charcoal; all intentional.
 
 ## Architecture, design, and syntax
 
@@ -50,7 +48,7 @@ and `check:design-system`.
 
 ## Safety
 
-- Never mutate a live memex, installed app, scheduler, daemon, Keychain, launch
+- Never mutate a live vault, installed app, scheduler, daemon, Keychain, launch
   agent, or production service without explicit target-specific authorization.
 - Do not manage `bun run tauri dev` or another persistent process unless asked.
 - Do not commit, push, deploy, publish, or release unless explicitly requested.

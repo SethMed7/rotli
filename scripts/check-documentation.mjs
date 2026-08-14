@@ -109,6 +109,8 @@ if (existsSync(join(root, "package.json"))) {
   const requiredScriptSteps = {
     lint: [
       "bun run typecheck",
+      "bun run check:e2e-types",
+      "bun run typecheck:tsc6",
       "bun run format:check",
       "bun run check:structure",
       "bun run check:docs",

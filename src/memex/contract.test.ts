@@ -8,6 +8,8 @@ import { describe, expect, test } from "bun:test";
 import {
   AI_KEYS,
   USER_KEYS,
+  addChatArtifact,
+  addChatArtifactTurn,
   appendMessages,
   canFile,
   canWrite,
@@ -21,11 +23,14 @@ import {
   isMemexId,
   noteStem,
   noteSlugify,
+  parseChatArtifacts,
+  parseChatArtifactTurns,
   parseAccessMode,
   parseMemexInfo,
   parsePrimaryUser,
   setAttachedTo,
   setChatPinned,
+  setChatTitle,
   setChatSecureContext,
   hasSecureContext,
   slugify,
@@ -94,6 +99,25 @@ describe("composeChatFile (byte-exact)", () => {
 
   test("rejects a source not on the chats surface", () => {
     expect(() => composeChatFile({ title: "x", source: "history" }, DATE)).toThrow(/not allowed/);
+  });
+});
+
+describe("setChatTitle (stable chat identity)", () => {
+  test("updates the first frontmatter title and contract-owned H1 only", () => {
+    const base =
+      composeChatFile({ title: "Old name", source: "rotli" }, DATE) +
+      "**assistant** · 2026-06-24 — title: leave this alone\n# and this too\n";
+    const out = setChatTitle(base, "  A better   name  ");
+    expect(out).toContain("title: A better name\n");
+    expect(out).toContain("# A better name\n");
+    expect(out).toContain("title: leave this alone\n# and this too\n");
+  });
+
+  test("normalizes pasted line breaks and leaves malformed files alone", () => {
+    const base = composeChatFile({ title: "Old", source: "rotli" }, DATE);
+    expect(setChatTitle(base, "First\nsecond")).toContain("title: First second\n");
+    expect(setChatTitle("title: body only\n", "New")).toBe("title: body only\n");
+    expect(setChatTitle(base, "   ")).toBe(base);
   });
 });
 
@@ -196,6 +220,82 @@ describe("secureContext taint (secure-note reads poison the chat, one-way)", () 
     expect(hasSecureContext(bare)).toBe(false); // and never read as tainted
     const decoy = "---\ntitle: T\n---\n\nsecureContext: true\n";
     expect(hasSecureContext(decoy)).toBe(false);
+  });
+});
+
+describe("chat artifact references", () => {
+  test("adds portable file/canvas references without changing the transcript", () => {
+    const base = composeChatFile({ title: "Artifacts", source: "rotli" }, DATE);
+    const withImage = addChatArtifact(base, {
+      kind: "file",
+      id: "storage/chats/artifacts/diagram.png",
+    });
+    const withDocument = addChatArtifact(withImage, {
+      kind: "file",
+      id: "storage/rotli/brief.docx",
+    });
+
+    expect(parseChatArtifacts(withDocument)).toEqual([
+      { kind: "file", id: "storage/chats/artifacts/diagram.png" },
+      { kind: "file", id: "storage/rotli/brief.docx" },
+    ]);
+    expect(withDocument).toContain("## Messages");
+    expect(withDocument.match(/^rotliArtifacts:/gm)?.length).toBe(1);
+  });
+
+  test("keeps an editable note source typed and labeled for the correct opener", () => {
+    const base = composeChatFile({ title: "PDF", source: "rotli" }, DATE);
+    const source = {
+      kind: "note" as const,
+      id: "01SOURCE",
+      label: "Quarterly brief — editable source",
+    };
+
+    expect(parseChatArtifacts(addChatArtifact(base, source))).toEqual([source]);
+  });
+
+  test("is idempotent, replaces malformed metadata, and never reads a body decoy", () => {
+    const base =
+      '---\ntitle: T\nrotliArtifacts: not-json\n---\n\nrotliArtifacts: [{"kind":"file","id":"body.png"}]\n';
+    expect(parseChatArtifacts(base)).toEqual([]);
+
+    const artifact = { kind: "canvas" as const, id: "wiki/diagram.excalidraw" };
+    const once = addChatArtifact(base, artifact);
+    expect(addChatArtifact(once, artifact)).toBe(once);
+    expect(parseChatArtifacts(once)).toEqual([artifact]);
+  });
+
+  test("retains the newest artifact when portable metadata reaches its bound", () => {
+    let contents = composeChatFile({ title: "Many artifacts", source: "rotli" }, DATE);
+    for (let index = 0; index < 101; index += 1) {
+      contents = addChatArtifact(contents, { kind: "file", id: `storage/rotli/item-${index}.docx` });
+    }
+    const artifacts = parseChatArtifacts(contents);
+    expect(artifacts).toHaveLength(100);
+    expect(artifacts[0]?.id).toBe("storage/rotli/item-1.docx");
+    expect(artifacts.at(-1)?.id).toBe("storage/rotli/item-100.docx");
+  });
+
+  test("binds artifacts to the assistant turn that created them", () => {
+    const base = composeChatFile({ title: "Artifacts", source: "rotli" }, DATE);
+    const first = { kind: "file" as const, id: "storage/rotli/first.docx" };
+    const second = { kind: "canvas" as const, id: "wiki/second.excalidraw" };
+    const contents = addChatArtifactTurn(addChatArtifactTurn(base, 0, [first]), 2, [second]);
+
+    expect(parseChatArtifactTurns(contents)).toEqual([
+      { assistant: 0, artifacts: [first] },
+      { assistant: 2, artifacts: [second] },
+    ]);
+    expect(contents).toContain("## Messages");
+  });
+
+  test("replacing a turn is idempotent and malformed turn metadata fails closed", () => {
+    const malformed = "---\ntitle: T\nrotliArtifactTurns: nope\n---\n\n## Messages\n";
+    expect(parseChatArtifactTurns(malformed)).toEqual([]);
+    const artifact = { kind: "file" as const, id: "storage/rotli/report.docx" };
+    const once = addChatArtifactTurn(malformed, 1, [artifact]);
+    expect(addChatArtifactTurn(once, 1, [artifact])).toBe(once);
+    expect(parseChatArtifactTurns(once)).toEqual([{ assistant: 1, artifacts: [artifact] }]);
   });
 });
 

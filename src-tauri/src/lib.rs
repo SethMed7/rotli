@@ -31,6 +31,7 @@ mod provider;
 mod routines;
 mod search_index;
 mod secret;
+mod usage;
 mod web;
 mod web_search;
 mod workspace;
@@ -197,8 +198,8 @@ mod deep_link_tests {
         assert_eq!(parse("rotli://open"), None); // no id
         assert_eq!(parse("rotli://open?id=%2Fetc%2Fpasswd"), None); // absolute
         assert_eq!(parse("rotli://open?id=..%2F..%2Fsecrets.md"), None); // traversal
-        // fully percent-encoded traversal decodes BEFORE the checks — pinned
-        // so the decode-then-validate ordering can never regress
+                                                                         // fully percent-encoded traversal decodes BEFORE the checks — pinned
+                                                                         // so the decode-then-validate ordering can never regress
         assert_eq!(parse("rotli://open?id=%2e%2e%2f%2e%2e%2fsecrets.md"), None);
         assert_eq!(parse("rotli://open?id=wiki%2F..%2Fsecrets.md"), None); // mid-path segment
         assert_eq!(parse("rotli://open?id=a&kind=chat"), None); // kind not in the lane
@@ -269,66 +270,155 @@ struct QuickReturn(Mutex<bool>);
 /// native `terminate:`, which tao surfaces only as `applicationWillTerminate`,
 /// far too late for the webview's ASYNC serialize (exceljs) to finish. So both
 /// paths now route through `graceful_quit`: emit "rotli:flush-before-quit" to
-/// the main webview, hold the exit until `quit_flush_done` acks (this condvar),
-/// and exit anyway after `QUIT_FLUSH_MAX` — quit can never hang on a wedged
-/// webview.
+/// every webview, hold the exit until `quit_flush_done` acks (this condvar),
+/// and ABORT quit on a failed or timed-out save. A forced OS termination may
+/// still kill any process, but Rotli never translates "probably saved" into a
+/// normal successful quit.
 struct QuitFlush {
     /// Webviews still owing a `quit_flush_done` ack. Every live webview (main,
     /// quick, capture) gets the flush event — the quick window keeps its OWN
     /// editor buffer in its own module instance, so main's ack alone never
     /// proved the quick note's last keystrokes were on disk.
-    pending: Mutex<usize>,
+    status: Mutex<QuitFlushStatus>,
     cv: Condvar,
+}
+
+#[derive(Default)]
+struct QuitFlushStatus {
+    attempt_id: u64,
+    pending: usize,
+    failed: bool,
+    errors: Vec<String>,
 }
 
 /// The longest a quit will wait for the webview's flush ack. The idle ack is
 /// milliseconds (the listener lives in the always-loaded persist chunk); this
 /// bound only matters when a big workbook is mid-serialize or the webview hung.
-const QUIT_FLUSH_MAX: Duration = Duration::from_secs(2);
+const QUIT_FLUSH_MAX: Duration = Duration::from_secs(15);
 
 /// One webview finished its pre-quit flush — release `graceful_quit`'s wait
 /// once EVERY emitted webview has acked (saturating: a double ack never wraps).
 #[tauri::command]
-fn quit_flush_done(app: AppHandle) {
+fn quit_flush_done(app: AppHandle, attempt_id: u64, ok: bool, error: Option<String>) {
     let state = app.state::<QuitFlush>();
-    let mut pending = state.pending.lock().unwrap();
-    *pending = pending.saturating_sub(1);
+    let mut status = state.status.lock().unwrap();
+    if status.attempt_id != attempt_id || status.pending == 0 {
+        return;
+    }
+    status.pending = status.pending.saturating_sub(1);
+    if !ok {
+        status.failed = true;
+        if let Some(error) = error.filter(|value| !value.trim().is_empty()) {
+            status.errors.push(error);
+        }
+    }
     state.cv.notify_all();
 }
 
 /// Quit, but let every live webview flush dirty state first (see QuitFlush).
 /// Called by the tray's Quit item and the app menu's ⌘Q replacement. Hidden
 /// panels ack in milliseconds (nothing dirty), so this adds no quit latency.
-fn graceful_quit(app: &AppHandle) {
-    let mut expected = 0usize;
-    for label in ["main", "quick", "capture"] {
-        if app.get_webview_window(label).is_some()
-            && app.emit_to(label, "rotli:flush-before-quit", ()).is_ok()
+fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
+    let labels: Vec<&str> = ["main", "quick", "capture"]
+        .into_iter()
+        .filter(|label| app.get_webview_window(label).is_some())
+        .collect();
+    let expected = labels.len();
+    if expected == 0 {
+        return Ok(());
+    }
+    let state = app.state::<QuitFlush>();
+    let attempt_id = {
+        let mut status = state.status.lock().unwrap();
+        if status.pending > 0 {
+            return Err("another quit or restart is already waiting for saves".into());
+        }
+        status.attempt_id = status.attempt_id.wrapping_add(1).max(1);
+        status.pending = expected;
+        status.failed = false;
+        status.errors.clear();
+        status.attempt_id
+    };
+    for label in labels {
+        if app
+            .emit_to(
+                label,
+                "rotli:flush-before-quit",
+                serde_json::json!({ "attemptId": attempt_id }),
+            )
+            .is_err()
         {
-            expected += 1;
+            quit_flush_done(
+                app.clone(),
+                attempt_id,
+                false,
+                Some(format!("{label} did not receive the save request")),
+            );
         }
     }
-    if expected == 0 {
-        app.exit(0); // nothing to flush / nothing reachable — just go
-        return;
+    let deadline = Instant::now() + QUIT_FLUSH_MAX;
+    let mut status = state.status.lock().unwrap();
+    while status.attempt_id == attempt_id && status.pending > 0 {
+        let now = Instant::now();
+        if now >= deadline {
+            break;
+        }
+        let (guard, _timeout) = state.cv.wait_timeout(status, deadline - now).unwrap();
+        status = guard;
     }
-    *app.state::<QuitFlush>().pending.lock().unwrap() = expected;
+    if status.attempt_id != attempt_id {
+        return Err("save handshake was superseded".into());
+    }
+    let timed_out = status.pending > 0;
+    let failed = status.failed;
+    let detail = if timed_out {
+        "Rotli did not quit because one or more windows did not finish saving. Your files remain open; try Save again or resolve the shown error."
+            .to_string()
+    } else if failed {
+        let suffix = status
+            .errors
+            .first()
+            .map(|error| format!(" ({error})"))
+            .unwrap_or_default();
+        format!("Rotli did not quit because some changes could not be saved{suffix}. Your files remain open.")
+    } else {
+        String::new()
+    };
+    status.pending = 0;
+    drop(status);
+    if timed_out || failed {
+        show_main(app);
+        let _ = app.emit_to("main", "rotli:quit-flush-failed", &detail);
+        Err(detail)
+    } else {
+        Ok(())
+    }
+}
+
+fn graceful_shutdown(app: &AppHandle, restart: bool) {
     let handle = app.clone();
     std::thread::spawn(move || {
-        let state = handle.state::<QuitFlush>();
-        let deadline = Instant::now() + QUIT_FLUSH_MAX;
-        let mut pending = state.pending.lock().unwrap();
-        while *pending > 0 {
-            let now = Instant::now();
-            if now >= deadline {
-                break; // wedged webview — quit anyway, bounded
+        if flush_webviews_before_shutdown(&handle).is_ok() {
+            if restart {
+                handle.restart();
+            } else {
+                handle.exit(0);
             }
-            let (guard, _timeout) = state.cv.wait_timeout(pending, deadline - now).unwrap();
-            pending = guard;
         }
-        drop(pending);
-        handle.exit(0);
     });
+}
+
+fn graceful_quit(app: &AppHandle) {
+    graceful_shutdown(app, false);
+}
+
+fn graceful_restart(app: &AppHandle) {
+    graceful_shutdown(app, true);
+}
+
+#[tauri::command]
+fn restart_after_flush(app: AppHandle) {
+    graceful_restart(&app);
 }
 
 fn show_main(app: &AppHandle) {
@@ -618,6 +708,84 @@ fn vault_lane() -> std::sync::MutexGuard<'static, ()> {
     VAULT_LANE.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+/// A user-visible notes root must never overlap the private runtime/config trees
+/// that decide what code and providers Rotli's agent subprocesses trust. If one
+/// of these directories became a writable corpus root, the ordinary file APIs
+/// could rewrite credentials, CLI configuration, or the local-model registry.
+fn reject_privileged_root(app: &AppHandle, candidate: &std::path::Path) -> Result<(), String> {
+    use tauri::Manager;
+    let candidate = std::fs::canonicalize(candidate)
+        .map_err(|error| format!("canonicalize selected folder: {error}"))?;
+    let mut protected = Vec::new();
+    let mut forbidden_home_or_ancestor = false;
+    if let Ok(home) = std::env::var("HOME") {
+        let home =
+            std::fs::canonicalize(home).map_err(|error| format!("canonicalize home: {error}"))?;
+        protected.extend(
+            [
+                ".memex",
+                ".codex",
+                ".claude",
+                ".ssh",
+                ".gnupg",
+                ".aws",
+                ".config",
+                ".breve-secrets",
+                "Library/Keychains",
+            ]
+            .into_iter()
+            .map(|relative| home.join(relative)),
+        );
+        // Selecting HOME (or one of its ancestors) intersects every protected
+        // child even when the child has not been created yet. Ordinary folders
+        // below HOME remain valid unless they overlap a named private subtree.
+        forbidden_home_or_ancestor = candidate == home || home.starts_with(&candidate);
+    }
+    if let Ok(path) = app.path().app_config_dir() {
+        protected.push(path);
+    }
+    if let Ok(path) = app.path().app_data_dir() {
+        protected.push(path);
+    }
+    if forbidden_home_or_ancestor || overlaps_any_private_path(&candidate, &protected) {
+        Err("That folder overlaps private application, credential, or agent-runtime state and cannot be used as a notes root.".into())
+    } else {
+        Ok(())
+    }
+}
+
+fn overlaps_any_private_path(
+    candidate: &std::path::Path,
+    protected: &[std::path::PathBuf],
+) -> bool {
+    protected
+        .iter()
+        .any(|path| candidate.starts_with(path) || path.starts_with(candidate))
+}
+
+#[cfg(test)]
+mod privileged_root_tests {
+    use super::overlaps_any_private_path;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn corpus_roots_cannot_contain_or_live_inside_agent_trust_state() {
+        let protected = vec![PathBuf::from("/Users/example/.memex")];
+        assert!(overlaps_any_private_path(
+            Path::new("/Users/example"),
+            &protected
+        ));
+        assert!(overlaps_any_private_path(
+            Path::new("/Users/example/.memex/ai"),
+            &protected
+        ));
+        assert!(!overlaps_any_private_path(
+            Path::new("/Users/example/Notes"),
+            &protected
+        ));
+    }
+}
+
 /// ASYNC command (vault-lane pass, 2026-07-31): the blocking picker + registry
 /// rewrite ran on the main thread and beachballed the window — worker now.
 #[tauri::command]
@@ -630,11 +798,13 @@ async fn corpus_add_folder(app: AppHandle, path: Option<String>) -> Result<bool,
 fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
     let _lane = vault_lane();
     if cfg!(debug_assertions) {
-        return Err("Location changes are disabled while the production memex is mounted read-only in development.".into());
+        return Err("Location changes are disabled in development; use the installed app to change connected vaults or folders.".into());
     }
     use tauri_plugin_dialog::DialogExt;
     let abs = match path {
-        Some(p) => std::path::PathBuf::from(p),
+        Some(p) => app
+            .state::<memex::FolderAuthorizations>()
+            .require(std::path::Path::new(&p))?,
         None => {
             let Some(picked) = app
                 .dialog()
@@ -650,6 +820,8 @@ fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bo
     if !abs.is_dir() {
         return Err("That isn't a folder.".into());
     }
+    reject_privileged_root(&app, &abs)?;
+    flush_webviews_before_shutdown(&app)?;
     if !corpus::add_folder(&app, abs)? {
         return Ok(true); // already the corpus / a brain / a folder — no-op, no restart
     }
@@ -662,11 +834,12 @@ fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bo
 fn corpus_forget_folder(app: AppHandle, id: String) -> Result<(), String> {
     let _lane = vault_lane();
     if cfg!(debug_assertions) {
-        return Err("Location changes are disabled while the production memex is mounted read-only in development.".into());
+        return Err("Location changes are disabled in development; use the installed app to change connected vaults or folders.".into());
     }
     if id == corpus::DEFAULT_ROOT_ID {
         return Err("That's your notes folder — it can't be removed.".into());
     }
+    flush_webviews_before_shutdown(&app)?;
     corpus::forget_root(&app, &id)?;
     app.restart();
 }
@@ -751,13 +924,16 @@ fn inspect_vault_path(path: &std::path::Path) -> Result<VaultInspection, String>
     let mut symlinks = 0usize;
     let mut stack = vec![root.clone()];
     while let Some(dir) = stack.pop() {
-        let entries = std::fs::read_dir(&dir).map_err(|e| format!("read {}: {e}", dir.display()))?;
+        let entries =
+            std::fs::read_dir(&dir).map_err(|e| format!("read {}: {e}", dir.display()))?;
         for entry in entries.filter_map(Result::ok) {
             let name = entry.file_name().to_string_lossy().into_owned();
             if name == ".rotli" || name.starts_with('.') {
                 continue;
             }
-            let Ok(kind) = entry.file_type() else { continue };
+            let Ok(kind) = entry.file_type() else {
+                continue;
+            };
             if kind.is_symlink() {
                 symlinks += 1;
             } else if kind.is_dir() {
@@ -777,7 +953,7 @@ fn inspect_vault_path(path: &std::path::Path) -> Result<VaultInspection, String>
     } else if root.join(".zennotes").is_dir() || root.join(".zen").is_dir() {
         "ZenNotes vault"
     } else if corpus::is_memex_root(&root) {
-        "Rotli memex"
+        "Rotli vault"
     } else {
         "Markdown folder"
     };
@@ -790,9 +966,11 @@ fn inspect_vault_path(path: &std::path::Path) -> Result<VaultInspection, String>
     };
     let mut warnings = Vec::new();
     if empty {
-        warnings.push("This folder is empty. Go back and choose Create a new vault instead.".into());
+        warnings
+            .push("This folder is empty. Go back and choose Create a new vault instead.".into());
     } else if markdown_files == 0 {
-        warnings.push("No Markdown files were found; other supported files will still appear.".into());
+        warnings
+            .push("No Markdown files were found; other supported files will still appear.".into());
     }
     if symlinks > 0 {
         warnings.push(format!(
@@ -817,16 +995,23 @@ fn inspect_vault_path(path: &std::path::Path) -> Result<VaultInspection, String>
 }
 
 #[tauri::command]
-async fn corpus_inspect_folder(path: String) -> Result<VaultInspection, String> {
-    tauri::async_runtime::spawn_blocking(move || inspect_vault_path(std::path::Path::new(&path)))
-        .await
-        .map_err(|e| format!("vault inspection worker failed ({e})"))?
+async fn corpus_inspect_folder(app: AppHandle, path: String) -> Result<VaultInspection, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = app
+            .state::<memex::FolderAuthorizations>()
+            .require(std::path::Path::new(&path))?;
+        inspect_vault_path(&path)
+    })
+    .await
+    .map_err(|e| format!("vault inspection worker failed ({e})"))?
 }
 
 fn copy_vault_tree(source: &std::path::Path, destination: &std::path::Path) -> Result<(), String> {
     let source = std::fs::canonicalize(source).map_err(|e| format!("open source: {e}"))?;
-    let destination = std::fs::canonicalize(destination).map_err(|e| format!("open destination: {e}"))?;
-    if source == destination || destination.starts_with(&source) || source.starts_with(&destination) {
+    let destination =
+        std::fs::canonicalize(destination).map_err(|e| format!("open destination: {e}"))?;
+    if source == destination || destination.starts_with(&source) || source.starts_with(&destination)
+    {
         return Err("Choose a separate destination outside the source vault.".into());
     }
     let has_entries = std::fs::read_dir(&destination)
@@ -839,7 +1024,9 @@ fn copy_vault_tree(source: &std::path::Path, destination: &std::path::Path) -> R
     let mut stack = vec![(source.clone(), destination.clone())];
     while let Some((from, to)) = stack.pop() {
         std::fs::create_dir_all(&to).map_err(|e| format!("create {}: {e}", to.display()))?;
-        for entry in std::fs::read_dir(&from).map_err(|e| format!("read {}: {e}", from.display()))? {
+        for entry in
+            std::fs::read_dir(&from).map_err(|e| format!("read {}: {e}", from.display()))?
+        {
             let entry = entry.map_err(|e| e.to_string())?;
             let name = entry.file_name();
             if name.to_str() == Some(".rotli") {
@@ -882,7 +1069,10 @@ mod vault_activation_tests {
         assert_eq!(report.source, "Obsidian vault");
         assert_eq!(report.markdown_files, 1);
         assert_eq!(report.folders, 2);
-        assert_eq!(std::fs::read_to_string(source.join("Projects/Nested/plan.md")).unwrap(), "# Plan\n");
+        assert_eq!(
+            std::fs::read_to_string(source.join("Projects/Nested/plan.md")).unwrap(),
+            "# Plan\n"
+        );
 
         copy_vault_tree(&source, &destination).unwrap();
         assert_eq!(
@@ -890,7 +1080,10 @@ mod vault_activation_tests {
             "# Plan\n"
         );
         assert!(destination.join(".obsidian/app.json").is_file());
-        assert!(!destination.join(".rotli").exists(), "source-specific Rotli state must not copy");
+        assert!(
+            !destination.join(".rotli").exists(),
+            "source-specific Rotli state must not copy"
+        );
     }
 
     #[test]
@@ -904,7 +1097,10 @@ mod vault_activation_tests {
         std::fs::write(destination.join("keep.md"), "# Keep\n").unwrap();
 
         assert!(copy_vault_tree(&source, &destination).is_err());
-        assert_eq!(std::fs::read_to_string(destination.join("keep.md")).unwrap(), "# Keep\n");
+        assert_eq!(
+            std::fs::read_to_string(destination.join("keep.md")).unwrap(),
+            "# Keep\n"
+        );
         assert!(!destination.join("note.md").exists());
     }
 }
@@ -917,11 +1113,12 @@ async fn corpus_import_vault_copy(
 ) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let _lane = vault_lane();
-        if cfg!(debug_assertions) {
-            return Err("Importing a primary vault is disabled in development.".into());
-        }
-        let source = std::path::PathBuf::from(source);
-        let destination = std::path::PathBuf::from(destination);
+        let authorizations = app.state::<memex::FolderAuthorizations>();
+        let source = authorizations.require(std::path::Path::new(&source))?;
+        let destination = authorizations.require(std::path::Path::new(&destination))?;
+        reject_privileged_root(&app, &source)?;
+        reject_privileged_root(&app, &destination)?;
+        flush_webviews_before_shutdown(&app)?;
         let inspection = inspect_vault_path(&source)?;
         copy_vault_tree(&source, &destination)?;
         corpus::set_corpus_path(&app, destination, inspection.kind != "memex")?;
@@ -942,13 +1139,10 @@ fn corpus_status(app: AppHandle) -> bool {
 #[tauri::command]
 fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
     let cfg = corpus::ensure_corpus_config(&app);
-    let (is_memex, memex_id, mut perms) = match memex::brain_view(&cfg.corpus.abs_path) {
+    let (is_memex, memex_id, perms) = match memex::brain_view(&cfg.corpus.abs_path) {
         Some((id, p)) => (true, Some(id), Some(p)),
         None => (false, None, None),
     };
-    if cfg!(debug_assertions) {
-        perms = Some(memex::MemexPerms::ReadOnly);
-    }
     let corpus_brain_enabled = root_brain_enabled(&cfg.corpus.abs_path);
     CorpusConfigView {
         corpus: CorpusView {
@@ -963,7 +1157,10 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
             .into_iter()
             .map(|b| {
                 let brain_enabled = root_brain_enabled(&b.abs_path);
-                BrainRootView { brain: b, brain_enabled }
+                BrainRootView {
+                    brain: b,
+                    brain_enabled,
+                }
             })
             .collect(),
         folders: cfg.folders,
@@ -988,12 +1185,11 @@ async fn corpus_choose_folder(app: AppHandle, path: Option<String>) -> Result<bo
 
 fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
-        return Err("The production memex is the fixed read-only source in development.".into());
-    }
     use tauri_plugin_dialog::DialogExt;
     let abs = match path {
-        Some(p) => std::path::PathBuf::from(p),
+        Some(p) => app
+            .state::<memex::FolderAuthorizations>()
+            .require(std::path::Path::new(&p))?,
         None => {
             let Some(picked) = app
                 .dialog()
@@ -1007,9 +1203,11 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
         }
     };
     let current = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
+    reject_privileged_root(&app, &abs)?;
     if current.as_ref() == Some(&abs) {
         return Ok(false);
     }
+    flush_webviews_before_shutdown(&app)?;
     match memex::detect_folder(&abs).kind.as_str() {
         "memex" => {
             if let Some(current) = &current {
@@ -1043,18 +1241,29 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
 /// ASYNC command (vault-lane pass, 2026-07-31): scaffold + settings carry +
 /// config rewrite ran on the main thread right behind the picker — worker now.
 #[tauri::command]
-async fn corpus_init_memex(app: AppHandle, path: String, brain_enabled: bool) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || corpus_init_memex_blocking(app, path, brain_enabled))
-        .await
-        .map_err(|e| format!("vault worker failed ({e})"))?
+async fn corpus_init_memex(
+    app: AppHandle,
+    path: String,
+    brain_enabled: bool,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        corpus_init_memex_blocking(app, path, brain_enabled)
+    })
+    .await
+    .map_err(|e| format!("vault worker failed ({e})"))?
 }
 
-fn corpus_init_memex_blocking(app: AppHandle, path: String, brain_enabled: bool) -> Result<(), String> {
+fn corpus_init_memex_blocking(
+    app: AppHandle,
+    path: String,
+    brain_enabled: bool,
+) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
-        return Err("Creating or replacing the primary memex is disabled in development.".into());
-    }
-    let root = std::path::PathBuf::from(&path);
+    let root = app
+        .state::<memex::FolderAuthorizations>()
+        .require(std::path::Path::new(&path))?;
+    reject_privileged_root(&app, &root)?;
+    flush_webviews_before_shutdown(&app)?;
     memex::scaffold_memex(&root)?;
     // a scaffolded memex has no .rotli — carry the onboarding flow's choices
     // (Librarian-vs-raw included) so the new vault honors what was just picked
@@ -1099,9 +1308,6 @@ async fn corpus_create_practice_vault(app: AppHandle) -> Result<(), String> {
 
 fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
-        return Err("Creating or replacing the primary memex is disabled in development.".into());
-    }
     use tauri::Manager;
     let current = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
     let home = app.path().home_dir().map_err(|e| e.to_string())?;
@@ -1111,6 +1317,7 @@ fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<(), String> {
         n += 1;
         root = home.join(format!("rotli Practice Vault {n}"));
     }
+    flush_webviews_before_shutdown(&app)?;
     memex::scaffold_memex(&root)?;
     if let Some(current) = &current {
         corpus::carry_settings(current, &root)?;
@@ -1153,16 +1360,18 @@ async fn corpus_connect_brain(app: AppHandle, path: Option<String>) -> Result<bo
 fn corpus_connect_brain_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
     let _lane = vault_lane();
     if cfg!(debug_assertions) {
-        return Err("The production memex is already mounted as the single read-only source in development.".into());
+        return Err("The production vault is already mounted as the single read-only source in development.".into());
     }
     use tauri_plugin_dialog::DialogExt;
     let abs = match path {
-        Some(p) => std::path::PathBuf::from(p),
+        Some(p) => app
+            .state::<memex::FolderAuthorizations>()
+            .require(std::path::Path::new(&p))?,
         None => {
             let Some(picked) = app
                 .dialog()
                 .file()
-                .set_title("Connect a brain (a memex folder)")
+                .set_title("Link another Rotli vault")
                 .blocking_pick_folder()
             else {
                 return Ok(false);
@@ -1170,6 +1379,8 @@ fn corpus_connect_brain_blocking(app: AppHandle, path: Option<String>) -> Result
             picked.into_path().map_err(|e| e.to_string())?
         }
     };
+    reject_privileged_root(&app, &abs)?;
+    flush_webviews_before_shutdown(&app)?;
     let meta = memex::prepare_brain_connect(&abs)?;
     corpus::upsert_brain(
         &app,
@@ -1192,10 +1403,11 @@ fn corpus_connect_brain_blocking(app: AppHandle, path: Option<String>) -> Result
 fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
     let _lane = vault_lane();
     if cfg!(debug_assertions) {
-        return Err("The production memex binding cannot be changed in development.".into());
+        return Err("The production vault binding cannot be changed in development.".into());
     }
     // forget_root is a superset of the old forget_brain (it also drops a folder by
     // id, a no-op for a brain id) — one path now handles brains + folders.
+    flush_webviews_before_shutdown(&app)?;
     corpus::forget_root(&app, &id)?;
     app.restart();
 }
@@ -1206,7 +1418,7 @@ fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
 fn corpus_set_active_brain(app: AppHandle, id: String) -> Result<(), String> {
     let _lane = vault_lane();
     if cfg!(debug_assertions) {
-        return Err("The production memex is the fixed read-only source in development.".into());
+        return Err("The production vault is the fixed read-only source in development.".into());
     }
     corpus::set_active_brain(&app, &id)
 }
@@ -1218,10 +1430,14 @@ fn corpus_set_active_brain(app: AppHandle, id: String) -> Result<(), String> {
 /// (its folder vanished) — that's fine, startup will re-apply the persisted
 /// perms whenever it binds again.
 #[tauri::command]
-fn corpus_set_brain_perms(app: AppHandle, id: String, perms: memex::MemexPerms) -> Result<(), String> {
+fn corpus_set_brain_perms(
+    app: AppHandle,
+    id: String,
+    perms: memex::MemexPerms,
+) -> Result<(), String> {
     let _lane = vault_lane();
     if cfg!(debug_assertions) {
-        return Err("Production memex permissions cannot be changed in development.".into());
+        return Err("Production vault permissions cannot be changed in development.".into());
     }
     corpus::set_brain_perms(&app, &id, perms)?;
     let state = app.state::<corpus::CorpusState>();
@@ -1261,25 +1477,51 @@ fn set_dock_visible(app: AppHandle, visible: bool) {
     let _ = (app, visible);
 }
 
+#[cfg(target_os = "macos")]
+fn app_icon_bytes(variant: &str) -> Option<&'static [u8]> {
+    // `tauri dev` launches an unbundled executable, so clearing AppKit's icon
+    // override reveals macOS's generic `exec` tile instead of the icon declared
+    // in tauri.dev.conf.json. Keep every debug build visibly distinct and safe
+    // to identify while release builds retain the user's icon preference.
+    #[cfg(debug_assertions)]
+    {
+        let _ = variant;
+        Some(include_bytes!("../icons-dev/runtime.png"))
+    }
+
+    #[cfg(not(debug_assertions))]
+    match variant {
+        "warm" => Some(include_bytes!("../icons/variants/warm.png")),
+        "paper" => Some(include_bytes!("../icons/variants/paper.png")),
+        "charcoal" => Some(include_bytes!("../icons/variants/charcoal.png")),
+        "clay" => Some(include_bytes!("../icons/variants/clay.png")),
+        _ => None, // "default" → the bundle icon (nil clears the override)
+    }
+}
+
+#[cfg(all(test, target_os = "macos", debug_assertions))]
+#[test]
+fn development_app_icon_is_embedded_for_the_default_variant() {
+    let bytes = app_icon_bytes("default").expect("debug builds must set a Dock icon");
+    assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
+}
+
 /// Swap the macOS Dock/app icon at runtime (Settings → Appearance → App icon).
-/// The variant PNGs are compiled in; "default" (or any unknown value) resets to
-/// the bundle icon. AppKit's setApplicationIconImage must run on the main thread.
+/// Debug builds always use the blue development icon because `tauri dev` has no
+/// app bundle to fall back to. Release builds keep the configured icon variant.
+/// AppKit's setApplicationIconImage must run on the main thread.
 #[tauri::command]
 fn set_app_icon(app: AppHandle, variant: String) {
     #[cfg(target_os = "macos")]
     {
-        let bytes: Option<Vec<u8>> = match variant.as_str() {
-            "warm" => Some(include_bytes!("../icons/variants/warm.png").to_vec()),
-            "paper" => Some(include_bytes!("../icons/variants/paper.png").to_vec()),
-            "charcoal" => Some(include_bytes!("../icons/variants/charcoal.png").to_vec()),
-            "clay" => Some(include_bytes!("../icons/variants/clay.png").to_vec()),
-            _ => None, // "default" → the bundle icon (nil clears the override)
-        };
+        let bytes = app_icon_bytes(&variant).map(<[u8]>::to_vec);
         let _ = app.run_on_main_thread(move || {
             use objc2::{AllocAnyThread, MainThreadMarker};
             use objc2_app_kit::{NSApplication, NSImage};
             use objc2_foundation::NSData;
-            let Some(mtm) = MainThreadMarker::new() else { return };
+            let Some(mtm) = MainThreadMarker::new() else {
+                return;
+            };
             let ns_app = NSApplication::sharedApplication(mtm);
             let image = bytes.as_ref().and_then(|b| {
                 let data = NSData::with_bytes(b);
@@ -1296,6 +1538,7 @@ fn set_app_icon(app: AppHandle, variant: String) {
 /// the real one), then relaunch. The user's real corpus config is never touched.
 #[tauri::command]
 fn set_demo_mode(app: AppHandle, on: bool) -> Result<(), String> {
+    flush_webviews_before_shutdown(&app)?;
     corpus::set_demo(&app, on)?;
     app.restart();
 }
@@ -1355,7 +1598,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -1413,7 +1655,9 @@ pub fn run() {
         .manage(CaptureReturn(Mutex::new(false)))
         .manage(QuickPlaced(Mutex::new(false)))
         .manage(QuickReturn(Mutex::new(false)))
-        .manage(QuitFlush { pending: Mutex::new(0), cv: Condvar::new() })
+        .manage(QuitFlush { status: Mutex::new(QuitFlushStatus::default()), cv: Condvar::new() })
+        .manage(corpus::ImportAuthorizations::default())
+        .manage(memex::FolderAuthorizations::default())
         .manage(provider::ProviderState::default())
         .manage(localmodel::LocalModelState::default())
         .manage(compute::ComputeState::default())
@@ -1427,6 +1671,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             toggle_main_window,
             quit_flush_done,
+            restart_after_flush,
             hide_main_window,
             show_main_window,
             hide_capture_window,
@@ -1468,12 +1713,14 @@ pub fn run() {
             corpus::corpus_write_file_bytes,
             corpus::corpus_new_file_bytes,
             corpus::corpus_create_managed_file,
+            corpus::corpus_export_note_pdf,
             corpus::corpus_convert_document,
             corpus::corpus_managed_file_creation_available,
             corpus::corpus_reveal_file,
             corpus::corpus_open_with_apps,
             corpus::corpus_open_file_with,
             corpus::corpus_import_file,
+            corpus::corpus_create_image_asset,
             corpus::corpus_abs,
             corpus::corpus_frontmatter,
             corpus::corpus_raw_frontmatter,
@@ -1514,6 +1761,7 @@ pub fn run() {
             breve::breve_brief_skill,
             breve::breve_write_brief_skill,
             breve::breve_write_watchlist,
+            breve::breve_backfill_watchlist,
             breve::breve_delivery_settings,
             breve::breve_write_delivery_settings,
             breve::breve_store_resend_key,
@@ -1529,6 +1777,7 @@ pub fn run() {
             provider::cli_complete,
             provider::cli_cancel,
             provider::generate_image,
+            usage::model_usage,
             localmodel::local_model_install,
             localmodel::local_model_install_progress,
             localmodel::local_model_install_cancel,
@@ -1560,12 +1809,15 @@ pub fn run() {
             corpus::corpus_overview,
             corpus::corpus_settings_read,
             corpus::corpus_settings_write,
+            corpus::corpus_main_read,
             corpus::corpus_main_write,
+            corpus::corpus_views_read,
             corpus::corpus_views_write,
             workspace::workspace_take_open_request,
             memex::memex_detect,
             memex::memex_read_contract,
             memex::memex_read,
+            memex::memex_read_chat,
             memex::memex_list_chats,
             memex::memex_chat_folders,
             memex::memex_write_chat_folders,
@@ -1613,18 +1865,14 @@ pub fn run() {
                 };
             let roots = corpus::startup_roots(app.handle());
             for root in roots {
-                let opened = if cfg!(debug_assertions) {
-                    corpus::CorpusStore::open_read_only(root.abs_path.clone())
-                } else if root.adopted {
+                let opened = if root.adopted {
                     corpus::CorpusStore::open_adopted(root.abs_path.clone())
                 } else {
                     corpus::CorpusStore::open(root.abs_path.clone())
                 };
                 match opened {
                     Ok(mut store) => {
-                        if cfg!(debug_assertions)
-                            || brain_perms.get(&root.id).is_some_and(|p| p.read_only())
-                        {
+                        if brain_perms.get(&root.id).is_some_and(|p| p.read_only()) {
                             store.set_perms_read_only(true);
                         }
                         let suppress = store.suppress_set();
@@ -1644,8 +1892,7 @@ pub fn run() {
                         // would split the §4.5 review loop across two corpora —
                         // proposals journaled where the UI never reads, approvals
                         // refused where the daemon never wrote.
-                        let is_target = !cfg!(debug_assertions)
-                            && root.id == corpus::DEFAULT_ROOT_ID
+                        let is_target = root.id == corpus::DEFAULT_ROOT_ID
                             && store.is_memex()
                             && daemon_target.is_none();
                         if is_target {
@@ -1694,7 +1941,9 @@ pub fn run() {
                                 );
                             }
                         }
-                        registry.insert(root.id, store);
+                        if let Err(error) = registry.insert(root.id.clone(), store) {
+                            eprintln!("rotli: corpus root {} disabled ({error})", root.id);
+                        }
                     }
                     Err(e) => {
                         eprintln!(
@@ -1816,23 +2065,26 @@ pub fn run() {
             // applicationWillTerminate). Swap it for a look-alike custom item
             // (same title, same ⌘Q) wired to graceful_quit. Structural, not
             // id-matched: the default app submenu's LAST item is the quit slot
-            // (menu.rs in tauri pins that shape); if the shape ever changes the
-            // swap degrades to a no-op and ⌘Q just quits un-flushed — never a
-            // startup failure.
+            // (menu.rs in tauri pins that shape). If that contract changes we
+            // fail startup closed; shipping an un-interceptable ⌘Q would turn a
+            // normal user action into silent loss of dirty editor buffers.
             #[cfg(target_os = "macos")]
-            if let Some(menu) = app.menu() {
-                if let Some(tauri::menu::MenuItemKind::Submenu(app_sub)) =
-                    menu.items().unwrap_or_default().into_iter().next()
-                {
-                    let items = app_sub.items().unwrap_or_default();
-                    if let Some(last @ tauri::menu::MenuItemKind::Predefined(_)) = items.last() {
-                        let quit_app = MenuItemBuilder::with_id("quit-app", "Quit rotli")
-                            .accelerator("CmdOrCtrl+Q")
-                            .build(app)?;
-                        app_sub.remove(last)?;
-                        app_sub.append(&quit_app)?;
-                    }
-                }
+            {
+                let menu = app.menu().ok_or("macOS app menu is unavailable; safe Quit cannot be installed")?;
+                let app_sub = match menu.items()?.into_iter().next() {
+                    Some(tauri::menu::MenuItemKind::Submenu(app_sub)) => app_sub,
+                    _ => return Err("macOS app submenu changed; refusing an unsafe unflushed Quit".into()),
+                };
+                let items = app_sub.items()?;
+                let last = match items.last() {
+                    Some(last @ tauri::menu::MenuItemKind::Predefined(_)) => last,
+                    _ => return Err("macOS Quit menu changed; refusing an unsafe unflushed Quit".into()),
+                };
+                let quit_app = MenuItemBuilder::with_id("quit-app", "Quit rotli")
+                    .accelerator("CmdOrCtrl+Q")
+                    .build(app)?;
+                app_sub.remove(last)?;
+                app_sub.append(&quit_app)?;
             }
 
             Ok(())
@@ -1845,6 +2097,13 @@ pub fn run() {
         // "Open rotli" would all go dead for the rest of the process.
         .on_window_event(|window, event| {
             match event {
+                WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+                    window
+                        .app_handle()
+                        .state::<corpus::ImportAuthorizations>()
+                        .authorize_native_drop(paths);
+                    return;
+                }
                 WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
                     let _ = window.hide();

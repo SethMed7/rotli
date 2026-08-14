@@ -13,6 +13,92 @@ export function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
 }
 
+export type ModelUsageRange = "24h" | "7d" | "30d" | "90d";
+
+export interface ModelUsageTokens {
+  uncachedInputTokens: number;
+  cachedInputTokens: number;
+  cacheCreationTokens: number;
+  outputTokens: number;
+  /** A subset of output tokens; never add it to a total. */
+  reasoningTokens: number;
+}
+
+export interface ModelUsageBucket {
+  bucketStartMs: number;
+  provider: "claude" | "codex";
+  model: string;
+  tokens: ModelUsageTokens;
+  responses: number;
+  sessions: number;
+}
+
+export interface ModelUsageTotal {
+  provider: "claude" | "codex";
+  model: string;
+  tokens: ModelUsageTokens;
+  responses: number;
+  sessions: number;
+}
+
+export interface ModelUsageSource {
+  provider: "claude" | "codex";
+  status: "ok" | "missing" | "partial";
+  scannedFiles: number;
+  skippedFiles: number;
+  malformedRecords: number;
+  message?: string;
+}
+
+export interface ModelUsageSummary {
+  range: ModelUsageRange;
+  readAtMs: number;
+  sinceMs: number;
+  untilMs: number;
+  bucketMs: number;
+  totalSessions: number;
+  buckets: ModelUsageBucket[];
+  models: ModelUsageTotal[];
+  sources: ModelUsageSource[];
+}
+
+/** Aggregate provider-owned local session histories. Rust chooses the only
+ * directories that can be scanned and returns counts only—never transcript
+ * text, paths, prompts, responses, or session identifiers. */
+export function modelUsage(range: ModelUsageRange, refresh = false): Promise<ModelUsageSummary> {
+  if (!isTauri()) {
+    return Promise.resolve({
+      range,
+      readAtMs: Date.now(),
+      sinceMs: Date.now(),
+      untilMs: Date.now(),
+      bucketMs: range === "24h" ? 60 * 60 * 1_000 : 24 * 60 * 60 * 1_000,
+      totalSessions: 0,
+      buckets: [],
+      models: [],
+      sources: [
+        {
+          provider: "claude",
+          status: "missing",
+          scannedFiles: 0,
+          skippedFiles: 0,
+          malformedRecords: 0,
+          message: "The browser twin does not inspect this computer.",
+        },
+        {
+          provider: "codex",
+          status: "missing",
+          scannedFiles: 0,
+          skippedFiles: 0,
+          malformedRecords: 0,
+          message: "The browser twin does not inspect this computer.",
+        },
+      ],
+    });
+  }
+  return invoke<ModelUsageSummary>("model_usage", { range, refresh });
+}
+
 export async function hideMainWindow(): Promise<void> {
   if (!isTauri()) return;
   await invoke("hide_main_window");
@@ -132,9 +218,9 @@ export async function toggleMaximize(): Promise<void> {
 // ——— in-app updates (Part 2 — the signed updater feed) — guarded so the
 //     browser/dev demo never imports the plugins; outside Tauri every call is a
 //     safe no-op ("nothing available, nothing to install"). The Rust side
-//     registers tauri-plugin-updater + tauri-plugin-process and the capability
-//     grants updater:default + process:allow-restart. CARL rule 2: nothing here
-//     pings on its own — the UI (Settings + a quiet App.tsx mount check) drives it.
+//     registers tauri-plugin-updater. Relaunch is a narrow Rust command that
+//     first completes the same all-webview save handshake as Quit. Nothing here
+//     pings on its own: only the user's explicit Settings action calls the feed.
 
 export interface UpdateStatus {
   available: boolean;
@@ -186,8 +272,7 @@ export async function downloadAndInstallUpdate(onProgress?: (pct: number) => voi
       onProgress?.(100);
     }
   });
-  const { relaunch } = await import("@tauri-apps/plugin-process");
-  await relaunch();
+  await invoke("restart_after_flush");
 }
 
 // ——— the corpus (phase 2) — typed wrappers over the Rust corpus commands
@@ -233,6 +318,7 @@ export interface CorpusBoardDoc {
   folderId: string;
   /** The raw .excalidraw JSON string, verbatim. */
   body: string;
+  revision: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -249,6 +335,8 @@ export interface CorpusNoteDoc {
   diskFolderId?: string | undefined;
   /** Frontmatter stripped — exactly what the editor edits. */
   body: string;
+  /** Opaque revision of the complete file, including managed frontmatter. */
+  revision: string;
   createdAt: number;
   updatedAt: number;
   pinned: boolean;
@@ -293,8 +381,12 @@ export function corpusRead(id: string): Promise<CorpusNoteDoc> {
   return corpusInvoke("corpus_read", { id });
 }
 
-export function corpusWrite(id: string, body: string): Promise<CorpusNoteMeta> {
-  return corpusInvoke("corpus_write", { id, body });
+export interface CorpusWriteResult extends CorpusNoteMeta {
+  revision: string;
+}
+
+export function corpusWrite(id: string, body: string, expectedRevision: string): Promise<CorpusWriteResult> {
+  return corpusInvoke("corpus_write", { id, body, expectedRevision });
 }
 
 export function corpusCreate(
@@ -302,7 +394,11 @@ export function corpusCreate(
   body: string,
   policy?: { secure?: boolean },
 ): Promise<CorpusNoteMeta> {
-  return corpusInvoke("corpus_create", { folderId, body, secure: policy?.secure ?? false });
+  return corpusInvoke("corpus_create", {
+    folderId,
+    body,
+    secure: policy?.secure ?? false,
+  });
 }
 
 export function corpusDelete(id: string): Promise<void> {
@@ -339,8 +435,12 @@ export function corpusReadBoard(id: string): Promise<CorpusBoardDoc> {
 
 /** Write a board's raw .excalidraw JSON verbatim (passes the memex writable
  * gate). Returns the board's meta (kind === "board"). */
-export function corpusWriteBoard(id: string, body: string): Promise<CorpusNoteMeta> {
-  return corpusInvoke("corpus_write_board", { id, body });
+export function corpusWriteBoard(
+  id: string,
+  body: string,
+  expectedRevision: string,
+): Promise<CorpusWriteResult> {
+  return corpusInvoke("corpus_write_board", { id, body, expectedRevision });
 }
 
 /** Create a new board in folderId with its initial name (collision-safe).
@@ -525,6 +625,10 @@ export function cliComplete(args: {
   model: string;
   prompt: string;
   timeoutMs?: number;
+  /** Provider-native frontier quality control. Rust validates the allowlist. */
+  reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  /** Codex account routing. `standard` preserves the configured default. */
+  serviceTier?: "standard" | "fast";
   /** Attached images as base64/data URLs. Rust stages them as real files and
    * passes them on lanes with a native image flag (codex `-i`); other lanes
    * ignore them rather than pretending to see (2026-08-04). */
@@ -701,6 +805,13 @@ export async function corpusImportFile(rootId: string, path: string): Promise<st
   return invoke<string>("corpus_import_file", { rootId, path });
 }
 
+/** Persist an image selected in Chat as a collision-safe user-owned asset.
+ * The transcript keeps only its portable `storage:` reference. */
+export async function corpusCreateImageAsset(rootId: string, name: string, base64: string): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_create_image_asset", { rootId, name, base64 });
+}
+
 /** Absolute path for a corpus-relative path (e.g. a `storage:` asset). */
 export async function corpusAbs(rootId: string, rel: string): Promise<string> {
   if (!isTauri()) return "";
@@ -761,6 +872,8 @@ export async function corpusFileBytes(id: string, maxBytes?: number): Promise<st
 
 export interface FileStat {
   len: number;
+  /** Opaque complete-file revision used for optimistic writes. */
+  revision: string;
   /** Whether the USER write lane may save this file (false in a memex/linked library). */
   writable: boolean;
   /** Whether this storage asset may move into the memex Archive or Trash. */
@@ -792,15 +905,35 @@ export async function corpusRestoreFile(id: string): Promise<string> {
 
 /** Save a surfaced FILE's bytes back to disk (base64) — the sheet editor's
  * explicit Save. `bak` copies the pre-rotli original to `<name>.bak` once. */
-export async function corpusWriteFileBytes(id: string, base64: string, bak = false): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("corpus_write_file_bytes", { id, base64, bak });
+export async function corpusWriteFileBytes(
+  id: string,
+  base64: string,
+  bak: boolean,
+  expectedRevision: string,
+): Promise<string> {
+  if (!isTauri()) return expectedRevision;
+  return invoke<string>("corpus_write_file_bytes", {
+    id,
+    base64,
+    bak,
+    expectedRevision,
+  });
 }
 
 /** Create a Rotli-owned .xlsx/.docx in its managed storage lane. */
-export async function corpusCreateManagedFile(name: string, base64: string): Promise<string> {
+export async function corpusCreateManagedFile(
+  name: string,
+  base64: string,
+  rootId?: string,
+): Promise<string> {
   if (!isTauri()) return "";
-  return invoke<string>("corpus_create_managed_file", { name, base64 });
+  return invoke<string>("corpus_create_managed_file", { name, base64, rootId });
+}
+
+/** Export an editable Markdown note to a separate PDF copy in the same root. */
+export async function corpusExportNotePdf(id: string, name: string, title: string): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_export_note_pdf", { id, name, title });
 }
 
 /** Convert a legacy document or embedded-text PDF into a new managed DOCX
@@ -810,7 +943,7 @@ export async function corpusConvertDocument(id: string): Promise<string> {
   return invoke<string>("corpus_convert_document", { id });
 }
 
-/** False for read-only roots, including the production snapshot mounted in dev. */
+/** False for genuinely read-only roots or unsupported vault contracts. */
 export async function corpusManagedFileCreationAvailable(): Promise<boolean> {
   if (!isTauri()) return false;
   return invoke<boolean>("corpus_managed_file_creation_available");
@@ -873,17 +1006,25 @@ export async function corpusSetPinned(id: string, pinned: boolean): Promise<void
 /** The note's frontmatter as RAW TEXT (fences included), byte-exact from disk —
  * the "Show file metadata" view renders this above the body. "" when the note
  * has none (or outside Tauri). */
-export async function corpusRawFrontmatter(id: string): Promise<string> {
-  if (!isTauri()) return "";
-  return invoke<string>("corpus_raw_frontmatter", { id });
+export async function corpusRawFrontmatter(id: string): Promise<VersionedText> {
+  if (!isTauri()) return { contents: "", revision: "browser" };
+  return invoke<VersionedText>("corpus_raw_frontmatter", { id });
 }
 
 /** Write back a user-edited raw frontmatter block. Rust keeps the typed lines
  * verbatim, restores the reserved provenance keys (id/owner/created), and
  * refuses notes the user can't write (the same gate as every editor save). */
-export async function corpusWriteFrontmatterRaw(id: string, block: string): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("corpus_write_frontmatter_raw", { id, block });
+export async function corpusWriteFrontmatterRaw(
+  id: string,
+  block: string,
+  expectedRevision: string,
+): Promise<string> {
+  if (!isTauri()) return "browser";
+  return invoke<string>("corpus_write_frontmatter_raw", {
+    id,
+    block,
+    expectedRevision,
+  });
 }
 
 // ── the AI Filer (contract v3.7) — driven by the manual "file this note" for now ──
@@ -1132,10 +1273,29 @@ export function corpusWriteAi(
   id: string,
   body: string,
   model: Pick<ChatModelInfo, "id" | "endpoint">,
-): Promise<CorpusNoteMeta> {
+  expectedRevision: string,
+): Promise<CorpusWriteResult> {
   return corpusInvoke("corpus_write_ai", {
     id,
     body,
+    modelId: model.id,
+    endpoint: model.endpoint,
+    expectedRevision,
+  });
+}
+
+export interface CorpusAiRead {
+  body: string;
+  revision: string;
+}
+
+export async function corpusReadAiVersioned(
+  id: string,
+  model: Pick<ChatModelInfo, "id" | "endpoint">,
+): Promise<CorpusAiRead> {
+  if (!isTauri()) return { body: "", revision: "browser:0" };
+  return invoke<CorpusAiRead>("corpus_read_ai", {
+    id,
     modelId: model.id,
     endpoint: model.endpoint,
   });
@@ -1150,8 +1310,7 @@ export async function corpusReadAi(
   id: string,
   model: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<string> {
-  if (!isTauri()) return "";
-  return invoke<string>("corpus_read_ai", { id, modelId: model.id, endpoint: model.endpoint });
+  return (await corpusReadAiVersioned(id, model)).body;
 }
 
 /** Which of `ids` this model may READ — ONE batched probe instead of a serial
@@ -1162,7 +1321,11 @@ export async function corpusReadableIds(
   model: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<string[]> {
   if (!isTauri()) return [];
-  return invoke<string[]>("corpus_readable_ids", { ids, modelId: model.id, endpoint: model.endpoint });
+  return invoke<string[]>("corpus_readable_ids", {
+    ids,
+    modelId: model.id,
+    endpoint: model.endpoint,
+  });
 }
 
 /** The AI's SEARCH lane — `corpus_search` with the read gate applied in RUST,
@@ -1199,7 +1362,10 @@ export async function corpusNotesAi(
   model: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<CorpusNoteMeta[]> {
   if (!isTauri()) return [];
-  return invoke<CorpusNoteMeta[]>("corpus_notes_ai", { modelId: model.id, endpoint: model.endpoint });
+  return invoke<CorpusNoteMeta[]>("corpus_notes_ai", {
+    modelId: model.id,
+    endpoint: model.endpoint,
+  });
 }
 
 // ——— the unified Location model (corpus.json) — ONE folder = your notes = your
@@ -1350,8 +1516,9 @@ export async function corpusSetBrainPerms(id: string, perms: MemexPerms): Promis
   await invoke("corpus_set_brain_perms", { id, perms });
 }
 
-/** The `.rotli/` dot-files — opaque JSON strings the frontend owns. */
-export type SettingsFile = "settings" | "viewstate" | "main" | "views";
+/** The per-machine `.rotli/` dot-files — opaque JSON strings the frontend owns.
+ * Portable Main/views projections use their versioned read/write commands. */
+export type SettingsFile = "settings" | "viewstate";
 
 /** The dot-files the app may WRITE through this lane. `main` goes through
  * corpusMainWrite (which also keeps it committable); `organizer` is the
@@ -1366,18 +1533,24 @@ export function corpusSettingsWrite(file: WritableSettingsFile, contents: string
   return corpusInvoke("corpus_settings_write", { file, contents });
 }
 
-/** Write `.rotli/main.json` — the Main arrangement. A separate command from settings
- * because it ALSO ensures the corpus `.gitignore` COMMITS it (durable user work,
- * unlike the per-machine settings/viewstate). Read it back with corpusSettingsRead("main"). */
-export function corpusMainWrite(contents: string): Promise<void> {
-  return corpusInvoke("corpus_main_write", { contents });
+/** Read/write `.rotli/main.json` with an exact revision. Main is durable user
+ * work, unlike per-machine settings/viewstate, and stale whole-tree writes must
+ * never replace a newer CLI/MCP/window edit. */
+export function corpusMainRead(): Promise<VersionedText> {
+  return corpusInvoke("corpus_main_read");
+}
+export function corpusMainWrite(contents: string, expectedRevision: string): Promise<string> {
+  return corpusInvoke("corpus_main_write", { contents, expectedRevision });
 }
 
 /** Write `.rotli/views.json` through the Rust synchronization boundary. The
  * host validates unique names and singular membership, then keeps Markdown's
  * managed `view_tag` aligned; boards and binaries remain frontmatter-free. */
-export function corpusViewsWrite(contents: string): Promise<void> {
-  return corpusInvoke("corpus_views_write", { contents });
+export function corpusViewsRead(): Promise<VersionedText> {
+  return corpusInvoke("corpus_views_read");
+}
+export function corpusViewsWrite(contents: string, expectedRevision: string): Promise<string> {
+  return corpusInvoke("corpus_views_write", { contents, expectedRevision });
 }
 
 export interface WorkspaceOpenRequest {
@@ -1515,21 +1688,44 @@ export function memexDetect(): Promise<DetectedMemex[]> {
 export function memexReadContract(root: string): Promise<MemexContractRaw> {
   return memexInvoke("memex_read_contract", { root });
 }
-export function memexRead(root: string, rel: string): Promise<string> {
-  return memexInvoke("memex_read", { root, rel });
+export interface VersionedText {
+  contents: string;
+  revision: string;
+}
+export type VersionedMemexChat = VersionedText;
+export function memexReadChat(root: string, slug: string): Promise<VersionedMemexChat> {
+  return memexInvoke("memex_read_chat", { root, slug });
 }
 export function memexListChats(root: string): Promise<MemexChatSummary[]> {
   return memexInvoke("memex_list_chats", { root });
 }
 /** The chat-folder manifest (a rebuildable .rotli sidecar) — "" when absent. */
-export function memexChatFolders(root: string): Promise<string> {
+export function memexChatFolders(root: string): Promise<VersionedText> {
   return memexInvoke("memex_chat_folders", { root });
 }
-export function memexWriteChatFolders(root: string, contents: string): Promise<void> {
-  return memexInvoke("memex_write_chat_folders", { root, contents });
+export function memexWriteChatFolders(
+  root: string,
+  contents: string,
+  expectedRevision: string,
+): Promise<string> {
+  return memexInvoke("memex_write_chat_folders", {
+    root,
+    contents,
+    expectedRevision,
+  });
 }
-export function memexWriteChat(root: string, slug: string, contents: string): Promise<string> {
-  return memexInvoke("memex_write_chat", { root, slug, contents });
+export function memexWriteChat(
+  root: string,
+  slug: string,
+  contents: string,
+  expectedRevision: string | null,
+): Promise<string> {
+  return memexInvoke("memex_write_chat", {
+    root,
+    slug,
+    contents,
+    expectedRevision,
+  });
 }
 
 /** Rename a chat file (chats/<old>.md → chats/<new>.md). Returns the new slug. */
@@ -1653,6 +1849,8 @@ export interface ThemePayload {
   themeFamily: "warm" | "mono";
   matchLightFamily: "warm" | "mono";
   matchDarkFamily: "warm" | "mono";
+  accentColor: "default" | "blue" | "green" | "violet" | "rose" | "amber" | "custom";
+  accentHue: number;
 }
 
 export function emitThemeSet(payload: ThemePayload): void {
@@ -1747,7 +1945,11 @@ export interface BreveConfig {
   leadMinutes: number;
   leadOverrides: { morning?: number; lunch?: number; night?: number };
   briefModel: string;
-  modelPolicy: { primary: string; fallbacks: string[]; localHelper: string | null };
+  modelPolicy: {
+    primary: string;
+    fallbacks: string[];
+    localHelper: string | null;
+  };
   pdfTheme: BrevePdfTheme;
   routines: BreveRoutine[];
   travel?: { start: string; end: string; tz: string } | null;
@@ -1767,6 +1969,15 @@ export interface BreveBrief {
   audioPath?: string;
 }
 
+export interface BreveNotification {
+  id: string;
+  at: string;
+  routine?: string;
+  kind: "running" | "success" | "warning" | "info";
+  title: string;
+  detail: string;
+}
+
 export interface BreveSnapshot {
   source: "rotli" | "legacy" | "empty";
   legacyRoot: string | null;
@@ -1776,9 +1987,18 @@ export interface BreveSnapshot {
   creators: Array<{ name: string; handle: string; channelId?: string }>;
   pages: Array<{ id: number; url: string; condition: string }>;
   briefs: BreveBrief[];
+  /** Sanitized projection of the current vault's recent scheduler log. Raw
+   * commands, paths, prompts, and stderr never cross IPC. */
+  notifications: BreveNotification[];
   artifactCount: number;
   imported: boolean;
   scheduler: "rotli" | "legacy-launchd" | "none";
+}
+
+export interface BreveBackfillResult {
+  snapshot: BreveSnapshot;
+  status: "preview" | "complete";
+  message: string;
 }
 
 export interface BreveDeliverySettings {
@@ -1845,6 +2065,7 @@ function browserBreveSnapshot(): BreveSnapshot {
         imported: true,
       },
     ],
+    notifications: [],
     artifactCount: 208,
     imported: true,
     scheduler: "rotli",
@@ -1862,7 +2083,12 @@ export function breveImportLegacy(): Promise<BreveSnapshot> {
 }
 
 export function breveTakeover(): Promise<BreveSnapshot> {
-  if (!isTauri()) return Promise.resolve({ ...browserBreveSnapshot(), source: "rotli", scheduler: "rotli" });
+  if (!isTauri())
+    return Promise.resolve({
+      ...browserBreveSnapshot(),
+      source: "rotli",
+      scheduler: "rotli",
+    });
   return invoke<BreveSnapshot>("breve_takeover");
 }
 
@@ -1872,27 +2098,55 @@ export function breveRetireLegacy(): Promise<BreveSnapshot> {
 }
 
 export function breveWriteConfig(config: BreveConfig): Promise<BreveSnapshot> {
-  if (!isTauri()) return Promise.resolve({ ...browserBreveSnapshot(), source: "rotli", config });
+  if (!isTauri())
+    return Promise.resolve({
+      ...browserBreveSnapshot(),
+      source: "rotli",
+      config,
+    });
   return invoke<BreveSnapshot>("breve_write_config", { config });
 }
 
 export function breveWriteWatchlist(markdown: string): Promise<BreveSnapshot> {
-  if (!isTauri()) return Promise.resolve({ ...browserBreveSnapshot(), source: "rotli", watchlist: markdown });
+  if (!isTauri())
+    return Promise.resolve({
+      ...browserBreveSnapshot(),
+      source: "rotli",
+      watchlist: markdown,
+    });
   return invoke<BreveSnapshot>("breve_write_watchlist", { markdown });
+}
+
+export function breveBackfillWatchlist(): Promise<BreveBackfillResult> {
+  if (!isTauri())
+    return Promise.resolve({
+      snapshot: browserBreveSnapshot(),
+      status: "preview",
+      message: "Preview only in the browser—no model ran and no files changed.",
+    });
+  return invoke<BreveBackfillResult>("breve_backfill_watchlist");
 }
 
 export function breveDeliverySettings(): Promise<BreveDeliverySettings> {
   if (!isTauri())
-    return Promise.resolve({ ...browserBreveDelivery, emailTo: [...browserBreveDelivery.emailTo] });
+    return Promise.resolve({
+      ...browserBreveDelivery,
+      emailTo: [...browserBreveDelivery.emailTo],
+    });
   return invoke<BreveDeliverySettings>("breve_delivery_settings");
 }
 
 export function breveWriteDeliverySettings(settings: BreveDeliverySettings): Promise<BreveDeliverySettings> {
   if (!isTauri()) {
     browserBreveDelivery = { ...settings, emailTo: [...settings.emailTo] };
-    return Promise.resolve({ ...browserBreveDelivery, emailTo: [...browserBreveDelivery.emailTo] });
+    return Promise.resolve({
+      ...browserBreveDelivery,
+      emailTo: [...browserBreveDelivery.emailTo],
+    });
   }
-  return invoke<BreveDeliverySettings>("breve_write_delivery_settings", { settings });
+  return invoke<BreveDeliverySettings>("breve_write_delivery_settings", {
+    settings,
+  });
 }
 
 export function breveTestEmail(): Promise<string> {
@@ -1907,7 +2161,10 @@ export function breveTestSignal(): Promise<string> {
 
 export function breveStoreResendKey(value: string): Promise<void> {
   if (!isTauri()) {
-    browserBreveDelivery = { ...browserBreveDelivery, resendKeyConfigured: !!value.trim() };
+    browserBreveDelivery = {
+      ...browserBreveDelivery,
+      resendKeyConfigured: !!value.trim(),
+    };
     return Promise.resolve();
   }
   return invoke<void>("breve_store_resend_key", { value });
@@ -1915,7 +2172,10 @@ export function breveStoreResendKey(value: string): Promise<void> {
 
 export function breveRemoveResendKey(): Promise<void> {
   if (!isTauri()) {
-    browserBreveDelivery = { ...browserBreveDelivery, resendKeyConfigured: false };
+    browserBreveDelivery = {
+      ...browserBreveDelivery,
+      resendKeyConfigured: false,
+    };
     return Promise.resolve();
   }
   return invoke<void>("breve_remove_resend_key");

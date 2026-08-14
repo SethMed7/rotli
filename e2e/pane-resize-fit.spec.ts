@@ -25,7 +25,14 @@ async function paneRects(page: import("@playwright/test").Page) {
   return page.evaluate(() =>
     [...document.querySelectorAll(".pane")].map((pane) => {
       const r = pane.getBoundingClientRect();
-      return { x: r.x, y: r.y, width: r.width, height: r.height, bottom: r.bottom, right: r.right };
+      return {
+        x: r.x,
+        y: r.y,
+        width: r.width,
+        height: r.height,
+        bottom: r.bottom,
+        right: r.right,
+      };
     }),
   );
 }
@@ -116,7 +123,12 @@ test("stacked chat panes in a small window keep their chrome inside their own pa
   const rects = await paneRects(page);
   const top = rects[0];
   if (!top) throw new Error("no top pane");
-  expect(await foreignPaintAt(page, 0, { top: Math.max(top.height - 80, 0), height: 78 })).toEqual([]);
+  expect(
+    await foreignPaintAt(page, 0, {
+      top: Math.max(top.height - 80, 0),
+      height: 78,
+    }),
+  ).toEqual([]);
 
   // the fixed rows themselves fit — the thread is what scrolls, not the chrome
   expect(await escapingChrome(page)).toEqual([]);
@@ -170,12 +182,14 @@ test("shrinking the window re-fits a lopsided split instead of crushing a pane",
   await page.setViewportSize({ width: 760, height: 480 });
   // the refit is debounced behind a resize observer
   await expect
-    .poll(async () => (await paneRects(page)).every((r) => r.height >= 150), { timeout: 3_000 })
+    .poll(async () => (await paneRects(page)).every((r) => r.height >= 150), {
+      timeout: 3_000,
+    })
     .toBe(true);
   expect(await escapingChrome(page)).toEqual([]);
 });
 
-/** ChatSurface's shipped scaffold (src/components/chatSurface.tsx), as markup.
+/** ChatSurface's shipped scaffold (src/components/chat/chatSurface.tsx), as markup.
  * The browser twin renders the chat's "runs in the app" state instead of the
  * live thread — no composer, no header tools — so the reported failure (a
  * composer taller than its pane, spilling onto the pane below) can only be
@@ -258,7 +272,7 @@ test("a live chat's composer stays inside its own pane in a stacked split", asyn
 test("a chat title yields to its header tools instead of sitting under them", async ({ page }) => {
   // CSS-grammar probe. The browser twin renders the chat surface without a
   // connected memex, so the header's tool cluster never mounts — this mirrors
-  // ChatSurface's header markup (src/components/chatSurface.tsx) into a real
+  // ChatSurface's header markup (src/components/chat/chatSurface.tsx) into a real
   // pane so the SHIPPED cascade is what gets measured.
   await openChatPane(page);
 
@@ -293,4 +307,56 @@ test("a chat title yields to its header tools instead of sitting under them", as
   // …and the tools keep their full width inside the header
   expect(overlap.toolsOverflowBy).toBeLessThanOrEqual(0);
   expect(overlap.toolsWidth).toBeGreaterThan(60);
+});
+
+test("a fresh chat keeps its optional name in the fixed header above the conversation", async ({ page }) => {
+  await openChatPane(page);
+
+  const geometry = await page.evaluate(() => {
+    const surface = document.querySelector(".chat-surface");
+    if (!surface) throw new Error("no chat surface");
+    surface.innerHTML = `
+      <header class="chat-head">
+        <div class="chat-breadcrumb">
+          <span class="chat-context">memex-vault</span>
+          <span class="chat-breadcrumb-separator">/</span>
+          <input class="chat-title-edit is-new" value="" placeholder="Name this chat (optional)">
+          <span class="chat-title-skip">↵ skips</span>
+        </div>
+        <div class="chat-head-tools"><button class="chat-head-action">W</button></div>
+      </header>
+      <main class="chat-main">
+        <div class="chat-conversation is-new">
+          <div class="chat-scroll"><div class="chat-thread"><p>Welcome</p></div></div>
+          <div class="chat-composer"><div class="chat-composer-inner"><div class="chat-box">Message</div></div></div>
+        </div>
+      </main>`;
+    const box = (selector: string) => {
+      const rect = surface.querySelector(selector)?.getBoundingClientRect();
+      if (!rect) throw new Error(`no ${selector}`);
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        left: rect.left,
+        right: rect.right,
+      };
+    };
+    const surfaceBox = surface.getBoundingClientRect();
+    return {
+      surface: {
+        top: surfaceBox.top,
+        bottom: surfaceBox.bottom,
+        left: surfaceBox.left,
+        right: surfaceBox.right,
+      },
+      head: box(".chat-head"),
+      conversation: box(".chat-conversation"),
+    };
+  });
+
+  expect(Math.abs(geometry.head.top - geometry.surface.top)).toBeLessThanOrEqual(1);
+  expect(geometry.head.bottom).toBeLessThanOrEqual(geometry.conversation.top + 1);
+  expect(geometry.head.left).toBeGreaterThanOrEqual(geometry.surface.left - 1);
+  expect(geometry.head.right).toBeLessThanOrEqual(geometry.surface.right + 1);
+  expect(geometry.conversation.bottom).toBeLessThanOrEqual(geometry.surface.bottom + 1);
 });

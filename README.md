@@ -56,13 +56,13 @@ This is the idea rotli is built around, so it's worth thirty seconds:
 - **Main** is *your* shelf — the notes you reach for, arranged by hand, in whatever order makes sense to you.
 - **The Library** is where those same notes actually live on disk, filed into tidy areas by the Librarian.
 
-They aren't copies. They're the **same file**, reached two ways. Rearrange Main all you like; the Library keeps everything findable. Let the Librarian refile things; your Main arrangement never moves. Your order, and a tidy library, at the same time — and the Librarian only ever touches a note's *location and metadata*, **never the words inside it** (every change is journaled and undoable).
+They aren't copies. They're the **same file**, reached two ways. Rearrange Main all you like; the Library keeps everything findable. Let the Librarian refile things; your Main arrangement never moves. Your order, and a tidy library, at the same time — and the Librarian only ever touches a note's *location and metadata*, **never the words inside it**. Rotli records its actions for review and offers guarded undo when the note still matches the recorded change.
 
 Main can also open additional named **views** for focused slices such as a
 project, client, or open-source work. Main keeps every referenced item; a named
 view adds its own virtual folders and one `view_tag` to Markdown metadata. New
 items and folders follow the view you are currently in, while the underlying
-file still enters the same intake/Brain workflow.
+file still enters the same intake/Library workflow when the Librarian is on.
 
 ## Two fronts, one window
 
@@ -133,7 +133,7 @@ You work how you want in **Main**; the Librarian organizes the **Library** under
 ```sh
 bun install
 bun run tauri dev   # the app (menu bar · ⌥Space opens · ⌥C captures)
-bun run dev         # frontend only, in a plain browser (in-memory demo memex)
+bun run dev         # frontend only, in a plain browser (in-memory demo vault)
 bun run check       # TypeScript, tests, runtime, architecture, design, and docs
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
@@ -156,7 +156,7 @@ edits, and updates require a fresh revision.
 /Applications/rotli.app/Contents/MacOS/rotli agent config
 ```
 
-The doctor is read-only, the self-test uses a disposable memex, and the final
+The doctor is read-only, the self-test uses a disposable vault, and the final
 command prints copy-ready Claude Code and Codex MCP configuration for that exact
 installed binary. Note results identify themselves as Markdown and include
 document metrics; Rotli keeps YAML frontmatter outside the agent-editable body.
@@ -175,10 +175,10 @@ Contributing or working with an AI coding tool? Start with
 |  |  |
 |---|---|
 | ✅ | Shell · panes & tabs · hybrid editor · `⌘K` · four work environments |
-| ✅ | **Your notes folder is a memex** — plain files, atomic writes, fs watcher, persistence |
+| ✅ | **Your vault stays ordinary files** — Rotli adds atomic writes, watching, metadata, and persistence without taking ownership |
 | ✅ | **Search** — full-text across your notes (titles + bodies), instant |
 | ✅ | **Chat** — on-device by default, or your own connected models; your notes are its knowledge base |
-| ✅ | **The Librarian** — an on-device organizer files your captures into the Library, fully journaled + undoable — or choose a raw vault with no AI at all |
+| ✅ | **The Librarian** — an on-device organizer files captures into the Library with an activity record and guarded undo — or choose a raw vault with no AI at all |
 | ⏳ | **[The roadmap](ROADMAP.md)** — email Inbox · mobile & tablet · handwriting-to-text notebook |
 
 ---

@@ -16,8 +16,8 @@ A few principles rotli is built on:
 
 1. **Your files are the source of truth.** The app is a warm window onto them, not
    their owner. Back them up, sync them, edit them anywhere.
-2. **The folder is the memex.** Notes, chats, and knowledge live together in one
-   place, organized by AI but always yours to rearrange.
+2. **The folder is your vault.** Notes, chats, and knowledge live together in one
+   place; the optional Librarian can organize them, but they remain yours.
 3. **Formatting is a lens, not a cage.** How a note looks is a render layer — it's
    never written into your markdown.
 

@@ -51,9 +51,10 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyGen = useRef(0);
   const diskLenRef = useRef(0);
+  const revisionRef = useRef("");
   const armedRef = useRef(false);
   // the registered quit-flush entry — flushDirtySheets writes its diskLen back
-  const entryRef = useRef<{ diskLen: number } | null>(null);
+  const entryRef = useRef<{ diskLen: number; revision: string } | null>(null);
 
   // the sheet's own tab open somewhere? that surface owns the pen
   const tabOpen = usePanesStore((s) => fileTabOpen(s.root, fileId));
@@ -81,7 +82,7 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
         // double-truthing the pending flush. Stale parks (the file changed on
         // disk underneath) are dropped, exactly like SheetEditor.
         let park = writable ? getParked(fileId) : undefined;
-        if (park && (park.mode !== mode || stat.len !== park.diskLen)) {
+        if (park && (park.mode !== mode || stat.revision !== park.revision)) {
           deleteParked(fileId);
           park = undefined;
         }
@@ -93,8 +94,10 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
           model = park.model;
           idMapRef.current = park.idMap;
           diskLenRef.current = park.diskLen;
+          revisionRef.current = park.revision;
           dirtyGen.current = Math.max(1, dirtyGen.current);
         } else if (mode === "csv") {
+          revisionRef.current = stat.revision;
           const csv = await corpusFileText(fileId, SHEET_EDIT_MAX_BYTES + 1);
           wb = fillFromCsvRows(
             newWorkbook(),
@@ -105,6 +108,7 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
           idMapRef.current = buildSheetIdMap(wb, model);
           diskLenRef.current = stat.len;
         } else {
+          revisionRef.current = stat.revision;
           const b64 = await corpusFileBytes(fileId);
           const bytes = bytesFromB64(b64);
           wb = await loadXlsx(bytes.buffer as ArrayBuffer);
@@ -137,12 +141,16 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
               } catch {
                 return; // snapshot failed — the flush lane retries
               }
-              writeSheetModel(fileId, mode, wbLive, snap, idMapRef.current)
-                .then((len) => {
+              writeSheetModel(fileId, mode, wbLive, snap, idMapRef.current, revisionRef.current)
+                .then((saved) => {
                   if (gen === dirtyGen.current) {
                     dirtyGen.current = 0;
-                    diskLenRef.current = len;
-                    if (entryRef.current) entryRef.current.diskLen = len;
+                    diskLenRef.current = saved.len;
+                    revisionRef.current = saved.revision;
+                    if (entryRef.current) {
+                      entryRef.current.diskLen = saved.len;
+                      entryRef.current.revision = saved.revision;
+                    }
                     deleteParked(fileId);
                   }
                   setSaveErr(null);
@@ -172,11 +180,13 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
             saveModel: () => handle.save(),
             idMap: idMapRef.current,
             diskLen: diskLenRef.current,
+            revision: revisionRef.current,
             dirtyGen: () => dirtyGen.current,
             onFlushed: (gen: number) => {
               if (dirtyGen.current === gen) {
                 dirtyGen.current = 0;
                 diskLenRef.current = entry.diskLen;
+                revisionRef.current = entry.revision;
                 deleteParked(fileId);
               }
             },
@@ -216,6 +226,7 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
             model: handle.save(),
             idMap: idMapRef.current,
             diskLen: diskLenRef.current,
+            revision: revisionRef.current,
             mode,
           });
         }

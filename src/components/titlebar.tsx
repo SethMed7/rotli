@@ -6,7 +6,7 @@
 // Rail-toggle law (Seth, 2026-06-13): the two titlebar rail icons (Folders ⌘0,
 // Notes list ⌥⌘L) are GONE. One unified, memory-based sidebar toggle now lives
 // INLINE left of the note-list filter (and on the warm-edge restore strip when
-// both rails are collapsed). The ⌘0 / ⌥⌘L chords stay rebindable in Hotkeys —
+// both rails are collapsed). The ⌘0 / ⌥⌘L chords stay rebindable in Keybindings —
 // they just no longer have a home in the bar.
 
 import type { MouseEvent } from "react";
@@ -20,6 +20,7 @@ import { QuokkaMark } from "./character";
 import { ChevronRight, PlusGlyph, SidebarGlyph, SplitDownGlyph, SplitRightGlyph, SunGlyph } from "./glyphs";
 import { Icon } from "./icon";
 import { IconButton } from "./iconButton";
+import { Palette } from "./palette";
 
 /** One size for every titlebar icon so the bar reads as one cohesive row
  * (Seth, 2026-06-15). */
@@ -44,6 +45,8 @@ export function Titlebar() {
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const sidebarMode = useUiStore((s) => s.sidebarMode);
   const breveActive = sidebarMode === "breve";
+  const paletteOpen = useUiStore((s) => s.paletteOpen);
+  const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const theme = useUiStore((s) => s.theme);
   const themeFamily = useUiStore((s) => s.themeFamily);
   const themeLabel =
@@ -77,11 +80,10 @@ export function Titlebar() {
           </button>
         </div>
       )}
-      {/* Seth, 2026-07-06: the wide top global-search field. The rotli
-          mark moved OFF the far left and INTO the field as a circular badge in
-          place of the search glyph (Seth, 2026-07-07). Opens the ⌘K palette. The
-          surrounding strip stays a window-drag region; the button stops its own
-          mousedown so a click never starts a drag. */}
+      {/* The titlebar field is the real search control: ⌘K focuses it and its
+          results unfold directly below. The surrounding strip remains a drag
+          region; search interactions stop propagation so they never drag or
+          maximize the window. */}
       <div className="tb-mid" onMouseDown={onDragRegionMouseDown} onDoubleClick={onDragRegionDoubleClick}>
         {!settingsOpen && (
           <>
@@ -112,19 +114,34 @@ export function Titlebar() {
                 </button>
               </>
             )}
-            <button
-              type="button"
-              className="tb-search"
-              aria-label={breveActive ? "Search Rotli and actions — ⌘K" : "Search notes and actions — ⌘K"}
-              onMouseDown={(event) => event.stopPropagation()}
-              onClick={() => dispatch("palette.toggle")}
-            >
-              <span className="tb-search-mark" aria-hidden="true">
-                <QuokkaMark size={15} />
-              </span>
-              <span className="tb-search-label">{breveActive ? "Search Rotli…" : "Search…"}</span>
-              <kbd className="tb-search-kbd">⌘K</kbd>
-            </button>
+            {paletteOpen ? (
+              <>
+                <button
+                  type="button"
+                  className="pal-focus-scrim"
+                  aria-label="Close search"
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                  onClick={() => setPaletteOpen(false)}
+                />
+                <Palette breveActive={breveActive} onClose={() => setPaletteOpen(false)} />
+              </>
+            ) : (
+              <button
+                type="button"
+                className="tb-search"
+                aria-label={breveActive ? "Search Rotli and actions — ⌘K" : "Search notes and actions — ⌘K"}
+                onMouseDown={(event) => event.stopPropagation()}
+                onDoubleClick={(event) => event.stopPropagation()}
+                onClick={() => dispatch("palette.toggle")}
+              >
+                <span className="tb-search-mark" aria-hidden="true">
+                  <QuokkaMark size={15} />
+                </span>
+                <span className="tb-search-label">{breveActive ? "Search Rotli…" : "Search…"}</span>
+                <kbd className="tb-search-kbd">⌘K</kbd>
+              </button>
+            )}
           </>
         )}
       </div>

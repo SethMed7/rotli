@@ -27,6 +27,7 @@ import {
   corpusResolveRef,
   fileAssetUrl,
   isTauri,
+  openUrl,
   type BreveDeliverySettings,
   type BrevePdfPalette,
   type BrevePdfTheme,
@@ -42,7 +43,17 @@ import {
 import { routinePipeline } from "../../routines/pipeline";
 import { usePanesStore } from "../../state/panes";
 import { useUiStore } from "../../state/ui";
-import { CheckGlyph, ChevronRight, ClockGlyph, LockGlyph, SearchGlyph, XGlyph } from "../glyphs";
+import {
+  ActivityGlyph,
+  CheckGlyph,
+  ChevronRight,
+  ClockGlyph,
+  ExternalLinkGlyph,
+  LockGlyph,
+  SearchGlyph,
+  XGlyph,
+} from "../glyphs";
+import { briefDashboardDigest } from "./breveDashboardModel";
 import {
   BreveSkeleton,
   EmptyMessage,
@@ -274,6 +285,334 @@ function BriefAudio({ path }: { path: string }) {
   );
 }
 
+function DashboardView({ snapshot }: { snapshot: BreveSnapshot }) {
+  const setView = useUiStore((s) => s.setBreveView);
+  const issues = useMemo(
+    () =>
+      sortBriefs(snapshot.briefs)
+        .filter((brief) => brief.path)
+        .sort(
+          (a, b) =>
+            b.date.localeCompare(a.date) ||
+            (KIND_RECENCY[b.kind] ?? 3) - (KIND_RECENCY[a.kind] ?? 3) ||
+            a.title.localeCompare(b.title),
+        ),
+    [snapshot.briefs],
+  );
+  const [selectedStem, setSelectedStem] = useState("");
+  const selectedIndex = Math.max(
+    0,
+    issues.findIndex((brief) => brief.stem === selectedStem),
+  );
+  const current = issues[selectedIndex];
+  useEffect(() => {
+    if (!issues.length) {
+      setSelectedStem("");
+      return;
+    }
+    if (!issues.some((brief) => brief.stem === selectedStem)) {
+      setSelectedStem(issues[0]!.stem);
+    }
+  }, [issues, selectedStem]);
+  const body = useQuery({
+    queryKey: ["breve", "dashboard-brief", current?.path ?? ""],
+    enabled: !!current?.path,
+    staleTime: 60_000,
+    queryFn: () => corpusFileText(current!.path!, BRIEF_READ_BYTES),
+  });
+  const digest = useMemo(() => briefDashboardDigest(body.data ?? ""), [body.data]);
+  const now = Date.now();
+  const upcoming = snapshot.config.routines
+    .filter((routine) => routine.enabled)
+    .map((routine) => ({
+      routine,
+      epoch: nextRoutineEpoch(routine, now, snapshot.config.timezone),
+    }))
+    .filter((entry): entry is { routine: BreveRoutine; epoch: number } => entry.epoch !== null)
+    .sort((a, b) => a.epoch - b.epoch)
+    .slice(0, 3);
+  const recentNotifications = snapshot.notifications.slice(0, 3);
+
+  return (
+    <div className="breve-page breve-dashboard">
+      <PageHead
+        title="Today"
+        detail="Your latest briefs, watchlist stories, and useful links—kept with this vault."
+      />
+
+      <div className="breve-dashboard-front">
+        <section className="breve-dashboard-brief" aria-labelledby="breve-dashboard-briefs">
+          <div className="breve-dashboard-panel-head">
+            <div>
+              <span className="breve-dashboard-eyebrow">Latest first</span>
+              <h3 id="breve-dashboard-briefs">Today’s Briefs</h3>
+            </div>
+            <div className="breve-dashboard-carousel" role="group" aria-label="Brief navigation">
+              <span>{issues.length ? `${selectedIndex + 1} of ${issues.length}` : "No issues"}</span>
+              <button
+                type="button"
+                disabled={selectedIndex >= issues.length - 1}
+                aria-label="Older brief"
+                onClick={() => setSelectedStem(issues[selectedIndex + 1]!.stem)}
+              >
+                <ChevronRight size={13} className="flip" />
+              </button>
+              <button
+                type="button"
+                disabled={selectedIndex === 0 || issues.length === 0}
+                aria-label="Newer brief"
+                onClick={() => setSelectedStem(issues[selectedIndex - 1]!.stem)}
+              >
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          </div>
+          {body.isLoading ? (
+            <BreveSkeleton label="Reading today’s brief" />
+          ) : current ? (
+            <div className="breve-dashboard-current-brief">
+              <div className="breve-dashboard-issue-meta">
+                <span className={`breve-kind ${current.kind}`}>{current.kind}</span>
+                <time dateTime={current.date}>{briefDateLabel(current.date)}</time>
+              </div>
+              <h4>{digest.headline || current.title}</h4>
+              <p>
+                {digest.stories[0]?.summary ??
+                  "Open the complete brief for this issue’s watchlist findings and sources."}
+              </p>
+              <button type="button" className="breve-linkbtn" onClick={() => setView("briefs")}>
+                Read this brief <ChevronRight size={10} />
+              </button>
+            </div>
+          ) : (
+            <EmptyMessage
+              title="Your first brief has not arrived yet."
+              detail={
+                snapshot.counts.topics > 0
+                  ? "Your watchlist is ready. Run or schedule a brief to make this your news home."
+                  : "Add watchlist topics so Breve can follow what matters to you."
+              }
+              action={
+                <button
+                  type="button"
+                  className="ghostbtn primary"
+                  onClick={() => setView(snapshot.counts.topics > 0 ? "routines" : "watchlist")}
+                >
+                  {snapshot.counts.topics > 0 ? "Review routines" : "Build watchlist"}
+                </button>
+              }
+            />
+          )}
+        </section>
+
+        <section className="breve-dashboard-top-stories" aria-labelledby="breve-dashboard-stories">
+          <div className="breve-dashboard-panel-head">
+            <div>
+              <span className="breve-dashboard-eyebrow">Your watchlist</span>
+              <h3 id="breve-dashboard-stories">Top stories</h3>
+            </div>
+            <button type="button" className="breve-linkbtn" onClick={() => setView("watchlist")}>
+              Edit topics
+            </button>
+          </div>
+          {digest.stories.length > 0 ? (
+            <div className="breve-dashboard-story-list">
+              {digest.stories.slice(0, 4).map((story, index) => (
+                <article key={`${story.title}:${index}`}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <div>
+                    <h4>{story.title}</h4>
+                    <p>{story.summary}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="breve-dashboard-panel-empty">
+              {snapshot.counts.topics > 0
+                ? "Top stories will appear here when a brief completes. Refresh the watchlist for a 30-day lookback."
+                : "Add topics to your watchlist to build a personal top-stories feed."}
+            </p>
+          )}
+        </section>
+      </div>
+
+      <div className="breve-dashboard-stats" aria-label="Breve at a glance">
+        <button type="button" onClick={() => setView("watchlist")}>
+          <strong>{snapshot.counts.topics}</strong>
+          <span>watchlist topics</span>
+        </button>
+        <button type="button" onClick={() => setView("routines")}>
+          <strong>{snapshot.config.routines.filter((routine) => routine.enabled).length}</strong>
+          <span>active routines</span>
+        </button>
+        <button type="button" onClick={() => setView("briefs")}>
+          <strong>{snapshot.briefs.length}</strong>
+          <span>saved briefs</span>
+        </button>
+        <button type="button" onClick={() => setView("notifications")}>
+          <strong>{snapshot.notifications.length}</strong>
+          <span>recent events</span>
+        </button>
+      </div>
+
+      <div className="breve-dashboard-columns">
+        <section className="breve-dashboard-section" aria-labelledby="breve-dashboard-next">
+          <div className="breve-section-head copy">
+            <div>
+              <h3 id="breve-dashboard-next">Coming up</h3>
+              <p>Next work scheduled for this vault.</p>
+            </div>
+            <button type="button" className="breve-linkbtn" onClick={() => setView("routines")}>
+              All routines
+            </button>
+          </div>
+          {upcoming.length ? (
+            <div className="breve-dashboard-list">
+              {upcoming.map(({ routine, epoch }) => (
+                <div key={routine.id}>
+                  <ClockGlyph size={13} />
+                  <span>
+                    <strong>{routine.label}</strong>
+                    <small>{formatNextRoutine(routine, now, snapshot.config.timezone)}</small>
+                  </span>
+                  <time dateTime={new Date(epoch).toISOString()}>
+                    {new Intl.DateTimeFormat(undefined, {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      timeZone: snapshot.config.timezone,
+                    }).format(new Date(epoch))}
+                  </time>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="breve-dashboard-empty">No scheduled routine is enabled.</p>
+          )}
+        </section>
+
+        <section className="breve-dashboard-section" aria-labelledby="breve-dashboard-activity">
+          <div className="breve-section-head copy">
+            <div>
+              <h3 id="breve-dashboard-activity">Recent activity</h3>
+              <p>Sanitized events from this vault’s scheduler.</p>
+            </div>
+            <button type="button" className="breve-linkbtn" onClick={() => setView("notifications")}>
+              All events
+            </button>
+          </div>
+          {recentNotifications.length ? (
+            <div className="breve-dashboard-list">
+              {recentNotifications.map((notification) => (
+                <div key={notification.id}>
+                  <ActivityGlyph size={13} />
+                  <span>
+                    <strong>{notification.title}</strong>
+                    <small>{notification.detail}</small>
+                  </span>
+                  <time dateTime={notification.at}>
+                    {new Intl.DateTimeFormat(undefined, {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    }).format(new Date(notification.at))}
+                  </time>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="breve-dashboard-empty">No scheduler activity has been recorded yet.</p>
+          )}
+        </section>
+      </div>
+
+      {(digest.actions.length > 0 || digest.resources.length > 0) && (
+        <div className="breve-dashboard-columns">
+          {digest.actions.length > 0 && (
+            <section className="breve-dashboard-section" aria-labelledby="breve-dashboard-actions">
+              <div className="breve-section-head copy">
+                <div>
+                  <h3 id="breve-dashboard-actions">Worth doing</h3>
+                  <p>Action items extracted from the latest brief.</p>
+                </div>
+              </div>
+              <ul className="breve-dashboard-actions">
+                {digest.actions.map((action) => (
+                  <li key={action}>{action}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {digest.resources.length > 0 && (
+            <section className="breve-dashboard-section" aria-labelledby="breve-dashboard-resources">
+              <div className="breve-section-head copy">
+                <div>
+                  <h3 id="breve-dashboard-resources">Resources</h3>
+                  <p>Sources already cited by the latest brief.</p>
+                </div>
+              </div>
+              <div className="breve-dashboard-resources">
+                {digest.resources.map((resource) => (
+                  <button type="button" key={resource.url} onClick={() => void openUrl(resource.url)}>
+                    <span>{resource.label}</span>
+                    <ExternalLinkGlyph size={12} />
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NotificationsView({ snapshot }: { snapshot: BreveSnapshot }) {
+  const setView = useUiStore((s) => s.setBreveView);
+  return (
+    <div className="breve-page">
+      <PageHead
+        title="Notifications"
+        detail="What Breve has started, completed, skipped, or needs help with in this vault."
+      />
+      {snapshot.notifications.length === 0 ? (
+        <EmptyMessage
+          title="No Breve activity yet."
+          detail="Events appear here after the vault-owned scheduler starts running routines."
+          action={
+            <button type="button" className="ghostbtn primary" onClick={() => setView("routines")}>
+              Review routines
+            </button>
+          }
+        />
+      ) : (
+        <div className="breve-notification-list" role="feed" aria-label="Breve notifications">
+          {snapshot.notifications.map((notification) => (
+            <article
+              key={notification.id}
+              className={`breve-notification ${notification.kind}`}
+              aria-label={notification.title}
+            >
+              <span className="breve-notification-dot" aria-hidden="true" />
+              <div>
+                <h3>{notification.title}</h3>
+                <p>{notification.detail}</p>
+              </div>
+              <time dateTime={notification.at}>
+                {new Intl.DateTimeFormat(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                }).format(new Date(notification.at))}
+              </time>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
   const openNote = usePanesStore((s) => s.openNote);
   const setSidebarMode = useUiStore((s) => s.setSidebarMode);
@@ -310,7 +649,10 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
   const now = Date.now();
   const nextBriefRoutine = snapshot.config.routines
     .filter((routine) => routine.enabled && routine.kind === "brief")
-    .map((routine) => ({ routine, epoch: nextRoutineEpoch(routine, now, snapshot.config.timezone) }))
+    .map((routine) => ({
+      routine,
+      epoch: nextRoutineEpoch(routine, now, snapshot.config.timezone),
+    }))
     .filter((entry): entry is { routine: BreveRoutine; epoch: number } => entry.epoch !== null)
     .sort((a, b) => a.epoch - b.epoch)[0]?.routine;
 
@@ -1132,7 +1474,11 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
  * Applies to the next scheduled brief — no restart needed. */
 function BriefSkillEditor() {
   const queryClient = useQueryClient();
-  const skill = useQuery({ queryKey: ["breve", "brief-skill"], queryFn: breveBriefSkill, staleTime: 60_000 });
+  const skill = useQuery({
+    queryKey: ["breve", "brief-skill"],
+    queryFn: breveBriefSkill,
+    staleTime: 60_000,
+  });
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -1294,7 +1640,10 @@ function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; e
       // write only THIS form's slice over the freshest config — the co-mounted
       // Delivery form may have saved since this one went dirty, and writing the
       // whole stale copy would revert its work (adversarial review, HIGH)
-      const next = await breveWriteConfig({ ...snapshot.config, modelPolicy: config.modelPolicy });
+      const next = await breveWriteConfig({
+        ...snapshot.config,
+        modelPolicy: config.modelPolicy,
+      });
       queryClient.setQueryData(BREVE_QUERY_KEY, next);
       setBase(next.config);
       setSaveState("saved");
@@ -1309,7 +1658,10 @@ function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; e
     const target = index + delta;
     if (target < 0 || target >= list.length) return;
     [list[index], list[target]] = [list[target]!, list[index]!];
-    setConfig({ ...config, modelPolicy: { ...config.modelPolicy, fallbacks: list } });
+    setConfig({
+      ...config,
+      modelPolicy: { ...config.modelPolicy, fallbacks: list },
+    });
   };
 
   return (
@@ -1362,7 +1714,10 @@ function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; e
                 setConfig({
                   ...config,
                   briefModel: e.target.value,
-                  modelPolicy: { ...config.modelPolicy, primary: e.target.value },
+                  modelPolicy: {
+                    ...config.modelPolicy,
+                    primary: e.target.value,
+                  },
                 })
               }
             >
@@ -1380,7 +1735,10 @@ function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; e
               onChange={(e) =>
                 setConfig({
                   ...config,
-                  modelPolicy: { ...config.modelPolicy, localHelper: e.target.value || null },
+                  modelPolicy: {
+                    ...config.modelPolicy,
+                    localHelper: e.target.value || null,
+                  },
                 })
               }
             >
@@ -1409,7 +1767,10 @@ function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; e
                 onChange={(e) => {
                   const list = [...config.modelPolicy.fallbacks];
                   list[index] = e.target.value;
-                  setConfig({ ...config, modelPolicy: { ...config.modelPolicy, fallbacks: list } });
+                  setConfig({
+                    ...config,
+                    modelPolicy: { ...config.modelPolicy, fallbacks: list },
+                  });
                 }}
               >
                 {options
@@ -1555,13 +1916,37 @@ function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; e
   );
 }
 
-type DeliveryTest = { target: "email" | "signal"; state: SaveState; message: string } | null;
+type DeliveryTest = {
+  target: "email" | "signal";
+  state: SaveState;
+  message: string;
+} | null;
 
-const PDF_THEME_OPTIONS: Array<{ value: BrevePdfThemePreset; label: string; detail: string }> = [
-  { value: "charcoal", label: "Charcoal", detail: "Breve’s original dark editorial palette" },
-  { value: "warmLight", label: "Warm Light", detail: "Rotli linen, cocoa, and clay" },
-  { value: "warmDark", label: "Warm Dark", detail: "Rotli cocoa with clay accents" },
-  { value: "paper", label: "Paper", detail: "Neutral white with crisp dark type" },
+const PDF_THEME_OPTIONS: Array<{
+  value: BrevePdfThemePreset;
+  label: string;
+  detail: string;
+}> = [
+  {
+    value: "charcoal",
+    label: "Charcoal",
+    detail: "Breve’s original dark editorial palette",
+  },
+  {
+    value: "warmLight",
+    label: "Warm Light",
+    detail: "Rotli linen, cocoa, and clay",
+  },
+  {
+    value: "warmDark",
+    label: "Warm Dark",
+    detail: "Rotli cocoa with clay accents",
+  },
+  {
+    value: "paper",
+    label: "Paper",
+    detail: "Neutral white with crisp dark type",
+  },
   { value: "custom", label: "Custom", detail: "Choose every PDF color" },
 ];
 
@@ -1615,7 +2000,12 @@ function PdfThemeEditor({
               id="breve-pdf-theme"
               value={theme.preset}
               aria-describedby="breve-pdf-theme-help"
-              onChange={(event) => onChange({ ...theme, preset: event.target.value as BrevePdfThemePreset })}
+              onChange={(event) =>
+                onChange({
+                  ...theme,
+                  preset: event.target.value as BrevePdfThemePreset,
+                })
+              }
             >
               {PDF_THEME_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -1638,7 +2028,13 @@ function PdfThemeEditor({
                       value={theme.custom[key]}
                       aria-label={`${label} color`}
                       onChange={(event) =>
-                        onChange({ ...theme, custom: { ...theme.custom, [key]: event.target.value } })
+                        onChange({
+                          ...theme,
+                          custom: {
+                            ...theme.custom,
+                            [key]: event.target.value,
+                          },
+                        })
                       }
                     />
                     <code>{theme.custom[key].toUpperCase()}</code>
@@ -1745,7 +2141,10 @@ function ConfigureView({ snapshot, embedded = false }: { snapshot: BreveSnapshot
       if (configDirty) {
         // slice-write, same reasoning as the Models save: never clobber the
         // co-mounted Models form's saved policy with a stale full config
-        const nextSnapshot = await breveWriteConfig({ ...snapshot.config, pdfTheme: config.pdfTheme });
+        const nextSnapshot = await breveWriteConfig({
+          ...snapshot.config,
+          pdfTheme: config.pdfTheme,
+        });
         setConfig(nextSnapshot.config);
         setConfigBase(nextSnapshot.config);
         queryClient.setQueryData(BREVE_QUERY_KEY, nextSnapshot);
@@ -1775,7 +2174,10 @@ function ConfigureView({ snapshot, embedded = false }: { snapshot: BreveSnapshot
     setError("");
     try {
       await breveRemoveResendKey();
-      const next = await breveWriteDeliverySettings({ ...draft, resendKeyConfigured: false });
+      const next = await breveWriteDeliverySettings({
+        ...draft,
+        resendKeyConfigured: false,
+      });
       setDraft(next);
       setBase(next);
       setApiKey("");
@@ -1798,7 +2200,11 @@ function ConfigureView({ snapshot, embedded = false }: { snapshot: BreveSnapshot
       const message = await (target === "email" ? breveTestEmail() : breveTestSignal());
       setTest({ target, state: "saved", message });
     } catch (e) {
-      setTest({ target, state: "error", message: e instanceof Error ? e.message : String(e) });
+      setTest({
+        target,
+        state: "error",
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
   };
 
@@ -2135,7 +2541,9 @@ export function BreveSurface() {
 
   return (
     <main className="breve-surface" aria-label={`Breve ${view}`}>
+      {view === "dashboard" && <DashboardView snapshot={snapshot} />}
       {view === "briefs" && <BriefsView snapshot={snapshot} />}
+      {view === "notifications" && <NotificationsView snapshot={snapshot} />}
       {view === "routines" && <RoutinesView snapshot={snapshot} />}
       {view === "watchlist" && <WatchlistView snapshot={snapshot} />}
       {view === "settings" && <SettingsView snapshot={snapshot} />}

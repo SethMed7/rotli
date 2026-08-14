@@ -9,7 +9,7 @@ SKILL="${ROTLI_BREVE_SKILL:-$BREVE/skills/breve/SKILL.md}"
 LANES=",${ROTLI_BREVE_LANES:-inApp,signal,email},"
 # Sandbox the brief's claude call exactly like the daemon tiers (write+read confinement).
 SB="$HOME/.cache/breve/breve-write-sandbox.sb"
-SANDBOX=""; if [ "$BREVE_SANDBOX" != "0" ] && [ -f "$SB" ]; then SANDBOX="/usr/bin/sandbox-exec -f $SB"; fi
+SANDBOX=""
 # If the profile is missing, sandbox.ts below generates it from the managed runtime paths.
 # Brief model is config-driven (settings.json "briefModel", default sonnet). Never inherit the system default.
 BREVE_MODEL="${BREVE_MODEL:-$(bun "$BREVE/scripts/brief-model.ts" 2>/dev/null || echo sonnet)}"
@@ -59,8 +59,11 @@ brief_exists() { [ "$1" = "--test" ] || [ -f "$BREVE/briefs/${TODAY}-night.md" ]
 {
   echo "=== Breve night run: $(date) ==="
   # Ensure the sandbox profile exists before run_model is used.
-  bun "$BREVE/scripts/sandbox.ts" --print >/dev/null 2>&1 || true
-  [ "$BREVE_SANDBOX" != "0" ] && [ -f "$SB" ] && SANDBOX="/usr/bin/sandbox-exec -f $SB"
+  if ! bun "$BREVE/scripts/sandbox.ts" --require >/dev/null 2>&1; then
+    echo "secure model sandbox unavailable — refusing to generate a remote brief"
+    exit 1
+  fi
+  SANDBOX="/usr/bin/sandbox-exec -f $SB"
   # Optional read-only gh token (empty = gh uses default auth).
   export GH_TOKEN="$(bun "$BREVE/scripts/secret.ts" get breve-gh-readonly 2>/dev/null || true)"
   run_model "$BREVE_MODEL"

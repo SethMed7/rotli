@@ -8,7 +8,16 @@
 
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import { SEC_SYSTEM, useUiStore } from "./ui";
+import { SEC_SYSTEM, SOLID_THEMES, THEME_FAMILY_PRESENTATIONS, useUiStore } from "./ui";
+
+describe("theme presentation", () => {
+  test("organizes the same four environments as two families with light and dark modes", () => {
+    expect(THEME_FAMILY_PRESENTATIONS.map((theme) => theme.label)).toEqual(["Paper & Charcoal", "Rotli"]);
+    expect(
+      new Set(THEME_FAMILY_PRESENTATIONS.flatMap(({ family }) => [`${family}:light`, `${family}:dark`])),
+    ).toEqual(new Set(SOLID_THEMES.map(({ family, mode }) => `${family}:${mode}`)));
+  });
+});
 
 describe("collapseAllDests", () => {
   beforeEach(() => {

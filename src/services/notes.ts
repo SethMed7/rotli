@@ -38,6 +38,12 @@ export function ulid(now = Date.now()): string {
 export class InMemoryNotesService implements NotesService {
   private folders = new Map<string, Folder>();
   private notes = new Map<string, Note>();
+  private revisionCounter = 0;
+
+  private nextRevision(): string {
+    this.revisionCounter += 1;
+    return `memory:${this.revisionCounter}`;
+  }
   /** Where an archived/trashed note came from, so Phase 2 restore is
    * reviewable in the browser surface — fs mode carries this on disk instead.
    * Side Map keeps Note's shape identical to the FS service (Seth, 2026-06-13). */
@@ -168,14 +174,20 @@ export class InMemoryNotesService implements NotesService {
       updatedAt: now,
       pinned: false,
       body,
+      revision: this.nextRevision(),
     };
     this.notes.set(note.id, note);
     return note;
   }
 
-  async updateNote(id: string, body: string): Promise<Note> {
+  async updateNote(id: string, body: string, expectedRevision: string): Promise<Note> {
     const existing = this.notes.get(id);
     if (!existing) throw new Error(`unknown note: ${id}`);
+    if (!expectedRevision || expectedRevision !== existing.revision) {
+      throw new Error(
+        `revision conflict: expected ${expectedRevision || "(missing)"}, found ${existing.revision}; the note changed after it was opened`,
+      );
+    }
     const title = titleOf(body);
     const aliases = [...(existing.aliases ?? [])];
     if (existing.title !== title) {
@@ -192,6 +204,7 @@ export class InMemoryNotesService implements NotesService {
       aliases,
       snippet: snippetOf(body),
       updatedAt: Date.now(),
+      revision: this.nextRevision(),
     };
     this.notes.set(id, updated);
     return updated;
@@ -277,6 +290,7 @@ export class InMemoryNotesService implements NotesService {
       updatedAt: opts.updatedAt,
       pinned: opts.pinned ?? false,
       body,
+      revision: this.nextRevision(),
     };
     this.notes.set(note.id, note);
     if (opts.origin) this.origins.set(note.id, opts.origin);

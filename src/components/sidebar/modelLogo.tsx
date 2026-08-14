@@ -4,7 +4,7 @@ import gemmaLogo from "../../brand/providers/gemma.svg";
 import qwenLogo from "../../brand/providers/qwen.svg";
 import type { ChatLogoKey } from "./chatMark";
 
-type ColorLogoKey = Exclude<ChatLogoKey, "openai">;
+type ColorLogoKey = Extract<ChatLogoKey, "anthropic" | "gemini" | "gemma" | "qwen">;
 
 const COLOR_LOGOS: Record<ColorLogoKey, string> = {
   anthropic: claudeLogo,
@@ -15,11 +15,11 @@ const COLOR_LOGOS: Record<ColorLogoKey, string> = {
 
 /** Authentic provider/model-family art. The wrapper owns the accessible name. */
 export function ModelLogo({ logo }: { logo: ChatLogoKey }) {
-  if (logo === "openai") {
-    // The official black Blossom is used as a mask so the exact silhouette can
-    // follow readable semantic ink in every theme and on selected rows.
-    return <span className="model-logo model-logo--openai" aria-hidden="true" />;
+  if (logo in COLOR_LOGOS) {
+    return <img className="model-logo" src={COLOR_LOGOS[logo as ColorLogoKey]} alt="" aria-hidden="true" />;
   }
 
-  return <img className="model-logo" src={COLOR_LOGOS[logo]} alt="" aria-hidden="true" />;
+  // Monochrome official marks are masks so their exact silhouettes follow
+  // semantic ink in every Rotli environment and selected state.
+  return <span className={`model-logo model-logo--${logo}`} aria-hidden="true" />;
 }

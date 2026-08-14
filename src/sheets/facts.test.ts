@@ -101,6 +101,7 @@ describe("size and stamp formatting refuse to fabricate", () => {
   test("a real stat reports its byte size", () => {
     const stat: FileStat = {
       len: 2048,
+      revision: "r1",
       writable: true,
       lifecycleMutable: false,
       createdMs: null,

@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { EMPTY_SCENE, createBoardSaver, parseBoardBody, serializeBoardScene } from "./session";
+import {
+  EMPTY_BOARD_META,
+  EMPTY_SCENE,
+  createBoardSaver,
+  parseBoardBody,
+  serializeBoardScene,
+} from "./session";
 
 const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -100,6 +106,40 @@ describe("serializeBoardScene", () => {
     const body = serializeBoardScene({ elements: [], appState: {}, files: {}, meta });
     expect(parseBoardBody(body).meta).toEqual(meta);
   });
+
+  test("preserves unknown top-level scene fields when known content changes", () => {
+    const source = {
+      ...EMPTY_SCENE,
+      futureSchemaField: { nested: ["keep-me"] },
+    };
+    const body = serializeBoardScene({
+      sourceScene: source,
+      elements: [{ id: "changed" }],
+      appState: {},
+      files: {},
+      meta: EMPTY_BOARD_META,
+    });
+    expect((JSON.parse(body) as Record<string, unknown>).futureSchemaField).toEqual({
+      nested: ["keep-me"],
+    });
+  });
+
+  test("preserves unknown fields on an element that Excalidraw edits", () => {
+    const source = {
+      ...EMPTY_SCENE,
+      elements: [{ id: "a", type: "rectangle", futureElementField: { keep: true }, x: 1 }],
+    };
+    const body = serializeBoardScene({
+      sourceScene: source,
+      elements: [{ id: "a", type: "rectangle", x: 2 }],
+      appState: {},
+      files: {},
+      meta: EMPTY_BOARD_META,
+    });
+    expect(
+      (JSON.parse(body) as { elements: Array<Record<string, unknown>> }).elements[0]?.futureElementField,
+    ).toEqual({ keep: true });
+  });
 });
 
 describe("createBoardSaver", () => {
@@ -164,7 +204,7 @@ describe("createBoardSaver", () => {
     saver.schedule(() => {
       throw new Error("scene too large");
     });
-    await saver.flush();
+    await expect(saver.flush()).rejects.toThrow("scene too large");
     await tick();
     expect(writes).toEqual([]);
     expect(results).toEqual(["scene too large"]);

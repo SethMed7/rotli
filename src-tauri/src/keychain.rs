@@ -46,7 +46,10 @@ fn allow(name: &str) -> Result<(), String> {
 /// webview never sees the value.
 pub(crate) fn get_secret(name: &str) -> Option<String> {
     if cfg!(debug_assertions) {
-        return dev_secrets().lock().ok().and_then(|values| values.get(name).cloned());
+        return dev_secrets()
+            .lock()
+            .ok()
+            .and_then(|values| values.get(name).cloned());
     }
     get_generic_password(SERVICE, name)
         .ok()

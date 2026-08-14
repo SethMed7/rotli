@@ -7,7 +7,13 @@ import type {
   DocumentFileWriter,
   DocumentRepository,
 } from "./ports";
-import { createDocument, documentFileName, editDocument } from "./workflow";
+import {
+  createDocument,
+  createNamedDocument,
+  documentFileName,
+  editDocument,
+  namedDocumentFileName,
+} from "./workflow";
 
 describe("document application workflows", () => {
   test("creation composes an encoder and repository without knowing either implementation", async () => {
@@ -33,11 +39,32 @@ describe("document application workflows", () => {
     expect(() => documentFileName("../", 42)).toThrow();
   });
 
+  test("populated documents get a safe meaningful filename without exposing a path", async () => {
+    const writes: string[] = [];
+    const encoder: DocumentEncoder = { extension: "docx", encode: async () => "bytes" };
+    const repository: DocumentRepository = {
+      create: async (name) => {
+        writes.push(name);
+        return `storage/rotli/${name}`;
+      },
+    };
+    expect(namedDocumentFileName("TanStack: Architecture / Guide", "docx", 42)).toBe(
+      "tanstack-architecture-guide-42.docx",
+    );
+    await createNamedDocument(
+      { encoder, repository },
+      "TanStack: Architecture / Guide",
+      { title: "Guide" },
+      42,
+    );
+    expect(writes).toEqual(["tanstack-architecture-guide-42.docx"]);
+  });
+
   test("editing refuses oversized files before reading or decoding bytes", async () => {
     let reads = 0;
     let decodes = 0;
     const reader: DocumentFileReader = {
-      stat: async () => ({ len: 101 }),
+      stat: async () => ({ len: 101, revision: "r1" }),
       readBase64: async () => {
         reads += 1;
         return "bytes";
@@ -54,7 +81,7 @@ describe("document application workflows", () => {
       },
       encode: async () => "encoded",
     };
-    const writer: DocumentFileWriter = { writeBase64: async () => {} };
+    const writer: DocumentFileWriter = { writeBase64: async () => "r2" };
 
     expect(await editDocument({ reader, writer, codec, maxBytes: 100 }, "large.docx")).toEqual({
       kind: "too-large",
@@ -66,12 +93,13 @@ describe("document application workflows", () => {
   test("editing saves through the selected codec while retaining its source", async () => {
     const writes: string[] = [];
     const reader: DocumentFileReader = {
-      stat: async () => ({ len: 5 }),
+      stat: async () => ({ len: 5, revision: "r1" }),
       readBase64: async (_id, maxBytes) => `bytes:${maxBytes}`,
     };
     const writer: DocumentFileWriter = {
-      writeBase64: async (_id, base64, backup) => {
-        writes.push(`${base64}:${backup}`);
+      writeBase64: async (_id, base64, backup, expectedRevision) => {
+        writes.push(`${base64}:${backup}:${expectedRevision}`);
+        return "r2";
       },
     };
     const codec: DocumentEditorCodec<string> = {
@@ -95,6 +123,6 @@ describe("document application workflows", () => {
       ...result.document,
       content: [{ kind: "paragraph", paragraph: { runs: [{ text: "after" }] } }],
     });
-    expect(writes).toEqual(["source:bytes:101:after:true"]);
+    expect(writes).toEqual(["source:bytes:101:after:true:r1"]);
   });
 });

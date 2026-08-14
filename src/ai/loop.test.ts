@@ -141,6 +141,21 @@ describe("parse", () => {
     expect(parseAction("hello", ALL).kind).toBe("unparseable");
   });
 
+  test("classifies bounded clarification questions independently of providers", () => {
+    expect(
+      parseAction(
+        '{"thought":"Need one material choice.","question":"Which layout?","options":["Report","Brief"]}',
+        ALL,
+      ),
+    ).toEqual({
+      kind: "question",
+      prompt: "Which layout?",
+      options: ["Report", "Brief"],
+      thought: "Need one material choice.",
+    });
+    expect(parseAction('{"question":"Which layout?","options":["Only one"]}', ALL).kind).toBe("invalid");
+  });
+
   test("captures a bounded private reasoning checkpoint without requiring it", () => {
     expect(
       parseAction('{"thought":"check the primary source","tool":"read_note","args":{"id":"n1"}}', ALL),
@@ -509,6 +524,45 @@ describe("guard", () => {
 // ── the loop ──────────────────────────────────────────────────────────────────
 
 describe("runAgent", () => {
+  test("emits Rotli's structured format question before calling a model", async () => {
+    const { host, calls } = fakeHost([], {
+      createDocument: async () => "created",
+    });
+    const { events } = await run(host, {
+      history: [],
+      userText: "Create a document about TanStack",
+      web: false,
+      documentTool: true,
+    });
+
+    expect(events).toEqual([
+      {
+        type: "question",
+        prompt: "Before I create it, which format do you want?",
+        options: ["Word document (.docx)", "Markdown note (.md)"],
+      },
+    ]);
+    expect(calls.complete).toHaveLength(0);
+  });
+
+  test("surfaces a model-authored clarification through the same event contract", async () => {
+    const { host } = fakeHost([
+      '{"question":"Which audience should this be written for?","options":["Technical team","Customers","Executives"]}',
+    ]);
+    const { events } = await run(host, {
+      history: [],
+      userText: "Draft the launch material",
+      web: false,
+    });
+
+    expect(events).toContainEqual({
+      type: "question",
+      prompt: "Which audience should this be written for?",
+      options: ["Technical team", "Customers", "Executives"],
+    });
+    expect(events.some((event) => event.type === "final")).toBe(false);
+  });
+
   test("recalls prior chats through the master memory protocol", async () => {
     const { host, calls } = fakeHost([
       '{"tool":"search_memory","args":{"query":"cedar launch decision"}}',
@@ -555,6 +609,60 @@ describe("runAgent", () => {
     expect(opened).toEqual(["n-new"]);
     const tools = events.filter((e) => e.type === "tool").map((e) => (e as { tool: string }).tool);
     expect(tools).toEqual(["create_note", "open_note"]);
+  });
+
+  test("create_document is available only through the explicit desktop capability", async () => {
+    const created: Array<{ title: string; body: string }> = [];
+    const { host } = fakeHost(
+      [
+        '{"tool":"create_document","args":{"title":"TanStack guide","body":"## Overview\\nHeadless tools."}}',
+        '{"final":"Created and opened the Word document."}',
+      ],
+      {
+        createDocument: async (title, body) => {
+          created.push({ title, body });
+          return "created editable Word document storage/rotli/tanstack-guide.docx";
+        },
+      },
+    );
+    const { events } = await run(host, {
+      history: [],
+      userText: "Create a Word document about TanStack",
+      web: false,
+      documentTool: true,
+    });
+    expect(created).toEqual([{ title: "TanStack guide", body: "## Overview\nHeadless tools." }]);
+    expect(events).toContainEqual({
+      type: "status",
+      text: "creating a Word document…",
+    });
+  });
+
+  test("allows generated images to flow into a native Word document", async () => {
+    const created: Array<{ title: string; body: string }> = [];
+    const { host, calls } = fakeHost(
+      [
+        '{"tool":"generate_image","args":{"prompt":"TanStack architecture"}}',
+        '{"tool":"create_document","args":{"title":"TanStack","body":"## Architecture\\nOrganized prose"}}',
+        '{"final":"The document and image are available in Artifacts."}',
+      ],
+      {
+        createDocument: async (title, body) => {
+          created.push({ title, body });
+          return "created editable Word document with 1 embedded image";
+        },
+      },
+    );
+    const { final } = await run(host, {
+      history: [],
+      userText: "Open up a Word doc, generate images, and use them in the doc",
+      web: false,
+      imageTool: true,
+      documentTool: true,
+    });
+    expect(final).toContain("available in Artifacts");
+    expect(calls.generateImage).toEqual(["TanStack architecture"]);
+    expect(created).toEqual([{ title: "TanStack", body: "## Architecture\nOrganized prose" }]);
   });
 
   test("preloads an explicitly attached note through the host access gate", async () => {
@@ -738,6 +846,18 @@ describe("runAgent", () => {
     expect(calls.generateImage).toEqual(["a warm quokka sticker"]);
   });
 
+  test("generated artifacts remain click-to-open instead of claiming an automatic pane change", async () => {
+    const { host } = fakeHost([]);
+    const observation = await runTool(
+      host,
+      "generate_image",
+      { prompt: "a quiet architecture diagram" },
+      budgetFor({ id: "gemma-3-12b-it-qat-4bit" }),
+    );
+    expect(observation).toContain("available in this chat's Artifacts");
+    expect(observation).not.toMatch(/opened|open beside/i);
+  });
+
   test("generate_image is refused when imageTool is off (never reaches the host)", async () => {
     const { host, calls } = fakeHost([
       '{"tool":"generate_image","args":{"prompt":"anything"}}', // invalid → observation
@@ -746,6 +866,30 @@ describe("runAgent", () => {
     const { final } = await run(host, { history: [], userText: "draw", web: false });
     expect(final).toBe("no images here");
     expect(calls.generateImage).toEqual([]);
+  });
+
+  test("create_artifact dispatches only when the desktop artifact lane is on", async () => {
+    const created: string[] = [];
+    const { host } = fakeHost(
+      [
+        '{"tool":"create_artifact","args":{"kind":"sheet","title":"Runway","content":"Month,Cash\\nJan,100"}}',
+        '{"final":"the sheet is ready"}',
+      ],
+      {
+        createArtifact: async (kind, title, content) => {
+          created.push(kind, title, content);
+          return "created runway.xlsx";
+        },
+      },
+    );
+    const { final } = await run(host, {
+      history: [],
+      userText: "make a runway sheet",
+      web: false,
+      artifactTool: true,
+    });
+    expect(final).toBe("the sheet is ready");
+    expect(created).toEqual(["sheet", "Runway", "Month,Cash\nJan,100"]);
   });
 
   test("the egress guard blocks a secret-shaped image prompt", async () => {
@@ -1044,5 +1188,47 @@ describe("draw_board tool", () => {
     const { host } = fakeHost([]);
     const result = await runTool(host, "draw_board", { mermaid: "flowchart TD\n  A --> B" }, budget);
     expect(result).toBe("error: this host cannot draw boards.");
+  });
+});
+
+describe("create_artifact tool", () => {
+  const budget = budgetFor({ id: "gemma-3-12b-it-qat-4bit" });
+
+  test("passes one supported editable format through to the host", async () => {
+    const { host } = fakeHost([]);
+    const seen: string[] = [];
+    const result = await runTool(
+      {
+        ...host,
+        createArtifact: async (kind, title, content) => {
+          seen.push(kind, title, content);
+          return "created quarterly-plan.docx";
+        },
+      },
+      "create_artifact",
+      { kind: "document", title: "Quarterly plan", content: "## Goals\nShip it." },
+      budget,
+    );
+    expect(result).toBe("created quarterly-plan.docx");
+    expect(seen).toEqual(["document", "Quarterly plan", "## Goals\nShip it."]);
+  });
+
+  test("rejects unsupported formats and empty content before touching the host", async () => {
+    const { host } = fakeHost([]);
+    let calls = 0;
+    const withArtifact = {
+      ...host,
+      createArtifact: async () => {
+        calls += 1;
+        return "never";
+      },
+    };
+    expect(
+      await runTool(withArtifact, "create_artifact", { kind: "html", title: "No", content: "x" }, budget),
+    ).toContain("supported kind");
+    expect(
+      await runTool(withArtifact, "create_artifact", { kind: "sheet", title: "No rows" }, budget),
+    ).toContain("needs");
+    expect(calls).toBe(0);
   });
 });

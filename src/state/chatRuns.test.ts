@@ -11,31 +11,39 @@ describe("chat run signals", () => {
     useChatRuns.setState({ runs: {} });
   });
 
-  test("running → settled-watched clears; settled-unwatched flips to unread", () => {
+  test("running → settled-watched stays done; settled-unwatched flips to unread", () => {
     const s = useChatRuns.getState();
     s.markRunning("corpus:a");
     s.markRunning("corpus:b");
-    expect(useChatRuns.getState().runs).toEqual({ "corpus:a": "running", "corpus:b": "running" });
+    expect(useChatRuns.getState().runs).toEqual({
+      "corpus:a": "running",
+      "corpus:b": "running",
+    });
 
     useChatRuns.getState().settleRun("corpus:a", true);
     useChatRuns.getState().settleRun("corpus:b", false);
-    expect(useChatRuns.getState().runs).toEqual({ "corpus:b": "unread" });
+    expect(useChatRuns.getState().runs).toEqual({
+      "corpus:a": "done",
+      "corpus:b": "unread",
+    });
   });
 
-  test("opening the chat spends unread but never a live run", () => {
+  test("opening the chat acknowledges unread as done but never changes a live run", () => {
     useChatRuns.getState().markRunning("corpus:a");
     useChatRuns.getState().clearUnread("corpus:a");
     expect(useChatRuns.getState().runs["corpus:a"]).toBe("running"); // still answering
 
     useChatRuns.getState().settleRun("corpus:a", false);
     useChatRuns.getState().clearUnread("corpus:a");
-    expect(useChatRuns.getState().runs["corpus:a"]).toBeUndefined();
+    expect(useChatRuns.getState().runs["corpus:a"]).toBe("done");
   });
 
   test("the first save retargets the unsaved pane key onto the slug key", () => {
     useChatRuns.getState().markRunning("unsaved:pane-1");
     useChatRuns.getState().retargetRun("unsaved:pane-1", "corpus:new-chat");
-    expect(useChatRuns.getState().runs).toEqual({ "corpus:new-chat": "running" });
+    expect(useChatRuns.getState().runs).toEqual({
+      "corpus:new-chat": "running",
+    });
     // retargeting a key with no entry is inert
     const before = useChatRuns.getState().runs;
     useChatRuns.getState().retargetRun("unsaved:pane-9", "corpus:x");

@@ -60,7 +60,7 @@ test("all four environments use one flat semantic scrim for full-screen backdrop
       semanticProbe.remove();
 
       const backdrops = [
-        { name: "command palette", className: "pal-scrim" },
+        { name: "search focus", className: "pal-focus-scrim" },
         { name: "WhichKey", className: "whichkey", pseudo: "::before" },
         { name: "rename", className: "rename-overlay" },
         { name: "render expansion", className: "rotli-render-overlay" },

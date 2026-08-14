@@ -2,7 +2,7 @@ import type { ComponentType, KeyboardEvent } from "react";
 
 import type { BreveView } from "../../state/ui";
 import { useUiStore } from "../../state/ui";
-import { ClockGlyph, CoffeeGlyph, EyeGlyph, FileGlyph, GearGlyph } from "../glyphs";
+import { ActivityGlyph, ClockGlyph, CoffeeGlyph, EyeGlyph, FileGlyph, GearGlyph, HomeGlyph } from "../glyphs";
 import { useBreveSnapshot } from "./useBreve";
 
 type NavItem = {
@@ -11,10 +11,13 @@ type NavItem = {
   glyph: ComponentType<{ size?: number }>;
 };
 
-// Reading first, then the schedule, then the registry, then one Settings home
-// (Models + Configure merged — Seth, 2026-07-30).
+// The dashboard is Breve's vault-specific news hub. Durable reading and
+// configuration stay directly reachable; notifications project the sanitized
+// scheduler log for this vault only.
 const NAV: NavItem[] = [
+  { id: "dashboard", label: "Dashboard", glyph: HomeGlyph },
   { id: "briefs", label: "Briefs", glyph: FileGlyph },
+  { id: "notifications", label: "Notifications", glyph: ActivityGlyph },
   { id: "routines", label: "Routines", glyph: ClockGlyph },
   { id: "watchlist", label: "Watchlist", glyph: EyeGlyph },
   { id: "settings", label: "Settings", glyph: GearGlyph },
@@ -26,7 +29,9 @@ export function BreveSidebar({ zoom }: { zoom: number }) {
   const snapshot = useBreveSnapshot().data;
   const enabledRoutines = snapshot?.config.routines.filter((r) => r.enabled).length ?? 0;
   const counts: Record<BreveView, number | null> = {
+    dashboard: null,
     briefs: snapshot ? snapshot.briefs.length : null,
+    notifications: snapshot ? snapshot.notifications.length : null,
     routines: snapshot ? enabledRoutines : null,
     watchlist: snapshot ? snapshot.counts.topics : null,
     settings: null,

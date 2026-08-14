@@ -2,11 +2,13 @@
 // "single-tab pane shows zero tab chrome" Apple-Notes default is retired, so a
 // lone tab is still visible and closeable. 34px on ground, 1px bottom border;
 // tabs 96–208px, always-labeled + type glyph; active = surface fill merging
-// into the editor; close × on active/hover only; labeled + button. Focus is
+// into the editor; close × on active/hover only, with its space always reserved
+// so the strip never reflows. Overflow follows Settings → General: Scroll keeps
+// the 96px title floor and pans, while Fit shrinks every tab into the pane.
+// Focus is
 // marked at the PANE level (the 1px accent ring on `.pane.focused`, multi-pane
 // only — the 2026-07-30 removal of the tab's clay top edge moved the cue there);
-// unfocused panes also dim their strips. Overflow compresses to the 96px floor,
-// then horizontally scrolls behind linen fade masks — no dropdown.
+// unfocused panes also dim their strips.
 //
 // Tabs drag with POINTER events (Seth, 2026-06-15: HTML5 drag is dead in the
 // macOS WKWebView shell): drag within a strip to reorder, onto another strip to
@@ -26,6 +28,8 @@ import { newItemInTab } from "../keys/actions";
 import { tabHotkeyAction } from "../keys/tabHotkeys";
 import { fileName } from "../lib/fileKind";
 import { startTabDrag } from "../lib/tabDrag";
+import { activeInstance } from "../memex/config";
+import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
 import { newItemDefinition } from "../newItems/model";
 import { useBoardRename } from "../services/boardRename";
 import { useChatRename } from "../services/chatRename";
@@ -47,7 +51,7 @@ function boardLabel(boardId: string): string {
 /** Narrow title accessor — an O(1) view over the note index, never a copy. */
 type TitleLookup = { get: (id: string) => string | undefined };
 
-function tabLabel(tab: Tab, titles: TitleLookup): string {
+function tabLabel(tab: Tab, titles: TitleLookup, chatTitles: ReadonlyMap<string, string>): string {
   // surfaceKind dispatch — grows with the union ('chat' …)
   switch (tab.surfaceKind) {
     case "note":
@@ -55,7 +59,7 @@ function tabLabel(tab: Tab, titles: TitleLookup): string {
     case "canvas":
       return boardLabel(tab.boardId);
     case "chat":
-      return tab.chatSlug ? tab.chatSlug.replace(/-/g, " ") : "New chat";
+      return tab.chatSlug ? (chatTitles.get(tab.chatSlug) ?? tab.chatSlug.replace(/-/g, " ")) : "New chat";
     case "file":
       return fileName(tab.fileId);
     case "activity":
@@ -67,6 +71,7 @@ function tabLabel(tab: Tab, titles: TitleLookup): string {
 
 export function TabStrip({ pane }: { pane: LeafNode }) {
   const newTabDefault = useUiStore((s) => s.newTabDefault);
+  const tabLayout = useUiStore((s) => s.tabLayout);
   const activateTab = usePanesStore((s) => s.activateTab);
   const draggingTab = usePanesStore((s) => s.draggingTab);
   // Main lives here too — a tab is a note (or board) you're looking at, so
@@ -99,6 +104,13 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   // title was O(all-notes) × per pane strip × per invalidation (perf audit
   // 2026-07-30, finding 11).
   const titles = useMemo<TitleLookup>(() => ({ get: (id) => noteIndex.get(id)?.title }), [noteIndex]);
+  const memexConfig = useMemexConfig();
+  const activeMemex = memexConfig.data ? activeInstance(memexConfig.data) : null;
+  const chats = useInstanceChats(activeMemex);
+  const chatTitles = useMemo(
+    () => new Map((chats.data ?? []).map((chat) => [chat.slug, chat.title])),
+    [chats.data],
+  );
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fade, setFade] = useState({ left: false, right: false });
@@ -211,7 +223,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   };
 
   return (
-    <div className="tabstrip" role="tablist">
+    <div className="tabstrip" data-tab-layout={tabLayout} role="tablist">
       <div className="tabscroll-wrap" data-fade-left={fade.left} data-fade-right={fade.right}>
         <div
           className="tabscroll"
@@ -223,7 +235,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
           {pane.tabs.map((tab, i) => {
             const dragging = draggingTab?.paneId === pane.id && draggingTab.tabId === tab.id;
             return (
-              <div key={tab.id} className="tabslot">
+              <div key={tab.id} className={tab.id === pane.activeTabId ? "tabslot active" : "tabslot"}>
                 {dropAt === i && <span className="tab-ins" aria-hidden="true" />}
                 <div
                   role="tab"
@@ -244,7 +256,9 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                       closeTabWithDraftCleanup(pane.id, tab.id);
                     }
                   }}
-                  onPointerDown={(event) => startTabDrag(event, pane.id, tab.id, tabLabel(tab, titles))}
+                  onPointerDown={(event) =>
+                    startTabDrag(event, pane.id, tab.id, tabLabel(tab, titles, chatTitles))
+                  }
                 >
                   {tab.surfaceKind === "canvas" ? (
                     <ExcalidrawGlyph size={13} className="tglyph" />
@@ -263,7 +277,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                   {tab.surfaceKind === "canvas" && renamingBoardId === tab.boardId ? (
                     <InlineRenameInput
                       className="tab-rename"
-                      defaultValue={tabLabel(tab, titles)}
+                      defaultValue={tabLabel(tab, titles, chatTitles)}
                       ariaLabel="Rename board"
                       onCommit={(value) => commitRename(tab.boardId, value)}
                       onCancel={cancelRename}
@@ -271,7 +285,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                   ) : tab.surfaceKind === "chat" && !!tab.chatSlug && renamingChatSlug === tab.chatSlug ? (
                     <InlineRenameInput
                       className="tab-rename"
-                      defaultValue={tabLabel(tab, titles)}
+                      defaultValue={tabLabel(tab, titles, chatTitles)}
                       ariaLabel="Rename chat"
                       onCommit={(value) => commitChatRename(tab.chatSlug ?? "", value)}
                       onCancel={cancelChatRename}
@@ -286,7 +300,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                             : undefined
                       }
                     >
-                      {tabLabel(tab, titles)}
+                      {tabLabel(tab, titles, chatTitles)}
                     </span>
                   )}
                   <button

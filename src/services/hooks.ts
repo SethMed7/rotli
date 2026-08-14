@@ -426,7 +426,7 @@ export function useRenameNote() {
       if (!t) return;
       const note = await notesService.getNote(id);
       if (!note) throw new Error(`unknown note: ${id}`);
-      await notesService.updateNote(id, replaceTitleLine(note.body ?? "", t));
+      await notesService.updateNote(id, replaceTitleLine(note.body ?? "", t), note.revision);
     },
     onSuccess: async () => {
       await invalidateNotes();

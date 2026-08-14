@@ -7,7 +7,9 @@ Detailed capability contracts and dated audits are routed from
 
 ## Durable truth
 
-- One notes folder is one memex. User-owned files are durable truth.
+- One user-chosen folder is one vault. User-owned files are durable truth;
+  Rotli's portable structure and metadata layer describes that vault without
+  becoming a second content store.
 - Main is the global reference projection over those files. Named views are
   additional subset projections; neither owns or copies content.
 - `.rotli/` contains rebuildable indexes, projections, journals, and explicit
@@ -46,6 +48,7 @@ by directory folklore.
 | Area | Ownership |
 |---|---|
 | `src/` | React presentation, frontend capability modules, application workflows, and browser/Tauri adapters |
+| `scripts/source-ownership.ts` | Executable ownership registry for every top-level `src/` area, root source file, presentation feature directory, root component, and effectful `lib` exception |
 | `src-tauri/src/` | Trusted Rust host: filesystem, security, IPC, process, updater, and scheduler edges |
 | `src-tauri/src/workspace.rs` | Headless application service plus CLI/MCP adapters over the same corpus policy; no provider calls |
 | `.rotli/main.json` / `.rotli/views.json` | Portable reference trees; named-view writes synchronize Markdown `view_tag` while boards/binaries remain frontmatter-free |
@@ -63,10 +66,10 @@ by directory folklore.
 - Secure notes are an AI-egress and organizer-access boundary, not an encrypted
   vault. At-rest encryption remains the responsibility of macOS/FileVault.
 - Provider calls and agent orchestration belong to Rotli adapters, never the
-  portable memex.
+  portable vault contract.
 - Browser mode cannot prove native filesystem, Keychain, titlebar, updater,
   scheduler, or process behavior.
-- Tests never target a live memex, Keychain, daemon, scheduler, or production
+- Tests never target a live vault, Keychain, daemon, scheduler, or production
   delivery account.
 - CLI and MCP reads use the remote-AI secure-content gate; external-agent
   writes additionally require a fresh revision, refuse locked notes, and use

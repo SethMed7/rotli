@@ -3,8 +3,10 @@
 
 import {
   DocumentFlavor,
+  DrawingTypeEnum,
   HorizontalAlign,
   ICommandService,
+  ImageSourceType,
   LocaleType,
   NamedStyleType,
   createUniver,
@@ -17,6 +19,7 @@ import {
   type ITextRun,
   type ITextStyle,
 } from "@univerjs/presets";
+import { UniverDocsDrawingPreset } from "@univerjs/preset-docs-drawing";
 import {
   DOCS_VIEW_KEY,
   CreateDocTableCommand,
@@ -36,10 +39,12 @@ import "@univerjs/preset-docs-core/lib/index.css";
 import { DOCUMENT_CANVAS_COLORS, documentUniverTheme } from "../../brand/univerTheme";
 import { documentFitZoom } from "../layout";
 import { documentInsertionRange, documentTableRanges, isDocumentContentMutation } from "./policy";
+import { documentImageDrawing } from "./imageDrawing";
 import { GENERATED_DOCX_THEME } from "../theme";
 import type {
   DocumentAlignment,
   DocumentContent,
+  DocumentImage,
   DocumentNamedStyle,
   DocumentParagraph,
   DocumentTable,
@@ -145,6 +150,9 @@ export function documentToSnapshot(document: EditableDocument): IDocumentData {
   const sectionBreaks: Array<{ startIndex: number }> = [];
   const tables: ICustomTable[] = [];
   const tableSource: Record<string, ITable> = {};
+  const customBlocks: NonNullable<NonNullable<IDocumentData["body"]>["customBlocks"]> = [];
+  const drawings: NonNullable<IDocumentData["drawings"]> = {};
+  const drawingsOrder: string[] = [];
 
   const appendParagraph = (paragraph: DocumentParagraph) => {
     for (const run of paragraph.runs) {
@@ -188,6 +196,15 @@ export function documentToSnapshot(document: EditableDocument): IDocumentData {
       appendParagraph(content.paragraph);
       continue;
     }
+    if (content.kind === "image") {
+      const image = content.image;
+      const startIndex = dataStream.length;
+      dataStream += "\b";
+      customBlocks.push({ startIndex, blockId: image.id });
+      drawings[image.id] = documentImageDrawing(document.id, image);
+      drawingsOrder.push(image.id);
+      continue;
+    }
     const table = content.table;
     const tableStart = dataStream.length;
     dataStream += "\x1a";
@@ -222,9 +239,11 @@ export function documentToSnapshot(document: EditableDocument): IDocumentData {
       textRuns,
       paragraphs,
       sectionBreaks,
+      ...(customBlocks.length ? { customBlocks } : {}),
       ...(tables.length ? { tables } : {}),
     },
     ...(tables.length ? { tableSource } : {}),
+    ...(drawingsOrder.length ? { drawings, drawingsOrder } : {}),
     documentStyle: {
       documentFlavor: DocumentFlavor.TRADITIONAL,
       pageSize: { width: 816, height: 1056 },
@@ -365,14 +384,49 @@ export function snapshotToDocument(snapshot: IDocumentData, fallback: EditableDo
     snapshot.body?.tables,
     Object.keys(snapshot.tableSource ?? {}),
   );
+  const imageRanges = (snapshot.body?.customBlocks ?? [])
+    .map((block) => {
+      const drawing = snapshot.drawings?.[block.blockId] as
+        | (NonNullable<IDocumentData["drawings"]>[string] & {
+            imageSourceType?: ImageSourceType;
+            source?: string;
+          })
+        | undefined;
+      if (!drawing || drawing.drawingType !== DrawingTypeEnum.DRAWING_IMAGE || !drawing.source) return null;
+      const source = drawing.source;
+      const data = /^data:(image\/(?:png|jpeg|gif|bmp));base64,([\s\S]+)$/i.exec(source);
+      if (!data?.[1] || !data[2]) return null;
+      const size = drawing.docTransform.size;
+      const image: DocumentImage = {
+        id: block.blockId,
+        name: drawing.title || "Image",
+        mimeType: data[1].toLowerCase() as DocumentImage["mimeType"],
+        base64: data[2],
+        widthPx: Math.max(1, Math.round(size.width ?? 600)),
+        heightPx: Math.max(1, Math.round(size.height ?? 338)),
+        ...(drawing.description ? { alt: drawing.description } : {}),
+      };
+      return { kind: "image" as const, startIndex: block.startIndex, endIndex: block.startIndex + 1, image };
+    })
+    .filter((range): range is NonNullable<typeof range> => range !== null);
+  const ranges = [
+    ...tableRanges.map((table) => ({
+      kind: "table" as const,
+      startIndex: table.startIndex,
+      endIndex: table.endIndex,
+      table,
+    })),
+    ...imageRanges,
+  ].sort((left, right) => left.startIndex - right.startIndex);
   const content: DocumentContent[] = [];
   let cursor = 0;
   const documentEnd = stream.endsWith("\n") ? stream.length - 1 : stream.length;
-  for (const range of tableRanges) {
+  for (const range of ranges) {
     for (const paragraph of paragraphsInRange(snapshot, cursor, range.startIndex)) {
       content.push({ kind: "paragraph", paragraph });
     }
-    content.push({ kind: "table", table: tableInRange(snapshot, range) });
+    if (range.kind === "table") content.push({ kind: "table", table: tableInRange(snapshot, range.table) });
+    else content.push({ kind: "image", image: range.image });
     cursor = range.endIndex;
   }
   for (const paragraph of paragraphsInRange(snapshot, cursor, documentEnd)) {
@@ -472,6 +526,7 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
         ribbonType: "simple",
         footer: false,
       }),
+      UniverDocsDrawingPreset(),
     ],
   });
   const api = univerAPI as unknown as UniverApiLike;

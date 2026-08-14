@@ -1,4 +1,5 @@
 import { trackNewDocumentDraft } from "../documents/draftComposition";
+import type { DocumentImage } from "../documents/model";
 import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
 /** Composition root for item creation. Product rules stay in model/workflow. */
 import { invalidateMemex } from "../memex/useMemex";
@@ -84,7 +85,10 @@ const creator: NewItemCreator = {
     if (kind === "sheet") {
       const { createBlankWorkbookBase64 } = await import("../sheets/create");
       const base64 = await createBlankWorkbookBase64();
-      return { id: await corpusCreateManagedFile(`untitled-${Date.now()}.xlsx`, base64), kind };
+      return {
+        id: await corpusCreateManagedFile(`untitled-${Date.now()}.xlsx`, base64),
+        kind,
+      };
     }
     throw new Error("a board needs a name before it can be created");
   },
@@ -169,6 +173,79 @@ export async function createManagedItem(
   return item;
 }
 
+/** Turn the transient empty-vault welcome into the user's first real note.
+ * The caller supplies a non-empty Markdown body only after the user names it;
+ * until then there is no durable file to clean up. */
+export function createNamedMarkdownItem(body: string): Promise<CreatedItem> {
+  if (!body.trim()) return Promise.reject(new Error("name the note before creating it"));
+  const namedCreator: NewItemCreator = {
+    async create() {
+      const selected = useUiStore.getState().selectedFolderId;
+      const selectedMain = selected.startsWith(MAIN_ROOT);
+      const routeFolder = selectedMain ? ALL_NOTES : selected;
+      const id = await createRoutedNote({
+        selectedFolderId: routeFolder,
+        isSmart: routeFolder === ALL_NOTES || routeFolder === RECENT,
+        localFallback: inboxFolderId,
+        body,
+      });
+      return { id, kind: "markdown" };
+    },
+  };
+  return createNewItem({ creator: namedCreator, presenter }, "markdown", {
+    newTab: false,
+  });
+}
+
+/** Create a populated editable Word artifact while retaining the same refresh,
+ * Main/view filing, and presentation policy as a toolbar-created document.
+ * Populated artifacts are never tracked as discardable blank drafts. */
+export function createManagedDocumentWithContent(
+  title: string,
+  body: string,
+  options: {
+    newTab?: boolean;
+    open?: boolean;
+    images?: DocumentImage[];
+    rootId?: string;
+  } = {},
+): Promise<CreatedItem> {
+  const populatedDocumentCreator: NewItemCreator = {
+    async create() {
+      const { createManagedDocumentFromMarkdown } = await import("../documents/composition");
+      return {
+        id: await createManagedDocumentFromMarkdown(title, body, Date.now(), options.images, options.rootId),
+        kind: "document",
+      };
+    },
+  };
+  return createNewItem({ creator: populatedDocumentCreator, presenter }, "document", options);
+}
+
+/** Generated sheets retain the same refresh and Main/view filing policy as a
+ * chooser-created item while letting their adapter supply populated bytes. */
+export function createPopulatedManagedItem(
+  kind: "document" | "sheet",
+  createFile: () => Promise<string>,
+): Promise<CreatedItem> {
+  return createNewItem(
+    {
+      creator: { create: async () => ({ id: await createFile(), kind }) },
+      presenter,
+    },
+    kind,
+    { open: false },
+  );
+}
+
+/** Register bytes created by a specialized adapter (for example a PDF export
+ * and its editable Markdown source) with the shared refresh/Main/view policy. */
+export async function registerPopulatedManagedItem(item: CreatedItem): Promise<CreatedItem> {
+  await presenter.refresh();
+  presenter.fileInMain(item);
+  return item;
+}
+
 /** Open the shared name-first lane used by chooser cards, menus, and hotkeys.
  * The file creator remains unavailable until the dialog supplies a name. */
 export function requestManagedBoardCreation(options: { newTab?: boolean } = {}): void {
@@ -183,11 +260,25 @@ export function requestManagedBoardCreation(options: { newTab?: boolean } = {}):
 export function createManagedBoardWithBody(
   body: string,
   name: string,
-  options: { newTab?: boolean; open?: boolean; besideNoteId?: string } = {},
+  options: {
+    newTab?: boolean;
+    open?: boolean;
+    besideNoteId?: string;
+    rootId?: string;
+  } = {},
 ): Promise<CreatedItem> {
   const populatedBoardCreator: NewItemCreator = {
     async create() {
-      const board = await corpusCreateBoard(resolvedPhysicalFolder(), name, body);
+      // Chat/tool calls carry an explicit root capability. Do not re-read the
+      // ambient sidebar selection after a long model run: it may now point at
+      // another vault. `Storage` is a conventional lane and the Rust memex
+      // adapter redirects it to storage/excalidraw.
+      const folder = options.rootId
+        ? options.rootId === "default"
+          ? DEST.storage
+          : `${options.rootId}:storage/excalidraw`
+        : resolvedPhysicalFolder();
+      const board = await corpusCreateBoard(folder, name, body);
       return { id: board.id, kind: "board" };
     },
   };

@@ -35,6 +35,8 @@ export interface NoteSummary {
 
 export interface Note extends NoteSummary {
   body: string; // markdown
+  /** Opaque complete-file revision returned by the enforcing adapter. */
+  revision: string;
 }
 
 /** One FULL-TEXT search hit — the corpus_search wire shape (Rust SearchHit,

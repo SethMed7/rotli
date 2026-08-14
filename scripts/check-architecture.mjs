@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { LIB_EFFECTFUL_FILE_OWNERS, sourceOwnershipViolations } from "./source-ownership.ts";
 
 const root = process.cwd();
 
@@ -11,19 +12,25 @@ const cleanFeatureDirs = readdirSync(join(root, "src"), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => join(root, "src", entry.name))
   .filter((dir) => existsSync(join(dir, "workflow.ts")) && existsSync(join(dir, "composition.ts")));
-const discoveredCleanFiles = cleanFeatureDirs.flatMap((dir) => readdirSync(dir)
+const discoveredCleanFiles = cleanFeatureDirs.flatMap((dir) =>
+  readdirSync(dir)
     .filter((name) => cleanFeatureRoles.has(name))
-    .map((name) => relative(root, join(dir, name))));
+    .map((name) => relative(root, join(dir, name))),
+);
 
 // Opt-in-by-file-presence must never be a silent third state: a feature dir that
 // carries clean-feature role files without the workflow.ts + composition.ts
 // trigger pair is either fully split or named here with its reason. A listed dir
 // that gains the full split (or vanishes) fails the check until its entry goes.
 const cleanFeatureExemptions = {
-  "src/sheets": "live Univer editing session — codec/engine adapters, kinds.ts policy constants, and the vendor seams below carry the boundaries; a model/ports/workflow split would be empty wrappers around the stateful engine handle",
-  "src/boards": "session.ts + composition.ts share the corpus round-trip; the board model is Excalidraw's vendor scene JSON behind boards/engine — no domain layer to split",
-  "src/noteChat": "model/composition/session mirror the seam shape without a workflow layer; model.ts stays pure (contract-only imports) under its colocated tests — a workflow.ts would be an empty trigger file",
-  "src/editor": "model.ts is the live shared text buffer (a state store), not a clean-feature domain model — the filename collides with the role vocabulary; the editor's real boundaries are the slash + vendor seams",
+  "src/sheets":
+    "live Univer editing session — codec/engine adapters, kinds.ts policy constants, and the vendor seams below carry the boundaries; a model/ports/workflow split would be empty wrappers around the stateful engine handle",
+  "src/boards":
+    "session.ts + composition.ts share the corpus round-trip; the board model is Excalidraw's vendor scene JSON behind boards/engine — no domain layer to split",
+  "src/noteChat":
+    "model/composition/session mirror the seam shape without a workflow layer; model.ts stays pure (contract-only imports) under its colocated tests — a workflow.ts would be an empty trigger file",
+  "src/editor":
+    "model.ts is the live shared text buffer (a state store), not a clean-feature domain model — the filename collides with the role vocabulary; the editor's real boundaries are the slash + vendor seams",
 };
 
 const allowedLocalRoleImports = {
@@ -36,14 +43,7 @@ const allowedLocalRoleImports = {
 const protectedLayers = [
   {
     files: discoveredCleanFiles,
-    forbidden: [
-      "react",
-      "@tauri-apps/",
-      "../components/",
-      "../lib/tauri",
-      "../state/",
-      "./composition",
-    ],
+    forbidden: ["react", "@tauri-apps/", "../components/", "../lib/tauri", "../state/", "./composition"],
   },
   {
     files: ["src/services/notesPort.ts"],
@@ -73,14 +73,7 @@ const protectedLayers = [
   },
   {
     files: ["src/memex/contract.ts", "src/memex/modelMap.ts"],
-    forbidden: [
-      "react",
-      "@tauri-apps/",
-      "../ai/",
-      "../components/",
-      "../lib/tauri",
-      "../state/",
-    ],
+    forbidden: ["react", "@tauri-apps/", "../ai/", "../components/", "../lib/tauri", "../state/"],
   },
   {
     files: [
@@ -110,6 +103,28 @@ const protectedLayers = [
 
 const violations = [];
 
+// Every source root and presentation cluster has an explicit owner. This closes
+// the catch-all loophole where a new capability could land beside established
+// features without choosing a boundary, and where components/ accumulated
+// feature helpers that belonged together.
+const sourceEntries = readdirSync(join(root, "src"), { withFileTypes: true });
+const componentEntries = readdirSync(join(root, "src", "components"), { withFileTypes: true });
+violations.push(
+  ...sourceOwnershipViolations({
+    sourceDirectories: sourceEntries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
+    sourceRootFiles: sourceEntries
+      .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
+      .map((entry) => entry.name),
+    componentDirectories: componentEntries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
+    componentRootFiles: componentEntries
+      .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
+      .map((entry) => entry.name),
+    serviceFiles: readdirSync(join(root, "src", "services"), { withFileTypes: true })
+      .filter((entry) => entry.isFile() && /\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name))
+      .map((entry) => entry.name),
+  }),
+);
+
 // F7: a partial split (any role file or composition.ts without BOTH trigger
 // files) gets no protection above — that state must be exempt-by-name, and an
 // exemption must go stale loudly, never linger past a real split.
@@ -121,14 +136,17 @@ for (const entry of readdirSync(join(root, "src"), { withFileTypes: true })) {
   const hasTriggerPair = existsSync(join(dir, "workflow.ts")) && existsSync(join(dir, "composition.ts"));
   const hasRoleFile = readdirSync(dir).some((name) => partialSplitSignals.has(name));
   if (hasRoleFile && !hasTriggerPair && !(rel in cleanFeatureExemptions)) {
-    violations.push(`${rel}: carries clean-feature role files without workflow.ts + composition.ts — add the full split or an exemption entry`);
+    violations.push(
+      `${rel}: carries clean-feature role files without workflow.ts + composition.ts — add the full split or an exemption entry`,
+    );
   }
   if (hasTriggerPair && rel in cleanFeatureExemptions) {
     violations.push(`${rel}: has the full clean-feature split — remove its stale exemption entry`);
   }
 }
 for (const dir of Object.keys(cleanFeatureExemptions)) {
-  if (!existsSync(join(root, dir))) violations.push(`${dir}: exempt dir no longer exists — remove its exemption entry`);
+  if (!existsSync(join(root, dir)))
+    violations.push(`${dir}: exempt dir no longer exists — remove its exemption entry`);
 }
 
 function importsOf(source) {
@@ -136,6 +154,29 @@ function importsOf(source) {
     ...source.matchAll(/(?:from\s+|import\s*\()(["'])([^"']+)\1/g),
     ...source.matchAll(/import\s+(["'])([^"']+)\1/g),
   ].map((match) => match[2]);
+}
+
+// lib is dependency-inward by default. The few cross-capability gesture and
+// shell adapters are explicit, reasoned exceptions; an effectful import in any
+// other lib file is a placement failure, and stale exceptions fail too.
+const effectfulLibPrefixes = ["@tauri-apps/", "../memex/", "../newItems/", "../services/", "../state/"];
+const libDir = join(root, "src", "lib");
+const effectfulLibFiles = new Set();
+for (const name of readdirSync(libDir)) {
+  if (!/\.tsx?$/.test(name) || /\.test\.tsx?$/.test(name)) continue;
+  const imports = importsOf(readFileSync(join(libDir, name), "utf8"));
+  if (!imports.some((dependency) => effectfulLibPrefixes.some((prefix) => dependency.startsWith(prefix)))) {
+    continue;
+  }
+  effectfulLibFiles.add(name);
+  if (!(name in LIB_EFFECTFUL_FILE_OWNERS)) {
+    violations.push(`src/lib/${name}: effectful cross-capability code needs a named owner or a services/ home`);
+  }
+}
+for (const name of Object.keys(LIB_EFFECTFUL_FILE_OWNERS)) {
+  if (!effectfulLibFiles.has(name)) {
+    violations.push(`src/lib/${name}: effectful-lib ownership entry is stale or the file is missing`);
+  }
 }
 
 for (const layer of protectedLayers) {
@@ -158,9 +199,10 @@ for (const dir of cleanFeatureDirs) {
     const source = readFileSync(path, "utf8");
     const imports = importsOf(source);
     for (const dependency of imports) {
-      if (dependency.startsWith("./") && !allowed.some(
-        (prefix) => dependency === prefix || dependency.startsWith(`${prefix}/`),
-      )) {
+      if (
+        dependency.startsWith("./") &&
+        !allowed.some((prefix) => dependency === prefix || dependency.startsWith(`${prefix}/`))
+      ) {
         violations.push(`${file}: ${role} may not depend outward on ${dependency}`);
       }
     }
@@ -171,11 +213,7 @@ for (const dir of cleanFeatureDirs) {
 // allowed to touch it directly; all feature code uses the typed lib/tauri.ts
 // façade so command names, browser fallbacks, and error normalization stay in
 // one place.
-const tauriAllowlist = new Set([
-  "src/app.tsx",
-  "src/lib/quitFlush.ts",
-  "src/lib/tauri.ts",
-]);
+const tauriAllowlist = new Set(["src/app.tsx", "src/lib/quitFlush.ts", "src/lib/tauri.ts"]);
 function walkSource(dir) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
@@ -197,8 +235,14 @@ walkSource(join(root, "src"));
 const vendorSeams = [
   { vendor: "exceljs", allowed: ["src/sheets/codec/", "src/sheets/engine/"] },
   { vendor: "@excalidraw/", allowed: ["src/boards/engine/", "src/app.tsx"] },
-  { vendor: "@univerjs", allowed: ["src/sheets/engine/", "src/documents/engine/", "src/brand/univerTheme.ts"] },
-  { vendor: "jszip", allowed: ["src/documents/codec/", "src/documents/create.ts"] },
+  {
+    vendor: "@univerjs",
+    allowed: ["src/sheets/engine/", "src/documents/engine/", "src/brand/univerTheme.ts"],
+  },
+  {
+    vendor: "jszip",
+    allowed: ["src/documents/codec/", "src/documents/create.ts", "src/sheets/codec/"],
+  },
 ];
 function walkVendors(dir) {
   for (const name of readdirSync(dir)) {
@@ -220,9 +264,7 @@ walkVendors(join(root, "src"));
 
 // Rust parser/vendor crates receive the same single-adapter protection. Cargo
 // package names use hyphens while Rust paths use underscores.
-const rustVendorSeams = [
-  { vendor: "pdf_extract", allowed: ["src-tauri/src/document_conversion.rs"] },
-];
+const rustVendorSeams = [{ vendor: "pdf_extract", allowed: ["src-tauri/src/document_conversion.rs"] }];
 function walkRustVendors(dir) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
@@ -246,4 +288,6 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log(`check:architecture ok — ${discoveredCleanFiles.length} clean-feature files point inward (${Object.keys(cleanFeatureExemptions).length} dirs exempt by name); ports and pure policies stay adapter-free; Tauri stays behind its adapter`);
+console.log(
+  `check:architecture ok — source roots, presentation clusters, services, and effectful lib adapters have owners; ${discoveredCleanFiles.length} clean-feature files point inward (${Object.keys(cleanFeatureExemptions).length} dirs exempt by name); Tauri stays behind its adapter`,
+);

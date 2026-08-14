@@ -27,11 +27,49 @@ describe("userName", () => {
   });
 });
 
+describe("onboarding checkpoint", () => {
+  test("survives a vault-selection relaunch and rejects unknown phases", () => {
+    expect(parseSettings("{}").onboardingPhase).toBe("preferences");
+    expect(parseSettings('{"onboardingPhase":"vault"}').onboardingPhase).toBe("vault");
+    expect(parseSettings('{"onboardingPhase":"models"}').onboardingPhase).toBe("models");
+    expect(parseSettings('{"onboardingPhase":"workspace"}').onboardingPhase).toBe("preferences");
+  });
+});
+
+describe("automatic housekeeping settings", () => {
+  test("both policies default off and preserve valid day counts", () => {
+    const defaults = parseSettings("{}");
+    expect(defaults.mainAutoRemoveDays).toBeNull();
+    expect(defaults.chatAutoArchiveDays).toBeNull();
+
+    const enabled = parseSettings('{"mainAutoRemoveDays":45,"chatAutoArchiveDays":90}');
+    expect(enabled.mainAutoRemoveDays).toBe(45);
+    expect(enabled.chatAutoArchiveDays).toBe(90);
+  });
+
+  test("invalid values fail closed instead of enabling cleanup", () => {
+    const parsed = parseSettings('{"mainAutoRemoveDays":0,"chatAutoArchiveDays":"30"}');
+    expect(parsed.mainAutoRemoveDays).toBeNull();
+    expect(parsed.chatAutoArchiveDays).toBeNull();
+  });
+});
+
 describe("raw Markdown syntax palette", () => {
   test("defaults to Rotli, preserves Mono, and rejects unknown palettes", () => {
     expect(parseSettings("{}").syntaxPalette).toBe("rotli");
     expect(parseSettings('{"syntaxPalette":"mono"}').syntaxPalette).toBe("mono");
     expect(parseSettings('{"syntaxPalette":"neon"}').syntaxPalette).toBe("rotli");
+  });
+});
+
+describe("custom primary color", () => {
+  test("keeps a safe hue and falls back cleanly on invalid settings", () => {
+    const custom = parseSettings('{"accentColor":"custom","accentHue":287}');
+    expect(custom.accentColor).toBe("custom");
+    expect(custom.accentHue).toBe(287);
+
+    expect(parseSettings('{"accentHue":999}').accentHue).toBe(210);
+    expect(parseSettings('{"accentHue":"blue"}').accentHue).toBe(210);
   });
 });
 
@@ -59,7 +97,9 @@ describe("sidebarView (the Home/Chat front, 2026-08-01)", () => {
   });
 
   test("a stored System fold survives the parse untouched", () => {
-    const raw = JSON.stringify({ expandedDests: { "sec:system": false, "sec:notes": false } });
+    const raw = JSON.stringify({
+      expandedDests: { "sec:system": false, "sec:notes": false },
+    });
     const dests = parseSettings(raw).expandedDests;
     expect(dests["sec:system"]).toBe(false);
     // the retired section key is preserved, not seeded over — a downgrade
@@ -69,14 +109,21 @@ describe("sidebarView (the Home/Chat front, 2026-08-01)", () => {
 });
 
 describe("parseSettings — Breve sidebar lens", () => {
-  test("defaults to Notes and the Briefs view", () => {
+  test("defaults to Notes and the Breve dashboard", () => {
     const s = parseSettings("{}");
     expect(s.sidebarMode).toBe("notes");
-    expect(s.breveView).toBe("briefs");
+    expect(s.breveView).toBe("dashboard");
   });
 
   test("keeps every valid Breve view", () => {
-    for (const view of ["briefs", "routines", "watchlist", "settings"] as const) {
+    for (const view of [
+      "dashboard",
+      "briefs",
+      "notifications",
+      "routines",
+      "watchlist",
+      "settings",
+    ] as const) {
       const s = parseSettings(JSON.stringify({ sidebarMode: "breve", breveView: view }));
       expect(s.sidebarMode).toBe("breve");
       expect(s.breveView).toBe(view);
@@ -93,7 +140,7 @@ describe("parseSettings — Breve sidebar lens", () => {
   test("coerces unknown values to the safe workspace defaults", () => {
     const s = parseSettings('{"sidebarMode":"mail","breveView":"accounts"}');
     expect(s.sidebarMode).toBe("notes");
-    expect(s.breveView).toBe("briefs");
+    expect(s.breveView).toBe("dashboard");
   });
 });
 
@@ -144,6 +191,12 @@ describe("parseSettings — creation and Brain model", () => {
     expect(parseSettings('{"newTabDefault":"database"}').newTabDefault).toBe("markdown");
   });
 
+  test("tab layout defaults to scroll and only accepts the two visible modes", () => {
+    expect(parseSettings("{}").tabLayout).toBe("scroll");
+    expect(parseSettings('{"tabLayout":"fit"}').tabLayout).toBe("fit");
+    expect(parseSettings('{"tabLayout":"compress"}').tabLayout).toBe("scroll");
+  });
+
   test("Gemini 3.5 is an explicit organizer choice; unknown values fail closed to local", () => {
     expect(parseSettings('{"organizerModel":"gemini35"}').organizerModel).toBe("gemini35");
     expect(parseSettings('{"organizerModel":"future"}').organizerModel).toBe("local");
@@ -178,18 +231,38 @@ describe("parseSettings — fileMetadata (Show file metadata)", () => {
 describe("parseSettings — chatWeb (#7: no session keys in the durable map)", () => {
   test("keeps real per-slug toggles, drops the legacy '' and unsaved: keys", () => {
     const raw = '{"chatWeb":{"":true,"unsaved:pane-1":true,"my-chat":true,"other":false}}';
-    expect(parseSettings(raw).chatWeb).toEqual({ "my-chat": true, other: false });
+    expect(parseSettings(raw).chatWeb).toEqual({
+      "my-chat": true,
+      other: false,
+    });
   });
 
   test("drops non-boolean entries entirely", () => {
-    expect(parseSettings('{"chatWeb":{"a":"yes","b":true}}').chatWeb).toEqual({ b: true });
+    expect(parseSettings('{"chatWeb":{"a":"yes","b":true}}').chatWeb).toEqual({
+      b: true,
+    });
+  });
+});
+
+describe("parseSettings — frontier controls", () => {
+  test("keeps allowlisted values and drops attacker-shaped/session values", () => {
+    const parsed = parseSettings(
+      '{"chatReasoning":{"corpus:a":"xhigh","corpus:b":"ultra","unsaved:p":"high"},"chatServiceTier":{"corpus:a":"fast","corpus:b":"priority"}}',
+    );
+    expect(parsed.chatReasoning).toEqual({ "corpus:a": "xhigh" });
+    expect(parsed.chatServiceTier).toEqual({ "corpus:a": "fast" });
   });
 });
 
 describe("parseSettings — the AI Models keys (Seth, 2026-07-02)", () => {
   test("defaults: every lane OFF, no presets, codex engine, note opens as tab", () => {
     const s = parseSettings("{}");
-    expect(s.aiProviders).toEqual({ claude: false, codex: false, agy: false, gemini: false });
+    expect(s.aiProviders).toEqual({
+      claude: false,
+      codex: false,
+      agy: false,
+      gemini: false,
+    });
     expect(s.hybridPresets).toEqual([]);
     expect(s.imageEngine).toBe("codex");
     expect(s.chatNoteOpen).toBe("tab");
@@ -205,7 +278,12 @@ describe("parseSettings — the AI Models keys (Seth, 2026-07-02)", () => {
 
   test("round-trips enabled lanes; unknown lanes and non-booleans are ignored", () => {
     const s = parseSettings('{"aiProviders":{"claude":true,"gemini":true,"evil":true,"codex":"yes"}}');
-    expect(s.aiProviders).toEqual({ claude: true, codex: false, agy: false, gemini: true });
+    expect(s.aiProviders).toEqual({
+      claude: true,
+      codex: false,
+      agy: false,
+      gemini: true,
+    });
     expect("evil" in s.aiProviders).toBe(false);
   });
 
@@ -219,6 +297,27 @@ describe("parseSettings — the AI Models keys (Seth, 2026-07-02)", () => {
     expect(parseSettings('{"imageEngine":"agy"}').imageEngine).toBe("agy");
     expect(parseSettings('{"chatNoteOpen":"window"}').chatNoteOpen).toBe("tab");
     expect(parseSettings('{"chatNoteOpen":"split"}').chatNoteOpen).toBe("split");
+  });
+
+  test("chat presentation preferences round-trip and reject unknown values", () => {
+    const defaults = parseSettings("{}");
+    expect(defaults.chatWelcomeStyle).toBe("lively");
+    expect(defaults.chatNaming).toBe("ask");
+    expect(defaults.chatArtifactOpen).toBe("sidecar");
+
+    const selected = parseSettings(
+      '{"chatWelcomeStyle":"calm","chatNaming":"automatic","chatArtifactOpen":"tab"}',
+    );
+    expect(selected.chatWelcomeStyle).toBe("calm");
+    expect(selected.chatNaming).toBe("automatic");
+    expect(selected.chatArtifactOpen).toBe("tab");
+
+    const invalid = parseSettings(
+      '{"chatWelcomeStyle":"animated","chatNaming":"surprise-me","chatArtifactOpen":"window"}',
+    );
+    expect(invalid.chatWelcomeStyle).toBe("lively");
+    expect(invalid.chatNaming).toBe("ask");
+    expect(invalid.chatArtifactOpen).toBe("sidecar");
   });
 
   test("hotkeyPeek round-trips; anything unknown reads as badges, never off", () => {
@@ -259,7 +358,12 @@ describe("parseHybridPresets — shape-validated, invalid entries dropped", () =
       fallback: 7,
     };
     expect(parseHybridPresets([messy])).toEqual([
-      { id: "p1", name: "My hybrid", organizer: "gemma-3", routes: [{ when: "ok", model: "sonnet" }] },
+      {
+        id: "p1",
+        name: "My hybrid",
+        organizer: "gemma-3",
+        routes: [{ when: "ok", model: "sonnet" }],
+      },
     ]);
   });
 
@@ -272,7 +376,10 @@ describe("parseHybridPresets — shape-validated, invalid entries dropped", () =
 describe("unknownSettingsKeys — the round-trip remainder (#35)", () => {
   test("returns keys this build has no field for, and only those", () => {
     const raw = '{"theme":"dark","organizerThreshold":0.9,"futureKnob":{"x":1}}';
-    expect(unknownSettingsKeys(raw)).toEqual({ organizerThreshold: 0.9, futureKnob: { x: 1 } });
+    expect(unknownSettingsKeys(raw)).toEqual({
+      organizerThreshold: 0.9,
+      futureKnob: { x: 1 },
+    });
   });
 
   test("is empty for a fully-known or corrupt file", () => {
@@ -309,10 +416,18 @@ describe("validTab — every surfaceKind survives a relaunch (#34)", () => {
 
   test("round-trips all five tab kinds", () => {
     roundTrips({ id: "t1", surfaceKind: "note", noteId: "note-1" });
-    roundTrips({ id: "t2", surfaceKind: "canvas", boardId: "Inbox/b.excalidraw" });
+    roundTrips({
+      id: "t2",
+      surfaceKind: "canvas",
+      boardId: "Inbox/b.excalidraw",
+    });
     roundTrips({ id: "t3", surfaceKind: "chat", chatSlug: "my-chat" });
     roundTrips({ id: "t4", surfaceKind: "chat", chatSlug: null });
-    roundTrips({ id: "t5", surfaceKind: "file", fileId: "storage/report.xlsx" });
+    roundTrips({
+      id: "t5",
+      surfaceKind: "file",
+      fileId: "storage/report.xlsx",
+    });
     roundTrips({ id: "t6", surfaceKind: "activity" });
   });
 

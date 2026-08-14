@@ -11,7 +11,7 @@ maintaining separate file-manipulation implementations.
   roots registered in Rotli's production `corpus.json`; tests may override the
   default with `ROTLI_CORPUS_ROOT`.
 - `CorpusStore` remains the filesystem and security adapter. Headless callers do
-  not accept arbitrary root paths and do not bypass memex write lanes.
+  not accept arbitrary root paths and do not bypass vault write lanes.
 - The packaged Tauri executable dispatches recognized headless commands before
   starting the GUI. A normal app launch is unchanged.
 - `rotli mcp` is a newline-delimited JSON-RPC stdio server. It opens no socket,
@@ -30,7 +30,7 @@ maintaining separate file-manipulation implementations.
 - Listing, full-text search, and structured query omit every Markdown note refused by the existing
   remote-AI secure-content gate. The gate checks both durable metadata and the
   secret-pattern detector.
-- `rotli notes query 'EXPRESSION'` and MCP `rotli_query` implement the memex v3.8
+- `rotli notes query 'EXPRESSION'` and MCP `rotli_query` implement the portable v3.8
   grammar from `QUERY.md`: quoted/bare text and typed predicates such as
   `area:projects`, `tags:payments`, or `updated:>=2026-07-01`, combined with
   implicit `AND`. Parsed clauses ride with bounded results so humans and agents
@@ -57,10 +57,14 @@ maintaining separate file-manipulation implementations.
   user-directed calls may edit or file non-secure `wiki/**` notes through the
   existing filer ownership gate; this is distinct from autonomous organizer
   behavior and never widens `self/`, history, control-file, or binary lanes.
-- New Markdown notes land in `wiki/_inbox` for a memex or `Inbox` for a legacy
-  corpus. Their stable ID is added to `.rotli/main.json` immediately.
+- New Markdown notes land in `wiki/_inbox` for a Rotli vault or `Inbox` for a
+  legacy corpus. Their stable ID is added to `.rotli/main.json` immediately.
 - Main folders are virtual organization only. Disk folders require an explicit
   `disk` scope and remain subject to corpus ownership rules.
+- Main and named-view JSON returned to headless callers is recursively filtered
+  through the same remote read gate as note listing, including after mutations.
+  Agent status reports opaque root ids and filtered counts, never absolute root
+  paths or the number of withheld secure references.
 - Removing an item from Main removes only its reference. It never deletes the
   underlying note or board.
 - `rotli views` and the matching MCP tools list, create, rename, delete, assign,
@@ -146,7 +150,7 @@ The agent surface is deliberately grouped and discoverable:
 ```sh
 rotli agent doctor      # read-only root, boundary, policy, and visible metrics
 rotli agent config      # copy-ready Claude/Codex commands and Codex TOML
-rotli agent self-test   # full workflow in a disposable temporary memex
+rotli agent self-test   # full workflow in a disposable temporary vault
 rotli rename "Old" "New" # rename one exact note title and its physical file
 rotli notes query 'area:projects tags:payments' # inspectable metadata filters
 rotli views list        # named reference trees (Main remains global)
@@ -163,7 +167,7 @@ appropriate during development.
 agent-visible content; it does not reveal how many secure notes were withheld.
 `agent self-test` creates notes, searches, patches, exercises stale-write and
 secret refusal, edits a board, computes metrics, and initializes MCP entirely in
-a temporary memex that is removed when the command exits. It never targets the
+a temporary vault that is removed when the command exits. It never targets the
 configured live workspace.
 
 The CLI and MCP never mutate a live workspace during automated tests. Rust tests
