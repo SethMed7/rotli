@@ -11,5 +11,6 @@
   ],
   "project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts", "scripts/**/*.{ts,mjs}", "breve-runtime/**/*.ts"],
   "ignoreBinaries": ["mktemp"],
+  "ignoreUnresolved": ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"],
   "ignoreExportsUsedInFile": true
 }
